@@ -22,8 +22,8 @@ INTENTIONAL_P0_CORRECTIONS = [
         "id": "remote-profile-default-selection",
         "paths": ["remote pull"],
         "contract": (
-            "Positional PROFILE and --profile resolve explicit membership or the in-use "
-            "manifest; -m/--material narrows, and redundant --all warns then is ignored."
+            "Positional PROFILE and --profile resolve explicit membership or the full "
+            "catalog; -m/--material narrows, and redundant --all warns then is ignored."
         ),
     },
     {

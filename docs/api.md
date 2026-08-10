@@ -27,6 +27,7 @@ not independent registries and not part of the supported API.
    pyrite.materials.CrystalSpec
    pyrite.materials.MediumSpec
    pyrite.materials.MaterialSpec
+   pyrite.materials.MaterialValidationSpec
    pyrite.materials.ScanSpec
    pyrite.materials.LayerSpec
    pyrite.materials.load_material_catalog

@@ -4631,6 +4631,21 @@ def test_remote_run_forwards_parallel_materials(monkeypatch):
 
 
 def test_remote_run_preserves_hyphenated_catalog_material(monkeypatch):
+    import pyrite.materials as materials_pkg
+
+    catalog = materials_pkg.CATALOG
+
+    class _CatalogWithComposite:
+        def __getattr__(self, name):
+            return getattr(catalog, name)
+
+        def profile_materials(self, name):
+            membership = catalog.profile_materials(name)
+            if name == "standard":
+                return (*membership, "mos2-on-sio2-si")
+            return membership
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _CatalogWithComposite())
     calls = []
     monkeypatch.setattr(
         lifecycle, "start_queue", lambda materials, **_kw: calls.append(materials) or "j"
@@ -4675,8 +4690,8 @@ def test_pull_rejects_unsafe_stem_before_sync_or_local_mutation(monkeypatch, tmp
     assert not (tmp_path / "checkpoints").exists()
 
 
-def test_sync_paths_include_all_materials_manifest():
-    assert "mats_to_sim.toml" in remote.SYNC_PATHS
+def test_sync_paths_do_not_include_retired_material_manifest():
+    assert "mats_to_sim.toml" not in remote.SYNC_PATHS
 
 
 # ---- pyrite remote check (Zhai GPU reproduction) ------------------------------

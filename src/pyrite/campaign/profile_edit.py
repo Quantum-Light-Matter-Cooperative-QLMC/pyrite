@@ -286,7 +286,7 @@ def membership_target(document, name):
     materials = target.get("materials")
     if materials is None:
         raise ValueError(
-            f"profile {name!r} has implicit all-in-use-materials membership; "
+            f"profile {name!r} has implicit all-catalog-materials membership; "
             "it already includes every material. To restrict it, use: "
             f"pyrite profile set {name} --material MATERIAL,..."
         )
@@ -311,19 +311,11 @@ def validate_materials(document, requested):
     return [key for key in known if key in requested]
 
 
-def group_materials(document, requested, *, unverified_dw, high_energy_only, allow_unknown=False):
-    """Expand membership group selectors and return catalog-ordered keys."""
+def group_materials(document, requested, *, allow_unknown=False):
+    """Validate requested membership and return catalog-ordered keys."""
     requested = list(requested)
-    if unverified_dw or high_energy_only:
-        from pyrite.runs.scan import load_manifest_groups
-
-        groups = load_manifest_groups()
-        if unverified_dw:
-            requested.extend(groups["no_verified_dw"])
-        if high_energy_only:
-            requested.extend(groups["high_energy_materials"])
     if not requested:
-        raise ValueError("provide MATERIAL keys, --unverified-dw, or --high-energy-only")
+        raise ValueError("provide MATERIAL keys")
     if allow_unknown:
         known = material_rows(document)
         requested = list(dict.fromkeys(requested))

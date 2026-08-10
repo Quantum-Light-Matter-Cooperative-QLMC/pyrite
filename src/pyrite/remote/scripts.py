@@ -7,13 +7,18 @@ import uuid
 from ..validation._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config, transport
 
+# Private compatibility classification for legacy queue records that stored a
+# high-energy floor instead of a catalog profile identity. New submissions use
+# the explicit ``high_energy`` profile and never consult this mapping.
+_LEGACY_HIGH_ENERGY_MATERIALS = frozenset({"tise2", "gep", "ges", "rese2"})
+
 
 # ---- detached job queue -------------------------------------------------------
 def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_profile="standard"):
     """Checkpoint stems a queue produces (the scan runner writes
     <material>_quick.pkl for --quick runs). ``high_energy_min_kev`` predicts the
-    non-canonical stem for any material in mats_to_sim.toml's
-    high_energy_materials list (a no-op stem-wise for every other material)."""
+    non-canonical stem for materials classified by legacy job records (a no-op
+    stem-wise for every other material)."""
     if quick:
         return [f"{m}_quick" for m in materials]
     if high_energy_min_kev is None:
@@ -26,12 +31,10 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_
             for material in materials
         ]
     from ..campaign.profiles import high_energy_floor_stem, named_profile_stem
-    from ..runs.scan import load_manifest_groups
 
-    tagged = set(load_manifest_groups(config.MATS_FILE).get("high_energy_materials", []))
     stems = []
     for material in materials:
-        if material in tagged:
+        if material in _LEGACY_HIGH_ENERGY_MATERIALS:
             stems.append(
                 high_energy_floor_stem(
                     material, high_energy_min_kev, fidelity, catalog_profile=catalog_profile

@@ -34,7 +34,6 @@ import subprocess
 import sys
 import threading
 import time
-import tomllib
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
@@ -47,8 +46,6 @@ from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
 from ..cli import dashboard as _dashboard
 from ..cli import json as cli_json
-
-MATS_FILE = Path("mats_to_sim.toml")
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.
@@ -183,65 +180,6 @@ def _dashboard_loop(args, materials, job_records, detail):
             _dashboard_stop.wait(1.0)
     finally:
         keys.stop()
-
-
-def _read_manifest_toml(path: Path):
-    try:
-        with path.open("rb") as f:
-            return tomllib.load(f)
-    except FileNotFoundError:
-        raise SystemExit(f"material manifest not found: {path}") from None
-    except tomllib.TOMLDecodeError as exc:
-        raise SystemExit(f"invalid material manifest {path}: {exc}") from None
-
-
-def _manifest_list(raw, path: Path, key: str, *, required: bool) -> list[str]:
-    materials = raw.get(key, [] if not required else None)
-    if (
-        not isinstance(materials, list)
-        or (required and not materials)
-        or not all(isinstance(material, str) and material.strip() for material in materials)
-    ):
-        raise SystemExit(
-            f"invalid material manifest {path}: expected a list of non-empty strings {key!r}"
-        )
-    duplicates = list(
-        dict.fromkeys(material for material in materials if materials.count(material) > 1)
-    )
-    if duplicates:
-        raise SystemExit(f"duplicate material(s) in {path} {key!r}: {', '.join(duplicates)}")
-    valid_materials = set(_cli_completion._material_keys())
-    unknown = [material for material in materials if material not in valid_materials]
-    if unknown:
-        raise SystemExit(f"unknown material(s) in {path} {key!r}: {', '.join(unknown)}")
-    return materials
-
-
-def load_all_materials(path: Path | None = None) -> list[str]:
-    """Read the ordered verified-material manifest group."""
-    path = MATS_FILE if path is None else path
-    raw = _read_manifest_toml(path)
-    return _manifest_list(raw, path, "materials", required=True)
-
-
-def load_manifest_groups(path: Path | None = None) -> dict[str, list[str]]:
-    """Read every material group from ``mats_to_sim.toml``.
-
-    ``materials`` is the verified/production subset (required, non-empty; goes
-    through ``load_all_materials`` so callers that monkeypatch it still take
-    effect here). ``no_verified_dw``, ``high_energy_materials``, and
-    ``materials_to_leave_out`` are optional and default to empty.
-    """
-    path = MATS_FILE if path is None else path
-    raw = _read_manifest_toml(path)
-    return {
-        "materials": load_all_materials(path),
-        "no_verified_dw": _manifest_list(raw, path, "no_verified_dw", required=False),
-        "high_energy_materials": _manifest_list(raw, path, "high_energy_materials", required=False),
-        "materials_to_leave_out": _manifest_list(
-            raw, path, "materials_to_leave_out", required=False
-        ),
-    }
 
 
 def validate_materials(materials: list[str]) -> None:
@@ -405,19 +343,18 @@ def resolve_profile_materials(catalog_profile: str, material: str | None = None)
 
     Shared boundary contract for local and remote ``cxr run``: ``-m``
     selects one profile member; omitting it selects the profile's explicit
-    ``materials`` membership, or the in-use manifest set (``mats_to_sim.toml``
-    ``materials`` -- what ``--all`` loads) when membership is implicit, e.g.
-    ``standard``. An implicit profile defaults to the campaign's in-use
-    subset, not the full catalog.
+    ``materials`` membership. A custom profile without an explicit membership
+    selects the full catalog; every shipped profile is explicit.
     """
     from ..materials import CATALOG
 
     validate_catalog_profile(catalog_profile, [], intersect=False)
     if material is not None:
+        validate_materials([material])
         materials = validate_catalog_profile(catalog_profile, [material], intersect=False)
     else:
         membership = CATALOG.profile_materials(catalog_profile)
-        materials = list(membership) if membership is not None else load_all_materials()
+        materials = list(membership) if membership is not None else list(CATALOG.material_keys)
     validate_materials(materials)
     return materials
 
@@ -624,11 +561,9 @@ def _resolved_run(args, material):
         )
     )
 
-    # High-energy-only materials (mats_to_sim.toml's high_energy_materials list,
-    # pulled in via --include-high-energy or -A) are "only worthwhile to sim for
-    # higher beam energies" -- filter their grid to the floor regardless of which
-    # flag selected them. --quick already substitutes its own fixed low-energy
-    # smoke-test grid, so the floor doesn't apply there.
+    # Legacy remote records may carry a high-energy floor. Preserve that private
+    # compatibility path while new runs express their energy range through the
+    # catalog profile, where it participates directly in dataset identity.
     floor = getattr(args, "high_energy_floor_map", None) or {}
     floor = floor.get(material)
     if floor is not None and not getattr(args, "quick", False):

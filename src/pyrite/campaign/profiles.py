@@ -456,10 +456,9 @@ def high_energy_floor_identity(
     material: str, floor_kev: float, fidelity: str = "full", *, catalog_profile: str = "standard"
 ) -> dict[str, Any]:
     """Resolve identity for a material/profile pair with its energy_keV grid
-    floored at ``floor_kev`` (mats_to_sim.toml's ``high_energy_materials``
-    convention -- see ``scan._resolved_run``). Mirrors ``named_profile_identity``
-    but for the filtered grid, so remote job orchestration (``_remote/scripts.py``
-    ``_stems``) can predict the same non-canonical stem the runner will write."""
+    floored at ``floor_kev`` for compatibility with legacy remote job records.
+    Mirrors ``named_profile_identity`` so remote orchestration can predict the
+    same non-canonical stem the runner will write."""
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 

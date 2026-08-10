@@ -82,14 +82,11 @@ def test_crystal_params_unknown_raises():
         crystal_params("unobtanium")
 
 
-def test_real_manifest_materials_are_unique_and_buildable():
-    """The shipped ``mats_to_sim.toml`` resolves to unique catalog keys, each of
-    which builds at least one case through the standard sweep path."""
-    from pyrite.runs.scan import MATS_FILE, load_all_materials
-
-    materials = load_all_materials(MATS_FILE)
-    assert materials, "manifest is empty"
-    assert len(materials) == len(set(materials)), "manifest has duplicate keys"
+def test_standard_profile_materials_are_unique_and_buildable():
+    """Every shipped standard-profile member builds through the sweep path."""
+    materials = CATALOG.profile_materials("standard")
+    assert materials, "standard profile is empty"
+    assert len(materials) == len(set(materials)), "profile has duplicate keys"
     assert all(key in CATALOG.materials for key in materials)
 
     for key in materials:
@@ -783,7 +780,22 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     # (run_sweep's default derives the name from cases[0]["crystal"]).
     import argparse
 
+    import pyrite.materials as materials_pkg
     from pyrite.runs import scan
+
+    catalog = materials_pkg.CATALOG
+
+    class _CatalogWithComposite:
+        def __getattr__(self, name):
+            return getattr(catalog, name)
+
+        def profile_materials(self, name):
+            membership = catalog.profile_materials(name)
+            if name == "standard":
+                return (*membership, "mos2-on-sio2-si")
+            return membership
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _CatalogWithComposite())
 
     seen = {}
 
@@ -824,6 +836,7 @@ def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
 
     args = argparse.Namespace(
         material="mose2",
+        catalog_profile="promising",
         workers=0,
         quick=True,
         n_families=None,
@@ -1143,6 +1156,7 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
     args = argparse.Namespace(
         material="mose2",
+        catalog_profile="promising",
         workers=0,
         quick=True,
         n_families=6,

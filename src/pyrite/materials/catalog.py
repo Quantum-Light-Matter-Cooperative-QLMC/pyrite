@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -224,6 +224,13 @@ class LayerSpec:
 
 
 @dataclass(frozen=True)
+class MaterialValidationSpec:
+    """Independent validation state attached to one material."""
+
+    crystal_database_match: Literal["verified", "unverified"] | None = None
+
+
+@dataclass(frozen=True)
 class MaterialSpec:
     """A runnable scan target."""
 
@@ -236,6 +243,7 @@ class MaterialSpec:
     scan: ScanSpec
     substrate: str | None = None
     stack: tuple[LayerSpec, ...] = ()
+    validation: MaterialValidationSpec = MaterialValidationSpec()
 
     @property
     def crystal(self) -> str:
@@ -303,7 +311,7 @@ class MaterialCatalog:
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the
-        profile has no membership row (every in-use material is allowed)."""
+        profile has no membership row (every catalog material is allowed)."""
         if name not in self.profile_names:
             raise KeyError(f"unknown profile {name!r}; have {list(self.profile_names)}")
         return self.profile_memberships.get(name)
@@ -1053,7 +1061,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
 
     Schema inversion (docs/adr/0005-energy-grid-schema-decisions.md decision 2):
     a profile carries scan defaults plus an optional ``materials`` list
-    (absent means all in-use materials) and an optional ``overrides`` table
+    (absent means all catalog materials) and an optional ``overrides`` table
     keyed by material, holding per-material deltas on the same scan keys.
     """
     table = _table(raw, "profiles", errors)
@@ -1086,9 +1094,11 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         materials_list = row.get("materials")
         if materials_list is not None and (
             not isinstance(materials_list, list)
-            or not all(isinstance(item, str) for item in materials_list)
+            or not all(isinstance(item, str) and item for item in materials_list)
         ):
-            errors.add(f"{path}.materials", "must be an array of material keys")
+            errors.add(f"{path}.materials", "must be an array of nonempty material keys")
+        elif isinstance(materials_list, list) and len(set(materials_list)) != len(materials_list):
+            errors.add(f"{path}.materials", "must not contain duplicate material keys")
         emission = row.get("emission")
         if emission is not None and emission not in _EMISSION_VALUES:
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
@@ -1272,7 +1282,7 @@ def _parse_materials(
     # store entry keyed by its resolving profile's name, or "standard".
     default_line_grids = energy_grids.get(profile_name, energy_grids.get("standard"))
 
-    allowed = {"label", "crystal", "substrate", "stack"}
+    allowed = {"label", "crystal", "substrate", "stack", "validation"}
     for key, value in table.items():
         path = f"materials.{key}"
         row = _table(value, path, errors)
@@ -1345,9 +1355,38 @@ def _parse_materials(
                         layers.append(layer)
         if substrate is not None and "stack" in row:
             errors.add(path, "cannot define both substrate and stack")
+        validation = MaterialValidationSpec()
+        validation_raw = row.get("validation")
+        if validation_raw is not None:
+            validation_row = _table(validation_raw, f"{path}.validation", errors)
+            if validation_row is not None:
+                errors.keys(
+                    validation_row,
+                    f"{path}.validation",
+                    {"crystal_database_match"},
+                )
+                crystal_database_match = validation_row.get("crystal_database_match")
+                if crystal_database_match not in {"verified", "unverified"}:
+                    errors.add(
+                        f"{path}.validation.crystal_database_match",
+                        "must be 'verified' or 'unverified'",
+                    )
+                else:
+                    validation = MaterialValidationSpec(
+                        crystal_database_match=cast(
+                            Literal["verified", "unverified"], crystal_database_match
+                        )
+                    )
         if label and crystal_key and scan is not None:
             out[key] = MaterialSpec(
-                key, label, profile_name, crystal_key, scan, substrate, tuple(layers)
+                key,
+                label,
+                profile_name,
+                crystal_key,
+                scan,
+                substrate,
+                tuple(layers),
+                validation,
             )
 
     for profile_key, profile_row in profiles.items():
@@ -1572,6 +1611,7 @@ __all__ = [
     "MaterialCatalog",
     "MaterialConfigError",
     "MaterialSpec",
+    "MaterialValidationSpec",
     "MediumSpec",
     "ScanSpec",
     "load_material_catalog",

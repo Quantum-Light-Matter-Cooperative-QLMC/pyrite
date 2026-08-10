@@ -366,7 +366,7 @@ crystal = "mos2"
 
 def _catalog_with_two_profiles(tmp_path: Path) -> Path:
     """``narrowed`` restricts membership to "mos2"; ``standard`` (no
-    ``materials`` row) allows every in-use material -- Phase 3 scan/submit
+    ``materials`` row) allows every catalog material -- Phase 3 scan/submit
     ``--profile`` intersection semantics read this membership."""
     text = _minimal_catalog(
         material_rows="""
@@ -398,6 +398,36 @@ def test_profile_names_and_memberships_are_exposed(tmp_path):
     assert catalog.profile_materials("narrowed") == ("mos2",)
     with pytest.raises(KeyError, match="unknown profile"):
         catalog.profile_materials("bogus")
+
+
+def test_packaged_profiles_have_explicit_membership():
+    from pyrite.materials import CATALOG
+
+    assert all(CATALOG.profile_materials(name) is not None for name in CATALOG.profile_names)
+    assert CATALOG.profile_materials("standard") == CATALOG.profile_materials("sub_100keV")
+    assert CATALOG.profile_materials("high_energy") == ("tise2", "gep", "ges", "rese2")
+
+
+def test_material_validation_metadata_is_typed_and_validated(tmp_path):
+    from pyrite.materials import MaterialConfigError, MaterialValidationSpec, load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample]
+label = "sample"
+crystal = "mos2"
+[materials.sample.validation]
+crystal_database_match = "unverified"
+"""
+    )
+    material = load_material_catalog(_write_catalog(tmp_path, text)).material("sample")
+    assert material.validation == MaterialValidationSpec(crystal_database_match="unverified")
+
+    invalid = text.replace(
+        'crystal_database_match = "unverified"', 'crystal_database_match = "maybe"'
+    )
+    with pytest.raises(MaterialConfigError, match="must be 'verified' or 'unverified'"):
+        load_material_catalog(_write_catalog(tmp_path, invalid))
 
 
 def _catalog_with_standard_beam(beam_block: str) -> str:
@@ -1285,6 +1315,9 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         assert actual.profile == expected["profile"]
         assert actual.crystal_key == expected["crystal_key"]
         assert actual.substrate == expected["substrate"]
+        assert actual.validation.crystal_database_match == expected.get("validation", {}).get(
+            "crystal_database_match"
+        )
         assert [
             {
                 "material": layer.material,

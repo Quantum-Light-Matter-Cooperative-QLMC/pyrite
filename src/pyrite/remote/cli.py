@@ -27,7 +27,6 @@ from ..cli._core import (
     run,
 )
 from ..cli._deprecations import DeprecatingGroup
-from ..runs.scan import load_all_materials
 from . import config, lifecycle, presentation, scripts, state, transport, viewer
 
 
@@ -124,19 +123,21 @@ def _performance_profile_name(ctx, param, value):
 
 
 def _selected_materials(args, attribute):
-    """Resolve explicit material arguments or the shared ``--all`` manifest."""
+    """Resolve explicit material arguments or standard-profile membership."""
     explicit = getattr(args, attribute)
     if args.all:
         if explicit:
             raise SystemExit(f"{args.remote_command} --all does not take material names")
-        return load_all_materials(config.MATS_FILE)
+        from ..runs.scan import resolve_profile_materials
+
+        return resolve_profile_materials("standard")
     if explicit:
         return explicit if isinstance(explicit, list) else [explicit]
     raise SystemExit(f"{args.remote_command} needs material name(s), or use --all")
 
 
 def _profile_default_materials(catalog_profile):
-    """Resolve a profile's explicit membership or implicit in-use manifest."""
+    """Resolve a profile's explicit membership or implicit full catalog."""
     from ..runs.scan import resolve_profile_materials
 
     return resolve_profile_materials(catalog_profile)
@@ -587,7 +588,7 @@ def _recompute_options(function):
         help="Recompute every record even when already at target.",
     )(function)
     function = click.option(
-        "-a", "--all", "all_", is_flag=True, help="Use every material in mats_to_sim.toml."
+        "-a", "--all", "all_", is_flag=True, help="Use every standard-profile material."
     )(function)
     return click.argument(
         "material",
@@ -711,7 +712,7 @@ def reline_command(
         "PROFILE selects the catalog campaign and its material membership; when "
         "omitted it uses the current configured profile (standard built-in). Use "
         "-m/--material to run one member only. Profiles without an explicit "
-        "membership run every in-use catalog material.\n\n"
+        "membership run every catalog material.\n\n"
         "A profile run names the job after PROFILE (NAME, then "
         "NAME-2 once a finished run holds the bare name) and refuses while "
         "another job under the same profile is live."
@@ -943,9 +944,6 @@ def start_command(
             materials=materials,
             all=False,
             actually_all=False,
-            include_unverified_dw=False,
-            include_high_energy=False,
-            high_energy_min_kev=None,
             fidelity=fidelity,
             catalog_profile=catalog_profile,
             quick=quick,
@@ -1208,8 +1206,8 @@ def reap_command(min_age_minutes, yes):
     default=None,
     metavar="NAME",
     help=(
-        "Alias for positional PROFILE. Pull its explicit members, or the in-use "
-        "manifest when membership is implicit; -m/--material narrows it."
+        "Alias for positional PROFILE. Pull its explicit members, or the full "
+        "catalog when membership is implicit; -m/--material narrows it."
     ),
 )
 @click.option(

@@ -9105,6 +9105,9 @@
       "profile": "standard",
       "crystal_key": "mose2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -9297,6 +9300,9 @@
       "profile": "standard",
       "crystal_key": "nbs2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -9393,6 +9399,9 @@
       "profile": "standard",
       "crystal_key": "nbse2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -10065,6 +10074,9 @@
       "profile": "standard",
       "crystal_key": "ptbi2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -10353,6 +10365,9 @@
       "profile": "standard",
       "crystal_key": "hfs2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -11313,6 +11328,9 @@
       "profile": "standard",
       "crystal_key": "res2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -12081,6 +12099,9 @@
       "profile": "standard",
       "crystal_key": "zrte5",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -12177,6 +12198,9 @@
       "profile": "standard",
       "crystal_key": "hfse2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {
@@ -12273,6 +12297,9 @@
       "profile": "standard",
       "crystal_key": "zrse2",
       "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
       "stack": [],
       "scan": {
         "thickness_ang": {

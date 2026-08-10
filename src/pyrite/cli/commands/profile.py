@@ -211,7 +211,7 @@ def _emit_show(payload):
     for row in payload["ranges"]:
         emit_result(f"  {row['name']}: [{_catalog_io.display(row['values'])}]")
     if payload["materials"] is None:
-        emit_result("  materials: all in-use materials (implicit)")
+        emit_result("  materials: all catalog materials (implicit)")
     else:
         emit_result(f"  materials: {', '.join(payload['materials']) or '(none)'}")
     if payload["beam_ref"] is not None:
@@ -303,7 +303,7 @@ def command():
 
     Profiles are named campaigns in ``[profiles.*]``. They own default ranges,
     electron-count grids, beam policy, detector geometry, and optional material
-    membership. An absent ``materials`` key means all in-use materials.
+    membership. An absent ``materials`` key means all catalog materials.
     Membership uses ``set|add|remove --material``; ``set --all-materials``
     restores implicit membership. Per-material
     range overrides are managed by ``pyrite material``. Energy grids are managed
@@ -471,7 +471,7 @@ def create_command(
 
     Range options replace individual cloned grids; beam and detector options
     replace individual cloned fields. Overrides and material membership are not
-    cloned. Without --material, the new profile starts with implicit all-in-use
+    cloned. Without --material, the new profile starts with implicit all-catalog
     membership and no per-material overrides. --beam NAME attaches a named
     [beams.NAME] reference and is mutually exclusive with the inline beam
     flags, which are deprecated in its favor.
@@ -549,7 +549,7 @@ def create_command(
 @click.option(
     "--all-materials",
     is_flag=True,
-    help="Restore implicit membership in every in-use material.",
+    help="Restore implicit membership in every catalog material.",
 )
 @click.option(
     "--emission",
@@ -954,12 +954,10 @@ def _csv_materials(material_csv):
     return _profile_edit.csv_materials(material_csv)
 
 
-def _group_materials(document, requested, *, unverified_dw, high_energy_only, allow_unknown=False):
+def _group_materials(document, requested, *, allow_unknown=False):
     return _profile_edit.group_materials(
         document,
         requested,
-        unverified_dw=unverified_dw,
-        high_energy_only=high_energy_only,
         allow_unknown=allow_unknown,
     )
 
@@ -987,20 +985,6 @@ def members_command():
     """Set, extend, shrink, or reset profile-owned material membership."""
 
 
-def _membership_group_options(function):
-    function = click.option(
-        "--high-energy-only",
-        is_flag=True,
-        help="Include mats_to_sim.toml's high-energy material group.",
-    )(function)
-    function = click.option(
-        "--unverified-dw",
-        is_flag=True,
-        help="Include mats_to_sim.toml's unverified-Debye-Waller material group.",
-    )(function)
-    return function
-
-
 def _member_options(function):
     function = click.option(
         "--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing."
@@ -1014,19 +998,13 @@ def _member_options(function):
 @members_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument("materials", nargs=-1, shell_complete=_cli_completion.complete_material)
-@_membership_group_options
 @_member_options
-def members_set_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
+def members_set_command(name, materials, yes, dry_run):
     """Replace NAME's explicit membership with MATERIAL keys."""
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
-        target["materials"] = _group_materials(
-            document,
-            materials,
-            unverified_dw=unverified_dw,
-            high_energy_only=high_energy_only,
-        )
+        target["materials"] = _group_materials(document, materials)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "replace material membership of", yes, dry_run)
@@ -1036,18 +1014,12 @@ def members_set_command(name, materials, unverified_dw, high_energy_only, yes, d
 @members_command.command("add")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument("materials", nargs=-1, shell_complete=_cli_completion.complete_material)
-@_membership_group_options
 @_member_options
-def members_add_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
+def members_add_command(name, materials, yes, dry_run):
     """Extend NAME's explicit membership with MATERIAL keys."""
     try:
         original, document = _catalog_io.catalog_text()
-        requested = _group_materials(
-            document,
-            materials,
-            unverified_dw=unverified_dw,
-            high_energy_only=high_energy_only,
-        )
+        requested = _group_materials(document, materials)
         added, skipped = _add_membership(document, name, requested)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -1061,19 +1033,12 @@ def members_add_command(name, materials, unverified_dw, high_energy_only, yes, d
 @members_command.command("remove")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument("materials", nargs=-1, shell_complete=_cli_completion.complete_material)
-@_membership_group_options
 @_member_options
-def members_remove_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
+def members_remove_command(name, materials, yes, dry_run):
     """Remove MATERIAL keys from NAME's explicit membership."""
     try:
         original, document = _catalog_io.catalog_text()
-        requested = _group_materials(
-            document,
-            materials,
-            unverified_dw=unverified_dw,
-            high_energy_only=high_energy_only,
-            allow_unknown=True,
-        )
+        requested = _group_materials(document, materials, allow_unknown=True)
         removed, missing = _remove_membership(document, name, requested)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -1088,7 +1053,7 @@ def members_remove_command(name, materials, unverified_dw, high_energy_only, yes
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_member_options
 def members_reset_command(name, yes, dry_run):
-    """Restore NAME's implicit all-in-use material membership."""
+    """Restore NAME's implicit all-catalog material membership."""
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -1100,7 +1065,7 @@ def members_reset_command(name, yes, dry_run):
         document,
         original,
         dry_run,
-        f"reset profile {name} membership to all in-use materials (implicit)",
+        f"reset profile {name} membership to all catalog materials (implicit)",
     )
 
 
@@ -1115,18 +1080,18 @@ command.add_command(members_command)
     "--all",
     "all_materials",
     is_flag=True,
-    help="Seed/extend membership with mats_to_sim.toml's verified `materials` list.",
+    help="Seed/extend membership with the standard profile's material list.",
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def add_material_command(name, materials, all_materials, yes, dry_run):
     """Deprecated compatibility alias for ``profile members add``.
 
-    With --all, seeds (or extends) membership with mats_to_sim.toml's verified
-    `materials` list -- the verified manifest group -- so a
+    With --all, seeds (or extends) membership with the standard profile's
+    explicit material list, so a
     profile can start from the standard list and be trimmed down with
     `pyrite profile remove-material` instead of typing every key by hand. --all
-    also seeds an implicit all-in-use profile (one with no `materials` row
+    also seeds an implicit all-catalog profile (one with no `materials` row
     yet), which plain MATERIAL args cannot do.
     """
     if not materials and not all_materials:
@@ -1137,16 +1102,20 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
         existing = target.get("materials")
         if existing is None and not all_materials:
             raise ValueError(
-                f"profile {name!r} has implicit all-in-use-materials membership; "
+                f"profile {name!r} has implicit all-catalog-materials membership; "
                 f"it already includes every material. To restrict it, use: "
                 f"pyrite profile set {name} --material MATERIAL,..."
             )
         membership = list(existing) if isinstance(existing, list) else []
         requested = list(materials)
         if all_materials:
-            from pyrite.runs.scan import load_all_materials
-
-            requested = [*requested, *load_all_materials()]
+            standard = document.get("profiles", {}).get("standard", {})
+            standard_materials = standard.get("materials")
+            if standard_materials is None:
+                standard_materials = list(_catalog_io.material_rows(document))
+            if not isinstance(standard_materials, list):
+                raise ValueError("standard profile material membership must be an array")
+            requested = [*requested, *standard_materials]
         known = _catalog_io.material_rows(document)
         unknown = [key for key in requested if key not in known]
         if unknown:

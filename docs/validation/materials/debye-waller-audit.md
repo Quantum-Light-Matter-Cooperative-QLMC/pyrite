@@ -37,10 +37,11 @@ Existing recoverable records:
 
 These remain `unverified` ledger evidence until independently reproduced.
 
-## `mats_to_sim.toml` production subset
+## Standard-profile production subset
 
-This pass is restricted to the 30 names in the file's first `materials` array.
-It excludes `high_energy_materials` and `materials_to_leave_out`.
+This pass is restricted to the 21 materials explicitly listed by
+`[profiles.standard]` in the packaged catalog. Materials in the separate
+`high_energy` profile and materials outside `standard` are excluded.
 
 ### Scalar replacements
 

@@ -17,6 +17,7 @@ def test_materials_package_exports_only_registry_conveniences():
         "CrystalSpec",
         "MediumSpec",
         "MaterialSpec",
+        "MaterialValidationSpec",
         "ScanSpec",
         "LayerSpec",
         "MaterialConfigError",

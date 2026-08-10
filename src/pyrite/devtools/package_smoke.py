@@ -81,11 +81,18 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
         "-c",
         (
             "from importlib import util; from importlib.metadata import distribution, distributions; "
+            "from pathlib import Path; "
             "import pyrite; dist = distribution('pyrite-xray'); "
             "assert dist.metadata['Name'] == 'pyrite-xray'; "
             "assert dist.version == pyrite.__version__; "
             "assert 'cxr-mc' not in {item.metadata['Name'] for item in distributions()}; "
             "assert (pyrite.DATA_DIR / 'materials.toml').is_file(); "
+            "from pyrite.materials import CATALOG; "
+            "from pyrite.runs.scan import resolve_profile_materials; "
+            "standard = CATALOG.profile_materials('standard'); "
+            "assert standard is not None and 'hopg' in standard; "
+            "assert resolve_profile_materials('standard') == list(standard); "
+            "assert not (Path.cwd() / 'mats_to_sim.toml').exists(); "
             "assert util.find_spec('cxr_mc') is not None; "
             "assert util.find_spec('pyrite_xray') is None"
         ),

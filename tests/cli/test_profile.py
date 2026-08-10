@@ -734,44 +734,15 @@ def test_remove_emission_mode_not_present_errors(tmp_path, monkeypatch):
     assert catalog.read_text() == original
 
 
-def test_member_group_selectors_expand_in_catalog_order_and_support_dry_run(tmp_path, monkeypatch):
-    from pyrite.runs import scan
-
+def test_retired_member_group_selectors_are_rejected(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
-    monkeypatch.setattr(
-        scan,
-        "load_manifest_groups",
-        lambda: {
-            "no_verified_dw": ["mose2"],
-            "high_energy_materials": ["hopg"],
-        },
-    )
-
-    set_result = invoke(
-        profile.command,
-        ["members", "set", "sub_100keV", "--unverified-dw", "hopg"],
-    )
-    assert set_result.exit_code == 0
-    assert "is deprecated" in set_result.stderr
-    assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
-
-    removed = invoke(
-        profile.command,
-        ["members", "remove", "sub_100keV", "--high-energy-only"],
-    )
-    assert removed.exit_code == 0
-    assert "is deprecated" in removed.stderr
-    assert 'materials = ["mose2"]' in catalog.read_text()
-
     original = catalog.read_text()
-    dry_run = invoke(
-        profile.command,
-        ["members", "add", "sub_100keV", "--high-energy-only", "--dry-run"],
-    )
-    assert dry_run.exit_code == 0
-    assert "is deprecated" in dry_run.stderr
-    assert 'materials = ["hopg", "mose2"]' in dry_run.stdout
-    assert catalog.read_text() == original
+
+    for flag in ("--unverified-dw", "--high-energy-only"):
+        result = invoke(profile.command, ["members", "add", "sub_100keV", flag])
+        assert result.exit_code == 2
+        assert f"No such option '{flag}'" in result.stderr
+        assert catalog.read_text() == original
 
 
 def test_member_group_selectors_require_a_selector_or_material(tmp_path, monkeypatch):
@@ -780,7 +751,7 @@ def test_member_group_selectors_require_a_selector_or_material(tmp_path, monkeyp
     result = invoke(profile.command, ["members", "set", "sub_100keV"])
 
     assert result.exit_code == 1
-    assert "provide MATERIAL keys, --unverified-dw, or --high-energy-only" in result.stderr
+    assert "provide MATERIAL keys" in result.stderr
 
 
 def test_members_reset_restores_implicit_membership(tmp_path, monkeypatch):
@@ -796,7 +767,7 @@ def test_members_reset_restores_implicit_membership(tmp_path, monkeypatch):
     section = catalog.read_text().split("[profiles.sub_100keV]", 1)[1].split("\n[", 1)[0]
     assert "materials" not in section
     assert_clean_result(shown)
-    assert "materials: all in-use materials (implicit)" in shown.stdout
+    assert "materials: all catalog materials (implicit)" in shown.stdout
 
 
 def test_set_all_materials_conflicts_with_explicit_materials(tmp_path, monkeypatch):
@@ -1029,7 +1000,7 @@ def test_membership_verbs_require_explicit_list(tmp_path, monkeypatch):
     result = invoke(profile.command, ["add", "standard", "--material", "mose2"])
 
     assert result.exit_code == 1
-    assert "implicit all-in-use-materials membership" in result.stderr
+    assert "implicit all-catalog-materials membership" in result.stderr
     assert "pyrite profile set standard --material MATERIAL" in result.stderr
 
 
@@ -1053,13 +1024,10 @@ def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
 
 
 def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
-    """--all seeds an implicit all-in-use profile straight from mats_to_sim.toml's
-    verified list -- the escape hatch `test_membership_verbs_require_explicit_list`
+    """--all seeds an implicit profile from standard-profile membership -- the
+    escape hatch `test_membership_verbs_require_explicit_list`
     otherwise requires (`pyrite profile set NAME --material KEY,...`, typed by hand)."""
-    from pyrite.runs import scan
-
     catalog = _catalog(tmp_path, monkeypatch)
-    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
 
     result = invoke(profile.command, ["add-material", "standard", "--all", "-y"])
 
@@ -1070,10 +1038,7 @@ def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
 
 
 def test_add_material_all_extends_and_skips_existing_members(tmp_path, monkeypatch):
-    from pyrite.runs import scan
-
     catalog = _catalog(tmp_path, monkeypatch)
-    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
 
     result = invoke(profile.command, ["add-material", "sub_100keV", "--all"])
 
@@ -1095,10 +1060,7 @@ def test_add_material_requires_materials_or_all(tmp_path, monkeypatch):
 
 def test_add_material_short_all_flag(tmp_path, monkeypatch):
     """-a is the short form of --all, matching the other listing options."""
-    from pyrite.runs import scan
-
     catalog = _catalog(tmp_path, monkeypatch)
-    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
 
     result = invoke(profile.command, ["add-material", "sub_100keV", "-a"])
 

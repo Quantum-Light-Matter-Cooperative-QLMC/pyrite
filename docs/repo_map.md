@@ -69,7 +69,7 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   [CLI reference](repo-design/cli/cli-reference.md).
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and
   profile-owned material membership through `profile members
-  set|add|remove|reset`. An absent membership key means all in-use materials.
+  set|add|remove|reset`. An absent membership key means all catalog materials.
 - **`pyrite material show|set MATERIAL [--profile NAME]`** → `cli.commands.material`:
   inspect effective ranges and edit per-profile material overrides. `pyrite material
   blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility
@@ -166,7 +166,7 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 ### `materials/` (package)
 Material domain package. Narrow top-level API expose immutable
 `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`,
-`CrystalSpec`, `MediumSpec`, `MaterialSpec`, `ScanSpec`, `LayerSpec`),
+`CrystalSpec`, `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`),
 `load_material_catalog`, compatibility projections (`CRYSTALS`, `MATERIALS`,
 `MATERIAL_LABELS`). Implementation helpers stay in submodules below.
 
@@ -176,7 +176,8 @@ phase-specific CIFs below packaged `data/cifs`, validate scan descriptors,
 transport support, pinned-reflection policy, stacks, then return deeply
 immutable typed records. `material_keys` preserve TOML declaration order.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`,
-  `MediumSpec`, `MaterialSpec`, `ScanSpec`, `LayerSpec`, `load_material_catalog`.
+  `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`,
+  `load_material_catalog`.
 - Deps: `materials._cif`, `materials._transport_data`, `materials._catalog_decode`,
   `DATA_DIR`.
 
@@ -394,13 +395,12 @@ next save. Shared case blobs live at
 
 ### `runs/scan.py`
 Headless sweep driver: build cases → `run_sweep` → checkpoint; owns
-`--no-cache`/`--recompute` and performance-run cache defaults, manifest and
+`--no-cache`/`--recompute` and performance-run cache defaults,
 catalog-profile resolution, and nsys re-exec. Click wiring is in
 `cli/commands/scan.py`; `scan.command` stays available via a lazy
 `__getattr__` so the Monte Carlo hot path never imports Click.
-- Public: `main`, `run`, `command` (lazy), `load_all_materials`,
-  `load_manifest_groups`, `validate_materials`, `validate_catalog_profile`,
-  `resolve_profile_materials`.
+- Public: `main`, `run`, `command` (lazy), `validate_materials`,
+  `validate_catalog_profile`, `resolve_profile_materials`.
 - Deps: `config`, `run`, `sweep`.
 
 ### `runs/blaze.py`

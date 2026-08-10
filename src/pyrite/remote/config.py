@@ -29,7 +29,6 @@ MAX_PARALLEL_MATERIALS = 4
 # the *checkout* (it tars the working tree up to the box), so it resolves paths
 # against the repo root, not its own package dir.
 LOCAL_ROOT = Path(__file__).resolve().parents[3]
-MATS_FILE = LOCAL_ROOT / "mats_to_sim.toml"
 
 # detached-job bookkeeping lives under <REMOTE_DIR>/jobs/<jobid>/ on the box
 # (gitignored there): run.sh, meta, state, log. One subdir per `start`.
@@ -51,7 +50,6 @@ SYNC_PATHS = [
     "pyproject.toml",
     "uv.lock",
     "README.md",
-    "mats_to_sim.toml",
 ]
 
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):

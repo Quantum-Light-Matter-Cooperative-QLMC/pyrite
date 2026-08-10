@@ -74,8 +74,8 @@ lint = [
 docs = [
     "sphinx>=8.2",
     "myst-parser>=4.0",
-    "furo>=2024.8.6",
     "sphinx-autobuild>=2025.8.25",
+    "pydata-sphinx-theme>=0.20.0",
 ]
 
 # Independent crystallography oracle. Validation-only; never imported by the

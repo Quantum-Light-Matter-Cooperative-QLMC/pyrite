@@ -46,6 +46,21 @@ def test_case_content_key_matches_across_profiles_for_shared_cases():
     assert any(E0 > 100.0 for _, E0 in standard) and not any(E0 > 100.0 for _, E0 in sub)
 
 
+def test_high_energy_profile_range_is_part_of_dataset_identity():
+    sweep = material_sweep("tise2", catalog_profile="high_energy")
+    identity = named_profile_identity("tise2", catalog_profile="high_energy")
+
+    np.testing.assert_array_equal(sweep.beam.energy_keV, [100.0, 150.0, 200.0, 250.0, 300.0])
+    assert identity["catalog_profile"] == "high_energy"
+    assert identity["resolved_parameters"]["sweep"]["energy_keV"] == [
+        100.0,
+        150.0,
+        200.0,
+        250.0,
+        300.0,
+    ]
+
+
 def test_case_content_key_excludes_label_perf_and_flux_scale_fields():
     case = next(iter(_cases_by_key("hopg", "standard").values()))
     base = case_content_key(case)

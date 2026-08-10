@@ -542,9 +542,8 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
     assert calls[0][1]["catalog_profile"] == "sub_100keV"
 
 
-def test_run_profile_without_membership_uses_manifest_materials(monkeypatch):
+def test_run_profile_without_membership_uses_catalog_materials(monkeypatch):
     import pyrite.materials as materials_pkg
-    import pyrite.runs.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
@@ -554,7 +553,6 @@ def test_run_profile_without_membership_uses_manifest_materials(monkeypatch):
             return None
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
-    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg"])
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -565,7 +563,7 @@ def test_run_profile_without_membership_uses_manifest_materials(monkeypatch):
     result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
 
     assert_legacy_run_result(result)
-    assert calls[0][0] == ["hopg"]
+    assert calls[0][0] == ["mose2", "hopg"]
 
 
 def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeypatch):
@@ -591,9 +589,16 @@ def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeyp
     [("--brem-only", "brem"), ("--line-only", "line")],
 )
 def test_partial_pull_all_forwards_full_material_list(monkeypatch, tmp_path, flag, dataset):
-    manifest = tmp_path / "materials.txt"
-    manifest.write_text('materials = ["hopg", "hbn", "mos2"]\n')
-    monkeypatch.setattr(remote.config, "MATS_FILE", manifest)
+    import pyrite.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard",)
+        material_keys = ("hopg", "hbn", "mos2")
+
+        def profile_materials(self, _name):
+            return self.material_keys
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
     seen = {}
     monkeypatch.setattr(
         lifecycle,
@@ -678,18 +683,17 @@ def test_stop_profile_dispatches_and_rejects_combinations(monkeypatch):
     assert "--profile" in bare.stderr
 
 
-def test_clear_implicit_profile_uses_manifest_materials(monkeypatch):
+def test_clear_implicit_profile_uses_catalog_materials(monkeypatch):
     import pyrite.materials as materials_pkg
-    import pyrite.runs.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard",)
+        material_keys = ("hopg", "hbn")
 
         def profile_materials(self, _name):
             return None
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
-    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "hbn"])
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -781,18 +785,17 @@ def test_pull_profile_qualifies_explicit_materials(monkeypatch):
     assert "drop the @PROFILE selector" in with_selector.stderr
 
 
-def test_pull_profile_without_membership_uses_manifest_materials(monkeypatch):
+def test_pull_profile_without_membership_uses_catalog_materials(monkeypatch):
     import pyrite.materials as materials_pkg
-    import pyrite.runs.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
+        material_keys = ("mose2", "hopg")
 
         def profile_materials(self, _name):
             return None
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
-    monkeypatch.setattr(scan, "load_all_materials", lambda: ["mose2", "hopg"])
     calls = []
     monkeypatch.setattr(
         lifecycle,

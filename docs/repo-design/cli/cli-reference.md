@@ -927,7 +927,7 @@ Options:
   -m, --material MATERIAL         Narrow positional PROFILE or --profile to MATERIAL;
                                   repeatable.
   --profile NAME                  Alias for positional PROFILE. Pull its explicit
-                                  members, or the in-use manifest when membership is
+                                  members, or the full catalog when membership is
                                   implicit; -m/--material narrows it.
   --hash HEXPREFIX                Pin one MATERIAL@PROFILE selector to a parameter-hash
                                   prefix.
@@ -1386,7 +1386,7 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
 
   Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
   count grids, beam policy, detector geometry, and optional material membership. An
-  absent ``materials`` key means all in-use materials. Membership uses ``set|add|remove
+  absent ``materials`` key means all catalog materials. Membership uses ``set|add|remove
   --material``; ``set --all-materials`` restores implicit membership. Per-material range
   overrides are managed by ``pyrite material``. Energy grids are managed by ``pyrite
   energy-grid``.
@@ -1466,7 +1466,7 @@ Usage: pyrite profile create [OPTIONS] NAME
 
   Range options replace individual cloned grids; beam and detector options replace
   individual cloned fields. Overrides and material membership are not cloned. Without
-  --material, the new profile starts with implicit all-in-use membership and no per-
+  --material, the new profile starts with implicit all-catalog membership and no per-
   material overrides. --beam NAME attaches a named [beams.NAME] reference and is
   mutually exclusive with the inline beam flags, which are deprecated in its favor.
 
@@ -1668,7 +1668,7 @@ Options:
                                   [0.0<x<=12.566370614359172]
   --material KEY,...              Replace explicit membership with comma-separated
                                   material keys.
-  --all-materials                 Restore implicit membership in every in-use material.
+  --all-materials                 Restore implicit membership in every catalog material.
   --emission [incoherent|coherent|both]
                                   Replace the emission policy
                                   (incoherent/coherent/both).

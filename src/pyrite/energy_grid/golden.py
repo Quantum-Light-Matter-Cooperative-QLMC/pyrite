@@ -125,6 +125,15 @@ def _serialize_material(spec) -> dict:
         "profile": spec.profile,
         "crystal_key": spec.crystal_key,
         "substrate": spec.substrate,
+        **(
+            {
+                "validation": {
+                    "crystal_database_match": spec.validation.crystal_database_match,
+                }
+            }
+            if spec.validation.crystal_database_match is not None
+            else {}
+        ),
         "stack": [
             {
                 "material": layer.material,
