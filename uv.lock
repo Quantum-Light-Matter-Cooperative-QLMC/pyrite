@@ -3309,6 +3309,7 @@ dependencies = [
     { name = "scipy" },
     { name = "tabulate" },
     { name = "tomlkit" },
+    { name = "tqdm" },
     { name = "xraydb" },
 ]
 
@@ -3398,6 +3399,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "tabulate", specifier = ">=0.10.0" },
     { name = "tomlkit", specifier = ">=0.13" },
+    { name = "tqdm", specifier = ">=4.68.2" },
     { name = "xraydb", specifier = ">=4.5.8" },
 ]
 provides-extras = ["external-db", "nvidia", "amd", "intel"]

@@ -23,6 +23,11 @@ file. Edit and drop items on `main`.
    at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`.
+2. **Energy-controlled electron transport.** Inventory the current segment
+   schema and add bounded per-flight diagnostics before selecting the controlled
+   energy-loss/hazard propagation model. →
+   `feature/energy-controlled-electron-transport`;
+   [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
 
 ## P1 - top-priority back burner
 
@@ -52,24 +57,18 @@ file. Edit and drop items on `main`.
 
 ### Gated
 
-1. **Energy-controlled electron transport.** Introduce midpoint/integrated
-   energy and time, controlled energy-loss/hazard substeps, physical-flight
-   identity, and substep-invariant PXR/CBS/bremsstrahlung coupling. Gated on the
-   correctness task and schema/convergence decisions.
-   → `feature/energy-controlled-electron-transport`;
-   [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
-2. **Reference elastic scattering data.** Replace out-of-range Browning totals
+1. **Reference elastic scattering data.** Replace out-of-range Browning totals
    in `mott` mode with provenance-controlled NIST totals and adopt DCS CDFs or a
    validated higher-moment surrogate. Gated on redistribution and model-form
    decisions. → `feature/reference-elastic-scattering-data`;
    [`agentdocs/tasks/feature/reference-elastic-scattering-data/`](agentdocs/tasks/feature/reference-elastic-scattering-data/).
-3. **Reference electron stopping data.** Package provenance-controlled
+2. **Reference electron stopping data.** Package provenance-controlled
    collisional/radiative stopping over 1--300 keV, retain Joy--Luo as an
    explicit fallback, and expose model/fallback metadata. Gated on source,
    redistribution, compound, and low-energy splice decisions.
    → `feature/reference-electron-stopping-data`;
    [`agentdocs/tasks/feature/reference-electron-stopping-data/`](agentdocs/tasks/feature/reference-electron-stopping-data/).
-4. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/physics/materials/crystal-mosaicity.md`](docs/physics/materials/crystal-mosaicity.md).
+3. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/physics/materials/crystal-mosaicity.md`](docs/physics/materials/crystal-mosaicity.md).
 5. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/physics/radiation-physics/coherent-emission.md`](docs/physics/radiation-physics/coherent-emission.md).
 
 ### Paused / on hold
