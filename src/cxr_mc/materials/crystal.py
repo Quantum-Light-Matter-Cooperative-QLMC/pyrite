@@ -386,12 +386,12 @@ def dominant_reflections(
 ):
     """
     Automatically select the strongest reflection FAMILIES of a crystal,
-    Zhai-style (their Table 5 keeps the four planes of largest |chi_g| per
+    Zhai-style (their Table 5 keeps the four planes of largest ``|chi_g|`` per
     crystal; everything weaker contributes < ~30%).
 
     Enumerates all reciprocal vectors with |g| <= g_max_invang, ranks by
         metric = |S(g)| e^{-W} / g^2
-    which is proportional to |chi_g| evaluated at each reflection's OWN line
+    which is proportional to ``|chi_g|`` evaluated at each reflection's OWN line
     energy (omega_res scales with g, and chi ~ S/omega^2). Symmetry-
     equivalent members are grouped by identical (|g|, metric) -- no explicit
     space-group code needed -- and ALL members of the top n_families are

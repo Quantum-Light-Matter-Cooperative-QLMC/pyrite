@@ -27,6 +27,7 @@ Commands:
     bootstrap  configure per-clone local git state (TODO.md merge driver)
     verify     check skills, lint, type check, and test
     cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
+    validation-ledger write or --check generated validation-ledger views
 """
 
 from __future__ import annotations
@@ -495,8 +496,14 @@ def cmd_imports(_: argparse.Namespace) -> None:
 def cmd_docs(args: argparse.Namespace) -> None:
     """Build all maintained and generated documentation from clean state."""
     from cxr_mc.devtools.docs_paths import check_doc_paths
+    from cxr_mc.devtools.validation_ledger import write_or_check
 
     check_doc_paths(ROOT)
+    ledger = ROOT / "docs" / "validation" / "physics-validation-ledger.md"
+    if not write_or_check(ledger, check=True):
+        raise RuntimeError(
+            "generated validation views are stale; run `pyrite-dev validation-ledger --write`"
+        )
     docs_dir = ROOT / "docs"
     _remove_path(docs_dir / "_autosummary")
     _remove_path(docs_dir / "_build")
@@ -546,6 +553,20 @@ def cmd_cli_deprecations(args: argparse.Namespace) -> None:
     status = main([mode, str(target)])
     if status:
         raise SystemExit(status)
+
+
+def cmd_validation_ledger(args: argparse.Namespace) -> None:
+    from cxr_mc.devtools.validation_ledger import write_or_check
+
+    ledger = ROOT / "docs" / "validation" / "physics-validation-ledger.md"
+    check = getattr(args, "check", False)
+    if not write_or_check(ledger, check=check):
+        print(
+            "generated validation views are stale; regenerate with "
+            "`pyrite-dev validation-ledger --write`",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
 
 
 def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
@@ -623,6 +644,11 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     cli_deprecations = sub.add_parser("cli-deprecations")
     cli_deprecations.add_argument("--check", action="store_true")
     cli_deprecations.set_defaults(func=cmd_cli_deprecations)
+    validation_ledger = sub.add_parser("validation-ledger")
+    validation_mode = validation_ledger.add_mutually_exclusive_group(required=True)
+    validation_mode.add_argument("--write", action="store_true")
+    validation_mode.add_argument("--check", action="store_true")
+    validation_ledger.set_defaults(func=cmd_validation_ledger)
     return ap
 
 

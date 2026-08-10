@@ -1,7 +1,7 @@
 """Sphinx configuration for the PyRITE documentation site.
 
 Lightweight by design: MyST renders the existing Markdown design notes and
-autosummary/autodoc pull the API straight from the package docstrings. Build
+autosummary/autodoc pull the curated API from package docstrings. Build
 with::
 
     uv run --group docs sphinx-build -b html docs docs/_build/html
@@ -58,7 +58,7 @@ autodoc_default_options = {
 }
 # CuPy is optional. Mock both namespaces so the docs build without a CUDA wheel
 # or GPU and importing MC modules never touches a device. ``cli.__main__``
-# executes Click on import; recursive autosummary must inspect, not run, it.
+# executes Click on import and must never run during documentation inspection.
 autodoc_mock_imports = ["cupy", "cupyx", "cxr_mc.cli.__main__"]
 
 napoleon_google_docstring = True

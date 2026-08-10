@@ -4,13 +4,17 @@ This section records the independent checks used to establish confidence in the 
 
 Validation may include comparison against analytic results, published literature, external databases or software, limiting cases, numerical convergence studies, and independent re-derivations.
 
-For a high-level view of validation coverage and current status, see the [physics validation ledger](physics-validation-ledger.md).
+Start with the generated [status summary](status-summary.md), then browse the
+[domain inventories](domain-inventories.md). The [detailed validation ledger]
+(physics-validation-ledger.md) remains the authoritative record.
 
 ```{toctree}
 :maxdepth: 1
 :caption: Validation overview
 
 physics-validation-ledger
+status-summary
+domain-inventories
 methodology
 ```
 
@@ -106,4 +110,5 @@ Individual validation documents should answer four questions wherever possible:
 
 A validation document is evidence about the implementation rather than the canonical description of the model itself. Where an associated physics reference page exists, the validation record should link to it rather than duplicate its explanation.
 
-The validation ledger provides the exhaustive project-level inventory; the groups above are intended primarily for browsing.
+The generated inventories provide exhaustive compact coverage. The groups above
+organize the detailed evidence pages; the detailed ledger owns status and notes.

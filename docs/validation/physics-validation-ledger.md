@@ -7,7 +7,9 @@ The single source of truth for **what physics PyRITE claims and whether it has b
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 99 signed-off** · 20 rederived · 6 anchored · 7 filtered · 1 blocked · 4 discrepancy.
+For current totals, use the generated [status summary](status-summary.md). For a
+short claim-by-claim view, use the generated [domain inventories](domain-inventories.md).
+The detailed rows below remain the authoritative records.
 
 ## Core coherent physics (highest risk — verify first)
 
