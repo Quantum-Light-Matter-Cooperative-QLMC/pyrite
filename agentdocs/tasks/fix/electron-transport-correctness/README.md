@@ -78,7 +78,7 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 - [x] F -- Add the review's input validation without changing valid runs.
 - [ ] G -- Prove CPU-core parity with focused statistical/deterministic tests;
       verify CUDA behavior on the configured remote GPU.
-- [ ] H -- Update physics documentation/ledger and regenerate affected golden
+- [x] H -- Update physics documentation/ledger and regenerate affected golden
       data only after the implementation and fresh-context review agree.
 
 ## Decisions and open questions
@@ -255,6 +255,26 @@ documentation/ledger closure separate.
   cores and the grooved/layered core, both spectrum entry points, explicit
   incomplete-history failures, successful count semantics, validation, and
   CUDA-source rule/code parity. CUDA runtime validation remains G.
+
+## Slice G--H closure evidence
+
+- CPU parity is green for the lockstep and per-electron cores. The focused
+  aggregate regression compares eight fixed seeds with 3,000 electrons per
+  core across backscatter/transmission fractions, segments per electron, mean
+  segment length and energy, and mean depth using a four-standard-error bound.
+  Determinism and the focused cutoff/step-limit regressions are also green.
+- Configured remote target resolution returns `qlmc`. Runtime CUDA evidence is
+  still pending: exporting this checkout with `pyrite remote sync` requires
+  explicit destination-specific approval before the remote hardware tests can
+  run. Checklist G remains open until that evidence exists.
+- Fresh-context validation independently rederived
+  `coherent-segment-midpoint-time` from Feranchuk--Spence (2000) Eqs. (8),
+  (10), and (12)--(14). Units, limits, sign, midpoint convention, and both
+  coherent reduction routes agree without discrepancy. The ledger is now
+  `rederived`; human `signed-off` remains pending.
+- No material/catalog data changed, so no catalog golden regeneration applies.
+  Generated validation inventories and status counts were regenerated from the
+  ledger.
 
 ## Delegation slices and required skills
 
