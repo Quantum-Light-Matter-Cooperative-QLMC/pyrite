@@ -76,7 +76,7 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 - [x] E -- Add explicit cutoff-stop and step-limited termination states/counts;
       raise by default when any history is incomplete.
 - [x] F -- Add the review's input validation without changing valid runs.
-- [ ] G -- Prove CPU-core parity with focused statistical/deterministic tests;
+- [x] G -- Prove CPU-core parity with focused statistical/deterministic tests;
       verify CUDA behavior on the configured remote GPU.
 - [x] H -- Update physics documentation/ledger and regenerate affected golden
       data only after the implementation and fresh-context review agree.
@@ -263,10 +263,22 @@ documentation/ledger closure separate.
   core across backscatter/transmission fractions, segments per electron, mean
   segment length and energy, and mean depth using a four-standard-error bound.
   Determinism and the focused cutoff/step-limit regressions are also green.
-- Configured remote target resolution returns `qlmc`. Runtime CUDA evidence is
-  still pending: exporting this checkout with `pyrite remote sync` requires
-  explicit destination-specific approval before the remote hardware tests can
-  run. Checklist G remains open until that evidence exists.
+- Configured remote target `qlmc` passed five bounded CUDA tests: deterministic
+  replay, first-step CPU-reference agreement, aggregate CPU/CUDA agreement,
+  exact cutoff-flight truncation/counting, and fail-closed step-limit reporting.
+  The run collected 53 tests, selected 5, and passed all 5 in 10.97 s. The new
+  cutoff endpoint tolerance is an approximately four-ulp float32 bound at
+  5 keV. No heavy sweep was run.
+- Remote evidence command used the synced checkout's source and NVIDIA extra:
+  `uv run --extra nvidia pyrite-dev test` on a temporary copy of
+  `test_transport_per_electron.py`, selecting the five CUDA tests above. The
+  temporary path made pytest omit the repository marker configuration, causing
+  12 benign unknown-marker warnings; CuPy also emitted one expected raw-kernel
+  future warning.
+- Packaging finding, outside this task: canonical `pyrite remote sync` imports
+  `remote/viewer.py`, which imports undeclared `tqdm`. The authorized sync
+  succeeded with ephemeral `uv run --with tqdm`; this task does not alter
+  dependency ownership.
 - Fresh-context validation independently rederived
   `coherent-segment-midpoint-time` from Feranchuk--Spence (2000) Eqs. (8),
   (10), and (12)--(14). Units, limits, sign, midpoint convention, and both

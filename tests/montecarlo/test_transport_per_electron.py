@@ -14,6 +14,7 @@ import pytest
 
 from pyrite.montecarlo.transport import (
     CUDA_TRANSPORT_MIN_ELECTRONS,
+    TRANSPORT_ELEMENTS,
     PerElectronTransportConfig,
     _splitmix64,
     _stream_key_scalar,
@@ -417,6 +418,59 @@ def test_cuda_matches_the_cpu_reference_in_aggregate():
         b = np.array([fn(r) for r in gpu])
         spread = np.hypot(a.std(ddof=1), b.std(ddof=1)) / np.sqrt(len(a))
         assert abs(a.mean() - b.mean()) < 4.0 * spread, name
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_cutoff_crossing_truncates_the_terminal_flight():
+    composition = [("C", 0.1136)]
+    cutoff = 5.0
+    out = simulate_trajectories(
+        5.01,
+        1,
+        1.0e8,
+        composition=composition,
+        E_cut_keV=cutoff,
+        elastic_model="sr",
+        seed=4,
+        max_steps=20,
+        transport_core="cuda",
+    )
+
+    terminal_start = out["E_keV"][-1]
+    params = TRANSPORT_ELEMENTS["C"]
+    k = 0.731 + 0.0688 * np.log10(params["Z"])
+    coeff = composition[0][1] / 0.602214076 * params["Z"]
+    stopping = (
+        7.85e-4
+        / terminal_start
+        * coeff
+        * np.log(1.166 * (terminal_start + k * params["J_keV"]) / params["J_keV"])
+    )
+    endpoint = terminal_start - stopping * out["L_ang"][-1]
+
+    # Device transport stores REAL segments in float32; this is a roughly
+    # four-ulp absolute bound at the 5 keV cutoff, not an observed-error fit.
+    assert endpoint == pytest.approx(cutoff, abs=2e-6)
+    assert out["n_cutoff_stopped"] == out["n_stopped"] == 1
+    assert out["n_step_limited"] == 0
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_step_limited_histories_raise_with_incomplete_count():
+    with pytest.raises(RuntimeError, match=r"n_step_limited=3, Ne=3, max_steps=1"):
+        simulate_trajectories(
+            30.0,
+            3,
+            1.0e8,
+            composition=[("C", 0.1136)],
+            E_cut_keV=5.0,
+            elastic_model="sr",
+            seed=2,
+            max_steps=1,
+            transport_core="cuda",
+        )
 
 
 # ---- device-resident segments -------------------------------------------------
