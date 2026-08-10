@@ -32,8 +32,7 @@ file. Edit and drop items on `main`.
    midpoint time, truncate cutoff-crossing flights, distinguish step-limited
    histories from physical stops, and tighten transport input validation across
    all CPU/CUDA cores. → `fix/electron-transport-correctness`;
-   [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/);
-   review: [`docs/electron_transport_physics_recommendations.docx`](docs/electron_transport_physics_recommendations.docx).
+   [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/).
 2. **Add support for characteristic X-rays**
 3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
@@ -168,8 +167,8 @@ Direction notes only; not prioritized backlog or active commitments.
   direction-dependent bremsstrahlung, channeling as a separate advanced model,
   secondary-electron emission, material ionization, high-energy interactions,
   electron coherence and QED effects, coherent transition radiation, and
-  transport of protons, ions, or neutrons. Near-term staging context:
-  [`docs/electron_transport_physics_recommendations.docx`](docs/electron_transport_physics_recommendations.docx).
+  transport of protons, ions, or neutrons. Near-term staging is tracked by the
+  P1 electron-transport tasks above.
 - **Complex geometry and interoperability.** Support multiple physical
   materials with arbitrary position, shape, and orientation; research
   interoperability with established simulation and PIC tools such as WarpX;

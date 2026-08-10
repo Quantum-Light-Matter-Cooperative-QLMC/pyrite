@@ -12,14 +12,16 @@ in the current 1--300 keV electron path:
 3. electrons that exhaust `max_steps` are included in `n_stopped` rather than
    reported as computationally incomplete.
 
-Source: [`docs/electron_transport_physics_recommendations.docx`](../../../../docs/electron_transport_physics_recommendations.docx), Stage 0.
+Source: Stage 0 of the August 2026 electron-transport review. The temporary
+review DOCX was retired in `fdac4ef`; this record preserves its actionable
+findings and decisions.
 
 This task owns the correctness fixes and their migration/validation surface.
 It does not introduce energy-loss substeps or replace elastic/stopping models.
 Those are separate dependent tasks.
 
 The review referred to `transport(4).py`; the current owner is
-`src/cxr_mc/montecarlo/transport.py`. The same algorithm now exists in four
+`src/pyrite/montecarlo/transport.py`. The same algorithm now exists in four
 paths, all in scope:
 
 - lockstep ungrooved CPU: `_transport_core_ungrooved`;
@@ -27,9 +29,13 @@ paths, all in scope:
 - per-electron CPU: `_transport_core_ungrooved_perelectron`; and
 - CUDA: `montecarlo/transport_jit_kernel.py`.
 
-`montecarlo/spectrum.py::mc_spectrum` and `::mc_brem_spectrum` consume the
-segment schema. `simulate_trajectories` owns validation and termination
-diagnostics.
+`montecarlo/spectrum/lines.py::mc_spectrum` and
+`montecarlo/spectrum/brem.py::mc_brem_spectrum` consume the segment schema.
+`simulate_trajectories` owns validation and termination diagnostics.
+
+Repository naming in this record follows the PyRITE migration: importable code
+lives under `src/pyrite/`, developer commands use `pyrite-dev`, and remote
+runtime checks use `pyrite remote`. Scientific CXR terminology is unchanged.
 
 ## Implementation path and likely owners
 
@@ -136,14 +142,15 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
   `run_transport_kernel`, and `make_cuda_transport_core` mirror the
   per-electron exit-code and segment-buffer contract. CUDA parity remains G and
   must use the remote GPU workflow.
-- `montecarlo/spectrum.py`: `_segments_in_layer` and `_segments_on_device`
+- `montecarlo/spectrum/lines.py`: `_segments_in_layer` and
+  `_segments_on_device`
   preserve additive keys; `mc_spectrum` (incoherent, batched coherent, streamed
   coherent, and per-reflection coherent paths) consumes `r_mid`, `v_hat`,
   `L_ang`, `E_keV`, `t_ang`, `t0_ang`, `elec_id`, and `layer`;
   `mc_brem_spectrum` consumes the same geometry/energy/length/identity subset.
   Population cutoff clipping belongs here so live and repair paths cannot
   diverge.
-- `montecarlo/runner.py`: `_transport_case`, `_brem_for_case`, and
+- `montecarlo/runner/__init__.py`: `_transport_case`, `_brem_for_case`, and
   `_transport_lines_for_case` call transport; `_lines_for_segments` and
   `_brem_wide_from_segments` select population/layer segments; and
   `_spectrum_case_impl` reduces transport diagnostics to `eta`, `hit_frac`, and
@@ -185,7 +192,7 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 
 ### Owner and test impact for B--F
 
-- B--C: `montecarlo/spectrum.py` and
+- B--C: `montecarlo/spectrum/lines.py` and
   `tests/montecarlo/test_coherent_emission.py`; cover both coherent reduction
   routes with one-flight/two-half-flight complex-field and spectrum invariance.
 - D: all four transport cores plus the spectrum cutoff adapter;
@@ -264,13 +271,13 @@ documentation/ledger closure separate.
 ## Acceptance checks
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_coherent_emission.py
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_montecarlo.py
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_transport_per_electron.py
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_groove.py
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite core
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_coherent_emission.py
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_montecarlo.py
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_transport_per_electron.py
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_groove.py
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
 ```
 
 - One physical constant-velocity flight and two numerical halves yield the

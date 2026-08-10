@@ -7,7 +7,9 @@ and radiation kinematics at the start of each physical flight. This is a
 left-endpoint rule with no convergence control; the exponential flight tail can
 produce large energy/hazard changes and coherent clock error.
 
-Source: [`docs/electron_transport_physics_recommendations.docx`](../../../../docs/electron_transport_physics_recommendations.docx), Stages 1 and 3.
+Source: Stages 1 and 3 of the August 2026 electron-transport review. The
+temporary review DOCX was retired in `fdac4ef`; this record preserves its
+actionable findings and decisions.
 
 This task introduces a controlled propagation model while keeping physical
 flights distinct from numerical energy-integration substeps. It is gated on
@@ -32,10 +34,15 @@ anisotropic bremsstrahlung.
 
 ## Implementation path and likely owners
 
-`montecarlo/transport.py` and `transport_jit_kernel.py` own propagation and the
-segment schema. `montecarlo/spectrum.py` owns representative-state CXR and
-bremsstrahlung integration. `montecarlo/runner.py`, results/checkpoint storage,
-plots, and apps are schema consumers and must be inventoried before migration.
+`src/pyrite/montecarlo/transport.py` and `transport_jit_kernel.py` own
+propagation and the segment schema. `montecarlo/spectrum/lines.py` and
+`montecarlo/spectrum/brem.py` own representative-state CXR and bremsstrahlung
+integration. `montecarlo/runner/__init__.py`, results/checkpoint storage, plots,
+and apps are schema consumers and must be inventoried before migration.
+
+Repository naming in this record follows the PyRITE migration: importable code
+lives under `src/pyrite/`, developer commands use `pyrite-dev`, and remote
+runtime checks use `pyrite remote`. Scientific CXR terminology is unchanged.
 
 Advance each material state by the minimum of physical collision distance,
 nearest physical boundary, cutoff distance, and numerical energy-loss limit.
@@ -108,10 +115,10 @@ Numerical substeps are integration detail:
 ## Acceptance checks
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite core
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 ```
 
 - Transport ranges, exit fractions, energy deposition, spectra, and coherent
@@ -122,6 +129,6 @@ UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
 - Tightening the energy tolerance does not change physical collision statistics
   beyond the documented Monte Carlo confidence interval.
 - All four execution paths implement the same accepted algorithm; CUDA evidence
-  comes from `cxr remote`, not a local heavy run.
+  comes from `pyrite remote`, not a local heavy run.
 - New physics equations and numerical claims carry validation markers, ledger
   rows, assumptions/limits, fresh-context validation, and human-only sign-off.
