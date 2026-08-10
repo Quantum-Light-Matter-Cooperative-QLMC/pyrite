@@ -7,7 +7,7 @@ back to its priority queue when paused. `Long-term plans` records unprioritized
 future direction, not committed work.
 
 Branch copies are disposable and auto-resolve to `main` on merge/rebase
-(`.gitattributes` `TODO.md merge=ours` driver — run `uv run cxr-dev bootstrap`
+(`.gitattributes` `TODO.md merge=ours` driver — run `uv run pyrite-dev bootstrap`
 once per clone). Branch detail lives in `agentdocs/tasks/<branch-name>/` (entry
 doc `README.md`); workflow and merge rules:
 [`agentdocs/README.md`](agentdocs/README.md).
@@ -23,10 +23,6 @@ file. Edit and drop items on `main`.
    at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`.
-2. **Documentation hierarchy cleanup.** Finish the Sphinx/MyST hierarchy
-   migration, repair stale links and navigation, and leave strict documentation
-   checks green. → `docs/create-hierarchy`;
-   [`agentdocs/tasks/docs/create-hierarchy/`](agentdocs/tasks/docs/create-hierarchy/).
 
 ## P1 - top-priority back burner
 
@@ -46,7 +42,7 @@ file. Edit and drop items on `main`.
    default above 1000 electrons. Round 5 ledgered the four line-path markers
    and deleted the dead `_USE_JIT_LINE_PROLOGUE` flag/module. What is left
    needs a CUDA box: one authorized remote job to exercise the ported
-   `cxr run -R --cpu`/`--cpu-only` profiler, plus hardware confirmation of the
+   `pyrite run -R --cpu`/`--cpu-only` profiler, plus hardware confirmation of the
    deferred levers (NVTX in `transport.py`, `REAL` compaction, and
    `gpu-pipeline` memory sizing; sizing itself is already fixed).
    Plan and open questions:
@@ -55,16 +51,11 @@ file. Edit and drop items on `main`.
 3. **Add support for characteristic X-rays**
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
-5. **Fix Analysis Compare loading and quality selection.** Analyze each
-   material checkpoint once for all three Compare plots, preserve persistent
-   cache reuse, and correct or accurately report the ratio plot's unexpected
-   material exclusions. → `fix/analysis-compare-loading-quality`;
-   [`agentdocs/tasks/fix/analysis-compare-loading-quality/`](agentdocs/tasks/fix/analysis-compare-loading-quality/).
-6. **Validate batched coherent line accumulation.** The implementation and
+5. **Validate batched coherent line accumulation.** The implementation and
    `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
    verification and human sign-off remain. → `feature/coherent-line-batching`;
    [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-7. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
@@ -73,20 +64,12 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
-8. **PyRITE project conversion.** Rebrand `cxr-mc` as **PyRITE** — “a Python
-   toolkit for Radiation from Interactions and Transport of Electrons” — using
-   lowercase `pyrite` for the repository; settle a collision-safe distribution,
-   import, CLI, environment/config, persisted-data, and compatibility matrix,
-   then migrate packaging, public documentation, generated references, and
-   external repository metadata after the active structure cleanup lands.
-   → `chore/pyrite-rebrand`;
-   [`agentdocs/tasks/chore/pyrite-rebrand/`](agentdocs/tasks/chore/pyrite-rebrand/).
 
 ### Gated
 
 1. **Energy-controlled electron transport.** Introduce midpoint/integrated
    energy and time, controlled energy-loss/hazard substeps, physical-flight
-   identity, and substep-invariant CXR/bremsstrahlung coupling. Gated on the
+   identity, and substep-invariant PXR/CBS/bremsstrahlung coupling. Gated on the
    correctness task and schema/convergence decisions.
    → `feature/energy-controlled-electron-transport`;
    [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
@@ -117,23 +100,12 @@ file. Edit and drop items on `main`.
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
    [`agentdocs/tasks/feature/profile-observation-angle/`](agentdocs/tasks/feature/profile-observation-angle/).
-3. **Documentation typesetting and quality gates.** Retain MyST while adding
-   semantic numbering/cross-reference rules, a representative scientific-doc
-   pilot, a first-class strict docs command, and a warning boundary that no
-   longer hides maintained-prose defects behind global `docutils` suppression.
-   → `docs/improve-typesetting-quality`;
-   [`agentdocs/tasks/docs/improve-typesetting-quality/`](agentdocs/tasks/docs/improve-typesetting-quality/).
 
 ## P3 - lower-priority / exploratory back burner
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
-3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
-4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
-5. **Tab completion latency.** Shell completion for `cxr` often takes
-   multiple seconds; likely SSH-bound remote completion timeout or
-   process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
-   [`agentdocs/tasks/feature/tab-completion-latency/`](agentdocs/tasks/feature/tab-completion-latency/).
+3. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
 
 ## Inbox - >user< to be triaged
 
@@ -152,23 +124,20 @@ file. Edit and drop items on `main`.
       `uv sync --all-groups --extra nvidia`, whereas if computer has intel gpu, then
       `uv sync --all-groups --extra intel`, etc.
       )
-5. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
+5. **Local SLURM integration.** Make `pyrite run` use the configured laptop-local
    SLURM installation (and, if available, report GPU usage statistics), if it exists.
 6. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
    This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
 
 ## CLI backlog
 
-Command-surface bugs and ergonomics folded from the retired `TODO_CLI.md`. The
-structural redesign (noun/verb ordering, artifact model, deprecation policy)
-lives in [ADR-0002](docs/adr/0002-cli-surface-redesign.md), with the current
-contract in the [CLI reference](docs/repo-design/cli/cli-reference.md), not here.
+Nothing yet.
 
 ## Bugs (fix + regression test)
 
-1. Running `cxr profile create <new_profile> --from <source_profile>` doesn't copy the
+1. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-2. Related to below: when user runs `cxr run <profile>`, but energy-grid bounds have
+2. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
    not been derived for that case:
    1. Give them a suggestion on what to run. We could also add a flag that automatically runs
       the derivation for their energy + mat before running their actual profile.
@@ -178,7 +147,7 @@ contract in the [CLI reference](docs/repo-design/cli/cli-reference.md), not here
 
 ### Ergonomics (ship anytime)
 
-1. `cxr` with no args should print help, like `-h/--help`.
+Nothing yet.
 
 ## Notebook backlog
 
@@ -191,8 +160,8 @@ contract in the [CLI reference](docs/repo-design/cli/cli-reference.md), not here
 
 1. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard Performance Profile for MoS2" [progress bar + absolute progress]`.
-2. Golden data should be an optional installable, e.g. `uv add cxr-mc[golden]`
-   or part of `uv add cxr-mc[all]`. Same with validation scripts/app -- not
+2. Golden data should be an optional installable, e.g. `uv add pyrite[golden]`
+   or part of `uv add pyrite[all]`. Same with validation scripts/app -- not
    critically required.
 3. Clarify that: 'gc' stands for garbage collection, rm stands for 'remove'.
    the `gc` help message could be a little more detailed, as well. functionality
@@ -207,7 +176,7 @@ Direction notes only; not prioritized backlog or active commitments.
 - **Workflow TUI.** Explore a dedicated interface, likely using Textual, for
   navigating checkpoints, running commands and sweeps, editing profiles, and
   extending the progress dashboard.
-- **Broader physics scope.** Generalize beyond CXR with optional physics across
+- **Broader physics scope.** Generalize beyond PXR/coherent brem with optional physics across
   wider energy regimes. Possible directions include electron energy-loss
   straggling and explicit hard inelastic events, consistent radiative stopping,
   direction-dependent bremsstrahlung, channeling as a separate advanced model,
