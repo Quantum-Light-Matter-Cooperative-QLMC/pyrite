@@ -263,6 +263,7 @@ def _nsys_reexec_command(
     fidelity,
     quick,
     n_families,
+    max_minutes=None,
     no_cache=False,
     recompute=False,
 ):
@@ -304,6 +305,8 @@ def _nsys_reexec_command(
         child += ["--quick"]
     if n_families is not None:
         child += ["--n-families", str(n_families)]
+    if max_minutes is not None:
+        child += ["--max-minutes", f"{max_minutes:g}"]
     if no_cache:
         child += ["--no-cache"]
     elif recompute:

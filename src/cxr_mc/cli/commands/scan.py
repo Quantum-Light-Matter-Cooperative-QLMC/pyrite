@@ -449,6 +449,7 @@ def command(
             fidelity=fidelity,
             quick=quick,
             n_families=n_families,
+            max_minutes=max_minutes,
             no_cache=no_cache,
             recompute=recompute,
         )

@@ -211,6 +211,7 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
         fidelity="survey",
         quick=False,
         n_families=None,
+        max_minutes=1.5,
     )
 
     assert argv[0] == "nsys" and argv[1] == "profile"
@@ -219,6 +220,7 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
     assert "--nsys" not in argv  # child must not recurse
     assert "--performance-profile" in argv and "sub_100keV" in argv
     assert "--perf-interval" in argv and "2" in argv
+    assert "--max-minutes" in argv and "1.5" in argv
     # isolated, always-uncached checkpoint dir so the trace covers real work
     assert "--checkpoint-dir" in argv
     assert "performance-profiles/sub_100keV/nsys-checkpoints/hopg" in argv

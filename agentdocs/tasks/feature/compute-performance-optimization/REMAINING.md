@@ -182,8 +182,8 @@ All measured, all deliberately not taken. Sizes are from Round 4 on `qlmc`
 | lever | size | why deferred | needs GPU |
 | --- | --- | --- | --- |
 | NVTX ranges in `transport.py` | diagnostic only | none — it is just unwritten; the round-1 method doc *claims* `cxr.transport.line`/`.brem` exist and they do not | no to write, yes to use |
-| Host-side remainder of the transport driver (scratch alloc, mask construction, output assembly) | 38% of hopg wall, 52% of MoSe2 | unattributed — this is exactly what the NVTX ranges above would resolve, so it is gated on them | yes |
-| Compact resident segments to `REAL` at the join | ~halves 509 MB held / 1176 MB peak pool | changes the dtype the function documents | yes |
+| Host-side remainder of the transport driver (scratch alloc, mask construction, output assembly) | **Measured locally 2026-08-10.** At `Ne=8000`, `.join` was 1.33 ms hopg / 1.46 ms MoSe2 and `.compact` 12.76 / 19.64 ms; `.capsync` dominated at 28.51 / 240.64 ms | attributed on ALEX-DESKTOP; larger `qlmc` workload remains useful only for cross-machine scaling | yes |
+| Compact resident segments to `REAL` at the join | ~halves 509 MB held / 1176 MB peak pool | **Not justified for throughput by the local trace:** `.join` was 2.3% / 0.5% of transport-core wall for hopg / MoSe2. Memory-only motivation remains, with the documented dtype/API cost | yes |
 | `gpu-pipeline` memory sizing | pipeline arm drove `qlmc` to 50.3 GB RSS + 12.9 GB swap on a 45 GB box | **Done 2026-08-09** (taken first, out of sequence): `_usable_cpus()` reads the affinity mask / `SLURM_CPUS_PER_TASK` / cgroup quota instead of `os.cpu_count()`, and sizing now budgets *slots* — worker payloads and in-flight driver payloads alike — so `2*nw + 2` residencies fit the host budget. Confirmation on hardware still owed | to confirm |
 | `numba.prange` over the per-electron core | starts from a 0.27-1.05x deficit vs lockstep | needs more than two cores just to break even | no |
 | Grooved transport on the CUDA core | grooved runs stay on lockstep | scope | yes |
@@ -226,3 +226,24 @@ workload for confirming it — the model predicts 4 workers and 6 in flight on a
 4. Is any of W4 wanted now, or does the task close with Round 4 and leave the
    levers in the round doc's "Still open"? The plan is written (round doc,
    "Round 5"); levers 1-4 all need `qlmc`.
+
+## Local ALEX-DESKTOP evidence (2026-08-10)
+
+The first W4 gate is now exercised on the user's home desktop: Ryzen 9 5900X,
+22.9 GiB RAM, RTX 3060 Ti 8 GiB, NVIDIA driver 610.43.02 / CUDA runtime 13.2,
+CuPy 14.1.1, Nsight Systems 2026.4.1. One warmed, uncached case per material used
+the `promising_low_ne` grids with `Ne=8000`, `Ne_brem=150`, seed 75001, 30 keV,
+1e4 A, polar tilt 45 degrees, azimuth 140 degrees, CUDA transport, resident
+segments, and `REAL=float32`. The arms differed only by material.
+
+| material | segments | unprofiled wall, five reps | `.core` | `.capsync` | `.compact` | `.join` | pool high-water |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| hopg | 373,949 | median 64.33 ms (63.09-89.19) | 58.23 ms | 28.51 ms | 12.76 ms | 1.33 ms | 375 MiB |
+| MoSe2 | 3,495,865 | median 740.46 ms (711.59-748.68) | 290.75 ms | 240.64 ms | 19.64 ms | 1.46 ms | 1,203 MiB |
+
+Nsight adds overhead, so stage numbers explain the trace and are not compared
+to the unprofiled wall as a speed ratio. `.join` is only 2.3% of hopg and 0.5%
+of MoSe2 transport-core wall; the gate for dtype-changing `REAL` compaction is
+not met on throughput. `.compact` is visible but is not the join-time dtype
+conversion proposed by that lever. No OOM occurred. Raw local artifacts are in
+`/tmp/pyrite-local-bench-20260810/` and intentionally untracked.

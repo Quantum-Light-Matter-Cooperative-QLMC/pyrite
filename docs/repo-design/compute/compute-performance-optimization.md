@@ -695,6 +695,26 @@ Sequenced, because two of them are gated on the first:
 The missing MoSe2 pipeline arm stays deferred until (3) is confirmed on hardware,
 and should be rerun only with an explicit memory cap on a box that is not shared.
 
+#### Local ALEX-DESKTOP NVTX result (2026-08-10)
+
+The first gate was exercised locally on the RTX 3060 Ti desktop with Nsight
+Systems 2026.4.1. Matched warmed cases used `Ne=8000`, `Ne_brem=150`, seed
+75001, 30 keV, 1e4 A, 45 degree polar tilt, 140 degree azimuth, the
+`promising_low_ne` grids, CUDA transport, resident segments, and
+`REAL=float32`. Hopg produced 373,949 segments and MoSe2 3,495,865.
+
+| material | unprofiled wall, five reps | transport `.core` | `.capsync` | `.compact` | `.join` | CuPy pool high-water |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| hopg | median 64.33 ms (63.09-89.19) | 58.23 ms | 28.51 ms | 12.76 ms | 1.33 ms | 375 MiB |
+| MoSe2 | median 740.46 ms (711.59-748.68) | 290.75 ms | 240.64 ms | 19.64 ms | 1.46 ms | 1,203 MiB |
+
+The profiled and unprofiled columns are deliberately not divided: Nsight adds
+overhead. Within the trace, `.join` is 2.3% of hopg and 0.5% of MoSe2
+transport-core wall. The throughput gate for changing the documented resident
+segment dtype to `REAL` is therefore not met; its remaining argument is memory
+capacity on larger cases, not measured join cost. `.capsync`, where the CUDA
+transport kernel completes, is the dominant MoSe2 stage. No OOM occurred.
+
 ### The `gpu-pipeline` host-memory fix
 
 Two independent defects, neither of them fixed by Round 4's flip.
