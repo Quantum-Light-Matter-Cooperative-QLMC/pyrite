@@ -13,26 +13,26 @@
 
 For a unit-cell structure factor
 
-\[
+```{math}
 S_{\mathbf g}=\sum_j f_j(\mathbf g,E)
   \exp(i\mathbf g\cdot\mathbf r_j)\exp(-W_j),
-\]
+```
 
 the Fourier component of the electron number density is
 `S_g / V_cell`. In Gaussian units the driven-electron response gives
 
-\[
+```{math}
 \chi_{\mathbf g}
 =-\frac{4\pi e^2}{m\omega^2}\frac{S_{\mathbf g}}{V_{cell}}.
-\]
+```
 
 Using `r_e=e^2/(mc^2)`, `k=omega/c=2 pi/lambda`,
 
-\[
+```{math}
 \chi_{\mathbf g}
 =-\frac{4\pi r_e}{k^2V_{cell}}S_{\mathbf g}
 =-\frac{r_e\lambda^2}{\pi V_{cell}}S_{\mathbf g}.
-\]
+```
 
 No extra factor of `2`, `pi`, or unit-cell multiplicity remains when `S_g`
 is the full unit-cell sum. A complex anomalous structure factor is allowed;
