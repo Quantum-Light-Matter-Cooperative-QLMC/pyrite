@@ -3301,6 +3301,7 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "crystals" },
+    { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "platformdirs" },
@@ -3389,6 +3390,7 @@ requires-dist = [
     { name = "dpctl", marker = "extra == 'intel'", specifier = ">=0.22.1" },
     { name = "dpnp", marker = "extra == 'intel'", specifier = ">=0.20.0" },
     { name = "mp-api", marker = "extra == 'external-db'", specifier = ">=0.46" },
+    { name = "numba", specifier = ">=0.66.0" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "pandas", specifier = ">=3.0.3" },
     { name = "platformdirs", specifier = ">=4.9" },
