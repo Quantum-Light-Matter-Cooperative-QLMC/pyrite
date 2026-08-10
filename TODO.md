@@ -16,13 +16,17 @@ file. Edit and drop items on `main`.
 
 ## Active
 
-1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
    The four incoherent-line-path markers are now ledgered (`line-hkl-batch`,
    `line-amplitude-fusion`, `line-gemv-elementwise` `filtered`;
    `line-absorption-tabulation` a `discrepancy` — tabulated `μ` off `2.72e-01`
    at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`.
+2. **Documentation hierarchy cleanup.** Finish the Sphinx/MyST hierarchy
+   migration, repair stale links and navigation, and leave strict documentation
+   checks green. → `docs/create-hierarchy`;
+   [`agentdocs/tasks/docs/create-hierarchy/`](agentdocs/tasks/docs/create-hierarchy/).
 
 ## P1 - top-priority back burner
 
@@ -36,7 +40,7 @@ file. Edit and drop items on `main`.
    review: [`docs/electron_transport_physics_recommendations.docx`](docs/electron_transport_physics_recommendations.docx).
 2. **Compute performance optimization — remainder.** Rounds 1-4 landed on `main`
    (see
-   [`docs/compute-performance-optimization.md`](docs/compute-performance-optimization.md));
+   [`docs/repo-design/compute/compute-performance-optimization.md`](docs/repo-design/compute/compute-performance-optimization.md));
    the MoSe2 `--ne-line=20000` report is closed as compute-bound transport plus a
    one-time pipeline-fill transient, and the CUDA transport core is now the
    default above 1000 electrons. Round 5 ledgered the four line-path markers
@@ -50,7 +54,7 @@ file. Edit and drop items on `main`.
    [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
 3. **Add support for characteristic X-rays**
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
-   factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+   factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
 5. **Fix Analysis Compare loading and quality selection.** Analyze each
    material checkpoint once for all three Compare plots, preserve persistent
    cache reuse, and correct or accurately report the ratio plot's unexpected
@@ -97,8 +101,8 @@ file. Edit and drop items on `main`.
    redistribution, compound, and low-energy splice decisions.
    → `feature/reference-electron-stopping-data`;
    [`agentdocs/tasks/feature/reference-electron-stopping-data/`](agentdocs/tasks/feature/reference-electron-stopping-data/).
-4. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-5. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
+4. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/physics/materials/crystal-mosaicity.md`](docs/physics/materials/crystal-mosaicity.md).
+5. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/physics/radiation-physics/coherent-emission.md`](docs/physics/radiation-physics/coherent-emission.md).
 
 ### Paused / on hold
 
@@ -107,7 +111,7 @@ file. Edit and drop items on `main`.
 
 ## P2 - medium-priority back burner
 
-1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/physics/detectors/grazing-grating.md`](docs/physics/detectors/grazing-grating.md).
 2. **Detector profiles and Zhai validation modernization.** Add profile-owned
    detector geometry with a 90 degree standard default, then route maintained
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
@@ -123,7 +127,7 @@ file. Edit and drop items on `main`.
 ## P3 - lower-priority / exploratory back burner
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
-2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/physics/detectors/grazing-grating.md`](docs/physics/detectors/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
 5. **Tab completion latency.** Shell completion for `cxr` often takes
@@ -157,8 +161,8 @@ file. Edit and drop items on `main`.
 
 Command-surface bugs and ergonomics folded from the retired `TODO_CLI.md`. The
 structural redesign (noun/verb ordering, artifact model, deprecation policy)
-lives in [`docs/cli-redesign-rfc.md`](docs/cli-redesign-rfc.md) and its sub-RFCs,
-not here.
+lives in [ADR-0002](docs/adr/0002-cli-surface-redesign.md), with the current
+contract in the [CLI reference](docs/repo-design/cli/cli-reference.md), not here.
 
 ## Bugs (fix + regression test)
 
