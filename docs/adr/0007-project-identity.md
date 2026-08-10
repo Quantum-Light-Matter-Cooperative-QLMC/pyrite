@@ -1,46 +1,26 @@
-# 0007 — PyRITE project identity
+# 0007 — PyRITE project identity and compatibility
 
 - **Status:** Accepted — 2026-08-09
 - **Date:** 2026-08-09
-- **Rationale:** [`docs/project-identity-rfc.md`](../project-identity-rfc.md)
 
 ## Context
 
-The old `cxr-mc` identity is narrower than the project's radiation,
-electron-transport, detector, materials, analysis, and validation scope. Its
-distribution, import, commands, environment, paths, and persisted protocols
-cannot be renamed safely as one text substitution.
+The `cxr-mc` name no longer reflects the project's broader scope across radiation, electron transport, materials, detectors, analysis, and validation. However, the old identity also appears in public Python imports, commands, environment variables, persisted data, wire protocols, workspaces, and scientific terminology, so a global rename would create unnecessary compatibility breakage.
 
 ## Decision
 
-- Display **PyRITE**, expanded as **a Python toolkit for Radiation from
-  Interactions and Transport of Electrons**, with the tagline **Coherent X-ray
-  radiation and electron transport in crystals.**
-- Use `pyrite` for the repository and user CLI, `pyrite-dev` for contributor
-  tooling, and `pyrite-xray` for the distribution.
-- Keep `cxr_mc` as the canonical public import and pickle namespace; do not add
-  `pyrite` or `pyrite_xray` import facades.
-- Keep `cxr` and `cxr-dev` as installed compatibility executables through at
-  least 0.4.0 when the canonical commands are introduced in 0.2.0. Normal
-  invocation warns; completion-mode invocation stays silent.
-- Make `PYRITE_*` environment names canonical while retaining corresponding
-  `CXR_*` aliases without a scheduled removal. Resolve per-call > `PYRITE_*` >
-  `CXR_*` > canonical store > legacy-store fallback > built-in.
-- Move mutable application state to Click's app directory named `pyrite` using
-  canonical-first reads, legacy fallback, and atomic copy-on-first-write. Use
-  `platformdirs` with app name `pyrite` for cache/data paths. Do not move
-  workspaces automatically.
-- Keep existing `cxr.*`, `cxr.lock.json`, remote-frame, checkpoint, manifest,
-  cache, and pickle identifiers as stable protocols. New schema families use
-  `pyrite.*`.
-- Name new release displays/artifacts for PyRITE, while leaving prior artifacts
-  immutable. Do not publish or rename external resources until authenticated
-  owners confirm availability and authority.
+The visible project identity is **PyRITE**, expanded as **a Python toolkit for Radiation from Interactions and Transport of Electrons**, with the tagline **Coherent X-ray radiation and electron transport in crystals.**
+
+Use `pyrite` for the repository and user command, `pyrite-dev` for contributor tooling, and `pyrite-xray` for the Python distribution. Keep `cxr_mc` indefinitely as the canonical public import and pickle namespace.
+
+`PYRITE_*` environment variables and `pyrite` application-state locations become canonical while corresponding legacy `CXR_*` names and state remain readable according to the project's compatibility rules. Existing user workspaces are not renamed automatically.
+
+Existing persisted `cxr.*`, `cxr.lock.json`, remote-frame, checkpoint, manifest, cache, and related protocol identifiers remain stable; new schema families use `pyrite.*`. Historical uses of `cxr-mc` and scientific uses of CXR/PXR terminology are not rewritten merely for branding.
+
+The `cxr` and `cxr-dev` executables remain compatibility aliases through their defined deprecation window. External repository or package-name changes require authenticated confirmation before execution.
 
 ## Consequences
 
-Brand, install name, import name, and protocol prefixes intentionally differ.
-Later implementation must test both canonical and retained compatibility
-surfaces. The old GitHub name remains reserved for redirects, and current
-private-repository visibility means the proposed repository name still needs
-credentialed confirmation.
+Brand, distribution, import, command, environment, and protocol identities intentionally do not all share one spelling. This avoids a costly Python namespace and persisted-data migration while providing a consistent new public identity.
+
+Compatibility beh

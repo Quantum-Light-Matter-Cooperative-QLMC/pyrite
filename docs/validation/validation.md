@@ -34,20 +34,19 @@ or human sign-off.
 
 ## Status lifecycle
 
-```
+```{}
 unverified → filtered → rederived → anchored → signed-off
                   ↓          ↓          ↓
                        discrepancy  (any failed check — tracked loudly)
 ```
 
-
 | status        | meaning                                                                                            |
-| --------------- | ---------------------------------------------------------------------------------------------------- |
+| ------------- | -------------------------------------------------------------------------------------------------- |
 | `unverified`  | ledgered, nothing checked yet                                                                      |
 | `filtered`    | units + limiting cases + sign/convention checks pass                                               |
 | `rederived`   | an independent fresh-context derivation matches the implementation                                 |
 | `anchored`    | a regression test pins it to a reference value, green in CI                                        |
-| `signed-off`  | **a human** read the source and the diff and certified it — the only state that gates publication |
+| `signed-off`  | **a human** read the source and the diff and certified it — the only state that gates publication  |
 | `discrepancy` | a check failed; under investigation                                                                |
 
 ## Workflow

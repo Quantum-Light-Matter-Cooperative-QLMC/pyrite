@@ -1,34 +1,24 @@
 # 0004 — Package & repository structure
 
-- **Status:** Accepted — 2026-08-01 (P4/P5 superseded by ADR-0006)
+- **Status:** Accepted — 2026-08-01 (document-location details partly superseded by ADR-0006)
 - **Date:** 2026-08-01
-- **Rationale:** [`docs/package-structure-rfc.md`](../package-structure-rfc.md)
 
 ## Context
 
-Command implementations live in two homes; one concept (energy-grid) has three
-module names; recompute/prune modules overlap; docs mixed durable reference with
-ephemeral plans; multiple TODO surfaces bypassed the `TODO.md merge=ours` driver.
+Repository structure had drifted outside the well-factored physics packages: command implementations lived in multiple locations, the energy-grid concept had inconsistent module names, recompute and cleanup behavior was spread across overlapping modules, and durable documentation was mixed with temporary planning material. Project decisions and backlog ownership were similarly fragmented.
+
+This made subsequent CLI and repository work harder because there was no predictable ownership rule for command code, project records, or several cross-cutting implementation concerns.
 
 ## Decision
 
-- **P4 (accepted, landed 2026-08-01):** split docs by lifetime — `docs/plans/`
-  for tracked-ephemeral plans/handoffs, `docs/adr/` for this log; durable
-  reference stays in `docs/` root.
-- **P5 (accepted, landed 2026-08-01):** fold `TODO_CLI.md` / `TODO_UI.md` into
-  `TODO.md` `## CLI backlog` / `## UI backlog`, so the single
-  merge-driver-protected file is the only backlog on `main`.
-- **P1–P3 (accepted, landed 2026-08-09):** command wiring is under
-  `src/cxr_mc/cli/commands/`, the energy-grid package matches its surface term,
-  and recompute/cleanup implementations are grouped under their domain owners.
+Command-line wiring belongs under `src/cxr_mc/cli/`, with reusable behavior remaining under its domain owner. Implementation names should follow canonical project terminology, including consolidation around `energy-grid`, and related recompute/cleanup behavior should be grouped under the packages that own it.
+
+Top-level implementation modules may be grouped into responsibility-oriented packages such as `checkpoints/`, `campaign/`, `runs/`, `apps/`, `validation/`, `perf/`, and `remote/`, while compatibility re-exports preserve supported former paths.
+
+Durable project documentation belongs under `docs/`, and architectural decisions are recorded as numbered ADRs. `TODO.md` is the single backlog authority on `main`. The original location policy for temporary agent work was subsequently superseded by [ADR-0006](0006-consolidate-agent-work-records.md).
 
 ## Consequences
 
-Document-location consequences below are historical and superseded by
-[ADR-0006](0006-consolidate-agent-work-records.md), which consolidates tracked
-agent work under `agentdocs/`.
+The repository has clearer ownership boundaries and a predictable home for command wiring, implementation domains, documentation, decisions, and backlog state. Structural refactors can be made without implying changes to the public CLI, Python API, or numerical/physics behavior.
 
-- Untracked agent scratch renamed `claudedocs/` → `agentdocs/` (agent-neutral;
-  the tree already standardizes on `AGENTS.md`).
-- `docs/plans/` and `docs/adr/` are excluded from the Sphinx site (dev-facing).
-- P1–P3 landed with compatibility re-exports for former module paths.
+Some former paths must remain as compatibility re-exports or follow explicit deprecation processes. This decision does not authorize changes to the established physics-package layout or removal of public interfaces.

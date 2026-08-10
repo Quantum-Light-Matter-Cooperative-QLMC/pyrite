@@ -1,0 +1,106 @@
+# Physics validation
+
+This section records the independent checks used to establish confidence in the physical models and numerical implementations used by Pyrite.
+
+Validation may include comparison against analytic results, published literature, external databases or software, limiting cases, numerical convergence studies, and independent re-derivations.
+
+For a high-level view of validation coverage and current status, see the [physics validation ledger](physics-validation-ledger.md).
+
+```{toctree}
+:maxdepth: 1
+:caption: Validation overview
+
+physics-validation-ledger
+validation
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Atomic physics
+
+atomic-physics/atomic-form-factor
+atomic-physics/structure-factor
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Beam physics and electron transport
+
+beam-transport/beam-energy-spread-injection
+beam-transport/beam-phase-space-injection
+beam-transport/beam-phase-space-metrics
+beam-transport/longitudinal-bunch-sampling
+beam-transport/longitudinal-target-timing
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Radiation physics
+
+radiation-physics/absorption-length
+radiation-physics/brem-spectrum
+radiation-physics/cbs-amplitude
+radiation-physics/coherent-emission
+radiation-physics/coherent-segment-midpoint-time
+radiation-physics/external-brem-subtraction
+radiation-physics/finite-time-lineshape
+radiation-physics/line-energy-dispersion
+radiation-physics/pxr-amplitude
+radiation-physics/self-absorption
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Materials and crystallography
+
+materials/2h-tas2-debye-waller-002
+materials/2ha-niobium-dichalcogenides
+materials/hbn-structure
+materials/hfs2-structure
+materials/mosaic-analytic
+materials/mosaic-mc
+materials/oriented-v2o5-tis2
+materials/pdte2-debye-waller-001
+materials/surface-hkl-orientation
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Geometry
+
+geometry/blazed-groove-geometry
+geometry/finite-beam-size
+geometry/finite-transverse-crystal
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Detectors and optics
+
+detectors/alexs-charge-diffusion
+detectors/alexs-qe-absorption
+detectors/detector-eaglexo
+detectors/detector-line-broadening
+detectors/grazing-beam-projection
+detectors/grazing-reflectivity
+```
+
+```{toctree}
+:maxdepth: 1
+:caption: Literature cross-checks
+
+literature-ref/zhai-supplementary
+```
+
+## Reading the validation record
+
+Individual validation documents should answer four questions wherever possible:
+
+1. **What is being validated?**
+2. **What independent reference or derivation is used?**
+3. **What constitutes acceptable agreement?**
+4. **What was the result?**
+
+A validation document is evidence about the implementation rather than the canonical description of the model itself. Where an associated physics reference page exists, the validation record should link to it rather than duplicate its explanation.
+
+The validation ledger provides the exhaustive project-level inventory; the groups above are intended primarily for browsing.
