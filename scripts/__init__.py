@@ -1,1 +1,1 @@
-"""Importable repository maintenance tools used by ``cxr-dev``."""
+"""Importable repository maintenance tools used by ``pyrite-dev``."""

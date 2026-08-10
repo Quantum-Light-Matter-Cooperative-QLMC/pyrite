@@ -8,7 +8,7 @@ diffs the local catalog against.
 
 Usage::
 
-    UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/refresh_external_cif.py
+    UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run python scripts/refresh_external_cif.py
 
 Requires network access. Run whenever a ``cod_id`` / ``mp_id`` is added or an
 external record is known to have changed; commit the refreshed JSON.

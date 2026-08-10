@@ -1,4 +1,4 @@
-"""``cxr`` Click command-line entry point."""
+"""PyRITE Click command-line entry point."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ _COMMAND_HELP = {
     "setup": "Detect GPU hardware and write PYRITE_MC_BACKEND to .env (first run).",
     "app": "Launch or export interactive analysis notebooks.",
     "checkpoint": "Inspect, transform, recompute, archive, and reclaim checkpoints.",
-    "completion": "Manage cxr shell tab-completion.",
+    "completion": "Manage PyRITE shell tab-completion.",
     "config": "Set and inspect current profile and remote-target defaults.",
     "performance": "List, analyze, or delete compute-performance artifacts.",
     "slim": "Shrink a checkpoint for transfer.",
@@ -59,7 +59,7 @@ _COMMAND_HELP = {
     "profile": "Manage named catalog campaigns and material membership.",
     "material": "Inspect, validate, edit, and blaze individual materials.",
     "beam": "Manage named beams, attachable to profiles by name.",
-    "prune": "Retired spelling of `cxr checkpoint gc`.",
+    "prune": "Retired spelling of `pyrite checkpoint gc`.",
     "check": "Launch validation or export cached validation figures.",
     "check-config": "Validate a material catalog without starting simulation.",
 }
@@ -94,17 +94,17 @@ def command() -> None:
     material membership. Then run campaigns, inspect checkpoints, or open analysis
     notebooks.
 
-    Run ``cxr COMMAND --help`` for command options, units, defaults, and side
+    Run ``pyrite COMMAND --help`` for command options, units, defaults, and side
     effects.
 
     \b
     Examples:
-      cxr setup
-      cxr profile list
-      cxr profile show sub_100keV
-      cxr run sub_100keV -m hopg
-      cxr run sub_100keV --remote --dry-run
-      cxr app analysis launch
+      pyrite setup
+      pyrite profile list
+      pyrite profile show sub_100keV
+      pyrite run sub_100keV -m hopg
+      pyrite run sub_100keV --remote --dry-run
+      pyrite app analysis launch
     """
 
 

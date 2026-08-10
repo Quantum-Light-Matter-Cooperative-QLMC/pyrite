@@ -1,12 +1,13 @@
-# cxr-mc
+# PyRITE
 
-Coherent X-ray radiation — parametric X-ray radiation (PXR) plus coherent
-bremsstrahlung — from table-top electron beams in crystals.
+**a Python toolkit for Radiation from Interactions and Transport of Electrons**
+
+Coherent X-ray radiation and electron transport in crystals.
 
 This site renders current CLI and API references, user guides, and validation
 records. For the scientific overview, installation,
 materials, detectors, and validation story, see the
-[project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc#readme).
+[project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme).
 
 ```{toctree}
 :caption: Guides

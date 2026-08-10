@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use when /triage is invoked with optional task-description text or user-marked backlog prose must become reviewable, tracked cxr-mc agent task records, task branches/worktrees, and canonical TODO pointers before dispatch.
+description: Use when /triage is invoked with optional task-description text or user-marked backlog prose must become reviewable, tracked PyRITE agent task records, task branches/worktrees, and canonical TODO pointers before dispatch.
 ---
 
 # Triage

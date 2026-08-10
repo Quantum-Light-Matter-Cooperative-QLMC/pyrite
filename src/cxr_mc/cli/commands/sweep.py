@@ -1,4 +1,4 @@
-"""Hidden compatibility paths for retired ``cxr sweep`` commands."""
+"""Hidden compatibility paths for retired ``pyrite sweep`` commands."""
 
 from __future__ import annotations
 
@@ -119,11 +119,11 @@ def command():
 )
 @output_option
 def show_command(material_name, profile_name, json_output):
-    """Deprecated; use ``cxr material show MATERIAL``."""
+    """Deprecated; use ``pyrite material show MATERIAL``."""
     if material_name is None:
-        _deprecations.warn("sweep show", replacement="cxr profile list")
+        _deprecations.warn("sweep show", replacement="pyrite profile list")
         return _show_overview(json_output)
-    replacement = f"cxr material show {material_name}"
+    replacement = f"pyrite material show {material_name}"
     if profile_name != _catalog_io.DEFAULT_PROFILE:
         replacement += f" --profile {profile_name}"
     _deprecations.warn("sweep show", replacement=replacement)
@@ -165,8 +165,8 @@ def set_command(
     yes,
     dry_run,
 ):
-    """Deprecated; use ``cxr material set MATERIAL``."""
-    replacement = f"cxr material set {material_name}"
+    """Deprecated; use ``pyrite material set MATERIAL``."""
+    replacement = f"pyrite material set {material_name}"
     if profile_name != _catalog_io.DEFAULT_PROFILE:
         replacement += f" --profile {profile_name}"
     _deprecations.warn("sweep set", replacement=replacement)

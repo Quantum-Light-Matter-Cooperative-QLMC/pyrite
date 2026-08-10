@@ -199,7 +199,7 @@ def _set(
 def command():
     """Inspect, validate, edit, and blaze individual materials.
 
-    Profile membership remains under ``cxr profile members``. ``validate``
+    Profile membership remains under ``pyrite profile members``. ``validate``
     checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
     """
 

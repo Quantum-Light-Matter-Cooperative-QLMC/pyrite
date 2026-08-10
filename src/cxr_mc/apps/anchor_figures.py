@@ -91,7 +91,7 @@ class ZhaiCacheMiss(FileNotFoundError):
         self.path = path
         super().__init__(
             f"Zhai cache missing or stale: {path}; populate it with "
-            "`cxr run --preset zhai --remote`"
+            "`pyrite run --preset zhai --remote`"
         )
 
 
@@ -938,7 +938,7 @@ def reproduce_all(
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
     under ``cache_dir`` (default checkpoints/zhai_reproduction/). This is the
     GPU-box-runnable unit behind ``cxr_mc._entry.reproduce_zhai`` /
-    ``cxr run --preset zhai --remote``.
+    ``pyrite run --preset zhai --remote``.
 
     Returns [(label, path, cache_hit)] for the Fig.1c anchor plus every
     supplementary (study, thickness) pair.
@@ -1087,7 +1087,7 @@ def figure_background_validation(validation: dict, anchor: ZhaiAnchor, model: di
             anchor.E_grid,
             model[25.0]["brem_det"] * scale,
             ":",
-            label="cxr-mc Born+Elwert brem",
+            label="PyRITE Born+Elwert brem",
         )
     ax_total.set_ylabel("Detected intensity (Phs/eV/s/nA)")
     ax_total.set_title("Zhai Fig. 3b: external-background fit")

@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 #
-# CPU-only image for cxr_mc: a reproducible environment from uv + the
+# CPU-only image for PyRITE: a reproducible environment from uv + the
 # committed lockfile, no local setup. The MC code falls back to CPU
-# automatically (cupy imports but finds no GPU), so the sweeps, the `cxr` CLI,
+# automatically (cupy imports but finds no GPU), so the sweeps, the `pyrite` CLI,
 # and the test suite all run here.
 #
-#   docker build -t cxr-mc .
-#   docker run --rm cxr-mc pytest -q                                   # CPU safety net
-#   docker run --rm -v "$PWD/checkpoints:/app/checkpoints" cxr-mc cxr scan silicon --quick
+#   docker build -t pyrite .
+#   docker run --rm pyrite pyrite-dev test-suite core
+#   docker run --rm -v "$PWD/checkpoints:/app/checkpoints" pyrite pyrite run standard -m hopg --fidelity survey
 #
 # ---------------------------------------------------------------------------
 # GPU image (future): everything below the base layer is shared with a GPU
@@ -38,18 +38,17 @@ WORKDIR /app
 # 1) Install dependencies from the lockfile first, so this heavy layer is cached
 #    and only re-runs when pyproject.toml / uv.lock change.
 COPY pyproject.toml uv.lock README.md ./
-COPY packages/cxr-mc-tests/pyproject.toml packages/cxr-mc-tests/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --package cxr-mc-tests
+    uv sync --frozen --no-install-project
 
 # 2) Add the source and install the package itself (fast; re-runs on any edit).
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --package cxr-mc-tests
+    uv sync --frozen
 
 # `uv run` is the entrypoint, so the container behaves like the local dev env:
-#   docker run cxr-mc                       -> cxr --help            (CMD below)
-#   docker run cxr-mc pytest -q             -> the CPU test suite
-#   docker run cxr-mc cxr scan silicon --quick
+#   docker run pyrite                       -> pyrite --help         (CMD below)
+#   docker run pyrite pyrite-dev test-suite core
+#   docker run pyrite pyrite run standard -m hopg --fidelity survey
 ENTRYPOINT ["uv", "run", "--frozen"]
-CMD ["cxr", "--help"]
+CMD ["pyrite", "--help"]

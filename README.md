@@ -1,9 +1,10 @@
-# cxr-mc
+# PyRITE
 
-**Coherent X-ray radiation (PXR + coherent bremsstrahlung) from table-top
-electron beams in crystals.**
+**a Python toolkit for Radiation from Interactions and Transport of Electrons**
 
-cxr-mc predicts narrow, tunable X-ray lines from ~30–60 keV electrons in
+**Coherent X-ray radiation and electron transport in crystals.**
+
+PyRITE predicts narrow, tunable X-ray lines from ~30–60 keV electrons in
 crystals, plus detector-visible flux. Active question: expected line flux and
 enhancement at θ_obs = 90° for a 2×2 Timepix3 quad or Raptor Eagle XO CCD.
 
@@ -39,11 +40,11 @@ slab faces. See [tilt convention](docs/tilt-convention.md) before geometry work.
 Requires Python ≥3.13 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc.git
-cd cxr-mc
+git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
+cd pyrite
 uv sync
-uv run cxr-dev bootstrap  # per-clone local git config (TODO.md merge driver)
-uv run cxr --help
+uv run pyrite-dev bootstrap  # per-clone local git config (TODO.md merge driver)
+uv run pyrite --help
 ```
 
 `uv sync` installs the root distribution and contributor dependency groups.
@@ -51,12 +52,12 @@ For a locked runtime-only installation use `uv sync --no-dev --locked`;
 focused contributor and CI commands are documented in
 [`docs/development-workspace.md`](docs/development-workspace.md).
 
-`cxr-dev bootstrap` is idempotent and only sets local git config that cannot be
+`pyrite-dev bootstrap` is idempotent and only sets local git config that cannot be
 committed (it registers the `.gitattributes` `TODO.md merge=ours` driver so
 merge/rebase conflicts on `TODO.md` resolve to the current branch automatically).
 Run it once per clone; worktrees share the config.
 
-Base `cxr-mc` is CPU-only. Install exactly one accelerator extra in a clean
+Base `pyrite-xray` is CPU-only. Install exactly one accelerator extra in a clean
 environment:
 
 | Hardware | Install | Backend |
@@ -66,17 +67,17 @@ environment:
 | Intel | `uv sync --extra intel` | oneAPI `dpnp` + `dpctl` |
 
 Do not combine `nvidia` and `amd`: both provide the `cupy` import. AMD's current
-`amd-cupy` wheels only support CPython 3.10, below cxr-mc's Python requirement,
+`amd-cupy` wheels only support CPython 3.10, below PyRITE's Python requirement,
 so the AMD extra uses upstream CuPy's ROCm source build. ROCm remains
 provisional until exercised on AMD hardware.
 
 Use `uv run ...`; bare system Python lacks locked dependencies.
-`CXR_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. `auto`
+`PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. `auto`
 tries CuPy, then SYCL, then NumPy; explicit accelerator selection errors if
-unavailable. `CXR_FP64=1` requires fp64 and falls back to CPU only under
+unavailable. `PYRITE_FP64=1` requires fp64 and falls back to CPU only under
 automatic selection.
 
-`CXR_MC_RESOURCE_POLICY=auto|conservative|balanced|throughput` controls memory
+`PYRITE_MC_RESOURCE_POLICY=auto|conservative|balanced|throughput` controls memory
 admission, retry count, release cadence, and host-worker admission. `auto`
 uses `conservative` below 8 GiB. Its device budget is
 `min(50% of VRAM, VRAM - 2 GiB)`, protecting small GPUs such as the 4 GiB Arc
@@ -91,21 +92,21 @@ bypass pre-allocation admission.
 
 ```bash
 # Small survey run; writes component checkpoints.
-uv run cxr run standard -m hopg --fidelity survey
+uv run pyrite run standard -m hopg --fidelity survey
 
 # Analyze existing checkpoint.
-uv run cxr app analysis launch hopg
+uv run pyrite app analysis launch hopg
 
 # Interactive transport/lattice viewer; no checkpoint required.
 uv run marimo run src/cxr_mc/apps/trace_app.py
 
 # Validation dashboard.
-uv run cxr app validation launch
+uv run pyrite app validation launch
 ```
 
 Main surfaces:
 
-- `cxr`: run, analysis, validation, export, checkpoint, profile, material,
+- `pyrite`: run, analysis, validation, export, checkpoint, profile, material,
   and remote workflows. See generated
   [CLI reference](docs/cli-reference.md).
 - `src/cxr_mc/apps/scan_app.py`: interactive sweep runner.
@@ -114,7 +115,7 @@ Main surfaces:
 - `src/cxr_mc/apps/validation_app.py`: literature-validation studies.
 - `src/cxr_mc/`: importable physics, results, plotting, and detector library.
 
-Full sweeps are heavy. Use [`cxr remote`](docs/running-on-a-cluster.md) for lab
+Full sweeps are heavy. Use [PyRITE's remote workflow](docs/running-on-a-cluster.md) for lab
 GPU work or follow portable SLURM templates there.
 
 ## Data and outputs
@@ -125,7 +126,7 @@ Phase-specific CIFs live under `src/cxr_mc/data/cifs/`; production loading is
 offline. Validate edits with:
 
 ```bash
-uv run cxr material validate
+uv run pyrite material validate
 ```
 
 Golden catalog snapshot must be regenerated after catalog/schema changes; use

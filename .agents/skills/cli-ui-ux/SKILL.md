@@ -1,6 +1,6 @@
 ---
 name: cli-ui-ux
-description: Use when designing, implementing, reviewing, or testing cxr-mc commands, options, help, prompts, progress, completion, streams, exit codes, JSON/NDJSON, destructive actions, or migrations.
+description: Use when designing, implementing, reviewing, or testing PyRITE commands, options, help, prompts, progress, completion, streams, exit codes, JSON/NDJSON, destructive actions, or migrations.
 ---
 
 # CLI UI/UX

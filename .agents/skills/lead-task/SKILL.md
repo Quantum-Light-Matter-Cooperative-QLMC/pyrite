@@ -1,6 +1,6 @@
 ---
 name: lead-task
-description: Use when a high-capability agent must own, decompose, implement, and integrate a complex cxr-mc task milestone, including ambiguous or cross-subsystem work, physics, performance, or supervised delegation.
+description: Use when a high-capability agent must own, decompose, implement, and integrate a complex PyRITE task milestone, including ambiguous or cross-subsystem work, physics, performance, or supervised delegation.
 ---
 
 # Lead Task

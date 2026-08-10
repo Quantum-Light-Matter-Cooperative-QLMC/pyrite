@@ -545,7 +545,7 @@ def invoke_legacy(function, /, **values):
 
 
 def run(command: click.Command, argv: Sequence[str] | None = None, *, prog_name: str) -> Any:
-    """Invoke Click without framework-owned exits; preserve cxr exit contract."""
+    """Invoke Click without framework-owned exits; preserve pyrite exit contract."""
     token = _COLOR_MODE.set("auto")
     try:
         return command.main(

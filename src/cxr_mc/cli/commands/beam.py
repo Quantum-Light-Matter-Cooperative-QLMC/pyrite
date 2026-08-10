@@ -43,7 +43,7 @@ def _unknown_beam(document, name):
     message = f"unknown beam: {name}"
     if suggestions:
         message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: cxr beam create {name}"
+    message += f". Create it first with: pyrite beam create {name}"
     raise ValueError(message)
 
 
@@ -127,16 +127,16 @@ def command():
 
     A named beam carries the same distribution fields as an inline
     ``[profiles.NAME.beam]`` block, plus an optional display-only ``label``.
-    Attach one to a profile with ``cxr profile set NAME --beam BEAM``.
+    Attach one to a profile with ``pyrite profile set NAME --beam BEAM``.
 
     \b
     Examples:
-      cxr beam list
-      cxr beam show rf_gun_200fs
-      cxr beam create rf_gun_200fs --rep-rate-hz 1000 --bunch-charge-pc 2.5
-      cxr beam set rf_gun_200fs --energy-spread 0.001
-      cxr beam rename rf_gun_200fs lab_gun
-      cxr beam delete rf_gun_200fs -y
+      pyrite beam list
+      pyrite beam show rf_gun_200fs
+      pyrite beam create rf_gun_200fs --rep-rate-hz 1000 --bunch-charge-pc 2.5
+      pyrite beam set rf_gun_200fs --energy-spread 0.001
+      pyrite beam rename rf_gun_200fs lab_gun
+      pyrite beam delete rf_gun_200fs -y
     """
 
 
@@ -212,7 +212,7 @@ def create_command(
 
     Requires at least one beam-field option; --label alone does not define a
     beam. Attach the result to a profile with
-    ``cxr profile set PROFILE --beam NAME``.
+    ``pyrite profile set PROFILE --beam NAME``.
     """
     _check_name(name)
     updates = collect_beam_updates(
@@ -232,7 +232,7 @@ def create_command(
         original, document = _catalog_io.catalog_text()
         beams = _catalog_io.beam_rows(document)
         if name in beams:
-            raise ValueError(f"beam {name!r} already exists; edit it with: cxr beam set {name}")
+            raise ValueError(f"beam {name!r} already exists; edit it with: pyrite beam set {name}")
         target = tomlkit.table()
         if label is not None:
             target["label"] = label
@@ -266,7 +266,7 @@ def set_command(
 ):
     """Update fields on an existing named beam NAME.
 
-    NAME must already exist (create it with ``cxr beam create``); unknown
+    NAME must already exist (create it with ``pyrite beam create``); unknown
     names error with suggestions.
     """
     updates = collect_beam_updates(

@@ -49,92 +49,92 @@ DEPRECATIONS: dict[str, Deprecation] = {
     entry.path: entry
     for entry in (
         # Flat checkpoint verbs, retired into the `checkpoint` noun.
-        _entry("slim", "cxr checkpoint slim"),
-        _entry("rebrem", "cxr checkpoint recompute brem"),
-        _entry("reline", "cxr checkpoint recompute line"),
-        _entry("archive", "cxr checkpoint archive"),
-        _entry("restore", "cxr checkpoint restore"),
-        _entry("archives", "cxr checkpoint list"),
-        _entry("union", "cxr checkpoint merge"),
-        _entry("prune", "cxr checkpoint gc"),
+        _entry("slim", "pyrite checkpoint slim"),
+        _entry("rebrem", "pyrite checkpoint recompute brem"),
+        _entry("reline", "pyrite checkpoint recompute line"),
+        _entry("archive", "pyrite checkpoint archive"),
+        _entry("restore", "pyrite checkpoint restore"),
+        _entry("archives", "pyrite checkpoint list"),
+        _entry("union", "pyrite checkpoint merge"),
+        _entry("prune", "pyrite checkpoint gc"),
         # D4 verb collapse: `prune` (reclaim obsolete) became `gc`; `clear`
         # (delete an explicit target) became `rm`.
-        _entry("checkpoint prune", "cxr checkpoint gc"),
-        _entry("checkpoint clear", "cxr checkpoint rm"),
-        _entry("performance prune", "cxr performance rm"),
+        _entry("checkpoint prune", "pyrite checkpoint gc"),
+        _entry("checkpoint clear", "pyrite checkpoint rm"),
+        _entry("performance prune", "pyrite performance rm"),
         # Retired scan-range group. Each leaf has its own canonical spelling,
         # so the rows sit on the leaves rather than on the `sweep` group.
         _entry(
             "sweep show",
-            "cxr material show",
-            note="With no MATERIAL argument, use `cxr profile list`.",
+            "pyrite material show",
+            note="With no MATERIAL argument, use `pyrite profile list`.",
         ),
         _entry(
             "sweep set",
-            "cxr material set",
+            "pyrite material set",
             note="The warning names the material and profile actually given.",
         ),
         # Config/validation spellings.
-        _entry("check", "cxr material validate"),
-        _entry("check-config", "cxr profile show"),
+        _entry("check", "pyrite material validate"),
+        _entry("check-config", "pyrite profile show"),
         # D1: app actions are explicit leaves; implicit group launch remains a
         # compatibility callback through the removal window.
-        _entry("app analysis", "cxr app analysis launch"),
-        _entry("app viewer", "cxr app viewer launch"),
-        _entry("app validation", "cxr app validation launch"),
+        _entry("app analysis", "pyrite app analysis launch"),
+        _entry("app viewer", "pyrite app viewer launch"),
+        _entry("app validation", "pyrite app validation launch"),
         # Flat energy-grid job verbs, retired into the `job` subgroup.
-        _entry("energy-grid attach", "cxr job attach"),
-        _entry("energy-grid logs", "cxr job logs"),
-        _entry("energy-grid status", "cxr job status"),
-        _entry("energy-grid stop", "cxr job stop"),
-        _entry("energy-grid job attach", "cxr job attach"),
-        _entry("energy-grid job logs", "cxr job logs"),
-        _entry("energy-grid job status", "cxr job status"),
-        _entry("energy-grid job stop", "cxr job stop"),
-        _entry("energy-grid submit", "cxr energy-grid derive --remote --detach"),
+        _entry("energy-grid attach", "pyrite job attach"),
+        _entry("energy-grid logs", "pyrite job logs"),
+        _entry("energy-grid status", "pyrite job status"),
+        _entry("energy-grid stop", "pyrite job stop"),
+        _entry("energy-grid job attach", "pyrite job attach"),
+        _entry("energy-grid job logs", "pyrite job logs"),
+        _entry("energy-grid job status", "pyrite job status"),
+        _entry("energy-grid job stop", "pyrite job stop"),
+        _entry("energy-grid submit", "pyrite energy-grid derive --remote --detach"),
         _entry(
             "energy-grid apply",
-            "cxr energy-grid add",
+            "pyrite energy-grid add",
             note="The replacement creates an immutable artifact and repoints the resolved profile.",
         ),
         _entry(
             "energy-grid line delete",
-            "cxr energy-grid rm",
+            "pyrite energy-grid rm",
             note="The replacement repoints a profile; gc later reclaims unreachable bytes.",
         ),
         # Profile membership and performance spellings.
-        _entry("profile add-material", "cxr profile add NAME --material MATERIAL,..."),
-        _entry("profile remove-material", "cxr profile remove NAME --material MATERIAL,..."),
-        _entry("profile analyze", "cxr performance analyze NAME"),
+        _entry("profile add-material", "pyrite profile add NAME --material MATERIAL,..."),
+        _entry("profile remove-material", "pyrite profile remove NAME --material MATERIAL,..."),
+        _entry("profile analyze", "pyrite performance analyze NAME"),
         # `profile members` stays reachable; `set/add/remove --material` is
         # canonical, and each membership verb maps to a different one.
-        _entry("profile members set", "cxr profile set NAME --material MATERIAL,..."),
-        _entry("profile members add", "cxr profile add NAME --material MATERIAL,..."),
-        _entry("profile members remove", "cxr profile remove NAME --material MATERIAL,..."),
-        _entry("profile members reset", "cxr profile set NAME --all-materials"),
+        _entry("profile members set", "pyrite profile set NAME --material MATERIAL,..."),
+        _entry("profile members add", "pyrite profile add NAME --material MATERIAL,..."),
+        _entry("profile members remove", "pyrite profile remove NAME --material MATERIAL,..."),
+        _entry("profile members reset", "pyrite profile set NAME --all-materials"),
         # Remote namespace: `profile` here meant the performance profile. The row
         # sits on the leaf so the warning names a runnable command, not a group.
-        _entry("remote profile pull", "cxr remote performance pull"),
-        _entry("remote run", "cxr run --remote"),
-        _entry("remote validate", "cxr run --preset zhai --remote"),
-        _entry("remote check", "cxr run --preset zhai --remote"),
-        _entry("remote rebrem", "cxr checkpoint recompute brem --remote"),
-        _entry("remote reline", "cxr checkpoint recompute line --remote"),
-        _entry("remote jobs", "cxr job list"),
-        _entry("remote status", "cxr job status"),
-        _entry("remote logs", "cxr job logs"),
-        _entry("remote stop", "cxr job stop"),
+        _entry("remote profile pull", "pyrite remote performance pull"),
+        _entry("remote run", "pyrite run --remote"),
+        _entry("remote validate", "pyrite run --preset zhai --remote"),
+        _entry("remote check", "pyrite run --preset zhai --remote"),
+        _entry("remote rebrem", "pyrite checkpoint recompute brem --remote"),
+        _entry("remote reline", "pyrite checkpoint recompute line --remote"),
+        _entry("remote jobs", "pyrite job list"),
+        _entry("remote status", "pyrite job status"),
+        _entry("remote logs", "pyrite job logs"),
+        _entry("remote stop", "pyrite job stop"),
         # D4 verb collapse in the remote namespace. `gc` runs both halves the
         # retired `prune` (obsolete records) and `reap` (orphaned reservations)
         # spellings ran separately, so both rows point at it.
-        _entry("remote clear", "cxr remote rm"),
-        _entry("remote prune", "cxr remote gc"),
+        _entry("remote clear", "pyrite remote rm"),
+        _entry("remote prune", "pyrite remote gc"),
         _entry(
             "remote reap",
-            "cxr remote gc",
+            "pyrite remote gc",
             note="`gc` also drops obsolete records; use `--min-age-minutes` as before.",
         ),
-        _entry("remote performance prune", "cxr remote performance rm"),
+        _entry("remote performance prune", "pyrite remote performance rm"),
     )
 }
 
@@ -156,9 +156,9 @@ def message(path: str, *, replacement: str | None = None) -> str:
     """
     entry = DEPRECATIONS.get(path)
     if entry is None:
-        return f"warning: 'cxr {path}' is deprecated"
+        return f"warning: 'pyrite {path}' is deprecated"
     return (
-        f"warning: 'cxr {entry.path}' is deprecated and will be removed in "
+        f"warning: 'pyrite {entry.path}' is deprecated and will be removed in "
         f"{entry.remove_in}; use '{replacement or entry.replacement}'"
     )
 
@@ -275,9 +275,9 @@ def _flag(
     return DeprecatedFlag(command, flag, replacement, since, _window(since), note)
 
 
-#: The nine ``cxr profile create``/``cxr profile set`` inline beam-distribution
+#: The nine ``pyrite profile create``/``pyrite profile set`` inline beam-distribution
 #: flags (decision 6, `agentdocs/tasks/feature/named-beam-objects`): the whole family
-#: moved to ``cxr beam create``/``cxr beam set``, so there is no differently
+#: moved to ``pyrite beam create``/``pyrite beam set``, so there is no differently
 #: named canonical flag on the *same* command to merge into the way D5's
 #: renamed spellings do. Each flag keeps its own name and stays fully
 #: functional through the support window; the command body warns manually
@@ -295,7 +295,7 @@ _BEAM_FLAG_NAMES: tuple[str, ...] = (
     "--twiss-beta",
     "--emittance",
 )
-_BEAM_FLAG_NOTE = "Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`."
+_BEAM_FLAG_NOTE = "Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`."
 
 #: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
@@ -304,7 +304,7 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     entry.key: entry
     for entry in (
         *(
-            _flag(command, flag, f"cxr beam create/set {flag}", note=_BEAM_FLAG_NOTE)
+            _flag(command, flag, f"pyrite beam create/set {flag}", note=_BEAM_FLAG_NOTE)
             for command in ("profile create", "profile set")
             for flag in _BEAM_FLAG_NAMES
         ),

@@ -4,5 +4,5 @@ args = [
   "start-mcp-server",
   "--context=codex",
   "--project-from-cwd",
-  "--add-mode=.serena/modes/cxr-tools.yml",
+  "--add-mode=.serena/modes/pyrite-tools.yml",
 ]

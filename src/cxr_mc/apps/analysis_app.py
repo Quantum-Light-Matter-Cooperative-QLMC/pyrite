@@ -613,7 +613,7 @@ def _(
 ):
     if not context.has_data:
         detail = (
-            context.load_error or "Run `cxr run standard -m <material>` to create a checkpoint."
+            context.load_error or "Run `pyrite run standard -m <material>` to create a checkpoint."
         )
         view = mo.callout(
             mo.md(f"**No checkpoint data available.** {detail}"),

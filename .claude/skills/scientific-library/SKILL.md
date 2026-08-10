@@ -1,6 +1,6 @@
 ---
 name: scientific-library
-description: "Use when deterministic cxr-mc library/API code needs work on vectorization, constants, typing, exports, or scientific docstrings; use monte-carlo or physics-review for those domain concerns."
+description: "Use when deterministic PyRITE library/API code needs work on vectorization, constants, typing, exports, or scientific docstrings; use monte-carlo or physics-review for those domain concerns."
 ---
 
 # Scientific Library

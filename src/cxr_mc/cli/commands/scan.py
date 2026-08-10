@@ -1,4 +1,4 @@
-"""Click wiring for ``cxr run``."""
+"""Click wiring for ``pyrite run``."""
 
 import re
 from pathlib import Path

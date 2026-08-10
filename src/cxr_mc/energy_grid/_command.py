@@ -1,7 +1,7 @@
-"""`cxr energy-grid` command group.
+"""`pyrite energy-grid` command group.
 
 Job verbs (``status``/``attach``/``logs``/``stop``) delegate to ``cxr_mc.remote``
-for output byte-identical to ``cxr remote``; ``derive``/``apply``/
+for output byte-identical to ``pyrite remote``; ``derive``/``apply``/
 ``line set``/``brem set``/``defaults``/``show``/``regen-golden`` call the package
 modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 ``cxr`` startup stays cheap.
@@ -158,8 +158,8 @@ def command():
     ``derive`` measures both coherent-line and bremsstrahlung
     upper bounds. ``defaults`` controls that diagnostic derivation only;
     ``add`` stores validated bounds and repoints a profile. Physical scan
-    profile defaults belong to ``cxr profile``; per-material range overrides
-    belong to ``cxr material``.
+    profile defaults belong to ``pyrite profile``; per-material range overrides
+    belong to ``pyrite material``.
 
     Scan ``--fidelity full|survey`` is separate. It controls later simulation
     cost and grid reduction; it never changes derivation or applied full bounds.
@@ -168,9 +168,9 @@ def command():
 
     \b
     Examples:
-      cxr energy-grid derive --material mose2,wse2 --energy 30,60
-      cxr energy-grid derive --material mose2 --remote --dry-run
-      cxr energy-grid show mose2
+      pyrite energy-grid derive --material mose2,wse2 --energy 30,60
+      pyrite energy-grid derive --material mose2 --remote --dry-run
+      pyrite energy-grid show mose2
     """
 
 
@@ -545,7 +545,7 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
 
     \b
     Example:
-      cxr energy-grid add combined_line_grid_bounds.json --material mose2,wse2
+      pyrite energy-grid add combined_line_grid_bounds.json --material mose2,wse2
     """
     path = _pull_combined() if pull else json_path
     if not path:
@@ -647,7 +647,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
 
     \b
     Example:
-      cxr energy-grid rm wse2 --energy 30 --energy 40
+      pyrite energy-grid rm wse2 --energy 30 --energy 40
     """
     if dry_run and json_output:
         raise click.UsageError("--dry-run and --output json cannot be combined")

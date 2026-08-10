@@ -1,6 +1,6 @@
 # Sweep fidelity and dataset identity
 
-`cxr run` accepts two named, independently resolved fidelity policies:
+`pyrite run` accepts two named, independently resolved fidelity policies:
 
 - `full` preserves production behavior: catalog grids, 300 line electrons,
   150 bremsstrahlung electrons, and complete configured reflection sets.
@@ -12,7 +12,7 @@
 Run a survey with:
 
 ```bash
-cxr run standard -m mose2 --fidelity survey
+pyrite run standard -m mose2 --fidelity survey
 ```
 
 `--profile full|survey` is not a compatibility spelling: `profile` is reserved
@@ -24,10 +24,10 @@ Python callers use `default_settings("survey")` and
 `material_sweep("mose2", fidelity="survey")`. `full` remains default for both.
 Explicit `material_sweep` overrides apply after profile resolution.
 
-`cxr energy-grid` is upstream of this choice. `derive`, locally or with
+`pyrite energy-grid` is upstream of this choice. `derive`, locally or with
 `--remote`, measures catalog-ready line and bremsstrahlung bounds without a
 fidelity setting, and `apply` stores those full bounds. Later
-`cxr run --fidelity survey` reduces the stored photon grids together with
+`pyrite run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.
 
 ## Identity and storage
@@ -63,9 +63,9 @@ envelope_rms_fs = 200.0
 beam = "gaussian_200fs"
 ```
 
-`cxr beam list|show|create|set|rename|delete` manages the objects;
-`cxr profile set <profile> --beam NAME` attaches one and
-`cxr profile remove <profile> --beam` detaches it. `rename` rewrites every
+`pyrite beam list|show|create|set|rename|delete` manages the objects;
+`pyrite profile set <profile> --beam NAME` attaches one and
+`pyrite profile remove <profile> --beam` detaches it. `rename` rewrites every
 referencing profile, and `delete` is blocked while any profile still points at
 the beam, so a reference is never orphaned.
 
@@ -83,11 +83,11 @@ been converted. A profile carrying both spellings fails to load.
 A beam table -- named or inline -- decodes into `BeamSpec`. The nested
 `longitudinal` and `transverse` sub-tables carry the bunch and phase-space
 policies; `docs/beam-phase-space.md` is the reference for every key, its units,
-and the mutual exclusions between them. `cxr beam create` / `cxr beam set` write
+and the mutual exclusions between them. `pyrite beam create` / `pyrite beam set` write
 the same keys from `--emittance`, `--twiss-beta`, `--twiss-alpha`,
 `--energy-spread`, and the legacy `--transverse-fwhm-mm`. The nine equivalent
-`cxr profile create` / `cxr profile set` flags still work and still write an
-inline block, but each warns once naming `cxr beam`.
+`pyrite profile create` / `pyrite profile set` flags still work and still write an
+inline block, but each warns once naming `pyrite beam`.
 
 Both sub-tables join `parameter_sha256` only when they diverge from the inert
 defaults, so a profile that never sets them hashes exactly as it did before the

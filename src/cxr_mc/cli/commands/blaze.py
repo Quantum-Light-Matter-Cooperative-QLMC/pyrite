@@ -1,4 +1,4 @@
-"""Click wiring for ``cxr material blaze``."""
+"""Click wiring for ``pyrite material blaze``."""
 
 from pathlib import Path
 

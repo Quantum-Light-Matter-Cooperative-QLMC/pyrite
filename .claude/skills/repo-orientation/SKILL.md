@@ -1,6 +1,6 @@
 ---
 name: repo-orientation
-description: Use when locating code, choosing owners, assessing cxr-mc structure, updating repository map, or planning surgical changes.
+description: Use when locating code, choosing owners, assessing PyRITE structure, updating repository map, or planning surgical changes.
 ---
 
 # Repo Orientation
@@ -21,5 +21,5 @@ Find smallest owner and existing helper before editing. Prefer focused test over
 broad refactor. Context7 is only for current external-library docs. Headroom
 shapes output; it is not a command or index. Do not use Tokensave or RTK.
 
-Regenerate repo inventory with `cxr-dev repo-map` after packages, entry
+Regenerate repo inventory with `pyrite-dev repo-map` after packages, entry
 points, or agent-tooling top-levels change.

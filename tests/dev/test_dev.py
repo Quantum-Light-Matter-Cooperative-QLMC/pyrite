@@ -145,9 +145,7 @@ def test_main_strips_leading_numba_flag_before_pytest_args(dev_module, monkeypat
 
 def test_test_numba_sets_disable_jit_env_for_pytest_subprocess(dev_module, monkeypatch) -> None:
     calls = []
-    monkeypatch.setattr(
-        dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs))
-    )
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_test(Namespace(numba=True, pytest_args=["--cov"]))
 
@@ -261,15 +259,10 @@ def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module,
     dev_module.cmd_repo_map(Namespace())
 
     output = capsys.readouterr().out
-    assert (
-        "Agent tooling:\n  .agents/\n  .claude/\n  agentdocs/\n\nCanonical commands:"
-        in output
-    )
+    assert "Agent tooling:\n  .agents/\n  .claude/\n  agentdocs/\n\nCanonical commands:" in output
 
 
-def test_repo_map_write_and_check_delegate_to_importable_generator(
-    dev_module, monkeypatch
-) -> None:
+def test_repo_map_write_and_check_delegate_to_importable_generator(dev_module, monkeypatch) -> None:
     from cxr_mc.devtools import repo_map
 
     calls = []
@@ -293,4 +286,4 @@ def test_repo_map_check_reports_stale_document(dev_module, monkeypatch, capsys) 
     with pytest.raises(SystemExit, match="1"):
         dev_module.cmd_repo_map(Namespace(write=False, check=True))
 
-    assert "cxr-dev repo-map --write" in capsys.readouterr().err
+    assert "pyrite-dev repo-map --write" in capsys.readouterr().err

@@ -106,7 +106,7 @@ def _action_contract(parameter: click.Parameter) -> dict[str, object]:
 
 
 def _help(path: tuple[str, ...]) -> str:
-    result = CliRunner().invoke(cli.command, [*path, "--help"], prog_name="cxr")
+    result = CliRunner().invoke(cli.command, [*path, "--help"], prog_name="pyrite")
     if result.exit_code != 0:
         raise RuntimeError(f"help failed for {' '.join(path) or 'root'}: {result.stderr}")
     return result.stdout
@@ -118,7 +118,7 @@ def _command_contract(
 ) -> dict[str, object]:
     subcommands = []
     if isinstance(command, click.Group):
-        context = click.Context(command, info_name=path[-1] if path else "cxr")
+        context = click.Context(command, info_name=path[-1] if path else "pyrite")
         for name in command.list_commands(context):
             child = command.get_command(context, name)
             if child is not None:

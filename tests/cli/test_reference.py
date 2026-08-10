@@ -29,19 +29,19 @@ def test_checked_cli_reference_is_current():
     )
     assert completed.returncode == 0, completed.stderr
     reference = REFERENCE.read_text(encoding="utf-8")
-    root_help = reference.split("## `cxr`", 1)[1].split("## `cxr ", 1)[0]
+    root_help = reference.split("## `pyrite`", 1)[1].split("## `pyrite ", 1)[0]
     assert "-h, --help" in root_help
 
 
 def test_help_documents_examples_units_side_effects_and_incompatibilities():
     runner = CliRunner()
     cases = {
-        (): ("Examples:", "cxr run"),
+        (): ("Examples:", "pyrite run"),
         ("run",): ("minutes", "--preset"),
-        ("remote",): ("CXR_REMOTE_HOST", "Examples:"),
+        ("remote",): ("PYRITE_REMOTE_HOST", "Examples:"),
         ("remote", "run"): ("PROFILE selects", "-m, --material"),
         ("remote", "pull"): ("--preset", "grid-filtered"),
-        ("energy-grid",): ("cxr profile", "per-material range overrides", "Examples:"),
+        ("energy-grid",): ("pyrite profile", "per-material range overrides", "Examples:"),
         ("energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
         ("energy-grid", "add"): ("precedence", "immutable"),
         ("energy-grid", "job", "status"): ("latest recorded job", "repeat"),

@@ -42,5 +42,5 @@ marimo run src/cxr_mc/apps/analysis_app.py
 - `views/`: ordinary Python rendering functions grouped by application section.
 
 These apps ship in the wheel and may be launched from any working directory via
-the `cxr app` commands. For edit/watch workflows, pass the packaged path shown
+the `pyrite app` commands. For edit/watch workflows, pass the packaged path shown
 above directly to marimo.

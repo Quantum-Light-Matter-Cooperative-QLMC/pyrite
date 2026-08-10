@@ -13,7 +13,7 @@ byte-equality across branches.
 
 1. Confirm the merge driver is installed in this clone:
    `git config --local --get merge.ours.driver` must print `true`. If missing,
-   run `uv run cxr-dev bootstrap` (see `agentdocs/README.md`). Without it, git falls
+   run `uv run pyrite-dev bootstrap` (see `agentdocs/README.md`). Without it, git falls
    back to a normal 3-way merge and TODO.md conflicts return.
 2. Read `main:TODO.md` once. Verify it is accurate: one summary line per active
    item with a branch and `agentdocs/tasks/<branch-name>/` pointer; `>user<` text

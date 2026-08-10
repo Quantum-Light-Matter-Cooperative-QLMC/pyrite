@@ -1,6 +1,6 @@
 ---
 name: physics-review
-description: Use when changed cxr-mc physics models, equations, derivation docs, validation markers, or ledger coverage need implementation-context review; not independent validation.
+description: Use when changed PyRITE physics models, equations, derivation docs, validation markers, or ledger coverage need implementation-context review; not independent validation.
 ---
 
 # Physics Review

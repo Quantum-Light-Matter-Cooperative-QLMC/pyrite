@@ -1,6 +1,6 @@
 # Sample-tilt convention (Zhai's)
 
-cxr-mc reports and grids sample tilt in Zhai et al.'s convention. This note is
+PyRITE reports and grids sample tilt in Zhai et al.'s convention. This note is
 the canonical reference; `montecarlo/geometry.py::tilted_geometry` and
 `::detector_directions` implement it and should be read alongside this file.
 

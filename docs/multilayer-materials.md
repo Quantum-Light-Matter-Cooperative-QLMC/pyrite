@@ -208,13 +208,13 @@ the rejected intermediate designs that motivated the full boundary-aware path.
 ## Catalog / "adding a stack" checklist
 
 N-layer stacks are live in `data/materials.toml`; `substrate = "key"` remains
-two-layer sugar. To add a named stack runnable as `cxr run standard -m <key>`:
+two-layer sugar. To add a named stack runnable as `pyrite run standard -m <key>`:
 
 1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and
    a `[crystals.<key>]` row. Add amorphous number densities under `[media.<key>]`.
 2. Add one `[materials.<run-key>]` row with the film `crystal`, a profile or scan
    overrides, and either `substrate` or an ordered inline `stack` (never both).
-3. Run `uv run cxr material validate`. Transport support errors are fatal; missing
+3. Run `uv run pyrite material validate`. Transport support errors are fatal; missing
    Mott CSVs warn and use the analytic fallback.
 
 The material run key is the CLI/checkpoint name; the film crystal key drives

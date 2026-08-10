@@ -1,6 +1,6 @@
 ---
 name: implement-task
-description: Use when implementing a coherent cxr-mc task checklist slice on its existing task branch/worktree with bounded independent investigation, tests, and checkpoint commits.
+description: Use when implementing a coherent PyRITE task checklist slice on its existing task branch/worktree with bounded independent investigation, tests, and checkpoint commits.
 ---
 
 # Implement Task

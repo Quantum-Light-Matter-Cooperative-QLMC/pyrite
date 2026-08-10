@@ -1,4 +1,4 @@
-# cxr-mc agent contract
+# PyRITE agent contract
 
 Keep replies terse; preserve technical substance. Fragments OK. Drop filler,
 pleasantries, and hedging. Use normal clarity for security, irreversible
@@ -23,25 +23,25 @@ prose keep required format.
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite core
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite cli
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite apps
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite packaging
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
-CXR_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --cov
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --numba --cov
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev format
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev nbstrip
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev precommit
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
+PYRITE_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --cov
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --numba --cov
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 ```
 
 If `uv run` cannot write project environment, add
-`UV_PROJECT_ENVIRONMENT=/tmp/cxr-mc-venv`; do not switch interpreters.
+`UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv`; do not switch interpreters.
 
 ## Work rules
 
@@ -52,7 +52,7 @@ If `uv run` cannot write project environment, add
   physics, docs, runtime, remote GPU, regression, catalog-golden, or TODO work.
 - CLI changes preserve documented command/help/output/exit contracts and
   regenerate `docs/cli-reference.md`.
-- Heavy sweeps/GPU work use `cxr remote`; never run locally.
+- Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
 
 ## Task dispatch
@@ -86,7 +86,7 @@ If `uv run` cannot write project environment, add
 
 `TODO.md` is authoritative on `main`; branch copies are disposable and
 auto-resolve to `main` on merge/rebase via the `TODO.md merge=ours` driver (run
-`uv run cxr-dev bootstrap` once per clone). Edit and drop items on `main`.
+`uv run pyrite-dev bootstrap` once per clone). Edit and drop items on `main`.
 Tracked agent plans and handoffs live only in `agentdocs/`, outside the public
 documentation tree. Branch detail belongs in
 `agentdocs/tasks/<branch-name>/` (full task branch name; entry doc `README.md`);

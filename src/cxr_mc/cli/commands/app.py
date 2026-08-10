@@ -1,4 +1,4 @@
-"""Lazy ``cxr app`` hierarchy for interactive marimo applications."""
+"""Lazy ``pyrite app`` hierarchy for interactive marimo applications."""
 
 from __future__ import annotations
 

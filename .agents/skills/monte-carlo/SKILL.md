@@ -1,6 +1,6 @@
 ---
 name: monte-carlo
-description: "Use when cxr-mc changes involve stochastic-kernel or RNG correctness: sampling, seed/stream behavior, Monte Carlo transport, and CPU/GPU reproducibility; use performance for benchmarks."
+description: "Use when PyRITE changes involve stochastic-kernel or RNG correctness: sampling, seed/stream behavior, Monte Carlo transport, and CPU/GPU reproducibility; use performance for benchmarks."
 ---
 
 # Monte Carlo

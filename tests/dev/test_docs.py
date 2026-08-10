@@ -33,9 +33,7 @@ def test_warning_baseline_filters_only_source_docutils(
 ) -> None:
     source_root = tmp_path / "src"
     generated_root = tmp_path / "docs" / "_autosummary"
-    baseline = warning_baseline_module.AutodocWarningBaseline(
-        source_root, generated_root
-    )
+    baseline = warning_baseline_module.AutodocWarningBaseline(source_root, generated_root)
 
     assert baseline.filter(_record(source_root / "cxr_mc" / "example.py")) is False
     generated = _record(generated_root / "cxr_mc.example.rst")
@@ -43,10 +41,7 @@ def test_warning_baseline_filters_only_source_docutils(
     assert baseline.filter(generated) is False
     assert baseline.filter(_record(tmp_path / "docs" / "guide.md")) is True
     assert (
-        baseline.filter(
-            _record(source_root / "cxr_mc" / "example.py", warning_type="ref")
-        )
-        is True
+        baseline.filter(_record(source_root / "cxr_mc" / "example.py", warning_type="ref")) is True
     )
     assert len(baseline.fingerprints) == 2
 

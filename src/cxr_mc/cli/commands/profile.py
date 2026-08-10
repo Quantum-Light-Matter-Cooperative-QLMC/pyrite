@@ -261,7 +261,7 @@ def _detector_table(profile):
 #: The nine inline beam-distribution flags (`_beam_cli_options`), keyed by
 #: their `_collect_beam_updates` parameter name -> CLI spelling. Registered in
 #: `cli/_deprecations.DEPRECATED_FLAGS` under `SELF_WARNING_FLAGS`: the whole
-#: family moved to ``cxr beam``, so there is no same-command canonical flag to
+#: family moved to ``pyrite beam``, so there is no same-command canonical flag to
 #: merge into via `RetiredOption` -- this module warns manually instead
 #: (decision 6, `agentdocs/tasks/feature/named-beam-objects`).
 _BEAM_FLAG_PARAMS = {
@@ -280,11 +280,11 @@ _BEAM_FLAG_PARAMS = {
 def _warn_inline_beam_flags(ctx, **beam_flag_values):
     for param_name, flag in _BEAM_FLAG_PARAMS.items():
         if beam_flag_values.get(param_name) is not None:
-            warn_flag(ctx, flag, f"cxr beam create/set {flag}")
+            warn_flag(ctx, flag, f"pyrite beam create/set {flag}")
 
 
 class _ProfileGroup(DeprecatingGroup):
-    """``cxr profile NAME`` aliases ``cxr profile show NAME``."""
+    """``pyrite profile NAME`` aliases ``pyrite profile show NAME``."""
 
     def resolve_command(self, ctx, args):
         if args and not args[0].startswith("-") and args[0] not in self.commands:
@@ -306,19 +306,19 @@ def command():
     membership. An absent ``materials`` key means all in-use materials.
     Membership uses ``set|add|remove --material``; ``set --all-materials``
     restores implicit membership. Per-material
-    range overrides are managed by ``cxr material``. Energy grids are managed
-    by ``cxr energy-grid``.
+    range overrides are managed by ``pyrite material``. Energy grids are managed
+    by ``pyrite energy-grid``.
 
     \b
     Examples:
-      cxr profile list
-      cxr profile show sub_100keV        (or: cxr profile sub_100keV)
-      cxr profile create sub_100keV --energy 30:100:10
-      cxr profile set sub_100keV --observation-angle 119
-      cxr profile add sub_100keV --energy 75
-      cxr profile set sub_100keV --material hopg,mose2
-      cxr profile rename sub_100keV sub100
-      cxr profile delete sub_100keV -y
+      pyrite profile list
+      pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
+      pyrite profile create sub_100keV --energy 30:100:10
+      pyrite profile set sub_100keV --observation-angle 119
+      pyrite profile add sub_100keV --energy 75
+      pyrite profile set sub_100keV --material hopg,mose2
+      pyrite profile rename sub_100keV sub100
+      pyrite profile delete sub_100keV -y
     """
 
 
@@ -589,7 +589,7 @@ def set_command(
 ):
     """Replace range grids, beam fields, detector scalars, or emission on a profile.
 
-    NAME must already exist (create it with ``cxr profile create``); unknown
+    NAME must already exist (create it with ``pyrite profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
     unless --yes is given; --dry-run never prompts. Detector scalars and
     emission replace supplied fields; unlike range grids, they are not
@@ -723,7 +723,7 @@ def add_command(
 ):
     """Incrementally add values to profile grids, or emission modes.
 
-    Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV
+    Incremental edit: ``pyrite profile add sub_100keV --energy 75`` inserts 75 keV
     without re-listing the grid. No prompt except on 'standard'. --coherent and
     --incoherent union into the profile's emission mode set; a set that ends up
     covering both modes auto-switches to 'both' (logged, not silent).
@@ -1125,7 +1125,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
     With --all, seeds (or extends) membership with mats_to_sim.toml's verified
     `materials` list -- the verified manifest group -- so a
     profile can start from the standard list and be trimmed down with
-    `cxr profile remove-material` instead of typing every key by hand. --all
+    `pyrite profile remove-material` instead of typing every key by hand. --all
     also seeds an implicit all-in-use profile (one with no `materials` row
     yet), which plain MATERIAL args cannot do.
     """
@@ -1139,7 +1139,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
             raise ValueError(
                 f"profile {name!r} has implicit all-in-use-materials membership; "
                 f"it already includes every material. To restrict it, use: "
-                f"cxr profile set {name} --material MATERIAL,..."
+                f"pyrite profile set {name} --material MATERIAL,..."
             )
         membership = list(existing) if isinstance(existing, list) else []
         requested = list(materials)

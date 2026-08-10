@@ -23,7 +23,7 @@ single canonical NIST spectrum. Fixture identity includes authors' deposited
 dataset version, figure, condition, and source-file checksums. Zhai SI S3 says
 experimental bremsstrahlung was subtracted with DTSA-II through a numerical
 method citing Clayton et al. (1987), but does not publish enough fit detail for
-exact reproduction. cxr-mc therefore documents and tests its own scale-only
+exact reproduction. PyRITE therefore documents and tests its own scale-only
 weighted sideband fit; it does not label that fit as Zhai's exact algorithm.
 
 Normalization is already detected intensity in `Phs/eV/s/nA`. No detector

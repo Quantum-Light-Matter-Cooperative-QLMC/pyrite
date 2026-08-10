@@ -481,7 +481,7 @@ spectrum taken above the threshold on a CUDA box has to be regenerated;
 Everything above is a per-case or per-phase measurement. This is the flip itself,
 end to end, on `qlmc` (RTX 5080 16 GB, 32 logical cores, 45 GB RAM, idle box, no
 SLURM allocation so the pipeline arm gets every core it asks for). Both arms run
-the same `cxr run` invocation and differ only in `CXR_MC_TRANSPORT_CORE`: unset
+the same `pyrite run` invocation and differ only in `PYRITE_MC_TRANSPORT_CORE`: unset
 (so `auto` resolves to the CUDA core, serial in the driver, segments resident)
 against `lockstep` (the historical `gpu-pipeline` arm, 16 transport workers).
 Fresh checkpoint directory per arm — `--perf` already bypasses the shared cache,
@@ -631,8 +631,8 @@ in this round moves a spectrum.
    Edge-localized and median `1.6e-6`, but it propagates to `exp(−μL_esc)` at
    `5.23e-01` for `L_esc = 1e4 Å`. Resolutions are in the ledger row; none is
    taken here.
-3. **`-c/--cpu` and `--cpu-only` on `cxr run -R/--remote`.** The CPU-profiling
-   phase existed only on `cxr remote run`, which is deprecated and hidden with
+3. **`-c/--cpu` and `--cpu-only` on `pyrite run -R/--remote`.** The CPU-profiling
+   phase existed only on `pyrite remote run`, which is deprecated and hidden with
    removal at 0.3.0, so the feature would have disappeared silently. Both flags
    require `-R`, imply `--perf`, and forward to the same job machinery;
    validation stays in `start_command`, unduplicated.

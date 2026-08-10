@@ -89,7 +89,7 @@ Zhai et al., *Nature Communications* **16**, 11218 (2025),
 doi:`10.1038/s41467-025-66063-6`, states that Figure 3 experimental
 bremsstrahlung is subtracted; SI S3 describes DTSA-II plus a numerical PIXE
 method but does not publish an objective, sideband, or fitted parameterization.
-Therefore the through-origin WLS procedure above is a cxr-mc analysis method,
+Therefore the through-origin WLS procedure above is a PyRITE analysis method,
 not a reconstruction of an unpublished Zhai fit.
 
 The cited DR-NTU dataset was checked independently through its Dataverse API:

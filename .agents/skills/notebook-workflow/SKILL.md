@@ -1,6 +1,6 @@
 ---
 name: notebook-workflow
-description: Use when changing cxr-mc scan, analysis, trace, or validation marimo apps, or cleaning the legacy validation notebook under checks/.
+description: Use when changing PyRITE scan, analysis, trace, or validation marimo apps, or cleaning the legacy validation notebook under checks/.
 ---
 
 # Notebook Workflow
@@ -15,5 +15,5 @@ Put reusable logic in `src/cxr_mc/`; keep apps thin. Add no new `.ipynb`
 workflows. Keep legacy notebook output-free.
 
 After marimo edits run `uv run marimo check <app.py>`. For legacy notebook run
-`cxr-dev nbqa` before edits and `nbstrip` before handoff. Use
-`cxr-dev verify` for full repository verification.
+`pyrite-dev nbqa` before edits and `nbstrip` before handoff. Use
+`pyrite-dev verify` for full repository verification.

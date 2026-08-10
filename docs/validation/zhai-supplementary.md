@@ -2,7 +2,7 @@
 
 **Scope.** `src/cxr_mc/apps/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
 WSe2/MoSe2/h-BN/HOPG reproductions rendered by the validation app's "Zhai
-supplementary" section and `cxr app validation export`.
+supplementary" section and `pyrite app validation export`.
 
 This is a provenance record, not a physics re-derivation. The inputs
 parameterize existing ledgered claims (`line-energy-dispersion`,

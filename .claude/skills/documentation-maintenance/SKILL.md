@@ -1,6 +1,6 @@
 ---
 name: documentation-maintenance
-description: Use when changing README/docs/public docstrings/generated references/repository map, maintaining cross-links, or auditing stale docs/builds in cxr-mc.
+description: Use when changing README/docs/public docstrings/generated references/repository map, maintaining cross-links, or auditing stale docs/builds in PyRITE.
 ---
 
 # Documentation Maintenance
@@ -28,8 +28,8 @@ use `docs/` only for durable project documentation.
 ## Verify touched artifacts
 
 - CLI: run generator `--write`, then `--check`.
-- Ownership: `cxr-dev repo-map`.
+- Ownership: `pyrite-dev repo-map`.
 - Docs/public API/navigation: strict `sphinx-build -W`.
-- Skills: `cxr-dev sync-skills`, then `check-skills`.
+- Skills: `pyrite-dev sync-skills`, then `check-skills`.
 
 Inspect scoped diff; report checks and evidence gaps.

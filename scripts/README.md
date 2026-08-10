@@ -1,7 +1,7 @@
 # Repository scripts
 
 Thin standalone wrappers and maintenance utilities for a source checkout.
-Reusable Python implementations invoked by `cxr-dev` live in
+Reusable Python implementations invoked by `pyrite-dev` live in
 `cxr_mc.devtools`; wrapper paths remain for documented direct invocations.
 
 - `generate_cli_reference.py`, `generate_cli_deprecations.py`, `smoke.py`, and
@@ -11,6 +11,6 @@ Reusable Python implementations invoked by `cxr-dev` live in
 - `cuda_test_profiler.py` and `testing.py` are developer diagnostics, not test
   or validation owners. GPU profiling must run through the remote workflow.
 - `hooks/` contains setup hooks; `user_scripts/` contains example operator
-  wrappers, not supported `cxr` command implementations.
+  wrappers, not supported `pyrite` command implementations.
 
-Prefer the canonical `uv run cxr-dev ...` commands listed in `AGENTS.md`.
+Prefer the canonical `uv run pyrite-dev ...` commands listed in `AGENTS.md`.

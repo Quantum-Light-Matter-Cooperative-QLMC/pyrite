@@ -1,9 +1,9 @@
-"""Click wiring for ``cxr checkpoint recompute {brem,line}``.
+"""Click wiring for ``pyrite checkpoint recompute {brem,line}``.
 
 The drivers these call live in :mod:`cxr_mc.checkpoints.recompute`; this module owns only
 the command surface, per the command-home rule in
-`docs/package-structure-rfc.md` P1. The retired top-level ``cxr rebrem`` and
-``cxr reline`` spellings resolve to the same commands through the deprecation
+`docs/package-structure-rfc.md` P1. The retired top-level ``pyrite rebrem`` and
+``pyrite reline`` spellings resolve to the same commands through the deprecation
 registry in :mod:`cxr_mc.cli._deprecations`.
 """
 
@@ -27,7 +27,7 @@ def _brem_cli(args):
     """CLI handler -- returns None so the dict never reaches sys.exit."""
     if bool(args.material) == bool(args.all):
         raise SystemExit(
-            "cxr rebrem: give one or more materials, or -a/--all for every checkpoint "
+            "pyrite rebrem: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
     return _recompute.rebrem_checkpoints(
@@ -50,7 +50,7 @@ def _brem_cli(args):
 def _brem_cli_json(args):
     if bool(args.material) == bool(args.all):
         raise SystemExit(
-            "cxr rebrem: give one or more materials, or -a/--all for every checkpoint "
+            "pyrite rebrem: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
     started = time.monotonic()
@@ -339,7 +339,7 @@ def _line_cli(args):
     """CLI handler -- returns None so the dict never reaches sys.exit."""
     if bool(args.material) == bool(args.all):
         raise SystemExit(
-            "cxr reline: give one or more materials, or -a/--all for every checkpoint "
+            "pyrite reline: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
     return _recompute.reline_checkpoints(
@@ -362,7 +362,7 @@ def _line_cli(args):
 def _line_cli_json(args):
     if bool(args.material) == bool(args.all):
         raise SystemExit(
-            "cxr reline: give one or more materials, or -a/--all for every checkpoint "
+            "pyrite reline: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
     started = time.monotonic()

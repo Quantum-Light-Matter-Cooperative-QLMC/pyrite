@@ -1,9 +1,9 @@
 """Small cross-platform developer command runner for cxr_mc.
 
 This keeps agents and humans out of shell one-liner hell on Windows.
-Exposed as the ``cxr-dev`` console script (see ``[project.scripts]``); run via:
+Exposed as the ``pyrite-dev`` console script (see ``[project.scripts]``); run via:
 
-    uv run cxr-dev <command>
+    uv run pyrite-dev <command>
 
 Commands:
     acp-up     start the Claude and Codex ACP WebSocket bridges
@@ -160,7 +160,7 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
         if not current:
             print(
                 "repository map dependency graph changed; "
-                "regenerate with `cxr-dev repo-map --write`",
+                "regenerate with `pyrite-dev repo-map --write`",
                 file=sys.stderr,
             )
             raise SystemExit(1)
@@ -203,22 +203,22 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
     print()
     print("Canonical commands:")
     for line in [
-        "uv run cxr-dev acp-up",
-        "uv run cxr-dev acp-down",
-        "uv run cxr-dev lint",
-        "uv run cxr-dev format",
-        "uv run cxr-dev typecheck",
-        "uv run cxr-dev precommit",
-        "uv run cxr-dev test",
-        "uv run cxr-dev test-suite core",
-        "uv run cxr-dev package-smoke",
-        "uv run cxr-dev smoke --material hopg --output-dir /tmp/cxr-mc-smoke",
-        "uv run cxr-dev sync-skills",
-        "uv run cxr-dev check-skills",
-        "uv run cxr-dev bootstrap",
-        "uv run cxr-dev verify",
-        "uv run cxr-dev nbqa",
-        "uv run cxr-dev nbstrip",
+        "uv run pyrite-dev acp-up",
+        "uv run pyrite-dev acp-down",
+        "uv run pyrite-dev lint",
+        "uv run pyrite-dev format",
+        "uv run pyrite-dev typecheck",
+        "uv run pyrite-dev precommit",
+        "uv run pyrite-dev test",
+        "uv run pyrite-dev test-suite core",
+        "uv run pyrite-dev package-smoke",
+        "uv run pyrite-dev smoke --material hopg --output-dir /tmp/pyrite-smoke",
+        "uv run pyrite-dev sync-skills",
+        "uv run pyrite-dev check-skills",
+        "uv run pyrite-dev bootstrap",
+        "uv run pyrite-dev verify",
+        "uv run pyrite-dev nbqa",
+        "uv run pyrite-dev nbstrip",
     ]:
         print(f"  {line}")
 
@@ -274,7 +274,7 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
 
     Four domain suites partition every ``tests/test_*.py`` module exactly once.
     ``integration`` intentionally samples public boundaries across domains; the
-    full ``cxr-dev test`` gate remains unchanged.
+    full ``pyrite-dev test`` gate remains unchanged.
     """
     tests_dir = root / "tests"
     files = sorted(tests_dir.rglob("test_*.py"))
@@ -517,7 +517,7 @@ def cmd_verify(args: argparse.Namespace) -> None:
     if not todo_merge_driver_configured():
         print(
             "warning: TODO.md merge driver not configured; "
-            "run `uv run cxr-dev bootstrap` (see agentdocs/README.md).",
+            "run `uv run pyrite-dev bootstrap` (see agentdocs/README.md).",
             file=sys.stderr,
         )
     cmd_imports(args)
@@ -596,7 +596,7 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         help=(
             "set NUMBA_DISABLE_JIT=1 so @njit bodies (transport.py, geometry.py, "
             "groove.py) are traced by coverage instead of running compiled; "
-            "must precede pytest_args, e.g. `cxr-dev test --numba --cov`"
+            "must precede pytest_args, e.g. `pyrite-dev test --numba --cov`"
         ),
     )
     test.add_argument("pytest_args", nargs=argparse.REMAINDER)

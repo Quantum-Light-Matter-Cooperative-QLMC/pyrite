@@ -1,6 +1,6 @@
 ---
 name: regression-testing
-description: Use when the task is to design or add a fast cxr-mc regression test for numerical, stochastic, plotting, checkpoint, or physics behavior; domain skills own implementation review.
+description: Use when the task is to design or add a fast PyRITE regression test for numerical, stochastic, plotting, checkpoint, or physics behavior; domain skills own implementation review.
 ---
 
 # Regression Testing
@@ -25,7 +25,7 @@ Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
 command:
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/path/to/test.py -k test_name
 ```
 

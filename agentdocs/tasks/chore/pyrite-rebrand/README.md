@@ -103,19 +103,19 @@ Related accepted design constraints:
       display brand, long form, tagline, lowercase repository name,
       distribution, import namespace, commands, environment variables, and
       config/cache directory policy.
-- [ ] C — Implement the approved distribution/import transition. Preserve or
+- [x] C — Implement the approved distribution/import transition. Preserve or
       intentionally migrate public imports, package data, version discovery,
       editable/wheel installs, pickled module paths, entry shims, and frozen
       exports.
-- [ ] D — Implement the approved CLI/config/environment transition additively.
+- [x] D — Implement the approved CLI/config/environment transition additively.
       Cover root and developer commands, help, completion, JSON contracts,
       remote-generated invocations, environment precedence, Click app
       directories, and deprecation warnings.
-- [ ] E — Update persisted/on-disk compatibility: checkpoint readers, campaign
+- [x] E — Update persisted/on-disk compatibility: checkpoint readers, campaign
       locks, remote job metadata, config/cache/workspace paths, and any schema
       identifiers selected for migration. Old valid artifacts must remain
       readable unless the approved matrix explicitly documents otherwise.
-- [ ] F — Rebrand README/docs/apps/scripts/container and repository metadata.
+- [x] F — Rebrand README/docs/apps/scripts/container and repository metadata.
       Regenerate `docs/cli-reference.md`, `docs/cli-deprecations.md`,
       `docs/api.md` where affected, and `docs/repo_map.md`; repair every
       maintained cross-link and clone/install example.
@@ -214,14 +214,15 @@ checks for the proposed and current repository paths both returned HTTP 404,
 which is inconclusive for this private organization repository. Full URLs and
 the credential boundary are recorded in the RFC.
 
-No C–H source/package/CLI/config/path implementation was performed in the A/B
-checkpoint. Repository/package structure cleanup has now landed, satisfying
-the dependency for the next implementation slice.
-
-A/B are closed by the accepted RFC and ADR, and repository/package structure
-cleanup has landed. C, E, and the repository-contained portion of F may be
-self-contained Serena `one-shot` slices; D remains cross-contract review work,
-and G remains a credentialed coordination step.
+C is checkpointed by `7cedf60`: distribution `pyrite-xray`, stable `cxr_mc`
+imports/pickle paths, and clean-install package guards. D/E are checkpointed by
+`268a9ad`: canonical and compatibility executables, deterministic environment
+precedence, completion compatibility, canonical config/state/cache writes with
+legacy read-through, and stable persisted/wire identifiers. F updates current
+public and contributor surfaces, release metadata/version 0.2.0, generated CLI
+and repository references, app chrome, scripts, Docker/CI, and canonical skill
+mirrors. G remains an explicitly credentialed external step; H records the
+release-gate evidence after the F checkpoint.
 
 ## Delegation slices and required skills
 
@@ -244,12 +245,12 @@ and G remains a credentialed coordination step.
 ## Acceptance checks
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite packaging
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite cli
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite apps
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev package-smoke
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev repo-map --check
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev package-smoke
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev repo-map --check
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 ```
 
 - The approved identity matrix has exactly one canonical spelling per surface

@@ -1,4 +1,4 @@
-"""Shared presentation primitives for cxr-mc Marimo applications."""
+"""Shared presentation primitives for PyRITE Marimo applications."""
 
 from __future__ import annotations
 
@@ -149,7 +149,7 @@ def style_sheet(mo):
     return mo.Html(notebook_css())
 
 
-def page_title(mo, title: str, intro: str, *, eyebrow: str = "CXR instrument"):
+def page_title(mo, title: str, intro: str, *, eyebrow: str = "PyRITE"):
     return mo.Html(
         '<header class="cxr-shell cxr-title">'
         f'<div class="cxr-title__eyebrow">{escape(eyebrow)}</div>'

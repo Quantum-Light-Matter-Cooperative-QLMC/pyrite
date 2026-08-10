@@ -47,7 +47,7 @@ probabilities, transition rates, linewidths, or low-energy validation records.
 
 Conclusion: neither G4ppyy, Geant4 channeling classes, nor `G4CHANNELING 2.0`
 explicitly supports defensible electron channeling below roughly 50–100 MeV.
-Geant4 remains suitable for ordinary electromagnetic transport, while cxr-mc
+Geant4 remains suitable for ordinary electromagnetic transport, while PyRITE
 must own low-energy quantum channeling.
 
 ### Low-energy theory and validation anchors

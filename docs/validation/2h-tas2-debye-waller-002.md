@@ -72,7 +72,7 @@ Inspection after fixing the derivation found:
 - `structure_factor` applies that factor once to each atom.
 
 A separate numeric calculation used only the source cell/basis and `xraydb.f0`
-(no cxr-mc crystallography helper). At 10 keV, changing the common scalar from
+(no PyRITE crystallography helper). At 10 keV, changing the common scalar from
 `0.60` to `0.53 Ang^2` changes `|F002|^2` by `+0.0957151%`. Replacing the
 site-specific source tensors by the common `0.53 Ang^2` projection changes it
 by `-0.0235936%`. These reproduce the ledger values (`+0.096%` and `-0.024%`).

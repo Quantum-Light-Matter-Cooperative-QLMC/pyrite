@@ -1,6 +1,6 @@
 ---
 name: performance
-description: Use when profiling, benchmarking, or investigating cxr-mc runtime, memory, GPU use, I/O, plotting, or remote latency.
+description: Use when profiling, benchmarking, or investigating PyRITE runtime, memory, GPU use, I/O, plotting, or remote latency.
 ---
 
 # Performance

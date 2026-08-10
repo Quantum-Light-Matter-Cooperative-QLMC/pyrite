@@ -50,7 +50,7 @@ Three consequences frame the whole implementation:
    between a few bound states — exactly what Watson observed at 1–3 MeV. The
    states must come from an explicit eigensolve; there is no continuum
    approximation to fall back on.
-2. **The photon energies land in or near the cxr-mc detector band.** The
+2. **The photon energies land in or near the PyRITE detector band.** The
    Doppler upshift $2\gamma^2$ maps eV-scale transverse spacings to
    0.1–20 keV photons, overlapping PXR/CBS lines. Channeling radiation is a
    physical foreground/background for the coherent spectra, not a separate

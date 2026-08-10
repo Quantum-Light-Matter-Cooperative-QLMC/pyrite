@@ -221,7 +221,7 @@ def complete_archive_stem(ctx: object, param: object, incomplete: str) -> list[C
 
 
 def complete_checkpoint(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
-    """Complete active checkpoint paths for commands such as ``cxr slim``."""
+    """Complete active checkpoint paths for commands such as ``pyrite slim``."""
     del param
     typed = Path(incomplete)
     if typed.parent != Path("."):

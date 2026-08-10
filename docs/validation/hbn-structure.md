@@ -47,7 +47,7 @@ This is **not** written in the Wyckoff `z = 1/4, 3/4` setting, but it is the
 *same crystal*. Applying the rigid origin shift `t = (2/3, 1/3, 3/4)` to the
 canonical Wyckoff positions reproduces the implemented basis atom-for-atom
 (verified numerically, mod-1, for all four atoms). A pure origin translation
-leaves `|F(g)|²` — the only structure-factor quantity cxr-mc consumes —
+leaves `|F(g)|²` — the only structure-factor quantity PyRITE consumes —
 invariant, so the two descriptions are physically identical.
 
 Checks (all pass):

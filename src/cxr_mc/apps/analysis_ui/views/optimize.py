@@ -12,7 +12,7 @@ from .common import thickness_selector
 def render_rankings(mo, *, context):
     frame = top_geometries(context.results, context.settings, top_n=20, select="quality_peak")
     if frame.empty:
-        command = "cxr blaze" if context.selected_face == "blazed" else "scan_app.py"
+        command = "pyrite material blaze" if context.selected_face == "blazed" else "scan_app.py"
         return mo.md(
             f"**No {context.selected_face} checkpoint for `{context.selected_material}`** — "
             f"run `{command}` first."

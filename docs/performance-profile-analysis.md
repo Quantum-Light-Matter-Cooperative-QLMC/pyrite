@@ -1,6 +1,6 @@
 # Performance-profile analysis playbook
 
-Use this guide after collecting `cxr run PROFILE --remote --perf` logs.
+Use this guide after collecting `pyrite run PROFILE --remote --perf` logs.
 Goal: identify throughput constraint from measured phase and resource behavior,
 then test one change at a time. High CPU or GPU utilization is supporting
 evidence, not optimization target; compute-weighted throughput is target.
@@ -48,8 +48,8 @@ The performance-profile name selects an existing catalog profile; it is not an
 arbitrary experiment label. Pulled remote logs retain job separation:
 
 ```bash
-cxr run sub_100keV --remote --perf --detach
-cxr remote performance pull sub_100keV
+pyrite run sub_100keV --remote --perf --detach
+pyrite remote performance pull sub_100keV
 ```
 
 Cached cases contain no new compute and must not be compared with uncached
@@ -62,7 +62,7 @@ single-process pipeline behavior is understood.
 Generate analysis artifacts after local collection or remote pull:
 
 ```bash
-cxr profile analyze sub_100keV
+pyrite profile analyze sub_100keV
 ```
 
 Use `--performance-dir PATH` for a non-default log root and `--sample-period
@@ -71,34 +71,34 @@ SECONDS` when collection did not use the default five-second interval.
 ### Repeat one uncached remote workload
 
 Run three comparable MoS2 sessions with one-second telemetry and a fixed
-six-worker allocation. Submissions go through `cxr run PROFILE -R/--remote`;
-`cxr remote run` still resolves but is deprecated and hidden (removal in 0.3.0,
+six-worker allocation. Submissions go through `pyrite run PROFILE -R/--remote`;
+`pyrite remote run` still resolves but is deprecated and hidden (removal in 0.3.0,
 see [`cli-deprecations.md`](cli-deprecations.md)). The supported form has no
 repetition flag — submit once per repetition, waiting for each to finish, since
 one live job per named profile is allowed. `--perf-reps`, `--chunk-minutes`, and
 `--parallel-materials` exist only on the deprecated command:
 
 ```bash
-cxr run mos2_heavy -m mos2 --remote \
+pyrite run mos2_heavy -m mos2 --remote \
   -p \
   -i 1 \
   --workers 6 \
   --detach
 
-cxr remote performance pull mos2_heavy
-cxr profile analyze mos2_heavy --sample-period 1
+pyrite remote performance pull mos2_heavy
+pyrite profile analyze mos2_heavy --sample-period 1
 ```
 
 `-p/--perf` runs without shared-cache reads or writes, so every repetition is
 uncached and existing production checkpoints stay untouched; profiling
 checkpoints are not automatically pulled. `PROFILE` must name a catalog profile
-(`cxr profile list`) — it is not a free-form experiment label.
+(`pyrite profile list`) — it is not a free-form experiment label.
 
 After the baseline completes, test a smaller line-spectrum chunk while keeping
 every other option fixed:
 
 ```bash
-cxr run mos2_heavy -m mos2 --remote \
+pyrite run mos2_heavy -m mos2 --remote \
   -p \
   -i 1 \
   --workers 6 \
@@ -118,7 +118,7 @@ capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and native
 CPU samples for one full uncached session:
 
 ```bash
-cxr run mos2_heavy -m mos2 --remote \
+pyrite run mos2_heavy -m mos2 --remote \
   -p \
   -i 1 \
   --workers 6 \
@@ -126,7 +126,7 @@ cxr run mos2_heavy -m mos2 --remote \
   --nsys \
   --detach
 
-cxr remote performance pull mos2_heavy
+pyrite remote performance pull mos2_heavy
 ```
 
 The spectrum-side ranges are `cxr.spectrum_case:*`, `cxr.lines*`, `cxr.brem`,
@@ -185,8 +185,8 @@ Nsight attributes device work; it will not tell you which Python function owns a
 host-side range. For that, add a bounded single-process `cProfile` pass:
 
 ```bash
-cxr run mos2_heavy -m mos2 --remote -c --detach     # primary run, then CPU pass
-cxr run mos2_heavy -m mos2 --remote --cpu-only --detach  # CPU pass only
+pyrite run mos2_heavy -m mos2 --remote -c --detach     # primary run, then CPU pass
+pyrite run mos2_heavy -m mos2 --remote --cpu-only --detach  # CPU pass only
 ```
 
 Both flags require `-R/--remote` (heavy profiling stays off the workstation),
@@ -195,7 +195,7 @@ phase first and the CPU pass after it; `--cpu-only` starts no GPU or Nsight
 phase at all. `--cpu` and `--cpu-only` are mutually exclusive, and `--cpu-only`
 rejects `--nsys` and the GPU chunk pins, which have nothing to act on. The pass
 writes `<material>.cpu.prof` and `<material>.cpu.txt` beside the NDJSON, pulled
-by the same `cxr remote performance pull`. A CPU-phase failure fails the job;
+by the same `pyrite remote performance pull`. A CPU-phase failure fails the job;
 with `--cpu` the primary artifacts are still retained.
 
 ## Validate and normalize

@@ -65,16 +65,16 @@ def recompute_command() -> None:
 def command() -> None:
     """Inspect, transform, recompute, archive, and reclaim local checkpoints.
 
-    Existing top-level paths such as ``cxr slim`` and ``cxr archive`` remain
+    Existing top-level paths such as ``pyrite slim`` and ``pyrite archive`` remain
     compatibility aliases.
 
     \b
     Examples:
-      cxr checkpoint list
-      cxr checkpoint archive hopg keeper
-      cxr checkpoint recompute line hopg
-      cxr checkpoint gc --profile standard
-      cxr checkpoint rm --profile standard
+      pyrite checkpoint list
+      pyrite checkpoint archive hopg keeper
+      pyrite checkpoint recompute line hopg
+      pyrite checkpoint gc --profile standard
+      pyrite checkpoint rm --profile standard
     """
 
 

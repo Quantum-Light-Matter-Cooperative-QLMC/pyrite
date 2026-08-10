@@ -1,6 +1,6 @@
 ---
 name: implement-task-lite
-description: Use when implementing one tightly bounded, low-risk cxr-mc task slice with specified owners and acceptance checks, especially through Haiku- or Luna-tier workers.
+description: Use when implementing one tightly bounded, low-risk PyRITE task slice with specified owners and acceptance checks, especially through Haiku- or Luna-tier workers.
 ---
 
 # Implement Task Lite

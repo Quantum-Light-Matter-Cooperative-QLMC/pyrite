@@ -1,6 +1,6 @@
 ---
 name: physics-validation
-description: Use when a ledgered cxr-mc equation needs fresh-context independent validation from source derivation through units/limits/signs, source-to-code agreement, or paper reproduction.
+description: Use when a ledgered PyRITE equation needs fresh-context independent validation from source derivation through units/limits/signs, source-to-code agreement, or paper reproduction.
 ---
 
 # Physics Validation

@@ -1,1 +1,1 @@
-"""Repository-only developer tooling behind ``cxr-dev``."""
+"""Repository-only developer tooling behind ``pyrite-dev``."""

@@ -1,4 +1,4 @@
-description: Expose optional Serena tools useful to cxr-mc Codex workers
+description: Expose optional Serena tools useful to PyRITE Codex workers
 prompt: ""
 excluded_tools: []
 included_optional_tools:

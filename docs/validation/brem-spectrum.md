@@ -62,7 +62,7 @@ electron. The remaining content is the cross-section `dsigma/dk`.
 
 ### 2a. Born (Bethe–Heitler) non-relativistic energy-differential cross-section
 
-cxr-mc operates at weakly relativistic beam energies (tens of keV), and the
+PyRITE operates at weakly relativistic beam energies (tens of keV), and the
 docstring states emission is taken isotropic at "weakly relativistic
 energies". The canonical Born-approximation bremsstrahlung cross-section,
 differential in photon energy `k` and integrated over photon and electron

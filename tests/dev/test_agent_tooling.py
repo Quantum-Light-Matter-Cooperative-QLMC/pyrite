@@ -168,16 +168,16 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
     assert "sync_local_backend.sh" in claude_command
     assert expected in claude_hook_script
     assert expected in codex_command
-    assert "UV_CACHE_DIR=/tmp/cxr-mc-uv-cache" in claude_hook_script
-    assert "UV_CACHE_DIR=/tmp/cxr-mc-uv-cache" in codex_command
+    assert "UV_CACHE_DIR=/tmp/pyrite-uv-cache" in claude_hook_script
+    assert "UV_CACHE_DIR=/tmp/pyrite-uv-cache" in codex_command
 
 
 @pytest.mark.parametrize(
     "command",
     [
-        "uv run cxr run standard -m hopg",
-        "UV_CACHE_DIR=/tmp/cache uv run cxr run standard -m hopg",
-        "git status && uv run cxr run standard -m hopg",
+        "uv run pyrite run standard -m hopg",
+        "UV_CACHE_DIR=/tmp/cache uv run pyrite run standard -m hopg",
+        "git status && uv run pyrite run standard -m hopg",
         "(uv run cxr run standard -m hopg)",
     ],
 )
@@ -188,14 +188,14 @@ def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None
 @pytest.mark.parametrize(
     "command",
     [
-        "uv run cxr run standard -m hopg --remote",
-        "uv run cxr run standard -m hopg --remote=qlmc",
-        "uv run cxr run standard -m hopg -R",
-        "uv run cxr run standard -m hopg -Rqlmc",
-        "uv run cxr remote run standard -m hopg",
-        "uv run cxr run --help",
-        "echo 'uv run cxr run standard -m hopg'",
-        "rg 'cxr run' README.md",
+        "uv run pyrite run standard -m hopg --remote",
+        "uv run pyrite run standard -m hopg --remote=qlmc",
+        "uv run pyrite run standard -m hopg -R",
+        "uv run pyrite run standard -m hopg -Rqlmc",
+        "uv run pyrite remote run standard -m hopg",
+        "uv run pyrite run --help",
+        "echo 'uv run pyrite run standard -m hopg'",
+        "rg 'pyrite run' README.md",
         "git status",
     ],
 )
@@ -206,9 +206,9 @@ def test_sweep_guard_allows_safe_commands(sweep_guard_module, command: str) -> N
 @pytest.mark.parametrize(
     "command",
     [
+        "PYRITE_LOCAL_SWEEP_OK=1 uv run pyrite run standard -m hopg",
         "CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
-        "CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
-        "env CXR_LOCAL_SWEEP_OK=true uv run cxr run standard -m hopg",
+        "env PYRITE_LOCAL_SWEEP_OK=true uv run pyrite run standard -m hopg",
     ],
 )
 def test_sweep_guard_inline_override_opts_out_a_detected_run(
@@ -222,8 +222,8 @@ def test_sweep_guard_inline_override_opts_out_a_detected_run(
 
 
 def test_sweep_guard_ambient_override_opts_out(sweep_guard_module, monkeypatch) -> None:
-    command = "uv run cxr run standard -m hopg"
-    monkeypatch.setenv("CXR_LOCAL_SWEEP_OK", "1")
+    command = "uv run pyrite run standard -m hopg"
+    monkeypatch.setenv("PYRITE_LOCAL_SWEEP_OK", "1")
     assert sweep_guard_module._override_active(command)
 
 
@@ -232,6 +232,6 @@ def test_sweep_guard_falsey_override_still_blocks(
     sweep_guard_module, monkeypatch, value: str
 ) -> None:
     monkeypatch.delenv("CXR_LOCAL_SWEEP_OK", raising=False)
-    command = f"CXR_LOCAL_SWEEP_OK={value} uv run cxr run standard -m hopg"
+    command = f"PYRITE_LOCAL_SWEEP_OK={value} uv run pyrite run standard -m hopg"
     assert sweep_guard_module._local_scan(command)
     assert not sweep_guard_module._override_active(command)

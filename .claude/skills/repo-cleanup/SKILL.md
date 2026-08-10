@@ -1,6 +1,6 @@
 ---
 name: repo-cleanup
-description: "Use when cxr-mc needs general git hygiene after task records are correct: safe branch rebases, stale tracking cleanup, and objectively merged worktree/ref removal; never edit TODO or task docs."
+description: "Use when PyRITE needs general git hygiene after task records are correct: safe branch rebases, stale tracking cleanup, and objectively merged worktree/ref removal; never edit TODO or task docs."
 ---
 
 # Repo Cleanup
@@ -28,7 +28,7 @@ temporary worktree when a checkout is required.
 
 1. Preflight with `git merge-tree --write-tree main <branch>`.
 2. Rebase only with no conflicts or `TODO.md`-only conflicts. The installed
-   `merge=ours` driver should resolve TODO; run `uv run cxr-dev bootstrap` if
+   `merge=ours` driver should resolve TODO; run `uv run pyrite-dev bootstrap` if
    missing.
 3. Abort on every conflict outside `TODO.md`; do not resolve it.
 4. Report branches already contained in main as retirement candidates.

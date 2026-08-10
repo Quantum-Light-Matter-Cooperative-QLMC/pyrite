@@ -62,8 +62,7 @@ class AutodocWarningBaseline(logging.Filter):
         subtype = getattr(record, "subtype", "")
         message = record.getMessage()
         self.fingerprints.append(
-            f"{source_name}::{record.levelname}::"
-            f"docutils.{subtype}::{message}"
+            f"{source_name}::{record.levelname}::docutils.{subtype}::{message}"
         )
         return os.environ.get("CXR_DOCS_SHOW_AUTODOC_WARNINGS") == "1"
 
@@ -74,9 +73,7 @@ class AutodocWarningBaseline(logging.Filter):
 
 def _install_filter(app: Sphinx) -> None:
     source_dir = Path(app.srcdir)
-    baseline = AutodocWarningBaseline(
-        source_dir.parent / "src", source_dir / "_autosummary"
-    )
+    baseline = AutodocWarningBaseline(source_dir.parent / "src", source_dir / "_autosummary")
     _BASELINES[id(app)] = baseline
     sphinx_logger = logging.getLogger(sphinx_logging.NAMESPACE)
     for handler in sphinx_logger.handlers:
@@ -90,8 +87,7 @@ def _check_filter(app: Sphinx, _exception: BaseException | None) -> None:
     digest = baseline.digest()
     if count != EXPECTED_COUNT or digest != EXPECTED_SHA256:
         sphinx_logging.getLogger(__name__).warning(
-            "autodoc warning baseline changed: count=%d, sha256=%s "
-            "(expected count=%d, sha256=%s)",
+            "autodoc warning baseline changed: count=%d, sha256=%s (expected count=%d, sha256=%s)",
             count,
             digest,
             EXPECTED_COUNT,

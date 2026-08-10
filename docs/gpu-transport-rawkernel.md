@@ -461,7 +461,7 @@ spectrum kernels.
 ## Reproducing the CPU-side checks
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/montecarlo/test_transport_per_electron.py \
   tests/montecarlo/test_transport_core_default.py \
   tests/montecarlo/test_segment_staging.py

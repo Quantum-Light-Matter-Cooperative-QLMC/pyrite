@@ -1,6 +1,6 @@
 # Beam phase space
 
-How `cxr-mc` specifies the electron beam **as an input**, and how that
+How PyRITE specifies the electron beam **as an input**, and how that
 specification becomes the per-electron initial conditions the Monte Carlo
 transports.
 
@@ -10,10 +10,10 @@ covers the *output* side, `beam_metrics.sampled_beam_metrics`).
 
 Every key below is spelled the same wherever the beam is written. Beams are now
 named catalog objects — a top-level `[beams.NAME]` table attached by
-`beam = "NAME"` on a profile and managed with `cxr beam ...` — rather than an
-inline `[profiles.NAME.beam]` sub-table written by `cxr profile` flags. The
+`beam = "NAME"` on a profile and managed with `pyrite beam ...` — rather than an
+inline `[profiles.NAME.beam]` sub-table written by `pyrite profile` flags. The
 inline spelling still decodes and still means exactly this, and the nine
-`cxr profile` beam flags still work while warning; nothing about the physics,
+`pyrite profile` beam flags still work while warning; nothing about the physics,
 the units, or the mutual exclusions changed with the move. Because a reference
 resolves to values before hashing, converting an inline block to a named beam
 leaves `parameter_sha256` bit-for-bit. See
@@ -26,7 +26,7 @@ plane where transport begins.
 
 This matters because the numbers a user has to hand are usually gun-exit or
 source numbers. At 1 pC in 200 fs at 30–100 keV, space charge is not negligible
-over a realistic source-to-target drift, and `cxr-mc` does not model it. There
+over a realistic source-to-target drift, and PyRITE does not model it. There
 is no beamline transport, no space charge, and no envelope evolution: the
 distribution written in a profile is the distribution sampled. Feeding gun-exit
 emittance into a profile and reading the output as physical is a user error the

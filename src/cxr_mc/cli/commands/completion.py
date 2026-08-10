@@ -134,13 +134,13 @@ def _target_options(function):
 )
 @_target_options
 def install_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> None:
-    """Append cxr tab-completion setup to a shell rc/config file.
+    """Append pyrite tab-completion setup to a shell rc/config file.
 
     \b
     Examples:
-      cxr completion install
-      cxr completion install --shell zsh --dry-run
-      cxr completion install --shell fish
+      pyrite completion install
+      pyrite completion install --shell zsh --dry-run
+      pyrite completion install --shell fish
     """
     shell, target = _resolve_target(shell, rc_file)
     line = _completion_line(shell)
@@ -210,18 +210,18 @@ def remove_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> No
         "remove": "cxr_mc.cli.commands.completion.remove_command",
     },
     lazy_help={
-        "install": "Append cxr tab-completion setup to a shell rc/config file.",
-        "remove": "Remove cxr tab-completion setup from a shell rc/config file.",
+        "install": "Append pyrite tab-completion setup to a shell rc/config file.",
+        "remove": "Remove pyrite tab-completion setup from a shell rc/config file.",
     },
     no_args_is_help=True,
 )
 def command() -> None:
-    """Manage cxr shell tab-completion.
+    """Manage pyrite shell tab-completion.
 
     \b
     Example:
-      cxr completion install
-      cxr completion install --shell zsh --dry-run
+      pyrite completion install
+      pyrite completion install --shell zsh --dry-run
     """
 
 

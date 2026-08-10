@@ -1,7 +1,7 @@
 [project]
 name = "pyrite-xray"
-version = "0.1.0"
-description = "Coherent X-ray radiation (PXR + coherent bremsstrahlung) from table-top electron beams in crystals"
+version = "0.2.0"
+description = "Coherent X-ray radiation and electron transport in crystals."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -37,7 +37,7 @@ external-db = [
 nvidia = [
     "cupy-cuda13x[ctk]>=14.1.1",
 ]
-# AMD's current ``amd-cupy`` wheels are CPython 3.10-only. cxr-mc requires
+# AMD's current ``amd-cupy`` wheels are CPython 3.10-only. PyRITE requires
 # Python 3.13+, so this extra builds upstream CuPy against ROCm instead. It must
 # not be installed beside the CUDA CuPy distribution in one environment.
 amd = [
@@ -53,6 +53,11 @@ pyrite = "cxr_mc.cli:main"
 pyrite-dev = "cxr_mc._dev:main"
 cxr = "cxr_mc.cli:legacy_main"
 cxr-dev = "cxr_mc._dev:legacy_main"
+
+[project.urls]
+Homepage = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme"
+Repository = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite"
+Documentation = "https://quantum-light-matter-cooperative-qlmc.github.io/pyrite/"
 
 [build-system]
 requires = ["hatchling"]
@@ -257,7 +262,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.uv]
-cache-dir = "/tmp/cxr-mc-uv-cache"
+cache-dir = "/tmp/pyrite-uv-cache"
 conflicts = [
     [
         { extra = "nvidia" },

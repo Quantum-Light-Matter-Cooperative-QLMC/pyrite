@@ -409,7 +409,7 @@ def _format_now_testing(current):
 def _format_case_progress(records, materials=()):
     """Render the latest validated atomic case snapshots."""
     if not records:
-        return "  No case progress reported yet. Use `cxr remote logs` for diagnostics."
+        return "  No case progress reported yet. Use `pyrite remote logs` for diagnostics."
     order = []
     for material in materials:
         order.extend(key for key, record in records.items() if record["material"] == material)

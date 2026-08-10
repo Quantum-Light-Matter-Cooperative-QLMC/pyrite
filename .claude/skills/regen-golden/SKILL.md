@@ -10,10 +10,10 @@ regen could mask unexplained drift.
 
 ```bash
 git status --short data/materials.toml src/cxr_mc/materials/catalog.py
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev regen-golden
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev regen-golden
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/materials/test_material_catalog.py -k golden
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/test_line_grid_golden.py
 git diff --stat tests/data/material_catalog_golden.json
 ```

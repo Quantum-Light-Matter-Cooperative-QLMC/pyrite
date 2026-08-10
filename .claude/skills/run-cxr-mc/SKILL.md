@@ -1,9 +1,9 @@
 ---
 name: run-cxr-mc
-description: Use when running, launching, smoke-testing, or confirming real cxr-mc CLI, component checkpoints, plotting, or marimo behavior beyond unit tests.
+description: Use when running, launching, smoke-testing, or confirming real PyRITE CLI, component checkpoints, plotting, or marimo behavior beyond unit tests.
 ---
 
-# Run cxr-mc
+# Run PyRITE
 
 User surfaces: `uv run cxr ...`; four packaged marimo apps under
 `src/cxr_mc/apps/`; library under `src/cxr_mc/`. Active checkpoints:
@@ -12,7 +12,7 @@ User surfaces: `uv run cxr ...`; four packaged marimo apps under
 Use existing-checkpoint smoke path:
 
 ```bash
-uv run cxr-dev smoke --material hopg --output-dir /tmp/cxr-mc-smoke
+uv run pyrite-dev smoke --material hopg --output-dir /tmp/pyrite-smoke
 ```
 
 Use `uv run cxr --help` for discovery and `uv run marimo run <app.py>` for
@@ -27,5 +27,5 @@ Own local runtime confirmation only. Unit/regression design belongs to
 Full repository gate:
 
 ```bash
-uv run cxr-dev verify
+uv run pyrite-dev verify
 ```

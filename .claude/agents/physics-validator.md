@@ -1,7 +1,7 @@
 ---
 name: physics-validator
 description: >-
-  Independently verify a ledgered cxr-mc physics claim in fresh context without
+  Independently verify a ledgered PyRITE physics claim in fresh context without
   modifying its implementation or signing it off.
 tools: Read, Grep, Glob, Bash, Write
 ---

@@ -1,6 +1,6 @@
 # Update Repository Map
 
 Use the mirrored `repo-orientation` skill, then run
-`rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev repo-map`.
+`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev repo-map`.
 Update `docs/repo_map.md` for:
 $ARGUMENTS

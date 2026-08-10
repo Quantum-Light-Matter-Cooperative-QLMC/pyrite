@@ -10,8 +10,8 @@ one-GPU SLURM batch script there (see :mod:`cxr_mc.runs.scan`), and pulls result
 toolchain.
 
 Optional, dev-only tool: it is only useful if you have an ssh host configured
-(default 'qlmc', override via CXR_REMOTE_HOST) to run sweeps on. Every other
-``cxr`` command works without it.
+(default 'qlmc', override via PYRITE_REMOTE_HOST) to run sweeps on. Every other
+``pyrite`` command works without it.
 
 Run, wait for SLURM, then pull:
 
@@ -54,7 +54,8 @@ Then locally: run ``pyrite app analysis <material>`` or ``pyrite app analysis ex
 
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
-Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
+Override the box via env: PYRITE_REMOTE_HOST / PYRITE_REMOTE_DIR / PYRITE_REMOTE_UV.
+The corresponding CXR_* spellings remain compatibility aliases.
 """
 
 # ---------------------------------------------------------------------------

@@ -549,9 +549,10 @@ def _reject_all_with_values(command_name, all_, values):
     deprecation_prefix="remote",
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
-        "Host, remote directory, and executable come from CXR_REMOTE_HOST, "
-        "CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence "
-        "over workflow defaults where offered.\n\n"
+        "Host, remote directory, and executable come from PYRITE_REMOTE_HOST, "
+        "PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV (legacy CXR_* aliases remain "
+        "supported). Command-line options take precedence over workflow defaults "
+        "where offered.\n\n"
         "\b\n"
         "Examples:\n"
         "  pyrite run sub_100keV --remote --dry-run\n"

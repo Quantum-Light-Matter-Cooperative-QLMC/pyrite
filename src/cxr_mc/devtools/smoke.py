@@ -1,4 +1,4 @@
-"""Headless checkpoint-to-plot smoke test for cxr-mc."""
+"""Headless checkpoint-to-plot smoke test for PyRITE."""
 
 from __future__ import annotations
 

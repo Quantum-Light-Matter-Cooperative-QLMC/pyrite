@@ -1,4 +1,4 @@
-"""Sphinx configuration for the cxr-mc documentation site.
+"""Sphinx configuration for the PyRITE documentation site.
 
 Lightweight by design: MyST renders the existing Markdown design notes and
 autosummary/autodoc pull the API straight from the package docstrings. Build
@@ -18,9 +18,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Keep autodoc imports deterministic and quiet without muting Sphinx warnings.
-os.environ.setdefault(
-    "MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "cxr-mc-matplotlib")
-)
+os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "pyrite-matplotlib"))
 
 # Make the package importable for autodoc even from a non-installed checkout
 # (an editable ``uv sync`` also puts it on the path).
@@ -33,7 +31,7 @@ from cxr_mc import __version__
 logging.getLogger("cxr_mc.materials.catalog").setLevel(logging.ERROR)
 
 # -- Project -----------------------------------------------------------------
-project = "cxr-mc"
+project = "PyRITE"
 author = "Alex Amador"
 copyright = "2026, Alex Amador"
 release = __version__
@@ -98,4 +96,4 @@ exclude_patterns = [
 
 # -- HTML output -------------------------------------------------------------
 html_theme = "furo"
-html_title = "cxr-mc"
+html_title = "PyRITE"

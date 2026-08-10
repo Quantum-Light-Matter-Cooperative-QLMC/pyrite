@@ -303,7 +303,7 @@ def _(
                 mo,
                 "Checkpoint already complete",
                 f"All requested cases already exist in `{checkpoint_path}`.",
-                f"cxr app analysis {MATERIAL}",
+                f"pyrite app analysis launch {MATERIAL}",
             )
         else:
             output = mo.callout(f"Scan failed while reading checkpoint: `{error}`", kind="danger")
@@ -325,7 +325,7 @@ def _(
                     mo,
                     "Scan complete",
                     f"Results saved at `{checkpoint_path}`. Checkpoint remains resumable.",
-                    f"cxr app analysis {MATERIAL}",
+                    f"pyrite app analysis launch {MATERIAL}",
                     kind="success",
                 ),
             ]

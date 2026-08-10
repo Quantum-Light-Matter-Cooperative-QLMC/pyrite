@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-This note surveys crystalline materials that are missing from cxr-mc's current
+This note surveys crystalline materials that are missing from PyRITE's current
 material catalog and may be promising for parametric X-ray radiation (PXR) or
 coherent bremsstrahlung (CBS) driven by electron beams in the tens to low
 hundreds of keV range. The selection criteria are:
@@ -23,7 +23,7 @@ are selected intercalated niobium dichalcogenides, MoO3, GaS, ZrS2, SnS2,
 and TiSe2.
 
 This is a research survey, not a validation-ledger sign-off. Numerical results
-from the literature must be reproduced in the cxr-mc geometry before they are
+from the literature must be reproduced in the PyRITE geometry before they are
 treated as predictions for this project.
 
 ## Physical selection criteria
@@ -105,7 +105,7 @@ phase identity and CIFs must be checked before implementation.
 The source calculations used non-tilted crystals, an observation angle of
 119 degrees, a solid angle of 0.066 sr, and integration over 10 eV around each
 coherent peak. Consequently, the ratios are screening evidence rather than
-predictions for cxr-mc's 90-degree geometries.
+predictions for PyRITE's 90-degree geometries.
 
 ## Highest-priority candidates
 
@@ -318,7 +318,7 @@ establish sufficiently low mosaicity. Before procurement, request:
 3. **Treat Fe1/3NbS2 and Ni1/3NbSe2 as custom-growth research targets.** Do not
    model or order them until the exact simulated structures are identified.
 
-### cxr-mc screening
+### PyRITE screening
 
 Add and evaluate, in order:
 

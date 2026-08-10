@@ -1,7 +1,7 @@
 """Beam distribution-field CLI options, validation, and TOML writers.
 
-Shared by ``cxr profile``'s inline ``[profiles.NAME.beam]`` flags and
-``cxr beam``'s named ``[beams.NAME]`` object verbs, so both surfaces validate
+Shared by ``pyrite profile``'s inline ``[profiles.NAME.beam]`` flags and
+``pyrite beam``'s named ``[beams.NAME]`` object verbs, so both surfaces validate
 identically.
 """
 

@@ -119,7 +119,7 @@ note):
 
 ## 5. Test suite
 
-`UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/detectors/test_grating.py -k charge_cloud -v`
+`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/detectors/test_grating.py -k charge_cloud -v`
 → **4 passed**:
 `test_charge_cloud_sigma_soft_photon_is_maximum_blur`,
 `test_charge_cloud_sigma_zero_when_absorbed_at_front`,

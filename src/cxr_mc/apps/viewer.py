@@ -143,7 +143,7 @@ def _launch(
         print(f"http://127.0.0.1:{TUNNEL_PORT}")
     env = {**os.environ, "PYRITE_VIEWER_INITIAL": material}
     if smoke:
-        with tempfile.TemporaryDirectory(prefix="cxr-mc-viewer-") as tmpdir:
+        with tempfile.TemporaryDirectory(prefix="pyrite-viewer-") as tmpdir:
             subprocess.run(
                 _smoke_command(material, Path(tmpdir) / "viewer.html"), check=True, env=env
             )

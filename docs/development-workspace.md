@@ -1,7 +1,9 @@
 # Development environment and focused verification
 
 The repository has one uv project and one publishable distribution. The root
-project owns `src/cxr_mc/`, packaged data, `cxr`, `cxr-dev`, and the test suite.
+project owns the `pyrite-xray` distribution, `src/cxr_mc/`, packaged data,
+`pyrite`, `pyrite-dev`, and the test suite. The installed `cxr` and `cxr-dev`
+executables are compatibility aliases through their documented removal window.
 Contributor tools are dependency groups in the root `pyproject.toml`; there is
 no uv workspace split or separate test-tools package.
 
@@ -30,17 +32,17 @@ uv sync --locked
 uv sync --no-dev --locked
 
 # Stable domain partitions. Together these contain every tests/test_*.py once.
-uv run cxr-dev test-suite core
-uv run cxr-dev test-suite cli
-uv run cxr-dev test-suite apps
-uv run cxr-dev test-suite packaging
+uv run pyrite-dev test-suite core
+uv run pyrite-dev test-suite cli
+uv run pyrite-dev test-suite apps
+uv run pyrite-dev test-suite packaging
 
 # Additive cross-boundary sample and unchanged release gate.
-uv run cxr-dev test-suite integration
-uv run cxr-dev verify
+uv run pyrite-dev test-suite integration
+uv run pyrite-dev verify
 
 # Clean wheel and editable-install compatibility check.
-uv run cxr-dev package-smoke
+uv run pyrite-dev package-smoke
 ```
 
 Suite ownership uses deterministic filename rules in `cxr_mc._dev`. A
@@ -52,8 +54,8 @@ imports/data, exports, CLI contract, remote, sweep/run, and a headless app path.
 ## Coverage
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --cov
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --numba --cov
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --cov
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --numba --cov
 ```
 
 `--cov` is forwarded straight to `pytest-cov`, which reads
@@ -94,5 +96,5 @@ baseline, so the observed deltas are not attributed to workspace metadata. No
 speed or isolation claim follows from this report.
 
 Outside the restricted sandbox, `marimo check` passed for all four apps and
-`cxr app analysis launch --smoke` completed successfully during the recorded
+`pyrite app analysis launch --smoke` completed successfully during the recorded
 measurement run.

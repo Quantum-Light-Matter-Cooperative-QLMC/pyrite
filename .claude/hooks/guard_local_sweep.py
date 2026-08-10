@@ -1,13 +1,14 @@
 #!/usr/bin/env python
-"""Block local ``cxr run`` invocations before Claude runs them.
+"""Block local ``pyrite run`` invocations before Claude runs them.
 
 Exit 2 blocks; parse failures and unrelated commands fail open.
 
 The block is an opt-in-overridable safety default for GPU-less/underprovisioned
 WSL hosts. A box with a real accelerator declares itself a local compute node by
-setting ``CXR_LOCAL_SWEEP_OK`` truthy -- ambient in the hook's environment (e.g.
+setting ``PYRITE_LOCAL_SWEEP_OK`` truthy -- ambient in the hook's environment (e.g.
 `.claude/settings.local.json` env) or inline on the command
-(``CXR_LOCAL_SWEEP_OK=1 cxr run ...``). Default stays a hard block so shared
+(``PYRITE_LOCAL_SWEEP_OK=1 pyrite run ...``). ``CXR_LOCAL_SWEEP_OK`` remains a
+compatibility alias. Default stays a hard block so shared
 contributors on unfit hosts remain protected.
 """
 
@@ -38,8 +39,10 @@ SHELL_SEPARATORS = set(";&|()")
 
 # Truthy override values; everything else (including unset) keeps the block.
 _FALSEY = {"", "0", "false", "no", "off"}
-_OVERRIDE_VAR = "CXR_LOCAL_SWEEP_OK"
-_OVERRIDE_ASSIGN_RE = re.compile(rf"^{_OVERRIDE_VAR}=(?P<value>.*)$")
+_OVERRIDE_VARS = ("PYRITE_LOCAL_SWEEP_OK", "CXR_LOCAL_SWEEP_OK")
+_OVERRIDE_ASSIGN_RE = re.compile(
+    rf"^(?P<name>{'|'.join(map(re.escape, _OVERRIDE_VARS))})=(?P<value>.*)$"
+)
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -60,12 +63,13 @@ def _segments(command: str) -> list[list[str]]:
         segments[-1].append(token)
     return [segment for segment in segments if segment]
 
+
 def _segment_has_local_run(tokens: list[str]) -> bool:
     if any(token in ("-h", "--help") for token in tokens):
         return False
 
     for i, tok in enumerate(tokens):
-        if os.path.basename(tok) != "cxr":
+        if os.path.basename(tok) not in {"pyrite", "cxr"}:
             continue
         trailing = tokens[i + 1 :]
         for nxt in trailing:
@@ -82,7 +86,7 @@ def _segment_has_local_run(tokens: list[str]) -> bool:
 
 
 def _local_scan(command: str) -> bool:
-    """Return whether any shell segment invokes flat local ``cxr run``."""
+    """Return whether any shell segment invokes a local PyRITE run."""
     try:
         return any(_segment_has_local_run(tokens) for tokens in _segments(command))
     except ValueError:
@@ -90,21 +94,26 @@ def _local_scan(command: str) -> bool:
 
 
 def _override_active(command: str) -> bool:
-    """Return whether this host opted this ``cxr run`` out of the sweep block.
+    """Return whether this host opted this ``pyrite run`` out of the sweep block.
 
-    Honors an ambient ``CXR_LOCAL_SWEEP_OK`` in the hook's environment and an
-    inline ``CXR_LOCAL_SWEEP_OK=<truthy>`` assignment anywhere in the command
+    The canonical override wins when both canonical and compatibility names
+    are present, whether ambient or inline.
     """
-    if _is_truthy(os.environ.get(_OVERRIDE_VAR)):
-        return True
+    for name in _OVERRIDE_VARS:
+        if name in os.environ:
+            return _is_truthy(os.environ[name])
     try:
         tokens = shlex.split(command, posix=True)
     except ValueError:
         return False
+    assignments: dict[str, str] = {}
     for token in tokens:
         match = _OVERRIDE_ASSIGN_RE.match(token)
-        if match and _is_truthy(match.group("value")):
-            return True
+        if match:
+            assignments[match.group("name")] = match.group("value")
+    for name in _OVERRIDE_VARS:
+        if name in assignments:
+            return _is_truthy(assignments[name])
     return False
 
 
@@ -117,11 +126,11 @@ def main() -> int:
     command = (payload.get("tool_input") or {}).get("command") or ""
     if _local_scan(command) and not _override_active(command):
         sys.stderr.write(
-            "Blocked: `cxr run` runs a full Monte-Carlo sweep locally and "
+            "Blocked: `pyrite run` runs a full Monte-Carlo sweep locally and "
             "OOMs/crashes WSL. Route it to the lab GPU box instead:\n"
-            "  cxr run [PROFILE] [-m MATERIAL] --remote\n"
+            "  pyrite run [PROFILE] [-m MATERIAL] --remote\n"
             "See the remote-gpu-jobs skill. On a host with a real accelerator, "
-            "set CXR_LOCAL_SWEEP_OK=1 (ambient or inline) to run locally. If you "
+            "set PYRITE_LOCAL_SWEEP_OK=1 (ambient or inline) to run locally. If you "
             "truly must run locally without it, ask the user to run it themselves.\n"
         )
         return 2

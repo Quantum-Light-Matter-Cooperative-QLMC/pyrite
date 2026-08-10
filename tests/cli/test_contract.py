@@ -45,7 +45,7 @@ _HIDDEN_COMPATIBILITY_PATHS = {
 class _EntryPoint:
     """Adapts ``cli.main``'s argv contract to ``CliRunner.invoke``."""
 
-    name = "cxr"
+    name = "pyrite"
 
     def main(self, args=None, prog_name=None, **extra):
         del prog_name, extra
@@ -76,7 +76,7 @@ def test_frozen_click_contract_records_current_tree():
     # Slice 3 adds six canonical `job` help paths while retaining hidden
     # compatibility paths in the frozen tree during the deprecation window;
     # slice 6 adds the artifact-store commands (`energy-grid verify`/`gc`).
-    assert len(list(_help_cases(_FROZEN["root"]))) < 132
+    assert len(list(_help_cases(_FROZEN["root"]))) < 140
     assert len(_FROZEN["intentional_p0_corrections"]) == 10
 
 
@@ -98,7 +98,7 @@ def test_every_help_path_uses_stdout(path, expected, capsys):
         cli.main([*path, "--help"])
     assert exc.value.code == 0
     captured = capsys.readouterr()
-    assert captured.out.startswith(f"Usage: cxr{' ' if path else ''}{' '.join(path)}")
+    assert captured.out.startswith(f"Usage: pyrite{' ' if path else ''}{' '.join(path)}")
     assert captured.err == ""
 
 
@@ -124,7 +124,7 @@ def test_click_tree_preserves_frozen_command_and_option_names():
 def test_version_uses_stdout():
     completed = _run("--version")
     assert completed.exit_code == 0
-    assert completed.stdout.startswith("cxr-mc ")
+    assert completed.stdout.startswith("PyRITE ")
     assert completed.stdout.endswith("\n")
     assert completed.stderr == ""
 
