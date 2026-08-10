@@ -16,7 +16,7 @@ plane (zero y-component).
 """
 
 import numpy as np
-from numba import jit as njit
+from numba import njit
 
 from ..materials.crystal import _direct_lattice_vectors, _rotation_between, reciprocal_g_vector
 
