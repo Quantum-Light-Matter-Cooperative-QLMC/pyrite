@@ -1,4 +1,4 @@
-# External bremsstrahlung validation and subtraction
+# External bremsstrahlung comparison and subtraction
 
 PyRITE compares its Born+Elwert background with external, already
 detector-normalized spectra ingested by `load_external_brem`. External identity

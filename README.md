@@ -50,7 +50,7 @@ uv run pyrite --help
 `uv sync` installs the root distribution and contributor dependency groups.
 For a locked runtime-only installation use `uv sync --no-dev --locked`;
 focused contributor and CI commands are documented in
-[`docs/development-workspace.md`](docs/development-workspace.md).
+[development workspace guide](docs/repo-design/development-workspace.md).
 
 `pyrite-dev bootstrap` is idempotent and only sets local git config that cannot be
 committed (it registers the `.gitattributes` `TODO.md merge=ours` driver so

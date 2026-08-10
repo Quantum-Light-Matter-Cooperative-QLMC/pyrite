@@ -247,6 +247,6 @@ checked against the coded `A_CBS` term-for-term. Not `signed-off` (human only).
 
 `status: unverified → filtered`; `checks: — → units+limits+signs (U_g rederived
 from Poisson; braced 1/gamma factor filtered, exact Eq. 14/Zhai SI Eq. 6 form
-not yet independently rederived)`; `anchor: — → docs/validation/cbs-amplitude.md`.
+not yet independently rederived)`; `anchor: — → docs/validation/radiation-physics/cbs-amplitude.md`.
 Consider tightening the note "1/gamma^2 (or 1/gamma)" to state the code uses a
 single `1/gamma` power. Human applies.

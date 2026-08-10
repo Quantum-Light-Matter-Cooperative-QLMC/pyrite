@@ -16,9 +16,9 @@ pyrite run standard -m mose2 --fidelity survey
 ```
 
 `--profile full|survey` is not a compatibility spelling: `profile` is reserved
-for catalog `[profiles.*]` campaigns (see
-`docs/cli-energy-grid-sweep-rework-plan.md`). Fidelity (`--fidelity`) selects
-the grid-reduction policy; catalog profiles select scan-parameter ranges.
+for catalog `[profiles.*]` campaigns. Fidelity (`--fidelity`) selects the
+grid-reduction policy; catalog profiles select scan-parameter ranges. See
+[ADR-0005](../adr/0005-energy-grid-schema-decisions.md) for the decision record.
 
 Python callers use `default_settings("survey")` and
 `material_sweep("mose2", fidelity="survey")`. `full` remains default for both.

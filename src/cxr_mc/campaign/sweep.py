@@ -236,7 +236,7 @@ def stack_layers(film_composition, film_thickness_ang, stack):
     side; with positive tilt (toward-detector, Zhai convention; front exit)
     the lower layers sit BEHIND the emission and do not attenuate -- they
     bite the back-exit / transmission geometry. See
-    docs/multilayer-materials.md."""
+    docs/physics/materials/multilayer-materials.md."""
     t_f = float(film_thickness_ang)
     layers = [(0.0, t_f, [(el, float(n)) for el, n in film_composition])]
     z = t_f
@@ -286,7 +286,7 @@ def substrate_radiator(substrate, n_families=4):
     own PXR/CBS; an AMORPHOUS preset ('sio2') returns None (it only
     absorbs + brems). This is the per-layer-radiation half of the multilayer
     feature -- the absorber stack (film_on_substrate_layers) is the other half.
-    See docs/multilayer-materials.md."""
+    See docs/physics/materials/multilayer-materials.md."""
     if substrate.lower() in CATALOG.media:
         return None  # amorphous: no coherent lines
     if substrate in CATALOG.crystals:
@@ -430,7 +430,7 @@ class Sweep:
     #       (serial under CuPy). See docs/physics/materials/crystal-mosaicity.md.
     mosaic_route: str = "analytic"
     mosaic_nodes: int = 5  # Gauss-Hermite nodes/tilt-axis for mosaic_route="mc" (K=nodes^2)
-    # film-on-substrate stack (optional; multilayer feature, docs/multilayer-materials.md).
+    # film-on-substrate stack (optional; multilayer feature, docs/physics/materials/multilayer-materials.md).
     # substrate=None -> free-standing film (unchanged). Otherwise each case gets an
     # abs_layers stack that drives BOTH multilayer electron transport (substrate
     # backscatter into the film + substrate bremsstrahlung) AND cross-stack

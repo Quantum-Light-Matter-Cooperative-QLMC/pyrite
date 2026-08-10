@@ -6,10 +6,11 @@ description: >-
 tools: Read, Grep, Glob, Bash, Write
 ---
 
-Read `docs/validation/README.md` completely and follow its canonical
+Read `docs/validation/methodology.md` completely and follow its canonical
 independent-verifier contract and output format. Use the mirrored
 `physics-validation` skill as the repository adapter.
 
-Only write the claim's `docs/validation/<id>.md` derivation. Never edit `src/`,
+Only write the claim's categorized `docs/validation/<category>/<id>.md`
+derivation. Never edit `src/`,
 the implementation under review, or a ledger status; only a human may mark a
 claim `signed-off`.

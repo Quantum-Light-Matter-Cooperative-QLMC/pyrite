@@ -3,7 +3,7 @@
 Owns three regions and edits only those via tomlkit (format-preserving TOML),
 leaving everything else untouched: the shared per-material derived-grid store
 (``[energy_grids.<material>].line_by_energy``, decision 3,
-docs/cli-energy-grid-sweep-rework-plan.md), per-material ``E_grid_brem``
+docs/adr/0005-energy-grid-schema-decisions.md), per-material ``E_grid_brem``
 (``[profiles.standard.overrides.<material>]``), and ``[profiles.standard]
 energy_keV``. Each line-grid row carries its own ``source``
 ("derived"/"manual") provenance inline; ``cxr_mc.energy_grid.provenance``
@@ -769,7 +769,7 @@ def delete_line_grid(
     """Delete rows at ENERGIES from ``energy_grids.MATERIAL``; irreversible.
 
     The only sanctioned way to remove derived/manual line-grid bounds
-    (decision 3, docs/cli-energy-grid-sweep-rework-plan.md): removes the
+    (decision 3, docs/adr/0005-energy-grid-schema-decisions.md): removes the
     whole ``[energy_grids.MATERIAL]`` table once its last row goes, rather
     than leaving an invalid empty array. Pre-write catalog validation blocks
     deleting a row a live profile's ``energy_keV`` still needs -- no separate

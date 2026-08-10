@@ -54,7 +54,7 @@ _NO_FLAT_LINE_GRID = "E_grid_line = { arange = { start = 50.0, stop = 60.0, step
 def _catalog_with_per_beam_line_grids(*, entries: str = PER_BEAM_ENTRIES) -> str:
     """A catalog where material "sample" resolves its line grid from its own
     ``[energy_grids.sample]`` store entry (decision 3,
-    docs/cli-energy-grid-sweep-rework-plan.md), not a profile-level grid."""
+    docs/adr/0005-energy-grid-schema-decisions.md), not a profile-level grid."""
     base = _minimal_catalog(
         material_rows="""
 [materials.sample]

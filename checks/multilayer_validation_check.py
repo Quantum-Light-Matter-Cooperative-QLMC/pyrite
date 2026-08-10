@@ -1,4 +1,4 @@
-"""Multilayer ANALYTIC validation (docs/multilayer-materials.md, "Validation
+"""Multilayer ANALYTIC validation (docs/physics/materials/multilayer-materials.md, "Validation
 plan"): two self-contained, quantitative checks that need NO measured data.
 
   A. CLOSED-FORM cross-stack absorption (slice 1). With identical emission

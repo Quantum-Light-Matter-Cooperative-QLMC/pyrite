@@ -14,9 +14,9 @@ alone marks `signed-off`). Read-only: report findings, edit nothing.
 
 ## Inputs
 
-- `docs/physics-validation-ledger.md` -- one row per claim: `id`, `code`
+- `docs/validation/physics-validation-ledger.md` -- one row per claim: `id`, `code`
   (`file::symbol` anchors), `status`, `checks`, `anchor` (test), `notes`.
-- `docs/validation/README.md` -- the status lifecycle and marker convention.
+- `docs/validation/methodology.md` -- the status lifecycle and marker convention.
 - In-code `Validation: <id>` markers in derivation docstrings under `src/cxr_mc/`.
 
 ## Checks

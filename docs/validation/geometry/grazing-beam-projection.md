@@ -1,4 +1,4 @@
-# grazing-beam-projection — independent re-derivation
+# Grazing-beam projection — independent re-derivation
 
 - **id**: `grazing-beam-projection`
 - **anchor**: `montecarlo/geometry.py::project_beam_entry`; wired through

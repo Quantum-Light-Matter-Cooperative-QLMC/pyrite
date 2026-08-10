@@ -1,6 +1,6 @@
 """Central registry and warning format for deprecated ``cxr`` spellings.
 
-RFC D7 (`docs/cli-redesign-rfc.md`) asks every renamed or retired command to
+ADR-0002 (`docs/adr/0002-cli-surface-redesign.md`) asks every renamed or retired command to
 (a) keep working for a published support window, (b) warn on stderr naming its
 replacement, and (c) appear in `docs/repo-design/cli/cli-deprecations.md` with a removal
 target. This module owns (a) and (b); that document is generated

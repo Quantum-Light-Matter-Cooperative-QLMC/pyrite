@@ -78,7 +78,7 @@ Intensity- and enhancement-dependent validations (peak height, integrated
 flux, bulk-vs-film enhancement ratios) must be re-run against the corrected
 (positive-tilt) grids before being trusted; see
 `docs/validation/physics-validation-ledger.md` and
-`docs/validation/zhai-supplementary.md`.
+`docs/validation/literature-ref/zhai-supplementary.md`.
 
 ## The `n`/`g` split hook (plumbed, unused)
 

@@ -16,16 +16,13 @@ atomic-physics/atomic-data-sources
 :caption: Electron transport
 
 beam-transport/beam-phase-space
-beam-transport/relativistic-electron-transport
 ```
 
 ```{toctree}
 :maxdepth: 1
 :caption: Radiation physics
 
-radiation-physics/channeling-radiation-physics
 radiation-physics/coherent-emission
-radiation-physics/external-bremsstrahlung-validation
 ```
 
 ```{toctree}
@@ -40,7 +37,6 @@ geometry/tilt-convention
 :caption: Detectors and optics
 
 detectors/detector-solid-angle
-detectors/grazing-grating
 ```
 
 ```{toctree}

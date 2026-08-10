@@ -73,5 +73,5 @@ after independent verification added `Validation: detector-eaglexo` to
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — operator and acceptance ownership match; empirical QE ordinates remain source-unverified
 - **Verdict**: `filtered`
-- **Write-up**: `docs/validation/detector-eaglexo.md`
+- **Write-up**: `docs/validation/detectors/detector-eaglexo.md`
 - **Suggested ledger change**: applied — status `filtered`, pending datasheet-to-CSV comparison recorded, exact back-reference added, estimate corrected

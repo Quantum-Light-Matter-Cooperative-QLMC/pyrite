@@ -67,5 +67,5 @@ Follow-up applied after independent verification: both `mc_spectrum` and
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent factor; normalization is exactly `1/pi`
 - **Verdict**: `rederived`
-- **Write-up**: `docs/validation/mosaic-mc.md`
+- **Write-up**: `docs/validation/materials/mosaic-mc.md`
 - **Suggested ledger change**: applied — status `rederived`, check retained as anchor, exact back-references added

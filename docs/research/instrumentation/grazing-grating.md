@@ -1,5 +1,7 @@
 # Grazing-incidence soft X-ray grating spectrometer
 
+**Status:** Exploratory research model; not wired into the production pipeline.
+
 A measurement modality promoted to TODO P1 (was P3 #2): instead of reading the
 PXR+CBS spectrum as energy-vs-counts at a fixed take-off angle (EDS/Timepix),
 **disperse** it with a reflection grating at grazing incidence and read the

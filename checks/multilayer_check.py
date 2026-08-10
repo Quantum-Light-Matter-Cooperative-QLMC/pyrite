@@ -1,5 +1,5 @@
 """Multilayer first-slice validation: mc_spectrum / mc_brem_spectrum with a
-film-on-substrate absorber stack (docs/multilayer-materials.md).
+film-on-substrate absorber stack (docs/physics/materials/multilayer-materials.md).
 
 Checks, on real MoSe2 transport segments:
   1. a single absorber layer [0, t_film] reproduces the single-slab path

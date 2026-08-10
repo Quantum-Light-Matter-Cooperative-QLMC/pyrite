@@ -2,7 +2,7 @@
 
 ## Why now
 
-`docs/compute-performance-optimization.md` ("GPU transport: not yet") deferred
+[the performance history](compute-performance-optimization.md) ("GPU transport: not yet") deferred
 this on the grounds that single-core transport was ≈1× the GPU phase per case,
 so the `gpu-pipeline` engine hid it at two or more transport workers. It named
 the condition for revisiting: *the prologue rawkernel lands and a fresh
@@ -348,7 +348,7 @@ specification; at production scale it reproduces it. The stream change itself is
 not small: `line.spec` median 0.43% / max 2.31%, `brem` median 4.01% / max 25.74%
 at `Ne_brem=150`, `spec_coherent` median 8.20% / max 37.91% — all tracking
 `1/√N` for their own population. See "Verification: whole-sweep A/B on qlmc" in
-[compute-performance optimization guide](../../guides/compute-performance-optimization.md).
+[compute-performance optimization history](compute-performance-optimization.md).
 
 ## Not done
 

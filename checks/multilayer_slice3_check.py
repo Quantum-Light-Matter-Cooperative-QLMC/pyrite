@@ -1,5 +1,5 @@
 """Multilayer slice-3 validation: per-layer COHERENT radiation
-(docs/multilayer-materials.md (2)).
+(docs/physics/materials/multilayer-materials.md (2)).
 
 mc_spectrum already radiates one crystal; slice 3 makes _spectrum_case radiate
 EVERY crystalline layer of a film-on-substrate stack and sum them incoherently,

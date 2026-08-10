@@ -1,6 +1,8 @@
 # Channeling radiation: physics implementation walkthrough
 
-Companion to [relativistic electron transport](../beam-transport/relativistic-electron-transport.md).
+**Status:** Proposed physics design; not implemented as a production model.
+
+Companion to [relativistic electron transport](relativistic-electron-transport.md).
 That document fixes the architecture (backends, data contracts, validation
 gates). This one works through the physics itself, step by step, in the order
 an implementation would build it: continuum potential → transverse quantum

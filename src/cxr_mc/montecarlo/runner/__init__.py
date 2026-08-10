@@ -84,7 +84,7 @@ def _usable_cpus():
     ``os.cpu_count()`` reports the MACHINE, not the allocation: inside a SLURM
     ``--cpus-per-task=8`` cgroup on a 32-core box it still returns 32, so the
     GPU pipeline sized a 16-worker pool into an 8-CPU allocation and helped
-    drive qlmc into swap (2026-08-08; see docs/compute-performance-optimization.md
+    drive qlmc into swap (2026-08-08; see docs/repo-design/compute/compute-performance-optimization.md
     "Still open"). Take the tightest of the machine count, the affinity mask,
     ``SLURM_CPUS_PER_TASK``, and the cgroup quota. Read once at import, like the
     rest of the host probe; workers inherit the value on spawn."""
@@ -1086,7 +1086,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # crystalline layer (film or crystalline substrate), None for an amorphous one
     # (no coherent lines). layer_radiators absent -> single slab: the film radiates
     # from ALL its segments via the case's scalar crystal keys (bit-for-bit the
-    # pre-multilayer path). See docs/multilayer-materials.md (per-layer radiation).
+    # pre-multilayer path). See docs/physics/materials/multilayer-materials.md (per-layer radiation).
     # DUAL-SPECTRA: `spec` is ALWAYS the incoherent line sum (kept for every
     # emission mode so no `record["spec"]` consumer KeyErrors); when the profile
     # emission includes coherent (`case["coherent_emission"]` true for

@@ -530,7 +530,7 @@ resolution, Poisson counts).
 #### `grating.py`
 **Exploratory** grazing-incidence soft-X-ray grating spectrometer forward model
 (dispersion geometry, coating reflectivity, simple CCD pixel grid; not
-wired into pipeline). See [grazing-grating model](physics/detectors/grazing-grating.md).
+wired into pipeline). See [grazing-grating model](research/instrumentation/grazing-grating.md).
 - Public: `Grating`, `wavelength_angstrom`, `groove_spacing_angstrom`,
   `coating_number_density_per_ang3`, `detector_position_mm`, `disperse_spectrum`,
   `resolving_power`, `ALEXS_SENSORS`, `SimpleCCD`, `bin_to_pixels`.

@@ -61,5 +61,5 @@ Follow-up applied after independent verification: both `mc_spectrum` and
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent term or convention
 - **Verdict**: `rederived`
-- **Write-up**: `docs/validation/self-absorption.md`
+- **Write-up**: `docs/validation/radiation-physics/self-absorption.md`
 - **Suggested ledger change**: applied — status `rederived`, write-up linked, exact back-references added

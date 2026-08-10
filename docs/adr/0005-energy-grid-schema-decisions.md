@@ -12,7 +12,8 @@ code and tests cite by number ("decision 2/3").
 
 ## Decision
 
-The decisions are recorded in `docs/cli-energy-grid-sweep-rework-plan.md`. That
+The original decisions were recorded in the now-retired
+`docs/cli-energy-grid-sweep-rework-plan.md`. That
 document is a live decision source — cited across `materials/catalog.py`,
 `energy_grid/apply.py`, `cli/json.py`, and tests — so it stays in `docs/` root as
 reference rather than moving with ephemeral agent plans (now `agentdocs/`; see

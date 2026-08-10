@@ -1,4 +1,8 @@
-# Parameter-space scanning: helping a user understand and prioritize the results
+# Proposal: parameter-space result prioritization
+
+**Status:** Proposed; not a description of current product behavior.
+
+**Task branch:** `docs/parameter-space-sampling-review`.
 
 The present scan can generate far more valid spectra than a user can reasonably
 inspect. The immediate problem is therefore not primarily how to compute fewer

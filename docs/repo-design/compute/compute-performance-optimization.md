@@ -1,8 +1,9 @@
-# Compute performance optimization
+# Compute performance optimization history
 
-Broad-strokes summary of the GPU/throughput work. Method, the levers found,
-what landed, and what is left. Written in rounds; each round records its own
-hardware, workload, and numbers.
+Historical implementation and measurement record for the GPU/throughput work.
+Each round records its own hardware, workload, findings, and resulting design.
+For the task-oriented profiling workflow, see the
+[performance-profile analysis guide](../../guides/performance-profile-analysis.md).
 
 - [Round 1 (2026-07-31)](#round-1-2026-07-31) — `xp.fuse` line-chain fusion and
   incremental checkpoint shards.
@@ -420,7 +421,7 @@ whole GPU phase** for the TMDs and **6–12×** for hopg on an RTX 5080, linear 
 line phase, was the constraint.
 
 Design, kernel structure, RNG, and the full measurement tables live in
-[GPU transport implementation](../repo-design/compute/gpu-transport-rawkernel.md). This is the
+[GPU transport implementation](gpu-transport-rawkernel.md). This is the
 summary and the verdict.
 
 ### What landed
@@ -619,7 +620,7 @@ in this round moves a spectrum.
    range is host-side wall clock, and all are no-ops off a profiled run
    (`_nsys_push`/`_nsys_pop` from `runner.py`, imported lazily because `runner`
    imports `transport`). The playbook is corrected in
-   [`performance-profile-analysis.md`](performance-profile-analysis.md).
+   [performance-profile analysis guide](../../guides/performance-profile-analysis.md).
 2. **The four orphan line-path `Validation:` markers are ledgered**:
    `line-hkl-batch`, `line-amplitude-fusion`, `line-gemv-elementwise` (all
    `filtered`) and `line-absorption-tabulation` (**`discrepancy`**). The last is

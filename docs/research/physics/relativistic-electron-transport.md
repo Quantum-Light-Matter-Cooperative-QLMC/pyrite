@@ -1,5 +1,7 @@
 # Relativistic 1–10 MeV electron transport and quantum channeling
 
+**Status:** Proposed design; current native transport remains the default.
+
 ## Summary
 
 This design adds optional Geant4 electromagnetic transport through `g4ppyy`,

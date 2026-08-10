@@ -142,7 +142,7 @@ Using the worktree virtual environment, the following all passed:
 - **Re-derivation**: **matches** — no divergent factor, sign, exponent, unit,
   or tie convention found.
 - **Verdict**: **rederived**.
-- **Write-up**: `docs/validation/finite-transverse-crystal.md`.
+- **Write-up**: `docs/validation/geometry/finite-transverse-crystal.md`.
 - **Suggested ledger change**: change status from `unverified` to `rederived`
   and append this independent write-up plus the passing-anchor evidence; a
   human may subsequently assess the `anchored`/`signed-off` transitions.

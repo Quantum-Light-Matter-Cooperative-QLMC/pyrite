@@ -26,6 +26,7 @@ cli/cli-deprecations
 :caption: Compute optimization/GPU Acceleration
 
 compute/coherent-streaming-rawkernel.md
+compute/compute-performance-optimization.md
 compute/gpu-transport-rawkernel.md
 ```
 
@@ -34,13 +35,6 @@ compute/gpu-transport-rawkernel.md
 :caption: Storage and artifacts
 
 storage/checkpoint-case-store
-```
-
-```{toctree}
-:maxdepth: 1
-:caption: Sweeps
-
-parameter-space-sampling-review
 ```
 
 ## Architecture decision records

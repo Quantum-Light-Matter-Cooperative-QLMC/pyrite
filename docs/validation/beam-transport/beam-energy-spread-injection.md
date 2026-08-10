@@ -200,7 +200,7 @@ independent derivation and the implementation.
 - **Verdict**: `filtered` (re-derivation corroborates; ledger status
   unchanged pending anchoring/human sign-off — this write-up does not
   itself flip the ledger).
-- **Write-up**: `docs/validation/beam-energy-spread-injection.md`.
+- **Write-up**: `docs/validation/beam-transport/beam-energy-spread-injection.md`.
 - **Suggested ledger change**: none required by this re-derivation; existing
   `filtered` status and cited anchor tests (`tests/montecarlo/test_transverse.py`,
   `tests/energy-grid/test_bounds.py`, `tests/montecarlo/test_beam_energy_spread_grid.py`,

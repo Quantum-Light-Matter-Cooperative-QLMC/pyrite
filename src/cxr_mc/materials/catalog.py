@@ -1051,7 +1051,7 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
-    Schema inversion (docs/cli-energy-grid-sweep-rework-plan.md decision 2):
+    Schema inversion (docs/adr/0005-energy-grid-schema-decisions.md decision 2):
     a profile carries scan defaults plus an optional ``materials`` list
     (absent means all in-use materials) and an optional ``overrides`` table
     keyed by material, holding per-material deltas on the same scan keys.
@@ -1391,7 +1391,7 @@ def _parse_materials(
 def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEnergy]:
     """Parse the shared per-material derived-grid store: ``[energy_grids.*]``.
 
-    Decision 3 (docs/cli-energy-grid-sweep-rework-plan.md): line-grid bounds
+    Decision 3 (docs/adr/0005-energy-grid-schema-decisions.md): line-grid bounds
     live here, keyed by material, independent of any profile -- so profile
     edits can never delete expensive Monte-Carlo-derived bounds; only an
     explicit ``cxr energy-grid line delete`` can. Absent entirely means no

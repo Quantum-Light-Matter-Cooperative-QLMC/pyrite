@@ -73,6 +73,7 @@ materials/surface-hkl-orientation
 geometry/blazed-groove-geometry
 geometry/finite-beam-size
 geometry/finite-transverse-crystal
+geometry/grazing-beam-projection
 ```
 
 ```{toctree}
@@ -83,7 +84,6 @@ detectors/alexs-charge-diffusion
 detectors/alexs-qe-absorption
 detectors/detector-eaglexo
 detectors/detector-line-broadening
-detectors/grazing-beam-projection
 detectors/grazing-reflectivity
 ```
 
@@ -91,6 +91,7 @@ detectors/grazing-reflectivity
 :maxdepth: 1
 :caption: Literature cross-checks
 
+literature-ref/external-bremsstrahlung-comparison
 literature-ref/zhai-supplementary
 ```
 

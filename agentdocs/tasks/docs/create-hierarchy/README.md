@@ -12,12 +12,12 @@
 
 ## Checklist
 
-- [ ] Establish intended filesystem and Sphinx navigation hierarchy.
-- [ ] Categorize strict docs and relevant test failures.
-- [ ] Repair canonical paths, links, configuration, and generators.
-- [ ] Update stale tests without weakening structural invariants.
-- [ ] Audit ADR-0004/0007 and retired RFC consumers.
-- [ ] Run strict docs, relevant suites, generator checks, and residual-link audit.
+- [x] Establish intended filesystem and Sphinx navigation hierarchy.
+- [x] Categorize strict docs and relevant test failures.
+- [x] Repair canonical paths, links, configuration, and generators.
+- [x] Update stale tests without weakening structural invariants.
+- [x] Audit ADR-0004/0007 and retired RFC consumers.
+- [x] Run strict docs, relevant suites, generator checks, and residual-link audit.
 
 ## Decisions
 
@@ -27,6 +27,21 @@
   repository design, ADRs, and API reference.
 - Existing task records may retain historical path mentions where they are
   point-in-time evidence; maintained/public consumers must use current paths.
+- Exploratory models and unimplemented proposals live under `docs/research/`;
+  current physical-model descriptions remain under `docs/physics/`.
+
+## Completion 2026-08-10
+
+- Added site-native getting-started and result/checkpoint guides.
+- Added the published research hierarchy; moved grazing-grating, future
+  relativistic/channeling designs, and parameter-space proposal into it.
+- Moved performance history under repository compute design, external
+  bremsstrahlung comparison under validation, and grazing-beam projection under
+  validation geometry.
+- Repaired maintained links, source/check references, validation self-paths,
+  TODO pointers, and the generated CLI-deprecation preamble.
+- Strict offline Sphinx build, lint, repository-map check, CLI-deprecation
+  regeneration/check, and focused CLI generator tests pass.
 
 ## Checkpoint 2026-08-09
 
