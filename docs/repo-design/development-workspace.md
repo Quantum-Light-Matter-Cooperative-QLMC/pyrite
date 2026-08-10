@@ -37,8 +37,9 @@ uv run pyrite-dev test-suite cli
 uv run pyrite-dev test-suite apps
 uv run pyrite-dev test-suite packaging
 
-# Additive cross-boundary sample and unchanged release gate.
+# Additive cross-boundary sample and release gates.
 uv run pyrite-dev test-suite integration
+uv run pyrite-dev docs
 uv run pyrite-dev verify
 
 # Clean wheel and editable-install compatibility check.
@@ -50,6 +51,9 @@ regression test requires the four domain suites to cover every test module
 exactly once, so a new test cannot silently disappear from focused coverage.
 The integration suite intentionally overlaps domain suites; it exercises public
 imports/data, exports, CLI contract, remote, sweep/run, and a headless app path.
+`pyrite-dev docs` performs the clean offline warnings-as-errors Sphinx build;
+`verify` includes that documentation gate along with skills, imports, generated
+repository structure, lint, types, and tests.
 
 ## Coverage
 

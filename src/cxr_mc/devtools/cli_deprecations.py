@@ -1,8 +1,8 @@
 """Generate or check the CLI deprecation table.
 
 Usage:
-    python scripts/generate_cli_deprecations.py --write docs/repo-design/cli/cli-deprecations.md
-    python scripts/generate_cli_deprecations.py --check docs/repo-design/cli/cli-deprecations.md
+    uv run pyrite-dev cli-deprecations --write
+    uv run pyrite-dev cli-deprecations --check
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ def build_deprecations() -> str:
             f"{SUPPORT_WINDOW_MINORS} minor releases, warns on stderr naming the "
             "replacement, and is listed here with its removal target. See the "
             "[CLI reference](cli-reference.md) for the current command surface; regenerate "
-            "this table with `pyrite-dev cli-deprecations`."
+            "this table with `pyrite-dev cli-deprecations --write`."
         ),
         "",
         "## Commands",

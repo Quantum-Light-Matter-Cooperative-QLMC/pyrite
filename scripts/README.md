@@ -14,3 +14,7 @@ Reusable Python implementations invoked by `pyrite-dev` live in
   wrappers, not supported `pyrite` command implementations.
 
 Prefer the canonical `uv run pyrite-dev ...` commands listed in `AGENTS.md`.
+In particular, use `pyrite-dev cli-reference --write|--check`,
+`pyrite-dev cli-deprecations --write|--check`, and `pyrite-dev docs`; the
+standalone generator files are compatibility wrappers, not documentation
+workflow owners.

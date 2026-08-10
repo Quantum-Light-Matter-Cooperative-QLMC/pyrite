@@ -9,7 +9,7 @@ Current command reference generated from live Click definitions. See
 [cluster guide](../../guides/running-on-a-cluster.md) for scheduler templates,
 [repository map](../../repo_map.md) for implementation ownership, and
 [deprecations](cli-deprecations.md) for retired-spelling replacements and
-removal versions.
+removal versions. Regenerate this page with `pyrite-dev cli-reference --write`.
 
 Remote lab defaults: `--chunk-minutes 10` runs one material at a time in
 self-resubmitting slices. `--chunk-minutes 0` selects one monolithic

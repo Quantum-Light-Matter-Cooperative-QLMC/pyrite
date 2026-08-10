@@ -1,8 +1,8 @@
 """Generate or check the Click command reference.
 
 Usage:
-    python scripts/generate_cli_reference.py --write docs/repo-design/cli/cli-reference.md
-    python scripts/generate_cli_reference.py --check docs/repo-design/cli/cli-reference.md
+    uv run pyrite-dev cli-reference --write
+    uv run pyrite-dev cli-reference --check
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ def build_reference() -> str:
         "[cluster guide](../../guides/running-on-a-cluster.md) for scheduler templates,",
         "[repository map](../../repo_map.md) for implementation ownership, and",
         "[deprecations](cli-deprecations.md) for retired-spelling replacements and",
-        "removal versions.",
+        "removal versions. Regenerate this page with `pyrite-dev cli-reference --write`.",
         "",
         "Remote lab defaults: `--chunk-minutes 10` runs one material at a time in",
         "self-resubmitting slices. `--chunk-minutes 0` selects one monolithic",

@@ -12,8 +12,10 @@ prose keep required format.
   call sites across the CLI/domain boundary. Use `rg` or direct reads for exact
   text, non-code, generated files, and anything faster to grep — `src/` is ~52k
   LOC, so grep is competitive for most questions.
-- `README.md`: science/install/workflow. `docs/`: guides, design, validation.
-  `TODO.md`: shared backlog.
+- `README.md`: science/install/primary workflow. Classify maintained pages under
+  `docs/guides/`, `docs/physics/`, `docs/validation/`, `docs/research/`,
+  `docs/repo-design/`, or `docs/adr/`; see
+  `docs/repo-design/documentation.md`. `TODO.md`: shared backlog.
 - Use Context7 only for current external-library docs. Headroom shapes agent and
   tool output; it is not a shell wrapper or code index. Do not use Tokensave or
   RTK.
@@ -36,6 +38,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev nbstrip
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 ```

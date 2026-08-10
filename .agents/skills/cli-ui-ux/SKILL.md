@@ -57,5 +57,6 @@ Test affected help/dispatch/default/validation/stream/exit paths plus
 incompatible options, prompts, interruption, TTY/non-TTY, color/Unicode,
 machine schemas, completion failure, and hostile inputs. Use framework tests
 and real subprocess probes where signals, streams, startup, or shell behavior
-matters. Regenerate `docs/repo-design/cli/cli-reference.md`; list each intentional compatibility
+matters. Regenerate with `pyrite-dev cli-reference --write` and check with
+`pyrite-dev cli-reference --check`; list each intentional compatibility
 difference.

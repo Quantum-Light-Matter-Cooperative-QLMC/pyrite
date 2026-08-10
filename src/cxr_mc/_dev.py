@@ -25,7 +25,8 @@ Commands:
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
     bootstrap  configure per-clone local git state (TODO.md merge driver)
-    verify     check skills, lint, type check, and test
+    verify     check skills, docs, imports, generated structure, lint, types, and tests
+    cli-reference     write or --check docs/repo-design/cli/cli-reference.md
     cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
     validation-ledger write or --check generated validation-ledger views
 """
@@ -215,6 +216,11 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
         "uv run pyrite-dev test-suite core",
         "uv run pyrite-dev package-smoke",
         "uv run pyrite-dev smoke --material hopg --output-dir /tmp/pyrite-smoke",
+        "uv run pyrite-dev docs",
+        "uv run pyrite-dev cli-reference --check",
+        "uv run pyrite-dev cli-deprecations --check",
+        "uv run pyrite-dev validation-ledger --check",
+        "uv run pyrite-dev repo-map --check",
         "uv run pyrite-dev sync-skills",
         "uv run pyrite-dev check-skills",
         "uv run pyrite-dev bootstrap",
@@ -534,6 +540,7 @@ def cmd_verify(args: argparse.Namespace) -> None:
         )
     cmd_imports(args)
     cmd_repo_map(argparse.Namespace(check=True, write=False))
+    cmd_docs(argparse.Namespace(linkcheck=False))
     cmd_lint(args)
     cmd_typecheck(args)
     cmd_test(args)
@@ -549,6 +556,16 @@ def cmd_cli_deprecations(args: argparse.Namespace) -> None:
     from cxr_mc.devtools.cli_deprecations import main
 
     target = ROOT / "docs" / "repo-design" / "cli" / "cli-deprecations.md"
+    mode = "--check" if getattr(args, "check", False) else "--write"
+    status = main([mode, str(target)])
+    if status:
+        raise SystemExit(status)
+
+
+def cmd_cli_reference(args: argparse.Namespace) -> None:
+    from cxr_mc.devtools.cli_reference import main
+
+    target = ROOT / "docs" / "repo-design" / "cli" / "cli-reference.md"
     mode = "--check" if getattr(args, "check", False) else "--write"
     status = main([mode, str(target)])
     if status:
@@ -642,8 +659,15 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     regen_golden.add_argument("--check", action="store_true")
     regen_golden.set_defaults(func=cmd_regen_golden)
     cli_deprecations = sub.add_parser("cli-deprecations")
-    cli_deprecations.add_argument("--check", action="store_true")
+    cli_deprecation_mode = cli_deprecations.add_mutually_exclusive_group()
+    cli_deprecation_mode.add_argument("--write", action="store_true")
+    cli_deprecation_mode.add_argument("--check", action="store_true")
     cli_deprecations.set_defaults(func=cmd_cli_deprecations)
+    cli_reference = sub.add_parser("cli-reference")
+    cli_reference_mode = cli_reference.add_mutually_exclusive_group()
+    cli_reference_mode.add_argument("--write", action="store_true")
+    cli_reference_mode.add_argument("--check", action="store_true")
+    cli_reference.set_defaults(func=cmd_cli_reference)
     validation_ledger = sub.add_parser("validation-ledger")
     validation_mode = validation_ledger.add_mutually_exclusive_group(required=True)
     validation_mode.add_argument("--write", action="store_true")

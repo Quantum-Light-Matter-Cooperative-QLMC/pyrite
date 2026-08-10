@@ -161,6 +161,8 @@ Eagle XO QE plus computed Timepix Si response.
 
 ## Repository guide
 
+- [published documentation](docs/index.md): guides, physics, validation,
+  research, repository design, ADRs, and API reference
 - [documentation authoring and maintenance](docs/repo-design/documentation.md)
 - [package ownership and dependency map](docs/repo_map.md)
 - [Python API](docs/api.md)

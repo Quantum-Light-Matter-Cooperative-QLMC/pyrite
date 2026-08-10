@@ -36,7 +36,7 @@ on a shared leaf.
 - Merge/rebase never prompts for TODO.md conflict resolution. The
   `.gitattributes` `TODO.md merge=ours` driver resolves conflicting hunks to the
   current branch (main's copy when a task branch merges in, or the rebase base).
-  The driver lives in local git config — run `uv run cxr-dev bootstrap` once per
+  The driver lives in local git config — run `uv run pyrite-dev bootstrap` once per
   clone; without it, git falls back to a 3-way merge and conflicts return.
 - Always have `dispatch-task` drop a completed task's line on `main` when
   retiring landed work — the authoritative writer. The driver keeps main's copy for any hunk

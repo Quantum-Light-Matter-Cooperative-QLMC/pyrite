@@ -219,6 +219,7 @@ def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
         "cmd_check_skills",
         "cmd_imports",
         "cmd_repo_map",
+        "cmd_docs",
         "cmd_lint",
         "cmd_typecheck",
         "cmd_test",
@@ -231,6 +232,7 @@ def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
         "cmd_check_skills",
         "cmd_imports",
         "cmd_repo_map",
+        "cmd_docs",
         "cmd_lint",
         "cmd_typecheck",
         "cmd_test",
@@ -294,3 +296,35 @@ def test_repo_map_check_reports_stale_document(dev_module, monkeypatch, capsys) 
         dev_module.cmd_repo_map(Namespace(write=False, check=True))
 
     assert "pyrite-dev repo-map --write" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("command", "module_name", "target_name"),
+    [
+        ("cmd_cli_reference", "cli_reference", "cli-reference.md"),
+        ("cmd_cli_deprecations", "cli_deprecations", "cli-deprecations.md"),
+    ],
+)
+def test_cli_doc_commands_use_canonical_targets(
+    dev_module, monkeypatch, command: str, module_name: str, target_name: str
+) -> None:
+    module = __import__(f"cxr_mc.devtools.{module_name}", fromlist=["main"])
+    calls = []
+    monkeypatch.setattr(module, "main", lambda args: calls.append(args) or 0)
+
+    getattr(dev_module, command)(Namespace(check=True))
+
+    assert calls == [
+        [
+            "--check",
+            str(dev_module.ROOT / "docs" / "repo-design" / "cli" / target_name),
+        ]
+    ]
+
+
+@pytest.mark.parametrize("command", ["cli-reference", "cli-deprecations"])
+def test_cli_doc_parsers_accept_explicit_write_mode(dev_module, command: str) -> None:
+    args = dev_module.build_parser().parse_args([command, "--write"])
+
+    assert args.write is True
+    assert args.check is False
