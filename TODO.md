@@ -111,7 +111,7 @@ file. Edit and drop items on `main`.
 
 ## P2 - medium-priority back burner
 
-1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/physics/detectors/grazing-grating.md`](docs/physics/detectors/grazing-grating.md).
+1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
 2. **Detector profiles and Zhai validation modernization.** Add profile-owned
    detector geometry with a 90 degree standard default, then route maintained
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
@@ -126,8 +126,8 @@ file. Edit and drop items on `main`.
 
 ## P3 - lower-priority / exploratory back burner
 
-1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
-2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/physics/detectors/grazing-grating.md`](docs/physics/detectors/grazing-grating.md).
+1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
+2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
 5. **Tab completion latency.** Shell completion for `cxr` often takes
