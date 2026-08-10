@@ -34,28 +34,14 @@ file. Edit and drop items on `main`.
    all CPU/CUDA cores. → `fix/electron-transport-correctness`;
    [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/);
    review: [`docs/electron_transport_physics_recommendations.docx`](docs/electron_transport_physics_recommendations.docx).
-2. **Compute performance optimization — remainder.** Rounds 1-4 landed on `main`
-   (see
-   [`docs/repo-design/compute/compute-performance-optimization.md`](docs/repo-design/compute/compute-performance-optimization.md));
-   the MoSe2 `--ne-line=20000` report is closed as compute-bound transport plus a
-   one-time pipeline-fill transient, and the CUDA transport core is now the
-   default above 1000 electrons. Round 5 ledgered the four line-path markers
-   and deleted the dead `_USE_JIT_LINE_PROLOGUE` flag/module. What is left
-   needs a CUDA box: one authorized remote job to exercise the ported
-   `pyrite run -R --cpu`/`--cpu-only` profiler, plus hardware confirmation of the
-   deferred levers (NVTX in `transport.py`, `REAL` compaction, and
-   `gpu-pipeline` memory sizing; sizing itself is already fixed).
-   Plan and open questions:
-   → `feature/compute-performance-optimization`;
-   [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
-3. **Add support for characteristic X-rays**
-4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
+2. **Add support for characteristic X-rays**
+3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
-5. **Validate batched coherent line accumulation.** The implementation and
+4. **Validate batched coherent line accumulation.** The implementation and
    `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
    verification and human sign-off remain. → `feature/coherent-line-batching`;
    [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+5. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
