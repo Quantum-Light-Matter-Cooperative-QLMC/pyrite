@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo.geometry import (
+from pyrite.montecarlo.geometry import (
     X_MAX,
     X_MIN,
     Y_MAX,

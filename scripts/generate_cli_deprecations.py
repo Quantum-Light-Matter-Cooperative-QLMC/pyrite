@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Compatibility wrapper for :mod:`cxr_mc.devtools.cli_deprecations`."""
+"""Compatibility wrapper for :mod:`pyrite.devtools.cli_deprecations`."""
 
-from cxr_mc.devtools.cli_deprecations import build_deprecations, main
+from pyrite.devtools.cli_deprecations import build_deprecations, main
 
 __all__ = ["build_deprecations", "main"]
 

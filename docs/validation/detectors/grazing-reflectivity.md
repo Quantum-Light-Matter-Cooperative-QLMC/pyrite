@@ -10,8 +10,8 @@ reflectivity `r(θ) = (θ − √(θ² − 2δ − 2iβ)) / (θ + √(θ² − 2
 `R(θ) = |r(θ)|²`, θ the grazing angle from the surface, treated
 polarization-independent.
 
-**Code.** `src/cxr_mc/materials/crystal.py::optical_constants`,
-`src/cxr_mc/detectors/grating.py::Grating.reflectivity` (+ `Grating.throughput`,
+**Code.** `src/pyrite/materials/crystal.py::optical_constants`,
+`src/pyrite/detectors/grating.py::Grating.reflectivity` (+ `Grating.throughput`,
 `disperse_spectrum(..., weight_by_throughput=)`).
 **Anchor.** `tests/materials/test_crystallography.py::test_optical_constants_beta_matches_absorption_length`,
 `::test_optical_constants_delta_positive_off_edge`;

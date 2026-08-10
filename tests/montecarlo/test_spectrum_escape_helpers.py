@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo.groove import blazed_groove_spec
-from cxr_mc.montecarlo.spectrum import (
+from pyrite.montecarlo.groove import blazed_groove_spec
+from pyrite.montecarlo.spectrum import (
     _escape_length,
     _observation_direction,
     _segment_escape_distance,

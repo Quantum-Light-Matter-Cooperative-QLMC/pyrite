@@ -122,7 +122,7 @@ def fetch_mp_lattice(
 
 def external_specs() -> list[tuple[str, int | None, str | None]]:
     """(crystal_key, cod_id, mp_id) for every catalog entry carrying an id."""
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     specs: list[tuple[str, int | None, str | None]] = []
     for key, spec in CATALOG.crystals.items():
@@ -150,7 +150,7 @@ def local_lattice_tuple(key: str) -> Lattice:
     Fills the right-angle / hexagonal defaults the catalog omits for
     high-symmetry systems so every entry compares on the full 6-tuple.
     """
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     lat = dict(CATALOG.crystal(key).lattice)
     a = float(lat["a"])

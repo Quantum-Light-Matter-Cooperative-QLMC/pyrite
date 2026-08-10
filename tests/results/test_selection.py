@@ -1,4 +1,4 @@
-"""Guard tests for cxr_mc.results.selection -- case label formatting,
+"""Guard tests for pyrite.results.selection -- case label formatting,
 case-picker table rows, and basket-record slimming. Same synthetic-record
 approach as test_altair_spectra_compare.py: small records, no GPU, no
 checkpoint. Tests case_label(), case_table_rows(), and slim_case_record().
@@ -6,7 +6,7 @@ checkpoint. Tests case_label(), case_table_rows(), and slim_case_record().
 
 import numpy as np
 
-from cxr_mc.results.selection import _peak, case_label, case_table_rows, slim_case_record
+from pyrite.results.selection import _peak, case_label, case_table_rows, slim_case_record
 
 
 def _record(

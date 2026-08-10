@@ -14,7 +14,7 @@ from pathlib import Path
 import click
 from click.testing import CliRunner
 
-from cxr_mc import cli
+from pyrite import cli
 
 SCHEMA_VERSION = 1
 INTENTIONAL_P0_CORRECTIONS = [

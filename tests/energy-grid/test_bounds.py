@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from cxr_mc.energy_grid.bounds import (
+from pyrite.energy_grid.bounds import (
     CoverageGridTooNarrow,
     coverage_energy,
     line_shift_fraction,

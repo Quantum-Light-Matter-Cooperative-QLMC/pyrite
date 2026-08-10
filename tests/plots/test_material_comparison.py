@@ -6,8 +6,8 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from cxr_mc.campaign.config import default_settings
-from cxr_mc.plots import (
+from pyrite.campaign.config import default_settings
+from pyrite.plots import (
     material_comparison_summary,
     plot_material_comparison,
     select_material_comparison,
@@ -122,8 +122,8 @@ def test_cross_material_tab_requests_new_comparisons():
     # render_cross_material (and its cached-summary/comparison wiring) moved
     # out of app.py into analysis_ui/views/materials.py; the beam-energy UI
     # widgets it's fed by stayed behind in app.py.
-    app_source = Path("src/cxr_mc/apps/analysis_app.py").read_text()
-    view_source = Path("src/cxr_mc/apps/analysis_ui/views/materials.py").read_text()
+    app_source = Path("src/pyrite/apps/analysis_app.py").read_text()
+    view_source = Path("src/pyrite/apps/analysis_ui/views/materials.py").read_text()
     # One cached summary per material feeds all three small selections.
     assert 'comparison("quality_peak")' in view_source
     assert 'comparison("peak")' in view_source
@@ -142,7 +142,7 @@ def test_cross_material_tab_requests_new_comparisons():
 
 
 def test_shared_summary_selects_all_modes_without_recomputing_metrics(monkeypatch):
-    import cxr_mc.plots.mpl.spectra as spectra
+    import pyrite.plots.mpl.spectra as spectra
 
     first = _record("First", 30.0, 150.0, peak=100.0)
     second = _record("Second", 60.0, 200.0, peak=10.0)

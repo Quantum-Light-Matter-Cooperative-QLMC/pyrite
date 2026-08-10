@@ -50,4 +50,4 @@ uses segment midpoint times and bunch offsets.
 The canonical ledger claim is `electron-transport`; phase-space injection and
 multilayer behavior have separate rows. Consult the [validation
 ledger](../../validation/physics-validation-ledger.md) before scientific use.
-Implementation owner: `cxr_mc.montecarlo.transport.simulate_trajectories`.
+Implementation owner: `pyrite.montecarlo.transport.simulate_trajectories`.

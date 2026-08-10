@@ -3,10 +3,10 @@ import importlib
 import numpy as np
 import pytest
 
-from cxr_mc.materials.attenuation import _mu_total_inv_ang
-from cxr_mc.montecarlo import _to_cpu
-from cxr_mc.montecarlo._backend import REAL
-from cxr_mc.montecarlo.groove import (
+from pyrite.materials.attenuation import _mu_total_inv_ang
+from pyrite.montecarlo import _to_cpu
+from pyrite.montecarlo._backend import REAL
+from pyrite.montecarlo.groove import (
     blazed_groove_spec,
     entry_points,
     escape_distance_ang,
@@ -14,8 +14,8 @@ from cxr_mc.montecarlo.groove import (
     in_material,
     surface_depth_ang,
 )
-from cxr_mc.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum
-from cxr_mc.montecarlo.transport import (
+from pyrite.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum
+from pyrite.montecarlo.transport import (
     TRANSPORT_ELEMENTS,
     beta_from_keV,
     simulate_trajectories,
@@ -40,7 +40,7 @@ MARCH_SPEC = blazed_groove_spec(
     tilt_polar_rad=TP,
     tilt_azim_rad=np.pi,
 )
-_transport_module = importlib.import_module("cxr_mc.montecarlo.transport")
+_transport_module = importlib.import_module("pyrite.montecarlo.transport")
 _SPECTRUM_RTOL = max(2e-12, 3.0 * float(np.finfo(REAL).eps))
 
 
@@ -274,7 +274,7 @@ _SIM_KW = dict(
 
 
 def _tilt_kw():
-    from cxr_mc.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.geometry import tilted_geometry
 
     beam, _ = tilted_geometry(np.pi / 2, TP, np.pi)
     return dict(beam_dir=beam, tilt_polar_rad=TP, tilt_azim_rad=np.pi)
@@ -676,11 +676,11 @@ def test_finite_side_exit_before_reentry_records_no_vacuum_leg():
     assert out["vacuum_start_ang"].shape == (0, 3)
 
 
-from cxr_mc.montecarlo.spectrum import mc_spectrum
+from pyrite.montecarlo.spectrum import mc_spectrum
 
 
 def _hopg_spectrum(groove=None, thickness_ang=2.0e5):
-    from cxr_mc.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.geometry import tilted_geometry
 
     beam, n_hat = tilted_geometry(np.pi / 2, TP, np.pi)
     segs = simulate_trajectories(
@@ -725,7 +725,7 @@ def test_spectrum_groove_transport_is_deterministic():
 
 
 def test_spectrum_groove_rejects_layers():
-    from cxr_mc.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.geometry import tilted_geometry
 
     _, n_hat = tilted_geometry(np.pi / 2, TP, np.pi)
     segs = simulate_trajectories(

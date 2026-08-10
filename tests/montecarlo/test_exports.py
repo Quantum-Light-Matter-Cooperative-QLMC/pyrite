@@ -2,15 +2,15 @@
 
 montecarlo was split from a single module into a package; the package must keep
 re-exporting every public AND internal name that external code (consumers,
-tests, checks/) imports as ``from cxr_mc.montecarlo import X``. This freezes the
+tests, checks/) imports as ``from pyrite.montecarlo import X``. This freezes the
 set so a dropped name fails here loudly rather than at some consumer's import.
 Importing the package runs the GPU/CPU backend probe and is otherwise cheap; it
 does NOT call mc_spectrum (GPU), so it stays in the fast suite.
 """
 
-import cxr_mc.montecarlo as mc
+import pyrite.montecarlo as mc
 
-# Every name imported from cxr_mc.montecarlo anywhere in src/, tests/ or checks/,
+# Every name imported from pyrite.montecarlo anywhere in src/, tests/ or checks/,
 # plus the backend/internal helpers re-exported for safety. Adding a name to the
 # package is fine; REMOVING one (or failing to re-export it) breaks this test.
 FROZEN_EXPORTS = frozenset(
@@ -103,6 +103,6 @@ def test_all_matches_frozen_set():
 def test_public_names_resolve_to_subpackage():
     # the re-exported callables must come from the new submodules, not a leftover
     # top-level montecarlo.py
-    assert mc.mc_spectrum.__module__ == "cxr_mc.montecarlo.spectrum"
-    assert mc.simulate_trajectories.__module__ == "cxr_mc.montecarlo.transport"
-    assert mc.run_cases.__module__ == "cxr_mc.montecarlo.runner"
+    assert mc.mc_spectrum.__module__ == "pyrite.montecarlo.spectrum"
+    assert mc.simulate_trajectories.__module__ == "pyrite.montecarlo.transport"
+    assert mc.run_cases.__module__ == "pyrite.montecarlo.runner"

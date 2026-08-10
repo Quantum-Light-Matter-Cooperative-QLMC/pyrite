@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from cxr_mc.cli import _catalog_io
-from cxr_mc.cli.commands import beam
+from pyrite.cli import _catalog_io
+from pyrite.cli.commands import beam
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -320,7 +320,7 @@ def test_create_matches_hand_written_toml_block_value_equality(tmp_path, monkeyp
     """A beam built purely from ``pyrite beam create`` flags must decode to the
     same resolved ``BeamSpec`` payload as an equivalent hand-written
     ``[beams.NAME]`` block, negative ``alpha_twiss`` included."""
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     (tmp_path / "built").mkdir()
     built_catalog = _catalog(tmp_path / "built", monkeypatch, _MINIMAL_VALID_CATALOG)

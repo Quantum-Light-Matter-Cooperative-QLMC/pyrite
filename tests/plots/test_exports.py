@@ -2,7 +2,7 @@
 
 plots was split from a single module into a package; the package must keep
 re-exporting every public AND internal name that external code (notebooks,
-tests) imports as ``from cxr_mc.plots import X``. This freezes the set so a
+tests) imports as ``from pyrite.plots import X``. This freezes the set so a
 dropped name fails here loudly rather than at some consumer's import. Importing
 the package pulls in matplotlib but draws nothing, so it stays in the fast suite.
 """
@@ -11,7 +11,7 @@ from importlib import import_module
 
 import pytest
 
-import cxr_mc.plots as p
+import pyrite.plots as p
 
 _COMPAT_SUBMODULES = {
     "altair_detectors": ("altair.detectors", "_collapsed"),
@@ -124,17 +124,17 @@ def test_all_matches_frozen_set():
 def test_public_names_resolve_to_subpackage():
     # the re-exported callables must come from the new submodules, not a leftover
     # top-level plots.py
-    assert p.plot_by_energy.__module__ == "cxr_mc.plots.mpl.spectra"
-    assert p.browse.__module__ == "cxr_mc.plots.mpl.interactive"
-    assert p.plot_heatmaps.__module__ == "cxr_mc.plots.mpl.sweeps"
-    assert p.plot_timepix_efficiency.__module__ == "cxr_mc.plots.mpl.detectors"
-    assert p.plot_trajectory_grid.__module__ == "cxr_mc.plots.mpl.trajectories"
+    assert p.plot_by_energy.__module__ == "pyrite.plots.mpl.spectra"
+    assert p.browse.__module__ == "pyrite.plots.mpl.interactive"
+    assert p.plot_heatmaps.__module__ == "pyrite.plots.mpl.sweeps"
+    assert p.plot_timepix_efficiency.__module__ == "pyrite.plots.mpl.detectors"
+    assert p.plot_trajectory_grid.__module__ == "pyrite.plots.mpl.trajectories"
 
 
 @pytest.mark.parametrize(("legacy_name", "canonical"), _COMPAT_SUBMODULES.items())
 def test_flat_submodule_paths_reexport_canonical_names(legacy_name, canonical):
     canonical_name, representative = canonical
-    legacy = import_module(f"cxr_mc.plots.{legacy_name}")
-    implementation = import_module(f"cxr_mc.plots.{canonical_name}")
+    legacy = import_module(f"pyrite.plots.{legacy_name}")
+    implementation = import_module(f"pyrite.plots.{canonical_name}")
 
     assert getattr(legacy, representative) is getattr(implementation, representative)

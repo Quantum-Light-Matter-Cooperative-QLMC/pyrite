@@ -8,7 +8,7 @@ Monte-Carlo run needed.
 
 import numpy as np
 
-from cxr_mc.results import records, select_thickness, thicknesses_by_energy
+from pyrite.results import records, select_thickness, thicknesses_by_energy
 
 
 def _record(E0, thickness_ang):

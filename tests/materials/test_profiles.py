@@ -6,8 +6,8 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from cxr_mc.campaign.config import default_settings, material_sweep
-from cxr_mc.campaign.profiles import (
+from pyrite.campaign.config import default_settings, material_sweep
+from pyrite.campaign.profiles import (
     FIDELITY_NAMES,
     FidelityPreset,
     case_content_key,
@@ -18,9 +18,9 @@ from cxr_mc.campaign.profiles import (
     named_profile_stem,
     variant_stem,
 )
-from cxr_mc.campaign.sweep import build_cases
-from cxr_mc.checkpoints import _checkpoint_store
-from cxr_mc.detectors import DetectorSpec
+from pyrite.campaign.sweep import build_cases
+from pyrite.checkpoints import _checkpoint_store
+from pyrite.detectors import DetectorSpec
 
 
 def _cases_by_key(material, catalog_profile):

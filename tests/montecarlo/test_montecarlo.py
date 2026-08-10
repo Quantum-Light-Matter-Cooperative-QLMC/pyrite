@@ -12,9 +12,9 @@ import warnings
 import numpy as np
 import pytest
 
-import cxr_mc.montecarlo.transport as transport
-from cxr_mc.campaign.sweep import BeamSpec, crystal_params
-from cxr_mc.montecarlo import (
+import pyrite.montecarlo.transport as transport
+from pyrite.campaign.sweep import BeamSpec, crystal_params
+from pyrite.montecarlo import (
     TRANSPORT_ELEMENTS,
     _normalize_composition,
     mc_spectrum,
@@ -401,7 +401,7 @@ def test_grazing_incidence_projects_beam_off_finite_sample():
     # along the tilt azimuth, overfilling the 5 mm sample, so most of the beam
     # now lands off the tilted face and is counted as missed -- the geometric
     # overlap loss that competes with the 1/cos path-length yield enhancement.
-    from cxr_mc.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.geometry import tilted_geometry
 
     cp = crystal_params("hbn")
     kw = dict(
@@ -478,7 +478,7 @@ def test_finite_footprint_rejects_invalid_dimension_pairs(width_mm, height_mm):
 
 
 def test_run_cases_should_stop_halts_new_dispatch(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
     calls = {"n": 0}
@@ -502,7 +502,7 @@ def test_run_cases_should_stop_halts_new_dispatch(monkeypatch):
 
 
 def test_run_cases_should_stop_none_runs_everything(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
     cases = [{"name": f"c{i}"} for i in range(3)]
@@ -553,14 +553,14 @@ class _SyncProcessPoolExecutor:
 
 
 def test_run_cases_invalid_engine_raises():
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     with pytest.raises(ValueError, match="engine"):
         runner.run_cases([{"name": "c0"}], engine="bogus")
 
 
 def test_run_cases_engine_auto_uses_cpu_pool_when_no_gpu(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner, "_GPU", False)
     monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
@@ -575,7 +575,7 @@ def test_run_cases_engine_auto_uses_cpu_pool_when_no_gpu(monkeypatch):
 
 
 def test_run_cases_nsys_uses_spawn_processes(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner, "_GPU", False)
     monkeypatch.setattr(runner, "_NSYS", True)
@@ -591,7 +591,7 @@ def test_run_cases_nsys_uses_spawn_processes(monkeypatch):
 
 
 def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     # _GPU True simulates a GPU box; engine="cpu" must still take the
     # full-case CPU pool (not the GPU-pipeline branch, which submits
@@ -610,8 +610,8 @@ def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):
 
 
 def test_run_cases_engine_gpu_errors_when_accelerator_unavailable(monkeypatch):
-    from cxr_mc.montecarlo import runner
-    from cxr_mc.montecarlo._backend import BackendUnavailableError
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo._backend import BackendUnavailableError
 
     monkeypatch.setattr(runner, "_GPU", False)
 
@@ -625,8 +625,8 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     doesn't break the worker, and that mc_spectrum/mc_brem_spectrum's xp/REAL
     (rebound by force_cpu) still produce a finite spectrum -- the design doc's
     Sec. 2 verification item, covered end-to-end rather than assumed."""
-    from cxr_mc.campaign.sweep import Sweep, build_cases
-    from cxr_mc.montecarlo import runner
+    from pyrite.campaign.sweep import Sweep, build_cases
+    from pyrite.montecarlo import runner
 
     sweep = Sweep(
         material="hopg",
@@ -654,7 +654,7 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
 
 
 def test_case_progress_label_names_single_material():
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     assert runner._case_progress_label([{"crystal": "hopg"}, {"crystal": "hopg"}]) == ("hopg cases")
     assert runner._case_progress_label([{"crystal": "hopg"}, {"crystal": "hbn"}]) == ("mixed cases")
@@ -670,7 +670,7 @@ def _patch_host(
     pipeline_budget_mb=1_536,
 ):
     """Fake a host for _cpu_pool_workers; defaults reproduce qlmc's shape."""
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner, "_N_CPUS", ncpus)
     monkeypatch.setattr(runner, "_available_mem_mb", lambda: avail_mb)
@@ -841,7 +841,7 @@ def test_run_cases_pipeline_holds_no_more_than_the_budgeted_prefetch(monkeypatch
 
 
 def test_usable_cpus_honors_the_affinity_mask(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.delenv("SLURM_CPUS_PER_TASK", raising=False)
     monkeypatch.setattr(runner.os, "cpu_count", lambda: 32)
@@ -851,7 +851,7 @@ def test_usable_cpus_honors_the_affinity_mask(monkeypatch):
 
 
 def test_usable_cpus_honors_slurm_and_the_cgroup_quota(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner.os, "cpu_count", lambda: 32)
     monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(32)))
@@ -863,7 +863,7 @@ def test_usable_cpus_honors_slurm_and_the_cgroup_quota(monkeypatch):
 
 
 def test_usable_cpus_ignores_an_unparseable_slurm_value(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner.os, "cpu_count", lambda: 4)
     monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(4)))
@@ -873,7 +873,7 @@ def test_usable_cpus_ignores_an_unparseable_slurm_value(monkeypatch):
 
 
 def test_cgroup_cpu_quota_reads_v2_then_v1(monkeypatch, tmp_path):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     (tmp_path / "proc").mkdir()
     (tmp_path / "proc" / "self").mkdir()
@@ -907,7 +907,7 @@ def _patch_cpu_chunk_policy(monkeypatch, *, budget_mb=1920, device_budget_bytes=
     """Pin chunk tests to the CPU/fp64 path, independent of test hardware."""
     from types import SimpleNamespace
 
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     monkeypatch.setattr(runner, "_GPU", False)
     monkeypatch.setattr(runner._spectrum_mod, "REAL", np.float64)

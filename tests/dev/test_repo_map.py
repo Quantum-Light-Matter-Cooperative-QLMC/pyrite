@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from cxr_mc.devtools import repo_map
+from pyrite.devtools import repo_map
 
 
 def test_strong_components_collapse_cycles_into_dag_nodes() -> None:

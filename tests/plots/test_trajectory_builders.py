@@ -14,12 +14,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pytest
 
-from cxr_mc.plots.mpl.trajectories import (
+from pyrite.plots.mpl.trajectories import (
     plot_electron_trajectories,
     plot_penetration_survival,
     plot_trajectory_grid,
 )
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases
+from pyrite.sweep import BeamSpec, Sweep, build_cases
 
 _NE = 20  # electron count kept tiny: these exercise the plotting code, not stats
 

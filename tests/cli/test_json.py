@@ -3,7 +3,7 @@ import pickle
 
 import pytest
 
-from cxr_mc.cli import json as cli_json
+from pyrite.cli import json as cli_json
 
 
 def test_result_is_one_versioned_json_value_with_newline():

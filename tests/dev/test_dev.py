@@ -6,7 +6,7 @@ from argparse import Namespace
 
 import pytest
 
-from cxr_mc import _dev
+from pyrite import _dev
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
     calls = []
     monkeypatch.setattr(dev_module, "_remove_path", removed.append)
     monkeypatch.setattr(
-        "cxr_mc.devtools.docs_paths.check_doc_paths", lambda root: calls.append(("paths", root))
+        "pyrite.devtools.docs_paths.check_doc_paths", lambda root: calls.append(("paths", root))
     )
     monkeypatch.setattr(dev_module, "run_uv", lambda *args, **kwargs: calls.append((args, kwargs)))
 
@@ -240,7 +240,7 @@ def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
 
 
 def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -> None:
-    from cxr_mc.devtools import smoke
+    from pyrite.devtools import smoke
 
     calls = []
     monkeypatch.setattr(smoke, "main", lambda args: calls.append(args) or 0)
@@ -254,7 +254,7 @@ def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -
 
 
 def test_package_smoke_uses_importable_devtool(dev_module, monkeypatch) -> None:
-    from cxr_mc.devtools import package_smoke
+    from pyrite.devtools import package_smoke
 
     calls = []
     monkeypatch.setattr(package_smoke, "main", lambda: calls.append(True))
@@ -272,7 +272,7 @@ def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module,
 
 
 def test_repo_map_write_and_check_delegate_to_importable_generator(dev_module, monkeypatch) -> None:
-    from cxr_mc.devtools import repo_map
+    from pyrite.devtools import repo_map
 
     calls = []
     monkeypatch.setattr(
@@ -288,7 +288,7 @@ def test_repo_map_write_and_check_delegate_to_importable_generator(dev_module, m
 
 
 def test_repo_map_check_reports_stale_document(dev_module, monkeypatch, capsys) -> None:
-    from cxr_mc.devtools import repo_map
+    from pyrite.devtools import repo_map
 
     monkeypatch.setattr(repo_map, "write_or_check", lambda **_: False)
 

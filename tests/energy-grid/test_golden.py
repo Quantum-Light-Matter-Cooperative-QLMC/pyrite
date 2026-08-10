@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from cxr_mc.energy_grid import golden
+from pyrite.energy_grid import golden
 
 
 def test_regen_recognizes_source_checkout():
@@ -48,7 +48,7 @@ def test_installed_wheel_layout_fails_with_source_checkout_error(tmp_path):
     """Exercise CLI from isolated installed-package layout without repository tests."""
     source_package = Path(golden.__file__).resolve().parents[1]
     site_packages = tmp_path / "venv" / "lib" / "python" / "site-packages"
-    shutil.copytree(source_package, site_packages / "cxr_mc")
+    shutil.copytree(source_package, site_packages / "pyrite")
 
     env = os.environ.copy()
     env["PYTHONPATH"] = str(site_packages)
@@ -56,7 +56,7 @@ def test_installed_wheel_layout_fails_with_source_checkout_error(tmp_path):
         [
             sys.executable,
             "-c",
-            "from cxr_mc.cli import main; raise SystemExit(main())",
+            "from pyrite.cli import main; raise SystemExit(main())",
             "energy-grid",
             "regen-golden",
             "--check",

@@ -7,7 +7,7 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc import cli
+from pyrite import cli
 
 
 def test_color_always_styles_help_and_human_result():

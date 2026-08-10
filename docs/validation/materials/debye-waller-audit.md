@@ -8,7 +8,7 @@ data.
 ## Baseline
 
 Snapshot: 2026-07-25, 48 crystal entries in
-`src/cxr_mc/data/materials.toml`.
+`src/pyrite/data/materials.toml`.
 
 | state | count | crystals |
 |---|---:|---|

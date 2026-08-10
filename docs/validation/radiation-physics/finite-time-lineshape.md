@@ -80,7 +80,7 @@ With \(c=1\), time and length share units.
 
 ## Implementation comparison
 
-`src/cxr_mc/montecarlo/spectrum/lines.py::mc_spectrum` defines
+`src/pyrite/montecarlo/spectrum/lines.py::mc_spectrum` defines
 
 \[
 \omega_{\rm res}=\frac{\mathbf v\cdot\mathbf g}

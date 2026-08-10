@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cxr_mc.cli import command as root_command
+from pyrite.cli import command as root_command
 from tests.helpers.cli import assert_clean_result, invoke
 
 

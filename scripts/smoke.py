@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Compatibility wrapper for :mod:`cxr_mc.devtools.smoke`."""
+"""Compatibility wrapper for :mod:`pyrite.devtools.smoke`."""
 
 from __future__ import annotations
 
-from cxr_mc.devtools.smoke import main
+from pyrite.devtools.smoke import main
 
 if __name__ == "__main__":
     raise SystemExit(main())

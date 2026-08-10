@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from cxr_mc.config import default_settings
-from cxr_mc.plots.mpl.detectors import (
+from pyrite.config import default_settings
+from pyrite.plots.mpl.detectors import (
     plot_eaglexo_charge,
     plot_eaglexo_charge_map,
     plot_eaglexo_detected,

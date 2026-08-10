@@ -99,13 +99,13 @@ rsync -avz login-node:~/pyrite/checkpoints/ ./checkpoints/
 ```
 
 Then run `pyrite app analysis launch <material>` (the
-`src/cxr_mc/apps/analysis_app.py` marimo app) or
+`src/pyrite/apps/analysis_app.py` marimo app) or
 run `pyrite app analysis export` locally —
 all interactive visualization and static-HTML export stay on your workstation.
 
 ## Notes
 
-- **`__main__` guard:** `pyrite run` (and the `python -m cxr_mc._entry.scan` shim) are properly
+- **`__main__` guard:** `pyrite run` (and the `python -m pyrite._entry.scan` shim) are properly
   guarded, so the `spawn` / `forkserver` transport workers are safe. Don't wrap the
   sweep in an unguarded `python -c "…"`.
 - **`--quick`** runs a tiny smoke grid into `<material>_quick.pkl` — use it to

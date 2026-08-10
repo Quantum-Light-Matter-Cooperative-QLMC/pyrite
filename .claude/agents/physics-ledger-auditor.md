@@ -17,7 +17,7 @@ alone marks `signed-off`). Read-only: report findings, edit nothing.
 - `docs/validation/physics-validation-ledger.md` -- one row per claim: `id`, `code`
   (`file::symbol` anchors), `status`, `checks`, `anchor` (test), `notes`.
 - `docs/validation/methodology.md` -- the status lifecycle and marker convention.
-- In-code `Validation: <id>` markers in derivation docstrings under `src/cxr_mc/`.
+- In-code `Validation: <id>` markers in derivation docstrings under `src/pyrite/`.
 
 ## Checks
 
@@ -37,7 +37,7 @@ alone marks `signed-off`). Read-only: report findings, edit nothing.
 
 ## How to find things
 
-- `Validation:` markers: `grep -rn "Validation:" src/cxr_mc/`
+- `Validation:` markers: `grep -rn "Validation:" src/pyrite/`
 - Symbols behind a `file::symbol` anchor: resolve with Serena or a direct read.
 - Do not launch other agents; you are a single read-only pass.
 

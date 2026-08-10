@@ -7,7 +7,7 @@ description: "Use when deterministic PyRITE library/API code needs work on vecto
 
 ## Conventions
 
-- All simulation kernels live in `src/cxr_mc/`.
+- All simulation kernels live in `src/pyrite/`.
 - Prefer NumPy/CuPy vectorization over Python loops.
 - Avoid OOP unless stateful behavior is required.
 - Public APIs require docstrings and type hints.

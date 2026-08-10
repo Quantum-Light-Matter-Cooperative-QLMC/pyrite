@@ -3,9 +3,9 @@ import json
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc.checkpoints import campaign_lock
-from cxr_mc.materials import CATALOG
-from cxr_mc.runs import scan
+from pyrite.checkpoints import campaign_lock
+from pyrite.materials import CATALOG
+from pyrite.runs import scan
 
 
 def _identity():

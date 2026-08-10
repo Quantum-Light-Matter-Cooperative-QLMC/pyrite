@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import cxr_mc
+import pyrite
 
 _COMPAT_MODULES = {
     "analyze": "apps.analyze",
@@ -36,23 +36,24 @@ _COMPAT_MODULES = {
 }
 
 
-def test_distribution_identity_keeps_cxr_mc_as_the_only_import_namespace() -> None:
+def test_distribution_identity_exposes_canonical_and_compatibility_namespaces() -> None:
     installed = distribution("pyrite-xray")
 
     assert installed.metadata["Name"] == "pyrite-xray"
-    assert installed.version == cxr_mc.__version__
-    assert util.find_spec("pyrite") is None
+    assert installed.version == pyrite.__version__
+    assert util.find_spec("pyrite") is not None
+    assert util.find_spec("cxr_mc") is not None
     assert util.find_spec("pyrite_xray") is None
 
 
 def test_root_exports_stay_frozen() -> None:
-    assert cxr_mc.__all__ == ["DATA_DIR", "__version__"]
+    assert pyrite.__all__ == ["DATA_DIR", "__version__"]
 
 
 @pytest.mark.parametrize(("legacy_name", "canonical_name"), _COMPAT_MODULES.items())
 def test_root_module_reexports(legacy_name: str, canonical_name: str) -> None:
-    legacy = import_module(f"cxr_mc.{legacy_name}")
-    canonical = import_module(f"cxr_mc.{canonical_name}")
+    legacy = import_module(f"pyrite.{legacy_name}")
+    canonical = import_module(f"pyrite.{canonical_name}")
     exports = getattr(
         canonical,
         "__all__",
@@ -66,7 +67,7 @@ def test_root_module_reexports(legacy_name: str, canonical_name: str) -> None:
 
 
 def test_remote_facade_is_the_public_package() -> None:
-    remote = import_module("cxr_mc.remote")
+    remote = import_module("pyrite.remote")
 
     assert Path(remote.__file__).name == "__init__.py"
-    assert import_module("cxr_mc.remote.lifecycle") is remote.lifecycle
+    assert import_module("pyrite.remote.lifecycle") is remote.lifecycle

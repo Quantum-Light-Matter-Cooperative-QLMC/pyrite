@@ -116,7 +116,7 @@ uv run pyrite run standard -m hopg --fidelity survey
 uv run pyrite app analysis launch hopg
 
 # Interactive transport/lattice viewer; no checkpoint required.
-uv run marimo run src/cxr_mc/apps/trace_app.py
+uv run marimo run src/pyrite/apps/trace_app.py
 
 # Validation dashboard.
 uv run pyrite app validation launch
@@ -127,20 +127,20 @@ Main surfaces:
 - `pyrite`: run, analysis, validation, export, checkpoint, profile, material,
   and remote workflows. See generated
   [CLI reference](docs/repo-design/cli/cli-reference.md).
-- `src/cxr_mc/apps/scan_app.py`: interactive sweep runner.
-- `src/cxr_mc/apps/analysis_app.py`: checkpoint analysis.
-- `src/cxr_mc/apps/trace_app.py`: trajectory/lattice viewer.
-- `src/cxr_mc/apps/validation_app.py`: literature-validation studies.
-- `src/cxr_mc/`: importable physics, results, plotting, and detector library.
+- `src/pyrite/apps/scan_app.py`: interactive sweep runner.
+- `src/pyrite/apps/analysis_app.py`: checkpoint analysis.
+- `src/pyrite/apps/trace_app.py`: trajectory/lattice viewer.
+- `src/pyrite/apps/validation_app.py`: literature-validation studies.
+- `src/pyrite/`: importable physics, results, plotting, and detector library.
 
 Full sweeps are heavy. Use [PyRITE's remote workflow](docs/guides/running-on-a-cluster.md) for lab
 GPU work or follow portable SLURM templates there.
 
 ## Data and outputs
 
-[`src/cxr_mc/data/materials.toml`](src/cxr_mc/data/materials.toml) is immutable
+[`src/pyrite/data/materials.toml`](src/pyrite/data/materials.toml) is immutable
 catalog source for crystals, media, scan profiles, materials, and stacks.
-Phase-specific CIFs live under `src/cxr_mc/data/cifs/`; production loading is
+Phase-specific CIFs live under `src/pyrite/data/cifs/`; production loading is
 offline. Validate edits with:
 
 ```bash

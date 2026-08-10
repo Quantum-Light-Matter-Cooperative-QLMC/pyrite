@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 
-from cxr_mc.cli import _catalog_io, _core
-from cxr_mc.cli._deprecations import flag_message
-from cxr_mc.cli.commands import profile
-from cxr_mc.energy_grid import artifacts
+from pyrite.cli import _catalog_io, _core
+from pyrite.cli._deprecations import flag_message
+from pyrite.cli.commands import profile
+from pyrite.energy_grid import artifacts
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -735,7 +735,7 @@ def test_remove_emission_mode_not_present_errors(tmp_path, monkeypatch):
 
 
 def test_member_group_selectors_expand_in_catalog_order_and_support_dry_run(tmp_path, monkeypatch):
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     catalog = _catalog(tmp_path, monkeypatch)
     monkeypatch.setattr(
@@ -1056,7 +1056,7 @@ def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
     """--all seeds an implicit all-in-use profile straight from mats_to_sim.toml's
     verified list -- the escape hatch `test_membership_verbs_require_explicit_list`
     otherwise requires (`pyrite profile set NAME --material KEY,...`, typed by hand)."""
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     catalog = _catalog(tmp_path, monkeypatch)
     monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
@@ -1070,7 +1070,7 @@ def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
 
 
 def test_add_material_all_extends_and_skips_existing_members(tmp_path, monkeypatch):
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     catalog = _catalog(tmp_path, monkeypatch)
     monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
@@ -1095,7 +1095,7 @@ def test_add_material_requires_materials_or_all(tmp_path, monkeypatch):
 
 def test_add_material_short_all_flag(tmp_path, monkeypatch):
     """-a is the short form of --all, matching the other listing options."""
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     catalog = _catalog(tmp_path, monkeypatch)
     monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])

@@ -1,11 +1,11 @@
-"""Tests for the cxr_mc._entry.reproduce_zhai shim (the box-invokable entry
-point for the remote Zhai preset, run as ``python -m cxr_mc._entry.reproduce_zhai``)
+"""Tests for the pyrite._entry.reproduce_zhai shim (the box-invokable entry
+point for the remote Zhai preset, run as ``python -m pyrite._entry.reproduce_zhai``)
 -- argument parsing and CLI wiring only; the actual MC work is reproduce_all,
 tested in tests/notebooks/test_anchor_figures.py."""
 
 from pathlib import Path
 
-from cxr_mc._entry import reproduce_zhai
+from pyrite._entry import reproduce_zhai
 
 
 def test_cli_defaults_match_app_defaults(monkeypatch):

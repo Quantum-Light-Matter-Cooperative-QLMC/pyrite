@@ -45,4 +45,4 @@ Self-absorption uses the same layered escape model as line radiation; see
 Validation: `brem-spectrum`. The full derivation, dimensional analysis, limits,
 and numeric comparison are in [Bremsstrahlung spectrum
 validation](../../validation/radiation-physics/brem-spectrum.md). Implementation
-owner: `cxr_mc.montecarlo.spectrum.brem.mc_brem_spectrum`.
+owner: `pyrite.montecarlo.spectrum.brem.mc_brem_spectrum`.

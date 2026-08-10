@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import numpy as np
 
-import cxr_mc.montecarlo.runner as runner
+import pyrite.montecarlo.runner as runner
 
 
 class DummyOOM(Exception):

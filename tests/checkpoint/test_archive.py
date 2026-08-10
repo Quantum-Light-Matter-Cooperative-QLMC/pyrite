@@ -7,7 +7,7 @@ import pickle
 
 import pytest
 
-from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store, archive
+from pyrite.checkpoints import _checkpoint_io, _checkpoint_store, archive
 
 
 def _write(path, payload):
@@ -138,7 +138,7 @@ def test_default_root_is_repo_anchored():
     must be the exact dir run.load_checkpoint reads from (repo-root anchored)."""
     import os
 
-    from cxr_mc.runs import run
+    from pyrite.runs import run
 
     assert os.path.isabs(archive.DEFAULT_ROOT)
     assert archive.DEFAULT_ROOT == run.DEFAULT_CHECKPOINT_DIR

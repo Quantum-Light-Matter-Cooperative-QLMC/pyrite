@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from cxr_mc.materials.crystal import CRYSTALS, reciprocal_g_vector, structure_factor
-from cxr_mc.validation import validation_oracles as vo
+from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector, structure_factor
+from pyrite.validation import validation_oracles as vo
 
 
 class FakeCell:

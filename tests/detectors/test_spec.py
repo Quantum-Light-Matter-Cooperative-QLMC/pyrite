@@ -4,7 +4,7 @@ from dataclasses import FrozenInstanceError, asdict
 
 import pytest
 
-from cxr_mc.detectors import DetectorSpec
+from pyrite.detectors import DetectorSpec
 
 
 def test_detector_spec_is_frozen_and_serializes_reserved_metadata():

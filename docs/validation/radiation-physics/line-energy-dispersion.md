@@ -91,7 +91,7 @@ The sign comparison below is made under the repository's explicit
 
 ## Implementation comparison
 
-`src/cxr_mc/montecarlo/spectrum/lines.py::mc_spectrum` computes, for each segment,
+`src/pyrite/montecarlo/spectrum/lines.py::mc_spectrum` computes, for each segment,
 
 ```python
 v_dot_g = v_all @ g_vec_d
@@ -123,7 +123,7 @@ coefficient. Consequently the exact difference is a single unresolved minus
 sign in the numerator; equivalence cannot be inferred merely because the
 reflection list may also contain `-hkl`.
 
-`src/cxr_mc/apps/anchor_figures.py::line_energy_eV` independently repeats the production
+`src/pyrite/apps/anchor_figures.py::line_energy_eV` independently repeats the production
 choice as
 
 \[

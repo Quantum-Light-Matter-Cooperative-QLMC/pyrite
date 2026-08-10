@@ -5,7 +5,7 @@ import os
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc.runs import scan
+from pyrite.runs import scan
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
 
     assert argv[0] == "nsys" and argv[1] == "profile"
     assert "--output=performance-profiles/sub_100keV/hopg" in argv
-    assert "-m" in argv and "cxr_mc._entry.scan" in argv
+    assert "-m" in argv and "pyrite._entry.scan" in argv
     assert "--nsys" not in argv  # child must not recurse
     assert "--performance-profile" in argv and "sub_100keV" in argv
     assert "--perf-interval" in argv and "2" in argv
@@ -240,7 +240,7 @@ def test_nsys_reexec_command_full_membership_uses_profile_stem():
         n_families=None,
     )
 
-    # full membership: only the `python -m cxr_mc._entry.scan` flag, no `-m <mat>`
+    # full membership: only the `python -m pyrite._entry.scan` flag, no `-m <mat>`
     assert argv.count("-m") == 1
     assert "--output=performance-profiles/sub_100keV/sub_100keV" in argv
     assert "performance-profiles/sub_100keV/nsys-checkpoints/sub_100keV" in argv

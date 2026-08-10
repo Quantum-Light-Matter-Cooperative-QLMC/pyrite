@@ -2,13 +2,13 @@
 
 results was split from a single module into a package; the package must keep
 re-exporting every public AND internal name that external code (consumers,
-tests, notebooks) imports as ``from cxr_mc.results import X``. This freezes the
+tests, notebooks) imports as ``from pyrite.results import X``. This freezes the
 set so a dropped name fails here loudly rather than at some consumer's import.
 Importing the package is cheap (numpy/pandas/scipy only), so it stays in the
 fast suite.
 """
 
-import cxr_mc.results as res
+import pyrite.results as res
 
 # Every top-level name the old results.py defined, now re-exported from the
 # package. Adding a name is fine; REMOVING one (or failing to re-export it)
@@ -77,8 +77,8 @@ def test_all_matches_frozen_set():
 def test_public_names_resolve_to_subpackage():
     # the re-exported callables must come from the new submodules, not a
     # leftover top-level results.py
-    assert res.store_result.__module__ == "cxr_mc.results.store"
-    assert res.records.__module__ == "cxr_mc.results.selection"
-    assert res.line_metrics.__module__ == "cxr_mc.results.metrics"
-    assert res.selection_score.__module__ == "cxr_mc.results.scoring"
-    assert res.summary_table.__module__ == "cxr_mc.results.tables"
+    assert res.store_result.__module__ == "pyrite.results.store"
+    assert res.records.__module__ == "pyrite.results.selection"
+    assert res.line_metrics.__module__ == "pyrite.results.metrics"
+    assert res.selection_score.__module__ == "pyrite.results.scoring"
+    assert res.summary_table.__module__ == "pyrite.results.tables"

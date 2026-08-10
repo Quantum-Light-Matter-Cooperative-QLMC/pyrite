@@ -7,11 +7,11 @@ from typing import Any
 import numpy as np
 import pytest
 
-from cxr_mc.campaign.config import default_settings, material_sweep
-from cxr_mc.campaign.sweep import build_cases
-from cxr_mc.checkpoints import _checkpoint_io
-from cxr_mc.checkpoints.slim import slim_checkpoint
-from cxr_mc.results import slim_results
+from pyrite.campaign.config import default_settings, material_sweep
+from pyrite.campaign.sweep import build_cases
+from pyrite.checkpoints import _checkpoint_io
+from pyrite.checkpoints.slim import slim_checkpoint
+from pyrite.results import slim_results
 
 
 def _record(tilt_deg: float, E0: float) -> dict[str, Any]:
@@ -174,8 +174,8 @@ def test_grid_keeps_only_current_grid_names():
 
 
 def test_grid_accepts_survey_profile_selector_and_variant_stem():
-    from cxr_mc.campaign.profiles import named_profile_stem
-    from cxr_mc.checkpoints.slim import _grid_from_stem
+    from pyrite.campaign.profiles import named_profile_stem
+    from pyrite.checkpoints.slim import _grid_from_stem
 
     keep = set(_grid_config_names("hopg", "survey")[:2])
     res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
@@ -196,8 +196,8 @@ def test_grid_from_stem_resolves_catalog_profile_variant():
     3-tuple grid selector, and slim_results filters on that profile's grid --
     this is the path `cxr remote pull --profile` exercises on the box via
     `cxr slim --grid`."""
-    from cxr_mc.campaign.profiles import named_profile_stem
-    from cxr_mc.checkpoints.slim import _grid_from_stem
+    from pyrite.campaign.profiles import named_profile_stem
+    from pyrite.checkpoints.slim import _grid_from_stem
 
     stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     selector = _grid_from_stem(f"checkpoints/{stem}")
@@ -256,7 +256,7 @@ def test_slim_checkpoint_grid_rejects_quick_stem(tmp_path):
 def test_pct_smaller_never_reports_negative_zero():
     """A slim that lands a hair LARGER (tiny checkpoint + float32 pickling
     overhead) must report '0% smaller', not the '-0%' float-format artifact."""
-    from cxr_mc.checkpoints.slim import _pct_smaller
+    from pyrite.checkpoints.slim import _pct_smaller
 
     assert str(_pct_smaller(100_004, 100_008)) == "0"  # -0.004% -> 0, not -0
     assert _pct_smaller(100, 37) == 63
@@ -274,7 +274,7 @@ def test_slim_checkpoint_grid_rejects_unknown_material_before_load(tmp_path):
 
 
 def test_project_dataset_keeps_only_that_datasets_keys():
-    from cxr_mc.results import project_dataset
+    from pyrite.results import project_dataset
 
     rec = {
         "case": {"E0_keV": 30.0},
@@ -294,7 +294,7 @@ def test_project_dataset_keeps_only_that_datasets_keys():
 def test_merge_dataset_line_overwrites_spec_and_reinterps_brem():
     import numpy as np
 
-    from cxr_mc.results import merge_dataset
+    from pyrite.results import merge_dataset
 
     local = {
         "n": {
@@ -329,7 +329,7 @@ def test_merge_dataset_line_overwrites_spec_and_reinterps_brem():
 def test_project_dataset_line_carries_spec_coherent():
     """`spec_coherent` lives on the line grid, so a --line-only pull must ship it;
     dropping it silently degrades a coherent checkpoint to incoherent-only."""
-    from cxr_mc.results import project_dataset
+    from pyrite.results import project_dataset
 
     rec = {"case": {}, "spec": [1.0], "E_grid": [1.0], "spec_coherent": [2.0], "brem": [3.0]}
     line = project_dataset({"n": {30.0: rec}}, "line")["n"][30.0]
@@ -342,7 +342,7 @@ def test_merge_dataset_line_drops_stale_local_spec_coherent():
     with the incoming grid."""
     import numpy as np
 
-    from cxr_mc.results import merge_dataset
+    from pyrite.results import merge_dataset
 
     local = {
         "n": {
@@ -362,7 +362,7 @@ def test_merge_dataset_line_drops_stale_local_spec_coherent():
 def test_merge_dataset_line_overwrites_spec_coherent_when_incoming_has_one():
     import numpy as np
 
-    from cxr_mc.results import merge_dataset
+    from pyrite.results import merge_dataset
 
     local = {
         "n": {
@@ -389,7 +389,7 @@ def test_merge_dataset_line_overwrites_spec_coherent_when_incoming_has_one():
 
 
 def test_merge_dataset_skips_unmatched_unless_force():
-    from cxr_mc.results import merge_dataset
+    from pyrite.results import merge_dataset
 
     local = {"n": {30.0: {"case": {}, "spec": [0.0], "E_grid": [1.0]}}}
     incoming = {"n": {50.0: {"case": {}, "spec": [9.0], "E_grid": [1.0]}}}

@@ -34,12 +34,12 @@ code cannot detect.
 
 ## What was already there
 
-The beam object is not new. `BeamSpec` (`src/cxr_mc/sweep.py`) has owned central
+The beam object is not new. `BeamSpec` (`src/pyrite/sweep.py`) has owned central
 energy, transverse spot FWHM, the longitudinal policy, bunch charge and
 repetition rate for some time, and profile plumbing decodes all of it.
 
 Two fields were declared, decoded and hashed but never read by anything under
-`src/cxr_mc/montecarlo/`: `divergence_mrad` and `energy_spread_frac`. The
+`src/pyrite/montecarlo/`: `divergence_mrad` and `energy_spread_frac`. The
 transport fanned a single `beam_dir` and a scalar `E0_keV` out across all
 electrons, and `geometry.py` stated the assumption in as many words —
 "perfectly collimated lab beam (zero divergence)".

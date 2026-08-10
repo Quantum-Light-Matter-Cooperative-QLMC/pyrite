@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cxr_mc import DATA_DIR, cli
+from pyrite import DATA_DIR, cli
 
 
 def test_check_config_validates_bundled_catalog_without_running_simulation(capsys) -> None:
@@ -58,7 +58,7 @@ def redirected_open(path, *args, **kwargs):
     return real_open(path, *args, **kwargs)
 
 Path.open = redirected_open
-from cxr_mc import cli
+from pyrite import cli
 cli.main(["check-config"])
 """
 

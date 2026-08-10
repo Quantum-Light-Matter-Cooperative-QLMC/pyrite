@@ -10,7 +10,7 @@ check its cheap input validation.
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import (
+from pyrite.montecarlo import (
     detector_directions,
     mc_spectrum_solid_angle,
     tilted_geometry,

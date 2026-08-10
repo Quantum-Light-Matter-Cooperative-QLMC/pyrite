@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from cxr_mc.campaign.sweep import (
+from pyrite.campaign.sweep import (
     BeamSpec,
     LayerSpec,
     Sweep,
@@ -21,7 +21,7 @@ from cxr_mc.campaign.sweep import (
     substrate_composition,
     substrate_radiator,
 )
-from cxr_mc.montecarlo import (
+from pyrite.montecarlo import (
     _layer_dz,
     _layer_path_length,
     _mu_total_inv_ang,
@@ -307,7 +307,7 @@ def test_build_cases_rejects_substrate_plus_stack():
 
 def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
     # each layer's radiator must reach mc_spectrum with ITS OWN azimuth_rad
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     calls = []
 

@@ -5,11 +5,11 @@ import sys
 
 import pytest
 
-from cxr_mc.apps import analyze, check, export, viewer
-from cxr_mc.checkpoints import _checkpoint_io, archive, slim
-from cxr_mc.cli.commands import recompute as recompute_cli
-from cxr_mc.runs import blaze, scan
-from cxr_mc.validation import check_config
+from pyrite.apps import analyze, check, export, viewer
+from pyrite.checkpoints import _checkpoint_io, archive, slim
+from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.runs import blaze, scan
+from pyrite.validation import check_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [
@@ -354,7 +354,7 @@ def test_run_unknown_profile_is_usage_error():
 
 
 def test_run_profile_membership_is_default_selection(monkeypatch):
-    import cxr_mc.materials as materials_pkg
+    import pyrite.materials as materials_pkg
 
     monkeypatch.setattr(
         materials_pkg, "CATALOG", _FakeCatalog(("standard", "narrowed"), {"narrowed": ("hopg",)})
@@ -371,7 +371,7 @@ def test_run_profile_membership_is_default_selection(monkeypatch):
 
 
 def test_run_explicit_material_outside_profile_is_usage_error(monkeypatch):
-    import cxr_mc.materials as materials_pkg
+    import pyrite.materials as materials_pkg
 
     monkeypatch.setattr(
         materials_pkg, "CATALOG", _FakeCatalog(("standard", "narrowed"), {"narrowed": ("hopg",)})
@@ -383,7 +383,7 @@ def test_run_explicit_material_outside_profile_is_usage_error(monkeypatch):
 
 
 def test_resolve_profile_materials_uses_profile_or_manifest_order(monkeypatch):
-    import cxr_mc.materials as materials_pkg
+    import pyrite.materials as materials_pkg
 
     monkeypatch.setattr(
         materials_pkg,
@@ -410,7 +410,7 @@ def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):
     remote profile runs still used standard-profile 250 keV cases."""
     import types
 
-    from cxr_mc.campaign.config import material_sweep as real_material_sweep
+    from pyrite.campaign.config import material_sweep as real_material_sweep
 
     calls = []
 
@@ -435,7 +435,7 @@ def test_standalone_click_usage_error_preserves_exit_and_streams():
         [
             sys.executable,
             "-m",
-            "cxr_mc.runs.scan",
+            "pyrite.runs.scan",
             "standard",
             "-m",
             "hopg",

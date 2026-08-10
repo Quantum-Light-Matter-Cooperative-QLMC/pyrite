@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from cxr_mc import DATA_DIR
-from cxr_mc.cli import _config
-from cxr_mc.paths import (
+from pyrite import DATA_DIR
+from pyrite.cli import _config
+from pyrite.paths import (
     cache_dir,
     data_dir,
     legacy_state_dir,
@@ -14,7 +14,7 @@ from cxr_mc.paths import (
 
 def test_data_dir_preserves_public_package_constant():
     assert data_dir() == DATA_DIR
-    assert data_dir().parent.name == "cxr_mc"
+    assert data_dir().parent.name == "pyrite"
 
 
 def test_workspace_root_precedence(monkeypatch, tmp_path):
@@ -53,16 +53,16 @@ def test_state_dir_matches_config_store_parent():
 
 
 def test_platform_cache_and_data_use_pyrite(monkeypatch, tmp_path):
-    monkeypatch.setattr("cxr_mc.paths.user_cache_path", lambda *args, **kwargs: tmp_path / "cache")
-    monkeypatch.setattr("cxr_mc.paths.user_data_path", lambda *args, **kwargs: tmp_path / "data")
+    monkeypatch.setattr("pyrite.paths.user_cache_path", lambda *args, **kwargs: tmp_path / "cache")
+    monkeypatch.setattr("pyrite.paths.user_data_path", lambda *args, **kwargs: tmp_path / "data")
     assert cache_dir() == tmp_path / "cache"
     assert user_data_dir() == tmp_path / "data"
 
 
 def test_checkpoint_defaults_follow_workspace_root():
-    from cxr_mc.checkpoints import archive, checkpoint_cleanup
-    from cxr_mc.cli import _completion
-    from cxr_mc.runs import run
+    from pyrite.checkpoints import archive, checkpoint_cleanup
+    from pyrite.cli import _completion
+    from pyrite.runs import run
 
     expected = workspace_root() / "checkpoints"
     assert Path(run.DEFAULT_CHECKPOINT_DIR) == expected

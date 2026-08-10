@@ -5,13 +5,13 @@ import pickle
 
 import pytest
 
-from cxr_mc import energy_grid, remote
-from cxr_mc.checkpoints import archive, recompute
-from cxr_mc.cli import command as root_command
-from cxr_mc.cli.commands import job as job_cli
-from cxr_mc.cli.commands import recompute as recompute_cli
-from cxr_mc.remote import lifecycle, viewer
-from cxr_mc.runs import blaze, scan
+from pyrite import energy_grid, remote
+from pyrite.checkpoints import archive, recompute
+from pyrite.cli import command as root_command
+from pyrite.cli.commands import job as job_cli
+from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.remote import lifecycle, viewer
+from pyrite.runs import blaze, scan
 from tests.helpers.cli import invoke
 
 
@@ -185,7 +185,7 @@ E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
 
 
 def test_line_grid_show_json_resolves_selected_profile_artifact(monkeypatch, tmp_path):
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
 
     identity = artifacts.artifact_identity(
         "hopg",
@@ -313,7 +313,7 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, na
     ],
 )
 def test_recompute_json_marks_low_level_exception_failed(monkeypatch, command, low_level):
-    from cxr_mc.runs import run
+    from pyrite.runs import run
 
     def fail(*_args, **_kwargs):
         raise OSError("checkpoint failed")

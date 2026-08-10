@@ -24,8 +24,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from cxr_mc.materials.crystal import CRYSTALS
-from cxr_mc.montecarlo import (
+from pyrite.materials.crystal import CRYSTALS
+from pyrite.montecarlo import (
     aperture_fwhm_eV,
     beta_from_keV,
     detector_directions,

@@ -1,9 +1,9 @@
-"""Guard tests for cxr_mc.plots.altair.spectra.compare_spectrum_chart -- the
+"""Guard tests for pyrite.plots.altair.spectra.compare_spectrum_chart -- the
 hue-generalized overlay chart backing the notebook's Polar-angle/Azimuthal
 comparison tabs (Energy comparison reuses the original spectrum_chart).
 
 Same synthetic-record approach as test_altair_plots.py: small charts, no GPU,
-no checkpoint. pyarrow-before-cxr_mc DLL ordering is handled globally by
+no checkpoint. pyarrow-before-pyrite DLL ordering is handled globally by
 tests/conftest.py.
 """
 
@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots.altair.spectra import (
+from pyrite.plots.altair.spectra import (
     compare_spectrum_chart,
     multi_case_spectrum_chart,
     spectrum_chart,

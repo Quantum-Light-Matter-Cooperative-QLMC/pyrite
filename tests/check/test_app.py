@@ -1,4 +1,4 @@
-"""Tests for cxr_mc.check: marimo launch args + the --export figure batch."""
+"""Tests for pyrite.check: marimo launch args + the --export figure batch."""
 
 import subprocess
 import sys
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cxr_mc.apps import check
+from pyrite.apps import check
 from tests.helpers.cli import invoke
 
 
@@ -147,7 +147,7 @@ def test_export_cli_calls_export_all_figures_and_skips_marimo(monkeypatch, tmp_p
             calls.append((outdir, ne, ne_brem, ne_supp))
             return [Path(outdir) / "a.png"]
 
-    monkeypatch.setitem(sys.modules, "cxr_mc.apps.anchor_figures", _FakeAF())
+    monkeypatch.setitem(sys.modules, "pyrite.apps.anchor_figures", _FakeAF())
     monkeypatch.setattr(
         check, "_launch", lambda **kw: pytest.fail("--export must not launch marimo")
     )
@@ -166,7 +166,7 @@ def test_export_tunnel_cli_calls_export_all_figures_and_skips_marimo(monkeypatch
             calls.append((outdir, ne, ne_brem, ne_supp))
             return []
 
-    monkeypatch.setitem(sys.modules, "cxr_mc.apps.anchor_figures", _FakeAF())
+    monkeypatch.setitem(sys.modules, "pyrite.apps.anchor_figures", _FakeAF())
     monkeypatch.setattr(
         check, "_launch", lambda **kw: pytest.fail("--export --tunnel must not launch marimo")
     )
@@ -184,7 +184,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
                 "Zhai cache missing; populate it with `cxr run --preset zhai --remote`"
             )
 
-    monkeypatch.setitem(sys.modules, "cxr_mc.apps.anchor_figures", _FakeAF())
+    monkeypatch.setitem(sys.modules, "pyrite.apps.anchor_figures", _FakeAF())
 
     result = invoke(check.command, ["--export", "--outdir", str(tmp_path)])
 
@@ -218,7 +218,7 @@ def test_launch_treats_keyboard_interrupt_as_normal_marimo_exit():
             sys.executable,
             "-c",
             (
-                "from cxr_mc.apps import check; "
+                "from pyrite.apps import check; "
                 "check.subprocess.run = lambda *args, **kwargs: "
                 "(_ for _ in ()).throw(KeyboardInterrupt()); "
                 "check._launch()"

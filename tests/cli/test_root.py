@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-from cxr_mc import cli
+from pyrite import cli
 
 
 def test_root_help_does_not_import_lazy_commands(monkeypatch, capsys):

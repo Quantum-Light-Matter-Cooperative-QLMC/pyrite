@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cxr_mc.devtools.docs_paths import StaleDocPath, check_doc_paths, find_stale_doc_paths
+from pyrite.devtools.docs_paths import StaleDocPath, check_doc_paths, find_stale_doc_paths
 
 
 @pytest.fixture(scope="module")
@@ -37,18 +37,18 @@ def test_warning_baseline_filters_only_source_docutils(
     generated_root = tmp_path / "docs" / "_autosummary"
     baseline = warning_baseline_module.AutodocWarningBaseline(source_root, generated_root)
 
-    assert baseline.filter(_record(source_root / "cxr_mc" / "example.py")) is False
-    generated = _record(generated_root / "cxr_mc.example.rst")
-    generated.location = f"{generated_root / 'cxr_mc.example.rst'}:12:<autosummary>"
+    assert baseline.filter(_record(source_root / "pyrite" / "example.py")) is False
+    generated = _record(generated_root / "pyrite.example.rst")
+    generated.location = f"{generated_root / 'pyrite.example.rst'}:12:<autosummary>"
     assert baseline.filter(generated) is False
     assert baseline.filter(_record(tmp_path / "docs" / "guide.md")) is True
     assert (
-        baseline.filter(_record(source_root / "cxr_mc" / "example.py", warning_type="ref")) is True
+        baseline.filter(_record(source_root / "pyrite" / "example.py", warning_type="ref")) is True
     )
     assert len(baseline.fingerprints) == 2
 
     monkeypatch.setenv("CXR_DOCS_SHOW_AUTODOC_WARNINGS", "1")
-    assert baseline.filter(_record(source_root / "cxr_mc" / "visible.py")) is True
+    assert baseline.filter(_record(source_root / "pyrite" / "visible.py")) is True
 
 
 def test_changed_warning_fingerprint_emits_unsuppressed_failure(

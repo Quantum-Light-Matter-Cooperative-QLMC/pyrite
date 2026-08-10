@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from cxr_mc.apps import _acp
+from pyrite.apps import _acp
 
 
 def test_running_acp_stops_bridges_after_notebook_exit(monkeypatch) -> None:

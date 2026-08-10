@@ -11,7 +11,9 @@ The `cxr-mc` name no longer reflects the project's broader scope across radiatio
 
 The visible project identity is **PyRITE**, expanded as **a Python toolkit for Radiation from Interactions and Transport of Electrons**, with the tagline **Coherent X-ray radiation and electron transport in crystals.**
 
-Use `pyrite` for the repository and user command, `pyrite-dev` for contributor tooling, and `pyrite-xray` for the Python distribution. Keep `cxr_mc` indefinitely as the canonical public import and pickle namespace.
+Use `pyrite` for the repository, user command, and canonical Python import and implementation namespace; use `pyrite-dev` for contributor tooling and `pyrite-xray` for the Python distribution. The implementation lives under `src/pyrite/`. Keep a thin `pyrite` compatibility namespace indefinitely so old root and deep imports resolve to the identical canonical modules.
+
+New pickles identify their canonical `pyrite.*` module owners. Current releases must continue to load existing `pyrite.*` pickles through the general import compatibility layer; old releases are not required to load new `pyrite.*` pickles. This supersedes the original 2026-08-09 decision to keep `pyrite` canonical.
 
 `PYRITE_*` environment variables and `pyrite` application-state locations become canonical while corresponding legacy `CXR_*` names and state remain readable according to the project's compatibility rules. Existing user workspaces are not renamed automatically.
 
@@ -21,6 +23,6 @@ The `cxr` and `cxr-dev` executables remain compatibility aliases through their d
 
 ## Consequences
 
-Brand, distribution, import, command, environment, and protocol identities intentionally do not all share one spelling. This avoids a costly Python namespace and persisted-data migration while providing a consistent new public identity.
+Repository, command, and import identities now share the `pyrite` spelling. The compatibility namespace adds import machinery and packaging tests, while persisted schema and wire identities intentionally remain unchanged.
 
 Compatibility beh

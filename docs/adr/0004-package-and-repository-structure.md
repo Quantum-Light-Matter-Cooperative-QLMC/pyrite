@@ -11,7 +11,7 @@ This made subsequent CLI and repository work harder because there was no predict
 
 ## Decision
 
-Command-line wiring belongs under `src/cxr_mc/cli/`, with reusable behavior remaining under its domain owner. Implementation names should follow canonical project terminology, including consolidation around `energy-grid`, and related recompute/cleanup behavior should be grouped under the packages that own it.
+Command-line wiring belongs under `src/pyrite/cli/`, with reusable behavior remaining under its domain owner. Implementation names should follow canonical project terminology, including consolidation around `energy-grid`, and related recompute/cleanup behavior should be grouped under the packages that own it.
 
 Top-level implementation modules may be grouped into responsibility-oriented packages such as `checkpoints/`, `campaign/`, `runs/`, `apps/`, `validation/`, `perf/`, and `remote/`, while compatibility re-exports preserve supported former paths.
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-APP = Path(__file__).parents[3] / "src" / "cxr_mc" / "apps" / "analysis_app.py"
+APP = Path(__file__).parents[3] / "src" / "pyrite" / "apps" / "analysis_app.py"
 
 
 def _attribute_path(node: ast.AST) -> tuple[str, ...]:
@@ -123,7 +123,7 @@ def test_material_and_face_select_labels_render_bold() -> None:
     # module now; both apps import it from there.
     widget_source = (APP.parent / "_widgets.py").read_text()
 
-    assert "from cxr_mc.apps._widgets import MaterialSelect" in source
+    assert "from pyrite.apps._widgets import MaterialSelect" in source
     assert 'const labelText = document.createElement("strong");' in widget_source
     assert 'labelText.textContent = model.get("label");' in widget_source
     assert 'label="Material"' in source
@@ -142,7 +142,7 @@ def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
     setup_block = next(node for node in tree.body if isinstance(node, ast.With))
     assert any(
         isinstance(node, ast.ImportFrom)
-        and node.module == "cxr_mc.runs.run"
+        and node.module == "pyrite.runs.run"
         and any(alias.name == "DEFAULT_CHECKPOINT_DIR" for alias in node.names)
         for node in ast.walk(setup_block)
     )
@@ -167,9 +167,9 @@ def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
 def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
     source = APP.read_text()
 
-    assert "from cxr_mc.materials import CATALOG" in source
+    assert "from pyrite.materials import CATALOG" in source
     assert "MATERIAL_LABELS" not in source
-    assert "from cxr_mc.campaign.config import MATERIALS" not in source
+    assert "from pyrite.campaign.config import MATERIALS" not in source
 
 
 def test_analysis_app_uses_four_top_level_tabs_and_action_names() -> None:

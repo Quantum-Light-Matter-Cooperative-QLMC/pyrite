@@ -9,7 +9,7 @@ Only regenerate after authorized catalog-source change; otherwise stop because
 regen could mask unexplained drift.
 
 ```bash
-git status --short data/materials.toml src/cxr_mc/materials/catalog.py
+git status --short data/materials.toml src/pyrite/materials/catalog.py
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev regen-golden
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/materials/test_material_catalog.py -k golden

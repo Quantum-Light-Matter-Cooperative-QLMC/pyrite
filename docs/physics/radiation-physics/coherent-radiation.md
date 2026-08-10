@@ -52,5 +52,5 @@ Validation: `pxr-amplitude`, `cbs-amplitude`, `finite-time-lineshape`,
 `line-energy-dispersion`, and `self-absorption`. Follow those rows in the
 [validation ledger](../../validation/physics-validation-ledger.md) for source
 derivations and current status. Implementation owners:
-`cxr_mc.materials.crystal.chi_g`, `U_g`, and
-`cxr_mc.montecarlo.spectrum.lines.mc_spectrum`.
+`pyrite.materials.crystal.chi_g`, `U_g`, and
+`pyrite.montecarlo.spectrum.lines.mc_spectrum`.

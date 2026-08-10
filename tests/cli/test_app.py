@@ -6,8 +6,8 @@ import importlib
 
 from click.testing import CliRunner
 
-from cxr_mc import cli
-from cxr_mc.apps import analyze, check, viewer
+from pyrite import cli
+from pyrite.apps import analyze, check, viewer
 
 
 def test_app_help_imports_only_the_group(monkeypatch):
@@ -25,7 +25,7 @@ def test_app_help_imports_only_the_group(monkeypatch):
     assert "analysis" in result.output
     assert "viewer" in result.output
     assert "validation" in result.output
-    assert imported == ["cxr_mc.cli.commands.app"]
+    assert imported == ["pyrite.cli.commands.app"]
 
 
 def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
@@ -38,7 +38,7 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
             launched.update(**kwargs),
         ),
     )
-    monkeypatch.setattr("cxr_mc.apps.export._export", lambda stem: launched.update(export=stem))
+    monkeypatch.setattr("pyrite.apps.export._export", lambda stem: launched.update(export=stem))
 
     runner = CliRunner()
     launch = runner.invoke(cli.command, ["app", "analysis", "launch", "mose2"])

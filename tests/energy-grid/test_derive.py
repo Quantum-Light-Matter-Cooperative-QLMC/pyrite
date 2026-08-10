@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from cxr_mc.energy_grid import derive as analyze
+from pyrite.energy_grid import derive as analyze
 
 
 def test_geometry_plan_is_full_curated_tilt_azimuth_product():
@@ -318,7 +318,7 @@ def test_candidate_brem_channel_refuses_silent_truncation():
     # The incoherent (brem) coverage call must keep allow_shortfall=False: a brem
     # spectrum whose 95% mass sits in the final bin means the true coverage lies
     # beyond the diagnostic ceiling and must raise, never clamp (issue_notes.md #1).
-    from cxr_mc.energy_grid.bounds import CoverageGridTooNarrow
+    from pyrite.energy_grid.bounds import CoverageGridTooNarrow
 
     E = np.arange(0.0, 100.0, 10.0)
     coherent = np.ones_like(E)

@@ -30,8 +30,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import itertools
 
-from cxr_mc.campaign.sweep import crystal_params
-from cxr_mc.montecarlo import (
+from pyrite.campaign.sweep import crystal_params
+from pyrite.montecarlo import (
     mc_spectrum,
     mosaic_fwhm_eV,
     mosaic_psi_rad,

@@ -1,4 +1,4 @@
-"""Guard tests for the Altair spectrum renderer (cxr_mc.plots.altair.spectra).
+"""Guard tests for the Altair spectrum renderer (pyrite.plots.altair.spectra).
 
 The renderer shares its physics/data prep with the matplotlib path; these tests
 exercise only the NEW rendering layer, on synthetic records (no GPU, no
@@ -12,7 +12,7 @@ import altair as alt
 import numpy as np
 import pytest
 
-from cxr_mc.plots.altair.spectra import spectrum_chart, spectrum_frame
+from pyrite.plots.altair.spectra import spectrum_chart, spectrum_frame
 
 
 def _settings():

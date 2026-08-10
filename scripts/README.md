@@ -2,10 +2,10 @@
 
 Thin standalone wrappers and maintenance utilities for a source checkout.
 Reusable Python implementations invoked by `pyrite-dev` live in
-`cxr_mc.devtools`; wrapper paths remain for documented direct invocations.
+`pyrite.devtools`; wrapper paths remain for documented direct invocations.
 
 - `generate_cli_reference.py`, `generate_cli_deprecations.py`, `smoke.py`, and
-  `package_smoke.py` delegate to importable `cxr_mc.devtools` owners.
+  `package_smoke.py` delegate to importable `pyrite.devtools` owners.
 - `freeze_cli_contract.py` and `refresh_external_cif.py` maintain checked-in
   repository artifacts.
 - `cuda_test_profiler.py` and `testing.py` are developer diagnostics, not test

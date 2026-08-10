@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from cxr_mc.config import default_settings
-from cxr_mc.plots.mpl.interactive import (
+from pyrite.config import default_settings
+from pyrite.plots.mpl.interactive import (
     browse,
     browse_plotly,
     plot_chunk,

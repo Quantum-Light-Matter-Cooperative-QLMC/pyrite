@@ -58,5 +58,5 @@ Validation claims include `detector-solid-angle`, `detector-line-broadening`,
 `alexs-qe-absorption`, `alexs-charge-diffusion`, `detector-eaglexo`, and
 `grazing-reflectivity`; consult the [validation
 ledger](../../validation/physics-validation-ledger.md) for current status.
-Implementation owners are `cxr_mc.montecarlo.detector` and
-`cxr_mc.detectors.*_response`.
+Implementation owners are `pyrite.montecarlo.detector` and
+`pyrite.detectors.*_response`.

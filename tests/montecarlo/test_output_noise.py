@@ -19,13 +19,13 @@ import sys
 
 import numpy as np
 
-from cxr_mc.montecarlo import transport
+from pyrite.montecarlo import transport
 
 
 def test_cli_help_has_no_gpu_banner():
     """A plain `cxr --help` must not print the GPU/CPU backend-probe banner."""
     result = subprocess.run(
-        [sys.executable, "-m", "cxr_mc.cli", "--help"],
+        [sys.executable, "-m", "pyrite.cli", "--help"],
         capture_output=True,
         text=True,
         check=True,
@@ -44,7 +44,7 @@ def test_mott_missing_table_logs_debug_once(caplog):
     rng = np.random.default_rng(0)
     E_keV = np.array([10.0, 20.0])
 
-    with caplog.at_level(logging.DEBUG, logger="cxr_mc.montecarlo.transport"):
+    with caplog.at_level(logging.DEBUG, logger="pyrite.montecarlo.transport"):
         transport._sample_cos_theta(6, E_keV, rng, "mott", element)
         transport._sample_cos_theta(6, E_keV, rng, "mott", element)
 

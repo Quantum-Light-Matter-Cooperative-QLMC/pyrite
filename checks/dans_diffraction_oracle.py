@@ -1,6 +1,6 @@
 """Thresholded ``Dans_Diffraction`` validation for crystallography.
 
-The check builds P1 ``Dans_Diffraction`` crystals from the internal cxr_mc
+The check builds P1 ``Dans_Diffraction`` crystals from the internal pyrite
 structures, then compares lattice parameters, ``|g|``, and ``|F_hkl|^2`` for a
 small material/reflection set. Non-resonant factors compare identical
 Waasmaier--Kirfel tables tightly. Dispersive factors compare cxr-mc's
@@ -26,7 +26,7 @@ from tabulate import tabulate
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from cxr_mc.validation.validation_oracles import (  # noqa: E402
+from pyrite.validation.validation_oracles import (  # noqa: E402
     DEFAULT_DANS_TOLERANCES,
     DansDiffractionUnavailableError,
     validate_dans_crystal,

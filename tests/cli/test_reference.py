@@ -8,7 +8,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from cxr_mc.cli import command
+from pyrite.cli import command
 
 ROOT = Path(__file__).resolve().parents[2]
 REFERENCE = ROOT / "docs" / "repo-design" / "cli" / "cli-reference.md"
@@ -58,7 +58,7 @@ def test_root_help_warm_median_below_200_ms():
     for _ in range(7):
         started = time.perf_counter()
         completed = subprocess.run(
-            [sys.executable, "-m", "cxr_mc.cli", "--help"],
+            [sys.executable, "-m", "pyrite.cli", "--help"],
             cwd=ROOT,
             capture_output=True,
             text=True,

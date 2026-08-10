@@ -1,12 +1,12 @@
 """Tests for config.gate_cases_by_penetration -- the pre-run penetration
 watchdog that drops thickness values a beam energy has already died in.
-These tests mock cxr_mc.campaign.config.simulate_trajectories so they exercise ONLY
+These tests mock pyrite.campaign.config.simulate_trajectories so they exercise ONLY
 the gating logic (grouping, cutoff detection, early-exit, reference-case
 selection), not real electron transport; test_gate_cases_by_penetration_
 drops_with_real_transport at the bottom of this file covers real physics.
 """
 
-from cxr_mc.campaign import config
+from pyrite.campaign import config
 
 
 def _case(E0_keV, thickness_ang, tilt_deg=0.0, composition="C", abs_layers=None):
@@ -109,7 +109,7 @@ def test_gate_cases_by_penetration_forwards_abs_layers_total_thickness(monkeypat
 
 
 def test_gate_cases_by_penetration_drops_with_real_transport():
-    # A real (unmocked) cxr_mc.montecarlo.simulate_trajectories call: a 15 keV
+    # A real (unmocked) pyrite.montecarlo.simulate_trajectories call: a 15 keV
     # beam through a light element (carbon) should fully transmit at 10nm,
     # be fully absorbed well before 100um, and 200um (never checked) is
     # inferred dead too. If this fails, print `fraction` per thickness (see

@@ -123,13 +123,13 @@ Related accepted design constraints:
       Regenerate `docs/cli-reference.md`, `docs/cli-deprecations.md`,
       `docs/api.md` where affected, and `docs/repo_map.md`; repair every
       maintained cross-link and clone/install example.
-- [ ] G — Execute the authenticated GitHub repository rename, update remotes and
+- [x] G — Execute the authenticated GitHub repository rename, update remotes and
       configured integrations, and verify old web/Git operations redirect. Do
       not reuse `cxr-mc` while the redirect is part of the compatibility plan.
 - [x] H — Run focused compatibility probes and the full release gate; review a
       scoped identity search so remaining `cxr-mc` / `cxr_mc` / `cxr` /
       `CXR_*` occurrences are intentional compatibility or historical records.
-- [ ] I — Relocate the implementation package from `src/cxr_mc/` to
+- [x] I — Relocate the implementation package from `src/cxr_mc/` to
       `src/pyrite/`. First revise and approve the import/pickle portion of the
       identity matrix; then provide a tested `cxr_mc` compatibility surface
       for old imports, deep imports, package resources, and existing pickle
@@ -157,12 +157,12 @@ recorded by [ADR-0007](../../../../docs/adr/0007-project-identity.md).
 - Distribution: `pyrite-xray`; normalized wheel/dist-info stem `pyrite_xray`.
   Do not create a new `cxr-mc` compatibility distribution. Recheck and control
   the name immediately before publication.
-- Import: keep `cxr_mc` canonical indefinitely. Do not add `pyrite` or
-  `pyrite_xray` facades; this preserves the public API and pickle module paths.
-  **Supersession required before I:** the requested move to `src/pyrite/`
-  conflicts with this decision. Approve a replacement import and pickle
-  compatibility matrix before implementation; a directory rename alone is not
-  acceptable because it breaks deep imports, resource lookup, and unpickling.
+- Import: `pyrite` is the canonical import and implementation
+  namespace. A thin `cxr_mc` compatibility package remains indefinitely and
+  maps old root and deep imports to the identical canonical module objects.
+  New pickles use `pyrite.*`; current releases read existing `cxr_mc.*` pickles.
+  Do not add a `pyrite_xray` facade.
+  Old releases are not required to read newly written `pyrite.*` pickles.
 - Commands: `pyrite` and `pyrite-dev` canonical from 0.2.0; `cxr` and
   `cxr-dev` remain installed compatibility executables, removable no earlier
   than 0.4.0 after the accepted two-minor window. Normal invocation warns;
@@ -176,23 +176,23 @@ recorded by [ADR-0007](../../../../docs/adr/0007-project-identity.md).
   deleting legacy state. Cache/data resolution uses `platformdirs` with app
   name `pyrite`; caches may read through and regenerate. Never move a workspace
   or configured remote checkout automatically.
-- Persisted protocols: keep `cxr_mc` pickle paths, all current `cxr.*` schema
-  IDs, `cxr.lock.json`, `CXR_REMOTE_V1`, `CXR_REMOTE_FRAME_END`, checkpoint
-  layouts, campaign locks, energy-grid artifacts, job metadata, and existing
-  directories readable. New schema families use `pyrite.*`.
+- Persisted protocols: keep existing `cxr_mc` pickle paths readable; new
+  pickles use `pyrite.*`. Keep all current `cxr.*` schema IDs, `cxr.lock.json`,
+  `CXR_REMOTE_V1`, `CXR_REMOTE_FRAME_END`, checkpoint layouts, campaign locks,
+  energy-grid artifacts, job metadata, and existing directories readable. New
+  schema families use `pyrite.*`.
 - Release identity: `PyRITE X.Y.Z`; tags remain `vX.Y.Z`; distribution files
   use `pyrite_xray-X.Y.Z`, containers use `pyrite:X.Y.Z`, and prior artifacts
   remain immutable.
 
-Credential-only questions remain outside repository implementation:
+Credential-only publication questions remain outside repository implementation:
 
 - PyPI returned HTTP 404 for `pyrite-xray` on 2026-08-09, but an authenticated
   owner must still confirm/reserve it and recheck immediately before the first
   publication. No package was reserved or published.
-- Anonymous GitHub API checks returned HTTP 404 for both the proposed `pyrite`
-  path and the known-private current `cxr-mc` path. Only an authenticated
-  organization owner can exclude a private collision and confirm rename
-  authority. No repository, remote, integration, or redirect was changed.
+- G completed by the repository owner on 2026-08-10. The GitHub repository is
+  now `Quantum-Light-Matter-Cooperative-QLMC/pyrite`; this worktree's `origin`
+  uses that SSH URL. The owner reports repository links and redirects updated.
 
 ## A/B evidence and inventory
 
@@ -247,6 +247,27 @@ old GitHub or GitHub Pages URLs; remaining old spellings are the RFC's retained
 import, protocol, compatibility, scientific, internal, or historical classes.
 The only full-suite warning was the pre-existing line-spectrum square-root
 runtime warning; no physics or numerical implementation changed.
+
+G completed externally on 2026-08-10: the repository owner renamed GitHub to
+`Quantum-Light-Matter-Cooperative-QLMC/pyrite`, updated repository links and
+redirects, and the task worktree's `origin` now uses the new SSH URL.
+
+I completed on the task branch after superseding the import/pickle matrix in
+this task record, its RFC, and ADR-0007. The sole implementation tree is
+`src/pyrite/`; `src/cxr_mc/__init__.py` installs an identity-preserving import
+alias for old root, deep, private, resource, pickle, and `python -m` paths.
+First-party code, tests, scripts, app paths, API docs, developer tooling, and
+generated repository ownership now use `pyrite`. New pickles use `pyrite.*`;
+the static legacy-global regression and clean wheel/editable probes prove old
+`cxr_mc.*` pickles remain readable. Package smoke also now installs the declared
+notebook dependency group and pins its isolated probes to CPU, making its app
+launch contract independent of the caller's backend environment. Evidence:
+package smoke passed for wheel and editable installs; packaging 239, CLI 1137,
+apps 295, focused compatibility 6, and the full verification gate 2971 passed
+with 57 skipped and the same pre-existing square-root warning. Strict docs,
+lint, typecheck, pre-commit, repository-map/import-linter contracts, skill
+mirror, and diff whitespace checks passed. No physics equations or numerical
+algorithms changed.
 
 ## Delegation slices and required skills
 

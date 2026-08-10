@@ -1,6 +1,6 @@
 # `alexs-charge-diffusion` — independent verification
 
-- **Code**: `src/cxr_mc/detectors/grating.py::charge_cloud_sigma_um`
+- **Code**: `src/pyrite/detectors/grating.py::charge_cloud_sigma_um`
 - **Ledger claim**: drift-diffusion charge-cloud spread,
   `σ² = 2(kT/q)·t·(t−min(L_abs(E),t))/v_dep`
 - **Cited source**: Einstein relation (`D = μkT/q`) + drift-diffusion,

@@ -11,16 +11,16 @@ convention-design.md):
 
 This module covers the convention itself (tilted_geometry) and the hook
 (_orientation_R / mc_spectrum); the grid-value flips in materials/registry.py /
-config.py / sweep.py / scan.py / src/cxr_mc/apps/anchor_figures.py are covered by
+config.py / sweep.py / scan.py / src/pyrite/apps/anchor_figures.py are covered by
 their existing consumer tests (already updated to the positive convention).
 """
 
 import numpy as np
 import pytest
 
-from cxr_mc.materials.crystal import CRYSTALS
-from cxr_mc.montecarlo import mc_spectrum, simulate_trajectories, tilted_geometry
-from cxr_mc.montecarlo.geometry import _orientation_R
+from pyrite.materials.crystal import CRYSTALS
+from pyrite.montecarlo import mc_spectrum, simulate_trajectories, tilted_geometry
+from pyrite.montecarlo.geometry import _orientation_R
 
 THETA_OBS = np.deg2rad(119.0)
 

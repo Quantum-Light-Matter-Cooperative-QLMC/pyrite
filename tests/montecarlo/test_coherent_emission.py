@@ -3,14 +3,14 @@
 import numpy as np
 import pytest
 
-from cxr_mc.materials.crystal import (
+from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
     beta_from_Ee,
     reciprocal_g_vector,
 )
-from cxr_mc.montecarlo import mc_spectrum
-from cxr_mc.montecarlo._backend import REAL
+from pyrite.montecarlo import mc_spectrum
+from pyrite.montecarlo._backend import REAL
 
 E_GRID = np.arange(700.0, 1500.0)
 
@@ -283,7 +283,7 @@ def test_runner_always_stores_incoherent_spec_and_omits_spec_coherent(monkeypatc
     """Default (incoherent) emission: `spec` is the incoherent line sum and no
     `spec_coherent` is attached -- so no downstream `record["spec"]` consumer can
     KeyError and no coherent grid is paid for."""
-    import cxr_mc.montecarlo.runner as runner
+    import pyrite.montecarlo.runner as runner
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
 
@@ -301,7 +301,7 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     incoherent `spec` and a `spec_coherent`, each matching a direct
     `mc_spectrum` on the SAME segments -- the single-transport / dual-kernel
     invariant."""
-    import cxr_mc.montecarlo.runner as runner
+    import pyrite.montecarlo.runner as runner
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
     segs = _segments(2)
@@ -349,7 +349,7 @@ def test_store_result_keeps_spec_coherent_from_transport():
     never mentioned `spec_coherent`, so every emission coherent/both run stored
     incoherent-only data no matter what the transport computed -- the analysis UI
     then found Coherent/Both permanently disabled."""
-    from cxr_mc.results import store_result
+    from pyrite.results import store_result
 
     out = _store_out(coherent=True)
     results = {}
@@ -364,7 +364,7 @@ def test_store_result_keeps_spec_coherent_from_transport():
 def test_store_result_omits_spec_coherent_for_incoherent_run():
     """An incoherent transport grows no key at all, so presence stays the honest
     gate every reader (emission_menu, the altair overlay, reline) tests on."""
-    from cxr_mc.results import store_result
+    from pyrite.results import store_result
 
     results = {}
     store_result(results, _store_case(), _store_out())

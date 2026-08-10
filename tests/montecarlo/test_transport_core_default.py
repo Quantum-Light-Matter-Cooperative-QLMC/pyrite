@@ -15,8 +15,8 @@ import os
 
 import pytest
 
-from cxr_mc.montecarlo import runner
-from cxr_mc.montecarlo.transport import (
+from pyrite.montecarlo import runner
+from pyrite.montecarlo.transport import (
     CUDA_TRANSPORT_MIN_ELECTRONS,
     resolve_transport_core,
 )
@@ -28,7 +28,7 @@ def cuda(monkeypatch):
 
     def _set(available=True):
         monkeypatch.setattr(
-            "cxr_mc.montecarlo.transport._cuda_transport_available",
+            "pyrite.montecarlo.transport._cuda_transport_available",
             lambda: available,
         )
 

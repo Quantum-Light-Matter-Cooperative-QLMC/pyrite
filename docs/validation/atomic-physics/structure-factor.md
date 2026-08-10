@@ -13,8 +13,8 @@ W = B \left(\frac{\sin\theta}{\lambda}\right)^2 = B\left(\frac{g}{4\pi}\right)^2
 with the crystallographic B-factor `B = 8π² <u_x²>` (`<u_x²>` = mean-square
 displacement along the scattering vector).
 
-**Code.** `src/cxr_mc/materials/crystal.py::structure_factor`,
-`src/cxr_mc/materials/crystal.py::debye_waller`
+**Code.** `src/pyrite/materials/crystal.py::structure_factor`,
+`src/pyrite/materials/crystal.py::debye_waller`
 **Source (as handed).** Standard kinematical structure factor
 $F(g) = \sum_j f_j exp(i g r_j) \exp\left(\frac{−B g^2}{16\pi^2}\right)$. The flagged trap is the
 Debye–Waller exponent convention: `B` vs `<u²>`, and the factor `16π²` vs `4`.

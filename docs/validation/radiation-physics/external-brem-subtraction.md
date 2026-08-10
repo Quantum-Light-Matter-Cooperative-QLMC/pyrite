@@ -4,7 +4,7 @@ Independent verification of weighted external-background normalization and
 subtraction.
 
 - **Claim id:** `external-brem-subtraction`
-- **Code:** `src/cxr_mc/validation/validation_background.py::fit_external_background`
+- **Code:** `src/pyrite/validation/validation_background.py::fit_external_background`
 - **Source:** weighted least squares through the origin. Zhai et al.,
   Supplementary Information S3, motivates numerical DTSA-II/PIXE
   bremsstrahlung subtraction but does not specify this fit.

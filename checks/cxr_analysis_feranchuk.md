@@ -408,7 +408,7 @@ import time
 import numpy as np
 from scipy import constants as const
 
-from cxr_mc.materials.crystal import CRYSTALS, reciprocal_g_vector
+from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector
 
 reflections = {
     # NOTE: MoSe2 previously used a d = 6.0 A placeholder with unknown indices;
@@ -437,7 +437,7 @@ from feranchuk_spence import (
     amplitudes_PXR_CBS_sweep,
 )
 
-from cxr_mc.materials.crystal import (
+from pyrite.materials.crystal import (
     ALPHA_FS,
     CRYSTALS,
     HC_EV_ANG,

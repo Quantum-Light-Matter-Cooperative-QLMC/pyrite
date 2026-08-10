@@ -12,7 +12,7 @@ import os
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo.transport import (
+from pyrite.montecarlo.transport import (
     CUDA_TRANSPORT_MIN_ELECTRONS,
     PerElectronTransportConfig,
     _splitmix64,
@@ -174,7 +174,7 @@ def test_capacity_probe_does_not_change_results(probe):
 
 def _core_calls(monkeypatch, **config_kwargs):
     """``(electrons, capacity)`` of every core call, replays included, and the run."""
-    from cxr_mc.montecarlo import transport as tr
+    from pyrite.montecarlo import transport as tr
 
     seen = []
     real = tr._alloc_scratch
@@ -304,7 +304,7 @@ def test_compound_target_selects_between_elements():
 
 
 def test_grooved_transport_rejects_the_per_electron_core():
-    from cxr_mc.montecarlo.groove import GrooveSpec
+    from pyrite.montecarlo.groove import GrooveSpec
 
     with pytest.raises(ValueError, match="grooved transport"):
         _run(
@@ -335,8 +335,8 @@ requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
 def test_launcher_signature_tracks_the_reference_core():
     import inspect
 
-    from cxr_mc.montecarlo.transport import _transport_core_ungrooved_perelectron
-    from cxr_mc.montecarlo.transport_jit_kernel import run_transport_kernel
+    from pyrite.montecarlo.transport import _transport_core_ungrooved_perelectron
+    from pyrite.montecarlo.transport_jit_kernel import run_transport_kernel
 
     reference = list(inspect.signature(_transport_core_ungrooved_perelectron.py_func).parameters)
     launcher = [
@@ -357,7 +357,7 @@ def test_cuda_core_is_deterministic():
 @requires_cuda
 @pytest.mark.parametrize("nthreads", [32, 128, 512])
 def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, monkeypatch):
-    from cxr_mc.montecarlo import transport_jit_kernel as tjk
+    from pyrite.montecarlo import transport_jit_kernel as tjk
 
     base = _run(transport_core="cuda")
     monkeypatch.setattr(

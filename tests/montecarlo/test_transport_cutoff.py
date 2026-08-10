@@ -4,14 +4,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import transport as transport_module
-from cxr_mc.montecarlo.groove import blazed_groove_spec
-from cxr_mc.montecarlo.spectrum import (
+from pyrite.montecarlo import transport as transport_module
+from pyrite.montecarlo.groove import blazed_groove_spec
+from pyrite.montecarlo.spectrum import (
     _clip_segments_to_cutoff,
     mc_brem_spectrum,
     mc_spectrum,
 )
-from cxr_mc.montecarlo.transport import TRANSPORT_ELEMENTS, simulate_trajectories
+from pyrite.montecarlo.transport import TRANSPORT_ELEMENTS, simulate_trajectories
 
 CARBON = [("C", 0.1136)]
 

@@ -15,7 +15,7 @@ EDS line width that dominates the soft-X-ray band today.
 
 ## Status
 
-`src/cxr_mc/detectors/grating.py` implements the **dispersion geometry**, the
+`src/pyrite/detectors/grating.py` implements the **dispersion geometry**, the
 **grazing-incidence Fresnel reflectivity** of the grating's coating, a
 **simple CCD pixel grid** (geometry-only rebinning), a **combined
 forward-model entry** (`detected_image`, chaining the two above) that turns an

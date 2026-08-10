@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from cxr_mc.energy_grid import job
+from pyrite.energy_grid import job
 
 
 def test_generated_slice_shell_has_fail_closed_handoff_contract():
@@ -27,7 +27,7 @@ def test_generated_slice_shell_has_fail_closed_handoff_contract():
     assert "PYRITE_MC_FREE_EVERY=40" in shell
     assert "PYRITE_MC_FREE_WATERMARK_MB=15000" in shell
     assert "PYRITE_MC_TIMING=1" in shell
-    assert "python -m cxr_mc.energy_grid.derive" in shell
+    assert "python -m pyrite.energy_grid.derive" in shell
     assert "scripts/analyze_line_grid_bounds.py" not in shell
 
 
@@ -215,7 +215,7 @@ def test_slice_payload_threads_geometry_and_set_default_to_derive():
     )
 
     derive_command = next(
-        line for line in shell.splitlines() if "python -m cxr_mc.energy_grid.derive" in line
+        line for line in shell.splitlines() if "python -m pyrite.energy_grid.derive" in line
     )
     argv = shlex.split(derive_command)
     assert argv[argv.index("--tilts") + 1] == "0,1.5; printf injected"
@@ -234,7 +234,7 @@ def test_slice_payload_omits_unset_geometry_and_set_default():
     )
 
     derive_command = next(
-        line for line in shell.splitlines() if "python -m cxr_mc.energy_grid.derive" in line
+        line for line in shell.splitlines() if "python -m pyrite.energy_grid.derive" in line
     )
     assert "--tilts" not in derive_command
     assert "--azimuths" not in derive_command

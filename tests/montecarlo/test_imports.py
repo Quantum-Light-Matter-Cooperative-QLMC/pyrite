@@ -45,12 +45,12 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         # -> spectrum.line_jit_kernel
         #
         # The import should now finish using the CPU backend.
-        importlib.import_module("cxr_mc.campaign.config")
+        importlib.import_module("pyrite.campaign.config")
 
-        from cxr_mc.montecarlo import _backend
-        from cxr_mc.montecarlo import runner
-        from cxr_mc.montecarlo import spectrum
-        from cxr_mc.montecarlo import transport
+        from pyrite.montecarlo import _backend
+        from pyrite.montecarlo import runner
+        from pyrite.montecarlo import spectrum
+        from pyrite.montecarlo import transport
 
         assert _backend._GPU is False
         assert spectrum.xp is np
@@ -58,9 +58,9 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
 
         # CUDA-only implementation modules must remain unloaded on CPU.
         cuda_modules = {
-            "cxr_mc.montecarlo.spectrum.line_jit_kernel",
-            "cxr_mc.montecarlo.spectrum.coherent_jit_kernel",
-            "cxr_mc.montecarlo.spectrum.brem_jit_kernel",
+            "pyrite.montecarlo.spectrum.line_jit_kernel",
+            "pyrite.montecarlo.spectrum.coherent_jit_kernel",
+            "pyrite.montecarlo.spectrum.brem_jit_kernel",
         }
 
         assert cuda_modules.isdisjoint(sys.modules)
@@ -89,7 +89,7 @@ def test_sincsq_lineshape_runs_on_cpu() -> None:
         """
         import numpy as np
 
-        from cxr_mc.montecarlo import spectrum
+        from pyrite.montecarlo import spectrum
 
         assert spectrum.xp is np
 
@@ -149,9 +149,9 @@ def test_config_import_does_not_require_cupy() -> None:
 
         # This is the import chain that originally prevented CLI startup
         # and pytest discovery.
-        import cxr_mc.campaign.config
+        import pyrite.campaign.config
 
-        from cxr_mc.montecarlo._backend import BACKEND
+        from pyrite.montecarlo._backend import BACKEND
 
         assert BACKEND.name not in {"cuda", "rocm"}
 

@@ -1,7 +1,7 @@
 import cupy as xp
 import numpy as np
 
-from cxr_mc.montecarlo import (
+from pyrite.montecarlo import (
     DEFAULT_SPECTRUM_KERNEL_CONFIG,
     SpectrumKernelConfig,
     run_reduction_kernel,

@@ -11,7 +11,7 @@ description: Use when changing PyRITE scan, analysis, trace, or validation marim
 - `validation_app.py`: validation studies.
 - `checks/cxr_analysis_feranchuk.ipynb`: only legacy Jupyter workflow.
 
-Put reusable logic in `src/cxr_mc/`; keep apps thin. Add no new `.ipynb`
+Put reusable logic in `src/pyrite/`; keep apps thin. Add no new `.ipynb`
 workflows. Keep legacy notebook output-free.
 
 After marimo edits run `uv run marimo check <app.py>`. For legacy notebook run

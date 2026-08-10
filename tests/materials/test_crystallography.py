@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-import cxr_mc.materials.crystal as crystal_module
-from cxr_mc.materials.crystal import (
+import pyrite.materials.crystal as crystal_module
+from pyrite.materials.crystal import (
     CRYSTALS,
     HC_EV_ANG,
     U_g,
@@ -498,7 +498,7 @@ def test_optical_constants_delta_positive_off_edge():
 
 
 def test_load_crystal_from_cif_returns_compatible_deterministic_info(tmp_path):
-    from cxr_mc.materials.crystal import load_crystal_from_cif
+    from pyrite.materials.crystal import load_crystal_from_cif
 
     cif = tmp_path / "nacl.cif"
     cif.write_text(
@@ -535,7 +535,7 @@ Cl1 Cl 0.5 0.5 0.5
 
 
 def test_load_crystal_from_cif_expands_non_p1_symmetry(tmp_path):
-    from cxr_mc.materials.crystal import load_crystal_from_cif
+    from pyrite.materials.crystal import load_crystal_from_cif
 
     cif = tmp_path / "inversion.cif"
     cif.write_text(
@@ -573,7 +573,7 @@ C1 C 0.1 0.2 0.3
 
 
 def test_load_crystal_from_cif_rejects_partial_occupancy(tmp_path):
-    from cxr_mc.materials.crystal import load_crystal_from_cif
+    from pyrite.materials.crystal import load_crystal_from_cif
 
     cif = tmp_path / "partial.cif"
     cif.write_text(
@@ -603,8 +603,8 @@ C1 C 0.0 0.0 0.0 0.5
 
 
 def test_packaged_p1_cifs_match_catalog_crystal_info():
-    from cxr_mc.materials import CATALOG
-    from cxr_mc.materials.crystal import load_crystal_from_cif
+    from pyrite.materials import CATALOG
+    from pyrite.materials.crystal import load_crystal_from_cif
 
     assert {spec.cif.stem for spec in CATALOG.crystals.values()} == set(CRYSTALS)
 

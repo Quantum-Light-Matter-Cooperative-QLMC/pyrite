@@ -1,4 +1,4 @@
-"""cxr_mc.remote (``pyrite remote``): material-name validation and the
+"""pyrite.remote (``pyrite remote``): material-name validation and the
 detached-queue runner generation.
 
 These are pure-string/logic checks (no ssh), so they run anywhere. The one
@@ -15,10 +15,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from cxr_mc import remote
-from cxr_mc.cli import dashboard as _dashboard
-from cxr_mc.cli.dashboard import poll as dashboard_poll
-from cxr_mc.remote import (  # noqa: F401
+from pyrite import remote
+from pyrite.cli import dashboard as _dashboard
+from pyrite.cli.dashboard import poll as dashboard_poll
+from pyrite.remote import (  # noqa: F401
     cli,
     config,
     lifecycle,
@@ -281,7 +281,7 @@ def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
     assert 'scan_launcher=("/home/aamador/.local/bin/uv" run --no-sync python)' in s
-    assert '"${scan_launcher[@]}" -m cxr_mc._entry.scan' in s
+    assert '"${scan_launcher[@]}" -m pyrite._entry.scan' in s
     assert "--quick" in s and "--workers 8" in s
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
@@ -771,7 +771,7 @@ def test_status_formats_latest_performance_profile():
 
 
 def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypatch):
-    import cxr_mc.campaign.profiles as profiles_module
+    import pyrite.campaign.profiles as profiles_module
 
     assert scripts._stems(["mos2"], False) == ["mos2"]
 
@@ -788,7 +788,7 @@ def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypa
 
 
 def test_queue_script_and_stem_resolve_survey_profile():
-    from cxr_mc.campaign.profiles import named_profile_stem
+    from pyrite.campaign.profiles import named_profile_stem
 
     script = remote._queue_script("j", ["mos2"], quick=False, workers=None, fidelity="survey")
     assert "--fidelity survey" in script
@@ -3801,7 +3801,7 @@ def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):
 
 def test_prune_remote_refuses_while_any_job_is_live(monkeypatch):
     target = type("Target", (), {"stem": "hopg"})()
-    monkeypatch.setattr("cxr_mc.checkpoints.checkpoint_cleanup._targets", lambda *_args: [target])
+    monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [target])
     monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
     monkeypatch.setattr(
         transport,
@@ -3830,7 +3830,7 @@ def test_prune_checkpoint_command_reserves_runs_and_releases():
 def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
     target = type("Target", (), {"stem": "hopg"})()
     commands = []
-    monkeypatch.setattr("cxr_mc.checkpoints.checkpoint_cleanup._targets", lambda *_args: [target])
+    monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [target])
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
     monkeypatch.setattr(
@@ -4225,7 +4225,7 @@ def test_pull_level9_flag_defaults_off_and_wires_through(monkeypatch):
 def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store
+    from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 
     payload = {
         "cfg": {
@@ -4273,7 +4273,7 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
 
 # ---- pull resolves identity-qualified survey checkpoints for a bare material ----
 def test_resolve_survey_stems_discovers_matching_survey_dir(monkeypatch, capsys):
-    from cxr_mc.campaign.profiles import named_profile_stem
+    from pyrite.campaign.profiles import named_profile_stem
 
     survey_stem = named_profile_stem("hopg", "survey")
     monkeypatch.setattr(
@@ -4301,7 +4301,7 @@ def test_resolve_survey_stems_ignores_other_materials_and_profiles(monkeypatch):
 
 
 def test_resolve_survey_stems_does_not_duplicate_an_explicitly_requested_stem(monkeypatch):
-    from cxr_mc.campaign.profiles import named_profile_stem
+    from pyrite.campaign.profiles import named_profile_stem
 
     survey_stem = named_profile_stem("hopg", "survey")
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: f"{survey_stem}\n")
@@ -4334,7 +4334,7 @@ def test_split_profile_selector_treats_full_at_stem_as_literal():
     (``<material>@<label>-<digest>``). It is an exact checkpoint, not a
     MATERIAL@PROFILE query, so pull must pass it through literally rather than
     try to re-resolve ``<label>-<digest>`` as a catalog profile."""
-    from cxr_mc.campaign.profiles import named_profile_stem
+    from pyrite.campaign.profiles import named_profile_stem
 
     at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     assert "@" in at_stem and at_stem != "hopg@sub_100keV"  # full stem, has digest tail
@@ -4347,7 +4347,7 @@ def test_check_shell_tokens_accepts_at_stems():
     """@-stems must survive the remote shell-token gate so pull/prune/slim can
     name them on the box (regression for the 2026-07-29 stem migration; ``@``
     was previously rejected by ``_SHELL_TOKEN_RE``)."""
-    from cxr_mc.campaign.profiles import named_profile_stem
+    from pyrite.campaign.profiles import named_profile_stem
 
     at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     remote._check_shell_tokens([at_stem])  # must not raise
@@ -4433,7 +4433,7 @@ def test_pull_hash_requires_exactly_one_qualified_selector(monkeypatch, tmp_path
 def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store
+    from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     resolved = []
@@ -4465,8 +4465,8 @@ def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_p
 def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, tmp_path, capsys):
     import numpy as np
 
-    from cxr_mc.campaign.profiles import named_profile_stem
-    from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store
+    from pyrite.campaign.profiles import named_profile_stem
+    from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 
     survey_stem = named_profile_stem("hopg", "survey")
     payload = {
@@ -4505,7 +4505,7 @@ def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, t
 def test_pull_quick_stem_does_not_resolve_survey_siblings(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc.checkpoints import _checkpoint_io
+    from pyrite.checkpoints import _checkpoint_io
 
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(
@@ -4689,7 +4689,7 @@ def test_zhai_queue_script_has_ne_flags_and_meta():
         tmd_azimuth=35.0,
         refresh=True,
     )
-    assert "python -m cxr_mc._entry.reproduce_zhai" in s
+    assert "python -m pyrite._entry.reproduce_zhai" in s
     assert "--ne 11" in s and "--ne-brem 3" in s and "--ne-supp 5" in s and "--refresh" in s
     assert "--tmd-azimuth 35.0" in s
     assert "20260101-000000" in s
@@ -4728,7 +4728,7 @@ def test_zhai_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
     jobid = remote.start_zhai_queue(dry_run=True)
 
     out = capsys.readouterr().out
-    assert jobid in out and "python -m cxr_mc._entry.reproduce_zhai" in out
+    assert jobid in out and "python -m pyrite._entry.reproduce_zhai" in out
 
 
 def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
@@ -4915,7 +4915,7 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
 
 
 def test_sync_paths_ship_checks_and_entry_shims():
-    # The entry shims live under src/cxr_mc/_entry/ now, so they travel via "src";
+    # The entry shims live under src/pyrite/_entry/ now, so they travel via "src";
     # checks/ still ships the real reproduce_all logic.
     assert "checks" in remote.SYNC_PATHS
     assert "src" in remote.SYNC_PATHS
@@ -5151,7 +5151,7 @@ def test_rebrem_chunked_queue_script_self_resubmits():
 
 
 def test_reline_queue_script_and_metadata():
-    from cxr_mc.remote import scripts
+    from pyrite.remote import scripts
 
     # Default remote reline is chunked like `pyrite remote run`.
     s = scripts._reline_chunked_queue_script(
@@ -5175,8 +5175,8 @@ def test_reline_queue_script_and_metadata():
 def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc.checkpoints import _checkpoint_io
-    from cxr_mc.remote import lifecycle
+    from pyrite.checkpoints import _checkpoint_io
+    from pyrite.remote import lifecycle
 
     # local checkpoint with a line record
     ckpt = tmp_path / "checkpoints" / "mos2.pkl"
@@ -5216,7 +5216,7 @@ def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
 
     lifecycle.pull(["mos2"], dataset="line")
 
-    from cxr_mc.checkpoints import _checkpoint_store
+    from pyrite.checkpoints import _checkpoint_store
 
     merged = _checkpoint_store.load("mos2", ckpt.parent)["n"][30.0]
     assert np.all(merged["spec"] == 7.0)  # line overwritten

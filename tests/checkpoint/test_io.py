@@ -1,4 +1,4 @@
-"""Tests for cxr_mc.checkpoints._checkpoint_io: zstd checkpoint compression (P2 #8) with
+"""Tests for pyrite.checkpoints._checkpoint_io: zstd checkpoint compression (P2 #8) with
 transparent backward-compat reads of gzip and legacy plain pickles."""
 
 import gzip
@@ -7,7 +7,7 @@ import pickle
 
 import numpy as np
 
-from cxr_mc.checkpoints import _checkpoint_io as ckio
+from pyrite.checkpoints import _checkpoint_io as ckio
 
 
 def _payload():

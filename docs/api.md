@@ -13,7 +13,7 @@ library deprecation. The command-line contract is documented separately in the
 
 ## Materials and crystallography
 
-`cxr_mc.materials.CATALOG` is the immutable bundled `MaterialCatalog`.
+`pyrite.materials.CATALOG` is the immutable bundled `MaterialCatalog`.
 `CRYSTALS`, `MATERIALS`, and `MATERIAL_LABELS` are compatibility projections,
 not independent registries and not part of the supported API.
 
@@ -21,24 +21,24 @@ not independent registries and not part of the supported API.
 .. autosummary::
    :toctree: _autosummary
 
-   cxr_mc.materials.MaterialCatalog
-   cxr_mc.materials.MaterialConfigError
-   cxr_mc.materials.CrystalInfo
-   cxr_mc.materials.CrystalSpec
-   cxr_mc.materials.MediumSpec
-   cxr_mc.materials.MaterialSpec
-   cxr_mc.materials.ScanSpec
-   cxr_mc.materials.LayerSpec
-   cxr_mc.materials.load_material_catalog
-   cxr_mc.materials.atomic.cromer_mann_f0
-   cxr_mc.materials.atomic.henke_dispersion
-   cxr_mc.materials.atomic.atomic_form_factor
-   cxr_mc.materials.crystal.reciprocal_g_vector
-   cxr_mc.materials.crystal.structure_factor
-   cxr_mc.materials.crystal.chi_g
-   cxr_mc.materials.crystal.U_g
-   cxr_mc.materials.crystal.absorption_length_ang
-   cxr_mc.materials.crystal.dominant_reflections
+   pyrite.materials.MaterialCatalog
+   pyrite.materials.MaterialConfigError
+   pyrite.materials.CrystalInfo
+   pyrite.materials.CrystalSpec
+   pyrite.materials.MediumSpec
+   pyrite.materials.MaterialSpec
+   pyrite.materials.ScanSpec
+   pyrite.materials.LayerSpec
+   pyrite.materials.load_material_catalog
+   pyrite.materials.atomic.cromer_mann_f0
+   pyrite.materials.atomic.henke_dispersion
+   pyrite.materials.atomic.atomic_form_factor
+   pyrite.materials.crystal.reciprocal_g_vector
+   pyrite.materials.crystal.structure_factor
+   pyrite.materials.crystal.chi_g
+   pyrite.materials.crystal.U_g
+   pyrite.materials.crystal.absorption_length_ang
+   pyrite.materials.crystal.dominant_reflections
 ```
 
 ## Simulation kernels
@@ -51,14 +51,14 @@ model controls.
 .. autosummary::
    :toctree: _autosummary
 
-   cxr_mc.montecarlo.transport.simulate_trajectories
-   cxr_mc.montecarlo.spectrum.mc_spectrum
-   cxr_mc.montecarlo.spectrum.mc_spectrum_solid_angle
-   cxr_mc.montecarlo.spectrum.mc_brem_spectrum
-   cxr_mc.montecarlo.detector.detector_efficiency
-   cxr_mc.montecarlo.detector.convolve_detector
-   cxr_mc.montecarlo.runner.run_case
-   cxr_mc.montecarlo.runner.run_cases
+   pyrite.montecarlo.transport.simulate_trajectories
+   pyrite.montecarlo.spectrum.mc_spectrum
+   pyrite.montecarlo.spectrum.mc_spectrum_solid_angle
+   pyrite.montecarlo.spectrum.mc_brem_spectrum
+   pyrite.montecarlo.detector.detector_efficiency
+   pyrite.montecarlo.detector.convolve_detector
+   pyrite.montecarlo.runner.run_case
+   pyrite.montecarlo.runner.run_cases
 ```
 
 ## Detector response
@@ -67,15 +67,15 @@ model controls.
 .. autosummary::
    :toctree: _autosummary
 
-   cxr_mc.detectors.DetectorSpec
-   cxr_mc.detectors.eaglexo_response.EagleResponse
-   cxr_mc.detectors.eaglexo_response.get_response
-   cxr_mc.detectors.timepix_response.TimepixResponse
-   cxr_mc.detectors.timepix_response.get_response
-   cxr_mc.detectors.grating.Grating
-   cxr_mc.detectors.grating.SimpleCCD
-   cxr_mc.detectors.grating.disperse_spectrum
-   cxr_mc.detectors.grating.detected_image
+   pyrite.detectors.DetectorSpec
+   pyrite.detectors.eaglexo_response.EagleResponse
+   pyrite.detectors.eaglexo_response.get_response
+   pyrite.detectors.timepix_response.TimepixResponse
+   pyrite.detectors.timepix_response.get_response
+   pyrite.detectors.grating.Grating
+   pyrite.detectors.grating.SimpleCCD
+   pyrite.detectors.grating.disperse_spectrum
+   pyrite.detectors.grating.detected_image
 ```
 
 ## Result analysis
@@ -88,11 +88,11 @@ storage](repo-design/storage/dataset-identity-and-storage.md).
 .. autosummary::
    :toctree: _autosummary
 
-   cxr_mc.results.Settings
-   cxr_mc.results.records
-   cxr_mc.results.filter_results
-   cxr_mc.results.select_results
-   cxr_mc.results.best_azimuth
-   cxr_mc.results.line_metrics
-   cxr_mc.results.summary_table
+   pyrite.results.Settings
+   pyrite.results.records
+   pyrite.results.filter_results
+   pyrite.results.select_results
+   pyrite.results.best_azimuth
+   pyrite.results.line_metrics
+   pyrite.results.summary_table
 ```

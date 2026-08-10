@@ -7,7 +7,7 @@ import numpy as np
 
 
 def test_materials_package_exports_only_registry_conveniences():
-    from cxr_mc import materials
+    from pyrite import materials
 
     assert set(materials.__all__) == {
         "CRYSTALS",
@@ -37,8 +37,8 @@ def test_materials_package_exports_only_registry_conveniences():
 
 
 def test_catalog_package_export_is_a_singleton():
-    import cxr_mc.materials as materials
-    from cxr_mc.materials import CATALOG
+    import pyrite.materials as materials
+    from pyrite.materials import CATALOG
 
     assert materials.CATALOG is CATALOG
 
@@ -55,7 +55,7 @@ def guarded_open(path, *args, **kwargs):
     return real_open(path, *args, **kwargs)
 
 Path.open = guarded_open
-import cxr_mc.materials.catalog
+import pyrite.materials.catalog
 print("catalog module imported lazily")
 """
 
@@ -73,16 +73,16 @@ print("catalog module imported lazily")
 def test_legacy_registry_and_crystal_toml_are_removed():
     from pathlib import Path
 
-    import cxr_mc
+    import pyrite
 
-    package = Path(cxr_mc.__file__).parent
+    package = Path(pyrite.__file__).parent
     assert not (package / "materials" / "registry.py").exists()
     assert not (package / "data" / "crystal_structures.toml").exists()
 
 
 def test_materials_package_preserves_crystal_registry_and_attenuation_behavior():
-    from cxr_mc.materials import CRYSTALS
-    from cxr_mc.materials.attenuation import _mu_total_inv_ang, _stack_tau
+    from pyrite.materials import CRYSTALS
+    from pyrite.materials.attenuation import _mu_total_inv_ang, _stack_tau
 
     assert {"silicon", "hbn", "mose2", "sapphire"} <= set(CRYSTALS)
 

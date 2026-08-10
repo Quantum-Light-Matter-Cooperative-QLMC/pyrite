@@ -66,8 +66,8 @@ crystal = "mos2"
 
 
 def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeypatch):
-    from cxr_mc.campaign import config
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.campaign import config
+    from pyrite.materials import load_material_catalog
 
     catalog = load_material_catalog(_write_catalog(tmp_path, _catalog_with_per_beam_line_grids()))
     scan = catalog.material("sample").scan
@@ -93,7 +93,7 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
 
 
 def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     text = (
         _catalog_with_per_beam_line_grids()
@@ -110,7 +110,7 @@ def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
     # replaces the shared default wholesale (decision 3); its E_grid_brem
     # override still lives under [profiles.standard.overrides.<material>], a
     # separate axis untouched by the line-grid store.
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     material_line = (
         '{ energy_keV = 25.0, grid = { values = [11.0, 14.0] }, source = "derived" },\n  '
@@ -140,7 +140,7 @@ def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
     ],
 )
 def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, error_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
     with pytest.raises(MaterialConfigError) as caught:
@@ -149,7 +149,7 @@ def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, erro
 
 
 def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     replacement = (
         '{ energy_keV = 25.0, grid = { values = [] }, source = "derived" },\n  '
@@ -172,7 +172,7 @@ def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
 
 
 def test_energy_grids_row_requires_a_valid_source(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     replacement = PER_BEAM_ENTRIES.replace('source = "derived"', 'source = "bogus"', 1)
     text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
@@ -187,7 +187,7 @@ def test_energy_grids_store_may_hold_more_energies_than_a_material_needs(tmp_pat
     """Decision 3: the shared store may be a superset of what any one
     profile currently needs -- pruning a profile's energy_keV must never
     force deleting store rows. An unused row is simply not an error."""
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     extra = (
         PER_BEAM_ENTRIES
@@ -209,8 +209,8 @@ def _catalog_with_artifact_ref(digest: str) -> str:
 
 
 def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
-    from cxr_mc.energy_grid import artifacts
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.energy_grid import artifacts
+    from pyrite.materials import load_material_catalog
 
     identity = artifacts.artifact_identity(
         "sample",
@@ -237,8 +237,8 @@ def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
 
 
 def test_profile_artifact_ref_matches_equivalent_legacy_resolution(tmp_path):
-    from cxr_mc.energy_grid import artifacts
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.energy_grid import artifacts
+    from pyrite.materials import load_material_catalog
 
     legacy_text = (
         _catalog_with_per_beam_line_grids()
@@ -276,8 +276,8 @@ def test_profile_artifact_ref_matches_equivalent_legacy_resolution(tmp_path):
 
 
 def test_profile_artifact_ref_rejects_missing_or_wrong_material(tmp_path):
-    from cxr_mc.energy_grid import artifacts
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.energy_grid import artifacts
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     missing = "a" * 64
     with pytest.raises(MaterialConfigError, match="artifact .* is missing"):
@@ -313,7 +313,7 @@ crystal = "mos2"
 
 
 def test_material_without_own_store_entry_falls_back_to_shared_default(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     scan = (
         load_material_catalog(_write_catalog(tmp_path, _catalog_with_default_store_only()))
@@ -325,7 +325,7 @@ def test_material_without_own_store_entry_falls_back_to_shared_default(tmp_path)
 
 
 def test_missing_beam_energy_errors_without_default_store_coverage(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     only_25 = '{ energy_keV = 25.0, grid = { values = [1.0, 2.0] }, source = "derived" }'
     text = _catalog_with_default_store_only(entries=only_25)
@@ -340,7 +340,7 @@ def test_material_config_error_groups_identical_messages_across_materials(tmp_pa
     # A profile-wide setting invalid for every material (no E_grid_line, no
     # material store entry for the profile's beam energies) must not repeat
     # one near-duplicate line per material (TODO.md Bugs #3).
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog(
         material_rows="""
@@ -388,7 +388,7 @@ materials = ["mos2"]
 
 
 def test_profile_names_and_memberships_are_exposed(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     catalog = load_material_catalog(_catalog_with_two_profiles(tmp_path))
 
@@ -417,8 +417,8 @@ crystal = "mos2"
 
 
 def test_profile_beam_block_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
-    from cxr_mc.campaign import config
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.campaign import config
+    from pyrite.materials import load_material_catalog
 
     text = _catalog_with_standard_beam(
         "\n[profiles.standard.beam]\n"
@@ -452,7 +452,7 @@ def test_profile_beam_block_decodes_and_reaches_material_sweep(tmp_path, monkeyp
 
 
 def test_profile_beam_block_rejects_energy_and_bad_values(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _catalog_with_standard_beam(
         "\n[profiles.standard.beam]\n"
@@ -471,7 +471,7 @@ def test_profile_beam_block_rejects_energy_and_bad_values(tmp_path):
 
 
 def test_profile_beam_offsets_coerced_to_tuple_and_absent_profile_is_none(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     text = _catalog_with_standard_beam(
         "\n[profiles.standard.beam]\nlong_offsets_fs = [-10.0, 0.0, 10.0]\n"
@@ -501,7 +501,7 @@ crystal = "mos2"
 
 
 def test_named_beam_reference_resolves_to_same_payload_as_inline_block(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     ref_text = _named_beam_catalog(
         beam_ref="rf_gun_200fs",
@@ -543,7 +543,7 @@ def test_named_beam_and_inline_block_together_is_a_decode_error(tmp_path):
     ``[profiles.NAME.beam]`` table. TOML's own duplicate-key rule (both
     spellings share the ``beam`` key) rejects this before catalog validation
     ever runs -- no bespoke mutual-exclusion check is needed."""
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _named_beam_catalog(
         beam_ref="rf_gun_200fs",
@@ -557,7 +557,7 @@ def test_named_beam_and_inline_block_together_is_a_decode_error(tmp_path):
 
 
 def test_named_beam_unknown_reference_errors(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _named_beam_catalog(beam_ref="bogus", beams_block="")
     with pytest.raises(MaterialConfigError) as caught:
@@ -566,7 +566,7 @@ def test_named_beam_unknown_reference_errors(tmp_path):
 
 
 def test_named_beam_round_trips_negative_alpha_twiss(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     text = _named_beam_catalog(
         beam_ref="diverging",
@@ -584,7 +584,7 @@ def test_named_beam_round_trips_negative_alpha_twiss(tmp_path):
 
 
 def test_named_beam_renaming_does_not_change_resolved_payload(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     def catalog_for(beam_key: str) -> object:
         text = _named_beam_catalog(
@@ -602,9 +602,9 @@ def test_named_beam_renaming_does_not_change_resolved_payload(tmp_path):
 def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     tmp_path, monkeypatch
 ):
-    from cxr_mc.campaign import config
-    from cxr_mc.detectors import DetectorSpec
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.campaign import config
+    from pyrite.detectors import DetectorSpec
+    from pyrite.materials import load_material_catalog
 
     text = (
         _catalog_with_two_profiles(tmp_path).read_text()
@@ -636,8 +636,8 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
 
 
 def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path):
-    from cxr_mc.detectors import DetectorSpec
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.detectors import DetectorSpec
+    from pyrite.materials import load_material_catalog
 
     fallback = load_material_catalog(
         _write_catalog(
@@ -662,7 +662,7 @@ crystal = "mos2"
 
 
 def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = (
         _minimal_catalog(
@@ -683,8 +683,8 @@ crystal = "mos2"
 
 
 def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
-    from cxr_mc.campaign import config
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.campaign import config
+    from pyrite.materials import load_material_catalog
 
     text = _catalog_with_standard_beam(
         "\n[profiles.standard.beam]\n"
@@ -718,7 +718,7 @@ def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path
     ],
 )
 def test_profile_longitudinal_policy_rejects_invalid_combinations(tmp_path, policy, message):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _catalog_with_standard_beam("\n[profiles.standard.beam.longitudinal]\n" + policy + "\n")
     with pytest.raises(MaterialConfigError, match=message):
@@ -726,7 +726,7 @@ def test_profile_longitudinal_policy_rejects_invalid_combinations(tmp_path, poli
 
 
 def test_bundled_crystal_validation_ids_are_ledgered():
-    from cxr_mc import DATA_DIR
+    from pyrite import DATA_DIR
 
     with (DATA_DIR / "materials.toml").open("rb") as stream:
         raw = tomllib.load(stream)
@@ -749,14 +749,14 @@ _ALLOWED_PHASES = frozenset({"1T", "1T'", "2H", "3R", "4H", "6H", "Td"})
 
 
 def test_every_bundled_crystal_has_a_full_name():
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     missing = sorted(key for key, spec in CATALOG.crystals.items() if not spec.full_name)
     assert not missing, f"crystals missing a full_name: {missing}"
 
 
 def test_bundled_crystal_phases_use_known_polytype_labels():
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     bad = sorted(
         (key, spec.phase)
@@ -767,7 +767,7 @@ def test_bundled_crystal_phases_use_known_polytype_labels():
 
 
 def test_bundled_crystal_external_ids_are_well_formed():
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     for key, spec in CATALOG.crystals.items():
         if spec.cod_id is not None:
@@ -781,8 +781,8 @@ def test_same_named_polytypes_keep_separate_checkpoints():
     vs 6H) must still map to distinct crystal keys and distinct per-material
     checkpoint pickles -- otherwise a sweep over one polytype would clobber the
     other's results, since run_sweep names the pickle for ``case['crystal']``."""
-    from cxr_mc.materials import CATALOG
-    from cxr_mc.runs.run import checkpoint_path_for
+    from pyrite.materials import CATALOG
+    from pyrite.runs.run import checkpoint_path_for
 
     # SiC polytypes: identical material name, different phase, different key.
     assert CATALOG.crystal("4h_sic").full_name == CATALOG.crystal("6h_sic").full_name
@@ -806,7 +806,7 @@ def test_same_named_polytypes_keep_separate_checkpoints():
 
 
 def test_packaged_catalog_exposes_frozen_ordered_public_api():
-    from cxr_mc.materials import CATALOG, MaterialCatalog
+    from pyrite.materials import CATALOG, MaterialCatalog
 
     assert isinstance(CATALOG, MaterialCatalog)
     assert len(CATALOG.crystals) == 48
@@ -843,7 +843,7 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
 
 
 def test_standard_profile_uses_requested_angles_energies_and_line_grids():
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     expected_bounds = {
         30.0: (10.0, 2500.0),
@@ -878,7 +878,7 @@ def test_standard_profile_uses_requested_angles_energies_and_line_grids():
 
 
 def test_exposed_arrays_cannot_have_writes_reenabled():
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     arrays = []
     for crystal in CATALOG.crystals.values():
@@ -914,7 +914,7 @@ def test_exposed_arrays_cannot_have_writes_reenabled():
 
 @pytest.mark.parametrize("version", ["true", "1.0"])
 def test_schema_version_requires_integer_one(tmp_path, version):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace("schema_version = 1", f"schema_version = {version}")
     with pytest.raises(MaterialConfigError, match="schema_version"):
@@ -956,7 +956,7 @@ def test_schema_version_requires_integer_one(tmp_path, version):
     ],
 )
 def test_grid_descriptor_types_are_strict_and_errors_are_wrapped(tmp_path, valid, invalid):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace(valid, invalid)
     with pytest.raises(MaterialConfigError, match="profiles.standard"):
@@ -973,7 +973,7 @@ def test_grid_descriptor_types_are_strict_and_errors_are_wrapped(tmp_path, valid
     ],
 )
 def test_scan_angles_stay_in_physical_domains(tmp_path, field, value):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     material_rows = f"""
 [materials.mos2]
@@ -989,7 +989,7 @@ label = "MoS2"
 
 
 def test_grid_descriptors_profile_overrides_and_layer_count_conversion(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     path = _write_catalog(
         tmp_path,
@@ -1018,10 +1018,10 @@ tilt_azim_deg = { logspace = { start = 0.0, stop = 2.0, num = 3, base = 2.0 } }
 
 
 def test_catalog_scalar_and_logspace_energy_grids_reach_runner_exactly(tmp_path, monkeypatch):
-    from cxr_mc.campaign import config
-    from cxr_mc.campaign import sweep as sweep_module
-    from cxr_mc.materials import load_material_catalog
-    from cxr_mc.montecarlo import runner
+    from pyrite.campaign import config
+    from pyrite.campaign import sweep as sweep_module
+    from pyrite.materials import load_material_catalog
+    from pyrite.montecarlo import runner
 
     text = _minimal_catalog(
         material_rows="""
@@ -1063,7 +1063,7 @@ crystal = "mos2"
 
 
 def test_pinned_hkls_add_negatives_and_require_positive_representatives(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     valid = _minimal_catalog(
         material_rows="""
@@ -1085,7 +1085,7 @@ label = "MoS2"
 
 
 def test_semantic_errors_accumulate_with_paths(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     path = _write_catalog(
         tmp_path,
@@ -1130,7 +1130,7 @@ stack = [{ material = "missing", thickness_ang = -2.0 }]
 
 
 def test_crystal_requires_exactly_one_orientation(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     material = """
 [materials.mos2]
@@ -1152,7 +1152,7 @@ label = "MoS2"
 
 
 def test_crystal_accepts_reciprocal_surface_orientation(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     text = _minimal_catalog(
         material_rows="""
@@ -1167,7 +1167,7 @@ label = "MoS2"
 
 
 def test_duplicate_toml_definition_is_material_config_error(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     path = _write_catalog(tmp_path, "schema_version=1\nschema_version=1\n")
     with pytest.raises(MaterialConfigError, match="Cannot overwrite a value"):
@@ -1175,7 +1175,7 @@ def test_duplicate_toml_definition_is_material_config_error(tmp_path):
 
 
 def test_runnable_crystal_must_use_supported_transport_elements(tmp_path):
-    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+    from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog(
         crystal="lif",
@@ -1189,7 +1189,7 @@ label = "LiF"
 
 
 def test_missing_mott_tables_warn_without_rejecting_catalog(tmp_path, caplog):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     text = _minimal_catalog(
         crystal="ws2",
@@ -1219,7 +1219,7 @@ def serialized_catalog_golden():
 
 
 def test_packaged_catalog_matches_independent_serialized_golden(serialized_catalog_golden):
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     golden = serialized_catalog_golden
     assert tuple(CATALOG.crystals) == tuple(golden["crystal_keys"])
@@ -1331,7 +1331,7 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
 
 
 def test_catalog_resolves_stack_layers_to_serialized_physical_data(serialized_catalog_golden):
-    from cxr_mc.materials import CATALOG
+    from pyrite.materials import CATALOG
 
     expected_stacks = serialized_catalog_golden["resolved_stacks"]
     assert tuple(expected_stacks) == tuple(
@@ -1354,7 +1354,7 @@ def test_catalog_resolves_stack_layers_to_serialized_physical_data(serialized_ca
 
 
 def test_resolved_stack_inherits_surface_and_direct_override_clears_it(tmp_path):
-    from cxr_mc.materials import load_material_catalog
+    from pyrite.materials import load_material_catalog
 
     text = _minimal_catalog(
         material_rows="""
@@ -1377,8 +1377,8 @@ stack = [
 
 
 def test_catalog_matches_serialized_physics_for_every_crystal(serialized_catalog_golden):
-    from cxr_mc.materials import CATALOG
-    from cxr_mc.materials import crystal as crystal_module
+    from pyrite.materials import CATALOG
+    from pyrite.materials import crystal as crystal_module
 
     for key, expected in serialized_catalog_golden["crystals"].items():
         spec = CATALOG.crystal(key)

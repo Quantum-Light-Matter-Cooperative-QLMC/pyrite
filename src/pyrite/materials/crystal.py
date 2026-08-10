@@ -1,0 +1,442 @@
+"""
+materials.crystal
+
+General-purpose X-ray crystallography / diffraction primitives, shared by the
+Monte-Carlo pipeline (montecarlo, sweep, the detector forward models) and the
+Feranchuk-Spence analytic checks (src/pyrite/apps/feranchuk_spence.py). Nothing here is
+specific to the Feranchuk amplitude framework -- it is the reusable layer above
+materials.atomic:
+
+  * physical constants (hc, hbar c, alpha, m_e, r_e),
+  * lattice geometry: direct/reciprocal vectors, |g| for any crystal system,
+  * the catalog-backed crystal database (CIF -> CATALOG -> CRYSTALS),
+  * Debye-Waller, structure factor S(g), and the polarizability / crystal-
+    potential Fourier components chi_g (PXR) and U_g (CBS),
+  * photoabsorption length from Henke f2,
+  * dominant_reflections (rank reflection families by |S| e^{-W} / g^2),
+  * _rotation_between (minimal rotation matrix, used to orient crystals).
+
+Units: energies eV, lengths Angstrom, angles radians.
+
+Crystal structures are projected from the immutable material catalog into the
+mapping-style ``CRYSTALS`` compatibility registry. Depends on materials.atomic
+(cromer_mann_f0, atomic_form_factor, henke_dispersion, Z_TABLE).
+"""
+
+import numpy as np
+
+from ._cif import (
+    crystals_crystal_to_crystal_info as crystals_crystal_to_crystal_info,
+)
+from ._cif import load_crystal_from_cif as load_crystal_from_cif
+from .atomic import (
+    Z_TABLE,
+    atomic_form_factor,
+    cromer_mann_f0,
+    henke_dispersion,
+)
+
+# ---- constants --------------------------------------------------------------
+HC_EV_ANG = 12398.4198  # h c [eV*Angstrom]
+HBARC_EV_ANG = 1973.269804  # hbar c [eV*Angstrom]
+ALPHA_FS = 1.0 / 137.035999
+M_E_EV = 510998.95  # electron rest energy [eV]
+R_E_ANG = 2.8179403e-5  # classical electron radius [Angstrom]
+E2_EV_ANG = ALPHA_FS * HBARC_EV_ANG  # e^2 (Gaussian) = alpha hbar c = 14.3996 [eV*Angstrom]
+
+# Elements whose edges fall in the soft-x-ray band -> force Chantler correction.
+# xraydb edge energies confirm that the 350--3500 eV catalog line grids cross
+# Fe L (707--845 eV), Bi M4/M5/M3 (2580--3177 eV), Re M (1883--2932 eV),
+# and Ta M (1735--2708 eV), in addition to the previously reviewed elements.
+_EDGE_PRONE = {"P", "Si", "Fe", "Ge", "Mo", "Nb", "Se", "Te", "Ta", "Re", "Bi"}
+
+
+# ---- lattice geometry --------------------------------------------------------
+def _direct_lattice_vectors(lattice):
+    """
+    Direct lattice vectors (a1, a2, a3) [Angstrom] from a lattice dict:
+        {"system": "cubic",       "a": a}
+        {"system": "tetragonal",  "a": a, "c": c}
+        {"system": "orthorhombic","a": a, "b": b, "c": c}
+        {"system": "hexagonal",   "a": a, "c": c}
+        {"system": "general",     "a": a, "b": b, "c": c,
+         "alpha": alpha, "beta": beta, "gamma": gamma}   # angles in DEGREES
+    """
+    sysname = lattice["system"]
+    if sysname == "cubic":
+        a = lattice["a"]
+        return (
+            np.array([a, 0.0, 0.0]),
+            np.array([0.0, a, 0.0]),
+            np.array([0.0, 0.0, a]),
+        )
+    if sysname == "tetragonal":
+        a, c = lattice["a"], lattice["c"]
+        return (
+            np.array([a, 0.0, 0.0]),
+            np.array([0.0, a, 0.0]),
+            np.array([0.0, 0.0, c]),
+        )
+    if sysname == "orthorhombic":
+        a, b, c = lattice["a"], lattice["b"], lattice["c"]
+        return (
+            np.array([a, 0.0, 0.0]),
+            np.array([0.0, b, 0.0]),
+            np.array([0.0, 0.0, c]),
+        )
+    if sysname == "hexagonal":
+        a, c = lattice["a"], lattice["c"]
+        # standard hexagonal: gamma = 120 deg between a1 and a2
+        return (
+            np.array([a, 0.0, 0.0]),
+            np.array([-a / 2.0, a * np.sqrt(3) / 2.0, 0.0]),
+            np.array([0.0, 0.0, c]),
+        )
+    if sysname == "general":
+        a, b, c = lattice["a"], lattice["b"], lattice["c"]
+        al = np.radians(lattice["alpha"])
+        be = np.radians(lattice["beta"])
+        ga = np.radians(lattice["gamma"])
+        a1 = np.array([a, 0.0, 0.0])
+        a2 = np.array([b * np.cos(ga), b * np.sin(ga), 0.0])
+        cx = c * np.cos(be)
+        cy = c * (np.cos(al) - np.cos(be) * np.cos(ga)) / np.sin(ga)
+        cz = np.sqrt(max(c**2 - cx**2 - cy**2, 0.0))
+        return a1, a2, np.array([cx, cy, cz])
+    raise ValueError(f"unknown crystal system '{sysname}'")
+
+
+def _cross3(u, v):
+    """Cross product for plain 3-vectors (much faster than np.cross)."""
+    return np.array(
+        [
+            u[1] * v[2] - u[2] * v[1],
+            u[2] * v[0] - u[0] * v[2],
+            u[0] * v[1] - u[1] * v[0],
+        ]
+    )
+
+
+_RECIP_BASIS_CACHE = {}
+
+
+def _reciprocal_basis(lattice):
+    """Rows are b1, b2, b3 [1/Angstrom]; cached per lattice (hot path)."""
+    key = tuple(sorted(lattice.items()))
+    B = _RECIP_BASIS_CACHE.get(key)
+    if B is None:
+        a1, a2, a3 = _direct_lattice_vectors(lattice)
+        V = np.dot(a1, _cross3(a2, a3))
+        B = 2.0 * np.pi * np.array([_cross3(a2, a3), _cross3(a3, a1), _cross3(a1, a2)]) / V
+        _RECIP_BASIS_CACHE[key] = B
+    return B
+
+
+def reciprocal_g_vector(hkl, lattice):
+    """
+    Reciprocal lattice vector g = h b1 + k b2 + l b3 for any crystal system.
+    Returns (g_vec [1/Angstrom, 3-vector], g_mag [1/Angstrom]).
+    Convention: |g| = 2*pi/d_hkl, matching the rest of the module.
+    """
+    g_vec = np.asarray(hkl, dtype=float) @ _reciprocal_basis(lattice)
+    return g_vec, np.linalg.norm(g_vec)
+
+
+# ---- catalog-backed crystal database ---------------------------------------
+def load_crystals(catalog=None):
+    """Project CIF-backed catalog crystals into mapping-style physics entries."""
+    if catalog is None:
+        from .catalog import _get_default_catalog
+
+        catalog = _get_default_catalog()
+    return {
+        key: {
+            "lattice": spec.lattice,
+            "basis": spec.basis,
+            "V_cell": spec.V_cell,
+            "mosaic_fwhm_deg": spec.mosaic_fwhm_deg,
+        }
+        for key, spec in catalog.crystals.items()
+    }
+
+
+CRYSTALS = load_crystals()
+
+
+# ---- kinematics -------------------------------------------------------------
+def beta_from_Ee(Ee_eV):
+    g = 1.0 + Ee_eV / M_E_EV
+    return np.sqrt(1.0 - 1.0 / g**2)
+
+
+def g_mag(d_ang):
+    """|g| = 2 pi / d  [1/Angstrom]."""
+    return 2.0 * np.pi / d_ang
+
+
+# ---- structure & Debye-Waller ----------------------------------------------
+def debye_waller(g_invang, B_ang2):
+    """Amplitude Debye-Waller factor exp(-W), W = B (sin(theta)/lambda)^2
+    = B (g/4pi)^2, for a tabulated B-factor [Angstrom^2] (B = 8 pi^2 <u_x^2>).
+    Intensities carry exp(-2W) = the square of this.
+
+    Validation: structure-factor
+    """
+    s = g_invang / (4.0 * np.pi)
+    return np.exp(-B_ang2 * s**2)
+
+
+def _atom_F(element, g, photon_E_eV, use_henke):
+    """
+    Per-atom form factor policy: complex Henke-corrected f0+f'+if'' for
+    edge-prone elements (or when use_henke is set), else non-resonant
+    Cromer-Mann f0 per Eq. (3). Always returns complex.
+    """
+    if use_henke or element in _EDGE_PRONE:
+        return atomic_form_factor(element, g, photon_E_eV)
+    return cromer_mann_f0(element, g) + 0.0j
+
+
+def _basis_F(basis, g, photon_E_eV, use_henke):
+    """Form factor per basis atom, computed once per unique element."""
+    cache = {}
+    for el, _ in basis:
+        if el not in cache:
+            cache[el] = _atom_F(el, g, photon_E_eV, use_henke)
+    return [cache[el] for el, _ in basis]
+
+
+def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
+    """
+    S(g) = sum_i F_i(g) exp(i g . R_i) exp(-W_i), Eq. (3).
+    Returns complex S(g) and |g| [1/Angstrom].
+    F_i is f0 (non-resonant) unless use_henke, then f0+f' (+ i f'').
+
+    Validation: structure-factor
+    """
+    info = CRYSTALS[crystal]
+    hkl = np.asarray(hkl, dtype=float)
+    _, g = reciprocal_g_vector(hkl, info["lattice"])
+    dwf = debye_waller(g, B_ang2)
+    S = 0.0 + 0.0j
+    for (_el, R), F in zip(
+        info["basis"], _basis_F(info["basis"], g, photon_E_eV, use_henke), strict=False
+    ):
+        phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
+        S += F * phase * dwf
+    return S, g
+
+
+# ---- couplings: chi_g (PXR) and U_g (CBS) ----------------------------------
+def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
+    """Return the polarizability Fourier component from Feranchuk Eq. (3).
+
+    With the Debye--Waller factor already included in ``S(g)`` by
+    :func:`structure_factor`,
+
+        chi_g = -(4 pi e^2 / m omega^2) * S(g) / V.
+
+    In the direct electron-density form with classical electron radius r_e:
+
+        chi_g = - r_e lambda^2 / (pi V_cell) * S(g)     [dimensionless]
+
+    Assumes the kinematic, independent-atom susceptibility convention used by
+    Feranchuk--Spence (2000). An extinct reflection has ``S(g) -> 0`` and hence
+    ``chi_g -> 0``; at high photon energy, ``chi_g`` falls as ``lambda**2``.
+
+    Validation: pxr-amplitude
+    """
+    S, _ = structure_factor(crystal, hkl, photon_E_eV, B_ang2, use_henke)
+    lam = HC_EV_ANG / photon_E_eV  # wavelength [Angstrom]
+    return -R_E_ANG * lam**2 / (np.pi * CRYSTALS[crystal]["V_cell"]) * S
+
+
+def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
+    """
+    Crystal-potential Fourier component (CBS coupling), Eq. (4), folded with
+    the 1/V of Eq. (14) and one electron charge:
+        e U_g / V = 4 pi e^2 sum_i exp(i g Ri) (Z_i - F_i)/g^2 exp(-W) / V
+    with e^2 = alpha hbar c = 14.3996 eV*Angstrom (Gaussian). Returned in eV;
+    divide by m_e c^2 to get the dimensionless e U_g / (m V) of Eq. (14).
+
+    Validation: cbs-amplitude
+    """
+    info = CRYSTALS[crystal]
+    hkl = np.asarray(hkl, dtype=float)
+    _, g = reciprocal_g_vector(hkl, info["lattice"])
+    dwf = debye_waller(g, B_ang2)
+    acc = 0.0 + 0.0j
+    for (el, R), F in zip(
+        info["basis"], _basis_F(info["basis"], g, photon_E_eV, use_henke), strict=False
+    ):
+        phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
+        acc += phase * (Z_TABLE[el] - F.real) / g**2 * dwf
+    return 4.0 * np.pi * E2_EV_ANG * acc / info["V_cell"]
+
+
+# ---- absorption length ------------------------------------------------------
+def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
+    """
+    Return the Beer-Lambert intensity attenuation length in Angstrom.
+
+    Starting from ``I(z) = I(0) exp(-mu z)`` and the Henke imaginary
+    refractive-index coefficient
+    ``beta = r_e lambda**2 n f2 / (2 pi)``, this uses
+    ``mu = 2 k beta = 2 r_e lambda n f2`` with ``k = 2 pi / lambda``.
+    The assumptions are a homogeneous elemental medium, passive attenuation,
+    and positive photon energy in the tabulated Henke range. For compounds,
+    inverse lengths add through ``sum_i n_i f2_i``. As ``n`` or ``f2`` tends
+    to zero, ``mu`` tends to zero and the returned length diverges.
+
+    Outside the Chantler table range, including at the wide bremsstrahlung
+    grid's 0 eV bin, ``henke_dispersion`` returns NaN and this function
+    therefore returns NaN. Downstream ``nan_to_num`` policy handles those
+    out-of-domain bins. The ``errstate`` guard only suppresses the associated
+    divide-by-zero and invalid-value warnings; the derivation above applies to
+    positive energies inside the tabulated range.
+
+    Validation: absorption-length
+    """
+    _, f2 = henke_dispersion(element, photon_E_eV)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = HC_EV_ANG / photon_E_eV
+        beta_idx = R_E_ANG * lam**2 / (2.0 * np.pi) * number_density_per_ang3 * f2
+        k = 2.0 * np.pi / lam
+        mu = 2.0 * k * beta_idx  # 1/Angstrom
+        return 1.0 / mu
+
+
+# ---- complex refractive index (grazing-incidence optics) --------------------
+def optical_constants(element, photon_E_eV, number_density_per_ang3):
+    """
+    Complex refractive index n = 1 - delta - i*beta of a material, from the
+    element's Henke/Chantler anomalous scattering factors f'(E), f''(E)
+    (`atomic_form_factors.henke_dispersion`), the Henke convention
+    f1 = Z + f' (forward-scattering factor):
+
+        delta(E) = (r_e lambda^2 / 2 pi) * n_atomic * f1(E),   f1 = Z + f'(E)
+        beta(E)  = (r_e lambda^2 / 2 pi) * n_atomic * f2(E)
+
+    Standard result, e.g. Als-Nielsen & McMorrow, "Elements of Modern X-ray
+    Physics" 2nd ed., Ch. 3 (index of refraction from the atomic scattering
+    factor); equivalently Attwood & Sakdinawat, "X-Rays and Extreme Ultraviolet
+    Radiation" 2nd ed., Ch. 3. Same r_e, lambda, 2*pi normalization as this
+    module's `absorption_length_ang`, whose `beta_idx` IS this beta -- that
+    function's mu = 2 k beta is the textbook absorption coefficient, so
+    beta computed here reproduces it exactly (limiting-case cross-check).
+
+    element : str element symbol.
+    photon_E_eV : float or array, photon energy [eV].
+    number_density_per_ang3 : float, atomic number density [1/Angstrom^3].
+
+    Returns (delta, beta), each shaped like photon_E_eV. Out-of-range energies
+    (see henke_dispersion) return NaN, consistent with the rest of the module.
+
+    Limiting case: f2 -> 0 (far from any edge, fully non-absorbing idealization)
+    gives beta -> 0, the lossless dielectric limit used by `Grating.reflectivity`'s
+    total-external-reflection / power-law-falloff checks.
+
+    Validation: grazing-optical-constants
+    """
+    fp, f2 = henke_dispersion(element, photon_E_eV)
+    f1 = Z_TABLE[element] + fp
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = HC_EV_ANG / np.asarray(photon_E_eV, float)  # wavelength [Angstrom]
+        pref = R_E_ANG * lam**2 / (2.0 * np.pi) * number_density_per_ang3
+        delta = pref * f1
+        beta = pref * f2
+    return delta, beta
+
+
+# ---- crystal orientation ----------------------------------------------------
+def _rotation_between(u_hat, t_hat):
+    """Minimal rotation matrix R such that R @ u_hat = t_hat (unit vectors)."""
+    c = float(np.dot(u_hat, t_hat))
+    axis = _cross3(u_hat, t_hat)
+    s = np.linalg.norm(axis)
+    if s < 1e-12:
+        if c > 0:
+            return np.eye(3)
+        # antiparallel: 180 deg about any axis perpendicular to u_hat
+        tmp = np.array([1.0, 0.0, 0.0]) if abs(u_hat[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+        axis = _cross3(u_hat, tmp)
+        axis /= np.linalg.norm(axis)
+        K = np.array(
+            [
+                [0.0, -axis[2], axis[1]],
+                [axis[2], 0.0, -axis[0]],
+                [-axis[1], axis[0], 0.0],
+            ]
+        )
+        return np.eye(3) + 2.0 * K @ K
+    axis = axis / s
+    K = np.array([[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]])
+    return np.eye(3) + s * K + (1.0 - c) * (K @ K)
+
+
+# ---- reflection ranking -----------------------------------------------------
+def dominant_reflections(
+    crystal,
+    n_families=4,
+    E_ref_eV=1000.0,
+    B_ang2=0.0,
+    use_henke=False,
+    g_max_invang=8.0,
+    representatives_only=False,
+):
+    """
+    Automatically select the strongest reflection FAMILIES of a crystal,
+    Zhai-style (their Table 5 keeps the four planes of largest ``|chi_g|`` per
+    crystal; everything weaker contributes < ~30%).
+
+    Enumerates all reciprocal vectors with |g| <= g_max_invang, ranks by
+        metric = |S(g)| e^{-W} / g^2
+    which is proportional to ``|chi_g|`` evaluated at each reflection's OWN line
+    energy (omega_res scales with g, and chi ~ S/omega^2). Symmetry-
+    equivalent members are grouped by identical (|g|, metric) -- no explicit
+    space-group code needed -- and ALL members of the top n_families are
+    returned as a sorted list of (h, k, l) tuples (including Friedel mates).
+    Set ``representatives_only`` to return one deterministic member per ranked
+    family, useful when each family should appear once in a visualization.
+
+    NOTE: this ranks by the crystal STRUCTURE only. Texture constraints are
+    yours to impose -- e.g. HOPG must be restricted to (00l) by hand, since
+    its in-plane reflections are incoherent across fiber-textured grains.
+    """
+    info = CRYSTALS[crystal]
+    B = _reciprocal_basis(info["lattice"])
+    a_vecs = _direct_lattice_vectors(info["lattice"])
+
+    # exact per-axis index bounds: |h_i| <= g_max |a_i| / 2 pi
+    nmax = [int(np.floor(g_max_invang * np.linalg.norm(a) / (2.0 * np.pi))) for a in a_vecs]
+    grids = np.meshgrid(*(np.arange(-n, n + 1) for n in nmax), indexing="ij")
+    hkl = np.column_stack([G.ravel() for G in grids]).astype(float)
+    g_vec = hkl @ B
+    g_mag = np.linalg.norm(g_vec, axis=1)
+    keep = (g_mag > 1e-9) & (g_mag <= g_max_invang)
+    hkl, g_mag = hkl[keep], g_mag[keep]
+
+    # |S(g)| with the per-element form-factor policy, vectorized over hkl
+    dwf = debye_waller(g_mag, B_ang2)
+    F_el = {}
+    for el in {el for el, _ in info["basis"]}:
+        F_el[el] = _atom_F(el, g_mag, E_ref_eV, use_henke)
+    S = np.zeros(g_mag.shape, dtype=complex)
+    for el, R_frac in info["basis"]:
+        S += F_el[el] * np.exp(2j * np.pi * (hkl @ R_frac)) * dwf
+    metric = np.abs(S) / g_mag**2
+
+    # group symmetry mates: identical (|g|, metric) to rounding
+    fams = {}
+    for i in range(hkl.shape[0]):
+        key = (round(float(g_mag[i]), 6), round(float(metric[i]), 9))
+        fams.setdefault(key, []).append(tuple(int(x) for x in hkl[i]))
+    ranked = sorted(fams.items(), key=lambda kv: -kv[0][1])
+
+    out = []
+    for (_, m), members in ranked[:n_families]:
+        if m < 1e-9 * ranked[0][0][1]:
+            break  # forbidden/negligible families
+        ordered = sorted(members)
+        out.extend([ordered[-1]] if representatives_only else ordered)
+    return out

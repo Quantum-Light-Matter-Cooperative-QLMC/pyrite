@@ -49,7 +49,7 @@ If `uv run` cannot write project environment, add
 ## Work rules
 
 - Make smallest owning change. Preserve unrelated dirty-tree work.
-- Prefer reusable logic in `src/cxr_mc/`; keep marimo apps thin. Keep notebooks
+- Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebooks
   output-free. Run `uv run marimo check <app.py>` after marimo edits.
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
   physics, docs, runtime, remote GPU, regression, catalog-golden, or TODO work.

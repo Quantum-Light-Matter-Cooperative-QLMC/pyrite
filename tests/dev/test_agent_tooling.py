@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from cxr_mc import _dev
+from pyrite import _dev
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def dev_module():
 @pytest.fixture
 def sweep_guard_module():
     path = Path(__file__).parents[2] / ".claude" / "hooks" / "guard_local_sweep.py"
-    spec = importlib.util.spec_from_file_location("cxr_mc_sweep_guard", path)
+    spec = importlib.util.spec_from_file_location("pyrite_sweep_guard", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

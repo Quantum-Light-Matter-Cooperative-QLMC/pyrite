@@ -10,9 +10,9 @@ spectra as host ones, and a case stages exactly once however many kernels run.
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import mc_brem_spectrum, mc_spectrum
-from cxr_mc.montecarlo._backend import REAL, _to_cpu
-from cxr_mc.montecarlo.spectrum import (
+from pyrite.montecarlo import mc_brem_spectrum, mc_spectrum
+from pyrite.montecarlo._backend import REAL, _to_cpu
+from pyrite.montecarlo.spectrum import (
     _SEG_ARRAYS,
     _segments_in_layer,
     _segments_on_device,
@@ -133,7 +133,7 @@ def test_a_case_stages_once_and_every_kernel_reads_that_copy(monkeypatch):
     """The point of the change: three kernels, one upload. A case that also
     wants the coherent spectrum runs two line kernels and the brem kernel, and
     all three must be handed the SAME staged dict."""
-    import cxr_mc.montecarlo.runner as runner
+    import pyrite.montecarlo.runner as runner
 
     stages = []
     real_stage = runner._segments_on_device
@@ -186,7 +186,7 @@ def test_a_case_reports_its_segment_counts_from_the_host_set(monkeypatch):
     """The staged copy is for the kernels only -- the run summary still counts
     segments and backscatter on `tp["segs"]`, which carries the scalar fields a
     device array cannot."""
-    import cxr_mc.montecarlo.runner as runner
+    import pyrite.montecarlo.runner as runner
 
     monkeypatch.setattr(runner, "_lines_for_segments", lambda *a, **k: np.zeros_like(E_GRID))
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
@@ -235,7 +235,7 @@ def test_device_resident_transport_feeds_the_kernels_the_same_spectra():
     to give the kernels exactly what a downloaded-then-uploaded run gives them.
     Staging is what makes it transparent -- it casts to REAL either way, and on
     segments that are already device arrays it is the only copy in the path."""
-    from cxr_mc.montecarlo import simulate_trajectories
+    from pyrite.montecarlo import simulate_trajectories
 
     case = dict(
         E0_keV=30.0,

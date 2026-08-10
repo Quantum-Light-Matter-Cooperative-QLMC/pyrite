@@ -19,16 +19,16 @@ any GPU machine -- the historical bug this parametrization fixes. Set
 import numpy as np
 import pytest
 
-from cxr_mc.materials.crystal import CRYSTALS
-from cxr_mc.montecarlo import (
+from pyrite.materials.crystal import CRYSTALS
+from pyrite.montecarlo import (
     _brem_dsigma_dk,
     mc_brem_spectrum,
     mc_spectrum,
     simulate_trajectories,
     spectrum,
 )
-from cxr_mc.montecarlo._backend import REAL
-from cxr_mc.montecarlo.runner import _env_chunk
+from pyrite.montecarlo._backend import REAL
+from pyrite.montecarlo.runner import _env_chunk
 
 xp = spectrum.xp
 

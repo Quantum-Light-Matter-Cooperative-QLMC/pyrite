@@ -109,7 +109,7 @@ the task.
 ## 3. Limiting-case and monotonicity checks (independent numerics)
 
 Using `m_e c² = 510.99895` keV and the closed form above, computed from
-scratch (no import of `cxr_mc`):
+scratch (no import of `pyrite`):
 
 ```
 γ→1 (T = 1 meV):        S = 0.499998...   → 0.5 to 5+ significant figures

@@ -26,8 +26,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from cxr_mc.campaign.sweep import Sweep, build_cases, substrate_radiator  # noqa: E402
-from cxr_mc.montecarlo import (  # noqa: E402
+from pyrite.campaign.sweep import Sweep, build_cases, substrate_radiator  # noqa: E402
+from pyrite.montecarlo import (  # noqa: E402
     _segments_in_layer,
     _spectrum_case,
     _transport_case,

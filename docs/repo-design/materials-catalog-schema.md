@@ -1,6 +1,6 @@
 # Materials catalog schema
 
-The bundled `cxr_mc/data/materials.toml` is the canonical schema-version-1
+The bundled `pyrite/data/materials.toml` is the canonical schema-version-1
 catalog for crystals, media, runnable materials, beams, and campaign profiles.
 `load_material_catalog()` validates the entire document and returns deeply
 immutable typed records. Invalid or unknown fields fail closed with grouped,

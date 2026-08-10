@@ -10,7 +10,7 @@ default keeps freeing per case and the spike frees on schedule.
 
 import pytest
 
-from cxr_mc.montecarlo.runner import _should_free
+from pyrite.montecarlo.runner import _should_free
 
 MB = 1 << 20
 

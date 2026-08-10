@@ -15,7 +15,7 @@
             "module": "marimo",
             "args": [
                 "run",
-                "${workspaceFolder}/src/cxr_mc/apps/trace_app.py"
+                "${workspaceFolder}/src/pyrite/apps/trace_app.py"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -29,7 +29,7 @@
             "module": "marimo",
             "args": [
                 "run",
-                "${workspaceFolder}/src/cxr_mc/apps/scan_app.py"
+                "${workspaceFolder}/src/pyrite/apps/scan_app.py"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -43,7 +43,7 @@
             "module": "marimo",
             "args": [
                 "run",
-                "${workspaceFolder}/src/cxr_mc/apps/analysis_app.py"
+                "${workspaceFolder}/src/pyrite/apps/analysis_app.py"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -57,7 +57,7 @@
             "module": "marimo",
             "args": [
                 "run",
-                "${workspaceFolder}/src/cxr_mc/apps/validation_app.py"
+                "${workspaceFolder}/src/pyrite/apps/validation_app.py"
             ],
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",

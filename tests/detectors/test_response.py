@@ -7,7 +7,7 @@ FWHM sqrt(3) times too large)."""
 
 import numpy as np
 
-from cxr_mc.montecarlo.detector import aperture_fwhm_eV
+from pyrite.montecarlo.detector import aperture_fwhm_eV
 
 
 def test_aperture_fwhm_prefactor_matches_eq14():

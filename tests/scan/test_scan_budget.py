@@ -4,7 +4,7 @@ import json
 
 from click.testing import CliRunner
 
-from cxr_mc.runs import scan
+from pyrite.runs import scan
 
 
 def _invoke(material=None, max_minutes=None, progress_file=None, *extra):

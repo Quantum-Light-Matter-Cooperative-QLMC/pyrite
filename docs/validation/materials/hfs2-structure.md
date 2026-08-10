@@ -4,8 +4,8 @@
 three-atom primitive hexagonal cell with `a = 3.62 A`, `c = 5.80 A`, Hf on
 `1a`, and S on `2d` using the idealized octahedral coordinate `z = 0.25`.
 
-**Code.** `src/cxr_mc/data/cifs/hfs2.cif` and
-`src/cxr_mc/data/materials.toml::[crystals.hfs2]`
+**Code.** `src/pyrite/data/cifs/hfs2.cif` and
+`src/pyrite/data/materials.toml::[crystals.hfs2]`
 
 **Anchor.** `tests/materials/test_crystallography.py::test_hfs2_structure_sane`
 

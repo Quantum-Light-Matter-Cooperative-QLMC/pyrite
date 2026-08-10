@@ -6,15 +6,15 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from cxr_mc import materials as material_registry
-from cxr_mc.campaign.config import (
+from pyrite import materials as material_registry
+from pyrite.campaign.config import (
     MATERIALS,
     PENETRATION_TILT_DEG,
     material_grid,
     material_sweep,
     trajectory_sweep,
 )
-from cxr_mc.campaign.sweep import (
+from pyrite.campaign.sweep import (
     MATERIAL_LABELS,
     BeamSpec,
     Sweep,
@@ -26,13 +26,13 @@ from cxr_mc.campaign.sweep import (
     scan_grid_rows,
     sweep_cost_weights,
 )
-from cxr_mc.detectors import DetectorSpec
-from cxr_mc.energy_grid.encoding import decode_energy_grid
-from cxr_mc.materials import (
+from pyrite.detectors import DetectorSpec
+from pyrite.energy_grid.encoding import decode_energy_grid
+from pyrite.materials import (
     CATALOG,
     LayerSpec,
 )
-from cxr_mc.montecarlo import runner
+from pyrite.montecarlo import runner
 
 ALL = [
     "mose2",
@@ -85,7 +85,7 @@ def test_crystal_params_unknown_raises():
 def test_real_manifest_materials_are_unique_and_buildable():
     """The shipped ``mats_to_sim.toml`` resolves to unique catalog keys, each of
     which builds at least one case through the standard sweep path."""
-    from cxr_mc.runs.scan import MATS_FILE, load_all_materials
+    from pyrite.runs.scan import MATS_FILE, load_all_materials
 
     materials = load_all_materials(MATS_FILE)
     assert materials, "manifest is empty"
@@ -783,7 +783,7 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     # (run_sweep's default derives the name from cases[0]["crystal"]).
     import argparse
 
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     seen = {}
 
@@ -807,7 +807,7 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
 def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
     import argparse
 
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     captured = {}
 
@@ -949,7 +949,7 @@ def test_build_cases_groove_requires_theta_obs_90():
 
 
 def test_scan_progress_record_is_atomically_replaced(tmp_path):
-    from cxr_mc.runs.scan import _write_progress_record
+    from pyrite.runs.scan import _write_progress_record
 
     path = tmp_path / "progress" / "hopg.json"
     _write_progress_record(
@@ -982,7 +982,7 @@ def test_scan_progress_record_is_atomically_replaced(tmp_path):
 def test_scan_progress_record_tracks_running_and_done(monkeypatch, tmp_path):
     import argparse
 
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     path = tmp_path / "progress" / "hopg.json"
     observed = []
@@ -1014,7 +1014,7 @@ def test_scan_progress_record_tracks_running_and_done(monkeypatch, tmp_path):
 def test_scan_progress_record_tracks_failure(monkeypatch, tmp_path):
     import argparse
 
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     path = tmp_path / "progress" / "hopg.json"
 
@@ -1042,8 +1042,8 @@ def test_scan_progress_record_tracks_failure(monkeypatch, tmp_path):
 def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
     import argparse
 
-    from cxr_mc.perf import performance_profile
-    from cxr_mc.runs import scan
+    from pyrite.perf import performance_profile
+    from pyrite.runs import scan
 
     observed = {}
 
@@ -1129,7 +1129,7 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
     # count and beam_uvw=(1, 0, 0) must override the material's (0, 0, 2) default.
     import argparse
 
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     default_hkl = crystal_params("mose2", n_families=4)["hkl_list"]
     override_hkl = crystal_params("mose2", n_families=6)["hkl_list"]
@@ -1160,7 +1160,7 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
 def test_scan_rejects_explicit_unknown_material_before_building(monkeypatch, tmp_path):
     import argparse
 
-    from cxr_mc.runs import scan
+    from pyrite.runs import scan
 
     monkeypatch.setattr(
         scan, "material_sweep", lambda *a, **kw: pytest.fail("must validate before building")

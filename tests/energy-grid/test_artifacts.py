@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import pytest
 
-from cxr_mc.energy_grid import artifacts
+from pyrite.energy_grid import artifacts
 
 
 def _identity(*, annotations=None):

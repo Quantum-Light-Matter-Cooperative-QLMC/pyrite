@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from cxr_mc.checkpoints import _checkpoint_io
-from cxr_mc.cli import _completion as _cli_completion
+from pyrite.checkpoints import _checkpoint_io
+from pyrite.cli import _completion as _cli_completion
 
 
 def _values(items):
@@ -180,7 +180,7 @@ def block_cupy(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 
 builtins.__import__ = block_cupy
-from cxr_mc.cli import legacy_main
+from pyrite.cli import legacy_main
 legacy_main()
 """
     completed = subprocess.run(
@@ -207,10 +207,10 @@ def _callback(command, name):
 
 
 def test_local_commands_wire_material_checkpoint_archive_and_choice_completion():
-    from cxr_mc.apps import analyze
-    from cxr_mc.checkpoints import archive, slim
-    from cxr_mc.cli.commands import recompute as recompute_cli
-    from cxr_mc.runs import blaze, scan
+    from pyrite.apps import analyze
+    from pyrite.checkpoints import archive, slim
+    from pyrite.cli.commands import recompute as recompute_cli
+    from pyrite.runs import blaze, scan
 
     for command in (scan.command, blaze.command, analyze.command):
         assert _callback(command, "material") is _cli_completion.complete_material
@@ -233,7 +233,7 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 
 
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
-    from cxr_mc.remote import cli
+    from pyrite.remote import cli
 
     command = cli.command.commands["run"]
     assert _callback(command, "catalog_profile") is _cli_completion.complete_profile
@@ -271,7 +271,7 @@ def test_remote_checkpoint_completion_includes_positional_profiles():
 
 
 def test_line_grid_wires_safe_completion_but_not_stop_target():
-    from cxr_mc.energy_grid import command
+    from pyrite.energy_grid import command
 
     for name in ("derive", "submit", "apply"):
         assert (
@@ -292,7 +292,7 @@ def test_line_grid_wires_safe_completion_but_not_stop_target():
 
 
 def test_profile_members_and_material_commands_wire_catalog_completion():
-    from cxr_mc.cli.commands import material, profile
+    from pyrite.cli.commands import material, profile
 
     members = profile.command.commands["members"]
     for name in ("set", "add", "remove"):
@@ -308,7 +308,7 @@ def test_profile_members_and_material_commands_wire_catalog_completion():
 
 
 def test_beam_commands_wire_catalog_completion_but_not_create():
-    from cxr_mc.cli.commands import beam, profile
+    from pyrite.cli.commands import beam, profile
 
     for name in ("show", "set", "rename", "delete"):
         assert _callback(beam.command.commands[name], "name") is _cli_completion.complete_beam

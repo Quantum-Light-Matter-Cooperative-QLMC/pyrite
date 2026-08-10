@@ -24,11 +24,11 @@ os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "pyrit
 # (an editable ``uv sync`` also puts it on the path).
 sys.path.insert(0, os.path.abspath("../src"))
 
-from cxr_mc import __version__
+from pyrite import __version__
 
 # Missing optional Mott tables are a documented runtime fallback, not a docs
 # build diagnostic; importing the full API otherwise logs one warning per element.
-logging.getLogger("cxr_mc.materials.catalog").setLevel(logging.ERROR)
+logging.getLogger("pyrite.materials.catalog").setLevel(logging.ERROR)
 
 # -- Project -----------------------------------------------------------------
 project = "PyRITE"
@@ -59,7 +59,7 @@ autodoc_default_options = {
 # CuPy is optional. Mock both namespaces so the docs build without a CUDA wheel
 # or GPU and importing MC modules never touches a device. ``cli.__main__``
 # executes Click on import and must never run during documentation inspection.
-autodoc_mock_imports = ["cupy", "cupyx", "cxr_mc.cli.__main__"]
+autodoc_mock_imports = ["cupy", "cupyx", "pyrite.cli.__main__"]
 
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True

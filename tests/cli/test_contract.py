@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from cxr_mc import cli
+from pyrite import cli
 
 CONTRACT = Path(__file__).parents[1] / "data" / "cli_contract.json"
 

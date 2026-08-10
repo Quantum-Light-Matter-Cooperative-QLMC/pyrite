@@ -6,10 +6,10 @@ docs/validation/geometry/blazed-groove-geometry.md)."""
 import numpy as np
 from click.testing import CliRunner
 
-from cxr_mc.campaign.config import material_sweep
-from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
-from cxr_mc.materials import CATALOG
-from cxr_mc.runs import blaze
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
+from pyrite.materials import CATALOG
+from pyrite.runs import blaze
 
 MATERIAL = "hopg"  # std tilt_deg grid [5,15,30,45,60,75,85] is groove-legal
 

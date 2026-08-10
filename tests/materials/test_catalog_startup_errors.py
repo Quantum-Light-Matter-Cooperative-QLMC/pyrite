@@ -20,7 +20,7 @@ def import_without_crystals(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = import_without_crystals
-from cxr_mc import cli
+from pyrite import cli
 cli.main(["run", "standard", "-m", "hopg", "--quick"])
 """
 
@@ -54,8 +54,8 @@ def import_without_crystals(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = import_without_crystals
-sys.argv = ["cxr_mc._entry.scan", "standard", "-m", "hopg", "--quick"]
-runpy.run_module("cxr_mc._entry.scan", run_name="__main__")
+sys.argv = ["pyrite._entry.scan", "standard", "-m", "hopg", "--quick"]
+runpy.run_module("pyrite._entry.scan", run_name="__main__")
 """
 
     result = subprocess.run(
@@ -75,7 +75,7 @@ runpy.run_module("cxr_mc._entry.scan", run_name="__main__")
 
 
 def test_transitive_module_not_found_is_not_reported_as_bad_catalog(monkeypatch) -> None:
-    from cxr_mc.materials import catalog
+    from pyrite.materials import catalog
 
     def missing_transitive_dependency(*args, **kwargs):
         raise ModuleNotFoundError("No module named 'spglib'", name="spglib")

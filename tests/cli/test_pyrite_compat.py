@@ -4,9 +4,9 @@ import tomllib
 
 import pytest
 
-from cxr_mc import _compat
-from cxr_mc.apps import analyze, viewer
-from cxr_mc.cli import _config, legacy_main, main
+from pyrite import _compat
+from pyrite.apps import analyze, viewer
+from pyrite.cli import _config, legacy_main, main
 
 
 def test_canonical_and_legacy_root_version(capsys):

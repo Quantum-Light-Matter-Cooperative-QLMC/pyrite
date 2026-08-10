@@ -1,6 +1,6 @@
 # `alexs-qe-absorption` — independent verification
 
-**Code**: `src/cxr_mc/detectors/grating.py::qe_absorption`
+**Code**: `src/pyrite/detectors/grating.py::qe_absorption`
 **Ledger claim**: Beer-Lambert absorption-efficiency QE, `QE(E) = peak·(1 − exp(−t/L_abs(E)))`
 **Source**: Beer-Lambert exponential attenuation + Henke f2 via `crystallography.absorption_length_ang`
 (same absorption-length routine already covered by the `absorption-length` ledger entry).

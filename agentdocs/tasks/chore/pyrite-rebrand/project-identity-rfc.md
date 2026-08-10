@@ -1,4 +1,4 @@
-# Archived RFC: PyRITE project identity and compatibility
+# Superseded RFC: PyRITE project identity and compatibility
 
 This accepted matrix is a point-in-time task record recovered after the flat
 `docs/` layout was retired. The active task and any supersession are in
@@ -33,7 +33,7 @@ rewrite accepted historical records merely to eliminate the old spelling.
 | GitHub repository | `Quantum-Light-Matter-Cooperative-QLMC/pyrite` | `Quantum-Light-Matter-Cooperative-QLMC/cxr-mc` redirect | Rename only in authenticated slice G. Keep the old GitHub name unclaimed for as long as its redirect is part of compatibility. |
 | Lowercase infrastructure stem | `pyrite` | `cxr-mc` only where compatibility or history requires it | New checkout, container, remote checkout, temporary, config, cache, and data names use `pyrite`. |
 | Python distribution | `pyrite-xray` | no new `cxr-mc` compatibility distribution | PEP 503 normalized name is `pyrite-xray`; wheel/dist-info stem is `pyrite_xray`. Recheck and control the name before the first publication. Existing source installs named `cxr-mc` remain historical; slice C updates lock/build metadata. |
-| Python import namespace | `cxr_mc` | none; do not add `pyrite` or `pyrite_xray` facades | Keep indefinitely. This is the public API and stable pickle module path. Brand and distribution need not match the import. |
+| Python import namespace | `pyrite` | `cxr_mc` compatibility namespace | Step I supersedes the original `cxr_mc`-canonical decision. The implementation lives only under `src/pyrite/`. A thin compatibility package maps old root, package, deep, and private imports to the identical canonical module objects; do not add a `pyrite_xray` facade. Retain `cxr_mc` indefinitely unless a later ADR defines a removal policy. |
 | User command | `pyrite` | installed `cxr` compatibility executable | Add in 0.2.0. Normal `cxr` invocation warns once on stderr and names `pyrite`; completion-mode invocation is silent. The executable is omitted from canonical docs/examples and is removable no earlier than 0.4.0 after two published minor releases. Help, completion, exit, stream, and JSON behavior otherwise match. |
 | Developer command | `pyrite-dev` | installed `cxr-dev` compatibility executable | Same 0.2.0 to 0.4.0 minimum window and normal-invocation warning. Contributor docs use `pyrite-dev` after slice F. |
 | Shell completion protocol | `_PYRITE_COMPLETE` for `pyrite` | `_CXR_COMPLETE` through the `cxr` executable window | New managed blocks use `pyrite`; the completion remover recognizes both managed block forms. `_CXR_COMPLETE=... cxr` suppresses the rebrand warning so generated completion remains protocol-clean. |
@@ -45,7 +45,7 @@ rewrite accepted historical records merely to eliminate the old spelling.
 | Workspace root selector | `PYRITE_HOME` | `CXR_HOME` | Precedence follows the environment rule. The selected directory is never renamed automatically. |
 | Workspace artifacts | existing `checkpoints/`, `energy-grid-artifacts/`, profiles, archives, and explicit paths | all valid old layouts already accepted by readers | Keep names and formats. A repository rebrand is not authority to move user workspaces. |
 | Persisted schema and wire IDs | existing `cxr.*`, `cxr.lock.json`, `CXR_REMOTE_V1`, and `CXR_REMOTE_FRAME_END` | same spellings are canonical protocol identifiers | Keep indefinitely. Readers and writers do not translate or rewrite these identifiers. |
-| Python pickles | module paths under `cxr_mc` | same | Stable because `cxr_mc` remains canonical. Old valid pickles require no migration. |
+| Python pickles | new writes use module paths under `pyrite` | existing paths under `cxr_mc` | Current releases load old `cxr_mc.*` pickles through the import compatibility layer, including ordinary `pickle.load`. Old releases are not required to load newly written `pyrite.*` pickles. Persisted schema IDs remain unchanged. |
 | Release display | `PyRITE X.Y.Z` | prior release titles remain historical | Tags remain `vX.Y.Z`. Do not rewrite old releases. |
 | Release files | `pyrite_xray-X.Y.Z` wheel/sdist stems; `pyrite:X.Y.Z` container tag; GitHub artifacts under repository `pyrite` | prior files remain immutable | Do not emit new release artifacts named `cxr-mc` after cutover. Publication remains outside this task. |
 
@@ -145,11 +145,11 @@ wire protocol, scientific terminology, generated output, or history.
 | Classification | Current owners and examples | Conversion rule |
 |---|---|---|
 | Public canonical | `README.md`, `docs/index.md`, Sphinx metadata, app chrome, CLI version banner | Change to PyRITE in F, after command/package work defines live behavior. |
-| Packaging/import | `pyproject.toml`, `uv.lock`, `src/cxr_mc/`, package-smoke and API/export tests | Apply the distribution decision but retain `cxr_mc`; verify wheel and editable installs in C. |
-| CLI contract | `pyproject.toml` scripts, `src/cxr_mc/cli/`, `src/cxr_mc/_dev.py`, completion, deprecation registry, CLI generators and snapshot | Add canonical commands and tested aliases in D; regenerate owned artifacts. |
-| Config and mutable paths | `src/cxr_mc/paths.py`, `cli/_config.py`, app launchers, Plotly render cache | Implement dual-read/canonical-write migration in D/E. |
+| Packaging/import | `pyproject.toml`, `uv.lock`, `src/pyrite/`, the thin `src/cxr_mc/` compatibility bootstrap, package-smoke and API/export tests | Step I makes `pyrite` canonical, retains identity-preserving legacy imports, and verifies wheel and editable installs. |
+| CLI contract | `pyproject.toml` scripts, `src/pyrite/cli/`, `src/pyrite/_dev.py`, completion, deprecation registry, CLI generators and snapshot | Add canonical commands and tested aliases in D; regenerate owned artifacts. |
+| Config and mutable paths | `src/pyrite/paths.py`, `cli/_config.py`, app launchers, Plotly render cache | Implement dual-read/canonical-write migration in D/E. |
 | Persisted/on-disk | checkpoint manifests, campaign locks, energy-grid artifacts, performance records, Zhai caches, remote frames | Preserve the listed identifiers and old valid artifacts in E. |
-| Remote/generated commands | `src/cxr_mc/remote/` script and path builders | Emit canonical distribution/command/env names while accepting configured old checkout paths. |
+| Remote/generated commands | `src/pyrite/remote/` script and path builders | Emit canonical distribution/command/env names while accepting configured old checkout paths. |
 | Generated documentation/data | CLI reference, CLI deprecations, repository-map generated region, API autosummary, CLI contract snapshot, lockfile | Change generators/owners first; regenerate only in their implementation slice. |
 | Repository/release | GitHub URLs, clone instructions, Docker tag/examples, package metadata, CI and release settings | Prepare repository-contained changes in F; authenticated rename only in G. |
 | Scientific/internal | coherent-X-ray terminology, CSS selectors, `cxr.*` instrumentation labels | Keep unless separately justified. |
@@ -163,7 +163,7 @@ Maintained repository URL owners for slice F are: `README.md` (clone URL),
 `docs/running-on-a-cluster.md` (cluster clone URL), `docs/index.md` (source
 link), `src/cxr_mc/devtools/cli_reference.py` (generated-reference source URL),
 `docs/repo_map.md` (README/docs/TODO links), and `docs/atomic-data-sources.md`
-(raw-file link). Generated `docs/cli-reference.md` changes through its owner.
+(raw-file link). Generated CLI references change through their owners.
 Historical URLs in accepted decisions or archived agent records remain
 historical unless they purport to be a current navigation link.
 
@@ -194,7 +194,9 @@ is authorized by this RFC.
 
 ## Consequences
 
-- The costly source namespace rename and pickle migration are avoided.
+- Step I accepts the source namespace migration cost so repository, command,
+  and import identities agree. Existing pickles remain readable; new pickles
+  intentionally identify canonical `pyrite.*` owners.
 - Users get a memorable `pyrite` command and deterministic environment/config
   migration without losing old workspaces or artifacts.
 - Stable automation schemas retain `cxr.*`; visible product identity does not

@@ -22,7 +22,7 @@ description: Use when implementing a coherent PyRITE task checklist slice on its
 ## Implement
 
 1. Prefer failing regression test when it proves behavior. Edit smallest owning
-   surface; keep reusable logic in `src/cxr_mc/` and apps thin.
+   surface; keep reusable logic in `src/pyrite/` and apps thin.
 2. Invoke matching domain skills for CLI, notebooks, physics, performance,
    docs, remote compute, scientific code, or stochastic tests.
 3. Verify each coherent slice with smallest useful fresh check. Use real CLI or

@@ -1,6 +1,6 @@
 import pytest
 
-import cxr_mc.energy_grid.provenance as p
+import pyrite.energy_grid.provenance as p
 
 
 def test_missing_file_is_empty(tmp_path, monkeypatch):

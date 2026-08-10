@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from cxr_mc.devtools.validation_ledger import parse_ledger, render_status_summary
+from pyrite.devtools.validation_ledger import parse_ledger, render_status_summary
 
 
 def test_parser_extracts_domains_and_statuses() -> None:
@@ -43,7 +43,7 @@ def test_status_summary_is_derived_from_rows() -> None:
 
 
 def test_checked_in_views_are_current() -> None:
-    from cxr_mc.devtools.validation_ledger import write_or_check
+    from pyrite.devtools.validation_ledger import write_or_check
 
     ledger = Path(__file__).parents[2] / "docs/validation/physics-validation-ledger.md"
     assert write_or_check(ledger, check=True)

@@ -5,8 +5,8 @@ from collections import Counter
 import numpy as np
 import pytest
 
-from cxr_mc.materials import CATALOG
-from cxr_mc.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
+from pyrite.materials import CATALOG
+from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
 
 
 @pytest.mark.parametrize(

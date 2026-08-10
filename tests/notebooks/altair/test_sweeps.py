@@ -1,4 +1,4 @@
-"""Guard tests for the Altair sweep renderers (cxr_mc.plots.altair.sweeps).
+"""Guard tests for the Altair sweep renderers (pyrite.plots.altair.sweeps).
 
 Like test_altair_plots.py, these exercise only the NEW rendering layer on
 synthetic records (no GPU, no checkpoint), small enough to stay under Vega-Lite's
@@ -11,8 +11,8 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots._frames import _value_label, heatmap_frame, metric_vs_frame
-from cxr_mc.plots.altair.sweeps import (
+from pyrite.plots._frames import _value_label, heatmap_frame, metric_vs_frame
+from pyrite.plots.altair.sweeps import (
     heatmap_chart,
     heatmap_select_chart,
     metric_vs_chart,
@@ -168,7 +168,7 @@ def test_heatmap_select_chart_none_on_empty():
 
 
 def test_heatmap_select_chart_click_selection_needs_non_vegafusion_transformer():
-    # src/cxr_mc/apps/analysis_app.py enables vegafusion GLOBALLY (to lift Vega-Lite's
+    # src/pyrite/apps/analysis_app.py enables vegafusion GLOBALLY (to lift Vega-Lite's
     # 5000-row cap for the dense spectra charts) but must build THIS chart's
     # `mo.ui.altair_chart` wrapper under a locally-restored default transformer
     # -- vegafusion serializes an already-compiled Vega spec (`signals`, no
@@ -176,7 +176,7 @@ def test_heatmap_select_chart_click_selection_needs_non_vegafusion_transformer()
     # know which named selection to listen for and report back as `.value`.
     # Under vegafusion the click still highlights visually (baked into the
     # compiled signal graph) but the selection can never reach the kernel.
-    # This guards the exact mechanism src/cxr_mc/apps/analysis_app.py works around.
+    # This guards the exact mechanism src/pyrite/apps/analysis_app.py works around.
     import marimo as mo
 
     chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux", panel_value=30.0)

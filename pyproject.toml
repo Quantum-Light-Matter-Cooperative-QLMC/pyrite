@@ -36,10 +36,10 @@ intel = [
 ]
 
 [project.scripts]
-pyrite = "cxr_mc.cli:main"
-pyrite-dev = "cxr_mc._dev:main"
-cxr = "cxr_mc.cli:legacy_main"
-cxr-dev = "cxr_mc._dev:legacy_main"
+pyrite = "pyrite.cli:main"
+pyrite-dev = "pyrite._dev:main"
+cxr = "pyrite.cli:legacy_main"
+cxr-dev = "pyrite._dev:legacy_main"
 
 [project.urls]
 Homepage = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme"
@@ -51,7 +51,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/cxr_mc"]
+packages = ["src/pyrite", "src/cxr_mc"]
 
 [dependency-groups]
 test = [
@@ -106,7 +106,7 @@ notebooks = [
 ]
 
 [tool.pytest.ini_options]
-# Put src/ on the path so `import cxr_mc` resolves without requiring an install
+# Put src/ on the path so `import pyrite` resolves without requiring an install
 # (an editable install via `uv sync` also works). Tests stay CPU-only/fast -- the
 # heavy MC physics validation lives in checks/, not here.
 testpaths = ["tests"]
@@ -123,7 +123,7 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["src/cxr_mc"]
+source = ["src/pyrite"]
 parallel = true
 # pytest-xdist workers each write their own data file; `coverage combine` (run
 # implicitly by pytest-cov) merges them.
@@ -131,7 +131,7 @@ parallel = true
 [tool.coverage.paths]
 # Map an installed/wheel copy back onto the checkout so combined runs from
 # different environments do not report the same module twice.
-source = ["src/cxr_mc", "*/site-packages/cxr_mc"]
+source = ["src/pyrite", "*/site-packages/pyrite"]
 
 [tool.coverage.report]
 precision = 1
@@ -163,9 +163,9 @@ include = ["src"]
 
 [[tool.ty.overrides]]
 include = [
-    "src/cxr_mc/montecarlo/*_jit_kernel.py",
-    "src/cxr_mc/montecarlo/runner/__init__.py",
-    "src/cxr_mc/montecarlo/spectrum/*_jit_kernel.py",
+    "src/pyrite/montecarlo/*_jit_kernel.py",
+    "src/pyrite/montecarlo/runner/__init__.py",
+    "src/pyrite/montecarlo/spectrum/*_jit_kernel.py",
 ]
 
 [tool.ty.analysis]
@@ -175,7 +175,7 @@ allowed-unresolved-imports = ["cupy*", "cupy*.*"]
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/cxr_mc/apps/**/*.py"]
+include = ["src/pyrite/apps/**/*.py"]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"
@@ -183,7 +183,7 @@ invalid-return-type = "ignore"
 no-matching-overload = "ignore"
 
 [tool.importlinter]
-root_packages = ["cxr_mc"]
+root_packages = ["pyrite"]
 exclude_type_checking_imports = true
 
 [[tool.importlinter.contracts]]
@@ -191,19 +191,19 @@ id = "physics-core-stays-below-drivers"
 name = "Physics core stays below driver and rendering packages"
 type = "forbidden"
 source_modules = [
-    "cxr_mc.detectors",
-    "cxr_mc.materials",
-    "cxr_mc.montecarlo",
+    "pyrite.detectors",
+    "pyrite.materials",
+    "pyrite.montecarlo",
 ]
 forbidden_modules = [
-    "cxr_mc.apps",
-    "cxr_mc.checkpoints",
-    "cxr_mc.cli",
-    "cxr_mc.perf",
-    "cxr_mc.plots",
-    "cxr_mc.remote",
-    "cxr_mc.runs",
-    "cxr_mc.validation",
+    "pyrite.apps",
+    "pyrite.checkpoints",
+    "pyrite.cli",
+    "pyrite.perf",
+    "pyrite.plots",
+    "pyrite.remote",
+    "pyrite.runs",
+    "pyrite.validation",
 ]
 allow_indirect_imports = true
 
@@ -212,14 +212,14 @@ id = "material-leaves-stay-independent"
 name = "Material leaves do not import higher material modules"
 type = "forbidden"
 source_modules = [
-    "cxr_mc.materials._cif",
-    "cxr_mc.materials._transport_data",
-    "cxr_mc.materials.atomic",
+    "pyrite.materials._cif",
+    "pyrite.materials._transport_data",
+    "pyrite.materials.atomic",
 ]
 forbidden_modules = [
-    "cxr_mc.materials.attenuation",
-    "cxr_mc.materials.catalog",
-    "cxr_mc.materials.crystal",
+    "pyrite.materials.attenuation",
+    "pyrite.materials.catalog",
+    "pyrite.materials.crystal",
 ]
 allow_indirect_imports = true
 
@@ -258,7 +258,7 @@ ignore = [
 # marimo apps display a cell's value as its bare last
 # expression (e.g. a UI element on its own line) -- that's the framework's render
 # mechanism, not a useless statement.
-"src/cxr_mc/apps/*_app.py" = ["B018"]
+"src/pyrite/apps/*_app.py" = ["B018"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -12,7 +12,7 @@ description: Use when locating code, choosing owners, assessing PyRITE structure
    artifacts, branch context, and affected tests. `src/` is ~52k LOC; grep is
    competitive for most questions.
 
-Prefer `src/cxr_mc/` implementations, `tests/` fast CPU checks, `checks/`
+Prefer `src/pyrite/` implementations, `tests/` fast CPU checks, `checks/`
 physics anchors, and thin marimo apps. Legacy
 `checks/cxr_analysis_feranchuk.ipynb` is not an app owner. Do not rewrite
 README/TODO/docs unless task targets them.

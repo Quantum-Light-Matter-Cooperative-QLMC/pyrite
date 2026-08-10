@@ -13,9 +13,9 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from cxr_mc.campaign.config import material_sweep
-from cxr_mc.campaign.sweep import beam_replace, build_cases
-from cxr_mc.runs.scan import _select_quick_energies
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import beam_replace, build_cases
+from pyrite.runs.scan import _select_quick_energies
 
 
 def _grid(energy):

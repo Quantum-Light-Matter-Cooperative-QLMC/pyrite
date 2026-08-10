@@ -3,7 +3,7 @@ import tomllib
 
 import pytest
 
-from cxr_mc.energy_grid import apply
+from pyrite.energy_grid import apply
 from tests.helpers.energy_grid_catalog import BASE_TOML, COMBINED
 
 
@@ -110,7 +110,7 @@ def test_apply_file_writes_and_validates(tmp_path, monkeypatch, capsys):
 def test_add_file_writes_deduplicated_artifact_and_only_repoints_profile(
     tmp_path, monkeypatch, capsys
 ):
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
 
     toml_path = tmp_path / "materials.toml"
     json_path = tmp_path / "combined.json"
@@ -156,7 +156,7 @@ def test_add_file_dry_run_writes_no_artifact_or_catalog(tmp_path, monkeypatch, c
 
 
 def test_add_file_preserves_manual_row_from_referenced_artifact(tmp_path, monkeypatch):
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
 
     toml_path = tmp_path / "materials.toml"
     json_path = tmp_path / "combined.json"
@@ -186,7 +186,7 @@ def test_add_file_preserves_manual_row_from_referenced_artifact(tmp_path, monkey
 
 
 def test_remove_line_rows_repoints_artifact_without_deleting_legacy_rows(tmp_path, monkeypatch):
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
 
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
@@ -220,7 +220,7 @@ def test_remove_line_rows_fails_closed_when_catalog_changed_after_preview(tmp_pa
 
 
 def test_set_line_artifact_repoints_ref_and_preserves_legacy_payload(tmp_path, monkeypatch):
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
 
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
@@ -253,7 +253,7 @@ def test_set_line_artifact_repoints_ref_and_preserves_legacy_payload(tmp_path, m
 
 
 def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path, monkeypatch):
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
 
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)

@@ -8,7 +8,7 @@ reproducing the old point-source beam bit-for-bit; the offset is drawn from an
 RNG stream independent of the main transport `rng`. Its zero-spectrum-effect
 conclusion applies only when both finite-footprint dimensions are `None`.
 
-**Code.** `src/cxr_mc/montecarlo/transport.py::simulate_trajectories`
+**Code.** `src/pyrite/montecarlo/transport.py::simulate_trajectories`
 (`beam_fwhm_mm=` parameter, branch at `if beam_fwhm_mm:` near
 `pos = np.zeros((Ne, 3))`).
 **Source.** Standard Gaussian beam-spot parametrization (no specific paper
@@ -39,7 +39,7 @@ equation — this is a geometric convention, not a derived physical law).
 
 ## 1. Docstring vs. implementation, unit and conversion factors
 
-Read `simulate_trajectories` in full (`src/cxr_mc/montecarlo/transport.py`,
+Read `simulate_trajectories` in full (`src/pyrite/montecarlo/transport.py`,
 lines 201–486 on `feature/finite-electron-beam-size`). Confirmed line-for-line:
 
 ```python
@@ -75,15 +75,15 @@ infinite, all-`None` footprint branch. They must not be generalized to a
 finite rectangular crystal.
 
 For that branch, grepped `r_mid`/`seg_r`/`pos[:, 0|1|:2]` across all of
-`src/cxr_mc`:
+`src/pyrite`:
 
 ```
-src/cxr_mc/montecarlo/spectrum/lines.py:173:   seg_r = xp.asarray(segments["r_mid"], ...)
-src/cxr_mc/montecarlo/spectrum/lines.py:283:   z_mid = seg_r[idx, 2]
-src/cxr_mc/montecarlo/spectrum/lines.py:521:   seg_r = xp.asarray(segments["r_mid"], ...)
-src/cxr_mc/montecarlo/spectrum/lines.py:524:   z_mid = seg_r[:, 2]
-src/cxr_mc/montecarlo/transport.py: (definition + docstring only)
-src/cxr_mc/plots/mpl/trajectories.py:227: L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
+src/pyrite/montecarlo/spectrum/lines.py:173:   seg_r = xp.asarray(segments["r_mid"], ...)
+src/pyrite/montecarlo/spectrum/lines.py:283:   z_mid = seg_r[idx, 2]
+src/pyrite/montecarlo/spectrum/lines.py:521:   seg_r = xp.asarray(segments["r_mid"], ...)
+src/pyrite/montecarlo/spectrum/lines.py:524:   z_mid = seg_r[:, 2]
+src/pyrite/montecarlo/transport.py: (definition + docstring only)
+src/pyrite/plots/mpl/trajectories.py:227: L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
 ```
 
 - `spectrum.py::mc_spectrum` (coherent PXR/CBS line spectrum): in the

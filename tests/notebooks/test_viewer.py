@@ -1,4 +1,4 @@
-"""``cxr viewer`` -- launches src/cxr_mc/apps/trace_app.py via marimo run/edit with
+"""``cxr viewer`` -- launches src/pyrite/apps/trace_app.py via marimo run/edit with
 a chosen initial material. The initial-material resolution has to be a pure,
 unit-testable helper (:func:`viewer.initial_material`) because marimo apps
 can't be driven live in this environment; these tests exercise that helper and
@@ -9,7 +9,7 @@ import sys
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc.apps import viewer
+from pyrite.apps import viewer
 
 
 @pytest.fixture(autouse=True)

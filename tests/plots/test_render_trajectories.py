@@ -5,7 +5,7 @@ import os
 
 import pytest
 
-from cxr_mc.plots.plotly.render import (
+from pyrite.plots.plotly.render import (
     cached_render_path,
     prune_render_cache,
     render_cache_dir,

@@ -5,8 +5,8 @@ load_henke must still return a finite, physical (E, f1, f2) table per element.""
 import numpy as np
 import pytest
 
-import cxr_mc.materials.crystal as crystal_module
-from cxr_mc.materials.atomic import (
+import pyrite.materials.crystal as crystal_module
+from pyrite.materials.atomic import (
     Z_TABLE,
     atomic_form_factor,
     cromer_mann_f0,

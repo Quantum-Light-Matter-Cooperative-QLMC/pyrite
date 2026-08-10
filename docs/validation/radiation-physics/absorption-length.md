@@ -63,7 +63,7 @@ the field-amplitude e-folding length would be twice as large.
 
 ## Implementation comparison
 
-`src/cxr_mc/materials/crystal.py::absorption_length_ang` evaluates
+`src/pyrite/materials/crystal.py::absorption_length_ang` evaluates
 
 ```python
 lam = HC_EV_ANG / photon_E_eV

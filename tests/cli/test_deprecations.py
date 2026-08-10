@@ -5,8 +5,8 @@ from pathlib import Path
 import click
 import pytest
 
-from cxr_mc.cli import command
-from cxr_mc.cli._deprecations import (
+from pyrite.cli import command
+from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,
     DEPRECATIONS,
     SELF_WARNING_FLAGS,

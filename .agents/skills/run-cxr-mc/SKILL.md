@@ -6,7 +6,7 @@ description: Use when running, launching, smoke-testing, or confirming real PyRI
 # Run PyRITE
 
 User surfaces: `uv run cxr ...`; four packaged marimo apps under
-`src/cxr_mc/apps/`; library under `src/cxr_mc/`. Active checkpoints:
+`src/pyrite/apps/`; library under `src/pyrite/`. Active checkpoints:
 `checkpoints/<stem>/{line,brem}.pkl`.
 
 Use existing-checkpoint smoke path:

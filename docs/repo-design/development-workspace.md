@@ -1,7 +1,7 @@
 # Development environment and focused verification
 
 The repository has one uv project and one publishable distribution. The root
-project owns the `pyrite-xray` distribution, `src/cxr_mc/`, packaged data,
+project owns the `pyrite-xray` distribution, `src/pyrite/`, packaged data,
 `pyrite`, `pyrite-dev`, and the test suite. The installed `cxr` and `cxr-dev`
 executables are compatibility aliases through their documented removal window.
 Contributor tools are dependency groups in the root `pyproject.toml`; there is
@@ -13,7 +13,7 @@ The import and data inventory has one natural wheel owner. Core material and
 Monte Carlo modules feed `sweep`, `results`, profiles, configuration, and run
 drivers; plotting consumes results and Monte Carlo APIs; the lazy CLI dispatches
 drivers, remote orchestration, plotting, and apps. All public imports live under
-`cxr_mc`, and `cxr_mc.DATA_DIR` owns the bundled catalogs, CIFs, detector data,
+`pyrite`, and `pyrite.DATA_DIR` owns the bundled catalogs, CIFs, detector data,
 and validation fixtures.
 
 Splitting that namespace between wheels would make installation order decide
@@ -46,7 +46,7 @@ uv run pyrite-dev verify
 uv run pyrite-dev package-smoke
 ```
 
-Suite ownership uses deterministic filename rules in `cxr_mc._dev`. A
+Suite ownership uses deterministic filename rules in `pyrite._dev`. A
 regression test requires the four domain suites to cover every test module
 exactly once, so a new test cannot silently disappear from focused coverage.
 The integration suite intentionally overlaps domain suites; it exercises public

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import click
 
-from cxr_mc.checkpoints import archive
-from cxr_mc.checkpoints import checkpoint_cleanup as cleanup
-from cxr_mc.cli import command as root_command
-from cxr_mc.cli.commands import checkpoint as checkpoint_cli
-from cxr_mc.cli.commands import recompute as recompute_cli
+from pyrite.checkpoints import archive
+from pyrite.checkpoints import checkpoint_cleanup as cleanup
+from pyrite.cli import command as root_command
+from pyrite.cli.commands import checkpoint as checkpoint_cli
+from pyrite.cli.commands import recompute as recompute_cli
 from tests.helpers.cli import assert_clean_result, invoke
 
 

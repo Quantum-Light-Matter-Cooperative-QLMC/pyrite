@@ -4,8 +4,8 @@
 represented as an explicit four-atom conventional-cell basis with
 `a = 2.504 Å`, `c = 6.661 Å`.
 
-**Code.** `src/cxr_mc/data/cifs/hbn.cif` and
-`src/cxr_mc/data/materials.toml::[crystals.hbn]`
+**Code.** `src/pyrite/data/cifs/hbn.cif` and
+`src/pyrite/data/materials.toml::[crystals.hbn]`
 **Anchor.** `tests/materials/test_crystallography.py::test_hbn_structure_sane`
 **Source.** Standard bulk h-BN; canonical structure determination
 Pease, *Acta Cryst.* **5**, 356 (1952): `a = 2.5040 Å`, `c = 6.6612 Å`.

@@ -12,7 +12,7 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 - **In-code back-reference** — every annotated physics function carries a one-line `Validation: <id>` marker in its docstring, tying code↔ledger both ways. A physics `def` with no marker is an unledgered claim — find them with:
   ```bash
   # physics symbols missing a Validation: back-reference
-  grep -L "Validation:" src/cxr_mc/{montecarlo,crystallography,atomic_form_factors}.py src/cxr_mc/detectors/{eaglexo_response,timepix_response}.py
+  grep -L "Validation:" src/pyrite/{montecarlo,crystallography,atomic_form_factors}.py src/pyrite/detectors/{eaglexo_response,timepix_response}.py
   ```
 - **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority.
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.

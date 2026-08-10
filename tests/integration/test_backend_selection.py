@@ -5,8 +5,8 @@ import types
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import _backend, runner
-from cxr_mc.montecarlo._resources import GIB, admitted_chunk, resolve_resource_policy
+from pyrite.montecarlo import _backend, runner
+from pyrite.montecarlo._resources import GIB, admitted_chunk, resolve_resource_policy
 
 
 def test_cpu_backend_contract_round_trip():
@@ -219,7 +219,9 @@ def _fake_sycl_modules(*, devices=None, get_devices=None, sycl_device=None):
 
     fake_dpctl = types.SimpleNamespace(
         get_devices=get_devices or default_get_devices,
-        SyclQueue=lambda selected: types.SimpleNamespace(wait=lambda: calls.setdefault("waited", True)),
+        SyclQueue=lambda selected: types.SimpleNamespace(
+            wait=lambda: calls.setdefault("waited", True)
+        ),
         SyclDevice=sycl_device or (lambda selector: types.SimpleNamespace(name=selector)),
     )
     fake_dpnp = types.SimpleNamespace(
@@ -419,7 +421,7 @@ def test_cpu_fallback_requires_host_ram_admission(monkeypatch):
 def test_cpu_spectrum_backend_updates_active_itemsize() -> None:
     import numpy as np
 
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     with runner._cpu_spectrum_backend():
         assert runner._GPU is False
@@ -449,8 +451,8 @@ def test_intel_machine_selects_sycl_backend() -> None:
         """
         import sys
 
-        import cxr_mc.campaign.config
-        from cxr_mc.montecarlo._backend import BACKEND
+        import pyrite.campaign.config
+        from pyrite.montecarlo._backend import BACKEND
 
         assert BACKEND.name == "sycl", (
             f"Expected SYCL backend, got {BACKEND.name!r}. "
@@ -506,7 +508,7 @@ def test_nsys_helpers_are_noops_for_sycl(monkeypatch) -> None:
 
 
 def test_cpu_spectrum_backend_restores_backend() -> None:
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     original = (
         runner._GPU,

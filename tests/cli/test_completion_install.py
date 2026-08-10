@@ -7,8 +7,8 @@ import subprocess
 
 import pytest
 
-from cxr_mc.cli import command as root_command
-from cxr_mc.cli.commands import completion as completion_command
+from pyrite.cli import command as root_command
+from pyrite.cli.commands import completion as completion_command
 from tests.helpers.cli import assert_clean_result, invoke
 
 

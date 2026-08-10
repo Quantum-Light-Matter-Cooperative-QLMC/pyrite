@@ -2,9 +2,9 @@
 
 - **Claim id**: `blazed-groove-geometry`
 - **Anchors**:
-  `src/cxr_mc/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`;
-  `src/cxr_mc/montecarlo/transport.py::simulate_trajectories`;
-  `src/cxr_mc/montecarlo/spectrum/lines.py::mc_spectrum`; `src/cxr_mc/montecarlo/spectrum/brem.py::mc_brem_spectrum`
+  `src/pyrite/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`;
+  `src/pyrite/montecarlo/transport.py::simulate_trajectories`;
+  `src/pyrite/montecarlo/spectrum/lines.py::mc_spectrum`; `src/pyrite/montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source**: elementary periodic ray–plane intersection (no literature
   equation)
 - **Verifier**: independent fresh context (did not write the implementation),

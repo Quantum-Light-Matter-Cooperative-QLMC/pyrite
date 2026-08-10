@@ -12,9 +12,9 @@ Validation: beam-energy-spread-injection
 import numpy as np
 import pytest
 
-from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases
-from cxr_mc.energy_grid.bounds import coverage_energy, line_shift_fraction
-from cxr_mc.montecarlo.runner import run_case
+from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.energy_grid.bounds import coverage_energy, line_shift_fraction
+from pyrite.montecarlo.runner import run_case
 
 # Small on purpose: the peak bin is stable well below the count where the
 # spectrum shape is, so the whole module costs ~1 s.

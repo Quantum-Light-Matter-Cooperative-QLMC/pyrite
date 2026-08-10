@@ -2,7 +2,7 @@ from time import perf_counter
 
 import numpy as np
 
-from cxr_mc.montecarlo.transport import _rotate_directions, _rotate_directions_numpy
+from pyrite.montecarlo.transport import _rotate_directions, _rotate_directions_numpy
 
 rng = np.random.default_rng(0)
 

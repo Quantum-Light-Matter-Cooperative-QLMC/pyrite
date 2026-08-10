@@ -11,8 +11,8 @@ from dataclasses import replace
 
 from click.testing import CliRunner
 
-from cxr_mc import materials
-from cxr_mc.runs import scan
+from pyrite import materials
+from pyrite.runs import scan
 
 
 def _resolved_run(monkeypatch, argv, emission=None):

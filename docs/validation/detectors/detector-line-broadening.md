@@ -5,7 +5,7 @@
 line `∂Ep/∂θobs = −Ep·(−cosφ cosθ v_x − sinφ cosθ v_y + sinθ v_z)/(c − cosφ
 sinθ v_x − sinφ sinθ v_y − cosθ v_z)`.
 
-**Code.** `src/cxr_mc/montecarlo/detector.py::aperture_fwhm_eV` (post
+**Code.** `src/pyrite/montecarlo/detector.py::aperture_fwhm_eV` (post
 2026-07-11 prefactor fix). **Anchor.** `tests/detectors/test_response.py`.
 **Source.** Zhai et al. 2025 SI Eq. (14).
 **Verifier context.** Independent session; did not author the implementation.

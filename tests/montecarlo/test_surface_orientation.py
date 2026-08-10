@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases, layer_radiator
-from cxr_mc.materials import LayerSpec, load_material_catalog
-from cxr_mc.materials.crystal import HBARC_EV_ANG
-from cxr_mc.montecarlo import beta_from_keV, mc_spectrum
-from cxr_mc.montecarlo.geometry import _orientation_R
+from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, layer_radiator
+from pyrite.materials import LayerSpec, load_material_catalog
+from pyrite.materials.crystal import HBARC_EV_ANG
+from pyrite.montecarlo import beta_from_keV, mc_spectrum
+from pyrite.montecarlo.geometry import _orientation_R
 
 GENERAL_LATTICE = {
     "system": "general",
@@ -116,7 +116,7 @@ def test_legacy_beam_orientation_is_numerically_frozen():
 
 
 def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monkeypatch):
-    import cxr_mc.campaign.sweep as sweep_module
+    import pyrite.campaign.sweep as sweep_module
 
     real = sweep_module.crystal_params("mose2")
     surface_params = {**real, "beam_uvw": None, "surface_hkl": (2, 0, -1)}
@@ -140,7 +140,7 @@ def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monk
 
 
 def test_explicit_layer_beam_override_clears_catalog_surface(monkeypatch):
-    import cxr_mc.campaign.sweep as sweep_module
+    import pyrite.campaign.sweep as sweep_module
 
     monkeypatch.setattr(
         sweep_module,
@@ -161,7 +161,7 @@ def test_explicit_layer_beam_override_clears_catalog_surface(monkeypatch):
 
 
 def test_detector_mosaic_geometry_uses_case_surface_hkl(monkeypatch):
-    from cxr_mc.montecarlo import detector
+    from pyrite.montecarlo import detector
 
     captured = {}
 
@@ -188,7 +188,7 @@ def test_detector_mosaic_geometry_uses_case_surface_hkl(monkeypatch):
 
 
 def test_runner_forwards_surface_hkl_to_spectrum(monkeypatch):
-    from cxr_mc.montecarlo import runner
+    from pyrite.montecarlo import runner
 
     captured = {}
     monkeypatch.setattr(
@@ -244,7 +244,7 @@ def test_orientation_rejects_conflicting_direct_and_reciprocal_contracts():
 
 
 def test_real_surface_catalog_case_changes_real_cpu_spectrum(tmp_path, monkeypatch):
-    import cxr_mc.campaign.sweep as sweep_module
+    import pyrite.campaign.sweep as sweep_module
 
     catalog_text = """
 schema_version = 1

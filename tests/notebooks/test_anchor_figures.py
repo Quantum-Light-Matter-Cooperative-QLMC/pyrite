@@ -1,4 +1,4 @@
-"""Fast unit tests for src/cxr_mc/apps/anchor_figures.py (the P1 #2 validation figures).
+"""Fast unit tests for src/pyrite/apps/anchor_figures.py (the P1 #2 validation figures).
 
 The heavy MC figure run lives in checks/; here we test only the cheap, pure
 pieces -- theory anchors, the reference-CSV loader, series matching, the
@@ -16,8 +16,8 @@ import pytest
 
 matplotlib.use("Agg")  # headless; no display in CI
 
-from cxr_mc.apps import anchor_figures as af
-from cxr_mc.detectors import DetectorSpec
+from pyrite.apps import anchor_figures as af
+from pyrite.detectors import DetectorSpec
 
 _APP_RESOURCES = Path(af.__file__).resolve().parent
 _CHECKS = Path(__file__).resolve().parents[2] / "checks"
@@ -32,12 +32,12 @@ def anchor():
 
 def test_line_energy_matches_dispersion(anchor):
     """line_energy_eV reproduces E = hbar c beta g / (1 - beta cos theta)."""
-    from cxr_mc.materials.crystal import (
+    from pyrite.materials.crystal import (
         CRYSTALS,
         HBARC_EV_ANG,
         reciprocal_g_vector,
     )
-    from cxr_mc.montecarlo import beta_from_keV
+    from pyrite.montecarlo import beta_from_keV
 
     info = CRYSTALS[anchor.crystal]
     _, g = reciprocal_g_vector(anchor.hkl, info["lattice"])
@@ -207,7 +207,7 @@ def _synthetic_model(anchor):
 
 
 def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
-    from cxr_mc.checkpoints import _checkpoint_io
+    from pyrite.checkpoints import _checkpoint_io
 
     expected = _synthetic_model(anchor)
     calls = []
@@ -236,7 +236,7 @@ def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
 
 
 def test_cached_model_spectra_recomputes_pre_detector_payload(anchor, tmp_path, monkeypatch):
-    from cxr_mc.checkpoints import _checkpoint_io
+    from pyrite.checkpoints import _checkpoint_io
 
     expected = _synthetic_model(anchor)
     calls = []
@@ -696,7 +696,7 @@ def test_supplementary_overview_rejects_unknown_key():
 
 
 def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch):
-    from cxr_mc.checkpoints import _checkpoint_io
+    from pyrite.checkpoints import _checkpoint_io
 
     calls = []
 
@@ -812,7 +812,7 @@ def test_supplementary_hbn_figure_rejects_incomplete_condition_set():
 
 
 def test_physics_source_tree_is_lf_only():
-    """The Zhai cache key hashes raw bytes of every src/cxr_mc/**/*.py file
+    """The Zhai cache key hashes raw bytes of every src/pyrite/**/*.py file
     (_zhai_cache_key / _supplementary_cache_key); the remote Zhai preset relies on
     the box and the laptop hashing identical bytes for a pulled cache to be a
     hit. The repo's .gitattributes pins `* text=auto eol=lf`, so a CRLF file
@@ -822,7 +822,7 @@ def test_physics_source_tree_is_lf_only():
     offenders = [
         str(path.relative_to(repo_root))
         for path in [
-            *sorted((repo_root / "src" / "cxr_mc").glob("**/*.py")),
+            *sorted((repo_root / "src" / "pyrite").glob("**/*.py")),
             _APP_RESOURCES / "anchor_figures.py",
         ]
         if b"\r\n" in path.read_bytes()

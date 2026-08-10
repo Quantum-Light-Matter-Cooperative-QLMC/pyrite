@@ -2,7 +2,7 @@
 
 Evaluation of whether to replace the project's hand-maintained atomic scattering data with
 an external library, and which one. **Conclusion: `xraydb` is the best fit, and it was
-ADOPTED on 2026-06-23** — `src/cxr_mc/materials/atomic.py` now sources f0/f′/f″/Z from xraydb
+ADOPTED on 2026-06-23** — `src/pyrite/materials/atomic.py` now sources f0/f′/f″/Z from xraydb
 (no hard-coded tables). The migration was re-validated against the Feranchuk and Zhai
 anchors (results below). xraylib was explicitly considered and rejected (see below).
 
@@ -10,7 +10,7 @@ anchors (results below). xraylib was explicitly considered and rejected (see bel
 
 ## What was hard-coded before (now sourced from xraydb)
 
-`src/cxr_mc/materials/atomic.py` provides, behind one clean seam:
+`src/pyrite/materials/atomic.py` provides, behind one clean seam:
 
 | Datum | Was | Now |
 |---|---|---|

@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import load_external_brem
-from cxr_mc.validation.validation_background import (
+from pyrite.montecarlo import load_external_brem
+from pyrite.validation.validation_background import (
     compare_external_background,
     fit_external_background,
     subtract_external_background,
@@ -15,7 +15,7 @@ from cxr_mc.validation.validation_background import (
 _FIXTURES = (
     Path(__file__).resolve().parents[2]
     / "src"
-    / "cxr_mc"
+    / "pyrite"
     / "apps"
     / "reference_data"
     / "external_brem"

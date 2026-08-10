@@ -5,11 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from cxr_mc import energy_grid
-from cxr_mc.cli import _core as _cli_core
-from cxr_mc.cli._deprecations import message
-from cxr_mc.energy_grid import _command
-from cxr_mc.remote import config as remote_config
+from pyrite import energy_grid
+from pyrite.cli import _core as _cli_core
+from pyrite.cli._deprecations import message
+from pyrite.energy_grid import _command
+from pyrite.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 CLICK_COMMANDS = (
@@ -75,7 +75,7 @@ def test_click_help_paths_are_clean(path):
 
 @pytest.mark.parametrize(
     "module",
-    ("cxr_mc.energy_grid.derive", "cxr_mc.energy_grid.job"),
+    ("pyrite.energy_grid.derive", "pyrite.energy_grid.job"),
 )
 def test_standalone_module_entry_points_remain_available(module):
     completed = subprocess.run(
@@ -231,7 +231,7 @@ def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
 
 def test_click_derive_forwards_brem_step(monkeypatch):
     seen = {}
-    from cxr_mc.energy_grid import derive
+    from pyrite.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda argv: seen.update(argv=argv) or 0)
 
@@ -349,7 +349,7 @@ def test_click_derive_rejects_incompatible_locality_controls():
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_derive_preserves_nonzero_status(monkeypatch, status):
-    from cxr_mc.energy_grid import derive
+    from pyrite.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda _argv: status)
 
@@ -392,7 +392,7 @@ def test_click_apply_alias_adds_artifact_without_touching_legacy_payload(tmp_pat
     import json as _json
     import tomllib
 
-    from cxr_mc.energy_grid import artifacts
+    from pyrite.energy_grid import artifacts
     from tests.helpers.energy_grid_catalog import BASE_TOML, COMBINED
 
     toml_path = tmp_path / "materials.toml"
@@ -762,7 +762,7 @@ def test_hidden_line_grid_job_aliases_remain_callable():
 
 
 def test_click_regen_golden_delegates_check(monkeypatch):
-    from cxr_mc.energy_grid import golden
+    from pyrite.energy_grid import golden
 
     seen = {}
     monkeypatch.setattr(
@@ -779,7 +779,7 @@ def test_click_regen_golden_delegates_check(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
-    from cxr_mc.energy_grid import golden
+    from pyrite.energy_grid import golden
 
     monkeypatch.setattr(golden, "regen", lambda check=False: status)
 
@@ -898,7 +898,7 @@ def test_cli_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
         [
             sys.executable,
             "-c",
-            "from cxr_mc.cli import main; raise SystemExit(main())",
+            "from pyrite.cli import main; raise SystemExit(main())",
             *argv,
         ],
         capture_output=True,

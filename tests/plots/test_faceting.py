@@ -6,7 +6,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from cxr_mc.results import Settings, results_dataframe  # noqa: E402
+from pyrite.results import Settings, results_dataframe  # noqa: E402
 
 
 def _rec(crystal, thick, tilt, E0):
@@ -78,7 +78,7 @@ def test_dataframe_metrics_false_skips_peak_finding():
 def test_facet_metric_grid_shape():
     from matplotlib.figure import Figure
 
-    from cxr_mc.plots import facet_metric
+    from pyrite.plots import facet_metric
 
     fig = facet_metric(
         _results(),
@@ -96,7 +96,7 @@ def test_facet_metric_grid_shape():
 def test_facet_metric_no_hue_and_single_facet():
     from matplotlib.figure import Figure
 
-    from cxr_mc.plots import facet_metric
+    from pyrite.plots import facet_metric
 
     fig = facet_metric(_results(), Settings(), x="thickness_ang", y="line_flux", hue=None)
     assert isinstance(fig, Figure)
@@ -104,6 +104,6 @@ def test_facet_metric_no_hue_and_single_facet():
 
 
 def test_facet_metric_bad_column_returns_none():
-    from cxr_mc.plots import facet_metric
+    from pyrite.plots import facet_metric
 
     assert facet_metric(_results(), Settings(), x="not_a_knob") is None

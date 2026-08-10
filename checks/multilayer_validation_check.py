@@ -39,8 +39,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from cxr_mc.campaign.sweep import crystal_params, substrate_composition  # noqa: E402
-from cxr_mc.montecarlo import (  # noqa: E402
+from pyrite.campaign.sweep import crystal_params, substrate_composition  # noqa: E402
+from pyrite.montecarlo import (  # noqa: E402
     TRANSPORT_ELEMENTS,
     _dEds_compound,
     _mu_total_inv_ang,

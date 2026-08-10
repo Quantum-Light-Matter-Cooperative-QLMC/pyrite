@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from cxr_mc.apps import _design
+from pyrite.apps import _design
 
 
 def test_design_tokens_are_complete_and_export_safe() -> None:
@@ -88,5 +88,5 @@ def test_scan_grid_states_map_to_palette_tokens() -> None:
 
 
 def test_core_package_does_not_import_notebook_design() -> None:
-    root = Path(__file__).parents[1] / "src" / "cxr_mc"
+    root = Path(__file__).parents[1] / "src" / "pyrite"
     assert all("notebooks._design" not in path.read_text() for path in root.rglob("*.py"))

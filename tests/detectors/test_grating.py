@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from cxr_mc.detectors._si_sensor import SI_N_PER_ANG3
-from cxr_mc.detectors.grating import (
+from pyrite.detectors._si_sensor import SI_N_PER_ANG3
+from pyrite.detectors.grating import (
     ALEXS_SENSORS,
     Grating,
     SimpleCCD,
@@ -21,7 +21,7 @@ from cxr_mc.detectors.grating import (
     resolving_power,
     wavelength_angstrom,
 )
-from cxr_mc.materials.crystal import HC_EV_ANG, absorption_length_ang, optical_constants
+from pyrite.materials.crystal import HC_EV_ANG, absorption_length_ang, optical_constants
 
 
 def test_wavelength_and_spacing():

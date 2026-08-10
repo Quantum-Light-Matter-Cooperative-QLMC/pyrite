@@ -1,12 +1,12 @@
 """``cxr export`` targets the marimo analysis app, not the retired Jupyter
-notebook (analysis.ipynb was replaced by src/cxr_mc/apps/analysis_app.py in the
+notebook (analysis.ipynb was replaced by src/pyrite/apps/analysis_app.py in the
 marimo migration -- exporting must follow, via ``marimo export html``)."""
 
 import datetime
 import sys
 from pathlib import Path
 
-from cxr_mc.apps import export
+from pyrite.apps import export
 
 
 def test_export_targets_existing_notebook():
