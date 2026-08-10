@@ -9,10 +9,12 @@ the two modes cannot overwrite each other.
 
 For one reciprocal vector and polarization, the opt-in path computes
 
-```text
-E_tot(E, n_hat) = sum_j A_j Q_j(E) exp[i E(t_abs,j - n_hat.r_j)/(hbar c)]
-dN/(dE dOmega) proportional to |E_tot|^2
-```
+$$
+E_{\mathrm{tot}}(E, n_{\mathrm{hat}}) = \sum_j A_j Q_j(E) \exp\left[\frac{i E(t_{\mathrm{abs,}j} - n_{\mathrm{hat}}.r_j)}{\hbar c}\right]
+$$
+$$
+\frac{dN}{dE d\Omega} \propto |E_tot|^2
+$$
 
 where `t_abs = t_ang + L_ang/(2 beta) + t0_ang`: transport's `t_ang` remains
 segment-start age, the half-flight term pairs time with `r_mid`, and `t0_ang`
