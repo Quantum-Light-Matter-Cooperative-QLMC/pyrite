@@ -16,6 +16,7 @@ atomic-physics/atomic-data-sources
 :caption: Electron transport
 
 beam-transport/beam-phase-space
+beam-transport/electron-transport
 ```
 
 ```{toctree}
@@ -23,6 +24,8 @@ beam-transport/beam-phase-space
 :caption: Radiation physics
 
 radiation-physics/coherent-emission
+radiation-physics/bremsstrahlung
+radiation-physics/coherent-radiation
 ```
 
 ```{toctree}
@@ -37,6 +40,7 @@ geometry/tilt-convention
 :caption: Detectors and optics
 
 detectors/detector-solid-angle
+detectors/detector-response
 ```
 
 ```{toctree}

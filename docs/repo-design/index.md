@@ -10,6 +10,8 @@ It is intended primarily for contributors and maintainers. User-facing instructi
 
 development-workspace
 documentation
+configuration-resolution
+materials-catalog-schema
 ../repo_map
 ```
 
@@ -35,6 +37,7 @@ compute/gpu-transport-rawkernel.md
 :caption: Storage and artifacts
 
 storage/checkpoint-case-store
+storage/dataset-identity-and-storage
 ```
 
 ## Architecture decision records

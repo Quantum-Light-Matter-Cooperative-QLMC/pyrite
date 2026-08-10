@@ -10,8 +10,11 @@ analysis workflows.
 :maxdepth: 1
 
 getting-started
+configuration-cookbook
 working-with-results
+analysis-tutorial
 running-on-a-cluster
 performance-profile-analysis
 sweep-profiles
+troubleshooting
 ```
