@@ -27,6 +27,9 @@ In scope:
   cache paths, persisted schemas, and release artifacts;
 - rebrand public prose, UI chrome, package metadata, generated references,
   contributor tooling, examples, and external repository metadata;
+- relocate the implementation from `src/cxr_mc/` to `src/pyrite/`, only after
+  revising the approved import/pickle compatibility policy and providing a
+  tested `cxr_mc` compatibility surface for existing users and artifacts;
 - introduce any approved new distribution/import/CLI/config identities with
   explicit compatibility aliases or migrations for existing users and data;
 - update tests and runtime probes so both the new canonical surface and every
@@ -58,7 +61,8 @@ overlapping that completed refactor.
 2. Write and approve the identity/compatibility matrix before moving packages
    or changing commands. Apply the CLI RFC's additive alias and deprecation
    policy to command/environment/config changes.
-3. Land the source/package transition in bounded checkpoints: packaging/import
+3. Revise the identity matrix for the `src/pyrite/` implementation move, then
+   land the source/package transition in bounded checkpoints: packaging/import
    compatibility first; CLI/config/path compatibility second; public brand and
    generated documentation third. Keep persisted checkpoint and remote-job
    interoperability explicit throughout.
@@ -125,6 +129,13 @@ Related accepted design constraints:
 - [x] H — Run focused compatibility probes and the full release gate; review a
       scoped identity search so remaining `cxr-mc` / `cxr_mc` / `cxr` /
       `CXR_*` occurrences are intentional compatibility or historical records.
+- [ ] I — Relocate the implementation package from `src/cxr_mc/` to
+      `src/pyrite/`. First revise and approve the import/pickle portion of the
+      identity matrix; then provide a tested `cxr_mc` compatibility surface
+      for old imports, deep imports, package resources, and existing pickle
+      module paths. Update packaging, tooling, generated references, tests,
+      and the repository map. Do not claim rebrand completion until G and I
+      both pass.
 
 ## Decisions
 
@@ -140,7 +151,7 @@ Decided from user review:
 - Treat the conversion as a compatibility migration, not global replacement.
 - Bare `pyrite` is already owned on PyPI; do not depend on acquiring it.
 
-Accepted A/B matrix: [`docs/project-identity-rfc.md`](../../../../docs/project-identity-rfc.md),
+Accepted A/B matrix: [`project-identity-rfc.md`](project-identity-rfc.md),
 recorded by [ADR-0007](../../../../docs/adr/0007-project-identity.md).
 
 - Distribution: `pyrite-xray`; normalized wheel/dist-info stem `pyrite_xray`.
@@ -148,6 +159,10 @@ recorded by [ADR-0007](../../../../docs/adr/0007-project-identity.md).
   the name immediately before publication.
 - Import: keep `cxr_mc` canonical indefinitely. Do not add `pyrite` or
   `pyrite_xray` facades; this preserves the public API and pickle module paths.
+  **Supersession required before I:** the requested move to `src/pyrite/`
+  conflicts with this decision. Approve a replacement import and pickle
+  compatibility matrix before implementation; a directory rename alone is not
+  acceptable because it breaks deep imports, resource lookup, and unpickling.
 - Commands: `pyrite` and `pyrite-dev` canonical from 0.2.0; `cxr` and
   `cxr-dev` remain installed compatibility executables, removable no earlier
   than 0.4.0 after the accepted two-minor window. Normal invocation warns;
