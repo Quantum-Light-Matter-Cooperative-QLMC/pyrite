@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import os
+import shlex
+import shutil
+import stat
 from pathlib import Path
 
 import click
+from click.shell_completion import get_completion_class
 
+from ...paths import atomic_write_text, user_data_dir
 from .._core import CLIError, LazyGroup, emit_result, run
 
 PROG_NAME = "pyrite"
@@ -25,11 +30,77 @@ _LEGACY_COMMENT = "# cxr shell completion"
 
 
 def _completion_line(shell: str, prog_name: str = PROG_NAME) -> str:
+    """Return the retained dynamic-source line used by older installations."""
     mode = _SHELL_SOURCE_MODE[shell]
     complete_var = f"_{prog_name.upper()}_COMPLETE"
     if shell == "fish":
         return f"{complete_var}={mode} {prog_name} | source"
     return f'eval "$({complete_var}={mode} {prog_name})"'
+
+
+def _completion_file(shell: str) -> Path:
+    suffix = {"bash": "bash", "zsh": "zsh", "fish": "fish"}[shell]
+    return user_data_dir() / "completions" / f"pyrite.{suffix}"
+
+
+def _generated_completion(shell: str) -> str:
+    completion_class = get_completion_class(shell)
+    if completion_class is None:  # pragma: no cover - choices and Click stay in lockstep
+        raise CLIError(f"Click does not support {shell} completion")
+
+    # Import lazily: this command is itself lazy-loaded by the root CLI.
+    from cxr_mc.cli import command as root_command
+
+    source = completion_class(root_command, {}, PROG_NAME, COMPLETE_VAR).source()
+    return source if source.endswith("\n") else f"{source}\n"
+
+
+def _source_line(completion_file: Path) -> str:
+    return f". {shlex.quote(str(completion_file))}"
+
+
+def _require_persistent_executable() -> None:
+    """Reject an entry point available only through the active project venv."""
+    virtual_env = os.environ.get("VIRTUAL_ENV")
+    executable = shutil.which(PROG_NAME)
+    if not virtual_env or not executable:
+        return
+
+    environment = Path(virtual_env).resolve()
+    try:
+        Path(executable).resolve().relative_to(environment)
+    except ValueError:
+        return
+
+    persistent_path = os.pathsep.join(
+        entry
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if not _is_within(Path(entry), environment)
+    )
+    if shutil.which(PROG_NAME, path=persistent_path) is None:
+        raise click.UsageError(
+            "pyrite is available only inside the active project environment, so completion "
+            "would not survive a new shell. Install the persistent command with "
+            "'uv tool install .' (or 'uv tool install --editable .'), run "
+            "'uv tool update-shell', restart the shell, then run this command again."
+        )
+
+
+def _is_within(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _write_shell_config(path: Path, content: str) -> None:
+    """Atomically update an rc file without replacing a dotfile-manager symlink."""
+    target = path.resolve() if path.is_symlink() else path
+    mode = stat.S_IMODE(target.stat().st_mode) if target.exists() else None
+    atomic_write_text(target, content)
+    if mode is not None:
+        target.chmod(mode)
 
 
 def _default_rc_file(shell: str) -> Path:
@@ -58,11 +129,23 @@ def _resolve_target(shell: str | None, rc_file: Path | None) -> tuple[str, Path]
     return shell, rc_file if rc_file is not None else _default_rc_file(shell)
 
 
-def _managed_block(shell: str) -> str:
-    return f"{_MANAGED_START}\n{_completion_line(shell)}\n{_MANAGED_END}\n"
+def _managed_block(shell: str, completion_file: Path) -> str:
+    lines = [_MANAGED_START]
+    if shell == "zsh":
+        lines.extend(
+            (
+                "if (( ! $+functions[compdef] )); then",
+                "  autoload -Uz compinit && compinit",
+                "fi",
+            )
+        )
+    lines.extend((_source_line(completion_file), _MANAGED_END))
+    return "\n".join(lines) + "\n"
 
 
-def _without_managed_completion(existing: str, line: str) -> tuple[str, bool]:
+def _without_managed_completion(
+    existing: str, shell: str, completion_file: Path
+) -> tuple[str, bool]:
     """Remove exact current or legacy managed blocks for one shell."""
     lines = existing.splitlines(keepends=True)
     kept: list[str] = []
@@ -70,15 +153,27 @@ def _without_managed_completion(existing: str, line: str) -> tuple[str, bool]:
     index = 0
     while index < len(lines):
         current = lines[index].strip()
-        managed = {
-            (_MANAGED_START, _MANAGED_END, line),
-            (_CXR_MANAGED_START, _CXR_MANAGED_END, _completion_line_from_line(line, "cxr")),
+        dynamic_line = _completion_line(shell)
+        legacy_blocks = {
+            (_MANAGED_START, _MANAGED_END, dynamic_line),
+            (
+                _CXR_MANAGED_START,
+                _CXR_MANAGED_END,
+                _completion_line_from_line(dynamic_line, "cxr"),
+            ),
         }
+        current_block = _managed_block(shell, completion_file).splitlines()
+        if lines[index : index + len(current_block)] and [
+            item.strip() for item in lines[index : index + len(current_block)]
+        ] == [item.strip() for item in current_block]:
+            removed = True
+            index += len(current_block)
+            continue
         if index + 2 < len(lines) and any(
             current == start
             and lines[index + 1].strip() == candidate
             and lines[index + 2].strip() == end
-            for start, end, candidate in managed
+            for start, end, candidate in legacy_blocks
         ):
             removed = True
             index += 3
@@ -86,7 +181,8 @@ def _without_managed_completion(existing: str, line: str) -> tuple[str, bool]:
         if (
             current == _LEGACY_COMMENT
             and index + 1 < len(lines)
-            and lines[index + 1].strip() in {line, _completion_line_from_line(line, "cxr")}
+            and lines[index + 1].strip()
+            in {dynamic_line, _completion_line_from_line(dynamic_line, "cxr")}
         ):
             removed = True
             index += 2
@@ -110,6 +206,12 @@ def _target_options(function):
         help="Print what would change without writing.",
     )(function)
     function = click.option(
+        "--completion-file",
+        type=click.Path(dir_okay=False, path_type=Path),
+        default=None,
+        help="Generated script path. Defaults to PyRITE's user-data directory.",
+    )(function)
+    function = click.option(
         "--rc-file",
         "rc_file",
         type=click.Path(dir_okay=False, path_type=Path),
@@ -127,14 +229,21 @@ def _target_options(function):
 @click.command(
     "install",
     help=(
-        "Append pyrite tab-completion setup to a shell rc/config file.\n\n"
-        "Idempotent: rerunning skips a file that already contains the line. "
+        "Generate a pyrite completion script and source it from a shell rc/config file.\n\n"
+        "The bare pyrite executable must remain on PATH across shell sessions; "
+        "for uv installations, use 'uv tool install' rather than project-only 'uv run'. "
+        "Idempotent: rerunning refreshes the generated script without duplicating the rc block. "
         "With no --shell, detects from $SHELL."
     ),
 )
 @_target_options
-def install_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> None:
-    """Append pyrite tab-completion setup to a shell rc/config file.
+def install_command(
+    shell: str | None,
+    rc_file: Path | None,
+    completion_file: Path | None,
+    dry_run: bool,
+) -> None:
+    """Generate and persist pyrite tab-completion setup.
 
     \b
     Examples:
@@ -143,63 +252,90 @@ def install_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> N
       pyrite completion install --shell fish
     """
     shell, target = _resolve_target(shell, rc_file)
-    line = _completion_line(shell)
+    _require_persistent_executable()
+    script_path = completion_file or _completion_file(shell)
+    script = _generated_completion(shell)
+    block = _managed_block(shell, script_path)
 
     try:
         existing = target.read_text() if target.exists() else ""
     except OSError as exc:
         raise CLIError(f"could not read {target}: {exc}") from None
 
-    if any(candidate.strip() == line for candidate in existing.splitlines()):
+    proposed, removed = _without_managed_completion(existing, shell, script_path)
+    separator = "" if not proposed or proposed.endswith("\n") else "\n"
+    proposed = f"{proposed}{separator}{block}"
+
+    try:
+        current_script = script_path.read_text() if script_path.exists() else None
+    except OSError as exc:
+        raise CLIError(f"could not read {script_path}: {exc}") from None
+
+    if proposed == existing and current_script == script:
         emit_result(f"pyrite completion already installed in {target}")
         return
 
     if dry_run:
-        emit_result(f"Would append to {target}:\n{_managed_block(shell).rstrip()}")
+        action = "refresh" if removed else "install"
+        emit_result(
+            f"Would {action} pyrite completion script {script_path}\n"
+            f"Would update {target}:\n{block.rstrip()}"
+        )
         return
 
     try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        separator = "" if not existing or existing.endswith("\n") else "\n"
-        with target.open("a") as handle:
-            handle.write(f"{separator}{_managed_block(shell)}")
+        atomic_write_text(script_path, script)
+        _write_shell_config(target, proposed)
     except OSError as exc:
-        raise CLIError(f"could not write {target}: {exc}") from None
+        raise CLIError(f"could not write completion setup: {exc}") from None
 
     emit_result(
-        f"Installed pyrite completion in {target}\nRestart your shell or run: source {target}"
+        f"Installed pyrite completion script {script_path}\n"
+        f"Updated {target}\nRestart your shell to load it."
     )
 
 
 @click.command(
     "remove",
     help=(
-        "Remove pyrite tab-completion setup from a shell rc/config file.\n\n"
+        "Remove pyrite tab-completion setup and its generated script.\n\n"
         "Idempotent: exact pyrite and retained cxr-managed blocks are removed. "
         "With no --shell, detects from $SHELL."
     ),
 )
 @_target_options
-def remove_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> None:
+def remove_command(
+    shell: str | None,
+    rc_file: Path | None,
+    completion_file: Path | None,
+    dry_run: bool,
+) -> None:
     """Remove cxr-managed tab-completion setup from a shell rc/config file."""
     shell, target = _resolve_target(shell, rc_file)
+    script_path = completion_file or _completion_file(shell)
     try:
         existing = target.read_text() if target.exists() else ""
     except OSError as exc:
         raise CLIError(f"could not read {target}: {exc}") from None
 
-    proposed, removed = _without_managed_completion(existing, _completion_line(shell))
-    if not removed:
+    proposed, removed = _without_managed_completion(existing, shell, script_path)
+    script_exists = script_path.exists()
+    if not removed and not script_exists:
         emit_result(f"pyrite completion not installed in {target}")
         return
     if dry_run:
-        emit_result(f"Would remove pyrite completion from {target}")
+        emit_result(
+            f"Would remove pyrite completion from {target}\n"
+            f"Would remove generated script {script_path}"
+        )
         return
     try:
-        target.write_text(proposed)
+        if removed:
+            _write_shell_config(target, proposed)
+        script_path.unlink(missing_ok=True)
     except OSError as exc:
-        raise CLIError(f"could not write {target}: {exc}") from None
-    emit_result(f"Removed pyrite completion from {target}")
+        raise CLIError(f"could not remove completion setup: {exc}") from None
+    emit_result(f"Removed pyrite completion from {target} and {script_path}")
 
 
 @click.group(
@@ -210,8 +346,8 @@ def remove_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> No
         "remove": "cxr_mc.cli.commands.completion.remove_command",
     },
     lazy_help={
-        "install": "Append pyrite tab-completion setup to a shell rc/config file.",
-        "remove": "Remove pyrite tab-completion setup from a shell rc/config file.",
+        "install": "Generate and persist pyrite shell tab-completion.",
+        "remove": "Remove pyrite tab-completion setup and its generated script.",
     },
     no_args_is_help=True,
 )

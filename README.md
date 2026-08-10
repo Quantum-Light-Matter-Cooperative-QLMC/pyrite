@@ -52,6 +52,24 @@ For a locked runtime-only installation use `uv sync --no-dev --locked`;
 focused contributor and CI commands are documented in
 [development workspace guide](docs/repo-design/development-workspace.md).
 
+`uv run` exposes project commands only for that invocation; it does not make
+`pyrite` persistently available to later shell sessions. For a regular user
+command and persistent tab-completion, install the checkout as a uv tool:
+
+```bash
+uv tool install .
+uv tool update-shell
+exec "$SHELL"
+pyrite completion install
+exec "$SHELL"
+```
+
+Contributors who want the persistent command to follow source edits may use
+`uv tool install --editable .`. Continue to use `uv run pyrite-dev ...` for
+locked development and verification. See the
+[shell-completion guide](docs/guides/shell-completion.md) for zsh setup,
+generated-file locations, removal, and troubleshooting.
+
 `pyrite-dev bootstrap` is idempotent and only sets local git config that cannot be
 committed (it registers the `.gitattributes` `TODO.md merge=ours` driver so
 merge/rebase conflicts on `TODO.md` resolve to the current branch automatically).

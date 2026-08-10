@@ -19,6 +19,8 @@ uv run pyrite --help
 The base installation is CPU-only. Accelerator extras and contributor setup
 are documented in the [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#install) and
 [development workspace guide](../repo-design/development-workspace.md).
+To expose `pyrite` as a persistent user command and enable tab-completion
+without activating `.venv`, follow the [shell-completion guide](shell-completion.md).
 
 ## Discover profiles and materials
 

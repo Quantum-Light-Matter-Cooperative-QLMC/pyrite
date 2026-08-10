@@ -638,8 +638,8 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  install  Append pyrite tab-completion setup to a shell rc/config file.
-  remove   Remove pyrite tab-completion setup from a shell rc/config file.
+  install  Generate and persist pyrite shell tab-completion.
+  remove   Remove pyrite tab-completion setup and its generated script.
 ```
 
 ## `pyrite completion install`
@@ -647,15 +647,19 @@ Commands:
 ```text
 Usage: pyrite completion install [OPTIONS]
 
-  Append pyrite tab-completion setup to a shell rc/config file.
+  Generate a pyrite completion script and source it from a shell rc/config file.
 
-  Idempotent: rerunning skips a file that already contains the line. With no --shell,
-  detects from $SHELL.
+  The bare pyrite executable must remain on PATH across shell sessions; for uv
+  installations, use 'uv tool install' rather than project-only 'uv run'. Idempotent:
+  rerunning refreshes the generated script without duplicating the rc block. With no
+  --shell, detects from $SHELL.
 
 Options:
   --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
   --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
                            location.
+  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data
+                           directory.
   --dry-run                Print what would change without writing.
   -h, --help               Show this message and exit.
 ```
@@ -665,7 +669,7 @@ Options:
 ```text
 Usage: pyrite completion remove [OPTIONS]
 
-  Remove pyrite tab-completion setup from a shell rc/config file.
+  Remove pyrite tab-completion setup and its generated script.
 
   Idempotent: exact pyrite and retained cxr-managed blocks are removed. With no --shell,
   detects from $SHELL.
@@ -674,6 +678,8 @@ Options:
   --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
   --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
                            location.
+  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data
+                           directory.
   --dry-run                Print what would change without writing.
   -h, --help               Show this message and exit.
 ```

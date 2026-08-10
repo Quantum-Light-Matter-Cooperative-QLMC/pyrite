@@ -10,6 +10,7 @@ analysis workflows.
 :maxdepth: 1
 
 getting-started
+shell-completion
 configuration-cookbook
 working-with-results
 analysis-tutorial
