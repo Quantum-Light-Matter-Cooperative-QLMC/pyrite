@@ -5,12 +5,10 @@
 The August 2026 transport review identifies three definite correctness defects
 in the current 1--300 keV electron path:
 
-1. coherent CXR uses the segment midpoint position with the segment-start
-   transport age;
+1. coherent CXR uses the segment midpoint position with the segment-start transport age
 2. a flight that crosses `E_cut_keV` is retained at its full sampled or
-   boundary-limited length; and
-3. electrons that exhaust `max_steps` are included in `n_stopped` rather than
-   reported as computationally incomplete.
+   boundary-limited length
+3. electrons that exhaust `max_steps` are included in `n_stopped` rather than reported as computationally incomplete
 
 Source: Stage 0 of the August 2026 electron-transport review. The temporary
 review DOCX was retired in `fdac4ef`; this record preserves its actionable
@@ -65,21 +63,21 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 
 ## Checklist
 
-- [x] A -- Specify segment-time compatibility and incomplete-history API;
-      identify every result/count consumer before changing keys or exceptions.
-- [x] B -- Add the constant-velocity one-flight versus two-subsegment coherent
-      field invariance regression, covering both coherent reduction routes.
-- [x] C -- Correct coherent midpoint time in all spectrum paths and add a new
-      `Validation: <id>` marker, ledger row, assumptions, and limiting case.
-- [x] D -- Add a constructed cutoff-crossing regression; truncate the terminal
-      flight consistently in lockstep, grooved, per-electron, and CUDA cores.
-- [x] E -- Add explicit cutoff-stop and step-limited termination states/counts;
-      raise by default when any history is incomplete.
-- [x] F -- Add the review's input validation without changing valid runs.
-- [x] G -- Prove CPU-core parity with focused statistical/deterministic tests;
-      verify CUDA behavior on the configured remote GPU.
-- [x] H -- Update physics documentation/ledger and regenerate affected golden
-      data only after the implementation and fresh-context review agree.
+- [X]  A -- Specify segment-time compatibility and incomplete-history API;
+  identify every result/count consumer before changing keys or exceptions.
+- [X]  B -- Add the constant-velocity one-flight versus two-subsegment coherent
+  field invariance regression, covering both coherent reduction routes.
+- [X]  C -- Correct coherent midpoint time in all spectrum paths and add a new
+  `Validation: <id>` marker, ledger row, assumptions, and limiting case.
+- [X]  D -- Add a constructed cutoff-crossing regression; truncate the terminal
+  flight consistently in lockstep, grooved, per-electron, and CUDA cores.
+- [X]  E -- Add explicit cutoff-stop and step-limited termination states/counts;
+  raise by default when any history is incomplete.
+- [X]  F -- Add the review's input validation without changing valid runs.
+- [X]  G -- Prove CPU-core parity with focused statistical/deterministic tests;
+  verify CUDA behavior on the configured remote GPU.
+- [X]  H -- Update physics documentation/ledger and regenerate affected golden
+  data only after the implementation and fresh-context review agree.
 
 ## Decisions and open questions
 
@@ -106,8 +104,7 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
   successful result adds `n_cutoff_stopped` and `n_step_limited == 0`, while
   legacy `n_stopped` remains as an alias of `n_cutoff_stopped` rather than its
   former residual count. Successful-count invariant:
-  `n_backscattered + n_transmitted + n_side_exited + n_missed + n_cutoff_stopped
-  == Ne`.
+  `n_backscattered + n_transmitted + n_side_exited + n_missed + n_cutoff_stopped == Ne`.
 - **Decided (A): Stage 0 uses the present left-endpoint stopping rule exactly.**
   On a candidate material flight, hold `dEds(E_start)` and `beta(E_start)`
   constant. If `E_start + dEds * L_candidate <= E_cut`, set
