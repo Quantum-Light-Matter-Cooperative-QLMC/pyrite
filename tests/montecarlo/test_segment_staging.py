@@ -34,13 +34,20 @@ BREM_KWARGS = {
 
 
 def _segments(count=4, n_layers=1):
-    """A synthetic segment set in the shape `simulate_trajectories` returns."""
+    """A synthetic segment set in the shape `simulate_trajectories` returns.
+
+    `E_end_keV` / `t_end_ang` are deliberately absent: the registry carries them
+    but only an ``energy_model="midpoint"`` run produces them, so every per-row
+    transform has to tolerate their absence.
+    """
     return {
         "r_mid": np.tile([4.0, 0.0, 5.0], (count, 1)),
         "v_hat": np.tile([0.0, 0.0, 1.0], (count, 1)),
         "L_ang": np.full(count, 10.0),
         "E_keV": np.full(count, 30.0),
+        "E_start_keV": np.full(count, 30.0),
         "t_ang": np.zeros(count),
+        "t_start_ang": np.zeros(count),
         "t0_ang": np.zeros(count),
         "elec_id": np.arange(count),
         "layer": np.arange(count) % n_layers,
@@ -82,6 +89,8 @@ def test_staging_carries_the_kernels_dtypes_and_values():
     staged = _segments_on_device(segments)
 
     for k in _SEG_ARRAYS:
+        if k not in segments:
+            continue
         want = np.asarray(segments[k])
         got = _to_cpu(staged[k])
         if want.dtype.kind == "f":
@@ -111,6 +120,8 @@ def test_staging_an_already_staged_set_copies_nothing():
     restaged = _segments_on_device(staged)
 
     for k in _SEG_ARRAYS:
+        if k not in staged:
+            continue
         assert restaged[k] is staged[k], k
 
 
@@ -124,6 +135,8 @@ def test_staged_segments_slice_by_layer_identically():
         device = _segments_in_layer(staged, layer)
         assert host["L_ang"].size == 2
         for k in _SEG_ARRAYS:
+            if k not in host:
+                continue
             want = np.asarray(host[k])
             got = _to_cpu(device[k])
             np.testing.assert_array_equal(got, want.astype(got.dtype), err_msg=k)

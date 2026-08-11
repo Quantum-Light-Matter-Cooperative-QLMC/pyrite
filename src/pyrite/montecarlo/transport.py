@@ -853,6 +853,7 @@ def _transport_core_ungrooved(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
     z_total,
     finite_footprint,
     width_ang,
@@ -887,6 +888,8 @@ def _transport_core_ungrooved(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
 ):
     """Compiled ungrooved transport core, with optional finite x/y footprint.
 
@@ -895,6 +898,12 @@ def _transport_core_ungrooved(
     wrapper; elements without a table use the analytic SR angular distribution
     while retaining the Browning total elastic collision rate, matching the
     legacy fallback behavior.
+
+    ``energy_model_code`` is 0 for the frozen left-endpoint rule and 1 for the
+    midpoint predictor-corrector: stopping and the ``L/beta`` clock are then
+    evaluated at the flight's midpoint energy instead of its start energy, and
+    ``seg_E_end``/``seg_t_end`` (sized 0 under the frozen rule) record the
+    flight's end state.
     """
     EPS = 1e-6
     nseg = 0
@@ -993,11 +1002,19 @@ def _transport_core_ungrooved(
             exit_top_j = cross_up_j and z_top_L <= 0.0
             exit_bot_j = cross_dn_j and z_bot_L >= z_total
 
-            # 3. Record the radiating material segment.
+            # 3. Close the flight's energy and clock, then record its row.
             dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
-            beta_j = beta_from_keV_scalar(E_j)
             cutoff_j = False
-            cutoff_distance = (E_cut_e - E_j) / dEds
+            if energy_model_code == 1:
+                # The midpoint rule makes E_end = E_cut at the cutoff by
+                # definition, so E_mid there is (E_start + E_cut)/2 exactly and
+                # the truncation distance solves the scheme rather than its
+                # left-endpoint linearization.
+                cutoff_distance = (E_cut_e - E_j) / _dEds_compound_scalar(
+                    J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_cut_e)
+                )
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
             if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
                 step_j = cutoff_distance
@@ -1007,6 +1024,27 @@ def _transport_core_ungrooved(
                 exit_top_j = False
                 exit_bot_j = False
                 exit_side_j = False
+
+            if energy_model_code == 1:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    # Predictor-corrector for the implicit midpoint rule
+                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                    # step_j <= cutoff_distance and |dE/ds| grows as E falls, so
+                    # the predictor never undershoots E_cut and the Joy-Luo log
+                    # argument stays in range.
+                    E_pred = E_j + dEds * step_j
+                    E_end_j = E_j + step_j * _dEds_compound_scalar(
+                        J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_pred)
+                    )
+                # One representative energy per flight also drives the clock:
+                # s / beta(E_mid) is the midpoint rule for int ds / beta(E(s)).
+                beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+            else:
+                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                beta_j = beta_from_keV_scalar(E_j)
+            t_end_j = clock[e] + step_j / beta_j
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -1019,14 +1057,17 @@ def _transport_core_ungrooved(
             seg_t0[nseg] = clock[e]
             seg_id[nseg] = e
             seg_lay[nseg] = L
+            if energy_model_code == 1:
+                seg_E_end[nseg] = E_end_j
+                seg_t_end[nseg] = t_end_j
             nseg += 1
 
             # 4. Advance position, energy, and transport clock.
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
-            clock[e] += step_j / beta_j
+            E_keV[e] = E_end_j
+            clock[e] = t_end_j
 
             # 5. Exit, internal-boundary, or collision handling.
             died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
@@ -2903,6 +2944,7 @@ def simulate_trajectories(
     keep_segments_on_device=False,
     transport_lut_config=DEFAULT_TRANSPORT_LUT_CONFIG,
     collect_diagnostics=False,
+    energy_model="frozen",
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -3088,6 +3130,23 @@ def simulate_trajectories(
     (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
     only bound memory and replay behavior; neither changes results.
 
+    energy_model: how a physical flight's energy and clock advance along it.
+      "frozen" (default) -- the historical left-endpoint rule: stopping power
+          and beta are evaluated once at the flight's start energy and held
+          constant over its whole length. BIT-FOR-BIT unchanged.
+      "midpoint" -- second-order predictor-corrector for the implicit midpoint
+          rule ``E_end = E_start + (dE/ds)((E_start + E_end)/2) * s``, with the
+          transport clock advanced by ``s / beta((E_start + E_end)/2)`` and the
+          cutoff truncation distance solved for ``E_end == E_cut``. Adds
+          ``E_end_keV`` and ``t_end_ang`` to the returned rows and leaves one
+          radiating row per physical flight. Elastic hazard stays frozen at the
+          start energy; only stopping and the clock are controlled here.
+          Currently implemented for the ungrooved lockstep core only -- any
+          other core or a grooved run raises rather than returning the frozen
+          schema under a midpoint request.
+
+    Validation: transport-midpoint-stopping
+
     collect_diagnostics: opt in to fixed-size percentile summaries of the
     per-flight fractional energy loss, relative elastic-hazard change,
     left-endpoint versus midpoint clock estimate, and cutoff overshoot. The
@@ -3119,6 +3178,9 @@ def simulate_trajectories(
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
       "layer" (M,) [emitting layer index]
+    with "E_start_keV"/"t_start_ang" as the canonical spellings of "E_keV"/
+    "t_ang", plus "E_end_keV" (M,) and "t_end_ang" (M,) under
+    energy_model="midpoint"
     incident phase-space diagnostics (one row per sampled electron, including
     missed entries): "initial_r_ang" (Ne,3), "initial_v_hat" (Ne,3),
       "initial_E_keV" (Ne,), "initial_t0_ang" (Ne,)
@@ -3159,6 +3221,8 @@ def simulate_trajectories(
 
     if elastic_model not in ("mott", "sr"):
         raise ValueError("elastic_model must be 'mott' or 'sr'")
+    if energy_model not in ("frozen", "midpoint"):
+        raise ValueError("energy_model must be 'frozen' or 'midpoint'")
 
     requested_core = transport_core
     transport_core = resolve_transport_core(transport_core, Ne, groove)
@@ -3169,6 +3233,15 @@ def simulate_trajectories(
             "keep_segments_on_device requires transport_core='cuda'; "
             f"{requested_core!r} resolved to {transport_core!r}"
         )
+    # Fail closed rather than return the frozen schema under a midpoint request:
+    # only the lockstep core carries the controlled propagator so far.
+    if energy_model == "midpoint" and transport_core != "lockstep":
+        raise ValueError(
+            "energy_model='midpoint' is only implemented for the lockstep core; "
+            f"{requested_core!r} resolved to {transport_core!r}"
+        )
+    if energy_model == "midpoint" and groove is not None:
+        raise ValueError("energy_model='midpoint' is not implemented for grooved transport")
 
     if E_cut_by_electrons is None:
         E_cut_by_electrons = np.full(
@@ -3472,12 +3545,18 @@ def simulate_trajectories(
     seg_t0 = np.empty(n_rows, dtype=float)
     seg_id = np.empty(n_rows, dtype=np.int64)
     seg_lay = np.empty(n_rows, dtype=np.int16)
+    # Flight end state exists only under the controlled propagator; the frozen
+    # rule keeps the historical seven-field row exactly.
+    n_end_rows = n_rows if energy_model == "midpoint" else 0
+    seg_E_end = np.empty(n_end_rows, dtype=float)
+    seg_t_end = np.empty(n_end_rows, dtype=float)
     _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
     # output below. NumPy unless the run asked to keep them on the device.
     seg_xp = np
     dev_segs = None
+    energy_model_code = 1 if energy_model == "midpoint" else 0
 
     _nsys_push("cxr.transport.core")
     if groove is None and transport_lut is not None and transport_core != "lockstep":
@@ -3651,6 +3730,7 @@ def simulate_trajectories(
             n_layers,
             internal_bounds,
             elastic_model_code,
+            energy_model_code,
             z_total,
             finite_footprint,
             0.0 if width_ang is None else float(width_ang),
@@ -3685,6 +3765,8 @@ def simulate_trajectories(
             seg_t0,
             seg_id,
             seg_lay,
+            seg_E_end,
+            seg_t_end,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -3805,8 +3887,12 @@ def simulate_trajectories(
         "r_mid": r_mid,
         "v_hat": v_hat,
         "L_ang": L_ang,
+        # `E_keV`/`t_ang` are unscheduled compatibility aliases of the canonical
+        # flight-start fields and never become midpoint/representative values.
         "E_keV": E_seg,
+        "E_start_keV": E_seg,
         "t_ang": t_ang,  # segment-start age sum(L/beta) [Ang, c=1]
+        "t_start_ang": t_ang,
         "t0_ang": t0_ang,  # per-electron longitudinal bunch offset [Ang, c=1]
         "elec_id": elec_id,  # emitting electron index in [0, Ne)
         "layer": layer,  # emitting layer index in [0, n_layers)
@@ -3829,6 +3915,9 @@ def simulate_trajectories(
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
+    if energy_model == "midpoint":
+        result["E_end_keV"] = seg_E_end[:nseg]
+        result["t_end_ang"] = seg_t_end[:nseg]
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

@@ -58,7 +58,7 @@ Numerical substeps are integration detail:
       staging.
 - [x] B -- Add per-flight diagnostics: fractional loss, hazard change, clock
       estimate, cutoff overshoot, and percentile summaries.
-- [ ] C -- Implement `E_start`/`E_end` plus midpoint predictor-corrector stopping
+- [x] C -- Implement `E_start`/`E_end` plus midpoint predictor-corrector stopping
       and midpoint/integrated clock while retaining one radiation object per
       physical flight.
 - [ ] D -- Add the CXR endpoint resonance-drift and bremsstrahlung quadrature
@@ -115,6 +115,20 @@ Numerical substeps are integration detail:
   checkpoint migration is needed for A--H unless a later slice deliberately
   persists diagnostics or raw flights. External direct callers of
   `simulate_trajectories` receive the aliases above.
+- **Decided:** the propagation rule is selected by `energy_model`
+  (`"frozen"` default, `"midpoint"`), following the existing `elastic_model` /
+  `transport_core` string-mode convention. New per-row fields appear only under
+  the mode that produces them, so the frozen schema is never partially
+  extended; unported cores raise on a midpoint request.
+- **Decided:** `_SEG_ARRAYS` in `montecarlo/spectrum/lines.py` is the owning
+  field registry named by decision A. Every per-row transform loops it with a
+  presence guard, so optional fields are safe to register — but an unregistered
+  per-row array survives a row mask at full length and silently desynchronizes,
+  which is why the new fields are registered in the same slice that adds them.
+- **Decided:** `_clip_segments_to_cutoff` drops `E_end_keV`/`t_end_ang` when it
+  shortens a flight. Its left-endpoint clip rule cannot reconstruct a
+  midpoint-integrated end state for the shortened flight, and a stale end state
+  is worse than an absent one.
 - **Open:** integrated optical-depth inversion versus bounded piecewise-constant
   hazard. Choose from correctness, convergence, Numba/CUDA feasibility, and
   measured cost.
@@ -169,6 +183,31 @@ positive cutoff undershoot as overshoot. It returns only p50/p90/p99/max plus
 calls add no key or pass. No RNG draws, propagation state, spectra, or resident
 device payload change; an explicit diagnostic request is the only path that
 downloads resident segment fields.
+
+## C -- midpoint predictor-corrector stopping and clock
+
+`simulate_trajectories(..., energy_model=...)` selects the propagation rule.
+`"frozen"` (default) is the historical left-endpoint rule, bit-for-bit
+unchanged. `"midpoint"` advances each physical flight by the implicit midpoint
+rule `E_end = E_start + (dE/ds)((E_start+E_end)/2)·s`, evaluated by one
+predictor-corrector pass, and advances the clock by `s/β((E_start+E_end)/2)`.
+The cutoff truncation distance is solved for `E_end = E_cut` rather than
+extrapolated, so a cutoff-stopped flight lands on the floor exactly and the
+frozen rule's range overshoot disappears.
+
+Measured local truncation error against a 20k-substep RK4 reference (one
+boundary-truncated carbon flight at 25 keV; 600/300/150 Å, 0.51%/0.25%/0.13%
+fractional loss): midpoint ratios 8.04/8.02 (energy) and 7.69/7.85 (clock)
+versus frozen 4.01/4.00 — third-order local, second-order global, one order
+above the frozen rule. Full numbers and the derivation are in
+`docs/validation/beam-transport/transport-midpoint-stopping.md`;
+`Validation: transport-midpoint-stopping`.
+
+Scope held deliberately tight: elastic hazard stays frozen at `E_start` (step
+F), radiation kernels still read the start energy (steps D and G), and the
+flight decomposition is untouched, so one radiating row per physical flight
+still holds. Only the ungrooved lockstep core carries the propagator; grooved,
+per-electron, and CUDA midpoint requests raise (step H).
 
 ## Delegation slices and required skills
 

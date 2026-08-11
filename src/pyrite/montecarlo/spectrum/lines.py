@@ -30,7 +30,24 @@ from ..groove import _THETA_TOL, escape_distance_ang
 from ..transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
-_SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
+# Owning registry for every per-row transform: layer filtering, population
+# cutoff clipping, and device staging. A per-row array missing from it would
+# survive a row mask at full length and silently desynchronize from the rows.
+# Optional fields are guarded by presence, so listing them here is safe.
+_SEG_ARRAYS = (
+    "r_mid",
+    "v_hat",
+    "L_ang",
+    "E_keV",
+    "E_start_keV",
+    "E_end_keV",
+    "t_ang",
+    "t_start_ang",
+    "t_end_ang",
+    "t0_ang",
+    "elec_id",
+    "layer",
+)
 _USE_JIT_LINE_REDUCTION = True
 _USE_JIT_COHERENT_REDUCTION = True
 _USE_JIT_COHERENT_STREAM = True
@@ -405,6 +422,11 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     start = old_mid - REAL(0.5) * old_L[:, None] * direction
     out["L_ang"] = new_L
     out["r_mid"] = start + REAL(0.5) * new_L[:, None] * direction
+    # A clipped flight is a shorter flight, so the transported end state no
+    # longer describes it. Drop it rather than hand on a stale value; the
+    # left-endpoint clip rule cannot reconstruct a midpoint-integrated end.
+    out.pop("E_end_keV", None)
+    out.pop("t_end_ang", None)
     return out
 
 
