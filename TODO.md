@@ -1,6 +1,6 @@
 # TODO / Backlog
 
-****
+---
 
 Branch copies are disposable and auto-resolve to `main` on merge/rebase
 (`.gitattributes` `TODO.md merge=ours` driver — run `uv run pyrite-dev bootstrap`
@@ -12,7 +12,8 @@ file. Edit and drop items on `main`.
 
 ## Active
 
-1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
+1. Add X-ray refractive index for tracking of phase for coherent interaction
+2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
    The four incoherent-line-path markers are now ledgered (`line-hkl-batch`,
    `line-amplitude-fusion`, `line-gemv-elementwise` `filtered`;
    `line-absorption-tabulation` a `discrepancy` — tabulated `μ` off `2.72e-01`
@@ -23,7 +24,7 @@ file. Edit and drop items on `main`.
       completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
       Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
       to fresh-context workers doing the rederivations.
-2. **Energy-controlled electron transport.** Inventory the current segment
+3. **Energy-controlled electron transport.** Inventory the current segment
    schema and add bounded per-flight diagnostics before selecting the controlled
    energy-loss/hazard propagation model. →
    `feature/energy-controlled-electron-transport`;
