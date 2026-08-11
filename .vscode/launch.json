@@ -2,11 +2,49 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "General Python Debugger: Current File",
+            "name": "Pyrite: all tests",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "module": "pytest",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "preLaunchTask": "uv: sync all groups"
+        },
+        {
+            "name": "DEBUG: pytest single-process, no JIT",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-n",
+                "0",
+                "-s",
+                "-vv",
+                "${file}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "stopOnEntry": true,
+            "env": {
+                "NUMBA_DISABLE_JIT": "1"
+            },
+            "preLaunchTask": "uv: sync all groups"
+        },
+        {
+            "name": "Pyrite: current test file",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-vv"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "preLaunchTask": "uv: sync all groups"
         },
         {
             "name": "Debug trace_app (marimo)",
@@ -20,7 +58,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "subProcess": true
+            "subProcess": true,
+            "preLaunchTask": "uv: sync all groups"
         },
         {
             "name": "Debug scan_app (marimo)",
@@ -34,7 +73,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "subProcess": true
+            "subProcess": true,
+            "preLaunchTask": "uv: sync all groups"
         },
         {
             "name": "Debug analysis_app (marimo)",
@@ -48,7 +88,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "subProcess": true
+            "subProcess": true,
+            "preLaunchTask": "uv: sync all groups"
         },
         {
             "name": "Debug validation_app (marimo)",
@@ -62,7 +103,8 @@
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
             "justMyCode": true,
-            "subProcess": true
+            "subProcess": true,
+            "preLaunchTask": "uv: sync all groups"
         },
     ]
 }

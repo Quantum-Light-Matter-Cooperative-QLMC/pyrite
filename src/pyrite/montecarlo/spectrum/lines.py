@@ -313,22 +313,22 @@ def _interp_gather_line_tables(
     )
 
 
-def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, nx, ny, nz):
-    """Resonance frequency + photon kinematics for the batched line path as a
-    single fused GPU kernel: collapses the ~15 tiny elementwise launches of
-    inline steps 1+4 (``v.g``, ``omega_res``, ``k``, ``kg``, ``detuning``,
-    ``k.g``, ``v.kg``, ``k.v``) into one. Pure kernel-merge of the identical
-    expression tree (no reassociation, ``x**2`` written ``x*x``) -> bit-for-bit
-    vs the inline code; carries NO new validation debt of its own."""
+def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
+    """Resonance frequency + photon kinematics with g-only algebra hoisted.
+
+    For unit detector direction ``n``, ``|(omega*n)+g|^2-omega^2`` is exactly
+    ``g^2 + 2*omega*(n.g)``. Likewise ``k.g = omega*(n.g)`` and
+    ``v.(k+g) = v.g + k.v``. ``g2`` and ``n_dot_g`` are therefore computed once
+    per reflection/orientation rather than rebuilding ``k`` and ``k+g`` for every
+    segment. The identities are exact; floating-point association differs from
+    the expanded vector form at rounding level.
+    """
     v_dot_g = vx * gx + vy * gy + vz * gz
     omega_res = v_dot_g / denom
-    kx, ky, kz = omega_res * nx, omega_res * ny, omega_res * nz
-    kgx, kgy, kgz = kx + gx, ky + gy, kz + gz
-    kg2 = kgx * kgx + kgy * kgy + kgz * kgz
-    detuning = kg2 - omega_res * omega_res
-    k_dot_g = kx * gx + ky * gy + kz * gz
-    v_dot_kg = vx * kgx + vy * kgy + vz * kgz
     k_dot_v = omega_res * (1.0 - denom)
+    k_dot_g = omega_res * n_dot_g
+    v_dot_kg = v_dot_g + k_dot_v
+    detuning = g2 + 2.0 * k_dot_g
     return omega_res, v_dot_g, detuning, k_dot_g, v_dot_kg, k_dot_v
 
 
@@ -800,6 +800,14 @@ def mc_spectrum(
 
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
 
+    # Segment-only kinematics shared by every reflection/orientation and by both
+    # the batched and compatibility paths. These used to be recomputed inside
+    # ``_accumulate`` for every g row.
+    v_dot_n_all = _matvec3(v_all, n_hat_d)
+    denom_all = 1.0 - v_dot_n_all
+    gamma_all = 1.0 / xp.sqrt(1.0 - beta_all * beta_all)
+    t_L_all = seg_L / beta_all
+
     # coherent (phased) sum precompute: the per-segment retardation scalar
     # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
     # retardation) and photon wavenumber k_gamma(E) = E / hbar c [1/Ang].
@@ -813,7 +821,7 @@ def mc_spectrum(
         cdtype = xp.result_type(REAL, 1j)
         seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
         seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
-        seg_t_mid = seg_t + 0.5 * seg_L / beta_all
+        seg_t_mid = seg_t + 0.5 * t_L_all
         d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
         omega_grid = E_grid / HBARC_EV_ANG
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
@@ -828,7 +836,9 @@ def mc_spectrum(
     # would be circular.
     from ..runner import _nsys_pop, _nsys_push
 
-    def _accumulate(g_vec_d, e_s, e_p, chi_re, chi_im, u_re, u_im, wm):
+    def _accumulate(
+        g_vec_d, e_s, e_p, g2, n_dot_g, g_dot_es, g_dot_ep, chi_re, chi_im, u_re, u_im, wm
+    ):
         """Add one reflection's contribution for crystallite reciprocal vector
         ``g_vec_d``, scaled by the mosaic-quadrature weight ``wm``, into spec /
         spec_pxr / spec_cbs in place. Every argument is a DEVICE array uploaded
@@ -841,7 +851,7 @@ def mc_spectrum(
         # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
         #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
         v_dot_g = _matvec3(v_all, g_vec_d)
-        denom = 1.0 - _matvec3(v_all, n_hat_d)  # the Doppler-like denominator
+        denom = denom_all
         omega_res = v_dot_g / denom
         E_res = HBARC_EV_ANG * omega_res  # -> eV
 
@@ -861,40 +871,39 @@ def mc_spectrum(
         E_r = E_res[idx]  # line energy per kept segment [eV]
         om = omega_res[idx]  # same in 1/Ang
         v = v_all[idx]  # velocity vectors
-        beta = beta_all[idx]
-        t_L = seg_L[idx] / beta  # interaction time [Ang] (c=1)
+        t_L = t_L_all[idx]  # interaction time [Ang] (c=1)
         dnm = denom[idx]
         vdg = v_dot_g[idx]
 
         # -- 3. couplings AT each segment's resonance energy --------------------
-        # (amplitudes vary slowly across the narrow line; freezing them at E_res
-        # is accurate to the linewidth/E_res level). Interpolated at E_res ON THE
-        # GPU from the per-reflection tabulation; chi_g/U_g are complex, so the
-        # real and imaginary parts are interpolated separately.
-        chi = xp.interp(E_r, E_tab_g, chi_re) + 1j * xp.interp(E_r, E_tab_g, chi_im)
-        eUg_over_m = (xp.interp(E_r, E_tab_g, u_re) + 1j * xp.interp(E_r, E_tab_g, u_im)) / M_E_EV
+        # All five tabulations share E_r and E_tab_g, so bracket once. U_g tables
+        # are pre-scaled by 1/m_e during construction.
+        _ix, _fr, _blw, _abv = _interp_index(E_r, E_tab_g)
+        chi_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_re)
+        chi_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_im)
+        u_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_re)
+        u_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_im)
+        mu_i = _interp_gather1d(_ix, _fr, _blw, _abv, mu_tab_g)
+        chi = chi_re_i + 1j * chi_im_i
+        eUg_over_m = u_re_i + 1j * u_im_i
 
         # -- 4. photon kinematics per segment ------------------------------------
-        k_vec = om[:, None] * n_hat_d  # photon wavevector omega * n_hat
-        kg_vec = k_vec + g_vec_d  # diffracted wavevector k + g
-        kg2 = _rowdot3(kg_vec, kg_vec)
-        detuning = kg2 - om**2  # PXR denominator (~g^2, never small)
-        k_dot_g = _matvec3(k_vec, g_vec_d)
-        # v.kg is polarization-independent (kg fixed per segment): hoist out of
-        # the e_s/e_p loop so it is contracted once, not twice.
-        v_dot_kg = _rowdot3(v, kg_vec)
+        # k = omega*n, so detuning = g^2 + 2*omega*(n.g), k.g = omega*(n.g),
+        # and v.(k+g) = v.g + k.v. The g-only scalars are precomputed once.
+        k_dot_v = om * (1.0 - dnm)
+        k_dot_g = om * n_dot_g
+        v_dot_kg = vdg + k_dot_v
+        detuning = g2 + 2.0 * k_dot_g
 
         # -- 5. Eq. (13) + relativistic Eq. (14) amplitudes, per segment ----------
         # CBS braced product {a;b} = a.b - (a.v)(b.v) and 1/gamma prefactor
-        # (Zhai SI Eq. 6); v here is the SEGMENT velocity, so k.v = omega(1-dnm)
-        gamma = 1.0 / xp.sqrt(1.0 - beta**2)
-        k_dot_v = om * (1.0 - dnm)
+        # (Zhai SI Eq. 6).
+        gamma = gamma_all[idx]
         A2 = xp.zeros(idx.size, dtype=REAL)
         A2_pxr = xp.zeros(idx.size, dtype=REAL)
         A2_cbs = xp.zeros(idx.size, dtype=REAL)
         pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
-        for e_d in (e_s, e_p):  # sum |A|^2 over both polarizations
-            g_dot_e = g_vec_d @ e_d  # scalar (e fixed per reflection)
+        for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
             v_dot_e = _matvec3(v, e_d)
             if coherent:
                 # Complex amplitudes retained verbatim -- the coherent path sums
@@ -955,7 +964,7 @@ def mc_spectrum(
             assert L_esc_all is not None  # set whenever finite_footprint and no groove
             L_esc = L_esc_all[idx]
             if layers is None:
-                tau = L_esc * _interp1(E_r, E_tab_g, mu_tab_g)
+                tau = L_esc * mu_i
             else:
                 tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
         else:
@@ -964,7 +973,7 @@ def mc_spectrum(
                     L_esc = z_mid / (-n_hat[2])  # out the entrance face
                 else:
                     L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
-                tau = L_esc * _interp1(E_r, E_tab_g, mu_tab_g)
+                tau = L_esc * mu_i
             else:
                 tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
         T_abs = xp.exp(-tau)
@@ -1127,9 +1136,9 @@ def mc_spectrum(
         # 15% of GPU-phase tottime on the 3060 Ti profile (hopg_coherent, 4
         # reflections). The chi/U rows are keyed by REFLECTION (they do not
         # depend on the mosaic orientation), the geometry rows by
-        # (reflection, orientation). Values are unchanged -- same CPU inputs,
-        # same float64 -> REAL cast, row views handed to _accumulate -- so the
-        # per-hkl path stays bit-for-bit.
+        # (reflection, orientation). U_g/m_e is now pre-scaled at table build and
+        # the fallback shares one interpolation bracket; these are algebraically
+        # identical with only float-rounding-level movement.
         _nsys_push("cxr.lines.tab")
         g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
         cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
@@ -1141,7 +1150,8 @@ def mc_spectrum(
             if R_orient is not None:
                 g_vec = R_orient @ g_vec
             chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
-            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
+            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
+            # Store U_g/m_e in the table: the mass scaling is energy-independent.
             cr_rows.append(chi_tab.real)
             ci_rows.append(chi_tab.imag)
             ur_rows.append(u_tab.real)
@@ -1161,6 +1171,10 @@ def mc_spectrum(
         CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
         U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
         U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
+        G2 = _rowdot3(G, G)
+        N_DOT_G = _matvec3(G, n_hat_d)
+        G_DOT_ES = _rowdot3(G, ES)
+        G_DOT_EP = _rowdot3(G, EP)
         # g-independent escape distance: one pass per case, sliced per g inside
         # _accumulate (only the finite-footprint, non-grooved branch reads it).
         L_esc_all = (
@@ -1175,6 +1189,10 @@ def mc_spectrum(
                 G[i_row],
                 ES[i_row],
                 EP[i_row],
+                G2[i_row],
+                N_DOT_G[i_row],
+                G_DOT_ES[i_row],
+                G_DOT_EP[i_row],
                 CHI_RE[i_hkl],
                 CHI_IM[i_hkl],
                 U_RE[i_hkl],
@@ -1217,7 +1235,8 @@ def mc_spectrum(
             if R_orient is not None:
                 g_vec = R_orient @ g_vec
             chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
-            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
+            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
+            # Store U_g/m_e once instead of dividing every interpolated pair.
             for R_m, wm in orients:
                 gd = g_vec if R_m is None else R_m @ g_vec
                 e_s, e_p = _polarization_pair(n_hat, gd)
@@ -1241,13 +1260,18 @@ def mc_spectrum(
 
         N_g = G.shape[0]
         gx, gy, gz = G[:, 0][None, :], G[:, 1][None, :], G[:, 2][None, :]  # (1, N_g)
-        nx, ny, nz = float(n_hat[0]), float(n_hat[1]), float(n_hat[2])
+        nz = float(n_hat[2])
+        G2 = _rowdot3(G, G)
+        N_DOT_G = _matvec3(G, n_hat_d)
+        G_DOT_ES = _rowdot3(G, ES)
+        G_DOT_EP = _rowdot3(G, EP)
+        g2 = G2[None, :]
+        n_dot_g = N_DOT_G[None, :]
 
         # option B: g-independent per-segment quantities, computed once
-        v_dot_n = _matvec3(v_all, n_hat_d)
-        denom_full = (1.0 - v_dot_n)[:, None]  # (n_seg, 1)
-        gamma_full = (1.0 / xp.sqrt(1.0 - beta_all**2))[:, None]
-        t_L_full = (seg_L / beta_all)[:, None]
+        denom_full = denom_all[:, None]
+        gamma_full = gamma_all[:, None]
+        t_L_full = t_L_all[:, None]
         # escape distance is g-independent (straight ray along n_hat): a finite
         # footprint picks the nearest prism face, else the plain slab path.
         if finite_footprint:
@@ -1303,10 +1327,17 @@ def mc_spectrum(
             _coh_g = G.reshape(-1)
             _coh_es = ES.reshape(-1)
             _coh_ep = EP.reshape(-1)
+            _coh_g2 = xp.ascontiguousarray(G2, dtype=REAL)
+            _coh_n_dot_g = xp.ascontiguousarray(N_DOT_G, dtype=REAL)
+            _coh_g_dot_es = xp.ascontiguousarray(G_DOT_ES, dtype=REAL)
+            _coh_g_dot_ep = xp.ascontiguousarray(G_DOT_EP, dtype=REAL)
             _coh_chi_re = CHI_RE.reshape(-1)
             _coh_chi_im = CHI_IM.reshape(-1)
             _coh_u_re = U_RE.reshape(-1)
             _coh_u_im = U_IM.reshape(-1)
+            _coh_aw = xp.ascontiguousarray(
+                denom_all * t_L_all / (2.0 * HBARC_EV_ANG), dtype=REAL
+            )
             _coh_phase_slope = xp.ascontiguousarray(d_all / HBARC_EV_ANG, dtype=REAL)
             coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
         else:
@@ -1401,11 +1432,16 @@ def mc_spectrum(
                     lo_keep=lo_keep,
                     hi_keep=hi_keep,
                     hbarc=HBARC_EV_ANG,
-                    electron_mass_eV=M_E_EV,
+                    electron_mass_eV=1.0,  # U tables are already U_g/m_e
                     alpha_fs=ALPHA_FS,
                     pref_c1=_PREF_C1,
                     n_hat=n_hat,
                     n_g=N_g,
+                    g2=_coh_g2,
+                    n_dot_g=_coh_n_dot_g,
+                    g_dot_es=_coh_g_dot_es,
+                    g_dot_ep=_coh_g_dot_ep,
+                    aw_seg=_coh_aw[sb],
                     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
                 )
                 _nsys_pop()
@@ -1431,10 +1467,10 @@ def mc_spectrum(
             L_esc = L_esc_full[sb]
 
             # -- 1+4. resonance energy + photon kinematics (fused kernel) --------
-            # steps 1 and 4 are the same ~15 tiny elementwise ops for every seg
-            # block; _line_kin_core JIT-merges them into ONE launch, bit-for-bit.
+            # steps 1 and 4 are reduced algebraically inside one fused launch;
+            # g-only invariants are hoisted outside the segment-block loop.
             omega_res, v_dot_g, detuning, k_dot_g, v_dot_kg, k_dot_v = _line_kin_core(
-                vx, vy, vz, gx, gy, gz, denom, nx, ny, nz
+                vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g
             )
             vdg = v_dot_g
             E_res = HBARC_EV_ANG * omega_res
@@ -1459,9 +1495,6 @@ def mc_spectrum(
                 U_IM,
                 mu_tab_g,
             )
-            u_re = u_re / M_E_EV
-            u_im = u_im / M_E_EV
-
             if coherent:
                 # -- 5c. COMPLEX amplitude per polarization ---------------------
                 # Eq. (13) PXR + relativistic Eq. (14) CBS, the SAME expression
@@ -1475,9 +1508,8 @@ def mc_spectrum(
                 chi = chi_re + 1j * chi_im
                 eUg_over_m = u_re + 1j * u_im  # u_re/u_im already carry 1/M_E_EV
                 pol_A = []
-                for E_pol in (ES, EP):
+                for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
                     ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
-                    g_dot_e = gx * ex + gy * ey + gz * ez  # (1, N_g)
                     v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
                     A_PXR = chi / detuning * (v_dot_kg * g_dot_e - omega_res**2 * v_dot_e)
                     braced_ge = g_dot_e - vdg * v_dot_e
@@ -1526,9 +1558,8 @@ def mc_spectrum(
             A2 = xp.zeros_like(omega_res)
             A2_pxr = xp.zeros_like(omega_res)
             A2_cbs = xp.zeros_like(omega_res)
-            for E_pol in (ES, EP):
+            for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
                 ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
-                g_dot_e = gx * ex + gy * ey + gz * ez  # (1, N_g)
                 v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
                 a2, a2p, a2c = _line_amp_sq_core(
                     chi_re,

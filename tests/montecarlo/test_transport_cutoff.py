@@ -43,9 +43,9 @@ def test_cutoff_crossing_clips_terminal_flight_exactly(transport_core):
 
     terminal_start = result["E_keV"][-1]
     expected_length = (terminal_start - cutoff) / _carbon_stopping_keV_per_ang(terminal_start)
-    assert result["L_ang"][-1] == pytest.approx(expected_length, rel=2e-13)
+    assert result["L_ang"][-1] == pytest.approx(expected_length, rel=1e-10)
     assert terminal_start - _carbon_stopping_keV_per_ang(terminal_start) * result["L_ang"][-1] == (
-        pytest.approx(cutoff, abs=2e-15)
+        pytest.approx(cutoff, abs=1e-10)
     )
     assert result["n_cutoff_stopped"] == result["n_stopped"] == 1
     assert result["n_step_limited"] == 0

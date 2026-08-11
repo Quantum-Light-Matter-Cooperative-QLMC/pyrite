@@ -77,6 +77,7 @@ I8_SIDE = np.int8(3)
 I8_STEP_LIMITED = np.int8(4)
 I8_NOT_ENTERED = np.int8(5)
 
+F64_ONE_OVER_511 = 1 / np.float64(510.99895)
 
 @dataclass(frozen=True)
 class TransportKernelConfig:
@@ -109,43 +110,36 @@ def _stream_uniform(key, counter):
 
 @jit.rawkernel(device=True)
 def _beta_from_keV(E_i):
-    g = F64_ONE + E_i / np.float64(510.99895)
+    g = F64_ONE + E_i * F64_ONE_OVER_511
     g_inv_square = F64_ONE / (g * g)
     return (F64_ONE - g_inv_square) ** F64_HALF
 
 
 @jit.rawkernel(device=True)
-def _rate_mott(E_i, Z_i, n_cm3_i):
+def _rate_mott(E_i, mott_numer, mott_denom1, mott_denom2):
     """Browning total elastic cross section [cm^2] times number density."""
-    z17 = Z_i ** np.float64(1.7)
-    numerator = np.float64(3.0e-18) * z17
-    z_exp = np.float64(0.005) * z17
-    z_squared = np.float64(0.0007) * Z_i * Z_i
     sqrt_E_i = xp.sqrt(E_i)
-    return numerator / (E_i + z_exp * sqrt_E_i + z_squared / sqrt_E_i) * n_cm3_i
+    return mott_numer / (E_i + mott_denom1 * sqrt_E_i + mott_denom2 / sqrt_E_i) 
 
 
 @jit.rawkernel(device=True)
-def _alpha_sr_joy(Z, E_keV):
-    return np.float64(3.4e-3) * Z ** np.float64(0.67) / E_keV
+def _alpha_sr_joy(sr_joy_numer, E_keV):
+    return sr_joy_numer / E_keV
 
 
 @jit.rawkernel(device=True)
-def _rate_sr(E_i, Z_i, n_cm3_i):
-    a = _alpha_sr_joy(Z_i, E_i)
+def _rate_sr(E_i, sr_rate_numer, sr_joy_numer):
+    a = _alpha_sr_joy(sr_joy_numer, E_i)
     E_i_plus_511 = E_i + np.float64(511.0)
     E_i_plus_1024 = E_i + np.float64(1024.0)
     E_i_511_over_1024 = E_i_plus_511 / E_i_plus_1024
     sig_i = (
-        np.float64(5.21e-21)
-        * (Z_i * Z_i)
+        sr_rate_numer
         / (E_i * E_i)
-        * np.float64(4.0)
-        * F64_PI
         / (a * (F64_ONE + a))
         * (E_i_511_over_1024 * E_i_511_over_1024)
     )
-    return n_cm3_i * sig_i
+    return sig_i
 
 
 @jit.rawkernel(device=True)
@@ -211,6 +205,11 @@ def _transport_kernel(
     L_ks,
     L_coeffs,
     L_ncm3,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer,
     L_nel,
     max_el,
     L_top,
@@ -281,9 +280,18 @@ def _transport_kernel(
         i_el = I32_ZERO
         while i_el < n_el:
             if elastic_model_code == I32_ONE:
-                total_rate += _rate_mott(E_j, L_Zs[row + i_el], L_ncm3[row + i_el])
+                total_rate += _rate_mott(
+                    E_j,
+                    L_mott_numer[row + i_el],
+                    L_mott_denom1[row + i_el],
+                    L_mott_denom2[row + i_el]
+                )
             else:
-                total_rate += _rate_sr(E_j, L_Zs[row + i_el], L_ncm3[row + i_el])
+                total_rate += _rate_sr(
+                    E_j,
+                    L_sr_rate_numer[row + i_el],
+                    L_sr_joy_numer[row + i_el]
+                )
             i_el += I32_ONE
 
         lam_ang = np.float64(1e8) / total_rate
@@ -445,15 +453,23 @@ def _transport_kernel(
                 picked = False
                 while k_el < n_el:
                     if elastic_model_code == I32_ONE:
-                        cumulative += _rate_mott(E_j, L_Zs[row + k_el], L_ncm3[row + k_el])
+                        cumulative += _rate_mott(
+                            E_j,
+                            L_mott_numer[row + k_el],
+                            L_mott_denom1[row + k_el],
+                            L_mott_denom2[row + k_el]
+                        )
                     else:
-                        cumulative += _rate_sr(E_j, L_Zs[row + k_el], L_ncm3[row + k_el])
+                        cumulative += _rate_sr(
+                            E_j,
+                            L_sr_rate_numer[row + k_el],
+                            L_sr_joy_numer[row + k_el]
+                        )
                     if cumulative > u and not picked:
                         sel = k_el
                         picked = True
                     k_el += I32_ONE
 
-            Z_i = L_Zs[row + sel]
             if elastic_model_code == I32_ONE and mott_has_table[row + sel] == np.uint8(1):
                 log_alpha = _interp_mott_log_alpha(
                     xp.log10(E_keV[e] * np.float64(1e3)),
@@ -464,7 +480,7 @@ def _transport_kernel(
                 )
                 alpha = F64_TEN**log_alpha
             else:
-                alpha = _alpha_sr_joy(Z_i, E_keV[e])
+                alpha = _alpha_sr_joy(L_sr_joy_numer[row + sel], E_keV[e])
 
             R_ang = _stream_uniform(key, draw)
             draw = draw + U64_ONE
@@ -512,6 +528,408 @@ def _transport_kernel(
     seg_count[i] = local_nseg
 
 
+
+@jit.rawkernel()
+def _transport_lut_kernel(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_nel,
+    max_el,
+    L_top,
+    L_bot,
+    lut_E_min_keV,
+    lut_inv_dE_keV,
+    lut_n_energy,
+    lut_total_rate,
+    lut_dEds,
+    lut_inv_beta,
+    lut_cdf,
+    lut_alpha,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+):
+    """LUT transport kernel: one thread owns one electron start-to-finish."""
+    i = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
+    if i >= e_count:
+        return
+
+    seg_count[i] = I32_ZERO
+    exit_code[i] = I8_NOT_ENTERED
+    e = e_start + i
+    if alive[e] == np.uint8(0):
+        return
+    exit_code[i] = I8_STEP_LIMITED
+
+    e3 = e * I32_THREE
+    key = stream_key[e]
+    draw = U64_ZERO
+    local_nseg = I32_ZERO
+    E_cut_e = E_cut_by_electrons[e]
+
+    step = I32_ZERO
+    running = True
+    while running and step < max_steps:
+        step += I32_ONE
+
+        if n_layers == I32_ONE:
+            L = I32_ZERO
+        else:
+            L = _searchsorted_right(internal_bounds, pos[e3 + I32_TWO], n_layers - I32_ONE)
+
+        n_el = L_nel[L]
+        z_top_L = L_top[L]
+        z_bot_L = L_bot[L]
+        E_j = E_keV[e]
+
+        lut_x = (E_j - lut_E_min_keV) * lut_inv_dE_keV
+        lut_last = lut_n_energy - I32_ONE
+        if lut_x <= F64_ZERO:
+            lut_i = I32_ZERO
+            lut_f = F64_ZERO
+        elif lut_x >= lut_last:
+            lut_i = lut_last - I32_ONE
+            lut_f = F64_ONE
+        else:
+            lut_i = np.int32(lut_x)
+            lut_f = lut_x - lut_i
+
+        layer_lut = L * lut_n_energy + lut_i
+        total0 = lut_total_rate[layer_lut]
+        total_rate = total0 + lut_f * (lut_total_rate[layer_lut + I32_ONE] - total0)
+        lam_ang = np.float64(1e8) / total_rate
+        step_j = -lam_ang * xp.log(_stream_uniform(key, draw))
+        draw = draw + U64_ONE
+
+        dx = dirs[e3]
+        dy = dirs[e3 + I32_ONE]
+        dz = dirs[e3 + I32_TWO]
+        px = pos[e3]
+        py = pos[e3 + I32_ONE]
+        pz = pos[e3 + I32_TWO]
+
+        cross_up_j = False
+        cross_dn_j = False
+        exit_side_j = False
+
+        if finite_footprint == I32_ONE:
+            best_t = F64_INF
+            best_face = FACE_NONE
+            half_w = F64_HALF * width_ang
+            half_h = F64_HALF * height_ang
+            if dx < F64_ZERO:
+                t = (-half_w - px) / dx
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_X_MIN
+            if dx > F64_ZERO:
+                t = (half_w - px) / dx
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_X_MAX
+            if dy < F64_ZERO:
+                t = (-half_h - py) / dy
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Y_MIN
+            if dy > F64_ZERO:
+                t = (half_h - py) / dy
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Y_MAX
+            if dz < F64_ZERO:
+                t = (z_top_L - pz) / dz
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Z_MIN
+            if dz > F64_ZERO:
+                t = (z_bot_L - pz) / dz
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Z_MAX
+            if step_j > best_t:
+                step_j = best_t
+                cross_up_j = best_face == FACE_Z_MIN
+                cross_dn_j = best_face == FACE_Z_MAX
+                exit_side_j = best_face >= FACE_X_MIN and best_face <= FACE_Y_MAX
+        else:
+            if dz < F64_ZERO:
+                s_boundary = (pz - z_top_L) / (-dz)
+                if step_j > s_boundary:
+                    step_j = s_boundary
+                    cross_up_j = True
+            elif dz > F64_ZERO:
+                s_boundary = (z_bot_L - pz) / dz
+                if step_j > s_boundary:
+                    step_j = s_boundary
+                    cross_dn_j = True
+
+        exit_top_j = cross_up_j and z_top_L <= F64_ZERO
+        exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+        dE0 = lut_dEds[layer_lut]
+        dEds = dE0 + lut_f * (lut_dEds[layer_lut + I32_ONE] - dE0)
+        b0 = lut_inv_beta[lut_i]
+        inv_beta_j = b0 + lut_f * (lut_inv_beta[lut_i + I32_ONE] - b0)
+        cutoff_j = False
+        cutoff_distance = (E_cut_e - E_j) / dEds
+        geometry_event = cross_up_j or cross_dn_j or exit_side_j
+        if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+            step_j = cutoff_distance
+            cutoff_j = True
+            cross_up_j = False
+            cross_dn_j = False
+            exit_top_j = False
+            exit_bot_j = False
+            exit_side_j = False
+
+        if local_nseg < cap:
+            slot = i * cap + local_nseg
+            s3 = slot * I32_THREE
+            seg_dir[s3] = dx
+            seg_dir[s3 + I32_ONE] = dy
+            seg_dir[s3 + I32_TWO] = dz
+            seg_mid[s3] = px + F64_HALF * step_j * dx
+            seg_mid[s3 + I32_ONE] = py + F64_HALF * step_j * dy
+            seg_mid[s3 + I32_TWO] = pz + F64_HALF * step_j * dz
+            seg_len[slot] = step_j
+            seg_E[slot] = E_j
+            seg_t0[slot] = clock[e]
+            seg_id[slot] = e
+            seg_lay[slot] = L
+        local_nseg += I32_ONE
+
+        pos[e3] = px + step_j * dx
+        pos[e3 + I32_ONE] = py + step_j * dy
+        pos[e3 + I32_TWO] = pz + step_j * dz
+        if cutoff_j:
+            E_keV[e] = E_cut_e
+        else:
+            E_keV[e] = E_j + dEds * step_j
+        clock[e] += step_j * inv_beta_j
+
+        if exit_top_j:
+            exit_code[i] = I8_BACKSCATTERED
+        elif exit_bot_j:
+            exit_code[i] = I8_TRANSMITTED
+        elif exit_side_j:
+            exit_code[i] = I8_SIDE
+        elif cutoff_j:
+            exit_code[i] = I8_CUTOFF_STOPPED
+
+        if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
+            running = False
+        elif cross_up_j or cross_dn_j:
+            if dirs[e3 + I32_TWO] > F64_ZERO:
+                pos[e3 + I32_TWO] += F64_EPS
+            else:
+                pos[e3 + I32_TWO] -= F64_EPS
+        else:
+            row = L * max_el
+            if n_el == I32_ONE:
+                sel = I32_ZERO
+            else:
+                u = _stream_uniform(key, draw)
+                draw = draw + U64_ONE
+                sel = n_el - I32_ONE
+                k_el = I32_ZERO
+                picked = False
+                while k_el < n_el:
+                    cdf_base = (row + k_el) * lut_n_energy + lut_i
+                    c0 = lut_cdf[cdf_base]
+                    cumulative = c0 + lut_f * (lut_cdf[cdf_base + I32_ONE] - c0)
+                    if cumulative > u and not picked:
+                        sel = k_el
+                        picked = True
+                    k_el += I32_ONE
+
+            alpha_x = (E_keV[e] - lut_E_min_keV) * lut_inv_dE_keV
+            if alpha_x <= F64_ZERO:
+                alpha_i = I32_ZERO
+                alpha_f = F64_ZERO
+            elif alpha_x >= lut_last:
+                alpha_i = lut_last - I32_ONE
+                alpha_f = F64_ONE
+            else:
+                alpha_i = np.int32(alpha_x)
+                alpha_f = alpha_x - alpha_i
+            alpha_base = (row + sel) * lut_n_energy + alpha_i
+            a0 = lut_alpha[alpha_base]
+            alpha = a0 + alpha_f * (lut_alpha[alpha_base + I32_ONE] - a0)
+
+            R_ang = _stream_uniform(key, draw)
+            draw = draw + U64_ONE
+            cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
+            phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
+            draw = draw + U64_ONE
+
+            odx = dirs[e3]
+            ody = dirs[e3 + I32_ONE]
+            odz = dirs[e3 + I32_TWO]
+            sin2 = F64_ONE - cos_t * cos_t
+            if sin2 < F64_ZERO:
+                sin2 = F64_ZERO
+            sin_t = xp.sqrt(sin2)
+            cos_phi = xp.cos(phi)
+            sin_phi = xp.sin(phi)
+            if xp.abs(odx) < np.float64(0.9):
+                refx = F64_ONE
+                refy = F64_ZERO
+            else:
+                refx = F64_ZERO
+                refy = F64_ONE
+            ux = -odz * refy
+            uy = odz * refx
+            uz = odx * refy - ody * refx
+            u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
+            ux /= u_mag
+            uy /= u_mag
+            uz /= u_mag
+            wx = ody * uz - odz * uy
+            wy = odz * ux - odx * uz
+            wz = odx * uy - ody * ux
+            a_rot = sin_t * cos_phi
+            b_rot = sin_t * sin_phi
+            outx = cos_t * odx + a_rot * ux + b_rot * wx
+            outy = cos_t * ody + a_rot * uy + b_rot * wy
+            outz = cos_t * odz + a_rot * uz + b_rot * wz
+            mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
+            dirs[e3] = outx / mag
+            dirs[e3 + I32_ONE] = outy / mag
+            dirs[e3 + I32_TWO] = outz / mag
+
+    seg_count[i] = local_nseg
+
+
+def run_transport_lut_kernel(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_nel,
+    L_top,
+    L_bot,
+    lut_E_min_keV,
+    lut_inv_dE_keV,
+    lut_n_energy,
+    lut_total_rate,
+    lut_dEds,
+    lut_inv_beta,
+    lut_cdf,
+    lut_alpha,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+    config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
+):
+    """Launch the energy-LUT transport kernel."""
+    nthreads = int(config.nthreads)
+    if nthreads not in (32, 64, 128, 256, 512, 1024):
+        raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
+    e_count = int(e_count)
+    if e_count == 0:
+        return
+
+    max_el = int(lut_cdf.shape[1])
+    nblocks = (e_count + nthreads - 1) // nthreads
+    _transport_lut_kernel(
+        (nblocks,),
+        (nthreads,),
+        (
+            np.int32(e_start),
+            np.int32(e_count),
+            np.int32(cap),
+            stream_key,
+            alive.astype(xp.uint8, copy=False),
+            np.int32(max_steps),
+            np.int32(n_layers),
+            internal_bounds,
+            np.int32(elastic_model_code),
+            np.float64(z_total),
+            np.int32(1 if finite_footprint else 0),
+            np.float64(width_ang),
+            np.float64(height_ang),
+            clock,
+            pos.reshape(-1),
+            dirs.reshape(-1),
+            E_cut_by_electrons,
+            L_nel.astype(xp.int32, copy=False),
+            np.int32(max_el),
+            L_top,
+            L_bot,
+            np.float64(lut_E_min_keV),
+            np.float64(lut_inv_dE_keV),
+            np.int32(lut_n_energy),
+            lut_total_rate.reshape(-1),
+            lut_dEds.reshape(-1),
+            lut_inv_beta,
+            lut_cdf.reshape(-1),
+            lut_alpha.reshape(-1),
+            E_keV,
+            seg_dir.reshape(-1),
+            seg_mid.reshape(-1),
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+            seg_count,
+            exit_code,
+        ),
+    )
+
+
+def make_cuda_transport_lut_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
+    """Return the LUT CUDA core and CuPy array module for the shared driver."""
+
+    def core(*args):
+        run_transport_lut_kernel(*args, config=config)
+
+    return core, xp
+
+
 def run_transport_kernel(
     e_start,
     e_count,
@@ -535,6 +953,11 @@ def run_transport_kernel(
     L_ks,
     L_coeffs,
     L_ncm3,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer,
     L_nel,
     L_top,
     L_bot,
@@ -596,6 +1019,11 @@ def run_transport_kernel(
             L_ks.reshape(-1),
             L_coeffs.reshape(-1),
             L_ncm3.reshape(-1),
+            L_sr_rate_numer.reshape(-1),
+            L_mott_numer.reshape(-1),
+            L_mott_denom1.reshape(-1),
+            L_mott_denom2.reshape(-1),
+            L_sr_joy_numer.reshape(-1),
             L_nel.astype(xp.int32, copy=False),
             np.int32(max_el),
             L_top,
@@ -617,7 +1045,6 @@ def run_transport_kernel(
             exit_code,
         ),
     )
-
 
 def make_cuda_transport_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
     """Return ``(core, array_module)`` for ``_run_per_electron_transport``."""

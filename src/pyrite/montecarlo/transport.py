@@ -274,20 +274,15 @@ def _sigma_browning_cm2(Z, E_keV):
 
 
 @njit(cache=True)
-def _sigma_browning_cm2_scalar(Z_i, E_i):
+def _sigma_browning_cm2_scalar(mott_numer, mott_denom1, mott_denom2, E_i):
     """
     Browning et al., J. Appl. Phys. 76, 2016 (1994): empirical fit to the
     tabulated Mott TOTAL elastic cross sections [cm^2], valid 0.1-30 keV,
     Z <= 92.
     """
-
-    z17 = Z_i**1.7
-    numerator = 3.0e-18 * z17
-    z_exp = 0.005 * z17
-    z_squared = 0.0007 * Z_i * Z_i
     sqrt_E_i = np.sqrt(E_i)
 
-    return numerator / (E_i + z_exp * sqrt_E_i + z_squared / sqrt_E_i)
+    return mott_numer / (E_i + mott_denom1 * sqrt_E_i + mott_denom2 / sqrt_E_i)
 
 
 def _alpha_sr_joy(Z, E_keV):
@@ -296,9 +291,9 @@ def _alpha_sr_joy(Z, E_keV):
 
 
 @njit(cache=True)
-def _alpha_sr_joy_scalar(Z, E_keV):
+def _alpha_sr_joy_scalar(sr_joy_numer, E_keV):
     """Classic analytic screened-Rutherford screening parameter (Joy/Bishop)."""
-    return 3.4e-3 * Z**0.67 / E_keV
+    return sr_joy_numer / E_keV
 
 
 @njit(cache=True)
@@ -373,29 +368,26 @@ _NO_MOTT = set()  # elements with no NIST Mott table -> screened-Rutherford
 
 
 @njit(cache=True)
-def _scatter_rates_mott_scalar(E_i, Z_i, n_cm3_i):
-    sig_i = _sigma_browning_cm2_scalar(Z_i, E_i)
-    return sig_i * n_cm3_i
+def _scatter_rates_mott_scalar(E_i, mott_numer, mott_denom1, mott_denom2):
+    sig_i = _sigma_browning_cm2_scalar(mott_numer, mott_denom1, mott_denom2, E_i)
+    return sig_i
 
 
 @njit(cache=True)
-def _scatter_rates_sr_scalar(E_i, Z_i, n_cm3_i):
+def _scatter_rates_sr_scalar(E_i, sr_rate_numer, sr_joy_numer):
     """Per-element elastic scattering rates [1/cm] at energies Ea (one layer)."""
-    a = _alpha_sr_joy_scalar(Z_i, E_i)
+    a = _alpha_sr_joy_scalar(sr_joy_numer, E_i)
     E_i_plus_511 = E_i + 511.0
     E_i_plus_1024 = E_i + 1024.0
     E_i_511_over_1024 = E_i_plus_511 / E_i_plus_1024
 
     sig_i = (
-        5.21e-21
-        * (Z_i * Z_i)
+        sr_rate_numer
         / (E_i * E_i)
-        * 4.0
-        * np.pi
         / (a * (1.0 + a))
         * (E_i_511_over_1024 * E_i_511_over_1024)
     )
-    return n_cm3_i * sig_i
+    return sig_i
 
 
 @njit(cache=True)
@@ -526,6 +518,187 @@ def _dEds_compound(J_arr, k_arr, coeff_arr, E_keV):
 
         out[j] = -7.85e-4 / E * total
     return out
+
+
+
+@dataclass(frozen=True)
+class TransportLUTConfig:
+    """Energy-grid policy for the ungrooved transport hot loops.
+
+    The LUT is deliberately uniform in kinetic energy so an event needs only one
+    multiply, one integer conversion, and linear interpolation -- no search or
+    logarithm just to locate a table entry. ``step_keV`` is a target spacing;
+    ``max_points`` bounds memory for unusually wide energy ranges.
+    """
+
+    enabled: bool = True
+    step_keV: float = 0.025
+    min_points: int = 256
+    max_points: int = 16384
+
+
+DEFAULT_TRANSPORT_LUT_CONFIG = TransportLUTConfig()
+
+
+@dataclass(frozen=True)
+class TransportEnergyLUT:
+    """Per-run transport tables shared by lockstep CPU, per-electron CPU and CUDA."""
+
+    E_min_keV: float
+    inv_dE_keV: float
+    n_energy: int
+    n_el: np.ndarray
+    total_rate: np.ndarray
+    dEds: np.ndarray
+    inv_beta: np.ndarray
+    cdf: np.ndarray
+    alpha: np.ndarray
+
+
+@njit(cache=True, inline="always")
+def _lut_index_frac_scalar(E_keV, E_min_keV, inv_dE_keV, n_energy):
+    """Return lower LUT index and interpolation fraction, clamped to the grid."""
+    x = (E_keV - E_min_keV) * inv_dE_keV
+    if x <= 0.0:
+        return 0, 0.0
+    last = n_energy - 1
+    if x >= last:
+        return last - 1, 1.0
+    i = int(x)
+    return i, x - i
+
+
+@njit(cache=True, inline="always")
+def _lut_lerp_1d(table, i, f):
+    return table[i] + f * (table[i + 1] - table[i])
+
+
+@njit(cache=True, inline="always")
+def _lut_lerp_2d(table, row, i, f):
+    return table[row, i] + f * (table[row, i + 1] - table[row, i])
+
+
+@njit(cache=True, inline="always")
+def _lut_lerp_3d(table, row, col, i, f):
+    return table[row, col, i] + f * (table[row, col, i + 1] - table[row, col, i])
+
+
+def build_transport_energy_lut(
+    E_min_keV,
+    E_max_keV,
+    elastic_model_code,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer,
+    mott_tables,
+    config=DEFAULT_TRANSPORT_LUT_CONFIG,
+):
+    """Precompute all energy-dependent scalar transport physics for one run.
+
+    Tables are material/layer specific.  Runtime transport then needs only uniform
+    grid indexing plus linear interpolation for the total elastic rate, stopping
+    power, 1/beta, collision-element CDF and scattering screening parameter.
+    """
+    E_min_keV = float(E_min_keV)
+    E_max_keV = float(E_max_keV)
+    if not np.isfinite(E_min_keV) or not np.isfinite(E_max_keV):
+        raise ValueError("transport LUT energy bounds must be finite")
+    if E_min_keV <= 0.0:
+        raise ValueError("transport LUT requires positive kinetic energies")
+    if E_max_keV <= E_min_keV:
+        E_max_keV = np.nextafter(E_min_keV, np.inf)
+
+    step = float(config.step_keV)
+    if not np.isfinite(step) or step <= 0.0:
+        raise ValueError("transport LUT step_keV must be finite and positive")
+    min_points = max(2, int(config.min_points))
+    max_points = max(min_points, int(config.max_points))
+    requested = int(np.ceil((E_max_keV - E_min_keV) / step)) + 1
+    n_energy = min(max_points, max(min_points, requested))
+
+    E_grid = np.linspace(E_min_keV, E_max_keV, n_energy, dtype=np.float64)
+    inv_dE_keV = np.float64((n_energy - 1) / (E_max_keV - E_min_keV))
+    n_layers = len(L_Zs)
+    max_el = max(arr.size for arr in L_Zs)
+    n_el = np.asarray([arr.size for arr in L_Zs], dtype=np.int32)
+
+    total_rate = np.empty((n_layers, n_energy), dtype=np.float64)
+    dEds = np.empty((n_layers, n_energy), dtype=np.float64)
+    cdf = np.ones((n_layers, max_el, n_energy), dtype=np.float64)
+    alpha = np.zeros((n_layers, max_el, n_energy), dtype=np.float64)
+
+    g = 1.0 + E_grid / 510.99895
+    beta = np.sqrt(1.0 - 1.0 / (g * g))
+    inv_beta = 1.0 / beta
+    sqrt_E = np.sqrt(E_grid)
+    E_511_over_1024 = (E_grid + 511.0) / (E_grid + 1024.0)
+    rel2 = E_511_over_1024 * E_511_over_1024
+
+    for L in range(n_layers):
+        n = int(n_el[L])
+        rates = np.empty((n, n_energy), dtype=np.float64)
+
+        stop_sum = np.zeros(n_energy, dtype=np.float64)
+        for i_el in range(n):
+            J = float(L_Js[L][i_el])
+            k = float(L_ks[L][i_el])
+            coeff = float(L_coeffs[L][i_el])
+            stop_sum += coeff * np.log(1.166 * (E_grid + k * J) / J)
+        dEds[L] = -7.85e-4 / E_grid * stop_sum
+
+        for i_el in range(n):
+            sr_joy = float(L_sr_joy_numer[L][i_el])
+            if elastic_model_code == 1:
+                rates[i_el] = float(L_mott_numer[L][i_el]) / (
+                    E_grid
+                    + float(L_mott_denom1[L][i_el]) * sqrt_E
+                    + float(L_mott_denom2[L][i_el]) / sqrt_E
+                )
+            else:
+                a = sr_joy / E_grid
+                rates[i_el] = (
+                    float(L_sr_rate_numer[L][i_el])
+                    / (E_grid * E_grid)
+                    / (a * (1.0 + a))
+                    * rel2
+                )
+
+            table = mott_tables[L][i_el]
+            if elastic_model_code == 1 and table is not None:
+                logE, logA = table
+                alpha[L, i_el] = 10.0 ** np.interp(
+                    np.log10(E_grid * 1e3),
+                    np.asarray(logE, dtype=np.float64),
+                    np.asarray(logA, dtype=np.float64),
+                )
+            else:
+                alpha[L, i_el] = sr_joy / E_grid
+
+        layer_total = rates.sum(axis=0)
+        if np.any(~np.isfinite(layer_total)) or np.any(layer_total <= 0.0):
+            raise ValueError("transport LUT produced a non-positive elastic rate")
+        total_rate[L] = layer_total
+        layer_cdf = np.cumsum(rates, axis=0) / layer_total[None, :]
+        layer_cdf[-1, :] = 1.0
+        cdf[L, :n, :] = layer_cdf
+
+    return TransportEnergyLUT(
+        E_min_keV=np.float64(E_min_keV),
+        inv_dE_keV=inv_dE_keV,
+        n_energy=n_energy,
+        n_el=n_el,
+        total_rate=total_rate,
+        dEds=dEds,
+        inv_beta=inv_beta,
+        cdf=cdf,
+        alpha=alpha,
+    )
 
 
 @njit(cache=True)
@@ -694,6 +867,11 @@ def _transport_core_ungrooved(
     L_ks,
     L_coeffs,
     L_ncm3,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer,
     L_top,
     L_bot,
     mott_has_table,
@@ -747,7 +925,11 @@ def _transport_core_ungrooved(
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
             coeff_arr = L_coeffs[L]
-            n_cm3s = L_ncm3[L]
+            sr_rate_numer = L_sr_rate_numer[L]
+            mott_numer = L_mott_numer[L]
+            mott_denom1 = L_mott_denom1[L]
+            mott_denom2 = L_mott_denom2[L]
+            sr_joy_numer = L_sr_joy_numer[L]
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
             E_j = E_keV[e]
@@ -756,9 +938,16 @@ def _transport_core_ungrooved(
             total_rate = 0.0
             for i_el in range(Z_arr.size):
                 if elastic_model_code == 1:
-                    rate = _scatter_rates_mott_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                    rate = _scatter_rates_mott_scalar(
+                        E_j,
+                        mott_numer[i_el],
+                        mott_denom1[i_el],
+                        mott_denom2[i_el]
+                    )
                 else:
-                    rate = _scatter_rates_sr_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                    rate = _scatter_rates_sr_scalar(
+                        E_j, sr_rate_numer[i_el], sr_joy_numer[i_el]
+                    )
                 rate_arr[i_el] = rate
                 total_rate += rate
 
@@ -873,7 +1062,6 @@ def _transport_core_ungrooved(
                         i_el = k
                         break
 
-            Z_i = Z_arr[i_el]
             if elastic_model_code == 1 and mott_has_table[L, i_el]:
                 log_alpha = _interp_mott_log_alpha_scalar(
                     np.log10(E_keV[e] * 1e3),
@@ -884,11 +1072,208 @@ def _transport_core_ungrooved(
                 )
                 alpha = 10.0**log_alpha
             else:
-                alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
+                alpha = _alpha_sr_joy_scalar(sr_joy_numer[i_el], E_keV[e])
 
             cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
             phi = 2.0 * np.pi * rng.random()
             dx, dy, dz = _rotate_direction_scalar(dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi)
+            dirs[e, 0] = dx
+            dirs[e, 1] = dy
+            dirs[e, 2] = dz
+
+    return nseg, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
+
+
+
+@njit(cache=True)
+def _transport_core_ungrooved_lut(
+    Ne,
+    alive,
+    max_steps,
+    max_segments,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    rng,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_nel,
+    L_top,
+    L_bot,
+    lut_E_min_keV,
+    lut_inv_dE_keV,
+    lut_n_energy,
+    lut_total_rate,
+    lut_dEds,
+    lut_inv_beta,
+    lut_cdf,
+    lut_alpha,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+):
+    """Ungrooved lockstep CPU core using pretabulated energy-dependent physics."""
+    EPS = 1e-6
+    nseg = 0
+    n_back = 0
+    n_trans = 0
+    n_side = 0
+    n_cutoff = 0
+    n_alive = int(alive.sum())
+
+    lockstep_step = 0
+    while lockstep_step < max_steps and n_alive > 0:
+        lockstep_step += 1
+        for e in range(Ne):
+            E_cut_e = E_cut_by_electrons[e]
+            if not alive[e]:
+                continue
+
+            if n_layers == 1:
+                L = 0
+            else:
+                L = np.searchsorted(internal_bounds, pos[e, 2], side="right")
+
+            n_el = L_nel[L]
+            z_top_L = L_top[L]
+            z_bot_L = L_bot[L]
+            E_j = E_keV[e]
+            lut_i, lut_f = _lut_index_frac_scalar(
+                E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+            )
+
+            # 1. Sample the next elastic-collision distance.
+            total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
+            lam_ang = 1e8 / total_rate
+            step_j = -lam_ang * np.log(rng.random())
+
+            if nseg >= max_segments:
+                raise RuntimeError("segment buffer exhausted")
+
+            # 2. Truncate the flight at this layer's z boundaries.
+            dx = dirs[e, 0]
+            dy = dirs[e, 1]
+            dz = dirs[e, 2]
+            px = pos[e, 0]
+            py = pos[e, 1]
+            pz = pos[e, 2]
+
+            cross_up_j = False
+            cross_dn_j = False
+            exit_side_j = False
+
+            if finite_footprint:
+                exit_distance, exit_face = _first_prism_exit_scalar(
+                    px, py, pz, dx, dy, dz, z_top_L, z_bot_L, width_ang, height_ang
+                )
+                if step_j > exit_distance:
+                    step_j = exit_distance
+                    cross_up_j = exit_face == Z_MIN
+                    cross_dn_j = exit_face == Z_MAX
+                    exit_side_j = exit_face >= X_MIN and exit_face <= Y_MAX
+            else:
+                if dz < 0.0:
+                    s_boundary = (pz - z_top_L) / (-dz)
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_up_j = True
+                elif dz > 0.0:
+                    s_boundary = (z_bot_L - pz) / dz
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_dn_j = True
+
+            exit_top_j = cross_up_j and z_top_L <= 0.0
+            exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+            # 3. Stopping and clock factors come from the same energy interpolation.
+            dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
+            inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
+            cutoff_j = False
+            cutoff_distance = (E_cut_e - E_j) / dEds
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+
+            seg_dir[nseg, 0] = dx
+            seg_dir[nseg, 1] = dy
+            seg_dir[nseg, 2] = dz
+            seg_mid[nseg, 0] = px + 0.5 * step_j * dx
+            seg_mid[nseg, 1] = py + 0.5 * step_j * dy
+            seg_mid[nseg, 2] = pz + 0.5 * step_j * dz
+            seg_len[nseg] = step_j
+            seg_E[nseg] = E_j
+            seg_t0[nseg] = clock[e]
+            seg_id[nseg] = e
+            seg_lay[nseg] = L
+            nseg += 1
+
+            # 4. Advance position, energy, and transport clock.
+            pos[e, 0] = px + step_j * dx
+            pos[e, 1] = py + step_j * dy
+            pos[e, 2] = pz + step_j * dz
+            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
+            clock[e] += step_j * inv_beta_j
+
+            # 5. Exit, internal-boundary, or collision handling.
+            died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
+            if exit_top_j:
+                n_back += 1
+            if exit_bot_j:
+                n_trans += 1
+            if exit_side_j:
+                n_side += 1
+            if cutoff_j:
+                n_cutoff += 1
+            if died_j:
+                alive[e] = False
+                n_alive -= 1
+                continue
+
+            crossed_internal = cross_up_j or cross_dn_j
+            if crossed_internal:
+                pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
+                continue
+
+            # The interpolated CDF replaces the second constituent-rate calculation.
+            if n_el == 1:
+                i_el = 0
+            else:
+                u = rng.random()
+                i_el = n_el - 1
+                for k_el in range(n_el):
+                    cumulative = _lut_lerp_3d(lut_cdf, L, k_el, lut_i, lut_f)
+                    if cumulative > u:
+                        i_el = k_el
+                        break
+
+            # Scattering angle uses the post-flight energy, matching the exact core.
+            alpha_i, alpha_f = _lut_index_frac_scalar(
+                E_keV[e], lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+            )
+            alpha = _lut_lerp_3d(lut_alpha, L, i_el, alpha_i, alpha_f)
+            cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
+            phi = 2.0 * np.pi * rng.random()
+            dx, dy, dz = _rotate_direction_scalar(
+                dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi
+            )
             dirs[e, 0] = dx
             dirs[e, 1] = dy
             dirs[e, 2] = dz
@@ -924,6 +1309,11 @@ def _transport_core_grooved(
     L_ks,
     L_coeffs,
     L_ncm3,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer,
     L_top,
     L_bot,
     mott_has_table,
@@ -995,7 +1385,11 @@ def _transport_core_grooved(
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
             coeff_arr = L_coeffs[L]
-            n_cm3s = L_ncm3[L]
+            sr_rate_numer = L_sr_rate_numer[L]
+            mott_numer = L_mott_numer[L]
+            mott_denom1 = L_mott_denom1[L]
+            mott_denom2 = L_mott_denom2[L]
+            sr_joy_numer = L_sr_joy_numer[L]
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
             E_j = E_keV[e]
@@ -1004,9 +1398,16 @@ def _transport_core_grooved(
             total_rate = 0.0
             for i_el in range(Z_arr.size):
                 if elastic_model_code == 1:
-                    rate = _scatter_rates_mott_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                    rate = _scatter_rates_mott_scalar(
+                        E_j,
+                        mott_numer[i_el],
+                        mott_denom1[i_el],
+                        mott_denom2[i_el]
+                    )
                 else:
-                    rate = _scatter_rates_sr_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                    rate = _scatter_rates_sr_scalar(
+                        E_j, sr_rate_numer[i_el], sr_joy_numer[i_el]
+                    )
                 rate_arr[i_el] = rate
                 total_rate += rate
 
@@ -1245,7 +1646,7 @@ def _transport_core_grooved(
                     )
                     alpha = 10.0**log_alpha
                 else:
-                    alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
+                    alpha = _alpha_sr_joy_scalar(sr_joy_numer[i_el], E_keV[e])
 
                 cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
                 phi = 2.0 * np.pi * rng.random()
@@ -1316,6 +1717,11 @@ def _transport_core_ungrooved_perelectron(
     L_ks,
     L_coeffs,
     L_ncm3,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer,
     L_nel,
     L_top,
     L_bot,
@@ -1382,14 +1788,26 @@ def _transport_core_ungrooved_perelectron(
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
             E_j = E_keV[e]
+            sr_rate_numer = L_sr_rate_numer[L]
+            mott_numer = L_mott_numer[L]
+            mott_denom1 = L_mott_denom1[L]
+            mott_denom2 = L_mott_denom2[L]
+            sr_joy_numer = L_sr_joy_numer[L]
 
             # 1. Sample the next elastic-collision distance.
             total_rate = 0.0
             for i_el in range(n_el):
                 if elastic_model_code == 1:
-                    rate = _scatter_rates_mott_scalar(E_j, L_Zs[L, i_el], L_ncm3[L, i_el])
+                    rate = _scatter_rates_mott_scalar(
+                        E_j,
+                        mott_numer[i_el],
+                        mott_denom1[i_el],
+                        mott_denom2[i_el]
+                    )
                 else:
-                    rate = _scatter_rates_sr_scalar(E_j, L_Zs[L, i_el], L_ncm3[L, i_el])
+                    rate = _scatter_rates_sr_scalar(
+                        E_j, sr_rate_numer[i_el], sr_joy_numer[i_el]
+                    )
                 total_rate += rate
 
             lam_ang = 1e8 / total_rate
@@ -1506,9 +1924,16 @@ def _transport_core_ungrooved_perelectron(
                 i_el = n_el - 1
                 for k_el in range(n_el):
                     if elastic_model_code == 1:
-                        rate = _scatter_rates_mott_scalar(E_j, L_Zs[L, k_el], L_ncm3[L, k_el])
+                        rate = _scatter_rates_mott_scalar(
+                            E_j,
+                            mott_numer[k_el],
+                            mott_denom1[k_el],
+                            mott_denom2[k_el],
+                        )
                     else:
-                        rate = _scatter_rates_sr_scalar(E_j, L_Zs[L, k_el], L_ncm3[L, k_el])
+                        rate = _scatter_rates_sr_scalar(
+                            E_j, sr_rate_numer[k_el], sr_joy_numer[k_el]
+                        )
                     cumulative += rate
                     if cumulative > u:
                         i_el = k_el
@@ -1525,7 +1950,7 @@ def _transport_core_ungrooved_perelectron(
                 )
                 alpha = 10.0**log_alpha
             else:
-                alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
+                alpha = _alpha_sr_joy_scalar(sr_joy_numer[i_el], E_keV[e])
 
             cos_t = _sample_cos_theta_from_alpha(alpha, _stream_uniform_scalar(key, draw))
             draw += _SM64_ONE
@@ -1539,7 +1964,211 @@ def _transport_core_ungrooved_perelectron(
         seg_count[i] = local_nseg
 
 
-def pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3):
+
+@njit(cache=True)
+def _transport_core_ungrooved_perelectron_lut(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_nel,
+    L_top,
+    L_bot,
+    lut_E_min_keV,
+    lut_inv_dE_keV,
+    lut_n_energy,
+    lut_total_rate,
+    lut_dEds,
+    lut_inv_beta,
+    lut_cdf,
+    lut_alpha,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+):
+    """Per-electron CPU reference for the CUDA LUT transport kernel."""
+    EPS = 1e-6
+
+    for i in range(e_count):
+        e = e_start + i
+        seg_count[i] = 0
+        exit_code[i] = EXIT_NOT_ENTERED
+        if not alive[e]:
+            continue
+        exit_code[i] = EXIT_STEP_LIMITED
+
+        key = stream_key[e]
+        draw = _SM64_ZERO
+        local_nseg = 0
+        E_cut_e = E_cut_by_electrons[e]
+
+        for _step in range(max_steps):
+            if n_layers == 1:
+                L = 0
+            else:
+                L = _searchsorted_right_scalar(internal_bounds, pos[e, 2], n_layers - 1)
+
+            n_el = L_nel[L]
+            z_top_L = L_top[L]
+            z_bot_L = L_bot[L]
+            E_j = E_keV[e]
+            lut_i, lut_f = _lut_index_frac_scalar(
+                E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+            )
+
+            total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
+            lam_ang = 1e8 / total_rate
+            R_step = _stream_uniform_scalar(key, draw)
+            draw += _SM64_ONE
+            step_j = -lam_ang * np.log(R_step)
+
+            dx = dirs[e, 0]
+            dy = dirs[e, 1]
+            dz = dirs[e, 2]
+            px = pos[e, 0]
+            py = pos[e, 1]
+            pz = pos[e, 2]
+
+            cross_up_j = False
+            cross_dn_j = False
+            exit_side_j = False
+
+            if finite_footprint:
+                exit_distance, exit_face = _first_prism_exit_scalar(
+                    px, py, pz, dx, dy, dz, z_top_L, z_bot_L, width_ang, height_ang
+                )
+                if step_j > exit_distance:
+                    step_j = exit_distance
+                    cross_up_j = exit_face == Z_MIN
+                    cross_dn_j = exit_face == Z_MAX
+                    exit_side_j = exit_face >= X_MIN and exit_face <= Y_MAX
+            else:
+                if dz < 0.0:
+                    s_boundary = (pz - z_top_L) / (-dz)
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_up_j = True
+                elif dz > 0.0:
+                    s_boundary = (z_bot_L - pz) / dz
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_dn_j = True
+
+            exit_top_j = cross_up_j and z_top_L <= 0.0
+            exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+            dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
+            inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
+            cutoff_j = False
+            cutoff_distance = (E_cut_e - E_j) / dEds
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+
+            if local_nseg < cap:
+                slot = i * cap + local_nseg
+                seg_dir[slot, 0] = dx
+                seg_dir[slot, 1] = dy
+                seg_dir[slot, 2] = dz
+                seg_mid[slot, 0] = px + 0.5 * step_j * dx
+                seg_mid[slot, 1] = py + 0.5 * step_j * dy
+                seg_mid[slot, 2] = pz + 0.5 * step_j * dz
+                seg_len[slot] = step_j
+                seg_E[slot] = E_j
+                seg_t0[slot] = clock[e]
+                seg_id[slot] = e
+                seg_lay[slot] = L
+            local_nseg += 1
+
+            pos[e, 0] = px + step_j * dx
+            pos[e, 1] = py + step_j * dy
+            pos[e, 2] = pz + step_j * dz
+            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
+            clock[e] += step_j * inv_beta_j
+
+            if exit_top_j:
+                exit_code[i] = EXIT_BACKSCATTERED
+            elif exit_bot_j:
+                exit_code[i] = EXIT_TRANSMITTED
+            elif exit_side_j:
+                exit_code[i] = EXIT_SIDE
+            elif cutoff_j:
+                exit_code[i] = EXIT_CUTOFF_STOPPED
+            if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
+                break
+
+            if cross_up_j or cross_dn_j:
+                pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
+                continue
+
+            if n_el == 1:
+                i_el = 0
+            else:
+                u = _stream_uniform_scalar(key, draw)
+                draw += _SM64_ONE
+                i_el = n_el - 1
+                for k_el in range(n_el):
+                    cumulative = _lut_lerp_3d(lut_cdf, L, k_el, lut_i, lut_f)
+                    if cumulative > u:
+                        i_el = k_el
+                        break
+
+            alpha_i, alpha_f = _lut_index_frac_scalar(
+                E_keV[e], lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+            )
+            alpha = _lut_lerp_3d(lut_alpha, L, i_el, alpha_i, alpha_f)
+            cos_t = _sample_cos_theta_from_alpha(alpha, _stream_uniform_scalar(key, draw))
+            draw += _SM64_ONE
+            phi = 2.0 * np.pi * _stream_uniform_scalar(key, draw)
+            draw += _SM64_ONE
+            ndx, ndy, ndz = _rotate_direction_scalar(
+                dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi
+            )
+            dirs[e, 0] = ndx
+            dirs[e, 1] = ndy
+            dirs[e, 2] = ndz
+
+        seg_count[i] = local_nseg
+
+
+def pack_layer_tables(
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_ncm3,
+    L_sr_rate_numer,
+    L_mott_numer,
+    L_mott_denom1,
+    L_mott_denom2,
+    L_sr_joy_numer
+):
     """Pad the per-layer element lists into ``(n_layers, max_elements)`` rows.
 
     The lockstep core indexes a Python list of ragged arrays, which neither the
@@ -1553,6 +2182,11 @@ def pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3):
     ks = np.zeros((n_layers, max_el), dtype=np.float64)
     coeffs = np.zeros((n_layers, max_el), dtype=np.float64)
     ncm3 = np.zeros((n_layers, max_el), dtype=np.float64)
+    sr_rate_numers = np.zeros((n_layers, max_el), dtype=np.float64)
+    mott_numers = np.zeros((n_layers, max_el), dtype=np.float64)
+    mott_denom1s = np.zeros((n_layers, max_el), dtype=np.float64)
+    mott_denom2s = np.zeros((n_layers, max_el), dtype=np.float64)
+    sr_joy_numers = np.zeros((n_layers, max_el), dtype=np.float64)
     nel = np.zeros(n_layers, dtype=np.int32)
     for L in range(n_layers):
         n = L_Zs[L].size
@@ -1560,10 +2194,29 @@ def pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3):
         Js[L, :n] = L_Js[L]
         Zs[L, :n] = L_Zs[L]
         ks[L, :n] = L_ks[L]
+        sr_rate_numers[L, :n] = L_sr_rate_numer[L]
+        mott_numers[L, :n] = L_mott_numer[L]
+        mott_denom1s[L, :n] = L_mott_denom1[L]
+        mott_denom2s[L, :n] = L_mott_denom2[L]
+        sr_joy_numers[L, :n] = L_sr_joy_numer[L]
         coeffs[L, :n] = L_coeffs[L]
         ncm3[L, :n] = L_ncm3[L]
-    return Js, Zs, ks, coeffs, ncm3, nel
 
+    packed_tables = (
+        Js,
+        Zs,
+        ks,
+        coeffs,
+        ncm3,
+        sr_rate_numers,
+        mott_numers,
+        mott_denom1s,
+        mott_denom2s,
+        sr_joy_numers,
+        nel
+    )
+    
+    return packed_tables
 
 @dataclass(frozen=True)
 class PerElectronTransportConfig:
@@ -1695,6 +2348,184 @@ def _batch_electrons(e, cap, Ne, config):
     if e == 0 and config.probe_electrons > 0:
         n = min(n, int(config.probe_electrons))
     return n
+
+
+
+def _run_per_electron_transport_lut(
+    core,
+    xp,
+    Ne,
+    seed,
+    max_steps,
+    max_segments,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    alive,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_nel,
+    L_top,
+    L_bot,
+    lut,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
+    keep_on_device=False,
+):
+    """Drive the CPU/CUDA LUT per-electron core with capacity replay."""
+    on_device = xp is not np
+    to_dev = xp.asarray if on_device else (lambda a: a)
+    to_host = xp.asnumpy if on_device else (lambda a: a)
+
+    from .runner import _nsys_pop, _nsys_push
+
+    _nsys_push("cxr.transport.upload")
+    d_keys = to_dev(stream_keys(seed, Ne))
+    d_alive = to_dev(alive)
+    d_clock = to_dev(clock)
+    d_pos = to_dev(pos)
+    d_dirs = to_dev(dirs)
+    d_E = to_dev(E_keV)
+    d_E_cut = to_dev(E_cut_by_electrons)
+    d_bounds = to_dev(internal_bounds)
+    d_nel = to_dev(L_nel)
+    d_top = to_dev(L_top)
+    d_bot = to_dev(L_bot)
+    d_total_rate = to_dev(lut.total_rate)
+    d_dEds = to_dev(lut.dEds)
+    d_inv_beta = to_dev(lut.inv_beta)
+    d_cdf = to_dev(lut.cdf)
+    d_alpha = to_dev(lut.alpha)
+    _nsys_pop()
+
+    out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
+    batches = []
+
+    cap = max(1, int(config.seg_capacity))
+    seen_max = 0
+    nseg = 0
+    n_back = n_trans = n_side = n_cutoff = n_step_limited = 0
+    e = 0
+    while e < Ne:
+        m = _batch_electrons(e, cap, Ne, config)
+        sl = slice(e, e + m)
+        snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
+
+        while True:
+            _nsys_push("cxr.transport.scratch")
+            scratch = _alloc_scratch(xp, m, cap)
+            seg_count = xp.zeros(m, dtype=xp.int64)
+            exit_code = xp.zeros(m, dtype=xp.int8)
+            _nsys_pop()
+            _nsys_push("cxr.transport.launch")
+            core(
+                e,
+                m,
+                cap,
+                d_keys,
+                d_alive,
+                max_steps,
+                n_layers,
+                d_bounds,
+                elastic_model_code,
+                z_total,
+                finite_footprint,
+                width_ang,
+                height_ang,
+                d_clock,
+                d_pos,
+                d_dirs,
+                d_E_cut,
+                d_nel,
+                d_top,
+                d_bot,
+                lut.E_min_keV,
+                lut.inv_dE_keV,
+                lut.n_energy,
+                d_total_rate,
+                d_dEds,
+                d_inv_beta,
+                d_cdf,
+                d_alpha,
+                d_E,
+                *scratch,
+                seg_count,
+                exit_code,
+            )
+            _nsys_pop()
+
+            _nsys_push("cxr.transport.capsync")
+            needed = int(seg_count.max())
+            _nsys_pop()
+            seen_max = max(seen_max, needed)
+            if needed <= cap:
+                break
+            cap = _capacity_for(seen_max, config)
+            d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
+            m = _batch_electrons(e, cap, Ne, config)
+            sl = slice(e, e + m)
+            snap = tuple(a[:m] for a in snap)
+
+        total = int(seg_count.sum())
+        if nseg + total > max_segments:
+            raise RuntimeError("segment buffer exhausted")
+        _nsys_push("cxr.transport.compact")
+        keep = xp.arange(cap)[None, :] < seg_count[:, None]
+        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
+        slots = (
+            s_dir.reshape(m, cap, 3),
+            s_mid.reshape(m, cap, 3),
+            s_len.reshape(m, cap),
+            s_E.reshape(m, cap),
+            s_t0.reshape(m, cap),
+            s_id.reshape(m, cap),
+            s_lay.reshape(m, cap),
+        )
+        if keep_on_device:
+            batches.append(tuple(a[keep] for a in slots))
+        else:
+            dst = slice(nseg, nseg + total)
+            for buf, a in zip(out_bufs, slots, strict=True):
+                buf[dst] = to_host(a[keep])
+        nseg += total
+        _nsys_pop()
+
+        _nsys_push("cxr.transport.exitcodes")
+        n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
+        n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
+        n_side += int((exit_code == EXIT_SIDE).sum())
+        n_cutoff += int((exit_code == EXIT_CUTOFF_STOPPED).sum())
+        n_step_limited += int((exit_code == EXIT_STEP_LIMITED).sum())
+        _nsys_pop()
+        e += m
+
+        if seen_max > 0:
+            cap = _capacity_for(seen_max, config)
+
+    joined = None
+    if keep_on_device:
+        _nsys_push("cxr.transport.join")
+        empty = _alloc_scratch(xp, 0, 1)
+        joined = tuple(
+            xp.concatenate([b[i] for b in batches]) if batches else empty[i]
+            for i in range(len(out_bufs))
+        )
+        _nsys_pop()
+
+    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined
 
 
 def _run_per_electron_transport(
@@ -1954,6 +2785,7 @@ def simulate_trajectories(
     transport_core="auto",
     per_electron_config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_segments_on_device=False,
+    transport_lut_config=DEFAULT_TRANSPORT_LUT_CONFIG,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -2289,6 +3121,32 @@ def simulate_trajectories(
         L_coeffs.append(np.asarray(coeff_arr, dtype=float))
         mott_tables.append(layer_mott_tables)
 
+    L_sr_rate_numer = []
+    L_mott_numer = []
+    L_mott_denom1 = []
+    L_mott_denom2 = []
+    L_sr_joy_numer = []
+
+    
+    for i, Z_i in enumerate(L_Zs):
+        n_cm3_i = L_ncm3[i]
+        # Rutherford Scattering coefficient hoisted out of hot loop
+        L_sr_rate_numer.append(
+            5.21e-21 * Z_i * Z_i
+            * np.float64(4.0) * np.float64(np.pi)
+            * n_cm3_i
+        )
+
+        # Browning fit coefficients to Mott scattering hoisted out of hot loop
+        z17 = Z_i ** np.float64(1.7)
+        L_mott_numer.append(np.float64(3.0e-18) * z17 * n_cm3_i)
+        L_mott_denom1.append(np.float64(0.005) * z17)
+        L_mott_denom2.append(np.float64(0.0007) * Z_i * Z_i)
+
+        # Joy-Luo
+        L_sr_joy_numer.append(np.float64(3.4e-3) * Z_i ** np.float64(0.67))
+
+
     L_top = np.asarray([float(a) for (a, _, _) in layers], dtype=float)
     L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
     internal_bounds = L_bot[:-1].copy()
@@ -2452,6 +3310,28 @@ def simulate_trajectories(
     initial_E_keV = E_keV.copy()
     _nsys_pop()
 
+    elastic_model_code = 1 if elastic_model == "mott" else 0
+    transport_lut = None
+    if groove is None and transport_lut_config.enabled:
+        _nsys_push("cxr.transport.lut")
+        transport_lut = build_transport_energy_lut(
+            float(np.min(E_cut_by_electrons)),
+            float(np.max(E_keV)),
+            elastic_model_code,
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
+            mott_tables,
+            config=transport_lut_config,
+        )
+        _nsys_pop()
+
     _nsys_push("cxr.transport.alloc")
     # Preallocate fixed-capacity output buffers.  ``max_steps`` is already a
     # conservative safety bound in ordinary runs; groove re-entry events can add
@@ -2474,10 +3354,104 @@ def simulate_trajectories(
     seg_xp = np
     dev_segs = None
 
-    elastic_model_code = 1 if elastic_model == "mott" else 0
-
     _nsys_push("cxr.transport.core")
-    if groove is None and transport_core != "lockstep":
+    if groove is None and transport_lut is not None and transport_core != "lockstep":
+        if transport_core == "cuda":
+            from .transport_jit_kernel import make_cuda_transport_lut_core
+
+            core, core_xp = make_cuda_transport_lut_core()
+        else:
+            core, core_xp = _transport_core_ungrooved_perelectron_lut, np
+        if keep_segments_on_device:
+            seg_xp = core_xp
+
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs = (
+            _run_per_electron_transport_lut(
+                core,
+                core_xp,
+                Ne,
+                seed,
+                max_steps,
+                max_segments,
+                n_layers,
+                internal_bounds,
+                elastic_model_code,
+                z_total,
+                finite_footprint,
+                0.0 if width_ang is None else float(width_ang),
+                0.0 if height_ang is None else float(height_ang),
+                alive,
+                clock,
+                pos,
+                dirs,
+                E_cut_by_electrons,
+                transport_lut.n_el,
+                L_top,
+                L_bot,
+                transport_lut,
+                E_keV,
+                seg_dir,
+                seg_mid,
+                seg_len,
+                seg_E,
+                seg_t0,
+                seg_id,
+                seg_lay,
+                config=per_electron_config,
+                keep_on_device=keep_segments_on_device,
+            )
+        )
+        nvac = 0
+        vac_start = np.empty((0, 3), dtype=float)
+        vac_end = np.empty((0, 3), dtype=float)
+        vac_E = np.empty(0, dtype=float)
+        vac_t0 = np.empty(0, dtype=float)
+        vac_id = np.empty(0, dtype=np.int64)
+    elif groove is None and transport_lut is not None:
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = _transport_core_ungrooved_lut(
+            Ne,
+            alive,
+            max_steps,
+            max_segments,
+            n_layers,
+            internal_bounds,
+            elastic_model_code,
+            z_total,
+            finite_footprint,
+            0.0 if width_ang is None else float(width_ang),
+            0.0 if height_ang is None else float(height_ang),
+            clock,
+            rng,
+            pos,
+            dirs,
+            E_cut_by_electrons,
+            transport_lut.n_el,
+            L_top,
+            L_bot,
+            transport_lut.E_min_keV,
+            transport_lut.inv_dE_keV,
+            transport_lut.n_energy,
+            transport_lut.total_rate,
+            transport_lut.dEds,
+            transport_lut.inv_beta,
+            transport_lut.cdf,
+            transport_lut.alpha,
+            E_keV,
+            seg_dir,
+            seg_mid,
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+        )
+        nvac = 0
+        vac_start = np.empty((0, 3), dtype=float)
+        vac_end = np.empty((0, 3), dtype=float)
+        vac_E = np.empty(0, dtype=float)
+        vac_t0 = np.empty(0, dtype=float)
+        vac_id = np.empty(0, dtype=np.int64)
+    elif groove is None and transport_core != "lockstep":
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
         if transport_core == "cuda":
@@ -2489,6 +3463,18 @@ def simulate_trajectories(
         if keep_segments_on_device:
             seg_xp = core_xp
 
+        packed_per_layer_tables = pack_layer_tables(
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer
+        )
         nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs = (
             _run_per_electron_transport(
                 core,
@@ -2509,7 +3495,7 @@ def simulate_trajectories(
                 pos,
                 dirs,
                 E_cut_by_electrons,
-                pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3),
+                packed_per_layer_tables,
                 L_top,
                 L_bot,
                 (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
@@ -2554,6 +3540,11 @@ def simulate_trajectories(
             L_ks,
             L_coeffs,
             L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
             L_top,
             L_bot,
             mott_has_table,
@@ -2613,6 +3604,11 @@ def simulate_trajectories(
             L_ks,
             L_coeffs,
             L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
             L_top,
             L_bot,
             mott_has_table,

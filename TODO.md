@@ -1,10 +1,6 @@
 # TODO / Backlog
 
-Kanban-style backlog; authoritative on `main`. `Active` contains only work in
-progress. P1-P3 are prioritized back-burner queues: items there are backlog,
-gated, or paused, never active. Move an item into `Active` when work starts and
-back to its priority queue when paused. `Long-term plans` records unprioritized
-future direction, not committed work.
+****
 
 Branch copies are disposable and auto-resolve to `main` on merge/rebase
 (`.gitattributes` `TODO.md merge=ours` driver — run `uv run pyrite-dev bootstrap`
@@ -123,9 +119,10 @@ Nothing yet.
 
 ## Bugs (fix + regression test)
 
-1. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
+1. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
+2. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-2. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
+3. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
    not been derived for that case:
    1. Give them a suggestion on what to run. We could also add a flag that automatically runs
       the derivation for their energy + mat before running their actual profile.

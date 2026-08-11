@@ -16,9 +16,10 @@ before squaring.  This module therefore splits the GPU work into three stages:
    mosaic-weighted reflection/orientation rows into the spectrum.  Different
    g rows therefore remain incoherent by construction.
 
-Peak line scratch is O(8 * segment_block * N_g), not O(8 * all_kept_pairs),
-and no device->host line-count transfer is needed between the prologue and
-reduction stages.
+Peak pair scratch is O(6 * segment_block * N_g) plus two O(segment_block)
+segment-only geometry arrays. ``aw`` and ``phase_slope`` are no longer duplicated
+for every g row. No device->host line-count transfer is needed between the
+prologue and reduction stages.
 """
 
 from dataclasses import dataclass
@@ -103,10 +104,13 @@ def _coherent_prologue_kernel(
     L_esc,
     line_electron,
     r_flat,
-    phase_slope_seg,
     g_flat,
     es_flat,
     ep_flat,
+    g2,
+    n_dot_g,
+    g_dot_es,
+    g_dot_ep,
     E_tab,
     chi_re_tab,
     chi_im_tab,
@@ -114,8 +118,6 @@ def _coherent_prologue_kernel(
     u_im_tab,
     mu_tab,
     E_r_out,
-    aw_out,
-    phase_slope_out,
     g_phase_out,
     cs_re_out,
     cs_im_out,
@@ -124,12 +126,8 @@ def _coherent_prologue_kernel(
     lo_keep,
     hi_keep,
     hbarc,
-    electron_mass_eV,
     alpha_fs,
     pref_c1,
-    nx,
-    ny,
-    nz,
     n_pairs,
     n_seg,
     n_g,
@@ -179,20 +177,14 @@ def _coherent_prologue_kernel(
 
     chi_re = _interp_row(chi_re_tab, g, idx, frac, below, above, n_tab)
     chi_im = _interp_row(chi_im_tab, g, idx, frac, below, above, n_tab)
-    u_re = _interp_row(u_re_tab, g, idx, frac, below, above, n_tab) / electron_mass_eV
-    u_im = _interp_row(u_im_tab, g, idx, frac, below, above, n_tab) / electron_mass_eV
+    u_re = _interp_row(u_re_tab, g, idx, frac, below, above, n_tab)
+    u_im = _interp_row(u_im_tab, g, idx, frac, below, above, n_tab)
     mu = _interp_shared(mu_tab, idx, frac, below, above, n_tab)
 
-    kx = omega * nx
-    ky = omega * ny
-    kz = omega * nz
-    kgx = kx + gx
-    kgy = ky + gy
-    kgz = kz + gz
-    detuning = kgx * kgx + kgy * kgy + kgz * kgz - omega * omega
-    k_dot_g = kx * gx + ky * gy + kz * gz
-    v_dot_kg = vx * kgx + vy * kgy + vz * kgz
     k_dot_v = omega * (F32_ONE - dnm)
+    k_dot_g = omega * n_dot_g[g]
+    v_dot_kg = v_dot_g + k_dot_v
+    detuning = g2[g] + F32_TWO * k_dot_g
 
     duration = t_L[seg]
     gm = gamma[seg]
@@ -212,7 +204,7 @@ def _coherent_prologue_kernel(
     # sigma polarization: A = chi*f_pxr + (U/m)*f_cbs, with both scalar
     # kinematic factors REAL. This is the real/imag expansion of the existing
     # coherent complex expression, preserving its phase information.
-    g_dot_e = gx * esx + gy * esy + gz * esz
+    g_dot_e = g_dot_es[g]
     v_dot_e = vx * esx + vy * esy + vz * esz
     numerator = v_dot_kg * g_dot_e - omega * omega * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
@@ -227,7 +219,7 @@ def _coherent_prologue_kernel(
     csi = coef_scale * a_im
 
     # pi polarization.
-    g_dot_e = gx * epx + gy * epy + gz * epz
+    g_dot_e = g_dot_ep[g]
     v_dot_e = vx * epx + vy * epy + vz * epz
     numerator = v_dot_kg * g_dot_e - omega * omega * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
@@ -239,8 +231,6 @@ def _coherent_prologue_kernel(
     cpi = coef_scale * a_im
 
     E_r_out[pair] = E_res
-    aw_out[pair] = dnm * duration / (F32_TWO * hbarc)
-    phase_slope_out[pair] = phase_slope_seg[seg]
     rbase = seg * U32_THREE
     g_phase_out[pair] = (
         r_flat[rbase] * gx + r_flat[rbase + U32_ONE] * gy + r_flat[rbase + U32_TWO] * gz
@@ -273,6 +263,7 @@ def _field_kernel_1e(
     fs_im,
     fp_re,
     fp_im,
+    geom_pair,
     n_seg,
     n_g,
     n_E,
@@ -302,8 +293,11 @@ def _field_kernel_1e(
         cpi = cp_im[line]
         if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
             Er = E_r[line]
-            aa = aw[line]
-            ps = phase_slope[line]
+            geom = seg
+            if geom_pair:
+                geom = line
+            aa = aw[geom]
+            ps = phase_slope[geom]
             gp = g_phase[line]
             x = aa * (E0 - Er)
             s = _sinc_unscaled(x)
@@ -358,6 +352,7 @@ def _field_kernel_2e(
     fs_im,
     fp_re,
     fp_im,
+    geom_pair,
     n_seg,
     n_g,
     n_E,
@@ -397,8 +392,11 @@ def _field_kernel_2e(
         cpi = cp_im[line]
         if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
             Er = E_r[line]
-            aa = aw[line]
-            ps = phase_slope[line]
+            geom = seg
+            if geom_pair:
+                geom = line
+            aa = aw[geom]
+            ps = phase_slope[geom]
             gp = g_phase[line]
 
             x = aa * (E0 - Er)
@@ -528,13 +526,24 @@ def run_coherent_prologue_kernel(
     pref_c1,
     n_hat,
     n_g,
+    g2=None,
+    n_dot_g=None,
+    g_dot_es=None,
+    g_dot_ep=None,
+    aw_seg=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Build g-major coherent line data for one contiguous segment block.
 
-    Returned arrays all have length ``n_g * n_seg``. Rejected pairs are marked
-    by four zero coefficient values; the geometry entries for those pairs are
-    intentionally unspecified and are never read by the field reducer.
+    The public/internal call shape is retained for compatibility. The returned
+    tuple also retains its historical eight entries, but ``aw`` and
+    ``phase_slope`` are now segment-sized rather than duplicated across g rows.
+    The field reducer accepts both layouts, so callers that construct pair-sized
+    geometry directly remain valid.
+
+    ``g2``/``n_dot_g``/``g_dot_e*`` and ``aw_seg`` are optional precomputed
+    hoists. When omitted they are constructed once here, preserving older direct
+    callers while the main line path avoids rebuilding them per segment block.
     """
     nthreads = int(config.prologue_nthreads)
     _validate_threads(nthreads, "prologue_nthreads")
@@ -545,17 +554,41 @@ def run_coherent_prologue_kernel(
         raise ValueError("coherent prologue requires at least one g row and two tabulation points")
     n_pairs = n_g * n_seg
 
-    storage = xp.empty(8 * n_pairs, dtype=xp.float32)
+    G = g_flat.reshape(n_g, 3)
+    ES = es_flat.reshape(n_g, 3)
+    EP = ep_flat.reshape(n_g, 3)
+    if g2 is None:
+        g2 = G[:, 0] * G[:, 0] + G[:, 1] * G[:, 1] + G[:, 2] * G[:, 2]
+    if n_dot_g is None:
+        nx, ny, nz = np.float32(n_hat[0]), np.float32(n_hat[1]), np.float32(n_hat[2])
+        n_dot_g = G[:, 0] * nx + G[:, 1] * ny + G[:, 2] * nz
+    if g_dot_es is None:
+        g_dot_es = G[:, 0] * ES[:, 0] + G[:, 1] * ES[:, 1] + G[:, 2] * ES[:, 2]
+    if g_dot_ep is None:
+        g_dot_ep = G[:, 0] * EP[:, 0] + G[:, 1] * EP[:, 1] + G[:, 2] * EP[:, 2]
+    if aw_seg is None:
+        aw_seg = denom * t_L / np.float32(2.0 * float(hbarc))
+
+    # Backward-compatible direct callers may still supply raw U_g tables. The
+    # optimized main path supplies pre-scaled U_g/m_e tables and sets mass=1.
+    if float(electron_mass_eV) != 1.0:
+        inv_m = np.float32(1.0 / float(electron_mass_eV))
+        u_re_kernel = u_re_tab * inv_m
+        u_im_kernel = u_im_tab * inv_m
+    else:
+        u_re_kernel = u_re_tab
+        u_im_kernel = u_im_tab
+
+    # Only g-dependent quantities live in pair scratch.
+    storage = xp.empty(6 * n_pairs, dtype=xp.float32)
     E_r = storage[0 * n_pairs : 1 * n_pairs]
-    aw = storage[1 * n_pairs : 2 * n_pairs]
-    phase_slope = storage[2 * n_pairs : 3 * n_pairs]
-    g_phase = storage[3 * n_pairs : 4 * n_pairs]
-    cs_re = storage[4 * n_pairs : 5 * n_pairs]
-    cs_im = storage[5 * n_pairs : 6 * n_pairs]
-    cp_re = storage[6 * n_pairs : 7 * n_pairs]
-    cp_im = storage[7 * n_pairs : 8 * n_pairs]
+    g_phase = storage[1 * n_pairs : 2 * n_pairs]
+    cs_re = storage[2 * n_pairs : 3 * n_pairs]
+    cs_im = storage[3 * n_pairs : 4 * n_pairs]
+    cp_re = storage[4 * n_pairs : 5 * n_pairs]
+    cp_im = storage[5 * n_pairs : 6 * n_pairs]
     if n_pairs == 0:
-        return E_r, aw, phase_slope, g_phase, cs_re, cs_im, cp_re, cp_im
+        return E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im
 
     nblocks = (n_pairs + nthreads - 1) // nthreads
     _coherent_prologue_kernel(
@@ -569,19 +602,20 @@ def run_coherent_prologue_kernel(
             L_esc,
             line_electron,
             r_flat,
-            phase_slope_seg,
             g_flat,
             es_flat,
             ep_flat,
+            g2,
+            n_dot_g,
+            g_dot_es,
+            g_dot_ep,
             E_tab,
             chi_re_tab,
             chi_im_tab,
-            u_re_tab,
-            u_im_tab,
+            u_re_kernel,
+            u_im_kernel,
             mu_tab,
             E_r,
-            aw,
-            phase_slope,
             g_phase,
             cs_re,
             cs_im,
@@ -590,19 +624,15 @@ def run_coherent_prologue_kernel(
             np.float32(lo_keep),
             np.float32(hi_keep),
             np.float32(hbarc),
-            np.float32(electron_mass_eV),
             np.float32(alpha_fs),
             np.float32(pref_c1),
-            np.float32(n_hat[0]),
-            np.float32(n_hat[1]),
-            np.float32(n_hat[2]),
             np.uint32(n_pairs),
             np.uint32(n_seg),
             np.uint32(n_g),
             np.uint32(n_tab),
         ),
     )
-    return E_r, aw, phase_slope, g_phase, cs_re, cs_im, cp_re, cp_im
+    return E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im
 
 
 def run_coherent_field_accumulation_kernel(
@@ -621,7 +651,12 @@ def run_coherent_field_accumulation_kernel(
     n_seg,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
-    """Add one segment block's complex fields into persistent g-by-energy planes."""
+    """Add one segment block's complex fields into persistent g-by-energy planes.
+
+    ``aw`` and ``phase_slope`` may be either the optimized segment-sized arrays
+    (length ``n_seg``) or the historical pair-sized arrays (length
+    ``n_g*n_seg``). This keeps direct kernel tests/callers source-compatible.
+    """
     nthreads = int(config.reduction_nthreads)
     _validate_threads(nthreads, "reduction_nthreads")
     epb = int(config.energies_per_block)
@@ -635,6 +670,12 @@ def run_coherent_field_accumulation_kernel(
     n_E = int(E_grid.size)
     if n_g == 0 or n_seg == 0 or n_E == 0:
         return fields
+    pair_geometry = int(aw.size) != n_seg
+    if pair_geometry and int(aw.size) != n_g * n_seg:
+        raise ValueError("aw must have length n_seg or n_g*n_seg")
+    if int(phase_slope.size) != int(aw.size):
+        raise ValueError("phase_slope must use the same geometry layout as aw")
+
     e_blocks = (n_E + epb - 1) // epb
     nblocks = n_g * e_blocks
     shared_bytes = 4 * epb * nthreads * np.dtype(np.float32).itemsize
@@ -656,6 +697,7 @@ def run_coherent_field_accumulation_kernel(
             fs_im,
             fp_re,
             fp_im,
+            np.uint32(1 if pair_geometry else 0),
             np.uint32(n_seg),
             np.uint32(n_g),
             np.uint32(n_E),

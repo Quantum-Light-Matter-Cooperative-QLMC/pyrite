@@ -397,6 +397,7 @@ def _run_grooved(
         layers = [(0.0, float(thickness_ang), n_atoms_per_ang3)]
     n_layers = len(layers)
     L_Zs, L_Js, L_ks, L_coeffs, L_ncm3 = [], [], [], [], []
+    L_sr_rate_numer, L_mott_numer, L_mott_denom1, L_mott_denom2, L_sr_joy_numer = [], [], [], [], []
     L_top, L_bot = [], []
     for top, bot, n_i in layers:
         coeff = (n_i / 0.602214076) * Z
@@ -407,6 +408,25 @@ def _run_grooved(
         L_ncm3.append(np.array([n_i * 1e24]))
         L_top.append(top)
         L_bot.append(bot)
+
+    for i, Z_i in enumerate(L_Zs):
+        n_cm3_i = L_ncm3[i]
+        # Rutherford Scattering coefficient hoisted out of hot loop
+        L_sr_rate_numer.append(
+            5.21e-21 * Z_i * Z_i
+            * np.float64(4.0) * np.float64(np.pi)
+            * n_cm3_i
+        )
+
+        # Browning fit coefficients to Mott scattering hoisted out of hot loop
+        z17 = Z_i ** np.float64(1.7)
+        L_mott_numer.append(np.float64(3.0e-18) * z17 * n_cm3_i)
+        L_mott_denom1.append(np.float64(0.005) * z17)
+        L_mott_denom2.append(np.float64(0.0007) * Z_i * Z_i)
+
+        # Joy-Luo
+        L_sr_joy_numer.append(np.float64(3.4e-3) * Z_i ** np.float64(0.67))
+
     L_top = np.array(L_top)
     L_bot = np.array(L_bot)
     internal_bounds = L_bot[:-1].copy()
@@ -471,6 +491,11 @@ def _run_grooved(
             L_ks,
             L_coeffs,
             L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
             L_top,
             L_bot,
             mott_has_table,

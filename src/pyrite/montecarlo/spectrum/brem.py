@@ -26,6 +26,54 @@ R_E_CM2 = 7.9407877e-26  # classical electron radius squared [cm^2]
 _BREM_MC2_KEV = 510.99895  # electron rest energy [keV]
 
 
+def _brem_incident_state(T_keV):
+    """Return incident momentum ``p/(m_e c)`` and beta for segment energies.
+
+    These depend only on the emitting segment energy, not on photon energy or
+    composition element, so the CUDA reduction path computes them once per
+    spectrum instead of once per ``(segment, energy-block, element)``.
+    """
+    T = xp.asarray(T_keV, dtype=REAL)
+    p_i = xp.sqrt(T * (T + 2.0 * _BREM_MC2_KEV)) / _BREM_MC2_KEV
+    beta_i = p_i / (1.0 + T / _BREM_MC2_KEV)
+    return p_i, beta_i
+
+
+def _brem_incident_prefactor_core(L_ang, p_i, beta_i, Z, density_cm3):
+    """Energy-independent part of ``n L dsigma/dk`` for one element.
+
+    The remaining CUDA-cell work depends on the final-state momentum/beta and
+    therefore still depends on photon energy. Hoisting this factor removes the
+    incident-side Elwert exponential and ``1/p_i**2`` work from every energy
+    block while preserving the Bethe-Heitler + Elwert expression algebraically.
+    """
+    zi = 2.0 * xp.pi * Z * ALPHA_FS
+    den_i = 1.0 - xp.exp(-zi / beta_i)
+    return (
+        density_cm3
+        * L_ang
+        * 1.0e-8
+        * (16.0 / 3.0)
+        * ALPHA_FS
+        * R_E_CM2
+        * Z
+        * Z
+        * beta_i
+        * den_i
+        / (p_i * p_i)
+    )
+
+
+if hasattr(xp, "fuse"):
+    _brem_incident_prefactor_core = xp.fuse()(_brem_incident_prefactor_core)
+
+
+def _brem_incident_prefactor(L_ang, p_i, beta_i, Z, density_cm3):
+    Z = REAL(Z)
+    density_cm3 = REAL(density_cm3)
+    return _brem_incident_prefactor_core(L_ang, p_i, beta_i, Z, density_cm3)
+
+
 def _brem_dsigma_dk_core(T_i, k, Z):
     """Pure-elementwise Bethe-Heitler + Elwert core, one fused GPU kernel.
 
@@ -254,10 +302,23 @@ def mc_brem_spectrum(
         T_jit = xp.ascontiguousarray(seg_E, dtype=REAL)
         L_jit = xp.ascontiguousarray(seg_L, dtype=REAL)
         E_jit = xp.ascontiguousarray(E_grid, dtype=REAL)
+        p_i_jit, beta_i_jit = _brem_incident_state(T_jit)
+        p_i_jit = xp.ascontiguousarray(p_i_jit, dtype=REAL)
+        beta_i_jit = xp.ascontiguousarray(beta_i_jit, dtype=REAL)
         n_abs_layers = int(path_by_layer.shape[1])
 
         for el_i, n_i in comp:
             Z_i = TRANSPORT_ELEMENTS[el_i]["Z"]
+            incident_prefactor = xp.ascontiguousarray(
+                _brem_incident_prefactor(
+                    L_jit,
+                    p_i_jit,
+                    beta_i_jit,
+                    Z_i,
+                    n_i * 1e24,
+                ),
+                dtype=REAL,
+            )
             run_brem_reduction_kernel(
                 T_jit,
                 L_jit,
@@ -267,6 +328,8 @@ def mc_brem_spectrum(
                 Z=Z_i,
                 density_cm3=n_i * 1e24,
                 n_layers=n_abs_layers,
+                p_i=p_i_jit,
+                incident_prefactor=incident_prefactor,
                 out=spec,
                 config=DEFAULT_BREM_KERNEL_CONFIG,
             )

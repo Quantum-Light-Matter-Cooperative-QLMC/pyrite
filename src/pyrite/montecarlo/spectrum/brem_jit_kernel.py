@@ -46,7 +46,14 @@ DEFAULT_BREM_KERNEL_CONFIG = BremKernelConfig(nthreads=256, energies_per_block=2
 
 
 @jit.rawkernel(device=True)
-def _dsigma_scalar(T_i, k_eV, Z, p_i, beta_i):
+def _dsigma_weighted_scalar(T_i, k_eV, Z, p_i, incident_prefactor):
+    """Weighted Bethe-Heitler + Elwert cell with incident work hoisted.
+
+    ``incident_prefactor`` already contains density, segment length, the common
+    Bethe-Heitler constant, ``Z**2``, ``1/p_i**2``, and the incident-side
+    ``beta_i * (1-exp(-2*pi*Z*alpha/beta_i))`` factor. Only final-state work
+    remains energy dependent here.
+    """
     k = k_eV * F32_1E_M3
     T_f = T_i - k
     if T_f <= F32_1E_M6 or k <= F32_ZERO:
@@ -61,29 +68,20 @@ def _dsigma_scalar(T_i, k_eV, Z, p_i, beta_i):
     born_log = xp.log((p_i + p_f) / dp)
 
     zi = Z * F32_TWO_PI_ALPHA
-    den_i = F32_ONE - xp.exp(-zi / beta_i)
     den_f = F32_ONE - xp.exp(-zi / beta_f)
-    elwert = beta_i / beta_f * den_i / den_f
 
     k_eV_safe = k_eV
     if k_eV_safe < F32_1E_M30:
         k_eV_safe = F32_1E_M30
 
-    return (
-        F32_16_OVER_3
-        * F32_ALPHA
-        * F32_R_E_CM2
-        * Z
-        * Z
-        / k_eV_safe
-        / (p_i * p_i)
-        * born_log
-        * elwert
-    )
+    return incident_prefactor * born_log / (k_eV_safe * beta_f * den_f)
 
 
 @jit.rawkernel(device=True)
 def _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
+    # Dominant single-slab case: avoid the tiny layer loop and its index math.
+    if n_layers == U32_ONE:
+        return path_flat[line] * mu_flat[k]
     tau = F32_ZERO
     layer = U32_ZERO
     while layer < n_layers:
@@ -93,7 +91,7 @@ def _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
 
 
 @jit.rawkernel()
-def _kernel_1e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg, n_E, n_layers):
+def _kernel_1e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
     k0 = jit.blockIdx.x
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
@@ -103,13 +101,12 @@ def _kernel_1e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
     line = tid
     while line < n_seg:
         Ti = T[line]
-        p_i = xp.sqrt(Ti * (Ti + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
-        beta_i = p_i / (F32_ONE + Ti / F32_MC2_KEV)
-        path_weight = density_cm3 * L_ang[line] * F32_1E_M8
+        p_i = p_i_arr[line]
+        pref_i = incident_prefactor[line]
 
         tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        ds0 = _dsigma_scalar(Ti, E0, Z, p_i, beta_i)
-        acc0 += path_weight * ds0 * xp.exp(-tau0)
+        ds0 = _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i)
+        acc0 += ds0 * xp.exp(-tau0)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -126,7 +123,7 @@ def _kernel_1e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
 
 
 @jit.rawkernel()
-def _kernel_2e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg, n_E, n_layers):
+def _kernel_2e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
     base = jit.blockIdx.x * U32_TWO
     k0 = base
     k1 = base + U32_ONE
@@ -143,15 +140,14 @@ def _kernel_2e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
     line = tid
     while line < n_seg:
         Ti = T[line]
-        p_i = xp.sqrt(Ti * (Ti + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
-        beta_i = p_i / (F32_ONE + Ti / F32_MC2_KEV)
-        path_weight = density_cm3 * L_ang[line] * F32_1E_M8
+        p_i = p_i_arr[line]
+        pref_i = incident_prefactor[line]
 
         tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += path_weight * _dsigma_scalar(Ti, E0, Z, p_i, beta_i) * xp.exp(-tau0)
+        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * xp.exp(-tau0)
         if has1:
             tau1 = _tau_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += path_weight * _dsigma_scalar(Ti, E1, Z, p_i, beta_i) * xp.exp(-tau1)
+            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * xp.exp(-tau1)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -174,7 +170,7 @@ def _kernel_2e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
 
 
 @jit.rawkernel()
-def _kernel_3e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg, n_E, n_layers):
+def _kernel_3e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
     base = jit.blockIdx.x * U32_THREE
     k0 = base
     k1 = base + U32_ONE
@@ -197,18 +193,17 @@ def _kernel_3e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
     line = tid
     while line < n_seg:
         Ti = T[line]
-        p_i = xp.sqrt(Ti * (Ti + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
-        beta_i = p_i / (F32_ONE + Ti / F32_MC2_KEV)
-        path_weight = density_cm3 * L_ang[line] * F32_1E_M8
+        p_i = p_i_arr[line]
+        pref_i = incident_prefactor[line]
 
         tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += path_weight * _dsigma_scalar(Ti, E0, Z, p_i, beta_i) * xp.exp(-tau0)
+        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * xp.exp(-tau0)
         if has1:
             tau1 = _tau_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += path_weight * _dsigma_scalar(Ti, E1, Z, p_i, beta_i) * xp.exp(-tau1)
+            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * xp.exp(-tau1)
         if has2:
             tau2 = _tau_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
-            acc2 += path_weight * _dsigma_scalar(Ti, E2, Z, p_i, beta_i) * xp.exp(-tau2)
+            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * xp.exp(-tau2)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -236,7 +231,7 @@ def _kernel_3e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
 
 
 @jit.rawkernel()
-def _kernel_4e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg, n_E, n_layers):
+def _kernel_4e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
     base = jit.blockIdx.x * U32_FOUR
     k0 = base
     k1 = base + U32_ONE
@@ -265,21 +260,20 @@ def _kernel_4e(T, L_ang, path_flat, mu_flat, E_grid, spec, Z, density_cm3, n_seg
     line = tid
     while line < n_seg:
         Ti = T[line]
-        p_i = xp.sqrt(Ti * (Ti + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
-        beta_i = p_i / (F32_ONE + Ti / F32_MC2_KEV)
-        path_weight = density_cm3 * L_ang[line] * F32_1E_M8
+        p_i = p_i_arr[line]
+        pref_i = incident_prefactor[line]
 
         tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += path_weight * _dsigma_scalar(Ti, E0, Z, p_i, beta_i) * xp.exp(-tau0)
+        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * xp.exp(-tau0)
         if has1:
             tau1 = _tau_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += path_weight * _dsigma_scalar(Ti, E1, Z, p_i, beta_i) * xp.exp(-tau1)
+            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * xp.exp(-tau1)
         if has2:
             tau2 = _tau_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
-            acc2 += path_weight * _dsigma_scalar(Ti, E2, Z, p_i, beta_i) * xp.exp(-tau2)
+            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * xp.exp(-tau2)
         if has3:
             tau3 = _tau_scalar(path_flat, mu_flat, line, k3, n_layers, n_E)
-            acc3 += path_weight * _dsigma_scalar(Ti, E3, Z, p_i, beta_i) * xp.exp(-tau3)
+            acc3 += _dsigma_weighted_scalar(Ti, E3, Z, p_i, pref_i) * xp.exp(-tau3)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -324,10 +318,17 @@ def run_brem_reduction_kernel(
     Z,
     density_cm3,
     n_layers,
+    p_i=None,
+    incident_prefactor=None,
     out=None,
     config=DEFAULT_BREM_KERNEL_CONFIG,
 ):
     """Accumulate one composition element's brem contribution into ``out``.
+
+    The historical call API is retained. ``p_i`` and ``incident_prefactor`` may
+    be supplied by the caller to share the incident-state work across composition
+    elements; otherwise they are computed once here, still hoisting that work out
+    of the photon-energy block loop.
 
     All array arguments must be contiguous float32 CuPy arrays. ``path_flat`` is
     C-order ``(n_seg, n_layers)`` and ``mu_flat`` is C-order
@@ -349,6 +350,29 @@ def run_brem_reduction_kernel(
     if n_E == 0 or T_keV.size == 0:
         return out
 
+    Z32 = np.float32(Z)
+    if p_i is None:
+        p_i = xp.sqrt(T_keV * (T_keV + F32_TWO * F32_MC2_KEV)) / F32_MC2_KEV
+        p_i = xp.ascontiguousarray(p_i, dtype=xp.float32)
+    if incident_prefactor is None:
+        beta_i = p_i / (F32_ONE + T_keV / F32_MC2_KEV)
+        zi = Z32 * F32_TWO_PI_ALPHA
+        den_i = F32_ONE - xp.exp(-zi / beta_i)
+        incident_prefactor = (
+            np.float32(density_cm3)
+            * L_ang
+            * F32_1E_M8
+            * F32_16_OVER_3
+            * F32_ALPHA
+            * F32_R_E_CM2
+            * Z32
+            * Z32
+            * beta_i
+            * den_i
+            / (p_i * p_i)
+        )
+        incident_prefactor = xp.ascontiguousarray(incident_prefactor, dtype=xp.float32)
+
     nblocks = (n_E + epb - 1) // epb
     shared_bytes = epb * nthreads * np.dtype(np.float32).itemsize
     kernel(
@@ -356,13 +380,13 @@ def run_brem_reduction_kernel(
         (nthreads,),
         (
             T_keV,
-            L_ang,
+            p_i,
+            incident_prefactor,
             path_flat,
             mu_flat,
             E_grid,
             out,
-            np.float32(Z),
-            np.float32(density_cm3),
+            Z32,
             np.uint32(T_keV.size),
             np.uint32(n_E),
             np.uint32(n_layers),
