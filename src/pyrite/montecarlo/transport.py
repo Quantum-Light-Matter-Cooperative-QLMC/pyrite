@@ -1135,6 +1135,7 @@ def _transport_core_ungrooved_lut(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
     z_total,
     finite_footprint,
     width_ang,
@@ -1163,8 +1164,15 @@ def _transport_core_ungrooved_lut(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
 ):
-    """Ungrooved lockstep CPU core using pretabulated energy-dependent physics."""
+    """Ungrooved lockstep CPU core using pretabulated energy-dependent physics.
+
+    ``energy_model_code`` matches the exact core: 0 for the frozen
+    left-endpoint rule, 1 for the midpoint predictor-corrector rule, which also
+    records ``seg_E_end``/``seg_t_end`` per flight.
+    """
     EPS = 1e-6
     nseg = 0
     n_back = 0
@@ -1242,7 +1250,22 @@ def _transport_core_ungrooved_lut(
             dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
             inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
             cutoff_j = False
-            cutoff_distance = (E_cut_e - E_j) / dEds
+            if energy_model_code == 1:
+                # The midpoint rule makes E_end = E_cut at the cutoff by
+                # definition, so the truncation distance solves the scheme at
+                # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
+                # linearization -- same construction as the exact core.
+                cut_i, cut_f = _lut_index_frac_scalar(
+                    0.5 * (E_j + E_cut_e),
+                    lut_E_min_keV,
+                    lut_inv_dE_keV,
+                    lut_n_energy,
+                )
+                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(
+                    lut_dEds, L, cut_i, cut_f
+                )
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
             if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
                 step_j = cutoff_distance
@@ -1252,6 +1275,33 @@ def _transport_core_ungrooved_lut(
                 exit_top_j = False
                 exit_bot_j = False
                 exit_side_j = False
+
+            if energy_model_code == 1:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    # Predictor-corrector for the implicit midpoint rule
+                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                    E_pred = E_j + dEds * step_j
+                    mid_i, mid_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_pred),
+                        lut_E_min_keV,
+                        lut_inv_dE_keV,
+                        lut_n_energy,
+                    )
+                    E_end_j = E_j + step_j * _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
+                # The clock uses the same representative energy: the midpoint
+                # rule for int ds / beta(E(s)) is s / beta(E_mid).
+                clk_i, clk_f = _lut_index_frac_scalar(
+                    0.5 * (E_j + E_end_j),
+                    lut_E_min_keV,
+                    lut_inv_dE_keV,
+                    lut_n_energy,
+                )
+                t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+            else:
+                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                t_end_j = clock[e] + step_j * inv_beta_j
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -1264,14 +1314,17 @@ def _transport_core_ungrooved_lut(
             seg_t0[nseg] = clock[e]
             seg_id[nseg] = e
             seg_lay[nseg] = L
+            if energy_model_code == 1:
+                seg_E_end[nseg] = E_end_j
+                seg_t_end[nseg] = t_end_j
             nseg += 1
 
             # 4. Advance position, energy, and transport clock.
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
-            clock[e] += step_j * inv_beta_j
+            E_keV[e] = E_end_j
+            clock[e] = t_end_j
 
             # 5. Exit, internal-boundary, or collision handling.
             died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
@@ -3620,6 +3673,7 @@ def simulate_trajectories(
             n_layers,
             internal_bounds,
             elastic_model_code,
+            energy_model_code,
             z_total,
             finite_footprint,
             0.0 if width_ang is None else float(width_ang),
@@ -3648,6 +3702,8 @@ def simulate_trajectories(
             seg_t0,
             seg_id,
             seg_lay,
+            seg_E_end,
+            seg_t_end,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)

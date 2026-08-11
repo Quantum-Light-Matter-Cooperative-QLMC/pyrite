@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
 
 CARBON = [("C", 0.1136)]
 _Z = 6.0
@@ -41,6 +41,11 @@ def _single_flight(thickness_ang, energy_model="midpoint", E0_keV=25.0):
     The free path is sampled before any truncation and depends only on the start
     energy and the seed, so all thicknesses below it yield exactly one row of
     length ``thickness_ang``.
+
+    The energy LUT is disabled so the core integrates the same analytic
+    Joy--Luo derivative as the RK4 reference: these tests pin the scheme's own
+    truncation error, not the LUT interpolation error, which is a separate
+    discretization shared by both energy models and covered by the LUT tests.
     """
     result = simulate_trajectories(
         E0_keV=E0_keV,
@@ -52,6 +57,7 @@ def _single_flight(thickness_ang, energy_model="midpoint", E0_keV=25.0):
         max_steps=200,
         transport_core="lockstep",
         energy_model=energy_model,
+        transport_lut_config=TransportLUTConfig(enabled=False),
     )
     assert result["L_ang"].size == 1
     assert result["L_ang"][0] == pytest.approx(thickness_ang)
