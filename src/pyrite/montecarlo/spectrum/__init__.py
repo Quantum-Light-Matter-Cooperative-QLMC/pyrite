@@ -15,6 +15,12 @@ from .brem import (
     load_external_brem,
     mc_brem_spectrum,
 )
+from .diagnostics import (
+    DEFAULT_BREM_QUADRATURE_WARN,
+    DEFAULT_RESONANCE_DRIFT_WARN,
+    brem_endpoint_quadrature_error,
+    cxr_endpoint_resonance_drift,
+)
 from .lines import (
     REAL,
     _INTERP_GATHER_LINE_TABLES_F32,
@@ -52,7 +58,14 @@ from .lines import (
 
 # Preserve the pre-split owner reported by introspection and frozen export
 # guards. The package path itself is unchanged; only implementation files move.
-for _function in (load_external_brem, mc_brem_spectrum, mc_spectrum, mc_spectrum_solid_angle):
+for _function in (
+    brem_endpoint_quadrature_error,
+    cxr_endpoint_resonance_drift,
+    load_external_brem,
+    mc_brem_spectrum,
+    mc_spectrum,
+    mc_spectrum_solid_angle,
+):
     _function.__module__ = __name__
 
 del _function
