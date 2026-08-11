@@ -6,18 +6,18 @@ Compact generated view of the [detailed validation ledger]
 (physics-validation-ledger.md). Regenerate with
 `pyrite-dev validation-ledger --write` after editing detailed records.
 
-**Publication gate:** 0 / 100 claims signed off.
+**Publication gate:** 0 / 101 claims signed off.
 
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 6 |
-| `rederived` | 21 |
+| `rederived` | 22 |
 | `filtered` | 8 |
 | `unverified` | 60 |
 | `blocked` | 1 |
 | `discrepancy` | 4 |
-| **Total** | **100** |
+| **Total** | **101** |
 
 Status meanings and promotion rules are defined in the
 [validation methodology](methodology.md).

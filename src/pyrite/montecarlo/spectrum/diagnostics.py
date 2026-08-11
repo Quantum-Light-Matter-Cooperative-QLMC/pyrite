@@ -83,10 +83,12 @@ def _flight_E_end_keV(segments, composition, layers):
         )
     E_start = _host(segments["E_keV"]).astype(float, copy=False)
     length = _host(segments["L_ang"]).astype(float, copy=False)
+    if layers is None:
+        # One composition applies to every row, whatever the layer field says.
+        return E_start + _stopping_keV_per_ang(E_start, composition) * length
     layer_index = _host(segments["layer"]).astype(np.int64, copy=False)
-    compositions = [composition] if layers is None else [item[2] for item in layers]
     E_end = np.empty_like(E_start)
-    for index, comp in enumerate(compositions):
+    for index, comp in enumerate([item[2] for item in layers]):
         mask = layer_index == index
         E_end[mask] = E_start[mask] + _stopping_keV_per_ang(E_start[mask], comp) * length[mask]
     return E_end

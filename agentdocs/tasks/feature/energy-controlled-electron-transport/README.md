@@ -61,7 +61,7 @@ Numerical substeps are integration detail:
 - [x] C -- Implement `E_start`/`E_end` plus midpoint predictor-corrector stopping
       and midpoint/integrated clock while retaining one radiation object per
       physical flight.
-- [ ] D -- Add the CXR endpoint resonance-drift and bremsstrahlung quadrature
+- [x] D -- Add the CXR endpoint resonance-drift and bremsstrahlung quadrature
       estimators; select warning thresholds from observed convergence rather
       than treating 0.05/1% suggestions as universal constants.
 - [ ] E -- Establish 2%, 1%, and 0.5% fractional-loss convergence matrices over
@@ -208,6 +208,33 @@ F), radiation kernels still read the start energy (steps D and G), and the
 flight decomposition is untouched, so one radiating row per physical flight
 still holds. Only the ungrooved lockstep core carries the propagator; grooved,
 per-electron, and CUDA midpoint requests raise (step H).
+
+## D -- radiation error estimators
+
+`montecarlo/spectrum/diagnostics.py` adds two host-side, opt-in, read-only
+estimators exported through `pyrite.montecarlo.spectrum`:
+`cxr_endpoint_resonance_drift` (per-flight sweep of the kernel's own resonance
+condition between endpoint speeds, in units of the flight's sinc linewidth,
+worst over the caller's reflection set) and `brem_endpoint_quadrature_error`
+(per-flight grid-integrated and worst-bin relative difference between the
+kernel's left-endpoint evaluation and a midpoint one). Both read the
+transported `E_end_keV` under `energy_model="midpoint"` and otherwise predict
+the end state with the same left-endpoint Joy--Luo rule as the slice-B
+transport diagnostics, so they apply to frozen runs unchanged. No default call
+path computes them; kernel migration to a representative energy stays with
+step G.
+
+Warning thresholds are calibrated, not assumed:
+`checks/radiation_error_estimator_calibration.py` measures both estimators
+against the ACTUAL spectral change from midpoint evaluation on identical
+segments over a C/W x thin/thick x 25/100 keV matrix. Drift p99 of 2.0--2.6
+linewidths corresponded to 4--10% line-region L1 changes, so the default warns
+at p99 = 1.0 linewidths; measured brem L1 ran at ~0.4x the p99 estimate, so
+the default warns at p99 = 1e-2 (~0.4% continuum change, above every measured
+case). The review's 0.05/1% figures match the measured TYPICAL errors, not
+useful warning levels. Full table and derivation:
+`docs/validation/beam-transport/radiation-error-estimators.md`;
+`Validation: radiation-error-estimators`.
 
 ## Delegation slices and required skills
 
