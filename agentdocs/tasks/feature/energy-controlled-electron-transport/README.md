@@ -162,6 +162,29 @@ Numerical substeps are integration detail:
   physical-flight-incoherent reduction on the same rows converges roughly 3x
   better and monotonically. This is evidence for slice G's grouping, but the
   conditioning of the global sum itself needs its own decision.
+- **Decided (E):** the CSDA clock the whole slice converges to is a
+  **mean-value construct**, and the tolerance bounds numerical error against it,
+  not physical phase fidelity. Fresh-context literature review (2026-08-11)
+  confirms the microphysics is discrete stochastic loss at constant velocity
+  between events, and that the "many inelastic events per flight" justification
+  fails here -- inelastic and elastic mean free paths are comparable (about 1.0
+  inelastic event per flight in C at 25 keV, 0.11 in W). Smooth in-flight
+  deceleration is a modeling choice, not a limit theorem. It is nonetheless the
+  right choice: the review independently reproduces the slice-E result that
+  freezing `beta` costs hundreds to thousands of radians per micron
+  (365 rad/um at 25 keV in C, matching the measured 11--1300 rad over
+  0.2--2.6 um trajectories).
+- **Decided (E):** the 0.1 rad tolerance stands because the frozen rule's error
+  is **systematic** (one-signed, accumulates coherently across the ensemble)
+  whereas unmodeled straggling jitter is **random** (suppresses the line via
+  `exp(-sigma_phi^2/2)` rather than displacing it). The two are not
+  commensurate and must not be compared as if they were.
+- **Open (raised by E):** energy-loss **straggling is unmodeled**, and by
+  Jensen's inequality it biases the *mean* arrival time, not just its variance
+  (~0.3 rad at 25 keV over 1 um at 1 keV) -- above the 0.1 rad numerical
+  tolerance. Numerical precision has outrun the transport model there. Out of
+  scope for F--H; needs its own task if coherent absolute phase is ever claimed
+  to that accuracy.
 - **Open:** integrated optical-depth inversion versus bounded piecewise-constant
   hazard. Choose from correctness, convergence, Numba/CUDA feasibility, and
   measured cost.
@@ -314,9 +337,9 @@ about 3x worse and non-monotone. Row counts across the ladder are 409, 409, 421,
 **Part D -- row-splitting floor vs take-off geometry.** At frozen energy AND
 clock, subdividing a flight is an exact algebraic identity for the coherent sum
 (Dirichlet-kernel composition), so any residual is the kernel's own per-row
-approximation. At the default 119 degree take-off it is 6.8e-3--1.0e-2 grid L1.
-At the near-grazing `n_hat = (1, 0, 0.01)` of
-`tests/montecarlo/test_coherent_emission.py` it is 1.7e-1--3.5e-1, because the
+approximation. At the default 119 degree take-off it is 2.41e-3 (f=1%) to
+8.94e-3 (f=0.125%) grid L1. At the near-grazing `n_hat = (1, 0, 0.01)` of
+`tests/montecarlo/test_coherent_emission.py` it is 8.71e-2 to 3.38e-1, because the
 Beer--Lambert escape path is the depth divided by `n_z` and so swings ~2x within
 a single flight. This is a per-row escape-factor quadrature defect, independent
 of `energy_model` and of the slice-E step control, and it bounds what any

@@ -490,6 +490,14 @@ def _fmt_pm(pair, scale=1.0, digits=4):
     return f"{value * scale:.{digits}f}+-{error * scale:.{digits}f}"
 
 
+def _row(cols, widths):
+    """Fixed-width row; downstream markdown injection slices by these widths."""
+    for key, w in widths:
+        if len(str(cols[key])) > w:
+            raise ValueError(f"cell {key}={cols[key]!r} overflows width {w}")
+    return " ".join(f"{cols[key]:>{w}}" for key, w in widths)
+
+
 def part_a(Ne):
     print("=" * 118)
     print(f"Part A -- transport observables, frozen vs midpoint (Ne={Ne}, seed={SEED})")
@@ -527,9 +535,9 @@ def part_a(Ne):
                 "loss p99": f"{diag['fractional_energy_loss']['p99']:.2e}",
                 "clk p99": f"{diag['relative_clock_error_estimate']['p99']:.2e}",
             }
-            print(" ".join(f"{cols[key]:>{w}}" for key, w in _A_WIDTHS))
+            print(_row(cols, _A_WIDTHS))
 
-        shift = {"case": "", "model": "shift/sigma"}
+        shift = {"case": "", "model": "shift/sig"}
         for key in ("trans", "back", "side", "stop", "path", "E_ret", "clock"):
             (value_f, err_f), (value_m, err_m) = summaries["frozen"][key], summaries["midpoint"][key]
             sigma = np.hypot(err_f, err_m)
@@ -537,7 +545,7 @@ def part_a(Ne):
             shift["path/e" if key == "path" else key] = text
         shift["loss p99"] = ""
         shift["clk p99"] = ""
-        print(" ".join(f"{shift[key]:>{w}}" for key, w in _A_WIDTHS))
+        print(_row(shift, _A_WIDTHS))
 
 
 def part_b(Ne):
@@ -605,7 +613,7 @@ def part_b(Ne):
                     cols[f"{tag} max"] = f"{_rel_max_bin(got[key], reference[key]):.2e}"
                 else:
                     cols[f"{tag} L1"] = cols[f"{tag} max"] = "--"
-            print(" ".join(f"{cols[key]:>{w}}" for key, w in _B_WIDTHS))
+            print(_row(cols, _B_WIDTHS))
             if capped:
                 print(f"  ! rung capped {capped} flight(s) at {_MAX_SUBSTEPS} substeps")
 
@@ -619,7 +627,7 @@ def part_b(Ne):
                 floor[f"{tag} max"] = f"{_rel_max_bin(split[key], base[key]):.2e}"
             else:
                 floor[f"{tag} L1"] = floor[f"{tag} max"] = "--"
-        print(" ".join(f"{floor[key]:>{w}}" for key, w in _B_WIDTHS))
+        print(_row(floor, _B_WIDTHS))
 
 def part_b_phase(Ne):
     """The emission-phase criterion, which the fractional-loss ladder is not.
@@ -683,7 +691,7 @@ def part_b_phase(Ne):
                     "cum dphi p99": f"{omega * np.percentile(cumulative, 99):.2e}",
                     "cum dphi max": f"{omega * cumulative.max():.2e}",
                 }
-                print(" ".join(f"{cols[key]:>{w}}" for key, w in _P_WIDTHS))
+                print(_row(cols, _P_WIDTHS))
                 first = False
 
 
@@ -732,7 +740,7 @@ def part_c(Ne):
             "cxrC L1": f"{_rel_l1(globally, global_reference):.2e}",
             "cxrC max": f"{_rel_max_bin(globally, global_reference):.2e}",
         }
-        print(" ".join(f"{cols[key]:>{w}}" for key, w in _C_WIDTHS))
+        print(_row(cols, _C_WIDTHS))
 
 
 def part_d(Ne):

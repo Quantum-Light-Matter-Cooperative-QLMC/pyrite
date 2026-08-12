@@ -127,6 +127,62 @@ the `floor` rows report.
 - All CXR numbers use the kernel's default 119 degree take-off. Near-grazing
   geometries are dominated by a different, unrelated defect; see Part D.
 
+### The clock this row converges is CSDA's clock, not the electron's
+
+Everything below measures convergence to the continuous-slowing-down clock
+`t = integral ds / beta(s)`. That clock is a **mean-value construct**, and the
+tolerance set here bounds numerical error against it, not physical phase
+fidelity. Three consequences, none of which the measured numbers address:
+
+- **The microphysics is discrete.** Electrons lose energy in stochastic events
+  -- plasmons (most probable loss 25--33 eV in graphite), shell ionization,
+  Moller delta rays with a `1/T^2` tail -- and travel at constant velocity
+  between them. CSDA is Berger's condensed-history average over that process.
+  The usual "many inelastic events per flight" defense does **not** apply at
+  these energies: the inelastic and elastic mean free paths are comparable, so
+  a flight contains of order one inelastic event in carbon (about 1.0 at
+  25 keV) and fewer than one in tungsten (about 0.11 at 25 keV). The smooth
+  velocity profile *within* a flight is a modeling choice, not a limit theorem.
+- **Straggling phase jitter is unmodeled.** Fluctuation about the mean loss
+  (Landau/Vavilov; `kappa` = 0.015 for carbon at 25 keV over 1 um, so strongly
+  skewed and not Gaussian) is genuine arrival-time randomness that CSDA
+  discards by construction. Order 300 eV of loss spread over 1 um at 25 keV in
+  graphite is ~60 as of timing jitter against a 4.1 as period at 1 keV. The
+  transport samples discrete elastic scattering, so angular decoherence is
+  captured; energy-loss decoherence is not. The omission enters the coherent
+  yield as a Debye--Waller factor `exp(-sigma_phi^2 / 2)` and is estimated at
+  1e-3--1e-5 of the multiple-scattering term in the exponent, which is why it
+  is tolerable -- but it is an omission, not a converged quantity.
+- **Why a 0.1 rad tolerance is still the right target.** The frozen rule's
+  error is **systematic**: it evaluates `beta` at the flight's start, always
+  overestimates speed, and the timing error is one-signed and accumulates
+  coherently across every electron in the ensemble. Straggling jitter is
+  **random** and suppresses the line rather than displacing it. A tight bound
+  on a systematic bias is therefore meaningful even where the unmodeled random
+  jitter is larger, and the two must not be compared as if commensurate.
+
+One known gap sits above the tolerance. By Jensen's inequality
+`<1/beta(E)> != 1/beta(<E>)` (curvature
+`d^2(1/beta)/dE^2 = 3 gamma / ((beta gamma)^5 (mc^2)^2)`), so straggling biases
+the mean arrival time, not just its variance. The estimate is ~0.3 rad at
+25 keV over 1 um at 1 keV photon energy -- larger than the 0.1 rad numerical
+tolerance. Numerical precision has outrun the transport model there. Closing it
+requires sampling energy-loss straggling, which is outside this row and outside
+slices F--H.
+
+Phase sensitivity to any energy error carries a `(beta gamma)^-3` prefactor,
+
+```
+delta_phi = omega delta_t = (omega/c) integral delta(1/beta) ds,
+delta(1/beta) = delta_E / ((beta gamma)^3 m c^2),
+```
+
+with `(beta gamma)^3 m c^2` = 16.2 keV at 25 keV and 144 keV at 100 keV, rising
+to GeV scale at the tens-of-MeV energies of the PXR literature. That is why the
+published coherent-radiation literature does not treat energy-loss straggling
+as a decoherence channel, and why it is nearly -- but not quite -- a live
+concern here.
+
 ## Limiting cases
 
 - **Lossless flight.** Every ladder entry and every phase error is identically
@@ -155,8 +211,8 @@ the `floor` rows report.
   A flight must not cross the surface for this to hold: a flight whose depth
   goes negative sees a discontinuity, not a quadrature error.
 
-  On the real case matrix the same term measures 6.8e-3--1.0e-2 grid L1 at the
-  default take-off. It is a genuine correction that refinement makes, not an
+  On the real case matrix the same term measures 6.26e-3--9.27e-3 grid L1 at
+  the default take-off. It is a genuine correction that refinement makes, not an
   artifact, but it is not an energy-step effect, so an energy-step claim in the
   same column must exceed it. That is what the `floor` rows report.
 - **Small step.** Bremsstrahlung, a plain left-endpoint rectangle rule per row,
@@ -170,49 +226,49 @@ binomial errors, means carry sample standard errors; `shift` is
 `(frozen - midpoint)` in units of the combined error.
 
 | case | model | trans | back | side | stop | path/e | E_ret | clock | loss p99 | clk p99 |
-|:---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+|---|---|---|---|---|---|---|---|---|---|---|
 | C    5 keV thin | frozen | 0.9245+-0.0042 | 0.0462+-0.0033 | 0.0000+-0.0000 | 0.0293+-0.0027 | 1291 | 3.882 | 1.002e+04 | 6.20e-02 | 1.55e-02 |
 | &nbsp; | midpoint | 0.9267+-0.0041 | 0.0390+-0.0031 | 0.0000+-0.0000 | 0.0343+-0.0029 | 1295 | 3.864 | 1.013e+04 | 6.31e-02 | 1.58e-02 |
-| &nbsp; | shift/sig | a             -0 | 4             +1 | 6 | -             -1 | 3         -0 | 3       +1 | 2         -0 | 9 | &nbsp; |
+| &nbsp; | shift/sig | -0.4 | +1.6 | -- | -1.3 | -0.3 | +1.2 | -0.9 | &nbsp; | &nbsp; |
 | C    5 keV thick | frozen | 0.0000+-0.0000 | 0.0595+-0.0037 | 0.0000+-0.0000 | 0.9405+-0.0037 | 3460 | 1.113 | 3.171e+04 | 9.89e-02 | 2.49e-02 |
 | &nbsp; | midpoint | 0.0000+-0.0000 | 0.0530+-0.0035 | 0.0000+-0.0000 | 0.9470+-0.0035 | 3424 | 1.104 | 3.165e+04 | 9.89e-02 | 2.49e-02 |
-| &nbsp; | shift/sig | a | -             +1 | 3 | -             -1 | 3         +4 | 3       +0 | 8         +0 | 7 | &nbsp; |
+| &nbsp; | shift/sig | -- | +1.3 | -- | -1.3 | +4.3 | +0.8 | +0.7 | &nbsp; | &nbsp; |
 | C   25 keV thin | frozen | 0.9980+-0.0007 | 0.0020+-0.0007 | 0.0000+-0.0000 | 0.0000+-0.0000 | 2050 | 24.57 | 6814 | 1.13e-02 | 2.63e-03 |
 | &nbsp; | midpoint | 0.9980+-0.0007 | 0.0020+-0.0007 | 0.0000+-0.0000 | 0.0000+-0.0000 | 2050 | 24.56 | 6822 | 1.13e-02 | 2.63e-03 |
-| &nbsp; | shift/sig | a             +0 | 0             +0 | 0 | - | -         +0 | 0       +0 | 4         -0 | 2 | &nbsp; |
+| &nbsp; | shift/sig | +0.0 | +0.0 | -- | -- | +0.0 | +0.4 | -0.2 | &nbsp; | &nbsp; |
 | C   25 keV thick | frozen | 0.9065+-0.0046 | 0.0475+-0.0034 | 0.0000+-0.0000 | 0.0460+-0.0033 | 2.671e+04 | 18.24 | 9.754e+04 | 3.00e-02 | 7.44e-03 |
 | &nbsp; | midpoint | 0.9050+-0.0046 | 0.0478+-0.0034 | 0.0000+-0.0000 | 0.0473+-0.0034 | 2.661e+04 | 18.26 | 9.726e+04 | 3.01e-02 | 7.43e-03 |
-| &nbsp; | shift/sig | a             +0 | 2             -0 | 1 | -             -0 | 3         +0 | 4       -0 | 1         +0 | 2 | &nbsp; |
+| &nbsp; | shift/sig | +0.2 | -0.1 | -- | -0.3 | +0.4 | -0.1 | +0.2 | &nbsp; | &nbsp; |
 | C  100 keV thin | frozen | 0.9980+-0.0007 | 0.0020+-0.0007 | 0.0000+-0.0000 | 0.0000+-0.0000 | 2.039e+04 | 98.67 | 3.727e+04 | 3.87e-03 | 7.40e-04 |
 | &nbsp; | midpoint | 0.9980+-0.0007 | 0.0020+-0.0007 | 0.0000+-0.0000 | 0.0000+-0.0000 | 2.039e+04 | 98.67 | 3.729e+04 | 3.87e-03 | 7.40e-04 |
-| &nbsp; | shift/sig | a             +0 | 0             +0 | 0 | - | -         -0 | 0       +0 | 2         -0 | 1 | &nbsp; |
+| &nbsp; | shift/sig | +0.0 | +0.0 | -- | -- | -0.0 | +0.2 | -0.1 | &nbsp; | &nbsp; |
 | C  100 keV thick | frozen | 0.9435+-0.0037 | 0.0348+-0.0029 | 0.0000+-0.0000 | 0.0217+-0.0023 | 2.574e+05 | 80.7 | 4.987e+05 | 9.97e-03 | 2.38e-03 |
 | &nbsp; | midpoint | 0.9450+-0.0036 | 0.0348+-0.0029 | 0.0000+-0.0000 | 0.0203+-0.0022 | 2.572e+05 | 80.71 | 4.984e+05 | 9.45e-03 | 2.24e-03 |
-| &nbsp; | shift/sig | a             -0 | 3             +0 | 0 | -             +0 | 5         +0 | 1       -0 | 0         +0 | 0 | &nbsp; |
+| &nbsp; | shift/sig | -0.3 | +0.0 | -- | +0.5 | +0.1 | -0.0 | +0.0 | &nbsp; | &nbsp; |
 | C  300 keV thick | frozen | 0.9772+-0.0024 | 0.0208+-0.0023 | 0.0000+-0.0000 | 0.0020+-0.0007 | 1.192e+06 | 268.3 | 1.563e+06 | 1.93e-03 | 2.68e-04 |
 | &nbsp; | midpoint | 0.9758+-0.0024 | 0.0215+-0.0023 | 0.0000+-0.0000 | 0.0027+-0.0008 | 1.198e+06 | 268 | 1.573e+06 | 2.01e-03 | 2.89e-04 |
-| &nbsp; | shift/sig | a             +0 | 4             -0 | 2 | -             -0 | 7         -0 | 5       +0 | 6         -0 | 6 | &nbsp; |
+| &nbsp; | shift/sig | +0.4 | -0.2 | -- | -0.7 | -0.5 | +0.6 | -0.6 | &nbsp; | &nbsp; |
 | W    5 keV thin | frozen | 0.4363+-0.0078 | 0.4765+-0.0079 | 0.0000+-0.0000 | 0.0872+-0.0045 | 462.9 | 3.56 | 3808 | 3.62e-02 | 9.04e-03 |
 | &nbsp; | midpoint | 0.4185+-0.0078 | 0.4895+-0.0079 | 0.0000+-0.0000 | 0.0920+-0.0046 | 465.4 | 3.545 | 3848 | 3.67e-02 | 9.15e-03 |
-| &nbsp; | shift/sig | a             +1 | 6             -1 | 2 | -             -0 | 7         -0 | 4       +0 | 6         -0 | 6 | &nbsp; |
+| &nbsp; | shift/sig | +1.6 | -1.2 | -- | -0.7 | -0.4 | +0.6 | -0.6 | &nbsp; | &nbsp; |
 | W    5 keV thick | frozen | 0.0000+-0.0000 | 0.5125+-0.0079 | 0.0000+-0.0000 | 0.4875+-0.0079 | 743 | 2.45 | 6715 | 5.00e-02 | 1.25e-02 |
 | &nbsp; | midpoint | 0.0000+-0.0000 | 0.5018+-0.0079 | 0.0000+-0.0000 | 0.4983+-0.0079 | 746.8 | 2.423 | 6786 | 5.01e-02 | 1.25e-02 |
-| &nbsp; | shift/sig | a | -             +1 | 0 | -             -1 | 0         -0 | 4       +0 | 8         -0 | 8 | &nbsp; |
+| &nbsp; | shift/sig | -- | +1.0 | -- | -1.0 | -0.4 | +0.8 | -0.8 | &nbsp; | &nbsp; |
 | W   25 keV thin | frozen | 0.8482+-0.0057 | 0.1517+-0.0057 | 0.0000+-0.0000 | 0.0000+-0.0000 | 824.3 | 24.24 | 2759 | 3.68e-03 | 8.59e-04 |
 | &nbsp; | midpoint | 0.8492+-0.0057 | 0.1507+-0.0057 | 0.0000+-0.0000 | 0.0000+-0.0000 | 824.5 | 24.24 | 2761 | 3.68e-03 | 8.58e-04 |
-| &nbsp; | shift/sig | a             -0 | 1             +0 | 1 | - | -         -0 | 0       +0 | 1         -0 | 0 | &nbsp; |
+| &nbsp; | shift/sig | -0.1 | +0.1 | -- | -- | -0.0 | +0.1 | -0.0 | &nbsp; | &nbsp; |
 | W   25 keV thick | frozen | 0.0405+-0.0031 | 0.5683+-0.0078 | 0.0000+-0.0000 | 0.3912+-0.0077 | 9413 | 12.41 | 4.035e+04 | 2.33e-02 | 5.81e-03 |
 | &nbsp; | midpoint | 0.0445+-0.0033 | 0.5557+-0.0079 | 0.0000+-0.0000 | 0.3997+-0.0077 | 9481 | 12.26 | 4.076e+04 | 2.32e-02 | 5.79e-03 |
-| &nbsp; | shift/sig | a             -0 | 9             +1 | 1 | -             -0 | 8         -0 | 5       +0 | 7         -0 | 6 | &nbsp; |
+| &nbsp; | shift/sig | -0.9 | +1.1 | -- | -0.8 | -0.5 | +0.7 | -0.6 | &nbsp; | &nbsp; |
 | W  100 keV thin | frozen | 0.8217+-0.0061 | 0.1782+-0.0061 | 0.0000+-0.0000 | 0.0000+-0.0000 | 8936 | 97.19 | 1.643e+04 | 8.94e-04 | 1.71e-04 |
 | &nbsp; | midpoint | 0.8160+-0.0061 | 0.1840+-0.0061 | 0.0000+-0.0000 | 0.0000+-0.0000 | 8895 | 97.2 | 1.635e+04 | 8.94e-04 | 1.71e-04 |
-| &nbsp; | shift/sig | a             +0 | 7             -0 | 7 | - | -         +0 | 3       -0 | 3         +0 | 3 | &nbsp; |
+| &nbsp; | shift/sig | +0.7 | -0.7 | -- | -- | +0.3 | -0.3 | +0.3 | &nbsp; | &nbsp; |
 | W  100 keV thick | frozen | 0.0333+-0.0028 | 0.5982+-0.0078 | 0.0000+-0.0000 | 0.3685+-0.0076 | 9.743e+04 | 52.67 | 2.214e+05 | 9.63e-03 | 2.38e-03 |
 | &nbsp; | midpoint | 0.0355+-0.0029 | 0.6002+-0.0077 | 0.0000+-0.0000 | 0.3643+-0.0076 | 9.795e+04 | 52.53 | 2.223e+05 | 9.51e-03 | 2.35e-03 |
-| &nbsp; | shift/sig | a             -0 | 6             -0 | 2 | -             +0 | 4         -0 | 3       +0 | 2         -0 | 2 | &nbsp; |
+| &nbsp; | shift/sig | -0.6 | -0.2 | -- | +0.4 | -0.3 | +0.2 | -0.2 | &nbsp; | &nbsp; |
 | W  300 keV thick | frozen | 0.2200+-0.0065 | 0.6162+-0.0077 | 0.0000+-0.0000 | 0.1638+-0.0059 | 5.278e+05 | 206 | 7.592e+05 | 2.79e-03 | 6.69e-04 |
 | &nbsp; | midpoint | 0.2135+-0.0065 | 0.6230+-0.0077 | 0.0000+-0.0000 | 0.1635+-0.0058 | 5.31e+05 | 205.3 | 7.64e+05 | 2.77e-03 | 6.63e-04 |
-| &nbsp; | shift/sig | a             +0 | 7             -0 | 6 | -             +0 | 0         -0 | 3       +0 | 3         -0 | 3 | &nbsp; |
+| &nbsp; | shift/sig | +0.7 | -0.6 | -- | +0.0 | -0.3 | +0.3 | -0.3 | &nbsp; | &nbsp; |
 
 Every entry is within 1.6 sigma except the mean path length of `C 5 keV thick`,
 at +4.3 sigma (3460 versus 3424 Ang). Replicated at 2e4 Ang, where the target
