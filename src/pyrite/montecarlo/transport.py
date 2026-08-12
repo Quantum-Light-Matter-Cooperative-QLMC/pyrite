@@ -2218,6 +2218,122 @@ def pack_layer_tables(
     
     return packed_tables
 
+def _percentile_summary(values):
+    """Compact, JSON-safe summary of one non-negative per-flight diagnostic."""
+    if values.size == 0:
+        return {"p50": None, "p90": None, "p99": None, "max": None}
+    p50, p90, p99 = np.percentile(values, (50.0, 90.0, 99.0))
+    return {
+        "p50": float(p50),
+        "p90": float(p90),
+        "p99": float(p99),
+        "max": float(np.max(values)),
+    }
+
+
+def _flight_diagnostic_summary(
+    E_start_keV,
+    L_ang,
+    elec_id,
+    layer,
+    E_cut_by_electrons,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_ncm3,
+    elastic_model,
+):
+    """Estimate frozen-state transport error per physical flight, then reduce it.
+
+    The current segment is one physical flight. Diagnostics recompute its
+    left-endpoint stopping and elastic hazard at the stored start energy and at
+    the predicted end energy. They do not feed values back into propagation and
+    retain only fixed-size percentile summaries.
+    """
+
+    def _host(array):
+        get = getattr(array, "get", None)
+        return np.asarray(get() if get is not None else array)
+
+    E_start = _host(E_start_keV).astype(float, copy=False)
+    length = _host(L_ang).astype(float, copy=False)
+    electron = _host(elec_id).astype(np.int64, copy=False)
+    layer_index = _host(layer).astype(np.int64, copy=False)
+    n_flights = E_start.size
+
+    stopping = np.zeros(n_flights, dtype=float)
+    for L, (J_arr, k_arr, coeff_arr) in enumerate(zip(L_Js, L_ks, L_coeffs, strict=True)):
+        mask = layer_index == L
+        E = E_start[mask]
+        if E.size == 0:
+            continue
+        total = np.zeros(E.size, dtype=float)
+        for J, k, coeff in zip(J_arr, k_arr, coeff_arr, strict=True):
+            total += coeff * np.log(1.166 * (E + k * J) / J)
+        stopping[mask] = -7.85e-4 * total / E
+
+    E_end = E_start + stopping * length
+    hazard_start = np.zeros(n_flights, dtype=float)
+    hazard_end = np.zeros(n_flights, dtype=float)
+    for L, (Z_arr, ncm3_arr) in enumerate(zip(L_Zs, L_ncm3, strict=True)):
+        mask = layer_index == L
+        start = E_start[mask]
+        end = E_end[mask]
+        if start.size == 0:
+            continue
+        start_total = np.zeros(start.size, dtype=float)
+        end_total = np.zeros(end.size, dtype=float)
+        for Z, ncm3 in zip(Z_arr, ncm3_arr, strict=True):
+            if elastic_model == "mott":
+                start_total += _sigma_browning_cm2(Z, start) * ncm3
+                end_total += _sigma_browning_cm2(Z, end) * ncm3
+            else:
+                alpha_start = 3.4e-3 * Z**0.67 / start
+                alpha_end = 3.4e-3 * Z**0.67 / end
+                start_rel = (start + 511.0) / (start + 1024.0)
+                end_rel = (end + 511.0) / (end + 1024.0)
+                start_total += (
+                    ncm3
+                    * 5.21e-21
+                    * Z**2
+                    / start**2
+                    * 4.0
+                    * np.pi
+                    / (alpha_start * (1.0 + alpha_start))
+                    * start_rel**2
+                )
+                end_total += (
+                    ncm3
+                    * 5.21e-21
+                    * Z**2
+                    / end**2
+                    * 4.0
+                    * np.pi
+                    / (alpha_end * (1.0 + alpha_end))
+                    * end_rel**2
+                )
+        hazard_start[mask] = start_total
+        hazard_end[mask] = end_total
+
+    midpoint = 0.5 * (E_start + E_end)
+    left_clock = length / _beta_array(E_start)
+    midpoint_clock = length / _beta_array(midpoint)
+    fractional_loss = np.maximum(0.0, (E_start - E_end) / E_start)
+    relative_hazard_change = np.abs(hazard_end - hazard_start) / hazard_start
+    relative_clock_error = np.abs(midpoint_clock - left_clock) / midpoint_clock
+    cutoff = np.asarray(E_cut_by_electrons, dtype=float)[electron]
+    cutoff_overshoot = np.maximum(0.0, cutoff - E_end)
+
+    return {
+        "n_flights": int(n_flights),
+        "fractional_energy_loss": _percentile_summary(fractional_loss),
+        "relative_hazard_change": _percentile_summary(relative_hazard_change),
+        "relative_clock_error_estimate": _percentile_summary(relative_clock_error),
+        "cutoff_overshoot_keV": _percentile_summary(cutoff_overshoot),
+    }
+
+
 @dataclass(frozen=True)
 class PerElectronTransportConfig:
     """Host-side batching policy for the per-electron cores.
@@ -2786,6 +2902,7 @@ def simulate_trajectories(
     per_electron_config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_segments_on_device=False,
     transport_lut_config=DEFAULT_TRANSPORT_LUT_CONFIG,
+    collect_diagnostics=False,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -2970,6 +3087,14 @@ def simulate_trajectories(
     per_electron_config: batching policy for the two new cores
     (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
     only bound memory and replay behavior; neither changes results.
+
+    collect_diagnostics: opt in to fixed-size percentile summaries of the
+    per-flight fractional energy loss, relative elastic-hazard change,
+    left-endpoint versus midpoint clock estimate, and cutoff overshoot. The
+    diagnostic pass runs after transport, consumes no random draws, does not
+    alter propagation, and retains no per-flight arrays. A device-resident run
+    copies the four required segment arrays to the host only when explicitly
+    requested.
 
     keep_segments_on_device: return the eight per-segment arrays where the CUDA
     core produced them instead of copying them to the host. Requires
@@ -3669,7 +3794,7 @@ def simulate_trajectories(
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
     _nsys_pop()
 
-    return {
+    result = {
         # Initial sampled phase space is diagnostic-only.  Keep per-electron
         # arrays (including missed entries), separate from per-segment arrays,
         # so beam metrics describe the incident bunch rather than its transport.
@@ -3704,3 +3829,18 @@ def simulate_trajectories(
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
+    if collect_diagnostics:
+        result["transport_diagnostics"] = _flight_diagnostic_summary(
+            E_seg,
+            L_ang,
+            elec_id,
+            layer,
+            E_cut_by_electrons,
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_ncm3,
+            elastic_model,
+        )
+    return result

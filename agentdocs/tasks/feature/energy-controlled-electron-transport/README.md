@@ -53,26 +53,27 @@ Numerical substeps are integration detail:
 
 ## Checklist
 
-- [ ]  A -- Inventory every segment-schema consumer and write the migration
-  contract for `E_keV`, `t_ang`, identifiers, checkpoints, and device
-  staging.
-- [ ]  B -- Add per-flight diagnostics: fractional loss, hazard change, clock
-  estimate, cutoff overshoot, and percentile summaries.
-- [ ]  C -- Implement `E_start`/`E_end` plus midpoint predictor-corrector stopping
-  and midpoint/integrated clock while retaining one radiation object per
-  physical flight.
-- [ ]  D -- Add the CXR endpoint resonance-drift and bremsstrahlung quadrature
-  estimators; select warning thresholds from observed convergence rather
-  than treating 0.05/1% suggestions as universal constants.
-- [ ]  E -- Establish 2%, 1%, and 0.5% fractional-loss convergence matrices over
-  thin/thick, low/high-Z, and 1--300 keV cases.
-- [ ]  F -- Introduce physical-flight and numerical-substep identity and an
-  energy-controlled propagator with collision optical-depth handling.
-- [ ]  G -- Make CXR and bremsstrahlung invariant to numerical substep refinement at fixed physical flights.
-- [ ]  H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
-  CUDA paths without weakening deterministic/statistical parity contracts.
-- [ ]  I -- Update public docs, validation ledger, checkpoint/schema handling,
-  and golden data; run fresh-context physics validation.
+- [x] A -- Inventory every segment-schema consumer and write the migration
+      contract for `E_keV`, `t_ang`, identifiers, checkpoints, and device
+      staging.
+- [x] B -- Add per-flight diagnostics: fractional loss, hazard change, clock
+      estimate, cutoff overshoot, and percentile summaries.
+- [ ] C -- Implement `E_start`/`E_end` plus midpoint predictor-corrector stopping
+      and midpoint/integrated clock while retaining one radiation object per
+      physical flight.
+- [ ] D -- Add the CXR endpoint resonance-drift and bremsstrahlung quadrature
+      estimators; select warning thresholds from observed convergence rather
+      than treating 0.05/1% suggestions as universal constants.
+- [ ] E -- Establish 2%, 1%, and 0.5% fractional-loss convergence matrices over
+      thin/thick, low/high-Z, and 1--300 keV cases.
+- [ ] F -- Introduce physical-flight and numerical-substep identity and an
+      energy-controlled propagator with collision optical-depth handling.
+- [ ] G -- Make CXR and bremsstrahlung invariant to numerical substep refinement
+      at fixed physical flights.
+- [ ] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
+      CUDA paths without weakening deterministic/statistical parity contracts.
+- [ ] I -- Update public docs, validation ledger, checkpoint/schema handling,
+      and golden data; run fresh-context physics validation.
 
 ## Decisions and open questions
 
@@ -80,11 +81,94 @@ Numerical substeps are integration detail:
   independent radiation intensities, or artificial decoherence merely because a tolerance was tightened.
 - **Decided:** physical boundary/collision identity remains distinct from
   numerical integration identity.
-- **Open:** exact compatibility lifetime and meaning of `E_keV` during
-  migration (`E_start` alias versus representative/midpoint energy).
-- **Open:** integrated optical-depth inversion versus bounded piecewise-constant hazard. Choose from correctness, convergence, Numba/CUDA feasibility, and measured cost.
-- **Open:** storage shape: emit substeps in the existing segment arrays, retain a compact physical-flight table plus quadrature state, or reduce substeps before return.
-- **Open:** accepted convergence tolerances for transport metrics, spectra, and coherent complex fields. Establish empirically before dispatching later slices as `one-shot`.
+- **Decided:** emitted rows remain numerical integration rows in the existing
+  segment arrays. Later radiation code groups them by `(electron_id,
+  flight_id)` before applying physical-flight coherence/incoherence semantics;
+  checkpoints continue to receive reduced spectra rather than raw transport
+  rows. A compact second flight table would duplicate geometry/state and make
+  every current masking/staging consumer dual-schema.
+- **Decided:** `E_keV` remains an unscheduled public compatibility alias of
+  `E_start_keV`; it must never silently change to midpoint/representative
+  energy. New propagation adds `E_end_keV` and an explicit `E_repr_keV` for
+  radiation/quadrature. The line and brem kernels migrate to the explicit
+  representative field only when their substep-invariance behavior lands.
+- **Decided:** `t_ang` remains an unscheduled compatibility alias of
+  `t_start_ang` (relative age, c=1). New propagation adds integrated
+  `t_end_ang`; representative emission time is explicit rather than changing
+  `t_ang`. `t0_ang` remains the separate per-electron bunch offset.
+- **Decided:** `electron_id` is the canonical new spelling and `elec_id`
+  remains its compatibility alias. `flight_id` is zero-based and monotonic
+  within each electron, so the stable physical key is `(electron_id,
+  flight_id)` independent of batching/backend row order. `substep_id` is
+  zero-based within that flight. Collision, material/vacuum boundary, and
+  terminal events close a physical flight; a numerical energy-limit event does
+  not.
+- **Decided:** every per-row schema transform (layer filtering, population
+  cutoff clipping, device staging, and later flight grouping) uses one owning
+  field registry. New float fields stage with backend `REAL`; identifiers retain
+  integer dtype. Fixed-size diagnostics and per-electron arrays remain on host.
+  Until H ports the accepted propagator, energy-controlled CUDA mode must fail
+  closed rather than return a partial schema; legacy CUDA transport remains
+  available.
+- **Decided:** raw transport segments are not checkpoint payloads. Current
+  checkpoints/results store reduced spectra, counts, and case metadata; no
+  checkpoint migration is needed for A--H unless a later slice deliberately
+  persists diagnostics or raw flights. External direct callers of
+  `simulate_trajectories` receive the aliases above.
+- **Open:** integrated optical-depth inversion versus bounded piecewise-constant
+  hazard. Choose from correctness, convergence, Numba/CUDA feasibility, and
+  measured cost.
+- **Open:** accepted convergence tolerances for transport metrics, spectra, and
+  coherent complex fields. Establish empirically before dispatching later
+  slices as `one-shot`.
+
+## A -- segment-schema consumer inventory
+
+Evidence is against the post-PyRITE package layout at `398ad4b` plus this
+slice. `simulate_trajectories` is the sole producer. Its eight material-row
+arrays are `r_mid`, `v_hat`, `L_ang`, `E_keV`, `t_ang`, `t0_ang`, `elec_id`,
+and `layer`; groove `vacuum_*`, incident `initial_*`, geometry, and count fields
+are separate shapes/scalars.
+
+- `montecarlo/spectrum/lines.py`: `_SEG_ARRAYS` owns layer filtering, cutoff
+  clipping, and host/device staging. `mc_spectrum` consumes position,
+  direction, length, start energy, electron identity, and—for coherent mode—
+  start age plus bunch offset. `_segment_escape_distance` consumes geometry.
+- `montecarlo/spectrum/brem.py`: consumes electron identity, midpoint, length,
+  and start energy after shared cutoff clipping; layer splitting is driven by
+  the runner. It currently treats every row as an independent path integral.
+- `montecarlo/runner/__init__.py`: `_transport_case`, `_brem_for_case`, and
+  `_transport_lines_for_case` produce/mask shared populations; line and brem
+  helpers filter by layer, stage one device copy, and reduce `L_ang.size` to
+  `n_segments`. Transport-pool segment pickling is transient IPC, not durable
+  checkpoint storage.
+- `campaign/config.py`: `gate_cases_by_penetration` calls transport and consumes
+  only exit/penetration summaries, not row energy/time semantics.
+- `plots/mpl/trajectories.py`: direct producer call; reconstructs endpoints,
+  orders tracks by `(elec_id, t_ang)`, colors by `E_keV`, and exports the row
+  payload to Altair/Plotly-ready trajectory data. Altair and Plotly consumers
+  then use the normalized `E`, time, geometry, and electron-id columns rather
+  than the raw transport mapping.
+- `apps/trace_app.py`: consumes normalized trajectory and incident phase-space
+  data from the matplotlib owner. `apps/anchor_figures.py` calls transport
+  directly and passes rows to line/brem kernels or reads exit counts.
+- `results/` and `checkpoints/`: no raw segment consumer or serializer found.
+  `results/store.py` stores reduced line/coherent/brem arrays and metadata.
+- Tests and fixtures under `tests/helpers/segments.py`, `tests/montecarlo/`,
+  `tests/plots/`, and `tests/notebooks/` construct or assert the current mapping;
+  schema/staging/coherence/cutoff tests must migrate with their owning paths.
+
+## B -- bounded transport diagnostics
+
+`simulate_trajectories(..., collect_diagnostics=True)` performs a deterministic
+post-transport pass over each current physical-flight row. It predicts end
+energy using the same left-endpoint stopping law, compares start/end elastic
+hazard, compares left-endpoint and midpoint `L/beta` clocks, and measures
+positive cutoff undershoot as overshoot. It returns only p50/p90/p99/max plus
+`n_flights` under `transport_diagnostics`; empty summaries use `None`. Default
+calls add no key or pass. No RNG draws, propagation state, spectra, or resident
+device payload change; an explicit diagnostic request is the only path that
+downloads resident segment fields.
 
 ## Delegation slices and required skills
 
