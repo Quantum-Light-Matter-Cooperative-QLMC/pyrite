@@ -76,14 +76,19 @@ extension unless the observation geometry approaches grazing incidence.
       the resonance, `k.g`, the detuning, and the PXR numerator's `k^2`, on both
       the batched and the per-hkl accumulation paths. Ledger
       `xray-in-medium-resonance`, status `filtered`.
-- [ ] In-medium wavevector in the coherent segment propagation phase.
-      Currently `refractive` + `coherent=True` raises `NotImplementedError`.
-- [ ] JIT/CUDA kernels in lockstep with the CPU core.
+- [x] In-medium wavevector in the coherent segment propagation phase. Lands as
+      `-delta(E) omega(E) L_esc,j` on top of the vacuum `omega d_j` — see the
+      decision below; this is NOT the `k(E) n_hat.r_j` form the brief sketched.
+      Ledger `xray-in-medium-propagation-phase`, status `filtered`.
+- [ ] JIT/CUDA kernels in lockstep with the CPU core. `refractive` + `coherent`
+      currently forces the exact array path (both the coherent reduction kernel
+      and the coherent stream kernel are gated off).
 - [x] Physics ledger rows + in-code `Validation: <id>` markers (for the
       landed slices).
-- [ ] Validation: accumulated phase vs thickness, coherent spectra at
-      representative thickness/energy. Resonance energy shift is done
-      (`tests/montecarlo/test_xray_dispersion.py`).
+- [x] Validation: accumulated phase vs depth (closed form reproduced to 5.7e-13
+      rad on both accumulation paths), interference inversion at ~1 um
+      separation, resonance energy shift. All in
+      `tests/montecarlo/test_xray_dispersion.py`.
 
 ## Decisions
 
@@ -109,20 +114,39 @@ extension unless the observation geometry approaches grazing incidence.
   `_line_kin_core` and `_line_amp_sq_core` are unchanged; they just receive
   in-medium arguments. Under `refractive` both `denom` and `n_hat.g` stop being
   hoistable (they become `(n_seg, N_g)`), which is the cost of the model.
+- The coherent propagation phase correction is `-delta(E) omega(E) L_esc,j`,
+  NOT the `omega t_j - k(E) (n_hat.r_j)` form sketched in the brief. Deriving it
+  from the observation-time phase `omega (t_j + n_med L_esc,j + L_vac,j)` with
+  the far-field split `L_esc + L_vac = R - n_hat.r_j` puts the index on the
+  in-crystal leg only; the sketched form charges the medium for the whole flight
+  to the detector. They agree up to a global phase only when the photon exits
+  along the face normal. The correct form also turns out to be the real partner
+  of the Beer-Lambert factor already applied over the SAME `L_esc`:
+  `exp(i n omega L) = exp(i omega L) exp(-i delta omega L) exp(-beta omega L)`
+  and `exp(-beta omega L) = sqrt(exp(-mu L))` is the existing `amp`. So the
+  coherent path was carrying `Im n` over the escape path all along and was
+  missing only its real partner.
+- Layered absorbers refuse `refractive` + `coherent`: the dispersive phase would
+  need a per-layer `delta` accumulated along the escape path, the real partner
+  of `_stack_tau`'s per-layer `mu`. Single-slab, groove, and finite-footprint
+  geometries are all supported.
 - The implicit resonance `omega_res = v.g / (1 - Re n(omega_res) v.n_hat)` is
   solved by fixed-point iteration from the vacuum root; the map contracts at
   rate ~`delta` ~ 1e-5, so 3 passes are far past float64 rounding.
 
 ## Remainder / next slices
 
-- Coherent propagation phase on the in-medium wavevector. Structural note: the
-  reduction kernels factor the phase as `exp(i * d_j * E)` with a per-segment
-  scalar `d_j = t_abs,j - n_hat.r_j`. In medium the space part picks up an
-  energy-dependent `Re n(E)`, so that factorization breaks — the phase becomes
-  `exp(i(omega(E) a_j - k(E) b_j))` with per-segment `a_j = t_abs,j` and
-  `b_j = n_hat.r_j` and two per-ENERGY tables. That is a signature change
-  across the CPU core, the JIT kernel, and the CUDA kernel, which is why it is
-  its own slice.
+- JIT/CUDA lockstep for the coherent phase. Both CUDA routes
+  (`coherent_jit_kernel.run_coherent_reduction_kernel` and
+  `coherent_stream_jit_kernel`) fold the phase as a single per-line
+  `slope_j * E`. The in-medium term is a second
+  (per-segment scalar `L_esc,j`) x (per-energy table `delta(E) omega(E)`)
+  product and does not fit that slope, so both are gated off under
+  `refractive` and the exact array path runs instead. Putting them in lockstep
+  means passing `L_esc` per line plus one extra per-energy table and adding one
+  fused-multiply into the phase argument — a signature change, but a smaller
+  one than the earlier `(a_j, b_j)` sketch implied, since `d_j` and the vacuum
+  slope are untouched and `delta(E) omega(E)` is zero-cost to skip.
 - Runner/campaign plumbing: `runner._lines_for_segments` derives `coherent`
   from the case dict; `xray_dispersion` should come the same way
   (`case.get("xray_dispersion", "vacuum")`), which also touches campaign config

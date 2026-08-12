@@ -94,6 +94,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`xray-chi-zero`](physics-validation-ledger.md) | g=0 unit-cell susceptibility `χ₀ = −rₑλ²/(πV_cell) · Σᵢ(f1ᵢ + i f2ᵢ)`, `f1 = Z + f′`, `f2 = f″` | `filtered` |
 | [`xray-refractive-index`](physics-validation-ledger.md) | complex crystal refractive index `n(E) = √(1 + χ₀(E)) ≈ 1 − δ − iβ` | `filtered` |
 | [`xray-in-medium-resonance`](physics-validation-ledger.md) | CXR line kinematics on the in-medium photon dispersion `k = Re n(ω) ω n̂`: resonance `ω_res = v·g / (1 − Re n (v·n̂))`, `k·v = ω(1 − denom)`, `k·g = Re n ω (n̂·g)`, PXR detuning `\|k+g\|² − k² = g² + 2k·g` and PXR numerator `k² = (Re n ω)²` | `filtered` |
+| [`xray-in-medium-propagation-phase`](physics-validation-ledger.md) | coherent segment-to-segment propagation phase on the in-medium wavevector: segment `j` accumulates `−δ(E) ω(E) L_esc,j` on top of the vacuum `ω d_j`, with `d_j = t_j − n̂·r_j` and `L_esc,j` the in-crystal escape path | `filtered` |
 | [`self-absorption`](physics-validation-ledger.md) | per-segment Beer–Lambert path-to-surface, cross-stack | `rederived` |
 
 ## Transport & background

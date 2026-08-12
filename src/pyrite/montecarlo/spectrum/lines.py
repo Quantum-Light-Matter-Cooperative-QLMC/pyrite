@@ -730,10 +730,15 @@ def mc_spectrum(
     Only the real part is applied: ``Im n`` is the same absorption already
     carried by the Beer-Lambert ``mu(E)`` escape factor. Bulk response only --
     interface/Fresnel refraction is not modelled, so grazing observation
-    geometry is out of scope. Not yet available with ``coherent=True`` (the
-    propagation phase is still on the vacuum wavevector).
+    geometry is out of scope.
 
-    Validation: xray-in-medium-resonance
+    With ``coherent=True`` the segment-to-segment propagation phase moves onto
+    the same dispersion relation: each segment's field picks up
+    ``-delta(E) omega(E) L_esc,j`` over its in-crystal escape path, the real
+    partner of the Beer-Lambert amplitude factor already applied over that same
+    path. Refused for LAYERED absorbers, whose per-layer delta is not modelled.
+
+    Validation: xray-in-medium-resonance, xray-in-medium-propagation-phase
 
     coherent: opt-in coherent (phased) segment sum. None/False (default) is the
     incoherent path above, bit-for-bit. When True the spectrum is
@@ -805,12 +810,14 @@ def mc_spectrum(
             f"got {xray_dispersion!r}."
         )
     refractive = xray_dispersion == "refractive"
-    if refractive and coherent:
+    if refractive and coherent and layers is not None:
         raise NotImplementedError(
-            "xray_dispersion='refractive' does not yet cover the coherent path: "
-            "the segment-to-segment propagation phase still uses the vacuum "
-            "wavevector k = omega, so the phase and the resonance would come "
-            "from different dispersion relations. Use coherent=False for now."
+            "xray_dispersion='refractive' does not cover the coherent path "
+            "through a LAYERED absorber: the dispersive propagation phase needs "
+            "a per-layer delta accumulated along the escape path -- the real "
+            "partner of _stack_tau's per-layer mu -- which is not modelled. "
+            "Single-slab absorbers (with or without a groove or a finite "
+            "footprint) are supported."
         )
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
@@ -934,6 +941,40 @@ def mc_spectrum(
         seg_t_mid = seg_t + 0.5 * t_L_all
         d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
         omega_grid = E_grid / HBARC_EV_ANG
+
+        # In-medium propagation phase. The observation-time phase is
+        # omega (t_j + n_med L_esc,j + L_vac,j), and the geometric total path
+        # L_esc + L_vac = R - n_hat.r_j to first order, so the vacuum
+        # ``omega d_j`` picks up exactly
+        #
+        #     omega (Re n(E) - 1) L_esc,j = - delta(E) omega(E) L_esc,j
+        #
+        # where L_esc,j is the SAME in-crystal escape distance the Beer-Lambert
+        # factor already runs over. That is not a coincidence: the escape leg
+        # contributes exp(i n omega L) = exp(i omega L) exp(-i delta omega L)
+        # exp(-beta omega L), and the last factor is sqrt(exp(-mu L)) = ``amp``.
+        # The dispersive phase is the real partner of an absorption the coherent
+        # path already carries; only the two together are one complex n.
+        #
+        # Note this is NOT ``k(E) n_hat.r_j``: that form would charge the medium
+        # for the whole flight to the detector. The two agree only when the
+        # photon exits along the face normal (where L_esc and n_hat.r differ by a
+        # segment-independent constant, i.e. a global phase).
+        #
+        # Tabulated on the OUTPUT grid: it is a propagation phase read across the
+        # whole spectrum, not a coupling frozen at the line energy. Left None
+        # under the vacuum model, whose phase expressions are then untouched and
+        # so stay bit-for-bit.
+        # Validation: xray-in-medium-propagation-phase
+        delta_omega_grid = None
+        if refractive:
+            delta_omega_grid = (
+                xp.asarray(
+                    1.0 - np.asarray(refractive_index(crystal, E_grid_eV, use_henke).real),
+                    dtype=REAL,
+                )
+                * omega_grid
+            )
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
@@ -1117,11 +1158,17 @@ def mc_spectrum(
             # complex SP[segment, energy] matrix and avoids both complex GEMVs.
             # The exact CuPy path below remains the fallback for CPU/other
             # backends, float64, and sinc_cutoff windowing.
+            # The reduction kernel folds the phase as ``slope_j * E``, a single
+            # per-line scalar against the energy axis. The in-medium term is a
+            # SECOND (per-segment scalar) x (per-energy table) product, so it
+            # cannot be absorbed into that slope; until the kernel carries both,
+            # the refractive model takes the exact path below.
             _use_jit_coherent_reduction = (
                 _USE_JIT_COHERENT_REDUCTION
                 and getattr(xp, "__name__", "") == "cupy"
                 and np.dtype(REAL) == np.dtype(np.float32)
                 and sinc_cutoff is None
+                and delta_omega_grid is None
             )
             if _use_jit_coherent_reduction:
                 from .coherent_jit_kernel import (
@@ -1156,7 +1203,10 @@ def mc_spectrum(
                     if not m.any():
                         continue
                     x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
-                    ph = xp.exp(1j * (d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]))
+                    arg = d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]
+                    if delta_omega_grid is not None:
+                        arg = arg - L_esc[sl][m, None] * delta_omega_grid[None, :]
+                    ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
                         f += c[sl][m] @ SP
@@ -1180,9 +1230,10 @@ def mc_spectrum(
                     if i1 <= i0:
                         continue
                     x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
-                    ph = xp.exp(
-                        1j * (d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None])
-                    )
+                    arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
+                    if delta_omega_grid is not None:
+                        arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
+                    ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
                         f[i0:i1] += c[sel] @ SP
@@ -1427,12 +1478,18 @@ def mc_spectrum(
         # sync, and per-g concatenate/slice pass.  The final kernel squares each g
         # row independently and only then mosaic-weights/sums rows, so reflections
         # and orientations remain incoherent.  Validation: coherent-line-hkl-batch
+        # Both CUDA coherent routes fold the propagation phase as a single
+        # per-line ``slope_j * E``. The in-medium term is a second
+        # (per-segment scalar) x (per-energy table) product and does not fit that
+        # slope, so the refractive model falls back to the exact path until the
+        # kernels carry both. See the task remainder.
         _use_jit_coherent_stream = (
             coherent
             and _USE_JIT_COHERENT_STREAM
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
             and sinc_cutoff is None
+            and delta_omega_grid is None
         )
         if _use_jit_coherent_stream:
             from .coherent_stream_jit_kernel import (
@@ -1468,6 +1525,7 @@ def mc_spectrum(
             and _USE_JIT_COHERENT_REDUCTION
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
+            and delta_omega_grid is None
         )
         if _use_jit_coherent_reduction:
             from .coherent_jit_kernel import (
@@ -1677,6 +1735,10 @@ def mc_spectrum(
                     c_p.real,
                     c_p.imag,
                 )
+                if delta_omega_grid is not None:
+                    # Escape distance rides along as the second phase slope, the
+                    # one that multiplies delta(E) omega(E) instead of E.
+                    per_line = (*per_line, L_esc)
                 coh_blocks.append(
                     [
                         xp.ascontiguousarray(xp.broadcast_to(f, shape).T).reshape(-1)[gm]
@@ -1794,11 +1856,11 @@ def mc_spectrum(
                 if not blocks:
                     continue
                 if len(blocks) == 1:
-                    E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = blocks[0]
+                    row = blocks[0]
                 else:
-                    E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = (
-                        xp.concatenate(parts) for parts in zip(*blocks, strict=True)
-                    )
+                    row = [xp.concatenate(parts) for parts in zip(*blocks, strict=True)]
+                E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = row[:8]
+                L_i = row[8] if len(row) > 8 else None  # escape distance, refractive only
                 wm_i = float(wm_rows[i_row])
                 if _use_jit_coherent_reduction:
                     run_coherent_reduction_kernel(
@@ -1821,7 +1883,10 @@ def mc_spectrum(
                 for j0 in range(0, E_r_i.size, chunk):
                     sl = slice(j0, min(j0 + chunk, E_r_i.size))
                     x = aw_i[sl][:, None] * (E_grid[None, :] - E_r_i[sl][:, None]) / xp.pi
-                    ph = xp.exp(1j * (ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]))
+                    arg = ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]
+                    if L_i is not None:
+                        arg = arg - L_i[sl][:, None] * delta_omega_grid[None, :]
+                    ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
                     f_s += (csr[sl] + 1j * csi[sl]) @ SP
                     f_p += (cpr[sl] + 1j * cpi[sl]) @ SP
