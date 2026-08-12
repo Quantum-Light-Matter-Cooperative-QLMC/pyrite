@@ -91,6 +91,9 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`tis2-003-structure`](physics-validation-ledger.md) | 1T-TiS2 P-3m1 lattice + explicit one-formula-unit basis for a symmetric (003) cut | `unverified` |
 | [`absorption-length`](physics-validation-ledger.md) | X-ray absorption length / μ | `anchored` |
 | [`grazing-optical-constants`](physics-validation-ledger.md) | complex refractive index `n = 1 − δ − iβ` (δ, β from f1=Z+f′, f2) | `rederived` |
+| [`xray-chi-zero`](physics-validation-ledger.md) | g=0 unit-cell susceptibility `χ₀ = −rₑλ²/(πV_cell) · Σᵢ(f1ᵢ + i f2ᵢ)`, `f1 = Z + f′`, `f2 = f″` | `filtered` |
+| [`xray-refractive-index`](physics-validation-ledger.md) | complex crystal refractive index `n(E) = √(1 + χ₀(E)) ≈ 1 − δ − iβ` | `filtered` |
+| [`xray-in-medium-resonance`](physics-validation-ledger.md) | CXR line kinematics on the in-medium photon dispersion `k = Re n(ω) ω n̂`: resonance `ω_res = v·g / (1 − Re n (v·n̂))`, `k·v = ω(1 − denom)`, `k·g = Re n ω (n̂·g)`, PXR detuning `\|k+g\|² − k² = g² + 2k·g` and PXR numerator `k² = (Re n ω)²` | `filtered` |
 | [`self-absorption`](physics-validation-ledger.md) | per-segment Beer–Lambert path-to-surface, cross-stack | `rederived` |
 
 ## Transport & background

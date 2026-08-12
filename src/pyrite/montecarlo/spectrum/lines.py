@@ -23,6 +23,7 @@ from ...materials.crystal import (
     U_g,
     chi_g,
     reciprocal_g_vector,
+    refractive_index,
 )
 from .._backend import REAL, _to_cpu, xp
 from ..geometry import _mosaic_quadrature, _orientation_R, first_prism_exit
@@ -339,6 +340,11 @@ def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
     per reflection/orientation rather than rebuilding ``k`` and ``k+g`` for every
     segment. The identities are exact; floating-point association differs from
     the expanded vector form at rounding level.
+
+    Under ``xray_dispersion="refractive"`` the caller passes the in-medium
+    ``denom`` and ``n_dot_g`` (the latter carrying its factor of ``Re n``), both
+    per (segment, g) rather than hoisted. Every identity above survives that
+    substitution unchanged -- see ``_in_medium_kinematics``.
     """
     v_dot_g = vx * gx + vy * gy + vz * gz
     omega_res = v_dot_g / denom
@@ -364,6 +370,48 @@ def _line_weight_core(omega_res, t_L, L_esc, mu, alpha_fs, pref_c1):
 
 if hasattr(xp, "fuse"):
     _line_weight_core = xp.fuse()(_line_weight_core)
+
+
+XRAY_DISPERSION_MODELS = ("vacuum", "refractive")
+
+
+def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
+    """In-medium resonance denominator and refractive factor per segment.
+
+    Energy-momentum conservation on a segment is ``omega = v.(k + g)``, and the
+    Maxwell dispersion relation in the bulk dielectric is ``k = n(omega) omega``
+    along the observation direction, so the vacuum resonance
+    ``omega_res = v.g / (1 - v.n_hat)`` becomes implicit:
+
+        omega_res = v.g / (1 - Re n(omega_res) (v.n_hat))
+
+    Only ``Re n`` enters. ``Im n`` is the same absorption already carried as the
+    Beer-Lambert ``mu(E)`` escape factor, so folding it in here as well would
+    double-count it.
+
+    Solved by fixed-point iteration from the vacuum root. The map's derivative is
+    ``(v.n_hat) (dn/dE) (dE/ddenom) ~ delta ~ 1e-5``, so each pass gains ~5
+    digits and two are already at float64 rounding; three are taken for margin.
+
+    Returns ``(denom, n_re)`` with the shape of ``v_dot_g``: the caller forms the
+    remaining in-medium scalars from ``n_re`` rather than re-deriving them, since
+    ``k.v = omega (1 - denom)`` still holds exactly while ``k.g`` and ``k^2``
+    pick up one and two powers of ``n_re`` respectively.
+
+    Out-of-range tabulation energies carry NaN out of ``n_re``, which propagates
+    to ``denom`` and drops the segment on the caller's finite/window mask -- the
+    same convention as the chi/U/mu tabulations.
+
+    Validation: xray-in-medium-resonance
+    """
+    denom = 1.0 - v_dot_n
+    n_re = None
+    for _ in range(3):
+        E_res = HBARC_EV_ANG * (v_dot_g / denom)
+        _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab)
+        n_re = _interp_gather1d(_ix, _fr, _blw, _abv, n_re_tab)
+        denom = 1.0 - n_re * v_dot_n
+    return denom, n_re
 
 
 def _segments_in_layer(segments, L):
@@ -540,6 +588,7 @@ def mc_spectrum(
     coherent=False,
     electron_limit=None,
     E_cut_keV=None,
+    xray_dispersion="vacuum",
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -671,6 +720,21 @@ def mc_spectrum(
 
     Validation: blazed-groove-geometry
 
+    xray_dispersion: photon dispersion relation used by the line kinematics.
+    ``"vacuum"`` (default) keeps ``k = omega`` everywhere and reproduces the
+    existing goldens bit-for-bit. ``"refractive"`` uses the bulk crystal
+    dielectric response, ``k = n(omega) omega`` with
+    ``n = sqrt(1 + chi_0)`` (materials.crystal.refractive_index), which shifts
+    the resonance denominator to ``1 - Re n (v.n_hat)`` and carries the
+    corresponding ``n`` powers into ``k.g`` and the PXR numerator's ``k^2``.
+    Only the real part is applied: ``Im n`` is the same absorption already
+    carried by the Beer-Lambert ``mu(E)`` escape factor. Bulk response only --
+    interface/Fresnel refraction is not modelled, so grazing observation
+    geometry is out of scope. Not yet available with ``coherent=True`` (the
+    propagation phase is still on the vacuum wavevector).
+
+    Validation: xray-in-medium-resonance
+
     coherent: opt-in coherent (phased) segment sum. None/False (default) is the
     incoherent path above, bit-for-bit. When True the spectrum is
     ``d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |sum_j A_j Q_j e^{i phi_j}|^2``
@@ -734,6 +798,19 @@ def mc_spectrum(
         raise ValueError(
             "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
             "pass the material's value (no silent default)."
+        )
+    if xray_dispersion not in XRAY_DISPERSION_MODELS:
+        raise ValueError(
+            f"mc_spectrum: xray_dispersion must be one of {XRAY_DISPERSION_MODELS}, "
+            f"got {xray_dispersion!r}."
+        )
+    refractive = xray_dispersion == "refractive"
+    if refractive and coherent:
+        raise NotImplementedError(
+            "xray_dispersion='refractive' does not yet cover the coherent path: "
+            "the segment-to-segment propagation phase still uses the vacuum "
+            "wavevector k = omega, so the phase and the resonance would come "
+            "from different dispersion relations. Use coherent=False for now."
         )
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
@@ -820,6 +897,17 @@ def mc_spectrum(
     # Validation: line-absorption-tabulation
     mu_tab_g = xp.asarray(np.asarray(_mu_total_inv_ang(abs_comp, E_tab)), dtype=REAL)
 
+    # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
+    # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
+    # its own edge structure, from the f1 cusp). Only built for the refractive
+    # model; the vacuum model leaves every k = omega expression untouched and so
+    # stays bit-for-bit.
+    n_re_tab_g = None
+    if refractive:
+        n_re_tab_g = xp.asarray(
+            np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
+        )
+
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
 
     # Segment-only kinematics shared by every reflection/orientation and by both
@@ -873,7 +961,11 @@ def mc_spectrum(
         # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
         #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
         v_dot_g = _matvec3(v_all, g_vec_d)
-        denom = denom_all
+        if n_re_tab_g is None:
+            denom = denom_all
+            n_re_seg = None
+        else:
+            denom, n_re_seg = _in_medium_kinematics(v_dot_n_all, v_dot_g, n_re_tab_g, E_tab_g)
         omega_res = v_dot_g / denom
         E_res = HBARC_EV_ANG * omega_res  # -> eV
 
@@ -912,8 +1004,13 @@ def mc_spectrum(
         # -- 4. photon kinematics per segment ------------------------------------
         # k = omega*n, so detuning = g^2 + 2*omega*(n.g), k.g = omega*(n.g),
         # and v.(k+g) = v.g + k.v. The g-only scalars are precomputed once.
+        # In medium k = n omega n_hat, so k.v = omega(1 - denom) still holds
+        # exactly (denom absorbed the n), while k.g takes one power of n and
+        # |k+g|^2 - k^2 = g^2 + 2 k.g keeps its form. k_mag = |k| is what the
+        # PXR numerator's k^2 needs; it is omega in vacuum.
+        k_mag = om if n_re_seg is None else om * n_re_seg[idx]
         k_dot_v = om * (1.0 - dnm)
-        k_dot_g = om * n_dot_g
+        k_dot_g = k_mag * n_dot_g
         v_dot_kg = vdg + k_dot_v
         detuning = g2 + 2.0 * k_dot_g
 
@@ -931,7 +1028,7 @@ def mc_spectrum(
                 # Complex amplitudes retained verbatim -- the coherent path sums
                 # phased fields, so it keeps the un-reassociated expression and
                 # its goldens are unaffected.
-                A_PXR = chi / detuning * (v_dot_kg * g_dot_e - om**2 * v_dot_e)
+                A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
                 braced_ge = g_dot_e - vdg * v_dot_e
                 braced_kg = k_dot_g - k_dot_v * vdg
                 A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
@@ -947,7 +1044,7 @@ def mc_spectrum(
                 eUg_over_m.imag,
                 v_dot_kg,
                 g_dot_e,
-                om,
+                k_mag,
                 v_dot_e,
                 vdg,
                 k_dot_g,
@@ -1482,6 +1579,20 @@ def mc_spectrum(
             vy = v_all[sb, 1][:, None]
             vz = v_all[sb, 2][:, None]
             denom = denom_full[sb]
+            n_dot_g_blk = n_dot_g
+            n_re_blk = None
+            if n_re_tab_g is not None:
+                # The in-medium root depends on g through E_res, so denom stops
+                # being a hoisted column and n.g stops being a hoisted row: both
+                # become (nb, N_g). _line_kin_core is elementwise, so it takes
+                # them unchanged.
+                denom, n_re_blk = _in_medium_kinematics(
+                    v_dot_n_all[sb][:, None],
+                    vx * gx + vy * gy + vz * gz,
+                    n_re_tab_g,
+                    E_tab_g,
+                )
+                n_dot_g_blk = n_re_blk * n_dot_g
             gamma = gamma_full[sb]
             t_L = t_L_full[sb]
             L_esc = L_esc_full[sb]
@@ -1490,9 +1601,10 @@ def mc_spectrum(
             # steps 1 and 4 are reduced algebraically inside one fused launch;
             # g-only invariants are hoisted outside the segment-block loop.
             omega_res, v_dot_g, detuning, k_dot_g, v_dot_kg, k_dot_v = _line_kin_core(
-                vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g
+                vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk
             )
             vdg = v_dot_g
+            k_mag = omega_res if n_re_blk is None else omega_res * n_re_blk
             E_res = HBARC_EV_ANG * omega_res
 
             line_electron_block = line_electron[sb][:, None]
@@ -1531,7 +1643,7 @@ def mc_spectrum(
                 for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
                     ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
                     v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
-                    A_PXR = chi / detuning * (v_dot_kg * g_dot_e - omega_res**2 * v_dot_e)
+                    A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
                     braced_ge = g_dot_e - vdg * v_dot_e
                     braced_kg = k_dot_g - k_dot_v * vdg
                     A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
@@ -1588,7 +1700,7 @@ def mc_spectrum(
                     u_im,
                     v_dot_kg,
                     g_dot_e,
-                    omega_res,
+                    k_mag,
                     v_dot_e,
                     vdg,
                     k_dot_g,

@@ -68,15 +68,22 @@ extension unless the observation geometry approaches grazing incidence.
       `absorption_length_ang` conventions — `-Re(chi_0)/2` and `-Im(chi_0)/2`
       reproduce `delta`/`beta` to 1e-12 rel. Ledger `xray-refractive-index`,
       status `filtered`.
-- [ ] `xray_dispersion` model switch plumbed to the spectrum entry points,
-      default `"vacuum"` so existing goldens are unchanged.
-- [ ] In-medium dispersion in the resonance denominator, derived from the
-      Maxwell dispersion relation rather than an ad hoc `n` insertion.
+- [x] `xray_dispersion` model switch plumbed to `mc_spectrum` (and to
+      `mc_spectrum_solid_angle` through its `**kwargs`), default `"vacuum"`,
+      bit-for-bit. Runner/campaign-config plumbing is NOT done — see remainder.
+- [x] In-medium dispersion in the resonance denominator, derived from the
+      Maxwell dispersion relation rather than an ad hoc `n` insertion. Covers
+      the resonance, `k.g`, the detuning, and the PXR numerator's `k^2`, on both
+      the batched and the per-hkl accumulation paths. Ledger
+      `xray-in-medium-resonance`, status `filtered`.
 - [ ] In-medium wavevector in the coherent segment propagation phase.
+      Currently `refractive` + `coherent=True` raises `NotImplementedError`.
 - [ ] JIT/CUDA kernels in lockstep with the CPU core.
-- [ ] Physics ledger rows + in-code `Validation: <id>` markers.
-- [ ] Validation: resonance energy shift, accumulated phase vs thickness,
-      coherent spectra at representative thickness/energy.
+- [x] Physics ledger rows + in-code `Validation: <id>` markers (for the
+      landed slices).
+- [ ] Validation: accumulated phase vs thickness, coherent spectra at
+      representative thickness/energy. Resonance energy shift is done
+      (`tests/montecarlo/test_xray_dispersion.py`).
 
 ## Decisions
 
@@ -93,6 +100,33 @@ extension unless the observation geometry approaches grazing incidence.
 - Sign convention `n = 1 - delta - i beta` (time factor `exp(+i omega t)`)
   is forced by the existing coherent propagation phase `exp{i[omega t - k.r]}`
   in `lines.py:685` and matches `optical_constants`.
+- Only `Re n` enters the kinematics. `Im n` is the same absorption already
+  carried as the Beer-Lambert `mu(E)` escape factor, so folding it in here
+  would double-count it.
+- The whole in-medium correction is routed through two existing quantities —
+  the resonance `denom` and `n_hat.g` — plus `k_mag` for the PXR numerator's
+  `k^2`. `k.v = omega (1 - denom)` survives the substitution exactly, so
+  `_line_kin_core` and `_line_amp_sq_core` are unchanged; they just receive
+  in-medium arguments. Under `refractive` both `denom` and `n_hat.g` stop being
+  hoistable (they become `(n_seg, N_g)`), which is the cost of the model.
+- The implicit resonance `omega_res = v.g / (1 - Re n(omega_res) v.n_hat)` is
+  solved by fixed-point iteration from the vacuum root; the map contracts at
+  rate ~`delta` ~ 1e-5, so 3 passes are far past float64 rounding.
+
+## Remainder / next slices
+
+- Coherent propagation phase on the in-medium wavevector. Structural note: the
+  reduction kernels factor the phase as `exp(i * d_j * E)` with a per-segment
+  scalar `d_j = t_abs,j - n_hat.r_j`. In medium the space part picks up an
+  energy-dependent `Re n(E)`, so that factorization breaks — the phase becomes
+  `exp(i(omega(E) a_j - k(E) b_j))` with per-segment `a_j = t_abs,j` and
+  `b_j = n_hat.r_j` and two per-ENERGY tables. That is a signature change
+  across the CPU core, the JIT kernel, and the CUDA kernel, which is why it is
+  its own slice.
+- Runner/campaign plumbing: `runner._lines_for_segments` derives `coherent`
+  from the case dict; `xray_dispersion` should come the same way
+  (`case.get("xray_dispersion", "vacuum")`), which also touches campaign config
+  validation.
 
 ## Pre-existing failures on `main` (not caused by this branch)
 
