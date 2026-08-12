@@ -64,8 +64,10 @@ Numerical substeps are integration detail:
 - [x] D -- Add the CXR endpoint resonance-drift and bremsstrahlung quadrature
       estimators; select warning thresholds from observed convergence rather
       than treating 0.05/1% suggestions as universal constants.
-- [ ] E -- Establish 2%, 1%, and 0.5% fractional-loss convergence matrices over
-      thin/thick, low/high-Z, and 1--300 keV cases.
+- [x] E -- Establish 2%, 1%, and 0.5% fractional-loss convergence matrices over
+      thin/thick, low/high-Z, and 1--300 keV cases. Measured; the headline
+      result is that a fractional-loss cap is the wrong control variable and
+      the binding tolerance is an absolute emission phase.
 - [ ] F -- Introduce physical-flight and numerical-substep identity and an
       energy-controlled propagator with collision optical-depth handling.
 - [ ] G -- Make CXR and bremsstrahlung invariant to numerical substep refinement
@@ -129,12 +131,40 @@ Numerical substeps are integration detail:
   shortens a flight. Its left-endpoint clip rule cannot reconstruct a
   midpoint-integrated end state for the shortened flight, and a stale end state
   is worse than an absent one.
+- **Decided (E):** the step-control variable is an **absolute emission-phase
+  tolerance**, not a fractional energy-loss cap. A coherent kernel weights each
+  row by `e^{i omega t_abs}`, the age is 10^3--10^4 Ang, and the clock error
+  accumulates along a trajectory while `|dE|/E` is per-flight, so the two are
+  only loosely related. Measured accepted tolerance: accumulated per-electron
+  `|dphi|` p99 < 0.1 rad at the case's resonance.
+- **Decided (E):** the midpoint rule is a **prerequisite** for coherent CXR, not
+  an optimization. At one row per flight it gives accumulated phase error
+  1e-3--0.2 rad against 10--10^3 rad for the frozen rule, three to four orders
+  better at equal cost; the frozen rule does not reach the tolerance anywhere
+  on the 2%/1%/0.5% ladder. Slices F--H must therefore treat `energy_model` as
+  load-bearing for radiation, not just for transport.
+- **Decided (E):** `elec_id` is **not** a grouping key in the line kernel.
+  `lines.py` uses it only as the row mask `elec_id < Ne`, and
+  `mc_spectrum(coherent=True)` sums ONE global complex field over every
+  surviving row; per-electron decoherence is emergent from the `t0_ang` spread.
+  Slice G must add explicit `(electron_id, flight_id)` grouping to the kernel
+  itself -- remapping `elec_id` to per-flight ids does not produce a
+  flight-incoherent reduction, it silently masks nearly every row away.
+- **Decided (E):** the requested 2%/1% rungs are **no-ops** on these cases. The
+  elastic mean free path already holds per-flight fractional loss below 2% for
+  ~99% of flights (p99 = 1e-2 to 1e-1 across the matrix), so those rungs
+  reproduce the unrefined row set almost exactly. Only 0.5% and below bind, and
+  then only on the top decile of flights.
+- **Open (raised by E):** the production global-coherent reduction appears
+  **ill-conditioned** to any per-row change. `|sum_j E_j|^2` is a small residual
+  of a large cancellation, so it does not converge under the ladder even with
+  accurate phases (54% residual in the 100 keV thick carbon case). The
+  physical-flight-incoherent reduction on the same rows converges roughly 3x
+  better and monotonically. This is evidence for slice G's grouping, but the
+  conditioning of the global sum itself needs its own decision.
 - **Open:** integrated optical-depth inversion versus bounded piecewise-constant
   hazard. Choose from correctness, convergence, Numba/CUDA feasibility, and
   measured cost.
-- **Open:** accepted convergence tolerances for transport metrics, spectra, and
-  coherent complex fields. Establish empirically before dispatching later
-  slices as `one-shot`.
 
 ## A -- segment-schema consumer inventory
 
@@ -235,6 +265,63 @@ case). The review's 0.05/1% figures match the measured TYPICAL errors, not
 useful warning levels. Full table and derivation:
 `docs/validation/beam-transport/radiation-error-estimators.md`;
 `Validation: radiation-error-estimators`.
+
+## E -- convergence matrices
+
+`checks/energy_step_convergence_matrix.py` measures four things over a
+C/W x thin/thick x 5--300 keV matrix at `E_cut = 1 keV`, seed 7. Full tables and
+derivation: `docs/validation/beam-transport/energy-step-convergence.md`;
+`Validation: energy-step-convergence`.
+
+**Part A -- transport, frozen vs midpoint (Ne = 4000).** The rules diverge
+trajectory-by-trajectory, so every observable is quoted with its Monte Carlo
+standard error and the shift in units of the combined error. Across 14 cases
+and 7 metrics, every shift is within 1.6 sigma except one: the mean path length
+of `C 5 keV thick`, +4.3 sigma (3460 vs 3424 Ang, 1.2%). Replicated at seeds
+7/101/2024/31337 at +4.3/+4.9/+4.6/+4.9 sigma, so it is a real bias and not the
+expected tail of 98 comparisons. Sign and location are both predicted: Joy--Luo
+`|dE/ds|` grows as `E` falls, so the left-endpoint rule understates the loss,
+needs more path to reach `E_cut`, and **overstates the CSDA range**. The effect
+tracks per-flight fractional loss, which peaks in exactly that case (p99 = 9.9%,
+matrix maximum) and is below 1% for every case at or above 100 keV, where all
+shifts are within 0.6 sigma.
+
+**Part B -- radiation ladder at fixed physical flights (Ne = 200).** One frozen
+transport run supplies the flights; only the numerical sampling of the emission
+integral is refined, so trajectory divergence cannot confound the measurement.
+Substeps and the reference rung both use the midpoint rule, so the reference is
+not itself mis-phased. Bremsstrahlung converges cleanly and first order
+(1.9e-3 to 8.2e-4 down the ladder, floor 1.5e-5). Coherent CXR does not, and
+the frozen-integrated repeat of the same ladder (`cxrCfz`) stalls a factor 2--3
+above the midpoint one, which is the propagation rule showing up directly in a
+spectrum.
+
+**Part B phase criterion -- the operative result.** The accumulated
+per-electron clock error against the midpoint rule at `f = 0.125%`, converted to
+radians at the case resonance. Under the frozen rule it is 11--1300 rad at one
+row per flight and falls only first order, reaching 3--900 rad at `f = 0.5%`:
+the frozen rule is unusable for coherent CXR at every rung of the requested
+ladder. Under the midpoint rule it is 1.4e-3--6.0e-2 rad p99 at one row per
+flight, already inside a 0.1 rad tolerance in all five cases, and `f = 2%`
+takes the worst case max to 5.9e-2 rad.
+
+**Part C -- physical-flight-incoherent CXR (Ne = 60).** One coherent kernel call
+per flight, which is what slice G owes the kernels. It converges (1.6e-1 to
+5.3e-2) while the production global-coherent reduction on the same rows is
+about 3x worse and non-monotone. Row counts across the ladder are 409, 409, 421,
+474 -- direct evidence that the 2% and 1% rungs subdivide essentially nothing.
+
+**Part D -- row-splitting floor vs take-off geometry.** At frozen energy AND
+clock, subdividing a flight is an exact algebraic identity for the coherent sum
+(Dirichlet-kernel composition), so any residual is the kernel's own per-row
+approximation. At the default 119 degree take-off it is 6.8e-3--1.0e-2 grid L1.
+At the near-grazing `n_hat = (1, 0, 0.01)` of
+`tests/montecarlo/test_coherent_emission.py` it is 1.7e-1--3.5e-1, because the
+Beer--Lambert escape path is the depth divided by `n_z` and so swings ~2x within
+a single flight. This is a per-row escape-factor quadrature defect, independent
+of `energy_model` and of the slice-E step control, and it bounds what any
+energy-step ladder can resolve in that geometry. The slice-E CXR matrix
+therefore uses the production default take-off, not the test geometry.
 
 ## Delegation slices and required skills
 

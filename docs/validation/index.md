@@ -33,6 +33,7 @@ atomic-physics/structure-factor
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
+beam-transport/energy-step-convergence
 beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
 beam-transport/radiation-error-estimators
