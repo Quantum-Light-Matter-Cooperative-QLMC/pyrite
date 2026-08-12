@@ -9,11 +9,13 @@ from pyrite.materials.crystal import (
     HC_EV_ANG,
     U_g,
     absorption_length_ang,
+    chi_0,
     chi_g,
     debye_waller,
     dominant_reflections,
     optical_constants,
     reciprocal_g_vector,
+    refractive_index,
     structure_factor,
 )
 
@@ -487,6 +489,85 @@ def test_absorption_length_matches_henke_f2_coefficient(monkeypatch):
     actual = crystal_module.absorption_length_ang("Si", energy_eV, number_density_per_ang3)
 
     np.testing.assert_allclose(actual, expected, rtol=1e-14)
+
+
+def _monoatomic_number_density(name):
+    info = CRYSTALS[name]
+    return len(info["basis"]) / info["V_cell"]
+
+
+@pytest.mark.parametrize("E", [1500.0, 5000.0, 10000.0])
+def test_chi_0_linearization_is_optical_constants_exactly(E):
+    # chi_0 and optical_constants share one normalization by construction:
+    # chi_0 = -(r_e lam^2 / pi V) * N * (f1 + i f2) and delta = (r_e lam^2 /
+    # 2 pi) * (N/V) * f1, so -Re(chi_0)/2 IS delta and -Im(chi_0)/2 IS beta,
+    # with no second-order slack. Exact-equality cross-check of the two
+    # normalizations, not an independent derivation.
+    name = "silicon"
+    n_per_ang3 = _monoatomic_number_density(name)
+    delta_ref, beta_ref = optical_constants("Si", E, n_per_ang3)
+    c0 = chi_0(name, E)
+    assert -c0.real / 2.0 == pytest.approx(delta_ref, rel=1e-12)
+    assert -c0.imag / 2.0 == pytest.approx(beta_ref, rel=1e-12)
+
+
+@pytest.mark.parametrize("E", [1500.0, 5000.0, 10000.0])
+def test_refractive_index_matches_linearization_to_second_order(E):
+    # n = sqrt(1 + chi_0) is taken exactly; it must agree with the linearized
+    # 1 - delta - i beta to O(chi_0^2). The delta residual is delta/2 and the
+    # beta residual is delta, both far below 1 in the X-ray regime.
+    name = "silicon"
+    delta_ref, beta_ref = optical_constants("Si", E, _monoatomic_number_density(name))
+    n = refractive_index(name, E)
+    delta = 1.0 - n.real
+    beta = -n.imag
+    assert delta == pytest.approx(delta_ref, rel=delta_ref)
+    assert beta == pytest.approx(beta_ref, rel=2.0 * delta_ref)
+
+
+def test_refractive_index_delta_beta_positive_off_edge():
+    # Off any edge the X-ray regime has n slightly below 1 with weak
+    # absorption: delta > 0, beta > 0, and delta >> beta.
+    n = refractive_index("silicon", 5000.0)
+    delta = 1.0 - n.real
+    beta = -n.imag
+    assert delta > 0.0
+    assert beta > 0.0
+    assert delta > beta
+
+
+def test_chi_0_vanishes_and_index_tends_to_vacuum_at_high_energy():
+    # Limiting case: chi_0 falls as lambda^2, so n -> 1 far above every edge
+    # and all in-medium expressions collapse to their vacuum form.
+    low = abs(chi_0("silicon", 2000.0))
+    high = abs(chi_0("silicon", 20000.0))
+    assert high < low
+    # lambda^2 scaling: a factor 10 in energy is a factor ~100 in |chi_0|,
+    # loosened to allow the f1(E) dispersion riding on top.
+    assert high == pytest.approx(low / 100.0, rel=0.15)
+    assert refractive_index("silicon", 20000.0) == pytest.approx(1.0 + 0j, abs=1e-5)
+
+
+def test_chi_0_without_henke_is_real_thomson_limit():
+    # use_henke=False drops f' and f'', leaving the non-resonant Thomson term:
+    # chi_0 -> -r_e lambda^2 Z_cell / (pi V_cell), purely real and negative.
+    name = "silicon"
+    info = CRYSTALS[name]
+    E = 5000.0
+    lam = HC_EV_ANG / E
+    Z_cell = sum(crystal_module.Z_TABLE[el] for el, _ in info["basis"])
+    expected = -crystal_module.R_E_ANG * lam**2 * Z_cell / (np.pi * info["V_cell"])
+    c0 = chi_0(name, E, use_henke=False)
+    assert c0.imag == 0.0
+    assert c0.real == pytest.approx(expected, rel=1e-12)
+    assert c0.real < 0.0
+
+
+def test_chi_0_is_array_shaped_like_energy():
+    E = np.array([1500.0, 5000.0, 10000.0])
+    c0 = chi_0("silicon", E)
+    assert c0.shape == E.shape
+    assert np.all(c0.real < 0.0)
 
 
 def test_optical_constants_delta_positive_off_edge():

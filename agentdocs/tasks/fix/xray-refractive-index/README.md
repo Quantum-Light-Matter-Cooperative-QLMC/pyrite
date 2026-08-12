@@ -61,11 +61,13 @@ extension unless the observation geometry approaches grazing incidence.
 
 ## Checklist
 
-- [ ] `chi_0(crystal, photon_E_eV)` in `materials/crystal.py` from Henke
+- [x] `chi_0(crystal, photon_E_eV)` in `materials/crystal.py` from Henke
       `f1`/`f2` summed over the unit cell; complex, dimensionless.
-- [ ] `refractive_index` / `delta`+`beta` accessor consistent with the
-      existing `optical_constants` and `absorption_length_ang` conventions
-      (cross-check: `mu = 2 k beta` must reproduce today's `mu`).
+      Ledger `xray-chi-zero`, status `filtered`.
+- [x] `refractive_index` consistent with the existing `optical_constants` and
+      `absorption_length_ang` conventions — `-Re(chi_0)/2` and `-Im(chi_0)/2`
+      reproduce `delta`/`beta` to 1e-12 rel. Ledger `xray-refractive-index`,
+      status `filtered`.
 - [ ] `xray_dispersion` model switch plumbed to the spectrum entry points,
       default `"vacuum"` so existing goldens are unchanged.
 - [ ] In-medium dispersion in the resonance denominator, derived from the
@@ -79,3 +81,25 @@ extension unless the observation geometry approaches grazing incidence.
 ## Decisions
 
 - Fresnel/interface refraction is out of scope (non-grazing geometry).
+- `chi_0` uses `Z_TABLE[el] + f'` for the forward factor rather than
+  `cromer_mann_f0(el, 0)`, so it shares one normalization with
+  `optical_constants` / `absorption_length_ang` exactly instead of to within
+  the Cromer-Mann `f0(0) ~ Z` fit residual.
+- `refractive_index` takes the square root exactly rather than linearizing.
+  The in-medium wavevector is defined from `n`, and the linearized form is
+  only an O(chi_0^2) approximation to it. Measured residual vs the linearized
+  `1 - delta - i beta` in Si: `delta/2` and `delta` respectively (9.2e-5 and
+  1.8e-4 rel at 1.5 keV).
+- Sign convention `n = 1 - delta - i beta` (time factor `exp(+i omega t)`)
+  is forced by the existing coherent propagation phase `exp{i[omega t - k.r]}`
+  in `lines.py:685` and matches `optical_constants`.
+
+## Pre-existing failures on `main` (not caused by this branch)
+
+- `pyrite-dev lint`: 2x `F841` in `montecarlo/transport.py` (:1638, :1942).
+- `pyrite-dev typecheck`: 52 diagnostics, mostly unresolved optional imports.
+- `tests/materials/test_crystal_lattice.py` fails to collect (`plotly` not
+  installed); `test_material_catalog.py::test_packaged_profiles_have_explicit_membership`
+  fails. Both verified failing with this branch's changes stashed.
+- `pyrite-dev format` reformats 8 files unrelated to this task; those reverts
+  are deliberate, keep them out of this branch's diff.

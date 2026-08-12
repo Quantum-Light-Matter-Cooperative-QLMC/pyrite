@@ -12,6 +12,8 @@ materials.atomic:
   * the catalog-backed crystal database (CIF -> CATALOG -> CRYSTALS),
   * Debye-Waller, structure factor S(g), and the polarizability / crystal-
     potential Fourier components chi_g (PXR) and U_g (CBS),
+  * the g=0 susceptibility chi_0 and the complex refractive index
+    n = sqrt(1 + chi_0) it defines,
   * photoabsorption length from Henke f2,
   * dominant_reflections (rank reflection families by |S| e^{-W} / g^2),
   * _rotation_between (minimal rotation matrix, used to orient crystals).
@@ -249,6 +251,87 @@ def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     S, _ = structure_factor(crystal, hkl, photon_E_eV, B_ang2, use_henke)
     lam = HC_EV_ANG / photon_E_eV  # wavelength [Angstrom]
     return -R_E_ANG * lam**2 / (np.pi * CRYSTALS[crystal]["V_cell"]) * S
+
+
+def chi_0(crystal, photon_E_eV, use_henke=True):
+    """Return the g=0 (bulk mean) polarizability of the unit cell.
+
+    This is :func:`chi_g` evaluated at ``g = 0``, where the Debye-Waller factor
+    ``exp(-B s^2)`` and every basis phase ``exp(i 2 pi hkl . R)`` reduce to 1,
+    so the structure factor collapses to the forward-scattering sum over the
+    cell:
+
+        S(0)  = sum_i (f1_i + i f2_i),   f1 = Z + f',  f2 = f''
+        chi_0 = - r_e lambda^2 / (pi V_cell) * S(0)     [dimensionless]
+
+    The forward form factors use the Henke convention ``f1 = Z + f'`` taken
+    from ``Z_TABLE`` and ``henke_dispersion``, not ``cromer_mann_f0(el, 0)``,
+    so that this shares one normalization with :func:`optical_constants` and
+    :func:`absorption_length_ang` exactly rather than to within the
+    Cromer-Mann ``f0(0) ~ Z`` fit residual.
+
+    ``use_henke`` defaults to True here, unlike :func:`chi_g`: the dispersive
+    ``f'`` is the entire content of the real refractive correction, and
+    dropping it would leave only the non-resonant Thomson term.
+
+    Assumes the same kinematic, independent-atom susceptibility convention as
+    :func:`chi_g`, and a homogeneous medium on the scale of the photon
+    wavelength (bulk response; interface/Fresnel effects are not included).
+
+    Limiting case: with ``f' = f'' = 0``, ``chi_0 -> -r_e lambda^2 Z_cell /
+    (pi V_cell)``, purely real and negative, giving the textbook Thomson
+    ``n = 1 - delta`` with ``delta = r_e lambda^2 n_e / (2 pi)``.
+
+    Out-of-range energies propagate NaN from ``henke_dispersion``, consistent
+    with the rest of the module.
+
+    Validation: xray-chi-zero
+    """
+    info = CRYSTALS[crystal]
+    E = np.asarray(photon_E_eV, dtype=float)
+    forward_F = {}
+    for el, _R in info["basis"]:
+        if el in forward_F:
+            continue
+        if use_henke:
+            fp, fpp = henke_dispersion(el, E)
+            forward_F[el] = (Z_TABLE[el] + fp) + 1j * fpp
+        else:
+            forward_F[el] = np.full(E.shape, float(Z_TABLE[el]), dtype=complex)
+    S = np.zeros(E.shape, dtype=complex)
+    for el, _R in info["basis"]:
+        S = S + forward_F[el]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = HC_EV_ANG / E  # wavelength [Angstrom]
+        return -R_E_ANG * lam**2 / (np.pi * info["V_cell"]) * S
+
+
+def refractive_index(crystal, photon_E_eV, use_henke=True):
+    """Complex X-ray refractive index of a catalog crystal.
+
+    From the Maxwell dispersion relation in a homogeneous dielectric,
+    ``k^2 = (1 + chi_0) omega^2``, so
+
+        n(E) = sqrt(1 + chi_0(E)) ~ 1 - delta - i beta
+
+    with the module-wide ``n = 1 - delta - i beta`` convention of
+    :func:`optical_constants` (time factor ``exp(+i omega t)``, matching the
+    coherent propagation phase ``exp{i[omega t - k.r]}`` used by the spectrum
+    kernels). The square root is taken exactly rather than linearized; the two
+    agree to O(chi_0^2) ~ 1e-10 in the X-ray regime, but the exact form is what
+    the in-medium wavevector is defined from.
+
+    Because ``|chi_0| << 1``, ``delta ~ -Re(chi_0)/2`` is typically 1e-5..1e-3;
+    it is small per Angstrom but accumulates over micron-scale trajectories,
+    which is precisely the effect this is here to track.
+
+    Limiting case: ``chi_0 -> 0`` (vacuum, or photon energy far above all
+    edges) gives ``n -> 1`` and every in-medium expression collapses to its
+    vacuum form.
+
+    Validation: xray-refractive-index
+    """
+    return np.sqrt(1.0 + chi_0(crystal, photon_E_eV, use_henke))
 
 
 def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
