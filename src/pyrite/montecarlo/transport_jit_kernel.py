@@ -79,6 +79,7 @@ I8_NOT_ENTERED = np.int8(5)
 
 F64_ONE_OVER_511 = 1 / np.float64(510.99895)
 
+
 @dataclass(frozen=True)
 class TransportKernelConfig:
     """Launch geometry. Does not affect results -- output slots are addressed by
@@ -119,7 +120,7 @@ def _beta_from_keV(E_i):
 def _rate_mott(E_i, mott_numer, mott_denom1, mott_denom2):
     """Browning total elastic cross section [cm^2] times number density."""
     sqrt_E_i = xp.sqrt(E_i)
-    return mott_numer / (E_i + mott_denom1 * sqrt_E_i + mott_denom2 / sqrt_E_i) 
+    return mott_numer / (E_i + mott_denom1 * sqrt_E_i + mott_denom2 / sqrt_E_i)
 
 
 @jit.rawkernel(device=True)
@@ -134,10 +135,7 @@ def _rate_sr(E_i, sr_rate_numer, sr_joy_numer):
     E_i_plus_1024 = E_i + np.float64(1024.0)
     E_i_511_over_1024 = E_i_plus_511 / E_i_plus_1024
     sig_i = (
-        sr_rate_numer
-        / (E_i * E_i)
-        / (a * (F64_ONE + a))
-        * (E_i_511_over_1024 * E_i_511_over_1024)
+        sr_rate_numer / (E_i * E_i) / (a * (F64_ONE + a)) * (E_i_511_over_1024 * E_i_511_over_1024)
     )
     return sig_i
 
@@ -284,14 +282,10 @@ def _transport_kernel(
                     E_j,
                     L_mott_numer[row + i_el],
                     L_mott_denom1[row + i_el],
-                    L_mott_denom2[row + i_el]
+                    L_mott_denom2[row + i_el],
                 )
             else:
-                total_rate += _rate_sr(
-                    E_j,
-                    L_sr_rate_numer[row + i_el],
-                    L_sr_joy_numer[row + i_el]
-                )
+                total_rate += _rate_sr(E_j, L_sr_rate_numer[row + i_el], L_sr_joy_numer[row + i_el])
             i_el += I32_ONE
 
         lam_ang = np.float64(1e8) / total_rate
@@ -457,13 +451,11 @@ def _transport_kernel(
                             E_j,
                             L_mott_numer[row + k_el],
                             L_mott_denom1[row + k_el],
-                            L_mott_denom2[row + k_el]
+                            L_mott_denom2[row + k_el],
                         )
                     else:
                         cumulative += _rate_sr(
-                            E_j,
-                            L_sr_rate_numer[row + k_el],
-                            L_sr_joy_numer[row + k_el]
+                            E_j, L_sr_rate_numer[row + k_el], L_sr_joy_numer[row + k_el]
                         )
                     if cumulative > u and not picked:
                         sel = k_el
@@ -526,7 +518,6 @@ def _transport_kernel(
             dirs[e3 + I32_TWO] = outz / mag
 
     seg_count[i] = local_nseg
-
 
 
 @jit.rawkernel()
@@ -1045,6 +1036,7 @@ def run_transport_kernel(
             exit_code,
         ),
     )
+
 
 def make_cuda_transport_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
     """Return ``(core, array_module)`` for ``_run_per_electron_transport``."""

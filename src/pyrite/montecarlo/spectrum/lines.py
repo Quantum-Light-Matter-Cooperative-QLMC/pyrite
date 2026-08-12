@@ -1357,9 +1357,7 @@ def mc_spectrum(
             _coh_chi_im = CHI_IM.reshape(-1)
             _coh_u_re = U_RE.reshape(-1)
             _coh_u_im = U_IM.reshape(-1)
-            _coh_aw = xp.ascontiguousarray(
-                denom_all * t_L_all / (2.0 * HBARC_EV_ANG), dtype=REAL
-            )
+            _coh_aw = xp.ascontiguousarray(denom_all * t_L_all / (2.0 * HBARC_EV_ANG), dtype=REAL)
             _coh_phase_slope = xp.ascontiguousarray(d_all / HBARC_EV_ANG, dtype=REAL)
             coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
         else:

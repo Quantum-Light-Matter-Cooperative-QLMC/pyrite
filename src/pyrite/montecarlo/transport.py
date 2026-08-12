@@ -381,12 +381,7 @@ def _scatter_rates_sr_scalar(E_i, sr_rate_numer, sr_joy_numer):
     E_i_plus_1024 = E_i + 1024.0
     E_i_511_over_1024 = E_i_plus_511 / E_i_plus_1024
 
-    sig_i = (
-        sr_rate_numer
-        / (E_i * E_i)
-        / (a * (1.0 + a))
-        * (E_i_511_over_1024 * E_i_511_over_1024)
-    )
+    sig_i = sr_rate_numer / (E_i * E_i) / (a * (1.0 + a)) * (E_i_511_over_1024 * E_i_511_over_1024)
     return sig_i
 
 
@@ -518,7 +513,6 @@ def _dEds_compound(J_arr, k_arr, coeff_arr, E_keV):
 
         out[j] = -7.85e-4 / E * total
     return out
-
 
 
 @dataclass(frozen=True)
@@ -663,10 +657,7 @@ def build_transport_energy_lut(
             else:
                 a = sr_joy / E_grid
                 rates[i_el] = (
-                    float(L_sr_rate_numer[L][i_el])
-                    / (E_grid * E_grid)
-                    / (a * (1.0 + a))
-                    * rel2
+                    float(L_sr_rate_numer[L][i_el]) / (E_grid * E_grid) / (a * (1.0 + a)) * rel2
                 )
 
             table = mott_tables[L][i_el]
@@ -948,15 +939,10 @@ def _transport_core_ungrooved(
             for i_el in range(Z_arr.size):
                 if elastic_model_code == 1:
                     rate = _scatter_rates_mott_scalar(
-                        E_j,
-                        mott_numer[i_el],
-                        mott_denom1[i_el],
-                        mott_denom2[i_el]
+                        E_j, mott_numer[i_el], mott_denom1[i_el], mott_denom2[i_el]
                     )
                 else:
-                    rate = _scatter_rates_sr_scalar(
-                        E_j, sr_rate_numer[i_el], sr_joy_numer[i_el]
-                    )
+                    rate = _scatter_rates_sr_scalar(E_j, sr_rate_numer[i_el], sr_joy_numer[i_el])
                 rate_arr[i_el] = rate
                 total_rate += rate
 
@@ -1125,7 +1111,6 @@ def _transport_core_ungrooved(
     return nseg, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
 
 
-
 @njit(cache=True)
 def _transport_core_ungrooved_lut(
     Ne,
@@ -1198,9 +1183,7 @@ def _transport_core_ungrooved_lut(
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
             E_j = E_keV[e]
-            lut_i, lut_f = _lut_index_frac_scalar(
-                E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
-            )
+            lut_i, lut_f = _lut_index_frac_scalar(E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy)
 
             # 1. Sample the next elastic-collision distance.
             total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
@@ -1261,9 +1244,7 @@ def _transport_core_ungrooved_lut(
                     lut_inv_dE_keV,
                     lut_n_energy,
                 )
-                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(
-                    lut_dEds, L, cut_i, cut_f
-                )
+                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
             else:
                 cutoff_distance = (E_cut_e - E_j) / dEds
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
@@ -1365,9 +1346,7 @@ def _transport_core_ungrooved_lut(
             alpha = _lut_lerp_3d(lut_alpha, L, i_el, alpha_i, alpha_f)
             cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
             phi = 2.0 * np.pi * rng.random()
-            dx, dy, dz = _rotate_direction_scalar(
-                dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi
-            )
+            dx, dy, dz = _rotate_direction_scalar(dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi)
             dirs[e, 0] = dx
             dirs[e, 1] = dy
             dirs[e, 2] = dz
@@ -1493,15 +1472,10 @@ def _transport_core_grooved(
             for i_el in range(Z_arr.size):
                 if elastic_model_code == 1:
                     rate = _scatter_rates_mott_scalar(
-                        E_j,
-                        mott_numer[i_el],
-                        mott_denom1[i_el],
-                        mott_denom2[i_el]
+                        E_j, mott_numer[i_el], mott_denom1[i_el], mott_denom2[i_el]
                     )
                 else:
-                    rate = _scatter_rates_sr_scalar(
-                        E_j, sr_rate_numer[i_el], sr_joy_numer[i_el]
-                    )
+                    rate = _scatter_rates_sr_scalar(E_j, sr_rate_numer[i_el], sr_joy_numer[i_el])
                 rate_arr[i_el] = rate
                 total_rate += rate
 
@@ -1893,15 +1867,10 @@ def _transport_core_ungrooved_perelectron(
             for i_el in range(n_el):
                 if elastic_model_code == 1:
                     rate = _scatter_rates_mott_scalar(
-                        E_j,
-                        mott_numer[i_el],
-                        mott_denom1[i_el],
-                        mott_denom2[i_el]
+                        E_j, mott_numer[i_el], mott_denom1[i_el], mott_denom2[i_el]
                     )
                 else:
-                    rate = _scatter_rates_sr_scalar(
-                        E_j, sr_rate_numer[i_el], sr_joy_numer[i_el]
-                    )
+                    rate = _scatter_rates_sr_scalar(E_j, sr_rate_numer[i_el], sr_joy_numer[i_el])
                 total_rate += rate
 
             lam_ang = 1e8 / total_rate
@@ -2058,7 +2027,6 @@ def _transport_core_ungrooved_perelectron(
         seg_count[i] = local_nseg
 
 
-
 @njit(cache=True)
 def _transport_core_ungrooved_perelectron_lut(
     e_start,
@@ -2126,9 +2094,7 @@ def _transport_core_ungrooved_perelectron_lut(
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
             E_j = E_keV[e]
-            lut_i, lut_f = _lut_index_frac_scalar(
-                E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
-            )
+            lut_i, lut_f = _lut_index_frac_scalar(E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy)
 
             total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
             lam_ang = 1e8 / total_rate
@@ -2241,9 +2207,7 @@ def _transport_core_ungrooved_perelectron_lut(
             draw += _SM64_ONE
             phi = 2.0 * np.pi * _stream_uniform_scalar(key, draw)
             draw += _SM64_ONE
-            ndx, ndy, ndz = _rotate_direction_scalar(
-                dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi
-            )
+            ndx, ndy, ndz = _rotate_direction_scalar(dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi)
             dirs[e, 0] = ndx
             dirs[e, 1] = ndy
             dirs[e, 2] = ndz
@@ -2261,7 +2225,7 @@ def pack_layer_tables(
     L_mott_numer,
     L_mott_denom1,
     L_mott_denom2,
-    L_sr_joy_numer
+    L_sr_joy_numer,
 ):
     """Pad the per-layer element lists into ``(n_layers, max_elements)`` rows.
 
@@ -2307,10 +2271,11 @@ def pack_layer_tables(
         mott_denom1s,
         mott_denom2s,
         sr_joy_numers,
-        nel
+        nel,
     )
-    
+
     return packed_tables
+
 
 def _percentile_summary(values):
     """Compact, JSON-safe summary of one non-negative per-flight diagnostic."""
@@ -2558,7 +2523,6 @@ def _batch_electrons(e, cap, Ne, config):
     if e == 0 and config.probe_electrons > 0:
         n = min(n, int(config.probe_electrons))
     return n
-
 
 
 def _run_per_electron_transport_lut(
@@ -3378,15 +3342,10 @@ def simulate_trajectories(
     L_mott_denom2 = []
     L_sr_joy_numer = []
 
-    
     for i, Z_i in enumerate(L_Zs):
         n_cm3_i = L_ncm3[i]
         # Rutherford Scattering coefficient hoisted out of hot loop
-        L_sr_rate_numer.append(
-            5.21e-21 * Z_i * Z_i
-            * np.float64(4.0) * np.float64(np.pi)
-            * n_cm3_i
-        )
+        L_sr_rate_numer.append(5.21e-21 * Z_i * Z_i * np.float64(4.0) * np.float64(np.pi) * n_cm3_i)
 
         # Browning fit coefficients to Mott scattering hoisted out of hot loop
         z17 = Z_i ** np.float64(1.7)
@@ -3396,7 +3355,6 @@ def simulate_trajectories(
 
         # Joy-Luo
         L_sr_joy_numer.append(np.float64(3.4e-3) * Z_i ** np.float64(0.67))
-
 
     L_top = np.asarray([float(a) for (a, _, _) in layers], dtype=float)
     L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
@@ -3733,7 +3691,7 @@ def simulate_trajectories(
             L_mott_numer,
             L_mott_denom1,
             L_mott_denom2,
-            L_sr_joy_numer
+            L_sr_joy_numer,
         )
         nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs = (
             _run_per_electron_transport(

@@ -32,21 +32,9 @@ def _old_weighted_brem_reference(T, L, paths, mu, E, *, Z, density_cm3):
             beta_f = p_f / (1.0 + Tf / mc2)
             born = np.log((p_i + p_f) / max(p_i - p_f, 1.0e-30))
             zi = 2.0 * np.pi * Z * alpha
-            elwert = (
-                beta_i
-                / beta_f
-                * (1.0 - np.exp(-zi / beta_i))
-                / (1.0 - np.exp(-zi / beta_f))
-            )
+            elwert = beta_i / beta_f * (1.0 - np.exp(-zi / beta_i)) / (1.0 - np.exp(-zi / beta_f))
             dsig = (
-                (16.0 / 3.0)
-                * alpha
-                * re2
-                * Z**2
-                / max(k_eV, 1.0e-30)
-                / (p_i * p_i)
-                * born
-                * elwert
+                (16.0 / 3.0) * alpha * re2 * Z**2 / max(k_eV, 1.0e-30) / (p_i * p_i) * born * elwert
             )
             tau = float(np.dot(paths[line], mu[:, k]))
             out[k] += path_weight * dsig * np.exp(-tau)
@@ -70,9 +58,7 @@ def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers):
         paths = np.array([[20.0], [50.0], [80.0], [100.0]], dtype=np.float32)
         mu = np.array([[3e-4, 2e-4, 9e-5, 3e-5, 5e-6]], dtype=np.float32)
     else:
-        paths = np.array(
-            [[10.0, 20.0], [30.0, 25.0], [60.0, 15.0], [75.0, 40.0]], dtype=np.float32
-        )
+        paths = np.array([[10.0, 20.0], [30.0, 25.0], [60.0, 15.0], [75.0, 40.0]], dtype=np.float32)
         mu = np.array(
             [
                 [3e-4, 2e-4, 9e-5, 3e-5, 5e-6],

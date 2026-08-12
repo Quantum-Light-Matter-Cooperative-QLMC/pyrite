@@ -69,9 +69,7 @@ def test_cxr_drift_matches_analytic_endpoint_sweep():
     )
     assert out["n_flights"] == 1
     assert out["resonance_drift_eV"]["max"] == pytest.approx(expected_eV, rel=1e-12)
-    assert out["resonance_drift_linewidths"]["max"] == pytest.approx(
-        expected_eV / width, rel=1e-12
-    )
+    assert out["resonance_drift_linewidths"]["max"] == pytest.approx(expected_eV / width, rel=1e-12)
     assert not out["warned"]
 
 
@@ -125,7 +123,8 @@ def test_cxr_drift_predicts_the_frozen_end_state_from_composition():
 def test_cxr_drift_requires_a_way_to_get_the_end_state():
     with pytest.raises(ValueError, match="composition"):
         cxr_endpoint_resonance_drift(
-            _segments(25.0, None), np.array([[0.0, 0.0, 0.5]]),
+            _segments(25.0, None),
+            np.array([[0.0, 0.0, 0.5]]),
             n_hat=np.array([0.0, 0.0, 1.0]),
         )
 
@@ -150,7 +149,10 @@ def test_brem_quadrature_matches_direct_cross_section_evaluation():
     # Independent recomputation: same public cross section (the estimator's
     # contract is the quadrature arithmetic), hand-written trapezoid weights.
     y_s = CARBON[0][1] * np.asarray(_brem_dsigma_dk(_Z, np.array([T_start]), E_grid))[0]
-    y_m = CARBON[0][1] * np.asarray(_brem_dsigma_dk(_Z, np.array([0.5 * (T_start + T_end)]), E_grid))[0]
+    y_m = (
+        CARBON[0][1]
+        * np.asarray(_brem_dsigma_dk(_Z, np.array([0.5 * (T_start + T_end)]), E_grid))[0]
+    )
     w = np.empty_like(E_grid)
     w[0], w[-1] = 0.5 * (E_grid[1] - E_grid[0]), 0.5 * (E_grid[-1] - E_grid[-2])
     w[1:-1] = 0.5 * (E_grid[2:] - E_grid[:-2])
@@ -164,12 +166,12 @@ def test_brem_quadrature_error_scales_linearly_with_energy_loss():
     # dsigma/dk is smooth in T away from the grid endpoint, so the
     # endpoint-vs-midpoint difference is first order in the flight's loss.
     E_grid = np.linspace(1.0e3, 2.0e4, 401)
-    full = brem_endpoint_quadrature_error(
-        _segments(25.0, 24.0), E_grid, composition=CARBON
-    )["integrated_relative_error"]["max"]
-    half = brem_endpoint_quadrature_error(
-        _segments(25.0, 24.5), E_grid, composition=CARBON
-    )["integrated_relative_error"]["max"]
+    full = brem_endpoint_quadrature_error(_segments(25.0, 24.0), E_grid, composition=CARBON)[
+        "integrated_relative_error"
+    ]["max"]
+    half = brem_endpoint_quadrature_error(_segments(25.0, 24.5), E_grid, composition=CARBON)[
+        "integrated_relative_error"
+    ]["max"]
     assert 1.8 < full / half < 2.2
 
 

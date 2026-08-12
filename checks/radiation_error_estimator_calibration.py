@@ -51,9 +51,18 @@ CASES = [
     ("W 100 keV  5e3 Ang", TUNGSTEN, 100.0, 5.0e3),
 ]
 
-_WIDTHS = (("case", 22), ("flights", 8), ("drift p50", 10), ("drift p99", 10),
-           ("cxr L1", 9), ("cxr max", 9), ("quad p50", 9), ("quad p99", 9),
-           ("brem L1", 9), ("brem max", 9))
+_WIDTHS = (
+    ("case", 22),
+    ("flights", 8),
+    ("drift p50", 10),
+    ("drift p99", 10),
+    ("cxr L1", 9),
+    ("cxr max", 9),
+    ("quad p50", 9),
+    ("quad p99", 9),
+    ("brem L1", 9),
+    ("brem max", 9),
+)
 
 
 def _rel_l1(a, b):

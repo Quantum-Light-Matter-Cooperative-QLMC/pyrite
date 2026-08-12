@@ -150,9 +150,9 @@ def cxr_endpoint_resonance_drift(
 
     t_L = length / beta_start
     width = 2.0 * np.pi * HBARC_EV_ANG / (dnm * t_L)  # (M,) half-width [eV]
-    drift_eV = np.where(
-        radiating, HBARC_EV_ANG * np.abs(omega_end - omega_start), -np.inf
-    ).max(axis=1)
+    drift_eV = np.where(radiating, HBARC_EV_ANG * np.abs(omega_end - omega_start), -np.inf).max(
+        axis=1
+    )
     drift_linewidths = np.where(
         radiating,
         HBARC_EV_ANG * np.abs(omega_end - omega_start) / width[:, None],
@@ -217,9 +217,7 @@ def brem_endpoint_quadrature_error(
     else:
         compositions = [item[2] for item in layers]
     E_start = _host(segments["E_keV"]).astype(float, copy=False)
-    E_end = _flight_E_end_keV(
-        segments, None if layers is not None else compositions[0], layers
-    )
+    E_end = _flight_E_end_keV(segments, None if layers is not None else compositions[0], layers)
     layer_index = _host(segments["layer"]).astype(np.int64, copy=False)
     E_grid = np.asarray(E_grid_eV, dtype=float)
     # Trapezoid weights turn the per-bin densities into an integrated yield.
@@ -258,9 +256,9 @@ def brem_endpoint_quadrature_error(
             (y_mid * weights[None, :]).sum(axis=1) + 1e-300
         )
         significant = y_mid >= 1e-6 * y_mid.max(axis=1, keepdims=True)
-        max_bin[lo:hi] = np.where(
-            significant & (y_mid > 0.0), diff / (y_mid + 1e-300), 0.0
-        ).max(axis=1)
+        max_bin[lo:hi] = np.where(significant & (y_mid > 0.0), diff / (y_mid + 1e-300), 0.0).max(
+            axis=1
+        )
 
     summary = _percentile_summary(integrated)
     warned = summary["p99"] is not None and summary["p99"] > warn_threshold

@@ -91,7 +91,9 @@ def _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
 
 
 @jit.rawkernel()
-def _kernel_1e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
+def _kernel_1e(
+    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+):
     k0 = jit.blockIdx.x
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
@@ -123,7 +125,9 @@ def _kernel_1e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec,
 
 
 @jit.rawkernel()
-def _kernel_2e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
+def _kernel_2e(
+    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+):
     base = jit.blockIdx.x * U32_TWO
     k0 = base
     k1 = base + U32_ONE
@@ -170,7 +174,9 @@ def _kernel_2e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec,
 
 
 @jit.rawkernel()
-def _kernel_3e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
+def _kernel_3e(
+    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+):
     base = jit.blockIdx.x * U32_THREE
     k0 = base
     k1 = base + U32_ONE
@@ -231,7 +237,9 @@ def _kernel_3e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec,
 
 
 @jit.rawkernel()
-def _kernel_4e(T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers):
+def _kernel_4e(
+    T, p_i_arr, incident_prefactor, path_flat, mu_flat, E_grid, spec, Z, n_seg, n_E, n_layers
+):
     base = jit.blockIdx.x * U32_FOUR
     k0 = base
     k1 = base + U32_ONE

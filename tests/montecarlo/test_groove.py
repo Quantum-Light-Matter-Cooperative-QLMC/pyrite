@@ -412,11 +412,7 @@ def _run_grooved(
     for i, Z_i in enumerate(L_Zs):
         n_cm3_i = L_ncm3[i]
         # Rutherford Scattering coefficient hoisted out of hot loop
-        L_sr_rate_numer.append(
-            5.21e-21 * Z_i * Z_i
-            * np.float64(4.0) * np.float64(np.pi)
-            * n_cm3_i
-        )
+        L_sr_rate_numer.append(5.21e-21 * Z_i * Z_i * np.float64(4.0) * np.float64(np.pi) * n_cm3_i)
 
         # Browning fit coefficients to Mott scattering hoisted out of hot loop
         z17 = Z_i ** np.float64(1.7)

@@ -67,9 +67,7 @@ def test_sr_transport_lut_matches_direct_scalar_physics():
 
     rng = np.random.default_rng(1234)
     energies = rng.uniform(5.0, 30.0, 2000)
-    rate_exact = np.array(
-        [t._scatter_rates_sr_scalar(E, L_sr[0][0], L_sj[0][0]) for E in energies]
-    )
+    rate_exact = np.array([t._scatter_rates_sr_scalar(E, L_sr[0][0], L_sj[0][0]) for E in energies])
     dEds_exact = np.array(
         [t._dEds_compound_scalar(L_Js[0], L_ks[0], L_coeffs[0], E) for E in energies]
     )

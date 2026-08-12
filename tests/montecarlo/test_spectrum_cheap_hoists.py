@@ -158,4 +158,6 @@ def test_prescaled_u_table_matches_interpolate_then_divide():
 
     # Float32 may round once in a different place; the error should remain at a
     # few ulps, not become a physics-scale discrepancy.
-    np.testing.assert_allclose(new, old, rtol=1.5e-6 if np.dtype(dtype) == np.float32 else 3e-15, atol=1e-12)
+    np.testing.assert_allclose(
+        new, old, rtol=1.5e-6 if np.dtype(dtype) == np.float32 else 3e-15, atol=1e-12
+    )

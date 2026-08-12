@@ -176,9 +176,7 @@ def _cxr_resonance_eV(E0_keV, g_vec, n_hat=None):
 def _cxr_grid(E0_keV, g_vec, n_hat=None):
     """1 eV grid centred on the forward-beam resonance for this beam energy."""
     E_res = _cxr_resonance_eV(E0_keV, g_vec, n_hat)
-    return np.arange(
-        max(1.0, E_res - CXR_HALF_WINDOW_EV), E_res + CXR_HALF_WINDOW_EV, 1.0
-    )
+    return np.arange(max(1.0, E_res - CXR_HALF_WINDOW_EV), E_res + CXR_HALF_WINDOW_EV, 1.0)
 
 
 def _advance(E_keV, walk_ang, composition, rule):
@@ -194,9 +192,7 @@ def _advance(E_keV, walk_ang, composition, rule):
         E_end = np.maximum(
             E_keV
             + walk_ang
-            * _stopping_keV_per_ang(
-                np.maximum(0.5 * (E_keV + E_pred), _E_FLOOR_KEV), composition
-            ),
+            * _stopping_keV_per_ang(np.maximum(0.5 * (E_keV + E_pred), _E_FLOOR_KEV), composition),
             _E_FLOOR_KEV,
         )
         return E_end, np.maximum(0.5 * (E_keV + E_end), _E_FLOOR_KEV)
@@ -337,9 +333,7 @@ def _subdivide(segments, composition, max_frac_loss, refine="both", rule="frozen
         n_sub = np.ones(n_rows, dtype=np.int64)
         capped = 0
     else:
-        loss = np.maximum(
-            0.0, -_stopping_keV_per_ang(E_start, composition) * length / E_start
-        )
+        loss = np.maximum(0.0, -_stopping_keV_per_ang(E_start, composition) * length / E_start)
         exact = np.maximum(1.0, np.ceil(loss / max_frac_loss))
         capped = int(np.count_nonzero(exact > _MAX_SUBSTEPS))
         n_sub = np.minimum(exact, _MAX_SUBSTEPS).astype(np.int64)
@@ -437,9 +431,7 @@ def _radiation_reductions(rows, composition, cxr_grid, only=None):
                 rows, cxr_grid, composition=composition, coherent=True, **CXR_KWARGS
             )
         if cxr_grid is not None and "cxr_incoh" in wanted:
-            values["cxr_incoh"] = mc_spectrum(
-                rows, cxr_grid, composition=composition, **CXR_KWARGS
-            )
+            values["cxr_incoh"] = mc_spectrum(rows, cxr_grid, composition=composition, **CXR_KWARGS)
     return values
 
 
@@ -455,33 +447,68 @@ def _flight_incoherent_cxr(rows, parent, composition, cxr_grid, Ne):
     for flight in np.unique(parent):
         mask = parent == flight
         one = {
-            key: (value[mask] if isinstance(value, np.ndarray) and value.shape[:1] == parent.shape else value)
+            key: (
+                value[mask]
+                if isinstance(value, np.ndarray) and value.shape[:1] == parent.shape
+                else value
+            )
             for key, value in rows.items()
         }
         one["Ne"] = 1
         with np.errstate(all="ignore"):
-            total += mc_spectrum(one, cxr_grid, composition=composition, coherent=True, **CXR_KWARGS)
+            total += mc_spectrum(
+                one, cxr_grid, composition=composition, coherent=True, **CXR_KWARGS
+            )
     return total / Ne
 
 
 _A_WIDTHS = (
-    ("case", 17), ("model", 9), ("trans", 16), ("back", 16), ("side", 16),
-    ("stop", 16), ("path/e", 12), ("E_ret", 10), ("clock", 12),
-    ("loss p99", 9), ("clk p99", 9),
+    ("case", 17),
+    ("model", 9),
+    ("trans", 16),
+    ("back", 16),
+    ("side", 16),
+    ("stop", 16),
+    ("path/e", 12),
+    ("E_ret", 10),
+    ("clock", 12),
+    ("loss p99", 9),
+    ("clk p99", 9),
 )
 _B_WIDTHS = (
-    ("case", 17), ("f", 8), ("rows", 9), ("brem L1", 10), ("brem max", 10),
-    ("cxrC L1", 10), ("cxrC max", 10), ("cxrCfz L1", 10), ("cxrCfz max", 10),
-    ("cxrI L1", 10), ("cxrI max", 10),
+    ("case", 17),
+    ("f", 8),
+    ("rows", 9),
+    ("brem L1", 10),
+    ("brem max", 10),
+    ("cxrC L1", 10),
+    ("cxrC max", 10),
+    ("cxrCfz L1", 10),
+    ("cxrCfz max", 10),
+    ("cxrI L1", 10),
+    ("cxrI max", 10),
 )
 _P_WIDTHS = (
-    ("case", 17), ("rule", 9), ("f", 8), ("dt p50", 10), ("dt p99", 10),
-    ("cum dt p99", 11), ("cum dt max", 11), ("dphi p99", 10),
-    ("cum dphi p99", 13), ("cum dphi max", 13),
+    ("case", 17),
+    ("rule", 9),
+    ("f", 8),
+    ("dt p50", 10),
+    ("dt p99", 10),
+    ("cum dt p99", 11),
+    ("cum dt max", 11),
+    ("dphi p99", 10),
+    ("cum dphi p99", 13),
+    ("cum dphi max", 13),
 )
 _C_WIDTHS = (
-    ("case", 17), ("f", 8), ("rows", 9), ("flights", 9),
-    ("cxrF L1", 10), ("cxrF max", 10), ("cxrC L1", 10), ("cxrC max", 10),
+    ("case", 17),
+    ("f", 8),
+    ("rows", 9),
+    ("flights", 9),
+    ("cxrF L1", 10),
+    ("cxrF max", 10),
+    ("cxrC L1", 10),
+    ("cxrC max", 10),
 )
 
 
@@ -539,7 +566,10 @@ def part_a(Ne):
 
         shift = {"case": "", "model": "shift/sig"}
         for key in ("trans", "back", "side", "stop", "path", "E_ret", "clock"):
-            (value_f, err_f), (value_m, err_m) = summaries["frozen"][key], summaries["midpoint"][key]
+            (value_f, err_f), (value_m, err_m) = (
+                summaries["frozen"][key],
+                summaries["midpoint"][key],
+            )
             sigma = np.hypot(err_f, err_m)
             text = "--" if sigma == 0.0 else f"{(value_f - value_m) / sigma:+.1f}"
             shift["path/e" if key == "path" else key] = text
@@ -553,8 +583,10 @@ def part_b(Ne):
     print()
     print("=" * 130)
     print(f"Part B -- radiation refinement ladder at fixed physical flights (Ne={Ne}, seed={SEED})")
-    print(f"hopg (0,0,2) |g| = {g002_mag:.4f} 1/Ang at {np.rad2deg(CXR_THETA_OBS_RAD):.0f} deg;"
-          f" reference rung f={LADDER_REFERENCE:.3%}, midpoint rule")
+    print(
+        f"hopg (0,0,2) |g| = {g002_mag:.4f} 1/Ang at {np.rad2deg(CXR_THETA_OBS_RAD):.0f} deg;"
+        f" reference rung f={LADDER_REFERENCE:.3%}, midpoint rule"
+    )
     print("f='flight' is the current production rule (one emission row per physical flight).")
     print("Substeps are integrated with the MIDPOINT rule, so the reference is not itself")
     print("mis-phased and the ladder measures the emission quadrature rather than the clock.")
@@ -579,9 +611,7 @@ def part_b(Ne):
             transport_core="lockstep",
         )
         cxr_grid = _cxr_grid(E0, g002) if comp is CARBON else None
-        ref_rows, _, ref_capped = _subdivide(
-            segments, comp, LADDER_REFERENCE, rule="midpoint"
-        )
+        ref_rows, _, ref_capped = _subdivide(segments, comp, LADDER_REFERENCE, rule="midpoint")
         reference = _radiation_reductions(ref_rows, comp, cxr_grid)
         if ref_capped:
             print(f"  ! reference rung capped {ref_capped} flight(s) at {_MAX_SUBSTEPS} substeps")
@@ -594,9 +624,7 @@ def part_b(Ne):
             rows, _, capped = _subdivide(segments, comp, max_loss, rule="midpoint")
             values = _radiation_reductions(rows, comp, cxr_grid)
             frozen_rows, _, _ = _subdivide(segments, comp, max_loss, rule="frozen")
-            frozen_values = _radiation_reductions(
-                frozen_rows, comp, cxr_grid, only=("cxr_coh",)
-            )
+            frozen_values = _radiation_reductions(frozen_rows, comp, cxr_grid, only=("cxr_coh",))
             cols = {
                 "case": name if max_loss is LADDER[0] else "",
                 "f": "flight" if max_loss is None else f"{max_loss:.3%}",
@@ -619,8 +647,10 @@ def part_b(Ne):
 
         floor = {"case": "", "f": "floor", "rows": ""}
         for tag, key in (
-            ("brem", "brem"), ("cxrC", "cxr_coh"),
-            ("cxrCfz", "cxr_coh"), ("cxrI", "cxr_incoh"),
+            ("brem", "brem"),
+            ("cxrC", "cxr_coh"),
+            ("cxrCfz", "cxr_coh"),
+            ("cxrI", "cxr_incoh"),
         ):
             if key in base:
                 floor[f"{tag} L1"] = f"{_rel_l1(split[key], base[key]):.2e}"
@@ -628,6 +658,7 @@ def part_b(Ne):
             else:
                 floor[f"{tag} L1"] = floor[f"{tag} max"] = "--"
         print(_row(floor, _B_WIDTHS))
+
 
 def part_b_phase(Ne):
     """The emission-phase criterion, which the fractional-loss ladder is not.
@@ -645,8 +676,10 @@ def part_b_phase(Ne):
     g002, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS["hopg"]["lattice"])
     print()
     print("=" * 132)
-    print(f"Part B (phase criterion) -- clock error vs the midpoint rule at"
-          f" f={LADDER_REFERENCE:.3%} (Ne={Ne}, seed={SEED})")
+    print(
+        f"Part B (phase criterion) -- clock error vs the midpoint rule at"
+        f" f={LADDER_REFERENCE:.3%} (Ne={Ne}, seed={SEED})"
+    )
     print("dt   = per-flight end-age error [Ang, c=1];  cum dt = same, accumulated over")
     print("       each electron's flights, which is what an absolute emission phase sees.")
     print("dphi = cum dt * E_res / hbar_c [rad] at the hopg (0,0,2) resonance for the beam")
@@ -668,9 +701,7 @@ def part_b_phase(Ne):
         elec_id = _host(segments["elec_id"]).astype(np.int64, copy=False)
         t_ang = _host(segments["t_ang"]).astype(float, copy=False)
         omega = _cxr_resonance_eV(E0, g002) / HBARC_EV_ANG
-        ref_rows, ref_parent, _ = _subdivide(
-            segments, comp, LADDER_REFERENCE, rule="midpoint"
-        )
+        ref_rows, ref_parent, _ = _subdivide(segments, comp, LADDER_REFERENCE, rule="midpoint")
         reference = _flight_end_clock(ref_rows, ref_parent, comp, "midpoint")
         first = True
         for rule in ("frozen", "midpoint"):
@@ -719,13 +750,9 @@ def part_c(Ne):
         seed=SEED,
         transport_core="lockstep",
     )
-    ref_rows, ref_parent, _ = _subdivide(
-        segments, comp, LADDER_REFERENCE, rule="midpoint"
-    )
+    ref_rows, ref_parent, _ = _subdivide(segments, comp, LADDER_REFERENCE, rule="midpoint")
     reference = _flight_incoherent_cxr(ref_rows, ref_parent, comp, cxr_grid, Ne)
-    global_reference = _radiation_reductions(
-        ref_rows, comp, cxr_grid, only=("cxr_coh",)
-    )["cxr_coh"]
+    global_reference = _radiation_reductions(ref_rows, comp, cxr_grid, only=("cxr_coh",))["cxr_coh"]
     for max_loss in LADDER:
         rows, parent, _ = _subdivide(segments, comp, max_loss, rule="midpoint")
         value = _flight_incoherent_cxr(rows, parent, comp, cxr_grid, Ne)
