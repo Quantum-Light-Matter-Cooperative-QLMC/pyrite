@@ -94,3 +94,12 @@ exclude_patterns = [
 # -- HTML output -------------------------------------------------------------
 html_theme = "pydata_sphinx_theme"
 html_title = "PyRITE"
+
+
+html_theme_options = {
+    "logo": {
+        "text": "PyRITE",
+        "image_light": "_static/pyrite_full.jpg",
+        "image_dark": "_static/pyrite_full.jpg",
+    }
+}

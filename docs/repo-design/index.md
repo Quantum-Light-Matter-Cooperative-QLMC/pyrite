@@ -1,4 +1,4 @@
-# Repository design and developer reference
+# Dev. Reference
 
 This section documents the structure, interfaces, data models, workflows, and implementation decisions that shape the Pyrite codebase.
 

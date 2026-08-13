@@ -1,4 +1,4 @@
-# Physics and simulation models
+# Physical models
 
 This section documents the physical models, assumptions, conventions, and numerical treatments used by the simulation.
 
