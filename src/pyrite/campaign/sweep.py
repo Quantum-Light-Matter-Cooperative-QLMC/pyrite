@@ -379,7 +379,8 @@ class Sweep:
     # Blazed sawtooth grooves on the beam-entrance face (docs/superpowers/
     # plans/2026-07-23-blazed-groove-geometry.md). Scalar, not sweepable in
     # v1. Requires tilt_azim_deg == 180, 0 < tilt_deg < 90, theta_obs = 90,
-    # no substrate/stack, no finite footprint.
+    # and no substrate/stack. A finite footprint IS compatible and is the
+    # default -- see _reject_invalid_groove_geometry for why.
     crystal_width_mm: ScalarOrSeq | None = 5.0
     crystal_height_mm: ScalarOrSeq | None = 5.0
     # fixed setup (single values) ------------------------------------------

@@ -395,8 +395,13 @@ key families threaded through `Sweep` and the case dict:
 
 The constraints between these families are real and are currently enforced by
 scattered validation: `substrate` and `stack` are mutually exclusive; grooves
-require `tilt_azim_deg == 180`, `0 < tilt_deg < 90`, `theta_obs == 90`, no
-stack, and no finite footprint.
+require `tilt_azim_deg == 180`, `0 < tilt_deg < 90`, `theta_obs == 90`, and no
+stack. A finite footprint is compatible with grooves and is in fact the default:
+the sub-micron groove phase and the mm-scale footprint are independent in
+transport. Two further angle rules — `tilt_deg == 0` is banned unless
+`allow_normal_incidence`, and `tilt_azim_deg == 90` is banned outright — are
+enforced separately in `_reject_banned_angles` but are target-angle validity by
+the same test, and Change 4 gathers them into the same error vocabulary.
 
 ### Target state
 
