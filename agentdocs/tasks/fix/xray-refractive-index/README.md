@@ -80,9 +80,10 @@ extension unless the observation geometry approaches grazing incidence.
       `-delta(E) omega(E) L_esc,j` on top of the vacuum `omega d_j` — see the
       decision below; this is NOT the `k(E) n_hat.r_j` form the brief sketched.
       Ledger `xray-in-medium-propagation-phase`, status `filtered`.
-- [ ] JIT/CUDA kernels in lockstep with the CPU core. `refractive` + `coherent`
-      currently forces the exact array path (both the coherent reduction kernel
-      and the coherent stream kernel are gated off).
+- [x] JIT/CUDA kernels in lockstep with the CPU core, for the reduction route.
+      Both reduction paths (per-hkl `_accumulate` and batched) now run under
+      `refractive`. The stream route stays gated — its blocker is the prologue's
+      vacuum kinematics, not the phase; see the decision below.
 - [x] Physics ledger rows + in-code `Validation: <id>` markers (for the
       landed slices).
 - [x] Validation: accumulated phase vs depth (closed form reproduced to 5.7e-13
@@ -133,20 +134,32 @@ extension unless the observation geometry approaches grazing incidence.
 - The implicit resonance `omega_res = v.g / (1 - Re n(omega_res) v.n_hat)` is
   solved by fixed-point iteration from the vacuum root; the map contracts at
   rate ~`delta` ~ 1e-5, so 3 passes are far past float64 rounding.
+- The in-medium term reaches the CUDA kernels as its own `(L_esc, delta_omega)`
+  argument pair plus a launch-uniform `use_medium` uint32 flag (precedent:
+  the existing `geom_pair` flag). Vacuum then skips the loads and the extra FMA
+  entirely, so bit-for-bit vacuum does not rest on `x - 0.0` IEEE identities.
+  When `use_medium` is 0 the two pointers bind to one cached length-1 device
+  array, allocated lazily so importing the module does not touch the device.
+- The coherent STREAM route is still vacuum-only under `refractive`, and the
+  reason is NOT the phase — `_field_kernel_*` carries the in-medium term and is
+  unit-tested on GPU. `run_coherent_prologue_kernel` is an independent CUDA port
+  of steps 1-6 that derives `E_r`/`a_width` from the vacuum denominator on the
+  device, so the in-medium resonance from `_in_medium_kinematics` never reaches
+  it. Un-gated it returns the VACUUM line silently: measured on a single-segment
+  probe (where `|F|^2` is phase-independent, so cancellation noise cannot be the
+  explanation) the stream route peaked at 1600.300 eV while the exact path and
+  the reduction kernel both peaked at 1600.400 eV.
 
 ## Remainder / next slices
 
-- JIT/CUDA lockstep for the coherent phase. Both CUDA routes
-  (`coherent_jit_kernel.run_coherent_reduction_kernel` and
-  `coherent_stream_jit_kernel`) fold the phase as a single per-line
-  `slope_j * E`. The in-medium term is a second
-  (per-segment scalar `L_esc,j`) x (per-energy table `delta(E) omega(E)`)
-  product and does not fit that slope, so both are gated off under
-  `refractive` and the exact array path runs instead. Putting them in lockstep
-  means passing `L_esc` per line plus one extra per-energy table and adding one
-  fused-multiply into the phase argument — a signature change, but a smaller
-  one than the earlier `(a_j, b_j)` sketch implied, since `d_j` and the vacuum
-  slope are untouched and `delta(E) omega(E)` is zero-cost to skip.
+- In-medium kinematics in `run_coherent_prologue_kernel`, to un-gate the
+  coherent stream route under `refractive`. Needs the fixed-point in-medium
+  root, `Re n * n_hat.g` and `k_mag` on the device — i.e. a CUDA port of
+  `_in_medium_kinematics` steps 1-6, plus a per-energy `Re n` table reaching the
+  prologue. The phase half is already done: `_field_kernel_1e`/`_2e` take
+  `(L_esc, delta_omega, use_medium)` and are covered by
+  `tests/montecarlo/test_xray_dispersion_cuda.py`; only the gate in
+  `lines.py::_use_jit_coherent_stream` and the prologue itself remain.
 - Runner/campaign plumbing: `runner._lines_for_segments` derives `coherent`
   from the case dict; `xray_dispersion` should come the same way
   (`case.get("xray_dispersion", "vacuum")`), which also touches campaign config
@@ -161,3 +174,8 @@ extension unless the observation geometry approaches grazing incidence.
   fails. Both verified failing with this branch's changes stashed.
 - `pyrite-dev format` reformats 8 files unrelated to this task; those reverts
   are deliberate, keep them out of this branch's diff.
+- On the GPU box (`qlmc`, RTX 5080, float32), `tests/montecarlo/` has 10
+  failures, 4 of them in `test_xray_dispersion.py` (float64-tuned tolerances and
+  a `ZeroDivisionError` in float32 peak extraction). Verified pre-existing by
+  re-running with `git show HEAD:` copies of the three changed source files in
+  place: identical 4 failures.

@@ -40,6 +40,20 @@ class CoherentKernelConfig:
 DEFAULT_COHERENT_KERNEL_CONFIG = CoherentKernelConfig(nthreads=256, energies_per_block=2)
 
 
+_DUMMY_F32 = None
+
+
+def _dummy():
+    """One cached length-1 float32 array to bind the unused in-medium pointers.
+
+    Allocated lazily so importing this module does not touch the device.
+    """
+    global _DUMMY_F32
+    if _DUMMY_F32 is None:
+        _DUMMY_F32 = xp.zeros(1, dtype=xp.float32)
+    return _DUMMY_F32
+
+
 @jit.rawkernel(device=True)
 def _sinc_unscaled(x):
     if x == F32_ZERO:
@@ -49,13 +63,31 @@ def _sinc_unscaled(x):
 
 @jit.rawkernel()
 def _kernel_1e(
-    E_r, aw, phase_slope, g_phase, cs_re, cs_im, cp_re, cp_im, E_grid, spec, wm, n_lines, n_E
+    E_r,
+    aw,
+    phase_slope,
+    g_phase,
+    cs_re,
+    cs_im,
+    cp_re,
+    cp_im,
+    E_grid,
+    L_esc,
+    delta_omega,
+    spec,
+    wm,
+    use_medium,
+    n_lines,
+    n_E,
 ):
     base = jit.blockIdx.x
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
     k0 = base
     E0 = E_grid[k0]
+    dw0 = F32_ZERO
+    if use_medium:
+        dw0 = delta_omega[k0]
     sr0 = F32_ZERO
     si0 = F32_ZERO
     pr0 = F32_ZERO
@@ -67,6 +99,9 @@ def _kernel_1e(
         aa = aw[line]
         ps = phase_slope[line]
         gp = g_phase[line]
+        Lj = F32_ZERO
+        if use_medium:
+            Lj = L_esc[line]
         csr = cs_re[line]
         csi = cs_im[line]
         cpr = cp_re[line]
@@ -74,6 +109,8 @@ def _kernel_1e(
         x = aa * (E0 - Er)
         s = _sinc_unscaled(x)
         phase = ps * E0 - gp
+        if use_medium:
+            phase = phase - Lj * dw0
         cph = xp.cos(phase)
         sph = xp.sin(phase)
         sr0 += s * (csr * cph - csi * sph)
@@ -111,13 +148,31 @@ def _kernel_1e(
 
 @jit.rawkernel()
 def _kernel_2e(
-    E_r, aw, phase_slope, g_phase, cs_re, cs_im, cp_re, cp_im, E_grid, spec, wm, n_lines, n_E
+    E_r,
+    aw,
+    phase_slope,
+    g_phase,
+    cs_re,
+    cs_im,
+    cp_re,
+    cp_im,
+    E_grid,
+    L_esc,
+    delta_omega,
+    spec,
+    wm,
+    use_medium,
+    n_lines,
+    n_E,
 ):
     base = jit.blockIdx.x * U32_TWO
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
     k0 = base
     E0 = E_grid[k0]
+    dw0 = F32_ZERO
+    if use_medium:
+        dw0 = delta_omega[k0]
     sr0 = F32_ZERO
     si0 = F32_ZERO
     pr0 = F32_ZERO
@@ -125,8 +180,11 @@ def _kernel_2e(
     k1 = base + U32_ONE
     has1 = k1 < n_E
     E1 = F32_ZERO
+    dw1 = F32_ZERO
     if has1:
         E1 = E_grid[k1]
+        if use_medium:
+            dw1 = delta_omega[k1]
     sr1 = F32_ZERO
     si1 = F32_ZERO
     pr1 = F32_ZERO
@@ -138,6 +196,9 @@ def _kernel_2e(
         aa = aw[line]
         ps = phase_slope[line]
         gp = g_phase[line]
+        Lj = F32_ZERO
+        if use_medium:
+            Lj = L_esc[line]
         csr = cs_re[line]
         csi = cs_im[line]
         cpr = cp_re[line]
@@ -145,6 +206,8 @@ def _kernel_2e(
         x = aa * (E0 - Er)
         s = _sinc_unscaled(x)
         phase = ps * E0 - gp
+        if use_medium:
+            phase = phase - Lj * dw0
         cph = xp.cos(phase)
         sph = xp.sin(phase)
         sr0 += s * (csr * cph - csi * sph)
@@ -155,6 +218,8 @@ def _kernel_2e(
             x = aa * (E1 - Er)
             s = _sinc_unscaled(x)
             phase = ps * E1 - gp
+            if use_medium:
+                phase = phase - Lj * dw1
             cph = xp.cos(phase)
             sph = xp.sin(phase)
             sr1 += s * (csr * cph - csi * sph)
@@ -210,13 +275,31 @@ def _kernel_2e(
 
 @jit.rawkernel()
 def _kernel_3e(
-    E_r, aw, phase_slope, g_phase, cs_re, cs_im, cp_re, cp_im, E_grid, spec, wm, n_lines, n_E
+    E_r,
+    aw,
+    phase_slope,
+    g_phase,
+    cs_re,
+    cs_im,
+    cp_re,
+    cp_im,
+    E_grid,
+    L_esc,
+    delta_omega,
+    spec,
+    wm,
+    use_medium,
+    n_lines,
+    n_E,
 ):
     base = jit.blockIdx.x * U32_THREE
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
     k0 = base
     E0 = E_grid[k0]
+    dw0 = F32_ZERO
+    if use_medium:
+        dw0 = delta_omega[k0]
     sr0 = F32_ZERO
     si0 = F32_ZERO
     pr0 = F32_ZERO
@@ -224,8 +307,11 @@ def _kernel_3e(
     k1 = base + U32_ONE
     has1 = k1 < n_E
     E1 = F32_ZERO
+    dw1 = F32_ZERO
     if has1:
         E1 = E_grid[k1]
+        if use_medium:
+            dw1 = delta_omega[k1]
     sr1 = F32_ZERO
     si1 = F32_ZERO
     pr1 = F32_ZERO
@@ -233,8 +319,11 @@ def _kernel_3e(
     k2 = base + U32_TWO
     has2 = k2 < n_E
     E2 = F32_ZERO
+    dw2 = F32_ZERO
     if has2:
         E2 = E_grid[k2]
+        if use_medium:
+            dw2 = delta_omega[k2]
     sr2 = F32_ZERO
     si2 = F32_ZERO
     pr2 = F32_ZERO
@@ -246,6 +335,9 @@ def _kernel_3e(
         aa = aw[line]
         ps = phase_slope[line]
         gp = g_phase[line]
+        Lj = F32_ZERO
+        if use_medium:
+            Lj = L_esc[line]
         csr = cs_re[line]
         csi = cs_im[line]
         cpr = cp_re[line]
@@ -253,6 +345,8 @@ def _kernel_3e(
         x = aa * (E0 - Er)
         s = _sinc_unscaled(x)
         phase = ps * E0 - gp
+        if use_medium:
+            phase = phase - Lj * dw0
         cph = xp.cos(phase)
         sph = xp.sin(phase)
         sr0 += s * (csr * cph - csi * sph)
@@ -263,6 +357,8 @@ def _kernel_3e(
             x = aa * (E1 - Er)
             s = _sinc_unscaled(x)
             phase = ps * E1 - gp
+            if use_medium:
+                phase = phase - Lj * dw1
             cph = xp.cos(phase)
             sph = xp.sin(phase)
             sr1 += s * (csr * cph - csi * sph)
@@ -273,6 +369,8 @@ def _kernel_3e(
             x = aa * (E2 - Er)
             s = _sinc_unscaled(x)
             phase = ps * E2 - gp
+            if use_medium:
+                phase = phase - Lj * dw2
             cph = xp.cos(phase)
             sph = xp.sin(phase)
             sr2 += s * (csr * cph - csi * sph)
@@ -360,6 +458,8 @@ def run_coherent_reduction_kernel(
     *,
     out,
     mosaic_weight=1.0,
+    L_esc=None,
+    delta_omega=None,
     config=DEFAULT_COHERENT_KERNEL_CONFIG,
 ):
     """Accumulate one reflection/orientation's coherent intensity into ``out``.
@@ -367,6 +467,15 @@ def run_coherent_reduction_kernel(
     Inputs are contiguous float32 CuPy arrays. ``phase_slope`` is
     ``(t_abs - n_hat.r) / HBARC_EV_ANG`` so the per-cell phase is
     ``phase_slope[j] * E_grid[k] - g_phase[j]``.
+
+    Under ``xray_dispersion="refractive"`` the caller also supplies the
+    per-line escape distance ``L_esc`` (Angstrom) and the per-energy table
+    ``delta_omega[k] = (1 - Re n(E_k)) * omega(E_k)``, which add the in-medium
+    term ``- L_esc[j] * delta_omega[k]`` to that phase. This is a second
+    (per-line scalar) x (per-energy table) product, so it cannot be folded into
+    ``phase_slope``. Both must be given together or both omitted; when omitted
+    the kernel evaluates the vacuum phase expression unchanged (the in-medium
+    term sits behind a launch-uniform branch, so vacuum stays bit-for-bit).
     """
     nthreads = int(config.nthreads)
     epb = int(config.energies_per_block)
@@ -377,9 +486,20 @@ def run_coherent_reduction_kernel(
     except KeyError:
         raise ValueError(f"energies_per_block must be one of {tuple(_REDUCTION_KERNELS)}") from None
 
+    if (L_esc is None) != (delta_omega is None):
+        raise ValueError("L_esc and delta_omega must be given together")
+
     n_E = int(E_grid.size)
     if n_E == 0 or E_r.size == 0:
         return out
+    use_medium = L_esc is not None
+    if use_medium:
+        if int(L_esc.size) != int(E_r.size):
+            raise ValueError("L_esc must have one entry per line")
+        if int(delta_omega.size) != n_E:
+            raise ValueError("delta_omega must have one entry per energy bin")
+    else:
+        L_esc = delta_omega = _dummy()
     nblocks = (n_E + epb - 1) // epb
     shared_bytes = 4 * epb * nthreads * np.dtype(np.float32).itemsize
     kernel(
@@ -395,8 +515,11 @@ def run_coherent_reduction_kernel(
             c_p_re,
             c_p_im,
             E_grid,
+            L_esc,
+            delta_omega,
             out,
             np.float32(mosaic_weight),
+            np.uint32(1 if use_medium else 0),
             np.uint32(E_r.size),
             np.uint32(n_E),
         ),

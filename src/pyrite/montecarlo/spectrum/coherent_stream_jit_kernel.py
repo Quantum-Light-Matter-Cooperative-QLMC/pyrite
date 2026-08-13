@@ -259,11 +259,14 @@ def _field_kernel_1e(
     cp_re,
     cp_im,
     E_grid,
+    L_esc,
+    delta_omega,
     fs_re,
     fs_im,
     fp_re,
     fp_im,
     geom_pair,
+    use_medium,
     n_seg,
     n_g,
     n_E,
@@ -278,6 +281,9 @@ def _field_kernel_1e(
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
     E0 = E_grid[k0]
+    dw0 = F32_ZERO
+    if use_medium:
+        dw0 = delta_omega[k0]
     sr0 = F32_ZERO
     si0 = F32_ZERO
     pr0 = F32_ZERO
@@ -299,9 +305,14 @@ def _field_kernel_1e(
             aa = aw[geom]
             ps = phase_slope[geom]
             gp = g_phase[line]
+            Lj = F32_ZERO
+            if use_medium:
+                Lj = L_esc[seg]
             x = aa * (E0 - Er)
             s = _sinc_unscaled(x)
             phase = ps * E0 - gp
+            if use_medium:
+                phase = phase - Lj * dw0
             cph = xp.cos(phase)
             sph = xp.sin(phase)
             sr0 += s * (csr * cph - csi * sph)
@@ -348,11 +359,14 @@ def _field_kernel_2e(
     cp_re,
     cp_im,
     E_grid,
+    L_esc,
+    delta_omega,
     fs_re,
     fs_im,
     fp_re,
     fp_im,
     geom_pair,
+    use_medium,
     n_seg,
     n_g,
     n_E,
@@ -369,9 +383,15 @@ def _field_kernel_2e(
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
     E0 = E_grid[k0]
+    dw0 = F32_ZERO
+    if use_medium:
+        dw0 = delta_omega[k0]
     E1 = F32_ZERO
+    dw1 = F32_ZERO
     if has1:
         E1 = E_grid[k1]
+        if use_medium:
+            dw1 = delta_omega[k1]
 
     sr0 = F32_ZERO
     si0 = F32_ZERO
@@ -398,10 +418,15 @@ def _field_kernel_2e(
             aa = aw[geom]
             ps = phase_slope[geom]
             gp = g_phase[line]
+            Lj = F32_ZERO
+            if use_medium:
+                Lj = L_esc[seg]
 
             x = aa * (E0 - Er)
             s = _sinc_unscaled(x)
             phase = ps * E0 - gp
+            if use_medium:
+                phase = phase - Lj * dw0
             cph = xp.cos(phase)
             sph = xp.sin(phase)
             sr0 += s * (csr * cph - csi * sph)
@@ -413,6 +438,8 @@ def _field_kernel_2e(
                 x = aa * (E1 - Er)
                 s = _sinc_unscaled(x)
                 phase = ps * E1 - gp
+                if use_medium:
+                    phase = phase - Lj * dw1
                 cph = xp.cos(phase)
                 sph = xp.sin(phase)
                 sr1 += s * (csr * cph - csi * sph)
@@ -485,6 +512,20 @@ def _finalize_fields_kernel(fs_re, fs_im, fp_re, fp_im, wm, spec, n_g, n_E):
         acc += wm[g] * (sr * sr + si * si + pr * pr + pi * pi)
         g += U32_ONE
     spec[k] += acc
+
+
+_DUMMY_F32 = None
+
+
+def _dummy():
+    """One cached length-1 float32 array to bind the unused in-medium pointers.
+
+    Allocated lazily so importing this module does not touch the device.
+    """
+    global _DUMMY_F32
+    if _DUMMY_F32 is None:
+        _DUMMY_F32 = xp.zeros(1, dtype=xp.float32)
+    return _DUMMY_F32
 
 
 def _validate_threads(nthreads, name):
@@ -649,6 +690,8 @@ def run_coherent_field_accumulation_kernel(
     fields,
     n_g,
     n_seg,
+    L_esc=None,
+    delta_omega=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Add one segment block's complex fields into persistent g-by-energy planes.
@@ -656,6 +699,14 @@ def run_coherent_field_accumulation_kernel(
     ``aw`` and ``phase_slope`` may be either the optimized segment-sized arrays
     (length ``n_seg``) or the historical pair-sized arrays (length
     ``n_g*n_seg``). This keeps direct kernel tests/callers source-compatible.
+
+    Under ``xray_dispersion="refractive"`` the caller supplies the block's
+    per-segment escape distance ``L_esc`` (Angstrom, length ``n_seg``; it is
+    g-independent, so it never takes the pair layout) and the per-energy table
+    ``delta_omega[k] = (1 - Re n(E_k)) * omega(E_k)``. Together they add
+    ``- L_esc[j] * delta_omega[k]`` to the propagation phase. Both must be given
+    together or both omitted; when omitted the kernel evaluates the vacuum
+    phase expression unchanged.
     """
     nthreads = int(config.reduction_nthreads)
     _validate_threads(nthreads, "reduction_nthreads")
@@ -675,6 +726,16 @@ def run_coherent_field_accumulation_kernel(
         raise ValueError("aw must have length n_seg or n_g*n_seg")
     if int(phase_slope.size) != int(aw.size):
         raise ValueError("phase_slope must use the same geometry layout as aw")
+    if (L_esc is None) != (delta_omega is None):
+        raise ValueError("L_esc and delta_omega must be given together")
+    use_medium = L_esc is not None
+    if use_medium:
+        if int(L_esc.size) != n_seg:
+            raise ValueError("L_esc must have one entry per segment")
+        if int(delta_omega.size) != n_E:
+            raise ValueError("delta_omega must have one entry per energy bin")
+    else:
+        L_esc = delta_omega = _dummy()
 
     e_blocks = (n_E + epb - 1) // epb
     nblocks = n_g * e_blocks
@@ -693,11 +754,14 @@ def run_coherent_field_accumulation_kernel(
             cp_re,
             cp_im,
             E_grid,
+            L_esc,
+            delta_omega,
             fs_re,
             fs_im,
             fp_re,
             fp_im,
             np.uint32(1 if pair_geometry else 0),
+            np.uint32(1 if use_medium else 0),
             np.uint32(n_seg),
             np.uint32(n_g),
             np.uint32(n_E),

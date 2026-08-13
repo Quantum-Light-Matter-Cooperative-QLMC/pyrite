@@ -1158,17 +1158,16 @@ def mc_spectrum(
             # complex SP[segment, energy] matrix and avoids both complex GEMVs.
             # The exact CuPy path below remains the fallback for CPU/other
             # backends, float64, and sinc_cutoff windowing.
-            # The reduction kernel folds the phase as ``slope_j * E``, a single
-            # per-line scalar against the energy axis. The in-medium term is a
-            # SECOND (per-segment scalar) x (per-energy table) product, so it
-            # cannot be absorbed into that slope; until the kernel carries both,
-            # the refractive model takes the exact path below.
+            # The reduction kernel folds the vacuum phase as ``slope_j * E``, a
+            # single per-line scalar against the energy axis. The in-medium term
+            # is a SECOND (per-segment scalar) x (per-energy table) product, so
+            # it rides along as its own ``L_esc``/``delta_omega`` pair rather
+            # than being absorbed into that slope.
             _use_jit_coherent_reduction = (
                 _USE_JIT_COHERENT_REDUCTION
                 and getattr(xp, "__name__", "") == "cupy"
                 and np.dtype(REAL) == np.dtype(np.float32)
                 and sinc_cutoff is None
-                and delta_omega_grid is None
             )
             if _use_jit_coherent_reduction:
                 from .coherent_jit_kernel import (
@@ -1191,6 +1190,16 @@ def mc_spectrum(
                         xp.ascontiguousarray(E_grid, dtype=REAL),
                         out=spec,
                         mosaic_weight=wm,
+                        L_esc=(
+                            None
+                            if delta_omega_grid is None
+                            else xp.ascontiguousarray(L_esc[sel], dtype=REAL)
+                        ),
+                        delta_omega=(
+                            None
+                            if delta_omega_grid is None
+                            else xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
+                        ),
                         config=DEFAULT_COHERENT_KERNEL_CONFIG,
                     )
                 return
@@ -1478,11 +1487,14 @@ def mc_spectrum(
         # sync, and per-g concatenate/slice pass.  The final kernel squares each g
         # row independently and only then mosaic-weights/sums rows, so reflections
         # and orientations remain incoherent.  Validation: coherent-line-hkl-batch
-        # Both CUDA coherent routes fold the propagation phase as a single
-        # per-line ``slope_j * E``. The in-medium term is a second
-        # (per-segment scalar) x (per-energy table) product and does not fit that
-        # slope, so the refractive model falls back to the exact path until the
-        # kernels carry both. See the task remainder.
+        # Still vacuum-only under ``refractive``, but NOT because of the phase:
+        # ``run_coherent_prologue_kernel`` is an independent CUDA port of steps
+        # 1-6 and derives ``E_r``/``a_width`` from the vacuum denominator on the
+        # device, so the in-medium resonance never reaches it. Un-gated, it
+        # silently returns the VACUUM line (measured: peak at 1600.300 eV where
+        # the exact path gives 1600.400 eV). The prologue needs the fixed-point
+        # in-medium root, ``Re n * n_hat.g`` and ``k_mag`` before this route can
+        # be un-gated; ``_field_kernel_*`` already carries the phase term.
         _use_jit_coherent_stream = (
             coherent
             and _USE_JIT_COHERENT_STREAM
@@ -1525,7 +1537,6 @@ def mc_spectrum(
             and _USE_JIT_COHERENT_REDUCTION
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
-            and delta_omega_grid is None
         )
         if _use_jit_coherent_reduction:
             from .coherent_jit_kernel import (
@@ -1627,6 +1638,10 @@ def mc_spectrum(
                     fields=coherent_fields,
                     n_g=N_g,
                     n_seg=sb.stop - sb.start,
+                    # g-independent, so it stays segment-sized here even though
+                    # the prologue's other outputs are pair-sized.
+                    L_esc=(None if delta_omega_grid is None else L_esc_full[sb].reshape(-1)),
+                    delta_omega=delta_omega_grid,
                     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
                 )
                 _nsys_pop()
@@ -1875,6 +1890,8 @@ def mc_spectrum(
                         E_grid,
                         out=spec,
                         mosaic_weight=wm_i,
+                        L_esc=L_i,
+                        delta_omega=delta_omega_grid,
                         config=DEFAULT_COHERENT_KERNEL_CONFIG,
                     )
                     continue
