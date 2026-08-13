@@ -483,7 +483,7 @@ def run_sweep(
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
-    cases : list of case dicts from sweep.build_cases.
+    cases : list of typed cases from sweep.build_cases.
     results : the dict to fill ({name: {E0: record}}).
     checkpoint_dir : directory for the per-material checkpoints. A sweep is
         single-material, so each writes ``<checkpoint_dir>/<material>.pkl``
@@ -507,7 +507,7 @@ def run_sweep(
         group, with all of that group's config names (cached + freshly run).
     on_progress : optional callback(completed_new_cases, total_cases, cached_cases)
         fired once after resume filtering and after every newly completed case.
-    on_case : optional callback(case) fired with each case dict as it finishes,
+    on_case : optional callback(case) fired with each case as it finishes,
         just before ``on_progress`` -- the frontier the sweep is working through.
         Lets a live viewer surface which crystal case (energy, tilts, thickness)
         is currently under test without threading it through ``on_progress``'s

@@ -46,12 +46,14 @@ not independent registries and not part of the supported API.
 
 These are the supported low-level simulation entry points. Inputs and outputs
 use the units stated in their docstrings; prefer keyword arguments for optional
-model controls.
+model controls. `Case` is the frozen, validated input record; its `to_dict()`
+method preserves the legacy mapping representation for serialization.
 
 ```{eval-rst}
 .. autosummary::
    :toctree: _autosummary
 
+   pyrite.montecarlo.Case
    pyrite.montecarlo.transport.simulate_trajectories
    pyrite.montecarlo.spectrum.mc_spectrum
    pyrite.montecarlo.spectrum.mc_spectrum_solid_angle

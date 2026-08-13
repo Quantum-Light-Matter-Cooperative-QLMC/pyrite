@@ -241,6 +241,9 @@ bremsstrahlung, parallel case runner, detector-convolution helpers.
 Split from single module into submodules; **every public and internal name
 re-exported from package** — `from pyrite.montecarlo import X` unchanged
 (`tests/montecarlo/test_exports.py` freeze export set).
+- `case` — frozen, validating `Case` input schema. `build_cases` returns it;
+  `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily
+  accepts either representation.
 - `_backend` — portable NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL backend
   adapters; deterministic `CXR_MC_BACKEND` selection plus compatibility
   exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`.

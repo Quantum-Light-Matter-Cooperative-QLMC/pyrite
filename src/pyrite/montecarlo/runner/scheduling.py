@@ -152,7 +152,7 @@ def run_cases(
     transport_only=False,
 ):
     """
-    Run a list of case dicts through run_case, results in input order.
+    Run typed cases or compatibility mappings through run_case in input order.
 
     GPU present, CPU transport (Ne at or below
     transport.CUDA_TRANSPORT_MIN_ELECTRONS, or a grooved run): the transport is

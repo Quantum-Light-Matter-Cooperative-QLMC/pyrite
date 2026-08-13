@@ -459,63 +459,20 @@ def run_case(
     keep_segments_on_device: bool = False,
     transport_core: str = "auto",
 ) -> dict[str, Any]:
-    """
-    Worker for one (crystal, beam energy) Monte Carlo case: transport + line
-    spectrum + bremsstrahlung. Module-level so it can be pickled into worker
-    processes on Windows (notebook-defined functions cannot).
+    """Run transport, line emission, and bremsstrahlung for one case.
 
-    keep_segments_on_device: leave a CUDA-transported case's segments where the
-    kernel made them instead of round-tripping them through host RAM. Only legal
-    when transport and spectrum run in ONE process (device arrays cannot be
-    pickled back from a worker), so run_cases sets it on its serial branch alone.
-    Ignored unless the case's transport resolves to the CUDA core; falls back to
-    a downloading transport if the device cannot hold the resident payload.
+    :class:`~pyrite.montecarlo.case.Case` owns the input schema and units;
+    arbitrary mappings remain accepted for one compatibility window. Electron
+    energies and cutoffs are in keV, photon grids in eV, lengths in angstrom
+    unless suffixed ``_mm``, angles follow their suffix, and solid angle is sr.
 
-    transport_core: forwarded to :func:`_transport_case`. "auto" (default) lets
-    the case's electron count choose; a worker pool pins "lockstep" so no worker
-    process opens a CUDA context.
+    ``transport_core="auto"`` lets the electron count and backend select the
+    core. ``keep_segments_on_device`` avoids a host round trip only when CUDA
+    transport and spectrum execute in one process; an allocation failure falls
+    back to downloaded segments without changing the result.
 
-    case: a plain dict --
-        required: crystal, composition, hkl_list, B_ang2, E0_keV, thickness_ang,
-                theta_obs_rad, Ne, Ne_brem, seed, and EITHER a single
-                E_grid = (start_eV, stop_eV, step_eV) OR the decoupled pair
-                E_grid_line / E_grid_brem (legacy uniform triples or exact arrays):
-                the lines are evaluated on the fine NARROW E_grid_line, the
-                smooth bremsstrahlung on the coarse WIDE E_grid_brem. Sweep-built
-                uniform brem triples extend to the beam energy; scalar/nonuniform
-                exact arrays retain their specified samples.
-        optional: tilt_deg (0), tilt_azim_deg (0), beam_uvw (None),
-                surface_hkl (None; reciprocal plane normal, mutually exclusive
-                with beam_uvw),
-                azimuth_rad (0), recip_miscut_rad (None; (polar_rad, azim_rad)
-                crystal miscut of g relative to n -- None is a strict no-op,
-                see montecarlo.geometry._orientation_R), E_cut_lines_keV (5),
-                E_cut_brem_keV (1),
-                spec_chunk / brem_chunk: segments per spectrum matmul -- by
-                default sized adaptively from the energy-grid width so the
-                matmul transients fit CXR_MC_SPEC_BUDGET_MB (_adaptive_chunk);
-                set to cap peak GPU memory on a busy/shared device. Precedence:
-                per-case value > CXR_MC_SPEC_CHUNK / CXR_MC_BREM_CHUNK env pins
-                (A1 sweep-accel spike) > adaptive,
-                sinc_cutoff (None = exact lineshapes; windowing buys nothing
-                for bulk targets, where scattering Doppler-spreads the lines
-                across the whole grid),
-                beam_fwhm_mm (None): transverse electron-beam spot size (Gaussian
-                FWHM, mm) -- None is a strict no-op, the point-source beam
-                (montecarlo.transport.simulate_trajectories, BIT-FOR-BIT
-                unchanged spectrum; see that docstring for why),
-                crystal_width_mm / crystal_height_mm (both None): optional full
-                rectangular crystal footprint dimensions in mm. They must be
-                supplied together and strictly positive to enable finite lateral
-                transport and six-face self-absorption; both None retains the
-                laterally infinite slab,
-                mosaic_mc_fwhm_rad (None) / mosaic_mc_nodes (1): the exact
-                Monte-Carlo crystal-mosaicity average (mc_spectrum); None/1 ->
-                perfect crystal,
-                brem_step_eV (10; legacy single-E_grid fallback only)
-
-    Returns dict(E_grid, spec, brem [on E_grid], E_grid_brem, brem_wide [the
-                full-range background], eta, n_segments) plus crystal/E0.
+    Returns line and bremsstrahlung arrays on their energy grids, backscatter
+    and hit fractions, segment count, crystal key, and incident energy.
     """
     return _spectrum_case(
         case,

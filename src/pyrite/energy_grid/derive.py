@@ -102,7 +102,7 @@ class Candidate:
 
 
 def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_electrons):
-    """One run_case dict for a fixed material/energy/geometry, on the wide
+    """One typed run case for a fixed material/energy/geometry, on the wide
     diagnostic grid. ``thickness_ang`` selects the crystal slab (default is the
     1 mm :data:`DIAGNOSTIC_THICKNESS_ANG` worst case); building is cheap and
     pure, running happens in a batch via _run_specs so the whole scan shares one

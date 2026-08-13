@@ -91,7 +91,7 @@ requirement of `refactor/scene-object-model`'s public API.
       defaulting to 1 when absent; readers dispatch on the recorded value,
       writers emit the current one. Register `IDENTITY_MIGRATIONS = {1: _identity_v1}`
       with the v2 slot documented but unimplemented.
-- [ ] G — Reduce the `run_case` docstring to semantics and units; the schema is
+- [x] G — Reduce the `run_case` docstring to semantics and units; the schema is
       now the type.
 
 ## Decisions and open questions

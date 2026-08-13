@@ -2,7 +2,7 @@
 sweep.py
 ============
 
-Define a parameter sweep and expand it into the per-case dicts that
+Define a parameter sweep and expand it into the typed per-case records that
 ``montecarlo.run_case`` consumes.
 
 The driver notebook sets ONE :class:`Sweep`. Every physical parameter accepts
@@ -631,7 +631,7 @@ def build_cases(
     coherent_emission=False,
     xray_dispersion="vacuum",
 ):
-    """Expand a :class:`Sweep` into a list of run_case dicts (the Cartesian
+    """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
     crossed with every beam energy). ``crystal_width_mm`` and
     ``crystal_height_mm`` are full dimensions: both ``None`` recovers the

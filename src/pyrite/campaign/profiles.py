@@ -414,10 +414,10 @@ def normalize_dataset_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def case_content_key(case: Case | Mapping[str, Any]) -> str:
-    """Content-addressable key for one :func:`pyrite.campaign.sweep.build_cases` case dict.
+    """Content-addressable key for one :func:`pyrite.campaign.sweep.build_cases` case.
 
-    A canonical SHA-256 over the resolved case dict minus
-    :data:`_CONTENT_KEY_DENYLIST`. Because the case dict is already fully
+    A canonical SHA-256 over the resolved case mapping minus
+    :data:`_CONTENT_KEY_DENYLIST`. Because the case is already fully
     resolved -- every physics-relevant field baked in by ``build_cases`` -- and
     carries NO profile name, two cases requested by two differently-named
     profiles that describe the same physics hash to the same key and share one
