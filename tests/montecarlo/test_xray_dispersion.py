@@ -211,3 +211,54 @@ def test_single_segment_coherent_is_pure_phase_under_refraction():
     inc = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, **kw)
     assert coh.max() > 0.0
     np.testing.assert_allclose(coh, inc, rtol=1e-10, atol=1e-14 * inc.max())
+
+
+# --- case-dict plumbing ----------------------------------------------------
+
+
+def _runner_case(**extra):
+    return dict(
+        crystal=CRYSTAL,
+        hkl_list=[HKL],
+        B_ang2=B_ANG2,
+        composition=None,
+        E_cut_lines_keV=None,
+        **extra,
+    )
+
+
+def _runner_lines(**extra):
+    from pyrite.montecarlo.runner import _lines_for_segments
+
+    return _lines_for_segments(
+        _segments(),
+        E_GRID,
+        _runner_case(**extra),
+        _observation_direction(np.deg2rad(119.0), None),
+        None,
+        None,
+    )
+
+
+@pytest.mark.parametrize("model", [None, "vacuum", "refractive"])
+def test_runner_takes_the_dispersion_model_from_the_case(model):
+    """``_lines_for_segments`` reads ``case["xray_dispersion"]`` the same way it
+    reads ``coherent_emission``; absent means vacuum."""
+    case_kw = {} if model is None else {"xray_dispersion": model}
+    expected = _spectrum(xray_dispersion=model or "vacuum")
+    np.testing.assert_array_equal(_runner_lines(**case_kw), expected)
+
+
+def test_build_cases_omits_the_key_for_the_vacuum_default():
+    from pyrite.campaign.sweep import Sweep, build_cases
+
+    sweep = Sweep(material="mose2", thickness_ang=1e4)
+    assert "xray_dispersion" not in build_cases(sweep)[0]
+    assert build_cases(sweep, xray_dispersion="refractive")[0]["xray_dispersion"] == "refractive"
+
+
+def test_build_cases_rejects_an_unknown_dispersion_model():
+    from pyrite.campaign.sweep import Sweep, build_cases
+
+    with pytest.raises(ValueError, match="xray_dispersion must be one of"):
+        build_cases(Sweep(material="mose2", thickness_ang=1e4), xray_dispersion="in_medium")

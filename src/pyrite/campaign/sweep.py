@@ -35,7 +35,7 @@ from ..detectors import DetectorSpec
 from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
 from ..materials._transport_data import TRANSPORT_ELEMENTS
-from ..materials.crystal import dominant_reflections
+from ..materials.crystal import XRAY_DISPERSION_MODELS, dominant_reflections
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 from .transverse import TransverseDistribution, resolve_transverse_distribution
 
@@ -623,7 +623,13 @@ def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: fl
         raise ValueError(f"no E_grid_line configured for beam energy {energy_keV:g} keV") from None
 
 
-def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_emission=False):
+def build_cases(
+    sweep: Sweep,
+    n_electrons=450,
+    n_electrons_brem=100,
+    coherent_emission=False,
+    xray_dispersion="vacuum",
+):
     """Expand a :class:`Sweep` into a list of run_case dicts (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
     crossed with every beam energy). ``crystal_width_mm`` and
@@ -640,7 +646,16 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
     ``n_electrons_brem`` sweep grids (catalog profile settings) cross
     electron-count statistics into the product and suffix the case name with
     ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
+    ``xray_dispersion`` selects the photon dispersion relation of the line
+    kinematics ("vacuum" or "refractive", see
+    :func:`montecarlo.spectrum.mc_spectrum`); it is a divergence-only key, so
+    the default leaves the case payload bit-for-bit.
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
+    if xray_dispersion not in XRAY_DISPERSION_MODELS:
+        raise ValueError(
+            f"build_cases: xray_dispersion must be one of {XRAY_DISPERSION_MODELS}, "
+            f"got {xray_dispersion!r}."
+        )
     cp = crystal_params(sweep.material, sweep.n_families)
     if sweep.max_reflections is not None:
         cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
@@ -894,6 +909,13 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
                         # coherent segment sum: divergence-only key (absent -> the
                         # incoherent default, bit-for-bit case payload).
                         **({"coherent_emission": True} if coherent_emission else {}),
+                        # in-medium line kinematics: divergence-only key too
+                        # ("vacuum" -> absent -> the bit-for-bit default).
+                        **(
+                            {"xray_dispersion": xray_dispersion}
+                            if xray_dispersion != "vacuum"
+                            else {}
+                        ),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

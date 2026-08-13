@@ -334,6 +334,13 @@ def refractive_index(crystal, photon_E_eV, use_henke=True):
     return np.sqrt(1.0 + chi_0(crystal, photon_E_eV, use_henke))
 
 
+# Photon dispersion models available to the line kinematics: "vacuum" keeps
+# k = omega, "refractive" uses k = Re n(omega) omega from refractive_index.
+# Lives here (a cheap, GPU-free import) so campaign-side case validation can
+# share the spectrum kernels' single source of truth.
+XRAY_DISPERSION_MODELS = ("vacuum", "refractive")
+
+
 def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     """
     Crystal-potential Fourier component (CBS coupling), Eq. (4), folded with

@@ -20,6 +20,7 @@ from ...materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
     M_E_EV,
+    XRAY_DISPERSION_MODELS,
     U_g,
     chi_g,
     reciprocal_g_vector,
@@ -370,9 +371,6 @@ def _line_weight_core(omega_res, t_L, L_esc, mu, alpha_fs, pref_c1):
 
 if hasattr(xp, "fuse"):
     _line_weight_core = xp.fuse()(_line_weight_core)
-
-
-XRAY_DISPERSION_MODELS = ("vacuum", "refractive")
 
 
 def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):

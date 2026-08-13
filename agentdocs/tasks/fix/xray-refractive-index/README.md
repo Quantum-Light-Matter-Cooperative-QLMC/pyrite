@@ -70,7 +70,9 @@ extension unless the observation geometry approaches grazing incidence.
       status `filtered`.
 - [x] `xray_dispersion` model switch plumbed to `mc_spectrum` (and to
       `mc_spectrum_solid_angle` through its `**kwargs`), default `"vacuum"`,
-      bit-for-bit. Runner/campaign-config plumbing is NOT done — see remainder.
+      bit-for-bit. Case-dict plumbing done: `build_cases(xray_dispersion=)`
+      writes the divergence-only case key, `runner._lines_for_segments` reads
+      it. Settings/CLI/dataset-identity plumbing is NOT done — see remainder.
 - [x] In-medium dispersion in the resonance denominator, derived from the
       Maxwell dispersion relation rather than an ad hoc `n` insertion. Covers
       the resonance, `k.g`, the detuning, and the PXR numerator's `k^2`, on both
@@ -127,6 +129,10 @@ extension unless the observation geometry approaches grazing incidence.
   and `exp(-beta omega L) = sqrt(exp(-mu L))` is the existing `amp`. So the
   coherent path was carrying `Im n` over the escape path all along and was
   missing only its real partner.
+- `XRAY_DISPERSION_MODELS` lives in `materials/crystal.py`, not `lines.py`, so
+  `campaign/sweep.py` can validate against the kernels' own list. `sweep.py` is
+  deliberately GPU-free at import; `lines.py` pulls in `montecarlo._backend`
+  (cupy), while `materials.crystal` was already a sweep dependency.
 - Layered absorbers refuse `refractive` + `coherent`: the dispersive phase would
   need a per-layer `delta` accumulated along the escape path, the real partner
   of `_stack_tau`'s per-layer `mu`. Single-slab, groove, and finite-footprint
@@ -160,10 +166,17 @@ extension unless the observation geometry approaches grazing incidence.
   `(L_esc, delta_omega, use_medium)` and are covered by
   `tests/montecarlo/test_xray_dispersion_cuda.py`; only the gate in
   `lines.py::_use_jit_coherent_stream` and the prologue itself remain.
-- Runner/campaign plumbing: `runner._lines_for_segments` derives `coherent`
-  from the case dict; `xray_dispersion` should come the same way
-  (`case.get("xray_dispersion", "vacuum")`), which also touches campaign config
-  validation.
+- Settings/CLI plumbing. The case key now exists end to end
+  (`build_cases(xray_dispersion=)` -> case -> `_lines_for_segments` ->
+  `mc_spectrum`), but nothing sets it from a `Settings` field or a CLI flag, so
+  a campaign run cannot request `refractive` yet. Following `emission`'s
+  pattern that means: a `Settings.xray_dispersion` field, the divergence-only
+  rule in `campaign/profiles.py::dataset_identity` (WITHOUT it, a
+  refractive run hashes to the SAME `parameter_sha256` as its vacuum twin and
+  the two resume into each other's checkpoints — the reason this is the next
+  slice and not a nice-to-have), pass-through in `runs/scan.py`,
+  `runs/blaze.py`, `checkpoints/checkpoint_cleanup.py`, and a `pyrite run`
+  flag + `cli-reference.md` regen.
 
 ## Pre-existing failures on `main` (not caused by this branch)
 
