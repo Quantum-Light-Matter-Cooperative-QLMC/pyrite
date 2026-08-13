@@ -12,19 +12,20 @@ file. Edit and drop items on `main`.
 
 ## Active
 
-1. Add X-ray refractive index for tracking of phase for coherent interaction
-2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
+1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
    The four incoherent-line-path markers are now ledgered (`line-hkl-batch`,
    `line-amplitude-fusion`, `line-gemv-elementwise` `filtered`;
    `line-absorption-tabulation` a `discrepancy` — tabulated `μ` off `2.72e-01`
    at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
-   `signed-off`.
+   `signed-off`, as are the four x-ray dispersion claims (`xray-chi-zero`,
+   `xray-refractive-index`, `xray-in-medium-resonance`,
+   `xray-in-medium-propagation-phase`).
    1. **Rederivation Clean-up and Formatting.** Need a worker to go thru and clean up the math in
       completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
       Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
       to fresh-context workers doing the rederivations.
-3. **Energy-controlled electron transport.** Inventory the current segment
+2. **Energy-controlled electron transport.** Inventory the current segment
    schema and add bounded per-flight diagnostics before selecting the controlled
    energy-loss/hazard propagation model. →
    `feature/energy-controlled-electron-transport`;
