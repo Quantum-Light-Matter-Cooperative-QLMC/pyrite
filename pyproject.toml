@@ -199,11 +199,13 @@ source_modules = [
 ]
 forbidden_modules = [
     "pyrite.apps",
+    "pyrite.campaign",
     "pyrite.checkpoints",
     "pyrite.cli",
     "pyrite.perf",
     "pyrite.plots",
     "pyrite.remote",
+    "pyrite.results",
     "pyrite.runs",
     "pyrite.validation",
 ]
