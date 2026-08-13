@@ -406,7 +406,11 @@ def dataset_identity(
 def normalize_dataset_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
     """Copy an artifact identity, treating an absent version as legacy v1."""
     version = identity.get("identity_version", 1)
-    if isinstance(version, bool) or not isinstance(version, int) or version not in IDENTITY_MIGRATIONS:
+    if (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version not in IDENTITY_MIGRATIONS
+    ):
         raise ValueError(f"unsupported dataset identity version: {version!r}")
     normalized = dict(identity)
     normalized["identity_version"] = version

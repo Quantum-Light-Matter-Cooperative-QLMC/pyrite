@@ -1703,7 +1703,6 @@ def _transport_core_grooved(
                             i_el = k
                             break
 
-                Z_i = Z_arr[i_el]
                 if elastic_model_code == 1 and mott_has_table[L, i_el]:
                     log_alpha = _interp_mott_log_alpha_scalar(
                         np.log10(E_keV[e] * 1e3),
@@ -2002,7 +2001,6 @@ def _transport_core_ungrooved_perelectron(
                         i_el = k_el
                         break
 
-            Z_i = L_Zs[L, i_el]
             if elastic_model_code == 1 and mott_has_table[L, i_el]:
                 log_alpha = _interp_mott_log_alpha_scalar(
                     np.log10(E_keV[e] * 1e3),

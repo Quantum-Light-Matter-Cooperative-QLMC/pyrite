@@ -105,8 +105,12 @@ def test_run_case_accepts_typed_case_and_legacy_mapping(monkeypatch):
 
     case = Case(**_legacy_case())
     seen = []
-    monkeypatch.setattr(runner, "_transport_case", lambda payload, *args, **kwargs: seen.append(payload))
-    monkeypatch.setattr(runner, "_spectrum_case", lambda payload, *args, **kwargs: {"case": payload})
+    monkeypatch.setattr(
+        runner, "_transport_case", lambda payload, *args, **kwargs: seen.append(payload)
+    )
+    monkeypatch.setattr(
+        runner, "_spectrum_case", lambda payload, *args, **kwargs: {"case": payload}
+    )
 
     typed = runner.run_case(case)
     legacy = runner.run_case(case.to_dict())
