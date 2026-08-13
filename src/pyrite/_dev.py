@@ -563,7 +563,7 @@ def cmd_cli_deprecations(args: argparse.Namespace) -> None:
 
 
 def cmd_cli_reference(args: argparse.Namespace) -> None:
-    from cxr_mc.devtools.cli_reference import main
+    from pyrite.devtools.cli_reference import main
 
     target = ROOT / "docs" / "repo-design" / "cli" / "cli-reference.md"
     mode = "--check" if getattr(args, "check", False) else "--write"

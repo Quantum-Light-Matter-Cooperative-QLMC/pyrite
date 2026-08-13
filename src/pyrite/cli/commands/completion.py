@@ -49,7 +49,7 @@ def _generated_completion(shell: str) -> str:
         raise CLIError(f"Click does not support {shell} completion")
 
     # Import lazily: this command is itself lazy-loaded by the root CLI.
-    from cxr_mc.cli import command as root_command
+    from pyrite.cli import command as root_command
 
     source = completion_class(root_command, {}, PROG_NAME, COMPLETE_VAR).source()
     return source if source.endswith("\n") else f"{source}\n"

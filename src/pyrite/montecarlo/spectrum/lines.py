@@ -1904,7 +1904,7 @@ def mc_spectrum(
                     sl = slice(j0, min(j0 + chunk, E_r_i.size))
                     x = aw_i[sl][:, None] * (E_grid[None, :] - E_r_i[sl][:, None]) / xp.pi
                     arg = ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]
-                    if L_i is not None:
+                    if L_i is not None and delta_omega_grid is not None:
                         arg = arg - L_i[sl][:, None] * delta_omega_grid[None, :]
                     ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
