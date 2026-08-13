@@ -295,11 +295,25 @@ repair, archive, and lock lifecycles; `runs/` owns executable local drivers.
 Turn `Sweep` definition into Cartesian product of `run_case` dicts.
 - Public: `BeamSpec` (incident phase space and pulse properties), `Sweep`
   (dataclass of simulation knobs), `beam_replace`, `LayerSpec` (one stack layer:
-  material, thickness, orientation), `build_cases`, `crystal_params`,
-  `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
-  `layer_radiator`, `substrate_radiator`, `geometry_table`,
-  `fmt_thickness`, `pm` (±hkl expansion); `MATERIAL_LABELS` registry.
-- Deps: `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
+  material, thickness, orientation), `build_cases`, `geometry_table`,
+  `pm` (±hkl expansion); `MATERIAL_LABELS` registry. Re-exports the
+  `campaign/geometry.py` surface, so `pyrite.campaign.sweep` stays the stable
+  import path for `crystal_params`, `fmt_thickness`, `stack_layers` and friends.
+- Deps: `campaign.geometry`, `materials` (`CATALOG`, `LayerSpec`),
+  `materials.crystal`.
+
+### `campaign/geometry.py`
+The closed target variant set and its lowering to today's geometry case keys
+(`abs_layers`, `layer_radiators`, `crystal_width_mm`, `crystal_height_mm`,
+`groove_spacing_ang`). Each variant owns its validity at construction; arbitrary
+geometry is a recorded non-goal, so there is no dispatch protocol or region
+algebra. Sits below `campaign/sweep.py` and imports without it.
+- Public: `Slab`, `Stack`, `Target` (the variant union), `Layer`, `Footprint`,
+  `BlazedGrooves`, `LoweredTarget`, `crystal_params`, `substrate_composition`,
+  `stack_layers`, `film_on_substrate_layers`, `layer_radiator`,
+  `substrate_radiator`, `fmt_thickness`, `ScalarOrSeq`.
+- Deps: `detectors` (`DetectorSpec`, for the target×detector groove check),
+  `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
 ### `campaign/longitudinal.py`
 Bunch-length policy on the input side of `BeamSpec`: named `long_shape` kinds

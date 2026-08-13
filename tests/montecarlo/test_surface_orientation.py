@@ -142,10 +142,10 @@ def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monk
 
 
 def test_explicit_layer_beam_override_clears_catalog_surface(monkeypatch):
-    import pyrite.campaign.sweep as sweep_module
+    import pyrite.campaign.geometry as geometry_module
 
     monkeypatch.setattr(
-        sweep_module,
+        geometry_module,
         "substrate_radiator",
         lambda *_args, **_kwargs: {
             "crystal": "synthetic",
@@ -246,6 +246,7 @@ def test_orientation_rejects_conflicting_direct_and_reciprocal_contracts():
 
 
 def test_real_surface_catalog_case_changes_real_cpu_spectrum(tmp_path, monkeypatch):
+    import pyrite.campaign.geometry as geometry_module
     import pyrite.campaign.sweep as sweep_module
 
     catalog_text = """
@@ -274,7 +275,10 @@ crystal = "mos2"
     path = tmp_path / "materials.toml"
     path.write_text(catalog_text)
     catalog = load_material_catalog(path)
+    # build_cases reads CATALOG for the case label; crystal_params and the layer
+    # composition/radiator lookups read it from campaign.geometry.
     monkeypatch.setattr(sweep_module, "CATALOG", catalog)
+    monkeypatch.setattr(geometry_module, "CATALOG", catalog)
 
     grid = np.arange(800.0, 3500.0, 5.0)
     base = dict(

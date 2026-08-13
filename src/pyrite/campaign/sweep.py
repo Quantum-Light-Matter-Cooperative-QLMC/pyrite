@@ -35,12 +35,32 @@ from ..detectors import DetectorSpec
 from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
 from ..materials._transport_data import TRANSPORT_ELEMENTS
-from ..materials.crystal import XRAY_DISPERSION_MODELS, dominant_reflections
+from ..materials.crystal import XRAY_DISPERSION_MODELS
 from ..montecarlo.case import Case
+from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
+    BlazedGrooves,
+    Footprint,
+    Layer,
+    LoweredTarget,
+    ScalarOrSeq,
+    Slab,
+    Stack,
+    Target,
+    _quantized_angles,
+    _radiator,
+    _reject_banned_angles,
+    _seq,
+    crystal_params,
+    film_on_substrate_layers,
+    fmt_thickness,
+    layer_radiator,
+    stack_layers,
+    substrate_composition,
+    substrate_radiator,
+)
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 from .transverse import TransverseDistribution, resolve_transverse_distribution
 
-ScalarOrSeq = float | Sequence[float] | np.ndarray
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
 
 
@@ -200,147 +220,6 @@ TIMEPIX3_DTHETA_OBS_DEG = float(
     np.degrees(2 * np.arctan((TIMEPIX3_CHIP_WIDTH_M / 2) / TIMEPIX3_DISTANCE_M))
 )
 TIMEPIX3_DOMEGA_SR = float(TIMEPIX3_CHIP_WIDTH_M**2 / TIMEPIX3_DISTANCE_M**2)
-
-
-def fmt_thickness(t_ang):
-    """Compact human thickness label from Angstroms: 316A / 31.6nm / 17um / 1mm."""
-    if t_ang < 1e2:
-        return f"{t_ang:g}A"
-    if t_ang < 1e4:
-        return f"{t_ang / 10:g}nm"
-    if t_ang < 1e7:
-        return f"{t_ang / 1e4:g}um"
-    return f"{t_ang / 1e7:g}mm"
-
-
-def substrate_composition(substrate):
-    """Number-density composition [(element, n_per_Ang3), ...] for a substrate.
-    Amorphous presets ('sio2') come from bulk density; a crystalline
-    substrate already in CRYSTALS (e.g. 'silicon') uses its unit-cell density."""
-    key = substrate.lower()
-    if key in CATALOG.media:
-        return list(CATALOG.media[key].composition)
-    if substrate in CATALOG.crystals:
-        return list(CATALOG.crystal(substrate).composition)
-    raise ValueError(
-        f"unknown substrate {substrate!r}; use one of {list(CATALOG.media)} "
-        f"or a crystal key in {list(CATALOG.crystals)}"
-    )
-
-
-def stack_layers(film_composition, film_thickness_ang, stack):
-    """Absorber stack [(z_top, z_bot, composition), ...] for a film at the
-    entrance face (z=0..t_film) followed by each :class:`LayerSpec` in ``stack``,
-    boundaries accumulating downward. Attach as a case's ``abs_layers`` so
-    emitted lines/brem are attenuated by the WHOLE stack (each crystalline
-    layer still RADIATES via its own layer_radiator). Beam enters the film
-    side; with positive tilt (toward-detector, Zhai convention; front exit)
-    the lower layers sit BEHIND the emission and do not attenuate -- they
-    bite the back-exit / transmission geometry. See
-    docs/physics/materials/multilayer-materials.md."""
-    t_f = float(film_thickness_ang)
-    layers = [(0.0, t_f, [(el, float(n)) for el, n in film_composition])]
-    z = t_f
-    for lay in stack:
-        t = float(lay.thickness_ang)
-        layers.append((z, z + t, substrate_composition(lay.material)))
-        z += t
-    return layers
-
-
-def film_on_substrate_layers(
-    film_composition, film_thickness_ang, substrate, substrate_thickness_ang
-):
-    """The 2-layer special case of :func:`stack_layers`: one film on one
-    substrate (kept as the stable public name for that common stack)."""
-    return stack_layers(
-        film_composition,
-        film_thickness_ang,
-        (LayerSpec(substrate, substrate_thickness_ang),),
-    )
-
-
-def _radiator(cp, *, beam_uvw=None, azimuth_rad=None):
-    """Coherent-radiator dict from a :func:`crystal_params` result ``cp``: crystal,
-    hkl_list, B_ang2, and its mutually exclusive beam_uvw/surface_hkl orientation.
-    An explicit beam_uvw overrides and clears ``cp``'s reciprocal surface. The
-    ``azimuth_rad`` key is included only when given -- a bare substrate radiator
-    carries no azimuth of its own (:func:`substrate_radiator`); only a stack/film
-    use of a radiator (:func:`layer_radiator`, :func:`build_cases`) does. The one
-    constructor behind all three radiator-dict call sites."""
-    rad: dict[str, Any] = dict(
-        crystal=cp["crystal"],
-        hkl_list=cp["hkl_list"],
-        B_ang2=cp["B_ang2"],
-        beam_uvw=cp["beam_uvw"] if beam_uvw is None else tuple(beam_uvw),
-        surface_hkl=cp["surface_hkl"] if beam_uvw is None else None,
-    )
-    if azimuth_rad is not None:
-        rad["azimuth_rad"] = float(azimuth_rad)
-    return rad
-
-
-def substrate_radiator(substrate, n_families=4):
-    """Coherent-radiation crystal params for a substrate, or None if it radiates
-    no lines. A CRYSTALLINE substrate (a CRYSTALS key, e.g. 'silicon') returns
-    {crystal, hkl_list, B_ang2, beam_uvw, surface_hkl} (from crystal_params) so it emits its
-    own PXR/CBS; an AMORPHOUS preset ('sio2') returns None (it only
-    absorbs + brems). This is the per-layer-radiation half of the multilayer
-    feature -- the absorber stack (film_on_substrate_layers) is the other half.
-    See docs/physics/materials/multilayer-materials.md."""
-    if substrate.lower() in CATALOG.media:
-        return None  # amorphous: no coherent lines
-    if substrate in CATALOG.crystals:
-        return _radiator(crystal_params(substrate, n_families))
-    raise ValueError(
-        f"unknown substrate {substrate!r}; use one of {list(CATALOG.media)} "
-        f"or a crystal key in {list(CATALOG.crystals)}"
-    )
-
-
-def layer_radiator(layer: LayerSpec, n_families: int = 4):
-    """Coherent radiator params for one stack :class:`LayerSpec`, or None if the
-    layer is amorphous. Same dict as :func:`substrate_radiator` plus the
-    per-layer orientation: ``beam_uvw`` (overridden if the spec sets one, clearing
-    any catalog surface_hkl) and ``azimuth_rad`` (the spec's in-plane rotation,
-    radians)."""
-    rad = substrate_radiator(layer.material, n_families)
-    if rad is None:
-        return None
-    if layer.beam_uvw is not None:
-        rad["beam_uvw"] = tuple(layer.beam_uvw)
-        rad["surface_hkl"] = None
-    rad["azimuth_rad"] = float(np.deg2rad(layer.azimuth_deg))
-    return rad
-
-
-def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
-    """Fixed crystallography for a material: composition, the dominant
-    reflections, exactly one direct beam axis [uvw] or reciprocal surface (hkl),
-    the isotropic B-factor, and a sensible default photon-energy grid. Override
-    the grid via Sweep.e_grid_eV."""
-    crystal_key = material
-    if material in CATALOG.materials:
-        crystal_key = CATALOG.material(material).crystal_key
-    if crystal_key not in CATALOG.crystals:
-        raise ValueError(f"unknown material {material!r} (have {list(CATALOG.crystals)})")
-    spec = CATALOG.crystal(crystal_key)
-    if spec.E_grid is None:
-        raise ValueError(f"crystal {crystal_key!r} has no configured photon-energy grid")
-    hkl_list: list[tuple[int, ...]]
-    if not spec.hkl_list:
-        hkl_list = dominant_reflections(crystal_key, n_families=n_families, B_ang2=spec.B_ang2)
-    else:
-        hkl_list = list(spec.hkl_list)
-    return dict(
-        crystal=crystal_key,
-        composition=list(spec.composition),
-        hkl_list=hkl_list,
-        beam_uvw=spec.beam_uvw,
-        surface_hkl=spec.surface_hkl,
-        B_ang2=spec.B_ang2,
-        E_grid=spec.E_grid,
-    )
 
 
 @dataclass
@@ -509,50 +388,6 @@ class Sweep:
                 solid_angle_sr=base.solid_angle_sr if domega_sr is None else domega_sr,
             )
         self.detector = base
-
-
-def _seq(x):
-    """Normalize a scalar-or-sequence into a 1-D float array, order preserved."""
-    return np.atleast_1d(np.asarray(x, dtype=float))
-
-
-def _quantized_angles(values: ScalarOrSeq) -> np.ndarray:
-    """Round degrees to nearest half away from zero at ties, then stable-unique."""
-    source = _seq(values)
-    scaled = source * 2.0
-    quantized = np.copysign(np.floor(np.abs(scaled) + 0.5), scaled) / 2.0
-    return np.asarray(list(dict.fromkeys(float(value) for value in quantized)), dtype=float)
-
-
-def _reject_banned_angles(
-    tilts: np.ndarray, azimuths: np.ndarray, *, allow_normal_incidence: bool = False
-) -> None:
-    """Refuse the degenerate geometries no emission sweep may use (issue_notes.md #1).
-
-    polar tilt == 0 deg radiates zero coherent-line intensity (the tilt=0
-    degeneracy the line-grid coverage search flags), and azimuth == 90 deg sits
-    on a symmetry axis that mis-ranked the coverage search (the azim-90 bug).
-    Guarding at case-build time makes every downstream path -- production sweeps,
-    catalog grids, the analyze_line_grid_bounds diagnostic -- structurally
-    incapable of silently sampling them; callers must pick a small nonzero tilt
-    (e.g. 5 deg) and an azimuth off 90 (e.g. 100-180 deg) instead.
-
-    ``allow_normal_incidence`` is the transport-only escape hatch: the
-    penetration-depth study is not an emission sweep and uses tilt=0 as its
-    physical baseline, so it opts out of the tilt check only. The azimuth==90 ban
-    is unconditional -- it has no legitimate use.
-    """
-    if not allow_normal_incidence and np.any(np.isclose(tilts, 0.0)):
-        raise ValueError(
-            "polar tilt_deg == 0 is disallowed for emission sweeps (degenerate "
-            "zero coherent-line geometry); use a small nonzero tilt such as 5 deg, "
-            "or set Sweep(allow_normal_incidence=True) for a transport-only study"
-        )
-    if np.any(np.isclose(azimuths, 90.0)):
-        raise ValueError(
-            "tilt_azim_deg == 90 is disallowed (degenerate symmetry axis, the "
-            "azim-90 ranking bug); use an azimuth off 90 such as 100-180 deg"
-        )
 
 
 def _reject_relativistic_energies(energies: np.ndarray) -> None:

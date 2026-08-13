@@ -150,8 +150,10 @@ change which inputs they accept.
       Include the groove conjunction, the footprint pairing rule, and the
       `substrate`/`stack` exclusion. Each becomes a `__post_init__` check with
       one error vocabulary.
-- [ ] B — Land `Slab`, `Stack`, `Layer`, `Footprint`, `BlazedGrooves` with
+- [x] B — Land `Slab`, `Stack`, `Layer`, `Footprint`, `BlazedGrooves` with
       construction-time validation and a `lower()` producing today's case keys.
+      Landed in `src/pyrite/campaign/geometry.py`; `build_cases` is untouched, so
+      B is additive and C is a pure rewire.
 - [ ] C — Route `build_cases` through `Target.lower()`. `build_cases` must end
       with **no geometry conditionals**.
 - [ ] D — `substrate=` becomes a `Stack` constructor helper; retire the parallel
@@ -168,6 +170,51 @@ change which inputs they accept.
       region table — never a polymorphic object graph.
 - [ ] G — Update `docs/repo_map.md` ownership rows and the geometry-facing
       physics/guide pages.
+
+## Slice B — what landed
+
+`src/pyrite/campaign/geometry.py` owns the variant set. It sits **below**
+`sweep.py` in the import graph, which forced one structural choice: lowering
+needs `substrate_composition` / `layer_radiator` / `stack_layers` / `crystal_params`
+/ `fmt_thickness`, and importing those from `sweep.py` would be a cycle. They
+moved down into `geometry.py` (a verbatim move, no behaviour change) and
+`sweep.py` re-exports them, so `pyrite.campaign.sweep.crystal_params` and the
+rest keep working for every existing importer.
+
+Two monkeypatch sites had to follow the move —
+`tests/montecarlo/test_surface_orientation.py` patched `sweep_module.CATALOG` and
+`sweep_module.substrate_radiator`, which no longer reach the definitions. The
+CATALOG test now patches both modules, because `build_cases` still reads
+`CATALOG` for the case label.
+
+Contract for slice C:
+
+- `Target.lower(cp, *, label, beam_uvw, n_families) -> tuple[LoweredTarget, ...]`
+  in exactly today's `product(thickness, tilts, azimuths, footprints)` order, so
+  the `seed=1000 * i_c + ...` enumeration is unchanged.
+- `LoweredTarget.name` is the whole geometry half of the case name, and
+  `LoweredTarget.case_keys()` is the payload fragment — it **omits**
+  `groove_spacing_ang` for an ungrooved target, which is what keeps existing case
+  payloads bit-for-bit. `build_cases` spreads both, so it needs no `if`.
+- `target.validate_against(detector)` is the single unconditional cross-object
+  call carrying constraint 7.
+- `tests/scan/test_target_geometry.py` already pins `lower()` against
+  `build_cases` output for seven configurations (default, infinite slab, full
+  four-axis product, both substrate sugars, a 3-layer stack, grooved). Those tests
+  are the equivalence evidence C must keep green.
+
+Two constraints beyond the slice-A inventory, both from making the object shape
+total rather than from new policy:
+
+- `Stack` requires the film plus at least one layer beneath it; a single-layer
+  stack is a `Slab`.
+- Only `Stack.layers[0]` (the film) may sweep `thickness_ang`. Layers beneath it
+  are single-valued today — `stack_layers` takes a float thickness per layer —
+  and making them sweepable is the per-layer axis work in
+  `refactor/scene-object-model`, not this task.
+
+Not in B, deliberately: `mosaic` (slice D), the `Sweep.material` /
+`substrate=` deprecation shim (slice D), and any `build_cases` change (slice C).
 
 ## Decisions and open questions
 
