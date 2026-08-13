@@ -71,7 +71,7 @@ requirement of `refactor/scene-object-model`'s public API.
 
 ## Checklist
 
-- [ ] A — Add `pyrite.campaign` and `pyrite.results` to the
+- [x] A — Add `pyrite.campaign` and `pyrite.results` to the
       `physics-core-stays-below-drivers` forbidden list (`pyproject.toml:191`)
       and confirm the contract passes unchanged. Two lines; ratifies a property
       the tree already has, before anything can erode it.
@@ -80,10 +80,10 @@ requirement of `refactor/scene-object-model`'s public API.
       divergence-only keys, with type and unit. This table is the deliverable
       that replaces the `run_case` docstring schema. See
       [`payload-inventory.md`](payload-inventory.md).
-- [ ] C — Land `Case` as a frozen typed wrapper with `to_dict()` that reproduces
+- [x] C — Land `Case` as a frozen typed wrapper with `to_dict()` that reproduces
       today's dict byte-identically, including key ordering wherever ordering
       feeds a digest. Assert equivalence against the existing golden cases.
-- [ ] D — Validation at construction: required fields present, unknown keys
+- [x] D — Validation at construction: required fields present, unknown keys
       rejected, units documented on the type.
 - [ ] E — Thread `Case` through `run_case` and the identity functions. No digest
       may change.

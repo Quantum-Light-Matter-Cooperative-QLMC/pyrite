@@ -39,7 +39,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -55,6 +55,7 @@ from pyrite.materials.crystal import (  # noqa: E402
     reciprocal_g_vector,
 )
 from pyrite.montecarlo import (  # noqa: E402
+    Case,
     aperture_fwhm_eV,
     beta_from_keV,
     convolve_detector,
@@ -357,7 +358,7 @@ def _resolved_case(
     seed: int,
     hkl_list: tuple[tuple[int, ...], ...] | None = None,
     B_ang2: float | None = None,
-) -> dict:
+) -> Case:
     """Build one current Sweep case for a literature condition."""
     sweep = Sweep(
         material=material,
@@ -374,16 +375,16 @@ def _resolved_case(
     )
     case = build_cases(sweep, n_electrons=ne, n_electrons_brem=ne_brem)[0]
     # Literature anchors may intentionally pin a narrower reflection set or
-    # published Debye-Waller value than the general catalog sweep.
-    if hkl_list is not None:
-        case["hkl_list"] = list(hkl_list)
-    if B_ang2 is not None:
-        case["B_ang2"] = B_ang2
-    # The validation compares one reported detector window. build_cases expands
-    # uniform production brem grids to E0; keep this check's explicit window.
-    case["E_grid_brem"] = E_grid.copy()
-    case["seed"] = seed
-    return case
+    # published Debye-Waller value than the general catalog sweep. The
+    # validation compares one reported detector window; build_cases expands
+    # uniform production brem grids to E0, so retain this explicit window.
+    return replace(
+        case,
+        hkl_list=case.hkl_list if hkl_list is None else list(hkl_list),
+        B_ang2=case.B_ang2 if B_ang2 is None else B_ang2,
+        E_grid_brem=E_grid.copy(),
+        seed=seed,
+    )
 
 
 def fig1c_case(

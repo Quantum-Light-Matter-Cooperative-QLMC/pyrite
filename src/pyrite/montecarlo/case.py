@@ -1,0 +1,255 @@
+"""Typed, validated input record for one Monte Carlo simulation case."""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
+from os import PathLike
+from typing import Any, Literal, cast
+
+import numpy as np
+
+type Composition = list[tuple[str, float]]
+type MillerIndex = tuple[int, int, int]
+type EnergyGrid = tuple[float, float, float] | np.ndarray
+type AbsorberLayer = tuple[float, float, Composition]
+type Radiator = dict[str, object]
+
+
+class _Absent:
+    """Sentinel for legacy keys whose absence is identity-significant."""
+
+    __slots__ = ()
+
+
+_ABSENT = _Absent()
+
+
+_CASE_KEY_ORDER = (
+    "name",
+    "crystal",
+    "composition",
+    "hkl_list",
+    "B_ang2",
+    "E0_keV",
+    "thickness_ang",
+    "crystal_width_mm",
+    "crystal_height_mm",
+    "beam_fwhm_mm",
+    "bunch_charge_pc",
+    "rep_rate_hz",
+    "beam_fwhm_y_mm",
+    "energy_spread_frac",
+    "long_shape",
+    "bunch_length_fs",
+    "long_offsets_fs",
+    "longitudinal_distribution",
+    "transverse_distribution",
+    "E_grid",
+    "E_grid_line",
+    "E_grid_brem",
+    "theta_obs_rad",
+    "tilt_deg",
+    "tilt_azim_deg",
+    "groove_spacing_ang",
+    "coherent_emission",
+    "xray_dispersion",
+    "beam_uvw",
+    "surface_hkl",
+    "mosaic_fwhm_rad",
+    "mosaic_mc_fwhm_rad",
+    "mosaic_mc_nodes",
+    "abs_layers",
+    "layer_radiators",
+    "brem_file",
+    "Ne",
+    "Ne_brem",
+    "seed",
+    "spec_chunk",
+    "brem_chunk",
+    "dtheta_obs_rad",
+    "domega_sr",
+    # Accepted legacy/manual-only runner controls. ``build_cases`` never emits
+    # them, so they serialize after the producer-owned schema when present.
+    "azimuth_rad",
+    "recip_miscut_rad",
+    "E_cut_lines_keV",
+    "E_cut_brem_keV",
+    "sinc_cutoff",
+    "brem_step_eV",
+)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Case(Mapping[str, Any]):
+    """Frozen input schema for one transport and spectrum calculation.
+
+    Length fields use angstrom unless suffixed ``_mm``; electron and cutoff
+    energies use keV, photon grids use eV, angles use their suffix (rad/deg),
+    compositions use atoms/angstrom^3, and detector acceptance uses steradian.
+    Optional divergence-only fields retain an internal absence sentinel so
+    :meth:`to_dict` exactly reproduces the historical mapping payload.
+    """
+
+    # Producer-required fields. Their declaration order need not match the
+    # legacy mapping: to_dict follows _CASE_KEY_ORDER explicitly.
+    name: str
+    crystal: str
+    composition: Composition
+    hkl_list: list[MillerIndex]
+    B_ang2: float
+    E0_keV: float
+    thickness_ang: float
+    crystal_width_mm: float | None
+    crystal_height_mm: float | None
+    beam_fwhm_mm: float | None
+    E_grid: EnergyGrid
+    E_grid_line: EnergyGrid
+    E_grid_brem: EnergyGrid
+    theta_obs_rad: float
+    tilt_deg: float
+    tilt_azim_deg: float
+    beam_uvw: MillerIndex | None
+    surface_hkl: MillerIndex | None
+    mosaic_fwhm_rad: float | None
+    mosaic_mc_fwhm_rad: float | None
+    mosaic_mc_nodes: int
+    abs_layers: list[AbsorberLayer] | None
+    layer_radiators: list[Radiator | None] | None
+    brem_file: str | PathLike[str] | None
+    Ne: int
+    Ne_brem: int
+    seed: int
+    spec_chunk: int | None
+    brem_chunk: int | None
+    dtheta_obs_rad: float
+    domega_sr: float
+
+    # Producer-conditional fields. `_Absent` is internal and skipped by
+    # serialization; explicit None remains a real legacy payload value.
+    bunch_charge_pc: float | _Absent = _ABSENT
+    rep_rate_hz: float | _Absent = _ABSENT
+    beam_fwhm_y_mm: float | None | _Absent = _ABSENT
+    energy_spread_frac: float | _Absent = _ABSENT
+    long_shape: str | _Absent = _ABSENT
+    bunch_length_fs: float | _Absent = _ABSENT
+    long_offsets_fs: tuple[float, ...] | _Absent = _ABSENT
+    longitudinal_distribution: dict[str, object] | _Absent = _ABSENT
+    transverse_distribution: dict[str, object] | _Absent = _ABSENT
+    groove_spacing_ang: float | _Absent = _ABSENT
+    coherent_emission: Literal[True] | _Absent = _ABSENT
+    xray_dispersion: Literal["refractive"] | _Absent = _ABSENT
+
+    # Legacy/manual-only controls accepted during the Mapping support window.
+    azimuth_rad: float | _Absent = _ABSENT
+    recip_miscut_rad: tuple[float, float] | None | _Absent = _ABSENT
+    E_cut_lines_keV: float | _Absent = _ABSENT
+    E_cut_brem_keV: float | _Absent = _ABSENT
+    sinc_cutoff: float | None | _Absent = _ABSENT
+    brem_step_eV: float | _Absent = _ABSENT
+
+    def __post_init__(self) -> None:
+        """Reject malformed values before they reach transport or identity."""
+        if not self.name or not isinstance(self.name, str):
+            raise ValueError("name must be a non-empty string")
+        if not self.crystal or not isinstance(self.crystal, str):
+            raise ValueError("crystal must be a non-empty string")
+        _positive("B_ang2", self.B_ang2, allow_zero=True)
+        _positive("E0_keV", self.E0_keV)
+        _positive("thickness_ang", self.thickness_ang)
+        _paired_positive_optional_dimensions(
+            self.crystal_width_mm,
+            self.crystal_height_mm,
+        )
+        _positive_optional("beam_fwhm_mm", self.beam_fwhm_mm)
+        if not isinstance(self.beam_fwhm_y_mm, _Absent):
+            _positive_optional("beam_fwhm_y_mm", self.beam_fwhm_y_mm)
+        for name in ("E_grid", "E_grid_line", "E_grid_brem"):
+            _energy_grid(name, getattr(self, name))
+        for name in ("theta_obs_rad", "tilt_deg", "tilt_azim_deg", "dtheta_obs_rad"):
+            _finite(name, getattr(self, name))
+        _positive("domega_sr", self.domega_sr)
+        _positive_optional("mosaic_fwhm_rad", self.mosaic_fwhm_rad, allow_zero=True)
+        _positive_optional("mosaic_mc_fwhm_rad", self.mosaic_mc_fwhm_rad, allow_zero=True)
+        _positive_int("mosaic_mc_nodes", self.mosaic_mc_nodes)
+        _positive_int("Ne", self.Ne)
+        _positive_int("Ne_brem", self.Ne_brem)
+        if isinstance(self.seed, bool) or not isinstance(self.seed, int):
+            raise ValueError("seed must be an integer")
+        for name in ("spec_chunk", "brem_chunk"):
+            value = getattr(self, name)
+            if value is not None:
+                _positive_int(name, value)
+        if self.coherent_emission is not _ABSENT and self.coherent_emission is not True:
+            raise ValueError("coherent_emission must be absent or True")
+        if self.xray_dispersion is not _ABSENT and self.xray_dispersion != "refractive":
+            raise ValueError("xray_dispersion must be absent or 'refractive'")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the exact legacy mapping shape and insertion order."""
+        payload: dict[str, Any] = {}
+        for key in _CASE_KEY_ORDER:
+            value = getattr(self, key)
+            if value is not _ABSENT:
+                payload[key] = value
+        return payload
+
+    def __getitem__(self, key: str) -> Any:
+        value = getattr(self, key, _ABSENT)
+        if value is _ABSENT or key not in _CASE_KEY_ORDER:
+            raise KeyError(key)
+        return value
+
+    def __iter__(self) -> Iterator[str]:
+        return (key for key in _CASE_KEY_ORDER if getattr(self, key) is not _ABSENT)
+
+    def __len__(self) -> int:
+        return sum(getattr(self, key) is not _ABSENT for key in _CASE_KEY_ORDER)
+
+
+def _finite(name: str, value: object) -> None:
+    try:
+        finite = math.isfinite(float(cast(Any, value)))
+    except (TypeError, ValueError):
+        finite = False
+    if not finite:
+        raise ValueError(f"{name} must be finite")
+
+
+def _positive(name: str, value: object, *, allow_zero: bool = False) -> None:
+    _finite(name, value)
+    numeric = float(cast(Any, value))
+    if numeric < 0.0 if allow_zero else numeric <= 0.0:
+        qualifier = "non-negative" if allow_zero else "positive"
+        raise ValueError(f"{name} must be finite and {qualifier}")
+
+
+def _positive_optional(
+    name: str,
+    value: object | None,
+    *,
+    allow_zero: bool = False,
+) -> None:
+    if value is not None:
+        _positive(name, value, allow_zero=allow_zero)
+
+
+def _positive_int(name: str, value: object) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{name} must be a positive integer")
+
+
+def _paired_positive_optional_dimensions(width: float | None, height: float | None) -> None:
+    if (width is None) != (height is None):
+        raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
+    _positive_optional("crystal_width_mm", width)
+    _positive_optional("crystal_height_mm", height)
+
+
+def _energy_grid(name: str, value: object) -> None:
+    grid = np.asarray(value, dtype=float)
+    if grid.ndim != 1 or grid.size == 0 or not np.all(np.isfinite(grid)):
+        raise ValueError(f"{name} must be a non-empty finite one-dimensional energy grid")
+    if isinstance(value, tuple) and len(value) != 3:
+        raise ValueError(f"{name} uniform encoding must be a three-item tuple")

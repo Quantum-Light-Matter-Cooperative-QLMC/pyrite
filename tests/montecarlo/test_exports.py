@@ -21,6 +21,8 @@ FROZEN_EXPORTS = frozenset(
         "REAL",
         "_to_cpu",
         "_GPU",
+        # case
+        "Case",
         # materials
         "_normalize_composition",
         "_mu_total_inv_ang",

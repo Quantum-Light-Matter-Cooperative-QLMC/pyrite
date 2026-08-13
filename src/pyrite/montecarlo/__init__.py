@@ -57,6 +57,7 @@ from ..materials.attenuation import (
     _stack_tau,
 )
 from ._backend import _GPU, REAL, _to_cpu, cp, xp
+from .case import Case
 from .detector import (
     aperture_fwhm_eV,
     convolve_detector,
@@ -128,6 +129,8 @@ __all__ = [
     "REAL",
     "_to_cpu",
     "_GPU",
+    # case
+    "Case",
     # materials
     "_normalize_composition",
     "_mu_total_inv_ang",

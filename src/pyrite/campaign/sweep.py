@@ -36,6 +36,7 @@ from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
 from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.crystal import XRAY_DISPERSION_MODELS, dominant_reflections
+from ..montecarlo.case import Case
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 from .transverse import TransverseDistribution, resolve_transverse_distribution
 
@@ -866,7 +867,7 @@ def build_cases(
             for i_n, (ne_line, ne_brem) in enumerate(ne_pairs):
                 case_name = f"{name} ne={ne_line}/{ne_brem}" if explicit_ne else name
                 cases.append(
-                    dict(
+                    Case(
                         name=case_name,
                         crystal=cp["crystal"],
                         composition=cp["composition"],
