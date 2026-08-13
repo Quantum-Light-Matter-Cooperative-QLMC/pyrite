@@ -188,6 +188,18 @@ def test_vacuum_dispersion_leaves_the_hash_bit_for_bit_and_refractive_diverges()
     assert refractive["parameter_sha256"] != vacuum["parameter_sha256"]
 
 
+def test_xray_dispersion_value_mirrors_agree():
+    """``_XRAY_DISPERSION_VALUES`` is copied into the catalog and the profile CLI
+    because ``crystal`` cannot be imported from ``catalog`` (import cycle). Pin
+    the copies to the kernels' own list so they cannot drift apart."""
+    from pyrite.cli.commands.profile import _XRAY_DISPERSION_VALUES as cli_values
+    from pyrite.materials.catalog import _XRAY_DISPERSION_VALUES as catalog_values
+    from pyrite.materials.crystal import XRAY_DISPERSION_MODELS
+
+    assert catalog_values == XRAY_DISPERSION_MODELS
+    assert cli_values == XRAY_DISPERSION_MODELS
+
+
 def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]

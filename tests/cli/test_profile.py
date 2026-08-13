@@ -641,6 +641,53 @@ def test_set_emission_invalid_value_rejected(tmp_path, monkeypatch):
     assert "not one of" in result.stderr.lower()
 
 
+def test_show_xray_dispersion_defaults_to_vacuum(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert "xray dispersion: vacuum (default)" in shown.stdout
+
+    machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert_clean_result(machine)
+    assert json.loads(machine.stdout)["payload"]["xray_dispersion"] is None
+
+
+def test_set_xray_dispersion_replaces_and_reports_in_show(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--xray-dispersion", "refractive"])
+
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert 'xray_dispersion = "refractive"' in catalog.read_text()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "xray dispersion: refractive" in shown.stdout
+
+    replaced = invoke(profile.command, ["set", "sub_100keV", "--xray-dispersion", "vacuum"])
+    assert_clean_result(replaced, stdout="updated profile sub_100keV\n")
+    assert 'xray_dispersion = "vacuum"' in catalog.read_text()
+
+
+def test_set_xray_dispersion_invalid_value_rejected(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--xray-dispersion", "bogus"])
+
+    assert result.exit_code == 2
+    assert "not one of" in result.stderr.lower()
+
+
+def test_xray_dispersion_is_not_a_run_flag(tmp_path, monkeypatch):
+    """Like emission, dispersion is profile-owned with no ``cxr run`` override,
+    and unlike emission it has no incremental add/remove spelling either."""
+    _catalog(tmp_path, monkeypatch)
+
+    added = invoke(profile.command, ["add", "sub_100keV", "--xray-dispersion", "refractive"])
+    assert added.exit_code == 2
+    removed = invoke(profile.command, ["remove", "sub_100keV", "--xray-dispersion", "refractive"])
+    assert removed.exit_code == 2
+
+
 def test_set_emission_on_standard_prompts(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
     original = catalog.read_text()

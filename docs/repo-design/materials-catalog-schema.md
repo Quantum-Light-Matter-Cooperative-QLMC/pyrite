@@ -68,7 +68,8 @@ thickness_ang = 1.0e4
 ## Profiles and scan descriptors
 
 `[profiles.NAME]` can define material membership, a named beam, detector,
-emission policy, energy-grid references, shared scan descriptors, and
+emission policy, X-ray dispersion model, energy-grid references, shared scan
+descriptors, and
 `[profiles.NAME.overrides.MATERIAL]` tables. Supported grids decode to immutable
 float64 arrays. A descriptor uses one of these forms:
 

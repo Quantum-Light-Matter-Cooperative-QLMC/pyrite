@@ -56,6 +56,12 @@ _SCAN_KEYS = (
 #: CATALOG``.
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 
+#: Valid ``[profiles.NAME].xray_dispersion`` values. Mirrors
+#: ``materials.crystal.XRAY_DISPERSION_MODELS``, which cannot be imported here:
+#: ``crystal`` builds ``CRYSTALS`` from this module at import time, so the edge
+#: would close a cycle. ``tests/materials/test_profiles.py`` pins the mirror.
+_XRAY_DISPERSION_VALUES = ("vacuum", "refractive")
+
 
 _MISSING_LINE_GRID_RE = re.compile(
     r"^requires E_grid_line, or an energy_grids store entry covering beam energies (\[.*\])$"
@@ -277,6 +283,10 @@ class MaterialCatalog:
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
     profile_emissions: Mapping[str, str] = MappingProxyType({})
+    #: Explicit ``profiles.NAME.xray_dispersion`` overrides ("vacuum"/
+    #: "refractive"), keyed by profile; profiles with no key are absent (the
+    #: active fidelity preset's dispersion model stands unmodified).
+    profile_xray_dispersions: Mapping[str, str] = MappingProxyType({})
     #: Explicit immutable energy-grid artifact refs, keyed first by profile and
     #: then material. Legacy ``[energy_grids.*]`` fallback rows are deliberately
     #: absent: callers can distinguish migrated refs from compatibility input.
@@ -302,6 +312,12 @@ class MaterialCatalog:
         profile carries no emission key. Consumed by :func:`scan._resolved_run`
         to override the active fidelity preset's emission."""
         return self.profile_emissions.get(name)
+
+    def profile_xray_dispersion(self, name: str) -> str | None:
+        """Explicit ``profiles.NAME.xray_dispersion`` override, or ``None`` when
+        the profile carries no key. Consumed by :func:`scan._resolved_run` to
+        override the active fidelity preset's photon dispersion model."""
+        return self.profile_xray_dispersions.get(name)
 
     def profile_detector(self, name: str) -> DetectorSpec:
         """Resolved detector for ``name`` with standard then legacy fallback."""
@@ -1077,7 +1093,15 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             row,
             path,
             set(_SCAN_KEYS)
-            | {"materials", "overrides", "beam", "detector", "emission", "energy_grid_refs"},
+            | {
+                "materials",
+                "overrides",
+                "beam",
+                "detector",
+                "emission",
+                "xray_dispersion",
+                "energy_grid_refs",
+            },
         )
         has_ang = "thickness_ang" in row
         has_layers = "thickness_layers" in row
@@ -1102,6 +1126,9 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         emission = row.get("emission")
         if emission is not None and emission not in _EMISSION_VALUES:
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
+        dispersion = row.get("xray_dispersion")
+        if dispersion is not None and dispersion not in _XRAY_DISPERSION_VALUES:
+            errors.add(f"{path}.xray_dispersion", f"must be one of {_XRAY_DISPERSION_VALUES}")
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         refs = row.get("energy_grid_refs")
@@ -1567,6 +1594,11 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("emission"), str)
     }
+    profile_xray_dispersions = {
+        name: cast(str, row["xray_dispersion"])
+        for name, row in profiles.items()
+        if isinstance(row.get("xray_dispersion"), str)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -1578,6 +1610,7 @@ def _load_material_catalog_cached(
         profile_beams=MappingProxyType(profile_beams),
         profile_detectors=MappingProxyType(profile_detectors),
         profile_emissions=MappingProxyType(profile_emissions),
+        profile_xray_dispersions=MappingProxyType(profile_xray_dispersions),
         profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
         resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
         beams=MappingProxyType(beams),

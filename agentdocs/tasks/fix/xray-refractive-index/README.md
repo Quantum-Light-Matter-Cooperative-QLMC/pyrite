@@ -74,7 +74,9 @@ extension unless the observation geometry approaches grazing incidence.
       writes the divergence-only case key, `runner._lines_for_segments` reads
       it. `Settings.xray_dispersion` feeds `build_cases` from `scan`/`blaze`/
       `checkpoint_cleanup` and adds the matching `dataset_identity` divergence
-      key. Catalog-profile ownership is NOT done — see remainder.
+      key. Catalog-profile ownership landed too: `[profiles.NAME].xray_dispersion`
+      -> `CATALOG.profile_xray_dispersion` -> `scan._resolved_run`, written with
+      `cxr profile set --xray-dispersion`.
 - [x] In-medium dispersion in the resonance denominator, derived from the
       Maxwell dispersion relation rather than an ad hoc `n` insertion. Covers
       the resonance, `k.g`, the detuning, and the PXR numerator's `k^2`, on both
@@ -131,6 +133,17 @@ extension unless the observation geometry approaches grazing incidence.
   and `exp(-beta omega L) = sqrt(exp(-mu L))` is the existing `amp`. So the
   coherent path was carrying `Im n` over the escape path all along and was
   missing only its real partner.
+- `xray_dispersion` is catalog-profile-owned with NO `cxr run` flag, matching
+  `emission` exactly (`tests/scan/test_scan_coherent.py`): it is a physics model
+  choice, not a per-invocation knob. It also joins the `canonical_full` guard in
+  `scan._resolved_run`, so a `refractive` run gets `hopg@full-<digest>` instead
+  of overwriting the canonical vacuum `hopg` stem.
+- `materials/catalog.py` and the profile CLI each keep a local copy of the
+  `("vacuum", "refractive")` tuple rather than importing
+  `XRAY_DISPERSION_MODELS`: `crystal.py` builds `CRYSTALS` from `catalog.py` at
+  import time, so `catalog -> crystal` closes a cycle. The copies are pinned to
+  the kernels' list by `tests/materials/test_profiles.py`. Same reason the
+  pre-existing `_EMISSION_VALUES` is mirrored.
 - `XRAY_DISPERSION_MODELS` lives in `materials/crystal.py`, not `lines.py`, so
   `campaign/sweep.py` can validate against the kernels' own list. `sweep.py` is
   deliberately GPU-free at import; `lines.py` pulls in `montecarlo._backend`
@@ -168,16 +181,7 @@ extension unless the observation geometry approaches grazing incidence.
   `(L_esc, delta_omega, use_medium)` and are covered by
   `tests/montecarlo/test_xray_dispersion_cuda.py`; only the gate in
   `lines.py::_use_jit_coherent_stream` and the prologue itself remain.
-- Catalog-profile ownership of `xray_dispersion`. `Settings.xray_dispersion`
-  now exists and reaches the cases and the digest, so a notebook/API caller can
-  run `refractive` via `replace(default_settings(), xray_dispersion=...)`. What
-  is missing is the profile key that `emission` has: `CATALOG.profile_emission`
-  has no dispersion twin, so `scan._resolved_run` cannot resolve one from the
-  catalog and there is no `cxr profile set --refractive`. That slice touches the
-  catalog schema, `campaign/profile_edit.py`, the profile CLI, and the catalog
-  goldens. Note emission is deliberately profile-owned with NO CLI run flag
-  (`tests/scan/test_scan_coherent.py`), so `xray_dispersion` should NOT grow a
-  `cxr run` flag either.
+- (none blocking besides the stream route above)
 
 ## Pre-existing failures on `main` (not caused by this branch)
 
