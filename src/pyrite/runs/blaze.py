@@ -15,7 +15,8 @@ adds a HOPG crystal with 2 micron-spaced grooves, scanned over polar angles
 
 Grooves are v1 single-slab: no substrate/stack, ``theta_obs = 90 deg``,
 ``tilt_azim = 180 deg``, ``0 < tilt < 90 deg``. These are enforced by
-``sweep._reject_invalid_groove_geometry``; this driver constructs every Sweep
+``campaign.geometry.Slab`` at construction (``theta_obs`` by
+``Target.validate_against``); this driver constructs every Sweep
 to satisfy them and does not relax them. The crystal keeps the default finite
 5x5 mm footprint (same as flat sweeps), so blazed records carry a real electron
 hit/miss fraction (``hit_frac``, shown in the analysis_app heatmap) rather than

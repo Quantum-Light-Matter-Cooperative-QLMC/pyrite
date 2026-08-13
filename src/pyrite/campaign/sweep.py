@@ -259,7 +259,7 @@ class Sweep:
     # plans/2026-07-23-blazed-groove-geometry.md). Scalar, not sweepable in
     # v1. Requires tilt_azim_deg == 180, 0 < tilt_deg < 90, theta_obs = 90,
     # and no substrate/stack. A finite footprint IS compatible and is the
-    # default -- see _reject_invalid_groove_geometry for why.
+    # default -- see geometry.BlazedGrooves, which owns those rules now.
     crystal_width_mm: ScalarOrSeq | None = 5.0
     crystal_height_mm: ScalarOrSeq | None = 5.0
     # fixed setup (single values) ------------------------------------------
@@ -414,37 +414,57 @@ def _reject_relativistic_energies(energies: np.ndarray) -> None:
         )
 
 
-def _reject_invalid_groove_geometry(
-    groove_spacing_ang: float, sweep: "Sweep", tilts: np.ndarray, azimuths: np.ndarray, stack
-) -> None:
-    """Refuse case geometries the v1 blazed-groove entrance face cannot model
-    (docs/validation/geometry/blazed-groove-geometry.md). Grooves are
-    a single-slab feature machined into one flat face at a fixed in-plane
-    orientation (montecarlo.groove.blazed_groove_spec), so every case must sit
-    at tilt_azim_deg == 180, 0 < tilt_deg < 90, and theta_obs_deg == 90, and no
-    substrate/stack may be present. Mirrors the theta_obs check in
-    montecarlo.groove.blazed_groove_spec so the restriction is enforced both at
-    case-build time and at spec construction.
+def _target_from_sweep(sweep: "Sweep") -> Target:
+    """Today's flat geometry fields as the :class:`Target` they describe.
 
-    A finite crystal footprint IS allowed and is the default (crystal_width_mm/
-    crystal_height_mm, same 5x5 mm as flat sweeps): the sub-micron groove phase
-    and the mm-scale footprint are independent in transport -- the groove offsets
-    the entry point within one period, the footprint kills beam electrons whose
-    (tilt-elongated) spot lands off the crystal -- so the launch-time hit/miss
-    classification (stored as ``hit_frac``, surfaced in the analysis_app heatmap)
-    applies unchanged to grooved crystals. The alive electrons still see the
-    laterally periodic groove escape profile."""
-    if groove_spacing_ang <= 0:
-        raise ValueError("groove_spacing_ang must be positive")
-    if not np.allclose(azimuths, 180.0):
-        raise ValueError("grooves require tilt_azim_deg == 180 for every case")
-    if not np.all((tilts > 0.0) & (tilts < 90.0)):
-        raise ValueError("grooves require 0 < tilt_deg < 90 for every case")
-    assert sweep.detector is not None
-    if not np.isclose(sweep.detector.observation_angle_deg, 90.0):
-        raise ValueError("grooves require theta_obs_deg == 90 for every case")
+    The flat spelling stays public until it retires; every geometry RULE is owned
+    by the target objects, so this only maps fields onto a variant and lets
+    construction do the rejecting. The three checks here exist solely because the
+    flat fields are separate: footprint pairing (unrepresentable once both
+    dimensions sit on one :class:`Footprint`), the substrate/stack exclusion, and
+    grooves-forbid-a-stack (a type constraint once ``entrance_face`` is reachable
+    only through :class:`Slab`).
+    """
+    footprint = None
+    if sweep.crystal_width_mm is not None or sweep.crystal_height_mm is not None:
+        if sweep.crystal_width_mm is None or sweep.crystal_height_mm is None:
+            raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
+        footprint = Footprint(sweep.crystal_width_mm, sweep.crystal_height_mm)
+
+    # normalize the substrate sugar onto the general stack (mutually exclusive)
+    stack = sweep.stack
+    if sweep.substrate is not None:
+        if stack is not None:
+            raise ValueError("give either substrate= or stack=, not both")
+        stack = (LayerSpec(sweep.substrate, sweep.substrate_thickness_ang),)
+
     if stack is not None:
-        raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
+        if sweep.groove_spacing_ang is not None:
+            raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
+        return Stack(
+            layers=(
+                Layer(sweep.material, sweep.thickness_ang),
+                *(
+                    Layer(lay.material, lay.thickness_ang, lay.beam_uvw, lay.azimuth_deg)
+                    for lay in stack
+                ),
+            ),
+            tilt_deg=sweep.tilt_deg,
+            tilt_azim_deg=sweep.tilt_azim_deg,
+            footprint=footprint,
+            allow_normal_incidence=sweep.allow_normal_incidence,
+        )
+    return Slab(
+        sweep.material,
+        thickness_ang=sweep.thickness_ang,
+        tilt_deg=sweep.tilt_deg,
+        tilt_azim_deg=sweep.tilt_azim_deg,
+        footprint=footprint,
+        entrance_face=(
+            None if sweep.groove_spacing_ang is None else BlazedGrooves(sweep.groove_spacing_ang)
+        ),
+        allow_normal_incidence=sweep.allow_normal_incidence,
+    )
 
 
 def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:
@@ -581,20 +601,6 @@ def build_cases(
             beam_case["long_offsets_fs"] = tuple(float(x) for x in b.long_offsets_fs)
     material_spec = CATALOG.materials.get(sweep.material)
     label = material_spec.label if material_spec is not None else sweep.material
-    width_src, height_src = sweep.crystal_width_mm, sweep.crystal_height_mm
-    if width_src is None and height_src is None:
-        footprints = [(None, None)]
-    elif width_src is None or height_src is None:
-        raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
-    else:
-        widths, heights = _seq(width_src), _seq(height_src)
-        if not (
-            np.all(np.isfinite(widths) & (widths > 0.0))
-            and np.all(np.isfinite(heights) & (heights > 0.0))
-        ):
-            raise ValueError("crystal_width_mm and crystal_height_mm must be finite and positive")
-        footprints = list(product(widths, heights))
-
     # crystal mosaicity (analytic, optional): None unless the run enables it AND the
     # crystal has a mosaic_fwhm_deg (or the Sweep overrides it). None -> perfect
     # crystal, so store_result adds no mosaic term (exact no-op).
@@ -616,9 +622,6 @@ def build_cases(
     mosaic_mc_rad = mosaic_fwhm_rad if mosaic_mc else None
 
     brem_case_grid = encode_energy_grid(brem_grid)
-    tilts = _quantized_angles(sweep.tilt_deg)
-    azimuths = _quantized_angles(sweep.tilt_azim_deg)
-    _reject_banned_angles(tilts, azimuths, allow_normal_incidence=sweep.allow_normal_incidence)
 
     def _electron_counts(grid, fallback, label):
         if grid is None:
@@ -637,45 +640,17 @@ def build_cases(
     )
     explicit_ne = sweep.n_electrons is not None or sweep.n_electrons_brem is not None
 
-    # normalize the substrate sugar onto the general stack (mutually exclusive)
-    stack = sweep.stack
-    if sweep.substrate is not None:
-        if stack is not None:
-            raise ValueError("give either substrate= or stack=, not both")
-        stack = (LayerSpec(sweep.substrate, sweep.substrate_thickness_ang),)
-
-    if sweep.groove_spacing_ang is not None:
-        _reject_invalid_groove_geometry(sweep.groove_spacing_ang, sweep, tilts, azimuths, stack)
+    # Geometry is owned end to end by the target: it validated itself at
+    # construction, validate_against carries the one target x detector rule, and
+    # lower() is the whole geometry product -- so nothing below branches on
+    # geometry, it only spreads what the target produced.
+    target = _target_from_sweep(sweep)
+    target.validate_against(sweep.detector)
+    geometries = target.lower(cp, label=label, beam_uvw=beam_uvw, n_families=sweep.n_families)
 
     cases = []
-    for i_c, (thickness, tilt, azim, (width, height)) in enumerate(
-        product(
-            _seq(sweep.thickness_ang),
-            tilts,
-            azimuths,
-            footprints,
-        )
-    ):
-        name = f"{label} {fmt_thickness(thickness)} pol={tilt:g} az={azim:g}"
-        abs_layers = None
-        layer_radiators = None
-        if stack is not None:
-            name = f"{name} on {'+'.join(lay.material for lay in stack)}"
-            abs_layers = stack_layers(cp["composition"], thickness, stack)
-            # per-layer coherent radiators, aligned with abs_layers: the film (its
-            # own crystal params) then one per stack Layer (crystal params + the
-            # Layer's own orientation if crystalline, None if amorphous). This is
-            # what lets a crystalline substrate emit its own PXR/CBS lines
-            # (per-layer radiation, slice 3).
-            layer_radiators = [
-                # stack azimuths are relative to the film -> azimuth_rad=0.0
-                _radiator(cp, beam_uvw=beam_uvw, azimuth_rad=0.0),
-                *(layer_radiator(lay, sweep.n_families) for lay in stack),
-            ]
-        if width is not None:
-            name = f"{name} footprint={width:g}x{height:g}mm"
-        if sweep.groove_spacing_ang is not None:
-            name = f"{name} groove={sweep.groove_spacing_ang / 1e4:g}um"
+    for i_c, geometry in enumerate(geometries):
+        name = geometry.name
         for i_e, E0 in enumerate(energies):
             line_case_grid = encode_energy_grid(line_grids[i_e])
             resolved_transverse = None
@@ -697,7 +672,7 @@ def build_cases(
                         beam_uvw=beam_uvw,
                         energy_keV=float(E0),
                         theta_obs_deg=float(sweep.detector.observation_angle_deg),
-                        tilt_deg=float(tilt),
+                        tilt_deg=geometry.tilt_deg,
                     )
                 )
             for i_n, (ne_line, ne_brem) in enumerate(ne_pairs):
@@ -710,9 +685,9 @@ def build_cases(
                         hkl_list=cp["hkl_list"],
                         B_ang2=cp["B_ang2"],
                         E0_keV=float(E0),
-                        thickness_ang=float(thickness),
-                        crystal_width_mm=None if width is None else float(width),
-                        crystal_height_mm=None if height is None else float(height),
+                        # thickness, footprint, tilts, stack layers, and the
+                        # groove spacing when there is one (absent otherwise)
+                        **geometry.case_keys(),
                         **beam_case,
                         **(
                             {"longitudinal_distribution": resolved_longitudinal}
@@ -736,13 +711,6 @@ def build_cases(
                             else brem_case_grid
                         ),
                         theta_obs_rad=np.deg2rad(sweep.detector.observation_angle_deg),
-                        tilt_deg=float(tilt),
-                        tilt_azim_deg=float(azim),
-                        **(
-                            {"groove_spacing_ang": float(sweep.groove_spacing_ang)}
-                            if sweep.groove_spacing_ang is not None
-                            else {}
-                        ),
                         # coherent segment sum: divergence-only key (absent -> the
                         # incoherent default, bit-for-bit case payload).
                         **({"coherent_emission": True} if coherent_emission else {}),
@@ -758,8 +726,6 @@ def build_cases(
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
                         mosaic_mc_fwhm_rad=mosaic_mc_rad,  # exact MC route (None if route="analytic")
                         mosaic_mc_nodes=sweep.mosaic_nodes,
-                        abs_layers=abs_layers,  # None -> single slab; else film-on-substrate stack
-                        layer_radiators=layer_radiators,  # per-layer coherent radiators (None -> slab)
                         brem_file=None,
                         Ne=ne_line,
                         Ne_brem=ne_brem,

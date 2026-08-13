@@ -154,7 +154,7 @@ change which inputs they accept.
       construction-time validation and a `lower()` producing today's case keys.
       Landed in `src/pyrite/campaign/geometry.py`; `build_cases` is untouched, so
       B is additive and C is a pure rewire.
-- [ ] C — Route `build_cases` through `Target.lower()`. `build_cases` must end
+- [x] C — Route `build_cases` through `Target.lower()`. `build_cases` must end
       with **no geometry conditionals**.
 - [ ] D — `substrate=` becomes a `Stack` constructor helper; retire the parallel
       field pair behind a deprecated shim under the existing D7 harness. Move
@@ -215,6 +215,35 @@ total rather than from new policy:
 
 Not in B, deliberately: `mosaic` (slice D), the `Sweep.material` /
 `substrate=` deprecation shim (slice D), and any `build_cases` change (slice C).
+
+## Slice C — what landed
+
+`build_cases` now holds no geometry conditional. `_reject_invalid_groove_geometry`
+is gone; `_target_from_sweep(sweep)` maps today's flat fields onto a `Slab` or
+`Stack`, and the body reduces to three lines: construct, `validate_against(
+sweep.detector)`, `lower(...)`. The loop spreads `geometry.case_keys()` into
+`Case`, which is a kw-only dataclass with an explicit `_CASE_KEY_ORDER` for
+serialization, so the kwarg reshuffle cannot move a payload key.
+
+Three checks stayed in `_target_from_sweep` rather than moving into `Target`,
+and all three exist *only* because the flat fields are still separate: footprint
+pairing, the `substrate`/`stack` exclusion, and grooves-forbid-a-stack. Slice D
+deletes the first and third by construction (one `Footprint`, `entrance_face` on
+`Slab` only) and turns the second into the `Stack` helper.
+
+Validation ORDER moved: footprint and angle rejection now fire just before the
+case loop rather than before the mosaic-route and electron-count checks. No test
+pins a two-error precedence, and every groove/footprint test asserts `ValueError`
+without a message, so the reworded messages are free.
+
+One behaviour narrowing worth recording: `stack=()` used to build a case with an
+empty `abs_layers` stack and a trailing `" on "` in the name; `Stack` now rejects
+it (film plus at least one layer). Nothing constructs it.
+
+Not touched, deliberately: `Sweep` keeps every flat geometry field with its
+current type and default, so no caller in `config.py`, `profiles.py`,
+`profile_edit.py`, `runs/`, or the CLI moved. Evidence: full `pyrite-dev test`
+green (3099 passed, 61 skipped), lint and typecheck clean.
 
 ## Decisions and open questions
 
