@@ -156,10 +156,15 @@ change which inputs they accept.
       B is additive and C is a pure rewire.
 - [x] C — Route `build_cases` through `Target.lower()`. `build_cases` must end
       with **no geometry conditionals**.
-- [ ] D — `substrate=` becomes a `Stack` constructor helper; retire the parallel
-      field pair behind a deprecated shim under the existing D7 harness. Move
-      `mosaic` onto `Target` in the same slice, leaving `mosaic_route` /
-      `mosaic_nodes` where they are for `refactor/scene-object-model`.
+- [ ] D1 — Land `Sweep.target` as the canonical spelling; the flat geometry
+      fields become deprecated shims that construct it, and the `config.py`
+      override path rebuilds the target instead of `replace`-ing flat fields.
+      See "Slice D — handoff" below; scoped and approved, not started.
+- [ ] D2 — `substrate=` becomes a `Stack` constructor helper; retire the
+      parallel field pair behind a deprecated shim under the existing D7
+      harness. Move `mosaic` onto `Target` in the same slice, leaving
+      `mosaic_route` / `mosaic_nodes` where they are for
+      `refactor/scene-object-model`.
 - [ ] E — Equivalence sweep: every existing catalog profile expands to an
       identical case list.
 - [ ] F — Write the ADR recording the arbitrary-geometry **non-goal**. The RFC
@@ -244,6 +249,101 @@ Not touched, deliberately: `Sweep` keeps every flat geometry field with its
 current type and default, so no caller in `config.py`, `profiles.py`,
 `profile_edit.py`, `runs/`, or the CLI moved. Evidence: full `pyrite-dev test`
 green (3099 passed, 61 skipped), lint and typecheck clean.
+
+## Slice D — handoff (scoped, not implemented)
+
+### Why D splits in two
+
+The checklist read narrowly (retire `substrate=`, add a `Stack` helper, move
+`mosaic`) does not reach the acceptance check *"an invalid target raises at
+construction, with a message naming the violated constraint"*. After C, geometry
+is still validated only when `build_cases` calls `_target_from_sweep`, which is
+the same "fails after profile resolution" timing the task exists to remove. The
+decisions section already assumes the wider shape — "`Sweep.material` retires as
+a deprecated forward to `target.material` in slice D" only parses if
+`Sweep(target=...)` exists. **Decided: go wide, split D1/D2.** D1 lands the
+surface; D2 is the sugar retirement and `mosaic`, and is small once D1 holds.
+
+### D1 — the seam
+
+`_target_from_sweep(sweep)` (`sweep.py`, added in C) is the whole conversion and
+is the thing to invert. D1 moves the call into `Sweep.__post_init__`, stores the
+result on a `target` field, and `build_cases` reads `sweep.target` instead of
+constructing one. Geometry then fails at `Sweep(...)` — and at `pr.Slab(...)`
+for a caller who builds the target directly.
+
+The repo already has the exact precedent for "legacy flat inputs normalize onto
+one nested object": `theta_obs_deg` / `dtheta_obs_deg` / `domega_sr` are
+`InitVar` (`sweep.py:266`), consumed in `__post_init__`, normalized onto the
+`detector` field, and rejected when they conflict with a supplied nested
+`DetectorSpec`. Follow it exactly rather than inventing a second pattern:
+
+- the flat geometry inputs (`material`, `thickness_ang`, `tilt_deg`,
+  `tilt_azim_deg`, `crystal_width_mm`, `crystal_height_mm`, `groove_spacing_ang`,
+  `substrate`, `substrate_thickness_ang`, `stack`, `allow_normal_incidence`)
+  become `InitVar`;
+- `target: Target | None = None` is the field, defaulted in `__post_init__` from
+  whatever flat inputs were supplied;
+- supplying both a `target=` and a conflicting flat input is an error, same
+  wording shape as the detector conflict message.
+
+**Trap, and the reason the InitVar route is safe:** `dataclasses.replace()` does
+not preserve `InitVar` values — it re-runs `__post_init__` with their defaults,
+silently dropping what the original constructor was given. That is survivable
+only because the normalized result lives on a real field: `replace(sweep, ...)`
+carries `detector` today and would carry `target` after D1. Any flat geometry
+input that is *not* also reconstructible from `target` would be lost by the first
+`replace()`, so nothing may stay flat-only.
+
+**The one real work item is the override path.** `config.py:194` does
+`replace(sweep, **overrides)` with CLI/profile-supplied keys, several of which
+are geometry. Once those are `InitVar`, that call drops them. `config.py:196`
+already shows the fix pattern for exactly this problem: `_BEAM_OVERRIDE_KEYS`
+splits beam-addressed overrides out and re-applies them through
+`beam_replace(sweep.beam, **beam_over)`. D1 adds the same split for
+target-addressed keys with a `target_replace` (or `dataclasses.replace` on the
+variant — note `Slab` and `Stack` are frozen, so `replace` is the natural spelling
+and re-runs `__post_init__`, preserving validation). Watch the two-variant case:
+an override that changes `substrate` changes which variant the target *is*, so
+the helper rebuilds rather than field-replaces.
+
+Sweep construction sites to sweep after the change: `campaign/config.py`,
+`apps/anchor_figures.py`, `devtools/package_smoke.py`,
+`detectors/eaglexo_response.py`, `plots/mpl/detectors.py`, plus tests.
+`sweep.material` is read ~33 times across `campaign/` and `runs/` alone — keep it
+readable as a property forwarding to `target.material`, so readers do not move.
+
+### D2 — sugar retirement and mosaic
+
+`substrate=` is not only a `Sweep` field. It is a catalog material key
+(`materials.toml:1244` and `:1375`, both `substrate = "sapphire"`), validated in
+`catalog.py` — allowed-keys set at `:1312`, must-reference-a-crystal-or-medium at
+`:1367-1372`, "cannot define both substrate and stack" at `:1383`, dependency
+refs at `:1214` — and it reaches `Sweep` through `MaterialSpec.substrate` /
+`MaterialSpec.stack` (`catalog.py:250-251`) via `config.py:105-107`, `:184`,
+`:238`, and `:264`. So D2 either keeps the catalog spelling and retires only the
+`Sweep` pair (recommended: the TOML key is a data vocabulary, not an object
+model), or it becomes a catalog migration too, which is out of this task's scope.
+
+`Stack.on_substrate(film_material, thickness_ang, substrate, substrate_thickness_ang=5e6)`
+is the helper; it is the `LayerSpec` construction that `_target_from_sweep`
+already performs, given a name. Note `Stack` requires the film plus at least one
+layer beneath, so the helper is the only sanctioned one-layer spelling.
+
+`mosaic` moves onto `Target` as a field; `build_cases` then reads `target.mosaic`
+where it reads `sweep.mosaic` today, keeping the resolution chain unchanged
+(`sweep.mosaic_fwhm_deg` override, else `CATALOG.crystal(cp["crystal"])
+.mosaic_fwhm_deg`). `mosaic_route` and `mosaic_nodes` stay on `Sweep` for
+`refactor/scene-object-model`, per the RFC.
+
+### Open question for the implementer
+
+Whether the shims emit `DeprecationWarning` immediately. Recommendation: silent
+in D1 — `config.py` and the profile surface are still *emitting* the flat
+spelling at that point, so warning would fire on the repo's own calls — then warn
+in D2 once the canonical spelling exists end to end, with a row in
+`docs/repo-design/cli/cli-deprecations.md` if any of it surfaces in CLI or
+profile vocabulary. Confirm before implementing.
 
 ## Decisions and open questions
 
