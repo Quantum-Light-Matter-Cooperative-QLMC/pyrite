@@ -47,7 +47,36 @@ file. Edit and drop items on `main`.
    `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
    verification and human sign-off remain. → `feature/coherent-line-batching`;
    [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-5. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+5. **Core architecture RFC — scene objects, scorers, API surface.** Seven
+   changes to the object model, simulation entry point, persistence, and
+   command surface; every step requires bit-for-bit reproduction of stored
+   spectra. Design and sequencing:
+   [`docs/repo-design/core-architecture-rfc.md`](docs/repo-design/core-architecture-rfc.md).
+   Arbitrary target geometry and a GUI are recorded **non-goals**. Six task
+   branches, in dependency order:
+   1. Typed `Case` + `identity_version` (ends the divergence-only-key tax;
+      `_identity_v2` deferred). Ready. → `refactor/typed-case-record`;
+      [`agentdocs/tasks/refactor/typed-case-record/`](agentdocs/tasks/refactor/typed-case-record/).
+   2. Consolidate the geometry surface behind `Target`; transport untouched;
+      includes the arbitrary-geometry non-goal ADR. Ready.
+      → `refactor/target-geometry-surface`;
+      [`agentdocs/tasks/refactor/target-geometry-surface/`](agentdocs/tasks/refactor/target-geometry-surface/).
+   3. Detector owns acceptance + binning + response; demotes `energy-grid`.
+      Gated on 2; overlaps `feature/profile-observation-angle` (P2), sequence
+      deliberately. → `refactor/detector-scorer`;
+      [`agentdocs/tasks/refactor/detector-scorer/`](agentdocs/tasks/refactor/detector-scorer/).
+   4. Split `Sweep` into `Scene`/`Sweep`/`Numerics`/`Analysis`, dissolve
+      `Settings`, add public `pr.simulate`. Structural core, one project.
+      Gated on 1–3. → `refactor/scene-object-model`;
+      [`agentdocs/tasks/refactor/scene-object-model/`](agentdocs/tasks/refactor/scene-object-model/).
+   5. Result arrays in HDF5/Zarr + MCPL export; `.pkl` readable forever. Gated
+      on 1. → `feature/result-format-interchange`;
+      [`agentdocs/tasks/feature/result-format-interchange/`](agentdocs/tasks/feature/result-format-interchange/).
+   6. Reduce 13 CLI nouns to 6; all contracts retained. Gated on 4. **Blocking
+      user decision:** the RFC folds `beam` into `profile`, contradicting the
+      completed `feature/named-beam-objects`. → `refactor/cli-noun-surface`;
+      [`agentdocs/tasks/refactor/cli-noun-surface/`](agentdocs/tasks/refactor/cli-noun-surface/).
+6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
