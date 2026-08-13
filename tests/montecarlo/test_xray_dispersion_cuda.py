@@ -261,3 +261,197 @@ def test_stream_field_kernel_requires_segment_sized_escape_lengths():
             L_esc=cp.asarray(np.tile(d["L_esc"], d["n_g"])),
             delta_omega=cp.asarray(d["delta_omega"]),
         )
+
+
+def _prologue_inputs():
+    """One small (segment, g) block whose lines land inside the tabulation grid.
+
+    ``delta = 1 - Re n`` is exaggerated to ~1e-3 (Si at 1.5 keV is ~1e-5) so the
+    in-medium shift of the resonance sits well above float32 resolution at these
+    line energies; the kinematics under test are linear in ``delta``.
+    """
+    n_g, n_seg = 2, 2
+    hbarc = 1973.269804
+    v = np.array([[0.20, 0.00, 0.10], [0.16, 0.03, 0.08]], dtype=np.float32)
+    n_hat = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    v_dot_n = (v @ n_hat).astype(np.float32)
+    E_tab = np.array([100.0, 400.0, 800.0, 1400.0], dtype=np.float32)
+    return dict(
+        n_g=n_g,
+        n_seg=n_seg,
+        hbarc=hbarc,
+        alpha=7.2973525693e-3,
+        pref_c1=4.0 * np.pi**2 * hbarc,
+        v=v,
+        n_hat=n_hat,
+        v_dot_n=v_dot_n,
+        # Formed the same way the kernel forms it under the refractive model, so
+        # the unit-index case can be compared bit-for-bit.
+        denom=(np.float32(1.0) - v_dot_n).astype(np.float32),
+        gamma=(1.0 / np.sqrt(1.0 - np.sum(v * v, axis=1))).astype(np.float32),
+        t_L=np.array([80.0, 110.0], dtype=np.float32),
+        L_esc=np.array([20.0, 35.0], dtype=np.float32),
+        r=np.array([[1.0, 2.0, 3.0], [-2.0, 1.0, 4.0]], dtype=np.float32),
+        phase_slope=np.array([0.002, -0.001], dtype=np.float32),
+        G=np.array([[1.0, 0.0, 0.5], [0.6, 0.4, 0.8]], dtype=np.float32),
+        ES=np.array([[0.0, 1.0, 0.0], [-0.5547, 0.83205, 0.0]], dtype=np.float32),
+        EP=np.array([[1.0, 0.0, 0.0], [0.66564, 0.44376, -0.6]], dtype=np.float32),
+        E_tab=E_tab,
+        chi_re=np.tile(np.array([1.2e-3, 1.1e-3, 0.9e-3, 0.7e-3], dtype=np.float32), (n_g, 1)),
+        chi_im=np.tile(np.array([1e-5, 2e-5, 3e-5, 4e-5], dtype=np.float32), (n_g, 1)),
+        u_re=np.tile(np.array([2e-5, 1.8e-5, 1.5e-5, 1.2e-5], dtype=np.float32), (n_g, 1)),
+        u_im=np.tile(np.array([1e-6, 2e-6, 1e-6, 0.5e-6], dtype=np.float32), (n_g, 1)),
+        mu=np.array([2e-4, 1e-4, 4e-5, 1e-5], dtype=np.float32),
+        n_re_tab=(1.0 - np.array([4e-3, 1.6e-3, 6e-4, 2e-4], dtype=np.float32)).astype(np.float32),
+    )
+
+
+def _run_prologue(d, *, n_re_tab=None):
+    from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
+        CoherentStreamKernelConfig,
+        run_coherent_prologue_kernel,
+    )
+
+    medium = n_re_tab is not None
+    G, ES, EP = d["G"], d["ES"], d["EP"]
+    aw_seg = None
+    if not medium:
+        aw_seg = cp.asarray(
+            (d["denom"] * d["t_L"] / np.float32(2.0 * d["hbarc"])).astype(np.float32)
+        )
+    out = run_coherent_prologue_kernel(
+        cp.asarray(d["v"]).reshape(-1),
+        cp.asarray(d["denom"]),
+        cp.asarray(d["gamma"]),
+        cp.asarray(d["t_L"]),
+        cp.asarray(d["L_esc"]),
+        cp.asarray(np.ones(d["n_seg"], dtype=bool)),
+        cp.asarray(d["r"]).reshape(-1),
+        cp.asarray(d["phase_slope"]),
+        cp.asarray(G).reshape(-1),
+        cp.asarray(ES).reshape(-1),
+        cp.asarray(EP).reshape(-1),
+        cp.asarray(d["E_tab"]),
+        cp.asarray(d["chi_re"]).reshape(-1),
+        cp.asarray(d["chi_im"]).reshape(-1),
+        cp.asarray(d["u_re"]).reshape(-1),
+        cp.asarray(d["u_im"]).reshape(-1),
+        cp.asarray(d["mu"]),
+        lo_keep=50.0,
+        hi_keep=1600.0,
+        hbarc=d["hbarc"],
+        electron_mass_eV=1.0,
+        alpha_fs=d["alpha"],
+        pref_c1=d["pref_c1"],
+        n_hat=d["n_hat"],
+        n_g=d["n_g"],
+        g2=cp.asarray(np.sum(G * G, axis=1).astype(np.float32)),
+        n_dot_g=cp.asarray((G @ d["n_hat"]).astype(np.float32)),
+        g_dot_es=cp.asarray(np.sum(G * ES, axis=1).astype(np.float32)),
+        g_dot_ep=cp.asarray(np.sum(G * EP, axis=1).astype(np.float32)),
+        aw_seg=aw_seg,
+        v_dot_n=cp.asarray(d["v_dot_n"]) if medium else None,
+        n_re_tab=cp.asarray(n_re_tab) if medium else None,
+        config=CoherentStreamKernelConfig(32, 32, 2, 32),
+    )
+    cp.cuda.Stream.null.synchronize()
+    return [cp.asnumpy(a) for a in out]
+
+
+def _in_medium_root_reference(d, n_re_tab):
+    """``omega = v.g / (1 - Re n(omega) v.n_hat)`` by the kernel's 3-pass fixed
+    point, in float64, with the same clamped linear interpolation on E_tab."""
+    E_tab = d["E_tab"].astype(float)
+    table = np.asarray(n_re_tab, dtype=float)
+    v_dot_g = (d["v"].astype(float) @ d["G"].astype(float).T).T  # (n_g, n_seg)
+    v_dot_n = d["v_dot_n"].astype(float)[None, :]
+    dnm = 1.0 - v_dot_n * np.ones_like(v_dot_g)
+    for _ in range(3):
+        E_it = d["hbarc"] * (v_dot_g / dnm)
+        n_re = np.interp(E_it, E_tab, table)
+        dnm = 1.0 - n_re * v_dot_n
+    E_r = d["hbarc"] * (v_dot_g / dnm)
+    aw = dnm * d["t_L"].astype(float)[None, :] / (2.0 * d["hbarc"])
+    return E_r.reshape(-1), aw.reshape(-1)
+
+
+def test_prologue_solves_the_in_medium_resonance():
+    """The stream prologue is an independent CUDA port of steps 1-6, so its
+    resonance root and sinc half-width are pinned to the same implicit
+    ``omega = v.g / (1 - Re n(omega) v.n_hat)`` the CPU core solves."""
+    d = _prologue_inputs()
+    E_r, aw = _run_prologue(d, n_re_tab=d["n_re_tab"])[:2]
+    E_r_ref, aw_ref = _in_medium_root_reference(d, d["n_re_tab"])
+
+    assert aw.size == d["n_g"] * d["n_seg"]  # per-(segment, g) under refraction
+    np.testing.assert_allclose(E_r, E_r_ref, rtol=3e-6)
+    np.testing.assert_allclose(aw, aw_ref, rtol=3e-6)
+
+    # The shift is the physics, not rounding: delta*(v.n)/denom ~ 1.4e-4 here,
+    # three orders above float32 resolution.
+    E_r_vac = _run_prologue(d)[0]
+    assert np.all(np.abs(E_r - E_r_vac) / np.abs(E_r_vac) > 5e-5)
+
+
+def test_prologue_unit_index_reproduces_the_vacuum_kinematics():
+    """``Re n = 1`` must collapse every in-medium branch -- the fixed point, the
+    half-width, ``k.g`` and the PXR numerator's ``k^2`` -- back onto the
+    pre-existing vacuum kernel exactly."""
+    d = _prologue_inputs()
+    vac = _run_prologue(d)
+    med = _run_prologue(d, n_re_tab=np.ones_like(d["n_re_tab"]))
+
+    np.testing.assert_array_equal(med[0], vac[0])  # E_r
+    np.testing.assert_array_equal(med[1], np.tile(vac[1], d["n_g"]))  # aw, pair layout
+    for got, want in zip(med[2:], vac[2:], strict=True):
+        np.testing.assert_array_equal(got, want)
+
+
+def test_prologue_rejects_a_half_specified_medium_and_a_hoisted_half_width():
+    d = _prologue_inputs()
+    with pytest.raises(ValueError, match="together"):
+        _run_prologue_raw(d, v_dot_n=cp.asarray(d["v_dot_n"]), n_re_tab=None, aw_seg=None)
+    with pytest.raises(ValueError, match="cannot be hoisted"):
+        _run_prologue_raw(
+            d,
+            v_dot_n=cp.asarray(d["v_dot_n"]),
+            n_re_tab=cp.asarray(d["n_re_tab"]),
+            aw_seg=cp.asarray(d["t_L"]),
+        )
+
+
+def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
+    from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
+        run_coherent_prologue_kernel,
+    )
+
+    return run_coherent_prologue_kernel(
+        cp.asarray(d["v"]).reshape(-1),
+        cp.asarray(d["denom"]),
+        cp.asarray(d["gamma"]),
+        cp.asarray(d["t_L"]),
+        cp.asarray(d["L_esc"]),
+        cp.asarray(np.ones(d["n_seg"], dtype=bool)),
+        cp.asarray(d["r"]).reshape(-1),
+        cp.asarray(d["phase_slope"]),
+        cp.asarray(d["G"]).reshape(-1),
+        cp.asarray(d["ES"]).reshape(-1),
+        cp.asarray(d["EP"]).reshape(-1),
+        cp.asarray(d["E_tab"]),
+        cp.asarray(d["chi_re"]).reshape(-1),
+        cp.asarray(d["chi_im"]).reshape(-1),
+        cp.asarray(d["u_re"]).reshape(-1),
+        cp.asarray(d["u_im"]).reshape(-1),
+        cp.asarray(d["mu"]),
+        lo_keep=50.0,
+        hi_keep=1600.0,
+        hbarc=d["hbarc"],
+        electron_mass_eV=1.0,
+        alpha_fs=d["alpha"],
+        pref_c1=d["pref_c1"],
+        n_hat=d["n_hat"],
+        n_g=d["n_g"],
+        aw_seg=aw_seg,
+        v_dot_n=v_dot_n,
+        n_re_tab=n_re_tab,
+    )

@@ -86,10 +86,11 @@ extension unless the observation geometry approaches grazing incidence.
       `-delta(E) omega(E) L_esc,j` on top of the vacuum `omega d_j` — see the
       decision below; this is NOT the `k(E) n_hat.r_j` form the brief sketched.
       Ledger `xray-in-medium-propagation-phase`, status `filtered`.
-- [x] JIT/CUDA kernels in lockstep with the CPU core, for the reduction route.
-      Both reduction paths (per-hkl `_accumulate` and batched) now run under
-      `refractive`. The stream route stays gated — its blocker is the prologue's
-      vacuum kinematics, not the phase; see the decision below.
+- [x] JIT/CUDA kernels in lockstep with the CPU core, on every route. Both
+      reduction paths (per-hkl `_accumulate` and batched) plus the coherent
+      stream route now run under `refractive`;
+      `run_coherent_prologue_kernel` takes `(v_dot_n, n_re_tab)` and solves the
+      in-medium root on the device.
 - [x] Physics ledger rows + in-code `Validation: <id>` markers (for the
       landed slices).
 - [x] Validation: accumulated phase vs depth (closed form reproduced to 5.7e-13
@@ -161,32 +162,34 @@ extension unless the observation geometry approaches grazing incidence.
   entirely, so bit-for-bit vacuum does not rest on `x - 0.0` IEEE identities.
   When `use_medium` is 0 the two pointers bind to one cached length-1 device
   array, allocated lazily so importing the module does not touch the device.
-- The coherent STREAM route is still vacuum-only under `refractive`, and the
-  reason is NOT the phase — `_field_kernel_*` carries the in-medium term and is
-  unit-tested on GPU. `run_coherent_prologue_kernel` is an independent CUDA port
-  of steps 1-6 that derives `E_r`/`a_width` from the vacuum denominator on the
-  device, so the in-medium resonance from `_in_medium_kinematics` never reaches
-  it. Un-gated it returns the VACUUM line silently: measured on a single-segment
-  probe (where `|F|^2` is phase-independent, so cancellation noise cannot be the
-  explanation) the stream route peaked at 1600.300 eV while the exact path and
-  the reduction kernel both peaked at 1600.400 eV.
+- The coherent STREAM route is un-gated. `run_coherent_prologue_kernel` is an
+  independent CUDA port of steps 1-6, so the model reaches it as its own
+  `(v_dot_n, n_re_tab)` argument pair plus a launch-uniform `use_medium` flag —
+  same shape as the phase half. It runs the identical 3-pass fixed point on the
+  device and then takes `k_mag = Re n omega` into `k.g` and the PXR numerator's
+  `k^2`. `v.n_hat` is passed rather than recovered as `1 - denom`, so the root
+  starts from the same float32 value the host had.
+- The stream prologue's half-width `a_width = denom t_L / 2 hbar c` follows the
+  in-medium denominator, so under `refractive` it stops being a per-segment
+  hoist and is emitted per (segment, g). The field reducer already accepted a
+  pair-sized `aw`, but it selected the layout for `aw` and `phase_slope`
+  together; `geom_pair` is therefore split into `aw_pair`/`slope_pair` so
+  `phase_slope`, which stays g-independent, is not tiled across g rows.
+- Measured after the port, on the two-segment probe that previously exposed the
+  vacuum-line bug: the stream route and the reduction kernel agree exactly
+  (peak 1600.6186 eV under `refractive`, 1600.3741 eV under `vacuum`), and the
+  single-segment stream peak matches the incoherent exact path to the grid step.
 
 ## Remainder / next slices
 
-- In-medium kinematics in `run_coherent_prologue_kernel`, to un-gate the
-  coherent stream route under `refractive`. Needs the fixed-point in-medium
-  root, `Re n * n_hat.g` and `k_mag` on the device — i.e. a CUDA port of
-  `_in_medium_kinematics` steps 1-6, plus a per-energy `Re n` table reaching the
-  prologue. The phase half is already done: `_field_kernel_1e`/`_2e` take
-  `(L_esc, delta_omega, use_medium)` and are covered by
-  `tests/montecarlo/test_xray_dispersion_cuda.py`; only the gate in
-  `lines.py::_use_jit_coherent_stream` and the prologue itself remain.
-- (none blocking besides the stream route above)
+- (none)
 
 ## Pre-existing failures on `main` (not caused by this branch)
 
 - `pyrite-dev lint`: 2x `F841` in `montecarlo/transport.py` (:1638, :1942).
-- `pyrite-dev typecheck`: 52 diagnostics, mostly unresolved optional imports.
+- `pyrite-dev typecheck`: 3 diagnostics (2 unresolved `cxr_mc` compat imports,
+  1 `delta_omega_grid` narrowing in `lines.py`), identical with this branch's
+  source changes stashed.
 - `tests/materials/test_crystal_lattice.py` fails to collect (`plotly` not
   installed); `test_material_catalog.py::test_packaged_profiles_have_explicit_membership`
   fails. Both verified failing with this branch's changes stashed.
@@ -195,5 +198,5 @@ extension unless the observation geometry approaches grazing incidence.
 - On the GPU box (`qlmc`, RTX 5080, float32), `tests/montecarlo/` has 10
   failures, 4 of them in `test_xray_dispersion.py` (float64-tuned tolerances and
   a `ZeroDivisionError` in float32 peak extraction). Verified pre-existing by
-  re-running with `git show HEAD:` copies of the three changed source files in
-  place: identical 4 failures.
+  re-running with `git show HEAD:` copies of the changed source files in place:
+  identical failures, both before and after the stream-route slice.

@@ -99,6 +99,7 @@ def _bracket_index(grid, x, n_tab):
 def _coherent_prologue_kernel(
     v_flat,
     denom,
+    v_dot_n,
     gamma,
     t_L,
     L_esc,
@@ -117,7 +118,9 @@ def _coherent_prologue_kernel(
     u_re_tab,
     u_im_tab,
     mu_tab,
+    n_re_tab,
     E_r_out,
+    aw_out,
     g_phase_out,
     cs_re_out,
     cs_im_out,
@@ -128,6 +131,7 @@ def _coherent_prologue_kernel(
     hbarc,
     alpha_fs,
     pref_c1,
+    use_medium,
     n_pairs,
     n_seg,
     n_g,
@@ -164,6 +168,28 @@ def _coherent_prologue_kernel(
 
     dnm = denom[seg]
     v_dot_g = vx * gx + vy * gy + vz * gz
+
+    # In-medium resonance root. The Maxwell dispersion relation k = n(omega) omega
+    # makes the vacuum root implicit,
+    #     omega_res = v.g / (1 - Re n(omega_res) (v.n_hat)),
+    # solved here by the same 3-pass fixed point the CPU core uses: the map
+    # contracts at rate ~delta ~1e-5, so two passes already sit past float32
+    # rounding. Only Re n enters -- Im n is the absorption the Beer-Lambert
+    # factor below already applies. Validation: xray-in-medium-resonance
+    n_re = F32_ONE
+    if use_medium:
+        vdn = v_dot_n[seg]
+        dnm = F32_ONE - vdn
+        for _it in range(3):
+            E_it = hbarc * (v_dot_g / dnm)
+            below_it = E_it <= E_tab[U32_ZERO]
+            above_it = E_it >= E_tab[n_tab - U32_ONE]
+            idx_it = _bracket_index(E_tab, E_it, n_tab)
+            x0_it = E_tab[idx_it - U32_ONE]
+            frac_it = (E_it - x0_it) / (E_tab[idx_it] - x0_it)
+            n_re = _interp_shared(n_re_tab, idx_it, frac_it, below_it, above_it, n_tab)
+            dnm = F32_ONE - n_re * vdn
+
     omega = v_dot_g / dnm
     E_res = hbarc * omega
     if E_res <= lo_keep or E_res <= F32_TEN or E_res >= hi_keep:
@@ -181,8 +207,14 @@ def _coherent_prologue_kernel(
     u_im = _interp_row(u_im_tab, g, idx, frac, below, above, n_tab)
     mu = _interp_shared(mu_tab, idx, frac, below, above, n_tab)
 
+    # k.v = omega (1 - denom) survives the substitution exactly (denom absorbed
+    # the index), k.g takes one power of Re n through k_mag = |k|, and the PXR
+    # numerator's k^2 takes two. |k+g|^2 - k^2 = g^2 + 2 k.g keeps its form.
+    k_mag = omega
+    if use_medium:
+        k_mag = omega * n_re
     k_dot_v = omega * (F32_ONE - dnm)
-    k_dot_g = omega * n_dot_g[g]
+    k_dot_g = k_mag * n_dot_g[g]
     v_dot_kg = v_dot_g + k_dot_v
     detuning = g2[g] + F32_TWO * k_dot_g
 
@@ -206,7 +238,7 @@ def _coherent_prologue_kernel(
     # coherent complex expression, preserving its phase information.
     g_dot_e = g_dot_es[g]
     v_dot_e = vx * esx + vy * esy + vz * esz
-    numerator = v_dot_kg * g_dot_e - omega * omega * v_dot_e
+    numerator = v_dot_kg * g_dot_e - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
     bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
@@ -221,7 +253,7 @@ def _coherent_prologue_kernel(
     # pi polarization.
     g_dot_e = g_dot_ep[g]
     v_dot_e = vx * epx + vy * epy + vz * epz
-    numerator = v_dot_kg * g_dot_e - omega * omega * v_dot_e
+    numerator = v_dot_kg * g_dot_e - k_mag * k_mag * v_dot_e
     braced_ge = g_dot_e - v_dot_g * v_dot_e
     braced_kg = k_dot_g - k_dot_v * v_dot_g
     bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
@@ -231,6 +263,11 @@ def _coherent_prologue_kernel(
     cpi = coef_scale * a_im
 
     E_r_out[pair] = E_res
+    # The sinc half-width rides on the resonance denominator, so under the
+    # refractive model it stops being a per-segment hoist and is emitted here in
+    # the pair layout the field reducer already understands.
+    if use_medium:
+        aw_out[pair] = dnm * duration / (F32_TWO * hbarc)
     rbase = seg * U32_THREE
     g_phase_out[pair] = (
         r_flat[rbase] * gx + r_flat[rbase + U32_ONE] * gy + r_flat[rbase + U32_TWO] * gz
@@ -265,7 +302,8 @@ def _field_kernel_1e(
     fs_im,
     fp_re,
     fp_im,
-    geom_pair,
+    aw_pair,
+    slope_pair,
     use_medium,
     n_seg,
     n_g,
@@ -299,11 +337,14 @@ def _field_kernel_1e(
         cpi = cp_im[line]
         if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
             Er = E_r[line]
-            geom = seg
-            if geom_pair:
-                geom = line
-            aa = aw[geom]
-            ps = phase_slope[geom]
+            aw_i = seg
+            if aw_pair:
+                aw_i = line
+            slope_i = seg
+            if slope_pair:
+                slope_i = line
+            aa = aw[aw_i]
+            ps = phase_slope[slope_i]
             gp = g_phase[line]
             Lj = F32_ZERO
             if use_medium:
@@ -365,7 +406,8 @@ def _field_kernel_2e(
     fs_im,
     fp_re,
     fp_im,
-    geom_pair,
+    aw_pair,
+    slope_pair,
     use_medium,
     n_seg,
     n_g,
@@ -412,11 +454,14 @@ def _field_kernel_2e(
         cpi = cp_im[line]
         if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
             Er = E_r[line]
-            geom = seg
-            if geom_pair:
-                geom = line
-            aa = aw[geom]
-            ps = phase_slope[geom]
+            aw_i = seg
+            if aw_pair:
+                aw_i = line
+            slope_i = seg
+            if slope_pair:
+                slope_i = line
+            aa = aw[aw_i]
+            ps = phase_slope[slope_i]
             gp = g_phase[line]
             Lj = F32_ZERO
             if use_medium:
@@ -572,6 +617,8 @@ def run_coherent_prologue_kernel(
     g_dot_es=None,
     g_dot_ep=None,
     aw_seg=None,
+    v_dot_n=None,
+    n_re_tab=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Build g-major coherent line data for one contiguous segment block.
@@ -585,6 +632,14 @@ def run_coherent_prologue_kernel(
     ``g2``/``n_dot_g``/``g_dot_e*`` and ``aw_seg`` are optional precomputed
     hoists. When omitted they are constructed once here, preserving older direct
     callers while the main line path avoids rebuilding them per segment block.
+
+    Under ``xray_dispersion="refractive"`` the caller supplies the per-segment
+    ``v_dot_n = v.n_hat`` together with ``n_re_tab``, the real refractive index
+    on the ``E_tab`` grid. The kernel then solves the implicit in-medium
+    resonance per (segment, g) instead of reading the hoisted vacuum ``denom``,
+    and returns ``aw`` in the pair layout because the sinc half-width follows
+    that denominator. Both must be given together or both omitted; when omitted
+    the kernel evaluates the vacuum kinematics unchanged.
     """
     nthreads = int(config.prologue_nthreads)
     _validate_threads(nthreads, "prologue_nthreads")
@@ -594,6 +649,17 @@ def run_coherent_prologue_kernel(
     if n_g <= 0 or n_tab < 2:
         raise ValueError("coherent prologue requires at least one g row and two tabulation points")
     n_pairs = n_g * n_seg
+
+    if (v_dot_n is None) != (n_re_tab is None):
+        raise ValueError("v_dot_n and n_re_tab must be given together")
+    use_medium = n_re_tab is not None
+    if use_medium:
+        if int(v_dot_n.size) != n_seg:
+            raise ValueError("v_dot_n must have one entry per segment")
+        if int(n_re_tab.size) != n_tab:
+            raise ValueError("n_re_tab must use the E_tab grid")
+        if aw_seg is not None:
+            raise ValueError("aw_seg cannot be hoisted per segment under the refractive model")
 
     G = g_flat.reshape(n_g, 3)
     ES = es_flat.reshape(n_g, 3)
@@ -607,7 +673,7 @@ def run_coherent_prologue_kernel(
         g_dot_es = G[:, 0] * ES[:, 0] + G[:, 1] * ES[:, 1] + G[:, 2] * ES[:, 2]
     if g_dot_ep is None:
         g_dot_ep = G[:, 0] * EP[:, 0] + G[:, 1] * EP[:, 1] + G[:, 2] * EP[:, 2]
-    if aw_seg is None:
+    if aw_seg is None and not use_medium:
         aw_seg = denom * t_L / np.float32(2.0 * float(hbarc))
 
     # Backward-compatible direct callers may still supply raw U_g tables. The
@@ -620,16 +686,23 @@ def run_coherent_prologue_kernel(
         u_re_kernel = u_re_tab
         u_im_kernel = u_im_tab
 
-    # Only g-dependent quantities live in pair scratch.
-    storage = xp.empty(6 * n_pairs, dtype=xp.float32)
+    # Only g-dependent quantities live in pair scratch; under the refractive
+    # model the half-width joins them.
+    n_slots = 7 if use_medium else 6
+    storage = xp.empty(n_slots * n_pairs, dtype=xp.float32)
     E_r = storage[0 * n_pairs : 1 * n_pairs]
     g_phase = storage[1 * n_pairs : 2 * n_pairs]
     cs_re = storage[2 * n_pairs : 3 * n_pairs]
     cs_im = storage[3 * n_pairs : 4 * n_pairs]
     cp_re = storage[4 * n_pairs : 5 * n_pairs]
     cp_im = storage[5 * n_pairs : 6 * n_pairs]
+    if use_medium:
+        aw_seg = storage[6 * n_pairs : 7 * n_pairs]
     if n_pairs == 0:
         return E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im
+
+    if not use_medium:
+        v_dot_n = n_re_tab = _dummy()
 
     nblocks = (n_pairs + nthreads - 1) // nthreads
     _coherent_prologue_kernel(
@@ -638,6 +711,7 @@ def run_coherent_prologue_kernel(
         (
             v_flat,
             denom,
+            v_dot_n,
             gamma,
             t_L,
             L_esc,
@@ -656,7 +730,9 @@ def run_coherent_prologue_kernel(
             u_re_kernel,
             u_im_kernel,
             mu_tab,
+            n_re_tab,
             E_r,
+            aw_seg,
             g_phase,
             cs_re,
             cs_im,
@@ -667,6 +743,7 @@ def run_coherent_prologue_kernel(
             np.float32(hbarc),
             np.float32(alpha_fs),
             np.float32(pref_c1),
+            np.uint32(1 if use_medium else 0),
             np.uint32(n_pairs),
             np.uint32(n_seg),
             np.uint32(n_g),
@@ -696,9 +773,12 @@ def run_coherent_field_accumulation_kernel(
 ):
     """Add one segment block's complex fields into persistent g-by-energy planes.
 
-    ``aw`` and ``phase_slope`` may be either the optimized segment-sized arrays
-    (length ``n_seg``) or the historical pair-sized arrays (length
-    ``n_g*n_seg``). This keeps direct kernel tests/callers source-compatible.
+    ``aw`` and ``phase_slope`` may each be either the optimized segment-sized
+    array (length ``n_seg``) or the pair-sized layout (length ``n_g*n_seg``), and
+    they are selected independently: the refractive prologue emits a pair-sized
+    ``aw`` (its half-width follows the per-(segment, g) in-medium denominator)
+    while ``phase_slope`` stays segment-sized. This also keeps direct kernel
+    tests/callers, which pass both in one layout, source-compatible.
 
     Under ``xray_dispersion="refractive"`` the caller supplies the block's
     per-segment escape distance ``L_esc`` (Angstrom, length ``n_seg``; it is
@@ -721,11 +801,12 @@ def run_coherent_field_accumulation_kernel(
     n_E = int(E_grid.size)
     if n_g == 0 or n_seg == 0 or n_E == 0:
         return fields
-    pair_geometry = int(aw.size) != n_seg
-    if pair_geometry and int(aw.size) != n_g * n_seg:
+    aw_pair = int(aw.size) != n_seg
+    if aw_pair and int(aw.size) != n_g * n_seg:
         raise ValueError("aw must have length n_seg or n_g*n_seg")
-    if int(phase_slope.size) != int(aw.size):
-        raise ValueError("phase_slope must use the same geometry layout as aw")
+    slope_pair = int(phase_slope.size) != n_seg
+    if slope_pair and int(phase_slope.size) != n_g * n_seg:
+        raise ValueError("phase_slope must have length n_seg or n_g*n_seg")
     if (L_esc is None) != (delta_omega is None):
         raise ValueError("L_esc and delta_omega must be given together")
     use_medium = L_esc is not None
@@ -760,7 +841,8 @@ def run_coherent_field_accumulation_kernel(
             fs_im,
             fp_re,
             fp_im,
-            np.uint32(1 if pair_geometry else 0),
+            np.uint32(1 if aw_pair else 0),
+            np.uint32(1 if slope_pair else 0),
             np.uint32(1 if use_medium else 0),
             np.uint32(n_seg),
             np.uint32(n_g),

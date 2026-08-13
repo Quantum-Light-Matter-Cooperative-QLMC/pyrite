@@ -1485,21 +1485,18 @@ def mc_spectrum(
         # sync, and per-g concatenate/slice pass.  The final kernel squares each g
         # row independently and only then mosaic-weights/sums rows, so reflections
         # and orientations remain incoherent.  Validation: coherent-line-hkl-batch
-        # Still vacuum-only under ``refractive``, but NOT because of the phase:
         # ``run_coherent_prologue_kernel`` is an independent CUDA port of steps
-        # 1-6 and derives ``E_r``/``a_width`` from the vacuum denominator on the
-        # device, so the in-medium resonance never reaches it. Un-gated, it
-        # silently returns the VACUUM line (measured: peak at 1600.300 eV where
-        # the exact path gives 1600.400 eV). The prologue needs the fixed-point
-        # in-medium root, ``Re n * n_hat.g`` and ``k_mag`` before this route can
-        # be un-gated; ``_field_kernel_*`` already carries the phase term.
+        # 1-6, so the refractive model reaches it as its own arguments: the
+        # per-segment ``v.n_hat`` plus the ``Re n(E)`` table let it solve the same
+        # implicit in-medium resonance on the device, and it then returns the
+        # half-width in the pair layout because that denominator is per
+        # (segment, g). ``_field_kernel_*`` carries the propagation-phase half.
         _use_jit_coherent_stream = (
             coherent
             and _USE_JIT_COHERENT_STREAM
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
             and sinc_cutoff is None
-            and delta_omega_grid is None
         )
         if _use_jit_coherent_stream:
             from .coherent_stream_jit_kernel import (
@@ -1521,7 +1518,13 @@ def mc_spectrum(
             _coh_chi_im = CHI_IM.reshape(-1)
             _coh_u_re = U_RE.reshape(-1)
             _coh_u_im = U_IM.reshape(-1)
-            _coh_aw = xp.ascontiguousarray(denom_all * t_L_all / (2.0 * HBARC_EV_ANG), dtype=REAL)
+            # Vacuum hoists the half-width per segment; the refractive prologue
+            # has to build it per (segment, g) from the in-medium denominator.
+            _coh_aw = (
+                None
+                if n_re_tab_g is not None
+                else xp.ascontiguousarray(denom_all * t_L_all / (2.0 * HBARC_EV_ANG), dtype=REAL)
+            )
             _coh_phase_slope = xp.ascontiguousarray(d_all / HBARC_EV_ANG, dtype=REAL)
             coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
         else:
@@ -1625,7 +1628,9 @@ def mc_spectrum(
                     n_dot_g=_coh_n_dot_g,
                     g_dot_es=_coh_g_dot_es,
                     g_dot_ep=_coh_g_dot_ep,
-                    aw_seg=_coh_aw[sb],
+                    aw_seg=(None if _coh_aw is None else _coh_aw[sb]),
+                    v_dot_n=(None if n_re_tab_g is None else v_dot_n_all[sb]),
+                    n_re_tab=n_re_tab_g,
                     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
                 )
                 _nsys_pop()
