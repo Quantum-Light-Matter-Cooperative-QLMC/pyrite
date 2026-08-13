@@ -26,9 +26,15 @@ file. Edit and drop items on `main`.
       completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
       Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
       to fresh-context workers doing the rederivations.
-2. **Energy-controlled electron transport.** Inventory the current segment
-   schema and add bounded per-flight diagnostics before selecting the controlled
-   energy-loss/hazard propagation model. →
+2. **Energy-controlled electron transport.** Schema inventory, per-flight
+   diagnostics, midpoint predictor-corrector stopping/clock, radiation error
+   estimators, and convergence matrices are done (A-E): the binding control
+   variable is absolute emission phase, not fractional energy loss, and the
+   midpoint rule is a prerequisite for coherent CXR. Remaining: the
+   energy-controlled propagator with collision optical-depth handling,
+   CXR/bremsstrahlung invariance to substep refinement, porting the accepted
+   algorithm to all four execution paths, and ledger/docs/golden-data closure
+   (F-I). →
    `feature/energy-controlled-electron-transport`;
    [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
 
