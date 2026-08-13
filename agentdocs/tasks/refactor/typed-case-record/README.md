@@ -110,9 +110,10 @@ requirement of `refactor/scene-object-model`'s public API.
   the whole of slice D and the RFC's "rejects unknown keys" criterion. To keep
   the diff incremental, `run_case` accepts `Case | Mapping` for one D7 support
   window so call sites migrate one at a time.
-- **Open:** does anything outside `src/` (notebooks, golden fixtures, remote job
-  payloads) construct a case dict by hand? Slice B must answer this before
-  slice E lands.
+- **Decided (inventory):** legacy fixtures and test doubles construct partial
+  mappings by hand, so `run_case` retains the one-support-window
+  `Case | Mapping` compatibility boundary. Production case construction now
+  returns `Case`; no notebook or remote payload required a second constructor.
 
 ## Delegation slices and required skills
 
@@ -145,6 +146,23 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
   `physics-core-stays-below-drivers` forbidden list and the contract passes.
 - `identity_version` round-trips through lock and checkpoint metadata, and an
   artifact written before this change still loads with an assumed version of 1.
+
+## Completion evidence
+
+- Full suite passes when excluding the unchanged
+  `test_packaged_profiles_have_explicit_membership` baseline failure; the
+  excluded materials paths have no branch diff.
+- Focused checkpoint-GC, surface-orientation, and process-based Monte Carlo
+  regressions pass. The process test was run outside the filesystem sandbox so
+  forkserver could create its Unix socket.
+- Ruff and ty pass for all changed source files; Ruff also passes for changed
+  tests. Import-linter reports both contracts kept.
+- Repository-wide lint remains blocked by two pre-existing unused `Z_i`
+  assignments in `montecarlo/transport.py`. Repository-wide typecheck remains
+  blocked by two unresolved legacy `cxr_mc` imports and one existing optional
+  array narrowing error in `montecarlo/spectrum/lines.py`.
+- Documentation build passes. No push or canonical `TODO.md` edit is authorized
+  by direct worker invocation.
 
 ## Related
 

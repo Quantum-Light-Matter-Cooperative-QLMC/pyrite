@@ -1,5 +1,7 @@
 """Reciprocal cleavage-plane orientation and pipeline regression tests."""
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -180,7 +182,7 @@ def test_detector_mosaic_geometry_uses_case_surface_hkl(monkeypatch):
             E_grid_brem=np.array([100.0]),
         )
     )[0]
-    case.update(beam_uvw=None, surface_hkl=(2, 0, -1))
+    case = replace(case, beam_uvw=None, surface_hkl=(2, 0, -1))
 
     detector.mosaic_psi_rad(case, 100.0)
 

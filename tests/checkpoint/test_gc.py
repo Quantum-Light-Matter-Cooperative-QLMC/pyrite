@@ -60,7 +60,10 @@ def test_prune_preview_does_not_rewrite_and_yes_drops_exact_stale_cases(
     assert set(loaded) == {"current"}
     assert set(loaded["current"]) == {30.0}
     manifest = json.loads((tmp_path / "hopg" / "meta.json").read_text())
-    assert manifest["dataset_identity"] == {"parameter_sha256": "current"}
+    assert manifest["dataset_identity"] == {
+        "identity_version": 1,
+        "parameter_sha256": "current",
+    }
     assert "removed 2 stale record(s) (3 -> 1)" in capsys.readouterr().out
 
 
