@@ -634,7 +634,8 @@ def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
 
     manifest = json.loads((tmp_path / "hopg" / "meta.json").read_text())
     assert manifest["schema"] == "cxr.checkpoint-manifest.v2"
-    assert manifest["dataset_identity"] == identity
+    assert manifest["identity_version"] == 1
+    assert manifest["dataset_identity"] == {**identity, "identity_version": 1}
 
 
 def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):
@@ -646,7 +647,7 @@ def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):
     _manifest_save(str(checkpoint), results, identity)
     refreshed = _manifest_save(str(checkpoint), results)
 
-    assert refreshed["dataset_identity"] == identity
+    assert refreshed["dataset_identity"] == {**identity, "identity_version": 1}
 
 
 def test_run_sweep_refuses_resume_across_dataset_identities(tmp_path, monkeypatch):

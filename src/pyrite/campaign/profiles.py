@@ -27,6 +27,7 @@ from .sweep import Sweep, beam_replace, build_cases, crystal_params
 FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
+CURRENT_IDENTITY_VERSION = 1
 
 # Case-dict fields excluded from the per-case content key. EVERYTHING else in a
 # resolved ``build_cases`` case dict determines the stored spec/brem arrays and
@@ -234,7 +235,7 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def dataset_identity(
+def _identity_v1(
     material: str,
     fidelity: str,
     settings: Settings,
@@ -362,6 +363,7 @@ def dataset_identity(
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,
+        "identity_version": 1,
         "material": material,
         "fidelity": fidelity,
         "variant": variant,
@@ -369,6 +371,46 @@ def dataset_identity(
         "parameter_sha256": hashlib.sha256(encoded).hexdigest(),
         "resolved_parameters": resolved,
     }
+
+
+# Version 2 is deliberately not registered: it is the deferred canonical
+# full-payload/recompute boundary from RFC Change 3 step 3.
+IDENTITY_MIGRATIONS = {1: _identity_v1}
+
+
+def dataset_identity(
+    material: str,
+    fidelity: str,
+    settings: Settings,
+    sweep: Sweep,
+    *,
+    variant: str | None = None,
+    catalog_profile: str = "standard",
+    identity_version: int = CURRENT_IDENTITY_VERSION,
+) -> dict[str, Any]:
+    """Resolve a dataset identity through its explicit versioned algorithm."""
+    try:
+        migration = IDENTITY_MIGRATIONS[identity_version]
+    except (KeyError, TypeError):
+        raise ValueError(f"unsupported dataset identity version: {identity_version!r}") from None
+    return migration(
+        material,
+        fidelity,
+        settings,
+        sweep,
+        variant=variant,
+        catalog_profile=catalog_profile,
+    )
+
+
+def normalize_dataset_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
+    """Copy an artifact identity, treating an absent version as legacy v1."""
+    version = identity.get("identity_version", 1)
+    if isinstance(version, bool) or not isinstance(version, int) or version not in IDENTITY_MIGRATIONS:
+        raise ValueError(f"unsupported dataset identity version: {version!r}")
+    normalized = dict(identity)
+    normalized["identity_version"] = version
+    return normalized
 
 
 def case_content_key(case: Case | Mapping[str, Any]) -> str:
@@ -560,7 +602,7 @@ def _sidecar_identity(stem: str, root: str | os.PathLike[str]) -> dict[str, Any]
             identity = json.load(handle).get("dataset_identity")
     except (OSError, ValueError, TypeError):
         return None
-    return identity if isinstance(identity, dict) else None
+    return normalize_dataset_identity(identity) if isinstance(identity, dict) else None
 
 
 def identity_from_stem(

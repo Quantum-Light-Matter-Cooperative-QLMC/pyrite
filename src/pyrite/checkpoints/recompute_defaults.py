@@ -57,6 +57,14 @@ def dataset_context(
         raise ValueError(
             f"invalid checkpoint metadata {meta_path}: dataset_identity is not an object"
         )
+    if identity is not None:
+        from ..campaign.profiles import normalize_dataset_identity
+
+        assert meta is not None
+        identity = normalize_dataset_identity(identity)
+        recorded_version = meta.get("identity_version", identity["identity_version"])
+        if recorded_version != identity["identity_version"]:
+            raise ValueError(f"invalid checkpoint metadata {meta_path}: identity versions disagree")
 
     material = identity.get("material") if identity else None
     stored_fidelity = identity.get("fidelity") if identity else None
@@ -68,6 +76,13 @@ def dataset_context(
             )
         case_material = cases.get("material")
         case_profile = cases.get("catalog_profile")
+        from ..campaign.profiles import normalize_dataset_identity
+
+        case_version = normalize_dataset_identity(
+            {"identity_version": cases.get("identity_version", 1)}
+        )["identity_version"]
+        if identity is not None and case_version != identity["identity_version"]:
+            raise ValueError("checkpoint metadata disagrees on identity version")
         if material is not None and case_material != material:
             raise ValueError(
                 f"checkpoint metadata disagrees on material: {material!r} != {case_material!r}"

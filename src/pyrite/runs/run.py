@@ -85,6 +85,10 @@ def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identit
         "cases": entries,
     }
     if dataset_identity is not None:
+        from ..campaign.profiles import normalize_dataset_identity
+
+        dataset_identity = normalize_dataset_identity(dataset_identity)
+        manifest["identity_version"] = dataset_identity["identity_version"]
         for field in ("catalog_profile", "variant", "parameter_sha256"):
             value = dataset_identity.get(field)
             if value is not None:
@@ -308,7 +312,11 @@ def _manifest_for(results, dataset_identity=None):
         "sweep": sweep_json,
     }
     if dataset_identity is not None:
-        manifest["dataset_identity"] = dataset_identity
+        from ..campaign.profiles import normalize_dataset_identity
+
+        identity = normalize_dataset_identity(dataset_identity)
+        manifest["identity_version"] = identity["identity_version"]
+        manifest["dataset_identity"] = identity
     return manifest
 
 
@@ -407,7 +415,20 @@ def checkpoint_manifest(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     newest_component = max(item[1] for item in _checkpoint_signature(path))
     if os.path.exists(manifest_path) and os.stat(manifest_path).st_mtime_ns >= newest_component:
         with open(manifest_path) as f:
-            return json.load(f)
+            manifest = json.load(f)
+        identity = manifest.get("dataset_identity")
+        if identity is not None:
+            from ..campaign.profiles import normalize_dataset_identity
+
+            if not isinstance(identity, dict):
+                raise ValueError(f"invalid checkpoint metadata {manifest_path}: dataset_identity")
+            identity = normalize_dataset_identity(identity)
+            recorded_version = manifest.get("identity_version", identity["identity_version"])
+            if recorded_version != identity["identity_version"]:
+                raise ValueError(f"invalid checkpoint metadata {manifest_path}: identity versions")
+            manifest["identity_version"] = identity["identity_version"]
+            manifest["dataset_identity"] = identity
+        return manifest
     results = load_checkpoint(material, checkpoint_dir)
     return _manifest_save(path, results)
 
@@ -545,6 +566,10 @@ def run_sweep(
     """
     if group_key is None:
         group_key = _default_group_key
+    if dataset_identity is not None:
+        from ..campaign.profiles import normalize_dataset_identity
+
+        dataset_identity = normalize_dataset_identity(dataset_identity)
 
     # per-material checkpoint: a sweep is single-material, so name the pickle for
     # the crystal and keep them together in their own subdir.
@@ -626,6 +651,10 @@ def run_sweep(
                     existing_identity = json.load(handle).get("dataset_identity")
             except (OSError, ValueError, TypeError):
                 pass
+        if isinstance(existing_identity, dict):
+            from ..campaign.profiles import normalize_dataset_identity
+
+            existing_identity = normalize_dataset_identity(existing_identity)
         if (
             dataset_identity is not None
             and existing_identity is not None

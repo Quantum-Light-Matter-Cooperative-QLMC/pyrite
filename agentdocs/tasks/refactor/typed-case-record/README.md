@@ -87,7 +87,7 @@ requirement of `refactor/scene-object-model`'s public API.
       rejected, units documented on the type.
 - [x] E — Thread `Case` through `run_case` and the identity functions. No digest
       may change.
-- [ ] F — Add `identity_version` to campaign locks and checkpoint metadata,
+- [x] F — Add `identity_version` to campaign locks and checkpoint metadata,
       defaulting to 1 when absent; readers dispatch on the recorded value,
       writers emit the current one. Register `IDENTITY_MIGRATIONS = {1: _identity_v1}`
       with the v2 slot documented but unimplemented.

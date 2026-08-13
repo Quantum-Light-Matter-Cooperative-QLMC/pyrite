@@ -40,7 +40,10 @@ def test_completed_campaign_lock_is_deterministic_and_readable(tmp_path):
     assert path == checkpoint / "cxr.lock.json"
     assert path.read_bytes() == first
     assert first.endswith(b"\n")
-    assert campaign_lock.read_lock(path)["artifacts"]["energy_grid"] == {"hopg": digest}
+    payload = campaign_lock.read_lock(path)
+    assert payload["identity_version"] == 1
+    assert payload["artifacts"]["energy_grid"] == {"hopg": digest}
+    assert payload["dataset_identity"]["identity_version"] == 1
 
 
 def test_legacy_run_lock_is_explicit_and_legacy_pickle_path_is_stable(tmp_path):
@@ -130,3 +133,18 @@ def test_campaign_lock_rejects_invalid_digest_and_schema(tmp_path):
     path.write_text('{"schema":"wrong"}\n')
     with pytest.raises(ValueError, match="expected schema"):
         campaign_lock.read_lock(path)
+
+
+def test_pre_version_campaign_lock_reads_as_identity_v1(tmp_path):
+    payload = campaign_lock.lock_payload(
+        profile="standard",
+        material="hopg",
+        dataset_identity=_identity(),
+        energy_grid_digest=None,
+    )
+    del payload["dataset_identity"]["identity_version"]
+    del payload["identity_version"]
+    path = tmp_path / "cxr.lock.json"
+    path.write_text(json.dumps(payload))
+
+    assert campaign_lock.read_lock(path)["dataset_identity"]["identity_version"] == 1

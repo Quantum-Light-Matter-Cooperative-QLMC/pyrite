@@ -14,6 +14,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from ..campaign.profiles import normalize_dataset_identity
+
 SCHEMA = "cxr.campaign-lock.v1"
 
 
@@ -42,15 +44,17 @@ def lock_payload(
         or any(character not in "0123456789abcdef" for character in energy_grid_digest)
     ):
         raise ValueError("energy_grid_digest must be a lowercase SHA-256 digest")
+    identity = normalize_dataset_identity(dataset_identity)
     return {
         "schema": SCHEMA,
+        "identity_version": identity["identity_version"],
         "profile": profile,
         "material": material,
         "artifacts": {
             "energy_grid": ({material: energy_grid_digest} if energy_grid_digest else {}),
         },
         "legacy_energy_grid": energy_grid_digest is None,
-        "dataset_identity": dict(dataset_identity),
+        "dataset_identity": identity,
     }
 
 
@@ -113,4 +117,13 @@ def read_lock(path: str | os.PathLike[str]) -> dict[str, Any]:
     artifacts = payload.get("artifacts")
     if not isinstance(artifacts, dict) or not isinstance(artifacts.get("energy_grid"), dict):
         raise ValueError(f"invalid campaign lock {source}: missing artifacts.energy_grid")
+    identity = payload.get("dataset_identity")
+    if not isinstance(identity, dict):
+        raise ValueError(f"invalid campaign lock {source}: missing dataset_identity")
+    identity = normalize_dataset_identity(identity)
+    recorded_version = payload.get("identity_version", identity["identity_version"])
+    if recorded_version != identity["identity_version"]:
+        raise ValueError(f"invalid campaign lock {source}: identity versions disagree")
+    payload["identity_version"] = identity["identity_version"]
+    payload["dataset_identity"] = identity
     return payload

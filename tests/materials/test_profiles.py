@@ -9,6 +9,7 @@ import pytest
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
     FIDELITY_NAMES,
+    IDENTITY_MIGRATIONS,
     FidelityPreset,
     case_content_key,
     dataset_identity,
@@ -53,6 +54,19 @@ def test_typed_case_content_key_matches_pre_case_golden():
     assert case_content_key(case) == (
         "469035680a013567be35f189059e3b76eeb22acc2d49653592613c784fc9079b"
     )
+
+
+def test_dataset_identity_dispatches_through_recorded_v1():
+    sweep = material_sweep("hopg")
+    identity = dataset_identity("hopg", "full", default_settings(), sweep)
+
+    assert set(IDENTITY_MIGRATIONS) == {1}
+    assert identity["identity_version"] == 1
+    assert identity["parameter_sha256"] == (
+        "d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c"
+    )
+    with pytest.raises(ValueError, match="unsupported dataset identity version"):
+        dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
 
 
 def test_high_energy_profile_range_is_part_of_dataset_identity():
