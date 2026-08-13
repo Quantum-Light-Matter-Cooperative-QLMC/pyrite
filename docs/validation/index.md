@@ -54,6 +54,10 @@ radiation-physics/finite-time-lineshape
 radiation-physics/line-energy-dispersion
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption
+radiation-physics/xray-chi-zero
+radiation-physics/xray-in-medium-propagation-phase
+radiation-physics/xray-in-medium-resonance
+radiation-physics/xray-refractive-index
 ```
 
 ```{toctree}

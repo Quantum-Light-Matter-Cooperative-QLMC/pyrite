@@ -97,6 +97,11 @@ extension unless the observation geometry approaches grazing incidence.
       rad on both accumulation paths), interference inversion at ~1 um
       separation, resonance energy shift. All in
       `tests/montecarlo/test_xray_dispersion.py`.
+- [x] Fresh-context independent re-derivation of all four claims. Four separate
+      validator contexts, each deriving from the cited source before reading the
+      implementation. All four returned `matches` / `rederived`; ledger rows and
+      the generated inventory/summary pages advanced `filtered` -> `rederived`.
+      Write-ups in `docs/validation/radiation-physics/xray-*.md`.
 
 ## Decisions
 
@@ -180,9 +185,46 @@ extension unless the observation geometry approaches grazing incidence.
   (peak 1600.6186 eV under `refractive`, 1600.3741 eV under `vacuum`), and the
   single-segment stream peak matches the incoherent exact path to the grid step.
 
+## Independent re-derivation (final step)
+
+Four fresh contexts, one per claim, each following the verifier contract in
+`docs/validation/methodology.md` (derive from the source first, read the
+implementation only afterwards). All four: `rederived`.
+
+- `xray-chi-zero` — g=0 limit of `chi_g` reproduced independently; recomputed
+  from direct `xraydb` `f1`/`f2` calls, bypassing `chi_0`/`chi_g`/
+  `structure_factor` entirely, to `abs diff = 0.0` on Si@5keV, hopg@1.5keV,
+  LiF@3890eV, in both the dispersive and the `use_henke=False` Thomson branch.
+- `xray-refractive-index` — exact sqrt confirmed; residuals vs the linearized
+  form measured at `delta/2` and `delta`, matching the closed-form prediction to
+  4 sig figs. Resolved the row's open item: both production consumers take the
+  exact root, and the linearized `optical_constants` only feeds the unrelated
+  `Grating.reflectivity` Fresnel path, so no exact/linearized mixing occurs.
+- `xray-in-medium-resonance` — the graded structure (one power of `Re n` in
+  `k.g`, two in the PXR numerator's `k^2`) was independently reproduced. That
+  grading is the signature of closing the Maxwell dispersion relation into every
+  `k`-dependent term, as opposed to multiplying the vacuum result by a common
+  index factor, which is what the brief asked for.
+- `xray-in-medium-propagation-phase` — independently derived
+  `-delta(E) omega(E) L_esc,j` with the index on the in-crystal leg ONLY,
+  confirming the decision to reject the brief's `k(E) n_hat.r_j` sketch.
+  Beer-Lambert cross-check confirms `Re n` and `Im n` act over the same
+  `L_esc,j` with no double-count.
+
+Ledger fixes made while applying the verdicts (both flagged independently by the
+validators and by review): row 103's note that the streaming route "still falls
+back to the exact array path" was stale as of `4d40255`; row 100's "not yet
+consumed by the spectrum kernels" was stale; row 101's accumulation question is
+answered by `xray-in-medium-propagation-phase`.
+
+Remaining status is `rederived`, not `anchored` or `signed-off`. Per
+`docs/validation/methodology.md` only a human moves a claim to `signed-off`, and
+that is the gate for publication use.
+
 ## Remainder / next slices
 
-- (none)
+- (none in code) Human sign-off on the four `rederived` claims is the only
+  open item, and is deliberately not an agent action.
 
 ## Pre-existing failures on `main` (not caused by this branch)
 
