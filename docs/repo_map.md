@@ -338,7 +338,9 @@ of resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoin
 stem selection. `FidelityPreset.emission` (`incoherent`/`coherent`/`both`, with a
 derived `coherent_emission`) is the preset-owned emission policy;
 `dataset_identity` adds an `emission` divergence key so the three modes get three
-distinct digests (incoherent unchanged, bit-for-bit).
+distinct digests (incoherent unchanged, bit-for-bit). `Settings.xray_dispersion`
+(`vacuum`/`refractive`) gets the same divergence key, so an in-medium run never
+resumes into its vacuum twin's checkpoint.
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
   `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.

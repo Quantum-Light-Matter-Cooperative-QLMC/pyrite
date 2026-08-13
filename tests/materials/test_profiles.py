@@ -170,6 +170,24 @@ def test_catalog_profile_leaves_standard_hash_bit_for_bit():
     assert "catalog_profile" not in implicit["resolved_parameters"]
 
 
+def test_vacuum_dispersion_leaves_the_hash_bit_for_bit_and_refractive_diverges():
+    """``Settings.xray_dispersion`` follows the emission divergence-only rule:
+    the "vacuum" default adds no key (so historical digests survive the new
+    field), while "refractive" gets its OWN digest -- otherwise a refractive run
+    would resume into its vacuum twin's checkpoint."""
+    settings = default_settings()
+    sweep = material_sweep("hopg")
+    vacuum = dataset_identity("hopg", "full", settings, sweep)
+    refractive = dataset_identity(
+        "hopg", "full", replace(settings, xray_dispersion="refractive"), sweep
+    )
+
+    assert "xray_dispersion" not in vacuum["resolved_parameters"]
+    assert "xray_dispersion" not in vacuum["resolved_parameters"]["settings"]
+    assert refractive["resolved_parameters"]["xray_dispersion"] == "refractive"
+    assert refractive["parameter_sha256"] != vacuum["parameter_sha256"]
+
+
 def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]

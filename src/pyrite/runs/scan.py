@@ -623,6 +623,7 @@ def _run_material(args, material, max_seconds=None):
         settings.n_electrons,
         settings.n_electrons_brem,
         coherent_emission=settings.coherent_emission,
+        xray_dispersion=settings.xray_dispersion,
     )
     cases, dropped = gate_cases_by_penetration(cases)
     summary = format_penetration_watchdog_summary(dropped, material=material)

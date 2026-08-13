@@ -346,10 +346,18 @@ def dataset_identity(
     settings_payload = resolved["settings"]
     if isinstance(settings_payload, Mapping):
         emission = str(settings_payload.pop("emission", "incoherent"))
+        dispersion = str(settings_payload.pop("xray_dispersion", "vacuum"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
+        dispersion = str(getattr(settings, "xray_dispersion", "vacuum"))
     if emission != "incoherent":
         resolved["emission"] = emission
+    # xray_dispersion (run-affecting) follows the same divergence-only rule, for
+    # the same reason: hashing it unconditionally would perturb every existing
+    # digest, while dropping it would let a refractive run resume into its
+    # vacuum twin's checkpoint.
+    if dispersion != "vacuum":
+        resolved["xray_dispersion"] = dispersion
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,

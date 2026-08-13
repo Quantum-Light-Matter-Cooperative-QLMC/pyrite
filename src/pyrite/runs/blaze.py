@@ -167,6 +167,7 @@ def run(args):
                 settings.n_electrons,
                 settings.n_electrons_brem,
                 coherent_emission=settings.coherent_emission,
+                xray_dispersion=settings.xray_dispersion,
             )
         )
 

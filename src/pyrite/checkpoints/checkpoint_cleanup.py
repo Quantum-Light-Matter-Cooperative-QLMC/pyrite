@@ -104,6 +104,7 @@ def _current_case_keys(target: _Target) -> dict[tuple[str, float], str]:
             settings.n_electrons,
             settings.n_electrons_brem,
             coherent_emission=settings.coherent_emission,
+            xray_dispersion=settings.xray_dispersion,
         )
     }
 

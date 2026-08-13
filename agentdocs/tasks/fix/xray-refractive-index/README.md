@@ -72,7 +72,9 @@ extension unless the observation geometry approaches grazing incidence.
       `mc_spectrum_solid_angle` through its `**kwargs`), default `"vacuum"`,
       bit-for-bit. Case-dict plumbing done: `build_cases(xray_dispersion=)`
       writes the divergence-only case key, `runner._lines_for_segments` reads
-      it. Settings/CLI/dataset-identity plumbing is NOT done — see remainder.
+      it. `Settings.xray_dispersion` feeds `build_cases` from `scan`/`blaze`/
+      `checkpoint_cleanup` and adds the matching `dataset_identity` divergence
+      key. Catalog-profile ownership is NOT done — see remainder.
 - [x] In-medium dispersion in the resonance denominator, derived from the
       Maxwell dispersion relation rather than an ad hoc `n` insertion. Covers
       the resonance, `k.g`, the detuning, and the PXR numerator's `k^2`, on both
@@ -166,17 +168,16 @@ extension unless the observation geometry approaches grazing incidence.
   `(L_esc, delta_omega, use_medium)` and are covered by
   `tests/montecarlo/test_xray_dispersion_cuda.py`; only the gate in
   `lines.py::_use_jit_coherent_stream` and the prologue itself remain.
-- Settings/CLI plumbing. The case key now exists end to end
-  (`build_cases(xray_dispersion=)` -> case -> `_lines_for_segments` ->
-  `mc_spectrum`), but nothing sets it from a `Settings` field or a CLI flag, so
-  a campaign run cannot request `refractive` yet. Following `emission`'s
-  pattern that means: a `Settings.xray_dispersion` field, the divergence-only
-  rule in `campaign/profiles.py::dataset_identity` (WITHOUT it, a
-  refractive run hashes to the SAME `parameter_sha256` as its vacuum twin and
-  the two resume into each other's checkpoints — the reason this is the next
-  slice and not a nice-to-have), pass-through in `runs/scan.py`,
-  `runs/blaze.py`, `checkpoints/checkpoint_cleanup.py`, and a `pyrite run`
-  flag + `cli-reference.md` regen.
+- Catalog-profile ownership of `xray_dispersion`. `Settings.xray_dispersion`
+  now exists and reaches the cases and the digest, so a notebook/API caller can
+  run `refractive` via `replace(default_settings(), xray_dispersion=...)`. What
+  is missing is the profile key that `emission` has: `CATALOG.profile_emission`
+  has no dispersion twin, so `scan._resolved_run` cannot resolve one from the
+  catalog and there is no `cxr profile set --refractive`. That slice touches the
+  catalog schema, `campaign/profile_edit.py`, the profile CLI, and the catalog
+  goldens. Note emission is deliberately profile-owned with NO CLI run flag
+  (`tests/scan/test_scan_coherent.py`), so `xray_dispersion` should NOT grow a
+  `cxr run` flag either.
 
 ## Pre-existing failures on `main` (not caused by this branch)
 
