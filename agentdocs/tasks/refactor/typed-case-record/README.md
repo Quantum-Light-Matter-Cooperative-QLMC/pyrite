@@ -85,7 +85,7 @@ requirement of `refactor/scene-object-model`'s public API.
       feeds a digest. Assert equivalence against the existing golden cases.
 - [x] D — Validation at construction: required fields present, unknown keys
       rejected, units documented on the type.
-- [ ] E — Thread `Case` through `run_case` and the identity functions. No digest
+- [x] E — Thread `Case` through `run_case` and the identity functions. No digest
       may change.
 - [ ] F — Add `identity_version` to campaign locks and checkpoint metadata,
       defaulting to 1 when absent; readers dispatch on the recorded value,

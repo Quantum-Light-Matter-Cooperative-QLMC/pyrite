@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from ..montecarlo.case import Case
 from ..results import EmissionMode, Settings
 from .sweep import Sweep, beam_replace, build_cases, crystal_params
 
@@ -370,7 +371,7 @@ def dataset_identity(
     }
 
 
-def case_content_key(case: Mapping[str, Any]) -> str:
+def case_content_key(case: Case | Mapping[str, Any]) -> str:
     """Content-addressable key for one :func:`pyrite.campaign.sweep.build_cases` case dict.
 
     A canonical SHA-256 over the resolved case dict minus

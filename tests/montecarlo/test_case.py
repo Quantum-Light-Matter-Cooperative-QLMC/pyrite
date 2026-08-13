@@ -30,6 +30,15 @@ def test_case_round_trips_legacy_mapping_byte_for_byte():
     assert pickle.dumps(case.to_dict(), protocol=5) == pickle.dumps(legacy, protocol=5)
 
 
+def test_case_process_pickle_preserves_absent_keys():
+    case = Case(**_legacy_case())
+
+    restored = pickle.loads(pickle.dumps(case, protocol=5))
+
+    assert restored.to_dict().keys() == case.to_dict().keys()
+    assert pickle.dumps(restored.to_dict(), protocol=5) == pickle.dumps(case.to_dict(), protocol=5)
+
+
 def test_case_round_trips_conditional_divergence_keys_in_legacy_order():
     sweep = Sweep(
         material="mose2",
@@ -89,3 +98,19 @@ def test_case_rejects_unknown_field():
 def test_case_validates_physical_and_divergence_invariants(change, message):
     with pytest.raises(ValueError, match=message):
         Case(**{**_legacy_case(), **change})
+
+
+def test_run_case_accepts_typed_case_and_legacy_mapping(monkeypatch):
+    import pyrite.montecarlo.runner as runner
+
+    case = Case(**_legacy_case())
+    seen = []
+    monkeypatch.setattr(runner, "_transport_case", lambda payload, *args, **kwargs: seen.append(payload))
+    monkeypatch.setattr(runner, "_spectrum_case", lambda payload, *args, **kwargs: {"case": payload})
+
+    typed = runner.run_case(case)
+    legacy = runner.run_case(case.to_dict())
+
+    assert typed["case"] is case
+    assert legacy["case"] == case.to_dict()
+    assert seen == [case, case.to_dict()]

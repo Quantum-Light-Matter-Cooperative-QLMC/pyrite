@@ -10,6 +10,7 @@ workers.
 
 import os
 import sys
+from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
 from functools import wraps
 from pathlib import Path
@@ -26,6 +27,7 @@ from .._backend import (
     _GPU,
     BACKEND,
 )
+from ..case import Case
 from ..geometry import tilted_geometry
 from ..groove import blazed_groove_spec
 from ..spectrum import (
@@ -451,7 +453,12 @@ def _report_timing(agg, mode, nw):
     print("\n".join(lines), file=sys.stderr, flush=True)
 
 
-def run_case(case, record_timing=False, keep_segments_on_device=False, transport_core="auto"):
+def run_case(
+    case: Case | Mapping[str, Any],
+    record_timing: bool = False,
+    keep_segments_on_device: bool = False,
+    transport_core: str = "auto",
+) -> dict[str, Any]:
     """
     Worker for one (crystal, beam energy) Monte Carlo case: transport + line
     spectrum + bremsstrahlung. Module-level so it can be pickled into worker

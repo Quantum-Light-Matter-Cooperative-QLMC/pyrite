@@ -22,8 +22,16 @@ class _Absent:
 
     __slots__ = ()
 
+    def __reduce__(self):
+        return (_restore_absent, ())
+
 
 _ABSENT = _Absent()
+
+
+def _restore_absent() -> _Absent:
+    """Return the process-wide absence sentinel when unpickling a Case."""
+    return _ABSENT
 
 
 _CASE_KEY_ORDER = (

@@ -46,6 +46,15 @@ def test_case_content_key_matches_across_profiles_for_shared_cases():
     assert any(E0 > 100.0 for _, E0 in standard) and not any(E0 > 100.0 for _, E0 in sub)
 
 
+def test_typed_case_content_key_matches_pre_case_golden():
+    case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
+
+    assert case_content_key(case) == case_content_key(case.to_dict())
+    assert case_content_key(case) == (
+        "469035680a013567be35f189059e3b76eeb22acc2d49653592613c784fc9079b"
+    )
+
+
 def test_high_energy_profile_range_is_part_of_dataset_identity():
     sweep = material_sweep("tise2", catalog_profile="high_energy")
     identity = named_profile_identity("tise2", catalog_profile="high_energy")
