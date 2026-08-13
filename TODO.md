@@ -20,7 +20,8 @@ file. Edit and drop items on `main`.
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`, as are the four x-ray dispersion claims (`xray-chi-zero`,
    `xray-refractive-index`, `xray-in-medium-resonance`,
-   `xray-in-medium-propagation-phase`).
+   `xray-in-medium-propagation-phase`) and `coherent-segment-midpoint-time`
+   (electron-transport correctness fix, implementation landed on `main`).
    1. **Rederivation Clean-up and Formatting.** Need a worker to go thru and clean up the math in
       completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
       Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
@@ -35,19 +36,14 @@ file. Edit and drop items on `main`.
 
 ### Ready
 
-1. **Electron transport correctness.** Pair coherent midpoint position with
-   midpoint time, truncate cutoff-crossing flights, distinguish step-limited
-   histories from physical stops, and tighten transport input validation across
-   all CPU/CUDA cores. → `fix/electron-transport-correctness`;
-   [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/).dir
-2. **Add support for characteristic X-rays**
-3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
+1. **Add support for characteristic X-rays**
+2. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
-4. **Validate batched coherent line accumulation.** The implementation and
+3. **Validate batched coherent line accumulation.** The implementation and
    `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
    verification and human sign-off remain. → `feature/coherent-line-batching`;
    [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-5. **Core architecture RFC — scene objects, scorers, API surface.** Seven
+4. **Core architecture RFC — scene objects, scorers, API surface.** Seven
    changes to the object model, simulation entry point, persistence, and
    command surface; every step requires bit-for-bit reproduction of stored
    spectra. Design and sequencing:
@@ -76,7 +72,7 @@ file. Edit and drop items on `main`.
       user decision:** the RFC folds `beam` into `profile`, contradicting the
       completed `feature/named-beam-objects`. → `refactor/cli-noun-surface`;
       [`agentdocs/tasks/refactor/cli-noun-surface/`](agentdocs/tasks/refactor/cli-noun-surface/).
-6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+5. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
