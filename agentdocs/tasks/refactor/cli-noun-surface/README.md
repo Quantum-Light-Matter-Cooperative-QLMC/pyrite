@@ -8,7 +8,8 @@ documented public-API replacement). Partially separable.
 
 ## Problem and scope
 
-Thirteen top-level groups and 88 documented commands. Current groups: `run`,
+Thirteen top-level groups and 88 documented commands, targeting nine. Current
+groups: `run`,
 `setup`, `app`, `checkpoint`, `completion`, `config`, `performance`, `remote`,
 `job`, `energy-grid`, `profile`, `material`, `beam`.
 
@@ -27,16 +28,21 @@ quality.
 
 ## Target state
 
-Six top-level nouns: `run`, `profile`, `material`, `job`, `app`, `cache`.
+Nine top-level nouns, down from thirteen: `run`, `app`, `checkpoint`, `config`,
+`remote`, `job`, `profile`, `material`, `beam`.
 
 | Current | Disposition |
 | --- | --- |
-| `run`, `job`, `app`, `profile`, `material` | Retained |
-| `checkpoint`, `performance`, `energy-grid` maintenance verbs | Consolidated under `cache` |
-| `energy-grid derive|show|defaults` | Retained under `material` / `profile` as grid inputs |
-| `config`, `setup`, `completion` | Retained; candidates for `pyrite config` consolidation |
+| `run`, `job`, `app`, `profile`, `material`, `beam` | Retained |
+| `checkpoint` | Retained under its own name |
+| `performance` | Moved to `pyrite-dev` |
+| `energy-grid derive\|show\|defaults` | Retained under `material` / `profile` as grid inputs |
+| `energy-grid verify\|gc\|regen-golden\|add\|rm` | Moved to `pyrite-dev` |
+| `config`, `setup`, `completion` | Consolidated under `pyrite config` |
 | `remote` | Retained as resource management only; `--remote` stays the run modifier |
-| `beam` | Folded into `profile` **unless** named beams prove independently useful |
+
+The reduction comes from machinery leaving the user CLI entirely, not from
+merging physical nouns together.
 
 Narrower proposal, to be decided rather than assumed: keep `profile show`,
 `profile list`, `material show`, `material validate`; reconsider the interactive
@@ -59,11 +65,10 @@ reasoning is binding context, not a blank slate:
   `feature/cli-command-home`, `feature/cli-vocab-controls`,
   `feature/cli-deprecation-substrate`.
 
-**`feature/named-beam-objects` is marked COMPLETE (2026-08-09) and deliberately
-promoted `beam` to a first-class CLI noun.** The RFC's "fold `beam` into
-`profile`" line is in direct tension with recently landed, user-requested work.
-Do not fold it on the strength of the RFC alone; this needs an explicit user
-decision. It is the single largest open question in this task.
+`feature/named-beam-objects` (COMPLETE 2026-08-09) deliberately promoted `beam`
+to a first-class CLI noun. **Resolved on review: `beam` stays.** The RFC's first
+draft proposed folding it into `profile`; that was rejected. See the decisions
+section below.
 
 ## Implementation path
 
@@ -73,54 +78,59 @@ harness with a hidden warning alias for one support window.
 
 ## Checklist
 
-- [ ] A — Confirm the `beam` disposition with the user. Blocking.
-- [ ] B — Map every one of the 88 commands to keep / move / deprecate, with the
+- [ ] A — Map every one of the 88 commands to keep / move / deprecate, with the
       replacement spelling for each move. No command is retired without a named
-      replacement.
-- [ ] C — Land `cache` and move the maintenance verbs under it, with hidden
-      deprecated aliases for the old spellings.
-- [ ] D — Relocate `energy-grid derive|show|defaults` under `material` /
-      `profile`; move `verify` / `gc` / `regen-golden` to `cache` or
+      replacement, and "the replacement is `pyrite-dev`" counts only if the
+      command is genuinely maintenance rather than a user workflow.
+- [ ] B — Move `performance` to `pyrite-dev`, with hidden deprecated aliases for
+      the old spellings.
+- [ ] C — Relocate `energy-grid derive|show|defaults` under `material` /
+      `profile`; move `verify` / `gc` / `regen-golden` / `add` / `rm` to
       `pyrite-dev`. Coordinate with `refactor/detector-scorer`, which demotes
       the grid to a detector input.
+- [ ] D — Consolidate `setup` and `completion` under `pyrite config`.
 - [ ] E — Decide and execute on the interactive profile-mutation flows.
       Separate slice; it is the largest line-count item and the least settled.
-- [ ] F — `config` / `setup` / `completion` consolidation, if slice B still
-      justifies it after C–E.
-- [ ] G — Regenerate `docs/repo-design/cli/cli-reference.md` and
+- [ ] F — Regenerate `docs/repo-design/cli/cli-reference.md` and
       `cli-deprecations.md`; the freeze test guards each step.
-- [ ] H — Write the ADR amending ADR-0002.
+- [ ] G — Write the ADR amending ADR-0002.
 
 ## Decisions and open questions
 
 - **Decided:** every existing CLI contract is retained unchanged.
 - **Decided:** no retired spelling breaks without a warning window under D7.
-- **Open, blocking:** `beam`. See the prior-art note above.
-- **Open:** does `cache` read as the right noun for `checkpoint` operations?
-  Checkpoints are results, not a cache, and calling them cache invites users to
-  treat them as discardable. `store` or `artifact` may be truer. Decide in
-  slice B — it is a user-facing vocabulary choice, and TODO UI backlog item 3
-  already records confusion about what `gc` means and whether it crosses
-  profiles.
+- **Decided (review): `beam` stays a top-level noun.** It is a catalog object
+  with named entries, profile reference counts, and its own lifecycle —
+  structurally identical to `profile` and `material`. Folding it would also
+  contradict `refactor/scene-object-model`, which promotes `pr.Beam` to one of
+  three public API primitives; removing the CLI noun for one of the three
+  top-level physical objects while elevating it in Python is incoherent. After
+  `refactor/detector-scorer`, a `detector` noun is a plausible tenth.
+- **Decided (review): no `cache` noun is created.** The first draft would have
+  merged `checkpoint`, `performance`, and `energy-grid` maintenance under
+  `cache`, but those are not one kind of artifact. Checkpoints are *results* —
+  GPU-hours to produce, not cheaply regenerable, and the evidence behind
+  validation ledger rows; naming that surface `cache` invites someone to
+  discard it. Energy-grid and performance artifacts genuinely are derived, so
+  they leave the user CLI for `pyrite-dev`. This answers TODO UI backlog item 3
+  (`gc` confusion) rather than renaming around it.
 - **Open:** whether interactive profile mutation is removed, reduced, or kept.
   Note TODO Inbox item 1 requests `--lock`/`--unlock` for profile mutability,
   and Bugs item 2 reports `profile create --from` not copying materials — both
   imply continued investment in that surface. Reconcile before slice E.
 - **Open:** how much of this is safely landable *before*
-  `refactor/scene-object-model`. Slices C, D, and G are largely mechanical and
-  may not need to wait; slice E does, because "use the Python API instead" is
-  only an honest answer once the API exists.
+  `refactor/scene-object-model`. Slices B, C, D, and F are largely mechanical
+  and may not need to wait; slice E does, because "use the Python API instead"
+  is only an honest answer once the API exists.
 
 ## Delegation slices and required skills
 
-- A → `lead-task`; requires a user decision, not an agent one.
-- B → `lead-task`; `cli-ui-ux`. The disposition map gates C–F.
-- C, D → `implement-task`; `cli-ui-ux`. Regenerate the reference in the same
-  change.
+- A → `lead-task`; `cli-ui-ux`. The disposition map gates B–E.
+- B, C, D → `implement-task`; `cli-ui-ux`. Regenerate the reference in the same
+  change as each move.
 - E → `lead-task`; `cli-ui-ux`. Material decisions open; never `one-shot`.
-- F → `implement-task`; `cli-ui-ux`.
-- G → `implement-task-lite`; `cli-ui-ux` + `documentation-maintenance`.
-- H → `implement-task-lite`; `documentation-maintenance`.
+- F → `implement-task-lite`; `cli-ui-ux` + `documentation-maintenance`.
+- G → `implement-task-lite`; `documentation-maintenance`.
 
 ## Acceptance checks
 
@@ -132,7 +142,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
 ```
 
-- Root help lists at most six primary nouns.
+- Root help lists at most nine primary nouns.
 - No retired spelling breaks without a warning window.
 - The generated reference and its freeze test are updated in the same change as
   each move.

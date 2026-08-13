@@ -55,18 +55,26 @@ Likely owners:
 | Lock metadata | `src/pyrite/checkpoints/campaign_lock.py` |
 | Checkpoint metadata | `src/pyrite/checkpoints/_checkpoint_store.py`, `_checkpoint_io.py` |
 
-The layering question is real and must be settled first: `run_case` lives in
-`pyrite.montecarlo`, which the `physics-core-stays-below-drivers` import-linter
-contract (`pyproject.toml:191`) holds below the driver packages. `pyrite.campaign`
-is not currently in that contract's forbidden list, so `montecarlo` importing a
-`Case` from `campaign` would lint clean today while inverting the intended
-layering. See the open question below.
+**Settled on review:** `Case` lives in `pyrite.montecarlo` — it is the transport
+layer's *input schema*, so it belongs with its consumer, not its producer.
+
+The layering point is not that an inversion exists but that the tree is
+currently clean by convention only. `pyrite.montecarlo`, `pyrite.detectors`, and
+`pyrite.materials` import from `campaign`/`results` in **zero** places today,
+while `campaign` imports the physics core (`campaign/profile_edit.py:14`). The
+`physics-core-stays-below-drivers` contract (`pyproject.toml:191`) forbids eight
+driver packages but omits `campaign` and `results` — so defining `Case` in
+`campaign` would add the first upward edge, close a package-level cycle, and
+lint clean. It would also make `import pyrite.montecarlo` transitively pull in
+catalog resolution and TOML loading, working against the no-filesystem-writes
+requirement of `refactor/scene-object-model`'s public API.
 
 ## Checklist
 
-- [ ] A — Decide where `Case` lives and whether `pyrite.campaign` joins the
-      `physics-core-stays-below-drivers` forbidden list. Write the decision down
-      before any code moves.
+- [ ] A — Add `pyrite.campaign` and `pyrite.results` to the
+      `physics-core-stays-below-drivers` forbidden list (`pyproject.toml:191`)
+      and confirm the contract passes unchanged. Two lines; ratifies a property
+      the tree already has, before anything can erode it.
 - [ ] B — Inventory the payload. Enumerate every key `build_cases` can emit and
       every key read anywhere in the tree, including the conditional
       divergence-only keys, with type and unit. This table is the deliverable
@@ -91,22 +99,26 @@ layering. See the open question below.
   implemented opportunistically inside this task.
 - **Decided:** zero digest churn. Any diff in a stored `parameter_sha256` is a
   bug in this task, not an accepted result.
-- **Open:** where `Case` lives. Candidates: `pyrite/campaign/case.py` (natural
-  home, but inverts layering for `montecarlo`); a new low leaf module that both
-  `campaign` and `montecarlo` may import; or `pyrite/montecarlo/case.py` (correct
-  direction, odd home for a campaign-layer product). Settle in slice A.
-- **Open:** whether `Case` should be a `dataclass` or a `TypedDict`. A
-  `TypedDict` is a zero-cost drop-in at every existing call site but cannot
-  validate at construction, which is half the point. A frozen dataclass with
-  `to_dict()` requires touching call sites but delivers slice D.
+- **Decided (review):** `Case` lives in `pyrite/montecarlo/case.py`, and
+  `campaign` + `results` join the import-linter forbidden list in the same
+  change. If slice B finds that `Case` must reference a type from `campaign`,
+  stop and escalate rather than moving it up — that would be new information,
+  not a licence to invert the layering.
+- **Decided (review):** frozen dataclass with `to_dict()`, not a `TypedDict`.
+  `TypedDict` is a smaller diff but cannot validate at construction, which is
+  the whole of slice D and the RFC's "rejects unknown keys" criterion. To keep
+  the diff incremental, `run_case` accepts `Case | Mapping` for one D7 support
+  window so call sites migrate one at a time.
 - **Open:** does anything outside `src/` (notebooks, golden fixtures, remote job
   payloads) construct a case dict by hand? Slice B must answer this before
   slice E lands.
 
 ## Delegation slices and required skills
 
-- A, B → `lead-task`; the layering decision and the key inventory gate
-  everything else. Not `one-shot` — a material decision is open.
+- A → `implement-task-lite`. `one-shot`: two lines of TOML plus a contract run,
+  and the decision is already made.
+- B → `lead-task`. The key inventory gates everything else and is the task's
+  real intellectual content.
 - C, D → `implement-task`; `scientific-library`. Reviewable together.
 - E → `implement-task`; `monte-carlo` + `catalog-golden` (touches the digest
   path; golden comparison is the acceptance evidence).
@@ -128,6 +140,8 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
 - Every `parameter_sha256` / `case_content_key` / `variant_stem` for existing
   catalog profiles is bit-for-bit unchanged.
 - The `run_case` docstring no longer carries a key schema.
+- `pyrite.campaign` and `pyrite.results` are in the
+  `physics-core-stays-below-drivers` forbidden list and the contract passes.
 - `identity_version` round-trips through lock and checkpoint metadata, and an
   artifact written before this change still loads with an assumed version of 1.
 

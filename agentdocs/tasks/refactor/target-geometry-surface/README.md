@@ -32,7 +32,11 @@ validation: `substrate` and `stack` are mutually exclusive; grooves require
 finite footprint.
 
 In scope: one `Target` object holding a **closed, named set of variants**, owning
-its own validity, lowering to exactly today's case keys.
+its own validity, lowering to exactly today's case keys — plus the `mosaic`
+switch, which is a property of the target (the catalog already carries
+per-crystal `mosaic_fwhm_deg`). `mosaic_route` and `mosaic_nodes` do **not**
+come along: they are quadrature choices and land on `Numerics.convergence` in
+`refactor/scene-object-model`.
 
 Out of scope, deliberately:
 
@@ -100,7 +104,9 @@ Likely owners:
 - [ ] C — Route `build_cases` through `Target.lower()`. `build_cases` must end
       with **no geometry conditionals**.
 - [ ] D — `substrate=` becomes a `Stack` constructor helper; retire the parallel
-      field pair behind a deprecated shim under the existing D7 harness.
+      field pair behind a deprecated shim under the existing D7 harness. Move
+      `mosaic` onto `Target` in the same slice, leaving `mosaic_route` /
+      `mosaic_nodes` where they are for `refactor/scene-object-model`.
 - [ ] E — Equivalence sweep: every existing catalog profile expands to an
       identical case list.
 - [ ] F — Write the ADR recording the arbitrary-geometry **non-goal**. The RFC

@@ -2,6 +2,7 @@
 
 * **Status:** Proposed
 * **Date:** 2026-08-13
+* **Revised:** 2026-08-13 — first review pass; see {ref}`sec-core-arch-review`
 * **Supersedes:** nothing
 * **Expected outcome:** one ADR per accepted section (see {ref}`sec-core-arch-adrs`)
 
@@ -49,12 +50,12 @@ PENELOPE/PENGEOM, and McStas/McXtrace.
   - Multi-detector runs; demotes `energy-grid`
   - Binning only
 * - 6
-  - Array results in HDF5/Zarr; MCPL export
+  - Array results in HDF5; MCPL export
   - Archival safety; external interoperability
   - No
 * - 7
-  - Reduce the CLI noun surface
-  - Smaller user vocabulary
+  - Reduce the CLI noun surface from 13 to 9
+  - Machinery stops being user vocabulary
   - No
 ```
 
@@ -235,11 +236,32 @@ Four objects with distinct lifetimes:
   - Yes, per expanded scene
 * - `Numerics`
   - electron counts, chunk sizes, transport core, backend policy
-  - Only where a value changes results
+  - No
+* - `Numerics.convergence`
+  - truncation and quadrature parameters — see below
+  - Yes
 * - `Analysis`
   - unit scaling, presentation-time convolution, plotting knobs
   - No
 ```
+
+The `Numerics.convergence` nesting exists so the identity column above is
+enforceable rather than aspirational. The physics-model switches now on `Sweep`
+are not one category:
+
+* `mosaic` selects whether the crystal is modelled as mosaic at all. That is a
+  property of the target — the catalog already carries per-crystal
+  `mosaic_fwhm_deg` — and it moves to `Target` with Change 4.
+* `n_families` (default 4), `max_reflections`, `mosaic_nodes` (Gauss--Hermite
+  nodes), and `mosaic_route` (`analytic` versus `mc`) are **convergence and
+  truncation parameters**: more is more correct, and a value is chosen for cost.
+  All four change results, and `n_families` / `max_reflections` already feed
+  `dataset_identity` ({file}`src/pyrite/campaign/profiles.py` line 236).
+
+Everything directly under `Numerics` — `spec_chunk`, `brem_chunk`, transport
+core, backend policy — must be result-invariant and must stay out of identity.
+Everything under `Numerics.convergence` enters identity. A field that cannot be
+placed by that test is misclassified.
 
 Axes are addressed by dotted path rather than by field type:
 
@@ -302,10 +324,37 @@ the recorded value; writers emit the current one. Old checkpoints continue to
 resolve because their digests are recomputed under `_identity_v1`, not because
 the payload keeps pretending the option does not exist.
 
+### Where `Case` lives
+
+`Case` is not the campaign layer's output; it is the **transport layer's input
+schema**. It therefore belongs with its consumer, in `pyrite.montecarlo`, not
+with its producer.
+
+This matters because the property is currently unenforced. The
+`physics-core-stays-below-drivers` contract ({file}`pyproject.toml` line 191)
+forbids `detectors` / `materials` / `montecarlo` from importing eight driver
+packages, but omits `campaign` and `results`. The physics core imports neither
+today — the dependency graph is clean — so defining `Case` in `campaign` and
+importing it from `run_case` would introduce the first upward edge, and
+import-linter would pass it silently. `campaign` already imports the physics
+core (for example {file}`src/pyrite/campaign/profile_edit.py` line 14), so that
+edge would close a package-level cycle.
+
+The practical cost is concrete: `campaign` owns catalog resolution, so the edge
+would make `import pyrite.montecarlo` transitively pull in profile lookup and
+TOML loading, working against Change 1's requirement that a single-shot
+simulation perform no filesystem access.
+
+Accordingly, this change also adds `pyrite.campaign` and `pyrite.results` to the
+contract's forbidden list, ratifying a property the tree already has.
+
 ### Migration
 
 1. Land `Case` as a typed wrapper that serializes to today's dict exactly, and
-   assert equivalence against the existing golden cases.
+   assert equivalence against the existing golden cases. It is a frozen
+   dataclass with `to_dict()`, not a `TypedDict`: construction-time validation
+   is the point, and `run_case` accepts `Case | Mapping` for one support window
+   so call sites migrate incrementally.
 2. Add `identity_version` to the lock and checkpoint metadata, defaulting to 1
    when absent.
 3. Introduce `_identity_v2` behind a profile-level opt-in; it is a
@@ -320,6 +369,8 @@ the accumulation of new divergence keys and cost nothing.
 * Every stored checkpoint continues to resume with no recomputation.
 * The `run_case` docstring schema is replaced by the type; the docstring is
   reduced to semantics and units.
+* `pyrite.campaign` and `pyrite.results` are in the
+  `physics-core-stays-below-drivers` forbidden list, and the contract passes.
 
 ## Change 4 — consolidate the geometry surface
 
@@ -371,6 +422,12 @@ target = pr.Slab(material, thickness_ang=2e4, tilt_deg=30.0,
 preconditions become `__post_init__` checks on one object with one error
 vocabulary, rather than conditions distributed across `build_cases`,
 `_reject_invalid_groove_geometry`, and `stack_layers`.
+
+`Target` also takes `mosaic` from `Sweep`. Whether a crystal is modelled as
+mosaic is a property of the target, and the catalog already carries per-crystal
+`mosaic_fwhm_deg`. The associated `mosaic_route` and `mosaic_nodes` are not
+target properties — they are quadrature choices and belong to
+`Numerics.convergence` under Change 2.
 
 **Transport internals are untouched.** `Target` lowers to exactly the case keys
 that exist now — `abs_layers`, `layer_radiators`, `crystal_width_mm`,
@@ -470,9 +527,9 @@ format for results that back scientific claims.
 
 ### Target state
 
-* Array payloads move to HDF5 or Zarr under a documented, versioned schema.
-  The CAS layout, the sharding, the atomic-write discipline, and the lock model
-  are retained unchanged; only the leaf encoding changes.
+* Array payloads move to **HDF5** under a documented, versioned schema. The CAS
+  layout, the sharding, the atomic-write discipline, and the lock model are
+  retained unchanged; only the leaf encoding changes.
 * A reader shim keeps existing `.pkl` datasets loadable indefinitely. Migration
   is opportunistic — rewrite on next save, as the store already does for the
   legacy flat layout.
@@ -481,6 +538,40 @@ format for results that back scientific claims.
   interchange format shared by Geant4, MCNP, McStas, and McXtrace, and it is
   the pragmatic answer to "can another code model our detector?" — it makes
   that possible without PyRITE owning a general detector geometry.
+
+### Why HDF5, and why not Zarr
+
+What the encoding change buys, in order of weight for this project:
+
+1. **Self-describing.** Dataset names, shapes, dtypes, and attributes live in
+   the file. A pickle is interpretable only by the class layout that wrote it;
+   `identity_version`, `schema_version`, units, and the parameter digest attach
+   as native HDF5 attributes instead of as implicit structure.
+2. **Version-stable archival.** These files are the evidence behind validation
+   ledger rows. Pickle has broken across Python and NumPy releases before; a
+   ledger whose evidence stops opening is not a ledger.
+3. **Safe to accept.** Unpickling executes arbitrary code, so a checkpoint
+   received from a collaborator is currently a code-execution vector. HDF5 is
+   inert data.
+4. **Third-party readable** with no PyRITE import — `h5py`, MATLAB, Julia, R.
+5. **Partial reads.** One spectrum or one slice without deserializing the whole
+   object graph, which `checkpoint slim`, the analysis apps, and the plotting
+   layer all currently pay full-load cost for.
+
+Zarr is rejected on two grounds specific to this store. Its advantage is many
+concurrent writers into one large array, which does not arise here: PyRITE
+writes many small independent per-case artifacts. Against that, Zarr's
+directory-of-chunks layout fights the store's existing write-then-rename
+atomicity, where a single `.h5` file renames atomically and maps one-to-one onto
+a CAS blob.
+
+`h5py` becomes a required dependency. So does `mcpl`: the meta-package pulls
+`mcpl-core` (prebuilt wheels for macOS x86-64/arm64, manylinux x86-64/aarch64,
+musllinux, and Windows amd64/arm64) and `mcpl-python` (pure Python, NumPy only),
+all Apache-2.0, so there is no build risk to hedge against with an optional
+extra. An escape hatch that is off by default would also be a weaker
+justification for the arbitrary-geometry non-goal than one that is always
+present.
 
 ### Acceptance
 
@@ -492,7 +583,8 @@ format for results that back scientific claims.
 
 ### Target state
 
-Six top-level nouns: `run`, `profile`, `material`, `job`, `app`, `cache`.
+Nine top-level nouns, down from thirteen: `run`, `app`, `checkpoint`, `config`,
+`remote`, `job`, `profile`, `material`, `beam`.
 
 ```{list-table} Disposition of the current top-level groups.
 :name: tbl-core-arch-cli
@@ -500,19 +592,43 @@ Six top-level nouns: `run`, `profile`, `material`, `job`, `app`, `cache`.
 
 * - Current
   - Disposition
-* - `run`, `job`, `app`, `profile`, `material`
+* - `run`, `job`, `app`, `profile`, `material`, `beam`
   - Retained
-* - `checkpoint`, `performance`, `energy-grid` maintenance verbs
-  - Consolidated under `cache`
+* - `checkpoint`
+  - Retained under its own name
+* - `performance`
+  - Moved to `pyrite-dev`
 * - `energy-grid derive|show|defaults`
   - Retained under `material` / `profile` as grid inputs
+* - `energy-grid verify|gc|regen-golden|add|rm`
+  - Moved to `pyrite-dev`
 * - `config`, `setup`, `completion`
-  - Retained; candidates for `pyrite config` consolidation
+  - Consolidated under `pyrite config`
 * - `remote`
   - Retained as resource management only; `--remote` stays the run modifier
-* - `beam`
-  - Folded into `profile` unless named beams prove independently useful
 ```
+
+The reduction comes from machinery leaving the user CLI entirely, not from
+merging physical nouns together.
+
+Two nouns the first draft proposed to remove are retained on review:
+
+* **`beam` stays.** It is a catalog object with named entries, reference counts
+  from profiles, and its own lifecycle — structurally identical to `profile` and
+  `material`, and promoted deliberately by the completed named-beam work.
+  Removing the CLI noun for one of the three top-level physical objects while
+  Change 1 promotes `pr.Beam` to a public API primitive would be incoherent.
+  After Change 5, a `detector` noun is a plausible tenth.
+* **No `cache` noun is created.** The first draft would have consolidated
+  `checkpoint`, `performance`, and `energy-grid` maintenance under `cache`, but
+  those are not one kind of artifact. Checkpoints are *results*: GPU-hours to
+  produce, not cheaply regenerable, and the evidence behind validation ledger
+  rows. Naming that surface `cache` tells users it is discardable, and someone
+  will eventually be misled into discarding it. Energy-grid and performance
+  artifacts genuinely are derived and regenerable, so they move to `pyrite-dev`,
+  which already exists for exactly that. This also answers, rather than renames
+  around, the recorded user confusion over what `gc` means and whether it
+  crosses profiles.
 
 Two narrower proposals:
 
@@ -536,9 +652,11 @@ cli-reference freeze test guards each step.
 
 ### Acceptance
 
-* Root help lists at most six primary nouns.
+* Root help lists at most nine primary nouns.
 * No retired spelling breaks without a warning window.
 * The generated reference and its freeze test are updated in the same change.
+* No user-facing command is removed without a documented replacement, whether
+  that replacement is another command, the public API, or `pyrite-dev`.
 
 (sec-core-arch-sequencing)=
 ## Sequencing
@@ -610,6 +728,40 @@ replacement.
   rewrite-on-save, matching the existing legacy-layout migration.
 * **CLI removals annoying existing users.** Mitigate with the standard support
   window and by ensuring the public API covers every removed workflow first.
+
+(sec-core-arch-review)=
+## Review decisions
+
+Six questions the first draft left open were settled in the 2026-08-13 review
+and are folded into the sections above. They are collected here so the change
+in position is visible rather than silently absorbed.
+
+```{list-table} Decisions taken on review.
+:name: tbl-core-arch-review
+:header-rows: 1
+
+* - Question
+  - Decision
+* - Fold `beam` into `profile`?
+  - No. It is a physical noun and a catalog object; the first draft optimized
+    for a round number. Change 7.
+* - Consolidate maintenance verbs under a `cache` noun?
+  - No. `checkpoint` keeps its name because checkpoints are results, not cache;
+    genuinely derived artifacts move to `pyrite-dev`. Change 7.
+* - Where does `Case` live?
+  - `pyrite.montecarlo`, as the transport layer's input schema, with `campaign`
+    and `results` added to the import-linter contract. Change 3.
+* - Where do the model switches land?
+  - Split: `mosaic` to `Target`; `n_families`, `max_reflections`,
+    `mosaic_nodes`, `mosaic_route` to `Numerics.convergence`. Changes 2 and 4.
+* - HDF5 or Zarr?
+  - HDF5, on atomicity and one-file-per-CAS-blob rather than on popularity.
+    Change 6.
+* - Is MCPL an optional extra?
+  - No. Prebuilt wheels on every supported platform, so there is no install
+    risk to hedge; a conditionally available escape hatch would also weaken the
+    geometry non-goal. Change 6.
+```
 
 (sec-core-arch-nongoals)=
 ## Non-goals

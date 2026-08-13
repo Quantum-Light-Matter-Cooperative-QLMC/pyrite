@@ -71,12 +71,12 @@ file. Edit and drop items on `main`.
       `Settings`, add public `pr.simulate`. Structural core, one project.
       Gated on 1–3. → `refactor/scene-object-model`;
       [`agentdocs/tasks/refactor/scene-object-model/`](agentdocs/tasks/refactor/scene-object-model/).
-   5. Result arrays in HDF5/Zarr + MCPL export; `.pkl` readable forever. Gated
-      on 1. → `feature/result-format-interchange`;
+   5. Result arrays in HDF5 + MCPL export (both required deps); `.pkl` readable
+      forever. Gated on 1. → `feature/result-format-interchange`;
       [`agentdocs/tasks/feature/result-format-interchange/`](agentdocs/tasks/feature/result-format-interchange/).
-   6. Reduce 13 CLI nouns to 6; all contracts retained. Gated on 4. **Blocking
-      user decision:** the RFC folds `beam` into `profile`, contradicting the
-      completed `feature/named-beam-objects`. → `refactor/cli-noun-surface`;
+   6. Reduce 13 CLI nouns to 9 by moving machinery to `pyrite-dev`; `beam` and
+      `checkpoint` stay, no `cache` noun. All contracts retained. Gated on 4.
+      → `refactor/cli-noun-surface`;
       [`agentdocs/tasks/refactor/cli-noun-surface/`](agentdocs/tasks/refactor/cli-noun-surface/).
 5. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`

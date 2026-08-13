@@ -68,8 +68,14 @@ Four objects with distinct lifetimes:
 | --- | --- | --- |
 | `Scene` | `beam`, `target`, `detector` | Yes |
 | `Sweep` | a base `Scene` plus named axes over paths into it | Yes, per expanded scene |
-| `Numerics` | electron counts, chunk sizes, transport core, backend policy | Only where a value changes results |
+| `Numerics` | electron counts, chunk sizes, transport core, backend policy | No |
+| `Numerics.convergence` | `n_families`, `max_reflections`, `mosaic_nodes`, `mosaic_route` | Yes |
 | `Analysis` | unit scaling, presentation-time convolution, plotting knobs | No |
+
+The `convergence` nesting is what makes the identity column enforceable:
+everything directly under `Numerics` must be result-invariant and stay out of
+`dataset_identity`; everything under `Numerics.convergence` enters it. A field
+that cannot be placed by that test is misclassified.
 
 Axes addressed by dotted path rather than by field type:
 
@@ -153,11 +159,20 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
   explicit — the split touches the object every physics module reads, so
   equivalence must be machine-checkable at the boundary before the objects
   above it move.
-- **Open:** where the model switches (`mosaic`, `mosaic_route`, `mosaic_nodes`,
-  `n_families`, `max_reflections`) land. They are neither scene geometry nor
-  pure numerics — they select a physical model *and* a sampling strategy.
-  Candidate: a fifth `Physics` object, or `Scene.model`. Slice A must decide;
-  do not leave them on `Numerics` by default.
+- **Decided (review):** the model switches are two categories, not one, and no
+  fifth object is needed. `mosaic` — whether the crystal is modelled as mosaic —
+  is a target property and moves to `Target` in
+  `refactor/target-geometry-surface`. `n_families` (default 4),
+  `max_reflections`, `mosaic_nodes` (Gauss–Hermite nodes), and `mosaic_route`
+  (`analytic` vs `mc`) are convergence and truncation parameters: more is more
+  correct, and a value is chosen for cost. They go to `Numerics.convergence`.
+  `n_families` and `max_reflections` already feed `dataset_identity`
+  (`campaign/profiles.py:236`), which confirms the classification.
+- **Worth a test while in here:** `mosaic_route="analytic"` and `"mc"` evaluate
+  the same mosaic integral, so they should agree within tolerance at high
+  `mosaic_nodes`. If they do not converge, that is a physics bug this refactor
+  would otherwise paper over. Route it to the physics ledger rather than
+  absorbing it.
 - **Open:** the `theta_obs_deg` / `dtheta_obs_deg` / `domega_sr` `InitVar`
   reconciliation. Once the detector owns acceptance, does this reconciliation
   survive at all, or is it deleted? Check against `refactor/detector-scorer`.
