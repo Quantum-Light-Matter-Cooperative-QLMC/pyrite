@@ -361,7 +361,45 @@ crystal = "mos2"
     message = str(caught.value)
     assert message.count("requires E_grid_line") == 1
     assert "2 paths (materials.sample_a.scan, materials.sample_b.scan)" in message
-    assert "run `cxr energy-grid derive --energy 25.0,30.0 --material sample_a,sample_b`" in message
+    assert (
+        "run `pyrite material energy-grid derive "
+        "--energy 25.0,30.0 --material sample_a,sample_b`"
+    ) in message
+
+
+def test_named_profile_scan_defaults_apply_only_to_members(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample_a]
+label = "sample_a"
+crystal = "mos2"
+
+[materials.sample_b]
+label = "sample_b"
+crystal = "mos2"
+
+[profiles.narrowed]
+thickness_ang = 1000.0
+energy_keV = 35.0
+tilt_deg = 5.0
+tilt_azim_deg = 95.0
+E_grid_brem = 0.0
+materials = ["sample_a"]
+"""
+    )
+
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
+
+    message = str(caught.value)
+    assert "materials.sample_a.scan" in message
+    assert "materials.sample_b.scan" not in message
+    assert (
+        "run `pyrite material energy-grid derive "
+        "--energy 35.0 --material sample_a`"
+    ) in message
 
 
 def _catalog_with_two_profiles(tmp_path: Path) -> Path:

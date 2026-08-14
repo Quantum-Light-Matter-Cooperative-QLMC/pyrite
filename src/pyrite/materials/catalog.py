@@ -69,8 +69,8 @@ _MISSING_LINE_GRID_RE = re.compile(
 )
 
 
-def _derive_hint(message: str, shown_paths: Sequence[str], *, truncated: bool) -> str | None:
-    """A ``cxr energy-grid derive`` suggestion for the shown materials when
+def _derive_hint(message: str, paths: Sequence[str]) -> str | None:
+    """A canonical energy-grid derivation suggestion for the affected materials when
     ``message`` is the missing-line-grid error, else ``None`` (TODO.md Bugs
     #3: point the user at the fix, not just the failure)."""
     match = _MISSING_LINE_GRID_RE.match(message)
@@ -79,13 +79,16 @@ def _derive_hint(message: str, shown_paths: Sequence[str], *, truncated: bool) -
     energies = match.group(1).strip("[]").replace(" ", "")
     materials = [
         path.removeprefix("materials.").removesuffix(".scan")
-        for path in shown_paths
+        for path in paths
         if path.startswith("materials.") and path.endswith(".scan")
     ]
     if not materials:
         return None
-    material_arg = ",".join(materials) + (",..." if truncated else "")
-    return f"run `cxr energy-grid derive --energy {energies} --material {material_arg}`"
+    material_arg = ",".join(materials)
+    return (
+        "run `pyrite material energy-grid derive "
+        f"--energy {energies} --material {material_arg}`"
+    )
 
 
 def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[str]:
@@ -113,7 +116,7 @@ def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[s
             shown_text = ", ".join(shown)
             suffix = f", +{remainder} more" if truncated else ""
             line = f"{len(paths)} paths ({shown_text}{suffix}): {message}"
-        hint = _derive_hint(message, shown, truncated=truncated)
+        hint = _derive_hint(message, paths)
         if hint is not None:
             line = f"{line} -- {hint}"
         lines.append(line)
@@ -1305,12 +1308,15 @@ def _parse_materials(
         )
         selected_profile = {}
 
-    overrides_raw = selected_profile.get("overrides")
-    overrides = overrides_raw if isinstance(overrides_raw, Mapping) else {}
-
-    # A material without its own energy_grids.<key> row falls back to the
-    # store entry keyed by its resolving profile's name, or "standard".
-    default_line_grids = energy_grids.get(profile_name, energy_grids.get("standard"))
+    standard_profile = profiles.get("standard")
+    if not isinstance(standard_profile, Mapping):
+        standard_profile = selected_profile
+    membership_raw = selected_profile.get("materials")
+    selected_members = (
+        {item for item in membership_raw if isinstance(item, str)}
+        if isinstance(membership_raw, list)
+        else None
+    )
 
     allowed = {"label", "crystal", "substrate", "stack", "validation"}
     for key, value in table.items():
@@ -1328,17 +1334,24 @@ def _parse_materials(
             errors.add(f"{path}.crystal", "must reference a crystal")
             crystal_key = ""
 
+        resolves_selected = selected_members is None or key in selected_members
+        resolving_profile_name = profile_name if resolves_selected else "standard"
+        resolving_profile = selected_profile if resolves_selected else standard_profile
+        overrides_raw = resolving_profile.get("overrides")
+        overrides = overrides_raw if isinstance(overrides_raw, Mapping) else {}
         override_raw = overrides.get(key)
         override: Mapping[str, object] = (
             cast(Mapping[str, object], override_raw) if isinstance(override_raw, Mapping) else {}
         )
-        values = {name: selected_profile[name] for name in _SCAN_KEYS if name in selected_profile}
+        values = {
+            name: resolving_profile[name] for name in _SCAN_KEYS if name in resolving_profile
+        }
         if "thickness_ang" in override or "thickness_layers" in override:
             values.pop("thickness_ang", None)
             values.pop("thickness_layers", None)
         values.update({name: override[name] for name in _SCAN_KEYS if name in override})
 
-        artifact = profile_artifacts.get(key)
+        artifact = profile_artifacts.get(key) if resolves_selected else None
         artifact_line_grids = None
         if artifact is not None:
             digest, identity = artifact
@@ -1364,7 +1377,13 @@ def _parse_materials(
             line_grid_store=(
                 artifact_line_grids
                 if artifact_line_grids is not None
-                else energy_grids.get(key, default_line_grids)
+                else energy_grids.get(
+                    key,
+                    energy_grids.get(
+                        resolving_profile_name,
+                        energy_grids.get("standard"),
+                    ),
+                )
             ),
         )
         substrate = row.get("substrate")
@@ -1411,7 +1430,7 @@ def _parse_materials(
             out[key] = MaterialSpec(
                 key,
                 label,
-                profile_name,
+                resolving_profile_name,
                 crystal_key,
                 scan,
                 substrate,
