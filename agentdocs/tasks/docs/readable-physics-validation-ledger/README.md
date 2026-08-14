@@ -29,19 +29,19 @@ does not change physics, validation verdicts, sign-off state, or methodology.
 
 ## Checklist
 
-- [ ] Record the current parsed inventory (IDs, domains, claims, statuses) as a
+- [x] Record the current parsed inventory (IDs, domains, claims, statuses) as a
       preservation baseline before converting the ledger.
-- [ ] Define a concise plain-Markdown record schema with a stable ID heading
+- [x] Define a concise plain-Markdown record schema with a stable ID heading
       and the seven labeled detail fields.
-- [ ] Convert every ledger row mechanically without changing field content or
+- [x] Convert every ledger row mechanically without changing field content or
       validation state.
-- [ ] Update the parser and focused tests, including malformed and duplicate
+- [x] Update the parser and focused tests, including malformed and duplicate
       record coverage.
-- [ ] Regenerate compact validation views and deep-link inventory IDs to their
+- [x] Regenerate compact validation views and deep-link inventory IDs to their
       detailed records.
-- [ ] Build the Sphinx site and inspect representative short and long records
+- [x] Build the Sphinx site and inspect representative short and long records
       at desktop and narrow content widths.
-- [ ] Review the scoped diff for accidental scientific or status changes.
+- [x] Review the scoped diff for accidental scientific or status changes.
 
 ## Decisions and open questions
 
@@ -56,6 +56,20 @@ does not change physics, validation verdicts, sign-off state, or methodology.
   renderer.
 - No material decision remains open. Minor field-label syntax is an
   implementation detail, provided it renders clearly in GitHub and Sphinx.
+
+## Implementation evidence
+
+- The pre-conversion and post-conversion inventories each contain 106 records.
+  Their ordered domain, ID, claim, status, and combined seven-field payload
+  match byte-for-byte (SHA-256
+  `f694127be8ac85aedd50b8f8f9600a9d6ef4e40ddd75bc5246ebc5d5d33e81c9`).
+- The built detailed page contains 106 single-column simple lists and no table.
+  Representative long (`line-absorption-tabulation`) and short
+  (`detector-timepix`) records have stable sections; generated inventory links
+  resolve to the corresponding Sphinx anchors. Block content has no fixed
+  width, so it reflows at narrow content widths without table traversal.
+- Focused tests, `validation-ledger --check`, Ruff, and the warning-as-error
+  Sphinx build pass.
 
 ## Delegation
 
@@ -79,4 +93,3 @@ boundaries or requires interpreting scientific content.
 - `UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs` passes cleanly.
 - Representative long records are readable in built HTML without
   character-by-character wrapping or requiring horizontal table traversal.
-

@@ -11,9 +11,15 @@ def test_parser_extracts_domains_and_statuses() -> None:
     entries = parse_ledger(
         """# Ledger
 ## Radiation
-| id | claim | code | source | status | checks | anchor | notes |
-|---|---|---|---|---|---|---|---|
-| `line` | `\\|A\\|²` | `code::line` | source | rederived | units | test | note with `|F|²` |
+### `line`
+
+- **Claim:** `\\|A\\|²`
+- **Code:** `code::line`
+- **Source:** source
+- **Status:** rederived
+- **Checks:** units
+- **Anchor:** test
+- **Notes:** note with `|F|²`
 """
     )
 
@@ -21,25 +27,83 @@ def test_parser_extracts_domains_and_statuses() -> None:
         ("Radiation", "line", "rederived")
     ]
     assert entries[0].claim == "`|A|²`"
+    assert entries[0].notes == "note with `|F|²`"
 
 
 def test_parser_rejects_duplicate_ids() -> None:
-    row = "| `same` | claim | code | source | unverified | — | — | — |\n"
+    row = """### `same`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** unverified
+- **Checks:** —
+- **Anchor:** —
+- **Notes:** —
+"""
     with pytest.raises(ValueError, match="duplicate validation IDs"):
         parse_ledger("## One\n" + row + "## Two\n" + row)
+
+
+def test_parser_rejects_malformed_records() -> None:
+    record = """## Domain
+### `missing-notes`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** anchored
+- **Checks:** checks
+- **Anchor:** test
+"""
+    with pytest.raises(ValueError, match="missing notes"):
+        parse_ledger(record)
 
 
 def test_status_summary_is_derived_from_rows() -> None:
     entries = parse_ledger(
         "## Domain\n"
-        "| `one` | claim | code | source | anchored | checks | test | note |\n"
-        "| `two` | claim | code | source | discrepancy | checks | — | note |\n"
+        + """### `one`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** anchored
+- **Checks:** checks
+- **Anchor:** test
+- **Notes:** note
+### `two`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** discrepancy
+- **Checks:** checks
+- **Anchor:** —
+- **Notes:** note
+"""
     )
 
     summary = render_status_summary(entries)
     assert "0 / 2 claims signed off" in summary
     assert "| `anchored` | 1 |" in summary
     assert "| `discrepancy` | 1 |" in summary
+
+
+def test_domain_inventory_links_to_detailed_record() -> None:
+    from pyrite.devtools.validation_ledger import render_domain_inventories
+
+    entries = parse_ledger(
+        """## Domain
+### `deep-link`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** filtered
+- **Checks:** checks
+- **Anchor:** test
+- **Notes:** note
+"""
+    )
+
+    inventory = render_domain_inventories(entries)
+    assert "(physics-validation-ledger.md#deep-link)" in inventory
 
 
 def test_checked_in_views_are_current() -> None:
