@@ -188,6 +188,8 @@ def _parse_progress_records(payload):
         phase = record.get("phase")
         if phase not in (None, "primary", "cpu"):
             continue
+        if record.get("activity") not in (None, "loading", "computing", "saving", "handoff"):
+            continue
         _sanitize_cost_fields(record)
         _sanitize_timing_fields(record)
         key = material if phase in (None, "primary") else f"{material}:cpu"

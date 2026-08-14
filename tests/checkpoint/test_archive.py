@@ -86,6 +86,18 @@ def test_component_checkpoint_archive_restore_roundtrip(tmp_path):
     assert set(_checkpoint_store.load("hopg", tmp_path)) == {"cfgA", "cfgB"}
 
 
+def test_shards_only_checkpoint_archive_restore_roundtrip(tmp_path):
+    expected = _material_store("hopg", ["cfg"])
+    _checkpoint_store.save_part("hopg", tmp_path, "cfg", expected["cfg"])
+
+    archive.archive_checkpoint("hopg", "paused", root=str(tmp_path))
+    assert (tmp_path / "archive" / "paused" / "parts").is_dir()
+    _checkpoint_store.clear_parts("hopg", tmp_path)
+    archive.restore_checkpoint("paused", "hopg", force=True, root=str(tmp_path))
+
+    assert _checkpoint_store.load("hopg", tmp_path) == expected
+
+
 def test_restore_infers_stem_from_dated_label(tmp_path):
     _write(tmp_path / "archive" / "hopg-20260704.pkl", _store())
     archive.restore_checkpoint("hopg-20260704", root=str(tmp_path))

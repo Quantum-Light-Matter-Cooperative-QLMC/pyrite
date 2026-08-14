@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from pyrite.checkpoints import _checkpoint_io
+from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 from pyrite.montecarlo import runner
 from pyrite.runs.run import (
     _checkpoint_save,
@@ -636,6 +636,60 @@ def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
     assert manifest["schema"] == "cxr.checkpoint-manifest.v2"
     assert manifest["identity_version"] == 1
     assert manifest["dataset_identity"] == {**identity, "identity_version": 1}
+
+
+def test_run_sweep_exact_metadata_hit_skips_decode_launch_and_writes(tmp_path, monkeypatch):
+    cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
+    identity = {
+        "schema": "cxr.dataset-identity.v1",
+        "material": "hopg",
+        "profile": "survey",
+        "parameter_sha256": "a" * 64,
+        "resolved_parameters": {"settings": {}, "sweep": {}},
+    }
+    monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
+    run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False, dataset_identity=identity)
+    paths = [tmp_path / "hopg" / name for name in ("line.pkl", "brem.pkl", "meta.json")]
+    before = {path: path.stat().st_mtime_ns for path in paths}
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("exact metadata hit must not decode, launch, or write")
+
+    monkeypatch.setattr("pyrite.runs.run._checkpoint_load", forbidden)
+    monkeypatch.setattr("pyrite.runs.run.run_cases", forbidden)
+    monkeypatch.setattr("pyrite.runs.run._checkpoint_components_save", forbidden)
+    progress = []
+    assert run_sweep(
+        cases,
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        dataset_identity=identity,
+        metadata_only_complete=True,
+        on_progress=lambda *values: progress.append(values),
+    )
+    assert progress == [(0, 2, 2)]
+    assert {path: path.stat().st_mtime_ns for path in paths} == before
+
+
+def test_budget_pause_keeps_shards_until_completion(tmp_path, monkeypatch):
+    cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
+
+    def first_only(cases, callback=None, **_kwargs):
+        callback(0, cases[0], fake_out(cases[0]))
+
+    monkeypatch.setattr("pyrite.runs.run.run_cases", first_only)
+    assert not run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False)
+    assert _checkpoint_store.has_parts("hopg", tmp_path)
+    assert not (tmp_path / "hopg" / "line.pkl").exists()
+    assert sum(len(items) for items in _checkpoint_store.load("hopg", tmp_path).values()) == 1
+
+    monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
+    results = {}
+    assert run_sweep(cases, results, checkpoint_dir=str(tmp_path), progress=False)
+    assert sum(len(items) for items in results.values()) == 2
+    assert (tmp_path / "hopg" / "line.pkl").is_file()
+    assert not _checkpoint_store.has_parts("hopg", tmp_path)
 
 
 def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):

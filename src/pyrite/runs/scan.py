@@ -620,6 +620,7 @@ def _checkpoint_stem(args, material):
 
 
 def _run_material(args, material, max_seconds=None):
+    deadline = None if max_seconds is None else time.monotonic() + max_seconds
     _load_runtime()
     assert format_penetration_watchdog_summary is not None
     assert gate_cases_by_penetration is not None
@@ -665,7 +666,25 @@ def _run_material(args, material, max_seconds=None):
         "cached_cases": 0,
         "completed_new_cases": 0,
     }
+    if progress_file is not None and Path(progress_file).is_file():
+        try:
+            previous = json.loads(Path(progress_file).read_text(encoding="utf-8"))
+            if (
+                previous.get("material") == material
+                and previous.get("total_cases") == len(cases)
+                and all(isinstance(previous.get(key), int) for key in ("cached_cases", "completed_new_cases"))
+                and 0
+                <= previous["cached_cases"] + previous["completed_new_cases"]
+                <= len(cases)
+            ):
+                latest_progress.update(
+                    cached_cases=previous["cached_cases"],
+                    completed_new_cases=previous["completed_new_cases"],
+                )
+        except (OSError, ValueError, TypeError):
+            pass
     latest_case = {}
+    last_completed_case = {}
     # Compute-weighted progress (item 6): cost is a pure function of a case dict
     # (sweep.case_cost), so the exact cached vs. done split run_sweep already
     # tracks (identity, not just a count) lets `attach` render a percent that
@@ -702,11 +721,11 @@ def _run_material(args, material, max_seconds=None):
         }
 
     def _note_case(case):
-        # Frontier crystal case just finished -- surface its parameters so a live
-        # viewer can show what's under test (energy, both tilts, thickness).
+        # Completion callbacks are not active-case signals. Keep this separately
+        # so the dashboard never presents a finished frontier as NOW TESTING.
         with performance_lock:
-            latest_case.clear()
-            latest_case.update(_case_summary(case))
+            last_completed_case.clear()
+            last_completed_case.update(_case_summary(case))
 
     def _record_cost(done_cost, total_cost):
         nonlocal initial_done_cost
@@ -741,6 +760,10 @@ def _run_material(args, material, max_seconds=None):
             }
             if case_snapshot:
                 rec["current"] = case_snapshot
+            if activity_info.get("phase"):
+                rec["activity"] = activity_info["phase"]
+            if last_completed_case:
+                rec["last_completed"] = dict(last_completed_case)
             if "done_cost" in cost_snapshot and "total_cost" in cost_snapshot:
                 rec["done_cost"] = cost_snapshot["done_cost"]
                 rec["total_cost"] = cost_snapshot["total_cost"]
@@ -761,6 +784,8 @@ def _run_material(args, material, max_seconds=None):
                 phase=progress_phase,
                 state="running",
                 current=case_snapshot,
+                activity=activity_info.get("phase"),
+                last_completed=dict(last_completed_case) or None,
                 **progress_snapshot,
                 **cost_snapshot,
                 **progress_timer.snapshot(
@@ -781,7 +806,6 @@ def _run_material(args, material, max_seconds=None):
                 timing_info["checkpoint_count"] += 1
                 timing_info["checkpoint_seconds"] = checkpoint_seconds
                 timing_info["checkpoint_seconds_total"] += checkpoint_seconds
-                return
             retries = info.get("gpu_oom_retry_count", 0)
             timing_info["gpu_oom_retry_count_total"] += retries
             for key, value in info.items():
@@ -804,9 +828,19 @@ def _run_material(args, material, max_seconds=None):
         info = dict(info)
         active = info.pop("case", None)
         active_case = _case_summary(active) if active is not None else None
+        raw_phase = info.get("phase")
+        phase = raw_phase if raw_phase in {"loading", "saving", "handoff"} else "computing"
         with performance_lock:
             activity_info.clear()
-            activity_info.update(info, active_case=active_case)
+            activity_info.update(info, phase=phase, active_case=active_case)
+            latest_case.clear()
+            if active_case is not None and phase == "computing":
+                latest_case.update(active_case)
+        _record_progress(
+            latest_progress["completed_new_cases"],
+            latest_progress["total_cases"],
+            latest_progress["cached_cases"],
+        )
 
     def _performance_context():
         with performance_lock:
@@ -892,8 +926,15 @@ def _run_material(args, material, max_seconds=None):
             ),
             on_runtime=_record_runtime if performance_logger is not None else None,
             on_timing=_record_timing if performance_logger is not None else None,
-            on_activity=_record_activity if performance_logger is not None else None,
-            max_seconds=max_seconds,
+            on_activity=(
+                _record_activity
+                if progress_file is not None or performance_logger is not None or has_dashboard
+                else None
+            ),
+            deadline=deadline,
+            max_seconds=(
+                None if deadline is None else max(0.0, deadline - time.monotonic())
+            ),
             dataset_identity=identity,
             case_cost_fn=(
                 case_cost
@@ -905,6 +946,7 @@ def _run_material(args, material, max_seconds=None):
                 if progress_file is not None or performance_logger is not None or has_dashboard
                 else None
             ),
+            metadata_only_complete=True,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --
@@ -961,6 +1003,8 @@ def _run_material(args, material, max_seconds=None):
             material=material,
             phase=progress_phase,
             state="done" if complete else "paused",
+            activity="handoff",
+            last_completed=dict(last_completed_case) or None,
             **latest_progress,
             **latest_cost,
             **progress_timer.snapshot(
@@ -972,7 +1016,10 @@ def _run_material(args, material, max_seconds=None):
                 ),
             ),
         )
-    n = sum(len(v) for v in results.values())
+    n = max(
+        sum(len(v) for v in results.values()),
+        latest_progress["cached_cases"] + latest_progress["completed_new_cases"],
+    )
     if complete:
         print(f"{_cli_core.paint('done', 'done')} -> {args.checkpoint_dir}/{stem}/ ({n} records)")
     else:
@@ -1039,6 +1086,8 @@ def _write_progress_record(
     state,
     phase=None,
     current=None,
+    activity=None,
+    last_completed=None,
     done_cost=None,
     total_cost=None,
     active_compute_seconds=None,
@@ -1070,6 +1119,10 @@ def _write_progress_record(
         record["phase"] = phase
     if current:
         record["current"] = current
+    if activity is not None:
+        record["activity"] = activity
+    if last_completed:
+        record["last_completed"] = last_completed
     if done_cost is not None and total_cost is not None:
         record["done_cost"] = done_cost
         record["total_cost"] = total_cost

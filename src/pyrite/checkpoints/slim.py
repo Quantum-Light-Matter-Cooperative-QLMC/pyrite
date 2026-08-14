@@ -132,6 +132,9 @@ def _slim_checkpoint(
             )
             for component in _checkpoint_store.COMPONENTS
         ]
+        parts = _checkpoint_store.parts_dir(os.path.basename(path), os.path.dirname(path))
+        if parts.is_dir():
+            input_paths.extend(parts.glob("*.pkl"))
         before = sum(item.stat().st_size for item in input_paths if item.is_file())
     else:
         results = _checkpoint_io.load(in_path)

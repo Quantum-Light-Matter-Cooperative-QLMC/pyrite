@@ -68,7 +68,7 @@ def _atomic_copy(src, dst):
 
 def _active_paths(stem, root):
     directory = Path(root) / stem
-    if (directory / "line.pkl").is_file():
+    if _checkpoint_store.checkpoint_exists(stem, root) and directory.is_dir():
         return directory, True
     legacy = Path(root) / f"{stem}.pkl"
     return legacy, False
@@ -76,7 +76,7 @@ def _active_paths(stem, root):
 
 def _archive_paths(label, root):
     directory = Path(_archive_dir(root)) / label
-    if (directory / "line.pkl").is_file():
+    if _checkpoint_store.checkpoint_exists(label, _archive_dir(root)) and directory.is_dir():
         return directory, True
     legacy = Path(_archive_dir(root)) / f"{label}.pkl"
     return legacy, False
@@ -177,7 +177,8 @@ def list_archives(root=DEFAULT_ROOT):
         {
             entry.name
             for entry in Path(adir).iterdir()
-            if entry.is_dir() and (entry / "line.pkl").is_file()
+            if entry.is_dir()
+            and _checkpoint_store.checkpoint_exists(entry.name, Path(adir))
         }
         | {entry.stem for entry in Path(adir).glob("*.pkl")}
     )

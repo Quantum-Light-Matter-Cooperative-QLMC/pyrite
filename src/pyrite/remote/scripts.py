@@ -251,7 +251,7 @@ run_material() {{
       scan_launcher=({config.shell_remote_uv()} run --no-sync python)
     fi
     scan_command=(
-      "${{scan_launcher[@]}}" -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags}
+      "${{scan_launcher[@]}}" -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags}
       "${{checkpoint_flags[@]}}" --progress-file "$JOBDIR/progress/$m.json" \\
       --progress-phase primary --no-progress
     )
@@ -430,7 +430,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync python -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync python -u -m pyrite._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"

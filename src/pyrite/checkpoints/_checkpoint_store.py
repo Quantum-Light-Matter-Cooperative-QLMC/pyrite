@@ -40,7 +40,11 @@ def manifest_path(stem: str, root: str | os.PathLike[str]) -> Path:
 
 
 def checkpoint_exists(stem: str, root: str | os.PathLike[str]) -> bool:
-    return component_path(stem, "line", root).is_file() or legacy_path(stem, root).is_file()
+    return (
+        component_path(stem, "line", root).is_file()
+        or legacy_path(stem, root).is_file()
+        or has_parts(stem, root)
+    )
 
 
 def discover(root: str | os.PathLike[str]) -> list[str]:
@@ -49,7 +53,10 @@ def discover(root: str | os.PathLike[str]) -> list[str]:
     if not base.is_dir():
         return []
     stems = {
-        path.name for path in base.iterdir() if path.is_dir() and (path / "line.pkl").is_file()
+        path.name
+        for path in base.iterdir()
+        if path.is_dir()
+        and ((path / "line.pkl").is_file() or any((path / "parts").glob("*.pkl")))
     }
     stems.update(path.stem for path in base.glob("*.pkl") if not path.name.endswith(".slim.pkl"))
     return sorted(stems)
@@ -218,11 +225,22 @@ def load(stem: str, root: str | os.PathLike[str]) -> dict:
             brem = _component_store(_checkpoint_io.load(str(legacy_path(stem, root))), "brem")
         else:
             brem = {}
-        return _merge(line, brem)
+        merged = _merge(line, brem)
+        return _overlay(merged, load_parts(stem, root))
     old = legacy_path(stem, root)
     if old.is_file():
-        return _checkpoint_io.load(str(old))
+        return _overlay(_checkpoint_io.load(str(old)), load_parts(stem, root))
+    if has_parts(stem, root):
+        return load_parts(stem, root)
     raise FileNotFoundError(line_path)
+
+
+def _overlay(base: dict, newer: dict) -> dict:
+    """Return the record union with ``newer`` winning per ``(name, energy)``."""
+    merged = {name: dict(by_energy) for name, by_energy in base.items()}
+    for name, by_energy in newer.items():
+        merged.setdefault(name, {}).update(by_energy)
+    return merged
 
 
 def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
@@ -232,9 +250,10 @@ def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
     if not present:
         old = legacy_path(stem, root)
         present = [old] if old.is_file() else []
-    return tuple(
+    component_signature = tuple(
         (str(path.resolve()), path.stat().st_mtime_ns, path.stat().st_size) for path in present
     )
+    return component_signature + parts_signature(stem, root)
 
 
 # ---- per-case content-addressable store (CAS) --------------------------------

@@ -9,7 +9,7 @@ import pytest
 
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.sweep import build_cases
-from pyrite.checkpoints import _checkpoint_io
+from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 from pyrite.checkpoints.slim import slim_checkpoint
 from pyrite.results import slim_results
 
@@ -90,6 +90,19 @@ def test_slim_checkpoint_roundtrip_preserves_requested_projection(tmp_path):
     assert set(reloaded) == set(res)
     assert "brem_wide" not in reloaded["t0.0"][25.0]
     assert reloaded["t0.0"][25.0]["spec"].dtype == np.float32
+
+
+def test_slim_checkpoint_reads_shards_only_directory(tmp_path):
+    res = _results()
+    for name, by_energy in res.items():
+        _checkpoint_store.save_part("hopg", tmp_path, name, by_energy)
+
+    out = tmp_path / "paused.slim.pkl"
+    slim_checkpoint(str(tmp_path / "hopg"), str(out), drop_wide_brem=True)
+
+    reloaded = _checkpoint_io.load(str(out))
+    assert set(reloaded) == set(res)
+    assert "brem_wide" not in reloaded["t0.0"][25.0]
 
 
 def test_slim_checkpoint_default_out_path(tmp_path):

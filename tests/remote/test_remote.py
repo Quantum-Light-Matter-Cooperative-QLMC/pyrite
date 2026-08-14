@@ -281,7 +281,7 @@ def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
     assert 'scan_launcher=("/home/aamador/.local/bin/uv" run --no-sync python)' in s
-    assert '"${scan_launcher[@]}" -m pyrite._entry.scan' in s
+    assert '"${scan_launcher[@]}" -u -m pyrite._entry.scan' in s
     assert "--quick" in s and "--workers 8" in s
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
@@ -3290,7 +3290,7 @@ def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
 def test_case_progress_shows_current_crystal_parameters_for_running_material():
     records = remote._parse_progress_records(
         '{"material":"hopg","total_cases":5,"cached_cases":1,'
-        '"completed_new_cases":2,"state":"running",'
+        '"completed_new_cases":2,"state":"running","activity":"computing",'
         '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
     )
 

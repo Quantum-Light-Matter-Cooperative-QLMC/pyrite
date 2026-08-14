@@ -146,29 +146,14 @@ def _checkpoint_exists(checkpoint_path):
     path = Path(checkpoint_path)
     if path.suffix == ".pkl":
         return path.is_file()
-    return (
-        (path / "line.pkl").is_file()
-        or path.with_suffix(".pkl").is_file()
-        or _checkpoint_store.has_parts(path.name, path.parent)
-    )
+    return _checkpoint_store.checkpoint_exists(path.name, path.parent)
 
 
 def _checkpoint_load(checkpoint_path):
     path = Path(checkpoint_path)
     if path.suffix == ".pkl":
         return _checkpoint_io.load(str(path))
-    if (path / "line.pkl").is_file():
-        base = _checkpoint_store.load(path.name, path.parent)
-    elif path.with_suffix(".pkl").is_file():
-        base = _checkpoint_io.load(str(path.with_suffix(".pkl")))
-    else:
-        base = {}
-    # Unconsolidated crash-safety shards (a sweep interrupted before its final
-    # consolidation) hold the newest per-config records; union them over any
-    # stale monolith, per (name, E0).
-    for name, by_energy in _checkpoint_store.load_parts(path.name, path.parent).items():
-        base.setdefault(name, {}).update(by_energy)
-    return base
+    return _checkpoint_store.load(path.name, path.parent)
 
 
 def _checkpoint_components_save(checkpoint_path, results, *, components=("line", "brem")):
@@ -185,12 +170,7 @@ def _checkpoint_signature(checkpoint_path):
     if path.suffix == ".pkl":
         stat = path.stat()
         return ((str(path.resolve()), stat.st_mtime_ns, stat.st_size),)
-    if not (path / "line.pkl").is_file() and path.with_suffix(".pkl").is_file():
-        legacy = path.with_suffix(".pkl")
-        stat = legacy.stat()
-        return ((str(legacy.resolve()), stat.st_mtime_ns, stat.st_size),)
-    sig = _checkpoint_store.signature(path.name, path.parent)
-    return sig or _checkpoint_store.parts_signature(path.name, path.parent)
+    return _checkpoint_store.signature(path.name, path.parent)
 
 
 @functools.lru_cache(maxsize=4)
@@ -306,10 +286,13 @@ def _manifest_for(results, dataset_identity=None):
     }
     energies = sorted(float(e) for e in sweep_json.get("E0_keV", []))
     manifest = {
+        # v2 readers ignore additive fields; keep the public schema label while
+        # completed_case_set carries its own independently versioned schema.
         "schema": "cxr.checkpoint-manifest.v2",
         "energies_keV": energies,
         "n_records": len(records(results)),
         "sweep": sweep_json,
+        "completed_case_set": _case_set_proof_from_results(results),
     }
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
@@ -318,6 +301,27 @@ def _manifest_for(results, dataset_identity=None):
         manifest["identity_version"] = identity["identity_version"]
         manifest["dataset_identity"] = identity
     return manifest
+
+
+def _case_set_proof(keys):
+    """Compact exact proof for a set of checkpoint record identities."""
+    canonical = sorted((str(name), float(energy).hex()) for name, energy in keys)
+    payload = json.dumps(canonical, ensure_ascii=False, separators=(",", ":")).encode()
+    return {
+        "schema": "cxr.completed-case-set.v1",
+        "count": len(canonical),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
+def _case_set_proof_from_results(results):
+    return _case_set_proof(
+        (name, energy) for name, by_energy in results.items() for energy in by_energy
+    )
+
+
+def _case_set_proof_from_cases(cases):
+    return _case_set_proof((case["name"], case["E0_keV"]) for case in cases)
 
 
 def _manifest_save(checkpoint_path, results, dataset_identity=None):
@@ -472,6 +476,7 @@ def run_sweep(
     on_timing=None,
     on_activity=None,
     max_seconds=None,
+    deadline=None,
     time_fn=None,
     dataset_identity=None,
     case_cost_fn=None,
@@ -480,6 +485,7 @@ def run_sweep(
     cache_read=True,
     cache_write=True,
     transport_only=False,
+    metadata_only_complete=False,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -564,6 +570,10 @@ def run_sweep(
     whatever finished before the deadline is persisted -- harmless and
     idempotent even when it turns out nothing new needed saving.
     """
+    if time_fn is None:
+        time_fn = time.monotonic
+    if deadline is None and max_seconds is not None:
+        deadline = time_fn() + max_seconds
     if group_key is None:
         group_key = _default_group_key
     if dataset_identity is not None:
@@ -621,7 +631,8 @@ def run_sweep(
         started = time.perf_counter()
         _save()
         if on_timing is not None:
-            on_timing({"checkpoint_seconds": time.perf_counter() - started})
+            elapsed = time.perf_counter() - started
+            on_timing({"checkpoint_seconds": elapsed, "consolidation_seconds": elapsed})
 
     def _save_part(name):
         """Persist one just-finished config as an immutable shard -- O(1) per
@@ -633,17 +644,28 @@ def run_sweep(
         _checkpoint_store.save_part(path.name, path.parent, name, results[name])
         _manifest_save(checkpoint_path, _material_subset(), dataset_identity)
         if on_timing is not None:
-            on_timing({"checkpoint_seconds": time.perf_counter() - started})
+            elapsed = time.perf_counter() - started
+            on_timing({"checkpoint_seconds": elapsed, "shard_write_seconds": elapsed})
 
     def _consolidate():
         """Fold shards into the authoritative ``{line,brem}.pkl`` monolith the
         rest of the toolchain expects, then drop the shard directory."""
-        _timed_save()
         path = Path(checkpoint_path)
+        if not _checkpoint_store.has_parts(path.name, path.parent):
+            return
+        if on_activity is not None:
+            on_activity({"phase": "saving", "case": None, "in_flight_case_count": 0})
+        print("checkpoint: saving completed material")
+        _timed_save()
         _checkpoint_store.clear_parts(path.name, path.parent)
 
     if resume and _checkpoint_exists(checkpoint_path):
+        if on_activity is not None:
+            on_activity({"phase": "loading", "case": None, "in_flight_case_count": 0})
+        print(f"checkpoint: loading {checkpoint_path}")
+        resume_started = time.perf_counter()
         manifest_path = _manifest_path_for(checkpoint_path)
+        path = Path(checkpoint_path)
         existing_identity = None
         if os.path.isfile(manifest_path):
             try:
@@ -669,7 +691,45 @@ def run_sweep(
                 f"{existing_identity.get('parameter_sha256', '')[:12]}; "
                 "archive or select a different variant before resuming"
             )
+        requested_proof = _case_set_proof_from_cases(cases)
+        signature = _checkpoint_signature(checkpoint_path)
+        manifest_fresh = bool(signature) and os.path.isfile(manifest_path) and (
+            os.stat(manifest_path).st_mtime_ns >= max(item[1] for item in signature)
+        )
+        if (
+            metadata_only_complete
+            and on_chunk is None
+            and not _checkpoint_store.has_parts(path.name, path.parent)
+            and manifest_fresh
+            and isinstance(existing_identity, dict)
+            and dataset_identity is not None
+            and existing_identity.get("parameter_sha256")
+            == dataset_identity.get("parameter_sha256")
+        ):
+            with open(manifest_path) as handle:
+                manifest = json.load(handle)
+            if manifest.get("completed_case_set") == requested_proof:
+                if on_timing is not None:
+                    on_timing({"resume_seconds": time.perf_counter() - resume_started})
+                if on_runtime is not None:
+                    on_runtime(runner.runtime_plan([], max_workers))
+                total_cost = (
+                    sum(case_cost_fn(case) for case in cases)
+                    if case_cost_fn is not None
+                    else None
+                )
+                if on_cost is not None and total_cost is not None:
+                    on_cost(total_cost, total_cost)
+                if on_progress is not None:
+                    on_progress(0, len(cases), len(cases))
+                if on_activity is not None:
+                    on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
+                print(f"0 of {len(cases)} cases to run ({len(cases)} cached; metadata proof)")
+                return True
         loaded = _checkpoint_load(checkpoint_path)
+        print(f"checkpoint: loaded in {time.perf_counter() - resume_started:.3f} s")
+        if on_timing is not None:
+            on_timing({"resume_seconds": time.perf_counter() - resume_started})
         results.update(loaded)
         print(
             f"resumed {sum(len(v) for v in loaded.values())} {material} cases from {checkpoint_path}"
@@ -827,9 +887,6 @@ def run_sweep(
             )
             on_chunk(group_names[g])
 
-    if time_fn is None:
-        time_fn = time.monotonic
-    deadline = None if max_seconds is None else time_fn() + max_seconds
     should_stop = None if deadline is None else (lambda: time_fn() >= deadline)
     profile_callbacks = {}
     if on_timing is not None:
@@ -851,11 +908,14 @@ def run_sweep(
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
     complete = all(c["name"] in results and c["E0_keV"] in results[c["name"]] for c in cases)
     if _sharded:
-        # Shards carry the live records; fold them into the monolith once, at the
-        # end -- whether the sweep finished or the budget cut it short.
-        _consolidate()
+        if complete:
+            # Completion publishes one authoritative component pair. Budget pauses
+            # retain immutable shards so the next slice does no full rewrite.
+            _consolidate()
     elif not complete:
         _timed_save()  # persist whatever finished before the budget ran out
+    if on_activity is not None:
+        on_activity({"phase": "handoff", "case": None, "in_flight_case_count": 0})
     return complete
 
 
