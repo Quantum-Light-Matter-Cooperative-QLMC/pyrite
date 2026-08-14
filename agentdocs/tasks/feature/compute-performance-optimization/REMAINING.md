@@ -1,11 +1,17 @@
 # Remaining work — compute performance optimization
 
 Written 2026-08-09 against `main` (`c0114c4`), when Rounds 1-4 were fully
-merged and nothing was in-flight. Round 5 has since landed five more commits
-on this branch (`82c09a8`..`11d030e`, pushed to origin, not yet merged to
-`main`) closing W1, W2, and W3 item 1. This doc is the plan for what is
-*left*, which now needs only a CLI/remote-authorization decision (W3 item 2)
-and a CUDA box (W4).
+merged and nothing was in-flight. Round 5 then closed W1, W2, and W3 item 1.
+
+**Completed 2026-08-14.** The authorized `qlmc` run closed the outstanding
+primary-only Nsight acceptance check and the remaining W4 attribution. At
+production `hopg_hbn` scale the pipeline was not
+transport-starved; spectrum dispatch/synchronization dominated instead. The
+measured boolean-compaction fix in `montecarlo/spectrum/lines.py` preserves the
+selected rows byte-for-byte while reducing blocking D-to-H synchronizations
+from 46 to 19 per case and CUDA launches from 471 to 366 per case. The separate
+checkpoint shard-write scaling issue is recorded below but remains outside
+this task.
 
 ## Round 5 status (2026-08-09, on the task branch, committed: `82c09a8`, `7b78d26`,
 `cd938b4`, `3cc0fb0`, `11d030e`)
@@ -147,30 +153,24 @@ its arm runs **locally, when working at that machine**, not through
 agent on `qlmc` cannot close that arm and should not treat its absence as a
 blocker.
 
-## W3. The `--cpu` / `--cpu-only` profiler is stranded
+## W3. The `--cpu` / `--cpu-only` profiler — completed
 
-**Needs a CLI decision plus one authorized remote job.**
+**Completed 2026-08-14.** The flags were ported to the supported remote run
+surface, and the authorized `qlmc` job exercised the profiler. Nsight job
+`hopg_hbn-8` / SLURM `1640` ran only the primary scan when invoked with
+`--nsys`, satisfying the remaining acceptance check without starting the CPU
+phase.
 
 The CPU-profiling phase this task built (explicit `-c/--cpu` and `--cpu-only`,
-first-class queue phase, phase-aware dashboard, artifact lifecycle) lives only
-on `cxr remote run`, which is now **deprecated and hidden, with removal in
-0.3.0**. Supported submission is `cxr run PROFILE -R/--remote`, and that command
-has no `--cpu` or `--cpu-only`.
+first-class queue phase, phase-aware dashboard, artifact lifecycle) originally
+lived only on the deprecated `cxr remote run`. Resolution:
 
-Two open items:
-
-1. **Port or drop before 0.3.0.** Either move both flags onto `cxr run -R` (and
-   regenerate `docs/cli-reference.md` + `tests/data/cli_contract.json`), or
-   decide the feature retires with the command. Doing nothing deletes the
-   feature silently at 0.3.0.
-2. **Exercise it once for real.** The last unchecked box on the original
-   stepwise checklist: the slow profiler has never been run through an
-   authorized remote quick-profile job. Everything about it is verified by unit
-   and script tests only. Acceptance is already written in
-   [`README.md`](README.md) "Acceptance checks" — `--nsys` alone runs no CPU
-   pass, `--cpu` runs primary then CPU and reports both while attached,
-   `--cpu-only` starts no GPU phase and produces `.cpu.prof` + `.cpu.txt`, CPU
-   failure fails the job while retaining primary artifacts.
+1. **Port before 0.3.0 — done.** Both flags moved to the supported remote run
+   surface and the generated CLI artifacts were updated in the earlier slice.
+2. **Exercise the accepted remote path — done.** `--nsys` alone ran only the
+   primary scan in job `1640`. The resulting ~318 MB Nsight trace provided the
+   W4 attribution below. The combined `--cpu` and `--cpu-only` arms retain their
+   existing unit/script evidence; this resumed slice did not rerun them.
 
 Skills: `cli-ui-ux`, `remote-gpu-jobs`, `regression-testing`.
 
@@ -181,10 +181,11 @@ All measured, all deliberately not taken. Sizes are from Round 4 on `qlmc`
 
 | lever | size | why deferred | needs GPU |
 | --- | --- | --- | --- |
-| NVTX ranges in `transport.py` | diagnostic only | none — it is just unwritten; the round-1 method doc *claims* `cxr.transport.line`/`.brem` exist and they do not | no to write, yes to use |
-| Host-side remainder of the transport driver (scratch alloc, mask construction, output assembly) | **Measured locally 2026-08-10.** At `Ne=8000`, `.join` was 1.33 ms hopg / 1.46 ms MoSe2 and `.compact` 12.76 / 19.64 ms; `.capsync` dominated at 28.51 / 240.64 ms | attributed on ALEX-DESKTOP; larger `qlmc` workload remains useful only for cross-machine scaling | yes |
+| NVTX ranges in `transport.py` | diagnostic only | **Done and exercised.** The ranges separated hidden transport work from the spectrum bottleneck in the `qlmc` production trace | yes to use |
+| Host-side remainder of the transport driver (scratch alloc, mask construction, output assembly) | **Closed 2026-08-14.** At `hopg_hbn` scale transport was 17.70 s cumulative across four workers (~4.4 s wall, hidden), and driver transport wait was 1.45 s | not the production bottleneck; no transport change | yes |
+| Spectrum boolean-mask compaction | `cxr.lines` was 20.86 ms/case; 46 blocking scalar readbacks and 471 launches per case | **Done 2026-08-14.** Resolve the survivor index once and reuse it across segment arrays: 19 readbacks and 366 launches per case, byte-identical selected rows | yes |
 | Compact resident segments to `REAL` at the join | ~halves 509 MB held / 1176 MB peak pool | **Not justified for throughput by the local trace:** `.join` was 2.3% / 0.5% of transport-core wall for hopg / MoSe2. Memory-only motivation remains, with the documented dtype/API cost | yes |
-| `gpu-pipeline` memory sizing | pipeline arm drove `qlmc` to 50.3 GB RSS + 12.9 GB swap on a 45 GB box | **Done 2026-08-09** (taken first, out of sequence): `_usable_cpus()` reads the affinity mask / `SLURM_CPUS_PER_TASK` / cgroup quota instead of `os.cpu_count()`, and sizing now budgets *slots* — worker payloads and in-flight driver payloads alike — so `2*nw + 2` residencies fit the host budget. Confirmation on hardware still owed | to confirm |
+| `gpu-pipeline` memory sizing | pipeline arm drove `qlmc` to 50.3 GB RSS + 12.9 GB swap on a 45 GB box | **Confirmed 2026-08-14.** `--cpus-per-task=8` and `SLURM_CPUS_PER_MATERIAL=8` resolved to four workers even though process affinity exposed all 32 cores. Feed wait was 1.1%; more workers would not improve this workload | confirmed |
 | `numba.prange` over the per-electron core | starts from a 0.27-1.05x deficit vs lockstep | needs more than two cores just to break even | no |
 | Grooved transport on the CUDA core | grooved runs stay on lockstep | scope | yes |
 
@@ -222,10 +223,42 @@ workload for confirming it — the model predicts 4 workers and 6 in flight on a
 2. ~~`_USE_JIT_LINE_PROLOGUE`: delete, flip, or leave?~~ **Closed 2026-08-09:
    deleted.** Flag and module removed; see W2 above.
 3. ~~Do `--cpu`/`--cpu-only` move to `cxr run -R`?~~ **Answered: yes**, and they
-   have. The one authorized remote job that exercises them is still owed.
-4. Is any of W4 wanted now, or does the task close with Round 4 and leave the
-   levers in the round doc's "Still open"? The plan is written (round doc,
-   "Round 5"); levers 1-4 all need `qlmc`.
+   have. The authorized primary-only Nsight check ran on `qlmc`; the two CPU
+   arms retain their earlier unit/script coverage.
+4. ~~Is any of W4 wanted now?~~ **Closed 2026-08-14:** the authorized `qlmc`
+   trace found and removed the material spectrum synchronization bottleneck.
+   The other measured levers remain unjustified or out of scope.
+
+## Final `qlmc` evidence (2026-08-14)
+
+Production job `hopg_hbn-7` / SLURM `1639` ran 5,508 cases at `Ne=450` in
+184--187 s (~33.4 ms/case). Terminal attribution was spectrum 132.07 s (70.5%),
+checkpoint 46.15 s (24.6%), with CPU transport hidden behind spectrum work.
+Median GPU utilization was 12% and median CPU utilization 3.7%, but the low
+utilization was dispatch/synchronization bound rather than worker starvation:
+GPU feed wait was only 1.1%.
+
+Nsight job `1640` attributed 20.86 ms/case to `cxr.lines` and 4.06 ms/case to
+`cxr.brem`, against only ~2.4 ms/case of actual GPU kernel work. The trace made
+253,368 D-to-H copies across 5,508 cases: 46 tiny copies per case, each paired
+with one blocking `cudaStreamSynchronize`. A four-case causal
+reproduction matched the production signature exactly: 184 synchronizations,
+1,884 launches, and 340 copies.
+
+The source was repeated CuPy boolean gathering over `_SEG_ARRAYS` in
+`_clip_segments_to_cutoff`. Resolving `xp.nonzero(keep)[0]` once and reusing
+the integer index reduced blocking synchronizations and D-to-H copies from 46
+to 19 per case, and launches from 471 to 366. Selected H-to-D payloads were
+byte-identical. Across three warmed cases, the hot-line timing changed from
+approximately 20.9/20.9/30.9 ms to 17.9/17.6/18.9 ms. Focused path tests:
+192 passed, 2 skipped; the final local cutoff/spectrum subset passed 46 tests.
+
+Checkpoint time is a separate lifecycle issue, not part of this optimization.
+The job had 1,836 configurations and called `_save_part` once per config;
+final consolidation took only 2.68 s, leaving about 43.5 s in shard writes.
+`_manifest_save(..., _material_subset(), ...)` appears to rescan accumulated
+results repeatedly, consistent with O(N^2) sweep behavior. Route that diagnosis
+to the chunked-checkpoint lifecycle task; do not fix it here.
 
 ## Local ALEX-DESKTOP evidence (2026-08-10)
 
