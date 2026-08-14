@@ -127,9 +127,9 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
       the four new objects each field lands on, and whether it enters dataset
       identity. This is the decision document; nothing else starts before it.
       See [slice-a-field-disposition.md](slice-a-field-disposition.md).
-- [ ] B — Land `Scene`, `Numerics`, `Analysis` alongside the existing classes.
+- [x] B — Land `Scene`, `Numerics`, `Analysis` alongside the existing classes.
       No removals yet.
-- [ ] C — Dotted-path axis resolution, including indexed segments
+- [x] C — Dotted-path axis resolution, including indexed segments
       (`target.layers[1].thickness_ang`), with the case-naming rule derived
       mechanically from path + value.
 - [ ] D — `Sweep.from_legacy(old_sweep, settings)` plus deprecated shims for the
@@ -137,7 +137,7 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
 - [ ] E — Equivalence: every existing catalog profile round-trips to an
       identical expanded case list, and the resolution order (catalog profile →
       per-material override → explicit argument) is unchanged.
-- [ ] F — Demonstrate at least one previously unreachable axis. Per-layer
+- [x] F — Demonstrate at least one previously unreachable axis. Per-layer
       thickness is the suggested target.
 - [ ] G — Public `pr.simulate` + `Result` with `spectrum` and `provenance`. No
       filesystem writes on the single-shot path.
