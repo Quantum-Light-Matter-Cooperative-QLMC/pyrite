@@ -62,9 +62,12 @@ as result payload, control-plane state, or incidental.
 
 ## Checklist
 
-- [ ] A — Classify every current pickle use. Only *result array payloads* are in
+- [x] A — Classify every current pickle use. Only *result array payloads* are in
       scope; control-plane state (job records, remote lifecycle) is a separate
       question and should be listed, not converted.
+      Evidence: [`pickle-inventory.md`](pickle-inventory.md) — 15 modules
+      classified; 4 payload, 2 control-plane, 9 incidental; all persistence
+      funnels through `_checkpoint_io`.
 - [ ] B — Add `h5py` and `mcpl` as required dependencies; write the
       result-format ADR recording the HDF5 decision and its reasoning.
 - [ ] C — Write the versioned schema document under `docs/repo-design/storage/`,
@@ -95,8 +98,17 @@ as result payload, control-plane state, or incidental.
   for an extra to hedge against, and a conditionally available escape hatch
   would weaken the arbitrary-geometry non-goal it is supposed to justify.
   Do not split it into `mcpl-python` alone to save a wheel.
-- **Open:** do checkpoints currently store any Python object that has no natural
-  array encoding? Slice A must find these before slice D commits to a schema.
+- **Resolved (slice A):** no checkpoint stores a Python object without a natural
+  array encoding. Every leaf is an ndarray, a scalar, a string, `None`, or a
+  container of those. Four shapes need an explicit schema *rule* rather than a
+  natural mapping — `None`-valued array slots, absent-vs-null keys
+  (`spec_coherent`), tuple-vs-list sequence kind, and non-string mapping keys
+  (`E0_keV` is a float). See [`pickle-inventory.md`](pickle-inventory.md).
+- **Decided (slice A): on-disk filenames stay `.pkl`.** 136 literal `.pkl`
+  references across 22 modules encode the CAS and component layout this task
+  holds fixed. `_checkpoint_io.load` already dispatches on magic bytes across
+  three generations; HDF5 is the fourth read by the same sniff. The extension is
+  a path token, not a format claim.
 - **Open:** MCPL carries particle type, position, direction, energy, time,
   weight, and polarization. Confirm PyRITE's emitted-photon record maps onto
   that without loss, and document any field that does not survive the round
