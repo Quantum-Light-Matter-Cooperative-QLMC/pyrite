@@ -74,12 +74,20 @@ Built at `montecarlo/runner/__init__.py:1138`. Same array keys as above plus
 triples; `value` is whatever `analyze()` returned. Derived, disposable, and
 regenerated on any mismatch.
 
+### 4. Validation reproduction cache
+
+`apps/anchor_figures.py` also uses the shared codec. Supplementary-spectrum
+payloads historically keyed one mapping by frozen `SupplementaryCondition`
+dataclass instances. New writes lower those keys to the natural scalar tuple
+`(energy_keV, polar_tilt_deg, azimuth_deg)`; the cache owner restores the
+dataclass on read and continues to accept legacy pickled dataclass keys.
+
 ## Resolution of the task doc's first open question
 
 > Do checkpoints currently store any Python object that has no natural array
 > encoding?
 
-**No blocking case.** Every leaf is an ndarray, a Python/NumPy scalar, a string,
+**No blocking case after owner-level lowering.** Every schema leaf is an ndarray, a Python/NumPy scalar, a string,
 `None`, or a container (`dict`, `list`, `tuple`) of those. Four shapes need an
 explicit schema rule rather than a natural HDF5 mapping:
 
@@ -98,10 +106,10 @@ explicit schema rule rather than a natural HDF5 mapping:
    float keys need a lossless round-trip (repr-based, plus a stored key-kind
    tag).
 
-No callable, no live handle, no class instance with custom `__reduce__` appears
-in any persisted payload. The one class instance that *is* pickled anywhere —
-`campaign.sweep.Sweep` in `package_smoke.py` — is a test fixture, not stored
-state.
+No callable or live handle appears in a result payload. The validation cache's
+frozen condition dataclass is lowered as described above. The other class
+instance pickled anywhere — `campaign.sweep.Sweep` in `package_smoke.py` — is a
+test fixture, not stored state.
 
 ## Consequence for naming
 

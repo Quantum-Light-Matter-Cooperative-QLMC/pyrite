@@ -697,6 +697,34 @@ def _cache_payload(record: object, *, kind: str, detector: DetectorSpec) -> obje
     return record.get("payload")
 
 
+def _encode_supplementary_spectra(
+    spectra: dict[SupplementaryCondition, np.ndarray],
+) -> dict[tuple[float, float, float | None], np.ndarray]:
+    """Lower dataclass keys to schema-native scalar tuples for persistence."""
+    return {
+        (condition.energy_keV, condition.polar_tilt_deg, condition.azimuth_deg): spectrum
+        for condition, spectrum in spectra.items()
+    }
+
+
+def _decode_supplementary_spectra(
+    payload: object,
+) -> dict[SupplementaryCondition, np.ndarray]:
+    """Restore current tuple keys or legacy pickled dataclass keys."""
+    if not isinstance(payload, dict):
+        raise ValueError("invalid supplementary cache payload")
+    spectra: dict[SupplementaryCondition, np.ndarray] = {}
+    for key, spectrum in payload.items():
+        if isinstance(key, SupplementaryCondition):
+            condition = key
+        elif isinstance(key, tuple) and len(key) == 3:
+            condition = SupplementaryCondition(key[0], key[1], key[2])
+        else:
+            raise ValueError("invalid supplementary cache condition key")
+        spectra[condition] = np.asarray(spectrum)
+    return spectra
+
+
 def cached_model_spectra(
     anchor: ZhaiAnchor,
     ne: int = 500,
@@ -899,7 +927,7 @@ def cached_coherent_spectra(
             detector=study.detector,
         )
         if cached is not None:
-            return cached, True, path
+            return _decode_supplementary_spectra(cached), True, path
     if cache_only:
         raise ZhaiCacheMiss(path)
 
@@ -910,7 +938,11 @@ def cached_coherent_spectra(
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
         _checkpoint_io.dump(
-            _cache_record(f"supplementary:{study.crystal}", study.detector, spectra),
+            _cache_record(
+                f"supplementary:{study.crystal}",
+                study.detector,
+                _encode_supplementary_spectra(spectra),
+            ),
             str(tmp),
         )
         os.replace(tmp, path)
