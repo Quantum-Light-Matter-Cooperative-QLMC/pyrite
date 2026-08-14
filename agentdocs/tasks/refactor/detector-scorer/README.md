@@ -82,9 +82,13 @@ Likely owners:
 
 ## Checklist
 
-- [ ] A — Audit each inert `DetectorSpec` field: which response model would
+- [x] A — Audit each inert `DetectorSpec` field: which response model would
       consume it, or is it dead? Produce a keep/live/delete disposition per
       field before writing the new class.
+      Evidence: [slice-a-field-audit.md](slice-a-field-audit.md) — 5 of the 6
+      inert fields are deleted; `sensor_thickness_um` becomes live as
+      `Timepix3(thickness_um=)`. No shipped TOML sets any of the six, so no
+      `parameter_sha256` moves.
 - [ ] B — Land `Detector` as a superset of `DetectorSpec`, with `DetectorSpec`
       retained as a deprecated alias under the D7 harness.
 - [ ] C — Move `energy_bins` onto `Detector`; keep line and brem binnings as two
@@ -105,13 +109,23 @@ Likely owners:
   step and must not be smuggled in.
 - **Decided:** `energy_grid/` stays; only its user-facing prominence changes,
   and that change belongs to the CLI task.
-- **Open:** does an inert field with a plausible future consumer get kept or
-  deleted? Default to delete — it can be re-added live. Slice A must justify
-  every survivor.
-- **Open:** where response application lands. `store_result` applies it today,
-  which means the stored record is already detector-convolved in some paths and
-  not others. Slice D must first establish which stored arrays are intrinsic
-  and which are detected; this is a prerequisite fact, not a design choice.
+- **Resolved (slice A):** no field survives on a *plausible* future consumer.
+  `sensor_thickness_um` survives only because it has an actual one today
+  (`TimepixResponse(thickness_um=)`), and it survives by moving to the response
+  object, not by staying inert. The other five are deleted. Deleting them
+  perturbs no digest: the identity payload re-attaches only non-`None` detector
+  fields (`profiles.py:298-303`) and no shipped TOML sets any of the six. See
+  [slice-a-field-audit.md](slice-a-field-audit.md).
+- **Resolved (slice D prerequisite):** the premise below was wrong.
+  `store_result` never convolves. **Every stored array is intrinsic**; the
+  detector enters the stored record only as two scalars, `fwhm` and `scale`.
+  The transform is applied entirely at read time, by two families that never
+  meet: the legacy analytic EDS window (`detected_background`,
+  `_detected_background_wide`, `_line_brem`, plus open-coded repeats) and the
+  real forward models (`TimepixResponse` / `EagleResponse`, plotting layer
+  only). Slice D is therefore a read-time unification and does not touch the
+  write path at all. See
+  [slice-d-intrinsic-vs-detected.md](slice-d-intrinsic-vs-detected.md).
 - **Open:** the catalog carries per-material grid entries. If `energy_bins` is a
   detector field, catalog resolution has to supply it — confirm this against
   the documented resolution order (profile → per-material override → explicit
