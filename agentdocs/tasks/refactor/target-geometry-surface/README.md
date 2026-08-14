@@ -7,6 +7,12 @@ Change 4 and the arbitrary-geometry entry in
 Depends on: nothing. Blocks: `refactor/detector-scorer`,
 `refactor/scene-object-model`.
 
+**Status: A–G complete, awaiting review.** All acceptance checks pass
+(`test` 3105 passed / 61 skipped, `verify`, `docs`, `lint`, `typecheck`), and
+slice E proves byte-identical case expansion against the merge-base. One item is
+deliberately deferred off-branch: rewording the `TODO.md` "Complex geometry and
+interoperability" bullet on `main` to cite ADR-0008 (see slice F).
+
 ## Problem and scope
 
 This task is about **how geometry is expressed**, not about supporting new
