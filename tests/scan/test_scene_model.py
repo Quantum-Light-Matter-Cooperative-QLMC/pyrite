@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import pickle
+
 import numpy as np
 import pytest
 
+from pyrite.api import build_sweep_cases
+from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.geometry import Layer, Slab, Stack
 from pyrite.campaign.legacy import analysis_from_legacy, numerics_from_legacy
 from pyrite.campaign.model import Analysis, Convergence, Numerics, Scene, Sweep
 from pyrite.campaign.sweep import BeamSpec
+from pyrite.campaign.sweep import build_cases as build_legacy_cases
 from pyrite.detectors import Detector
+from pyrite.materials import CATALOG
 from pyrite.results import Settings
 
 
@@ -20,6 +26,10 @@ def _scene() -> Scene:
         ),
         detector=Detector(),
     )
+
+
+def _case_bytes(cases) -> list[bytes]:
+    return [pickle.dumps(case.to_dict(), protocol=5) for case in cases]
 
 
 def test_scene_rejects_implicit_sweep_values() -> None:
@@ -90,3 +100,46 @@ def test_legacy_pair_distributes_settings_and_swept_scene_fields() -> None:
     assert sweep.base.emission == "both"
     assert numerics_from_legacy(old, settings).n_electrons == 12
     assert analysis_from_legacy(settings).beam_current_na == settings.beam_current_na
+
+
+def test_legacy_bridge_preserves_expanded_cases_exactly() -> None:
+    from pyrite.campaign.sweep import Sweep as LegacySweep
+
+    old = LegacySweep(
+        material="hopg",
+        beam=BeamSpec(energy_keV=[30.0, 60.0]),
+        thickness_ang=[1_000.0, 2_000.0],
+        tilt_deg=[20.0, 30.0],
+        n_electrons=[2, 3],
+    )
+    settings = Settings(n_electrons=12, n_electrons_brem=6, emission="both")
+
+    with pytest.warns(DeprecationWarning):
+        converted = Sweep.from_legacy(old, settings)
+
+    expected = build_legacy_cases(
+        old,
+        settings.n_electrons,
+        settings.n_electrons_brem,
+        coherent_emission=settings.coherent_emission,
+        xray_dispersion=settings.xray_dispersion,
+    )
+    assert _case_bytes(build_sweep_cases(converted)) == _case_bytes(expected)
+
+
+def test_every_catalog_profile_round_trips_a_resolved_case_list() -> None:
+    settings = default_settings("survey")
+    for profile in CATALOG.profile_names:
+        members = CATALOG.profile_materials(profile)
+        material = members[0] if members else "hopg"
+        old = material_sweep(material, fidelity="survey", catalog_profile=profile)
+        with pytest.warns(DeprecationWarning):
+            converted = Sweep.from_legacy(old, settings)
+        expected = build_legacy_cases(
+            old,
+            settings.n_electrons,
+            settings.n_electrons_brem,
+            coherent_emission=settings.coherent_emission,
+            xray_dispersion=settings.xray_dispersion,
+        )
+        assert _case_bytes(build_sweep_cases(converted)) == _case_bytes(expected), profile

@@ -204,6 +204,9 @@ class Sweep:
 
     base: Scene
     axes: Mapping[str, Sequence[Any]] = field(default_factory=dict)
+    _legacy_source: tuple[Any, Any] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if not isinstance(self.base, Scene):
@@ -246,7 +249,9 @@ class Sweep:
             DeprecationWarning,
             stacklevel=2,
         )
-        return sweep_from_legacy(old_sweep, settings)
+        converted = sweep_from_legacy(old_sweep, settings)
+        object.__setattr__(converted, "_legacy_source", (old_sweep, settings))
+        return converted
 
 
 __all__ = ["Analysis", "Convergence", "Numerics", "Scene", "Sweep"]

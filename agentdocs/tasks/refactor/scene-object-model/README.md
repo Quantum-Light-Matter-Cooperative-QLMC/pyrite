@@ -134,7 +134,7 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
       mechanically from path + value.
 - [ ] D — `Sweep.from_legacy(old_sweep, settings)` plus deprecated shims for the
       old classes through one D7 support window.
-- [ ] E — Equivalence: every existing catalog profile round-trips to an
+- [x] E — Equivalence: every existing catalog profile round-trips to an
       identical expanded case list, and the resolution order (catalog profile →
       per-material override → explicit argument) is unchanged.
 - [x] F — Demonstrate at least one previously unreachable axis. Per-layer
