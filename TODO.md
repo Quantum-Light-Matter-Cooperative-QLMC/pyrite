@@ -42,6 +42,20 @@ file. Edit and drop items on `main`.
    scientific content and generated summaries. →
    `docs/readable-physics-validation-ledger`;
    [`agentdocs/tasks/docs/readable-physics-validation-ledger/`](agentdocs/tasks/docs/readable-physics-validation-ledger/).
+4. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
+   evidence: `qlmc` job `1638` (`hopg_hbn`) computed 5508 hopg cases in 195 s and
+   5508 h-BN cases in 206 s — ~35-37 ms/case — while the box held ~5% CPU and
+   10-15% GPU utilization with no burstiness, so the case loop is bound by
+   neither CPU nor GPU. Checkpoint I/O is no longer the suspect: after the
+   record-table encoding (`543394b`) that job saved 5508 records per material in
+   ~11 s and ~6 s, against the 152 s version-1 decodes that returned zero work in
+   jobs `1635`/`1636` and were SIGTERM-killed in `1637`. Remaining work is what
+   W3 item 2 and W4 already scoped and gated on a CUDA box: one authorized remote
+   job exercising the ported `pyrite run -R --cpu`/`--cpu-only` profiler, NVTX
+   ranges in `transport.py`, and attribution of the host-side transport remainder
+   (`.capsync` was 28.5 ms of a 64.3 ms local hopg case). →
+   `feature/compute-performance-optimization`;
+   [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
 
 ## P1 - top-priority back burner
 
