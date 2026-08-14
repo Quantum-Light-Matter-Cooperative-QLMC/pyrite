@@ -551,3 +551,145 @@ class Stack(_TargetGeometry):
 
 Target = Slab | Stack
 """The closed target variant set. Not an extension point -- see the module docstring."""
+
+
+class _UnsetType:
+    """Sentinel for a flat geometry input that was not supplied at all.
+
+    ``None`` cannot serve: ``crystal_width_mm=None`` is the explicit infinite
+    slab, a different statement from "did not mention the footprint".
+    """
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+    def __bool__(self) -> bool:
+        return False
+
+
+UNSET = _UnsetType()
+
+
+def target_from_flat(
+    material: str,
+    *,
+    thickness_ang: ScalarOrSeq = 2e4,
+    tilt_deg: ScalarOrSeq = 30.0,
+    tilt_azim_deg: ScalarOrSeq = 0.0,
+    crystal_width_mm: ScalarOrSeq | None = 5.0,
+    crystal_height_mm: ScalarOrSeq | None = 5.0,
+    groove_spacing_ang: float | None = None,
+    substrate: str | None = None,
+    substrate_thickness_ang: float = 5e6,
+    stack: Sequence[LayerSpec] | None = None,
+    allow_normal_incidence: bool = False,
+) -> Target:
+    """Build the target described by the legacy flat geometry inputs.
+
+    The defaults are the historical :class:`pyrite.campaign.sweep.Sweep` field
+    defaults, so a flat construction that named nothing lowers exactly as it did.
+    Every geometry RULE is owned by the target objects; the three checks here
+    exist solely because the flat inputs are separate keys -- footprint pairing
+    (unrepresentable once both dimensions sit on one :class:`Footprint`), the
+    substrate/stack exclusion, and grooves-forbid-a-stack (a type constraint once
+    ``entrance_face`` is reachable only through :class:`Slab`).
+    """
+    footprint = None
+    if crystal_width_mm is not None or crystal_height_mm is not None:
+        if crystal_width_mm is None or crystal_height_mm is None:
+            raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
+        footprint = Footprint(crystal_width_mm, crystal_height_mm)
+
+    # normalize the substrate sugar onto the general stack (mutually exclusive)
+    if substrate is not None:
+        if stack is not None:
+            raise ValueError("give either substrate= or stack=, not both")
+        stack = (LayerSpec(substrate, substrate_thickness_ang),)
+
+    if stack is not None:
+        if groove_spacing_ang is not None:
+            raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
+        return Stack(
+            layers=(
+                Layer(material, thickness_ang),
+                *(
+                    Layer(lay.material, lay.thickness_ang, lay.beam_uvw, lay.azimuth_deg)
+                    for lay in stack
+                ),
+            ),
+            tilt_deg=tilt_deg,
+            tilt_azim_deg=tilt_azim_deg,
+            footprint=footprint,
+            allow_normal_incidence=allow_normal_incidence,
+        )
+    return Slab(
+        material,
+        thickness_ang=thickness_ang,
+        tilt_deg=tilt_deg,
+        tilt_azim_deg=tilt_azim_deg,
+        footprint=footprint,
+        entrance_face=(None if groove_spacing_ang is None else BlazedGrooves(groove_spacing_ang)),
+        allow_normal_incidence=allow_normal_incidence,
+    )
+
+
+def target_flat_fields(target: Target) -> dict[str, Any]:
+    """The flat geometry inputs that rebuild ``target`` through
+    :func:`target_from_flat`.
+
+    Exactly one default-oriented layer beneath the film inverts to the
+    ``substrate=`` sugar rather than the general ``stack=`` spelling, because
+    that IS its definition -- ``substrate="x"`` means
+    ``stack=(LayerSpec("x", substrate_thickness_ang),)``. Keeping the sugar makes
+    the projection lossless in both directions and lets the legacy identity
+    payload keep the spelling it has always hashed.
+    """
+    footprint = target.footprint
+    face = target._entrance_face()
+    below = target._below_film()
+    substrate = None
+    substrate_thickness_ang = 5e6
+    stack: tuple[LayerSpec, ...] | None = None if below is None else tuple(below)
+    if stack is not None and len(stack) == 1 and stack[0].beam_uvw is None:
+        only = stack[0]
+        if float(only.azimuth_deg) == 0.0:
+            substrate = only.material
+            substrate_thickness_ang = float(only.thickness_ang)
+            stack = None
+    return {
+        "material": target.material,
+        "thickness_ang": target._film_thickness(),
+        "tilt_deg": target.tilt_deg,
+        "tilt_azim_deg": target.tilt_azim_deg,
+        "crystal_width_mm": None if footprint is None else footprint.width_mm,
+        "crystal_height_mm": None if footprint is None else footprint.height_mm,
+        "groove_spacing_ang": None if face is None else face.spacing_ang,
+        "substrate": substrate,
+        "substrate_thickness_ang": substrate_thickness_ang,
+        "stack": stack,
+        "allow_normal_incidence": target.allow_normal_incidence,
+    }
+
+
+def target_replace(target: Target, **changes: Any) -> Target:
+    """``target`` with flat geometry overrides applied, rebuilt and revalidated.
+
+    Overrides are flat because that is the vocabulary the CLI, catalog profiles
+    and the sweep override path already speak. A rebuild rather than a field
+    replace is required: ``substrate=`` / ``stack=`` change which variant the
+    target IS, and a footprint dimension has to merge with the one it keeps.
+    """
+    flat = target_flat_fields(target)
+    unknown = sorted(set(changes) - set(flat))
+    if unknown:
+        raise TypeError(f"target_replace: unknown geometry override(s): {', '.join(unknown)}")
+    if "substrate" in changes or "stack" in changes:
+        # The pair states the layers beneath the film as a whole; keeping the
+        # inherited stack would make substrate=None a no-op instead of a clear.
+        flat["substrate"] = None
+        flat["stack"] = None
+        flat["substrate_thickness_ang"] = 5e6
+    elif "substrate_thickness_ang" in changes and flat["substrate"] is None:
+        raise ValueError("substrate_thickness_ang override requires substrate=")
+    flat.update(changes)
+    return target_from_flat(**flat)

@@ -19,7 +19,7 @@ from pyrite.campaign.profiles import (
     named_profile_stem,
     variant_stem,
 )
-from pyrite.campaign.sweep import build_cases
+from pyrite.campaign.sweep import build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import DetectorSpec
 
@@ -132,9 +132,10 @@ def test_survey_profile_reduces_every_expensive_sweep_dimension():
     assert settings.n_electrons == 60
     assert settings.n_electrons_brem == 30
     assert len(np.atleast_1d(survey.beam.energy_keV)) <= 2
-    assert len(np.atleast_1d(survey.thickness_ang)) <= 3
-    assert len(np.atleast_1d(survey.tilt_deg)) <= 5
-    assert len(np.atleast_1d(survey.tilt_azim_deg)) <= 2
+    survey_geometry = target_flat_fields(survey.target)
+    assert len(np.atleast_1d(survey_geometry["thickness_ang"])) <= 3
+    assert len(np.atleast_1d(survey_geometry["tilt_deg"])) <= 5
+    assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
     assert survey.n_families == 2
     assert len(survey.E_grid_brem) < len(full.E_grid_brem)
     assert max(len(grid) for grid in survey.E_grid_line_by_energy.values()) < max(

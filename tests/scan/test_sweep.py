@@ -25,6 +25,7 @@ from pyrite.campaign.sweep import (
     geometry_table,
     scan_grid_rows,
     sweep_cost_weights,
+    target_flat_fields,
 )
 from pyrite.detectors import DetectorSpec
 from pyrite.energy_grid.encoding import decode_energy_grid
@@ -706,9 +707,10 @@ def test_mote2_material_grid_is_bulk():
     )
 
     sweep = material_sweep("mote2")
-    assert sweep.substrate is None
+    flat = target_flat_fields(sweep.target)
+    assert flat["substrate"] is None
     np.testing.assert_array_equal(
-        sweep.thickness_ang,
+        flat["thickness_ang"],
         [
             1000.0,
             5000.0,
@@ -732,11 +734,12 @@ def test_mote2_product_material_grid_matches_few_layer_sapphire():
     np.testing.assert_allclose(grid["thickness_ang"], layer_pitch_ang * np.arange(3, 7))
 
     sweep = material_sweep("mote2_product")
-    assert sweep.substrate == "sapphire"
-    np.testing.assert_allclose(sweep.thickness_ang, grid["thickness_ang"])
+    flat = target_flat_fields(sweep.target)
+    assert flat["substrate"] == "sapphire"
+    np.testing.assert_allclose(flat["thickness_ang"], grid["thickness_ang"])
 
     override = material_sweep("mote2", substrate="sio2")
-    assert override.substrate == "sio2"
+    assert target_flat_fields(override.target)["substrate"] == "sio2"
 
 
 def test_named_stack_registered():
@@ -744,16 +747,17 @@ def test_named_stack_registered():
     # runnable via `cxr run standard -m <key>` like any single material
     assert "mos2-on-sio2-si" in MATERIALS
     sweep = material_sweep("mos2-on-sio2-si")
-    assert sweep.material == "mos2"
-    assert sweep.stack is not None
-    assert [lay.material for lay in sweep.stack] == ["sio2", "silicon"]
+    assert sweep.target.material == "mos2"
+    stack = target_flat_fields(sweep.target)["stack"]
+    assert stack is not None
+    assert [lay.material for lay in stack] == ["sio2", "silicon"]
 
     case = build_cases(sweep, 10, 5)[0]
     assert case["crystal"] == "mos2"
     assert len(case["abs_layers"]) == 3
 
     # the penetration-figure sweep resolves the FILM crystal too
-    assert trajectory_sweep("mos2-on-sio2-si").material == "mos2"
+    assert trajectory_sweep("mos2-on-sio2-si").target.material == "mos2"
 
 
 def test_trajectory_sweep_uses_penetration_angle_set():
@@ -761,7 +765,7 @@ def test_trajectory_sweep_uses_penetration_angle_set():
     assert sweep.beam.energy_keV == [30, 50]
     cases = build_cases(sweep, 10, 5)
 
-    assert tuple(sweep.tilt_deg) == PENETRATION_TILT_DEG
+    assert tuple(sweep.target.tilt_deg) == PENETRATION_TILT_DEG
     assert sorted({c["tilt_deg"] for c in cases}) == sorted(PENETRATION_TILT_DEG)
     assert len(cases) == len(PENETRATION_TILT_DEG) * 2
 
@@ -770,7 +774,7 @@ def test_trajectory_sweep_accepts_explicit_penetration_thickness():
     sweep = trajectory_sweep("hbn", thickness_ang=100000.0)
     cases = build_cases(sweep, 10, 5)
 
-    assert sweep.thickness_ang == 100000.0
+    assert target_flat_fields(sweep.target)["thickness_ang"] == 100000.0
     assert {c["thickness_ang"] for c in cases} == {100000.0}
 
 

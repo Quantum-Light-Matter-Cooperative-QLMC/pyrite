@@ -30,7 +30,7 @@ from ..montecarlo import simulate_trajectories
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
 from .profiles import get_fidelity_preset
-from .sweep import BeamSpec, Sweep, beam_replace
+from .sweep import BeamSpec, Sweep, beam_replace, target_replace
 from .transverse import TransverseDistribution
 
 # Override keys that address the beam (BeamSpec) rather than the Sweep itself,
@@ -38,6 +38,24 @@ from .transverse import TransverseDistribution
 # ``beam_fwhm_mm=`` keep working after the beam moved onto ``Sweep.beam``.
 _BEAM_OVERRIDE_KEYS = frozenset(
     {f.name for f in dataclasses.fields(BeamSpec)} | {"beam_fwhm_mm", "transverse_fwhm_mm"}
+)
+
+# Override keys that address the target geometry rather than the Sweep itself.
+# They are InitVars on ``Sweep`` -- ``dataclasses.replace`` would drop them
+# silently -- so they rebuild the target the same way beam keys rebuild the beam.
+_TARGET_OVERRIDE_KEYS = frozenset(
+    {
+        "thickness_ang",
+        "tilt_deg",
+        "tilt_azim_deg",
+        "crystal_width_mm",
+        "crystal_height_mm",
+        "groove_spacing_ang",
+        "substrate",
+        "substrate_thickness_ang",
+        "stack",
+        "allow_normal_incidence",
+    }
 )
 
 MATERIALS = CATALOG.material_keys
@@ -190,10 +208,14 @@ def material_sweep(
     # Split beam-addressed overrides (energy_keV, spot/bunch fields) from
     # Sweep-level ones so both keep working through the single **overrides API.
     beam_over = {k: overrides.pop(k) for k in list(overrides) if k in _BEAM_OVERRIDE_KEYS}
+    target_over = {k: overrides.pop(k) for k in list(overrides) if k in _TARGET_OVERRIDE_KEYS}
     if overrides:
         sweep = replace(sweep, **overrides)
     if beam_over:
         sweep = replace(sweep, beam=beam_replace(sweep.beam, **beam_over))
+    if target_over:
+        assert sweep.target is not None
+        sweep = replace(sweep, target=target_replace(sweep.target, **target_over))
     return sweep
 
 

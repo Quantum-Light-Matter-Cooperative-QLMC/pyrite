@@ -124,7 +124,7 @@ def test_polar_override_sets_tilt_grid(monkeypatch):
 
 def test_polar_omitted_uses_std_catalog_grid(monkeypatch):
     captured = _run_and_capture(monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6"])
-    expected = set(np.atleast_1d(material_sweep(MATERIAL).tilt_deg).tolist())
+    expected = set(np.atleast_1d(material_sweep(MATERIAL).target.tilt_deg).tolist())
     assert {c["tilt_deg"] for c in captured["cases"]} == expected
 
 

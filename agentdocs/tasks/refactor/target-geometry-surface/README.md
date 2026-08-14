@@ -156,10 +156,10 @@ change which inputs they accept.
       B is additive and C is a pure rewire.
 - [x] C — Route `build_cases` through `Target.lower()`. `build_cases` must end
       with **no geometry conditionals**.
-- [ ] D1 — Land `Sweep.target` as the canonical spelling; the flat geometry
+- [x] D1 — Land `Sweep.target` as the canonical spelling; the flat geometry
       fields become deprecated shims that construct it, and the `config.py`
       override path rebuilds the target instead of `replace`-ing flat fields.
-      See "Slice D — handoff" below; scoped and approved, not started.
+      See "Slice D1 — what landed" below.
 - [ ] D2 — `substrate=` becomes a `Stack` constructor helper; retire the
       parallel field pair behind a deprecated shim under the existing D7
       harness. Move `mosaic` onto `Target` in the same slice, leaving
@@ -250,7 +250,72 @@ current type and default, so no caller in `config.py`, `profiles.py`,
 `profile_edit.py`, `runs/`, or the CLI moved. Evidence: full `pyrite-dev test`
 green (3099 passed, 61 skipped), lint and typecheck clean.
 
-## Slice D — handoff (scoped, not implemented)
+## Slice D1 — what landed
+
+`Sweep.target` is the canonical geometry owner. Every flat geometry input is an
+`InitVar` normalized onto it in `__post_init__`, so geometry now fails at
+`Sweep(...)` (and at `pr.Slab(...)`) rather than inside `build_cases`.
+`_target_from_sweep` is gone; its body is now
+`geometry.target_from_flat(material, **flat)`, a keyword function carrying the
+historical `Sweep` field defaults, joined by two inverses:
+`target_flat_fields(target)` (the flat projection) and
+`target_replace(target, **flat_changes)` (rebuild-and-revalidate). The override
+paths use those instead of `dataclasses.replace` on flat fields:
+`config.material_sweep` splits `_TARGET_OVERRIDE_KEYS` exactly as it already
+split `_BEAM_OVERRIDE_KEYS`, and `FidelityPreset.apply_sweep` down-samples
+through `target_replace`.
+
+Deviations from the handoff, each deliberate:
+
+- **No forwarding properties.** The handoff suggested keeping `sweep.material`
+  readable as a property onto `target.material`. A `@property` cannot share a
+  name with a field or `InitVar` in the same dataclass body — the property
+  object silently becomes that field's *default value*. A base/subclass split
+  works but makes `replace()` round-trip flat values back through the
+  properties, which would defeat the "target= plus flat input is a conflict"
+  rule. So `material` stays a real field that `__post_init__` keeps
+  `== target.material`, and the ~33 `sweep.material` readers did not move. The
+  other flat names have no reader outside tests.
+- **Reads of a retired flat name return `None`, they do not raise.**
+  `dataclasses` leaves an `InitVar`'s default as a class attribute, and
+  `dataclasses.replace` needs it (`getattr(obj, name)` for every `InitVar` with
+  a default), so it cannot be deleted. `sweep.tilt_deg` is therefore `None`
+  rather than an `AttributeError`. This silently weakened three assertions
+  (`tests/materials/test_profiles.py`, `tests/cli/test_blaze.py`); all were
+  found and rewritten to read through `sweep.target`. D2's
+  `DeprecationWarning` work should treat "make the read loud" as part of its
+  charter.
+- **`UNSET` sentinel for the footprint pair.** `crystal_width_mm=None` IS the
+  explicit infinite slab, so `None` cannot also mean "not mentioned". The other
+  flat inputs have no such collision and use `None`.
+- **Identity payload keeps the flat spelling.** `_jsonable` walks
+  `dataclasses.fields()`, which excludes `InitVar`s, so the hashed sweep payload
+  lost every flat geometry key and gained a nested `target` — breaking every
+  pinned `parameter_sha256` (and therefore checkpoint identity). `_identity_v1`
+  now pops `target` and splices `target_flat_fields(...)` back in, the same
+  legacy projection the beam and detector already get. All pinned digests are
+  bit-for-bit unchanged.
+- **`target_flat_fields` inverts a single default-oriented sub-layer to
+  `substrate=`.** That is the definition of the sugar, it makes the projection
+  lossless both ways, and it keeps the identity payload's historical spelling.
+  Checked: no catalog material is misprojected — `materials.toml` has one
+  `stack` entry and it has two layers.
+- **Silent shims,** per the handoff's own recommendation; `config.py` still
+  emits the flat spelling, so warning would fire on the repo's own calls. D2
+  warns.
+
+One test fixture changed behaviour rather than spelling: the synthetic catalog
+in `tests/materials/test_material_catalog.py` had `tilt_deg` starting at `0.0`,
+which `Slab` bans for emission sweeps. It used to survive because nothing built
+a target until `build_cases`; it now fails at `material_sweep(...)`. The fixture
+grid starts at `5.0` (9 sites) and the one assertion pinning the expanded grid
+follows. That is the acceptance criterion "an invalid target raises at
+construction" doing its job.
+
+Evidence: `pyrite-dev test` green (3099 passed, 61 skipped), `verify` green,
+`docs` builds, lint and typecheck clean.
+
+## Slice D — handoff (D1 landed above; D2 still pending)
 
 ### Why D splits in two
 
@@ -343,7 +408,9 @@ in D1 — `config.py` and the profile surface are still *emitting* the flat
 spelling at that point, so warning would fire on the repo's own calls — then warn
 in D2 once the canonical spelling exists end to end, with a row in
 `docs/repo-design/cli/cli-deprecations.md` if any of it surfaces in CLI or
-profile vocabulary. Confirm before implementing.
+profile vocabulary. **Resolved: took the recommendation.** D1 is silent; D2
+owns the warning, and must also make a retired flat *read* loud (see the D1
+deviations above — it currently returns `None`).
 
 ## Decisions and open questions
 

@@ -24,7 +24,7 @@ schema_version = 1
 [profiles.standard]
 thickness_ang = {{ logspace = {{ start = 2.0, stop = 3.0, num = 2 }} }}
 energy_keV = {{ values = [25.0, 30.0] }}
-tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false }} }}
+tilt_deg = {{ linspace = {{ start = 5.0, stop = 80.0, num = 3, endpoint = false }} }}
 tilt_azim_deg = 0.0
 E_grid_line = {{ arange = {{ start = 50.0, stop = 60.0, step = 2.0 }} }}
 E_grid_brem = 0.0
@@ -377,7 +377,7 @@ crystal = "mos2"
 [profiles.narrowed]
 thickness_ang = { logspace = { start = 2.0, stop = 3.0, num = 2 } }
 energy_keV = { values = [25.0, 30.0] }
-tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }
+tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 3, endpoint = false } }
 tilt_azim_deg = 0.0
 E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }
 E_grid_brem = 0.0
@@ -968,16 +968,16 @@ def test_schema_version_requires_integer_one(tmp_path, version):
             "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = false } }",
         ),
         (
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 2.5, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 2.5, endpoint = false } }",
         ),
         (
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = inf, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = inf, endpoint = false } }",
         ),
         (
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = 1 } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 3, endpoint = 1 } }",
         ),
         (
             "tilt_azim_deg = 0.0",
@@ -1041,7 +1041,7 @@ tilt_azim_deg = { logspace = { start = 0.0, stop = 2.0, num = 3, base = 2.0 } }
     scan = catalog.material("sample").scan
     np.testing.assert_array_equal(scan.energy_keV, [25.0, 30.0])
     np.testing.assert_array_equal(scan.E_grid_line, np.arange(50.0, 60.0, 2.0))
-    np.testing.assert_array_equal(scan.tilt_deg, np.linspace(0.0, 80.0, 3, endpoint=False))
+    np.testing.assert_array_equal(scan.tilt_deg, np.linspace(5.0, 80.0, 3, endpoint=False))
     np.testing.assert_array_equal(scan.tilt_azim_deg, np.logspace(0.0, 2.0, 3, base=2.0))
     np.testing.assert_allclose(scan.thickness_ang, np.array([3.0, 4.0]) * 12.294 / 2.0)
     assert catalog.material("sample").stack[0].azimuth_deg == 12.0
@@ -1073,7 +1073,7 @@ crystal = "mos2"
         # (the azim-rework banned-angle guard); pin legal emission angles so this
         # test exercises the grid passthrough, not the guard.
         .replace(
-            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 5.0, stop = 80.0, num = 3, endpoint = false } }",
             "tilt_deg = { values = [5.0, 45.0] }",
         )
     )

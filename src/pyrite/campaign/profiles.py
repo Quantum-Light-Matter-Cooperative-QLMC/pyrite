@@ -22,7 +22,14 @@ import numpy as np
 
 from ..montecarlo.case import Case
 from ..results import EmissionMode, Settings
-from .sweep import Sweep, beam_replace, build_cases, crystal_params
+from .sweep import (
+    Sweep,
+    beam_replace,
+    build_cases,
+    crystal_params,
+    target_flat_fields,
+    target_replace,
+)
 
 FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
@@ -166,12 +173,17 @@ class FidelityPreset:
                 self.photon_grid_span_fraction,
             )
         )
+        assert sweep.target is not None
+        geometry = target_flat_fields(sweep.target)
         return replace(
             sweep,
             beam=beam_replace(sweep.beam, energy_keV=energies),
-            thickness_ang=_centered_sample(sweep.thickness_ang, self.max_thicknesses),
-            tilt_deg=_centered_sample(sweep.tilt_deg, self.max_tilts),
-            tilt_azim_deg=_centered_sample(sweep.tilt_azim_deg, self.max_azimuths),
+            target=target_replace(
+                sweep.target,
+                thickness_ang=_centered_sample(geometry["thickness_ang"], self.max_thicknesses),
+                tilt_deg=_centered_sample(geometry["tilt_deg"], self.max_tilts),
+                tilt_azim_deg=_centered_sample(geometry["tilt_azim_deg"], self.max_azimuths),
+            ),
             n_families=self.n_families or sweep.n_families,
             max_reflections=self.max_reflections,
             E_grid_line=line_grid,
@@ -245,7 +257,8 @@ def _identity_v1(
     catalog_profile: str = "standard",
 ) -> dict[str, Any]:
     """Return profile plus exact resolved parameters and stable SHA-256 digest."""
-    crystallography = crystal_params(sweep.material, sweep.n_families)
+    assert sweep.target is not None
+    crystallography = crystal_params(sweep.target.material, sweep.n_families)
     reflections = crystallography["hkl_list"]
     if sweep.max_reflections is not None:
         reflections = reflections[: sweep.max_reflections]
@@ -270,6 +283,14 @@ def _identity_v1(
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
     sweep_payload = resolved["sweep"]
+    # Flat legacy projection of the geometry, for the same reason as the beam and
+    # detector projections below: geometry lives on ``Sweep.target`` in code, but
+    # the hashed payload keeps the HISTORICAL flat keys -- ``thickness_ang``,
+    # ``tilt_deg``, the footprint pair, the substrate sugar -- so every
+    # pre-existing ``parameter_sha256`` (and its checkpoint stem) stays
+    # bit-for-bit.
+    sweep_payload.pop("target", None)
+    sweep_payload.update(_jsonable(target_flat_fields(sweep.target)))
     detector_payload = sweep_payload.pop("detector")
     sweep_payload["theta_obs_deg"] = detector_payload["observation_angle_deg"]
     sweep_payload["dtheta_obs_deg"] = detector_payload["polar_acceptance_deg"]
