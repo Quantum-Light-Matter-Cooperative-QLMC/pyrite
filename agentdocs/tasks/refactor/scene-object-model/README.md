@@ -123,9 +123,10 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
 
 ## Checklist
 
-- [ ] A — Field-by-field disposition table for `Sweep` and `Settings`: which of
+- [x] A — Field-by-field disposition table for `Sweep` and `Settings`: which of
       the four new objects each field lands on, and whether it enters dataset
       identity. This is the decision document; nothing else starts before it.
+      See [slice-a-field-disposition.md](slice-a-field-disposition.md).
 - [ ] B — Land `Scene`, `Numerics`, `Analysis` alongside the existing classes.
       No removals yet.
 - [ ] C — Dotted-path axis resolution, including indexed segments
