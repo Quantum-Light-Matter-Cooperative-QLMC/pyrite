@@ -244,6 +244,8 @@ Checkpoint commits:
 - `9d29ac4` — scan and blaze share the public simulation lowering seam.
 - `47c8c94` — scan/trace marimo consumers, D7 `e_grid_eV` warning alias, public
   API/export documentation, and export freezes.
+- `c3ef934` — public result selection for coherent emission and disabled or
+  unavailable external background sources, without changing transport kernels.
 
 Acceptance evidence:
 
@@ -255,6 +257,7 @@ Acceptance evidence:
 - `marimo check` for `scan_app.py` and `trace_app.py`: pass; apps suite passes.
 - `test_every_catalog_profile_round_trips_a_resolved_case_list`: pass.
 - `test_simulate_is_bit_for_bit_the_existing_single_case_path`: pass on CPU.
+- `test_scene_model_switches_select_returned_arrays`: pass.
 - Added no `ScalarOrSeq` field. `simulate` contains no checkpoint, store, path,
   open, or write call.
 
