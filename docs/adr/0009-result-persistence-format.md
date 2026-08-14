@@ -101,9 +101,13 @@ layout.
 
 - A result file can be opened with `h5py.File(path)` and read with no PyRITE
   import, no `sys.path` arrangement, and no code execution.
-- Compression moves inside the container. HDF5 per-dataset filters replace the
-  whole-stream zstd frame, so the artifact is self-describing at the cost of a
-  measured write-throughput change recorded in the schema document.
+- Compression leaves the stored artifact entirely. This ADR originally expected
+  HDF5 per-dataset filters to replace the whole-stream zstd frame; measurement
+  refuted that. Deflate costs about 2.5x the write time and, once array content
+  is deduplicated, saves nothing a whole-container frame does not save better,
+  so artifacts are unfiltered and self-describing. The zstd frame survives as a
+  transfer codec for `slim -o -` and is never stored. Numbers are in the schema
+  document.
 - The validation ledger's evidence files become independently inspectable, which
   is the practical motivation.
 - Control-plane state is untouched. Job records and remote lifecycle state are
