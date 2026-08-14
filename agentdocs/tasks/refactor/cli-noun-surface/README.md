@@ -78,10 +78,12 @@ harness with a hidden warning alias for one support window.
 
 ## Checklist
 
-- [ ] A — Map every one of the 88 commands to keep / move / deprecate, with the
+- [x] A — Map every one of the 88 commands to keep / move / deprecate, with the
       replacement spelling for each move. No command is retired without a named
       replacement, and "the replacement is `pyrite-dev`" counts only if the
       command is genuinely maintenance rather than a user workflow.
+      The current post-beam tree is 94 visible paths; the complete disposition
+      and invariant inventory is in [command-disposition.md](command-disposition.md).
 - [ ] B — Move `performance` to `pyrite-dev`, with hidden deprecated aliases for
       the old spellings.
 - [ ] C — Relocate `energy-grid derive|show|defaults` under `material` /
@@ -122,6 +124,18 @@ harness with a hidden warning alias for one support window.
   `refactor/scene-object-model`. Slices B, C, D, and F are largely mechanical
   and may not need to wait; slice E does, because "use the Python API instead"
   is only an honest answer once the API exists.
+
+### Open-question resolution (2026-08-14)
+
+- **Interactive profile mutation stays.** Removing leaf verbs would not reduce
+  the top-level noun count, named-beam attachment depends on the lifecycle, and
+  the approved lock/unlock and create-from follow-ups explicitly invest in it.
+  Those untriaged/bug follow-ups remain out of scope here.
+- **Slices B-D and F-G are safely landable.** This branch now contains the
+  completed detector-scorer and scene-object-model stacks, including the public
+  filesystem-free simulation replacement. No pre-Scene exception remains.
+- The exact command/alias and contract inventory is checkpointed before behavior
+  work in [command-disposition.md](command-disposition.md).
 
 ## Delegation slices and required skills
 
