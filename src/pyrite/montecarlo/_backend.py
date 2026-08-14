@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import warnings
 from dataclasses import dataclass
+from importlib import import_module
 from types import ModuleType
 from typing import Any
 
@@ -262,8 +263,8 @@ def _load_cupy(expected: str | None = None) -> CuPyBackend:
 
 def _load_sycl() -> SyclBackend:
     try:
-        import dpctl  # ty: ignore[unresolved-import]
-        import dpnp  # ty: ignore[unresolved-import]
+        dpctl = import_module("dpctl")
+        dpnp = import_module("dpnp")
 
         return SyclBackend(dpnp, dpctl)
     except BackendUnavailableError:

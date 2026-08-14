@@ -1,16 +1,15 @@
 # Core architecture RFC: scene objects, scorers, and API surface
 
-* **Status:** Proposed
+* **Status:** Implemented
 * **Date:** 2026-08-13
 * **Revised:** 2026-08-14 — Change 6 retains HDF5 and defers interchange format
   selection; see {ref}`sec-core-arch-review`
 * **Supersedes:** nothing
 * **Expected outcome:** one ADR per accepted section (see {ref}`sec-core-arch-adrs`)
 
-This RFC proposes a set of changes to PyRITE's object model, simulation entry
-point, result persistence, and command surface. It records the current state
-with evidence, the target state with interface sketches, and a migration path
-for each change. It does not itself change behavior.
+This RFC records the changes implemented in PyRITE's object model, simulation
+entry point, result persistence, and command surface. It preserves the original
+state evidence, interface sketches, migration rationale, and review decisions.
 
 The changes are motivated by a comparison against codes solving a similar
 problem — Monte Carlo transport of a configurable beam into a configurable
@@ -22,7 +21,7 @@ PENELOPE/PENGEOM, and McStas/McXtrace.
 
 ## Summary
 
-```{list-table} Proposed changes, in dependency order.
+```{list-table} Implemented changes, in dependency order.
 :name: tbl-core-arch-changes
 :header-rows: 1
 

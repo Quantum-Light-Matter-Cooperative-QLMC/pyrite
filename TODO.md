@@ -49,34 +49,7 @@ file. Edit and drop items on `main`.
    `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
    verification and human sign-off remain. → `feature/coherent-line-batching`;
    [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-4. **Core architecture RFC — scene objects, scorers, API surface.** Seven
-   changes to the object model, simulation entry point, persistence, and
-   command surface; every step requires bit-for-bit reproduction of stored
-   spectra. Design and sequencing:
-   [`docs/repo-design/core-architecture-rfc.md`](docs/repo-design/core-architecture-rfc.md).
-   Arbitrary target geometry
-   ([ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md)) and a GUI are
-   recorded **non-goals**. Steps 1–2 landed on `main` (typed `Case` +
-   `identity_version`, with `_identity_v2` still deferred; and the `Target`
-   geometry surface plus its non-goal ADR). Four branches remain, in dependency
-   order:
-   1. **Next up — unblocked.** Detector owns acceptance + binning + response;
-      demotes `energy-grid`. Overlaps `feature/profile-observation-angle` (P2),
-      sequence deliberately. → `refactor/detector-scorer`;
-      [`agentdocs/tasks/refactor/detector-scorer/`](agentdocs/tasks/refactor/detector-scorer/).
-   2. **Unblocked, parallelizable.** Result arrays in HDF5 + MCPL export (both
-      required deps); `.pkl` readable forever. Independent of the detector work,
-      so it can run alongside. → `feature/result-format-interchange`;
-      [`agentdocs/tasks/feature/result-format-interchange/`](agentdocs/tasks/feature/result-format-interchange/).
-   3. Split `Sweep` into `Scene`/`Sweep`/`Numerics`/`Analysis`, dissolve
-      `Settings`, add public `pr.simulate`. Structural core, one project. Gated
-      on the detector work. → `refactor/scene-object-model`;
-      [`agentdocs/tasks/refactor/scene-object-model/`](agentdocs/tasks/refactor/scene-object-model/).
-   4. Reduce 13 CLI nouns to 9 by moving machinery to `pyrite-dev`; `beam` and
-      `checkpoint` stay, no `cache` noun. All contracts retained. Gated on the
-      `Scene` split. → `refactor/cli-noun-surface`;
-      [`agentdocs/tasks/refactor/cli-noun-surface/`](agentdocs/tasks/refactor/cli-noun-surface/).
-5. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+4. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
@@ -200,12 +173,13 @@ Direction notes only; not prioritized backlog or active commitments.
   electron coherence and QED effects, coherent transition radiation, and
   transport of protons, ions, or neutrons. Near-term staging is tracked by the
   P1 electron-transport tasks above.
-- **Geometry interoperability.** Research interoperability with established
-  simulation and PIC tools such as WarpX, and evaluate export formats.
-  Arbitrary in-simulation geometry (multiple materials at arbitrary position,
-  shape, and orientation; STL/STEP import) is a recorded **non-goal** —
-  [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md); MCPL export is the
-  sanctioned answer, so this item is the interoperability half only.
+- **Geometry interoperability.** Start from a concrete downstream consumer,
+  define a format-neutral `PhotonSource` contract with normalization and
+  closure tests, then select and validate an adapter; MCPL remains one
+  candidate for particle-transport consumers. Arbitrary in-simulation geometry
+  (multiple materials at arbitrary position, shape, and orientation; STL/STEP
+  import) remains a recorded **non-goal** —
+  [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md).
 - **Custom detector tooling.** Extend the existing detector model with CLI
   tools for defining, loading, saving, and editing detector responses,
   geometries, and resolution for photon and charged-particle detectors.
