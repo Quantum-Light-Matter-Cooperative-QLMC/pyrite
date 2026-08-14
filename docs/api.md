@@ -38,7 +38,10 @@ result.provenance["identity_digest"]
 `Result.spectrum` and `Result.background` are intrinsic photon-density arrays
 per incident electron per eV per sr. Their coordinates are `energy_eV` and
 `background_energy_eV`. `Result.provenance` records the resolved scene,
-numerics, content identity, backend/device, and library versions.
+numerics, content identity, backend/device, and library versions. Coherent or
+`both` emission also exposes `coherent_spectrum`; coherent-only simulation
+selects that array as `spectrum`. A `none` or unavailable external background
+source returns a zero background on the resolved continuum grid.
 
 `Sweep` expresses a Cartesian product as ordered paths into a scalar base
 scene. Paths are checked when the sweep is constructed, including indexed

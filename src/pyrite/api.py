@@ -116,9 +116,13 @@ def simulate(
     output = run_case(case, transport_core=resolved_numerics.transport_core)
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
+    if scene.brem_source != "mc":
+        background = np.zeros_like(background)
+    coherent = output.get("spec_coherent")
+    spectrum = coherent if scene.emission == "coherent" else output["spec"]
     return Result(
         energy_eV=np.asarray(output["E_grid"]),
-        spectrum=np.asarray(output["spec"]),
+        spectrum=np.asarray(spectrum),
         background_energy_eV=np.asarray(background_energy),
         background=np.asarray(background),
         case=case,
@@ -130,6 +134,7 @@ def simulate(
             "device": BACKEND.device,
             "versions": {"pyrite": __version__, "numpy": np.__version__},
         },
+        coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
     )
 
 

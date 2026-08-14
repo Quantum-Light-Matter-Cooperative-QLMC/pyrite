@@ -27,12 +27,15 @@ class Result:
     background: np.ndarray
     case: Case
     provenance: Mapping[str, Any]
+    coherent_spectrum: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "energy_eV", np.asarray(self.energy_eV))
         object.__setattr__(self, "spectrum", np.asarray(self.spectrum))
         object.__setattr__(self, "background_energy_eV", np.asarray(self.background_energy_eV))
         object.__setattr__(self, "background", np.asarray(self.background))
+        if self.coherent_spectrum is not None:
+            object.__setattr__(self, "coherent_spectrum", np.asarray(self.coherent_spectrum))
         object.__setattr__(self, "provenance", MappingProxyType(dict(self.provenance)))
 
 

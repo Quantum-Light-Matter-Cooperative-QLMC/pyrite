@@ -73,3 +73,33 @@ def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
     np.testing.assert_array_equal(result.energy_eV, expected["E_grid"])
     np.testing.assert_array_equal(result.spectrum, expected["spec"])
     np.testing.assert_array_equal(result.background, expected["brem_wide"])
+
+
+def test_scene_model_switches_select_returned_arrays(monkeypatch) -> None:
+    beam, target, detector, numerics = _inputs()
+
+    monkeypatch.setattr(
+        api,
+        "run_case",
+        lambda case, *, transport_core: {
+            "E_grid": np.array([1.0, 2.0]),
+            "spec": np.array([3.0, 4.0]),
+            "spec_coherent": np.array([7.0, 8.0]),
+            "E_grid_brem": np.array([1.0, 2.0]),
+            "brem_wide": np.array([5.0, 6.0]),
+            "brem": np.array([5.0, 6.0]),
+        },
+    )
+
+    result = pr.simulate(
+        beam,
+        target,
+        detector,
+        numerics=numerics,
+        emission="coherent",
+        brem_source="none",
+    )
+
+    np.testing.assert_array_equal(result.spectrum, [7.0, 8.0])
+    np.testing.assert_array_equal(result.coherent_spectrum, [7.0, 8.0])
+    np.testing.assert_array_equal(result.background, [0.0, 0.0])
