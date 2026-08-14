@@ -70,7 +70,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     context_settings={"help_option_names": ["-h", "--help"]},
     help=(
         "Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n"
-        "Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan "
+        "Writes checkpoints/<material>_blazed/, separate from flat-face scan "
         "checkpoints. Repeat --energy/--spacing/--polar for multiple values."
     ),
 )
@@ -118,7 +118,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     default="checkpoints",
     show_default=True,
     metavar="DIR",
-    help="Read and write blazed checkpoint pickles in DIR.",
+    help="Read and write blazed component checkpoints in DIR.",
 )
 @click.option(
     "--max-minutes",

@@ -16,7 +16,7 @@ _LEGACY_HIGH_ENERGY_MATERIALS = frozenset({"tise2", "gep", "ges", "rese2"})
 # ---- detached job queue -------------------------------------------------------
 def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_profile="standard"):
     """Checkpoint stems a queue produces (the scan runner writes
-    <material>_quick.pkl for --quick runs). ``high_energy_min_kev`` predicts the
+    <material>_quick/ for --quick runs). ``high_energy_min_kev`` predicts the
     non-canonical stem for materials classified by legacy job records (a no-op
     stem-wise for every other material)."""
     if quick:

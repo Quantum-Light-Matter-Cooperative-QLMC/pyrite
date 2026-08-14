@@ -40,7 +40,7 @@ def _refuse_if_busy(materials, quick):
 
 def clear_remote(materials, yes=False, catalog_profile="standard"):
     """Delete one or more materials' accumulated checkpoints on the box: both
-    ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl`` for
+    ``checkpoints/<material>/`` and ``checkpoints/<material>_quick/`` for
     each standard-profile material, or current full/survey identity stems for
     ``catalog_profile``. Accepts a single crystal key or a list.
 

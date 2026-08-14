@@ -11,6 +11,10 @@ old imports are internal or compatibility surfaces. They may change without a
 library deprecation. The command-line contract is documented separately in the
 [CLI reference](repo-design/cli/cli-reference.md).
 
+For a task-oriented walkthrough, including detector scoring and the boundary
+between in-memory results and checkpoint campaigns, see the
+[Python API workflow](guides/python-api-workflow.md).
+
 ## Scene simulation
 
 The root package exposes the preferred high-level API. A `Scene` contains one
@@ -40,8 +44,9 @@ per incident electron per eV per sr. Their coordinates are `energy_eV` and
 `background_energy_eV`. `Result.provenance` records the resolved scene,
 numerics, content identity, backend/device, and library versions. Coherent or
 `both` emission also exposes `coherent_spectrum`; coherent-only simulation
-selects that array as `spectrum`. A `none` or unavailable external background
-source returns a zero background on the resolved continuum grid.
+selects that array as `spectrum`. The high-level API does not currently accept
+an external background array, so both `none` and `external` return a zero
+background on the resolved continuum grid.
 
 `Sweep` expresses a Cartesian product as ordered paths into a scalar base
 scene. Paths are checked when the sweep is constructed, including indexed
@@ -61,6 +66,12 @@ cases = sweep.cases(pr.Numerics())
 For a `Stack`, paths such as `target.layers[1].thickness_ang` address a
 particular layer. A misspelled field or out-of-range index raises at `Sweep`
 construction.
+
+`Sweep.expand()` returns ordered `(label, Scene)` pairs; `Sweep.cases()` lowers
+them to typed cases but does not execute or persist them. `simulate` accepts
+the separate beam, target, and detector components, not a `Scene` argument.
+Helpers exported from `pyrite.api` but not listed on this page are provisional
+lowering or compatibility seams.
 
 ```{eval-rst}
 .. autosummary::
@@ -161,8 +172,9 @@ Single-shot simulations return `pyrite.Result`. Resumable campaign checkpoints
 continue to use result dictionaries; their storage identity and lifecycle are
 documented in [dataset identity and
 storage](repo-design/storage/dataset-identity-and-storage.md). `Settings` is the
-D7 compatibility surface for those checkpoint-analysis functions; new code
-uses `Analysis` for presentation controls.
+D7 compatibility surface for those checkpoint-analysis functions. `Analysis`
+is the corresponding presentation-control value object and legacy-conversion
+target; it is not currently consumed by `simulate`.
 
 ```{eval-rst}
 .. autosummary::

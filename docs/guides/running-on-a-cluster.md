@@ -69,7 +69,8 @@ behind a GPU. A pinned `--workers` clamped by either budget now warns.
 
 ## 3. Several materials as a job array
 
-One array task per material — they run independently and write their own pickles:
+One array task per material — they run independently and write their own
+component checkpoints:
 
 ```bash
 #!/usr/bin/env bash
@@ -108,7 +109,8 @@ all interactive visualization and static-HTML export stay on your workstation.
 - **`__main__` guard:** `pyrite run` (and the `python -m pyrite._entry.scan` shim) are properly
   guarded, so the `spawn` / `forkserver` transport workers are safe. Don't wrap the
   sweep in an unguarded `python -c "…"`.
-- **`--quick`** runs a tiny smoke grid into `<material>_quick.pkl` — use it to
+- **`--quick`** runs a tiny smoke grid into the `<material>_quick/` component
+  directory — use it to
   validate your sbatch script cheaply before submitting the full sweep.
 - **fp64:** set `PYRITE_FP64=1` for double-precision reference runs (the GPU path
   defaults to fp32). Devices without fp64 error when selected explicitly;

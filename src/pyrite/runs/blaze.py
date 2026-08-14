@@ -2,13 +2,13 @@
 
 Runs the Monte-Carlo CXR parameter sweep for one material with a blazed
 groove entrance face, writing to a checkpoint kept separate from the
-crystal's flat-face (``cxr run``) checkpoint:
-``checkpoints/<material>_blazed.pkl``. Groove face angles are set
+crystal's flat-face (``pyrite run``) checkpoint:
+``checkpoints/<material>_blazed/``. Groove face angles are set
 automatically by the existing geometry code
 (``montecarlo.groove.blazed_groove_spec``); this driver only supplies groove
 spacing and the scan grid.
 
-    cxr material blaze hopg --spacing 2e-6 --energy 30 --polar 25 45
+    pyrite material blaze hopg --spacing 2e-6 --energy 30 --polar 25 45
 
 adds a HOPG crystal with 2 micron-spaced grooves, scanned over polar angles
 25 deg and 45 deg.

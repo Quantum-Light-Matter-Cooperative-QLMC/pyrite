@@ -10,6 +10,7 @@ analysis workflows.
 :maxdepth: 1
 
 getting-started
+python-api-workflow
 shell-completion
 configuration-cookbook
 working-with-results

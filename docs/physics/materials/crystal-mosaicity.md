@@ -43,10 +43,10 @@ FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
   `case["mosaic_fwhm_rad"]`, capped at `E_pk`.
 - `data/materials.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable
   `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
-- `Sweep(target=Slab(…, mosaic=True), mosaic_fwhm_deg=…)` → `build_cases` →
-  `case["mosaic_fwhm_rad"]`. `mosaic` is target state (whether *this crystal* is
-  a mosaic); `mosaic_fwhm_deg`, `mosaic_route`, and `mosaic_nodes` stay on
-  `Sweep` as the model/numerics knobs.
+- `Scene(target=Slab(…, mosaic=True), …)` → public case lowering →
+  `case["mosaic_fwhm_rad"]`. `mosaic` is target state; the width comes from the
+  catalog crystal. Route and quadrature controls live under
+  `Numerics.convergence`.
 - `plots.plot_mosaic_comparison` — overlay grades from one record.
 - Tests: `tests/montecarlo/test_mosaic.py`.
 
@@ -123,7 +123,7 @@ in energy drops below the intrinsic core width. A smooth broad lineshape needs
 `mosaic_nodes` scaling with (mosaic width / intrinsic width): HOPG ZYH (3.5°) on a thin
 film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13.
 Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so
-the broad-lineshape regime is genuinely expensive. The `Sweep` default
+the broad-lineshape regime is genuinely expensive. The `Convergence` default
 (`mosaic_nodes=5`) targets converged moments; raise it for a publication-quality broad
 lineshape.
 
@@ -134,18 +134,29 @@ lineshape.
 - `montecarlo.mc_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
 - `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` /
   `case["mosaic_mc_nodes"]`.
-- `Sweep(target=Slab(…, mosaic=True), mosaic_route="mc", mosaic_nodes=…)` → `build_cases` sets the
-  `mosaic_mc_*` case keys **and turns the analytic `store_result` term off** — the two
+- `Scene(target=Slab(…, mosaic=True), …)` with
+  `Numerics(convergence=Convergence(mosaic_route="mc", mosaic_nodes=…))` sets
+  the `mosaic_mc_*` case keys **and turns the analytic `store_result` term off** — the two
   routes are mutually exclusive (applying both double-counts the broadening).
 - Validation: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature +
   wiring): `tests/montecarlo/test_mosaic_mc.py`. The completed scoping study was retired after
   its decision was implemented; its conclusion is preserved above.
 
 ```python
-material_sweep("hopg", mosaic=True, mosaic_route="mc")                       # default nodes (moments)
-material_sweep("hopg", mosaic=True, mosaic_route="mc",
-               mosaic_fwhm_deg=3.5, mosaic_nodes=35)                         # ZYH, smooth lineshape
+import pyrite as pr
+
+beam = pr.Beam(energy_keV=30.0)
+target = pr.Slab("hopg", thickness_ang=10_000.0, mosaic=True)
+detector = pr.Detector()
+numerics = pr.Numerics(
+    convergence=pr.Convergence(mosaic_route="mc", mosaic_nodes=35)
+)
+result = pr.simulate(beam, target, detector, numerics=numerics)
 ```
+
+The supported high-level API uses the catalog's `mosaic_fwhm_deg`. Campaign
+compatibility helpers still permit explicit run-level width overrides, but
+they are not part of the supported scene API.
 
 ### Validated (`checks/mosaic_mc_check.py`; HOPG (002), 30 keV, θ_obs 90°)
 

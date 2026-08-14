@@ -24,7 +24,8 @@ the import-linter contracts from `pyproject.toml`.
 - Stable `pyrite-dev test-suite {core,cli,apps,packaging}` selectors partition all
   test modules; `integration` overlaps deliberately; `verify` remains full gate.
 - Runtime paths resolve through `pyrite.paths`: packaged read-only data stays
-  package-relative; workspace artifacts use explicit path > `CXR_HOME` >
+  package-relative; workspace artifacts use explicit path > `PYRITE_HOME` >
+  legacy `CXR_HOME` >
   `workspace.root` config > cwd; mutable user state uses Click's platform app
   directory. Marimo apps, validation figure builders, and reference data ship
   under `pyrite.apps`; standalone `checks/` scripts remain developer-only.
@@ -61,15 +62,22 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 ## Entry points
 
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
-  `catalog`, `checkpoint`, `config`, `remote`, `energy-grid`, `profile`, and `material`.
-  Older flat checkpoint verbs (including `prune`), `check`, and `check-config`
-  remain hidden compatibility aliases.
+  lazy Click dispatch for the nine visible user nouns: `run`, `app`,
+  `checkpoint`, `config`, `remote`, `job`, `profile`, `material`, and `beam`.
+  Retired top-level setup, completion, performance, energy-grid, scan,
+  analyze/export, and flat checkpoint spellings remain hidden compatibility
+  aliases where the D7 registry documents a replacement.
   Checked user-facing inventory:
   [CLI reference](repo-design/cli/cli-reference.md).
-- **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and
-  profile-owned material membership through `profile members
-  set|add|remove|reset`. An absent membership key means all catalog materials.
+- **`import pyrite`** → `__init__`: lightweight lazy exports for `Beam`, target
+  variants, `Detector`, `Scene`, path-addressed `Sweep`, `Numerics`,
+  `Convergence`, `Analysis`, `Result`, and `simulate`.
+- **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one
+  scalar scene to the typed `Case`, run it without checkpoint I/O, and return
+  intrinsic arrays plus resolved provenance in `Result`.
+- **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign
+  defaults and material membership through `set|add|remove`; an absent
+  membership key means all catalog materials.
 - **`pyrite material show|set MATERIAL [--profile NAME]`** → `cli.commands.material`:
   inspect effective ranges and edit per-profile material overrides. `pyrite material
   blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility
@@ -94,8 +102,9 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 - **`pyrite config set|get|list|setup|completion`** → `cli.commands.config` +
   `cli._config`: persist and inspect the current profile and remote target,
   select the local compute backend, and manage shell completion. Values resolve through the
-  shared per-call > `CXR_*` environment > config store > built-in precedence
-  chain. The user store is written atomically under Click's platform config dir.
+  shared per-call > `PYRITE_*` environment > legacy `CXR_*` environment >
+  config store > built-in precedence chain. The user store is written
+  atomically under Click's platform config dir.
 - **`-o/--output table|json|wide`** → `cli._core.output_option`: shared output
   selector on JSON-capable non-interactive commands. `table` is the human
   default, `wide` is human-only, and only `json` carries the stable versioned
@@ -158,15 +167,17 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   for run, grid, recompute, and validation jobs. `list --kind` normalizes legacy
   submitter metadata to `run|grid|recompute|validate`; destructive stop targets
   exactly one job ID, profile, or all live jobs.
-- **`pyrite slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
+- **`pyrite checkpoint slim <checkpoint-dir> [--grid]`** →
+  `slim:slim_checkpoint` →
   `results.slim_results`: shrink a checkpoint HDF5 artifact for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's
   current-grid configs).
-- **`pyrite archive`/`restore`/`archives`/`union`** → `archive:*`: local
-  checkpoint shelf — copy active slot `checkpoints/<stem>/` to/from
-  long-term `checkpoints/archive/<label>/`; `union` merge shelved
-  checkpoint back into active slot for same material.
-- **Sweep worker**: `montecarlo.run_case` (module-level so it pickle into
+- **`pyrite checkpoint archive|restore|list|merge`** → `archive:*`: local
+  checkpoint shelf — copy active slot `checkpoints/<stem>/` to/from long-term
+  `checkpoints/archive/<label>/`; `merge` combines a shelved checkpoint back
+  into the active slot for the same material. Retired top-level spellings are
+  hidden compatibility aliases.
+- **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into
   `run_cases` process pool).
 
 ---
@@ -255,7 +266,8 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily
   accepts either representation.
 - `_backend` — portable NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL backend
-  adapters; deterministic `CXR_MC_BACKEND` selection plus compatibility
+  adapters; deterministic `PYRITE_MC_BACKEND` selection plus legacy `CXR_*`
+  compatibility
   exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`.
 - `_resources` — execution resource-policy resolution and backend-neutral
   pre-allocation chunk admission. Small devices default conservative.
@@ -266,7 +278,7 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `beta_from_keV`, scattering/stopping helpers; `TRANSPORT_ELEMENTS`
   registry. NumPy/Numba, plus a device core: `resolve_transport_core` picks the
   CUDA one above `CUDA_TRANSPORT_MIN_ELECTRONS` (1000) electrons on a CUDA box,
-  pinnable with `CXR_MC_TRANSPORT_CORE`. Deps: `materials.attenuation`,
+  pinnable with `PYRITE_MC_TRANSPORT_CORE`. Deps: `materials.attenuation`,
   `DATA_DIR`.
 - `transport_jit_kernel` — the `cupyx.jit` port of
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
@@ -300,6 +312,34 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
 
 `campaign/` owns resolved campaign inputs; `checkpoints/` owns persistence,
 repair, archive, and lock lifecycles; `runs/` owns executable local drivers.
+
+### `campaign/model.py`
+
+Supported scalar scene API: `Beam`, `Scene`, path-addressed `Sweep`,
+`Numerics`, nested `Convergence`, and presentation-only `Analysis`. `Scene`
+rejects implicit multi-value fields; `Sweep` applies ordered dotted/indexed
+paths such as `target.layers[1].thickness_ang`, expands Cartesian products,
+and lowers them through `api.build_sweep_cases`. This `Sweep` is the preferred
+public object; `campaign.sweep.Sweep` below remains the profile/CLI-compatible
+campaign implementation.
+
+- Public: root-lazy `Beam`, `Scene`, `Sweep`, `Numerics`, `Convergence`,
+  `Analysis`.
+- Deps: `campaign.geometry`, `campaign.sweep.BeamSpec`, `detectors`.
+
+### `api.py`
+
+Filesystem-free simulation seam. `simulate` combines scalar beam, target, and
+detector components into a `Scene`, lowers exactly one typed `Case`, calls the
+existing `montecarlo.run_case`, and returns `results.model.Result` with
+intrinsic arrays and resolved identity/backend/version provenance. It never
+reads or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and
+legacy lowering helpers are implementation/compatibility seams rather than
+the root supported surface.
+
+- Public: root-lazy `simulate`.
+- Deps: `campaign.model`, `campaign.sweep`, `campaign.profiles`, `detectors`,
+  `montecarlo`, `results`.
 
 ### `campaign/sweep.py`
 Turn `Sweep` definition into Cartesian product of `run_case` dicts.
@@ -410,7 +450,8 @@ owns validation and mutation semantics.
 ### `energy_grid/` (package)
 Photon-energy-grid derivation, bounds analysis, catalog application, and the
 compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
-`_energy_grid.py` into one package matching the `pyrite energy-grid` noun).
+`_energy_grid.py` into one domain package; user inspection now nests under
+`pyrite material` and `pyrite profile`).
 - `encoding.py` (was `_energy_grid.py`) is the hot-path leaf: `encode_energy_grid`
   / `decode_energy_grid`, imported by `sweep`, `run`, `montecarlo.runner`.
 - `_command.py` holds the 700-line Click group (eager `click`, `remote`, `cli`);
@@ -475,7 +516,7 @@ Headless blazed-crystal (sawtooth entrance face) sweep entry: `pyrite material b
 parse args → build cases → `run_sweep` → checkpoint structure, but forces v1
 groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint)
 per (energy, spacing) pair and writes to a dedicated
-`checkpoints/<material>_blazed.pkl`, never the flat-face `<material>.pkl`.
+`checkpoints/<material>_blazed/`, never the flat-face `<material>/`.
 Click wiring is in `cli/commands/blaze.py`; `blaze.command` stays available via
 a lazy `__getattr__`.
 - Public: `main`, `run`, `command` (lazy).
@@ -722,14 +763,15 @@ SSH-tunnel-friendly fixed-port launch.
   `emission_menu`, `pick_spectrum`, `apply_emission`, `checkpoint_stem`,
   `initial_material`, `get_default_material`, `set_default_material`, `command`,
   `main`. `face_menu`/`checkpoint_stem` back the app's flat/blazed **Face**
-  dropdown (blazed loads `<material>_blazed.pkl` from `pyrite material blaze`).
+  dropdown (blazed loads `<material>_blazed/` from `pyrite material blaze`).
   `emission_menu`/`apply_emission` back the app's **Emission** radio
   (Incoherent/Coherent), gated per checkpoint on the stored `spec`/`spec_coherent`
   and routing every spectrum read through the one `pick_spectrum`.
 
 ### `apps/check.py`
-`pyrite check` launcher for `src/pyrite/apps/validation_app.py` plus cached validation
-figure export, optional remote Zhai-job launch/status/pull helpers.
+`pyrite app validation launch|export` owner for
+`src/pyrite/apps/validation_app.py`, plus optional remote Zhai-job
+launch/status/pull helpers. `pyrite check` is a hidden compatibility alias.
 - Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`,
   `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`,
   `add_subparser`, `main`.
@@ -745,8 +787,8 @@ and export consumers are cache-only and direct misses to
 - Deps: `detectors.Detector`.
 
 ### `validation/check_config.py`
-`pyrite check-config` validate bundled material catalog or explicit full
-catalog without importing GPU-heavy CLI modules.
+`pyrite material validate` implementation for the bundled material catalog or
+an explicit full catalog without importing GPU-heavy CLI modules.
 - Public: `add_subparser`, `main`.
 
 ### `remote/`
@@ -784,18 +826,18 @@ and clear, remote validation jobs.
 - Public: `add_subparser`, `main`.
 
 ### `checkpoints/slim.py`
-`pyrite slim` subcommand — shrink checkpoint HDF5 for transfer (drop
+`pyrite checkpoint slim` subcommand — shrink checkpoint HDF5 for transfer (drop
 full-range brem arrays, downcast spectra to float32, filter configs; `--grid`
 keep only material's current-grid configs).
 - Public: `slim_checkpoint`, `add_subparser`, `main`.
 - Deps: `results` (`slim_results`, `_grid_names`).
 
 ### `checkpoints/archive.py`
-`pyrite archive`/`restore`/`archives`/`union` subcommands — durable local
+`pyrite checkpoint archive|restore|list|merge` subcommands — durable local
 checkpoint shelf. Copy active slot `checkpoints/<stem>/` (including resolved
 dataset identity in `meta.json`) to/from
 long-term `checkpoints/archive/<label>/` (atomic temp+replace, `--force`
-overwrite guards, label↔stem date-stamp inference). `union` merge archived
+overwrite guards, label↔stem date-stamp inference). `merge` combines an archived
 checkpoint into active slot for same material and resolved dataset identity
 (compared via manifests when both have identity, then each store's
 `case["crystal"]`), live win on any overlapping (config name, E0) point;
@@ -805,7 +847,9 @@ source archive intact by default (`--delete-archive` to remove).
   `union_checkpoint`, `add_subparser`, `main`.
 
 ### `__init__.py`
-Package root: expose `DATA_DIR` (packaged-data resolver) and `__version__`.
+Lightweight package root: expose `DATA_DIR`, `__version__`, and lazy supported
+scene/result objects plus `simulate`, without importing plotting or accelerator
+stacks during `import pyrite`.
 
 ### `devtools/`
 Importable repository maintenance implementations behind `pyrite-dev`: package

@@ -10,6 +10,9 @@
 This RFC records the changes implemented in PyRITE's object model, simulation
 entry point, result persistence, and command surface. It preserves the original
 state evidence, interface sketches, migration rationale, and review decisions.
+Where an original sketch differs from the implemented interface, the current
+[Python API reference](../api.md) and [workflow guide](../guides/python-api-workflow.md)
+are authoritative.
 
 The changes are motivated by a comparison against codes solving a similar
 problem — Monte Carlo transport of a configurable beam into a configurable
@@ -171,25 +174,18 @@ unchanged. The proposal concerns the number of nouns, not their quality.
 
 ### Target state
 
-A user-facing function that takes a scene and returns a result, with no sweep,
-no profile, no checkpoint, and no catalog mutation:
+A user-facing function that takes scalar scene components and returns a result,
+with no sweep, profile, checkpoint, or catalog mutation:
 
 ```python
 import pyrite as pr
 
-beam = pr.Beam(
-    energy_keV=45.0,
-    transverse=pr.CourantSnyder(eps_n=1e-6, beta_m=0.5),
-)
-target = pr.Slab(pr.material("hopg"), thickness_ang=2e4, tilt_deg=30.0)
-detector = pr.Detector(
-    observation_angle_deg=90.0,
-    energy_bins=pr.arange_eV(100.0, 5000.0, 3.0),
-    response=pr.Timepix3(),
-)
+beam = pr.Beam(energy_keV=45.0)
+target = pr.Slab("hopg", thickness_ang=20_000.0, tilt_deg=30.0)
+detector = pr.Detector(observation_angle_deg=90.0)
 
 result = pr.simulate(beam, target, detector, numerics=pr.Numerics(n_electrons=450))
-result.spectrum          # counts or photons per bin, units documented on the object
+result.spectrum          # intrinsic photons per electron per eV per sr
 result.provenance        # resolved scene, identity digest, backend, versions
 ```
 
@@ -236,7 +232,7 @@ Four objects with distinct lifetimes:
   - Yes, per expanded scene
 * - `Numerics`
   - electron counts, chunk sizes, transport core, backend policy
-  - No
+  - Electron counts: yes; execution controls: no
 * - `Numerics.convergence`
   - truncation and quadrature parameters — see below
   - Yes
@@ -258,10 +254,11 @@ are not one category:
   All four change results, and `n_families` / `max_reflections` already feed
   `dataset_identity` ({file}`src/pyrite/campaign/profiles.py` line 236).
 
-Everything directly under `Numerics` — `spec_chunk`, `brem_chunk`, transport
-core, backend policy — must be result-invariant and must stay out of identity.
-Everything under `Numerics.convergence` enters identity. A field that cannot be
-placed by that test is misclassified.
+Electron counts directly under `Numerics` affect the sampled result and enter
+content identity. Its `spec_chunk`, `brem_chunk`, transport core, and backend
+policy are result-invariant execution controls and stay out of identity.
+Everything under `Numerics.convergence` enters identity. A field that cannot
+be placed by that test is misclassified.
 
 Axes are addressed by dotted path rather than by field type:
 

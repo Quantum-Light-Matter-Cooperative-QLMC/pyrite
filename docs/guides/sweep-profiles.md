@@ -20,9 +20,11 @@ for catalog `[profiles.*]` campaigns. Fidelity (`--fidelity`) selects the
 grid-reduction policy; catalog profiles select scan-parameter ranges. See
 [ADR-0005](../adr/0005-energy-grid-schema-decisions.md) for the decision record.
 
-Python callers use `default_settings("survey")` and
-`material_sweep("mose2", fidelity="survey")`. `full` remains default for both.
-Explicit `material_sweep` overrides apply after profile resolution.
+The supported high-level Python API has no fidelity shorthand. Construct a
+`Scene`, `Sweep`, and `Numerics` explicitly as described in the [Python API
+workflow](python-api-workflow.md). The internal
+`pyrite.campaign.config.default_settings` and `material_sweep` helpers remain
+campaign compatibility surfaces rather than the supported library entry point.
 
 `pyrite material energy-grid derive`, locally or with `--remote`, is upstream
 of this choice: it measures catalog-ready line and bremsstrahlung bounds
@@ -40,7 +42,8 @@ payload under `dataset_identity`.
 
 Canonical, unmodified `full` runs retain `checkpoints/<material>/` for
 compatibility. Survey runs and explicitly overridden full runs use
-`checkpoints/<material>--<variant>-<12-char-hash>/`. `--quick` retains its
+`checkpoints/<material>@<label>-<12-char-hash>/`. Older
+`<material>--<fidelity>-<digest>` stems remain readable. `--quick` retains its
 historical `<material>_quick` stem but also records resolved identity. Thus
 variants cannot silently resume into each other.
 

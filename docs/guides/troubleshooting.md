@@ -25,18 +25,19 @@ survey-cropped bounds into the catalog; fidelity reduction happens later.
 
 ## A run does not resume the checkpoint I expected
 
-Compare the dataset identities with `pyrite checkpoint list`. Fidelity,
-profile-resolved values, overrides, beam/detector values, emission mode, and
-crystallography can change the digest and stem. This is intentional isolation,
-not a cache miss bug. Legacy checkpoints without identity are
-provenance-incomplete.
+Compare each active stem's component metadata beneath the effective
+`checkpoints/` root. Fidelity, profile-resolved values, overrides,
+beam/detector values, emission mode, and crystallography can change the digest
+and stem. This is intentional isolation, not a cache miss bug. `pyrite
+checkpoint list` lists the archive shelf, not active datasets. Legacy
+checkpoints without identity are provenance-incomplete.
 
 ## Analysis cannot find output
 
 Confirm the effective `workspace.root`, any `PYRITE_HOME`/`CXR_HOME`, and any
-`--checkpoint-dir` used for the run. Then use `pyrite checkpoint list` from the
-same context. Analysis needs component checkpoint data; exported HTML alone is
-not an input dataset.
+`--checkpoint-dir` used for the run. Inspect that same active checkpoint root
+or the analysis app's dataset selector. Analysis needs component checkpoint
+data; exported HTML alone is not an input dataset.
 
 ## Only one spectral component is present
 

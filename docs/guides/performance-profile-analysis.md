@@ -62,7 +62,7 @@ single-process pipeline behavior is understood.
 Generate analysis artifacts after local collection or remote pull:
 
 ```bash
-pyrite profile analyze sub_100keV
+pyrite-dev performance analyze sub_100keV
 ```
 
 Use `--performance-dir PATH` for a non-default log root and `--sample-period
@@ -86,7 +86,7 @@ pyrite run mos2_heavy -m mos2 --remote \
   --detach
 
 pyrite remote performance pull mos2_heavy
-pyrite profile analyze mos2_heavy --sample-period 1
+pyrite-dev performance analyze mos2_heavy --sample-period 1
 ```
 
 `-p/--perf` runs without shared-cache reads or writes, so every repetition is
@@ -153,7 +153,7 @@ fork-without-exec deadlock mode.
 Python-level stack sampling and CUDA backtraces stay opt-in: nsys 2025.6.x
 stack-walkers SIGSEGV while unwinding CPython 3.14's frame layout, so the
 session omits `--python-sampling`/`--python-backtrace`/`--cudabacktrace` by
-default. Set `CXR_MC_NSYS_PYSTACK=1` in the submit environment to add them back
+default. Set `PYRITE_MC_NSYS_PYSTACK=1` in the submit environment to add them back
 only on a supported Python/nsys pair. Without them the trace still carries the
 CUDA kernel timeline, NVTX phases, OS runtime, and process-tree CPU samples --
 enough to diagnose bursty-GPU/low-CPU behavior; only Python-frame attribution
@@ -309,7 +309,7 @@ because no case completed during one sample interval.
 | Evidence | Likely constraint | Next experiment |
 |---|---|---|
 | `gpu_feed_wait_fraction >= 0.25`, frequent `transport_wait`, falling in-flight count | CPU transport cannot feed GPU | Increase workers within measured RAM headroom |
-| Effective workers equal memory cap; max worker RSS far below `worker_memory_budget_mib` | Conservative worker admission | Test lower `CXR_MC_WORKER_MEM_MB` (`CXR_MC_PIPELINE_WORKER_MEM_MB` on the `gpu-pipeline` engine) or explicit `--workers` |
+| Effective workers equal memory cap; max worker RSS far below `worker_memory_budget_mib` | Conservative worker admission | Test lower `PYRITE_MC_WORKER_MEM_MB` (`PYRITE_MC_PIPELINE_WORKER_MEM_MB` on the `gpu-pipeline` engine) or explicit `--workers` |
 | Low feed-wait, spectrum dominates, GPU busy | GPU spectrum compute | Test spectrum algorithm or safe chunk increase |
 | Low feed-wait, spectrum dominates, GPU below 20%, clocks active | Launch/synchronization or host work inside spectrum phase | Sweep `spec_chunk`/`brem_chunk`; profile spectrum internals if unchanged |
 | Low GPU utilization plus low clocks, low power, idle P-state during `spectrum` | Power-state, scheduling, or burst sampling | Compare longer cases; inspect GPU clock/throttle policy |

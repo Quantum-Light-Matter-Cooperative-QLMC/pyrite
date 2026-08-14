@@ -6,7 +6,8 @@ no heavy dependencies (matplotlib / cupy / the MC pipeline). Import submodules
 explicitly, e.g. ``from pyrite import crystallography`` or
 ``from pyrite.montecarlo import run_cases``.
 
-See the README for the scientific overview and CLAUDE.md for working conventions.
+See the README for the scientific overview, ``docs/api.md`` for the supported
+surface, and ``AGENTS.md`` for repository working conventions.
 """
 
 import logging

@@ -34,8 +34,8 @@ def _performance_profile(ctx, param, value):
         "and owns material membership, campaign ranges, and workload settings. "
         "Use -m/--material to run one profile member instead of the full resolved "
         "membership.\n\n"
-        "Resumes compatible checkpoints in CHECKPOINTS. Full writes "
-        "<material>.pkl-compatible data in <material>/; variants use "
+        "Resumes compatible checkpoints in CHECKPOINTS. Full writes component "
+        "data beneath <material>/; variants use "
         "identity-qualified stems."
     ),
 )
@@ -63,7 +63,7 @@ def _performance_profile(ctx, param, value):
 @click.option(
     "--quick",
     is_flag=True,
-    help="Use tiny smoke-test grid and write <material>_quick.pkl.",
+    help="Use a tiny smoke-test grid and write the <material>_quick/ component directory.",
 )
 @click.option(
     "--n-families",
@@ -76,7 +76,7 @@ def _performance_profile(ctx, param, value):
     default="checkpoints",
     show_default=True,
     metavar="DIR",
-    help="Read and write checkpoint pickles in DIR.",
+    help="Read and write component checkpoints in DIR.",
 )
 @click.option(
     "--max-minutes",

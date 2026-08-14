@@ -5,14 +5,12 @@ interactive comparison. It does not rerun transport.
 
 ## 1. Find a dataset
 
-```bash
-pyrite checkpoint list
-```
-
-Choose the identity-qualified stem produced by your run. If no checkpoint
-exists, complete the [Getting started](getting-started.md) survey first. Check
-that both line and bremsstrahlung components are present before comparing a
-total spectrum.
+Inspect the effective `checkpoints/` directory or open the analysis app's
+dataset selector, then choose the identity-qualified stem produced by your
+run. `pyrite checkpoint list` lists only long-term archive labels, not active
+datasets. If no active checkpoint exists, complete the [Getting
+started](getting-started.md) survey first. Check that both line and
+bremsstrahlung components are present before comparing a total spectrum.
 
 ## 2. Launch analysis
 

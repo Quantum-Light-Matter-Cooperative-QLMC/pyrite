@@ -18,7 +18,7 @@ wins over the persistent store and does not mutate it:
 
 ```bash
 PYRITE_PROFILE=sub_100keV pyrite run -m hopg --fidelity survey
-PYRITE_HOME=/scratch/my-run pyrite checkpoint list
+PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # archive shelf in that workspace
 ```
 
 ## Create and inspect a campaign

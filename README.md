@@ -44,6 +44,7 @@ git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync
 uv run pyrite-dev bootstrap  # per-clone local git config (TODO.md merge driver)
+uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
 
@@ -108,6 +109,8 @@ bypass pre-allocation admission.
 
 ## Run
 
+Use `pyrite run` for resumable profile campaigns that write checkpoints:
+
 ```bash
 # Small survey run; writes component checkpoints.
 uv run pyrite run standard -m hopg --fidelity survey
@@ -116,16 +119,40 @@ uv run pyrite run standard -m hopg --fidelity survey
 uv run pyrite app analysis launch hopg
 
 # Interactive transport/lattice viewer; no checkpoint required.
-uv run marimo run src/pyrite/apps/trace_app.py
+uv run pyrite app viewer launch hopg
 
 # Validation dashboard.
 uv run pyrite app validation launch
 ```
 
+Use the Python API for one filesystem-free simulation:
+
+```python
+import pyrite as pr
+
+beam = pr.Beam(energy_keV=30.0)
+target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0)
+detector = pr.Detector()
+result = pr.simulate(
+    beam,
+    target,
+    detector,
+    numerics=pr.Numerics(n_electrons=450, n_electrons_brem=100),
+)
+print(result.provenance["identity_digest"])
+```
+
+`simulate` returns intrinsic arrays and provenance without reading or writing a
+checkpoint. See the [Python API workflow](docs/guides/python-api-workflow.md)
+for scenes, sweeps, detector scoring, and persistence boundaries; use
+`pyrite run` when resumability, profiles, remote execution, or analysis apps
+matter.
+
 Main surfaces:
 
-- `pyrite`: run, analysis, validation, export, checkpoint, profile, material,
-  and remote workflows. See generated
+- `pyrite`: nine visible user nouns — `run`, `app`, `checkpoint`, `config`,
+  `remote`, `job`, `profile`, `material`, and `beam`. App launch/export lives
+  below `pyrite app`. See the generated
   [CLI reference](docs/repo-design/cli/cli-reference.md).
 - `src/pyrite/apps/scan_app.py`: interactive sweep runner.
 - `src/pyrite/apps/analysis_app.py`: checkpoint analysis.
@@ -150,8 +177,10 @@ uv run pyrite material validate
 Golden catalog snapshot must be regenerated after catalog/schema changes; use
 `regen-golden` skill.
 
-Active checkpoints use
-`checkpoints/<stem>/{line,brem}.pkl`; analysis tolerates historical layouts.
+Active checkpoints use `checkpoints/<stem>/{line,brem}.pkl`. The suffix is a
+historical layout token: new artifacts contain `pyrite.result` HDF5 version 1,
+while legacy plain, gzip, and zstd pickles remain readable. See the
+[result schema](docs/repo-design/storage/result-schema.md).
 Stored spectra are intrinsic unless a detector view applies downstream response.
 Timepix3 and Eagle XO geometry/QE are instrument-specific; never transfer
 counts or solid angle between setups. See

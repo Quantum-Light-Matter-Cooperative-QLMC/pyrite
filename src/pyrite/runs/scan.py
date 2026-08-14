@@ -1,17 +1,17 @@
 """Headless CXR scan runner (the library twin of ``src/pyrite/apps/scan_app.py``).
 
 Runs the Monte-Carlo CXR parameter sweep for one material and writes the
-per-material checkpoint (checkpoints/<material>.pkl). Use this to run sweeps
+per-material component checkpoint (``checkpoints/<material>/``). Use this to run sweeps
 non-interactively -- in particular over SSH on the GPU box; see pyrite.remote,
 which drives this and pulls the checkpoint back so interactive analysis and
 static-HTML export can stay on the laptop.
 
-    cxr run                        # standard profile membership
-    cxr run sub_100keV             # named profile membership
-    cxr run standard -m mose2     # one standard-profile member
-    cxr run standard -m mose2 --fidelity survey
-    cxr run standard -m mose2 --quick
-    cxr run standard -m mose2 --workers 0
+    pyrite run                        # standard profile membership
+    pyrite run sub_100keV             # named profile membership
+    pyrite run standard -m mose2      # one standard-profile member
+    pyrite run standard -m mose2 --fidelity survey
+    pyrite run standard -m mose2 --quick
+    pyrite run standard -m mose2 --workers 0
 
 (equivalently ``python -m pyrite._entry.scan standard -m mose2`` via the
 module shim).
@@ -653,7 +653,7 @@ def _run_material(args, material, max_seconds=None):
     # Always pass an explicit path named for the catalog material key: run_sweep's
     # default derives the name from the film crystal, which would make a named
     # stack (e.g. mos2-on-sio2-si) clobber/resume the plain film's checkpoint.
-    # A --quick smoke test writes to its OWN checkpoint (<material>_quick.pkl), so
+    # A --quick smoke test writes to its OWN checkpoint (<material>_quick/), so
     # its coarse off-grid points never contaminate the real per-material sweep.
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}

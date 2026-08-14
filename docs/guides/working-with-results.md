@@ -10,7 +10,9 @@ profiles use identity-qualified directories so incompatible parameter sets do
 not silently resume into one another. Each dataset records its resolved input
 payload and hash in component metadata.
 
-List locally available data with:
+Active datasets are directories beneath the effective `checkpoints/` root and
+are offered by the analysis app's dataset selector. `pyrite checkpoint list`
+does not list them; it lists labels in the long-term archive shelf:
 
 ```bash
 uv run pyrite checkpoint list
@@ -29,10 +31,15 @@ Launch the checkpoint-driven analysis app for a material:
 uv run pyrite app analysis launch hopg
 ```
 
-For non-interactive use, inspect `pyrite export --help` and
-`pyrite app analysis export --help`. The generated
+For non-interactive use, inspect `pyrite app analysis export --help`. The generated
 [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for
 accepted arguments and output formats.
+
+Current component paths retain a `.pkl` suffix for compatibility, but new
+writes contain versioned HDF5 data. Legacy plain, gzip, and zstd pickle
+generations remain readable and migrate to HDF5 on the next normal save. Use
+the [result schema](../repo-design/storage/result-schema.md) for independent
+inspection; do not infer the encoding from the suffix.
 
 ## Preserve or reduce data
 

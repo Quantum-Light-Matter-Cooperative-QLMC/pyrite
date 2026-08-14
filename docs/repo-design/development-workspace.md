@@ -27,24 +27,38 @@ wheel. A third analysis/app member is deferred.
 ```bash
 # Normal contributor setup: root package and contributor tools.
 uv sync --locked
+uv run pyrite-dev bootstrap  # once per clone; configures TODO.md merge driver
 
 # Runtime-only environment, used by remote installations.
 uv sync --no-dev --locked
 
 # Stable domain partitions. Together these contain every tests/test_*.py once.
-uv run pyrite-dev test-suite core
-uv run pyrite-dev test-suite cli
-uv run pyrite-dev test-suite apps
-uv run pyrite-dev test-suite packaging
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite core
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite cli
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite apps
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite packaging
+
+# One focused test module or selection.
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test path/to/test.py -k test_name
+
+# Static and formatting checks.
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev lint
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev format
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev precommit
 
 # Additive cross-boundary sample and release gates.
-uv run pyrite-dev test-suite integration
-uv run pyrite-dev docs
-uv run pyrite-dev verify
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test-suite integration
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 
 # Clean wheel and editable-install compatibility check.
-uv run pyrite-dev package-smoke
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev package-smoke
 ```
+
+Use the project runner rather than bare `pytest` or an environment-specific
+Python path. If the project environment is not writable, add
+`UV_PROJECT_ENVIRONMENT=/tmp/pyrite-venv` instead of switching interpreters.
 
 Suite ownership uses deterministic filename rules in `pyrite._dev`. A
 regression test requires the four domain suites to cover every test module

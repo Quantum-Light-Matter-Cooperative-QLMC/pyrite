@@ -59,7 +59,9 @@ than editing them. A command's
 
 ## Lifecycle and safety
 
-- `checkpoint list` discovers active datasets and their identities.
+- Active datasets live beneath the effective checkpoint root and are exposed
+  by checkpoint-consuming workflows such as the analysis app. `checkpoint
+  list` inventories only the long-term archive shelf.
 - `checkpoint archive` and `restore` copy complete component directories,
   including provenance.
 - `checkpoint merge` rejects identity-bearing datasets with different resolved
