@@ -167,7 +167,7 @@ change which inputs they accept.
       `refactor/scene-object-model`.
 - [x] E — Equivalence sweep: every existing catalog profile expands to an
       identical case list.
-- [ ] F — Write the ADR recording the arbitrary-geometry **non-goal**. The RFC
+- [x] F — Write the ADR recording the arbitrary-geometry **non-goal**. The RFC
       states this is a decision in its own right and should be recorded even
       though it produces no code. Include the narrow future seam
       (`locate`, `distance_to_boundary`, `escape_path`) and the constraint that
@@ -511,6 +511,29 @@ variants, all of which reject on both sides:
 Conclusion: the geometry consolidation is behaviour-preserving for every
 profile the repo ships. Identity digests are unaffected, which the `mosaic`
 splice in `_identity_v1` already covers by test.
+
+## Slice F — what landed
+
+`docs/adr/0008-no-arbitrary-target-geometry.md`, Accepted, plus its `index.md`
+toctree and table rows. It records the non-goal, the GPU reasoning
+(AdePT/Celeritas, VecGeom's surface model), MCPL export as the sanctioned
+interoperability answer and why it stays a required dependency, and the named
+seam (`locate`, `distance_to_boundary`, `escape_path`) with the
+flat/bounded-depth/device-representable constraint. It cross-references the RFC
+non-goals section by label rather than restating it; the docs build resolves
+the link and is warning-free.
+
+Consequences section ties the non-goal back to this branch's code: the closed
+variant set is what lets `__post_init__` reject at construction time and lets
+`Target.lower()` stay total with no dispatch protocol.
+
+**Deferred to `main`:** the TODO reconciliation. `TODO.md` line 205, "Complex
+geometry and interoperability", still reads as if arbitrary-shape support were
+planned. ADR-0008 scopes that item to the interoperability half (WarpX, MCPL);
+STL/STEP import as PyRITE *simulation* geometry is now explicitly out of scope.
+`TODO.md` is authoritative on `main` and branch copies are disposable, so the
+edit is not made here — the owner should reword that bullet on `main` and cite
+ADR-0008.
 
 ## Decisions and open questions
 

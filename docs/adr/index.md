@@ -41,6 +41,7 @@ In other words:
 0005-energy-grid-schema-decisions
 0006-consolidate-agent-work-records
 0007-project-identity
+0008-no-arbitrary-target-geometry
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -52,3 +53,4 @@ In other words:
 | [0005](0005-energy-grid-schema-decisions.md)        | Energy-grid schema decisions        | Accepted                               |
 | [0006](0006-consolidate-agent-work-records.md)      | Consolidate agent work records      | Accepted                               |
 | [0007](0007-project-identity.md)                    | PyRITE project identity             | Accepted                               |
+| [0008](0008-no-arbitrary-target-geometry.md)        | No arbitrary target geometry        | Accepted                               |
