@@ -7,6 +7,7 @@ energy_keV = { values = [30.0, 40.0, 50.0, 60.0, 100.0, 150.0, 200.0, 250.0, 300
 tilt_deg = { values = [5.0, 15.0, 30.0, 45.0, 60.0, 75.0, 85.0] }
 tilt_azim_deg = { values = [95.0, 105.0, 120.0, 135.0, 150.0, 165.0, 180.0] }
 E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
+energy_grid_refs = {hbn = "f78491ef95bae45e1bcffb03cfe08d969150db29caa097bf85cda7ffc9f47221", hopg = "a929cb11e0718bc0b1fdddd27575aa3df05421d5e38a630596417e4194b9d6fe"}
 
 [profiles.standard.detector]
 observation_angle_deg = 90.0

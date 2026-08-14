@@ -1,0 +1,52 @@
+{
+  "hopg": {
+    "line_rows": [
+      {
+        "energy_keV": 35.0,
+        "raw_eV": 2670.0,
+        "start_eV": 10.0,
+        "stop_eV": 2900.0,
+        "num": 964,
+        "driver_material": "hopg",
+        "driver_tilt_deg": 5.0,
+        "driver_azim_deg": 95.0,
+        "spot_check_flagged": false,
+        "brem_raw_eV": 23625.0,
+        "brem_stop_eV": 24900.0,
+        "brem_driver_material": "hopg",
+        "brem_driver_tilt_deg": 5.0,
+        "brem_driver_azim_deg": 95.0
+      }
+    ],
+    "brem": {
+      "stop_eV": 24900.0,
+      "raw_eV": 23625.0,
+      "step_eV": 25.0
+    }
+  },
+  "hbn": {
+    "line_rows": [
+      {
+        "energy_keV": 35.0,
+        "raw_eV": 2680.0,
+        "start_eV": 10.0,
+        "stop_eV": 2900.0,
+        "num": 964,
+        "driver_material": "hbn",
+        "driver_tilt_deg": 5.0,
+        "driver_azim_deg": 95.0,
+        "spot_check_flagged": false,
+        "brem_raw_eV": 23825.0,
+        "brem_stop_eV": 25100.0,
+        "brem_driver_material": "hbn",
+        "brem_driver_tilt_deg": 5.0,
+        "brem_driver_azim_deg": 95.0
+      }
+    ],
+    "brem": {
+      "stop_eV": 25100.0,
+      "raw_eV": 23825.0,
+      "step_eV": 25.0
+    }
+  }
+}
