@@ -126,11 +126,15 @@ Likely owners:
   only). Slice D is therefore a read-time unification and does not touch the
   write path at all. See
   [slice-d-intrinsic-vs-detected.md](slice-d-intrinsic-vs-detected.md).
-- **Open:** the catalog carries per-material grid entries. If `energy_bins` is a
-  detector field, catalog resolution has to supply it — confirm this against
-  the documented resolution order (profile → per-material override → explicit
-  argument) in [configuration resolution](../../../../docs/repo-design/configuration-resolution.md)
-  before slice C.
+- **Resolved (slice C prerequisite):** yes, catalog resolution supplies it, and
+  the documented order already accommodates this. `configuration-resolution.md`
+  states the run order as `CLI context -> catalog profile -> material override
+  -> named beam/detector/grid -> fidelity preset -> explicit run overrides`, in
+  which the detector and the grid are already **one stage**. Moving
+  `energy_bins` onto `Detector` merges two things that already resolve
+  together and perturbs no documented precedence. The catalog → scene hand-off
+  is a single three-line pattern repeated three times in `campaign/config.py`.
+  See [slice-ce-energy-grid-audit.md](slice-ce-energy-grid-audit.md).
 
 ## Delegation slices and required skills
 
