@@ -160,7 +160,7 @@ change which inputs they accept.
       fields become deprecated shims that construct it, and the `config.py`
       override path rebuilds the target instead of `replace`-ing flat fields.
       See "Slice D1 — what landed" below.
-- [ ] D2 — `substrate=` becomes a `Stack` constructor helper; retire the
+- [x] D2 — `substrate=` becomes a `Stack` constructor helper; retire the
       parallel field pair behind a deprecated shim under the existing D7
       harness. Move `mosaic` onto `Target` in the same slice, leaving
       `mosaic_route` / `mosaic_nodes` where they are for
@@ -315,7 +315,65 @@ construction" doing its job.
 Evidence: `pyrite-dev test` green (3099 passed, 61 skipped), `verify` green,
 `docs` builds, lint and typecheck clean.
 
-## Slice D — handoff (D1 landed above; D2 still pending)
+## Slice D2 — what landed
+
+`Stack.on_substrate(material, thickness_ang, substrate, substrate_thickness_ang)`
+is the sanctioned one-layer spelling, and `target_from_flat` routes the sugar
+through it, so the "substrate = one `Layer` beneath the film" identity has a
+single construction site. Two duplicated defaults got names in the same pass:
+`DEFAULT_FOOTPRINT` (was an identical `default_factory` lambda on `Slab` and
+`Stack`) and `DEFAULT_SUBSTRATE_THICKNESS_ANG` (was a bare `5e6` in four places).
+`target_from_flat` also hoists its two flat-only rules above the variant branch,
+so `substrate`/`stack` exclusion and grooves-forbid-a-stack each have one site.
+
+`mosaic` is target state: a field on `Slab`/`Stack`, `Sweep.mosaic` is an alias
+`InitVar`, and `build_cases` reads `target.mosaic`. `mosaic_route` /
+`mosaic_nodes` stay on `Sweep` for `refactor/scene-object-model`, and so does
+`mosaic_fwhm_deg` — it is a run-level substitution for the catalog value, not
+target state, and the resolution chain is unchanged. The identity digest is
+bit-for-bit: `mosaic` left `dataclasses.fields(Sweep)` but rejoined the payload
+through `target_flat_fields`, and `_identity_v1` serializes with
+`sort_keys=True`, so the key's position never mattered.
+
+`substrate=` / `substrate_thickness_ang=` on `Sweep` now emit a
+`DeprecationWarning` naming `Stack.on_substrate`. Nothing in the repo emits them
+any more: `config.material_sweep` and `config.trajectory_sweep` build the target
+with `target_from_flat(...)` and pass `target=`, which is honest — the catalog
+speaks the flat vocabulary and that function is its documented projection, not a
+user-facing shim.
+
+Decisions taken here rather than discovered in review:
+
+- **Only the substrate pair warns.** The other flat geometry inputs
+  (`thickness_ang`, `tilt_deg`, the footprint pair, ...) are *not* retired by
+  this task — they are the sweep-template vocabulary until `scene-object-model`
+  makes `target.layers[1].thickness_ang` addressable. Warning on them would fire
+  on ~30 live call sites for a spelling with no replacement yet.
+- **`target_replace(substrate=...)` stays silent.** That is the CLI/profile
+  *override* vocabulary, not the constructor; `runs/blaze.py` clears a stack
+  through it. Retiring the override keys is a CLI-surface question, and
+  `substrate` reaches no CLI flag today, so there is no
+  `cli-deprecations.md` row to add.
+- **The catalog TOML `substrate` key stays**, per the handoff recommendation: it
+  is a data vocabulary, not the object model.
+- **Retired flat reads are loud.** `_RetiredFlatInput` replaces `_UnsetType` /
+  `UNSET` and is the default of every flat geometry `InitVar`. It still has to be
+  *readable* — `dataclasses.replace` does `getattr(obj, name)` for every `InitVar`
+  with a default — but every use of the value other than `isinstance`/`is` raises
+  `AttributeError` naming `sweep.target`. So `sweep.tilt_deg == 45.0` now fails
+  instead of silently comparing against `None`, which is the D1 hazard that
+  weakened three assertions.
+- **"Not supplied" is now the sentinel alone.** An explicit `None` is a
+  statement and reaches the target: `crystal_width_mm=None` IS the infinite slab,
+  `substrate=None` IS a free-standing film. Consequence: `Sweep(target=...,
+  substrate=None)` is now a conflict rather than a silent no-op, and
+  `allow_normal_incidence=False` counts as mentioned. Nothing in the repo does
+  either.
+
+Evidence: `pyrite-dev test` green (3105 passed, 61 skipped — six new tests, no
+new warnings), `verify` green, `docs` builds, lint and typecheck clean.
+
+## Slice D — handoff (D1 landed above; D2 landed above)
 
 ### Why D splits in two
 

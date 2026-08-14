@@ -30,7 +30,7 @@ from ..montecarlo import simulate_trajectories
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
 from .profiles import get_fidelity_preset
-from .sweep import BeamSpec, Sweep, beam_replace, target_replace
+from .sweep import BeamSpec, Sweep, beam_replace, target_from_flat, target_replace
 from .transverse import TransverseDistribution
 
 # Override keys that address the beam (BeamSpec) rather than the Sweep itself,
@@ -55,6 +55,7 @@ _TARGET_OVERRIDE_KEYS = frozenset(
         "substrate_thickness_ang",
         "stack",
         "allow_normal_incidence",
+        "mosaic",
     }
 )
 
@@ -190,17 +191,23 @@ def material_sweep(
     sweep = Sweep(
         material=spec.crystal_key,
         detector=resolved_detector,
-        thickness_ang=scan.thickness_ang,
         beam=beam,
-        tilt_deg=scan.tilt_deg,
-        tilt_azim_deg=scan.tilt_azim_deg,
+        # The catalog speaks the flat geometry vocabulary, so the scan grid is
+        # projected onto the target here rather than handed to Sweep's retired
+        # flat aliases.
+        target=target_from_flat(
+            spec.crystal_key,
+            thickness_ang=scan.thickness_ang,
+            tilt_deg=scan.tilt_deg,
+            tilt_azim_deg=scan.tilt_azim_deg,
+            substrate=spec.substrate,
+            stack=spec.stack or None,
+        ),
         E_grid_line=scan.E_grid_line,
         E_grid_line_by_energy=scan.E_grid_line_by_energy,
         E_grid_brem=scan.E_grid_brem,
         n_electrons=scan.n_electrons,
         n_electrons_brem=scan.n_electrons_brem,
-        substrate=spec.substrate,
-        stack=spec.stack or None,
     )
     sweep = get_fidelity_preset(fidelity).apply_sweep(sweep)
     if not overrides:
@@ -271,26 +278,30 @@ def trajectory_sweep(
         tilt_values = tuple(float(t) for t in tilts)
     return Sweep(
         material=spec.crystal_key,  # named stacks: the film
-        thickness_ang=thick,
         beam=BeamSpec(energy_keV=list(energies)),
-        tilt_deg=tilt_values,
-        tilt_azim_deg=float(azim_deg),
         theta_obs_deg=90.0,
         E_grid_line=scan.E_grid_line,
         E_grid_line_by_energy=scan.E_grid_line_by_energy,
         E_grid_brem=scan.E_grid_brem,
-        # transport-only study; normal incidence (tilt=0) is its baseline, so it
-        # opts out of the emission-sweep tilt=0 ban (issue_notes.md #1).
-        allow_normal_incidence=True,
-        stack=stack,
-        substrate=substrate,
-        groove_spacing_ang=groove_spacing_ang,
-        # Finite 5x5 mm footprint for grooved and ungrooved alike (the groove
-        # escape treats the slab as laterally periodic and only the launch stage
-        # sees the footprint -- see montecarlo.spectrum.mc_spectrum), so the
-        # penetration figures record the same electron hit/miss as the sweep.
-        crystal_width_mm=5.0,
-        crystal_height_mm=5.0,
+        target=target_from_flat(
+            spec.crystal_key,
+            thickness_ang=thick,
+            tilt_deg=tilt_values,
+            tilt_azim_deg=float(azim_deg),
+            # transport-only study; normal incidence (tilt=0) is its baseline, so
+            # it opts out of the emission-sweep tilt=0 ban (issue_notes.md #1).
+            allow_normal_incidence=True,
+            stack=stack,
+            substrate=substrate,
+            groove_spacing_ang=groove_spacing_ang,
+            # Finite 5x5 mm footprint for grooved and ungrooved alike (the groove
+            # escape treats the slab as laterally periodic and only the launch
+            # stage sees the footprint -- see montecarlo.spectrum.mc_spectrum), so
+            # the penetration figures record the same electron hit/miss as the
+            # sweep.
+            crystal_width_mm=5.0,
+            crystal_height_mm=5.0,
+        ),
     )
 
 

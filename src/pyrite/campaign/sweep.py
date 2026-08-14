@@ -24,6 +24,7 @@ energy grid) is looked up per material; the detector geometry defaults to the
 are imported here (no GPU), so this module is cheap to import and test.
 """
 
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import InitVar, asdict, dataclass, field, replace
 from itertools import product
@@ -38,7 +39,6 @@ from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.crystal import XRAY_DISPERSION_MODELS
 from ..montecarlo.case import Case
 from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
-    UNSET,
     BlazedGrooves,
     Footprint,
     Layer,
@@ -50,12 +50,13 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     _quantized_angles,
     _radiator,
     _reject_banned_angles,
+    _RetiredFlatInput,
     _seq,
-    _UnsetType,
     crystal_params,
     film_on_substrate_layers,
     fmt_thickness,
     layer_radiator,
+    retired_flat_input,
     stack_layers,
     substrate_composition,
     substrate_radiator,
@@ -236,7 +237,7 @@ class Sweep:
     spellings (``thickness_ang``, ``tilt_deg``, ``tilt_azim_deg``,
     ``crystal_width_mm``, ``crystal_height_mm``, ``groove_spacing_ang``,
     ``substrate``, ``substrate_thickness_ang``, ``stack``,
-    ``allow_normal_incidence``) remain accepted as construction-time aliases
+    ``allow_normal_incidence``, ``mosaic``) remain accepted as construction-time aliases
     that build that target; they are ``InitVar``s, so they do NOT survive as
     attributes -- read geometry through ``sweep.target`` (or
     :func:`~pyrite.campaign.geometry.target_flat_fields` for the flat view).
@@ -261,10 +262,10 @@ class Sweep:
     # beyond geometry. ``__post_init__`` keeps it == ``target.material``, so it
     # is a mirror of the target rather than a second source of truth.
     material: str | None = None
-    thickness_ang: InitVar[ScalarOrSeq | None] = None
+    thickness_ang: InitVar[ScalarOrSeq] = retired_flat_input("thickness_ang")
     beam: BeamSpec = field(default_factory=BeamSpec)
-    tilt_deg: InitVar[ScalarOrSeq | None] = None
-    tilt_azim_deg: InitVar[ScalarOrSeq | None] = None
+    tilt_deg: InitVar[ScalarOrSeq] = retired_flat_input("tilt_deg")
+    tilt_azim_deg: InitVar[ScalarOrSeq] = retired_flat_input("tilt_azim_deg")
     # Optional electron-count grids (catalog ``[profiles.*]`` settings,
     # ``n_electrons`` / ``n_electrons_brem`` keys): None -> build_cases falls
     # back to the caller's settings-level counts. Single values are typical;
@@ -273,16 +274,14 @@ class Sweep:
     # (keyed on (name, E0_keV)) never conflates statistics variants.
     n_electrons: ScalarOrSeq | None = None
     n_electrons_brem: ScalarOrSeq | None = None
-    groove_spacing_ang: InitVar[float | None] = None
+    groove_spacing_ang: InitVar[float | None] = retired_flat_input("groove_spacing_ang")
     # Blazed sawtooth grooves on the beam-entrance face (docs/superpowers/
     # plans/2026-07-23-blazed-groove-geometry.md). Scalar, not sweepable in
     # v1. Requires tilt_azim_deg == 180, 0 < tilt_deg < 90, theta_obs = 90,
     # and no substrate/stack. A finite footprint IS compatible and is the
     # default -- see geometry.BlazedGrooves, which owns those rules now.
-    # UNSET, not None: None IS the explicit infinite slab, so it cannot double
-    # as "not mentioned" the way it can for the other geometry inputs.
-    crystal_width_mm: InitVar[ScalarOrSeq | None | _UnsetType] = UNSET
-    crystal_height_mm: InitVar[ScalarOrSeq | None | _UnsetType] = UNSET
+    crystal_width_mm: InitVar[ScalarOrSeq | None] = retired_flat_input("crystal_width_mm")
+    crystal_height_mm: InitVar[ScalarOrSeq | None] = retired_flat_input("crystal_height_mm")
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: InitVar[float | None] = None
     n_families: int = 4
@@ -319,7 +318,11 @@ class Sweep:
     #   mosaic_fwhm_deg        -> override the per-crystal value for ALL crystals in
     #       the sweep (e.g. HOPG ZYA 0.4 / ZYB 0.8 / ZYH 3.5), or supply one for a
     #       crystal that has none. Ignored unless mosaic=True.
-    mosaic: bool = False
+    # ``mosaic`` is a property of the target crystal, so it lives on
+    # ``Sweep.target`` and this is an alias that normalizes onto it. The
+    # ``mosaic_fwhm_deg`` override stays here: it is a run-level substitution for
+    # the catalog value, not target state.
+    mosaic: InitVar[bool] = retired_flat_input("mosaic")
     mosaic_fwhm_deg: float | None = None
     # how the mosaic broadening (when mosaic=True) is applied:
     #   "analytic" (default) -> the cheap energy-shift Gaussian added in quadrature
@@ -340,21 +343,24 @@ class Sweep:
     # own coherent PXR/CBS lines (the film, and a crystalline substrate e.g.
     # "silicon" or "sapphire"), summed incoherently; an amorphous substrate ("sio2") adds
     # only brem + absorption.
-    substrate: InitVar[str | None] = None  # "sio2" | a crystal key e.g. "silicon"/"sapphire"
-    substrate_thickness_ang: InitVar[float | None] = None  # 0.5 mm default
+    # RETIRED in favour of ``target=Stack.on_substrate(...)``: still accepted,
+    # but it warns. The catalog TOML keeps its own ``substrate`` key -- that is a
+    # data vocabulary, not the object model.
+    substrate: InitVar[str | None] = retired_flat_input("substrate")
+    substrate_thickness_ang: InitVar[float] = retired_flat_input("substrate_thickness_ang")
     # general N-layer stack under the film (mutually exclusive with substrate=;
     # substrate="x" is sugar for stack=(LayerSpec("x", substrate_thickness_ang),)).
     # Each LayerSpec carries its own thickness + orientation (beam_uvw, azimuth_deg),
     # so e.g. a few-layer film / thin a-SiO2 / thick crystalline Si device stack
     # is stack=(LayerSpec("sio2", 2850), LayerSpec("silicon", 5e6)).
-    stack: InitVar[Sequence[LayerSpec] | None] = None
+    stack: InitVar[Sequence[LayerSpec] | None] = retired_flat_input("stack")
     # Transport-only escape hatch for the polar tilt_deg==0 ban (issue_notes.md
     # #1). tilt=0 is a degenerate ZERO coherent-line geometry, so emission /
     # line-grid sweeps must never sample it; the penetration-depth study, though,
     # is transport only and uses normal incidence (tilt=0, normal azimuth) as its
     # physical baseline. Only that study sets this True. azimuth==90 stays banned
     # regardless -- no legitimate use, and it carried the azim-90 ranking bug.
-    allow_normal_incidence: InitVar[bool] = False
+    allow_normal_incidence: InitVar[bool] = retired_flat_input("allow_normal_incidence")
     # Canonical detector owner. Kept after existing fields so legacy positional
     # Sweep construction retains its historical argument order.
     detector: DetectorSpec | None = None
@@ -365,17 +371,18 @@ class Sweep:
 
     def __post_init__(
         self,
-        thickness_ang: ScalarOrSeq | None,
-        tilt_deg: ScalarOrSeq | None,
-        tilt_azim_deg: ScalarOrSeq | None,
+        thickness_ang: ScalarOrSeq,
+        tilt_deg: ScalarOrSeq,
+        tilt_azim_deg: ScalarOrSeq,
         groove_spacing_ang: float | None,
-        crystal_width_mm: ScalarOrSeq | None | _UnsetType,
-        crystal_height_mm: ScalarOrSeq | None | _UnsetType,
+        crystal_width_mm: ScalarOrSeq | None,
+        crystal_height_mm: ScalarOrSeq | None,
         theta_obs_deg: float | None,
         dtheta_obs_deg: float | None,
         domega_sr: float | None,
+        mosaic: bool,
         substrate: str | None,
-        substrate_thickness_ang: float | None,
+        substrate_thickness_ang: float,
         stack: Sequence[LayerSpec] | None,
         allow_normal_incidence: bool,
     ) -> None:
@@ -388,26 +395,35 @@ class Sweep:
         after profile resolution.
         """
         self._normalize_detector(theta_obs_deg, dtheta_obs_deg, domega_sr)
-        flat: dict[str, Any] = {}
-        for name, value in (
-            ("thickness_ang", thickness_ang),
-            ("tilt_deg", tilt_deg),
-            ("tilt_azim_deg", tilt_azim_deg),
-            ("groove_spacing_ang", groove_spacing_ang),
-            ("substrate", substrate),
-            ("substrate_thickness_ang", substrate_thickness_ang),
-            ("stack", stack),
-        ):
-            if value is not None:
-                flat[name] = value
-        for name, value in (
-            ("crystal_width_mm", crystal_width_mm),
-            ("crystal_height_mm", crystal_height_mm),
-        ):
-            if not isinstance(value, _UnsetType):
-                flat[name] = value
-        if allow_normal_incidence:
-            flat["allow_normal_incidence"] = True
+        # Only the sentinel means "not supplied": an explicit None is a statement
+        # (``crystal_width_mm=None`` IS the infinite slab, ``substrate=None`` IS a
+        # free-standing film), so it reaches the target like any other value.
+        flat: dict[str, Any] = {
+            name: value
+            for name, value in (
+                ("thickness_ang", thickness_ang),
+                ("tilt_deg", tilt_deg),
+                ("tilt_azim_deg", tilt_azim_deg),
+                ("groove_spacing_ang", groove_spacing_ang),
+                ("crystal_width_mm", crystal_width_mm),
+                ("crystal_height_mm", crystal_height_mm),
+                ("substrate", substrate),
+                ("substrate_thickness_ang", substrate_thickness_ang),
+                ("stack", stack),
+                ("allow_normal_incidence", allow_normal_incidence),
+                ("mosaic", mosaic),
+            )
+            if not isinstance(value, _RetiredFlatInput)
+        }
+        retired = [name for name in ("substrate", "substrate_thickness_ang") if name in flat]
+        if retired:
+            warnings.warn(
+                f"Sweep({'=, '.join(retired)}=) is deprecated; build the target instead: "
+                "target=Stack.on_substrate(material, thickness_ang, substrate, "
+                "substrate_thickness_ang)",
+                DeprecationWarning,
+                stacklevel=3,
+            )
 
         if self.target is None:
             if self.material is None:
@@ -645,7 +661,7 @@ def build_cases(
     # crystal has a mosaic_fwhm_deg (or the Sweep overrides it). None -> perfect
     # crystal, so store_result adds no mosaic term (exact no-op).
     mosaic_deg = None
-    if sweep.mosaic:
+    if target.mosaic:
         mosaic_deg = (
             sweep.mosaic_fwhm_deg
             if sweep.mosaic_fwhm_deg is not None

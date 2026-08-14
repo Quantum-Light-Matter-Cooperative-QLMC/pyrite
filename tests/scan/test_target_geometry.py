@@ -4,6 +4,8 @@ The equivalence tests pin ``lower()`` against what ``build_cases`` produces
 today, so slice C is a rewire rather than a behaviour change.
 """
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -178,6 +180,7 @@ def _sweep(**kwargs):
     return Sweep(**{**base, **kwargs})
 
 
+@pytest.mark.filterwarnings("ignore:Sweep.substrate:DeprecationWarning")
 @pytest.mark.parametrize(
     ("sweep_kwargs", "target"),
     [
@@ -207,11 +210,11 @@ def _sweep(**kwargs):
         ),
         (
             {"substrate": "sio2"},
-            Stack(layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6))),
+            Stack.on_substrate(MATERIAL, 2e4, "sio2"),
         ),
         (
             {"substrate": "silicon", "substrate_thickness_ang": 1e6},
-            Stack(layers=(Layer(MATERIAL, 2e4), Layer("silicon", 1e6))),
+            Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6),
         ),
         (
             {
@@ -302,3 +305,46 @@ def test_stack_radiators_align_with_the_absorber_stack():
     assert geometry.layer_radiators[1] is None  # amorphous sio2 only absorbs
     assert geometry.layer_radiators[2]["crystal"] == "silicon"
     assert np.isclose(geometry.abs_layers[0][1], 2e4)
+
+
+# ---- the retired substrate pair, the Stack helper, and mosaic ----------------
+
+
+def test_on_substrate_is_the_one_layer_stack():
+    assert Stack.on_substrate(MATERIAL, 2e4, "sio2") == Stack(
+        layers=(Layer(MATERIAL, 2e4), Layer("sio2", 5e6))
+    )
+
+
+def test_the_substrate_pair_warns_but_still_builds_the_target():
+    with pytest.deprecated_call(match="Stack.on_substrate"):
+        sweep = _sweep(substrate="silicon", substrate_thickness_ang=1e6)
+    assert sweep.target == Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6)
+
+
+def test_the_canonical_target_spelling_does_not_warn():
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        _sweep(target=Stack.on_substrate(MATERIAL, 2e4, "silicon", 1e6))
+
+
+def test_reading_a_retired_flat_name_raises():
+    sweep = _sweep(tilt_deg=45.0)
+    assert sweep.target.tilt_deg == 45.0
+    with pytest.raises(AttributeError, match="sweep.target"):
+        float(sweep.tilt_deg)
+    with pytest.raises(AttributeError, match="sweep.target"):
+        assert sweep.tilt_deg == 45.0
+
+
+def test_mosaic_is_target_state():
+    assert _sweep().target.mosaic is False
+    assert _sweep(mosaic=True).target.mosaic is True
+    assert _sweep(target=Slab(MATERIAL, mosaic=True)).target.mosaic is True
+
+
+def test_build_cases_reads_mosaic_from_the_target():
+    off = build_cases(_sweep(mosaic_fwhm_deg=0.8))[0]
+    on = build_cases(_sweep(target=Slab(MATERIAL, mosaic=True), mosaic_fwhm_deg=0.8))[0]
+    assert off["mosaic_fwhm_rad"] is None
+    assert on["mosaic_fwhm_rad"] == pytest.approx(np.deg2rad(0.8))

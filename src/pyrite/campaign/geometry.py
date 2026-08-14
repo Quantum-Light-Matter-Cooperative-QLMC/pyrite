@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import product
 from typing import Any
 
@@ -259,6 +259,13 @@ class Footprint:
         return list(product(_seq(self.width_mm), _seq(self.height_mm)))
 
 
+DEFAULT_FOOTPRINT = Footprint(5.0, 5.0)
+"""The historical default bounded footprint. Frozen, so one instance is shared."""
+
+DEFAULT_SUBSTRATE_THICKNESS_ANG = 5e6
+"""The historical ``substrate_thickness_ang`` default: a 0.5 mm wafer."""
+
+
 @dataclass(frozen=True)
 class BlazedGrooves:
     """Blazed sawtooth grooves machined into the beam-entrance face.
@@ -359,6 +366,7 @@ class _TargetGeometry:
     tilt_azim_deg: ScalarOrSeq
     footprint: Footprint | None
     allow_normal_incidence: bool
+    mosaic: bool
 
     # -- variant hooks --------------------------------------------------------
 
@@ -480,9 +488,14 @@ class Slab(_TargetGeometry):
     thickness_ang: ScalarOrSeq = 2e4
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    footprint: Footprint | None = field(default_factory=lambda: Footprint(5.0, 5.0))
+    footprint: Footprint | None = DEFAULT_FOOTPRINT
     entrance_face: BlazedGrooves | None = None
     allow_normal_incidence: bool = False
+    # Crystal mosaicity is a property of the target crystal, not of the run: True
+    # applies the catalog's per-crystal ``mosaic_fwhm_deg`` (crystals without one
+    # stay perfect). The QUADRATURE choices that consume it -- ``mosaic_route``
+    # and ``mosaic_nodes`` -- stay on ``Sweep``; they are numerics.
+    mosaic: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.material, str) or not self.material.strip():
@@ -514,8 +527,9 @@ class Stack(_TargetGeometry):
     layers: tuple[Layer, ...]
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    footprint: Footprint | None = field(default_factory=lambda: Footprint(5.0, 5.0))
+    footprint: Footprint | None = DEFAULT_FOOTPRINT
     allow_normal_incidence: bool = False
+    mosaic: bool = False
 
     def __post_init__(self) -> None:
         if isinstance(self.layers, Layer) or not isinstance(self.layers, Sequence):
@@ -537,6 +551,38 @@ class Stack(_TargetGeometry):
         object.__setattr__(self, "layers", layers)
         self._validate_geometry()
 
+    @classmethod
+    def on_substrate(
+        cls,
+        material: str,
+        thickness_ang: ScalarOrSeq,
+        substrate: str,
+        substrate_thickness_ang: float = DEFAULT_SUBSTRATE_THICKNESS_ANG,
+        *,
+        tilt_deg: ScalarOrSeq = 30.0,
+        tilt_azim_deg: ScalarOrSeq = 0.0,
+        footprint: Footprint | None = DEFAULT_FOOTPRINT,
+        allow_normal_incidence: bool = False,
+        mosaic: bool = False,
+    ) -> Stack:
+        """A film on one substrate wafer -- the sanctioned one-layer stack.
+
+        This is what the retired ``Sweep(substrate=...)`` pair meant, spelled as a
+        constructor: :class:`Stack` itself requires the film plus at least one
+        layer beneath it, so a caller who wants only a substrate builds it here.
+        """
+        return cls(
+            layers=(
+                Layer(material, thickness_ang),
+                Layer(substrate, substrate_thickness_ang),
+            ),
+            tilt_deg=tilt_deg,
+            tilt_azim_deg=tilt_azim_deg,
+            footprint=footprint,
+            allow_normal_incidence=allow_normal_incidence,
+            mosaic=mosaic,
+        )
+
     @property
     def material(self) -> str:
         """The film material -- the one whose crystal params drive the case."""
@@ -553,21 +599,51 @@ Target = Slab | Stack
 """The closed target variant set. Not an extension point -- see the module docstring."""
 
 
-class _UnsetType:
-    """Sentinel for a flat geometry input that was not supplied at all.
+class _RetiredFlatInput:
+    """The class attribute a retired flat geometry ``InitVar`` leaves behind.
 
-    ``None`` cannot serve: ``crystal_width_mm=None`` is the explicit infinite
-    slab, a different statement from "did not mention the footprint".
+    It does two jobs. It is the "was not supplied at all" sentinel that ``None``
+    cannot serve -- ``crystal_width_mm=None`` IS the explicit infinite slab, a
+    different statement from not mentioning the footprint. And it is what a READ
+    of the retired name returns: ``dataclasses`` keeps an ``InitVar``'s default
+    as a class attribute and ``dataclasses.replace`` reads it back, so the name
+    cannot simply be deleted. Every use of the value other than an identity or
+    ``isinstance`` check raises, so a stale ``sweep.tilt_deg`` reader fails
+    loudly instead of silently seeing ``None``.
     """
 
+    __slots__ = ("_name",)
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+
     def __repr__(self) -> str:
-        return "UNSET"
+        return f"<retired flat geometry input {self._name!r}>"
 
-    def __bool__(self) -> bool:
-        return False
+    def _retired(self, *_args: Any, **_kwargs: Any) -> Any:
+        raise AttributeError(
+            f"{self._name!r} is not state on Sweep: geometry lives on sweep.target "
+            f"(target_flat_fields(sweep.target) gives the flat projection)"
+        )
+
+    __bool__ = _retired
+    __eq__ = _retired
+    __ne__ = _retired
+    __lt__ = _retired
+    __le__ = _retired
+    __gt__ = _retired
+    __ge__ = _retired
+    __float__ = _retired
+    __int__ = _retired
+    __iter__ = _retired
+    __len__ = _retired
+    __getitem__ = _retired
+    __hash__ = None  # type: ignore[assignment]
 
 
-UNSET = _UnsetType()
+def retired_flat_input(name: str) -> Any:
+    """The default for a retired flat geometry ``InitVar`` named *name*."""
+    return _RetiredFlatInput(name)
 
 
 def target_from_flat(
@@ -580,9 +656,10 @@ def target_from_flat(
     crystal_height_mm: ScalarOrSeq | None = 5.0,
     groove_spacing_ang: float | None = None,
     substrate: str | None = None,
-    substrate_thickness_ang: float = 5e6,
+    substrate_thickness_ang: float = DEFAULT_SUBSTRATE_THICKNESS_ANG,
     stack: Sequence[LayerSpec] | None = None,
     allow_normal_incidence: bool = False,
+    mosaic: bool = False,
 ) -> Target:
     """Build the target described by the legacy flat geometry inputs.
 
@@ -600,15 +677,26 @@ def target_from_flat(
             raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
         footprint = Footprint(crystal_width_mm, crystal_height_mm)
 
-    # normalize the substrate sugar onto the general stack (mutually exclusive)
+    if substrate is not None and stack is not None:
+        raise ValueError("give either substrate= or stack=, not both")
+    if groove_spacing_ang is not None and (substrate is not None or stack is not None):
+        raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
+
+    # the substrate sugar IS the one-layer stack, so it goes through its helper
     if substrate is not None:
-        if stack is not None:
-            raise ValueError("give either substrate= or stack=, not both")
-        stack = (LayerSpec(substrate, substrate_thickness_ang),)
+        return Stack.on_substrate(
+            material,
+            thickness_ang,
+            substrate,
+            substrate_thickness_ang,
+            tilt_deg=tilt_deg,
+            tilt_azim_deg=tilt_azim_deg,
+            footprint=footprint,
+            allow_normal_incidence=allow_normal_incidence,
+            mosaic=mosaic,
+        )
 
     if stack is not None:
-        if groove_spacing_ang is not None:
-            raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
         return Stack(
             layers=(
                 Layer(material, thickness_ang),
@@ -621,6 +709,7 @@ def target_from_flat(
             tilt_azim_deg=tilt_azim_deg,
             footprint=footprint,
             allow_normal_incidence=allow_normal_incidence,
+            mosaic=mosaic,
         )
     return Slab(
         material,
@@ -630,6 +719,7 @@ def target_from_flat(
         footprint=footprint,
         entrance_face=(None if groove_spacing_ang is None else BlazedGrooves(groove_spacing_ang)),
         allow_normal_incidence=allow_normal_incidence,
+        mosaic=mosaic,
     )
 
 
@@ -648,7 +738,7 @@ def target_flat_fields(target: Target) -> dict[str, Any]:
     face = target._entrance_face()
     below = target._below_film()
     substrate = None
-    substrate_thickness_ang = 5e6
+    substrate_thickness_ang = DEFAULT_SUBSTRATE_THICKNESS_ANG
     stack: tuple[LayerSpec, ...] | None = None if below is None else tuple(below)
     if stack is not None and len(stack) == 1 and stack[0].beam_uvw is None:
         only = stack[0]
@@ -668,6 +758,7 @@ def target_flat_fields(target: Target) -> dict[str, Any]:
         "substrate_thickness_ang": substrate_thickness_ang,
         "stack": stack,
         "allow_normal_incidence": target.allow_normal_incidence,
+        "mosaic": target.mosaic,
     }
 
 
@@ -688,7 +779,7 @@ def target_replace(target: Target, **changes: Any) -> Target:
         # inherited stack would make substrate=None a no-op instead of a clear.
         flat["substrate"] = None
         flat["stack"] = None
-        flat["substrate_thickness_ang"] = 5e6
+        flat["substrate_thickness_ang"] = DEFAULT_SUBSTRATE_THICKNESS_ANG
     elif "substrate_thickness_ang" in changes and flat["substrate"] is None:
         raise ValueError("substrate_thickness_ang override requires substrate=")
     flat.update(changes)

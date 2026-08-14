@@ -13,6 +13,7 @@ import pytest
 from pyrite.campaign.sweep import (
     BeamSpec,
     LayerSpec,
+    Stack,
     Sweep,
     build_cases,
     film_on_substrate_layers,
@@ -167,10 +168,8 @@ def test_build_cases_attaches_abs_layers_only_with_substrate():
     stacked = build_cases(
         Sweep(
             material="mose2",
-            tilt_deg=30.0,
             beam=BeamSpec(energy_keV=30.0),
-            substrate="sio2",
-            substrate_thickness_ang=1e6,
+            target=Stack.on_substrate("mose2", 2e4, "sio2", 1e6, tilt_deg=30.0),
         )
     )
     for c in stacked:
@@ -208,7 +207,11 @@ def test_build_cases_layer_radiators_match_stack():
 
     # amorphous substrate -> [film radiator, None] (substrate adds no lines)
     amorph = build_cases(
-        Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0), substrate="sio2")
+        Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=30.0),
+            target=Stack.on_substrate("mose2", 2e4, "sio2", tilt_deg=30.0),
+        )
     )[0]
     film, sub = amorph["layer_radiators"]
     assert sub is None
@@ -220,7 +223,11 @@ def test_build_cases_layer_radiators_match_stack():
 
     # crystalline substrate -> [film radiator, substrate radiator]
     cryst = build_cases(
-        Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0), substrate="sapphire")
+        Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=30.0),
+            target=Stack.on_substrate("mose2", 2e4, "sapphire", tilt_deg=30.0),
+        )
     )[0]
     assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
     assert len(cryst["layer_radiators"]) == len(cryst["abs_layers"]) == 2
@@ -285,13 +292,21 @@ def test_build_cases_stack_three_layers():
 
 def test_build_cases_substrate_sugar_matches_single_layer_stack():
     kw: dict[str, Any] = dict(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0))
-    a = build_cases(Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6))[0]
-    b = build_cases(Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)))[0]
-    assert a["abs_layers"] == b["abs_layers"]
-    assert a["layer_radiators"] == b["layer_radiators"]
-    assert a["name"] == b["name"]
+    with pytest.deprecated_call():
+        sugar = build_cases(Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6))[0]
+    general = build_cases(Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)))[0]
+    helper = build_cases(
+        Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=30.0),
+            target=Stack.on_substrate("mose2", 2e4, "sapphire", 1e6, tilt_deg=30.0),
+        )
+    )[0]
+    for key in ("abs_layers", "layer_radiators", "name"):
+        assert sugar[key] == general[key] == helper[key]
 
 
+@pytest.mark.filterwarnings("ignore:Sweep.substrate:DeprecationWarning")
 def test_build_cases_rejects_substrate_plus_stack():
     with pytest.raises(ValueError):
         build_cases(

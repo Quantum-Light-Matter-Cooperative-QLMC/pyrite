@@ -17,6 +17,7 @@ from pyrite.campaign.config import (
 from pyrite.campaign.sweep import (
     MATERIAL_LABELS,
     BeamSpec,
+    Stack,
     Sweep,
     build_cases,
     case_cost,
@@ -904,6 +905,7 @@ def test_build_cases_groove_requires_tilt_between_0_and_90():
         )
 
 
+@pytest.mark.filterwarnings("ignore:Sweep.substrate:DeprecationWarning")
 def test_build_cases_groove_rejects_substrate():
     with pytest.raises(ValueError):
         build_cases(
@@ -1225,11 +1227,8 @@ def test_case_cost_walks_a_multilayer_stack():
     (stacked,) = build_cases(
         Sweep(
             material="hopg",
-            tilt_deg=5.0,
-            tilt_azim_deg=180.0,
-            thickness_ang=2e4,
             beam=BeamSpec(energy_keV=60.0),
-            substrate="silicon",
+            target=Stack.on_substrate("hopg", 2e4, "silicon", tilt_deg=5.0, tilt_azim_deg=180.0),
         )
     )
     assert stacked.get("abs_layers") is not None
