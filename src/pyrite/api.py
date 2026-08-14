@@ -73,6 +73,13 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
     return cases
 
 
+def build_legacy_cases(old_sweep: Any, settings: Any) -> list[Case]:
+    """Internal scan/blaze bridge onto the public sweep lowering path."""
+    from .campaign.legacy import adapt_legacy_sweep
+
+    return build_sweep_cases(adapt_legacy_sweep(old_sweep, settings))
+
+
 def simulate(
     beam: Any,
     target: Any,
@@ -126,4 +133,4 @@ def simulate(
     )
 
 
-__all__ = ["build_case", "build_sweep_cases", "simulate"]
+__all__ = ["build_case", "build_legacy_cases", "build_sweep_cases", "simulate"]

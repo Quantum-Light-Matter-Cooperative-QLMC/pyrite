@@ -242,16 +242,14 @@ class Sweep:
     @classmethod
     def from_legacy(cls, old_sweep: Any, settings: Any) -> Sweep:
         """Convert the D7 `campaign.sweep.Sweep`/`Settings` pair."""
-        from .legacy import sweep_from_legacy
+        from .legacy import adapt_legacy_sweep
 
         warnings.warn(
             "Sweep.from_legacy() is a compatibility bridge for the D7 support window",
             DeprecationWarning,
             stacklevel=2,
         )
-        converted = sweep_from_legacy(old_sweep, settings)
-        object.__setattr__(converted, "_legacy_source", (old_sweep, settings))
-        return converted
+        return adapt_legacy_sweep(old_sweep, settings)
 
 
 __all__ = ["Analysis", "Convergence", "Numerics", "Scene", "Sweep"]

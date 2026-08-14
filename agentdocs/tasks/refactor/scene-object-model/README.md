@@ -141,7 +141,7 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
       thickness is the suggested target.
 - [x] G — Public `pr.simulate` + `Result` with `spectrum` and `provenance`. No
       filesystem writes on the single-shot path.
-- [ ] H — Reimplement `runs.scan` and `runs.blaze` over `pr.simulate`'s
+- [x] H — Reimplement `runs.scan` and `runs.blaze` over `pr.simulate`'s
       internals, so the sweep driver and the single-shot path share one code
       path rather than two.
 - [ ] I — Port the marimo apps to the public API. The trace app already runs

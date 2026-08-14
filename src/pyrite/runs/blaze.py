@@ -59,8 +59,8 @@ def _load_runtime() -> None:
     global _ProgressTimer
     global validate_materials
 
+    from .. import api as api_module
     from ..campaign import config as config_module
-    from ..campaign import sweep as sweep_module
     from . import run as run_module
     from . import scan as scan_module
 
@@ -71,7 +71,7 @@ def _load_runtime() -> None:
     gate_cases_by_penetration = gate_cases_by_penetration or config_module.gate_cases_by_penetration
     material_sweep = material_sweep or config_module.material_sweep
     run_sweep = run_sweep or run_module.run_sweep
-    build_cases = build_cases or sweep_module.build_cases
+    build_cases = build_cases or api_module.build_legacy_cases
     _write_progress_record = _write_progress_record or scan_module._write_progress_record
     _ProgressTimer = _ProgressTimer or scan_module._ProgressTimer
     validate_materials = validate_materials or scan_module.validate_materials
@@ -163,13 +163,7 @@ def run(args):
             overrides["tilt_deg"] = args.angles
         sweep = material_sweep(args.material, **overrides)
         cases.extend(
-            build_cases(
-                sweep,
-                settings.n_electrons,
-                settings.n_electrons_brem,
-                coherent_emission=settings.coherent_emission,
-                xray_dispersion=settings.xray_dispersion,
-            )
+            build_cases(sweep, settings)
         )
 
     cases, dropped = gate_cases_by_penetration(cases)

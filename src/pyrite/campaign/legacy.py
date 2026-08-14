@@ -89,6 +89,13 @@ def sweep_from_legacy(old_sweep: Any, settings: Any) -> Sweep:
     return Sweep(base=scene, axes=axes)
 
 
+def adapt_legacy_sweep(old_sweep: Any, settings: Any) -> Sweep:
+    """Internal bridge retaining the exact source expansion for D7 callers."""
+    converted = sweep_from_legacy(old_sweep, settings)
+    object.__setattr__(converted, "_legacy_source", (old_sweep, settings))
+    return converted
+
+
 def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
     """Resolve the first legacy sampling-budget point and all fixed controls."""
     line = old_sweep.n_electrons
@@ -120,4 +127,9 @@ def analysis_from_legacy(settings: Any) -> Analysis:
     )
 
 
-__all__ = ["analysis_from_legacy", "numerics_from_legacy", "sweep_from_legacy"]
+__all__ = [
+    "adapt_legacy_sweep",
+    "analysis_from_legacy",
+    "numerics_from_legacy",
+    "sweep_from_legacy",
+]
