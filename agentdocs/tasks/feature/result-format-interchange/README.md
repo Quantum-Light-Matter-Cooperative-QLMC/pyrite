@@ -131,9 +131,13 @@ as result payload, control-plane state, or incidental.
 - `4bb595f` — schema-version-1 HDF5 writer, signature dispatch, permanent
   plain/gzip/zstd pickle readers, h5py-independent-inspection regression, and
   bit-for-bit spectrum regression.
+- `e782cce` — lower validation reproduction cache dataclass keys to native
+  scalar tuples, restoring them at the cache boundary and retaining legacy
+  dataclass-key pickle reads.
 - Focused checkpoint/run/analysis regression surface: 221 passed.
-- `pyrite-dev lint`, `pyrite-dev typecheck`, `pyrite-dev repo-map --check`, and
-  `pyrite-dev docs`: passed.
+- Full `pyrite-dev test`: passed. `pyrite-dev verify`: passed, including the
+  repeated full suite, docs, lint, typecheck, import contracts, repo-map check,
+  and skill synchronization. Standalone `pyrite-dev docs`: passed.
 - MCPL validation: blocked; no scientifically defined photon phase-space record
   exists to export. No synthetic/fabricated particle records were written.
 
