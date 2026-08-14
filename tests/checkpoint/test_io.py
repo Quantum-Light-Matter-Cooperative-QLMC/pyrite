@@ -1,11 +1,12 @@
-"""Tests for pyrite.checkpoints._checkpoint_io: zstd checkpoint compression (P2 #8) with
-transparent backward-compat reads of gzip and legacy plain pickles."""
+"""Versioned HDF5 checkpoint encoding and permanent pickle compatibility."""
 
 import gzip
 import io
 import pickle
 
+import h5py
 import numpy as np
+from compression import zstd
 
 from pyrite.checkpoints import _checkpoint_io as ckio
 
@@ -14,10 +15,17 @@ def _payload():
     return {"cfg_a": {30.0: {"case": {"crystal": "hopg"}, "spec": np.ones(1000)}}}
 
 
-def test_dump_writes_zstd_magic_header(tmp_path):
+def test_dump_writes_independently_readable_hdf5(tmp_path):
     path = tmp_path / "hopg.pkl"
     ckio.dump(_payload(), str(path))
-    assert path.read_bytes()[:4] == b"\x28\xb5\x2f\xfd"
+    assert path.read_bytes()[:8] == b"\x89HDF\r\n\x1a\n"
+    with h5py.File(path, "r") as h5:
+        assert h5.attrs["schema"] == "pyrite.result"
+        assert h5.attrs["schema_version"] == 1
+        assert h5.attrs["identity_version"] == 1
+        assert h5["value/items/00000000/value/items/00000000/value/items/00000001/value"][...].shape == (
+            1000,
+        )
 
 
 def test_dump_is_byte_stable_across_paths_and_write_times(tmp_path):
@@ -64,14 +72,40 @@ def test_dump_load_roundtrips(tmp_path):
     assert np.allclose(loaded["cfg_a"][30.0]["spec"], payload["cfg_a"][30.0]["spec"])
 
 
-def test_dump_is_smaller_than_plain_pickle(tmp_path):
-    payload = _payload()
-    compressed = tmp_path / "compressed.pkl"
-    plain = tmp_path / "plain.pkl"
-    ckio.dump(payload, str(compressed))
-    with open(plain, "wb") as f:
-        pickle.dump(payload, f)
-    assert compressed.stat().st_size < plain.stat().st_size
+def test_spectrum_bytes_roundtrip_bit_for_bit(tmp_path):
+    path = tmp_path / "spectrum.pkl"
+    spectrum = np.array([0.0, -0.0, np.nan, np.inf, -np.inf, np.nextafter(1.0, 2.0)])
+    ckio.dump({"spec": spectrum}, str(path))
+    loaded = ckio.load(str(path))["spec"]
+    assert loaded.dtype == spectrum.dtype
+    assert loaded.tobytes() == spectrum.tobytes()
+
+
+def test_dump_load_preserves_container_kinds_nulls_and_numpy_dtypes(tmp_path):
+    path = tmp_path / "shapes.pkl"
+    payload = {
+        "absent-is-distinct": None,
+        "sequence": ([np.int16(2)], ("x", np.float32(3.5))),
+        30.0: {"unicode": "MoS₂", "logical": True, "complex": 1 + 2j},
+    }
+    ckio.dump(payload, str(path))
+    loaded = ckio.load(str(path))
+    assert loaded.keys() == payload.keys()
+    assert loaded["absent-is-distinct"] is None
+    assert isinstance(loaded["sequence"], tuple)
+    assert isinstance(loaded["sequence"][0], list)
+    assert isinstance(loaded["sequence"][0][0], np.int16)
+    assert isinstance(loaded["sequence"][1][1], np.float32)
+    assert loaded[30.0] == payload[30.0]
+
+
+def test_dump_uses_portable_gzip_filter_for_numeric_arrays(tmp_path):
+    path = tmp_path / "compressed.pkl"
+    ckio.dump(_payload(), str(path))
+    with h5py.File(path, "r") as h5:
+        spec = h5["value/items/00000000/value/items/00000000/value/items/00000001/value"]
+        assert spec.compression == "gzip"
+        assert spec.shuffle
 
 
 def test_load_reads_legacy_plain_pickle(tmp_path):
@@ -96,3 +130,13 @@ def test_load_reads_gzip_pickle(tmp_path):
         pickle.dump(payload, f)
     loaded = ckio.load(str(path))
     assert set(loaded) == set(payload)
+
+
+def test_load_reads_zstd_pickle(tmp_path):
+    path = tmp_path / "zstd.pkl"
+    payload = _payload()
+    with zstd.ZstdFile(path, "wb") as f:
+        pickle.dump(payload, f)
+    loaded = ckio.load(str(path))
+    assert set(loaded) == set(payload)
+    assert np.array_equal(loaded["cfg_a"][30.0]["spec"], payload["cfg_a"][30.0]["spec"])

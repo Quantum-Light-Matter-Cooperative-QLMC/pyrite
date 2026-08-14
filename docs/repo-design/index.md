@@ -39,6 +39,7 @@ compute/gpu-transport-rawkernel.md
 
 storage/checkpoint-case-store
 storage/dataset-identity-and-storage
+storage/result-schema
 ```
 
 ## Architecture decision records
