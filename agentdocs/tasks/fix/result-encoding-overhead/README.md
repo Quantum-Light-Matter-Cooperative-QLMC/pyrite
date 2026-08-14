@@ -20,8 +20,9 @@ totalling 24.7 MB; median array 8 KB, largest 16 KB):
 | Current schema v1 | 42.5 MB | 6.9 s | 6.5 s | 6.6 MB in 0.04 s |
 | Sketch: scalars as attributes | 25.9 MB | 2.09 s | 0.55 s | 5.8 MB in 0.03 s |
 | Sketch: attributes, no array filter | 30.7 MB | 1.38 s | — | 7.0 MB in 0.04 s |
-| **Sketch: record table, gzip blobs** | 7.97 MB | 0.26 s | 0.115 s | **5.32 MB in 0.013 s** |
+| Sketch: record table, gzip blobs | 7.97 MB | 0.26 s | 0.115 s | 5.32 MB in 0.013 s |
 | **Sketch: record table, unfiltered blobs** | **7.70 MB** | **0.105 s** | **0.073 s** | 6.52 MB in 0.027 s |
+| **Sketch: record table, `shuffle` blobs** | 9.72 MB | 0.149 s | 0.085 s | **4.67 MB in 0.027 s** |
 
 So the current encoding costs **6.5x the bytes and roughly 200x the CPU** of the
 format it replaced, in both directions. The record-table layout is **66x faster
@@ -61,11 +62,21 @@ Two further findings from the table sketch:
   repeats the record's own grid. A content-addressed blob pool with an index
   column removes that redundancy without any semantic assumption — it is the
   same content addressing the CAS layer already uses.
-- **Per-array gzip is a pure loss on this data.** Filtered blobs are both
-  *larger* (7.97 MB vs 7.70 MB) and 2.4x slower to write than unfiltered ones,
-  because deduplicated `float64` spectra have high-entropy mantissas while the
-  chunk and filter-pipeline metadata is not free. Compression belongs in the
-  container frame, not per dataset.
+- **Per-array gzip is a pure loss; the useful filter is `shuffle`.** Measured
+  across blob filter choices:
+
+  | Blob filter | On disk | Write | Read | + zstd-3 frame |
+  | --- | --- | --- | --- | --- |
+  | unfiltered | 7.70 MB | 0.106 s | 0.075 s | 6.52 MB |
+  | shuffle only | 9.72 MB | 0.149 s | 0.085 s | **4.67 MB** |
+  | gzip-3 + shuffle | 7.97 MB | 0.260 s | 0.117 s | 5.32 MB |
+
+  gzip is dominated: shuffle alone produces a *smaller* framed payload
+  (4.67 MB vs 5.32 MB) for 0.1 s less CPU. What gzip appeared to buy was the
+  byte transposition of its companion `shuffle` filter, which makes `float64`
+  mantissas compressible by the container codec; the deflate pass on top adds
+  chunk and filter-pipeline metadata and buys nothing. Deduplicated spectra are
+  high-entropy to deflate.
 
 Non-causes, checked and excluded:
 
@@ -161,8 +172,15 @@ packing on the measurements above.
   sentinel. The sketch needed a one-byte opaque sentinel because HDF5
   variable-length strings reject embedded NULs; a mask distinguishes absent from
   null without inventing a magic value.
-- Write blobs **unfiltered**. Per-array gzip is measurably counterproductive
-  here (see above); the container frame in step 3 does the compression.
+- **No gzip anywhere.** The filter choice differs per sink, and `slim` already
+  re-encodes for transfer, so each sink takes its own optimum:
+  - stored artifacts (`_checkpoint_store`, CAS blobs, archive): **unfiltered** —
+    smallest on disk (7.70 MB) and fastest to write and read;
+  - the `slim` transfer artifact: **`shuffle`, still no compression**, then the
+    container frame from step 3 — 4.67 MB on the wire.
+
+  Do not add `compression="gzip"` to either path. If a future measurement finds
+  a case where deflate wins, it must beat both rows above on its own numbers.
 - Keep a **typed-tree fallback** for payloads that are not uniform record sets —
   CAS runner blobs, `anchor_figures` caches, `archive.union_checkpoint` output.
   Use the measured attribute-packed form for that path, so the fallback is
@@ -228,14 +246,14 @@ store — 66x faster write, 89x faster read, 5.5x smaller than version 1.
 - **Content-addressed array blobs.** Deduplication is what takes the array
   payload from 24.7 MB to 7.0 MB; it is not an optional optimization, it is why
   the table beats the legacy pickle on the wire.
-- **Compression lives in the container frame, not the dataset filter.**
-  Unfiltered blobs are smaller *and* 2.4x faster to write than gzip-filtered
-  ones once duplicates are gone. This reverses the earlier draft of this
-  document and the ADR's "compression moves inside the container" consequence;
-  the ADR's decision (HDF5, self-describing, pickle-free) is untouched, only its
-  filter tactic. Frame choice on the wire is a measured trade: filtered blobs
-  plus zstd reach 5.32 MB for 0.14 s more CPU than unfiltered plus zstd at
-  6.52 MB. Pick by link rate; default to the cheaper CPU.
+- **Compression lives in the container frame, not the dataset filter, and gzip
+  is dropped entirely.** Deflate is dominated on every axis once array content
+  is deduplicated (table above): it is slower, and with the frame applied it is
+  also *bigger* than plain `shuffle`. Stored artifacts go unfiltered; the
+  transfer artifact takes `shuffle` and the frame. This reverses ADR-0009's
+  "compression moves inside the container" consequence — its decision (HDF5,
+  self-describing, pickle-free) is untouched, only that filter tactic, and the
+  consequence line needs amending when the schema document is updated.
 
 ## Open questions for implementation owner
 
@@ -295,7 +313,7 @@ unless the dispatcher explicitly grants that authority.
 - A version-2 artifact opens with `h5py.File`, reports
   `schema_version == 2`, and `visit(print)` yields a legible tree with no
   opaque blob standing in for the structure.
-- `pyrite slim -o -` transfers at most 7 MB for the reference store, and the
+- `pyrite slim -o -` transfers at most 5 MB for the reference store, and the
   pull throughput line reports both framed and unframed sizes.
 - A real `pyrite remote pull --profile hopg_hbn` completes in a small fraction
   of the 26-minute baseline, with the measured before/after recorded in
