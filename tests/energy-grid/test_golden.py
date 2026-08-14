@@ -70,5 +70,6 @@ def test_installed_wheel_layout_fails_with_source_checkout_error(tmp_path):
 
     assert completed.returncode == 1
     assert completed.stdout == ""
-    assert completed.stderr == golden._SOURCE_CHECKOUT_ERROR + "\n"
+    assert completed.stderr.endswith(golden._SOURCE_CHECKOUT_ERROR + "\n")
+    assert "use 'pyrite-dev regen-golden'" in completed.stderr
     assert not (tmp_path / "venv" / "lib" / "python" / "tests").exists()

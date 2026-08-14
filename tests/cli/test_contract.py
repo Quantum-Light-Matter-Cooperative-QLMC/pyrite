@@ -22,6 +22,10 @@ def _help_cases(node):
 
 _FROZEN = json.loads(CONTRACT.read_text(encoding="utf-8"))
 _HIDDEN_COMPATIBILITY_PATHS = {
+    ("setup",),
+    ("completion",),
+    ("performance",),
+    ("energy-grid",),
     ("slim",),
     ("rebrem",),
     ("reline",),

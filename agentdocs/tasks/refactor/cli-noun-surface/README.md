@@ -84,18 +84,18 @@ harness with a hidden warning alias for one support window.
       command is genuinely maintenance rather than a user workflow.
       The current post-beam tree is 94 visible paths; the complete disposition
       and invariant inventory is in [command-disposition.md](command-disposition.md).
-- [ ] B — Move `performance` to `pyrite-dev`, with hidden deprecated aliases for
+- [x] B — Move `performance` to `pyrite-dev`, with hidden deprecated aliases for
       the old spellings.
-- [ ] C — Relocate `energy-grid derive|show|defaults` under `material` /
+- [x] C — Relocate `energy-grid derive|show|defaults` under `material` /
       `profile`; move `verify` / `gc` / `regen-golden` / `add` / `rm` to
       `pyrite-dev`. Coordinate with `refactor/detector-scorer`, which demotes
       the grid to a detector input.
-- [ ] D — Consolidate `setup` and `completion` under `pyrite config`.
-- [ ] E — Decide and execute on the interactive profile-mutation flows.
+- [x] D — Consolidate `setup` and `completion` under `pyrite config`.
+- [x] E — Decide and execute on the interactive profile-mutation flows.
       Separate slice; it is the largest line-count item and the least settled.
-- [ ] F — Regenerate `docs/repo-design/cli/cli-reference.md` and
+- [x] F — Regenerate `docs/repo-design/cli/cli-reference.md` and
       `cli-deprecations.md`; the freeze test guards each step.
-- [ ] G — Write the ADR amending ADR-0002.
+- [x] G — Write ADR-0010 amending ADR-0002.
 
 ## Decisions and open questions
 
@@ -116,14 +116,12 @@ harness with a hidden warning alias for one support window.
   discard it. Energy-grid and performance artifacts genuinely are derived, so
   they leave the user CLI for `pyrite-dev`. This answers TODO UI backlog item 3
   (`gc` confusion) rather than renaming around it.
-- **Open:** whether interactive profile mutation is removed, reduced, or kept.
+- **Resolved:** interactive profile mutation is kept.
   Note TODO Inbox item 1 requests `--lock`/`--unlock` for profile mutability,
   and Bugs item 2 reports `profile create --from` not copying materials — both
   imply continued investment in that surface. Reconcile before slice E.
-- **Open:** how much of this is safely landable *before*
-  `refactor/scene-object-model`. Slices B, C, D, and F are largely mechanical
-  and may not need to wait; slice E does, because "use the Python API instead"
-  is only an honest answer once the API exists.
+- **Resolved:** all approved slices are landable on the completed
+  `refactor/scene-object-model` and `refactor/detector-scorer` dependencies.
 
 ### Open-question resolution (2026-08-14)
 
@@ -165,11 +163,26 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs
   inspection.
 - ADR amending ADR-0002 exists and is listed in `docs/adr/index.md`.
 
+### Acceptance evidence (2026-08-14)
+
+- Decision inventory checkpoint: `b911aae docs(task): settle CLI noun disposition`.
+- Integrated implementation checkpoint:
+  `837f11c refactor(cli): reduce top-level noun surface`.
+- Root subprocess help lists exactly nine primary nouns. Canonical and hidden
+  `energy-grid show -o json` subprocesses return byte-identical stdout and exit
+  zero; the hidden spelling adds only its D7 stderr warning.
+- `pyrite-dev test-suite cli -q`: passed.
+- `pyrite-dev lint`, `typecheck`, `cli-reference --check`,
+  `cli-deprecations --check`, and `repo-map --check`: passed.
+- `pyrite-dev docs`: passed.
+- `pyrite-dev verify`: 3,171 passed, 62 skipped; architecture contracts,
+  generated docs, static checks, and skill-mirror checks passed.
+
 ## Related
 
 - `refactor/scene-object-model` — supplies the replacement for anything removed.
 - `refactor/detector-scorer` — demotes `energy-grid` from user vocabulary; this
   task performs the actual verb relocation.
-- TODO Inbox item 1 (`--lock`/`--unlock` profiles), Bugs items 1–3, UI backlog
-  item 3 (`gc` naming) all land on this surface. Fold them in rather than
-  fighting them.
+- TODO Inbox item 1 (`--lock`/`--unlock` profiles), Bugs items 1–3, and UI
+  backlog item 3 (`gc` naming) remain separate follow-ups; none is folded into
+  this milestone.

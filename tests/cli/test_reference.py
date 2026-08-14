@@ -44,7 +44,7 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("material", "energy-grid"): ("detector energy-grid inputs", "Examples:"),
         ("material", "energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
         ("profile", "energy-grid", "defaults"): ("persistent derivation inputs", "fidelity"),
-        ("job", "status"): ("latest recorded job", "repeat"),
+        ("job", "status"): ("defaults to latest", "repeat"),
     }
     for path, expected in cases.items():
         result = runner.invoke(command, [*path, "--help"])
