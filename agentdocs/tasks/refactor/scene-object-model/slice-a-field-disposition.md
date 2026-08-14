@@ -79,4 +79,3 @@ simulation core.
   converter must still handle multi-value grids because profile editing and
   regression fixtures permit them; the canonical object model does not add a
   sweep-typed count field.
-

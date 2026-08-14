@@ -227,3 +227,38 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
   has a documented public-API replacement.
 - TODO P3 "Parameter-space sampling review" becomes tractable once axes are
   paths rather than field types; it is not in scope here.
+
+## Implementation evidence
+
+Status: A–J complete on `refactor/scene-object-model`; not pushed or landed.
+
+Checkpoint commits:
+
+- `0c36a1c` — field ownership, identity disposition, and open-question decisions.
+- `681384c` — scalar `Scene`, separated `Numerics` / `Analysis`, validated dotted
+  and indexed axes, and the per-layer-thickness regression.
+- `8058481` — lazy public exports, filesystem-free `simulate`, `Result`,
+  provenance, and the CPU bit-for-bit single-case regression.
+- `6f1dce7` — exact D7 legacy expansion, including multi-value electron-count
+  grids and every bundled catalog profile.
+- `9d29ac4` — scan and blaze share the public simulation lowering seam.
+- `47c8c94` — scan/trace marimo consumers, D7 `e_grid_eV` warning alias, public
+  API/export documentation, and export freezes.
+
+Acceptance evidence:
+
+- `pyrite-dev test`: pass (full suite).
+- `pyrite-dev verify`: pass, including full tests, docs, import contracts,
+  lint/typecheck, repository checks, and skill synchronization.
+- `pyrite-dev docs`: pass, warnings as errors.
+- `pyrite-dev typecheck`: pass.
+- `marimo check` for `scan_app.py` and `trace_app.py`: pass; apps suite passes.
+- `test_every_catalog_profile_round_trips_a_resolved_case_list`: pass.
+- `test_simulate_is_bit_for_bit_the_existing_single_case_path`: pass on CPU.
+- Added no `ScalarOrSeq` field. `simulate` contains no checkpoint, store, path,
+  open, or write call.
+
+No physics equations or behavior changed. Existing analytic/MC mosaic tests pass
+in the full suite; no discrepancy was absorbed into this refactor. Remaining
+lifecycle work is dispatch/integration review, push, landing, and task retirement
+under the corresponding supervisor authorities.
