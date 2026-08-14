@@ -37,6 +37,11 @@ file. Edit and drop items on `main`.
    (F-I). →
    `feature/energy-controlled-electron-transport`;
    [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
+3. **Readable physics validation ledger.** Replace the squeezed eight-column
+   Sphinx table with one labeled record per validation ID, preserving all
+   scientific content and generated summaries. →
+   `docs/readable-physics-validation-ledger`;
+   [`agentdocs/tasks/docs/readable-physics-validation-ledger/`](agentdocs/tasks/docs/readable-physics-validation-ledger/).
 
 ## P1 - top-priority back burner
 
