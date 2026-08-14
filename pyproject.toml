@@ -17,6 +17,12 @@ dependencies = [
     "psutil>=7.2.2",
     "numba>=0.66.0",
     "tqdm>=4.68.2",
+    # Result persistence. See docs/adr/0009-result-persistence-format.md.
+    "h5py>=3.16.0",
+    # MCPL interchange. Required, not an extra: ADR-0008 routes users who need
+    # arbitrary geometry to MCPL export, and a conditionally available escape
+    # hatch would weaken that non-goal.
+    "mcpl>=2.2.8",
 ]
 
 [project.optional-dependencies]

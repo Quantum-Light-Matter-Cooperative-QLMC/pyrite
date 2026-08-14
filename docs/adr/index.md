@@ -42,6 +42,7 @@ In other words:
 0006-consolidate-agent-work-records
 0007-project-identity
 0008-no-arbitrary-target-geometry
+0009-result-persistence-format
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -54,3 +55,4 @@ In other words:
 | [0006](0006-consolidate-agent-work-records.md)      | Consolidate agent work records      | Accepted                               |
 | [0007](0007-project-identity.md)                    | PyRITE project identity             | Accepted                               |
 | [0008](0008-no-arbitrary-target-geometry.md)        | No arbitrary target geometry        | Accepted                               |
+| [0009](0009-result-persistence-format.md)           | Result persistence format           | Accepted                               |
