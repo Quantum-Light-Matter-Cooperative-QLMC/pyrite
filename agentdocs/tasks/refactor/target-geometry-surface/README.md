@@ -165,7 +165,7 @@ change which inputs they accept.
       harness. Move `mosaic` onto `Target` in the same slice, leaving
       `mosaic_route` / `mosaic_nodes` where they are for
       `refactor/scene-object-model`.
-- [ ] E — Equivalence sweep: every existing catalog profile expands to an
+- [x] E — Equivalence sweep: every existing catalog profile expands to an
       identical case list.
 - [ ] F — Write the ADR recording the arbitrary-geometry **non-goal**. The RFC
       states this is a decision in its own right and should be recorded even
@@ -469,6 +469,48 @@ in D2 once the canonical spelling exists end to end, with a row in
 profile vocabulary. **Resolved: took the recommendation.** D1 is silent; D2
 owns the warning, and must also make a retired flat *read* loud (see the D1
 deviations above — it currently returns `None`).
+
+## Slice E — what landed
+
+The acceptance evidence for B through D2: a cross-commit equivalence sweep
+against the merge-base `64e429a` (the branch point; `main` has since moved on
+with unrelated docs commits, so the merge-base is the honest baseline).
+
+Method. A throwaway script fingerprints each expanded case list with a
+streaming SHA-256 over a canonical encoding of `dict(case)` — `ndarray` by
+shape plus `tobytes()`, floats by `repr(round(v, 12))`, dicts key-sorted. A
+plain JSON dump was the first attempt and is not viable: 185,835 cases carrying
+full energy grids is gigabytes. Digest-per-profile keeps the comparison to a
+few hundred lines while still being byte-exact on every field. The script ran in
+this worktree and in a throwaway detached worktree at `64e429a` (removed
+afterwards); the two outputs were diffed.
+
+Coverage. 98 `material_sweep` profiles — all 49 `CATALOG.material_keys` at both
+fidelities, 185,835 cases total — plus 196 `trajectory_sweep` profiles: every
+material across four variants (defaults, explicit `thickness_ang`, an
+`n_tilts`/`tilt_span`/`azim_deg` span, and a grooved variant). `trajectory_sweep`
+is covered because D2 rewrote it too, and it is the only caller that exercises
+`groove_spacing_ang`, `crystal_width_mm/height_mm`, and
+`allow_normal_incidence=True` together.
+
+Result. **Every successfully expanded case list is byte-identical.** The 49
+`spanned` variants reject identically on both sides (the azim-90 ban). The only
+diffs in the whole sweep are the rejection *messages* of the 49 invalid grooved
+variants, all of which reject on both sides:
+
+- 46 materials: `grooves require ...` → `blazed grooves require tilt_azim_deg
+  == 180 for every case`, a pure rewording from the `BlazedGrooves` rule.
+- 3 substrate-backed profiles (`mos2-on-sapphire`, `mos2-on-sio2-si`,
+  `mote2_product`): now `grooves are v1 single-slab only (no substrate/stack)`.
+  Same rejection, raised earlier and for the more accurate reason — the target
+  refuses grooves-plus-substrate at construction before any azimuth is
+  quantized. Baseline rejected the same configuration at azimuth 180 (see
+  `test_build_cases_groove_rejects_substrate`), so no configuration changed
+  from accepted to rejected or the reverse.
+
+Conclusion: the geometry consolidation is behaviour-preserving for every
+profile the repo ships. Identity digests are unaffected, which the `mosaic`
+splice in `_identity_v1` already covers by test.
 
 ## Decisions and open questions
 
