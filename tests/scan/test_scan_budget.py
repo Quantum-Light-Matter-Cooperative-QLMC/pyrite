@@ -230,5 +230,30 @@ def test_run_profile_threads_one_deadline_across_materials(monkeypatch, tmp_path
     assert result.exit_code == 0
 
     assert seen == [300.0, 100.0, 0.0]
+
+
+def test_resume_loading_preserves_previous_progress_counts(monkeypatch, tmp_path):
+    progress = tmp_path / "hopg.json"
+    progress.write_text(
+        '{"material":"hopg","total_cases":1,"cached_cases":0,'
+        '"completed_new_cases":1,"state":"paused"}\n'
+    )
+    snapshots = []
+
+    def fake_run_sweep(*_args, **kwargs):
+        kwargs["on_activity"](
+            {"phase": "loading", "case": None, "in_flight_case_count": 0}
+        )
+        snapshots.append(json.loads(progress.read_text()))
+        return False
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    _stub_cases(monkeypatch)
+
+    result = _invoke("hopg", 1.0, progress, "--checkpoint-dir", str(tmp_path))
+
+    assert result.exit_code == 75
+    assert snapshots[0]["activity"] == "loading"
+    assert snapshots[0]["cached_cases"] + snapshots[0]["completed_new_cases"] == 1
     assert seen[1] <= seen[0]  # the second material only gets what's left
     assert seen[2] == 0.0  # deadline elapsed: still called, with zero budget

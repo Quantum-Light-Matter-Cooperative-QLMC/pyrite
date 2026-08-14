@@ -3303,6 +3303,19 @@ def test_case_progress_shows_current_crystal_parameters_for_running_material():
     assert "0.5 µm" in output
 
 
+def test_case_progress_labels_checkpoint_activity_and_hides_stale_current():
+    records = remote._parse_progress_records(
+        '{"material":"hopg","total_cases":5,"cached_cases":3,'
+        '"completed_new_cases":0,"state":"running","activity":"saving",'
+        '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
+    )
+
+    output = remote._format_case_progress(records, ["hopg"])
+
+    assert "saving checkpoint" in output
+    assert "30 keV" not in output
+
+
 def test_case_progress_omits_current_params_for_non_running_material():
     records = remote._parse_progress_records(
         '{"material":"hopg","total_cases":5,"cached_cases":5,'
