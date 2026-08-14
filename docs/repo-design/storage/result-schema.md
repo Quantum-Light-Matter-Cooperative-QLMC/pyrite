@@ -1,52 +1,134 @@
 # Result persistence schema
 
-PyRITE result artifacts use HDF5 schema `pyrite.result`, version 1. Historical
+PyRITE result artifacts use HDF5 schema `pyrite.result`, version 2. Historical
 path tokens still end in `.pkl`; the suffix is part of the checkpoint/CAS
 layout, not a claim about the bytes. Open a current artifact directly with
 `h5py.File("line.pkl")` or any HDF5 reader.
+
+Version 1 is read forever and never written again. See
+[Compatibility and writes](#compatibility-and-writes).
 
 ## Container header
 
 The HDF5 root has three required attributes:
 
-| Attribute | Type | Version 1 value | Meaning |
+| Attribute | Type | Current value | Meaning |
 | --- | --- | --- | --- |
 | `schema` | UTF-8 string | `pyrite.result` | Format discriminator |
-| `schema_version` | integer | `1` | Container/tree encoding version |
+| `schema_version` | integer | `2` | Container/tree encoding version |
 | `identity_version` | integer | `1` | Dataset-identity normalization version |
 
-The root group `value` contains the encoded payload. Readers must reject an
-unknown `schema` or `schema_version`; identity compatibility remains governed by
-the checkpoint manifest and dataset-identity rules.
+The root group `value` contains the encoded payload; the root group `blobs`, when
+present, is the array pool. Readers must reject an unknown `schema` or
+`schema_version`; identity compatibility remains governed by the checkpoint
+manifest and dataset-identity rules.
+
+## Why version 2 exists
+
+Version 1 gave every Python leaf its own HDF5 object. An object header costs
+about 840 B and about 125 µs, so a reference component store — 50,383 nodes, of
+which only 2,916 were arrays — spent roughly 36 MB of its 42.5 MB on metadata
+describing a few hundred kB of scalars, and `pyrite remote pull` took 26 minutes
+for two ~500–600 MB stores. Measured on that store:
+
+| Encoding | Bytes | Write | Read | Framed for transfer |
+| --- | --- | --- | --- | --- |
+| Version 1 typed tree | 42.5 MB | 6.9 s | 6.5 s | 6.6 MB |
+| Version 2, gzip+shuffle blobs | 7.97 MB | 0.26 s | 0.115 s | 5.32 MB |
+| Version 2, unfiltered | 7.70 MB | 0.105 s | 0.073 s | 6.52 MB |
+| Version 2, shuffle only | 9.72 MB | 0.149 s | 0.085 s | 4.67 MB |
+
+Three results set the design. Array content is 3.5× duplicated (24.7 MB of
+arrays over 7.0 MB of distinct content) because `E_grid` and `E_grid_brem` repeat
+across every configuration at a given energy. Deflate costs roughly 2.5× the
+write time and, once that duplication is gone, saves nothing a whole-container
+frame does not save better. What deflate's `shuffle` companion filter does pay
+for is compressibility, so it is applied only in front of that frame.
+
+Stored artifacts are therefore written **unfiltered**; the transfer artifact is
+written with `shuffle` and framed whole.
+
+## Record tables
+
+A component store has the shape `{configuration: {E0_keV: record}}` — many rows
+over one key set — so it encodes columnar rather than as a tree.
+
+A mapping becomes a `record-table` when peeling nested mapping levels reaches a
+uniform record layer of at least `MIN_TABLE_ROWS` (4) rows whose keys overlap by
+at least `MIN_KEY_DENSITY` (0.5) of the key union. Anything else — CAS runner
+blobs, analysis caches, small payloads — stays a typed tree.
+
+| Object | Contents |
+| --- | --- |
+| `keys/00`, `keys/01`, … | one column per nesting level above the record layer |
+| `records` | a `column-set` over the record mappings |
+| `records/cols/<name>` | one `column` per record key |
+| `records/layout*` | pooled per-row key order and presence |
+
+`layout` holds one pooled-signature index per row; `layout_values` and
+`layout_offsets` hold the distinct signatures. A uniform record set costs one
+signature, and an optional key such as `spec_coherent` adds one more — not a
+presence mask per column. A column present in only some rows is `dense = False`
+and carries its own `rows` index.
+
+Column encodings, chosen by content:
+
+| `enc` | Payload |
+| --- | --- |
+| `null` | every row null; no data |
+| `scalar` | one `values` dataset of a single tag's dtype (UTF-8 for `str`) |
+| `array-ref` | `refs` into the blob pool, `-1` for null |
+| `column-set` | nested record columns for mapping-valued keys such as `case` |
+| `seq-fixed` | equal-length numeric sequences as one 2D block |
+| `seq-ragged` | unequal-length numeric sequences as `values` plus `offsets` |
+| `tree-pool` | content-addressed typed trees plus `refs`, for anything else |
+
+Nullable columns carry a `nulls` boolean dataset alongside their values.
+
+## Blob pool
+
+Numeric arrays inside a record table are stored once in `/blobs`, keyed by a
+16-byte BLAKE2b digest over a type-tagged serialization, and referenced by
+index. **Readers materialize a fresh array per reference**, so deduplication is
+never observable as aliasing — callers mutate spectra in place.
 
 ## Typed tree encoding
 
-Every node has a UTF-8 `kind` attribute. The encoding preserves mapping order,
-non-string mapping keys, absent mapping entries, explicit nulls, list/tuple
-kind, array dtype, and NumPy-scalar dtype.
+Payloads that are not record sets, and the record table's own `tree-pool`
+entries, use the typed tree. Every node has a UTF-8 `kind` attribute. The
+encoding preserves mapping order, non-string mapping keys, absent mapping
+entries, explicit nulls, list/tuple kind, array dtype, and NumPy-scalar dtype.
 
 | `kind` | HDF5 object | Payload |
 | --- | --- | --- |
-| `mapping` | group | `items/00000000`, …; each item has typed `key` and `value` nodes |
-| `list`, `tuple` | group | typed nodes under `items/00000000`, … |
-| `null` | group | no payload |
+| `mapping` | group | one child or attribute per entry; see below |
+| `list`, `tuple` | group | entries named `00000000`, … |
+| `packed-sequence` | dataset | a uniform-tag numeric sequence as one array |
+| `record-table` | group | see [Record tables](#record-tables) |
 | `array` | dataset | native NumPy numeric/boolean/byte array with exact shape and dtype |
 | `unicode-array` | dataset | variable-width UTF-8 values plus `numpy_dtype` attribute |
-| `numpy-scalar` | scalar dataset | exact NumPy scalar dtype |
-| `python-scalar` | scalar dataset | Boolean, integer, float, or complex value |
-| `string` | scalar dataset | variable-width UTF-8 text |
+| `scalar` | group | `tag` plus a `v` attribute; `null` carries no value |
 | `bytes` | `uint8[N]` dataset | uninterpreted bytes |
 
-Non-scalar numeric datasets use the standard HDF5 gzip filter and shuffle
-filter. Historical compression levels 1–22 remain accepted by the API; levels
-above gzip level 9 map to 9. Scalar and one-element datasets are not chunked.
-Object-dtype arrays and arbitrary Python objects are rejected.
+Scalar entries do not get their own object: a group stores them in attributes
+named `v:<name>`, with a parallel `kinds` attribute naming each entry's tag
+(`node` for entries that are children). This is what removes version 1's
+per-leaf object cost. Mapping keys are inline in a `keys` attribute when all of
+them are strings, and otherwise written as a `_keys` sequence node.
+
+Child and attribute names are the literal string key when it is non-empty,
+unique, and free of `/`, `.`, and a leading `_`, so `h5dump` shows real field
+names; anything else takes an `_00000000` index. Keys that themselves begin with
+`_` never take the literal form, so the two namespaces cannot collide.
+
+Object-dtype arrays and arbitrary Python objects are rejected. Nothing is
+unpickled on load.
 
 ## Result-store semantics
 
 Component stores have the logical shape `{configuration: {E0_keV: record}}`.
-CAS blobs contain the runner output mapping for one case. The typed tree above
-is the normative physical encoding; these tables define the scientific fields.
+CAS blobs contain the runner output mapping for one case. The encoding above is
+the normative physical form; these tables define the scientific fields.
 
 | Record field | Dtype | Shape | Unit / meaning |
 | --- | --- | --- | --- |
@@ -70,15 +152,28 @@ timing/backend diagnostics. Diagnostics are metadata, not scientific arrays.
 
 ## Compatibility and writes
 
-Readers sniff the HDF5 eight-byte signature. If absent, they permanently fall
-back to the previous zstd-compressed pickle, gzip-compressed pickle, and plain
-pickle readers. Loading does not rewrite. The next normal store save writes the
-same logical payload as HDF5 through the existing same-filesystem temporary file
-and `os.replace`; no bulk migration is required.
+Readers sniff the HDF5 eight-byte signature and then the container's
+`schema_version`, so version 1 and version 2 artifacts load side by side with no
+migration step and no flag day. If the signature is absent, readers permanently
+fall back to the previous zstd-compressed pickle, gzip-compressed pickle, and
+plain pickle readers; a zstd frame is disambiguated by the signature of what it
+decodes to. Loading does not rewrite. The next normal store save writes version
+2 through the existing same-filesystem temporary file and `os.replace`.
 
-HDF5 requires random-access output. `dump_stream` therefore builds a seekable
-spooled file, then copies the completed container to the caller's pipe. This
-retains stdout/remote-pull compatibility but transfer begins after encoding.
+`compresslevel` keeps its historical 1–22 interface for CLI compatibility but no
+longer affects a stored artifact. It selects the transfer frame's strength.
+
+## Transfer frame
+
+HDF5 requires random-access output, so `dump_stream` stages the container in a
+temporary directory and then compresses it onto the caller's pipe as a single
+zstd frame. `pyrite remote pull` loads that frame and deletes it immediately, so
+no framed artifact is ever stored.
+
+The frame — not per-dataset filters — is what keeps a pull cheap: HDF5 object
+metadata is highly redundant, and `shuffle`-transposed arrays compress far
+better whole than one dataset at a time. Encoding does not overlap the transfer,
+because the staged container must be complete before its first byte ships.
 
 ## Independent inspection
 
@@ -93,6 +188,6 @@ with h5py.File("checkpoints/hopg/line.pkl", "r") as result:
     result.visit(print)
 ```
 
-The numbered tree is deliberately explicit rather than dependent on Python
-class names. External tools may inspect arrays directly; reconstructing the
-ordered Python-shaped mapping requires following each item's `key` and `value`.
+External tools may read any array directly. Reconstructing the ordered
+Python-shaped mapping means following a record table's key columns and layout
+pool, or, in a typed tree, each group's `keys`, `names`, and `kinds` attributes.

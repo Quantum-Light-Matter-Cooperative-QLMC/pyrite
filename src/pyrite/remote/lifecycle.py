@@ -1508,10 +1508,12 @@ def pull(
             ckpt = config.remote_path("checkpoints", stem)
             incoming_local = dest / f".{stem}.incoming.pkl"
             # `-o -` streams the encoded artifact straight down this ssh
-            # session's stdout (slim's own report goes to stderr), so the box's
-            # compress pass overlaps the transfer. The older write-temp-then-cat
-            # form serialized the two and staged a gigabyte-scale temp on box
-            # disk; a nonzero slim exit still fails the pull, because ssh
+            # session's stdout (slim's own report goes to stderr). HDF5 needs
+            # random-access output, so the box still stages the container in its
+            # own tempdir and only the zstd frame overlaps the transfer -- there
+            # is no encode/transfer overlap to claim. The older
+            # write-temp-then-cat form staged that temp beside the checkpoint
+            # instead; a nonzero slim exit still fails the pull, because ssh
             # propagates the remote command's status.
             remote_transfer = (
                 f"cd {config.shell_remote_dir()} && "

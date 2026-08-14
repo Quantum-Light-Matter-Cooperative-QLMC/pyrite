@@ -117,7 +117,9 @@ def test_slim_checkpoint_pipe_mode_writes_artifact_to_stdout_and_report_to_stder
     tmp_path, capsysbinary
 ):
     """`cxr slim -o -` is what `cxr remote pull` streams: stdout must be the
-    artifact and nothing else, with every report on stderr."""
+    artifact and nothing else, with every report on stderr. Piped bytes are
+    zstd-framed rather than byte-identical to a file dump -- the frame is what
+    keeps redundant HDF5 metadata off the wire -- so equality is on content."""
     src = tmp_path / "hopg.pkl"
     with open(src, "wb") as f:
         pickle.dump(_results(), f)
@@ -127,7 +129,18 @@ def test_slim_checkpoint_pipe_mode_writes_artifact_to_stdout_and_report_to_stder
 
     slim_checkpoint(str(src), "-")
     captured = capsysbinary.readouterr()
-    assert captured.out == reference.read_bytes()
+    assert captured.out[:4] == b"\x28\xb5\x2f\xfd"
+    piped = tmp_path / "piped.pkl"
+    piped.write_bytes(captured.out)
+    streamed = _checkpoint_io.load(str(piped))
+    stored = _checkpoint_io.load(str(reference))
+    assert streamed.keys() == stored.keys()
+    for config, energies in stored.items():
+        assert streamed[config].keys() == energies.keys()
+        for energy, record in energies.items():
+            assert streamed[config][energy].keys() == record.keys()
+            assert streamed[config][energy]["case"] == record["case"]
+            assert np.array_equal(streamed[config][energy]["spec"], record["spec"])
     assert b"slimmed" in captured.err
 
 

@@ -3,6 +3,8 @@
 import gzip
 import io
 import pickle
+import time
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -10,22 +12,25 @@ from compression import zstd
 
 from pyrite.checkpoints import _checkpoint_io as ckio
 
+_DATA = Path(__file__).parent / "data"
+
 
 def _payload():
     return {"cfg_a": {30.0: {"case": {"crystal": "hopg"}, "spec": np.ones(1000)}}}
 
 
 def test_dump_writes_independently_readable_hdf5(tmp_path):
+    """ADR-0009: a stored artifact opens in stock h5py, with no pyrite code and
+    no unpickling, and its arrays are reachable under readable names."""
     path = tmp_path / "hopg.pkl"
     ckio.dump(_payload(), str(path))
     assert path.read_bytes()[:8] == b"\x89HDF\r\n\x1a\n"
     with h5py.File(path, "r") as h5:
         assert h5.attrs["schema"] == "pyrite.result"
-        assert h5.attrs["schema_version"] == 1
+        assert h5.attrs["schema_version"] == 2
         assert h5.attrs["identity_version"] == 1
-        assert h5["value/items/00000000/value/items/00000000/value/items/00000001/value"][...].shape == (
-            1000,
-        )
+        assert h5["value/cfg_a/_00000000/spec"][...].shape == (1000,)
+        assert h5["value/cfg_a/_00000000/case"].attrs["v:crystal"] == "hopg"
 
 
 def test_dump_is_byte_stable_across_paths_and_write_times(tmp_path):
@@ -42,25 +47,41 @@ def test_dump_is_byte_stable_across_paths_and_write_times(tmp_path):
     assert remote_path.read_bytes() == local_path.read_bytes()
 
 
-def test_dump_stream_matches_dump_and_leaves_stream_open(tmp_path):
-    """`cxr slim -o -` pipes the same bytes a file dump would produce, and must
-    not close the caller's stdout."""
+def test_dump_stream_frames_the_container_and_leaves_stream_open(tmp_path):
+    """`cxr slim -o -` is a wire format, not a stored artifact: it frames the
+    same container in zstd so redundant HDF5 metadata is not sent raw. It must
+    not close the caller's stdout, and load() must take the frame back."""
     path = tmp_path / "hopg.pkl"
     ckio.dump(_payload(), str(path))
     buffer = io.BytesIO()
     ckio.dump_stream(_payload(), buffer)
-    assert buffer.getvalue() == path.read_bytes()
+    framed = buffer.getvalue()
     assert not buffer.closed
+    assert framed[:4] == b"\x28\xb5\x2f\xfd"
+    assert zstd.decompress(framed)[:8] == b"\x89HDF\r\n\x1a\n"
+
+    piped = tmp_path / "piped.pkl"
+    piped.write_bytes(framed)
+    loaded = ckio.load(str(piped))
+    assert np.array_equal(loaded["cfg_a"][30.0]["spec"], _payload()["cfg_a"][30.0]["spec"])
 
 
-def test_dump_honours_compresslevel(tmp_path):
+def test_compresslevel_selects_the_frame_and_never_the_stored_artifact(tmp_path):
+    """The 1--22 interface survives for CLI compatibility, but deflate is
+    counterproductive once array content is deduplicated, so nothing on disk is
+    compressed. The level now only picks the transfer frame's strength."""
     payload = {f"cfg_{i}": {30.0: {"spec": np.arange(4000.0)}} for i in range(40)}
     low = tmp_path / "low.pkl"
     high = tmp_path / "high.pkl"
     ckio.dump(payload, str(low), compresslevel=ckio.LEVEL_RANGE[0])
     ckio.dump(payload, str(high), compresslevel=ckio.MAX_LEVEL)
-    assert high.stat().st_size <= low.stat().st_size
+    assert high.read_bytes() == low.read_bytes()
     assert ckio.load(str(high)).keys() == payload.keys()
+
+    cheap, dear = io.BytesIO(), io.BytesIO()
+    ckio.dump_stream(payload, cheap, compresslevel=ckio.LEVEL_RANGE[0])
+    ckio.dump_stream(payload, dear, compresslevel=ckio.MAX_LEVEL)
+    assert len(dear.getvalue()) <= len(cheap.getvalue())
 
 
 def test_dump_load_roundtrips(tmp_path):
@@ -99,13 +120,107 @@ def test_dump_load_preserves_container_kinds_nulls_and_numpy_dtypes(tmp_path):
     assert loaded[30.0] == payload[30.0]
 
 
-def test_dump_uses_portable_gzip_filter_for_numeric_arrays(tmp_path):
-    path = tmp_path / "compressed.pkl"
+def test_stored_arrays_carry_no_filters_and_wire_arrays_carry_shuffle(tmp_path):
+    """Measured on a real store: gzip costs ~25x the write time to save nothing
+    once arrays are deduplicated, so no stored dataset is filtered. Its
+    companion byte-transposition filter is what pays, and only in front of the
+    frame, so it appears on the wire and nowhere else."""
+    path = tmp_path / "stored.pkl"
     ckio.dump(_payload(), str(path))
     with h5py.File(path, "r") as h5:
-        spec = h5["value/items/00000000/value/items/00000000/value/items/00000001/value"]
-        assert spec.compression == "gzip"
+        spec = h5["value/cfg_a/_00000000/spec"]
+        assert spec.compression is None
+        assert not spec.shuffle
+
+    buffer = io.BytesIO()
+    ckio.dump_stream(_payload(), buffer)
+    wire = tmp_path / "wire.h5"
+    wire.write_bytes(zstd.decompress(buffer.getvalue()))
+    with h5py.File(wire, "r") as h5:
+        spec = h5["value/cfg_a/_00000000/spec"]
+        assert spec.compression is None
         assert spec.shuffle
+
+
+def test_dump_load_roundtrips_empty_containers(tmp_path):
+    """`cxr slim` trims records down to empty mappings and arrays; an empty set
+    of names has no inferable element type, so it needs an explicit one."""
+    path = tmp_path / "empty.pkl"
+    payload = {"n": {30.0: {"case": {}, "hkl_list": [], "tags": (), "spec": np.zeros(0)}}}
+    ckio.dump(payload, str(path))
+    record = ckio.load(str(path))["n"][30.0]
+    assert record["case"] == {}
+    assert record["hkl_list"] == []
+    assert record["tags"] == ()
+    assert record["spec"].shape == (0,)
+
+
+def test_load_reads_schema_version_1_hdf5_fixture():
+    """Version 1 spent one HDF5 object per Python leaf. It is never written
+    again, but every artifact already on a laptop or box is one, and there is no
+    migration step -- so this committed fixture must read forever."""
+    payload = ckio.load(str(_DATA / "schema_v1.pkl"))
+    assert set(payload) == {"config-a", "config-b", "meta"}
+    record = payload["config-a"][30.0]
+    assert set(record) == {"E_grid", "spec", "eta", "case"}
+    assert record["E_grid"].shape == record["spec"].shape
+    assert isinstance(record["eta"], float)
+    assert record["case"]["crystal"] == "hopg"
+    assert record["case"]["hkl_list"] == [(0, 0, 2), (0, 0, -2)]
+    assert record["case"]["surface_hkl"] is None
+    assert record["case"]["coherent_emission"] is True
+    assert payload["config-b"][40.0]["spec"][1] == 2.0
+    assert payload["meta"] == ("v1", b"\x00\x01", ["x", 2, None])
+
+
+def test_encoding_cost_per_record_stays_bounded(tmp_path):
+    """Regression guard for the 26-minute pull. The bounds are ~2x the measured
+    cost of this store and ~10x below version 1's, so machine noise passes and a
+    return to per-leaf objects (which was ~90 kB and ~15 ms per record) fails."""
+    rng = np.random.default_rng(0)
+    energies = (20.0, 30.0, 40.0)
+    grids = {e: np.linspace(1.0, e, 900) for e in energies}
+    store = {}
+    for i in range(60):
+        for energy in energies:
+            store.setdefault(f"cfg_{i:03d}", {})[energy] = {
+                # A real case mapping is wide and mostly scalar; that width is
+                # what version 1 charged an object apiece for.
+                "case": {f"k{j}": (j * 0.5 if j % 2 else f"s{j}") for j in range(32)},
+                "E_grid": grids[energy],  # shared across configs: must dedup
+                "spec": rng.random(900),
+                "eta": i / 60,
+            }
+    n_records = 60 * len(energies)
+
+    path = tmp_path / "census.pkl"
+    started = time.perf_counter()
+    ckio.dump(store, str(path))
+    write_seconds = time.perf_counter() - started
+    started = time.perf_counter()
+    loaded = ckio.load(str(path))
+    read_seconds = time.perf_counter() - started
+
+    assert loaded["cfg_000"][30.0]["case"]["k1"] == 0.5
+    assert path.stat().st_size / n_records < 16_000
+    assert write_seconds / n_records < 3e-3
+    assert read_seconds / n_records < 3e-3
+
+
+def test_shared_arrays_are_stored_once_but_never_aliased(tmp_path):
+    """Duplicate array content dominates a real store (measured 3.5x), so the
+    blob pool holds one copy. Decoding must still hand every reference its own
+    array: callers mutate spectra in place."""
+    grid = np.linspace(1.0, 30.0, 256)
+    store = {f"cfg_{i}": {30.0: {"E_grid": grid, "spec": np.full(256, float(i))}} for i in range(8)}
+    path = tmp_path / "shared.pkl"
+    ckio.dump(store, str(path))
+    with h5py.File(path, "r") as h5:
+        assert len(h5["blobs"]) == 9  # eight distinct spectra, one shared grid
+
+    loaded = ckio.load(str(path))
+    loaded["cfg_0"][30.0]["E_grid"][0] = -1.0
+    assert loaded["cfg_1"][30.0]["E_grid"][0] == grid[0]
 
 
 def test_load_reads_legacy_plain_pickle(tmp_path):
