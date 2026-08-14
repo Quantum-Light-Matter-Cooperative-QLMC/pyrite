@@ -180,10 +180,16 @@ Nothing yet.
 
 ## Bugs (fix + regression test)
 
-1. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
-2. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
+1. **Chunked checkpoint lifecycle and truthful progress.** Eliminate full checkpoint
+   decode/rewrite stalls for cached and budget-paused remote sweeps, make shards a
+   first-class resumable/pullable state, account setup/finalization in slice budgets,
+   and report loading/computing/saving activity without stale "NOW TESTING" cases. →
+   `fix/chunked-checkpoint-lifecycle`;
+   [`agentdocs/tasks/fix/chunked-checkpoint-lifecycle/`](agentdocs/tasks/fix/chunked-checkpoint-lifecycle/).
+2. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
+3. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-3. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
+4. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
    not been derived for that case:
    1. Give them a suggestion on what to run. We could also add a flag that automatically runs
       the derivation for their energy + mat before running their actual profile.
