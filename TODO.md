@@ -88,12 +88,58 @@ file. Edit and drop items on `main`.
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
    [`agentdocs/tasks/feature/profile-observation-angle/`](agentdocs/tasks/feature/profile-observation-angle/).
+3. **Analysis handoff and figure reproducibility.** `pyrite app analysis export`
+   renders default selector state regardless of the requested view
+   (`apps/export.py:29` passes no `--` argv; the smoke path
+   `apps/analyze.py:411` does), and exported HTML carries no machine-readable
+   provenance even though `dataset_identity` is in hand at load time — the
+   tutorial asks the human to transcribe the digest. Sequence: parameterise the
+   export and stamp digest/stem/version/revision into the page; require explicit
+   identity for `export` rather than falling back to persisted machine-local
+   defaults; add `html-wasm` and plotted-series data output; then collapse
+   launch, export, and `anchor_figures` onto one parameterised render entry
+   point so interactive and publication figures cannot disagree. Review:
+   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
+   §4 G1/G2/G4/G6, §6.
+4. **Machine-readable validation check records.** `checks/*.py` print
+   `PASS`/`FAIL` to stdout, produce no artifact, sit outside the `test-suite`
+   selectors, and map to ledger ids only through a hand-maintained table in
+   `checks/README.md`. Have each check emit one JSON record (ledger id, measured
+   value, reference value, tolerance, verdict, revision) and generate
+   `docs/validation/status-summary.md` from those records instead of prose, so a
+   passing check becomes dated, diffable evidence. Peers do this: Geant4 diffs
+   example reference outputs in CI, geant-val stores every comparison. Supports
+   ledger sign-off (Active 1). Review:
+   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
+   §4 G3.
 
 ## P3 - lower-priority / exploratory back burner
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
 3. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
+4. **Result interchange for microscopy tooling.** Optional
+   `pyrite[interchange]` writer exporting per-case spectra to `.hspy`/`.emd`/
+   `.nxs` via standalone RosettaSciIO, with the identity digest in the signal
+   metadata, so microscopists can open PyRITE output beside measured data
+   without installing PyRITE. One-way export, never a checkpoint replacement;
+   only worth building after exported artifacts carry provenance (P2 3).
+   Decision recorded: **HyperSpy itself is rejected as a dependency** — sweeps
+   are sparse (99 of 108 cells in the measured `hopg` checkpoint) and the signal
+   axis varies per navigation position (four distinct `E_grid` definitions, one
+   per beam energy), which HyperSpy's dense single-signal-axis array model
+   cannot express without NaN-padding and lossy resampling; it also costs 18 new
+   packages and its `exspy` EDS layer duplicates the ledgered detector model
+   empirically. Revisit xarray, not HyperSpy, only if `results/selection.py`
+   keeps growing. Review:
+   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
+   §5.
+5. **Verify documented code blocks.** `docs/conf.py` loads `myst_parser` and
+   autodoc only, so every fenced example in `docs/guides/*.md` is unverified
+   prose that rots silently; abTEM, OpenMC, and HyperSpy all execute their
+   documented examples. Add a doctest pass over the guide code blocks. Review:
+   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
+   §4 G5.
 
 ## Inbox - >user< to be triaged
 
@@ -136,11 +182,16 @@ Nothing yet.
 
 ### Ergonomics (ship anytime)
 
-Nothing yet.
+1. Delete the stale root `notebooks/` tree — it now holds only `__pycache__`
+   directories shadowing `analysis_ui` module names, left over from the move
+   into `src/pyrite/apps/`.
+2. Write new checkpoint payloads as `.h5`, not `line.pkl` / `brem.pkl`. The
+   content has been HDF5 since `checkpoints/_checkpoint_io.py:153`; the `.pkl`
+   extension hides that from anyone with `h5py`. Readers already accept both.
 
 ## Notebook backlog
 
-1. Make it so 'narrow_auto' in make_axis_controls from notebooks/analysis_ui/controls
+1. Make it so 'narrow_auto' in make_axis_controls from `src/pyrite/apps/analysis_ui/controls.py`
    auto-sets the x-axis lims according to the Min/Max x-values of the widest *line energy*
    grid being plotted. Right now it goes off the brem grid, which makes it run to 10's or 100's
    of keV, defeating the whole purpose of the *narrow* plot.
