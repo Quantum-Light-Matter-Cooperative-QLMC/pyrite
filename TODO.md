@@ -192,10 +192,12 @@ Nothing yet.
    the bytes and ~200x the CPU of the zstd-pickle format it replaced, measured
    both directions. Cost a 26-minute `pull --profile hopg_hbn` on 2026-08-14,
    and the same 95 s/component write stalls seen in Bugs 1. Fix both ends —
-   schema version 2 packing scalars as attributes, plus a whole-container zstd
-   frame on the wire — while keeping ADR-0009's pickle-free, `h5py`-openable
-   artifact and permanent version-1 reads. Supplies the A/B measurement Bugs 1
-   deferred. → `fix/result-encoding-overhead`;
+   schema version 2 as a columnar record table with content-addressed array
+   blobs (measured 66x faster write, 89x faster read, 5.5x smaller), plus a
+   whole-container zstd frame on the wire — while keeping ADR-0009's
+   pickle-free, `h5py`-openable artifact and permanent version-1 reads.
+   Supplies the A/B measurement Bugs 1 deferred.
+   → `fix/result-encoding-overhead`;
    [`agentdocs/tasks/fix/result-encoding-overhead/`](agentdocs/tasks/fix/result-encoding-overhead/).
 3. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
 4. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
