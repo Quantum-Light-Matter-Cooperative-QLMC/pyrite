@@ -186,10 +186,21 @@ Nothing yet.
    and report loading/computing/saving activity without stale "NOW TESTING" cases. →
    `fix/chunked-checkpoint-lifecycle`;
    [`agentdocs/tasks/fix/chunked-checkpoint-lifecycle/`](agentdocs/tasks/fix/chunked-checkpoint-lifecycle/).
-2. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
-3. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
+2. **Result encoding and transfer overhead.** The version-1 HDF5 leaf encoding
+   spends one HDF5 object (~840 B, ~125 us) on every Python scalar and mapping
+   key, and `slim -o -` sends the resulting redundant metadata unframed: 6.5x
+   the bytes and ~200x the CPU of the zstd-pickle format it replaced, measured
+   both directions. Cost a 26-minute `pull --profile hopg_hbn` on 2026-08-14,
+   and the same 95 s/component write stalls seen in Bugs 1. Fix both ends —
+   schema version 2 packing scalars as attributes, plus a whole-container zstd
+   frame on the wire — while keeping ADR-0009's pickle-free, `h5py`-openable
+   artifact and permanent version-1 reads. Supplies the A/B measurement Bugs 1
+   deferred. → `fix/result-encoding-overhead`;
+   [`agentdocs/tasks/fix/result-encoding-overhead/`](agentdocs/tasks/fix/result-encoding-overhead/).
+3. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
+4. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-4. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
+5. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
    not been derived for that case:
    1. Give them a suggestion on what to run. We could also add a flag that automatically runs
       the derivation for their energy + mat before running their actual profile.
