@@ -173,7 +173,7 @@ change which inputs they accept.
       (`locate`, `distance_to_boundary`, `escape_path`) and the constraint that
       any future implementation be a flat, bounded-depth, device-representable
       region table — never a polymorphic object graph.
-- [ ] G — Update `docs/repo_map.md` ownership rows and the geometry-facing
+- [x] G — Update `docs/repo_map.md` ownership rows and the geometry-facing
       physics/guide pages.
 
 ## Slice B — what landed
@@ -534,6 +534,41 @@ STL/STEP import as PyRITE *simulation* geometry is now explicitly out of scope.
 `TODO.md` is authoritative on `main` and branch copies are disposable, so the
 edit is not made here — the owner should reword that bullet on `main` and cite
 ADR-0008.
+
+## Slice G — what landed
+
+`docs/repo_map.md`, three rows:
+
+- `campaign/geometry.py` — added the flat-projection trio
+  (`target_from_flat` / `target_flat_fields` / `target_replace`) and why it
+  exists (catalog data, profile overrides, and identity digests still speak the
+  flat vocabulary), `Stack.on_substrate`, the two named defaults,
+  `retired_flat_input`, `mosaic` in the lowered key list, construction-time
+  validity, and the ADR-0008 citation for the non-goal.
+- `campaign/sweep.py` — a new bullet stating that `target` is the only geometry
+  state on `Sweep`, that `build_cases` reads geometry only through
+  `target.lower()`, that the flat arguments are `InitVar` aliases following the
+  `detector` precedent, that a retired flat *read* raises, and that the
+  substrate pair is deprecated in favour of `Stack.on_substrate`.
+- `campaign/config.py` — both builders project through `target_from_flat`; added
+  `geometry` to its dependency list.
+
+Physics pages:
+
+- `physics/materials/crystal-mosaicity.md` — both wiring lines respelled to
+  `Sweep(target=Slab(…, mosaic=True), …)`, with the split stated once: `mosaic`
+  is target state, `mosaic_fwhm_deg` / `mosaic_route` / `mosaic_nodes` are the
+  model and numerics knobs and stay on `Sweep`.
+- `physics/materials/multilayer-materials.md` — `Sweep(substrate="silicon")` →
+  `Stack.on_substrate(...)`, and the status note's `substrate=None` → "a bare
+  `Slab` target".
+
+Checked and left alone: `docs/guides/` and `docs/api.md` carry no geometry
+spellings, so nothing there was stale. The RFC's `sec-core-arch-nongoals`
+section is the ADR's context source and stays as the proposal record; its
+"Current state" inventory is deliberately historical. The stale RFC
+groove/footprint claim and the `groove_spacing_ang` field comment were already
+corrected earlier on this branch.
 
 ## Decisions and open questions
 

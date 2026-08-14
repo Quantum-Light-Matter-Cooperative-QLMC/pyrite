@@ -43,7 +43,10 @@ FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
   `case["mosaic_fwhm_rad"]`, capped at `E_pk`.
 - `data/materials.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable
   `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
-- `sweep.Sweep(mosaic=…, mosaic_fwhm_deg=…)` → `build_cases` → `case["mosaic_fwhm_rad"]`.
+- `Sweep(target=Slab(…, mosaic=True), mosaic_fwhm_deg=…)` → `build_cases` →
+  `case["mosaic_fwhm_rad"]`. `mosaic` is target state (whether *this crystal* is
+  a mosaic); `mosaic_fwhm_deg`, `mosaic_route`, and `mosaic_nodes` stay on
+  `Sweep` as the model/numerics knobs.
 - `plots.plot_mosaic_comparison` — overlay grades from one record.
 - Tests: `tests/montecarlo/test_mosaic.py`.
 
@@ -131,7 +134,7 @@ lineshape.
 - `montecarlo.mc_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
 - `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` /
   `case["mosaic_mc_nodes"]`.
-- `sweep.Sweep(mosaic=True, mosaic_route="mc", mosaic_nodes=…)` → `build_cases` sets the
+- `Sweep(target=Slab(…, mosaic=True), mosaic_route="mc", mosaic_nodes=…)` → `build_cases` sets the
   `mosaic_mc_*` case keys **and turns the analytic `store_result` term off** — the two
   routes are mutually exclusive (applying both double-counts the broadening).
 - Validation: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature +

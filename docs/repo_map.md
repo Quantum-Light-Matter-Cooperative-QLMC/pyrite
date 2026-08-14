@@ -299,19 +299,34 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
   `pm` (±hkl expansion); `MATERIAL_LABELS` registry. Re-exports the
   `campaign/geometry.py` surface, so `pyrite.campaign.sweep` stays the stable
   import path for `crystal_params`, `fmt_thickness`, `stack_layers` and friends.
+- `Sweep.target` is the canonical geometry spelling and the only geometry state
+  on `Sweep`; `build_cases` reads geometry only through `target.lower()`. The
+  flat constructor arguments (`thickness_ang`, `tilt_deg`, `groove_spacing_ang`,
+  …) are `InitVar` aliases normalized onto `target` in `__post_init__`, mirroring
+  the `detector` precedent — supplying both nested and flat is an error, and
+  *reading* a retired flat name raises rather than returning stale state.
+  `substrate=`/`substrate_thickness_ang=` are deprecated in favour of
+  `Stack.on_substrate`.
 - Deps: `campaign.geometry`, `materials` (`CATALOG`, `LayerSpec`),
   `materials.crystal`.
 
 ### `campaign/geometry.py`
 The closed target variant set and its lowering to today's geometry case keys
 (`abs_layers`, `layer_radiators`, `crystal_width_mm`, `crystal_height_mm`,
-`groove_spacing_ang`). Each variant owns its validity at construction; arbitrary
-geometry is a recorded non-goal, so there is no dispatch protocol or region
-algebra. Sits below `campaign/sweep.py` and imports without it.
+`groove_spacing_ang`, `mosaic`). Each variant owns its validity at construction,
+so an impossible target raises in the user's script rather than after profile
+resolution; arbitrary geometry is a recorded non-goal (ADR-0008), so there is no
+dispatch protocol or region algebra. `target_from_flat` / `target_flat_fields` /
+`target_replace` are the inverse pair between a `Target` and the flat geometry
+vocabulary that catalog data, profile overrides, and identity digests still
+speak. Sits below `campaign/sweep.py` and imports without it.
 - Public: `Slab`, `Stack`, `Target` (the variant union), `Layer`, `Footprint`,
-  `BlazedGrooves`, `LoweredTarget`, `crystal_params`, `substrate_composition`,
-  `stack_layers`, `film_on_substrate_layers`, `layer_radiator`,
-  `substrate_radiator`, `fmt_thickness`, `ScalarOrSeq`.
+  `BlazedGrooves`, `LoweredTarget`, `Stack.on_substrate` (the sanctioned
+  one-layer film-on-wafer stack), `DEFAULT_FOOTPRINT`,
+  `DEFAULT_SUBSTRATE_THICKNESS_ANG`, `target_from_flat`, `target_flat_fields`,
+  `target_replace`, `retired_flat_input`, `crystal_params`,
+  `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
+  `layer_radiator`, `substrate_radiator`, `fmt_thickness`, `ScalarOrSeq`.
 - Deps: `detectors` (`DetectorSpec`, for the target×detector groove check),
   `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
@@ -346,8 +361,11 @@ Default settings/sweep builders shared by CLI and both notebooks; per-material
 scan grids project from immutable `materials.CATALOG`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
   `trajectory_sweep`; `MATERIALS` ordered tuple.
+  The catalog speaks the flat geometry vocabulary, so both builders project
+  their scan grid through `target_from_flat` and hand `Sweep` a built `target`.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`),
-  `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`).
+  `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`),
+  `geometry` (`target_from_flat`).
 
 ### `campaign/profiles.py`
 Named `full`/provisional `survey` fidelity presets, deterministic serialization

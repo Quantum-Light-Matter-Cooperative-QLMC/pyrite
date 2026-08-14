@@ -11,8 +11,8 @@ The pipeline models an ordered stack of layers; a single-crystal slab is the
 one-layer compatibility path.
 
 > **Implementation status. Slices 1–3 are implemented.** Slice 1 (cross-stack
-> self-absorption, §1) is opt-in — `substrate=None` is bit-for-bit the old single-material
-> path. Slice 2 (multilayer electron transport — substrate backscatter + material-aware
+> self-absorption, §1) is opt-in — a bare `Slab` target is bit-for-bit the old
+> single-material path. Slice 2 (multilayer electron transport — substrate backscatter + material-aware
 > bremsstrahlung, §3 option A) and slice 3 (per-layer coherent radiation — a *crystalline*
 > substrate emits its own lines, §2) live in `montecarlo.simulate_trajectories` /
 > `_spectrum_case` and `sweep.build_cases`. Validated in `checks/multilayer_check.py`
@@ -166,8 +166,9 @@ Amorphous layers (fused-silica SiO₂) are skipped for lines — their segments 
 and they still absorb. Brem (`mc_brem_spectrum`) is summed per layer with the same
 cross-stack `T_abs` (slice 2).
 
-A crystalline substrate is just another material key: `Sweep(substrate="silicon")` makes the
-substrate radiate its own (hkl) lines. **Caveats:** the substrate radiates on the *film's*
+A crystalline substrate is just another material key:
+`Stack.on_substrate(film, thickness_ang, "silicon")` makes the substrate radiate its own
+(hkl) lines. **Caveats:** the substrate radiates on the *film's*
 line grid (set `E_grid_line` wide enough to bracket both materials' lines) with the substrate
 crystal's default `beam_uvw`; deep substrate emission is strongly self-absorbed in a thick
 substrate, so the visible substrate lines come from near the interface.
