@@ -54,29 +54,27 @@ file. Edit and drop items on `main`.
    command surface; every step requires bit-for-bit reproduction of stored
    spectra. Design and sequencing:
    [`docs/repo-design/core-architecture-rfc.md`](docs/repo-design/core-architecture-rfc.md).
-   Arbitrary target geometry and a GUI are recorded **non-goals**. Six task
-   branches, in dependency order:
-   1. Typed `Case` + `identity_version` (ends the divergence-only-key tax;
-      `_identity_v2` deferred). Ready. → `refactor/typed-case-record`;
-      [`agentdocs/tasks/refactor/typed-case-record/`](agentdocs/tasks/refactor/typed-case-record/).
-   2. Consolidate the geometry surface behind `Target`; transport untouched;
-      includes the arbitrary-geometry non-goal ADR. Ready.
-      → `refactor/target-geometry-surface`;
-      [`agentdocs/tasks/refactor/target-geometry-surface/`](agentdocs/tasks/refactor/target-geometry-surface/).
-   3. Detector owns acceptance + binning + response; demotes `energy-grid`.
-      Gated on 2; overlaps `feature/profile-observation-angle` (P2), sequence
-      deliberately. → `refactor/detector-scorer`;
+   Arbitrary target geometry
+   ([ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md)) and a GUI are
+   recorded **non-goals**. Steps 1–2 landed on `main` (typed `Case` +
+   `identity_version`, with `_identity_v2` still deferred; and the `Target`
+   geometry surface plus its non-goal ADR). Four branches remain, in dependency
+   order:
+   1. **Next up — unblocked.** Detector owns acceptance + binning + response;
+      demotes `energy-grid`. Overlaps `feature/profile-observation-angle` (P2),
+      sequence deliberately. → `refactor/detector-scorer`;
       [`agentdocs/tasks/refactor/detector-scorer/`](agentdocs/tasks/refactor/detector-scorer/).
-   4. Split `Sweep` into `Scene`/`Sweep`/`Numerics`/`Analysis`, dissolve
-      `Settings`, add public `pr.simulate`. Structural core, one project.
-      Gated on 1–3. → `refactor/scene-object-model`;
-      [`agentdocs/tasks/refactor/scene-object-model/`](agentdocs/tasks/refactor/scene-object-model/).
-   5. Result arrays in HDF5 + MCPL export (both required deps); `.pkl` readable
-      forever. Gated on 1. → `feature/result-format-interchange`;
+   2. **Unblocked, parallelizable.** Result arrays in HDF5 + MCPL export (both
+      required deps); `.pkl` readable forever. Independent of the detector work,
+      so it can run alongside. → `feature/result-format-interchange`;
       [`agentdocs/tasks/feature/result-format-interchange/`](agentdocs/tasks/feature/result-format-interchange/).
-   6. Reduce 13 CLI nouns to 9 by moving machinery to `pyrite-dev`; `beam` and
-      `checkpoint` stay, no `cache` noun. All contracts retained. Gated on 4.
-      → `refactor/cli-noun-surface`;
+   3. Split `Sweep` into `Scene`/`Sweep`/`Numerics`/`Analysis`, dissolve
+      `Settings`, add public `pr.simulate`. Structural core, one project. Gated
+      on the detector work. → `refactor/scene-object-model`;
+      [`agentdocs/tasks/refactor/scene-object-model/`](agentdocs/tasks/refactor/scene-object-model/).
+   4. Reduce 13 CLI nouns to 9 by moving machinery to `pyrite-dev`; `beam` and
+      `checkpoint` stay, no `cache` noun. All contracts retained. Gated on the
+      `Scene` split. → `refactor/cli-noun-surface`;
       [`agentdocs/tasks/refactor/cli-noun-surface/`](agentdocs/tasks/refactor/cli-noun-surface/).
 5. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
@@ -202,10 +200,12 @@ Direction notes only; not prioritized backlog or active commitments.
   electron coherence and QED effects, coherent transition radiation, and
   transport of protons, ions, or neutrons. Near-term staging is tracked by the
   P1 electron-transport tasks above.
-- **Complex geometry and interoperability.** Support multiple physical
-  materials with arbitrary position, shape, and orientation; research
-  interoperability with established simulation and PIC tools such as WarpX;
-  evaluate standard import/export formats, including STL and STEP geometry.
+- **Geometry interoperability.** Research interoperability with established
+  simulation and PIC tools such as WarpX, and evaluate export formats.
+  Arbitrary in-simulation geometry (multiple materials at arbitrary position,
+  shape, and orientation; STL/STEP import) is a recorded **non-goal** —
+  [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md); MCPL export is the
+  sanctioned answer, so this item is the interoperability half only.
 - **Custom detector tooling.** Extend the existing detector model with CLI
   tools for defining, loading, saving, and editing detector responses,
   geometries, and resolution for photon and charged-particle detectors.
