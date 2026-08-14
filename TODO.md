@@ -137,7 +137,13 @@ file. Edit and drop items on `main`.
 5. **Verify documented code blocks.** `docs/conf.py` loads `myst_parser` and
    autodoc only, so every fenced example in `docs/guides/*.md` is unverified
    prose that rots silently; abTEM, OpenMC, and HyperSpy all execute their
-   documented examples. Add a doctest pass over the guide code blocks. Review:
+   documented examples. Triage found only 4 of 49 guide blocks are `python`
+   and 37 are `bash`, so a doctest pass would reach ~8%; the plan instead
+   checks `pyrite`/`pyrite-dev` blocks against the live Click and argparse
+   trees and covers the Python narrative separately. →
+   `chore/verify-documented-code-blocks`;
+   [`agentdocs/tasks/chore/verify-documented-code-blocks/`](agentdocs/tasks/chore/verify-documented-code-blocks/).
+   Review:
    [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
    §4 G5.
 
