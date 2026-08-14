@@ -39,9 +39,13 @@ if env_value("CXR_MC_DEBUG"):
 
 _PUBLIC_OBJECTS = {
     "Analysis": ("pyrite.campaign.model", "Analysis"),
-    "Beam": ("pyrite.campaign.sweep", "BeamSpec"),
+    "Beam": ("pyrite.campaign.model", "Beam"),
+    "BlazedGrooves": ("pyrite.campaign.geometry", "BlazedGrooves"),
     "Convergence": ("pyrite.campaign.model", "Convergence"),
     "Detector": ("pyrite.detectors", "Detector"),
+    "EnergyBins": ("pyrite.detectors", "EnergyBins"),
+    "Footprint": ("pyrite.campaign.geometry", "Footprint"),
+    "Layer": ("pyrite.campaign.geometry", "Layer"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
     "Result": ("pyrite.results.model", "Result"),
     "Scene": ("pyrite.campaign.model", "Scene"),

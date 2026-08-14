@@ -132,7 +132,7 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
 - [x] C — Dotted-path axis resolution, including indexed segments
       (`target.layers[1].thickness_ang`), with the case-naming rule derived
       mechanically from path + value.
-- [ ] D — `Sweep.from_legacy(old_sweep, settings)` plus deprecated shims for the
+- [x] D — `Sweep.from_legacy(old_sweep, settings)` plus deprecated shims for the
       old classes through one D7 support window.
 - [x] E — Equivalence: every existing catalog profile round-trips to an
       identical expanded case list, and the resolution order (catalog profile →
@@ -144,11 +144,11 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
 - [x] H — Reimplement `runs.scan` and `runs.blaze` over `pr.simulate`'s
       internals, so the sweep driver and the single-shot path share one code
       path rather than two.
-- [ ] I — Port the marimo apps to the public API. The trace app already runs
+- [x] I — Port the marimo apps to the public API. The trace app already runs
       transport directly from catalog scan grids and is the natural first
       consumer. Per the RFC's GUI non-goal, apps **must not** construct case
       payloads directly.
-- [ ] J — `docs/api.md` documents the public names; extend the export-freeze
+- [x] J — `docs/api.md` documents the public names; extend the export-freeze
       tests (`tests/montecarlo/test_exports.py`, `tests/results/test_exports.py`,
       `tests/plots/test_exports.py`) rather than relaxing them.
 

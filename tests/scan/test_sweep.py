@@ -258,6 +258,13 @@ def test_material_sweep_grid_overrides_resolve_into_detector_bins():
     assert sweep.detector.energy_bins.brem is None
 
 
+def test_dead_e_grid_alias_warns_and_routes_to_detector_bins():
+    fixed = np.array([75.0, 78.0])
+    with pytest.warns(DeprecationWarning, match="e_grid_eV is deprecated"):
+        sweep = material_sweep("mose2", e_grid_eV=fixed)
+    np.testing.assert_array_equal(sweep.detector.energy_bins.line, fixed)
+
+
 def test_sweep_scene_has_no_energy_grid_fields():
     for name in ("E_grid_line", "E_grid_line_by_energy", "E_grid_brem", "e_grid_eV"):
         assert name not in {item.name for item in dataclasses.fields(Sweep)}

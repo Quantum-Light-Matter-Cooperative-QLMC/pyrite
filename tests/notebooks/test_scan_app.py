@@ -22,7 +22,7 @@ def test_scan_app_gates_cases_by_penetration_before_running() -> None:
     source = APP.read_text()
 
     assert "gate_cases_by_penetration" in source
-    build_at = source.index("build_cases(sweep")
+    build_at = source.index("pr.Sweep.from_legacy(sweep, settings).cases()")
     gate_at = source.index("gate_cases_by_penetration(cases")
     run_at = source.index("run_sweep(")
     assert build_at < gate_at < run_at

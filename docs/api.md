@@ -11,6 +11,73 @@ old imports are internal or compatibility surfaces. They may change without a
 library deprecation. The command-line contract is documented separately in the
 [CLI reference](repo-design/cli/cli-reference.md).
 
+## Scene simulation
+
+The root package exposes the preferred high-level API. A `Scene` contains one
+scalar `Beam`, target, and `Detector`; `Numerics` contains sampling and execution
+controls. `simulate` lowers those objects to the established typed `Case` and
+calls the existing Monte Carlo runner directly. It neither reads nor writes a
+checkpoint.
+
+```python
+import pyrite as pr
+
+beam = pr.Beam(energy_keV=30.0)
+target = pr.Slab("hopg", thickness_ang=10_000.0, tilt_deg=30.0)
+detector = pr.Detector()
+result = pr.simulate(
+    beam,
+    target,
+    detector,
+    numerics=pr.Numerics(n_electrons=450, n_electrons_brem=100),
+)
+result.spectrum
+result.provenance["identity_digest"]
+```
+
+`Result.spectrum` and `Result.background` are intrinsic photon-density arrays
+per incident electron per eV per sr. Their coordinates are `energy_eV` and
+`background_energy_eV`. `Result.provenance` records the resolved scene,
+numerics, content identity, backend/device, and library versions.
+
+`Sweep` expresses a Cartesian product as ordered paths into a scalar base
+scene. Paths are checked when the sweep is constructed, including indexed
+segments:
+
+```python
+sweep = pr.Sweep(
+    base=pr.Scene(beam, target, detector),
+    axes={
+        "beam.energy_keV": [30.0, 45.0, 60.0],
+        "target.tilt_deg": [15.0, 30.0, 45.0],
+    },
+)
+cases = sweep.cases(pr.Numerics())
+```
+
+For a `Stack`, paths such as `target.layers[1].thickness_ang` address a
+particular layer. A misspelled field or out-of-range index raises at `Sweep`
+construction.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: _autosummary
+
+   pyrite.Beam
+   pyrite.Slab
+   pyrite.Stack
+   pyrite.Layer
+   pyrite.Footprint
+   pyrite.BlazedGrooves
+   pyrite.Scene
+   pyrite.Sweep
+   pyrite.Convergence
+   pyrite.Numerics
+   pyrite.Analysis
+   pyrite.Result
+   pyrite.simulate
+```
+
 ## Materials and crystallography
 
 `pyrite.materials.CATALOG` is the immutable bundled `MaterialCatalog`.
@@ -87,9 +154,12 @@ method preserves the legacy mapping representation for serialization.
 
 ## Result analysis
 
-Result dictionaries are currently the supported interchange type. Their
-storage identity and lifecycle are documented in [dataset identity and
-storage](repo-design/storage/dataset-identity-and-storage.md).
+Single-shot simulations return `pyrite.Result`. Resumable campaign checkpoints
+continue to use result dictionaries; their storage identity and lifecycle are
+documented in [dataset identity and
+storage](repo-design/storage/dataset-identity-and-storage.md). `Settings` is the
+D7 compatibility surface for those checkpoint-analysis functions; new code
+uses `Analysis` for presentation controls.
 
 ```{eval-rst}
 .. autosummary::

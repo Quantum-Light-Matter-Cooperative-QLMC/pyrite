@@ -24,6 +24,10 @@ _SEGMENT = re.compile(r"(?P<name>[A-Za-z_]\w*)(?P<indexes>(?:\[\d+\])*)\Z")
 _INDEX = re.compile(r"\[(\d+)\]")
 
 
+class Beam(BeamSpec):
+    """Public name for the frozen electron-beam phase-space object."""
+
+
 def _one_float(name: str, value: Any) -> float:
     values = np.atleast_1d(np.asarray(value, dtype=float))
     if values.size != 1:
@@ -239,6 +243,12 @@ class Sweep:
             expanded.append((" ".join(_axis_label(path, value) for path, value in zip(paths, values, strict=True)), scene))
         return tuple(expanded)
 
+    def cases(self, numerics: Numerics | None = None) -> list[Any]:
+        """Lower this sweep through the same case seam as :func:`pyrite.simulate`."""
+        from ..api import build_sweep_cases
+
+        return build_sweep_cases(self, numerics)
+
     @classmethod
     def from_legacy(cls, old_sweep: Any, settings: Any) -> Sweep:
         """Convert the D7 `campaign.sweep.Sweep`/`Settings` pair."""
@@ -252,4 +262,4 @@ class Sweep:
         return adapt_legacy_sweep(old_sweep, settings)
 
 
-__all__ = ["Analysis", "Convergence", "Numerics", "Scene", "Sweep"]
+__all__ = ["Analysis", "Beam", "Convergence", "Numerics", "Scene", "Sweep"]

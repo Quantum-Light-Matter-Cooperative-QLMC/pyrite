@@ -15,6 +15,7 @@ def _():
     import marimo as mo
     import numpy as np
 
+    import pyrite as pr
     from pyrite.apps._design import page_title, style_sheet
     from pyrite.apps._widgets import MaterialSelect
 
@@ -28,7 +29,7 @@ def _():
 
     from pyrite.campaign.beam_metrics import initial_state_metrics
     from pyrite.campaign.config import default_settings, trajectory_sweep
-    from pyrite.campaign.sweep import build_cases, fmt_thickness
+    from pyrite.campaign.sweep import fmt_thickness
     from pyrite.materials import CATALOG
     from pyrite.plots.altair.trajectories import (
         penetration_survival_chart,
@@ -49,7 +50,6 @@ def _():
     return (
         CATALOG,
         MaterialSelect,
-        build_cases,
         cached_render_path,
         crystal_lattice_figure,
         default_settings,
@@ -59,6 +59,7 @@ def _():
         np,
         page_title,
         penetration_survival_chart,
+        pr,
         prune_render_cache,
         render_cache_key,
         render_reveal_animation,
@@ -336,7 +337,6 @@ def _(mo):
 @app.cell
 def _(
     MATERIAL,
-    build_cases,
     cached_render_path,
     get_penetration_data,
     get_penetration_render_status,
@@ -353,6 +353,7 @@ def _(
     penetration_energy_source_ui,
     penetration_groove_ui,
     penetration_ne_ui,
+    pr,
     penetration_realistic_ui,
     penetration_regen_ui,
     penetration_render_button_ui,
@@ -410,14 +411,14 @@ def _(
 
         try:
             _sweep = _make_sweep(_groove_spacing)
-            _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
+            _traj = pr.Sweep.from_legacy(_sweep, settings).cases()
         except ValueError as _exc:
             # geometry/material rejects grooves (tilt=0, substrate/stack, ...):
             # fall back to the flat face and surface the reason.
             _groove_spacing = None
             _groove_note = mo.md(f"*Grooves not applied: {_exc}*")
             _sweep = _make_sweep(None)
-            _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
+            _traj = pr.Sweep.from_legacy(_sweep, settings).cases()
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
         # The sweep has one selected energy and tilt; keep the nearest-case guard

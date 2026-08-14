@@ -20,6 +20,7 @@ detector/analysis knobs still live here.
 """
 
 import dataclasses
+import warnings
 from dataclasses import replace
 from typing import Any
 
@@ -193,6 +194,13 @@ def material_sweep(
     missing = object()
     line_override = overrides.pop("E_grid_line", missing)
     legacy_line_override = overrides.pop("e_grid_eV", missing)
+    if legacy_line_override is not missing:
+        warnings.warn(
+            "e_grid_eV is deprecated; use detector=Detector(energy_bins=EnergyBins(line=...)) "
+            "or E_grid_line= during the D7 compatibility window",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     line_by_energy_override = overrides.pop("E_grid_line_by_energy", missing)
     brem_override = overrides.pop("E_grid_brem", missing)
     resolved_detector = replace(

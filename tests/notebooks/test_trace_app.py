@@ -116,7 +116,8 @@ def test_penetration_controls_offer_material_presets_and_bounded_manual_values()
 def test_thickness_controls_and_context_use_shared_human_units() -> None:
     source = APP.read_text()
 
-    assert "from pyrite.campaign.sweep import build_cases, fmt_thickness" in source
+    assert "from pyrite.campaign.sweep import fmt_thickness" in source
+    assert "pr.Sweep.from_legacy(_sweep, settings).cases()" in source
     # The preset-thickness dropdown labels its options in human units.
     assert "fmt_thickness(value)" in source
     assert source.count("fmt_thickness(") >= 2
