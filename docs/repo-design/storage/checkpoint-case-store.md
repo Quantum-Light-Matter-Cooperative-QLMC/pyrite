@@ -24,6 +24,10 @@ names deterministic output, so independent writers need no shared lock.
 `run_sweep()` records a thin `<stem>/cases.json` (or `<stem>.cases.json` for a
 legacy file path) mapping each requested case to its content key.
 
+The `.pkl` suffix is a stable layout token. New component, shard, and CAS leaf
+files contain [versioned HDF5](result-schema.md); the shared reader continues to
+accept all historical pickle encodings.
+
 ## Cache modes
 
 | Mode | Read CAS | Write CAS | Per-profile checkpoint |
@@ -42,6 +46,10 @@ Component checkpoints remain materialized under
 `checkpoints/<stem>/{line,brem}.pkl`. Analysis, archive, prune, slim, and remote
 pull retain their existing read contracts; manifest-only consumers belong to
 the checkpoint-command rework.
+
+Legacy plain, gzip, and zstd pickle artifacts are never rewritten merely by
+reading them. Any later normal save uses HDF5, so migration is opportunistic and
+inherits the existing component/CAS atomic replacement discipline.
 
 A compatible existing profile checkpoint seeds missing CAS blobs during normal
 resume. Migration compares requested and stored case content keys before
@@ -69,6 +77,8 @@ does not have.
 
 - `src/pyrite/campaign/profiles.py`: content-key schema and canonical hashing.
 - `src/pyrite/checkpoints/_checkpoint_store.py`: sharded paths and atomic blob I/O.
+- `src/pyrite/checkpoints/_checkpoint_io.py`: versioned HDF5 codec and permanent
+  legacy-pickle reader dispatch.
 - `src/pyrite/runs/run.py`: replay/write, migration, and `cases.json` manifests.
 - `src/pyrite/runs/scan.py` and `src/pyrite/cli/commands/scan.py`: run policy
   plus CLI cache modes and performance options.

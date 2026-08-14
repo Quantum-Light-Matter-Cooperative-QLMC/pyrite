@@ -309,11 +309,11 @@ def test_checkpoint_save_roundtrips(tmp_path):
     assert set(_checkpoint_io.load(str(ckpt))) == {"cfg_a"}
 
 
-def test_checkpoint_save_is_compressed(tmp_path):
-    """TODO P2 #8: checkpoints are written zstd-compressed, not as plain pickles."""
+def test_checkpoint_save_is_hdf5(tmp_path):
+    """Result writes use the versioned HDF5 container despite the path suffix."""
     ckpt = tmp_path / "hopg.pkl"
     _checkpoint_save(str(ckpt), {"cfg_a": {30.0: {"case": {}, "spec": np.ones(1000)}}})
-    assert ckpt.read_bytes()[:4] == b"\x28\xb5\x2f\xfd"
+    assert ckpt.read_bytes()[:8] == b"\x89HDF\r\n\x1a\n"
 
 
 def test_checkpoint_save_is_atomic(tmp_path):

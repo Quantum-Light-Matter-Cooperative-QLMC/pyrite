@@ -2,7 +2,8 @@
 
 * **Status:** Proposed
 * **Date:** 2026-08-13
-* **Revised:** 2026-08-13 — first review pass; see {ref}`sec-core-arch-review`
+* **Revised:** 2026-08-14 — Change 6 retains HDF5 and defers interchange format
+  selection; see {ref}`sec-core-arch-review`
 * **Supersedes:** nothing
 * **Expected outcome:** one ADR per accepted section (see {ref}`sec-core-arch-adrs`)
 
@@ -50,8 +51,8 @@ PENELOPE/PENGEOM, and McStas/McXtrace.
   - Multi-detector runs; demotes `energy-grid`
   - Binning only
 * - 6
-  - Array results in HDF5; MCPL export
-  - Archival safety; external interoperability
+  - Array results in HDF5; defer interchange adapter
+  - Archival safety; preserves a sound interoperability boundary
   - No
 * - 7
   - Reduce the CLI noun surface from 13 to 9
@@ -514,7 +515,7 @@ an implementation detail of catalog resolution. The `derive`, `verify`, and
 * No inert field survives on the public detector object.
 * `E_grid_line` / `E_grid_brem` are absent from the scene objects.
 
-## Change 6 — result persistence and interchange
+## Change 6 — result persistence; interchange deferred
 
 ### Current state
 
@@ -538,11 +539,11 @@ format for results that back scientific claims.
 * A reader shim keeps existing `.pkl` datasets loadable indefinitely. Migration
   is opportunistic — rewrite on next save, as the store already does for the
   legacy flat layout.
-* Add MCPL export for the emitted photon list, and optionally for the transport
-  segment list. [MCPL](https://mctools.github.io/mcpl/mcpl.pdf) is the
-  interchange format shared by Geant4, MCNP, McStas, and McXtrace, and it is
-  the pragmatic answer to "can another code model our detector?" — it makes
-  that possible without PyRITE owning a general detector geometry.
+* Do not select or implement an interchange adapter in this change. PyRITE
+  stores spectral tallies, not emitted-photon phase-space records. Future work
+  starts from a concrete downstream consumer, defines a format-neutral
+  `PhotonSource` contract with normalization and closure tests, then selects an
+  adapter. MCPL remains a strong candidate for particle-transport consumers.
 
 ### Why HDF5, and why not Zarr
 
@@ -570,19 +571,17 @@ directory-of-chunks layout fights the store's existing write-then-rename
 atomicity, where a single `.h5` file renames atomically and maps one-to-one onto
 a CAS blob.
 
-`h5py` becomes a required dependency. So does `mcpl`: the meta-package pulls
-`mcpl-core` (prebuilt wheels for macOS x86-64/arm64, manylinux x86-64/aarch64,
-musllinux, and Windows amd64/arm64) and `mcpl-python` (pure Python, NumPy only),
-all Apache-2.0, so there is no build risk to hedge against with an optional
-extra. An escape hatch that is off by default would also be a weaker
-justification for the arbitrary-geometry non-goal than one that is always
-present.
+`h5py` becomes a required dependency. No interchange dependency is added.
+Format availability is not the blocker: an adapter cannot recover position,
+direction, time, polarization, or their correlations from the stored spectral
+tallies. Choosing defaults for those fields would be a new source model, not a
+serialization detail.
 
 ### Acceptance
 
 * A result file is readable by `h5py` with no PyRITE import.
 * Every stored `.pkl` dataset loads unchanged.
-* An exported MCPL file passes `mcpltool` validation.
+* Round-trip through HDF5 reproduces every stored spectrum bit for bit.
 
 ## Change 7 — reduce the CLI noun surface
 
@@ -695,7 +694,7 @@ cli-reference freeze test guards each step.
   - 4
   - No
 * - 6
-  - Result format and MCPL export (Change 6)
+  - Result persistence (Change 6)
   - 1
   - Yes
 * - 7
@@ -762,10 +761,10 @@ in position is visible rather than silently absorbed.
 * - HDF5 or Zarr?
   - HDF5, on atomicity and one-file-per-CAS-blob rather than on popularity.
     Change 6.
-* - Is MCPL an optional extra?
-  - No. Prebuilt wheels on every supported platform, so there is no install
-    risk to hedge; a conditionally available escape hatch would also weaken the
-    geometry non-goal. Change 6.
+* - Should Change 6 require MCPL?
+  - No. Stored results are spectral tallies, not photon phase space. Define a
+    format-neutral `PhotonSource` from a concrete consumer first, then choose
+    and validate an adapter. MCPL remains a candidate. Change 6.
 ```
 
 (sec-core-arch-nongoals)=
@@ -789,8 +788,11 @@ The reasoning, recorded so it is not re-litigated:
   register pressure, and the response was a
   [GPU-friendly surface model](https://www.epj-conferences.org/articles/epjconf/abs/2025/22/epjconf_chep2025_01207/epjconf_chep2025_01207.html)
   in VecGeom — a substantial project in its own right.
-* **The cheap escape hatch already exists.** MCPL export (Change 6) lets a code
-  that already solved general geometry consume PyRITE's emitted photons.
+* **Interoperability is downstream, not an internal geometry system.** A future
+  adapter can hand a scientifically defined photon source to a code that owns
+  general geometry. It cannot make arbitrary target geometry participate in
+  PyRITE's electron transport or coherent emission. Change 6 therefore defers
+  format selection until a concrete consumer and `PhotonSource` contract exist.
 
 If the constraint ever changes, the seam is narrow and is worth naming now: the
 transport core needs `locate(r) -> region`,

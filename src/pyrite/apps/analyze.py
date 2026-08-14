@@ -144,6 +144,7 @@ def _read_checkpoint_or_none(material: str, read):
     except (
         EOFError,
         FileNotFoundError,
+        OSError,
         gzip.BadGzipFile,
         pickle.UnpicklingError,
         zlib.error,
