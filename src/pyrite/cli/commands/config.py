@@ -8,7 +8,7 @@ import click
 
 from ...remote.config import validate_remote_target
 from .. import _config
-from .._core import CLIError
+from .._core import CLIError, LazyGroup
 
 _KEY = click.Choice(_config.keys(), case_sensitive=True)
 
@@ -31,7 +31,18 @@ def _validated(key: str, value: str) -> str:
     return value
 
 
-@click.group("config")
+@click.group(
+    "config",
+    cls=LazyGroup,
+    lazy_commands={
+        "setup": "pyrite.cli.commands.backend_setup.command",
+        "completion": "pyrite.cli.commands.completion.command",
+    },
+    lazy_help={
+        "setup": "Detect GPU hardware and persist the selected backend.",
+        "completion": "Manage PyRITE shell tab-completion.",
+    },
+)
 def command() -> None:
     """Set and inspect environment-scoped CLI defaults.
 

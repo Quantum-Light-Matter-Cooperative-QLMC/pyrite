@@ -168,9 +168,9 @@ def command():
 
     \b
     Examples:
-      pyrite energy-grid derive --material mose2,wse2 --energy 30,60
-      pyrite energy-grid derive --material mose2 --remote --dry-run
-      pyrite energy-grid show mose2
+      pyrite material energy-grid derive --material mose2,wse2 --energy 30,60
+      pyrite material energy-grid derive --material mose2 --remote --dry-run
+      pyrite material energy-grid show mose2
     """
 
 
@@ -179,7 +179,7 @@ def line_command():
     """Inspect or manually set coherent line-energy grids."""
 
 
-@command.group("brem", no_args_is_help=True)
+@command.group("brem", cls=DeprecatingGroup, no_args_is_help=True)
 def brem_command():
     """Inspect or manually set bremsstrahlung energy grids."""
 
@@ -545,7 +545,7 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
 
     \b
     Example:
-      pyrite energy-grid add combined_line_grid_bounds.json --material mose2,wse2
+      pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2
     """
     path = _pull_combined() if pull else json_path
     if not path:
@@ -647,7 +647,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
 
     \b
     Example:
-      pyrite energy-grid rm wse2 --energy 30 --energy 40
+      pyrite-dev energy-grid rm wse2 --energy 30 --energy 40
     """
     if dry_run and json_output:
         raise click.UsageError("--dry-run and --output json cannot be combined")

@@ -70,6 +70,10 @@ _COMMAND_HELP = {
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
     lazy_hidden={
+        "setup",
+        "completion",
+        "performance",
+        "energy-grid",
         "slim",
         "rebrem",
         "reline",
@@ -99,7 +103,7 @@ def command() -> None:
 
     \b
     Examples:
-      pyrite setup
+      pyrite config setup
       pyrite profile list
       pyrite profile show sub_100keV
       pyrite run sub_100keV -m hopg

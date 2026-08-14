@@ -24,9 +24,10 @@ Python callers use `default_settings("survey")` and
 `material_sweep("mose2", fidelity="survey")`. `full` remains default for both.
 Explicit `material_sweep` overrides apply after profile resolution.
 
-`pyrite energy-grid` is upstream of this choice. `derive`, locally or with
-`--remote`, measures catalog-ready line and bremsstrahlung bounds without a
-fidelity setting, and `add` stores those full bounds. Later
+`pyrite material energy-grid derive`, locally or with `--remote`, is upstream
+of this choice: it measures catalog-ready line and bremsstrahlung bounds
+without a fidelity setting. `pyrite-dev energy-grid add` stores those full
+bounds. Later
 `pyrite run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.
 

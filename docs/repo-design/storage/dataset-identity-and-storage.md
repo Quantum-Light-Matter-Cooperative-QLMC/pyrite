@@ -49,7 +49,8 @@ specific scale and reporting values.
 ```
 
 The exact internal files are implementation details; use `pyrite checkpoint`
-and `pyrite energy-grid` commands rather than editing them. A command's
+and the `pyrite material energy-grid` / `pyrite-dev energy-grid` commands rather
+than editing them. A command's
 `--checkpoint-dir` overrides the workspace checkpoint root for that invocation.
 
 ## Lifecycle and safety
@@ -63,8 +64,9 @@ and `pyrite energy-grid` commands rather than editing them. A command's
   resolution; preview is the default.
 - `checkpoint rm` deletes selected datasets and blobs kept reachable only by
   them; preview is the default.
-- `energy-grid verify` checks immutable object bytes and profile references;
-  `energy-grid gc` reclaims unreachable objects after its grace period.
+- `pyrite-dev energy-grid verify` checks immutable object bytes and profile
+  references; `pyrite-dev energy-grid gc` reclaims unreachable objects after
+  its grace period.
 
 Legacy checkpoints remain readable, but missing identity cannot be reconstructed
 retroactively. Treat them as provenance-incomplete. For case-store mechanics,

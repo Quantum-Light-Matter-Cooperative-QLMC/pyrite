@@ -28,11 +28,13 @@ _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False
 
 _COMMANDS = {
     "blaze": "pyrite.cli.commands.blaze.command",
+    "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
     "validate": "pyrite.cli.commands.check_config.command",
 }
 
 _COMMAND_HELP = {
     "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
+    "energy-grid": "Derive and inspect detector energy-grid inputs.",
     "validate": "Validate a material catalog without starting simulation.",
 }
 

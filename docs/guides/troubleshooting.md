@@ -18,8 +18,9 @@ support. See the [catalog schema](../repo-design/materials-catalog-schema.md).
 
 The selected profile/material lacks a verified immutable line-grid reference.
 Select the profile through `PYRITE_PROFILE` or persistent configuration, run
-`pyrite energy-grid derive`, add the returned JSON to that profile with `pyrite
-energy-grid add --profile NAME`, then run `pyrite energy-grid verify`. Do not paste
+`pyrite material energy-grid derive`, add the returned JSON to that profile with
+`pyrite-dev energy-grid add --profile NAME`, then run `pyrite-dev energy-grid
+verify`. Do not paste
 survey-cropped bounds into the catalog; fidelity reduction happens later.
 
 ## A run does not resume the checkpoint I expected
@@ -46,7 +47,7 @@ correctly rejected.
 
 ## The GPU is unavailable or runs out of memory
 
-Inspect `pyrite backend-setup --help` and the active backend environment. CPU is the
+Inspect `pyrite config setup --help` and the active backend environment. CPU is the
 safe base installation. Do not solve memory pressure by changing scientific
 inputs invisibly: use documented resource/chunk controls, record them for
 performance work, and route heavy GPU sweeps through the [cluster

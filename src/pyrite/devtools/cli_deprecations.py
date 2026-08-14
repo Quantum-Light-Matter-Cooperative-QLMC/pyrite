@@ -53,8 +53,11 @@ def build_deprecations() -> str:
     )
     for key in sorted(DEPRECATED_FLAGS):
         entry = DEPRECATED_FLAGS[key]
+        command = (
+            entry.command if entry.command.startswith("pyrite-dev ") else f"pyrite {entry.command}"
+        )
         lines.append(
-            f"| `pyrite {entry.command}` | `{entry.flag}` | `{entry.replacement}` "
+            f"| `{command}` | `{entry.flag}` | `{entry.replacement}` "
             f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
         )
     lines.append("")

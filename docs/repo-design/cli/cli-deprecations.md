@@ -19,20 +19,37 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite check-config` | `pyrite profile show` | 0.1.0 | 0.3.0 |  |
 | `pyrite checkpoint clear` | `pyrite checkpoint rm` | 0.1.0 | 0.3.0 |  |
 | `pyrite checkpoint prune` | `pyrite checkpoint gc` | 0.1.0 | 0.3.0 |  |
-| `pyrite energy-grid apply` | `pyrite energy-grid add` | 0.1.0 | 0.3.0 | The replacement creates an immutable artifact and repoints the resolved profile. |
+| `pyrite completion install` | `pyrite config completion install` | 0.1.0 | 0.3.0 |  |
+| `pyrite completion remove` | `pyrite config completion remove` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid add` | `pyrite-dev energy-grid add` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid apply` | `pyrite-dev energy-grid add` | 0.1.0 | 0.3.0 | The replacement creates an immutable artifact and repoints the resolved profile. |
 | `pyrite energy-grid attach` | `pyrite job attach` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid brem set` | `pyrite-dev energy-grid brem set` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid brem show` | `pyrite material energy-grid brem show` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid defaults` | `pyrite profile energy-grid defaults` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid derive` | `pyrite material energy-grid derive` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid gc` | `pyrite-dev energy-grid gc` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid job attach` | `pyrite job attach` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid job logs` | `pyrite job logs` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid job status` | `pyrite job status` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid job stop` | `pyrite job stop` | 0.1.0 | 0.3.0 |  |
-| `pyrite energy-grid line delete` | `pyrite energy-grid rm` | 0.1.0 | 0.3.0 | The replacement repoints a profile; gc later reclaims unreachable bytes. |
+| `pyrite energy-grid line delete` | `pyrite-dev energy-grid rm` | 0.1.0 | 0.3.0 | The replacement repoints a profile; gc later reclaims unreachable bytes. |
+| `pyrite energy-grid line set` | `pyrite-dev energy-grid line set` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid line show` | `pyrite material energy-grid line show` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid logs` | `pyrite job logs` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid regen-golden` | `pyrite-dev regen-golden` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid rm` | `pyrite-dev energy-grid rm` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid show` | `pyrite material energy-grid show` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid status` | `pyrite job status` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid stop` | `pyrite job stop` | 0.1.0 | 0.3.0 |  |
-| `pyrite energy-grid submit` | `pyrite energy-grid derive --remote --detach` | 0.1.0 | 0.3.0 |  |
-| `pyrite performance prune` | `pyrite performance rm` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid submit` | `pyrite material energy-grid derive --remote --detach` | 0.1.0 | 0.3.0 |  |
+| `pyrite energy-grid verify` | `pyrite-dev energy-grid verify` | 0.1.0 | 0.3.0 |  |
+| `pyrite performance analyze` | `pyrite-dev performance analyze` | 0.1.0 | 0.3.0 |  |
+| `pyrite performance list` | `pyrite-dev performance list` | 0.1.0 | 0.3.0 |  |
+| `pyrite performance prune` | `pyrite-dev performance rm` | 0.1.0 | 0.3.0 |  |
+| `pyrite performance rm` | `pyrite-dev performance rm` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile add-material` | `pyrite profile add NAME --material MATERIAL,...` | 0.1.0 | 0.3.0 |  |
-| `pyrite profile analyze` | `pyrite performance analyze NAME` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile analyze` | `pyrite-dev performance analyze NAME` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile members add` | `pyrite profile add NAME --material MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile members remove` | `pyrite profile remove NAME --material MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile members reset` | `pyrite profile set NAME --all-materials` | 0.1.0 | 0.3.0 |  |
@@ -56,6 +73,7 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite remote stop` | `pyrite job stop` | 0.1.0 | 0.3.0 |  |
 | `pyrite remote validate` | `pyrite run --preset zhai --remote` | 0.1.0 | 0.3.0 |  |
 | `pyrite restore` | `pyrite checkpoint restore` | 0.1.0 | 0.3.0 |  |
+| `pyrite setup` | `pyrite config setup` | 0.1.0 | 0.3.0 |  |
 | `pyrite slim` | `pyrite checkpoint slim` | 0.1.0 | 0.3.0 |  |
 | `pyrite sweep set` | `pyrite material set` | 0.1.0 | 0.3.0 | The warning names the material and profile actually given. |
 | `pyrite sweep show` | `pyrite material show` | 0.1.0 | 0.3.0 | With no MATERIAL argument, use `pyrite profile list`. |
@@ -103,6 +121,14 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite job status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite material blaze` | `--angles` | `--polar` | 0.1.0 | 0.3.0 |  |
 | `pyrite material blaze` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid brem show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid derive` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid derive` | `--energies` | `--energy` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid derive` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid derive` | `--set-default` | `--save-default` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid derive` | `--tilts` | `--polar` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid line show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite material energy-grid show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite material show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile create` | `--bunch-charge-pc` | `pyrite beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
@@ -116,6 +142,10 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile create` | `--twiss-alpha` | `pyrite beam create/set --twiss-alpha` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile create` | `--twiss-beta` | `pyrite beam create/set --twiss-beta` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile energy-grid defaults` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile energy-grid defaults` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile energy-grid defaults` | `--set` | `--save-default` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile energy-grid defaults` | `--tilts` | `--polar` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile remove` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile set` | `--bunch-charge-pc` | `pyrite beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
@@ -129,6 +159,8 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile set` | `--twiss-alpha` | `pyrite beam create/set --twiss-alpha` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile set` | `--twiss-beta` | `pyrite beam create/set --twiss-beta` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite-dev energy-grid add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `pyrite-dev energy-grid rm` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite rebrem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite reline` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite remote jobs` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |

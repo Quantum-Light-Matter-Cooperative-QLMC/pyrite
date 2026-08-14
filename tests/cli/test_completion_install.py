@@ -23,7 +23,7 @@ def _script_path(tmp_path, shell):
 
 
 def test_root_help_lists_completion_group(capsys):
-    result = invoke(root_command, ["--help"])
+    result = invoke(root_command, ["config", "--help"])
     assert_clean_result(result)
     assert "completion" in result.stdout
 
@@ -34,7 +34,7 @@ def test_writes_line_and_creates_missing_rc_file(tmp_path, monkeypatch):
 
     result = invoke(
         root_command,
-        ["completion", "install", "--shell", "bash", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "bash", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(result)
@@ -56,7 +56,7 @@ def test_appends_after_existing_content_without_trailing_newline(tmp_path):
 
     result = invoke(
         root_command,
-        ["completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(result)
@@ -81,7 +81,7 @@ def test_preserves_shell_config_symlink_and_mode(tmp_path):
 
     result = invoke(
         root_command,
-        ["completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(result)
@@ -95,11 +95,11 @@ def test_rerun_is_idempotent(tmp_path):
 
     first = invoke(
         root_command,
-        ["completion", "install", "--shell", "bash", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "bash", "--rc-file", str(rc_file)],
     )
     second = invoke(
         root_command,
-        ["completion", "install", "--shell", "bash", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "bash", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(first)
@@ -113,7 +113,16 @@ def test_dry_run_does_not_write(tmp_path):
 
     result = invoke(
         root_command,
-        ["completion", "install", "--shell", "bash", "--rc-file", str(rc_file), "--dry-run"],
+        [
+            "config",
+            "completion",
+            "install",
+            "--shell",
+            "bash",
+            "--rc-file",
+            str(rc_file),
+            "--dry-run",
+        ],
     )
 
     assert_clean_result(result)
@@ -125,7 +134,7 @@ def test_dry_run_does_not_write(tmp_path):
 def test_fish_uses_pipe_source_and_config_fish_default(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    result = invoke(root_command, ["completion", "install", "--shell", "fish"])
+    result = invoke(root_command, ["config", "completion", "install", "--shell", "fish"])
 
     assert_clean_result(result)
     target = tmp_path / ".config" / "fish" / "config.fish"
@@ -140,7 +149,7 @@ def test_fish_uses_pipe_source_and_config_fish_default(monkeypatch, tmp_path):
 def test_zsh_honors_zdotdir(monkeypatch, tmp_path):
     monkeypatch.setenv("ZDOTDIR", str(tmp_path))
 
-    result = invoke(root_command, ["completion", "install", "--shell", "zsh"])
+    result = invoke(root_command, ["config", "completion", "install", "--shell", "zsh"])
 
     assert_clean_result(result)
     assert (tmp_path / ".zshrc").exists()
@@ -148,7 +157,7 @@ def test_zsh_honors_zdotdir(monkeypatch, tmp_path):
 
 def test_missing_shell_detection_is_usage_error(monkeypatch, capsys):
     monkeypatch.delenv("SHELL", raising=False)
-    result = invoke(root_command, ["completion", "install"])
+    result = invoke(root_command, ["config", "completion", "install"])
 
     assert result.exit_code == 2
     assert "SHELL" in result.output or "could not detect shell" in result.output
@@ -159,7 +168,7 @@ def test_detects_shell_from_environment(tmp_path, monkeypatch):
     monkeypatch.delenv("ZDOTDIR", raising=False)
     rc_file = tmp_path / ".zshrc"
 
-    result = invoke(root_command, ["completion", "install", "--rc-file", str(rc_file)])
+    result = invoke(root_command, ["config", "completion", "install", "--rc-file", str(rc_file)])
 
     assert_clean_result(result)
     assert str(_script_path(tmp_path, "zsh")) in rc_file.read_text()
@@ -167,7 +176,7 @@ def test_detects_shell_from_environment(tmp_path, monkeypatch):
 
 
 def test_unsupported_shell_choice_is_usage_error():
-    result = invoke(root_command, ["completion", "install", "--shell", "powershell"])
+    result = invoke(root_command, ["config", "completion", "install", "--shell", "powershell"])
 
     assert result.exit_code == 2
     assert "powershell" in result.output
@@ -205,12 +214,12 @@ def test_remove_managed_installation_and_preserve_other_content(tmp_path):
     rc_file.write_text("export KEEP=1\n")
     installed = invoke(
         root_command,
-        ["completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
     )
 
     removed = invoke(
         root_command,
-        ["completion", "remove", "--shell", "zsh", "--rc-file", str(rc_file)],
+        ["config", "completion", "remove", "--shell", "zsh", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(installed)
@@ -228,7 +237,7 @@ def test_remove_recognizes_legacy_two_line_installation(tmp_path):
 
     result = invoke(
         root_command,
-        ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+        ["config", "completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(result)
@@ -237,19 +246,22 @@ def test_remove_recognizes_legacy_two_line_installation(tmp_path):
 
 def test_remove_is_idempotent_and_dry_run_preserves_file(tmp_path):
     rc_file = tmp_path / ".bashrc"
-    install = ["completion", "install", "--shell", "bash", "--rc-file", str(rc_file)]
+    install = ["config", "completion", "install", "--shell", "bash", "--rc-file", str(rc_file)]
     invoke(root_command, install)
     original = rc_file.read_text()
 
-    preview = invoke(root_command, [*install[:1], "remove", *install[2:], "--dry-run"])
+    preview = invoke(root_command, [*install[:2], "remove", *install[3:], "--dry-run"])
     assert_clean_result(preview)
     assert "Would remove" in preview.stdout
     assert rc_file.read_text() == original
 
-    invoke(root_command, ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)])
+    invoke(
+        root_command,
+        ["config", "completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+    )
     repeated = invoke(
         root_command,
-        ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+        ["config", "completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
     )
     assert_clean_result(repeated)
     assert "not installed" in repeated.stdout
@@ -262,7 +274,7 @@ def test_remove_does_not_delete_unmanaged_completion_line(tmp_path):
 
     result = invoke(
         root_command,
-        ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+        ["config", "completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(result)
@@ -280,7 +292,7 @@ def test_install_migrates_dynamic_zsh_block(tmp_path):
 
     result = invoke(
         root_command,
-        ["completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
     )
 
     assert_clean_result(result)
@@ -294,7 +306,7 @@ def test_zsh_fresh_shell_initializes_and_registers_completion(tmp_path):
     rc_file = tmp_path / ".zshrc"
     result = invoke(
         root_command,
-        ["completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
+        ["config", "completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
     )
     assert_clean_result(result)
 

@@ -247,9 +247,9 @@ def install_command(
 
     \b
     Examples:
-      pyrite completion install
-      pyrite completion install --shell zsh --dry-run
-      pyrite completion install --shell fish
+      pyrite config completion install
+      pyrite config completion install --shell zsh --dry-run
+      pyrite config completion install --shell fish
     """
     shell, target = _resolve_target(shell, rc_file)
     _require_persistent_executable()
@@ -356,8 +356,8 @@ def command() -> None:
 
     \b
     Example:
-      pyrite completion install
-      pyrite completion install --shell zsh --dry-run
+      pyrite config completion install
+      pyrite config completion install --shell zsh --dry-run
     """
 
 

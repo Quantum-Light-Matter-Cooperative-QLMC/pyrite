@@ -41,10 +41,10 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("remote",): ("PYRITE_REMOTE_HOST", "Examples:"),
         ("remote", "run"): ("PROFILE selects", "-m, --material"),
         ("remote", "pull"): ("--preset", "grid-filtered"),
-        ("energy-grid",): ("pyrite profile", "per-material range overrides", "Examples:"),
-        ("energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
-        ("energy-grid", "add"): ("precedence", "immutable"),
-        ("energy-grid", "job", "status"): ("latest recorded job", "repeat"),
+        ("material", "energy-grid"): ("detector energy-grid inputs", "Examples:"),
+        ("material", "energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
+        ("profile", "energy-grid", "defaults"): ("persistent derivation inputs", "fidelity"),
+        ("job", "status"): ("latest recorded job", "repeat"),
     }
     for path, expected in cases.items():
         result = runner.invoke(command, [*path, "--help"])

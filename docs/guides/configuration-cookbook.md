@@ -69,9 +69,9 @@ Add `--yes` only after checking the exact selection.
 If `run` reports missing line bounds:
 
 ```bash
-PYRITE_PROFILE=my-survey pyrite energy-grid derive --material hopg
-pyrite energy-grid add PATH_FROM_DERIVE --profile my-survey --material hopg
-pyrite energy-grid verify
+PYRITE_PROFILE=my-survey pyrite material energy-grid derive --material hopg
+pyrite-dev energy-grid add PATH_FROM_DERIVE --profile my-survey --material hopg
+pyrite-dev energy-grid verify
 ```
 
 Derivation can be remote for heavy work. The stored artifact contains full

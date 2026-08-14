@@ -1,6 +1,6 @@
 # 0002 — CLI surface redesign (noun→verb)
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR-0010
 - **Date:** 2026-08-01
 - **Historical rationale:** retired “CLI redesign RFC” (recoverable from Git history)
 

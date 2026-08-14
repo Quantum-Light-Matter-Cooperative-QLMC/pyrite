@@ -22,6 +22,7 @@ from pyrite.cli._core import (
     THICKNESS_CSV_RANGE,
     TILT_CSV_RANGE,
     CLIError,
+    LazyGroup,
     confirm_destructive,
     emit_json_result,
     emit_result,
@@ -287,11 +288,11 @@ def _warn_inline_beam_flags(ctx, **beam_flag_values):
             warn_flag(ctx, flag, f"pyrite beam create/set {flag}")
 
 
-class _ProfileGroup(DeprecatingGroup):
+class _ProfileGroup(LazyGroup):
     """``pyrite profile NAME`` aliases ``pyrite profile show NAME``."""
 
     def resolve_command(self, ctx, args):
-        if args and not args[0].startswith("-") and args[0] not in self.commands:
+        if args and not args[0].startswith("-") and args[0] not in self.list_commands(ctx):
             args = ["show", *args]
         return super().resolve_command(ctx, args)
 
@@ -301,7 +302,14 @@ class _ProfileGroup(DeprecatingGroup):
         return items
 
 
-@click.group(name="profile", cls=_ProfileGroup, no_args_is_help=True, deprecation_prefix="profile")
+@click.group(
+    name="profile",
+    cls=_ProfileGroup,
+    lazy_commands={"energy-grid": "pyrite.cli.commands.energy_grid_surface.profile_command"},
+    lazy_help={"energy-grid": "Manage profile-scoped energy-grid derivation inputs."},
+    no_args_is_help=True,
+    deprecation_prefix="profile",
+)
 def command():
     """Manage catalog scan profiles (named campaign defaults).
 
@@ -310,8 +318,7 @@ def command():
     membership. An absent ``materials`` key means all catalog materials.
     Membership uses ``set|add|remove --material``; ``set --all-materials``
     restores implicit membership. Per-material
-    range overrides are managed by ``pyrite material``. Energy grids are managed
-    by ``pyrite energy-grid``.
+    range overrides and derived energy grids are managed by ``pyrite material``.
 
     \b
     Examples:

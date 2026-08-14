@@ -8,7 +8,7 @@ two persistent parts:
 
 `uv sync` creates the project environment, and `uv run pyrite ...` exposes its
 entry point only for that command. Installing completion through
-`uv run pyrite completion install` does not make the bare `pyrite` command
+`uv run pyrite config completion install` does not make the bare `pyrite` command
 persistent, so the completion installer rejects that project-only state unless
 another `pyrite` executable is already available outside the active environment.
 Activating `.venv` manually in each session is not the recommended user
@@ -51,14 +51,14 @@ linting, documentation builds, and other contributor verification.
 After `command -v pyrite` succeeds in a new shell, install completion:
 
 ```bash
-pyrite completion install
+pyrite config completion install
 exec "$SHELL"
 ```
 
 Pass the shell explicitly when `$SHELL` does not identify the intended shell:
 
 ```bash
-pyrite completion install --shell zsh
+pyrite config completion install --shell zsh
 ```
 
 The command generates a completion script once under PyRITE's platform user
@@ -96,7 +96,7 @@ should report `_pyrite_completion: function` after `.zshrc` has loaded.
 Remove both the managed startup block and generated script with:
 
 ```bash
-pyrite completion remove
+pyrite config completion remove
 ```
 
 This does not uninstall PyRITE. To remove the persistent uv tool afterward:
@@ -113,5 +113,5 @@ virtual environment unless that environment is intentionally managed by the
 shell configuration.
 
 If zsh completion was installed before this cached-script implementation,
-rerun `pyrite completion install --shell zsh`. The installer replaces the
+rerun `pyrite config completion install --shell zsh`. The installer replaces the
 older managed `eval "$(_PYRITE_COMPLETE=zsh_source pyrite)"` block.

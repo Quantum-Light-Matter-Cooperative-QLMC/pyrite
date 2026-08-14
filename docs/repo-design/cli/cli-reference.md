@@ -33,8 +33,11 @@ Zhai reproduction uses `pyrite run --preset zhai --remote`. Legacy `check`,
 `check-config`, `remote validate`, and `remote check` paths remain hidden
 compatibility aliases. Remote runs use `pyrite run --remote`; retired
 `remote run`, `scan`, `submit`, and `start` paths are hidden or absent.
-Energy-grid job lifecycle uses `pyrite energy-grid job ...`; legacy flat job
-verbs remain aliases.
+Energy-grid job lifecycle uses the top-level `pyrite job ...` paths; former
+`pyrite energy-grid` job paths remain hidden aliases.
+User grid derivation and inspection live below `pyrite material energy-grid`;
+profile derivation defaults live below `pyrite profile energy-grid`.
+Artifact mutation and verification use `pyrite-dev energy-grid`.
 
 Automation contract: usage errors exit 2; runtime failures exit 1;
 interrupted viewers exit 130; resumable compute exits 75. Diagnostics,
@@ -45,7 +48,7 @@ default; `wide` is human-only and not a stable automation contract.
 
 Destructive commands preview exact targets by default. In a TTY, accept the
 `[y/N]` prompt to execute; in non-interactive use, pass `-y/--yes`.
-`pyrite energy-grid stop` additionally requires JOBID or explicit `--latest`.
+`pyrite job stop` requires JOBID or an explicit selector.
 
 Commands below are authoritative for this version.
 
@@ -64,7 +67,7 @@ Usage: pyrite [OPTIONS] COMMAND [ARGS]...
   Run ``pyrite COMMAND --help`` for command options, units, defaults, and side effects.
 
   Examples:
-    pyrite setup
+    pyrite config setup
     pyrite profile list
     pyrite profile show sub_100keV
     pyrite run sub_100keV -m hopg
@@ -78,19 +81,15 @@ Options:
   -h, --help                   Show this message and exit.
 
 Commands:
-  run          Run a profile's MC sweeps and write checkpoints.
-  setup        Detect GPU hardware and write PYRITE_MC_BACKEND to .env (first run).
-  app          Launch or export interactive analysis notebooks.
-  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.
-  completion   Manage PyRITE shell tab-completion.
-  config       Set and inspect current profile and remote-target defaults.
-  performance  List, analyze, or delete compute-performance artifacts.
-  remote       Run and manage MC sweeps on a remote GPU host.
-  job          List, inspect, follow, or stop asynchronous remote jobs.
-  energy-grid  Derive, inspect, and manage immutable photon-energy-grid artifacts.
-  profile      Manage named catalog campaigns and material membership.
-  material     Inspect, validate, edit, and blaze individual materials.
-  beam         Manage named beams, attachable to profiles by name.
+  run         Run a profile's MC sweeps and write checkpoints.
+  app         Launch or export interactive analysis notebooks.
+  checkpoint  Inspect, transform, recompute, archive, and reclaim checkpoints.
+  config      Set and inspect current profile and remote-target defaults.
+  remote      Run and manage MC sweeps on a remote GPU host.
+  job         List, inspect, follow, or stop asynchronous remote jobs.
+  profile     Manage named catalog campaigns and material membership.
+  material    Inspect, validate, edit, and blaze individual materials.
+  beam        Manage named beams, attachable to profiles by name.
 ```
 
 ## `pyrite run`
@@ -170,25 +169,6 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
-```
-
-## `pyrite setup`
-
-```text
-Usage: pyrite setup [OPTIONS]
-
-  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.
-
-  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-ls/lspci) --
-  no vendor Python package (cupy, dpnp/dpctl) needs to be installed first. Prompts
-  interactively to opt into an accelerator; defaults to cpu if none is detected,
-  declined, or the session is non-interactive. A no-op once PYRITE_MC_BACKEND or its
-  CXR_MC_BACKEND alias is already set in .env, unless --force is given.
-
-Options:
-  -y, --yes   Accept the top detected accelerator without an interactive prompt.
-  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value in .env.
-  -h, --help  Show this message and exit.
 ```
 
 ## `pyrite app`
@@ -623,67 +603,6 @@ Options:
   -h, --help            Show this message and exit.
 ```
 
-## `pyrite completion`
-
-```text
-Usage: pyrite completion [OPTIONS] COMMAND [ARGS]...
-
-  Manage pyrite shell tab-completion.
-
-  Example:
-    pyrite completion install
-    pyrite completion install --shell zsh --dry-run
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  install  Generate and persist pyrite shell tab-completion.
-  remove   Remove pyrite tab-completion setup and its generated script.
-```
-
-## `pyrite completion install`
-
-```text
-Usage: pyrite completion install [OPTIONS]
-
-  Generate a pyrite completion script and source it from a shell rc/config file.
-
-  The bare pyrite executable must remain on PATH across shell sessions; for uv
-  installations, use 'uv tool install' rather than project-only 'uv run'. Idempotent:
-  rerunning refreshes the generated script without duplicating the rc block. With no
-  --shell, detects from $SHELL.
-
-Options:
-  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
-  --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
-                           location.
-  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data
-                           directory.
-  --dry-run                Print what would change without writing.
-  -h, --help               Show this message and exit.
-```
-
-## `pyrite completion remove`
-
-```text
-Usage: pyrite completion remove [OPTIONS]
-
-  Remove pyrite tab-completion setup and its generated script.
-
-  Idempotent: exact pyrite and retained cxr-managed blocks are removed. With no --shell,
-  detects from $SHELL.
-
-Options:
-  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
-  --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
-                           location.
-  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data
-                           directory.
-  --dry-run                Print what would change without writing.
-  -h, --help               Show this message and exit.
-```
-
 ## `pyrite config`
 
 ```text
@@ -698,9 +617,11 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  get   Print the effective value for KEY.
-  list  List effective values and the winning precedence source.
-  set   Persist VALUE for KEY.
+  get         Print the effective value for KEY.
+  list        List effective values and the winning...
+  set         Persist VALUE for KEY.
+  setup       Detect GPU hardware and persist the selected backend.
+  completion  Manage PyRITE shell tab-completion.
 ```
 
 ## `pyrite config get`
@@ -736,61 +657,84 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite performance`
+## `pyrite config setup`
 
 ```text
-Usage: pyrite performance [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite config setup [OPTIONS]
 
-  List, analyze, or delete local compute-performance artifacts.
+  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.
+
+  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-ls/lspci) --
+  no vendor Python package (cupy, dpnp/dpctl) needs to be installed first. Prompts
+  interactively to opt into an accelerator; defaults to cpu if none is detected,
+  declined, or the session is non-interactive. A no-op once PYRITE_MC_BACKEND or its
+  CXR_MC_BACKEND alias is already set in .env, unless --force is given.
+
+Options:
+  -y, --yes   Accept the top detected accelerator without an interactive prompt.
+  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value in .env.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite config completion`
+
+```text
+Usage: pyrite config completion [OPTIONS] COMMAND [ARGS]...
+
+  Manage pyrite shell tab-completion.
+
+  Example:
+    pyrite config completion install
+    pyrite config completion install --shell zsh --dry-run
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  analyze  Analyze NAME's logs into CSV, Markdown, and PNG artifacts.
-  list     List local performance profiles with artifact counts and sizes.
-  rm       Delete explicitly selected local performance profiles; preview by default.
+  install  Generate and persist pyrite shell tab-completion.
+  remove   Remove pyrite tab-completion setup and its generated script.
 ```
 
-## `pyrite performance analyze`
+## `pyrite config completion install`
 
 ```text
-Usage: pyrite performance analyze [OPTIONS] NAME
+Usage: pyrite config completion install [OPTIONS]
 
-  Analyze NAME's logs into CSV, Markdown, and PNG artifacts.
+  Generate a pyrite completion script and source it from a shell rc/config file.
+
+  The bare pyrite executable must remain on PATH across shell sessions; for uv
+  installations, use 'uv tool install' rather than project-only 'uv run'. Idempotent:
+  rerunning refreshes the generated script without duplicating the rc block. With no
+  --shell, detects from $SHELL.
 
 Options:
-  --performance-dir DIRECTORY  Directory containing NAME's local or pulled NDJSON logs.
-                               [default: performance-profiles]
-  --sample-period SECONDS      Expected sampling period; intervals over twice this value
-                               are gaps.  [default: 5.0; x>0]
-  -h, --help                   Show this message and exit.
+  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
+  --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
+                           location.
+  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data
+                           directory.
+  --dry-run                Print what would change without writing.
+  -h, --help               Show this message and exit.
 ```
 
-## `pyrite performance list`
+## `pyrite config completion remove`
 
 ```text
-Usage: pyrite performance list [OPTIONS] [PROFILES]...
+Usage: pyrite config completion remove [OPTIONS]
 
-  List local performance profiles with artifact counts and sizes.
+  Remove pyrite tab-completion setup and its generated script.
 
-Options:
-  --performance-dir DIRECTORY  [default: performance-profiles]
-  -h, --help                   Show this message and exit.
-```
-
-## `pyrite performance rm`
-
-```text
-Usage: pyrite performance rm [OPTIONS] [PROFILES]...
-
-  Delete explicitly selected local performance profiles; preview by default.
+  Idempotent: exact pyrite and retained cxr-managed blocks are removed. With no --shell,
+  detects from $SHELL.
 
 Options:
-  --all                        Select every local profile.
-  -y, --yes                    Delete exact previewed profile directories.
-  --performance-dir DIRECTORY  [default: performance-profiles]
-  -h, --help                   Show this message and exit.
+  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
+  --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
+                           location.
+  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data
+                           directory.
+  --dry-run                Print what would change without writing.
+  -h, --help               Show this message and exit.
 ```
 
 ## `pyrite remote`
@@ -1058,325 +1002,6 @@ Options:
   -h, --help      Show this message and exit.
 ```
 
-## `pyrite energy-grid`
-
-```text
-Usage: pyrite energy-grid [OPTIONS] COMMAND [ARGS]...
-
-  Derive and manage per-material photon-energy grids.
-
-  ``derive`` measures both coherent-line and bremsstrahlung upper bounds. ``defaults``
-  controls that diagnostic derivation only; ``add`` stores validated bounds and repoints
-  a profile. Physical scan profile defaults belong to ``pyrite profile``; per-material
-  range overrides belong to ``pyrite material``.
-
-  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost and
-  grid reduction; it never changes derivation or applied full bounds.
-
-  Command-line derivation values override persistent defaults for one run.
-
-  Examples:
-    pyrite energy-grid derive --material mose2,wse2 --energy 30,60
-    pyrite energy-grid derive --material mose2 --remote --dry-run
-    pyrite energy-grid show mose2
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  add           Add immutable derived-grid artifacts and repoint one profile.
-  brem          Inspect or manually set bremsstrahlung energy grids.
-  defaults      Show, update, or clear persistent derivation inputs.
-  derive        Derive line and bremsstrahlung energy-grid bounds locally or remotely.
-  gc            Reclaim unreachable immutable artifacts after a 14-day grace window.
-  job           Inspect, follow, or stop remote energy-grid jobs.
-  line          Inspect or manually set coherent line-energy grids.
-  regen-golden  Regenerate or check material-catalog golden snapshot.
-  rm            Remove line rows by repointing a profile to a new immutable artifact.
-  show          Show line and bremsstrahlung grids together.
-  verify        Verify stored and profile/lock-referenced immutable artifacts.
-```
-
-## `pyrite energy-grid add`
-
-```text
-Usage: pyrite energy-grid add [OPTIONS] JSON
-
-  Add immutable derived-grid artifacts and repoint one profile.
-
-  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed and
-  immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy grid tables,
-  scan ranges, and material overrides remain unchanged.
-
-  Manual line and bremsstrahlung overrides remain unchanged unless ``--force`` is
-  passed. This command does not run a scan and does not select ``full`` or ``survey``
-  fidelity.
-
-  Example:
-    pyrite energy-grid add combined_line_grid_bounds.json --material mose2,wse2
-
-Options:
-  --material KEY,...  Apply only listed material keys.
-  --pull              Fetch default combined JSON from remote host; takes precedence
-                      over JSON.
-  --force             Replace manually overridden rows; otherwise preserve them.
-  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE > config
-                      store > standard.
-  --regen-golden      Regenerate checked catalog snapshot after successful write.
-  --dry-run           Print proposed diff; write nothing.
-  -h, --help          Show this message and exit.
-```
-
-## `pyrite energy-grid brem`
-
-```text
-Usage: pyrite energy-grid brem [OPTIONS] COMMAND [ARGS]...
-
-  Inspect or manually set bremsstrahlung energy grids.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  set   Set a bremsstrahlung grid by repointing an immutable artifact.
-  show  Show bremsstrahlung energy grids.
-```
-
-## `pyrite energy-grid brem set`
-
-```text
-Usage: pyrite energy-grid brem set [OPTIONS] MATERIAL
-
-  Set a bremsstrahlung grid by repointing an immutable artifact.
-
-Options:
-  --stop EV       Bremsstrahlung grid upper bound in eV.  [required]
-  --step EV       Grid spacing in eV; preserve current value if omitted.
-  --note TEXT     Provenance note stored with manual override.
-  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config store >
-                  standard.
-  -h, --help      Show this message and exit.
-```
-
-## `pyrite energy-grid brem show`
-
-```text
-Usage: pyrite energy-grid brem show [OPTIONS] [MATERIAL]
-
-  Show bremsstrahlung energy grids.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
-                                  config store > standard.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite energy-grid defaults`
-
-```text
-Usage: pyrite energy-grid defaults [OPTIONS]
-
-  Show, update, or clear persistent derivation inputs.
-
-  These values feed local and remote ``derive`` when matching options are omitted.
-  Geometry searches determine both line and bremsstrahlung upper bounds; ``brem-step``
-  controls only applied bremsstrahlung spacing.
-
-  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile angles.
-  These are not physical scan defaults and do not select scan ``--fidelity
-  full|survey``.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --save-default                  Persist supplied values; otherwise only show defaults.
-  --clear FIELD                   Reset one field to inherited/built-in behavior;
-                                  repeatable. Fields: polar, azimuth, thickness, brem-
-                                  step, energy, material.
-  --reset                         Reset every persistent derivation field to
-                                  inherited/built-in behavior.
-  --polar DEG,...                 Persistent derivation polar tilts in degrees [0, 90).
-  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].
-  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in angstrom.
-  --brem-step EV                  Persistent derivation bremsstrahlung spacing in eV.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite energy-grid derive`
-
-```text
-Usage: pyrite energy-grid derive [OPTIONS]
-
-  Derive line and bremsstrahlung energy-grid bounds locally or remotely.
-
-Options:
-  --material KEY,...        Material keys; comma-separated. Omit to use persistent
-                            defaults.
-  --energy KEV,...          Beam energies in keV; comma-separated and positive.
-  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.
-  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.
-  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and
-                            positive.
-  --save-default            Persist supplied geometry, energies, and materials as future
-                            defaults.
-  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides
-                            persistent default.
-  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote slice.
-                            [default: 10.0]
-  --no-sync                 Skip code upload before remote submission.
-  --dry-run                 Print remote batch script and submission command; do not
-                            connect or submit.
-  --wait                    Wait for remote completion and pull the result.
-  --detach                  Return after remote submission.
-  -R, --remote [TARGET]     Run remotely; bare uses the configured target, =TARGET
-                            overrides it.
-  -h, --help                Show this message and exit.
-```
-
-## `pyrite energy-grid gc`
-
-```text
-Usage: pyrite energy-grid gc [OPTIONS]
-
-  Reclaim unreachable immutable artifacts after a 14-day grace window.
-
-Options:
-  --checkpoint-dir DIR  Checkpoint root whose active/archive campaign locks remain
-                        reachable.  [default: checkpoints]
-  --prune-all           Ignore the 14-day orphan grace window and select every
-                        unreachable artifact.
-  -y, --yes             Delete the exact revalidated preview.
-  -h, --help            Show this message and exit.
-```
-
-## `pyrite energy-grid job`
-
-```text
-Usage: pyrite energy-grid job [OPTIONS] COMMAND [ARGS]...
-
-  Inspect, follow, or stop remote energy-grid jobs.
-
-Options:
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite energy-grid line`
-
-```text
-Usage: pyrite energy-grid line [OPTIONS] COMMAND [ARGS]...
-
-  Inspect or manually set coherent line-energy grids.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  set   Set one line-grid row by repointing an immutable artifact.
-  show  Show coherent line-energy grids.
-```
-
-## `pyrite energy-grid line set`
-
-```text
-Usage: pyrite energy-grid line set [OPTIONS] MATERIAL
-
-  Set one line-grid row by repointing an immutable artifact.
-
-Options:
-  --energy KEV    Beam energy in keV.  [required]
-  --stop EV       Line-grid upper bound in eV.  [required]
-  --num N         Grid point count; preserve current value if omitted.
-  --start EV      Line-grid lower bound in eV; preserve current value if omitted.
-  --note TEXT     Provenance note stored with manual override.
-  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config store >
-                  standard.
-  -h, --help      Show this message and exit.
-```
-
-## `pyrite energy-grid line show`
-
-```text
-Usage: pyrite energy-grid line show [OPTIONS] [MATERIAL]
-
-  Show coherent line-energy grids.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
-                                  config store > standard.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite energy-grid regen-golden`
-
-```text
-Usage: pyrite energy-grid regen-golden [OPTIONS]
-
-  Regenerate or check material-catalog golden snapshot.
-
-  Requires source checkout because installed wheels do not contain test data.
-
-Options:
-  --check     Check snapshot for drift; do not write (exit 1 when stale).
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite energy-grid rm`
-
-```text
-Usage: pyrite energy-grid rm [OPTIONS] MATERIAL
-
-  Remove line rows by repointing a profile to a new immutable artifact.
-
-  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them after its
-  grace window.
-
-  Example:
-    pyrite energy-grid rm wse2 --energy 30 --energy 40
-
-Options:
-  --energy KEV                    Beam energy in keV; repeat for multiple rows.
-                                  [required]
-  -y, --yes                       Delete the exact previewed rows.
-  --dry-run                       Print proposed diff; delete nothing.
-  --profile NAME                  Repoint profile NAME; precedence: flag > CXR_PROFILE >
-                                  config store > standard.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite energy-grid show`
-
-```text
-Usage: pyrite energy-grid show [OPTIONS] [MATERIAL]
-
-  Show line and bremsstrahlung grids together.
-
-Options:
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
-                                  config store > standard.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite energy-grid verify`
-
-```text
-Usage: pyrite energy-grid verify [OPTIONS]
-
-  Verify stored and profile/lock-referenced immutable artifacts.
-
-Options:
-  --checkpoint-dir DIR  Checkpoint root whose campaign locks are reachability roots.
-                        [default: checkpoints]
-  -h, --help            Show this message and exit.
-```
-
 ## `pyrite profile`
 
 ```text
@@ -1388,8 +1013,7 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   count grids, beam policy, detector geometry, and optional material membership. An
   absent ``materials`` key means all catalog materials. Membership uses ``set|add|remove
   --material``; ``set --all-materials`` restores implicit membership. Per-material range
-  overrides are managed by ``pyrite material``. Energy grids are managed by ``pyrite
-  energy-grid``.
+  overrides and derived energy grids are managed by ``pyrite material``.
 
   Examples:
     pyrite profile list
@@ -1405,14 +1029,15 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add     Incrementally add values to profile grids, or emission modes.
-  create  Create a new profile, cloning defaults from --from (standard).
-  delete  Delete a profile; irreversible.
-  list    List catalog profiles with membership, override, and grid-ref counts.
-  remove  Remove values from an existing profile's grids, or emission modes.
-  rename  Rename profile NAME to NEW_NAME.
-  set     Replace range grids, beam fields, detector scalars, emission, or dispersion.
-  show    Show one profile's ranges, beam, detector, membership, and overrides.
+  add          Incrementally add values to profile grids,...
+  create       Create a new profile, cloning defaults...
+  delete       Delete a profile; irreversible.
+  list         List catalog profiles with membership,...
+  remove       Remove values from an existing profile's...
+  rename       Rename profile NAME to NEW_NAME.
+  set          Replace range grids, beam fields, detector...
+  show         Show one profile's ranges, beam, detector,...
+  energy-grid  Manage profile-scoped energy-grid derivation inputs.
 ```
 
 ## `pyrite profile add`
@@ -1693,6 +1318,51 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
+## `pyrite profile energy-grid`
+
+```text
+Usage: pyrite profile energy-grid [OPTIONS] COMMAND [ARGS]...
+
+  Manage profile-scoped energy-grid derivation inputs.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  defaults  Show, update, or clear persistent derivation inputs.
+```
+
+## `pyrite profile energy-grid defaults`
+
+```text
+Usage: pyrite profile energy-grid defaults [OPTIONS]
+
+  Show, update, or clear persistent derivation inputs.
+
+  These values feed local and remote ``derive`` when matching options are omitted.
+  Geometry searches determine both line and bremsstrahlung upper bounds; ``brem-step``
+  controls only applied bremsstrahlung spacing.
+
+  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile angles.
+  These are not physical scan defaults and do not select scan ``--fidelity
+  full|survey``.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  --save-default                  Persist supplied values; otherwise only show defaults.
+  --clear FIELD                   Reset one field to inherited/built-in behavior;
+                                  repeatable. Fields: polar, azimuth, thickness, brem-
+                                  step, energy, material.
+  --reset                         Reset every persistent derivation field to
+                                  inherited/built-in behavior.
+  --polar DEG,...                 Persistent derivation polar tilts in degrees [0, 90).
+  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].
+  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in angstrom.
+  --brem-step EV                  Persistent derivation bremsstrahlung spacing in eV.
+  -h, --help                      Show this message and exit.
+```
+
 ## `pyrite material`
 
 ```text
@@ -1707,10 +1377,11 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set       Set or reset MATERIAL overrides without...
-  show      Show MATERIAL's effective ranges and...
-  blaze     Run a grooved-crystal sweep and write a checkpoint.
-  validate  Validate a material catalog without starting simulation.
+  set          Set or reset MATERIAL overrides without...
+  show         Show MATERIAL's effective ranges and...
+  blaze        Run a grooved-crystal sweep and write a checkpoint.
+  energy-grid  Derive and inspect detector energy-grid inputs.
+  validate     Validate a material catalog without starting simulation.
 ```
 
 ## `pyrite material set`
@@ -1782,6 +1453,131 @@ Options:
                                   resumable work remains.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material energy-grid`
+
+```text
+Usage: pyrite material energy-grid [OPTIONS] COMMAND [ARGS]...
+
+  Derive and inspect detector energy-grid inputs by material.
+
+  Examples:
+    pyrite material energy-grid derive --material mose2 --energy 30,60
+    pyrite material energy-grid show mose2
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  derive  Derive line and bremsstrahlung energy-grid bounds.
+  show    Show line and bremsstrahlung grids together.
+  line    Inspect coherent line-energy grids.
+  brem    Inspect bremsstrahlung energy grids.
+```
+
+## `pyrite material energy-grid derive`
+
+```text
+Usage: pyrite material energy-grid derive [OPTIONS]
+
+  Derive line and bremsstrahlung energy-grid bounds locally or remotely.
+
+Options:
+  --material KEY,...        Material keys; comma-separated. Omit to use persistent
+                            defaults.
+  --energy KEV,...          Beam energies in keV; comma-separated and positive.
+  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.
+  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.
+  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and
+                            positive.
+  --save-default            Persist supplied geometry, energies, and materials as future
+                            defaults.
+  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides
+                            persistent default.
+  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote slice.
+                            [default: 10.0]
+  --no-sync                 Skip code upload before remote submission.
+  --dry-run                 Print remote batch script and submission command; do not
+                            connect or submit.
+  --wait                    Wait for remote completion and pull the result.
+  --detach                  Return after remote submission.
+  -R, --remote [TARGET]     Run remotely; bare uses the configured target, =TARGET
+                            overrides it.
+  -h, --help                Show this message and exit.
+```
+
+## `pyrite material energy-grid show`
+
+```text
+Usage: pyrite material energy-grid show [OPTIONS] [MATERIAL]
+
+  Show line and bremsstrahlung grids together.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material energy-grid line`
+
+```text
+Usage: pyrite material energy-grid line [OPTIONS] COMMAND [ARGS]...
+
+  Inspect coherent line-energy grids.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  show  Show coherent line-energy grids.
+```
+
+## `pyrite material energy-grid line show`
+
+```text
+Usage: pyrite material energy-grid line show [OPTIONS] [MATERIAL]
+
+  Show coherent line-energy grids.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material energy-grid brem`
+
+```text
+Usage: pyrite material energy-grid brem [OPTIONS] COMMAND [ARGS]...
+
+  Inspect bremsstrahlung energy grids.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  show  Show bremsstrahlung energy grids.
+```
+
+## `pyrite material energy-grid brem show`
+
+```text
+Usage: pyrite material energy-grid brem show [OPTIONS] [MATERIAL]
+
+  Show bremsstrahlung energy grids.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
   -h, --help                      Show this message and exit.
 ```
 

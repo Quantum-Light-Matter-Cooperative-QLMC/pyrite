@@ -1,4 +1,4 @@
-"""``pyrite setup``: detect GPU hardware and persist ``PYRITE_MC_BACKEND`` in ``.env``.
+"""``pyrite config setup``: detect hardware and persist ``PYRITE_MC_BACKEND``.
 
 Detection is OS-tooling only (``nvidia-smi``, ``rocm-smi``/``rocminfo``,
 ``clinfo``/``sycl-ls``/``lspci``, device nodes) and never assumes a vendor
@@ -252,7 +252,7 @@ def command(yes: bool, force: bool) -> None:
         else:
             click.echo(
                 f"detected {top.vendor} GPU ({top.reason}) but this session is "
-                "non-interactive; defaulting to PYRITE_MC_BACKEND=cpu. Re-run `pyrite setup "
+                "non-interactive; defaulting to PYRITE_MC_BACKEND=cpu. Re-run `pyrite config setup "
                 "-y` to accept it without a prompt.",
                 err=True,
             )

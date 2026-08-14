@@ -48,7 +48,7 @@ uv run pyrite run standard -m hopg --fidelity survey
 ```
 
 If the selected profile lacks derived photon-energy bounds, follow the CLI's
-`pyrite energy-grid derive` guidance before rerunning. Full sweeps are heavy;
+`pyrite material energy-grid derive` guidance before rerunning. Full sweeps are heavy;
 use the [cluster guide](running-on-a-cluster.md) for GPU or SLURM work.
 
 ## Inspect the result

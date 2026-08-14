@@ -61,7 +61,16 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # (delete an explicit target) became `rm`.
         _entry("checkpoint prune", "pyrite checkpoint gc"),
         _entry("checkpoint clear", "pyrite checkpoint rm"),
-        _entry("performance prune", "pyrite performance rm"),
+        # Change 7: configuration helpers remain user workflows but move below
+        # the retained `config` noun. Derived-artifact maintenance leaves the
+        # user CLI for `pyrite-dev`.
+        _entry("setup", "pyrite config setup"),
+        _entry("completion install", "pyrite config completion install"),
+        _entry("completion remove", "pyrite config completion remove"),
+        _entry("performance analyze", "pyrite-dev performance analyze"),
+        _entry("performance list", "pyrite-dev performance list"),
+        _entry("performance rm", "pyrite-dev performance rm"),
+        _entry("performance prune", "pyrite-dev performance rm"),
         # Retired scan-range group. Each leaf has its own canonical spelling,
         # so the rows sit on the leaves rather than on the `sweep` group.
         _entry(
@@ -91,21 +100,39 @@ DEPRECATIONS: dict[str, Deprecation] = {
         _entry("energy-grid job logs", "pyrite job logs"),
         _entry("energy-grid job status", "pyrite job status"),
         _entry("energy-grid job stop", "pyrite job stop"),
-        _entry("energy-grid submit", "pyrite energy-grid derive --remote --detach"),
+        _entry(
+            "energy-grid derive",
+            "pyrite material energy-grid derive",
+        ),
+        _entry("energy-grid show", "pyrite material energy-grid show"),
+        _entry("energy-grid line show", "pyrite material energy-grid line show"),
+        _entry("energy-grid brem show", "pyrite material energy-grid brem show"),
+        _entry("energy-grid defaults", "pyrite profile energy-grid defaults"),
+        _entry("energy-grid add", "pyrite-dev energy-grid add"),
+        _entry("energy-grid line set", "pyrite-dev energy-grid line set"),
+        _entry("energy-grid brem set", "pyrite-dev energy-grid brem set"),
+        _entry("energy-grid rm", "pyrite-dev energy-grid rm"),
+        _entry("energy-grid verify", "pyrite-dev energy-grid verify"),
+        _entry("energy-grid gc", "pyrite-dev energy-grid gc"),
+        _entry("energy-grid regen-golden", "pyrite-dev regen-golden"),
+        _entry(
+            "energy-grid submit",
+            "pyrite material energy-grid derive --remote --detach",
+        ),
         _entry(
             "energy-grid apply",
-            "pyrite energy-grid add",
+            "pyrite-dev energy-grid add",
             note="The replacement creates an immutable artifact and repoints the resolved profile.",
         ),
         _entry(
             "energy-grid line delete",
-            "pyrite energy-grid rm",
+            "pyrite-dev energy-grid rm",
             note="The replacement repoints a profile; gc later reclaims unreachable bytes.",
         ),
         # Profile membership and performance spellings.
         _entry("profile add-material", "pyrite profile add NAME --material MATERIAL,..."),
         _entry("profile remove-material", "pyrite profile remove NAME --material MATERIAL,..."),
-        _entry("profile analyze", "pyrite performance analyze NAME"),
+        _entry("profile analyze", "pyrite-dev performance analyze NAME"),
         # `profile members` stays reachable; `set/add/remove --material` is
         # canonical, and each membership verb maps to a different one.
         _entry("profile members set", "pyrite profile set NAME --material MATERIAL,..."),
@@ -311,17 +338,32 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         # D5: one canonical name per quantity. The singular spellings were
         # already canonical on `material set`, `sweep set`, and `profile *`;
         # these are the stragglers that kept the plural.
-        _flag("energy-grid derive", "--energies", "--energy"),
-        _flag("energy-grid derive", "--tilts", "--polar"),
-        _flag("energy-grid derive", "--azimuths", "--azimuth"),
-        _flag("energy-grid derive", "--materials", "--material"),
+        *(
+            _flag(command, retired, replacement)
+            for command in ("energy-grid derive", "material energy-grid derive")
+            for retired, replacement in (
+                ("--energies", "--energy"),
+                ("--tilts", "--polar"),
+                ("--azimuths", "--azimuth"),
+                ("--materials", "--material"),
+            )
+        ),
         _flag("energy-grid submit", "--energies", "--energy"),
         _flag("energy-grid submit", "--tilts", "--polar"),
         _flag("energy-grid submit", "--azimuths", "--azimuth"),
         _flag("energy-grid submit", "--materials", "--material"),
-        _flag("energy-grid defaults", "--tilts", "--polar"),
-        _flag("energy-grid defaults", "--azimuths", "--azimuth"),
-        _flag("energy-grid add", "--materials", "--material"),
+        *(
+            _flag(command, "--tilts", "--polar")
+            for command in ("energy-grid defaults", "profile energy-grid defaults")
+        ),
+        *(
+            _flag(command, "--azimuths", "--azimuth")
+            for command in ("energy-grid defaults", "profile energy-grid defaults")
+        ),
+        *(
+            _flag(command, "--materials", "--material")
+            for command in ("energy-grid add", "pyrite-dev energy-grid add")
+        ),
         _flag("energy-grid apply", "--materials", "--material"),
         _flag("material blaze", "--angles", "--polar"),
         _flag("profile create", "--materials", "--material"),
@@ -329,9 +371,15 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("profile add", "--materials", "--material"),
         _flag("profile remove", "--materials", "--material"),
         # D5 persist-as-default: one `--save-default` everywhere.
-        _flag("energy-grid derive", "--set-default", "--save-default"),
+        *(
+            _flag(command, "--set-default", "--save-default")
+            for command in ("energy-grid derive", "material energy-grid derive")
+        ),
         _flag("energy-grid submit", "--set-default", "--save-default"),
-        _flag("energy-grid defaults", "--set", "--save-default"),
+        *(
+            _flag(command, "--set", "--save-default")
+            for command in ("energy-grid defaults", "profile energy-grid defaults")
+        ),
         _flag("app analysis", "--default", "--save-default"),
         _flag("app viewer", "--default", "--save-default"),
         _flag("app analysis launch", "--default", "--save-default"),
@@ -350,14 +398,29 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("remote status", "--json", "--output json"),
         _flag("job list", "--json", "--output json"),
         _flag("job status", "--json", "--output json"),
-        _flag("energy-grid defaults", "--json", "--output json"),
-        _flag("energy-grid show", "--json", "--output json"),
+        *(
+            _flag(command, "--json", "--output json")
+            for command in ("energy-grid defaults", "profile energy-grid defaults")
+        ),
+        *(
+            _flag(command, "--json", "--output json")
+            for command in ("energy-grid show", "material energy-grid show")
+        ),
         _flag("energy-grid status", "--json", "--output json"),
         _flag("energy-grid job status", "--json", "--output json"),
-        _flag("energy-grid rm", "--json", "--output json"),
+        *(
+            _flag(command, "--json", "--output json")
+            for command in ("energy-grid rm", "pyrite-dev energy-grid rm")
+        ),
         _flag("energy-grid line delete", "--json", "--output json"),
-        _flag("energy-grid line show", "--json", "--output json"),
-        _flag("energy-grid brem show", "--json", "--output json"),
+        *(
+            _flag(command, "--json", "--output json")
+            for command in ("energy-grid line show", "material energy-grid line show")
+        ),
+        *(
+            _flag(command, "--json", "--output json")
+            for command in ("energy-grid brem show", "material energy-grid brem show")
+        ),
         _flag("sweep show", "--json", "--output json"),
         _flag("profile delete", "--json", "--output json"),
         _flag("profile list", "--json", "--output json"),

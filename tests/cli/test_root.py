@@ -46,7 +46,7 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         cli.main(["--help"])
 
     assert exc.value.code == 0
-    lines = capsys.readouterr().out.splitlines()
+    lines = capsys.readouterr().out.split("Commands:\n", 1)[1].splitlines()
     command_lines = {
         line.split()[0]
         for line in lines
@@ -68,6 +68,17 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
             "check-config",
         }
     )
+    assert command_lines == {
+        "run",
+        "app",
+        "checkpoint",
+        "config",
+        "remote",
+        "job",
+        "profile",
+        "material",
+        "beam",
+    }
 
 
 @pytest.mark.parametrize(

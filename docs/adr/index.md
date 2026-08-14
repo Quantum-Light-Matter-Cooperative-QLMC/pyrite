@@ -42,15 +42,17 @@ In other words:
 0006-consolidate-agent-work-records
 0007-project-identity
 0008-no-arbitrary-target-geometry
+0010-reduce-cli-noun-surface
 ```
 
 | ADR                                                 | Title                               | Status                                 |
 | --------------------------------------------------- | ----------------------------------- | -------------------------------------- |
 | [0001](0001-adopt-architecture-decision-records.md) | Adopt architecture decision records | Accepted                               |
-| [0002](0002-cli-surface-redesign.md)                | CLI surface redesign (noun→verb)    | Accepted                               |
+| [0002](0002-cli-surface-redesign.md)                | CLI surface redesign (noun→verb)    | Superseded by ADR-0010                 |
 | [0003](0003-content-addressed-artifact-model.md)    | Content-addressed artifact model    | Accepted                               |
 | [0004](0004-package-and-repository-structure.md)    | Package & repository structure      | Accepted; P4/P5 superseded by ADR-0006 |
 | [0005](0005-energy-grid-schema-decisions.md)        | Energy-grid schema decisions        | Accepted                               |
 | [0006](0006-consolidate-agent-work-records.md)      | Consolidate agent work records      | Accepted                               |
 | [0007](0007-project-identity.md)                    | PyRITE project identity             | Accepted                               |
 | [0008](0008-no-arbitrary-target-geometry.md)        | No arbitrary target geometry        | Accepted                               |
+| [0010](0010-reduce-cli-noun-surface.md)             | Reduce the CLI noun surface          | Accepted                               |

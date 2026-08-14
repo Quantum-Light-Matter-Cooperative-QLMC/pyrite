@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 import pytest
 
+from pyrite import _dev
 from pyrite.cli import command
 from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,
@@ -16,6 +17,7 @@ from pyrite.cli._deprecations import (
     canonical_option,
     message,
 )
+from pyrite.devtools.cli_commands import energy_grid_command, performance_command
 from scripts.generate_cli_deprecations import build_deprecations
 from tests.helpers.cli import invoke
 
@@ -101,7 +103,20 @@ def test_retired_flag_registry_matches_live_command_tree() -> None:
     root_ctx = click.Context(command, info_name="cxr")
     live: dict[tuple[str, str], RetiredOption] = {}
 
-    for path, child, _child_ctx in _walk_commands(command, root_ctx):
+    trees = [
+        _walk_commands(command, root_ctx),
+        _walk_commands(
+            energy_grid_command,
+            click.Context(energy_grid_command, info_name="energy-grid"),
+            ("pyrite-dev", "energy-grid"),
+        ),
+        _walk_commands(
+            performance_command,
+            click.Context(performance_command, info_name="performance"),
+            ("pyrite-dev", "performance"),
+        ),
+    ]
+    for path, child, _child_ctx in (item for tree in trees for item in tree):
         for param in child.params:
             if isinstance(param, RetiredOption):
                 key = (" ".join(path), param.retired_flag)
@@ -114,12 +129,13 @@ def test_retired_flag_registry_matches_live_command_tree() -> None:
         assert param.replacement == DEPRECATED_FLAGS[key].replacement
 
 
-def _replacement_command_path(replacement: str) -> str:
+def _replacement_command_path(replacement: str) -> tuple[str, str]:
     """Extract the Click command path from a documented replacement template."""
     parts = replacement.split()
 
     assert parts
-    assert parts[0] == "pyrite"
+    assert parts[0] in {"pyrite", "pyrite-dev"}
+    executable = parts[0]
 
     command_parts = []
 
@@ -131,20 +147,28 @@ def _replacement_command_path(replacement: str) -> str:
 
         command_parts.append(part)
 
-    return " ".join(command_parts)
+    return executable, " ".join(command_parts)
 
 
 def test_every_replacement_names_a_live_non_deprecated_command() -> None:
     for old_path, deprecation in DEPRECATIONS.items():
-        replacement_path = _replacement_command_path(deprecation.replacement)
+        executable, replacement_path = _replacement_command_path(deprecation.replacement)
 
         assert replacement_path, f"{old_path!r} has no resolvable replacement command"
 
-        _resolve_command_path(command, replacement_path)
+        if executable == "pyrite":
+            _resolve_command_path(command, replacement_path)
+            assert replacement_path not in DEPRECATIONS, (
+                f"{old_path!r} points to another deprecated command: {replacement_path!r}"
+            )
+            continue
 
-        assert replacement_path not in DEPRECATIONS, (
-            f"{old_path!r} points to another deprecated command: {replacement_path!r}"
-        )
+        parsed = _dev.build_parser().parse_args(replacement_path.split())
+        assert parsed.func in {
+            _dev.cmd_performance,
+            _dev.cmd_energy_grid,
+            _dev.cmd_regen_golden,
+        }
 
 
 @pytest.mark.parametrize("path", sorted(DEPRECATIONS))
@@ -255,7 +279,10 @@ def test_generated_deprecation_docs_are_current() -> None:
 
     assert actual == expected
     for entry in DEPRECATED_FLAGS.values():
+        command_name = (
+            entry.command if entry.command.startswith("pyrite-dev ") else f"pyrite {entry.command}"
+        )
         assert (
-            f"| `pyrite {entry.command}` | `{entry.flag}` | `{entry.replacement}` "
+            f"| `{command_name}` | `{entry.flag}` | `{entry.replacement}` "
             f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
         ) in actual

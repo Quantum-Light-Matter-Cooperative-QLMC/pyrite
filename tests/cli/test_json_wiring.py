@@ -10,6 +10,7 @@ from pyrite.checkpoints import archive, recompute
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import job as job_cli
 from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
 from pyrite.remote import lifecycle, viewer
 from pyrite.runs import blaze, scan
 from tests.helpers.cli import invoke
@@ -149,11 +150,11 @@ def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
         },
     )
 
-    document = _document(invoke(energy_grid.command, ["defaults", "-o", "json"]))
+    document = _document(invoke(profile_command, ["defaults", "-o", "json"]))
 
     assert document["schema"] == "cxr.energy-grid.defaults"
     assert document["payload"]["source"] == "persisted"
-    result = invoke(energy_grid.command, ["defaults", "--set", "-o", "json"])
+    result = invoke(profile_command, ["defaults", "--set", "-o", "json"])
     assert result.exit_code == 2
     assert result.stdout == ""
 
@@ -176,7 +177,7 @@ E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
     monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", catalog)
     monkeypatch.setattr(energy_grid.apply._provenance, "load", lambda: {})
 
-    document = _document(invoke(energy_grid.command, ["show", "hopg", "-o", "json"]))
+    document = _document(invoke(material_command, ["show", "hopg", "-o", "json"]))
 
     assert document["schema"] == "cxr.energy-grid.show"
     material = document["payload"]["materials"][0]
@@ -216,7 +217,7 @@ energy_grid_refs = {{ hopg = "{stored.digest}" }}
 
     document = _document(
         invoke(
-            energy_grid.command,
+            material_command,
             ["show", "hopg", "--profile", "campaign", "-o", "json"],
         )
     )

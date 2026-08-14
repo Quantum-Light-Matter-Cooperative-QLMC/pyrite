@@ -60,7 +60,7 @@ command and persistent tab-completion, install the checkout as a uv tool:
 uv tool install .
 uv tool update-shell
 exec "$SHELL"
-pyrite completion install
+pyrite config completion install
 exec "$SHELL"
 ```
 

@@ -119,6 +119,15 @@ def test_docs_parser_exposes_offline_and_linkcheck_modes(dev_module) -> None:
     assert online.linkcheck is True
 
 
+@pytest.mark.parametrize("command", ["performance", "energy-grid"])
+def test_relocated_click_help_is_forwarded(dev_module, command: str, capsys) -> None:
+    dev_module.main([command, "--help"])
+
+    captured = capsys.readouterr()
+    assert captured.out.startswith(f"Usage: pyrite-dev {command} ")
+    assert captured.err == ""
+
+
 def test_test_forwards_pytest_selectors_and_arguments(dev_module, monkeypatch) -> None:
     calls = []
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))

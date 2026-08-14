@@ -232,7 +232,7 @@ def test_setup_detected_gpu_non_interactive_defaults_to_cpu_with_stderr_hint(
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
     captured = capsys.readouterr()
     assert "non-interactive" in captured.err
-    assert "pyrite setup -y" in captured.err
+    assert "pyrite config setup -y" in captured.err
 
 
 def test_setup_yes_flag_accepts_top_detected_backend_without_prompt(monkeypatch, tmp_path, capsys):

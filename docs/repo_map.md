@@ -91,8 +91,9 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   `cli.commands.cleanup:rm_command`: delete explicitly selected local datasets
   and the CAS blobs they alone kept reachable. Hidden compatibility alias:
   `pyrite checkpoint clear`.
-- **`pyrite config set|get|list`** → `cli.commands.config` + `cli._config`: persist
-  and inspect the current profile and remote target. Both resolve through the
+- **`pyrite config set|get|list|setup|completion`** → `cli.commands.config` +
+  `cli._config`: persist and inspect the current profile and remote target,
+  select the local compute backend, and manage shell completion. Values resolve through the
   shared per-call > `CXR_*` environment > config store > built-in precedence
   chain. The user store is written atomically under Click's platform config dir.
 - **`-o/--output table|json|wide`** → `cli._core.output_option`: shared output
@@ -107,16 +108,25 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   local runs reject them. Local output is canonical
   `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
   directory. Box shim: `python -m pyrite._entry.scan`.
-- **`pyrite energy-grid derive [-R[=TARGET]]`** → `energy_grid._command` → local
+- **`pyrite material energy-grid derive [-R[=TARGET]]`** →
+  `energy_grid._command` → local
   derivation or the existing sliced SSH/SLURM grid job. Remote derivation waits
   and pulls its JSON by default; `--detach` returns after submission. Hidden
-  compatibility alias: `pyrite energy-grid submit`.
-- **`pyrite energy-grid add|rm|verify|gc`** → `energy_grid._command` → immutable
+  compatibility aliases remain hidden below `pyrite energy-grid`.
+- **`pyrite material energy-grid show|line show|brem show`** and **`pyrite
+  profile energy-grid defaults`** → `energy_grid._command`: inspect resolved
+  detector bins and manage persistent derivation inputs without a root noun.
+- **`pyrite-dev energy-grid add|rm|verify|gc|line set|brem set`** →
+  `energy_grid._command` → immutable
   `energy-grid-artifacts/<first2>/<sha256>.json` objects plus mutable
   `profiles.NAME.energy_grid_refs`. `add`/manual setters/rm create replacement
   objects and repoint only the selected profile; `verify` checks bytes and refs;
   `gc` reclaims unreachable objects after a 14-day grace window. Hidden D7
-  aliases: `apply` → `add`, `line delete` → `rm`.
+  hidden user-CLI aliases: `apply` → `add`, `line delete` → `rm`.
+- **`pyrite-dev performance list|analyze|rm`** →
+  `cli.commands.performance`: inspect and reclaim derived compute-performance
+  artifacts. The former top-level `pyrite performance` group is a hidden D7
+  alias.
 - **Marimo apps**: `src/pyrite/apps/scan_app.py` (sweep runner → checkpoint),
   `src/pyrite/apps/analysis_app.py` (checkpoint-driven 2D figures, Altair +
   matplotlib, lazy tabbed layout), `src/pyrite/apps/trace_app.py` (3D trajectory

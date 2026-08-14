@@ -22,6 +22,8 @@ Commands:
     test-suite run one stable core/CLI/app/packaging/integration test suite
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
+    performance list, analyze, or delete compute-performance artifacts
+    energy-grid maintain derived detector energy-grid artifacts
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
     bootstrap  configure per-clone local git state (TODO.md merge driver)
@@ -586,6 +588,35 @@ def cmd_validation_ledger(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def _run_relocated_click(command, argv: list[str], *, prog_name: str) -> None:
+    """Run a relocated Click tree while preserving stream and exit contracts."""
+    from pyrite.cli._core import run as run_cli
+
+    status = run_cli(command, argv, prog_name=prog_name)
+    if isinstance(status, int) and status:
+        raise SystemExit(status)
+
+
+def cmd_performance(args: argparse.Namespace) -> None:
+    from pyrite.devtools.cli_commands import performance_command
+
+    _run_relocated_click(
+        performance_command,
+        args.command_args,
+        prog_name="pyrite-dev performance",
+    )
+
+
+def cmd_energy_grid(args: argparse.Namespace) -> None:
+    from pyrite.devtools.cli_commands import energy_grid_command
+
+    _run_relocated_click(
+        energy_grid_command,
+        args.command_args,
+        prog_name="pyrite-dev energy-grid",
+    )
+
+
 def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=prog_name)
     sub = ap.add_subparsers(dest="command", required=True)
@@ -658,6 +689,20 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     regen_golden = sub.add_parser("regen-golden")
     regen_golden.add_argument("--check", action="store_true")
     regen_golden.set_defaults(func=cmd_regen_golden)
+    performance = sub.add_parser(
+        "performance",
+        add_help=False,
+        help="list, analyze, or delete compute-performance artifacts",
+    )
+    performance.add_argument("command_args", nargs=argparse.REMAINDER)
+    performance.set_defaults(func=cmd_performance)
+    energy_grid = sub.add_parser(
+        "energy-grid",
+        add_help=False,
+        help="maintain derived detector energy-grid artifacts",
+    )
+    energy_grid.add_argument("command_args", nargs=argparse.REMAINDER)
+    energy_grid.set_defaults(func=cmd_energy_grid)
     cli_deprecations = sub.add_parser("cli-deprecations")
     cli_deprecation_mode = cli_deprecations.add_mutually_exclusive_group()
     cli_deprecation_mode.add_argument("--write", action="store_true")
@@ -678,6 +723,11 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> None:
     raw_args = list(sys.argv[1:] if argv is None else argv)
+    if raw_args and raw_args[0] in {"performance", "energy-grid"}:
+        command = raw_args[0]
+        func = cmd_performance if command == "performance" else cmd_energy_grid
+        func(argparse.Namespace(command=command, command_args=raw_args[1:]))
+        return
     if raw_args and raw_args[0] in {"test", "verify"}:
         command = raw_args[0]
         func = cmd_test if command == "test" else cmd_verify
