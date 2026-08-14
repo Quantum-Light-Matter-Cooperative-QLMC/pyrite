@@ -307,8 +307,11 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
   *reading* a retired flat name raises rather than returning stale state.
   `substrate=`/`substrate_thickness_ang=` are deprecated in favour of
   `Stack.on_substrate`.
-- Deps: `campaign.geometry`, `materials` (`CATALOG`, `LayerSpec`),
-  `materials.crystal`.
+- `Sweep.detector` is the only detector state on the scene. Its `EnergyBins`
+  supply the fine line and wide bremsstrahlung grids lowered into each case;
+  retired top-level sweep grid names raise instead of exposing stale state.
+- Deps: `campaign.geometry`, `detectors` (`Detector`, `EnergyBins`),
+  `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
 ### `campaign/geometry.py`
 The closed target variant set and its lowering to today's geometry case keys
@@ -327,7 +330,7 @@ speak. Sits below `campaign/sweep.py` and imports without it.
   `target_replace`, `retired_flat_input`, `crystal_params`,
   `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
   `layer_radiator`, `substrate_radiator`, `fmt_thickness`, `ScalarOrSeq`.
-- Deps: `detectors` (`DetectorSpec`, for the target×detector groove check),
+- Deps: `detectors` (`Detector`, for the target×detector groove check),
   `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
 ### `campaign/longitudinal.py`
@@ -363,9 +366,11 @@ scan grids project from immutable `materials.CATALOG`.
   `trajectory_sweep`; `MATERIALS` ordered tuple.
   The catalog speaks the flat geometry vocabulary, so both builders project
   their scan grid through `target_from_flat` and hand `Sweep` a built `target`.
+  Catalog energy-grid artifacts resolve into the built detector's `EnergyBins`
+  at this boundary.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`),
   `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`),
-  `geometry` (`target_from_flat`).
+  `geometry` (`target_from_flat`), `detectors` (`Detector`, `EnergyBins`).
 
 ### `campaign/profiles.py`
 Named `full`/provisional `survey` fidelity presets, deterministic serialization
@@ -373,7 +378,10 @@ of resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoin
 stem selection. `FidelityPreset.emission` (`incoherent`/`coherent`/`both`, with a
 derived `coherent_emission`) is the preset-owned emission policy;
 `dataset_identity` adds an `emission` divergence key so the three modes get three
-distinct digests (incoherent unchanged, bit-for-bit). `Settings.xray_dispersion`
+distinct digests (incoherent unchanged, bit-for-bit). Detector response and
+nested energy bins project back to the historical payload vocabulary, so
+read-time scoring does not perturb transport/checkpoint identity.
+`Settings.xray_dispersion`
 (`vacuum`/`refractive`) gets the same divergence key, so an in-medium run never
 resumes into its vacuum twin's checkpoint.
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
@@ -386,7 +394,7 @@ membership, overrides, detector settings, beam references, emission policy,
 rename, and deletion. The Click layer owns prompts and persistence; this module
 owns validation and mutation semantics.
 - Public: intentionally internal to `cli.commands.profile`.
-- Deps: `detectors.spec` (`DetectorSpec`), `tomlkit` document/container types;
+- Deps: `detectors.spec` (`Detector`), `tomlkit` document/container types;
   lazy `runs.scan` import for manifest-backed membership groups.
 
 ### `energy_grid/` (package)
@@ -483,9 +491,10 @@ submodule DAG (leaf → driver):
 `_style → _common → _frames → mpl.sweeps → {mpl.spectra, mpl.detectors, mpl.trajectories} → mpl.interactive`.
 - `_style` — `COLORS`, `_ENERGY_PALETTE`, `energy_color` (per-energy colour map
   consistent across every figure). Leaf; no sibling deps.
-- `_common` — shared figure plumbing: `_line_brem` (per-record line/brem split),
+- `_common` — shared figure plumbing: `_line_brem` (per-record line/brem split
+  scored through `Detector.score`),
   `_per_tilt_figs` (one-figure-per-tilt loop), `_mode`, `_EFF_CACHE`. Deps:
-  `montecarlo`, `results`.
+  `detectors`, `montecarlo`, `results`.
 - `_frames` — renderer-neutral tidy-data builders (`heatmap_frame`, `metric_vs_frame`,
   `scan_mode`, `pick_hue`, `_effective_x`/`_ndistinct`, axis/value-label registries
   `_AXIS_SPECS`/`_axis_disp`/`_value_label`/`_FLUX_GATED`): per-cell/per-point
@@ -495,14 +504,14 @@ submodule DAG (leaf → driver):
 - `mpl/spectra` — `plot_by_energy`, `plot_full_spectrum`, `plot_peak_vs_tilt`,
   `plot_mosaic_comparison`, `plot_best_spectra`, `plot_material_comparison`,
   `plot_tilt_panel`, `_draw_*` spectral drawers. Deps: `_style`, `_common`,
-  `montecarlo`, `results`.
+  `detectors`, `montecarlo`, `results`.
 - `mpl/sweeps` — `plot_heatmaps`, `facet_metric` (small-multiples over many knobs),
   `plot_metric_vs`, `plot_scan`; `_HEATMAP_QUANTITIES` / `_METRIC_LABELS`
   tables + axis helpers. Render from `_frames` tidy DataFrames, not re-derive
   best-record reduction inline. Deps: `_style`, `_frames`, `results`.
 - `mpl/detectors` — `plot_timepix_efficiency` / `_detected` / `_poisson`,
   `plot_eaglexo_efficiency` / `_detected` / `_charge` / `_charge_map`. Deps:
-  `_style`, `_common`, `sweeps`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
+  `_style`, `_common`, `sweeps`, `results`, `detectors` response adapters.
 - `mpl/trajectories` — `plot_electron_trajectories`, `plot_trajectory_grid`,
   `plot_penetration_survival`, and transport initial-state arrays used by trace
   beam diagnostics. Deps: `_style`, `montecarlo`, `results`.
@@ -525,7 +534,7 @@ submodule DAG (leaf → driver):
   - `detectors` — Timepix3/Eagle XO spectral views:
     `timepix_detected_chart`, `eaglexo_detected_chart`, `eaglexo_charge_chart`
     (+ their `*_frame` builders). Deps: `_common`, `altair.spectra`,
-    `detectors`, `detectors.eaglexo_response`.
+    `detectors` response adapters.
   - `trajectories` — penetration views: `penetration_survival_chart`,
     `trajectory_chart` (+ `survival_frame`, `tracks_frame`,
     `track_segments_frame`); dense datashader raster stay on matplotlib.
@@ -534,13 +543,17 @@ submodule DAG (leaf → driver):
   `trajectories` builds 3D beam/crystal/track figures from shared
   `mpl.trajectories` geometry; `crystal_lattice` renders unit-cell figures;
   `render` owns cached animation export over the Plotly trajectory builder.
-- Deps: `montecarlo`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
+- Deps: `detectors`, `montecarlo`, `results`.
 
 ## Detector forward models
 
 ### `detectors/`
-Detector and detector-adjacent forward models. Deps: `materials.crystal`,
-`DATA_DIR`.
+Detector configuration, read-time scoring, and detector-adjacent forward
+models. `spec.py` owns `Detector`, its fine-line/wide-bremsstrahlung
+`EnergyBins`, the `Timepix3`/`EagleXO`/`LegacyEDS` response adapters, and the
+deprecated `DetectorSpec` spelling. Stored arrays remain intrinsic; plots and
+result tables call `Detector.score`. Deps: `materials.crystal`, `montecarlo`
+(legacy analytic response only), `DATA_DIR`.
 
 #### `_si_sensor.py`
 Internal shared silicon-sensor plumbing for both detector forward models:
@@ -708,7 +721,7 @@ and export consumers are cache-only and direct misses to
 `pyrite run --preset zhai --remote`.
 - Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`,
   `detector_metadata`.
-- Deps: `detectors.DetectorSpec`.
+- Deps: `detectors.Detector`.
 
 ### `validation/check_config.py`
 `pyrite check-config` validate bundled material catalog or explicit full

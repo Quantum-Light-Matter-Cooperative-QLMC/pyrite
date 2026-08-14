@@ -72,7 +72,9 @@ def test_determinism_and_bounded_count():
 
 def test_standard_hopg_quick_resolves_30_50():
     sweep = material_sweep("hopg")
-    chosen = _select_quick_energies(sweep.E_grid_line_by_energy, sweep.E_grid_line)
+    chosen = _select_quick_energies(
+        sweep.detector.energy_bins.line_by_energy, sweep.detector.energy_bins.line
+    )
     assert chosen == [30, 50]
     quick = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=chosen))
     cases = build_cases(quick)
@@ -83,9 +85,21 @@ def test_profile_lacking_50_reaches_valid_bounded_cases():
     # Simulate a profile whose per-energy line grids omit 50 keV: dropping 50
     # from a real standard sweep reproduces the pre-fix ValueError condition.
     sweep = material_sweep("hopg")
-    by_energy = {float(e): g for e, g in sweep.E_grid_line_by_energy.items() if float(e) != 50.0}
-    lacking = replace(sweep, E_grid_line_by_energy=by_energy)
-    chosen = _select_quick_energies(lacking.E_grid_line_by_energy, lacking.E_grid_line)
+    by_energy = {
+        float(e): g
+        for e, g in sweep.detector.energy_bins.line_by_energy.items()
+        if float(e) != 50.0
+    }
+    lacking = replace(
+        sweep,
+        detector=replace(
+            sweep.detector,
+            energy_bins=replace(sweep.detector.energy_bins, line_by_energy=by_energy),
+        ),
+    )
+    chosen = _select_quick_energies(
+        lacking.detector.energy_bins.line_by_energy, lacking.detector.energy_bins.line
+    )
     assert 50.0 not in chosen
     assert chosen == [30, 40.0]  # tie 40/60 vs 50 breaks low
     quick = replace(lacking, beam=beam_replace(lacking.beam, energy_keV=chosen))
@@ -96,8 +110,18 @@ def test_profile_lacking_50_reaches_valid_bounded_cases():
 def test_line_grid_for_energy_still_strict_on_missing():
     # The downstream invariant remains: an absent per-energy grid fails closed.
     sweep = material_sweep("hopg")
-    by_energy = {float(e): g for e, g in sweep.E_grid_line_by_energy.items() if float(e) != 50.0}
-    lacking = replace(sweep, E_grid_line_by_energy=by_energy)
+    by_energy = {
+        float(e): g
+        for e, g in sweep.detector.energy_bins.line_by_energy.items()
+        if float(e) != 50.0
+    }
+    lacking = replace(
+        sweep,
+        detector=replace(
+            sweep.detector,
+            energy_bins=replace(sweep.detector.energy_bins, line_by_energy=by_energy),
+        ),
+    )
     forced = replace(lacking, beam=beam_replace(lacking.beam, energy_keV=[50]))
     with pytest.raises(ValueError, match="no E_grid_line configured for beam energy 50"):
         build_cases(forced)

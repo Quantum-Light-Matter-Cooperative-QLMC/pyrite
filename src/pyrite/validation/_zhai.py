@@ -6,18 +6,18 @@ from dataclasses import asdict
 from math import radians
 from typing import Any
 
-from ..detectors import DetectorSpec
+from ..detectors import Detector
 
 ZHAI_CACHE_SCHEMA = 4
 ZHAI_CACHE_FORMAT = "cxr.zhai-cache.v4"
-ZHAI_DETECTOR = DetectorSpec(
+ZHAI_DETECTOR = Detector(
     observation_angle_deg=119.0,
     polar_acceptance_deg=16.6,
     solid_angle_sr=0.066,
 )
 
 
-def detector_metadata(detector: DetectorSpec = ZHAI_DETECTOR) -> dict[str, Any]:
+def detector_metadata(detector: Detector = ZHAI_DETECTOR) -> dict[str, Any]:
     """Return portable detector provenance plus resolved historical case fields."""
     return {
         "spec": asdict(detector),

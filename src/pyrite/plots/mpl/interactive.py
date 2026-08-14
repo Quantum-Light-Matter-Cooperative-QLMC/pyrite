@@ -6,9 +6,7 @@ Interactive / streaming browsers (matplotlib + plotly slider, scan chunks).
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ...montecarlo import (
-    detector_efficiency,
-)
+from ...detectors import Detector, LegacyEDS
 from ...results import (
     best_azimuth,
     records,
@@ -229,8 +227,8 @@ def browse_plotly(
                         trace_tilt.append(ti)
                 else:  # full
                     Eb = np.asarray(r["E_grid_brem"], dtype=float)
-                    qe_b = detector_efficiency(Eb) if settings.apply_detector_qe else 1.0
-                    brem_wide_det = r["brem_wide"] * qe_b * r["scale"]
+                    detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe))
+                    brem_wide_det = detector.score(Eb, r["brem_wide"], scale=r["scale"])
                     total_line = (line_det + brem_det) * r["scale"]
                     fig.add_trace(
                         go.Scattergl(

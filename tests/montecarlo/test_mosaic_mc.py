@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.detectors import Detector, EnergyBins
 from pyrite.montecarlo import (
     _mosaic_quadrature,
     _small_tilt_R,
@@ -75,8 +76,12 @@ def _sweep(**kw):
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
-        E_grid_line=E_GRID,
-        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+        detector=Detector(
+            energy_bins=EnergyBins(
+                line=E_GRID,
+                brem=np.arange(0.0, 1000.0, 100.0),
+            )
+        ),
         **kw,
     )
 
@@ -102,8 +107,12 @@ def test_route_mc_is_noop_without_mosaic_data():
             thickness_ang=1e4,
             beam=BeamSpec(energy_keV=30),
             tilt_deg=30.0,
-            E_grid_line=E_GRID,
-            E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+            detector=Detector(
+                energy_bins=EnergyBins(
+                    line=E_GRID,
+                    brem=np.arange(0.0, 1000.0, 100.0),
+                )
+            ),
             mosaic=True,
             mosaic_route="mc",
         )

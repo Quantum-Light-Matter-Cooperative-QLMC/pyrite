@@ -70,7 +70,11 @@ method preserves the legacy mapping representation for serialization.
 .. autosummary::
    :toctree: _autosummary
 
-   pyrite.detectors.DetectorSpec
+   pyrite.detectors.Detector
+   pyrite.detectors.EnergyBins
+   pyrite.detectors.Timepix3
+   pyrite.detectors.EagleXO
+   pyrite.detectors.LegacyEDS
    pyrite.detectors.eaglexo_response.EagleResponse
    pyrite.detectors.eaglexo_response.get_response
    pyrite.detectors.timepix_response.TimepixResponse

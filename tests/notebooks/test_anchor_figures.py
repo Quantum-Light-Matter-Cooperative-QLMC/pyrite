@@ -17,7 +17,8 @@ import pytest
 matplotlib.use("Agg")  # headless; no display in CI
 
 from pyrite.apps import anchor_figures as af
-from pyrite.detectors import DetectorSpec
+from pyrite.detectors import Detector, LegacyEDS
+from pyrite.montecarlo import convolve_detector, detector_efficiency
 
 _APP_RESOURCES = Path(af.__file__).resolve().parent
 _CHECKS = Path(__file__).resolve().parents[2] / "checks"
@@ -66,7 +67,7 @@ def test_zhai_detector_is_canonical_and_survives_current_case_path(anchor):
     )
 
     assert anchor.detector is af.ZHAI_DETECTOR
-    assert anchor.detector == DetectorSpec(119.0, 16.6, 0.066)
+    assert anchor.detector == Detector(119.0, 16.6, 0.066)
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
     assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
     assert case["domega_sr"] == pytest.approx(0.066)
@@ -75,7 +76,7 @@ def test_zhai_detector_is_canonical_and_survives_current_case_path(anchor):
 
 
 def test_observation_angle_changes_case_and_line_energy(anchor):
-    changed = af.ZhaiAnchor(detector=DetectorSpec(100.0, 16.6, 0.066))
+    changed = af.ZhaiAnchor(detector=Detector(100.0, 16.6, 0.066))
     case = af.fig1c_case(
         changed,
         25.0,
@@ -90,7 +91,7 @@ def test_observation_angle_changes_case_and_line_energy(anchor):
 
 
 def test_model_routes_resolved_case_geometry_through_all_components(monkeypatch):
-    detector = DetectorSpec(101.0, 12.0, 0.02)
+    detector = Detector(101.0, 12.0, 0.02)
     anchor = af.ZhaiAnchor(detector=detector, energies_keV=(25.0,))
     geometry_calls = []
     aperture_calls = []
@@ -118,7 +119,11 @@ def test_model_routes_resolved_case_geometry_through_all_components(monkeypatch)
     )
     monkeypatch.setattr(af, "eds_fwhm_eV", lambda _energy: 0.0)
     monkeypatch.setattr(af, "aperture_fwhm_eV", fake_aperture)
-    monkeypatch.setattr(af, "convolve_detector", lambda _grid, spectrum, _fwhm: spectrum)
+    monkeypatch.setattr(
+        LegacyEDS,
+        "score",
+        lambda _self, _grid, spectrum, **_kwargs: spectrum,
+    )
 
     model = af.model_spectra(anchor, ne=1, ne_brem=1)
 
@@ -431,8 +436,8 @@ def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
             ),
         )
     )
-    spectrum_eff = spectrum * af.detector_efficiency(study.E_grid)
-    expected = af.convolve_detector(study.E_grid, spectrum_eff, fwhm_eV)
+    spectrum_eff = spectrum * detector_efficiency(study.E_grid)
+    expected = convolve_detector(study.E_grid, spectrum_eff, fwhm_eV)
     expected *= anchor.domega_sr * anchor.per_nA
 
     assert np.allclose(af._supplementary_detected_spectrum(study, condition, spectrum), expected)

@@ -10,6 +10,7 @@ import functools
 import logging
 import re
 import tomllib
+import warnings
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
-from ..detectors.spec import DetectorSpec
+from ..detectors.spec import Detector
 from ..energy_grid import artifacts as _grid_artifacts
 from ._catalog_decode import (
     LineGridByEnergy,
@@ -277,8 +278,8 @@ class MaterialCatalog:
     #: here -- it stays the per-material ``ScanSpec.energy_keV`` scan grid.
     profile_beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit profile detector blocks. Missing selected-profile blocks inherit
-    #: ``standard``; missing standard falls back to :class:`DetectorSpec`.
-    profile_detectors: Mapping[str, DetectorSpec] = MappingProxyType({})
+    #: ``standard``; missing standard falls back to :class:`Detector`.
+    profile_detectors: Mapping[str, Detector] = MappingProxyType({})
     #: Explicit ``profiles.NAME.emission`` overrides ("incoherent"/"coherent"/
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
@@ -319,11 +320,9 @@ class MaterialCatalog:
         override the active fidelity preset's photon dispersion model."""
         return self.profile_xray_dispersions.get(name)
 
-    def profile_detector(self, name: str) -> DetectorSpec:
+    def profile_detector(self, name: str) -> Detector:
         """Resolved detector for ``name`` with standard then legacy fallback."""
-        return self.profile_detectors.get(
-            name, self.profile_detectors.get("standard", DetectorSpec())
-        )
+        return self.profile_detectors.get(name, self.profile_detectors.get("standard", Detector()))
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the
@@ -831,11 +830,9 @@ _BEAM_KEYS = _BEAM_POSITIVE_KEYS | {
     "longitudinal",
     "transverse",
 }
-_DETECTOR_KEYS = frozenset(
+_DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
+_DEPRECATED_DETECTOR_KEYS = frozenset(
     {
-        "observation_angle_deg",
-        "polar_acceptance_deg",
-        "solid_angle_sr",
         "response_model",
         "qe_curve",
         "pixel_pitch_um",
@@ -1058,15 +1055,21 @@ def _parse_beams(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]
     return out
 
 
-def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> DetectorSpec | None:
+def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector | None:
     """Validate one portable ``[profiles.NAME.detector]`` block."""
     table = _table(raw, path, errors)
     if table is None:
         return None
-    errors.keys(table, path, set(_DETECTOR_KEYS))
+    errors.keys(table, path, set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS))
+    for key in sorted(table.keys() & _DEPRECATED_DETECTOR_KEYS):
+        warnings.warn(
+            f"{path}.{key} is deprecated and ignored; configure a Detector response object",
+            DeprecationWarning,
+            stacklevel=3,
+        )
     known = {key: value for key, value in table.items() if key in _DETECTOR_KEYS}
     try:
-        return DetectorSpec(**cast("dict[str, Any]", known))
+        return Detector(**cast("dict[str, Any]", known))
     except (TypeError, ValueError) as exc:
         errors.add(path, str(exc))
         return None
@@ -1585,9 +1588,9 @@ def _load_material_catalog_cached(
     if errors.items:
         raise MaterialConfigError(errors.items)
     profile_detectors = {
-        name: cast("DetectorSpec", row["detector"])
+        name: cast("Detector", row["detector"])
         for name, row in profiles.items()
-        if isinstance(row.get("detector"), DetectorSpec)
+        if isinstance(row.get("detector"), Detector)
     }
     profile_emissions = {
         name: cast(str, row["emission"])

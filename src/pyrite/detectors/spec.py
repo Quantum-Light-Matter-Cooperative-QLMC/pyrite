@@ -1,11 +1,15 @@
-"""Portable detector geometry and reserved detector-description metadata."""
+"""Detector acceptance, photon-energy binning, and read-time scoring."""
 
 from __future__ import annotations
 
 import math
-import re
-from dataclasses import dataclass
+import warnings
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from numbers import Real
+from typing import Protocol
+
+import numpy as np
 
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
@@ -20,63 +24,157 @@ def _number(name: str, value: object, *, minimum: float, maximum: float | None =
     return number
 
 
-def _positive_optional(
-    name: str, value: object | None, *, allow_zero: bool = False
-) -> float | None:
+def _positive_optional(name: str, value: object | None) -> float | None:
     if value is None:
         return None
     number = _number(name, value, minimum=0.0)
-    if not allow_zero and number == 0.0:
+    if number == 0.0:
         raise ValueError(f"{name} must be positive")
     return number
 
 
-def _portable_identifier(name: str, value: str | None) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise TypeError(f"{name} must be a string resource identifier")
-    identifier = value.strip()
-    if not identifier:
-        raise ValueError(f"{name} must be a non-empty resource identifier")
-    if (
-        identifier.startswith(("/", "~"))
-        or "\\" in identifier
-        or re.match(r"^[A-Za-z]:", identifier)
-        or ".." in identifier.split("/")
-    ):
-        raise ValueError(
-            f"{name} must be a portable registry/resource identifier, not an absolute "
-            "or parent-relative path"
+@dataclass(frozen=True, eq=False)
+class EnergyBins:
+    """The detector's line and bremsstrahlung photon-energy binnings.
+
+    ``line`` is fine and narrow because coherent-line evaluation is expensive
+    and kinematically bounded. ``brem`` is coarse and wide because the smooth,
+    cheap continuum must extend to the beam energy. ``line_by_energy`` selects
+    a fine line grid per beam energy when one fixed line grid is insufficient.
+    """
+
+    line: np.ndarray | None = None
+    line_by_energy: Mapping[float, np.ndarray] | None = None
+    brem: np.ndarray | None = None
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, EnergyBins):
+            return NotImplemented
+        if (self.line is None) != (other.line is None) or (self.brem is None) != (
+            other.brem is None
+        ):
+            return False
+        if (
+            self.line is not None
+            and other.line is not None
+            and not np.array_equal(self.line, other.line)
+        ):
+            return False
+        if (
+            self.brem is not None
+            and other.brem is not None
+            and not np.array_equal(self.brem, other.brem)
+        ):
+            return False
+        if (self.line_by_energy is None) != (other.line_by_energy is None):
+            return False
+        if self.line_by_energy is None:
+            return True
+        assert other.line_by_energy is not None
+        return self.line_by_energy.keys() == other.line_by_energy.keys() and all(
+            np.array_equal(grid, other.line_by_energy[energy])
+            for energy, grid in self.line_by_energy.items()
         )
-    return identifier
+
+
+class DetectorResponse(Protocol):
+    """Read-time detector response consumed by :meth:`Detector.score`."""
+
+    def score(
+        self,
+        energy_eV: np.ndarray,
+        intrinsic_density: np.ndarray,
+        *,
+        fwhm_eV: float | None,
+        scale: float,
+    ) -> np.ndarray: ...
 
 
 @dataclass(frozen=True)
-class DetectorSpec:
-    """Resolved detector geometry plus inert, portable hardware metadata.
+class Timepix3:
+    """Timepix3 response configuration.
 
-    ``polar_acceptance_deg`` is the detector's full polar span and maps to the
-    historical ``dtheta_obs_rad`` case field. ``solid_angle_sr`` maps to the
-    historical ``domega_sr`` field. When either is ``None``, case construction
-    retains the current Timepix3 geometry fallback.
+    ``thickness_um`` is the one formerly inert detector field with an existing
+    physical consumer. The forward-model equations remain in
+    :mod:`pyrite.detectors.timepix_response`.
+    """
 
-    The remaining fields are serializable identity metadata only. No response,
-    efficiency, pixel, thickness, distance, or threshold behavior changes until
-    a named detector adapter explicitly consumes the corresponding field.
-    ``qe_curve`` and ``response_model`` are portable registry/resource
-    identifiers, never embedded arrays or machine-specific absolute paths.
+    thickness_um: float | None = None
+    bias_v: float | None = None
+    dE_mc: float = 50.0
+    dE_out: float = 25.0
+    n_mc: int = 60000
+    seed: int = 0
+
+    def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
+        from .timepix_response import get_response
+
+        incident = np.asarray(intrinsic_density) * scale
+        return get_response(
+            energy_eV,
+            dE_mc=self.dE_mc,
+            dE_out=self.dE_out,
+            n_mc=self.n_mc,
+            seed=self.seed,
+            thickness_um=self.thickness_um,
+            bias_v=self.bias_v,
+        ).apply(incident)
+
+
+@dataclass(frozen=True)
+class EagleXO:
+    """Eagle XO response configuration; equations remain in its forward model."""
+
+    coating: str = "BN"
+    resolve_energy: bool = False
+    n_pix: int = 4
+
+    def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
+        from .eaglexo_response import get_response
+
+        incident = np.asarray(intrinsic_density) * scale
+        return get_response(
+            energy_eV,
+            coating=self.coating,
+            resolve_energy=self.resolve_energy,
+            n_pix=self.n_pix,
+        ).apply(incident)
+
+
+@dataclass(frozen=True)
+class LegacyEDS:
+    """Compatibility response for the historical EDS window and Gaussian blur."""
+
+    apply_qe: bool = False
+    convolve: bool = False
+
+    def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
+        from ..montecarlo import convolve_detector, detector_efficiency
+
+        scored = np.asarray(intrinsic_density)
+        if self.apply_qe:
+            scored = scored * detector_efficiency(energy_eV)
+        if self.convolve:
+            if fwhm_eV is None:
+                raise ValueError("LegacyEDS convolution requires fwhm_eV")
+            scored = convolve_detector(energy_eV, scored, fwhm_eV)
+        return scored * scale
+
+
+@dataclass(frozen=True)
+class Detector:
+    """One detector's acceptance, photon-energy binnings, and response.
+
+    Stored spectral arrays stay intrinsic. :meth:`score` applies the response
+    only when results are read, so the same transport can be rescored. A
+    ``None`` response is the identity apart from the acceptance ``scale``.
     """
 
     observation_angle_deg: float = 90.0
     polar_acceptance_deg: float | None = None
     solid_angle_sr: float | None = None
-    response_model: str | None = None
-    qe_curve: str | None = None
-    pixel_pitch_um: float | None = None
-    sensor_thickness_um: float | None = None
-    distance_mm: float | None = None
-    threshold_eV: float | None = None
+    energy_bins: EnergyBins = field(default_factory=EnergyBins)
+    response: DetectorResponse | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -97,21 +195,37 @@ class DetectorSpec:
         if solid_angle is not None and solid_angle > 4.0 * math.pi:
             raise ValueError("solid_angle_sr must be <= 4*pi sr")
         object.__setattr__(self, "solid_angle_sr", solid_angle)
-        object.__setattr__(
-            self, "response_model", _portable_identifier("response_model", self.response_model)
+        if not isinstance(self.energy_bins, EnergyBins):
+            raise TypeError("energy_bins must be an EnergyBins")
+        if self.response is not None and not hasattr(self.response, "score"):
+            raise TypeError("response must implement score()")
+
+    def score(
+        self,
+        energy_eV: np.ndarray,
+        intrinsic_density: np.ndarray,
+        *,
+        fwhm_eV: float | None = None,
+        scale: float = 1.0,
+    ) -> np.ndarray:
+        """Return this detector's scored density without mutating stored data."""
+        if self.response is None:
+            return np.asarray(intrinsic_density) * scale
+        return self.response.score(
+            np.asarray(energy_eV),
+            np.asarray(intrinsic_density),
+            fwhm_eV=fwhm_eV,
+            scale=scale,
         )
-        object.__setattr__(self, "qe_curve", _portable_identifier("qe_curve", self.qe_curve))
-        object.__setattr__(
-            self, "pixel_pitch_um", _positive_optional("pixel_pitch_um", self.pixel_pitch_um)
+
+
+class DetectorSpec(Detector):
+    """Deprecated compatibility spelling for :class:`Detector`."""
+
+    def __new__(cls, *args, **kwargs):
+        warnings.warn(
+            "DetectorSpec is deprecated; use Detector",
+            DeprecationWarning,
+            stacklevel=2,
         )
-        object.__setattr__(
-            self,
-            "sensor_thickness_um",
-            _positive_optional("sensor_thickness_um", self.sensor_thickness_um),
-        )
-        object.__setattr__(self, "distance_mm", _positive_optional("distance_mm", self.distance_mm))
-        object.__setattr__(
-            self,
-            "threshold_eV",
-            _positive_optional("threshold_eV", self.threshold_eV, allow_zero=True),
-        )
+        return super().__new__(cls)

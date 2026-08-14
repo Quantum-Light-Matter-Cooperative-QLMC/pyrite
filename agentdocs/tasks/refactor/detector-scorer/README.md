@@ -89,19 +89,42 @@ Likely owners:
       inert fields are deleted; `sensor_thickness_um` becomes live as
       `Timepix3(thickness_um=)`. No shipped TOML sets any of the six, so no
       `parameter_sha256` moves.
-- [ ] B — Land `Detector` as a superset of `DetectorSpec`, with `DetectorSpec`
+- [x] B — Land `Detector` as a superset of `DetectorSpec`, with `DetectorSpec`
       retained as a deprecated alias under the D7 harness.
-- [ ] C — Move `energy_bins` onto `Detector`; keep line and brem binnings as two
+- [x] C — Move `energy_bins` onto `Detector`; keep line and brem binnings as two
       named binnings, documented with their physical rationale.
-- [ ] D — Move response application from `store_result` and the plotting layer
+- [x] D — Move response application from `store_result` and the plotting layer
       onto the detector object, so `response=None` yields the intrinsic
       spectrum and a response object yields the detected one, by one code path.
-- [ ] E — Remove `E_grid_line` / `E_grid_line_by_energy` / `E_grid_brem` from
+- [x] E — Remove `E_grid_line` / `E_grid_line_by_energy` / `E_grid_brem` from
       the scene objects, resolving them from the detector instead.
-- [ ] F — Document the multi-detector seam without implementing it: what a list
+- [x] F — Document the multi-detector seam without implementing it: what a list
       of detectors would need from the transport pass, and what in the stored
       record layout would have to change.
-- [ ] G — Update `docs/repo_map.md` and the detector-facing physics pages.
+- [x] G — Update `docs/repo_map.md` and the detector-facing physics pages.
+
+## Completion evidence
+
+- `Detector` now owns acceptance, `EnergyBins`, and an optional read-time
+  response. `DetectorSpec` remains a warning compatibility subclass; the six
+  audited inert fields are absent from the public object.
+- `Timepix3`, `EagleXO`, and `LegacyEDS` adapters delegate to the unchanged
+  response implementations. Results, tables, and plotting call
+  `Detector.score`; `store_result` and the one-detector record keys are
+  unchanged.
+- `Sweep` contains no grid fields. Catalog/config resolution installs line,
+  per-energy line, and bremsstrahlung bins on its detector; case lowering still
+  emits the historical mapping keys. Identity projection reconstructs the
+  historical payload, and focused digest regressions pass unchanged.
+- The future list-of-detectors inputs and required versioned per-detector record
+  grouping are recorded in
+  `docs/physics/detectors/detector-response.md#multi-detector-seam` without
+  implementing either change.
+- Focused detector/campaign/material/result/plot/Monte Carlo regressions pass,
+  including an array-exact `LegacyEDS` comparison and the subprocess case run.
+- Acceptance (2026-08-13): full `pyrite-dev test` passed at 100%; standalone
+  `pyrite-dev docs` built 151 sources successfully; `pyrite-dev verify` passed
+  architecture contracts, docs, lint, typecheck, full tests, and skill mirror.
 
 ## Decisions and open questions
 

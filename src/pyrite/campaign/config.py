@@ -25,6 +25,7 @@ from typing import Any
 
 import numpy as np
 
+from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
 from ..results import Settings
@@ -188,6 +189,40 @@ def material_sweep(
     resolved_detector = (
         detector if detector is not None else replace(catalog_detector, **supplied_legacy)
     )
+    current_bins = resolved_detector.energy_bins
+    missing = object()
+    line_override = overrides.pop("E_grid_line", missing)
+    legacy_line_override = overrides.pop("e_grid_eV", missing)
+    line_by_energy_override = overrides.pop("E_grid_line_by_energy", missing)
+    brem_override = overrides.pop("E_grid_brem", missing)
+    resolved_detector = replace(
+        resolved_detector,
+        energy_bins=EnergyBins(
+            line=(
+                line_override
+                if line_override is not missing
+                else legacy_line_override
+                if legacy_line_override is not missing
+                else current_bins.line
+                if current_bins.line is not None
+                else scan.E_grid_line
+            ),
+            line_by_energy=(
+                line_by_energy_override
+                if line_by_energy_override is not missing
+                else current_bins.line_by_energy
+                if current_bins.line_by_energy is not None
+                else scan.E_grid_line_by_energy
+            ),
+            brem=(
+                brem_override
+                if brem_override is not missing
+                else current_bins.brem
+                if current_bins.brem is not None
+                else scan.E_grid_brem
+            ),
+        ),
+    )
     sweep = Sweep(
         material=spec.crystal_key,
         detector=resolved_detector,
@@ -203,9 +238,6 @@ def material_sweep(
             substrate=spec.substrate,
             stack=spec.stack or None,
         ),
-        E_grid_line=scan.E_grid_line,
-        E_grid_line_by_energy=scan.E_grid_line_by_energy,
-        E_grid_brem=scan.E_grid_brem,
         n_electrons=scan.n_electrons,
         n_electrons_brem=scan.n_electrons_brem,
     )
@@ -279,10 +311,13 @@ def trajectory_sweep(
     return Sweep(
         material=spec.crystal_key,  # named stacks: the film
         beam=BeamSpec(energy_keV=list(energies)),
-        theta_obs_deg=90.0,
-        E_grid_line=scan.E_grid_line,
-        E_grid_line_by_energy=scan.E_grid_line_by_energy,
-        E_grid_brem=scan.E_grid_brem,
+        detector=Detector(
+            energy_bins=EnergyBins(
+                line=scan.E_grid_line,
+                line_by_energy=scan.E_grid_line_by_energy,
+                brem=scan.E_grid_brem,
+            )
+        ),
         target=target_from_flat(
             spec.crystal_key,
             thickness_ang=thick,

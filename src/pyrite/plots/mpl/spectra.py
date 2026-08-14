@@ -6,11 +6,8 @@ Intrinsic-spectrum figures: by-energy, full-range, peak-vs-tilt, mosaic, compari
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ...montecarlo import (
-    convolve_detector,
-    detector_efficiency,
-    mosaic_psi_rad,
-)
+from ...detectors import Detector, LegacyEDS
+from ...montecarlo import mosaic_psi_rad
 from ...results import (
     beam_current_na,
     best_azimuth,
@@ -153,8 +150,8 @@ def _draw_full_spectrum(
         az = r["case"]["tilt_azim_deg"]
         lbl = rf"{E0:g} keV ($\phi$={az:.1f}$\degree$)"
         Eb = r["E_grid_brem"]
-        qe_b = detector_efficiency(Eb) if settings.apply_detector_qe else 1.0
-        brem_wide_det = r["brem_wide"] * qe_b * r["scale"]
+        detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe))
+        brem_wide_det = detector.score(Eb, r["brem_wide"], scale=r["scale"])
         xmax = max(xmax, float(Eb[-1]))  # full brem grid -> beam energy
         line_det, brem_det = _line_brem(r, settings, convolve=False)
         total_line = (line_det + brem_det) * r["scale"]
@@ -249,8 +246,6 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
     re-derived here per grade. Returns the Figure."""
     case = r["case"]
     E, E_pk = r["E_grid"], r["E_pk"]
-    qe = detector_efficiency(E) if settings.apply_detector_qe else 1.0
-    line_in = r["spec"] * qe
     psi = mosaic_psi_rad(case, E_pk)
 
     curves = []  # (label, fwhm, detected)
@@ -261,7 +256,8 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
         else:
             fwhm = line_fwhm_eV(case, E_pk, np.deg2rad(grade))
             lbl = rf"mosaic {grade:g}$\degree$"
-        det = convolve_detector(E, line_in, fwhm) * r["scale"]
+        detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=True))
+        det = detector.score(E, r["spec"], fwhm_eV=fwhm, scale=r["scale"])
         curves.append((lbl, fwhm, det))
 
     if ax is None:

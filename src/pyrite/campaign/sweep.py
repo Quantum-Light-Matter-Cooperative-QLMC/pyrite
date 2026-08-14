@@ -25,14 +25,14 @@ are imported here (no GPU), so this module is cheap to import and test.
 """
 
 import warnings
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import InitVar, asdict, dataclass, field, replace
 from itertools import product
 from typing import Any
 
 import numpy as np
 
-from ..detectors import DetectorSpec
+from ..detectors import Detector
 from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
 from ..materials._transport_data import TRANSPORT_ELEMENTS
@@ -288,18 +288,6 @@ class Sweep:
     # Optional resolved-profile cap applied after catalog-pinned or dynamically
     # selected reflections. None preserves the complete production set.
     max_reflections: int | None = None
-    # two independent photon-energy grids (None -> per-material defaults):
-    #   E_grid_line : fine + NARROW; where the coherent lines are evaluated (the
-    #       expensive sinc^2). Lines are kinematically capped at a few keV, so it
-    #       need not extend past ~4 keV.
-    #   E_grid_brem : coarse + WIDE; where the smooth bremsstrahlung is evaluated
-    #       (cheap). Extend to 20-40 keV / the beam energy to model the full
-    #       measured spectrum without inflating the line cost. Default spans the
-    #       line start up to the highest beam energy at a 50 eV step.
-    E_grid_line: np.ndarray | None = None
-    E_grid_line_by_energy: Mapping[float, np.ndarray] | None = None
-    E_grid_brem: np.ndarray | None = None
-    e_grid_eV: np.ndarray | None = None  # deprecated: alias for E_grid_line
     dtheta_obs_deg: InitVar[float | None] = None
     domega_sr: InitVar[float | None] = None
     beam_uvw: tuple | None = None  # None -> per-material default
@@ -363,7 +351,7 @@ class Sweep:
     allow_normal_incidence: InitVar[bool] = retired_flat_input("allow_normal_incidence")
     # Canonical detector owner. Kept after existing fields so legacy positional
     # Sweep construction retains its historical argument order.
-    detector: DetectorSpec | None = None
+    detector: Detector | None = None
     # Canonical geometry owner. Every flat geometry input above is an InitVar
     # that normalizes onto this field, so the target is the only geometry state
     # a Sweep carries and ``dataclasses.replace`` preserves it.
@@ -463,9 +451,9 @@ class Sweep:
             "domega_sr": domega_sr,
         }
         nested = self.detector
-        if nested is not None and not isinstance(nested, DetectorSpec):
-            raise TypeError("detector must be a DetectorSpec")
-        base = DetectorSpec() if nested is None else nested
+        if nested is not None and not isinstance(nested, Detector):
+            raise TypeError("detector must be a Detector")
+        base = Detector() if nested is None else nested
         detector_values = {
             "theta_obs_deg": base.observation_angle_deg,
             "dtheta_obs_deg": base.polar_acceptance_deg,
@@ -480,7 +468,7 @@ class Sweep:
             joined = ", ".join(conflicts)
             raise ValueError(
                 f"conflicting nested detector and legacy flat input(s): {joined}; "
-                "supply DetectorSpec values or flat theta_obs_deg/dtheta_obs_deg/domega_sr, "
+                "supply Detector values or flat theta_obs_deg/dtheta_obs_deg/domega_sr, "
                 "not both"
             )
         if nested is None:
@@ -522,14 +510,16 @@ def _reject_relativistic_energies(energies: np.ndarray) -> None:
 
 
 def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:
-    """Select the fixed, legacy, mapped, or material-default line grid."""
-    fixed = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
+    """Select the detector's fixed, mapped, or material-default line grid."""
+    assert sweep.detector is not None
+    bins = sweep.detector.energy_bins
+    fixed = bins.line
     if fixed is not None:
         return np.asarray(fixed, dtype=float)
-    if sweep.E_grid_line_by_energy is None:
+    if bins.line_by_energy is None:
         return np.asarray(default_grid, dtype=float)
     try:
-        return np.asarray(sweep.E_grid_line_by_energy[float(energy_keV)], dtype=float)
+        return np.asarray(bins.line_by_energy[float(energy_keV)], dtype=float)
     except KeyError:
         raise ValueError(f"no E_grid_line configured for beam energy {energy_keV:g} keV") from None
 
@@ -572,8 +562,8 @@ def build_cases(
     cp = crystal_params(target.material, sweep.n_families)
     if sweep.max_reflections is not None:
         cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
-    # line grid: fine + narrow (per-material default, per-energy mapping,
-    # E_grid_line, or the deprecated e_grid_eV alias). brem grid: coarse + wide
+    # line grid: fine + narrow (per-material default or detector mapping/fixed
+    # binning). brem grid: coarse + wide
     # -- each case spans up to that case's beam energy because brem cuts off at
     # the particle energy.
     # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
@@ -583,16 +573,16 @@ def build_cases(
     line_grids = tuple(
         _line_grid_for_energy(sweep, cp["E_grid"], float(energy)) for energy in energies
     )
-    fixed_line_grid = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
-    if sweep.E_grid_brem is not None:
-        brem_grid = np.asarray(sweep.E_grid_brem, float)
+    assert sweep.detector is not None
+    bins = sweep.detector.energy_bins
+    fixed_line_grid = bins.line
+    if bins.brem is not None:
+        brem_grid = np.asarray(bins.brem, float)
     else:
         if fixed_line_grid is not None:
             brem_start = float(np.atleast_1d(fixed_line_grid)[0])
-        elif sweep.E_grid_line_by_energy is not None:
-            brem_start = min(
-                float(np.atleast_1d(grid)[0]) for grid in sweep.E_grid_line_by_energy.values()
-            )
+        elif bins.line_by_energy is not None:
+            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.line_by_energy.values())
         else:
             brem_start = float(cp["E_grid"][0])
         brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]

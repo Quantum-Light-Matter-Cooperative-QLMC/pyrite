@@ -626,6 +626,7 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     (rebound by force_cpu) still produce a finite spectrum -- the design doc's
     Sec. 2 verification item, covered end-to-end rather than assumed."""
     from pyrite.campaign.sweep import Sweep, build_cases
+    from pyrite.detectors import Detector, EnergyBins
     from pyrite.montecarlo import runner
 
     sweep = Sweep(
@@ -633,8 +634,12 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
-        E_grid_line=np.arange(50.0, 300.0, 5.0),
-        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+        detector=Detector(
+            energy_bins=EnergyBins(
+                line=np.arange(50.0, 300.0, 5.0),
+                brem=np.arange(0.0, 1000.0, 100.0),
+            )
+        ),
     )
     cases = build_cases(sweep, n_electrons=40, n_electrons_brem=20)
     results = runner.run_cases(cases, max_workers=1, progress=False, engine="cpu")

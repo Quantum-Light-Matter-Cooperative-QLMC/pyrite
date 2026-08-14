@@ -28,11 +28,21 @@ times measured quantum efficiency; an optional low-occupancy mode adds
 Fano/read-noise energy resolution. The grazing-grating/ALEXS path combines
 optical mapping with silicon QE, diffusion, and resolution models.
 
-Profile detector fields currently provide geometry plus portable response
-metadata. The metadata joins dataset identity, but remains inert until a named
-adapter explicitly consumes it. Detector-model modules also contain
-experiment-specific placeholders; absolute predictions require those values to
-be replaced by calibrated hardware geometry and operating conditions.
+`pyrite.detectors.Detector` is the read-time scoring boundary. It owns the
+acceptance, an `EnergyBins` pair, and an optional response adapter. The line
+bins are fine and narrow because coherent-line evaluation is expensive and
+kinematically bounded; the bremsstrahlung bins are coarse and wide because the
+smooth, cheap continuum must extend to the beam energy. Catalog resolution
+attaches both bins to the detector before case construction.
+
+Stored spectral arrays remain intrinsic. `Detector.score()` applies acceptance
+scaling and, when configured, one of `Timepix3`, `EagleXO`, or the compatibility
+`LegacyEDS` adapter. `response=None` returns the scaled intrinsic density. This
+single read path keeps response choices out of transport identity and permits
+the same transport result to be rescored without rewriting its checkpoint.
+Detector-model modules still contain experiment-specific placeholders;
+absolute predictions require calibrated hardware geometry and operating
+conditions.
 
 A response matrix $R(E_m\mid E)$ acts on a true-energy spectrum as
 
@@ -58,5 +68,21 @@ Validation claims include `detector-solid-angle`, `detector-line-broadening`,
 `alexs-qe-absorption`, `alexs-charge-diffusion`, `detector-eaglexo`, and
 `grazing-reflectivity`; consult the [validation
 ledger](../../validation/physics-validation-ledger.md) for current status.
-Implementation owners are `pyrite.montecarlo.detector` and
-`pyrite.detectors.*_response`.
+Implementation owners are `pyrite.detectors.spec`,
+`pyrite.detectors.*_response`, and the legacy analytic helpers in
+`pyrite.montecarlo.detector`.
+
+## Multi-detector seam
+
+The campaign currently carries exactly one detector. A later multi-detector
+run can reuse one electron-transport pass only when each detector receives the
+intrinsic line and bremsstrahlung densities on its own `EnergyBins`, plus the
+acceptance inputs needed to lower that detector to a case. Response adapters
+remain read-time consumers and do not require another transport pass.
+
+The one-detector record layout is intentionally unchanged: intrinsic `spec`
+and `brem` arrays, their grids, and scalar `fwhm`/`scale` remain top-level.
+Supporting multiple detectors therefore requires a new versioned layout that
+groups grids, intrinsic arrays, `fwhm`, and `scale` by stable detector identity,
+with an explicit compatibility projection back to today's top-level record.
+This task does not introduce that container or change checkpoint identity.

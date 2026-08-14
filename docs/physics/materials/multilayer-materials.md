@@ -169,7 +169,7 @@ cross-stack `T_abs` (slice 2).
 A crystalline substrate is just another material key:
 `Stack.on_substrate(film, thickness_ang, "silicon")` makes the substrate radiate its own
 (hkl) lines. **Caveats:** the substrate radiates on the *film's*
-line grid (set `E_grid_line` wide enough to bracket both materials' lines) with the substrate
+line bins (set `detector.energy_bins.line` wide enough to bracket both materials' lines) with the substrate
 crystal's default `beam_uvw`; deep substrate emission is strongly self-absorbed in a thick
 substrate, so the visible substrate lines come from near the interface.
 

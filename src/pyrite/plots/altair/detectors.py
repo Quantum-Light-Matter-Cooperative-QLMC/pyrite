@@ -32,8 +32,8 @@ import numpy as np
 import pandas as pd
 from altair.utils.schemapi import UndefinedType
 
+from ...detectors import Detector, Timepix3
 from ...detectors import eaglexo_response as eag
-from ...detectors import timepix_response as tpx
 from ...results import beam_current_na
 from .._common import _best_azimuth, _case_title
 from ..mpl.detectors import (
@@ -154,14 +154,15 @@ def timepix_detected_frame(
             az = float(r["case"]["tilt_azim_deg"])
             if band == "broad" and r.get("brem_wide") is not None:
                 E, inc = _broad_incident(r)
-                resp = tpx.get_response(
-                    E,
-                    n_mc=n_mc,
-                    seed=seed,
-                    thickness_um=thickness_um,
-                    bias_v=bias_v,
+                detector = Detector(
+                    response=Timepix3(
+                        n_mc=n_mc,
+                        seed=seed,
+                        thickness_um=thickness_um,
+                        bias_v=bias_v,
+                    )
                 )
-                det = resp.apply(inc)
+                det = detector.score(E, inc)
                 rows = [("broad", E, inc, det)]
             else:
                 E = np.asarray(r["E_grid"], dtype=float)

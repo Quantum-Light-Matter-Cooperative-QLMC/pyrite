@@ -32,7 +32,7 @@ from typing import Any
 
 import numpy as np
 
-from ..detectors import DetectorSpec
+from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import dominant_reflections
 
@@ -168,7 +168,7 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, exactly one direct beam axis [uvw] or reciprocal surface (hkl),
     the isotropic B-factor, and a sensible default photon-energy grid. Override
-    the grid via Sweep.e_grid_eV."""
+    the grid via ``Sweep.detector.energy_bins``."""
     crystal_key = material
     if material in CATALOG.materials:
         crystal_key = CATALOG.material(material).crystal_key
@@ -400,7 +400,7 @@ class _TargetGeometry:
         if not np.all((tilts > 0.0) & (tilts < 90.0)):
             raise ValueError("blazed grooves require 0 < tilt_deg < 90 for every case")
 
-    def validate_against(self, detector: DetectorSpec) -> None:
+    def validate_against(self, detector: Detector) -> None:
         """Validate the target x detector leg the target cannot own alone.
 
         Grooves are machined for one escape direction, so they need

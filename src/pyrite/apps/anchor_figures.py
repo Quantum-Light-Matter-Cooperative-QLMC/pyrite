@@ -47,7 +47,7 @@ from tabulate import tabulate
 
 _HERE = Path(__file__).resolve().parent
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases  # noqa: E402
-from pyrite.detectors import DetectorSpec  # noqa: E402
+from pyrite.detectors import Detector, EnergyBins, LegacyEDS  # noqa: E402
 from pyrite.materials.crystal import (  # noqa: E402
     CRYSTALS,
     HBARC_EV_ANG,
@@ -58,8 +58,6 @@ from pyrite.montecarlo import (  # noqa: E402
     Case,
     aperture_fwhm_eV,
     beta_from_keV,
-    convolve_detector,
-    detector_efficiency,
     eds_fwhm_eV,
     mc_brem_spectrum,
     mc_spectrum,
@@ -121,7 +119,7 @@ class SupplementaryCoherentStudy:
     e_min_eV: float
     e_max_eV: float
     conditions_by_thickness_nm: tuple[tuple[float, tuple[SupplementaryCondition, ...]], ...]
-    detector: DetectorSpec = ZHAI_DETECTOR
+    detector: Detector = ZHAI_DETECTOR
 
     def __post_init__(self) -> None:
         if self.detector.polar_acceptance_deg is None or self.detector.solid_angle_sr is None:
@@ -304,7 +302,7 @@ class ZhaiAnchor:
     hkl: tuple[int, int, int] = (0, 0, 2)
     hkl_list: tuple[tuple[int, int, int], ...] = ((0, 0, 2), (0, 0, -2))
     energies_keV: tuple[float, ...] = (17.5, 20.0, 22.5, 25.0)
-    detector: DetectorSpec = ZHAI_DETECTOR
+    detector: Detector = ZHAI_DETECTOR
     per_nA: float = 6.2415e9  # electrons/s at 1 nA
     thick_bulk_ang: float = 1e7  # 1 mm
     thick_film_ang: float = 290.0  # 29 nm
@@ -347,7 +345,7 @@ class ZhaiAnchor:
 def _resolved_case(
     *,
     material: str,
-    detector: DetectorSpec,
+    detector: Detector,
     energy_keV: float,
     thickness_ang: float,
     E_grid: np.ndarray,
@@ -368,10 +366,8 @@ def _resolved_case(
         tilt_azim_deg=azimuth_deg,
         crystal_width_mm=None,
         crystal_height_mm=None,
-        E_grid_line=E_grid,
-        E_grid_brem=E_grid,
         allow_normal_incidence=polar_tilt_deg == 0.0,
-        detector=detector,
+        detector=replace(detector, energy_bins=EnergyBins(line=E_grid, brem=E_grid)),
     )
     case = build_cases(sweep, n_electrons=ne, n_electrons_brem=ne_brem)[0]
     # Literature anchors may intentionally pin a narrower reflection set or
@@ -578,7 +574,7 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
                 ),
             )
         )
-        spec_det = convolve_detector(E_grid, spec, fwhm)
+        spec_det = Detector(response=LegacyEDS(convolve=True)).score(E_grid, spec, fwhm_eV=fwhm)
         segs_b = simulate_trajectories(
             case["E0_keV"],
             case["Ne_brem"],
@@ -594,7 +590,7 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
             composition=case["composition"],
             n_hat=n_hat,
         )
-        brem_det = convolve_detector(E_grid, brem, fwhm)
+        brem_det = Detector(response=LegacyEDS(convolve=True)).score(E_grid, brem, fwhm_eV=fwhm)
         out[E0] = {
             "spec": spec,
             "spec_det": spec_det,
@@ -640,7 +636,9 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
         beam_uvw=film_case["beam_uvw"],
         surface_hkl=film_case["surface_hkl"],
     )
-    spec_f_det = convolve_detector(E_grid, spec_f, out[E_top]["fwhm"])
+    spec_f_det = Detector(response=LegacyEDS(convolve=True)).score(
+        E_grid, spec_f, fwhm_eV=out[E_top]["fwhm"]
+    )
     out["film"] = {
         "E0_keV": E_top,
         "spec": spec_f,
@@ -671,7 +669,7 @@ def _zhai_cache_key(anchor: ZhaiAnchor, ne: int, ne_brem: int) -> str:
     return digest.hexdigest()[:20]
 
 
-def _cache_record(kind: str, detector: DetectorSpec, payload: object) -> dict:
+def _cache_record(kind: str, detector: Detector, payload: object) -> dict:
     """Wrap generated data with cache schema and resolved detector provenance."""
     return {
         "format": ZHAI_CACHE_FORMAT,
@@ -682,7 +680,7 @@ def _cache_record(kind: str, detector: DetectorSpec, payload: object) -> dict:
     }
 
 
-def _cache_payload(record: object, *, kind: str, detector: DetectorSpec) -> object | None:
+def _cache_payload(record: object, *, kind: str, detector: Detector) -> object | None:
     """Return a valid v4 payload; reject pre-detector or mismatched records."""
     if not isinstance(record, dict):
         return None
@@ -1288,9 +1286,11 @@ def _supplementary_detected_spectrum(
             ),
         )
     )
-    spectrum_eff = spectrum * detector_efficiency(study.E_grid)
-    return convolve_detector(study.E_grid, spectrum_eff, fwhm_eV) * (
-        study.domega_sr * ZhaiAnchor.per_nA
+    return Detector(response=LegacyEDS(apply_qe=True, convolve=True)).score(
+        study.E_grid,
+        spectrum,
+        fwhm_eV=fwhm_eV,
+        scale=study.domega_sr * ZhaiAnchor.per_nA,
     )
 
 

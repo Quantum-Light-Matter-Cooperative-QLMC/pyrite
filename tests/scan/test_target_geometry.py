@@ -18,7 +18,7 @@ from pyrite.campaign.geometry import (
     crystal_params,
 )
 from pyrite.campaign.sweep import MATERIAL_LABELS, BeamSpec, Sweep, build_cases
-from pyrite.detectors import DetectorSpec
+from pyrite.detectors import Detector
 from pyrite.materials import LayerSpec
 
 MATERIAL = "mose2"
@@ -139,13 +139,13 @@ def test_grooves_forbid_a_stack_by_construction():
 
 def test_grooves_require_a_90_degree_observation_angle():
     target = Slab(MATERIAL, tilt_deg=45.0, tilt_azim_deg=180.0, entrance_face=BlazedGrooves(2.0e4))
-    target.validate_against(DetectorSpec(observation_angle_deg=90.0))
+    target.validate_against(Detector(observation_angle_deg=90.0))
     with pytest.raises(ValueError, match="theta_obs_deg == 90"):
-        target.validate_against(DetectorSpec(observation_angle_deg=45.0))
+        target.validate_against(Detector(observation_angle_deg=45.0))
 
 
 def test_ungrooved_target_accepts_any_observation_angle():
-    Slab(MATERIAL).validate_against(DetectorSpec(observation_angle_deg=45.0))
+    Slab(MATERIAL).validate_against(Detector(observation_angle_deg=45.0))
 
 
 def test_layer_validates_material_and_thickness():

@@ -3,9 +3,20 @@
 from importlib import import_module
 from types import ModuleType
 
-from .spec import DetectorSpec
+from .spec import Detector, DetectorResponse, DetectorSpec, EagleXO, EnergyBins, LegacyEDS, Timepix3
 
-__all__ = ["DetectorSpec", "eaglexo_response", "grating", "timepix_response"]
+__all__ = [
+    "Detector",
+    "DetectorResponse",
+    "DetectorSpec",
+    "EagleXO",
+    "EnergyBins",
+    "LegacyEDS",
+    "Timepix3",
+    "eaglexo_response",
+    "grating",
+    "timepix_response",
+]
 
 _MODULE_EXPORTS = frozenset({"eaglexo_response", "grating", "timepix_response"})
 

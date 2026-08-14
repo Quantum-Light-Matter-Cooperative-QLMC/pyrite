@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from pyrite.plots.altair import detectors as altair_detectors
+from pyrite.detectors import Timepix3
 from pyrite.plots.altair.detectors import (
     eaglexo_charge_chart,
     eaglexo_charge_frame,
@@ -84,15 +84,11 @@ def test_timepix_frame_uses_one_response_across_line_grid_boundary(monkeypatch):
 
     calls = []
 
-    class _IdentityResponse:
-        def apply(self, spec):
-            return np.asarray(spec, dtype=float)
-
-    def _response(E, **_kwargs):
+    def _score(_self, E, spec, **_kwargs):
         calls.append(np.asarray(E, dtype=float))
-        return _IdentityResponse()
+        return np.asarray(spec, dtype=float)
 
-    monkeypatch.setattr(altair_detectors.tpx, "get_response", _response)
+    monkeypatch.setattr(Timepix3, "score", _score)
     df = timepix_detected_frame([rec], _settings(), **_TPX_KW)
 
     # Broadband Timepix detection must use one response over the summed

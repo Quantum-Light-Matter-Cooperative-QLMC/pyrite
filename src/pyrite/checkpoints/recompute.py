@@ -108,7 +108,7 @@ def rebrem_checkpoints(
                     catalog_profile=context.catalog_profile,
                 )
                 profile_start, _profile_stop, profile_step = uniform_bounds(
-                    profile_sweep.E_grid_brem
+                    profile_sweep.detector.energy_bins.brem
                 )
             except (KeyError, TypeError, ValueError):
                 # Derived stems (for example ``*_blazed``) have no catalog row.

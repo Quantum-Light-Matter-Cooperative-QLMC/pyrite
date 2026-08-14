@@ -11,7 +11,7 @@ import difflib
 
 import tomlkit
 
-from pyrite.detectors.spec import DetectorSpec
+from pyrite.detectors.spec import Detector
 
 RANGES = {
     "thickness": "thickness_ang",
@@ -120,7 +120,10 @@ def profile_payload(document, name):
     if not isinstance(raw_detector, dict):
         standard = profiles.get("standard", {})
         raw_detector = standard.get("detector", {}) if isinstance(standard, dict) else {}
-    detector = DetectorSpec(**dict(raw_detector))
+    active_detector_keys = {key for key, _label, _unit in ACTIVE_DETECTOR_FIELDS}
+    detector = Detector(
+        **{key: value for key, value in raw_detector.items() if key in active_detector_keys}
+    )
     return {
         "name": name,
         "ranges": [

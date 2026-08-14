@@ -210,7 +210,8 @@ so once injection is randomized the emitted line spectrum picks up divergence
 and energy spread with no further work. Two consequences are worth stating
 explicitly:
 
-1. **The `E_grid_line` window is derived from the nominal case energy**, so an
+1. **The `detector.energy_bins.line` window is derived from the nominal case
+   energy**, so an
    energy-spread-broadened line is displaced from where the grid was cut.
    Checked, and it does not clip. Differentiating the resonance
    `omega = v.g / (1 - n.v)` in `beta` gives a fractional line shift of

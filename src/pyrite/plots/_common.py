@@ -6,10 +6,7 @@ Shared figure plumbing: per-record line/brem split and the per-tilt figure loop.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..montecarlo import (
-    convolve_detector,
-    detector_efficiency,
-)
+from ..detectors import Detector, LegacyEDS
 from ..results import (
     beam_current_na,
     detected_background,
@@ -120,9 +117,8 @@ def _line_brem(r, settings, convolve=None):
     intrinsic (convolve=False) and detector-convolved (convolve=True) spectra
     side by side."""
     do_conv = getattr(settings, "convolve_with_det", False) if convolve is None else convolve
-    qe = detector_efficiency(r["E_grid"]) if settings.apply_detector_qe else 1.0
-    line_in = r["spec"] * qe
-    line_det = convolve_detector(r["E_grid"], line_in, r["fwhm"]) if do_conv else line_in
+    detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=do_conv))
+    line_det = detector.score(r["E_grid"], r["spec"], fwhm_eV=r["fwhm"])
     brem_det = detected_background(r, settings, convolve=do_conv) / r["scale"]
     return line_det, brem_det
 

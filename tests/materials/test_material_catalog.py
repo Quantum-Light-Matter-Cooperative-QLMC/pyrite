@@ -86,10 +86,10 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
     trajectory = config.trajectory_sweep("sample")
     assert grid["E_grid_line"] is None
     assert grid["E_grid_line_by_energy"] is scan.E_grid_line_by_energy
-    assert sweep.E_grid_line is None
-    assert sweep.E_grid_line_by_energy is scan.E_grid_line_by_energy
-    assert trajectory.E_grid_line is None
-    assert trajectory.E_grid_line_by_energy is scan.E_grid_line_by_energy
+    assert sweep.detector.energy_bins.line is None
+    assert sweep.detector.energy_bins.line_by_energy is scan.E_grid_line_by_energy
+    assert trajectory.detector.energy_bins.line is None
+    assert trajectory.detector.energy_bins.line_by_energy is scan.E_grid_line_by_energy
 
 
 def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
@@ -632,8 +632,10 @@ def test_named_beam_renaming_does_not_change_resolved_payload(tmp_path):
 def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     tmp_path, monkeypatch
 ):
+    from dataclasses import replace
+
     from pyrite.campaign import config
-    from pyrite.detectors import DetectorSpec
+    from pyrite.detectors import Detector, EnergyBins
     from pyrite.materials import load_material_catalog
 
     text = (
@@ -650,8 +652,8 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     path = _write_catalog(tmp_path, text)
     catalog = load_material_catalog(path, profile="narrowed")
 
-    assert catalog.profile_detector("standard") == DetectorSpec(91.0, 12.0, 0.05)
-    selected = DetectorSpec(119.0, 16.6, 0.066)
+    assert catalog.profile_detector("standard") == Detector(91.0, 12.0, 0.05)
+    selected = Detector(119.0, 16.6, 0.066)
     assert catalog.profile_detector("narrowed") == selected
 
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
@@ -659,14 +661,14 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     explicit = config.material_sweep(
         "mos2",
         catalog_profile="narrowed",
-        detector=DetectorSpec(100.0, 8.0, 0.01),
+        detector=Detector(100.0, 8.0, 0.01),
     )
-    assert profiled.detector == selected
-    assert explicit.detector == DetectorSpec(100.0, 8.0, 0.01)
+    assert replace(profiled.detector, energy_bins=EnergyBins()) == selected
+    assert replace(explicit.detector, energy_bins=EnergyBins()) == Detector(100.0, 8.0, 0.01)
 
 
 def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path):
-    from pyrite.detectors import DetectorSpec
+    from pyrite.detectors import Detector
     from pyrite.materials import load_material_catalog
 
     fallback = load_material_catalog(
@@ -681,14 +683,14 @@ crystal = "mos2"
             ),
         )
     )
-    assert fallback.profile_detector("standard") == DetectorSpec()
+    assert fallback.profile_detector("standard") == Detector()
 
     text = (
         _catalog_with_two_profiles(tmp_path).read_text()
         + "\n[profiles.standard.detector]\nobservation_angle_deg = 91.0\n"
     )
     inherited = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
-    assert inherited.profile_detector("narrowed") == DetectorSpec(91.0)
+    assert inherited.profile_detector("narrowed") == Detector(91.0)
 
 
 def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):

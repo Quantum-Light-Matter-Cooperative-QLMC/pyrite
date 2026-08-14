@@ -21,7 +21,7 @@ from pyrite.campaign.profiles import (
 )
 from pyrite.campaign.sweep import build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
-from pyrite.detectors import DetectorSpec
+from pyrite.detectors import Detector, EnergyBins, Timepix3
 
 
 def _cases_by_key(material, catalog_profile):
@@ -137,9 +137,9 @@ def test_survey_profile_reduces_every_expensive_sweep_dimension():
     assert len(np.atleast_1d(survey_geometry["tilt_deg"])) <= 5
     assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
     assert survey.n_families == 2
-    assert len(survey.E_grid_brem) < len(full.E_grid_brem)
-    assert max(len(grid) for grid in survey.E_grid_line_by_energy.values()) < max(
-        len(grid) for grid in full.E_grid_line_by_energy.values()
+    assert len(survey.detector.energy_bins.brem) < len(full.detector.energy_bins.brem)
+    assert max(len(grid) for grid in survey.detector.energy_bins.line_by_energy.values()) < max(
+        len(grid) for grid in full.detector.energy_bins.line_by_energy.values()
     )
     cases = build_cases(survey, settings.n_electrons, settings.n_electrons_brem)
     assert cases
@@ -297,30 +297,21 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 def test_nondefault_detector_round_trips_cases_identity_and_stem():
     settings = default_settings()
     standard_sweep = material_sweep("hopg")
-    detector = DetectorSpec(
-        119.0,
-        16.6,
-        0.066,
-        response_model="registry/zhai",
-        qe_curve="package-data/qe/zhai.csv",
-    )
+    detector = Detector(119.0, 16.6, 0.066, response=Timepix3(thickness_um=500.0))
     custom_sweep = material_sweep("hopg", detector=detector)
     standard = dataset_identity("hopg", "full", settings, standard_sweep)
     custom = dataset_identity("hopg", "full", settings, custom_sweep)
     case = build_cases(custom_sweep)[0]
     payload = custom["resolved_parameters"]["sweep"]
 
-    assert custom_sweep.detector == detector
+    assert replace(custom_sweep.detector, energy_bins=EnergyBins()) == detector
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
     assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
     assert case["domega_sr"] == pytest.approx(0.066)
     assert payload["theta_obs_deg"] == 119.0
     assert payload["dtheta_obs_deg"] == 16.6
     assert payload["domega_sr"] == 0.066
-    assert payload["detector"] == {
-        "qe_curve": "package-data/qe/zhai.csv",
-        "response_model": "registry/zhai",
-    }
+    assert "detector" not in payload
     assert custom["parameter_sha256"] != standard["parameter_sha256"]
     assert variant_stem(custom) != variant_stem(standard)
 
@@ -328,24 +319,35 @@ def test_nondefault_detector_round_trips_cases_identity_and_stem():
 @pytest.mark.parametrize(
     "detector",
     [
-        DetectorSpec(observation_angle_deg=119.0),
-        DetectorSpec(polar_acceptance_deg=16.6),
-        DetectorSpec(solid_angle_sr=0.066),
-        DetectorSpec(response_model="registry/test"),
-        DetectorSpec(qe_curve="package-data/qe/test.csv"),
-        DetectorSpec(pixel_pitch_um=55.0),
-        DetectorSpec(sensor_thickness_um=500.0),
-        DetectorSpec(distance_mm=400.0),
-        DetectorSpec(threshold_eV=100.0),
+        Detector(observation_angle_deg=119.0),
+        Detector(polar_acceptance_deg=16.6),
+        Detector(solid_angle_sr=0.066),
     ],
 )
-def test_every_nondefault_detector_field_changes_identity(detector):
+def test_every_nondefault_detector_acceptance_field_changes_identity(detector):
     settings = default_settings()
     standard_sweep = material_sweep("hopg")
     standard = dataset_identity("hopg", "full", settings, standard_sweep)
     changed = dataset_identity("hopg", "full", settings, replace(standard_sweep, detector=detector))
 
     assert changed["parameter_sha256"] != standard["parameter_sha256"]
+
+
+def test_read_time_response_does_not_change_transport_identity():
+    settings = default_settings()
+    standard_sweep = material_sweep("hopg")
+    rescored = replace(
+        standard_sweep,
+        detector=replace(
+            standard_sweep.detector,
+            response=Timepix3(thickness_um=500.0),
+        ),
+    )
+
+    assert (
+        dataset_identity("hopg", "full", settings, rescored)["parameter_sha256"]
+        == dataset_identity("hopg", "full", settings, standard_sweep)["parameter_sha256"]
+    )
 
 
 def test_catalog_profile_changes_hash_and_stem_when_not_standard():

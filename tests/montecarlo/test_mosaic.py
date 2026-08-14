@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.detectors import Detector, EnergyBins
 from pyrite.materials.crystal import CRYSTALS
 from pyrite.montecarlo import (
     aperture_fwhm_eV,
@@ -27,8 +28,7 @@ def _sweep(material, **kw):
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
-        E_grid_line=LINE_GRID,
-        E_grid_brem=BREM_GRID,
+        detector=Detector(energy_bins=EnergyBins(line=LINE_GRID, brem=BREM_GRID)),
         **kw,
     )
 

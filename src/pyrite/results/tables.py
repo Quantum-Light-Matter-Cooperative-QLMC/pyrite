@@ -14,8 +14,8 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
+from ..detectors import Detector, LegacyEDS
 from ..materials import CATALOG
-from ..montecarlo import convolve_detector, detector_efficiency
 from ..sweep import fmt_thickness
 from .metrics import line_metrics
 from .store import Settings, beam_current_na, detected_background
@@ -96,8 +96,8 @@ def summary_table(recs, settings):
     ):
         c = r["case"]
         cur = beam_current_na(r, settings)
-        qe = detector_efficiency(r["E_grid"]) if settings.apply_detector_qe else 1.0
-        line_det = convolve_detector(r["E_grid"], r["spec"] * qe, r["fwhm"])
+        detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=True))
+        line_det = detector.score(r["E_grid"], r["spec"], fwhm_eV=r["fwhm"])
         brem_det = detected_background(r, settings) / r["scale"]
         i_pk = np.argmax(line_det)
         line_cts_per_na = np.trapezoid(r["spec"], r["E_grid"]) * r["scale"]

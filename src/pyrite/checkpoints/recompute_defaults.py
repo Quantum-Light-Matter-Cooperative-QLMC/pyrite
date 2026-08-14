@@ -177,13 +177,14 @@ def sweep(material: str, fidelity: str, *, catalog_profile: str = "standard"):
             indices = np.linspace(0, array.size - 1, limit, dtype=int)
             return array[indices]
 
-        line_by_energy = current.E_grid_line_by_energy
+        bins = current.detector.energy_bins
+        line_by_energy = bins.line_by_energy
         if line_by_energy is not None:
             line_by_energy = {
                 energy: np.asarray(grid, dtype=float)[::5]
                 for energy, grid in line_by_energy.items()
             }
-        brem = current.E_grid_brem
+        brem = bins.brem
         if brem is not None:
             brem = np.asarray(brem, dtype=float)[::5]
         return replace(
@@ -192,8 +193,10 @@ def sweep(material: str, fidelity: str, *, catalog_profile: str = "standard"):
             thickness_ang=reduced(current.thickness_ang, 3),
             tilt_deg=reduced(current.tilt_deg, 5),
             tilt_azim_deg=reduced(current.tilt_azim_deg, 2),
-            E_grid_line_by_energy=line_by_energy,
-            E_grid_brem=brem,
+            detector=replace(
+                current.detector,
+                energy_bins=replace(bins, line_by_energy=line_by_energy, brem=brem),
+            ),
             n_families=2,
         )
 

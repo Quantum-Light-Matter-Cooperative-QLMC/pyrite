@@ -19,11 +19,10 @@ XrayDispersion = Literal["vacuum", "refractive"]
 
 import numpy as np
 
+from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
     aperture_fwhm_eV,
     beta_from_keV,
-    convolve_detector,
-    detector_efficiency,
     eds_fwhm_eV,
     load_external_brem,
     mosaic_fwhm_eV,
@@ -180,11 +179,8 @@ def detected_background(r, settings, convolve=None):
     if settings.brem_source == "external":
         path = r["case"].get("brem_file")
         return load_external_brem(path, E) if path else np.zeros_like(E)
-    qe = detector_efficiency(E) if settings.apply_detector_qe else 1.0
-    b = r["brem"] * qe
-    if do_conv:
-        b = convolve_detector(E, b, r["fwhm"])
-    return b * r["scale"]
+    detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=do_conv))
+    return detector.score(E, r["brem"], fwhm_eV=r["fwhm"], scale=r["scale"])
 
 
 def _detected_background_wide(r, settings, convolve=None):
@@ -208,8 +204,11 @@ def _detected_background_wide(r, settings, convolve=None):
         path = r["case"].get("brem_file")
         b = load_external_brem(path, E) if path else np.zeros_like(E)
     else:
-        qe = detector_efficiency(E) if settings.apply_detector_qe else 1.0
-        b = np.asarray(brem_wide, dtype=float) * qe
-    if do_conv:
-        b = convolve_detector(E, b, r["fwhm"])
-    return E, b * r["scale"]
+        b = np.asarray(brem_wide, dtype=float)
+    detector = Detector(
+        response=LegacyEDS(
+            apply_qe=settings.apply_detector_qe and settings.brem_source != "external",
+            convolve=do_conv,
+        )
+    )
+    return E, detector.score(E, b, fwhm_eV=r["fwhm"], scale=r["scale"])

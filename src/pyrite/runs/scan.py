@@ -548,7 +548,10 @@ def _resolved_run(args, material):
             # (issue_notes.md #1), and build_cases rejects it.
             tilt_deg=np.linspace(5.0, 85.0, 5),
             tilt_azim_deg=np.array([10.0, 30.0]),
-            energy_keV=_select_quick_energies(probe.E_grid_line_by_energy, probe.E_grid_line),
+            energy_keV=_select_quick_energies(
+                probe.detector.energy_bins.line_by_energy,
+                probe.detector.energy_bins.line,
+            ),
         )
     if getattr(args, "n_families", None) is not None:
         overrides["n_families"] = args.n_families

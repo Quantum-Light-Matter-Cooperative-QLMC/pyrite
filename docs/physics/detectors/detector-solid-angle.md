@@ -13,8 +13,11 @@ The spectrum is computed at **one** `n̂` (from `montecarlo.tilted_geometry`), a
 finite detector is folded in by two separate approximations:
 
 1. **Flux:** the per-steradian intensity is multiplied by a flat solid angle —
-   `results.store_result` sets `scale = domega_sr · PER_NA`. This assumes
-   `d²N/dE dΩ` is constant across the face.
+   `results.store_result` records `scale = domega_sr · PER_NA`, and the
+   configured `Detector.score()` applies it at read time. This assumes
+   `d²N/dE dΩ` is constant across the face. The corresponding acceptance lives
+   on `Detector`; it is lowered to the existing scalar case keys so the stored
+   one-detector record remains unchanged.
 2. **Line width:** an analytic, **polar-only**, symmetric Gaussian
    (`montecarlo.aperture_fwhm_eV`, from the detector polar span Δθ) added in quadrature
    with the EDS resolution and applied via `convolve_detector`.

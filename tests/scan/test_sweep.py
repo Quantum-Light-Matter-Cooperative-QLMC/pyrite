@@ -1,5 +1,6 @@
 """Sweep / build_cases: the Cartesian expansion and the required-material guard."""
 
+import dataclasses
 import json
 from dataclasses import replace
 
@@ -28,7 +29,7 @@ from pyrite.campaign.sweep import (
     sweep_cost_weights,
     target_flat_fields,
 )
-from pyrite.detectors import DetectorSpec
+from pyrite.detectors import Detector, EnergyBins, Timepix3
 from pyrite.energy_grid.encoding import decode_energy_grid
 from pyrite.materials import (
     CATALOG,
@@ -58,6 +59,14 @@ ALL = [
     "v2o5",
     "tis2",
 ]
+
+
+def _detector(*, line=None, line_by_energy=None, brem=None, detector=None):
+    base = Detector() if detector is None else detector
+    return replace(
+        base,
+        energy_bins=EnergyBins(line=line, line_by_energy=line_by_energy, brem=brem),
+    )
 
 
 def test_fmt_thickness_uses_millimetres_at_one_mm():
@@ -106,8 +115,10 @@ def test_build_cases_is_cartesian_product():
         beam=BeamSpec(energy_keV=[30, 45]),
         tilt_deg=[30, 10],
         tilt_azim_deg=[45],
-        E_grid_line=np.arange(50.0, 100.0, 5.0),
-        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+        detector=_detector(
+            line=np.arange(50.0, 100.0, 5.0),
+            brem=np.arange(0.0, 1000.0, 100.0),
+        ),
     )
 
     cases = build_cases(sw)
@@ -132,7 +143,8 @@ def test_standard_sweep_owns_ninety_degree_detector_and_builds_pi_over_two_case(
     sweep = material_sweep("mose2")
     case = build_cases(sweep)[0]
 
-    assert sweep.detector == DetectorSpec(observation_angle_deg=90.0)
+    assert sweep.detector.observation_angle_deg == 90.0
+    assert sweep.detector.energy_bins.line_by_energy is not None
     assert case["theta_obs_rad"] == pytest.approx(np.pi / 2.0)
 
 
@@ -147,7 +159,7 @@ def test_legacy_flat_detector_inputs_normalize_to_detector_and_cases():
     )
     case = build_cases(sweep)[0]
 
-    assert sweep.detector == DetectorSpec(119.0, 16.6, 0.066)
+    assert sweep.detector == Detector(119.0, 16.6, 0.066)
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
     assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
     assert case["domega_sr"] == pytest.approx(0.066)
@@ -157,22 +169,14 @@ def test_conflicting_nested_and_flat_detector_inputs_fail_actionably():
     with pytest.raises(ValueError, match="conflicting nested detector.*theta_obs_deg"):
         Sweep(
             material="mose2",
-            detector=DetectorSpec(observation_angle_deg=119.0),
+            detector=Detector(observation_angle_deg=119.0),
             theta_obs_deg=90.0,
         )
 
 
-def test_reserved_detector_fields_remain_inert_in_case_construction():
-    active = DetectorSpec(119.0, 16.6, 0.066)
-    described = replace(
-        active,
-        response_model="registry/test",
-        qe_curve="package-data/qe/test.csv",
-        pixel_pitch_um=55.0,
-        sensor_thickness_um=500.0,
-        distance_mm=400.0,
-        threshold_eV=100.0,
-    )
+def test_read_time_response_does_not_enter_case_construction():
+    active = Detector(119.0, 16.6, 0.066)
+    scored = replace(active, response=Timepix3(thickness_um=500.0))
     base = Sweep(
         material="mose2",
         beam=BeamSpec(energy_keV=30.0),
@@ -180,19 +184,16 @@ def test_reserved_detector_fields_remain_inert_in_case_construction():
         detector=active,
     )
     plain_case = build_cases(base)[0]
-    described_case = build_cases(replace(base, detector=described))[0]
+    scored_case = build_cases(replace(base, detector=scored))[0]
 
-    for key in ("theta_obs_rad", "dtheta_obs_rad", "domega_sr"):
-        assert described_case[key] == plain_case[key]
-    for key in (
-        "response_model",
-        "qe_curve",
-        "pixel_pitch_um",
-        "sensor_thickness_um",
-        "distance_mm",
-        "threshold_eV",
-    ):
-        assert key not in described_case
+    for key, expected in plain_case.to_dict().items():
+        actual = scored_case[key]
+        if isinstance(expected, np.ndarray):
+            np.testing.assert_array_equal(actual, expected)
+        else:
+            assert actual == expected
+    for key in ("response", "thickness_um"):
+        assert key not in scored_case
 
 
 def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
@@ -206,8 +207,7 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             tilt_deg=5.0,
-            E_grid_line_by_energy=grids,
-            E_grid_brem=75.0,
+            detector=_detector(line_by_energy=grids, brem=75.0),
         )
     )
 
@@ -234,26 +234,36 @@ def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            E_grid_line=fixed,
-            E_grid_line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
+            detector=_detector(
+                line=fixed,
+                line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
+            ),
         )
     )
     for case in cases:
         np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), fixed)
 
 
-def test_deprecated_line_grid_alias_takes_precedence_over_per_beam_mapping():
+def test_material_sweep_grid_overrides_resolve_into_detector_bins():
     fixed = np.array([75.0, 78.0])
-    cases = build_cases(
-        Sweep(
-            material="mose2",
-            beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            e_grid_eV=fixed,
-            E_grid_line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
-        )
+    sweep = material_sweep(
+        "mose2",
+        E_grid_line=fixed,
+        E_grid_line_by_energy=None,
+        E_grid_brem=None,
     )
-    for case in cases:
-        np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), fixed)
+
+    np.testing.assert_array_equal(sweep.detector.energy_bins.line, fixed)
+    assert sweep.detector.energy_bins.line_by_energy is None
+    assert sweep.detector.energy_bins.brem is None
+
+
+def test_sweep_scene_has_no_energy_grid_fields():
+    for name in ("E_grid_line", "E_grid_line_by_energy", "E_grid_brem", "e_grid_eV"):
+        assert name not in {item.name for item in dataclasses.fields(Sweep)}
+        assert not hasattr(Sweep(material="mose2"), name)
+    with pytest.raises(TypeError, match="unexpected keyword argument 'E_grid_line'"):
+        Sweep(material="mose2", E_grid_line=np.array([75.0]))
 
 
 def test_missing_per_beam_line_grid_fails_before_cases_are_built():
@@ -262,7 +272,7 @@ def test_missing_per_beam_line_grid_fails_before_cases_are_built():
             Sweep(
                 material="mose2",
                 beam=BeamSpec(energy_keV=[30.0, 50.0]),
-                E_grid_line_by_energy={30.0: np.array([10.0])},
+                detector=_detector(line_by_energy={30.0: np.array([10.0])}),
             )
         )
 
@@ -273,7 +283,7 @@ def test_empty_per_beam_line_grid_fails_with_selected_energy():
             Sweep(
                 material="mose2",
                 beam=BeamSpec(energy_keV=30.0),
-                E_grid_line_by_energy={},
+                detector=_detector(line_by_energy={}),
             )
         )
 
@@ -283,10 +293,12 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
         Sweep(
             material="mose2",
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
-            E_grid_line_by_energy={
-                30.0: np.array([25.0, 50.0]),
-                50.0: np.array([10.0, 50.0]),
-            },
+            detector=_detector(
+                line_by_energy={
+                    30.0: np.array([25.0, 50.0]),
+                    50.0: np.array([10.0, 50.0]),
+                }
+            ),
         )
     )
 
@@ -303,8 +315,7 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
             tilt_azim_deg=[-1.24, -1.26, -1.25, -1.24],
             crystal_width_mm=None,
             crystal_height_mm=None,
-            E_grid_line=np.array([75.0]),
-            E_grid_brem=np.array([75.0]),
+            detector=_detector(line=np.array([75.0]), brem=np.array([75.0])),
         )
     )
 
@@ -346,8 +357,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            E_grid_line=line_grid,
-            E_grid_brem=brem_grid,
+            detector=_detector(line=line_grid, brem=brem_grid),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -370,8 +380,10 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            E_grid_line=np.arange(50.0, 100.0, 5.0),
-            E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+            detector=_detector(
+                line=np.arange(50.0, 100.0, 5.0),
+                brem=np.arange(0.0, 1000.0, 100.0),
+            ),
         )
     )[0]
 
@@ -388,8 +400,7 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
-            E_grid_line=line_grid,
-            E_grid_brem=75.0,
+            detector=_detector(line=line_grid, brem=75.0),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -419,8 +430,7 @@ def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, l
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 40.0]),
             tilt_deg=5.0,
-            E_grid_line=line_grid,
-            E_grid_brem=75.0,
+            detector=_detector(line=line_grid, brem=75.0),
         ),
         n_electrons=1,
         n_electrons_brem=1,
@@ -535,8 +545,10 @@ def test_brem_grid_upper_limit_tracks_case_beam_energy():
         beam=BeamSpec(energy_keV=[25, 35]),
         tilt_deg=[10],
         tilt_azim_deg=[0],
-        E_grid_line=np.arange(50.0, 100.0, 5.0),
-        E_grid_brem=np.arange(0.0, 60000.0, 5000.0),
+        detector=_detector(
+            line=np.arange(50.0, 100.0, 5.0),
+            brem=np.arange(0.0, 60000.0, 5000.0),
+        ),
     )
 
     cases = build_cases(sw)
@@ -590,8 +602,10 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
-        E_grid_line=np.arange(500.0, 520.0, 5.0),
-        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+        detector=_detector(
+            line=np.arange(500.0, 520.0, 5.0),
+            brem=np.arange(0.0, 1000.0, 100.0),
+        ),
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
     assert case["crystal"] == material
@@ -653,8 +667,10 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
-        E_grid_line=np.arange(500.0, 520.0, 5.0),
-        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+        detector=_detector(
+            line=np.arange(500.0, 520.0, 5.0),
+            brem=np.arange(0.0, 1000.0, 100.0),
+        ),
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
     assert case["crystal"] == material

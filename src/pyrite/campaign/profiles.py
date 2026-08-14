@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 
+from ..detectors import EnergyBins
 from ..montecarlo.case import Case
 from ..results import EmissionMode, Settings
 from .sweep import (
@@ -146,7 +147,9 @@ class FidelityPreset:
             return sweep
         energies = _centered_sample(sweep.beam.energy_keV, self.max_energies)
         energy_values = {float(value) for value in np.atleast_1d(energies)}
-        by_energy = sweep.E_grid_line_by_energy
+        assert sweep.detector is not None
+        bins = sweep.detector.energy_bins
+        by_energy = bins.line_by_energy
         if by_energy is not None:
             by_energy = {
                 float(energy): _coarsen_grid(
@@ -157,18 +160,18 @@ class FidelityPreset:
             }
         line_grid = (
             None
-            if sweep.E_grid_line is None
+            if bins.line is None
             else _coarsen_grid(
-                sweep.E_grid_line,
+                bins.line,
                 self.photon_grid_stride,
                 self.photon_grid_span_fraction,
             )
         )
         brem_grid = (
             None
-            if sweep.E_grid_brem is None
+            if bins.brem is None
             else _coarsen_grid(
-                sweep.E_grid_brem,
+                bins.brem,
                 self.photon_grid_stride,
                 self.photon_grid_span_fraction,
             )
@@ -186,9 +189,10 @@ class FidelityPreset:
             ),
             n_families=self.n_families or sweep.n_families,
             max_reflections=self.max_reflections,
-            E_grid_line=line_grid,
-            E_grid_line_by_energy=by_energy,
-            E_grid_brem=brem_grid,
+            detector=replace(
+                sweep.detector,
+                energy_bins=EnergyBins(line=line_grid, line_by_energy=by_energy, brem=brem_grid),
+            ),
         )
 
 
@@ -295,6 +299,15 @@ def _identity_v1(
     sweep_payload["theta_obs_deg"] = detector_payload["observation_angle_deg"]
     sweep_payload["dtheta_obs_deg"] = detector_payload["polar_acceptance_deg"]
     sweep_payload["domega_sr"] = detector_payload["solid_angle_sr"]
+    energy_bins = detector_payload.pop("energy_bins")
+    sweep_payload["E_grid_line"] = energy_bins["line"]
+    sweep_payload["E_grid_line_by_energy"] = energy_bins["line_by_energy"]
+    sweep_payload["E_grid_brem"] = energy_bins["brem"]
+    sweep_payload["e_grid_eV"] = None
+    # Response is applied only to intrinsic arrays at read time. It must not
+    # fork transport/checkpoint identity, which is deliberately reusable by
+    # several response models and is the future multi-detector seam.
+    detector_payload.pop("response", None)
     reserved_detector = {
         key: value
         for key, value in detector_payload.items()

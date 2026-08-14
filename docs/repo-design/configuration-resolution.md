@@ -57,8 +57,9 @@ for the selected profile before a material sweep is built.
 For each material, the run path performs the following conceptual sequence:
 
 ```text
-CLI context -> catalog profile -> material override -> named beam/detector/grid
-            -> fidelity preset -> explicit run overrides -> cases and identity
+CLI context -> catalog profile -> material override -> named beam/detector
+            -> resolved detector energy bins -> fidelity preset
+            -> explicit run overrides -> cases and identity
 ```
 
 All values are resolved before the dataset identity is computed. Changing a

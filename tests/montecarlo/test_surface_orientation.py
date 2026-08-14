@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, layer_radiator
+from pyrite.detectors import Detector, EnergyBins
 from pyrite.materials import LayerSpec, load_material_catalog
 from pyrite.materials.crystal import HBARC_EV_ANG
 from pyrite.montecarlo import beta_from_keV, mc_spectrum
@@ -129,8 +130,7 @@ def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monk
         thickness_ang=100.0,
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=5.0,
-        E_grid_line=np.array([100.0]),
-        E_grid_brem=np.array([100.0]),
+        detector=Detector(energy_bins=EnergyBins(line=np.array([100.0]), brem=np.array([100.0]))),
     )
     catalog_case = build_cases(Sweep(**base))[0]
     override_case = build_cases(Sweep(**base, beam_uvw=(1, 0, 0)))[0]
@@ -178,8 +178,9 @@ def test_detector_mosaic_geometry_uses_case_surface_hkl(monkeypatch):
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=20.0,
-            E_grid_line=np.array([100.0]),
-            E_grid_brem=np.array([100.0]),
+            detector=Detector(
+                energy_bins=EnergyBins(line=np.array([100.0]), brem=np.array([100.0]))
+            ),
         )
     )[0]
     case = replace(case, beam_uvw=None, surface_hkl=(2, 0, -1))
@@ -286,8 +287,7 @@ crystal = "mos2"
         thickness_ang=100.0,
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=5.0,
-        E_grid_line=grid,
-        E_grid_brem=np.array([100.0]),
+        detector=Detector(energy_bins=EnergyBins(line=grid, brem=np.array([100.0]))),
     )
     surface_case = build_cases(Sweep(**base), n_electrons=1, n_electrons_brem=1)[0]
     direct_case = build_cases(Sweep(**base, beam_uvw=(1, 0, 0)), n_electrons=1, n_electrons_brem=1)[

@@ -6,6 +6,7 @@ Timepix3 and Eagle XO detector-view figures (efficiency, detected, charge).
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ...detectors import Detector, EagleXO, Timepix3
 from ...detectors import eaglexo_response as eag
 from ...detectors import timepix_response as tpx
 from ...results import (
@@ -96,10 +97,15 @@ def _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed):
     """Incident and Timepix3-detected (line + brem) [Phs/eV/s/nA] on r['E_grid'];
     the per-grid response is cached by tpx.get_response."""
     incident = (r["spec"] + r["brem"]) * r["scale"]
-    resp = tpx.get_response(
-        r["E_grid"], n_mc=n_mc, seed=seed, thickness_um=thickness_um, bias_v=bias_v
+    detector = Detector(
+        response=Timepix3(
+            n_mc=n_mc,
+            seed=seed,
+            thickness_um=thickness_um,
+            bias_v=bias_v,
+        )
     )
-    return incident, resp.apply(incident)
+    return incident, detector.score(r["E_grid"], r["spec"] + r["brem"], scale=r["scale"])
 
 
 def _draw_timepix_detected(
@@ -320,15 +326,21 @@ def _eag_detected(r, settings, coating="BN", resolve_energy=False):
     """Incident and Eagle-detected (line + brem) [Phs/eV/s/nA] on r['E_grid'];
     the per-grid response is cached by eag.get_response."""
     incident = (r["spec"] + r["brem"]) * r["scale"]
-    resp = eag.get_response(r["E_grid"], coating=coating, resolve_energy=resolve_energy)
-    return incident, resp.apply(incident)
+    detector = Detector(response=EagleXO(coating=coating, resolve_energy=resolve_energy))
+    return incident, detector.score(r["E_grid"], r["spec"] + r["brem"], scale=r["scale"])
 
 
 def _eag_wide_brem(r, coating="BN"):
     """Wide-grid Eagle XO incident and detected brem [Phs/eV/s/nA]."""
     E = np.asarray(r["E_grid_brem"], dtype=float)
     incident = np.asarray(r["brem_wide"], dtype=float) * r["scale"]
-    return E, incident, incident * eag.qe(E, coating)
+    detector = Detector(response=EagleXO(coating=coating))
+    detected = detector.score(E, r["brem_wide"], scale=r["scale"])
+    # EagleResponse sanitizes non-finite response-matrix inputs. This wide-grid
+    # diagnostic historically exposed missing input bins as NaN; retain that
+    # presentation contract after routing the actual response through Detector.
+    detected = np.where(np.isnan(incident), np.nan, detected)
+    return E, incident, detected
 
 
 def _eag_wide_charge(r, coating="BN", beam_current_na=1.0):
