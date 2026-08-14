@@ -19,6 +19,7 @@ installation.
 From a PyRITE checkout, install the distribution as an
 [isolated uv tool](https://docs.astral.sh/uv/guides/tools/#installing-tools):
 
+<!-- verify: skip (uv tool environment setup, not a pyrite/pyrite-dev command) -->
 ```bash
 uv tool install .
 uv tool update-shell
@@ -36,6 +37,7 @@ when the persistent command should use a GPU backend.
 For a development checkout whose persistent command should immediately follow
 source changes, use an editable tool installation:
 
+<!-- verify: skip (uv tool environment setup, not a pyrite/pyrite-dev command) -->
 ```bash
 uv tool install --editable .
 uv tool update-shell
@@ -101,6 +103,7 @@ pyrite config completion remove
 
 This does not uninstall PyRITE. To remove the persistent uv tool afterward:
 
+<!-- verify: skip (uv tool environment teardown, not a pyrite/pyrite-dev command) -->
 ```bash
 uv tool uninstall pyrite-xray
 ```

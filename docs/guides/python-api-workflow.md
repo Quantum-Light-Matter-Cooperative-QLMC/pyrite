@@ -134,6 +134,7 @@ kernel entry point.
 
 Select the array backend before importing PyRITE, for example:
 
+<!-- verify: skip (illustrative script invocation, not a pyrite/pyrite-dev command) -->
 ```bash
 PYRITE_MC_BACKEND=cpu uv run python my_simulation.py
 ```

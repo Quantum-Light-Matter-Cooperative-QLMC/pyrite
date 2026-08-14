@@ -130,22 +130,42 @@ marker.
 
 ## Decisions / open questions
 
-1. **Open — are the Python blocks executed?** Depends on step 1's timing.
-   - *Execute* (`integration` suite): highest fidelity, catches behavioural
-     breakage, but pays a real Monte Carlo run per CI pass.
-   - *Bind-check only* (`packaging` suite): resolve `pr.Beam`, `pr.Slab`,
-     `pr.simulate`, `pr.Numerics`, `pr.Convergence`, `pr.Scene`, `pr.Sweep`,
-     `pyrite.detectors.Timepix3` and bind the call kwargs against their
-     signatures without running. Near-zero cost, catches renames and changed
-     kwargs — but *cannot* check `result.energy_eV` / `result.provenance` in
-     blocks 2-4, since those need a real result object.
-   - Recommended: bind-check in `packaging` for fast feedback, plus one
-     executed pass in `integration` so the `result.*` attribute reads are
-     genuinely covered. Confirm against the measured cost before committing.
-   - Rejected up front: shrinking the numerics so the doc runs faster. The
-     guide would then display parameters nobody runs.
-2. **Open — opt-out mechanism.** Inline `<!-- verify: skip (reason) -->`
-   (recommended) vs central allowlist. Cheap to change; settle in review.
+1. **Settled — the Python blocks are executed directly in `packaging`, no
+   split.** Step 1 measurement: `python-api-workflow.md` block 1
+   (`pr.simulate(...)`, `n_electrons=450`, `n_electrons_brem=100`,
+   `n_families=4`, CPU backend) via `bash -c 'time uv run ...'` in the
+   worktree venv: 7.089s on a cold run that included `uv`'s
+   venv/dependency provisioning, then 2.223s and 2.475s on warm re-runs
+   (pure execution, ~2.6-2.9s wall including interpreter startup). This is
+   unambiguously cheap — nowhere near the "real Monte Carlo run per CI pass"
+   cost the *Execute* option above worried about. Given that, the
+   bind-check/`integration`-split design is unnecessary complexity for no
+   real savings: all 4 blocks now run sequentially as one accumulating
+   namespace (`beam`, `target`, `detector`, `result`, then `pr.Scene` /
+   `pr.Sweep` built from them) directly inside
+   `tests/dev/test_doc_blocks.py::test_python_api_workflow_executes_as_one_accumulating_namespace`,
+   which lives in the `packaging` suite alongside the CLI-block checks —
+   not registered in `INTEGRATION_TESTS`. This gives full fidelity
+   (`result.energy_eV`, `result.spectrum`, `result.background_energy_eV`,
+   `result.background`, `result.provenance`, `result.case`, and the
+   `Scene.expand()` / `Sweep.cases()` calls in blocks 2-4 are all exercised
+   for real, not just bind-checked) at negligible cost: the whole
+   `packaging` suite moved from 245 passed / 6.03s to 295 passed / 9.26s
+   (+50 tests, +~3.2s) after adding this task's full test file, of which
+   the Python-execution test is only part.
+2. **Settled — inline `<!-- verify: skip (reason) -->` immediately above the
+   fence.** Applied to exactly the 5 bash blocks with zero checkable
+   `pyrite`/`pyrite-dev` invocation lines: the `PYRITE_MC_BACKEND=cpu uv run
+   python my_simulation.py` block in `python-api-workflow.md` (illustrative
+   script invocation, not a `pyrite`/`pyrite-dev` command); the `rsync
+   login-node:...` block in `running-on-a-cluster.md` (rsync to a login
+   node, not a `pyrite`/`pyrite-dev` command); and the `uv tool install`,
+   `uv tool update-shell` + `exec "$SHELL"`, and `uv tool uninstall
+   pyrite-xray` blocks in `shell-completion.md` (uv tool environment
+   setup/teardown, not `pyrite`/`pyrite-dev` commands). The checker enforces
+   "no silent skips": every other bash block in `docs/guides/*.md` is either
+   checked (has at least one recognized invocation, each option validated)
+   or fails the test.
 3. **Settled — no new Sphinx extension.** `sphinx.ext.doctest` needs `>>>`
    prompts or `testcode`/`testoutput` directives; the guide blocks are plain
    fences with no expected output, so adopting it would mean rewriting the

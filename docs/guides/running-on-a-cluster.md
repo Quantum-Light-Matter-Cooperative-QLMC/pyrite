@@ -95,6 +95,7 @@ uv run pyrite run standard -m "${MATERIALS[$SLURM_ARRAY_TASK_ID]}"
 
 The checkpoints are the only output you need off the cluster:
 
+<!-- verify: skip (rsync to a login node, not a pyrite/pyrite-dev command) -->
 ```bash
 rsync -avz login-node:~/pyrite/checkpoints/ ./checkpoints/
 ```

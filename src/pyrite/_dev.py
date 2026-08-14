@@ -65,6 +65,7 @@ TEST_SUITE_PATTERNS = {
         "cli/test_reference.py",
         "detectors/test_package.py",
         "dev/test_dev.py",
+        "dev/test_doc_blocks.py",
         "materials/test_materials_package.py",
         "montecarlo/test_exports.py",
         "plots/test_exports.py",
