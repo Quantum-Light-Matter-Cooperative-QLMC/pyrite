@@ -2067,49 +2067,6 @@ wheels = [
 ]
 
 [[package]]
-name = "mcpl"
-version = "2.2.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "mcpl-core" },
-    { name = "mcpl-python" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/79/bb/d55aa1db89c397a94ae0d24c3ebdb40b4f611a38bd9196bcdeb831a859ba/mcpl-2.2.8.tar.gz", hash = "sha256:1362696b4c6f3c23cfe8b56f1eeb850b0e9889850167a1eec128f1449d3c8a52", size = 6791, upload-time = "2026-02-18T15:49:55.954Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/52/6b/2c1cf41b550f9e1c5fcb1011a2ec822c491305d98182008d1e6dc1f83acd/mcpl-2.2.8-py3-none-any.whl", hash = "sha256:0e0c04e2f4d85d3171250d0e747aa583201e754f91cb5083eee5a708443aa723", size = 6822, upload-time = "2026-02-18T15:49:30.488Z" },
-]
-
-[[package]]
-name = "mcpl-core"
-version = "2.2.8"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/2f/4f/2cafc9958b2861a6cdde968ef4026dab86c2ac961cf9e204c4c0a9ed4b07/mcpl_core-2.2.8.tar.gz", hash = "sha256:9dea5b722aee98f456690fc6b66d2cb785291ca020f3b5d9d30ec236ee45803f", size = 89155, upload-time = "2026-02-18T15:49:56.829Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/00/4e96db3e06c0ab93b707a84f7d1d9f954d7a0278ab7297c06490e4220390/mcpl_core-2.2.8-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:5e8645186932508a6b86300efe29177c2ee66f6c14b198d4f3fcdc2d8a6b58e2", size = 122675, upload-time = "2026-02-18T15:49:31.564Z" },
-    { url = "https://files.pythonhosted.org/packages/e8/f5/17d42fbf0b179df45dd7eae2aaf3c1f8b2e1c6bb976be95b38e17d64f078/mcpl_core-2.2.8-py3-none-macosx_11_0_arm64.whl", hash = "sha256:c413d09b32e842aedf10a126dde08d29e50028edd34c24cdf1182beac3c008a1", size = 118014, upload-time = "2026-02-18T15:49:32.696Z" },
-    { url = "https://files.pythonhosted.org/packages/5b/c1/d48c3898c11713dd2cd4b8abd78bdaf98f02ef569dbaa5ca64506511fd65/mcpl_core-2.2.8-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e9e94bab14b27cd75d08fb71140e2cc37f627e9b38a4b61e77c5f79c4ffb1c35", size = 135927, upload-time = "2026-02-18T15:49:33.756Z" },
-    { url = "https://files.pythonhosted.org/packages/31/4c/d84f164e101feeaa0e67ac6a1e933064e70bb94973f28a261a6354e4b977/mcpl_core-2.2.8-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:58ae34e6c51e86174769d4a11a8a6976b70fd9a7eb855d43136d2ba6e0ee87a6", size = 130068, upload-time = "2026-02-18T15:49:35.28Z" },
-    { url = "https://files.pythonhosted.org/packages/3a/2a/d19142c1be6ea226a477afcd8916a3ed66a6fb68ff27600e2a9928509bcf/mcpl_core-2.2.8-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ab7bed1e93b97ae5654cbb976fe95c9b3e47694987a74bb98ebf99402aadb1cf", size = 135720, upload-time = "2026-02-18T15:49:36.37Z" },
-    { url = "https://files.pythonhosted.org/packages/4e/ae/a2f6eb7a7fd2784759c9f0f51ade67e3151ae50b27e09895720f210a1685/mcpl_core-2.2.8-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:d687252f633de7be6aea44b2e71ed8d146a9d968d0b287a6a3ec72bef4c44b33", size = 133287, upload-time = "2026-02-18T15:49:37.88Z" },
-    { url = "https://files.pythonhosted.org/packages/95/1b/c9eaa785226aec37074755fa093000d0edb38fba2aca01c098a38d758687/mcpl_core-2.2.8-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:00df3b996aefdd89b4c72a9af3098be3b3df488a515970983b88b54e9202a8f8", size = 138008, upload-time = "2026-02-18T15:49:39.37Z" },
-    { url = "https://files.pythonhosted.org/packages/a2/f9/19b19cce87631c7f6c34350ffc1b545bb27a0b96507162f7e0fbffc000d6/mcpl_core-2.2.8-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:183ad5962c97d6e30c54aa3c9f463ea12e786eaa595aaa36f7e0acaf12343a77", size = 137945, upload-time = "2026-02-18T15:49:40.772Z" },
-    { url = "https://files.pythonhosted.org/packages/87/06/42b497da036406c19afd1a64a776fa0c85ee731e4e5af8e9accab47a298e/mcpl_core-2.2.8-py3-none-win_amd64.whl", hash = "sha256:41569c34454343166a94b17b8f5bdfbbcc5de9973d06f736328506331f0e429a", size = 184440, upload-time = "2026-02-18T15:49:41.907Z" },
-    { url = "https://files.pythonhosted.org/packages/7f/94/f7ecf39257eb8a1ce38083cf1db9e1608a4299e70d4d7c16969a17f5a64d/mcpl_core-2.2.8-py3-none-win_arm64.whl", hash = "sha256:977a1defd8a8b1b92d237c0aa4b847ad51566b94892f56ce0f02d9783bcec218", size = 167721, upload-time = "2026-02-18T15:49:43.084Z" },
-]
-
-[[package]]
-name = "mcpl-python"
-version = "2.2.8"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/93/af/974cd20fef547de2f7e4c1649df0db2b33c260b9be9bb3b7df331352ed30/mcpl_python-2.2.8.tar.gz", hash = "sha256:b79cabf96a8fc90c38a7cbd275d80e757d0a3ee7420f32bff4b057accd8e9315", size = 29336, upload-time = "2026-02-18T15:49:58.562Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/aa/c2/ec4838df2127bf8d60e78e2a817d6ca643f9305bb0521caf29aa16a0b0f5/mcpl_python-2.2.8-py3-none-any.whl", hash = "sha256:1cebbe563155152767e9c93f59ca70f15167e8e996d0d7675a5b98fce20b466d", size = 30395, upload-time = "2026-02-18T15:49:54.996Z" },
-]
-
-[[package]]
 name = "mdit-py-plugins"
 version = "0.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3380,7 +3337,6 @@ dependencies = [
     { name = "click" },
     { name = "crystals" },
     { name = "h5py" },
-    { name = "mcpl" },
     { name = "numba" },
     { name = "numpy" },
     { name = "pandas" },
@@ -3471,7 +3427,6 @@ requires-dist = [
     { name = "dpctl", marker = "extra == 'intel'", specifier = ">=0.22.1" },
     { name = "dpnp", marker = "extra == 'intel'", specifier = ">=0.20.0" },
     { name = "h5py", specifier = ">=3.16.0" },
-    { name = "mcpl", specifier = ">=2.2.8" },
     { name = "mp-api", marker = "extra == 'external-db'", specifier = ">=0.46" },
     { name = "numba", specifier = ">=0.66.0" },
     { name = "numpy", specifier = ">=2.4.6" },

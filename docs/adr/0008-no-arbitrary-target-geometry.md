@@ -2,7 +2,31 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-13
+- **Amended:** 2026-08-14 — interoperability remains the downstream strategy;
+  MCPL is no longer preselected or required
 - **Context source:** {ref}`core architecture RFC, Non-goals <sec-core-arch-nongoals>`
+
+## Amendment: do not preselect an interchange format
+
+The original decision named required MCPL export as the interoperability escape
+hatch. Implementation review found that PyRITE stores energy-binned spectral
+tallies, not photon phase-space records. A valid MCPL particle requires semantics
+for position, direction, energy, time, polarization, and statistical weight;
+inventing those fields during export would turn a format adapter into an
+unreviewed source model.
+
+Interoperability remains the sanctioned downstream strategy, but no format is
+preselected or required. Work must start from a concrete consumer and define a
+format-neutral `PhotonSource` contract, including reference surface, joint
+phase-space distribution, normalization, provenance, and closure tests. Only
+then should the project select and test an adapter. MCPL remains a strong
+candidate for Geant4, OpenMC, MCNP/PHITS, and McStas/McXtrace workflows.
+
+This does not weaken the geometry non-goal. An interchange adapter can hand a
+defined photon source to another transport code; it cannot make arbitrary
+target geometry affect electron transport and coherent photon production inside
+PyRITE. The MCPL-specific wording below records the original decision and is
+superseded by this amendment.
 
 ## Context
 
@@ -35,11 +59,12 @@ register pressure, and the response was a
 [GPU-friendly surface model](https://www.epj-conferences.org/articles/epjconf/abs/2025/22/epjconf_chep2025_01207/epjconf_chep2025_01207.html)
 in VecGeom — a substantial project in its own right.
 
-Interoperability, not generality, is the sanctioned answer to a user who needs
-arbitrary geometry: MCPL export lets a code that has already solved general
-geometry consume PyRITE's emitted photons. MCPL is therefore a required
-dependency rather than an optional extra — an optional escape hatch would
-weaken this non-goal.
+Interoperability, not generality, was the sanctioned answer to a user who needs
+arbitrary geometry. The original decision specified required MCPL export so a
+code that has already solved general geometry could consume PyRITE's emitted
+photons. The 2026-08-14 amendment retains interoperability but defers the format
+until PyRITE has a scientifically defined photon-source boundary and a concrete
+consumer.
 
 ### The seam, named but not built
 
@@ -64,9 +89,8 @@ whole of the forward plan; nothing in the current design builds toward it.
 - `Target.lower()` can stay a total function over a closed set with no dispatch
   protocol or plugin registry.
 - The transport kernels keep their specialized, divergence-free boundary logic.
-- Users needing arbitrary geometry are routed to MCPL export, and the backlog
-  item on complex geometry and interoperability is scoped to that
-  interoperability work — import of STL/STEP as PyRITE simulation geometry is
-  out of scope under this ADR.
+- Users needing arbitrary downstream geometry are routed to future
+  interoperability work driven by a concrete consumer. Import of STL/STEP as
+  PyRITE simulation geometry remains out of scope under this ADR.
 - Reversing this decision requires a superseding ADR, and the seam above is the
   interface it would have to implement.

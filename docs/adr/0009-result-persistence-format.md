@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-13
+- **Revised:** 2026-08-14 — defer interchange format selection
 - **Context source:** core architecture RFC, Change 6
 
 ## Context
@@ -30,17 +31,16 @@ those files. Evidence that only one program can read, and only while that
 program's dependencies stay pinned, is weak evidence.
 
 Separately, ADR-0008 declines to build a general geometry system and routes
-users who need one to interoperability instead. That promise needs a format.
+downstream transport needs to interoperability. That strategy eventually needs
+a source contract and an adapter, but neither is a result-persistence concern.
 
 ## Decision
 
 **Array payloads are stored as HDF5**, under a versioned schema documented at
 {doc}`../repo-design/storage/result-schema`.
 
-**`mcpl` and `h5py` are required dependencies**, not extras.
-
-**MCPL is the interchange export** for emitted photons, written through the
-official `libmcpl` C writer.
+**`h5py` is a required dependency.** No interchange-format dependency is added
+by this decision.
 
 ### HDF5, not Zarr
 
@@ -59,19 +59,24 @@ The decision is atomicity and blob semantics. Reader popularity is not the
 argument — though HDF5 also happens to be what `h5py`, MATLAB, Julia, IDL, and
 `h5dump` already read.
 
-### `mcpl`, the full meta-package, required
+### Interchange format deferred
 
-`mcpl-core` ships prebuilt wheels for macOS x86-64 and arm64, manylinux x86-64
-and aarch64, musllinux, and Windows amd64 and arm64. `mcpl-python` is pure
-Python needing only `numpy>=1.22`. Both are Apache-2.0.
+The RFC originally selected required MCPL export. Inspection during
+implementation showed that the stored result is an energy-binned spectral
+tally, not an emitted-photon list. It contains no joint position, direction,
+energy, time, polarization, and statistically normalized weight record. Writing
+MCPL from it would require a new source estimator or a documented lossy
+projection; neither is a file-format operation.
 
-There is no build risk for an extra to hedge against. And a conditionally
-available escape hatch would weaken the non-goal it exists to justify: ADR-0008
-answers "can another code model our detector?" with "export MCPL", and that
-answer cannot be contingent on how the user installed PyRITE.
+Interchange work is therefore deferred and ordered explicitly:
 
-Do not split it into `mcpl-python` alone to save a wheel. `mcpl-python` is a
-*reader*; the writer lives in `libmcpl`, which only `mcpl-core` ships.
+1. Identify a concrete downstream consumer and its transport boundary.
+2. Define a format-neutral `PhotonSource` contract and physical closure tests.
+3. Select and test the adapter that matches that workflow.
+
+MCPL remains a strong candidate when the consumer is Geant4, OpenMC,
+MCNP/PHITS, or McStas/McXtrace. It is not required until such a workflow and
+source-state contract justify it.
 
 ### The filename does not change
 
@@ -104,9 +109,9 @@ layout.
 - Control-plane state is untouched. Job records and remote lifecycle state are
   not pickled today (the campaign lock is already JSON), so there is nothing to
   convert and no decision owed here.
-- MCPL export is a lossy *projection*, not a serialisation of the result. It
-  carries what MCPL's particle record can carry. The schema document names every
-  field that does not survive.
+- Result persistence does not fabricate particle phase space. A future
+  interchange adapter is owned by the format-neutral photon-source boundary,
+  not by this HDF5 schema.
 - Reversing this requires a superseding ADR. The pickle reader would remain
   regardless — it is permanent by the decision above, independent of what new
   writes use.
