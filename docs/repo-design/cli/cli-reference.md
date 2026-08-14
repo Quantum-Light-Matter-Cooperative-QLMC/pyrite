@@ -1482,7 +1482,7 @@ Commands:
 ```text
 Usage: pyrite material energy-grid derive [OPTIONS]
 
-  Derive line and bremsstrahlung energy-grid bounds locally or remotely.
+  Derive and install line and bremsstrahlung grids locally or remotely.
 
 Options:
   --material KEY,...        Material keys; comma-separated. Omit to use persistent
@@ -1503,6 +1503,8 @@ Options:
                             connect or submit.
   --wait                    Wait for remote completion and pull the result.
   --detach                  Return after remote submission.
+  --profile NAME            Install derived grids for profile NAME; precedence: flag >
+                            configuration > standard.
   -R, --remote [TARGET]     Run remotely; bare uses the configured target, =TARGET
                             overrides it.
   -h, --help                Show this message and exit.

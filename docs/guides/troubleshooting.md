@@ -17,10 +17,12 @@ support. See the [catalog schema](../repo-design/materials-catalog-schema.md).
 ## A run asks for an energy grid
 
 The selected profile/material lacks a verified immutable line-grid reference.
-Select the profile through `PYRITE_PROFILE` or persistent configuration, run
-`pyrite material energy-grid derive`, add the returned JSON to that profile with
-`pyrite-dev energy-grid add --profile NAME`, then run `pyrite-dev energy-grid
-verify`. Do not paste
+Run `pyrite material energy-grid derive --profile NAME`; add `--remote` for the
+configured compute host. A successful attached derivation installs immutable
+artifacts and repoints that profile automatically. Then run `pyrite-dev
+energy-grid verify`. Detached submission returns before installation; attach to
+the job for progress, then rerun without `--detach` to resume, pull, and install.
+Do not paste
 survey-cropped bounds into the catalog; fidelity reduction happens later.
 
 ## A run does not resume the checkpoint I expected

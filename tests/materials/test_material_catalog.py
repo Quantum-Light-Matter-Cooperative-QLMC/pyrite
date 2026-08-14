@@ -363,7 +363,7 @@ crystal = "mos2"
     assert "2 paths (materials.sample_a.scan, materials.sample_b.scan)" in message
     assert (
         "run `pyrite material energy-grid derive "
-        "--energy 25.0,30.0 --material sample_a,sample_b`"
+        "--energy 25.0,30.0 --material sample_a,sample_b --profile standard`"
     ) in message
 
 
@@ -398,7 +398,7 @@ materials = ["sample_a"]
     assert "materials.sample_b.scan" not in message
     assert (
         "run `pyrite material energy-grid derive "
-        "--energy 35.0 --material sample_a`"
+        "--energy 35.0 --material sample_a --profile narrowed`"
     ) in message
 
 

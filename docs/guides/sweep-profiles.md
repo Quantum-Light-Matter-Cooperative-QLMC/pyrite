@@ -28,8 +28,8 @@ campaign compatibility surfaces rather than the supported library entry point.
 
 `pyrite material energy-grid derive`, locally or with `--remote`, is upstream
 of this choice: it measures catalog-ready line and bremsstrahlung bounds
-without a fidelity setting. `pyrite-dev energy-grid add` stores those full
-bounds. Later
+without a fidelity setting and installs those full bounds for `--profile NAME`
+(or the configured current profile). Later
 `pyrite run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.
 

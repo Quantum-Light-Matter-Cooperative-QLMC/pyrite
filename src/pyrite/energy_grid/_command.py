@@ -168,7 +168,7 @@ def command():
 
     \b
     Examples:
-      pyrite material energy-grid derive --material mose2,wse2 --energy 30,60
+      pyrite material energy-grid derive --material mose2,wse2 --energy 30,60 --profile survey
       pyrite material energy-grid derive --material mose2 --remote --dry-run
       pyrite material energy-grid show mose2
     """
@@ -208,6 +208,13 @@ def brem_command():
 )
 @click.option("--wait", is_flag=True, help="Wait for remote completion and pull the result.")
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
+@click.option(
+    "--profile",
+    "catalog_profile",
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_profile,
+    help="Install derived grids for profile NAME; precedence: flag > configuration > standard.",
+)
 @remote_option
 @click.pass_context
 def derive_command(
@@ -224,9 +231,10 @@ def derive_command(
     dry_run,
     wait,
     detach,
+    catalog_profile,
     remote_target,
 ):
-    """Derive line and bremsstrahlung energy-grid bounds locally or remotely."""
+    """Derive and install line and bremsstrahlung grids locally or remotely."""
     if wait and detach:
         raise click.UsageError("--wait and --detach are mutually exclusive")
     remote_only = {
@@ -247,7 +255,14 @@ def derive_command(
                 f"remote-only option(s) require -R/--remote: {', '.join(explicit)}"
             )
         return _derive_local(
-            materials, energies, tilts, azimuths, thickness, set_default, brem_step
+            materials,
+            energies,
+            tilts,
+            azimuths,
+            thickness,
+            set_default,
+            brem_step,
+            _cli_config.resolve("profile.current", catalog_profile).value,
         )
     return _derive_remote(
         materials=materials,
@@ -263,10 +278,13 @@ def derive_command(
         detach=detach,
         remote_target=remote_target,
         persist_local=True,
+        catalog_profile=_cli_config.resolve("profile.current", catalog_profile).value,
     )
 
 
-def _derive_local(materials, energies, tilts, azimuths, thickness, set_default, brem_step):
+def _derive_local(
+    materials, energies, tilts, azimuths, thickness, set_default, brem_step, catalog_profile
+):
     from pyrite.energy_grid import derive
 
     argv = []
@@ -283,7 +301,18 @@ def _derive_local(materials, energies, tilts, azimuths, thickness, set_default, 
         argv.extend(("--brem-step", str(brem_step)))
     if set_default:
         argv.append("--set-default")
-    return _invoke_callback(derive.main, argv)
+    argv.extend(("--json-out", job.DEFAULT_JSON_OUT))
+    _invoke_callback(derive.main, argv)
+    _install_derived(job.DEFAULT_JSON_OUT, catalog_profile)
+    return 0
+
+
+def _install_derived(path: str, catalog_profile: str) -> None:
+    try:
+        apply.add_file(path, profile=catalog_profile)
+    except (KeyError, ValueError, OSError) as exc:
+        _expected_failure(exc)
+    emit_result(f"installed derived grids for profile {catalog_profile}")
 
 
 def _derive_remote(
@@ -301,6 +330,7 @@ def _derive_remote(
     detach,
     remote_target,
     persist_local,
+    catalog_profile,
 ):
     from pyrite.remote.config import override_remote_host
 
@@ -354,7 +384,9 @@ def _derive_remote(
             return 0
         if not remote._job_succeeded(jobid):
             raise CLIError("energy-grid derivation failed; skipping automatic pull")
-        emit_result(f"pulled {_pull_combined()}")
+        path = _pull_combined()
+        emit_result(f"pulled {path}")
+        _install_derived(path, catalog_profile)
     return 0
 
 
@@ -400,6 +432,7 @@ def submit_command(
         detach=True,
         remote_target="__configured__",
         persist_local=False,
+        catalog_profile="standard",
     )
 
 

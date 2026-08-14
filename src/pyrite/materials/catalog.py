@@ -69,7 +69,7 @@ _MISSING_LINE_GRID_RE = re.compile(
 )
 
 
-def _derive_hint(message: str, paths: Sequence[str]) -> str | None:
+def _derive_hint(message: str, paths: Sequence[str], profile: str | None) -> str | None:
     """A canonical energy-grid derivation suggestion for the affected materials when
     ``message`` is the missing-line-grid error, else ``None`` (TODO.md Bugs
     #3: point the user at the fix, not just the failure)."""
@@ -85,13 +85,16 @@ def _derive_hint(message: str, paths: Sequence[str]) -> str | None:
     if not materials:
         return None
     material_arg = ",".join(materials)
+    profile_arg = f" --profile {profile}" if profile is not None else ""
     return (
         "run `pyrite material energy-grid derive "
-        f"--energy {energies} --material {material_arg}`"
+        f"--energy {energies} --material {material_arg}{profile_arg}`"
     )
 
 
-def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[str]:
+def _grouped_error_lines(
+    errors: Sequence[str], *, profile: str | None = None, max_paths: int = 3
+) -> list[str]:
     """Collapse identical-message errors across many material paths into one
     summary line each. A profile-wide setting invalid for every material
     (e.g. a beam energy with no material's line-grid store covering it)
@@ -116,7 +119,7 @@ def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[s
             shown_text = ", ".join(shown)
             suffix = f", +{remainder} more" if truncated else ""
             line = f"{len(paths)} paths ({shown_text}{suffix}): {message}"
-        hint = _derive_hint(message, paths)
+        hint = _derive_hint(message, paths, profile)
         if hint is not None:
             line = f"{line} -- {hint}"
         lines.append(line)
@@ -126,11 +129,13 @@ def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[s
 class MaterialConfigError(ValueError):
     """One or more path-qualified material catalog errors."""
 
-    def __init__(self, errors: Sequence[str]):
+    def __init__(self, errors: Sequence[str], *, profile: str | None = None):
         self.errors = tuple(errors)
         super().__init__(
             "invalid material catalog:\n"
-            + "\n".join(f"- {e}" for e in _grouped_error_lines(self.errors))
+            + "\n".join(
+                f"- {e}" for e in _grouped_error_lines(self.errors, profile=profile)
+            )
         )
 
 
@@ -1581,7 +1586,7 @@ def _load_material_catalog_cached(
         profile_name=profile,
     )
     if errors.items:
-        raise MaterialConfigError(errors.items)
+        raise MaterialConfigError(errors.items, profile=profile)
     _warn_missing_mott(materials, crystals, media)
     profile_memberships = {
         name: tuple(cast("list[str]", row["materials"]))
@@ -1605,7 +1610,7 @@ def _load_material_catalog_cached(
         elif isinstance(beam_value, Mapping):
             profile_beams[name] = MappingProxyType(dict(cast("Mapping[str, object]", beam_value)))
     if errors.items:
-        raise MaterialConfigError(errors.items)
+        raise MaterialConfigError(errors.items, profile=profile)
     profile_detectors = {
         name: cast("Detector", row["detector"])
         for name, row in profiles.items()

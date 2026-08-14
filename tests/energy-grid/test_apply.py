@@ -103,7 +103,7 @@ def test_apply_file_writes_and_validates(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == (
-        "warning: material catalog changed; golden is now stale; run `cxr energy-grid regen-golden`\n"
+        "warning: material catalog changed; golden is now stale; run `pyrite-dev regen-golden`\n"
     )
 
 
@@ -117,7 +117,7 @@ def test_add_file_writes_deduplicated_artifact_and_only_repoints_profile(
     toml_path.write_text(BASE_TOML)
     json_path.write_text(_json.dumps(COMBINED))
     monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
-    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path, **kwargs: None)
 
     refs = apply.add_file(json_path, catalog_path=toml_path)
     digest = refs["hopg"]
@@ -138,6 +138,36 @@ def test_add_file_writes_deduplicated_artifact_and_only_repoints_profile(
     assert refs_again == refs
     assert artifacts.inventory_artifacts(tmp_path / "energy-grid-artifacts") == (digest,)
     assert "added hopg ->" in capsys.readouterr().out
+
+
+def test_add_file_keeps_named_profile_beam_energies(tmp_path, monkeypatch):
+    from pyrite.energy_grid import artifacts
+
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    named = BASE_TOML.replace(
+        "[energy_grids.hopg]",
+        "[profiles.hopg_hbn]\n"
+        'materials = ["hopg"]\n'
+        "energy_keV = { values = [30.0, 35.0, 40.0] }\n\n"
+        "[energy_grids.hopg]",
+    )
+    toml_path.write_text(named)
+    combined = _json.loads(_json.dumps(COMBINED))
+    combined["hopg"]["line_rows"] = [
+        {"energy_keV": 35.0, "start_eV": 10.0, "stop_eV": 2900.0, "num": 964}
+    ]
+    json_path.write_text(_json.dumps(combined))
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path, **kwargs: None)
+
+    digest = apply.add_file(
+        json_path, catalog_path=toml_path, profile="hopg_hbn"
+    )["hopg"]
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
+
+    assert stored.identity["beam_energies_keV"] == [30.0, 35.0, 40.0]
+    assert [row["energy_keV"] for row in stored.identity["line_rows"]] == [30.0, 35.0, 100.0]
 
 
 def test_add_file_dry_run_writes_no_artifact_or_catalog(tmp_path, monkeypatch, capsys):
@@ -162,7 +192,7 @@ def test_add_file_preserves_manual_row_from_referenced_artifact(tmp_path, monkey
     json_path = tmp_path / "combined.json"
     toml_path.write_text(BASE_TOML)
     json_path.write_text(_json.dumps(COMBINED))
-    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path, **kwargs: None)
     monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
     monkeypatch.setattr(
         apply._provenance, "is_manual_line", lambda material, energy, **kwargs: False

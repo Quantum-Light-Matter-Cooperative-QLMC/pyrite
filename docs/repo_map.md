@@ -120,7 +120,9 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 - **`pyrite material energy-grid derive [-R[=TARGET]]`** →
   `energy_grid._command` → local
   derivation or the existing sliced SSH/SLURM grid job. Remote derivation waits
-  and pulls its JSON by default; `--detach` returns after submission. Hidden
+  and pulls its JSON by default, then installs immutable artifacts and repoints
+  `--profile NAME` (or the configured current profile); local completion does
+  the same. `--detach` returns after submission without installing. Hidden
   compatibility aliases remain hidden below `pyrite energy-grid`.
 - **`pyrite material energy-grid show|line show|brem show`** and **`pyrite
   profile energy-grid defaults`** → `energy_grid._command`: inspect resolved

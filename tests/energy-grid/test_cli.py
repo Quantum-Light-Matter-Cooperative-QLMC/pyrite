@@ -253,11 +253,21 @@ def test_click_derive_forwards_brem_step(monkeypatch):
     from pyrite.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda argv: seen.update(argv=argv) or 0)
+    monkeypatch.setattr(
+        energy_grid.apply, "add_file", lambda path, **kwargs: seen.update(path=path, **kwargs)
+    )
 
-    result = _invoke_grid(["derive", "--brem-step", "12.5"])
+    result = _invoke_grid(["derive", "--brem-step", "12.5", "--profile", "survey"])
 
-    assert_clean_result(result)
-    assert seen["argv"] == ["--brem-step", "12.5"]
+    assert_clean_result(result, stdout="installed derived grids for profile survey\n")
+    assert seen["argv"] == [
+        "--brem-step",
+        "12.5",
+        "--json-out",
+        energy_grid.job.DEFAULT_JSON_OUT,
+    ]
+    assert seen["path"] == energy_grid.job.DEFAULT_JSON_OUT
+    assert seen["profile"] == "survey"
 
 
 def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
@@ -273,15 +283,34 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
     )
     monkeypatch.setattr(_command.remote, "_job_succeeded", lambda jobid: jobid == "job7")
     monkeypatch.setattr(_command, "_pull_combined", lambda: "bounds.json")
-
-    result = _invoke_grid(
-        ["derive", "--remote=box-a", "--wait", "--brem-step", "12.5"],
+    monkeypatch.setattr(
+        energy_grid.apply, "add_file", lambda path, **kwargs: seen.update(path=path, **kwargs)
     )
 
-    assert_clean_result(result, stdout="pulled bounds.json\n")
+    result = _invoke_grid(
+        [
+            "derive",
+            "--remote=box-a",
+            "--wait",
+            "--brem-step",
+            "12.5",
+            "--profile",
+            "hopg_hbn",
+        ],
+    )
+
+    assert_clean_result(
+        result,
+        stdout=(
+            "pulled bounds.json\n"
+            "installed derived grids for profile hopg_hbn\n"
+        ),
+    )
     assert seen["host"] == "box-a"
     assert seen["brem_step"] == 12.5
     assert seen["attached"] == "job7"
+    assert seen["path"] == "bounds.json"
+    assert seen["profile"] == "hopg_hbn"
     assert remote_config.remote_host() == "configured-box"
 
 
@@ -422,7 +451,9 @@ def test_click_apply_alias_adds_artifact_without_touching_legacy_payload(tmp_pat
     )
     # BASE_TOML is a single-material stub, so skip the full-catalog re-parse the
     # way the other add_file tests do; production still validates the real one.
-    monkeypatch.setattr(energy_grid.apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(
+        energy_grid.apply, "load_material_catalog", lambda path, **kwargs: None
+    )
 
     result = _invoke_grid(["apply", str(json_path)])
 

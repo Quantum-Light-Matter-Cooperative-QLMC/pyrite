@@ -310,6 +310,23 @@ def _set_profile_refs(document, profile: str, refs: dict[str, str]) -> None:
         table[material] = digest
 
 
+def _profile_beam_energies(document, profile: str, material: str) -> list[float]:
+    """Return the profile-owned beam energies for one artifact identity."""
+    selected = _profile_row(document, profile)
+    standard = _profile_row(document, "standard")
+    overrides = selected.get("overrides", {})
+    override = overrides.get(material, {}) if isinstance(overrides, Mapping) else {}
+    descriptor = override.get("energy_keV") if isinstance(override, Mapping) else None
+    if descriptor is None:
+        descriptor = selected.get("energy_keV", standard.get("energy_keV"))
+    values = descriptor.get("values") if isinstance(descriptor, Mapping) else None
+    if not isinstance(values, list):
+        raise ValueError(
+            f"profile {profile!r} energy_keV must be a values grid before adding artifacts"
+        )
+    return [_positive_float(value, f"profiles.{profile}.energy_keV") for value in values]
+
+
 def add_file(
     json_path,
     *,
@@ -382,7 +399,7 @@ def add_file(
             material,
             rows,
             brem,
-            [row["energy_keV"] for row in rows],
+            _profile_beam_energies(document, profile, material),
         )
 
     refs = {
@@ -397,7 +414,7 @@ def add_file(
 
     for identity in identities.values():
         artifacts.write_artifact(store_root, identity)
-    _validate_catalog_text(path, new_text)
+    _validate_catalog_text(path, new_text, profile=profile)
     if path.read_text() != original:
         raise ValueError("material catalog changed while adding artifacts; rerun command")
     _atomic_write(path, new_text)
@@ -639,7 +656,7 @@ def _atomic_write(path, text):
         raise
 
 
-def _validate_catalog_text(path, text):
+def _validate_catalog_text(path, text, *, profile: str | None = None):
     """Validate candidate catalog from a temporary file, without replacing live data."""
     loader = load_material_catalog
     if loader is None:
@@ -650,7 +667,10 @@ def _validate_catalog_text(path, text):
     try:
         with os.fdopen(fd, "w") as f:
             f.write(text)
-        loader(Path(tmp))
+        if profile is None:
+            loader(Path(tmp))
+        else:
+            loader(Path(tmp), profile=profile)
     finally:
         try:
             os.remove(tmp)
@@ -683,7 +703,7 @@ def _print_diff(original, new_text):
 
 def _warn_stale_golden():
     print(
-        "warning: material catalog changed; golden is now stale; run `cxr energy-grid regen-golden`",
+        "warning: material catalog changed; golden is now stale; run `pyrite-dev regen-golden`",
         file=sys.stderr,
     )
 
