@@ -68,17 +68,17 @@ as result payload, control-plane state, or incidental.
       Evidence: [`pickle-inventory.md`](pickle-inventory.md) — 15 modules
       classified; 4 payload, 2 control-plane, 9 incidental; all persistence
       funnels through `_checkpoint_io`.
-- [ ] B — Add `h5py` and `mcpl` as required dependencies; write the
+- [x] B — Add `h5py` and `mcpl` as required dependencies; write the
       result-format ADR recording the HDF5 decision and its reasoning.
-- [ ] C — Write the versioned schema document under `docs/repo-design/storage/`,
+- [x] C — Write the versioned schema document under `docs/repo-design/storage/`,
       including dataset names, dtypes, units, and the `identity_version` /
       `schema_version` fields.
-- [ ] D — Writer for the new format; reader dispatching on format.
-- [ ] E — Reader shim for `.pkl`, permanent. Opportunistic rewrite on next save.
+- [x] D — Writer for the new format; reader dispatching on format.
+- [x] E — Reader shim for `.pkl`, permanent. Opportunistic rewrite on next save.
 - [ ] F — MCPL export for the emitted photon list. Validate with `mcpltool`.
-- [ ] G — Optional: MCPL export of the transport segment list, if slice F's
-      design makes it near-free. Drop it otherwise.
-- [ ] H — Update the two storage design pages and `docs/repo_map.md`.
+- [x] G — Dropped: transport segments are transient kernel inputs and are not
+      persisted; exporting them is not near-free.
+- [x] H — Update the two storage design pages and `docs/repo_map.md`.
 
 ## Decisions and open questions
 
@@ -113,6 +113,29 @@ as result payload, control-plane state, or incidental.
   weight, and polarization. Confirm PyRITE's emitted-photon record maps onto
   that without loss, and document any field that does not survive the round
   trip.
+- **Blocked after inspection:** PyRITE has no emitted-photon record. The runner
+  persists only energy-binned spectra plus aggregate metadata; emission
+  positions, individual directions, times, and polarization are discarded
+  before checkpoint assembly. An MCPL projection would therefore require a new
+  sampling/estimator contract and would invent or choose phase-space fields.
+  Slice F cannot be implemented losslessly without a scope/design decision.
+  The minimum upstream decision is either (1) specify an owning phase-space
+  estimator that retains photon position, direction, energy, time,
+  polarization, and statistically normalized weight, or (2) explicitly redefine
+  F as a lossy weighted spectral-bin projection and specify every default field
+  plus its normalization. This task does neither implicitly.
+
+## Implementation evidence (2026-08-13)
+
+- `252fd46` — required h5py/MCPL dependencies and ADR-0009.
+- `4bb595f` — schema-version-1 HDF5 writer, signature dispatch, permanent
+  plain/gzip/zstd pickle readers, h5py-independent-inspection regression, and
+  bit-for-bit spectrum regression.
+- Focused checkpoint/run/analysis regression surface: 221 passed.
+- `pyrite-dev lint`, `pyrite-dev typecheck`, `pyrite-dev repo-map --check`, and
+  `pyrite-dev docs`: passed.
+- MCPL validation: blocked; no scientifically defined photon phase-space record
+  exists to export. No synthetic/fabricated particle records were written.
 
 ## Delegation slices and required skills
 

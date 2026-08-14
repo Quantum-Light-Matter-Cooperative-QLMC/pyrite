@@ -33,6 +33,10 @@ refer to those immutable blobs and retain per-dataset derived metadata. The
 cache can therefore reuse a case across datasets while recomputing requester-
 specific scale and reporting values.
 
+Current array leaves use [HDF5 result schema version 1](result-schema.md). Its
+root records `identity_version = 1` for independent inspection, while the
+manifest remains authoritative for the full resolved dataset identity.
+
 ## Workspace layout
 
 ```text

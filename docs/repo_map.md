@@ -149,7 +149,7 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   submitter metadata to `run|grid|recompute|validate`; destructive stop targets
   exactly one job ID, profile, or all live jobs.
 - **`pyrite slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
-  `results.slim_results`: shrink checkpoint pickle for transfer (drop
+  `results.slim_results`: shrink a checkpoint HDF5 artifact for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's
   current-grid configs).
 - **`pyrite archive`/`restore`/`archives`/`union`** → `archive:*`: local
@@ -426,9 +426,20 @@ Component storage adapter: active datasets live under
 in-memory result records, and migrate legacy `checkpoints/<stem>.pkl` stores on
 next save. Shared case blobs live at
 `checkpoints/<material>/<first2hex>/<content-key>.pkl` and use atomic writes.
+The `.pkl` suffix remains a layout token; current bytes use the versioned HDF5
+schema.
 - Internal: `discover`, `load`, `save`, `signature`, `cas_contains`,
   `cas_load`, `cas_save`, component/path helpers.
 - Deps: `_checkpoint_io`, NumPy.
+
+### `checkpoints/_checkpoint_io.py`
+Result leaf codec. New writes use `pyrite.result` HDF5 schema version 1 with
+portable per-array gzip filters. Reads sniff bytes and permanently dispatch
+across current HDF5 plus legacy zstd, gzip, and plain pickle generations.
+`dump_stream` stages seekable HDF5 output before copying it to remote-pull pipes.
+- Internal: `dump`, `dump_stream`, `load`; schema/version and compatibility
+  constants.
+- Deps: h5py, NumPy, stdlib compression/pickle compatibility readers.
 
 ### `runs/scan.py`
 Headless sweep driver: build cases → `run_sweep` → checkpoint; owns
@@ -750,7 +761,7 @@ and clear, remote validation jobs.
 - Public: `add_subparser`, `main`.
 
 ### `checkpoints/slim.py`
-`pyrite slim` subcommand — shrink checkpoint pickle for transfer (drop
+`pyrite slim` subcommand — shrink checkpoint HDF5 for transfer (drop
 full-range brem arrays, downcast spectra to float32, filter configs; `--grid`
 keep only material's current-grid configs).
 - Public: `slim_checkpoint`, `add_subparser`, `main`.
