@@ -47,7 +47,21 @@ def test_distribution_identity_exposes_canonical_and_compatibility_namespaces() 
 
 
 def test_root_exports_stay_frozen() -> None:
-    assert pyrite.__all__ == ["DATA_DIR", "__version__"]
+    assert pyrite.__all__ == [
+        "DATA_DIR",
+        "__version__",
+        "Analysis",
+        "Beam",
+        "Convergence",
+        "Detector",
+        "Numerics",
+        "Result",
+        "Scene",
+        "Slab",
+        "Stack",
+        "Sweep",
+        "simulate",
+    ]
 
 
 @pytest.mark.parametrize(("legacy_name", "canonical_name"), _COMPAT_MODULES.items())

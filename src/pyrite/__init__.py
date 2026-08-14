@@ -10,6 +10,7 @@ See the README for the scientific overview and CLAUDE.md for working conventions
 """
 
 import logging
+from typing import Any
 
 from ._compat import env_value
 from .paths import data_dir
@@ -36,4 +37,32 @@ if env_value("CXR_MC_DEBUG"):
     logger.addHandler(_handler)
     logger.setLevel(logging.DEBUG)
 
-__all__ = ["DATA_DIR", "__version__"]
+_PUBLIC_OBJECTS = {
+    "Analysis": ("pyrite.campaign.model", "Analysis"),
+    "Beam": ("pyrite.campaign.sweep", "BeamSpec"),
+    "Convergence": ("pyrite.campaign.model", "Convergence"),
+    "Detector": ("pyrite.detectors", "Detector"),
+    "Numerics": ("pyrite.campaign.model", "Numerics"),
+    "Result": ("pyrite.results.model", "Result"),
+    "Scene": ("pyrite.campaign.model", "Scene"),
+    "Slab": ("pyrite.campaign.geometry", "Slab"),
+    "Stack": ("pyrite.campaign.geometry", "Stack"),
+    "Sweep": ("pyrite.campaign.model", "Sweep"),
+    "simulate": ("pyrite.api", "simulate"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve the public simulation surface lazily."""
+    try:
+        module_name, attribute = _PUBLIC_OBJECTS[name]
+    except KeyError as exc:
+        raise AttributeError(name) from exc
+    from importlib import import_module
+
+    value = getattr(import_module(module_name), attribute)
+    globals()[name] = value
+    return value
+
+
+__all__ = ["DATA_DIR", "__version__", *_PUBLIC_OBJECTS]

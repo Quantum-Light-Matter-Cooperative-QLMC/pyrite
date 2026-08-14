@@ -32,6 +32,7 @@ from .metrics import (
     line_metrics,
     line_quality,
 )
+from .model import Result
 from .scoring import (
     SELECTION_MODES,
     selection_score,
@@ -88,6 +89,7 @@ __all__ = [
     "line_fwhm_eV",
     "store_result",
     "detected_background",
+    "Result",
     # selection
     "records",
     "records_for_cases",

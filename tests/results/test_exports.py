@@ -24,6 +24,7 @@ FROZEN_EXPORTS = frozenset(
         "line_fwhm_eV",
         "store_result",
         "detected_background",
+        "Result",
         # selection
         "records",
         "records_for_cases",

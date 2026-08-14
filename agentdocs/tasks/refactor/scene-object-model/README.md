@@ -139,7 +139,7 @@ that construct sweeps, and `src/pyrite/apps/` as the first consumer.
       per-material override → explicit argument) is unchanged.
 - [x] F — Demonstrate at least one previously unreachable axis. Per-layer
       thickness is the suggested target.
-- [ ] G — Public `pr.simulate` + `Result` with `spectrum` and `provenance`. No
+- [x] G — Public `pr.simulate` + `Result` with `spectrum` and `provenance`. No
       filesystem writes on the single-shot path.
 - [ ] H — Reimplement `runs.scan` and `runs.blaze` over `pr.simulate`'s
       internals, so the sweep driver and the single-shot path share one code
