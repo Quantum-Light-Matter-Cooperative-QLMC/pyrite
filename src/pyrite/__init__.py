@@ -53,10 +53,13 @@ _PUBLIC_OBJECTS = {
     "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),
     "PlanarPose": ("pyrite.instrument", "PlanarPose"),
+    "PixelRayMap": ("pyrite.results.model", "PixelRayMap"),
     "Result": ("pyrite.results.model", "Result"),
     "Scene": ("pyrite.campaign.model", "Scene"),
     "Slab": ("pyrite.campaign.geometry", "Slab"),
     "Stack": ("pyrite.campaign.geometry", "Stack"),
+    "SpatialResult": ("pyrite.results.model", "SpatialResult"),
+    "SpectralFactors": ("pyrite.results.model", "SpectralFactors"),
     "Sweep": ("pyrite.campaign.model", "Sweep"),
     "simulate": ("pyrite.api", "simulate"),
 }

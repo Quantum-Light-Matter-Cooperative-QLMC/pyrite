@@ -19,7 +19,7 @@ def _direct_mu_inv_mm(composition, energy_eV):
 
 
 def test_linear_attenuation_resolves_catalog_crystal_composition() -> None:
-    energy = np.array([5_000.0, 10_000.0])
+    energy = np.array([5_000.0, 10_000.0, 60_000.0])
 
     coefficient = linear_attenuation_inv_mm("silicon", energy)
 

@@ -88,6 +88,9 @@ lowering or compatibility seams.
    pyrite.FilterPlate
    pyrite.PlanarDetector
    pyrite.PixelScorer
+   pyrite.PixelRayMap
+   pyrite.SpectralFactors
+   pyrite.SpatialResult
    pyrite.Scene
    pyrite.Sweep
    pyrite.Convergence

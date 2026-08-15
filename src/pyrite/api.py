@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+import hashlib
+import json
+from collections.abc import Mapping
+from dataclasses import fields, is_dataclass, replace
+from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 import numpy as np
@@ -21,9 +25,117 @@ from .campaign.sweep import Sweep as LegacySweep
 from .campaign.sweep import build_cases
 from .detectors import Detector
 from .instrument import FilterPlate, PixelScorer, PlanarDetector
+from .instrument.geometry import (
+    angular_tiles,
+    filter_path_lengths,
+    planar_detector_rays,
+)
+from .materials import CATALOG, MediumSpec
+from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
 from .montecarlo._backend import BACKEND
-from .results.model import Result
+from .montecarlo.geometry import directions_to_sample_frame
+from .montecarlo.runner import run_case_directions
+from .results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
+
+
+def _canonical_value(value: Any) -> Any:
+    if is_dataclass(value):
+        return {field.name: _canonical_value(getattr(value, field.name)) for field in fields(value)}
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, Mapping):
+        return {str(key): _canonical_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_canonical_value(item) for item in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if hasattr(value, "__dict__"):
+        return {
+            key: _canonical_value(item)
+            for key, item in vars(value).items()
+            if not key.startswith("_")
+        }
+    raise TypeError(f"cannot canonicalize observation value {type(value).__name__}")
+
+
+def _array_identity(array: np.ndarray) -> dict[str, Any]:
+    contiguous = np.ascontiguousarray(array)
+    return {
+        "shape": list(contiguous.shape),
+        "dtype": contiguous.dtype.str,
+        "sha256": hashlib.sha256(contiguous.tobytes()).hexdigest(),
+    }
+
+
+def _resolved_composition(material: str | MediumSpec) -> tuple[tuple[str, float], ...]:
+    if isinstance(material, MediumSpec):
+        return material.composition
+    if material in CATALOG.media:
+        return CATALOG.media[material].composition
+    return CATALOG.crystals[material].composition
+
+
+def _observation_provenance(
+    source_digest: str,
+    scene: Scene,
+    scorer: PixelScorer,
+    coefficients: tuple[np.ndarray, ...],
+) -> tuple[str, dict[str, Any]]:
+    detector = scene.detector
+    assert isinstance(detector, PlanarDetector)
+    detector_payload = {
+        "pose": _canonical_value(detector.pose),
+        "size_mm": list(detector.size_mm or ()),
+        "pixels": None if detector.pixels is None else _canonical_value(detector.pixels),
+        "response": (
+            None
+            if detector.response is None
+            else {
+                "type": f"{type(detector.response).__module__}.{type(detector.response).__qualname__}",
+                "config": _canonical_value(detector.response),
+            }
+        ),
+    }
+    filters_payload = [
+        {
+            "composition": _canonical_value(_resolved_composition(plate.material)),
+            "thickness_mm": plate.thickness_mm,
+            "size_mm": list(plate.size_mm),
+            "pose": _canonical_value(plate.pose),
+        }
+        for plate in scene.filters
+    ]
+    payload = {
+        "schema": "pyrite.observation.v1",
+        "source_identity_digest": source_digest,
+        "detector": detector_payload,
+        "filters": filters_payload,
+        "angular_shape": list(scorer.angular_shape),
+        "attenuation_arrays": [_array_identity(array) for array in coefficients],
+        "approximations": {
+            "emission_source": "point-source-target-reference",
+            "pixel_sampling": "centre-ray",
+            "filter_interactions": "primary-attenuation-only",
+        },
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest(), payload
+
+
+def _package_version(name: str) -> str | None:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return None
+
+
+def _attenuation_matrix(filters: tuple[FilterPlate, ...], energy_eV: np.ndarray) -> np.ndarray:
+    if not filters:
+        return np.empty((0, energy_eV.size), dtype=float)
+    return np.stack([linear_attenuation_inv_mm(plate.material, energy_eV) for plate in filters])
 
 
 def build_case(scene: Scene, numerics: Numerics) -> Case:
@@ -117,14 +229,14 @@ def simulate(
         xray_dispersion=xray_dispersion,
         brem_source=brem_source,
     )
-    if scene.filters or scene.pixel_scorer is not None:
-        raise NotImplementedError("positioned filters and pixel scoring require the spatial runner")
     if resolved_numerics.backend not in {"auto", BACKEND.name}:
         raise ValueError(
             f"Numerics.backend={resolved_numerics.backend!r} does not match the active "
             f"backend {BACKEND.name!r}; select the backend before importing pyrite"
         )
     case = build_case(scene, resolved_numerics)
+    if isinstance(scene.detector, PlanarDetector):
+        return _simulate_planar(scene, resolved_numerics, case)
     output = run_case(case, transport_core=resolved_numerics.transport_core)
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
@@ -147,6 +259,87 @@ def simulate(
             "versions": {"pyrite": __version__, "numpy": np.__version__},
         },
         coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
+    )
+
+
+def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
+    detector = scene.detector
+    assert isinstance(detector, PlanarDetector)
+    scorer = PixelScorer() if scene.pixel_scorer is None else scene.pixel_scorer
+    rays = planar_detector_rays(detector)
+    tile_index, directions_lab = angular_tiles(rays, scorer.angular_shape)
+    directions_sample = directions_to_sample_frame(
+        directions_lab,
+        np.deg2rad(float(case.get("tilt_deg", 0.0))),
+        np.deg2rad(float(case.get("tilt_azim_deg", 0.0))),
+    )
+    output = run_case_directions(
+        case,
+        directions_sample,
+        transport_core=numerics.transport_core,
+    )
+    energy = np.asarray(output["E_grid"])
+    background_energy = np.asarray(output["E_grid_brem"])
+    line_mu = _attenuation_matrix(scene.filters, energy)
+    background_mu = _attenuation_matrix(scene.filters, background_energy)
+    ray_map = PixelRayMap(
+        tile_index=tile_index,
+        solid_angle_sr=rays.solid_angle_sr,
+        path_length_mm=filter_path_lengths(rays, scene.filters),
+    )
+    line = SpectralFactors(energy, np.asarray(output["spec_by_direction"]), line_mu)
+    background_intrinsic = np.asarray(output["brem_wide_by_direction"])
+    if scene.brem_source != "mc":
+        background_intrinsic = np.zeros_like(background_intrinsic)
+    background = SpectralFactors(background_energy, background_intrinsic, background_mu)
+    coherent = (
+        None
+        if "spec_coherent_by_direction" not in output
+        else SpectralFactors(
+            energy,
+            np.asarray(output["spec_coherent_by_direction"]),
+            line_mu,
+        )
+    )
+    spatial = SpatialResult(
+        ray_map=ray_map,
+        line=line,
+        background=background,
+        detector=detector,
+        coherent_line=coherent,
+    )
+    selected_line = coherent if scene.emission == "coherent" else line
+    selected_name = "coherent" if selected_line is coherent else "line"
+    source_digest = case_content_key(case)
+    observation_digest, observation = _observation_provenance(
+        source_digest,
+        scene,
+        scorer,
+        (line_mu, background_mu),
+    )
+    coherent_average = None if coherent is None else spatial.average_density("coherent")
+    return Result(
+        energy_eV=energy,
+        spectrum=spatial.average_density(selected_name),
+        background_energy_eV=background_energy,
+        background=spatial.average_density("background"),
+        case=case,
+        provenance={
+            "scene": scene,
+            "numerics": numerics,
+            "identity_digest": source_digest,
+            "observation_identity_digest": observation_digest,
+            "observation": observation,
+            "backend": BACKEND.name,
+            "device": BACKEND.device,
+            "versions": {
+                "pyrite": __version__,
+                "numpy": np.__version__,
+                "xraydb": _package_version("xraydb"),
+            },
+        },
+        coherent_spectrum=coherent_average,
+        spatial=spatial if scene.pixel_scorer is not None else None,
     )
 
 

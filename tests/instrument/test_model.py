@@ -140,19 +140,83 @@ def test_physical_detector_projects_to_unchanged_case_schema() -> None:
     assert "pixel_scorer" not in case.to_dict()
 
 
-def test_simulate_refuses_to_ignore_spatial_scene_until_runner_is_connected() -> None:
+def test_simulate_returns_partial_filter_spatial_result_and_observation_identity(
+    monkeypatch,
+) -> None:
     plate = pr.FilterPlate(
         "silicon",
         thickness_mm=0.1,
-        size_mm=(2.0, 2.0),
+        size_mm=(2.0, 10.0),
         pose=pr.PlanarPose((0.0, 0.0, 50.0)),
     )
-    with pytest.raises(NotImplementedError, match="require the spatial runner"):
-        pr.simulate(
-            pr.Beam(30.0),
-            pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
-            _detector(),
-            filters=(plate,),
-            pixel_scorer=pr.PixelScorer(),
-            numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
-        )
+
+    def fake_directional(case, n_hats, *, transport_core):
+        n_tile = len(n_hats)
+        return {
+            "E_grid": np.array([5_000.0, 6_000.0]),
+            "E_grid_brem": np.array([5_000.0, 6_000.0]),
+            "spec_by_direction": np.ones((n_tile, 2)),
+            "brem_wide_by_direction": np.full((n_tile, 2), 0.5),
+        }
+
+    monkeypatch.setattr(api, "run_case_directions", fake_directional)
+    kwargs = dict(
+        filters=(plate,),
+        pixel_scorer=pr.PixelScorer(),
+        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+    )
+    result = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        _detector(),
+        **kwargs,
+    )
+
+    assert result.spatial is not None
+    paths = result.spatial.ray_map.path_length_mm[..., 0]
+    assert np.any(paths == 0.0)
+    assert np.any(paths > 0.0)
+    _, pixel_spectra = result.spatial.spectra(region=(slice(None), slice(None)), component="line")
+    np.testing.assert_allclose(
+        result.spectrum,
+        np.sum(pixel_spectra, axis=0) / np.sum(result.spatial.ray_map.solid_angle_sr),
+        rtol=1.0e-15,
+    )
+    assert result.provenance["identity_digest"] == api.case_content_key(result.case)
+    assert len(result.provenance["observation_identity_digest"]) == 64
+
+    moved = pr.FilterPlate(
+        "silicon",
+        thickness_mm=plate.thickness_mm,
+        size_mm=plate.size_mm,
+        pose=pr.PlanarPose((1.0, 0.0, 50.0)),
+    )
+    moved_result = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        _detector(),
+        **{**kwargs, "filters": (moved,)},
+    )
+    assert moved_result.provenance["identity_digest"] == result.provenance["identity_digest"]
+    assert (
+        moved_result.provenance["observation_identity_digest"]
+        != result.provenance["observation_identity_digest"]
+    )
+
+    labeled = pr.FilterPlate(
+        "silicon",
+        thickness_mm=plate.thickness_mm,
+        size_mm=plate.size_mm,
+        pose=plate.pose,
+        name="operator label only",
+    )
+    labeled_result = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        _detector(),
+        **{**kwargs, "filters": (labeled,)},
+    )
+    assert (
+        labeled_result.provenance["observation_identity_digest"]
+        == result.provenance["observation_identity_digest"]
+    )

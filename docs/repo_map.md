@@ -332,12 +332,13 @@ campaign implementation.
 ### `api.py`
 
 Filesystem-free simulation seam. `simulate` combines scalar beam, target, and
-detector components into a `Scene`, lowers exactly one typed `Case`, calls the
-existing `montecarlo.run_case`, and returns `results.model.Result` with
-intrinsic arrays and resolved identity/backend/version provenance. It never
-reads or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and
-legacy lowering helpers are implementation/compatibility seams rather than
-the root supported surface.
+detector components into a `Scene` and lowers exactly one typed `Case`. Scalar
+detectors call the unchanged `montecarlo.run_case`; physical detectors reuse
+one transport across coarse angular tiles, then attach exact pixel rays and
+finite-filter attenuation as a factorized `SpatialResult`. Source-case and
+observation identities remain separate. The API never reads or writes campaign
+checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are
+implementation/compatibility seams rather than the root supported surface.
 
 - Public: root-lazy `simulate`.
 - Deps: `campaign.model`, `campaign.sweep`, `campaign.profiles`, `detectors`,
@@ -542,6 +543,9 @@ package** — `from pyrite.results import X` unchanged
   `top_geometries`, `show_top`.
 - `tables` — DataFrame views: `results_dataframe`, `summary_table`,
   `show_summary`.
+- `model` — in-memory `Result` plus factorized `SpatialResult`, `PixelRayMap`,
+  and `SpectralFactors`; selected pixel spectra and images materialize in
+  bounded chunks and are not checkpoint schema fields.
 - Deps: `montecarlo`, `sweep`.
 
 ### `plots/` (package)
@@ -616,7 +620,8 @@ Closed, analytic post-emission photon geometry. `model.py` owns frozen
 `PlanarPose`, `PixelGrid`, `FilterPlate`, physical `PlanarDetector`, and the
 narrow `PixelScorer` request; `geometry.py` owns point-source pixel rays,
 solid-angle weights, coarse angular partitions, and exact finite-box path
-lengths. `Scene` owns ordered plates and accepts either the legacy scalar
+lengths; `attenuation.py` owns stacked primary-photon transmission. `Scene`
+owns ordered plates and accepts either the legacy scalar
 `Detector` or physical `PlanarDetector`; instrument objects never enter the
 electron-transport navigator. Deps: `detectors.spec`, `materials`.
 

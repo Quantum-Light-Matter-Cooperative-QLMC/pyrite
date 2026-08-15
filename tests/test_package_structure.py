@@ -64,10 +64,13 @@ def test_root_exports_stay_frozen() -> None:
         "PixelScorer",
         "PlanarDetector",
         "PlanarPose",
+        "PixelRayMap",
         "Result",
         "Scene",
         "Slab",
         "Stack",
+        "SpatialResult",
+        "SpectralFactors",
         "Sweep",
         "simulate",
     ]

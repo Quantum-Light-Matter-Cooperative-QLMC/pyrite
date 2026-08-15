@@ -70,6 +70,65 @@ The high-level API currently cannot inject an external bremsstrahlung array.
 `brem_source="external"` and `brem_source="none"` therefore return zeros on
 the resolved continuum grid; use `brem_source="mc"` for simulated background.
 
+## Place a finite filter over detector pixels
+
+A physical detector and filter are downstream photon objects. They do not
+enter electron transport, so all angular tiles reuse one transported electron
+population. This example places a silicon plate over part of one Timepix3 chip:
+
+```python
+pose = pr.PlanarPose.from_observation(distance_mm=400.0, polar_deg=90.0)
+detector = pr.PlanarDetector.timepix3_chip(pose)
+filter_pose = pr.PlanarPose.from_observation(
+    distance_mm=200.0,
+    polar_deg=90.0,
+    offset_mm=(3.52, 0.0),
+)
+half_filter = pr.FilterPlate(
+    "silicon",
+    thickness_mm=0.1,
+    size_mm=(7.04, 14.08),
+    pose=filter_pose,
+)
+
+result = pr.simulate(
+    beam,
+    target,
+    detector,
+    filters=(half_filter,),
+    pixel_scorer=pr.PixelScorer(angular_shape=(2, 2)),
+)
+spatial = result.spatial
+assert spatial is not None
+
+energy_eV, selected = spatial.spectra(
+    pixels=[(128, 64), (128, 192)],
+    component="line",
+)
+line_image = spatial.image((4_000.0, 6_000.0), component="line")
+```
+
+Selected spectra include each pixel's solid angle and therefore have units of
+photons per incident electron per eV. `Result.spectrum` remains a detector-
+averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and
+attenuation coefficients as separate factors; `spectra` materializes only the
+selection and `image` works in bounded pixel chunks rather than allocating a
+full `(row, column, energy)` cube. Pass `measured=True` to either method to
+apply a configured `PlanarDetector.response` explicitly.
+
+Pixels use centre rays from the target reference point. The plate is a finite
+oriented box, so translation, distance, rotation, oblique thickness, edge
+misses, and side escape affect the shadow. The primary model includes only
+Beer--Lambert attenuation: no filter scatter, fluorescence, diffraction, or
+secondary photons. A `PlanarDetector` without `PixelGrid` supports one centre
+ray and scalar output; partial-coverage scoring requires `PixelScorer` and a
+physical grid.
+
+`provenance["identity_digest"]` remains the intrinsic source-case digest.
+Physical observations additionally carry `observation_identity_digest`, which
+includes ordered geometry, resolved compositions, angular partition, response,
+and hashes of the coefficient arrays. Plate display names are not identity.
+
 ## Apply detector response explicitly
 
 Simulation output remains intrinsic even when the scene's detector has a
