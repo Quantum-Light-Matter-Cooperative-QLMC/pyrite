@@ -393,3 +393,39 @@ extent. These limits are explicit in objects, results, docs, and tests.
   filter physics are visible in API documentation and provenance.
 - Focused core/API/detector/profile tests, validation checks, lint, typecheck,
   docs, and any changed CLI reference generation pass.
+
+## Implementation evidence (2026-08-14)
+
+Checkpoint commits:
+
+- `37c2d04` — frozen downstream geometry objects, public ownership, scene
+  validation, explicit source-facing pose convention, and ADR boundary;
+- `78c6c0a` — shared pixel rays, exact finite-box intersections, moved/rotated/
+  side-exit/partial-coverage regressions;
+- `1febe00` — homogeneous-material attenuation helper, stacked primary
+  transmission, ledger row, and author-prepared verification packet;
+- `f1c478b` — one electron transport reused across direction tiles, explicit
+  lab-to-sample mapping, `(1,1)` bitwise scalar compatibility, and discrete
+  tile-flux conservation;
+- `033ace1` — factorized spatial results, bounded materialization and detector
+  scoring, physical simulation wiring, separate observation identity, public
+  exports, and worked partial-coverage guide.
+
+Acceptance evidence:
+
+- 257 task-focused instrument/material/API/runner/detector/result/checkpoint/
+  validation tests pass;
+- scoped Ruff and `ty` checks pass; repository-wide `pyrite-dev typecheck`
+  passes after syncing declared groups;
+- `pyrite-dev docs` and `pyrite-dev repo-map --check` pass;
+- the core suite reaches completion with seven unrelated baseline failures in
+  catalog/golden/ledger/profile/performance expectations; this branch does not
+  change their catalog data, golden files, profile identity, or performance
+  owners, and its ledger edit only adds this task's well-formed record/views;
+- repository-wide lint remains blocked by the pre-existing undefined `seen` in
+  `tests/scan/test_scan_budget.py`.
+
+The `positioned-filter-attenuation` ledger row deliberately remains
+`unverified`. Its implementation-side checks are green, but a separate
+fresh-context physics validator must audit the prepared packet before status
+advances. No profile/CLI or checkpoint-schema surface was added.
