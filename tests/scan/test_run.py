@@ -95,6 +95,54 @@ def _fake_case(
     )
 
 
+def test_run_case_directions_transports_once_and_stacks_direction_outputs(monkeypatch):
+    case = _fake_case("directions", 30.0)
+    calls = {"transport": 0, "spectrum": 0}
+
+    def fake_transport(payload, **kwargs):
+        assert payload is case
+        assert kwargs["keep_segments_on_device"] is True
+        calls["transport"] += 1
+        return {"n_hat": np.array([0.0, 0.0, 1.0]), "segments": object()}
+
+    def fake_spectrum(payload, transport):
+        assert payload is case
+        calls["spectrum"] += 1
+        value = transport["n_hat"][0]
+        return {
+            "E_grid": np.array([1.0, 2.0]),
+            "E_grid_brem": np.array([1.0, 2.0, 3.0]),
+            "spec": np.array([value, value + 1.0]),
+            "brem": np.array([value + 2.0, value + 3.0]),
+            "brem_wide": np.array([value + 2.0, value + 3.0, value + 4.0]),
+        }
+
+    monkeypatch.setattr(runner, "_transport_case", fake_transport)
+    monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
+
+    output = runner.run_case_directions(case, np.array([[1.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]))
+
+    assert calls == {"transport": 1, "spectrum": 2}
+    np.testing.assert_array_equal(output["spec_by_direction"], [[1.0, 2.0], [-1.0, 0.0]])
+    assert output["brem_wide_by_direction"].shape == (2, 3)
+
+
+def test_one_direction_runner_matches_scalar_runner_bit_for_bit() -> None:
+    case = _fake_case("one-direction", 30.0)
+    case["hkl_list"] = [(0, 0, 2)]
+    _, direction = runner.tilted_geometry(
+        case["theta_obs_rad"],
+        np.deg2rad(case["tilt_deg"]),
+        np.deg2rad(case["tilt_azim_deg"]),
+    )
+
+    scalar = runner.run_case(case)
+    directional = runner.run_case_directions(case, direction[None, :])
+
+    np.testing.assert_array_equal(directional["spec_by_direction"][0], scalar["spec"])
+    np.testing.assert_array_equal(directional["brem_wide_by_direction"][0], scalar["brem_wide"])
+
+
 def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatch):
     case = _fake_case("finite", 30.0)
     case.update(
@@ -843,10 +891,7 @@ def test_checkpoint_shards_win_over_stale_monolith(tmp_path):
         {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([9.0])}},
     )
     _checkpoint_store.save_part(
-        "hopg",
-        tmp_path,
-        "cfg_b",
-        {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}},
+        "hopg", tmp_path, "cfg_b", {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}}
     )
     loaded = _checkpoint_load(str(tmp_path / "hopg"))
     assert np.array_equal(loaded["cfg_a"][30.0]["spec"], np.array([9.0]))
@@ -915,7 +960,10 @@ def test_component_and_shard_pkl_payloads_remain_readable(tmp_path):
         path = _checkpoint_store.component_path("hopg", component, tmp_path)
         path.replace(path.with_suffix(".pkl"))
     _checkpoint_store.save_part(
-        "hopg", tmp_path, "cfg_b", {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}}
+        "hopg",
+        tmp_path,
+        "cfg_b",
+        {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}},
     )
     shard = next((tmp_path / "hopg" / "parts").glob("*.h5"))
     shard.replace(shard.with_suffix(".pkl"))

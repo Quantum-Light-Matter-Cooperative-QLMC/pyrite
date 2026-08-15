@@ -10,6 +10,7 @@ from pyrite.instrument.geometry import (
     planar_detector_rays,
     ray_box_path_lengths,
 )
+from pyrite.montecarlo.geometry import directions_to_sample_frame, tilted_geometry
 
 
 def _detector(shape=(4, 4), pitch=(1.0, 1.0), distance=100.0) -> PlanarDetector:
@@ -128,6 +129,35 @@ def test_angular_tiles_cover_uneven_grid_and_use_weighted_unit_directions() -> N
     assert directions.shape == (6, 3)
     np.testing.assert_allclose(np.linalg.norm(directions, axis=1), 1.0)
     assert np.bincount(tile_index.ravel()).tolist() == [6, 3, 3, 4, 2, 2]
+
+
+def test_lab_direction_mapping_matches_tilted_geometry_central_ray() -> None:
+    theta = np.deg2rad(73.0)
+    tilt = np.deg2rad(21.0)
+    azimuth = np.deg2rad(35.0)
+    detector = PlanarDetector(
+        pose=PlanarPose.from_observation(100.0, np.rad2deg(theta)),
+        pixels=PixelGrid((1, 1), (1.0, 1.0)),
+    )
+    ray = planar_detector_rays(detector).directions_lab.reshape(1, 3)
+
+    mapped = directions_to_sample_frame(ray, tilt, azimuth)
+    _, expected = tilted_geometry(theta, tilt, azimuth)
+
+    np.testing.assert_allclose(mapped[0], expected, rtol=0.0, atol=1.0e-15)
+
+
+def test_tile_inheritance_conserves_discrete_pixel_flux() -> None:
+    rays = planar_detector_rays(_detector(shape=(5, 7), pitch=(0.5, 0.75)))
+    tile_index, _ = angular_tiles(rays, (2, 3))
+    intrinsic = np.arange(1.0, 7.0)
+
+    pixel_flux = intrinsic[tile_index] * rays.solid_angle_sr
+
+    for tile in range(intrinsic.size):
+        selected = tile_index == tile
+        expected = intrinsic[tile] * np.sum(rays.solid_angle_sr[selected])
+        np.testing.assert_allclose(np.sum(pixel_flux[selected]), expected, rtol=1.0e-15)
 
 
 @pytest.mark.parametrize("angular_shape", [(0, 1), (1, 0), (5, 1), (1, 5)])

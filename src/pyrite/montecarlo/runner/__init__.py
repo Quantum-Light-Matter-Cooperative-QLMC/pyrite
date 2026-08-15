@@ -486,6 +486,57 @@ def run_case(
     )
 
 
+def run_case_directions(
+    case: Case | Mapping[str, Any],
+    n_hats,
+    *,
+    transport_core: str = "auto",
+) -> dict[str, Any]:
+    """Evaluate spectra at multiple sample-frame directions after one transport.
+
+    Returned ``spec_by_direction`` and ``brem_wide_by_direction`` have leading
+    direction dimension. ``spec_coherent_by_direction`` is present when the
+    case requests coherent emission. Every direction consumes the same
+    transported electron segments; this function never places downstream
+    photon geometry in the electron navigator.
+    """
+    directions = np.asarray(n_hats, dtype=float)
+    if directions.ndim != 2 or directions.shape[1] != 3 or not directions.shape[0]:
+        raise ValueError("n_hats must have shape (N, 3) with N positive")
+    if not np.all(np.isfinite(directions)):
+        raise ValueError("n_hats must contain only finite values")
+    if not np.allclose(np.linalg.norm(directions, axis=1), 1.0, rtol=0.0, atol=1.0e-12):
+        raise ValueError("n_hats must contain unit vectors")
+
+    transport = _transport_case(
+        case,
+        transport_core=transport_core,
+        keep_segments_on_device=True,
+    )
+    outputs = []
+    for direction in directions:
+        directional_transport = dict(transport)
+        directional_transport["n_hat"] = direction
+        outputs.append(_spectrum_case(case, directional_transport))
+
+    first = outputs[0]
+    result = {
+        key: value
+        for key, value in first.items()
+        if key not in {"spec", "spec_coherent", "brem", "brem_wide"}
+    }
+    result["spec_by_direction"] = np.stack([np.asarray(output["spec"]) for output in outputs])
+    result["brem_by_direction"] = np.stack([np.asarray(output["brem"]) for output in outputs])
+    result["brem_wide_by_direction"] = np.stack(
+        [np.asarray(output["brem_wide"]) for output in outputs]
+    )
+    if "spec_coherent" in first:
+        result["spec_coherent_by_direction"] = np.stack(
+            [np.asarray(output["spec_coherent"]) for output in outputs]
+        )
+    return result
+
+
 def _beam_kwargs(case):
     """Beam phase-space kwargs a case dict forwards to ``simulate_trajectories``:
     the transverse spot (elliptical ``beam_fwhm_mm`` / ``beam_fwhm_y_mm``) and

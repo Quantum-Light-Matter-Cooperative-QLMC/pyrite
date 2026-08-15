@@ -429,6 +429,34 @@ def detector_directions(
     return n_hats, weights
 
 
+def directions_to_sample_frame(
+    directions_lab,
+    tilt_polar_rad=0.0,
+    tilt_azim_rad=0.0,
+):
+    """Map unit observation directions from the lab into the sample frame.
+
+    This is the vectorized direction half of :func:`tilted_geometry`. Positive
+    target tilt rotates the sample normal into the lab; row-vector directions
+    therefore map back with ``directions_lab @ R``. Inputs must already be
+    finite unit vectors so geometry errors are not hidden by normalization.
+    """
+    directions = np.asarray(directions_lab, dtype=float)
+    if directions.ndim != 2 or directions.shape[1] != 3:
+        raise ValueError("directions_lab must have shape (N, 3)")
+    if not np.all(np.isfinite(directions)):
+        raise ValueError("directions_lab must contain only finite values")
+    norms = np.linalg.norm(directions, axis=1)
+    if not np.allclose(norms, 1.0, rtol=0.0, atol=1.0e-12):
+        raise ValueError("directions_lab must contain unit vectors")
+    st, ct = np.sin(tilt_polar_rad), np.cos(tilt_polar_rad)
+    normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
+    rotation = _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab)
+    mapped = directions @ rotation
+    mapped.setflags(write=False)
+    return mapped
+
+
 def _orientation_R(
     lattice,
     beam_uvw,
