@@ -16,6 +16,7 @@ physics-validation-ledger
 status-summary
 domain-inventories
 methodology
+formatting-style
 ```
 
 ```{toctree}

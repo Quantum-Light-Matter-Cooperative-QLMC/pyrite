@@ -13,44 +13,45 @@
 
 For a unit-cell structure factor
 
-```{math}
+\[
 S_{\mathbf g}=\sum_j f_j(\mathbf g,E)
   \exp(i\mathbf g\cdot\mathbf r_j)\exp(-W_j),
-```
+\]
 
 the Fourier component of the electron number density is
-`S_g / V_cell`. In Gaussian units the driven-electron response gives
+\(S_{\mathbf g} / V_{\rm cell}\). In Gaussian units the driven-electron
+response gives
 
-```{math}
+\[
 \chi_{\mathbf g}
-=-\frac{4\pi e^2}{m\omega^2}\frac{S_{\mathbf g}}{V_{cell}}.
-```
+=-\frac{4\pi e^2}{m\omega^2}\frac{S_{\mathbf g}}{V_{\rm cell}}.
+\]
 
-Using `r_e=e^2/(mc^2)`, `k=omega/c=2 pi/lambda`,
+Using \(r_e=e^2/(mc^2)\), \(k=\omega/c=2\pi/\lambda\),
 
-```{math}
+\[
 \chi_{\mathbf g}
-=-\frac{4\pi r_e}{k^2V_{cell}}S_{\mathbf g}
-=-\frac{r_e\lambda^2}{\pi V_{cell}}S_{\mathbf g}.
-```
+=-\frac{4\pi r_e}{k^2V_{\rm cell}}S_{\mathbf g}
+=-\frac{r_e\lambda^2}{\pi V_{\rm cell}}S_{\mathbf g}.
+\]
 
-No extra factor of `2`, `pi`, or unit-cell multiplicity remains when `S_g`
-is the full unit-cell sum. A complex anomalous structure factor is allowed;
-the overall minus sign maps a positive electron-density amplitude to the
-usual X-ray susceptibility convention.
+No extra factor of \(2\), \(\pi\), or unit-cell multiplicity remains when
+\(S_{\mathbf g}\) is the full unit-cell sum. A complex anomalous structure
+factor is allowed; the overall minus sign maps a positive electron-density
+amplitude to the usual X-ray susceptibility convention.
 
 ## Cheap filters
 
-- Units: `r_e lambda^2 / V_cell` is `angstrom^3 / angstrom^3`; `S_g` is in
+- Units: \(r_e\lambda^2 / V_{\rm cell}\) is Å³/Å³; \(S_{\mathbf g}\) is in
   electrons, treated as a dimensionless scattering amplitude. `chi_g` is
   dimensionless.
-- Limits: `S_g -> 0` for an extinct reflection gives `chi_g -> 0`;
-  `lambda -> 0` gives `chi_g -> 0` as `lambda^2`; doubling identical unit-cell
-  contents and volume leaves `chi_g` unchanged.
+- Limits: \(S_{\mathbf g}\to0\) for an extinct reflection gives
+  `chi_g` \(\to0\); \(\lambda\to0\) gives `chi_g` \(\to0\) as \(\lambda^2\);
+  doubling identical unit-cell contents and volume leaves `chi_g` unchanged.
 - Sign/convention: the leading minus sign follows the negative-electron
-  plasma response. With `F=f0+f'+i f''` and the repository's wave convention,
-  the same minus sign produces the passive-medium susceptibility sign used by
-  its absorption model.
+  plasma response. With \(F=f_0+f'+if''\) and the repository's wave
+  convention, the same minus sign produces the passive-medium susceptibility
+  sign used by its absorption model.
 
 ## Implementation comparison
 

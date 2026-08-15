@@ -14,7 +14,7 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
   # physics symbols missing a Validation: back-reference
   grep -L "Validation:" src/pyrite/{montecarlo,crystallography,atomic_form_factors}.py src/pyrite/detectors/{eaglexo_response,timepix_response}.py
   ```
-- **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority.
+- **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority. Write and format the math per the [LaTeX/MyST style rules](formatting-style.md).
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.
 
 ### Optional external crystallography oracle
@@ -76,8 +76,9 @@ Follow this order:
 2. Apply cheap filters: dimensional consistency, limiting cases, and
    sign/symmetry/convention checks. A failure is immediately a `discrepancy`.
 3. Starting from the source and signature, derive the expression independently
-   in the ledgered `docs/validation/<domain>/<id>.md`. The derivation must precede inspection of the
-   implementation body so the code cannot anchor the result.
+   in the ledgered `docs/validation/<domain>/<id>.md`, formatted per the
+   [LaTeX/MyST style rules](formatting-style.md). The derivation must precede
+   inspection of the implementation body so the code cannot anchor the result.
 4. Read the implementation and compare it symbolically and dimensionally;
    compare at one or more numeric points when feasible. Use independent
    reference data or `checks/` anchors rather than implementation helpers.

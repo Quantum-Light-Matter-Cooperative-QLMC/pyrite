@@ -181,9 +181,9 @@ The required integration over \(P\in[-20/T,20/T]\) produced the values in
 :name: tbl-finite-time-spot-check
 :header-rows: 1
 
-* - $T$
+* - \(T\)
   - Numerical integral
-  - $\pi T$
+  - \(\pi T\)
 * - 10.0
   - 30.906233356297136
   - 31.41592653589793

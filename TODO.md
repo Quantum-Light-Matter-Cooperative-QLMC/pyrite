@@ -13,11 +13,6 @@ file. Edit and drop items on `main`.
 ## Active
 
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
-
-   1. **Rederivation Clean-up and Formatting.** Need a worker to go thru and clean up the math in
-      completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
-      Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
-      to fresh-context workers doing the rederivations.
 2. **Energy-controlled electron transport.** Schema inventory, per-flight
    diagnostics, midpoint predictor-corrector stopping/clock, radiation error
    estimators, and convergence matrices are done (A-E): the binding control
