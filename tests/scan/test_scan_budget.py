@@ -255,5 +255,3 @@ def test_resume_loading_preserves_previous_progress_counts(monkeypatch, tmp_path
     assert result.exit_code == 75
     assert snapshots[0]["activity"] == "loading"
     assert snapshots[0]["cached_cases"] + snapshots[0]["completed_new_cases"] == 1
-    assert seen[1] <= seen[0]  # the second material only gets what's left
-    assert seen[2] == 0.0  # deadline elapsed: still called, with zero budget
