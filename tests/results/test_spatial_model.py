@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -30,6 +32,12 @@ def _spatial() -> SpatialResult:
         response=HalfResponse(),
     )
     return SpatialResult(ray_map, factors, factors, detector)
+
+
+def _materialize_with_chunk(spatial: SpatialResult, method: str, pixel_chunk: Any) -> object:
+    if method == "image":
+        return spatial.image((1.0, 3.0), pixel_chunk=pixel_chunk)
+    return spatial.average_density("line", pixel_chunk=pixel_chunk)
 
 
 def test_selected_spectra_include_solid_angle_and_filter_transmission() -> None:
@@ -69,6 +77,24 @@ def test_average_density_recovers_sum_flux_over_total_solid_angle() -> None:
     expected = np.sum(spectra, axis=0) / np.sum(spatial.ray_map.solid_angle_sr)
 
     np.testing.assert_allclose(spatial.average_density("line"), expected, rtol=1.0e-15)
+
+
+@pytest.mark.parametrize("pixel_chunk", [0, -1])
+@pytest.mark.parametrize("method", ["image", "average_density"])
+def test_spatial_materialization_rejects_nonpositive_pixel_chunks(method, pixel_chunk) -> None:
+    spatial = _spatial()
+
+    with pytest.raises(ValueError, match="pixel_chunk must be positive"):
+        _materialize_with_chunk(spatial, method, pixel_chunk)
+
+
+@pytest.mark.parametrize("pixel_chunk", [True, 1.5])
+@pytest.mark.parametrize("method", ["image", "average_density"])
+def test_spatial_materialization_rejects_noninteger_pixel_chunks(method, pixel_chunk) -> None:
+    spatial = _spatial()
+
+    with pytest.raises(TypeError, match="pixel_chunk must be an integer"):
+        _materialize_with_chunk(spatial, method, pixel_chunk)
 
 
 @pytest.mark.parametrize(

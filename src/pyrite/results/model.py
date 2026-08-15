@@ -20,6 +20,14 @@ def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
     return array
 
 
+def _positive_integer(name: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, Integral):
+        raise TypeError(f"{name} must be an integer")
+    if value <= 0:
+        raise ValueError(f"{name} must be positive")
+    return int(value)
+
+
 @dataclass(frozen=True)
 class PixelRayMap:
     """Shared pixel geometry for factorized downstream photon scoring."""
@@ -207,8 +215,7 @@ class SpatialResult:
         pixel_chunk: int = 1024,
     ) -> np.ndarray:
         """Integrate a true or measured energy window in bounded pixel chunks."""
-        if pixel_chunk <= 0:
-            raise ValueError("pixel_chunk must be positive")
+        chunk = _positive_integer("pixel_chunk", pixel_chunk)
         factor = self._factor(component)
         low, high = map(float, energy_range_eV)
         if not np.isfinite(low) or not np.isfinite(high) or low >= high:
@@ -219,8 +226,8 @@ class SpatialResult:
         ny, nx = self.ray_map.tile_index.shape
         image = np.empty(ny * nx, dtype=float)
         flat = np.arange(ny * nx)
-        for start in range(0, flat.size, pixel_chunk):
-            chosen = flat[start : start + pixel_chunk]
+        for start in range(0, flat.size, chunk):
+            chosen = flat[start : start + chunk]
             coordinates = np.column_stack(np.unravel_index(chosen, (ny, nx)))
             spectra = self._materialize(factor, coordinates)
             if measured:
@@ -244,12 +251,13 @@ class SpatialResult:
 
     def average_density(self, component: str, *, pixel_chunk: int = 1024) -> np.ndarray:
         """Return the solid-angle-weighted detector-average density [per sr]."""
+        chunk = _positive_integer("pixel_chunk", pixel_chunk)
         factor = self._factor(component)
         ny, nx = self.ray_map.tile_index.shape
         total = np.zeros(factor.energy_eV.shape, dtype=float)
         flat = np.arange(ny * nx)
-        for start in range(0, flat.size, pixel_chunk):
-            chosen = flat[start : start + pixel_chunk]
+        for start in range(0, flat.size, chunk):
+            chosen = flat[start : start + chunk]
             coordinates = np.column_stack(np.unravel_index(chosen, (ny, nx)))
             total += np.sum(self._materialize(factor, coordinates), axis=0)
         return total / np.sum(self.ray_map.solid_angle_sr)
@@ -257,11 +265,14 @@ class SpatialResult:
 
 @dataclass(frozen=True)
 class Result:
-    """Intrinsic spectral arrays and resolved simulation provenance.
+    """Scalar spectral arrays, optional spatial factors, and provenance.
 
-    ``spectrum`` and ``background`` are photon-density arrays per incident
-    electron per eV per sr. ``energy_eV`` and ``background_energy_eV`` are their
-    respective photon-energy coordinates in eV.
+    ``spectrum`` and ``background`` are photon densities per incident electron
+    per eV per sr. For scalar-detector simulations they are intrinsic. For a
+    physical planar detector they are filter-attenuated, solid-angle-weighted
+    observation averages. Selected ``spatial`` spectra are accepted per-pixel
+    flux, with pixel solid angle included. ``energy_eV`` and
+    ``background_energy_eV`` are the respective photon-energy coordinates.
     """
 
     energy_eV: np.ndarray

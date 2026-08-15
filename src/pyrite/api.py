@@ -212,9 +212,12 @@ def simulate(
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
-    This function only composes the established case builder and Monte Carlo
-    runner. The returned arrays are intrinsic; score them through the detector
-    explicitly when detected units are wanted.
+    A scalar :class:`Detector` returns intrinsic photon densities per incident
+    electron per eV per sr. With a :class:`PlanarDetector`, the scalar arrays
+    are filter-attenuated, solid-angle-weighted observation averages in the
+    same per-sr units. Selected spatial spectra include pixel solid angle and
+    are accepted flux per incident electron per eV. Detector response remains
+    an explicit read-time operation.
     """
     resolved_numerics = Numerics() if numerics is None else numerics
     if not isinstance(resolved_numerics, Numerics):

@@ -90,6 +90,8 @@ def ray_box_path_lengths(rays: PixelRays, plate: FilterPlate) -> np.ndarray:
     the finite source--pixel segment. Parallel axes use an explicit inside/
     outside test; side escape and oblique thickness follow from the same slab
     interval calculation.
+
+    Validation: positioned-filter-attenuation
     """
     if not isinstance(rays, PixelRays):
         raise TypeError("rays must be PixelRays")
