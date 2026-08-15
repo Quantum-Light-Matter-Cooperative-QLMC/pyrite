@@ -7,6 +7,7 @@ target geometry and never enter the electron-transport navigator.
 import math
 from dataclasses import dataclass, field
 from numbers import Integral, Real
+from typing import Literal
 
 import numpy as np
 
@@ -419,6 +420,7 @@ class PixelScorer:
     """
 
     angular_shape: tuple[int, int] = (1, 1)
+    reconstruction: Literal["nearest_tile"] = "nearest_tile"
 
     def __post_init__(self) -> None:
         try:
@@ -432,6 +434,8 @@ class PixelScorer:
         if any(int(x) <= 0 for x in shape):
             raise ValueError("PixelScorer.angular_shape values must be positive")
         object.__setattr__(self, "angular_shape", (int(shape[0]), int(shape[1])))
+        if self.reconstruction != "nearest_tile":
+            raise ValueError("PixelScorer.reconstruction must be 'nearest_tile'")
 
 
 def validate_downstream_scene(filters: tuple[FilterPlate, ...], detector: PlanarDetector) -> None:

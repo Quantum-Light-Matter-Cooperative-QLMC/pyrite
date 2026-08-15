@@ -101,6 +101,76 @@ class DetectorResponse(Protocol):
 
 
 @dataclass(frozen=True)
+class NativeSpectrum:
+    """Measured event mass on explicit native half-open energy bins.
+
+    ``events`` may have arbitrary leading batch dimensions; its last dimension
+    corresponds to ``edges_eV`` intervals. Values retain the caller's leading
+    normalization, for example events per incident electron.
+    """
+
+    edges_eV: np.ndarray
+    events: np.ndarray
+
+    def __post_init__(self) -> None:
+        edges = np.asarray(self.edges_eV, dtype=float)
+        events = np.asarray(self.events, dtype=float)
+        if edges.ndim != 1 or edges.size < 2:
+            raise ValueError("NativeSpectrum.edges_eV requires at least two edges")
+        if not np.all(np.isfinite(edges)) or np.any(edges < 0.0):
+            raise ValueError("NativeSpectrum.edges_eV must be finite and nonnegative")
+        if np.any(np.diff(edges) <= 0.0):
+            raise ValueError("NativeSpectrum.edges_eV must be strictly increasing")
+        if events.ndim == 0 or events.shape[-1] != edges.size - 1:
+            raise ValueError("NativeSpectrum.events last dimension must match its bins")
+        if not np.all(np.isfinite(events)) or np.any(events < 0.0):
+            raise ValueError("NativeSpectrum.events must be finite and nonnegative")
+        edges.setflags(write=False)
+        events.setflags(write=False)
+        object.__setattr__(self, "edges_eV", edges)
+        object.__setattr__(self, "events", events)
+
+
+def _sample_edges(energy_eV: np.ndarray) -> np.ndarray:
+    energy = np.asarray(energy_eV, dtype=float)
+    if energy.ndim != 1 or energy.size < 2:
+        raise ValueError("native response energy_eV requires at least two samples")
+    if not np.all(np.isfinite(energy)) or np.any(energy < 0.0) or np.any(np.diff(energy) <= 0.0):
+        raise ValueError("native response energy_eV must be finite, nonnegative, and increasing")
+    midpoints = 0.5 * (energy[:-1] + energy[1:])
+    first = max(0.0, energy[0] - 0.5 * (energy[1] - energy[0]))
+    last = energy[-1] + 0.5 * (energy[-1] - energy[-2])
+    return np.concatenate(([first], midpoints, [last]))
+
+
+def _native_density(energy_eV, intrinsic_density, *, scale: float) -> NativeSpectrum:
+    edges = _sample_edges(np.asarray(energy_eV, dtype=float))
+    density = np.asarray(intrinsic_density, dtype=float)
+    if density.ndim == 0 or density.shape[-1] != edges.size - 1:
+        raise ValueError("intrinsic_density last dimension must match energy_eV")
+    if not np.all(np.isfinite(density)) or np.any(density < 0.0):
+        raise ValueError("native response intrinsic_density must be finite and nonnegative")
+    return NativeSpectrum(edges, density * np.diff(edges) * float(scale))
+
+
+@dataclass(frozen=True)
+class IdealPhotonCounter:
+    """Explicit unit-efficiency, energy-preserving photon-event response.
+
+    This is a mathematical reference response, not calibrated hardware. One
+    accepted photon remains one measured event at the same energy.
+    """
+
+    def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
+        del energy_eV, fwhm_eV
+        return np.asarray(intrinsic_density) * scale
+
+    def native_score(self, energy_eV, intrinsic_density, *, scale=1.0) -> NativeSpectrum:
+        """Integrate accepted density into energy-preserving native bins."""
+        return _native_density(energy_eV, intrinsic_density, scale=scale)
+
+
+@dataclass(frozen=True)
 class Timepix3:
     """Timepix3 response configuration.
 
@@ -142,6 +212,22 @@ class Timepix3:
             thickness_um=self.thickness_um,
             bias_v=self.bias_v,
         ).apply(incident)
+
+    def native_score(self, energy_eV, intrinsic_density, *, scale=1.0) -> NativeSpectrum:
+        """Apply the clustered-event response on its native measured bins."""
+        from .timepix_response import get_response
+
+        incident = np.asarray(intrinsic_density) * scale
+        response = get_response(
+            energy_eV,
+            dE_mc=self.dE_mc,
+            dE_out=self.dE_out,
+            n_mc=self.n_mc,
+            seed=self.seed,
+            thickness_um=self.thickness_um,
+            bias_v=self.bias_v,
+        )
+        return NativeSpectrum(response.out_edges_eV, response.apply_native(incident))
 
 
 @dataclass(frozen=True)
@@ -286,6 +372,30 @@ class Detector:
             fwhm_eV=fwhm_eV,
             scale=scale,
         )
+
+    def native_score(
+        self,
+        energy_eV: np.ndarray,
+        intrinsic_density: np.ndarray,
+        *,
+        scale: float = 1.0,
+    ) -> NativeSpectrum:
+        """Return event mass on the response's explicit native measured bins."""
+        if self.response is None:
+            raise ValueError("native scoring requires an explicit detector response")
+        scorer = getattr(self.response, "native_score", None)
+        if scorer is None:
+            raise NotImplementedError(
+                f"{type(self.response).__name__} does not expose native measured bins"
+            )
+        result = scorer(
+            np.asarray(energy_eV),
+            np.asarray(intrinsic_density),
+            scale=scale,
+        )
+        if not isinstance(result, NativeSpectrum):
+            raise TypeError("response native_score() must return NativeSpectrum")
+        return result
 
 
 class DetectorSpec(Detector):

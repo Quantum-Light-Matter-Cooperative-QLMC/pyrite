@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -187,6 +189,8 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         xsgen_tables=result.provenance["xsgen_tables"],
     )
     assert len(result.provenance["observation_identity_digest"]) == 64
+    assert result.provenance["observation"]["schema"] == "pyrite.observation.v1"
+    assert "true_spatial_digest" not in result.provenance
 
     moved = pr.FilterPlate(
         "silicon",
@@ -222,4 +226,93 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     assert (
         labeled_result.provenance["observation_identity_digest"]
         == result.provenance["observation_identity_digest"]
+    )
+
+
+def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) -> None:
+    def fake_directional(case, n_hats, *, transport_core):
+        n_tile = len(n_hats)
+        return {
+            "E_grid": np.array([500.0, 1_000.0]),
+            "E_grid_brem": np.array([500.0, 1_000.0]),
+            "spec_by_direction": np.ones((n_tile, 2)),
+            "spec_characteristic_by_direction": np.zeros((n_tile, 2)),
+            "brem_wide_by_direction": np.full((n_tile, 2), 0.5),
+        }
+
+    monkeypatch.setattr(api, "run_case_directions", fake_directional)
+    detector = pr.PlanarDetector(
+        pose=pr.PlanarPose.from_observation(100.0, 60.0),
+        pixels=pr.PixelGrid((2, 2), (0.055, 0.055)),
+        response=pr.IdealPhotonCounter(),
+    )
+    acquisition = pr.Acquisition(
+        exposure_s=1.0,
+        measured_edges_eV=(0.0, 500.0, 1_000.0),
+    )
+    kwargs = dict(
+        numerics=pr.Numerics(n_electrons=1, n_electrons_brem=1),
+        pixel_scorer=pr.PixelScorer((1, 1)),
+    )
+    first = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        detector,
+        acquisition=acquisition,
+        **kwargs,
+    )
+    rescored = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        detector,
+        acquisition=replace(acquisition, exposure_s=2.0),
+        **kwargs,
+    )
+    implicit_scorer = pr.simulate(
+        pr.Beam(30.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        detector,
+        acquisition=acquisition,
+        numerics=kwargs["numerics"],
+    )
+    renormalized = pr.simulate(
+        pr.Beam(30.0, bunch_charge_pc=2.0),
+        pr.Slab("hopg", 1_000.0, tilt_deg=30.0),
+        detector,
+        acquisition=acquisition,
+        **kwargs,
+    )
+
+    provenance = first.provenance
+    assert provenance["observation"]["schema"] == "pyrite.observation.v2"
+    assert (
+        provenance["observation_identity_digest"]
+        == provenance["observation"]["observation_identity_digest"]
+    )
+    assert len(provenance["true_spatial_digest"]) == 64
+    assert len(provenance["response_digest"]) == 64
+    assert len(provenance["acquisition_digest"]) == 64
+    assert rescored.provenance["identity_digest"] == provenance["identity_digest"]
+    assert rescored.provenance["true_spatial_digest"] == provenance["true_spatial_digest"]
+    assert rescored.provenance["response_digest"] == provenance["response_digest"]
+    assert rescored.provenance["acquisition_digest"] != provenance["acquisition_digest"]
+    assert (
+        rescored.provenance["observation_identity_digest"]
+        != provenance["observation_identity_digest"]
+    )
+    assert first.spatial is not None
+    assert implicit_scorer.spatial is not None
+    assert renormalized.provenance["identity_digest"] == provenance["identity_digest"]
+    assert renormalized.provenance["true_spatial_digest"] == provenance["true_spatial_digest"]
+    assert renormalized.provenance["response_digest"] == provenance["response_digest"]
+    assert renormalized.provenance["acquisition_digest"] != provenance["acquisition_digest"]
+    selected = first.acquire(pixels=[(0, 0)])
+    assert selected.expected.shape == (1, 2)
+    np.testing.assert_allclose(
+        first.acquisition_image(pixel_chunk=1).ravel()[0],
+        first.acquire(pixels=[(0, 0)]).total_counts[0],
+    )
+    np.testing.assert_allclose(
+        renormalized.acquire(pixels=[(0, 0)]).expected,
+        2.0 * selected.expected,
     )

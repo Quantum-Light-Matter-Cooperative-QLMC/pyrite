@@ -192,6 +192,7 @@ Generated browsing views of every claim in the [detailed validation ledger] (phy
 | [`positioned-filter-attenuation`](ledger-detector-forward-models.md#positioned-filter-attenuation) | primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)` | `rederived` |
 | [`detector-eaglexo`](ledger-detector-forward-models.md#detector-eaglexo) | `solid_angle(Ω) × QE(E)` CCD operator | `filtered` |
 | [`detector-timepix`](ledger-detector-forward-models.md#detector-timepix) | Si charge model, diffusion, ~1.9 keV counting threshold | `blocked` |
+| [`pixel-acquisition-counting`](ledger-detector-forward-models.md#pixel-acquisition-counting) | accepted event mass per incident electron scales to expected counts with $N_e=t_{exp}f_{rep}Q_{bunch}10^{-12}/e$; reporting bins plus disjoint underflow, overflow, and below-cut channels conservatively partition native measured event mass | `unverified` |
 | [`detector-line-broadening`](ledger-detector-forward-models.md#detector-line-broadening) | EDS polar-aperture line broadening `FWHM = (2√(2ln2)/3)·(∂Ep/∂θobs)·Δθobs` | `rederived` |
 
 ## Grazing-incidence grating spectrometer

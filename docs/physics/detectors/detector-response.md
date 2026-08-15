@@ -28,11 +28,56 @@ N_m(E_m)=\int R(E_m\mid E)\,\eta(E)\,N(E)\,dE,
 
 where $\eta(E)$ is efficiency/throughput. Matrix columns must conserve the accepted probability appropriate to the selected detector model; any loss belongs in efficiency, not an unexplained normalization.
 
+## Native measured bins and counting acquisition
+
+`Detector.native_score()` returns event mass on the response model's explicit
+half-open measured-energy bins instead of interpolating it back to the true
+energy samples. `Timepix3` exposes the native columns of its existing response
+matrix; `IdealPhotonCounter` uses unit efficiency and measured energy equal to
+true energy. For the ideal response, adjacent true-energy sample midpoints are
+cell edges and each endpoint cell uses its nearest half-spacing, clipped at
+zero energy. Other response adapters fail explicitly until they define native
+measured bins. Validation: `detector-timepix`.
+
+Acquisition conservatively transfers each native-bin event mass to requested
+reporting bins by interval overlap. Because the response has no information
+within one native bin, this operation assumes uniform event density inside that
+bin. A threshold crossing a native or reporting bin is handled by the same
+fractional overlap. The result partitions response output into disjoint
+registered, reporting-axis underflow, reporting-axis overflow, and in-range
+below-cut channels; these channels sum to the native event mass apart from
+roundoff.
+
+For an accepted per-pixel density expressed per incident electron, the number
+of physical source electrons in one exposure is
+
+$$
+N_e = t_{\mathrm{exp}} f_{\mathrm{rep}}
+      \frac{Q_{\mathrm{bunch}}\,10^{-12}}{e},
+$$
+
+where exposure is in seconds, cadence in hertz, bunch charge in picocoulombs,
+and `scipy.constants.elementary_charge` supplies the exact SI elementary
+charge. Expected measured event mass per incident electron is multiplied by
+$N_e$. Zero cadence or charge is the exact zero-count limit. This is source
+normalization and detector bookkeeping, not an additional transport or
+detector-physics approximation. Validation: `pixel-acquisition-counting`.
+
+Expected counts are deterministic. Poisson mode draws every component and
+pixel from a coordinate-keyed NumPy Philox stream identified by
+`pyrite.coordinate-philox.v1`; the key includes observation digest, user seed,
+row, column, and component. Selection order and pixel chunking therefore do
+not change a pixel's result. Total and energy-window images sum their reporting
+bin/component draws and never make an independent total draw. Exact replay
+across a future RNG algorithm change requires retaining the algorithm version
+or realized arrays.
+
 ## Assumptions and interpretation
 
 - response parameters describe an idealized configured instrument, not an automatic calibration of a particular physical detector;
 - convolution cannot create source photons and should be inspected after the unconvolved components;
 - measured-energy binning and interpolation can affect narrow features;
+- conservative reporting-bin overlap treats native-bin event density as uniform and cannot recover sub-bin structure;
 - external background subtraction is analysis-only and is not detector response or source bremsstrahlung.
 
 Validation claims include `detector-solid-angle`, `detector-line-broadening`, `alexs-qe-absorption`, `alexs-charge-diffusion`, `detector-eaglexo`, and `grazing-reflectivity`; consult the [validation ledger](../../validation/physics-validation-ledger.md) for current status. Implementation owners are `pyrite.detectors.spec`, `pyrite.detectors.*_response`, and the legacy analytic helpers in `pyrite.montecarlo.detector`.

@@ -96,7 +96,34 @@ _FILTER_KEYS = frozenset(
     }
 )
 _PHYSICAL_DETECTOR_KEYS = frozenset(
-    {"distance_mm", "polar_deg", "azimuth_deg", "roll_deg", "offset_mm", "shape", "pitch_mm"}
+    {
+        "distance_mm",
+        "polar_deg",
+        "azimuth_deg",
+        "roll_deg",
+        "offset_mm",
+        "shape",
+        "pitch_mm",
+        "scorer",
+        "response",
+        "acquisition",
+    }
+)
+_PIXEL_SCORER_KEYS = frozenset({"reconstruction", "angular_shape"})
+_OBSERVATION_RESPONSE_KEYS = frozenset(
+    {"kind", "thickness_um", "bias_v", "dE_mc", "dE_out", "n_mc", "seed"}
+)
+_ACQUISITION_KEYS = frozenset(
+    {
+        "exposure_s",
+        "measured_edges_eV",
+        "measured_min_eV",
+        "measured_max_eV",
+        "measured_bin_width_eV",
+        "hit_threshold_eV",
+        "mode",
+        "seed",
+    }
 )
 _LONGITUDINAL_KINDS = frozenset({"gaussian", "microtrain", "compressed"})
 _LONGITUDINAL_KEYS = frozenset(
@@ -478,6 +505,168 @@ def _parse_filter_rows(
     return tuple(rows)
 
 
+def _parse_pixel_scorer(
+    raw: object,
+    path: str,
+    errors: _Errors,
+    *,
+    pixel_shape: tuple[int, int] | None,
+) -> Mapping[str, object] | None:
+    row = _table(raw, path, errors)
+    if row is None:
+        return None
+    errors.keys(row, path, set(_PIXEL_SCORER_KEYS))
+    reconstruction = row.get("reconstruction", "nearest_tile")
+    if reconstruction != "nearest_tile":
+        errors.add(f"{path}.reconstruction", "must be 'nearest_tile'")
+    angular_shape = _pair(
+        row.get("angular_shape", [1, 1]),
+        f"{path}.angular_shape",
+        errors,
+        integer=True,
+    )
+    if (
+        angular_shape is not None
+        and pixel_shape is not None
+        and any(
+            requested > available
+            for requested, available in zip(angular_shape, pixel_shape, strict=True)
+        )
+    ):
+        errors.add(f"{path}.angular_shape", "cannot exceed physical detector shape")
+    if reconstruction != "nearest_tile" or angular_shape is None:
+        return None
+    return MappingProxyType(
+        {
+            "reconstruction": reconstruction,
+            "angular_shape": cast(tuple[int, int], angular_shape),
+        }
+    )
+
+
+def _parse_observation_response(
+    raw: object,
+    path: str,
+    errors: _Errors,
+) -> Mapping[str, object] | None:
+    row = _table(raw, path, errors)
+    if row is None:
+        return None
+    errors.keys(row, path, set(_OBSERVATION_RESPONSE_KEYS))
+    kind = row.get("kind")
+    if kind not in {"ideal", "timepix3"}:
+        errors.add(f"{path}.kind", "must be 'ideal' or 'timepix3'")
+        return None
+    extra = set(row) - {"kind"}
+    if kind == "ideal" and extra:
+        errors.add(path, "ideal response accepts only kind")
+        return None
+    cleaned: dict[str, object] = {"kind": kind}
+    for key in ("thickness_um", "bias_v", "dE_mc", "dE_out"):
+        if key not in row:
+            continue
+        value = _number(row[key])
+        if value is None or value <= 0.0:
+            errors.add(f"{path}.{key}", "must be a finite positive number")
+        else:
+            cleaned[key] = value
+    for key in ("n_mc", "seed"):
+        if key not in row:
+            continue
+        value = row[key]
+        minimum = 1 if key == "n_mc" else 0
+        if type(value) is not int or value < minimum:
+            relation = "positive" if key == "n_mc" else "nonnegative"
+            errors.add(f"{path}.{key}", f"must be a {relation} integer")
+        else:
+            cleaned[key] = value
+    return MappingProxyType(cleaned)
+
+
+def _parse_acquisition(
+    raw: object,
+    path: str,
+    errors: _Errors,
+) -> Mapping[str, object] | None:
+    row = _table(raw, path, errors)
+    if row is None:
+        return None
+    errors.keys(row, path, set(_ACQUISITION_KEYS))
+    exposure = _number(row.get("exposure_s"))
+    if exposure is None or exposure <= 0.0:
+        errors.add(f"{path}.exposure_s", "must be a finite positive number")
+
+    explicit = "measured_edges_eV" in row
+    uniform_keys = ("measured_min_eV", "measured_max_eV", "measured_bin_width_eV")
+    uniform_count = sum(key in row for key in uniform_keys)
+    edges: tuple[float, ...] | None = None
+    if explicit and uniform_count:
+        errors.add(path, "use measured_edges_eV or min/max/bin-width, not both")
+    elif explicit:
+        raw_edges = row["measured_edges_eV"]
+        values = [_number(item) for item in raw_edges] if isinstance(raw_edges, list) else []
+        if len(values) < 2 or any(value is None or value < 0.0 for value in values):
+            errors.add(f"{path}.measured_edges_eV", "must contain at least two nonnegative numbers")
+        elif any(
+            cast(float, right) <= cast(float, left)
+            for left, right in zip(values, values[1:], strict=False)
+        ):
+            errors.add(f"{path}.measured_edges_eV", "must be strictly increasing")
+        else:
+            edges = tuple(cast(float, value) for value in values)
+    elif uniform_count == len(uniform_keys):
+        minimum, maximum, width = (_number(row[key]) for key in uniform_keys)
+        if (
+            minimum is None
+            or maximum is None
+            or width is None
+            or minimum < 0.0
+            or maximum <= minimum
+            or width <= 0.0
+        ):
+            errors.add(path, "measured min/max/bin-width must define a finite positive range")
+        else:
+            quotient = (maximum - minimum) / width
+            bins = round(quotient)
+            if bins <= 0 or not math.isclose(quotient, bins, rel_tol=1.0e-12, abs_tol=1.0e-12):
+                errors.add(
+                    f"{path}.measured_bin_width_eV",
+                    "energy range must be an integer multiple of bin width",
+                )
+            else:
+                generated = tuple(minimum + index * width for index in range(bins + 1))
+                edges = (*generated[:-1], maximum)
+    else:
+        errors.add(path, "requires measured_edges_eV or all of measured min/max/bin-width")
+
+    threshold = _number(row.get("hit_threshold_eV", 0.0))
+    if threshold is None or threshold < 0.0:
+        errors.add(f"{path}.hit_threshold_eV", "must be a finite nonnegative number")
+    mode = row.get("mode", "expected")
+    if mode not in {"expected", "poisson"}:
+        errors.add(f"{path}.mode", "must be 'expected' or 'poisson'")
+    seed = row.get("seed")
+    if seed is not None and (type(seed) is not int or seed < 0):
+        errors.add(f"{path}.seed", "must be a nonnegative integer")
+    if mode == "poisson" and seed is None:
+        errors.add(f"{path}.seed", "is required for poisson mode")
+    if mode == "expected" and seed is not None:
+        errors.add(f"{path}.seed", "is not accepted in expected mode")
+    if exposure is None or exposure <= 0.0 or edges is None or threshold is None or threshold < 0:
+        return None
+    if mode not in {"expected", "poisson"}:
+        return None
+    return MappingProxyType(
+        {
+            "exposure_s": exposure,
+            "measured_edges_eV": edges,
+            "hit_threshold_eV": threshold,
+            "mode": mode,
+            "seed": seed,
+        }
+    )
+
+
 def _parse_physical_detector(
     raw: object, path: str, errors: _Errors
 ) -> Mapping[str, object] | None:
@@ -512,6 +701,24 @@ def _parse_physical_detector(
             errors.add(f"{path}.pitch_mm", "must contain positive numbers")
         else:
             cleaned["pitch_mm"] = pitch
+    pixel_shape = cast(tuple[int, int] | None, shape)
+    if "scorer" in row:
+        scorer = _parse_pixel_scorer(
+            row["scorer"],
+            f"{path}.scorer",
+            errors,
+            pixel_shape=pixel_shape,
+        )
+        if scorer is not None:
+            cleaned["scorer"] = scorer
+    if "response" in row:
+        response = _parse_observation_response(row["response"], f"{path}.response", errors)
+        if response is not None:
+            cleaned["response"] = response
+    if "acquisition" in row:
+        acquisition = _parse_acquisition(row["acquisition"], f"{path}.acquisition", errors)
+        if acquisition is not None:
+            cleaned["acquisition"] = acquisition
     return MappingProxyType(cleaned)
 
 

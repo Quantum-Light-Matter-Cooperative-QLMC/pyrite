@@ -6,7 +6,8 @@ from typing import Any, NotRequired, TypedDict, cast
 import click
 import tomlkit
 
-from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
+from pyrite.campaign.observation import filter_from_config, physical_detector_from_config
+from pyrite.instrument import FilterPlate, PlanarDetector
 
 
 class _FilterRow(TypedDict):
@@ -183,36 +184,12 @@ def physical_detector_cli_options(function):
 
 def filter_from_row(row: Mapping[str, object]) -> FilterPlate:
     """Construct the validated public object from one TOML array row."""
-    typed = cast(_FilterRow, row)
-    pose = PlanarPose.from_observation(
-        typed["distance_mm"],
-        typed["polar_deg"],
-        typed.get("azimuth_deg", 0.0),
-        typed.get("roll_deg", 0.0),
-        typed.get("offset_mm", (0.0, 0.0)),
-    )
-    return FilterPlate(
-        material=typed["material"],
-        thickness_mm=typed["thickness_mm"],
-        size_mm=typed["size_mm"],
-        pose=pose,
-        name=typed.get("name"),
-    )
+    return filter_from_config(row)
 
 
 def physical_detector_from_row(row: Mapping[str, object]) -> PlanarDetector:
     """Construct a planar pixel detector from the profile TOML table."""
-    typed = cast(_PhysicalDetectorRow, row)
-    pose = PlanarPose.from_observation(
-        typed["distance_mm"],
-        typed.get("polar_deg", 90.0),
-        typed.get("azimuth_deg", 0.0),
-        typed.get("roll_deg", 0.0),
-        typed.get("offset_mm", (0.0, 0.0)),
-    )
-    shape = typed.get("shape", (256, 256))
-    pitch = typed.get("pitch_mm", (0.055, 0.055))
-    return PlanarDetector(pose=pose, pixels=PixelGrid(shape=shape, pitch_mm=pitch))
+    return physical_detector_from_config(row)
 
 
 def filter_row(**values):

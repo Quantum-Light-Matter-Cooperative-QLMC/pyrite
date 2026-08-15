@@ -12,7 +12,7 @@ import numpy as np
 from .._numerics import Convergence, Numerics
 from .._numerics import MosaicRoute as MosaicRoute
 from ..detectors import Detector
-from ..instrument import FilterPlate, PixelScorer, PlanarDetector
+from ..instrument import Acquisition, FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
 from .geometry import Slab, Stack, Target
 from .lowering import build_sweep_cases
@@ -177,6 +177,7 @@ class Scene:
     detector: Detector | PlanarDetector = field(default_factory=Detector)
     filters: tuple[FilterPlate, ...] = ()
     pixel_scorer: PixelScorer | None = None
+    acquisition: Acquisition | None = None
     emission: EmissionMode = "incoherent"
     brem_source: BremSource = "mc"
 
@@ -194,6 +195,8 @@ class Scene:
         object.__setattr__(self, "filters", filters)
         if self.pixel_scorer is not None and not isinstance(self.pixel_scorer, PixelScorer):
             raise TypeError("Scene.pixel_scorer must be a PixelScorer or None")
+        if self.acquisition is not None and not isinstance(self.acquisition, Acquisition):
+            raise TypeError("Scene.acquisition must be an Acquisition or None")
         if filters and not isinstance(self.detector, PlanarDetector):
             raise TypeError("Scene.filters require a physical PlanarDetector")
         if self.pixel_scorer is not None:
@@ -210,6 +213,11 @@ class Scene:
                 )
             ):
                 raise ValueError("pixel scorer angular shape cannot exceed detector pixel shape")
+        if self.acquisition is not None:
+            if not isinstance(self.detector, PlanarDetector) or self.detector.pixels is None:
+                raise TypeError("Scene.acquisition requires a physical pixel detector")
+            if self.detector.response is None:
+                raise ValueError("Scene.acquisition requires an explicit detector response")
         if isinstance(self.detector, PlanarDetector):
             validate_downstream_scene(filters, self.detector)
         object.__setattr__(

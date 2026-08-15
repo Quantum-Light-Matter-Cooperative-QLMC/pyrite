@@ -20,7 +20,14 @@ from .campaign.model import (
 )
 from .campaign.profiles import case_bremsstrahlung_marker, case_content_key
 from .detectors import Detector
-from .instrument import FilterPlate, PixelScorer, PlanarDetector
+from .instrument import (
+    Acquisition,
+    FilterPlate,
+    PixelScorer,
+    PlanarDetector,
+    ResolvedObservation,
+    observation_identity,
+)
 from .instrument.geometry import (
     angular_tiles,
     filter_path_lengths,
@@ -168,6 +175,7 @@ def simulate(
     brem_source: BremSource = "mc",
     filters: tuple[FilterPlate, ...] = (),
     pixel_scorer: PixelScorer | None = None,
+    acquisition: Acquisition | None = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -222,6 +230,7 @@ def simulate(
         detector=detector,
         filters=filters,
         pixel_scorer=pixel_scorer,
+        acquisition=acquisition,
         emission=emission,
         brem_source=brem_source,
     )
@@ -359,12 +368,35 @@ def _simulate_planar(
     selected_line = coherent if scene.emission == "coherent" else line
     selected_name = "coherent" if selected_line is coherent else "line"
     source_digest = case_content_key(case, xsgen_tables=xsgen_tables)
-    observation_digest, observation = _observation_provenance(
-        source_digest,
-        scene,
-        scorer,
-        (line_mu, background_mu),
-    )
+    if scene.acquisition is None:
+        observation_digest, observation = _observation_provenance(
+            source_digest,
+            scene,
+            scorer,
+            (line_mu, background_mu),
+        )
+        identity_provenance: dict[str, Any] = {}
+    else:
+        layered_identity = observation_identity(
+            source_digest,
+            ResolvedObservation(
+                detector=detector,
+                scorer=scorer,
+                filters=scene.filters,
+                acquisition=scene.acquisition,
+            ),
+            rep_rate_hz=scene.beam.rep_rate_hz,
+            bunch_charge_pc=scene.beam.bunch_charge_pc,
+            representative_directions_lab=directions_lab,
+            attenuation_arrays=(line_mu, background_mu),
+        )
+        observation_digest = layered_identity.observation_digest
+        observation = dict(layered_identity.payload)
+        identity_provenance = {
+            "true_spatial_digest": layered_identity.true_spatial_digest,
+            "response_digest": layered_identity.response_digest,
+            "acquisition_digest": layered_identity.acquisition_digest,
+        }
     coherent_average = None if coherent is None else spatial.average_density("coherent")
     characteristic_average = spatial.average_density("characteristic")
     return Result(
@@ -381,6 +413,7 @@ def _simulate_planar(
             **_line_grid_provenance(case, output),
             "observation_identity_digest": observation_digest,
             "observation": observation,
+            **identity_provenance,
             "stopping_model": STOPPING_MODEL,
             "characteristic_model": CHARACTERISTIC_MODEL,
             "bremsstrahlung_model": case_bremsstrahlung_marker(case),
@@ -395,7 +428,9 @@ def _simulate_planar(
         },
         coherent_spectrum=coherent_average,
         characteristic_spectrum=characteristic_average,
-        spatial=spatial if scene.pixel_scorer is not None else None,
+        spatial=(
+            spatial if scene.pixel_scorer is not None or scene.acquisition is not None else None
+        ),
     )
 
 

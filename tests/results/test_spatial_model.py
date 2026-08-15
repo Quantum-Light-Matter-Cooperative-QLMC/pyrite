@@ -2,8 +2,10 @@ from typing import Any
 
 import numpy as np
 import pytest
+from scipy.constants import elementary_charge
 
-from pyrite.instrument import PixelGrid, PlanarDetector, PlanarPose
+from pyrite.detectors import IdealPhotonCounter
+from pyrite.instrument import Acquisition, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.results.model import PixelRayMap, SpatialResult, SpectralFactors
 
 
@@ -30,6 +32,21 @@ def _spatial() -> SpatialResult:
         response=HalfResponse(),
     )
     return SpatialResult(ray_map, factors, factors, detector)
+
+
+def _counting_spatial() -> SpatialResult:
+    spatial = _spatial()
+    detector = PlanarDetector(
+        pose=spatial.detector.pose,
+        pixels=spatial.detector.pixels,
+        response=IdealPhotonCounter(),
+    )
+    return SpatialResult(
+        spatial.ray_map,
+        spatial.line,
+        spatial.background,
+        detector,
+    )
 
 
 def _materialize_with_chunk(spatial: SpatialResult, method: str, pixel_chunk: Any) -> object:
@@ -75,6 +92,47 @@ def test_average_density_recovers_sum_flux_over_total_solid_angle() -> None:
     expected = np.sum(spectra, axis=0) / np.sum(spatial.ray_map.solid_angle_sr)
 
     np.testing.assert_allclose(spatial.average_density("line"), expected, rtol=1.0e-15)
+
+
+def test_acquisition_image_is_chunk_invariant_and_sums_component_draws(monkeypatch) -> None:
+    spatial = _counting_spatial()
+    largest = 0
+    original = SpatialResult._materialize
+
+    def bounded(self, factor, coordinates):
+        nonlocal largest
+        largest = max(largest, len(coordinates))
+        return original(self, factor, coordinates)
+
+    monkeypatch.setattr(SpatialResult, "_materialize", bounded)
+    acquisition = Acquisition(
+        exposure_s=1.0,
+        measured_edges_eV=(0.5, 1.5, 2.5, 3.5),
+        mode="poisson",
+        seed=23,
+    )
+    kwargs = dict(
+        acquisition=acquisition,
+        rep_rate_hz=1.0,
+        bunch_charge_pc=elementary_charge * 1.0e12 * 100.0,
+        observation_digest="b" * 64,
+        components=("line", "background"),
+    )
+
+    one = spatial.acquisition_image(pixel_chunk=1, **kwargs)
+    assert largest == 1
+    two = spatial.acquisition_image(pixel_chunk=2, **kwargs)
+    assert largest == 2
+    window = spatial.acquisition_image(
+        energy_range_eV=(0.5, 1.5),
+        pixel_chunk=1,
+        **kwargs,
+    )
+    selected = spatial.acquire(pixels=[(0, 0), (0, 1)], **kwargs)
+
+    np.testing.assert_array_equal(one, two)
+    np.testing.assert_array_equal(one.ravel(), selected.total_counts)
+    np.testing.assert_array_equal(window.ravel(), selected.window_counts((0.5, 1.5)))
 
 
 @pytest.mark.parametrize("pixel_chunk", [0, -1])

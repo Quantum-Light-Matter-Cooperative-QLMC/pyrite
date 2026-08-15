@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from numbers import Integral
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -14,6 +14,9 @@ from ..montecarlo import Case
 
 #: Spatial result components. ``*_total`` adds characteristic radiation.
 COMPONENTS = ("line", "background", "coherent", "characteristic", "line_total", "coherent_total")
+
+if TYPE_CHECKING:
+    from ..instrument import Acquisition, AcquisitionBatch
 
 
 def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
@@ -388,6 +391,80 @@ class SpatialResult:
             total += np.sum(self._materialize(factor, coordinates), axis=0)
         return total / np.sum(self.ray_map.solid_angle_sr)
 
+    def acquire(
+        self,
+        acquisition: Acquisition,
+        *,
+        rep_rate_hz: float,
+        bunch_charge_pc: float,
+        observation_digest: str,
+        pixels=None,
+        region=None,
+        components: tuple[str, ...] = ("line", "background"),
+    ) -> AcquisitionBatch:
+        """Score selected pixels into common reporting bins and count channels."""
+        from ..instrument import combine_acquisitions, score_acquisition
+
+        resolved_components = tuple(components)
+        if not resolved_components:
+            raise ValueError("components must not be empty")
+        if len(set(resolved_components)) != len(resolved_components):
+            raise ValueError("components must be unique")
+        coordinates = self._coordinates(pixels=pixels, region=region)
+        detector = self.detector.scalar_detector()
+        batches = []
+        for component in resolved_components:
+            factor = self._factor(component)
+            batches.append(
+                score_acquisition(
+                    detector,
+                    factor.energy_eV,
+                    self._materialize(factor, coordinates),
+                    acquisition,
+                    rep_rate_hz=rep_rate_hz,
+                    bunch_charge_pc=bunch_charge_pc,
+                    observation_digest=observation_digest,
+                    coordinates=coordinates,
+                    component=component,
+                )
+            )
+        return combine_acquisitions(batches)
+
+    def acquisition_image(
+        self,
+        *,
+        acquisition: Acquisition,
+        rep_rate_hz: float,
+        bunch_charge_pc: float,
+        observation_digest: str,
+        energy_range_eV: tuple[float, float] | None = None,
+        components: tuple[str, ...] = ("line", "background"),
+        pixel_chunk: int = 1024,
+    ) -> np.ndarray:
+        """Return a total or reporting-window count image in bounded pixel chunks."""
+        chunk = _positive_integer("pixel_chunk", pixel_chunk)
+        ny, nx = self.ray_map.tile_index.shape
+        dtype = np.int64 if acquisition.mode == "poisson" else float
+        image = np.empty(ny * nx, dtype=dtype)
+        flat = np.arange(ny * nx)
+        for start in range(0, flat.size, chunk):
+            chosen = flat[start : start + chunk]
+            coordinates = np.column_stack(np.unravel_index(chosen, (ny, nx)))
+            batch = self.acquire(
+                acquisition,
+                rep_rate_hz=rep_rate_hz,
+                bunch_charge_pc=bunch_charge_pc,
+                observation_digest=observation_digest,
+                pixels=coordinates,
+                components=components,
+            )
+            image[chosen] = (
+                batch.total_counts
+                if energy_range_eV is None
+                else batch.window_counts(energy_range_eV)
+            )
+        return image.reshape(ny, nx)
+
 
 @dataclass(frozen=True)
 class Result:
@@ -474,6 +551,69 @@ class Result:
             "spec_characteristic": self.characteristic_spectrum,
         }
         return line_spectrum(record, coherent=coherent, characteristic=characteristic)
+
+    def _acquisition_context(self):
+        scene = self.provenance.get("scene")
+        acquisition = getattr(scene, "acquisition", None)
+        beam = getattr(scene, "beam", None)
+        if acquisition is None or beam is None:
+            raise ValueError("result was not produced with an acquisition configuration")
+        if self.spatial is None:
+            raise ValueError("result does not contain spatial factors")
+        digest = self.provenance.get("observation_identity_digest")
+        if not isinstance(digest, str):
+            raise ValueError("result does not contain an observation identity digest")
+        return acquisition, beam, digest, scene
+
+    def acquire(
+        self,
+        *,
+        pixels=None,
+        region=None,
+        components: tuple[str, ...] | None = None,
+    ) -> AcquisitionBatch:
+        """Score selected pixels using this result's frozen acquisition identity."""
+        acquisition, beam, digest, scene = self._acquisition_context()
+        assert self.spatial is not None
+        selected = (
+            (("coherent", "background") if scene.emission == "coherent" else ("line", "background"))
+            if components is None
+            else components
+        )
+        return self.spatial.acquire(
+            acquisition,
+            rep_rate_hz=beam.rep_rate_hz,
+            bunch_charge_pc=beam.bunch_charge_pc,
+            observation_digest=digest,
+            pixels=pixels,
+            region=region,
+            components=selected,
+        )
+
+    def acquisition_image(
+        self,
+        energy_range_eV: tuple[float, float] | None = None,
+        *,
+        components: tuple[str, ...] | None = None,
+        pixel_chunk: int = 1024,
+    ) -> np.ndarray:
+        """Return the configured total or reporting-window detector count image."""
+        acquisition, beam, digest, scene = self._acquisition_context()
+        assert self.spatial is not None
+        selected = (
+            (("coherent", "background") if scene.emission == "coherent" else ("line", "background"))
+            if components is None
+            else components
+        )
+        return self.spatial.acquisition_image(
+            acquisition=acquisition,
+            rep_rate_hz=beam.rep_rate_hz,
+            bunch_charge_pc=beam.bunch_charge_pc,
+            observation_digest=digest,
+            energy_range_eV=energy_range_eV,
+            components=selected,
+            pixel_chunk=pixel_chunk,
+        )
 
 
 __all__ = ["PixelRayMap", "Result", "SpatialResult", "SpectralFactors"]

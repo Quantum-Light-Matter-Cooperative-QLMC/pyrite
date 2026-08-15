@@ -28,9 +28,19 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Code:** `detectors/timepix_response.py::TimepixResponse`
 - **Source:** Henke `f₂` convention, Chantler/FFAST tabulation via xraydb (Si)
 - **Status:** blocked
-- **Checks:** —
-- **Anchor:** —
-- **Notes:** **hardware params are placeholders** — can't sign off until real quad values land
+- **Checks:** native measured-bin batch application matches one-spectrum application; output bins are explicit and nonnegative; detected event mass cannot exceed incident event mass in the focused regression
+- **Anchor:** `tests/instrument/test_acquisition_core.py`
+- **Notes:** **hardware params are placeholders** — can't sign off until real quad values land. The native-bin checks cover operator bookkeeping only, not hardware accuracy.
+
+## `pixel-acquisition-counting`
+
+- **Claim:** accepted event mass per incident electron scales to expected counts with $N_e=t_{exp}f_{rep}Q_{bunch}10^{-12}/e$; reporting bins plus disjoint underflow, overflow, and below-cut channels conservatively partition native measured event mass
+- **Code:** `instrument/acquisition.py::electron_count`; `instrument/acquisition.py::score_acquisition`
+- **Source:** SI definitions of coulomb, picocoulomb, hertz, and the exact elementary charge; `scipy.constants.elementary_charge`
+- **Status:** unverified
+- **Checks:** units; analytic one-electron-per-bunch normalization; exact zero-charge limit; hand-computed fractional-overlap partition; component-additive totals; fixed-seed selection/chunk invariance
+- **Anchor:** `tests/instrument/test_acquisition_core.py`; `tests/results/test_spatial_model.py`
+- **Notes:** implementation-context review only. Uniform density within each native measured bin is the conservative-rebin assumption. Fresh-context validation remains pending; no hardware calibration claim is made.
 
 ## `detector-line-broadening`
 
