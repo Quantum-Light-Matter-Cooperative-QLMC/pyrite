@@ -13,15 +13,7 @@ file. Edit and drop items on `main`.
 ## Active
 
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
-   The four incoherent-line-path markers are now ledgered (`line-hkl-batch`,
-   `line-amplitude-fusion`, `line-gemv-elementwise` `filtered`;
-   `line-absorption-tabulation` is `rederived` and awaits human `signed-off`).
-   `beam-phase-space-injection` /
-   `beam-energy-spread-injection` are `rederived` and await human
-   `signed-off`, as are the four x-ray dispersion claims (`xray-chi-zero`,
-   `xray-refractive-index`, `xray-in-medium-resonance`,
-   `xray-in-medium-propagation-phase`) and `coherent-segment-midpoint-time`
-   (electron-transport correctness fix, implementation landed on `main`).
+
    1. **Rederivation Clean-up and Formatting.** Need a worker to go thru and clean up the math in
       completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
       Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
@@ -37,12 +29,7 @@ file. Edit and drop items on `main`.
    (F-I). →
    `feature/energy-controlled-electron-transport`;
    [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
-3. **Readable physics validation ledger.** Replace the squeezed eight-column
-   Sphinx table with one labeled record per validation ID, preserving all
-   scientific content and generated summaries. →
-   `docs/readable-physics-validation-ledger`;
-   [`agentdocs/tasks/docs/readable-physics-validation-ledger/`](agentdocs/tasks/docs/readable-physics-validation-ledger/).
-4. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
+3. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
    evidence: `qlmc` job `1638` (`hopg_hbn`) computed 5508 hopg cases in 195 s and
    5508 h-BN cases in 206 s — ~35-37 ms/case — while the box held ~5% CPU and
    10-15% GPU utilization with no burstiness, so the case loop is bound by
@@ -56,6 +43,7 @@ file. Edit and drop items on `main`.
    (`.capsync` was 28.5 ms of a 64.3 ms local hopg case). →
    `feature/compute-performance-optimization`;
    [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
+
 ## P1 - top-priority back burner
 
 ### Ready
@@ -156,18 +144,6 @@ file. Edit and drop items on `main`.
    keeps growing. Review:
    [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
    §5.
-5. **Verify documented code blocks.** `docs/conf.py` loads `myst_parser` and
-   autodoc only, so every fenced example in `docs/guides/*.md` is unverified
-   prose that rots silently; abTEM, OpenMC, and HyperSpy all execute their
-   documented examples. Triage found only 4 of 49 guide blocks are `python`
-   and 37 are `bash`, so a doctest pass would reach ~8%; the plan instead
-   checks `pyrite`/`pyrite-dev` blocks against the live Click and argparse
-   trees and covers the Python narrative separately. →
-   `chore/verify-documented-code-blocks`;
-   [`agentdocs/tasks/chore/verify-documented-code-blocks/`](agentdocs/tasks/chore/verify-documented-code-blocks/).
-   Review:
-   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
-   §4 G5.
 
 ## Inbox - >user< to be triaged
 
@@ -203,44 +179,12 @@ Nothing yet.
    and report loading/computing/saving activity without stale "NOW TESTING" cases. →
    `fix/chunked-checkpoint-lifecycle`;
    [`agentdocs/tasks/fix/chunked-checkpoint-lifecycle/`](agentdocs/tasks/fix/chunked-checkpoint-lifecycle/).
-2. **Result encoding and transfer overhead.** The version-1 HDF5 leaf encoding
-   spends one HDF5 object (~840 B, ~125 us) on every Python scalar and mapping
-   key, and `slim -o -` sends the resulting redundant metadata unframed: 6.5x
-   the bytes and ~200x the CPU of the zstd-pickle format it replaced, measured
-   both directions. Cost a 26-minute `pull --profile hopg_hbn` on 2026-08-14,
-   and the same 95 s/component write stalls seen in Bugs 1. Fix both ends —
-   schema version 2 as a columnar record table with content-addressed array
-   blobs (measured 66x faster write, 89x faster read, 5.5x smaller), plus a
-   whole-container zstd frame on the wire — while keeping ADR-0009's
-   pickle-free, `h5py`-openable artifact and permanent version-1 reads.
-   Supplies the A/B measurement Bugs 1 deferred.
-   → `fix/result-encoding-overhead`;
-   [`agentdocs/tasks/fix/result-encoding-overhead/`](agentdocs/tasks/fix/result-encoding-overhead/).
-3. **Restore remote `pyrite run` cache flags and automatic pull.** Propagate
-   `--no-cache` / `--recompute` through `pyrite run [PROFILE] -R` with their
-   local semantics, then fix the error after successful remote attachment when
-   checkpoints should auto-pull. →
-   `fix/run-cache-flags-auto-pull`;
-   [`agentdocs/tasks/fix/run-cache-flags-auto-pull/`](agentdocs/tasks/fix/run-cache-flags-auto-pull/).
-4. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
+2. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-5. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
-   not been derived for that case:
-   1. Give them a suggestion on what to run. We could also add a flag that automatically runs
-      the derivation for their energy + mat before running their actual profile.
-   2. shorten up the lines that are spit out. currently, spits out list of ALL materials
-      in the entire repo (even ones marked non-standard in mats_to_sim.toml) which need to be
-      set up for this energy, along with a long boilerplate text string next to every material.
 
 ### Ergonomics (ship anytime)
 
-1. Delete the stale root `notebooks/` tree — it now holds only `__pycache__`
-   directories shadowing `analysis_ui` module names, left over from the move
-   into `src/pyrite/apps/`.
-2. **Checkpoint HDF5 suffixes.** Write new checkpoint payloads as `.h5`, not
-   `line.pkl` / `brem.pkl`, while retaining reads of legacy `.pkl` payloads. →
-   `fix/checkpoint-h5-suffix`;
-   [`agentdocs/tasks/fix/checkpoint-h5-suffix/`](agentdocs/tasks/fix/checkpoint-h5-suffix/).
+Nothing here yet.
 
 ## Notebook backlog
 
@@ -253,14 +197,6 @@ Nothing yet.
 
 1. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard Performance Profile for MoS2" [progress bar + absolute progress]`.
-2. Golden data should be an optional installable, e.g. `uv add pyrite[golden]`
-   or part of `uv add pyrite[all]`. Same with validation scripts/app -- not
-   critically required.
-3. Clarify that: 'gc' stands for garbage collection, rm stands for 'remove'.
-   the `gc` help message could be a little more detailed, as well. functionality
-   is a little unclear to me (if there is an identical case on both
-   'standard' and 'sub_100keV' profiles, does `gc --profile standard` end up
-   dropping the sub_100 keV cases too? I hope not.)
 
 ## Long-term plans
 
