@@ -545,6 +545,21 @@ def test_build_cases_carries_pulse_source_fields_from_beam():
     assert case["rep_rate_hz"] == 10_000.0
 
 
+def test_build_cases_preserves_beam_bunch_length_for_coherent_emission():
+    sweep = Sweep(
+        material="mose2",
+        thickness_ang=100.0,
+        beam=BeamSpec(energy_keV=30.0, bunch_length_fs=120.0),
+        tilt_deg=5.0,
+    )
+
+    incoherent = build_cases(sweep, coherent_emission=False)[0]
+    coherent = build_cases(sweep, coherent_emission=True)[0]
+
+    assert incoherent["bunch_length_fs"] == 120.0
+    assert coherent["bunch_length_fs"] == incoherent["bunch_length_fs"]
+
+
 def test_brem_grid_upper_limit_tracks_case_beam_energy():
     sw = Sweep(
         material="mose2",
