@@ -3802,6 +3802,55 @@ def test_clear_profile_targets_only_profile_stems(monkeypatch, capsys):
     assert "would delete" in capsys.readouterr().out
 
 
+def test_profile_checkpoint_stems_discovers_previous_profile_identity(monkeypatch):
+    old = "hopg@hopg_hbn-111111111111"
+    same_label_variant = "hbn@hopg_hbn-222222222222"
+    unrelated = "hopg@other-333333333333"
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: f"{old}\n{same_label_variant}\n{unrelated}\n",
+    )
+    identities = {
+        old: {"catalog_profile": "hopg_hbn"},
+        same_label_variant: {"catalog_profile": "standard", "variant": "hopg_hbn"},
+    }
+    monkeypatch.setattr(
+        lifecycle,
+        "_remote_meta_json",
+        lambda stem: ("raw", {"dataset_identity": identities[stem]}),
+    )
+
+    assert lifecycle._profile_checkpoint_stems(
+        "hopg_hbn",
+        current_stems=["hopg@hopg_hbn-aaaaaaaaaaaa"],
+    ) == [
+        old,
+        "hopg@hopg_hbn-aaaaaaaaaaaa",
+    ]
+
+
+def test_clear_profile_previews_partial_previous_identity_directory(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    old = "hopg@hopg_hbn-111111111111"
+    commands = []
+    monkeypatch.setattr(
+        lifecycle,
+        "_profile_checkpoint_stems",
+        lambda *_args, **_kwargs: [old],
+    )
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: commands.append(command) or f"{old}/\n",
+    )
+
+    lifecycle.clear_remote(["hopg", "hbn"], catalog_profile="hopg_hbn")
+
+    assert f'for stem in {old}' in commands[-1]
+    assert f"checkpoints/{old}/" in capsys.readouterr().out
+
+
 def test_clear_profile_cli_uses_profile_membership(monkeypatch):
     calls = []
     monkeypatch.setattr(cli, "_profile_default_materials", lambda profile: ("hopg", "hbn"))
@@ -3933,6 +3982,67 @@ def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
     assert "for stem in hopg" in commands[0]
     assert "pyrite prune --profile standard" in commands[0]
     assert "would prune remote" in capsys.readouterr().out
+
+
+def test_prune_remote_reserves_previous_profile_identity_for_reclamation(
+    monkeypatch, capsys
+):
+    current = type(
+        "Target",
+        (),
+        {"stem": "hopg@hopg_hbn-aaaaaaaaaaaa"},
+    )()
+    old = "hopg@hopg_hbn-111111111111"
+    commands = []
+    monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [current])
+    monkeypatch.setattr(
+        lifecycle,
+        "_profile_checkpoint_stems",
+        lambda *_args, **_kwargs: [current.stem, old],
+    )
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "would prune remote",
+    )
+
+    lifecycle.prune_remote(catalog_profile="hopg_hbn")
+
+    assert f"for stem in {old} {current.stem}" in commands[0]
+    assert "would delete obsolete profile checkpoint: checkpoints/%s/" in commands[0]
+    assert old in commands[0]
+    assert "would prune remote" in capsys.readouterr().out
+
+
+def test_prune_remote_obsolete_only_confirmation_reuses_exact_selection(monkeypatch):
+    current = type("Target", (), {"stem": "hopg@hopg_hbn-aaaaaaaaaaaa"})()
+    old = "hopg@hopg_hbn-111111111111"
+    discoveries = []
+    commands = []
+    monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [current])
+    monkeypatch.setattr(
+        lifecycle,
+        "_profile_checkpoint_stems",
+        lambda *_args, **_kwargs: discoveries.append(True) or [current.stem, old],
+    )
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: commands.append(command)
+        or "would delete obsolete profile checkpoint",
+    )
+    monkeypatch.setattr(lifecycle._cli_core, "confirm_destructive", lambda *_args: True)
+
+    lifecycle.prune_remote(catalog_profile="hopg_hbn")
+
+    assert len(discoveries) == 1
+    assert len(commands) == 2
+    assert all(old in command for command in commands)
+    assert "pyrite prune --profile hopg_hbn --yes" in commands[1]
 
 
 def _bash_or_skip(tmp_path):

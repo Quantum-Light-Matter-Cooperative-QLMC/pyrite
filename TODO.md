@@ -195,7 +195,8 @@ Nothing here yet.
 
 ## UI backlog
 
-1. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
+1. When a profile parameter is set, CLI should print out something along the lines of "< changed from <old_value(s))> to <new_value(s))>" if there were old values, otherwise just "< set to <new_value(s))>"
+2. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard Performance Profile for MoS2" [progress bar + absolute progress]`.
 
 ## Long-term plans

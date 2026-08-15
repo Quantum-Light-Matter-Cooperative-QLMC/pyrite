@@ -33,7 +33,7 @@ def _refuse_if_busy(materials, quick):
             "refusing to start: a live job is already producing the same "
             "checkpoint(s), and two runs writing one <stem>.pkl race on its "
             f".tmp and crash.\n{detail}\n"
-            "monitor it (pyrite remote status <jobid> --attach) or stop it "
+            "monitor it (pyrite job attach <jobid>) or stop it "
             "(pyrite remote stop <material>) first, or run different materials."
         )
 
@@ -41,8 +41,8 @@ def _refuse_if_busy(materials, quick):
 def clear_remote(materials, yes=False, catalog_profile="standard"):
     """Delete one or more materials' accumulated checkpoints on the box: both
     ``checkpoints/<material>/`` and ``checkpoints/<material>_quick/`` for
-    each standard-profile material, or current full/survey identity stems for
-    ``catalog_profile``. Accepts a single crystal key or a list.
+    each standard-profile material, or every manifest-confirmed identity
+    generation owned by ``catalog_profile``. Accepts a single crystal key or a list.
 
     Refuses (before touching anything) if a live job or a pre-submission
     reservation protects any stem.  Without ``yes`` this is a safe dry preview:
@@ -53,7 +53,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
     transport._check_materials(materials)  # interpolated into a remote shell command
     label = f"profile={catalog_profile}" if catalog_profile != "standard" else ", ".join(materials)
     if catalog_profile != "standard":
-        stems = [
+        current_stems = [
             stem
             for fidelity in ("full", "survey")
             for stem in scripts._stems(
@@ -63,6 +63,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
                 catalog_profile=catalog_profile,
             )
         ]
+        stems = _profile_checkpoint_stems(catalog_profile, current_stems=current_stems)
     else:
         stems = [stem for m in materials for stem in (m, f"{m}_quick")]
     wanted = set(stems)
@@ -74,9 +75,9 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
     )
     if catalog_profile != "standard":
         busy = [
-            (jid, sorted(set(materials).intersection(jmats)))
+            (jid, sorted(jmats))
             for jid, _jquick, jmats in live_jobs
-            if live_profiles.get(jid) == catalog_profile and set(materials).intersection(jmats)
+            if live_profiles.get(jid) == catalog_profile
         ]
     else:
         busy = [
@@ -92,24 +93,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
             "stop it (pyrite remote stop <material>) first, or wait for it to finish."
         )
     if yes:
-        outcome = transport._ssh_capture(
-            scripts._clear_checkpoint_stems_command(f"clear-{scripts._new_jobid()}", stems)
-        ).splitlines()
-        reservations = [line.split("\t", 1)[1] for line in outcome if line.startswith("RESERVED\t")]
-        if reservations:
-            raise SystemExit(
-                "refusing to clear: a checkpoint reservation is still active for "
-                f"{', '.join(reservations)}. Wait for submission to resolve, or stop "
-                "the recorded job before clearing."
-            )
-        existing = [line.split("\t", 1)[1] for line in outcome if line.startswith("CLEARED\t")]
-        if not existing:
-            print(f"(nothing to clear for {label})")
-            return
-        print("cleared on the box:")
-        for f in existing:
-            print(f"  checkpoints/{f}")
-        return
+        return _clear_exact_remote_stems(stems, label)
     reservations = state._reservation_holders(stems)
     if reservations:
         detail = "\n".join(
@@ -130,7 +114,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
         f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
         f": legacy-candidates {legacy_names}; "
         f"for stem in {stem_names}; do "
-        '[ -f "$stem/line.h5" ] || [ -f "$stem/line.pkl" ] && echo "$stem/" || true; '
+        '[ -d "$stem" ] && echo "$stem/" || true; '
         '[ -f "$stem.pkl" ] && echo "$stem.pkl" || true; done'
     )
     existing = transport._ssh_capture(listing).split()
@@ -142,7 +126,53 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
         print(f"  checkpoints/{f}")
     if not _cli_core.confirm_destructive(yes, "Delete these remote checkpoints?"):
         return
-    return clear_remote(materials, yes=True, catalog_profile=catalog_profile)
+    return _clear_exact_remote_stems(stems, label)
+
+
+def _clear_exact_remote_stems(stems, label):
+    """Reserve and delete the exact stems previously selected or previewed."""
+    outcome = transport._ssh_capture(
+        scripts._clear_checkpoint_stems_command(f"clear-{scripts._new_jobid()}", stems)
+    ).splitlines()
+    reservations = [line.split("\t", 1)[1] for line in outcome if line.startswith("RESERVED\t")]
+    if reservations:
+        raise SystemExit(
+            "refusing to clear: a checkpoint reservation is still active for "
+            f"{', '.join(reservations)}. Wait for submission to resolve, or stop "
+            "the recorded job before clearing."
+        )
+    existing = [line.split("\t", 1)[1] for line in outcome if line.startswith("CLEARED\t")]
+    if not existing:
+        print(f"(nothing to clear for {label})")
+        return
+    print("cleared on the box:")
+    for name in existing:
+        print(f"  checkpoints/{name}")
+
+
+def _profile_checkpoint_stems(catalog_profile, *, current_stems=()):
+    """Return exact remote stems owned by a named catalog profile.
+
+    Current predicted stems remain candidates even before they have a manifest.
+    Older identity generations are accepted only when their remote manifest
+    confirms profile ownership; a readable ``@`` label alone is not deletion
+    authority because explicit variants share the same stem namespace.
+    """
+    from ..campaign.profiles import _VARIANT_STEM_RE
+
+    stems = set(current_stems)
+    names = transport._ssh_capture(scripts._list_checkpoint_dirs_command()).split()
+    for name in names:
+        match = _VARIANT_STEM_RE.fullmatch(name)
+        if match is None or match["label"] != catalog_profile:
+            continue
+        remote_meta = _remote_meta_json(name)
+        if remote_meta is None:
+            continue
+        identity = remote_meta[1].get("dataset_identity")
+        if isinstance(identity, dict) and identity.get("catalog_profile") == catalog_profile:
+            stems.add(name)
+    return sorted(stems)
 
 
 def clear_all_remote(yes=False):
@@ -205,11 +235,19 @@ def prune_remote(
     catalog_profile: str | None = None,
     yes: bool = False,
 ):
-    """Preview or prune stale records on box under exact stem reservations."""
+    """Preview or prune stale records and obsolete profile generations remotely."""
     from ..checkpoints.checkpoint_cleanup import _targets
 
     targets = _targets(all_profiles, catalog_profile)
-    stems = [target.stem for target in targets]
+    current_stems = [target.stem for target in targets]
+    obsolete_stems = []
+    if catalog_profile is not None and catalog_profile != "standard":
+        profile_stems = _profile_checkpoint_stems(
+            catalog_profile,
+            current_stems=current_stems,
+        )
+        obsolete_stems = sorted(set(profile_stems).difference(current_stems))
+    stems = sorted(set(current_stems).union(obsolete_stems))
     live = state._live_jobs()
     if live:
         detail = "\n".join(
@@ -231,27 +269,52 @@ def prune_remote(
             f"{detail}\n"
             "wait for submission to resolve, reap orphans, or stop its recorded job."
         )
+    output = _run_remote_prune(
+        stems,
+        all_profiles=all_profiles,
+        catalog_profile=catalog_profile,
+        obsolete_stems=obsolete_stems,
+        yes=yes,
+    )
+    if (
+        not yes
+        and (
+            "would prune" in output.lower()
+            or "would delete obsolete profile checkpoint" in output.lower()
+        )
+        and _cli_core.confirm_destructive(False, "Delete these stale remote checkpoint records?")
+    ):
+        return _run_remote_prune(
+            stems,
+            all_profiles=all_profiles,
+            catalog_profile=catalog_profile,
+            obsolete_stems=obsolete_stems,
+            yes=True,
+        )
+
+
+def _run_remote_prune(
+    stems,
+    *,
+    all_profiles,
+    catalog_profile,
+    obsolete_stems,
+    yes,
+):
+    """Run remote pruning against one exact, already-resolved stem selection."""
     output = transport._ssh_capture(
         scripts._prune_checkpoint_stems_command(
             f"prune-{scripts._new_jobid()}",
             stems,
             all_profiles=all_profiles,
             catalog_profile=catalog_profile,
+            obsolete_stems=obsolete_stems,
             yes=yes,
         )
     )
     if output:
         print(output)
-    if (
-        not yes
-        and "would prune" in output.lower()
-        and _cli_core.confirm_destructive(False, "Delete these stale remote checkpoint records?")
-    ):
-        return prune_remote(
-            all_profiles=all_profiles,
-            catalog_profile=catalog_profile,
-            yes=True,
-        )
+    return output
 
 
 def prune_job_dirs(*, profile=None, all_jobs=False, yes=False):
@@ -313,8 +376,8 @@ def _refuse_if_profile_live(catalog_profile):
         raise SystemExit(
             f"refusing to submit: profile {catalog_profile!r} already has a live job "
             f"({', '.join(clash)}); monitor it "
-            f"(pyrite remote status {clash[0]} --attach) or stop it "
-            f"(pyrite remote stop --profile {catalog_profile}) first."
+            f"(pyrite job attach {clash[0]}) or stop it "
+            f"(pyrite job stop --profile {catalog_profile}) first."
         )
 
 
@@ -590,9 +653,9 @@ def start_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"pyrite remote status {jobid} --attach"),
-                ("Status", f"pyrite remote status {jobid} -vv"),
-                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Monitor", f"pyrite job attach {jobid}"),
+                ("Status", f"pyrite job status {jobid} -vv"),
+                ("Logs", f"pyrite job logs {jobid}"),
                 *(
                     [
                         (
@@ -662,9 +725,9 @@ def start_zhai_queue(
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Workload", "Zhai reproduction"),
-                ("Monitor", f"pyrite remote status {jobid} --attach"),
-                ("Status", f"pyrite remote status {jobid} -vv"),
-                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Monitor", f"pyrite job attach {jobid}"),
+                ("Status", f"pyrite job status {jobid} -vv"),
+                ("Logs", f"pyrite job logs {jobid} --follow"),
                 ("Pull", "pyrite remote pull --preset zhai  (after completion)"),
             ]
         )
@@ -944,9 +1007,9 @@ def start_rebrem_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"pyrite remote status {jobid} --attach"),
-                ("Status", f"pyrite remote status {jobid} -vv"),
-                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Monitor", f"pyrite job attach {jobid}"),
+                ("Status", f"pyrite job status {jobid} -vv"),
+                ("Logs", f"pyrite job logs {jobid} --follow"),
                 ("Pull", f"pyrite remote pull {' '.join(stems)}  (after completion)"),
             ]
         )
@@ -1065,9 +1128,9 @@ def start_reline_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"pyrite remote status {jobid} --attach"),
-                ("Status", f"pyrite remote status {jobid} -vv"),
-                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Monitor", f"pyrite job attach {jobid}"),
+                ("Status", f"pyrite job status {jobid} -vv"),
+                ("Logs", f"pyrite job logs {jobid} --follow"),
                 ("Pull", f"pyrite remote pull {' '.join(stems)} --line-only  (after completion)"),
             ]
         )

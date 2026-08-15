@@ -30,12 +30,12 @@ Run, wait for SLURM, then pull:
 
 Remote jobs survive SSH disconnects:
 
-pyrite remote status [JOBID] --attach  # (re)connect + track live (default: latest)
-    pyrite remote jobs                     # list jobs on the box + their state
-    pyrite remote status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
-    pyrite remote logs [JOBID] --follow    # tail the remote log (live)
-    pyrite remote stop mose2 wse2          # cancel live SLURM job(s) by material
-    pyrite remote stop --all               # cancel every live SLURM job
+pyrite job attach [JOBID]  # (re)connect + track live (default: latest)
+    pyrite job list                     # list jobs on the box + their state
+    pyrite job status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
+    pyrite job logs [JOBID] --follow    # tail the remote log (live)
+    pyrite job stop mose2 wse2          # cancel live SLURM job(s) by material
+    pyrite job stop --all -y            # cancel every live SLURM job
     pyrite remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
 `run --remote --detach` returns after shipping code, writing a batch script
