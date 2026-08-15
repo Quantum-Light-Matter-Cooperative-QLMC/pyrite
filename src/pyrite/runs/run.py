@@ -303,6 +303,54 @@ def _manifest_for(results, dataset_identity=None):
     return manifest
 
 
+class _IncrementalManifest:
+    """Accumulate a live shard manifest without rescanning prior records.
+
+    The exact completed-case proof is intentionally published only by the final
+    consolidated manifest. While shards exist, consumers need current counts and
+    sweep values; the completion fast path already refuses metadata-only proofs
+    when ``parts/`` is present.
+    """
+
+    _FIELDS = ("crystal", "E0_keV", "tilt_deg", "tilt_azim_deg", "thickness_ang", "B_ang2")
+
+    def __init__(self, dataset_identity=None):
+        self._keys = set()
+        self._values = defaultdict(set)
+        self._identity = dataset_identity
+
+    def add(self, results):
+        for name, by_energy in results.items():
+            for energy, record in by_energy.items():
+                key = (str(name), float(energy))
+                if key in self._keys:
+                    continue
+                self._keys.add(key)
+                case = record["case"]
+                for field in self._FIELDS:
+                    if field in case:
+                        self._values[field].add(case[field])
+
+    def manifest(self):
+        sweep = {
+            field: [value.item() if hasattr(value, "item") else value for value in sorted(values)]
+            for field, values in self._values.items()
+        }
+        manifest = {
+            "schema": "cxr.checkpoint-manifest.v2",
+            "energies_keV": sorted(float(value) for value in sweep.get("E0_keV", [])),
+            "n_records": len(self._keys),
+            "sweep": sweep,
+        }
+        if self._identity is not None:
+            from ..campaign.profiles import normalize_dataset_identity
+
+            identity = normalize_dataset_identity(self._identity)
+            manifest["identity_version"] = identity["identity_version"]
+            manifest["dataset_identity"] = identity
+        return manifest
+
+
 def _case_set_proof(keys):
     """Compact exact proof for a set of checkpoint record identities."""
     canonical = sorted((str(name), float(energy).hex()) for name, energy in keys)
@@ -324,15 +372,24 @@ def _case_set_proof_from_cases(cases):
     return _case_set_proof((case["name"], case["E0_keV"]) for case in cases)
 
 
+def _manifest_write(checkpoint_path, manifest):
+    """Atomically publish one already-built sidecar manifest."""
+    manifest_path = _manifest_path_for(checkpoint_path)
+    os.makedirs(os.path.dirname(manifest_path) or ".", exist_ok=True)
+    tmp = f"{manifest_path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(manifest, f)
+    os.replace(tmp, manifest_path)
+    return manifest
+
+
 def _manifest_save(checkpoint_path, results, dataset_identity=None):
-    """Atomically write/refresh the sidecar checkpoint manifest
-    (``<material>.meta.json``) alongside a ``_checkpoint_save`` -- lets
-    :func:`checkpoint_manifest` enumerate a checkpoint's energies/record
-    count/sweep values without unpickling the (140-225 MB) checkpoint itself.
-    JSON is tiny, so this runs on every save. Atomic write mirrors
-    ``_checkpoint_save``: a sibling ``.<pid>.tmp`` then ``os.replace``, so a
-    crash never leaves a half-written ``meta.json``. Returns the manifest dict
-    written."""
+    """Build and atomically refresh the sidecar checkpoint manifest.
+
+    Full construction is used for authoritative component saves and backfills.
+    Per-config shards use :class:`_IncrementalManifest` so a sweep does not
+    repeatedly traverse every accumulated result.
+    """
     manifest_path = _manifest_path_for(checkpoint_path)
     if dataset_identity is None and os.path.isfile(manifest_path):
         try:
@@ -341,11 +398,7 @@ def _manifest_save(checkpoint_path, results, dataset_identity=None):
         except (OSError, ValueError, TypeError):
             pass
     manifest = _manifest_for(results, dataset_identity)
-    tmp = f"{manifest_path}.{os.getpid()}.tmp"
-    with open(tmp, "w") as f:
-        json.dump(manifest, f)
-    os.replace(tmp, manifest_path)
-    return manifest
+    return _manifest_write(checkpoint_path, manifest)
 
 
 def _save_recomputed_checkpoint(checkpoint_path, results, *, components):
@@ -634,15 +687,25 @@ def run_sweep(
             elapsed = time.perf_counter() - started
             on_timing({"checkpoint_seconds": elapsed, "consolidation_seconds": elapsed})
 
+    incremental_manifest = None
+
     def _save_part(name):
         """Persist one just-finished config as an immutable shard -- O(1) per
         config, versus ``_save``'s whole-store re-serialization (O(N^2) over a
-        sweep). The manifest is still refreshed each time (tiny JSON) so live
-        viewers see fresh energy/record counts before consolidation."""
+        sweep). The manifest accumulator scans existing/resumed results once,
+        then visits only each newly completed config so live viewers retain fresh
+        counts without an O(N^2) sweep rescan."""
+        nonlocal incremental_manifest
+
         started = time.perf_counter()
         path = Path(checkpoint_path)
         _checkpoint_store.save_part(path.name, path.parent, name, results[name])
-        _manifest_save(checkpoint_path, _material_subset(), dataset_identity)
+        if incremental_manifest is None:
+            incremental_manifest = _IncrementalManifest(dataset_identity)
+            incremental_manifest.add(_material_subset())
+        else:
+            incremental_manifest.add({name: results[name]})
+        _manifest_write(checkpoint_path, incremental_manifest.manifest())
         if on_timing is not None:
             elapsed = time.perf_counter() - started
             on_timing({"checkpoint_seconds": elapsed, "shard_write_seconds": elapsed})
