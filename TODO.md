@@ -234,9 +234,10 @@ Nothing yet.
 1. Delete the stale root `notebooks/` tree — it now holds only `__pycache__`
    directories shadowing `analysis_ui` module names, left over from the move
    into `src/pyrite/apps/`.
-2. Write new checkpoint payloads as `.h5`, not `line.pkl` / `brem.pkl`. The
-   content has been HDF5 since `checkpoints/_checkpoint_io.py:153`; the `.pkl`
-   extension hides that from anyone with `h5py`. Readers already accept both.
+2. **Checkpoint HDF5 suffixes.** Write new checkpoint payloads as `.h5`, not
+   `line.pkl` / `brem.pkl`, while retaining reads of legacy `.pkl` payloads. →
+   `fix/checkpoint-h5-suffix`;
+   [`agentdocs/tasks/fix/checkpoint-h5-suffix/`](agentdocs/tasks/fix/checkpoint-h5-suffix/).
 
 ## Notebook backlog
 
