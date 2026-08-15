@@ -213,7 +213,12 @@ Nothing yet.
    Supplies the A/B measurement Bugs 1 deferred.
    → `fix/result-encoding-overhead`;
    [`agentdocs/tasks/fix/result-encoding-overhead/`](agentdocs/tasks/fix/result-encoding-overhead/).
-3. Bring back `--no-cache` and `--recompute` args to `pyrite run` and associated commands.
+3. **Restore `pyrite run` cache flags and remote automatic pull.** Reconcile the
+   user-observed absence of `--no-cache` / `--recompute` with their current
+   `main` help and implementation, then fix the error after successful
+   `pyrite run [PROFILE] -R` attachment when checkpoints should auto-pull. →
+   `fix/run-cache-flags-auto-pull`;
+   [`agentdocs/tasks/fix/run-cache-flags-auto-pull/`](agentdocs/tasks/fix/run-cache-flags-auto-pull/).
 4. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
 5. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
