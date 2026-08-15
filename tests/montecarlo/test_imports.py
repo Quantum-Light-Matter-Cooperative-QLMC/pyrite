@@ -6,6 +6,32 @@ import os
 import subprocess
 import sys
 import textwrap
+import warnings
+
+import pytest
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "pyrite.montecarlo.transport_jit_kernel",
+        "pyrite.montecarlo.spectrum.brem_jit_kernel",
+        "pyrite.montecarlo.spectrum.line_jit_kernel",
+        "pyrite.montecarlo.spectrum.coherent_jit_kernel",
+        "pyrite.montecarlo.spectrum.coherent_stream_jit_kernel",
+    ],
+)
+def test_rawkernel_import_does_not_emit_experimental_warning(module: str) -> None:
+    """CuPy's known experimental notice must not pollute normal PyRITE runs."""
+    pytest.importorskip("cupy")
+    sys.modules.pop(module, None)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "error",
+            message=r"cupyx\.jit\.rawkernel is experimental.*",
+            category=FutureWarning,
+        )
+        __import__(module)
 
 
 def test_cpu_import_path_does_not_require_cupy() -> None:

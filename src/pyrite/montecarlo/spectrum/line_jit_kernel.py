@@ -1,6 +1,7 @@
 import cupy as xp
 import numpy as np
-from cupyx import jit
+
+from .._cupy_jit import jit
 
 F32_ZERO = np.float32(0.0)
 F32_TINY = np.float32(1.0e-20)

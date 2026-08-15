@@ -1423,7 +1423,7 @@ def pull(
     (``--brem-only``/``--line-only``), since those require an existing local
     checkpoint to merge into and a freshly discovered stem would not have one.
 
-    Every pull runs the transfer through ``pyrite slim`` on the box, which encodes
+    Every pull runs the transfer through ``pyrite checkpoint slim`` on the box, which encodes
     straight to that ssh session's stdout (``-o -``) -- the box's compress pass
     overlaps the wire instead of staging a whole temp artifact on box disk
     first. ``grid`` filters to just the material's current grid (plus the
@@ -1517,7 +1517,7 @@ def pull(
             # propagates the remote command's status.
             remote_transfer = (
                 f"cd {config.shell_remote_dir()} && "
-                f"{config.shell_remote_uv()} run --no-sync pyrite slim "
+                f"{config.shell_remote_uv()} run --no-sync pyrite checkpoint slim "
                 f"{config.shell_arg(ckpt)}{flags} -o -"
             )
             # Timed so a slow pull is attributable: this covers box slim CPU +

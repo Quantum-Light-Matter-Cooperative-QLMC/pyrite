@@ -4273,6 +4273,8 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     assert len(transfers) == 1
     transfer_command, destination = transfers[0]
     assert "/checkpoints/hopg" in transfer_command
+    assert "pyrite checkpoint slim" in transfer_command
+    assert "pyrite slim" not in transfer_command
     assert "--grid" in transfer_command
     assert f"--compresslevel {_checkpoint_io.MAX_LEVEL}" in transfer_command
     # Streamed straight down the ssh session's stdout: no box temp to trap-clean,
