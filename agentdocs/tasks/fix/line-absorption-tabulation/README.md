@@ -41,20 +41,20 @@ scope as a fix.
 
 ## Checklist
 
-- [ ] Add a failing edge-focused regression before changing production code.
-- [ ] Implement stable per-element log-log attenuation interpolation in every
+- [x] Add a failing edge-focused regression before changing production code.
+- [x] Implement stable per-element log-log attenuation interpolation in every
       tabulated line route without restoring per-segment CPU/device transfers.
-- [ ] Include all absorber-composition elements when constructing the native
+- [x] Include all absorber-composition elements when constructing the native
       edge grid and preserve endpoint clamping and out-of-range policy.
-- [ ] Verify units, positivity, zero-path transmission, elemental and compound
+- [x] Verify units, positivity, zero-path transmission, elemental and compound
       limits, and exact-node identity.
-- [ ] Measure identical CPU workloads before/after; record table size, warm-up,
+- [x] Measure identical CPU workloads before/after; record table size, warm-up,
       repeats, spread, and any unavailable CUDA evidence.
-- [ ] Add the derivation record and update the ledger without marking it
+- [x] Add the derivation record and update the ledger without marking it
       `signed-off`.
-- [ ] Run focused line/interpolation tests, neighboring Monte Carlo tests,
+- [x] Run focused line/interpolation tests, neighboring Monte Carlo tests,
       lint/typecheck, and docs proportional to the touched paths.
-- [ ] Review the scoped diff and checkpoint independently valid work.
+- [x] Review the scoped diff and checkpoint independently valid work.
 
 ## Decisions and open questions
 
@@ -71,6 +71,39 @@ scope as a fix.
   available CUDA runner.  Do not launch a remote job without separate
   authority; absence is reportable and does not justify weakening CPU physics
   coverage.
+
+## Implementation evidence
+
+- Pre-fix regression: canonical collection failed because the corrected helper
+  surface was absent. The prior-method numerical evidence remains HOPG
+  `2.72e-1` maximum relative coefficient error and `5.23e-1` relative
+  transmission error at a 10000 Angstrom path.
+- Corrected midpoint maxima against direct xraydb: HOPG/MoS2/MoSe2 float64
+  `1.25e-12`/`1.94e-13`/`1.27e-13`; float32
+  `9.01e-5`/`5.26e-5`/`2.19e-5`.
+- Focused and neighboring CPU run: 102 passed, 1 CUDA test skipped. Covered the
+  new anchor, cheap interpolation hoists, chunk invariance, coherent emission,
+  finite-footprint escape, multilayer, groove, xray-dispersion CUDA collection,
+  and coherent-stream CUDA collection.
+- Whole-route CPU benchmark: NumPy float64, MoS2, 4000 deterministic segments,
+  two reflections, 315 energy bins, no RNG, two warm-ups, seven repeats. Old
+  `27.202--27.865 ms` (median `27.597`); corrected `28.616--29.044 ms`
+  (median `28.708`, `+4.03%`). Tracemalloc peak 43,108,750 to 43,165,968 bytes
+  (`+0.13%`).
+- Interpolation-only CPU benchmark: MoS2, 400000 seeded (`1729`) queries, 3423
+  nodes, two elements, three warm-ups, 15 repeats. Old median `1.474 ms`, new
+  `23.550 ms` (`15.98x`); table 27,384 to 54,768 bytes. This isolates the
+  deliberate log/exp/sum cost; the whole-route result above is representative.
+- CUDA: unavailable locally (`nvidia-smi` absent); no remote job launched.
+- Checks: focused Ruff and format checks pass; typecheck passes with the
+  `notebooks` dependency group; validation-ledger generation/check and Sphinx
+  warnings-as-errors docs pass. Repository-wide lint remains red only for the
+  pre-existing undefined `seen` in `tests/scan/test_scan_budget.py:258`.
+- Physics review: units, passive sign, positivity, exact nodes, endpoint clamps,
+  zero escape path, elemental/compound construction, and unchanged exact
+  layered/grooved paths pass. The derivation is implementation-context only;
+  fresh-context validation, CUDA evidence, spectrum-level exact A/B, and human
+  sign-off remain open. Ledger status stays `discrepancy`.
 
 ## Delegation
 
@@ -96,4 +129,3 @@ a Serena one-shot contract.  No sub-delegation is authorized.
 - The derivation record and ledger identify the exact old divergent convention,
   the corrected expression, assumptions, limits, anchor, and human sign-off
   requirement.
-

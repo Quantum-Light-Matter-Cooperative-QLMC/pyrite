@@ -213,6 +213,64 @@ def _interp_index(x, grid):
     return idx, frac, below, above
 
 
+def _log_interp_fraction(x, grid, idx):
+    """Stable log-energy interpolation fraction for a precomputed bracket.
+
+    ``log(x/x0) / log(x1/x0)`` is evaluated with ``log1p`` so adjacent
+    float32 edge nodes do not lose their separation to cancellation.
+    Endpoint masks remain the responsibility of the gather, matching the
+    existing linear-table interpolation policy.
+    """
+    x0 = grid[idx - 1]
+    x1 = grid[idx]
+    bounded_x = xp.minimum(xp.maximum(x, x0), x1)
+    return xp.log1p((bounded_x - x0) / x0) / xp.log1p((x1 - x0) / x0)
+
+
+def _interp_elemental_mu(idx, log_frac, below, above, log_mu_table):
+    """Interpolate elemental ``log(mu_i)`` rows, exponentiate, then sum.
+
+    xraydb's non-``f1`` Chantler rule is log-linear in energy. Since
+    ``mu_i = 2 r_e lambda n_i f2_i`` is proportional to ``f2_i / E``, each
+    ``log(mu_i)`` is linear on the same native interval. Compound attenuation
+    is the sum of the interpolated elemental coefficients, not a log-linear
+    interpolation of their total. Validation: line-absorption-tabulation
+    """
+    f0 = log_mu_table[:, idx - 1]
+    values = xp.exp(f0 + log_frac[None, ...] * (log_mu_table[:, idx] - f0))
+    endpoint_shape = (log_mu_table.shape[0],) + (1,) * idx.ndim
+    low = xp.exp(log_mu_table[:, 0]).reshape(endpoint_shape)
+    high = xp.exp(log_mu_table[:, -1]).reshape(endpoint_shape)
+    values = xp.where(below[None, ...], low, values)
+    values = xp.where(above[None, ...], high, values)
+    return xp.sum(values, axis=0)
+
+
+def _elemental_log_mu_table(composition, energy_grid):
+    """Return CPU ``log(mu_i)`` rows [log(1/Angstrom)] for ``composition``."""
+    rows = [
+        np.asarray(_mu_total_inv_ang([(element, density)], energy_grid))
+        for element, density in composition
+    ]
+    return np.log(np.stack(rows, axis=0))
+
+
+def _line_tabulation_grid(crystal_info, composition, lo, hi):
+    """Shared 1 eV/native-Chantler line grid, including absorber elements."""
+    from ...materials.atomic import load_henke
+
+    grids = [np.arange(lo, hi + 1.0, 1.0)]
+    elements = {element for element, _ in crystal_info["basis"]}
+    elements.update(element for element, _density in composition)
+    for element in elements:
+        try:
+            native_energy = load_henke(element)[0]
+            grids.append(native_energy[(native_energy >= lo) & (native_energy <= hi)])
+        except Exception:
+            pass
+    return np.unique(np.concatenate(grids))
+
+
 def _interp_gather2d(idx, frac, below, above, tables, gcol):
     """Per-column gather+blend for the shared ``_interp_index`` bracket against
     per-``g`` ``tables`` of shape ``(N_g, n)`` (``gcol == arange(N_g)``, hoisted
@@ -243,10 +301,10 @@ if hasattr(xp, "ElementwiseKernel"):
     # the old f0 + frac*(f1-f0) sequence into an FMA, preserving the accepted
     # line-hkl-batch rounding for each interpolation blend.
     _INTERP_GATHER_LINE_TABLES_F32 = xp.ElementwiseKernel(
-        "raw I idx, raw float32 frac, raw bool below, raw bool above, "
+        "raw I idx, raw float32 frac, raw float32 log_frac, raw bool below, raw bool above, "
         "raw float32 chi_re_tab, raw float32 chi_im_tab, "
-        "raw float32 u_re_tab, raw float32 u_im_tab, raw float32 mu_tab, "
-        "int32 n_g, int32 n_tab",
+        "raw float32 u_re_tab, raw float32 u_im_tab, raw float32 log_mu_tab, "
+        "int32 n_g, int32 n_mu, int32 n_tab",
         "float32 chi_re, float32 chi_im, float32 u_re, float32 u_im, float32 mu",
         r"""
         const long long bracket = (long long)idx[i];
@@ -275,11 +333,17 @@ if hasattr(xp, "ElementwiseKernel"):
                : (use_hi ? u_im_tab[base + n_tab - 1]
                          : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(u_im_tab[hi], a0))));
 
-        const long long mu_lo = bracket - 1;
-        a0 = mu_tab[mu_lo];
-        mu = use_lo ? mu_tab[0]
-             : (use_hi ? mu_tab[n_tab - 1]
-                       : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(mu_tab[bracket], a0))));
+        const float lf = log_frac[i];
+        mu = 0.0f;
+        for (int element = 0; element < n_mu; ++element) {
+            const long long mu_base = (long long)element * (long long)n_tab;
+            const long long mu_lo = mu_base + bracket - 1;
+            const float log0 = log_mu_tab[mu_lo];
+            const float log_mu = use_lo ? log_mu_tab[mu_base]
+                               : (use_hi ? log_mu_tab[mu_base + n_tab - 1]
+                                         : __fadd_rn(log0, __fmul_rn(lf, __fsub_rn(log_mu_tab[mu_base + bracket], log0))));
+            mu += expf(log_mu);
+        }
         """,
         "cxr_interp_gather_line_tables_f32",
     )
@@ -288,13 +352,14 @@ if hasattr(xp, "ElementwiseKernel"):
 def _interp_gather_line_tables(
     idx,
     frac,
+    log_frac,
     below,
     above,
     chi_re_tab,
     chi_im_tab,
     u_re_tab,
     u_im_tab,
-    mu_tab,
+    log_mu_tab,
 ):
     """Gather every line-coupling table from one shared interpolation bracket."""
     if (
@@ -302,20 +367,23 @@ def _interp_gather_line_tables(
         and idx.dtype.kind in "iu"
         and frac.dtype == xp.float32
         and chi_re_tab.dtype == xp.float32
-        and mu_tab.dtype == xp.float32
+        and log_mu_tab.dtype == xp.float32
     ):
         n_g, n_tab = chi_re_tab.shape
+        n_mu = log_mu_tab.shape[0]
         flat = _INTERP_GATHER_LINE_TABLES_F32(
             idx,
             frac,
+            log_frac,
             below,
             above,
             chi_re_tab,
             chi_im_tab,
             u_re_tab,
             u_im_tab,
-            mu_tab,
+            log_mu_tab,
             np.int32(n_g),
+            np.int32(n_mu),
             np.int32(n_tab),
             size=idx.size,
         )
@@ -328,7 +396,7 @@ def _interp_gather_line_tables(
         _interp_gather2d(idx, frac, below, above, chi_im_tab, gcol),
         _interp_gather2d(idx, frac, below, above, u_re_tab, gcol),
         _interp_gather2d(idx, frac, below, above, u_im_tab, gcol),
-        _interp_gather1d(idx, frac, below, above, mu_tab),
+        _interp_elemental_mu(idx, log_frac, below, above, log_mu_tab),
     )
 
 
@@ -874,46 +942,24 @@ def mc_spectrum(
     # ~0.25 s/case over ~10^5 segments, and E_res stays on the device (no
     # per-reflection GPU->CPU->GPU round-trip; that structure-factor CPU cost was
     # what capped GPU utilisation on a fast card). The grid is a 1 eV mesh UNION
-    # the basis elements' native Henke energies, which densely sample the edges --
-    # a plain uniform mesh mis-resolves the edge jumps (tens of % at e.g. the
-    # C K-edge). Window matches the keep mask below.
-    from ...materials.atomic import load_henke
-
+    # the basis and absorber elements' native Henke energies, which densely
+    # sample the edges -- a plain uniform mesh mis-resolves the edge jumps (tens
+    # of % at e.g. the C K-edge). Window matches the keep mask below.
     _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
     _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
     _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
-    _grids = [np.arange(_lo, _hi + 1.0, 1.0)]
-    for _el in {el for el, _ in info["basis"]}:
-        try:
-            _Eh = load_henke(_el)[0]
-            _grids.append(_Eh[(_Eh >= _lo) & (_Eh <= _hi)])
-        except Exception:
-            pass
-    E_tab = np.unique(np.concatenate(_grids))
+    E_tab = _line_tabulation_grid(info, abs_comp, _lo, _hi)
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
-    # Absorption coefficient mu(E) [1/Ang] tabulated on the SAME edge-resolved
-    # E_tab grid as chi/U, for on-device interpolation at each resonance energy
-    # (_interp1) in both the batched and per-hkl line paths. Previously mu was
-    # evaluated exactly per (segment, reflection) via a CPU xraydb spline behind
-    # a per-block _to_cpu sync -- the real GPU-starving cost (~59 s at ~9% GPU
-    # utilisation). mu uses only f2 and is smoother between nodes than chi/U (no
-    # f1 edge cusp). Applied to the single-slab and finite-footprint
-    # branches (coherent AND incoherent alike, so their single-segment
-    # limiting-case identity still holds bit-for-bit); the layered _stack_tau
-    # and grooved escape paths keep exact per-point mu.
-    #
-    # CAUTION: the "smoother than chi/U, so at least as accurate" argument this
-    # comment used to make is MEASURABLY FALSE near an absorption edge, and using
-    # only f2 is why -- the edge jump is the whole of mu's variation, where in
-    # chi_g it rides on a smooth f0. Measured against exact per-point mu, the
-    # error is edge-localized but reaches 2.7e-1 within ~1 eV of hopg's C K-edge
-    # (283.7 eV) and 3.8e-2 at MoS2's S K-edge, versus 5.8e-5 for chi_g on the
-    # same grid. Median is 1.6e-6. See the ledger row for the full bound.
-    #
-    # Physics-METHOD change (tabulated vs exact absorption), not a reassociation.
-    # Ledgered `discrepancy`; REGEN + human sign-off still REQUIRED.
+    # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and
+    # interpolated linearly against log(E) before summing. This reproduces the
+    # pinned xraydb non-f1 Chantler rule; interpolating the compound total in
+    # either linear or log space does not. Explicit absorber elements contribute
+    # their native nodes to E_tab even when absent from the crystal basis.
+    # Applied only to single-slab/finite-footprint routes. Layered and grooved
+    # escape retain exact per-point mu. No per-segment host/device transfer is
+    # restored. Fresh-context verification and human sign-off remain required.
     # Validation: line-absorption-tabulation
-    mu_tab_g = xp.asarray(np.asarray(_mu_total_inv_ang(abs_comp, E_tab)), dtype=REAL)
+    log_mu_tab_g = xp.asarray(_elemental_log_mu_table(abs_comp, E_tab), dtype=REAL)
 
     # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
     # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
@@ -1045,11 +1091,12 @@ def mc_spectrum(
         # All five tabulations share E_r and E_tab_g, so bracket once. U_g tables
         # are pre-scaled by 1/m_e during construction.
         _ix, _fr, _blw, _abv = _interp_index(E_r, E_tab_g)
+        _log_fr = _log_interp_fraction(E_r, E_tab_g, _ix)
         chi_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_re)
         chi_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_im)
         u_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_re)
         u_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_im)
-        mu_i = _interp_gather1d(_ix, _fr, _blw, _abv, mu_tab_g)
+        mu_i = _interp_elemental_mu(_ix, _log_fr, _blw, _abv, log_mu_tab_g)
         chi = chi_re_i + 1j * chi_im_i
         eUg_over_m = u_re_i + 1j * u_im_i
 
@@ -1681,7 +1728,7 @@ def mc_spectrum(
                     _coh_chi_im,
                     _coh_u_re,
                     _coh_u_im,
-                    mu_tab_g,
+                    log_mu_tab_g,
                     lo_keep=lo_keep,
                     hi_keep=hi_keep,
                     hbarc=HBARC_EV_ANG,
@@ -1758,16 +1805,18 @@ def mc_spectrum(
             # so bracket ONCE (_interp_index) and gather per table -- kills the
             # fourfold-redundant searchsorted/clip. Bit-for-bit vs _batch_interp.
             _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab_g)
+            _log_fr = _log_interp_fraction(E_res, E_tab_g, _ix)
             chi_re, chi_im, u_re, u_im, mu = _interp_gather_line_tables(
                 _ix,
                 _fr,
+                _log_fr,
                 _blw,
                 _abv,
                 CHI_RE,
                 CHI_IM,
                 U_RE,
                 U_IM,
-                mu_tab_g,
+                log_mu_tab_g,
             )
             if coherent:
                 # -- 5c. COMPLEX amplitude per polarization ---------------------

@@ -51,6 +51,7 @@ radiation-physics/coherent-emission
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/external-brem-subtraction
 radiation-physics/finite-time-lineshape
+radiation-physics/line-absorption-tabulation
 radiation-physics/line-energy-dispersion
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption

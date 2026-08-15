@@ -79,6 +79,24 @@ def _interp_shared(table, idx, frac, below, above, n_tab):
 
 
 @jit.rawkernel(device=True)
+def _interp_elemental_mu(log_mu_table, idx, log_frac, below, above, n_mu, n_tab):
+    mu = F32_ZERO
+    element = U32_ZERO
+    while element < n_mu:
+        base = element * n_tab
+        if below:
+            log_mu = log_mu_table[base]
+        elif above:
+            log_mu = log_mu_table[base + n_tab - U32_ONE]
+        else:
+            log0 = log_mu_table[base + idx - U32_ONE]
+            log_mu = log0 + log_frac * (log_mu_table[base + idx] - log0)
+        mu += xp.exp(log_mu)
+        element += U32_ONE
+    return mu
+
+
+@jit.rawkernel(device=True)
 def _bracket_index(grid, x, n_tab):
     """Equivalent to ``clip(searchsorted(grid, x), 1, n_tab - 1)``."""
     lo = U32_ZERO
@@ -118,7 +136,7 @@ def _coherent_prologue_kernel(
     chi_im_tab,
     u_re_tab,
     u_im_tab,
-    mu_tab,
+    log_mu_tab,
     n_re_tab,
     E_r_out,
     aw_out,
@@ -136,6 +154,7 @@ def _coherent_prologue_kernel(
     n_pairs,
     n_seg,
     n_g,
+    n_mu,
     n_tab,
 ):
     # g-major fixed order: pair = g*n_seg + seg.  The reduction kernel then
@@ -201,12 +220,14 @@ def _coherent_prologue_kernel(
     idx = _bracket_index(E_tab, E_res, n_tab)
     x0 = E_tab[idx - U32_ONE]
     frac = (E_res - x0) / (E_tab[idx] - x0)
+    bounded_energy = min(max(E_res, x0), E_tab[idx])
+    log_frac = xp.log1p((bounded_energy - x0) / x0) / xp.log1p((E_tab[idx] - x0) / x0)
 
     chi_re = _interp_row(chi_re_tab, g, idx, frac, below, above, n_tab)
     chi_im = _interp_row(chi_im_tab, g, idx, frac, below, above, n_tab)
     u_re = _interp_row(u_re_tab, g, idx, frac, below, above, n_tab)
     u_im = _interp_row(u_im_tab, g, idx, frac, below, above, n_tab)
-    mu = _interp_shared(mu_tab, idx, frac, below, above, n_tab)
+    mu = _interp_elemental_mu(log_mu_tab, idx, log_frac, below, above, n_mu, n_tab)
 
     # k.v = omega (1 - denom) survives the substitution exactly (denom absorbed
     # the index), k.g takes one power of Re n through k_mag = |k|, and the PXR
@@ -603,7 +624,7 @@ def run_coherent_prologue_kernel(
     chi_im_tab,
     u_re_tab,
     u_im_tab,
-    mu_tab,
+    log_mu_tab,
     *,
     lo_keep,
     hi_keep,
@@ -646,6 +667,7 @@ def run_coherent_prologue_kernel(
     _validate_threads(nthreads, "prologue_nthreads")
     n_g = int(n_g)
     n_tab = int(E_tab.size)
+    n_mu = int(log_mu_tab.shape[0])
     n_seg = int(denom.size)
     if n_g <= 0 or n_tab < 2:
         raise ValueError("coherent prologue requires at least one g row and two tabulation points")
@@ -730,7 +752,7 @@ def run_coherent_prologue_kernel(
             chi_im_tab,
             u_re_kernel,
             u_im_kernel,
-            mu_tab,
+            log_mu_tab,
             n_re_tab,
             E_r,
             aw_seg,
@@ -748,6 +770,7 @@ def run_coherent_prologue_kernel(
             np.uint32(n_pairs),
             np.uint32(n_seg),
             np.uint32(n_g),
+            np.uint32(n_mu),
             np.uint32(n_tab),
         ),
     )

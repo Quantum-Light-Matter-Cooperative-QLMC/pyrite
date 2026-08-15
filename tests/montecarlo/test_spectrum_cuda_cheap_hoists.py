@@ -265,7 +265,7 @@ def test_coherent_prologue_returns_only_pair_dependent_planes():
         cp.asarray(chi_im).reshape(-1),
         cp.asarray(u_re).reshape(-1),
         cp.asarray(u_im).reshape(-1),
-        cp.asarray(mu),
+        cp.asarray(np.log(mu)[None, :]),
         lo_keep=50.0,
         hi_keep=1600.0,
         hbarc=hbarc,
