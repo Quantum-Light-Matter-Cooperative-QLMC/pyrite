@@ -213,10 +213,10 @@ Nothing yet.
    Supplies the A/B measurement Bugs 1 deferred.
    → `fix/result-encoding-overhead`;
    [`agentdocs/tasks/fix/result-encoding-overhead/`](agentdocs/tasks/fix/result-encoding-overhead/).
-3. **Restore `pyrite run` cache flags and remote automatic pull.** Reconcile the
-   user-observed absence of `--no-cache` / `--recompute` with their current
-   `main` help and implementation, then fix the error after successful
-   `pyrite run [PROFILE] -R` attachment when checkpoints should auto-pull. →
+3. **Restore remote `pyrite run` cache flags and automatic pull.** Propagate
+   `--no-cache` / `--recompute` through `pyrite run [PROFILE] -R` with their
+   local semantics, then fix the error after successful remote attachment when
+   checkpoints should auto-pull. →
    `fix/run-cache-flags-auto-pull`;
    [`agentdocs/tasks/fix/run-cache-flags-auto-pull/`](agentdocs/tasks/fix/run-cache-flags-auto-pull/).
 4. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the

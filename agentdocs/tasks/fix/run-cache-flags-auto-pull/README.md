@@ -11,15 +11,13 @@ Two user-observed regressions affect the canonical `pyrite run` workflow:
 2. `pyrite run [PROFILE] -R` submits and tracks the remote run but errors during
    the automatic pull that should follow successful completion.
 
-Current `main` does not reproduce the first symptom at the source-checkout help
-boundary: `UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite run --help` lists both
-flags. `src/pyrite/cli/commands/scan.py` also implements their cache read/write
-matrix, `tests/cli/test_local_click_cli.py` exercises it, and
-`docs/repo-design/cli/cli-reference.md` records both options. The task must
-therefore reconcile the user-observed command with the current checkout before
-changing code: identify whether the missing flags occur in an installed/stale
-entry point, an associated compatibility command, or specifically the remote
-`-R` path. Do not duplicate already-working local options.
+Current `main` exposes both flags for local runs but rejects them with `-R`:
+`src/pyrite/cli/commands/scan.py` classifies `no_cache` and `recompute` as
+local-only options before delegating to `remote.cli.start_command`. The user
+confirmed that `pyrite run PROFILE -R --no-cache` must work; the original request
+also requires consistent `--recompute` support. Preserve the existing local
+cache read/write matrix while threading both modes through remote submission and
+the generated box-side run command.
 
 The remote path is:
 
@@ -38,10 +36,8 @@ before the fix.
 
 ## Scope
 
-- Reproduce the flag-availability discrepancy through the same executable and
-  environment the user invoked.
-- Preserve or restore `--no-cache` and `--recompute` on the intended
-  `pyrite run` surfaces with explicit help, incompatibility, and cache semantics.
+- Support `--no-cache` and `--recompute` for both local and remote
+  `pyrite run` with explicit help, incompatibility, and cache semantics.
 - Reproduce and fix the successful remote run's automatic checkpoint pull.
 - Add focused regressions at the public CLI and remote orchestration boundaries.
 - Regenerate the CLI reference if public command/help contracts change.
@@ -56,15 +52,15 @@ Non-goals:
 
 ## Implementation path and likely owners
 
-1. **Reproduce both reports before editing.** Record `which pyrite`, reported
-   version/revision, `pyrite run --help`, and the exact failing remote command
-   and error. Compare the installed entry point with the source-checkout command.
-2. **Resolve cache-flag ownership.** The likely owner is
-   `src/pyrite/cli/commands/scan.py`, with local execution in
-   `src/pyrite/runs/scan.py` and `src/pyrite/runs/run.py`. Audit associated
-   compatibility surfaces and the `-R` delegation boundary. If the defect is
-   packaging or stale installation, fix that owning surface instead of adding a
-   second cache implementation.
+1. **Reproduce both reports before editing.** Freeze the current usage error for
+   `pyrite run PROFILE -R --no-cache` / `--recompute`, and capture the exact
+   automatic-pull error from a plain successful remote run.
+2. **Thread cache policy through the remote owner.** Start at
+   `src/pyrite/cli/commands/scan.py`; pass the selected mode through
+   `src/pyrite/remote/cli.py`, the queue/submission owner, and the generated
+   box-side `pyrite run` command. Keep cache behavior owned by
+   `src/pyrite/runs/scan.py` / `src/pyrite/runs/run.py`; do not add a second
+   implementation in remote code.
 3. **Freeze the cache contract.** Add or strengthen public-root tests for help,
    parsing, mutual exclusion, and the read/write matrix:
    default `(read, write)`, `--recompute` `(false, true)`, and `--no-cache`
@@ -93,11 +89,9 @@ Non-goals:
 - A plain successful `pyrite run PROFILE -R` continues to attach and
   automatically pull. `--detach` continues to return without attaching or
   pulling; a disconnected/nonterminal viewer continues to skip automatic pull.
-- Open: which executable/version produced the missing cache flags?
-- Open: does "associated commands" mean compatibility entry points, remote
-  runs, checkpoint recompute commands, or another surface? Do not broaden cache
-  flags to remote execution without resolving this intent and defining how the
-  flags propagate into remote job scripts.
+- Reviewed: `--no-cache` and `--recompute` must be accepted with `-R` and
+  propagated into the remote job's box-side `pyrite run`. Their semantics remain
+  mutually exclusive and identical to local execution.
 - Open: capture the automatic-pull exception and determine whether it is stem
   resolution, remote command construction, transfer, decode, or local install.
 
@@ -105,8 +99,8 @@ Non-goals:
 
 1. **Reproduction, implementation, and focused regressions** — owner:
    `implement-task` with `cli-ui-ux`, `regression-testing`, `run-cxr-mc`, and
-   `remote-gpu-jobs`. Not Serena `one-shot`: the cache surface and exact pull
-   failure remain material open questions.
+   `remote-gpu-jobs`. Not Serena `one-shot`: the exact automatic-pull failure
+   remains an open runtime question.
 2. **CLI reference and bounded runtime closure** — same owner after the behavior
    is fixed; use `documentation-maintenance` if generated or durable public docs
    change. Self-contained enough for Serena `one-shot` only after slice 1 fixes
@@ -117,15 +111,13 @@ unless the dispatcher explicitly grants that authority.
 
 ## Acceptance checks
 
-- The user-observed executable and the source-checkout executable both expose
-  `--no-cache` and `--recompute` on every confirmed intended `pyrite run`
-  surface.
+- Local and remote `pyrite run` expose and accept `--no-cache` and
+  `--recompute`.
 - Local behavior preserves the documented cache matrix, forwards it to the run
   driver, and rejects both flags together with usage exit `2`.
-- If cache flags are intentionally supported with `-R`, their semantics and
-  remote propagation are documented and tested; otherwise the reviewed task
-  record identifies the intended associated surfaces without silently expanding
-  remote behavior.
+- With `-R`, each cache mode reaches the generated box-side command exactly
+  once and preserves the local read/write semantics; both together fail with
+  usage exit `2` before submission.
 - A successful canonical `pyrite run PROFILE -R` attaches, resolves only the
   completed profile materials and their correct checkpoint stems, and completes
   the automatic pull without the reported error.
