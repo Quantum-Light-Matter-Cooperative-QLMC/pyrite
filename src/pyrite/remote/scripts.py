@@ -157,6 +157,8 @@ def _queue_script(
     nsys=False,
     cpu=False,
     cpu_only=False,
+    no_cache=False,
+    recompute=False,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -168,6 +170,8 @@ def _queue_script(
         raise ValueError("cpu and cpu_only are mutually exclusive")
     if cpu_only and nsys:
         raise ValueError("cpu_only cannot be combined with nsys")
+    if no_cache and recompute:
+        raise ValueError("no_cache and recompute are mutually exclusive")
     flags = ""
     if quick:
         flags += " --quick"
@@ -175,6 +179,10 @@ def _queue_script(
         flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
+    if no_cache:
+        flags += " --no-cache"
+    elif recompute:
+        flags += " --recompute"
     if performance_profile is not None and not cpu_only:
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
@@ -377,6 +385,8 @@ def _chunked_queue_script(
     performance_interval=5.0,
     spec_chunk=None,
     brem_chunk=None,
+    no_cache=False,
+    recompute=False,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -394,6 +404,12 @@ def _chunked_queue_script(
         flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
+    if no_cache and recompute:
+        raise ValueError("no_cache and recompute are mutually exclusive")
+    if no_cache:
+        flags += " --no-cache"
+    elif recompute:
+        flags += " --recompute"
     if performance_profile is not None:
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
@@ -1055,6 +1071,8 @@ def _queue_metadata(
     nsys: bool = False,
     cpu: bool = False,
     cpu_only: bool = False,
+    no_cache: bool = False,
+    recompute: bool = False,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -1076,6 +1094,8 @@ def _queue_metadata(
             f"nsys: {bool(nsys)}",
             f"cpu: {bool(cpu)}",
             f"cpu_only: {bool(cpu_only)}",
+            f"no_cache: {bool(no_cache)}",
+            f"recompute: {bool(recompute)}",
             "progress_dashboard: True",
             "",
         ]

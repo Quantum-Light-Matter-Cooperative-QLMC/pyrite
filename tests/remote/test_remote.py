@@ -1435,6 +1435,81 @@ def test_run_defaults_to_attach_and_pull(monkeypatch):
     assert events[-1][2]["no_sync"] is True
 
 
+def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatch, tmp_path):
+    import numpy as np
+
+    from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
+
+    remote_stem = f"hopg@sub_100keV-{'a' * 12}"
+    payload = {
+        "cfg": {
+            30.0: {
+                "case": {"crystal": "hopg"},
+                "E_grid": np.array([1.0]),
+                "spec": np.array([2.0]),
+            }
+        }
+    }
+    transfer = tmp_path / "transfer.pkl"
+    _checkpoint_io.dump(payload, str(transfer))
+    resolved = []
+    transfers = []
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _materials, **_kwargs: "job")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _materials: ["hopg"])
+
+    def resolve(material, profile, *, fidelity, **_kwargs):
+        resolved.append((material, profile, fidelity))
+        return remote_stem
+
+    monkeypatch.setattr(lifecycle, "resolve_profile_stem", resolve)
+    monkeypatch.setattr(
+        lifecycle,
+        "_remote_meta_json",
+        lambda _stem: (
+            1.0,
+            {
+                "dataset_identity": {
+                    "material": "hopg",
+                    "catalog_profile": "sub_100keV",
+                    "fidelity": "full",
+                    "parameter_sha256": "a" * 64,
+                }
+            },
+        ),
+    )
+
+    def download(command, destination):
+        transfers.append(command)
+        assert f"/checkpoints/{remote_stem}" in command
+        shutil.copyfile(transfer, destination)
+
+    monkeypatch.setattr(transport, "_ssh_download", download)
+
+    remote.main(["run", "sub_100keV", "--no-sync"])
+
+    assert resolved == [("hopg", "sub_100keV", "full")]
+    assert len(transfers) == 1
+    assert _checkpoint_store.checkpoint_exists(remote_stem, tmp_path / "checkpoints")
+
+
+@pytest.mark.parametrize("cache_flag", ["--no-cache", "--recompute"])
+@pytest.mark.parametrize("chunk_minutes", [None, "0"])
+def test_run_cache_mode_reaches_each_box_side_scan_once(cache_flag, chunk_minutes, capsys):
+    args = ["run", "standard", "-m", "hopg", "--dry-run", cache_flag]
+    if chunk_minutes is not None:
+        args.extend(["--chunk-minutes", chunk_minutes])
+
+    remote.main(args)
+
+    script = capsys.readouterr().out
+    assert script.count(f" {cache_flag}") == 1
+    other = "--recompute" if cache_flag == "--no-cache" else "--no-cache"
+    assert f" {other}" not in script
+
+
 def test_run_headless_skips_attach_and_pull(monkeypatch):
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
@@ -4428,6 +4503,40 @@ def test_resolve_profile_stem_hash_prefix_pins_one(monkeypatch):
     monkeypatch.setattr(transport, "_ssh_capture", _fake_remote_catalog(f"{a}\n{b}\n", meta))
 
     assert lifecycle.resolve_profile_stem("hopg", "sub_100keV", hash_prefix="a" * 12) == a
+
+
+def test_resolve_profile_stem_filters_requested_fidelity(monkeypatch):
+    full = f"hopg--full-{'a' * 12}"
+    survey = f"hopg--survey-{'b' * 12}"
+    meta = {
+        full: (
+            100,
+            {
+                "dataset_identity": {
+                    "catalog_profile": "sub_100keV",
+                    "fidelity": "full",
+                    "parameter_sha256": "a" * 64,
+                }
+            },
+        ),
+        survey: (
+            200,
+            {
+                "dataset_identity": {
+                    "catalog_profile": "sub_100keV",
+                    "fidelity": "survey",
+                    "parameter_sha256": "b" * 64,
+                }
+            },
+        ),
+    }
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        _fake_remote_catalog(f"{full}\n{survey}\n", meta),
+    )
+
+    assert lifecycle.resolve_profile_stem("hopg", "sub_100keV", fidelity="full") == full
 
 
 def test_resolve_profile_stem_raises_with_no_match(monkeypatch):

@@ -350,6 +350,8 @@ def start_queue(
     nsys=False,
     cpu=False,
     cpu_only=False,
+    no_cache=False,
+    recompute=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -405,6 +407,8 @@ def start_queue(
         )
     if cpu and cpu_only:
         raise SystemExit("cpu and cpu-only modes are mutually exclusive")
+    if no_cache and recompute:
+        raise SystemExit("no-cache and recompute modes are mutually exclusive")
     if cpu_only and nsys:
         raise SystemExit("cpu-only mode cannot be combined with nsys")
     if cpu_only and performance_repetitions != 1:
@@ -465,6 +469,8 @@ def start_queue(
             performance_interval,
             spec_chunk,
             brem_chunk,
+            no_cache,
+            recompute,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -488,6 +494,8 @@ def start_queue(
             nsys,
             cpu,
             cpu_only,
+            no_cache,
+            recompute,
         )
         time_limit = config.SLURM_TIME
     workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)
@@ -520,6 +528,8 @@ def start_queue(
             nsys,
             cpu,
             cpu_only,
+            no_cache,
+            recompute,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -575,6 +585,8 @@ def start_queue(
                             nsys,
                             cpu,
                             cpu_only,
+                            no_cache,
+                            recompute,
                         )
                     ),
                 ),
@@ -1359,7 +1371,7 @@ def _profile_pull_candidates(material):
     return candidates
 
 
-def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None):
+def resolve_profile_stem(material, catalog_profile, *, fidelity=None, hash_prefix=None):
     """Resolve a ``MATERIAL@PROFILE`` pull selector to one exact on-disk
     checkpoint stem.
 
@@ -1380,23 +1392,32 @@ def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None):
         identity = meta.get("dataset_identity") or {}
         profile = identity.get("catalog_profile") or "standard"
         digest = str(identity.get("parameter_sha256", ""))
-        found.append((stem, profile, digest, mtime))
-    matches = [item for item in found if item[1] == catalog_profile]
+        found.append((stem, profile, str(identity.get("fidelity", "full")), digest, mtime))
+    matches = [
+        item
+        for item in found
+        if item[1] == catalog_profile and (fidelity is None or item[2] == fidelity)
+    ]
     if hash_prefix is not None:
-        matches = [item for item in matches if item[2].startswith(hash_prefix)]
+        matches = [item for item in matches if item[3].startswith(hash_prefix)]
     if not matches:
-        available = sorted({f"{profile}:{digest[:12]}" for _, profile, digest, _ in found})
+        available = sorted(
+            {
+                f"{profile}/{found_fidelity}:{digest[:12]}"
+                for _, profile, found_fidelity, digest, _ in found
+            }
+        )
         detail = f"; found on the box: {', '.join(available)}" if available else "; none found"
         selector = f"{material}@{catalog_profile}"
         if hash_prefix is not None:
             selector += f" --hash {hash_prefix}"
         raise SystemExit(f"no remote checkpoint matches {selector}{detail}")
-    matches.sort(key=lambda item: item[3], reverse=True)
+    matches.sort(key=lambda item: item[4], reverse=True)
     if len(matches) > 1 and hash_prefix is None:
-        alternates = ", ".join(item[2][:12] for item in matches[1:])
+        alternates = ", ".join(item[3][:12] for item in matches[1:])
         print(
             f"{material}@{catalog_profile}: {len(matches)} hashes found on the box; "
-            f"pulling newest ({matches[0][2][:12]}); pin another with "
+            f"pulling newest ({matches[0][3][:12]}); pin another with "
             f"--hash (alternates: {alternates})"
         )
     return matches[0][0]

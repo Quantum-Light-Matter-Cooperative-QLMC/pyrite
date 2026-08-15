@@ -46,6 +46,40 @@ def test_bare_remote_uses_configured_target_and_waits_by_default(monkeypatch):
     assert seen["no_pull"] is False
 
 
+def test_remote_cache_modes_delegate_with_local_semantics(monkeypatch):
+    seen = []
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.append(vars(args)))
+
+    no_cache = invoke(
+        scan.command,
+        ["standard", "-m", "hopg", "--remote", "--no-cache", "--detach"],
+    )
+    recompute = invoke(
+        scan.command,
+        ["standard", "-m", "hopg", "--remote", "--recompute", "--detach"],
+    )
+
+    assert_clean_result(no_cache)
+    assert_clean_result(recompute)
+    assert (seen[0]["no_cache"], seen[0]["recompute"]) == (True, False)
+    assert (seen[1]["no_cache"], seen[1]["recompute"]) == (False, True)
+
+
+def test_remote_cache_modes_are_mutually_exclusive_before_submission(monkeypatch):
+    def fail_submission(_args):
+        raise AssertionError("cache conflict must not submit")
+
+    monkeypatch.setattr(remote_cli, "_cli_start", fail_submission)
+
+    result = invoke(
+        scan.command,
+        ["standard", "-m", "hopg", "--remote", "--no-cache", "--recompute"],
+    )
+
+    assert result.exit_code == 2
+    assert "--no-cache and --recompute are mutually exclusive" in result.stderr
+
+
 def test_remote_wait_detach_and_local_only_options_are_rejected():
     conflict = invoke(scan.command, ["--remote", "--wait", "--detach"])
     local_only = invoke(scan.command, ["--remote", "--checkpoint-dir", "elsewhere"])

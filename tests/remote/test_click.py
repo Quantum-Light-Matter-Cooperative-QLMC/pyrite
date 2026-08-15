@@ -124,6 +124,8 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
                 "nsys": False,
                 "cpu": False,
                 "cpu_only": False,
+                "no_cache": False,
+                "recompute": False,
             },
         )
     ]

@@ -139,3 +139,26 @@ unless the dispatcher explicitly grants that authority.
 - Runtime closure records the exact help probe and, when dispatch grants remote
   submission authority, one bounded quick remote run that reaches automatic
   pull. Heavy sweeps remain remote-only.
+
+## Implementation outcome
+
+- Reproduced both cache flags as usage exit 2: the root command classified
+  `--no-cache` and `--recompute` as local-only before remote delegation.
+- Reproduced the automatic-pull stem mismatch read-only against completed job
+  `hopg_hbn-12`: the box wrote `hopg@hopg_hbn-4135cde714d5` and
+  `hbn@hopg_hbn-4df3a3857e39`, while the foreground client predicted
+  `hopg@hopg_hbn-223df84b3911` and `hbn@hopg_hbn-658793db51d3` from current
+  local profile inputs. The predicted paths do not exist on the box.
+- Implemented cache-mode propagation through root dispatch, remote submission,
+  and both generated queue runners. Each box-side scan receives exactly one of
+  the mutually exclusive flags.
+- Automatic pull now resolves each completed noncanonical profile/fidelity from
+  authoritative remote checkpoint metadata before transfer. Standard full and
+  quick stems retain their direct deterministic paths.
+- Focused and neighboring CLI/remote tests, CLI reference/deprecation checks,
+  touched-file lint, and repository typecheck pass. Repository-wide lint remains
+  blocked by the pre-existing undefined `seen` assertions in
+  `tests/scan/test_scan_budget.py`.
+- Remaining: a real bounded remote submission through automatic pull requires
+  authority not granted by this handoff. Read-only metadata resolution against
+  the reproduced job returns the exact box-side stems above.

@@ -309,6 +309,8 @@ def _cli_start(args):
         nsys=getattr(args, "nsys", False),
         cpu=getattr(args, "cpu", False),
         cpu_only=getattr(args, "cpu_only", False),
+        no_cache=getattr(args, "no_cache", False),
+        recompute=getattr(args, "recompute", False),
     )
     if args.dry_run:
         return
@@ -352,13 +354,24 @@ def _cli_start(args):
             "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
         )
         return
-    stems = scripts._stems(
-        completed,
-        args.quick,
-        getattr(args, "fidelity", "full"),
-        high_energy_min_kev=high_energy_min_kev,
-        catalog_profile=getattr(args, "catalog_profile", "standard"),
-    )
+    fidelity = getattr(args, "fidelity", "full")
+    catalog_profile = getattr(args, "catalog_profile", "standard")
+    if args.quick or (fidelity == "full" and catalog_profile == "standard"):
+        stems = scripts._stems(
+            completed,
+            args.quick,
+            fidelity,
+            high_energy_min_kev=high_energy_min_kev,
+            catalog_profile=catalog_profile,
+        )
+    else:
+        # The synchronized box is authoritative after a potentially long job.
+        # Recomputing identity hashes locally after attachment can target a
+        # nonexistent directory when profile/catalog inputs changed meanwhile.
+        stems = [
+            lifecycle.resolve_profile_stem(material, catalog_profile, fidelity=fidelity)
+            for material in completed
+        ]
     lifecycle.pull(
         stems,
         grid=args.grid,
@@ -829,6 +842,22 @@ def reline_command(
         "GPU/Nsight scan and implies --perf and --chunk-minutes 0."
     ),
 )
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help=(
+        "Neither read nor write the shared per-case checkpoint cache: an "
+        "ephemeral run that recomputes every case and stores nothing shared."
+    ),
+)
+@click.option(
+    "--recompute",
+    is_flag=True,
+    help=(
+        "Ignore cached cases and recompute fresh, but repopulate the shared "
+        "per-case cache with the results."
+    ),
+)
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
 @click.option(
@@ -869,6 +898,8 @@ def start_command(
     nsys,
     cpu,
     cpu_only,
+    no_cache,
+    recompute,
     no_sync,
     dry_run,
     headless,
@@ -889,6 +920,8 @@ def start_command(
     materials = resolve_profile_materials(catalog_profile, material)
     if cpu and cpu_only:
         raise click.UsageError("--cpu and --cpu-only are mutually exclusive")
+    if no_cache and recompute:
+        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
     if cpu_only and nsys:
         raise click.UsageError("--cpu-only cannot be combined with --nsys")
     if cpu_only and performance_repetitions != 1:
@@ -958,6 +991,8 @@ def start_command(
             nsys=nsys,
             cpu=cpu,
             cpu_only=cpu_only,
+            no_cache=no_cache,
+            recompute=recompute,
             no_sync=no_sync,
             dry_run=dry_run,
             headless=headless,

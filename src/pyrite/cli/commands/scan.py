@@ -288,6 +288,8 @@ def command(
         raise click.UsageError("--preset/--no-sync/--dry-run require -R/--remote")
     if remote_target is None and (cpu or cpu_only):
         raise click.UsageError("--cpu/--cpu-only require -R/--remote")
+    if no_cache and recompute:
+        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
     zhai_parameters = {
         "ne": "--ne",
         "ne_brem": "--ne-brem",
@@ -365,8 +367,6 @@ def command(
             "max_minutes": "--max-minutes",
             "performance_profile": "--performance-profile",
             "performance_dir": "--performance-dir",
-            "no_cache": "--no-cache",
-            "recompute": "--recompute",
             "progress_file": "--progress-file",
             "progress_phase": "--progress-phase",
             "no_progress": "--no-progress",
@@ -400,6 +400,8 @@ def command(
                 nsys=nsys,
                 cpu=cpu,
                 cpu_only=cpu_only,
+                no_cache=no_cache,
+                recompute=recompute,
                 no_sync=no_sync,
                 dry_run=dry_run,
                 headless=detach,
@@ -425,8 +427,6 @@ def command(
     # compute and never pollutes the shared store with a measurement run; an
     # explicit --no-cache/--recompute on the same line wins (explicit beats the
     # perf default).
-    if no_cache and recompute:
-        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
     perf_no_cache = performance_profile is not None and not (no_cache or recompute)
     cache_read = not (no_cache or recompute or perf_no_cache)
     cache_write = not (no_cache or perf_no_cache)
