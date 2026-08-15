@@ -130,7 +130,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
         f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
         f": legacy-candidates {legacy_names}; "
         f"for stem in {stem_names}; do "
-        '[ -f "$stem/line.pkl" ] && echo "$stem/" || true; '
+        '[ -f "$stem/line.h5" ] || [ -f "$stem/line.pkl" ] && echo "$stem/" || true; '
         '[ -f "$stem.pkl" ] && echo "$stem.pkl" || true; done'
     )
     existing = transport._ssh_capture(listing).split()
@@ -181,11 +181,11 @@ def clear_all_remote(yes=False):
     # missing checkpoints/ dir or a find failure from becoming ssh's exit status.
     listing = (
         f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
-        r'find . -type f -name "*.pkl" 2>/dev/null | sed "s|^\./||" | sort || true'
+        r'find . -type f \( -name "*.h5" -o -name "*.pkl" \) 2>/dev/null | sed "s|^\./||" | sort || true'
     )
     existing = transport._ssh_capture(listing).split()
     if not existing:
-        print("(nothing to clear: checkpoints/ holds no .pkl files)")
+        print("(nothing to clear: checkpoints/ holds no .h5 or .pkl files)")
         return
     print(f"would delete on the box -- {len(existing)} file(s):")
     for f in existing:
@@ -194,7 +194,7 @@ def clear_all_remote(yes=False):
         return
     transport._ssh_capture(
         f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
-        r'find . -type f -name "*.pkl" -delete'
+        r'find . -type f \( -name "*.h5" -o -name "*.pkl" \) -delete'
     )
     print(f"cleared on the box: {len(existing)} checkpoint file(s) under checkpoints/")
 

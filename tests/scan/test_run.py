@@ -677,7 +677,7 @@ def test_run_sweep_exact_metadata_hit_skips_decode_launch_and_writes(tmp_path, m
     }
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False, dataset_identity=identity)
-    paths = [tmp_path / "hopg" / name for name in ("line.pkl", "brem.pkl", "meta.json")]
+    paths = [tmp_path / "hopg" / name for name in ("line.h5", "brem.h5", "meta.json")]
     before = {path: path.stat().st_mtime_ns for path in paths}
 
     def forbidden(*_args, **_kwargs):
@@ -709,14 +709,14 @@ def test_budget_pause_keeps_shards_until_completion(tmp_path, monkeypatch):
     monkeypatch.setattr("pyrite.runs.run.run_cases", first_only)
     assert not run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False)
     assert _checkpoint_store.has_parts("hopg", tmp_path)
-    assert not (tmp_path / "hopg" / "line.pkl").exists()
+    assert not (tmp_path / "hopg" / "line.h5").exists()
     assert sum(len(items) for items in _checkpoint_store.load("hopg", tmp_path).values()) == 1
 
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     results = {}
     assert run_sweep(cases, results, checkpoint_dir=str(tmp_path), progress=False)
     assert sum(len(items) for items in results.values()) == 2
-    assert (tmp_path / "hopg" / "line.pkl").is_file()
+    assert (tmp_path / "hopg" / "line.h5").is_file()
     assert not _checkpoint_store.has_parts("hopg", tmp_path)
 
 
@@ -796,8 +796,8 @@ def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
     ckpt = tmp_path / "hopg"
-    assert (ckpt / "line.pkl").exists()
-    assert (ckpt / "brem.pkl").exists()
+    assert (ckpt / "line.h5").exists()
+    assert (ckpt / "brem.h5").exists()
     saved = load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
     assert "cfg_a" in saved
 
@@ -814,7 +814,7 @@ def test_checkpoint_load_recovers_unconsolidated_shards(tmp_path):
     from pyrite.runs.run import _checkpoint_exists, _checkpoint_load
 
     # simulate a sweep killed after writing a shard but before consolidation:
-    # no line.pkl/brem.pkl monolith, only the parts directory
+    # no line.h5/brem.h5 monolith, only the parts directory
     _checkpoint_store.save_part(
         "hopg",
         tmp_path,
@@ -822,7 +822,7 @@ def test_checkpoint_load_recovers_unconsolidated_shards(tmp_path):
         {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}},
     )
     ckpt = str(tmp_path / "hopg")
-    assert not (tmp_path / "hopg" / "line.pkl").exists()
+    assert not (tmp_path / "hopg" / "line.h5").exists()
     assert _checkpoint_exists(ckpt)
     loaded = _checkpoint_load(ckpt)
     assert 30.0 in loaded["cfg_a"]
@@ -857,8 +857,8 @@ def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
 
-    line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.pkl"))
-    brem = _checkpoint_io.load(str(tmp_path / "hopg" / "brem.pkl"))
+    line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.h5"))
+    brem = _checkpoint_io.load(str(tmp_path / "hopg" / "brem.h5"))
     line_record = line["cfg_a"][30.0]
     brem_record = brem["cfg_a"][30.0]
     assert "spec" in line_record and "brem_wide" not in line_record
@@ -879,7 +879,7 @@ def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch)
         progress=False,
     )
 
-    assert (tmp_path / "hopg" / "line.pkl").is_file()
+    assert (tmp_path / "hopg" / "line.h5").is_file()
     assert set(load_checkpoint("hopg", checkpoint_dir=str(tmp_path))) == {"cfg_a", "cfg_b"}
 
 
@@ -901,11 +901,27 @@ def test_partial_component_save_fully_migrates_legacy_checkpoint(tmp_path):
     record["brem_wide"] = np.array([7.0, 8.0])
     _checkpoint_store.save("hopg", tmp_path, legacy, components=("brem",))
 
-    assert (tmp_path / "hopg" / "line.pkl").is_file()
-    assert (tmp_path / "hopg" / "brem.pkl").is_file()
+    assert (tmp_path / "hopg" / "line.h5").is_file()
+    assert (tmp_path / "hopg" / "brem.h5").is_file()
     loaded = _checkpoint_store.load("hopg", tmp_path)
     assert np.array_equal(loaded["cfg_a"][30.0]["spec"], np.array([3.0, 4.0]))
     assert np.array_equal(loaded["cfg_a"][30.0]["brem_wide"], np.array([7.0, 8.0]))
+
+
+def test_component_and_shard_pkl_payloads_remain_readable(tmp_path):
+    record = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
+    _checkpoint_store.save("hopg", tmp_path, record)
+    for component in _checkpoint_store.COMPONENTS:
+        path = _checkpoint_store.component_path("hopg", component, tmp_path)
+        path.replace(path.with_suffix(".pkl"))
+    _checkpoint_store.save_part(
+        "hopg", tmp_path, "cfg_b", {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}}
+    )
+    shard = next((tmp_path / "hopg" / "parts").glob("*.h5"))
+    shard.replace(shard.with_suffix(".pkl"))
+
+    loaded = _checkpoint_store.load("hopg", tmp_path)
+    assert set(loaded) == {"cfg_a", "cfg_b"}
 
 
 def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
@@ -947,7 +963,7 @@ def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatc
         progress=False,
     )
     material = cases[0]["crystal"]
-    blobs = list((tmp_path / material).glob("*/*.pkl"))
+    blobs = list((tmp_path / material).glob("*/*.h5"))
     assert len(blobs) == 2  # one blob per case
 
     # Profile B run: a different stem, same cases -> everything reused, run_cases
@@ -983,7 +999,7 @@ def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
         progress=False,
     )
     material = cases[0]["crystal"]
-    before = {p.name for p in (tmp_path / material).glob("*/*.pkl")}
+    before = {p.name for p in (tmp_path / material).glob("*/*.h5")}
     assert before
 
     ran = []
@@ -999,7 +1015,7 @@ def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
         progress=False,
     )
     assert ran == ["cfg_a"]  # no read -> recomputed
-    after = {p.name for p in (tmp_path / material).glob("*/*.pkl")}
+    after = {p.name for p in (tmp_path / material).glob("*/*.h5")}
     assert after == before  # no write -> CAS untouched
     assert not (tmp_path / "hopg@b-111111111111" / "cases.json").exists()  # ephemeral
 
@@ -1017,7 +1033,7 @@ def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
         progress=False,
     )
     material = cases[0]["crystal"]
-    blob = next((tmp_path / material).glob("*/*.pkl"))
+    blob = next((tmp_path / material).glob("*/*.h5"))
     blob.unlink()  # remove so we can prove --recompute rewrites it
 
     ran = []
@@ -1033,7 +1049,7 @@ def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
         progress=False,
     )
     assert ran == ["cfg_a"]  # skipped read -> recomputed
-    assert list((tmp_path / material).glob("*/*.pkl"))  # write -> repopulated
+    assert list((tmp_path / material).glob("*/*.h5"))  # write -> repopulated
     assert (tmp_path / "hopg@b-111111111111" / "cases.json").exists()  # manifest written
 
 
@@ -1044,7 +1060,7 @@ def test_existing_checkpoint_seeds_shared_cache_on_resume(tmp_path, monkeypatch)
     cases = [_fake_case("cfg_a", 30.0)]
     stem = tmp_path / "hopg@legacy-000000000000"
     run_sweep(cases, {}, checkpoint_path=str(stem), progress=False)
-    assert not list((tmp_path / "hopg").glob("*/*.pkl"))
+    assert not list((tmp_path / "hopg").glob("*/*.h5"))
 
     run_sweep(
         cases,
@@ -1053,7 +1069,7 @@ def test_existing_checkpoint_seeds_shared_cache_on_resume(tmp_path, monkeypatch)
         content_key_fn=case_content_key,
         progress=False,
     )
-    assert len(list((tmp_path / "hopg").glob("*/*.pkl"))) == 1
+    assert len(list((tmp_path / "hopg").glob("*/*.h5"))) == 1
 
 
 def test_invalid_cached_payload_falls_back_to_recompute(tmp_path, monkeypatch):
@@ -1091,10 +1107,10 @@ def test_content_key_fn_none_leaves_cas_inert(tmp_path, monkeypatch):
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     run_sweep(cases, {}, checkpoint_path=str(tmp_path / "hopg"), progress=False)
-    assert not list((tmp_path / "hopg").glob("*/*.pkl"))  # no sharded CAS blobs
+    assert not list((tmp_path / "hopg").glob("*/*.h5"))  # no sharded CAS blobs
     assert not (tmp_path / "hopg" / "cases.json").exists()
     # only the component store + its meta sidecar exist
-    assert (tmp_path / "hopg" / "line.pkl").exists()
+    assert (tmp_path / "hopg" / "line.h5").exists()
 
 
 def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):

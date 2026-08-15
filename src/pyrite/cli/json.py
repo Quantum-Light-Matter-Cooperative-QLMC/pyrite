@@ -444,7 +444,8 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
             [
                 path
                 for path in archive_dir.iterdir()
-                if path.is_dir() and (path / "line.pkl").is_file()
+                if path.is_dir()
+                and ((path / "line.h5").is_file() or (path / "line.pkl").is_file())
             ],
             key=lambda path: path.name,
         )
@@ -470,7 +471,7 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
                 )
             )
         size = (
-            sum(item.stat().st_size for item in path.glob("*.pkl"))
+            sum(item.stat().st_size for item in [*path.glob("*.h5"), *path.glob("*.pkl")])
             if path.is_dir()
             else path.stat().st_size
         )

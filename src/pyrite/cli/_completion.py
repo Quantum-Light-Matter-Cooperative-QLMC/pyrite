@@ -194,7 +194,10 @@ def _safe_checkpoint_stems(directory: Path) -> list[str]:
                 if (
                     entry.is_dir(follow_symlinks=False)
                     and _SAFE_TOKEN_RE.fullmatch(entry.name)
-                    and (Path(entry.path) / "line.pkl").is_file()
+                    and (
+                        (Path(entry.path) / "line.h5").is_file()
+                        or (Path(entry.path) / "line.pkl").is_file()
+                    )
                 ):
                     values.append(entry.name)
     except OSError:

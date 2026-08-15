@@ -309,6 +309,8 @@ def _select_stems(
 def _dataset_artifacts(root: Path, stem: str) -> list[Path]:
     directory = root / stem
     artifacts = [
+        directory / "line.h5",
+        directory / "brem.h5",
         directory / "line.pkl",
         directory / "brem.pkl",
         directory / "meta.json",

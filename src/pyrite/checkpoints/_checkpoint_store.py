@@ -1,6 +1,6 @@
 """Component-aware checkpoint storage.
 
-Active checkpoints live at ``<root>/<stem>/{line,brem}.pkl``.  Callers keep
+Active checkpoints live at ``<root>/<stem>/{line,brem}.h5``.  Callers keep
 using the historical merged ``{name: {E0: record}}`` in-memory shape; this
 module splits records on write and merges them on read.  A legacy
 ``<root>/<stem>.pkl`` remains readable, so migration happens on the next save.
@@ -17,6 +17,8 @@ import numpy as np
 from . import _checkpoint_io
 
 COMPONENTS = ("line", "brem")
+_HDF5_SUFFIX = ".h5"
+_LEGACY_SUFFIX = ".pkl"
 _BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide"})
 _BREM_CASE_KEYS = frozenset({"Ne_brem", "E_grid_brem", "brem_chunk", "brem_file"})
 
@@ -32,7 +34,17 @@ def legacy_path(stem: str, root: str | os.PathLike[str]) -> Path:
 def component_path(stem: str, component: str, root: str | os.PathLike[str]) -> Path:
     if component not in COMPONENTS:
         raise ValueError(f"unknown checkpoint component: {component!r}")
-    return checkpoint_dir(stem, root) / f"{component}.pkl"
+    return checkpoint_dir(stem, root) / f"{component}{_HDF5_SUFFIX}"
+
+
+def _legacy_component_path(stem: str, component: str, root: str | os.PathLike[str]) -> Path:
+    return component_path(stem, component, root).with_suffix(_LEGACY_SUFFIX)
+
+
+def component_read_path(stem: str, component: str, root: str | os.PathLike[str]) -> Path:
+    """Return the preferred new component path, falling back to legacy ``.pkl``."""
+    path = component_path(stem, component, root)
+    return path if path.is_file() else _legacy_component_path(stem, component, root)
 
 
 def manifest_path(stem: str, root: str | os.PathLike[str]) -> Path:
@@ -41,7 +53,7 @@ def manifest_path(stem: str, root: str | os.PathLike[str]) -> Path:
 
 def checkpoint_exists(stem: str, root: str | os.PathLike[str]) -> bool:
     return (
-        component_path(stem, "line", root).is_file()
+        component_read_path(stem, "line", root).is_file()
         or legacy_path(stem, root).is_file()
         or has_parts(stem, root)
     )
@@ -56,7 +68,11 @@ def discover(root: str | os.PathLike[str]) -> list[str]:
         path.name
         for path in base.iterdir()
         if path.is_dir()
-        and ((path / "line.pkl").is_file() or any((path / "parts").glob("*.pkl")))
+        and (
+            component_read_path(path.name, "line", base).is_file()
+            or any((path / "parts").glob("*.h5"))
+            or any((path / "parts").glob("*.pkl"))
+        )
     }
     stems.update(path.stem for path in base.glob("*.pkl") if not path.name.endswith(".slim.pkl"))
     return sorted(stems)
@@ -90,7 +106,7 @@ def parts_dir(stem: str, root: str | os.PathLike[str]) -> Path:
     re-serializing the whole growing store on every save (which was O(N^2) in
     total bytes across a sweep).  Shards are the intermediate only: a normal or
     budget-stopped run consolidates them into the authoritative
-    ``{line,brem}.pkl`` monolith and clears this directory, so downstream tools
+    ``{line,brem}.h5`` monolith and clears this directory, so downstream tools
     (slim/prune/archive/remote) still see the historical layout.  A hard crash
     leaves shards behind; :func:`load_parts` recovers them on resume.
     """
@@ -99,7 +115,14 @@ def parts_dir(stem: str, root: str | os.PathLike[str]) -> Path:
 
 def _part_path(stem: str, root: str | os.PathLike[str], name: str) -> Path:
     digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:16]
-    return parts_dir(stem, root) / f"{digest}.pkl"
+    return parts_dir(stem, root) / f"{digest}{_HDF5_SUFFIX}"
+
+
+def _part_paths(directory: Path) -> list[Path]:
+    """Return one path per shard, preferring a new-format name over `.pkl`."""
+    paths = {path.stem: path for path in directory.glob(f"*{_LEGACY_SUFFIX}")}
+    paths.update({path.stem: path for path in directory.glob(f"*{_HDF5_SUFFIX}")})
+    return [paths[stem] for stem in sorted(paths)]
 
 
 def save_part(
@@ -122,14 +145,14 @@ def load_parts(stem: str, root: str | os.PathLike[str]) -> dict:
     if not directory.is_dir():
         return {}
     merged: dict = {}
-    for shard in sorted(directory.glob("*.pkl")):
+    for shard in _part_paths(directory):
         merged.update(_checkpoint_io.load(str(shard)))
     return merged
 
 
 def has_parts(stem: str, root: str | os.PathLike[str]) -> bool:
     directory = parts_dir(stem, root)
-    return directory.is_dir() and any(directory.glob("*.pkl"))
+    return directory.is_dir() and bool(_part_paths(directory))
 
 
 def clear_parts(stem: str, root: str | os.PathLike[str]) -> None:
@@ -141,7 +164,7 @@ def parts_signature(stem: str, root: str | os.PathLike[str]) -> tuple:
     directory = parts_dir(stem, root)
     if not directory.is_dir():
         return ()
-    shards = sorted(directory.glob("*.pkl"))
+    shards = _part_paths(directory)
     if not shards:
         return ()
     newest = max(shards, key=lambda p: p.stat().st_mtime_ns)
@@ -176,7 +199,7 @@ def save(
     if old.is_file():
         legacy = None
         for component in COMPONENTS:
-            if component not in components and not component_path(stem, component, root).is_file():
+            if component not in components and not component_read_path(stem, component, root).is_file():
                 legacy = _checkpoint_io.load(str(old)) if legacy is None else legacy
                 _atomic_dump(
                     component_path(stem, component, root),
@@ -215,10 +238,10 @@ def _merge(line: dict, brem: dict) -> dict:
 
 
 def load(stem: str, root: str | os.PathLike[str]) -> dict:
-    line_path = component_path(stem, "line", root)
+    line_path = component_read_path(stem, "line", root)
     if line_path.is_file():
         line = _checkpoint_io.load(str(line_path))
-        brem_path = component_path(stem, "brem", root)
+        brem_path = component_read_path(stem, "brem", root)
         if brem_path.is_file():
             brem = _checkpoint_io.load(str(brem_path))
         elif legacy_path(stem, root).is_file():
@@ -245,7 +268,7 @@ def _overlay(base: dict, newer: dict) -> dict:
 
 def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
     """Stable cache key covering every active component or legacy monolith."""
-    paths = [component_path(stem, component, root) for component in COMPONENTS]
+    paths = [component_read_path(stem, component, root) for component in COMPONENTS]
     present = [path for path in paths if path.is_file()]
     if not present:
         old = legacy_path(stem, root)
@@ -263,7 +286,7 @@ def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
 # one case's raw transport ``out`` dict, so a case computed by any profile can be
 # replayed (``store_result``) by any other profile whose case hashes equal. The
 # blobs live under the per-material directory alongside its component store; the
-# 2-hex shard names never collide with ``line.pkl`` / ``brem.pkl`` / ``meta.json``
+# 2-hex shard names never collide with ``line.h5`` / ``brem.h5`` / ``meta.json``
 # and are invisible to :func:`discover`.
 
 
@@ -278,19 +301,24 @@ def _validate_content_key(content_key: str) -> str:
 
 
 def cas_blob_path(material: str, content_key: str, root: str | os.PathLike[str]) -> Path:
-    """Sharded blob path ``<root>/<material>/<first2hex>/<content_key>.pkl``."""
+    """Sharded blob path ``<root>/<material>/<first2hex>/<content_key>.h5``."""
     content_key = _validate_content_key(content_key)
-    return Path(root) / material / content_key[:2] / f"{content_key}.pkl"
+    return Path(root) / material / content_key[:2] / f"{content_key}{_HDF5_SUFFIX}"
+
+
+def _cas_read_path(material: str, content_key: str, root: str | os.PathLike[str]) -> Path:
+    path = cas_blob_path(material, content_key, root)
+    return path if path.is_file() else path.with_suffix(_LEGACY_SUFFIX)
 
 
 def cas_contains(material: str, content_key: str, root: str | os.PathLike[str]) -> bool:
     """Whether a case blob for ``content_key`` exists -- a single ``stat``, no load."""
-    return cas_blob_path(material, content_key, root).is_file()
+    return _cas_read_path(material, content_key, root).is_file()
 
 
 def cas_load(material: str, content_key: str, root: str | os.PathLike[str]) -> dict:
     """Load one case's stored transport ``out`` dict from the CAS."""
-    return _checkpoint_io.load(str(cas_blob_path(material, content_key, root)))
+    return _checkpoint_io.load(str(_cas_read_path(material, content_key, root)))
 
 
 def cas_save(
