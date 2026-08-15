@@ -614,9 +614,11 @@ submodule DAG (leaf → driver):
 ### `instrument/`
 Closed, analytic post-emission photon geometry. `model.py` owns frozen
 `PlanarPose`, `PixelGrid`, `FilterPlate`, physical `PlanarDetector`, and the
-narrow `PixelScorer` request. `Scene` owns ordered plates and accepts either the
-legacy scalar `Detector` or physical `PlanarDetector`; instrument objects never
-enter the electron-transport navigator. Deps: `detectors.spec`, `materials`.
+narrow `PixelScorer` request; `geometry.py` owns point-source pixel rays,
+solid-angle weights, coarse angular partitions, and exact finite-box path
+lengths. `Scene` owns ordered plates and accepts either the legacy scalar
+`Detector` or physical `PlanarDetector`; instrument objects never enter the
+electron-transport navigator. Deps: `detectors.spec`, `materials`.
 
 ### `detectors/`
 Detector configuration, read-time scoring, and detector-adjacent forward

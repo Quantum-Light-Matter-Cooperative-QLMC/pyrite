@@ -18,6 +18,8 @@ plane (zero y-component).
 import numpy as np
 from numba import njit
 
+from ..instrument import PixelGrid, PlanarDetector, PlanarPose
+from ..instrument.geometry import planar_detector_rays
 from ..materials.crystal import _direct_lattice_vectors, _rotation_between, reciprocal_g_vector
 
 X_MIN = 0
@@ -415,29 +417,14 @@ def detector_directions(
     normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
     R = _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab)
 
-    # central lab line of sight c, and chip in-plane axes (chip face _|_ c):
-    #   w lies in the scattering (x-z) plane -> polar (Delta-theta) spread
-    #   u is out of plane (+y)               -> azimuthal spread
-    c = np.array([np.sin(theta_obs_rad), 0.0, np.cos(theta_obs_rad)])
-    w = np.array([np.cos(theta_obs_rad), 0.0, -np.sin(theta_obs_rad)])
-    u = np.array([0.0, 1.0, 0.0])
-
     step = chip_mm / n_side
-    offs = (np.arange(n_side) - (n_side - 1) / 2.0) * step  # cell centres
-    da = step**2  # cell area [mm^2]
-
-    n_hats = np.empty((n_side * n_side, 3))
-    weights = np.empty(n_side * n_side)
-    i = 0
-    for a in offs:  # out-of-plane (azimuth)
-        for b in offs:  # in-plane (polar)
-            P = dist_mm * c + a * u + b * w  # source -> cell vector [mm]
-            r = float(np.linalg.norm(P))
-            n_lab = P / r
-            cos_psi = float(n_lab @ c)  # obliquity to the chip normal (= c)
-            n_hats[i] = R.T @ n_lab
-            weights[i] = da * cos_psi / r**2
-            i += 1
+    detector = PlanarDetector(
+        pose=PlanarPose.from_observation(dist_mm, np.rad2deg(theta_obs_rad)),
+        pixels=PixelGrid((n_side, n_side), (step, step)),
+    )
+    rays = planar_detector_rays(detector)
+    n_hats = rays.directions_lab.reshape(-1, 3) @ R
+    weights = rays.solid_angle_sr.reshape(-1).copy()
     weights *= domega_sr / weights.sum()  # conserve the detector's total Omega
     return n_hats, weights
 
