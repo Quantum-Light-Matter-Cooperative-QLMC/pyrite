@@ -159,6 +159,41 @@ Non-goals:
 - HDF5 schema redesign is deferred. First remove redundant reads/writes; profile
   the one remaining completion consolidation before considering format work.
 
+## Bounded manifest-rescan slice (2026-08-14)
+
+The production trace identified an independent O(N^2) cost inside the existing
+shard lifecycle: every completed config called
+`_manifest_save(checkpoint_path, _material_subset(), ...)`, rebuilding sweep
+values and record counts from all accumulated results. Shard publication now
+keeps a run-local manifest accumulator. It scans resumed results once, then adds
+only each newly completed config; partial manifests intentionally omit the exact
+completed-case proof, which the final authoritative consolidation publishes.
+The metadata-only completion path already refuses proofs while `parts/` exists.
+
+A three-repeat synthetic reproduction of 1,836 configs with three energies each
+measured 6.399--6.479 s for repeated full scans and 0.0300--0.0302 s for the
+incremental accumulator (about 213x for manifest construction). The focused
+regression asserts that a complete sharded sweep performs one full manifest scan,
+at final consolidation, instead of one per config plus consolidation.
+
+Real `qlmc` confirmation used the same full, uncached 5,508-case hopg workload,
+parameter digest `4135cde714d5`, RTX 5080 backend, and performance sampler. Job
+`hopg_hbn-12` / SLURM `1644` is the pre-change baseline; `hopg_hbn-15` / SLURM
+`1647` is the candidate:
+
+| metric | baseline | candidate | delta |
+| --- | ---: | ---: | ---: |
+| checkpoint cumulative | 45.581 s | 28.981 s | -36.4% |
+| final consolidation | 2.665 s | 2.727 s | +0.062 s |
+| case-loop/session elapsed | 161.330 s | 131.513 s | -18.5% |
+
+The session delta also includes the independently measured shared line-table
+optimization; the checkpoint counters isolate 16.60 s of this slice's gain.
+The complete `line.pkl` and `brem.pkl` SHA-256 hashes match the baseline. Residual
+checkpoint time is about 26 seconds across 1,836 immutable shard writes; changing
+that durability granularity is a separate lifecycle decision, not part of this
+bounded fix.
+
 ## Open questions for implementation owner
 
 - Choose the completed-case proof encoding (sorted identity digest versus a
