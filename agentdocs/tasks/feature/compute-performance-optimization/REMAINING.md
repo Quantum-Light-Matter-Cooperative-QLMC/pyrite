@@ -300,6 +300,40 @@ final consolidation took only 2.68 s, leaving about 43.5 s in shard writes.
 results repeatedly, consistent with O(N^2) sweep behavior. Route that diagnosis
 to the chunked-checkpoint lifecycle task; do not fix it here.
 
+### Shared dual-spectrum line preparation
+
+The next matched pair tested the remaining duplicated line preparation identified
+in job `1643`: `_spectrum_case_impl` evaluates incoherent and coherent spectra
+back-to-back over the same segments, energy grid, crystal orientation, and
+reflection list, but each call rebuilt and uploaded the same reflection tables.
+The runner now gives the pair a short-lived table cache; the first call prepares
+the device tables and the coherent call reuses them. The cache is scoped to one
+case and keyed by every table-defining input, so it cannot retain device state
+across cases or mix multilayer radiators.
+
+Jobs `hopg_hbn-13` / SLURM `1645` (baseline) and `hopg_hbn-14` / SLURM `1646`
+(candidate) used the same full 5,508-case uncached hopg scan, parameter digest
+`4135cde714d5`, `Ne=300`, `Ne_brem=150`, four lockstep transport workers, RTX
+5080 CUDA backend, and full Nsight capture:
+
+| metric | baseline | candidate | delta |
+| --- | ---: | ---: | ---: |
+| case-loop wall | 183 s | 169 s | -7.7% |
+| performance-session elapsed | 185.986 s | 172.635 s | -7.2% |
+| spectrum cumulative | 125.800 s | 112.452 s | -10.6% |
+| `cxr.lines` mean | 18.804 ms/case | 16.377 ms/case | -12.9% |
+| `cxr.lines.tab` instances | 2/case | 1/case | -50.0% |
+| CUDA memcpy calls | 52/case | 44/case | -15.4% |
+| CUDA launches | 345/case | 341/case | -1.2% |
+| synchronizing readbacks | 13/case | 13/case | unchanged |
+
+The complete `line.pkl` and `brem.pkl` artifacts are byte-identical across the
+pair (matching SHA-256 for each). The focused coherent, staging, and chunk
+invariance checks passed 37 tests with one skipped. This low-energy profile is a
+dispatch-heavy case because transport is short; the absolute table preparation
+removal remains valid at higher energy, but its percentage throughput gain is
+not generalized beyond this measured workload.
+
 ## Local ALEX-DESKTOP evidence (2026-08-10)
 
 The first W4 gate is now exercised on the user's home desktop: Ryzen 9 5900X,
