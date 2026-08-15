@@ -220,6 +220,8 @@ def _log_interp_fraction(x, grid, idx):
     float32 edge nodes do not lose their separation to cancellation.
     Endpoint masks remain the responsibility of the gather, matching the
     existing linear-table interpolation policy.
+
+    Validation: line-absorption-tabulation
     """
     x0 = grid[idx - 1]
     x1 = grid[idx]
@@ -247,7 +249,10 @@ def _interp_elemental_mu(idx, log_frac, below, above, log_mu_table):
 
 
 def _elemental_log_mu_table(composition, energy_grid):
-    """Return CPU ``log(mu_i)`` rows [log(1/Angstrom)] for ``composition``."""
+    """Return CPU ``log(mu_i)`` rows [log(1/Angstrom)] for ``composition``.
+
+    Validation: line-absorption-tabulation
+    """
     rows = [
         np.asarray(_mu_total_inv_ang([(element, density)], energy_grid))
         for element, density in composition
@@ -256,7 +261,10 @@ def _elemental_log_mu_table(composition, energy_grid):
 
 
 def _line_tabulation_grid(crystal_info, composition, lo, hi):
-    """Shared 1 eV/native-Chantler line grid, including absorber elements."""
+    """Shared 1 eV/native-Chantler line grid, including absorber elements.
+
+    Validation: line-absorption-tabulation
+    """
     from ...materials.atomic import load_henke
 
     grids = [np.arange(lo, hi + 1.0, 1.0)]
@@ -699,6 +707,9 @@ def mc_spectrum(
     composition: [(element, n_per_Ang3), ...] for compound self-absorption;
     defaults to the single absorber_element at the crystal's total atom
     density (exact for elemental crystals).
+
+    Validation: line-absorption-tabulation
+
     layers: optional film-on-substrate absorber stack
     [(z_top, z_bot, composition), ...] (top/entrance first). When given, the
     escape attenuation is the piecewise mu_i*dz_i sum across the whole stack

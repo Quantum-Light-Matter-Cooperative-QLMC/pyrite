@@ -30,8 +30,8 @@ catalog data, or detector attenuation.
 - `docs/validation/radiation-physics/line-absorption-tabulation.md`: record the
   source behavior, derivation, units, limits, numeric comparison, and remaining
   evidence.
-- `docs/validation/physics-validation-ledger.md`: retain `discrepancy` until a
-  fresh-context verifier confirms the change; update checks, anchor, and notes.
+- `docs/validation/physics-validation-ledger.md`: advance to `rederived` after
+  fresh-context confirmation; retain human sign-off and remaining evidence debt.
 
 The key derivation is elemental: xraydb interpolates non-`f1` Chantler data
 linearly in `log(f2)` versus `log(E)`, and `mu_i` is proportional to `f2_i/E`,
@@ -55,6 +55,8 @@ scope as a fix.
 - [x] Run focused line/interpolation tests, neighboring Monte Carlo tests,
       lint/typecheck, and docs proportional to the touched paths.
 - [x] Review the scoped diff and checkpoint independently valid work.
+- [x] Apply the fresh-context `rederived` verdict and add owning-symbol
+      validation markers without claiming human sign-off.
 
 ## Decisions and open questions
 
@@ -102,9 +104,10 @@ scope as a fix.
   pre-existing undefined `seen` in `tests/scan/test_scan_budget.py:258`.
 - Physics review: units, passive sign, positivity, exact nodes, endpoint clamps,
   zero escape path, elemental/compound construction, and unchanged exact
-  layered/grooved paths pass. The derivation is implementation-context only;
-  fresh-context validation, CUDA evidence, spectrum-level exact A/B, and human
-  sign-off remain open. Ledger status stays `discrepancy`.
+  layered/grooved paths pass. Fresh-context independent verification rederived
+  the source-to-code mapping with no physics divergence. CUDA runtime/numerical/
+  performance evidence, spectrum-level exact A/B, and human sign-off remain
+  open. Ledger status is `rederived`.
 
 ## Delegation
 

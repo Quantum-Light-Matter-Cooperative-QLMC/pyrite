@@ -12,11 +12,11 @@ Compact generated view of the [detailed validation ledger]
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 6 |
-| `rederived` | 26 |
+| `rederived` | 27 |
 | `filtered` | 8 |
 | `unverified` | 61 |
 | `blocked` | 1 |
-| `discrepancy` | 4 |
+| `discrepancy` | 3 |
 | **Total** | **106** |
 
 Status meanings and promotion rules are defined in the

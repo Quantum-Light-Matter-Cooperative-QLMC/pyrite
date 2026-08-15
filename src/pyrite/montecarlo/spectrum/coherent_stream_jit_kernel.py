@@ -80,6 +80,10 @@ def _interp_shared(table, idx, frac, below, above, n_tab):
 
 @jit.rawkernel(device=True)
 def _interp_elemental_mu(log_mu_table, idx, log_frac, below, above, n_mu, n_tab):
+    """Sum per-element log-log attenuation interpolation on device.
+
+    Validation: line-absorption-tabulation
+    """
     mu = F32_ZERO
     element = U32_ZERO
     while element < n_mu:

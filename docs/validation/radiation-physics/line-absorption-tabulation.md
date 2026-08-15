@@ -118,8 +118,9 @@ host transfer. CUDA timing and numerical checks were unavailable locally
 
 ## Validation state
 
-This document is an implementation-context derivation, not an independent
-fresh-context validation. The ledger remains `discrepancy` until a separate
-verifier reviews the pinned-source behavior, source-to-code mapping, CUDA
-numerics when available, and spectrum-level impact. Only a human may mark the
-claim `signed-off`.
+This document began as an implementation-context derivation. A fresh-context
+independent verifier subsequently rederived the pinned-source behavior, checked
+the source-to-code mapping, units, signs, and limiting cases, and found no
+physics divergence; the ledger is therefore `rederived`. CUDA runtime/numerical/
+performance evidence and a spectrum-level exact-vs-tabulated A/B remain open.
+Only a human may mark the claim `signed-off`.
