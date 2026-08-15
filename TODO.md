@@ -136,7 +136,11 @@ file. Edit and drop items on `main`.
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
-3. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
+3. **Positioned photon filters and pixel-resolved detection.** Add standalone
+   finite material filter plates with pose and analytic attenuation between the
+   target and a planar pixel detector, including partial coverage without a
+   general geometry engine. → `feature/positioned-photon-filters`;
+   [`agentdocs/tasks/feature/positioned-photon-filters/`](agentdocs/tasks/feature/positioned-photon-filters/).
 4. **Result interchange for microscopy tooling.** Optional
    `pyrite[interchange]` writer exporting per-case spectra to `.hspy`/`.emd`/
    `.nxs` via standalone RosettaSciIO, with the identity digest in the signal
