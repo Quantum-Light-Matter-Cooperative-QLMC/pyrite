@@ -15,8 +15,8 @@ file. Edit and drop items on `main`.
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
    The four incoherent-line-path markers are now ledgered (`line-hkl-batch`,
    `line-amplitude-fusion`, `line-gemv-elementwise` `filtered`;
-   `line-absorption-tabulation` a `discrepancy` — tabulated `μ` off `2.72e-01`
-   at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
+   `line-absorption-tabulation` remains a separately tracked `discrepancy`).
+   `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`, as are the four x-ray dispersion claims (`xray-chi-zero`,
    `xray-refractive-index`, `xray-in-medium-resonance`,
@@ -56,6 +56,12 @@ file. Edit and drop items on `main`.
    (`.capsync` was 28.5 ms of a 64.3 ms local hopg case). →
    `feature/compute-performance-optimization`;
    [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
+5. **Correct line-absorption tabulation.** Replace linear interpolation of
+   compound `μ(E)` with stable per-element log-log interpolation on every
+   tabulated line path, include explicit absorber elements in the edge grid,
+   and add physics, regression, and performance evidence. →
+   `fix/line-absorption-tabulation`;
+   [`agentdocs/tasks/fix/line-absorption-tabulation/`](agentdocs/tasks/fix/line-absorption-tabulation/).
 
 ## P1 - top-priority back burner
 
