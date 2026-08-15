@@ -123,13 +123,15 @@ file. Edit and drop items on `main`.
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
-3. **Timepix per-pixel spectra and angular reconstruction.** Build on the
-   landed positioned-filter/physical-detector path so user-defined pixel grids,
-   including explicit 512 by 512 assemblies, expose discrete true and Timepix
-   measured spectra per requested pixel from a bounded coarse angular
-   calculation. Validate whether conservative tile inheritance is sufficient or
-   needs interpolation/adaptive refinement; keep dense spectral cubes and the
-   CCD/grating path out of scope. → `feature/timepix-pixel-spectra`;
+3. **Pixel-detector acquisition, visualization, and Timepix spectra.** Build on
+   the landed positioned-filter path so user-defined grids expose total-hit
+   images and Timepix per-pixel measured-energy histograms from bounded coarse
+   angular calculations. Add exposure, threshold, and measured-bin settings;
+   persist factorized observation artifacts; visualize images/spectra in the
+   analysis app; and configure physical detectors and ordered filters through
+   profiles/CLI. Validate angular reconstruction and hit/charge-sharing
+   semantics; keep dense spectral cubes and CCD/grating inference out of scope.
+   → `feature/timepix-pixel-spectra`;
    [`agentdocs/tasks/feature/timepix-pixel-spectra/`](agentdocs/tasks/feature/timepix-pixel-spectra/).
 4. **Result interchange for microscopy tooling.** Optional
    `pyrite[interchange]` writer exporting per-case spectra to `.hspy`/`.emd`/
