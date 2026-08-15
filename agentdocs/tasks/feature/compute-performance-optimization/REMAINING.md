@@ -284,6 +284,15 @@ bremsstrahlung, and coherent-emission checks passed: 59 tests. The 13 remaining
 readbacks are no longer repeated gathers over the two masks fixed here; further
 reduction needs a broader result-transfer or kernel-interface change.
 
+Production confirmation `hopg_hbn-12` / SLURM `1644` then completed the same
+current profile in 158 s for hopg and 172 s for h-BN. The immediately preceding
+non-profiled job `1641` took 175 s and 186 s respectively, but treat that
+9.7%/7.5% comparison as indicative rather than a matched A/B: job `1644` also
+enabled the performance sampler. Its median GPU utilization remained 14% hopg
+and 13% h-BN; median CPU utilization was 3.8%/3.7%, and median feed wait was
+2.3%/1.9%. The optimization improves queue progress, not kernel occupancy, so
+low aggregate utilization remains expected.
+
 Checkpoint time is a separate lifecycle issue, not part of this optimization.
 The job had 1,836 configurations and called `_save_part` once per config;
 final consolidation took only 2.68 s, leaving about 43.5 s in shard writes.
