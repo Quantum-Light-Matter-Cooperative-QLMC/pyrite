@@ -1,4 +1,4 @@
-# Validation draft: line-absorption-tabulation
+# Validation: line-absorption-tabulation
 
 ## Source behavior and derivation
 

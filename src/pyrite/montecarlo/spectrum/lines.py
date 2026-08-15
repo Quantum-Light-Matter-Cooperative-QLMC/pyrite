@@ -968,7 +968,8 @@ def mc_spectrum(
     # their native nodes to E_tab even when absent from the crystal basis.
     # Applied only to single-slab/finite-footprint routes. Layered and grooved
     # escape retain exact per-point mu. No per-segment host/device transfer is
-    # restored. Fresh-context verification and human sign-off remain required.
+    # restored. Independently rederived with no physics divergence; human
+    # sign-off remains required.
     # Validation: line-absorption-tabulation
     log_mu_tab_g = xp.asarray(_elemental_log_mu_table(abs_comp, E_tab), dtype=REAL)
 
