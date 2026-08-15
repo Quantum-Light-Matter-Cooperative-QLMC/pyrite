@@ -87,6 +87,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`hbn-debye-waller-00l`](physics-validation-ledger.md#hbn-debye-waller-00l) | room-temperature h-BN basal-reflection Debye–Waller coefficient `B33=3.45 Å²` (`U33=0.0437 Å²`) used for pinned `(002)/(004)` | `unverified` |
 | [`nbs2-2ha-structure`](physics-validation-ledger.md#nbs2-2ha-structure) | 2H-a NbS2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `unverified` |
 | [`nbse2-2ha-structure`](physics-validation-ledger.md#nbse2-2ha-structure) | 2H-a NbSe2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `unverified` |
+| [`fes2-pyrite-structure`](physics-validation-ledger.md#fes2-pyrite-structure) | cubic pyrite FeS2 Pa-3 lattice + explicit 4a(Fe)/8c(S) conventional-cell basis | `unverified` |
 | [`v2o5-010-structure`](physics-validation-ledger.md#v2o5-010-structure) | alpha-V2O5 standard-Pmmn lattice + explicit two-formula-unit basis for the layered cut conventionally indexed as (010) | `unverified` |
 | [`tis2-003-structure`](physics-validation-ledger.md#tis2-003-structure) | 1T-TiS2 P-3m1 lattice + explicit one-formula-unit basis for a symmetric (003) cut | `unverified` |
 | [`absorption-length`](physics-validation-ledger.md#absorption-length) | X-ray absorption length / μ | `anchored` |
@@ -101,7 +102,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 
 | ID | Claim | Status |
 |---|---|---|
-| [`electron-transport`](physics-validation-ledger.md#electron-transport) | Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments | `unverified` |
+| [`electron-transport`](physics-validation-ledger.md#electron-transport) | Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments | `rederived` |
 | [`gpu-transport-core`](physics-validation-ledger.md#gpu-transport-core) | run-to-completion per-electron transport (CPU core and its CUDA port) samples the SAME distribution as the lockstep core: identical models, identical draw semantics, one counter-addressed SplitMix64 stream per electron instead of one shared step-major stream. No new equation — a sampling-order claim over `electron-transport`. `transport_core="auto"` (the default) takes the CUDA core when the process has a CUDA device, the run is ungrooved, and `Ne > 1000` | `filtered` |
 | [`transport-midpoint-stopping`](physics-validation-ledger.md#transport-midpoint-stopping) | `energy_model="midpoint"` advances a physical flight by the implicit midpoint rule `E_end = E_start + (dE/ds)((E_start+E_end)/2)·s`, evaluated by one predictor-corrector pass, and advances the transport clock by `Δt = s/β((E_start+E_end)/2)`; the cutoff truncation distance is solved for `E_end = E_cut` exactly, so `s_cut = (E_cut−E_start)/(dE/ds)((E_start+E_cut)/2)`. Replaces the left-endpoint (frozen) rule that held `dE/ds` and `β` at `E_start` over the whole flight. Elastic hazard stays frozen at `E_start`; flight decomposition is unchanged, so one radiating row per physical flight remains | `filtered` |
 | [`radiation-error-estimators`](physics-validation-ledger.md#radiation-error-estimators) | host-side, opt-in per-flight estimators of the error the radiation kernels make by evaluating emission coefficients at the flight's start energy: (1) CXR endpoint resonance drift — the sweep of `E_res = ħc·v·g/(1−v·n)` between the flight's endpoint speeds (each with its own Doppler denominator), in units of the flight's sinc half-width `W = 2πħc/(dnm·t_L)`; (2) bremsstrahlung endpoint quadrature error — the grid-integrated (trapezoid) relative difference between the kernel's left-endpoint `n·dsigma/dk(T_start)·L` and a midpoint evaluation, per flight. p50/p90/p99/max summaries; warning when p99 exceeds the calibrated threshold | `rederived` |
@@ -113,8 +114,8 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`brem-spectrum`](physics-validation-ledger.md#brem-spectrum) | bremsstrahlung background, Born + Elwert | `rederived` |
 | [`external-brem-subtraction`](physics-validation-ledger.md#external-brem-subtraction) | weighted scale-only sideband fit and subtraction of external detected background | `rederived` |
 | [`finite-beam-size`](physics-validation-ledger.md#finite-beam-size) | transverse electron-beam entry point sampled from an isotropic Gaussian (`beam_fwhm_mm`, standard Gaussian-beam-spot FWHM convention) | `rederived` |
-| [`grazing-beam-projection`](physics-validation-ledger.md#grazing-beam-projection) | collimated lab beam-spot Gaussian projected onto the tilted sample entrance face by ray–plane intersection, stretching the incident footprint by `1/cos(tilt_polar)` along the tilt azimuth so grazing-incidence overlap loss registers as `n_missed` | `unverified` |
-| [`finite-transverse-crystal`](physics-validation-ledger.md#finite-transverse-crystal) | optional finite rectangular footprint: first electron exit from its six-face prism and Beer--Lambert attenuation to the first photon face, normalized per incident electron including beam spillover | `unverified` |
+| [`grazing-beam-projection`](physics-validation-ledger.md#grazing-beam-projection) | collimated lab beam-spot Gaussian projected onto the tilted sample entrance face by ray–plane intersection, stretching the incident footprint by `1/cos(tilt_polar)` along the tilt azimuth so grazing-incidence overlap loss registers as `n_missed` | `rederived` |
+| [`finite-transverse-crystal`](physics-validation-ledger.md#finite-transverse-crystal) | optional finite rectangular footprint: first electron exit from its six-face prism and Beer--Lambert attenuation to the first photon face, normalized per incident electron including beam spillover | `rederived` |
 | [`blazed-groove-geometry`](physics-validation-ledger.md#blazed-groove-geometry) | blazed sawtooth entrance-face profile (period Λ, depth h = Λ sin(tp)cos(tp); working facet ⊥ n̂, relief facet ⊥ beam) with exact periodic material/vacuum crossings for electron entry, exit, and later-facet re-entry plus coherent and bremsstrahlung photon escape; restricted to θ_obs = 90°, tilt_azim = 180°, 0 < tilt_polar < 90° | `unverified` |
 
 ## Mosaicity & multilayer (code-cross-checked; need sign-off + measured data)
@@ -123,7 +124,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 |---|---|---|
 | [`mosaic-analytic`](physics-validation-ledger.md#mosaic-analytic) | analytic broadening `FWHM = E·\|tan ψ\|·η` | `rederived` |
 | [`mosaic-mc`](physics-validation-ledger.md#mosaic-mc) | exact per-orientation incoherent average (2-D Gauss–Hermite) | `rederived` |
-| [`multilayer-stack`](physics-validation-ledger.md#multilayer-stack) | film-on-substrate transport + absorption | `unverified` |
+| [`multilayer-stack`](physics-validation-ledger.md#multilayer-stack) | film-on-substrate transport + absorption | `rederived` |
 
 ## Detector forward models (downstream — lower risk)
 

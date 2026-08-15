@@ -855,11 +855,11 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 
 - **Claim:** Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments
 - **Code:** `montecarlo/transport.py::simulate_trajectories`
-- **Source:** Joy–Luo; NIST SRD 64 Mott; Browning free paths
-- **Status:** unverified
-- **Checks:** —
-- **Anchor:** —
-- **Notes:** CASINO-style single-scattering MC; upstream of all spectra
+- **Source:** Joy–Luo, *Scanning* **11**, 176 (1989); Browning et al., *J. Appl. Phys.* **76**, 2016 (1994); Bishop/Joy screening parameter; NIST SRD 64 Mott transport tables
+- **Status:** rederived
+- **Checks:** units; limits (`α→0` forward-peaked, `α→∞` isotropic, single-element compound reduction, `dE/ds<0`); kernel identity against independently coded closed forms (max rel diff `1.9e-16`); sampler exactness (`<1−cosθ>` within `1.7σ` at `α=1e-4…1`, first-flight KS vs `Exp(λ)` p=0.71, `α`-from-first-moment round trip)
+- **Anchor:** — (physics anchor still needed; see notes)
+- **Notes:** CASINO-style single-scattering MC; upstream of all spectra. Fresh-context re-derivation matches every kernel term-for-term — Joy–Luo `k=0.731+0.0688 log10 Z`, compound Bragg weight `n_i Z_i/0.602214076` (exact rewrite of `ρZ/A`), Browning total, `α=3.4e-3 Z^0.67/E`, relativistic SR total, `λ=1e8/Σnσ`, `s=−λ ln R`, element draw `∝ n_i σ_i`, `cosθ = 1 − 2αR/(1+α−R)`, uniform azimuth, non-degenerate frame rotation. Backscatter at 20 keV vs Hunger–Küchler: Si 0.1598 (`mott`) / 0.1716 (`sr`) vs 0.1636; C 0.0480 / 0.0524 vs 0.0583 — `E_cut`-insensitive over 0.1–2 keV, so the low-`Z` deficit is model form. **Validity ceiling:** Joy–Luo / relativistic ICRU-37 Bethe stopping ratio is 0.98 at 10 keV, 0.94 at 25, 0.88 at 50, 0.78 at 100, 0.63 at 200, 0.52 at 300 keV, and the Browning fit is used above its stated 0.1–30 keV window with no guard — the quantitative case for the gated reference-stopping/reference-elastic backlog items. `J_keV` uses ICRU/PDG mean excitation energies rather than the Berger–Seltzer fit Joy–Luo was tuned against (C: 78 vs 100 eV, ≈4% stopping-power effect at 25 keV; Si agrees to 0.3%). Human sign-off pending. [validation write-up](beam-transport/electron-transport.md)
 
 ### `gpu-transport-core`
 
@@ -976,20 +976,20 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 - **Claim:** collimated lab beam-spot Gaussian projected onto the tilted sample entrance face by ray–plane intersection, stretching the incident footprint by `1/cos(tilt_polar)` along the tilt azimuth so grazing-incidence overlap loss registers as `n_missed`
 - **Code:** `montecarlo/geometry.py::project_beam_entry`; wired through `montecarlo/transport.py::simulate_trajectories` (`tilt_polar_rad`/`tilt_azim_rad`) and `montecarlo/runner/__init__.py::{_transport_case,_brem_for_case}`
 - **Source:** elementary rectangular ray–plane intersection (no literature equation)
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** tilt=0 identity bit-for-bit; in-plane `1/cos` stretch vs out-of-plane invariance at azimuth 0°/90°; grazing tilt overfills a finite footprint with misses kept in `Ne`
 - **Anchor:** `tests/montecarlo/test_finite_transverse_geometry.py::test_project_beam_entry_normal_incidence_is_identity`, `::test_project_beam_entry_stretches_inplane_by_one_over_cos`, `::test_project_beam_entry_stretch_axis_follows_azimuth`; `tests/montecarlo/test_montecarlo.py::test_grazing_incidence_projects_beam_off_finite_sample`, `::test_grazing_projection_identity_at_normal_incidence_is_bitwise`
-- **Notes:** Implementation-side record only; addresses `issue_notes.md` #1 (unphysical ~89° flux peak from full illumination plus the real `1/cos` path enhancement without the competing overlap loss). Assumes a zero-divergence collimated beam; off-face electrons are pure misses (no side-face clipping model). An independent fresh-context verifier must author `geometry/grazing-beam-projection.md`; the implementation author must not advance this row.
+- **Notes:** Addresses `issue_notes.md` #1 (unphysical ~89° flux peak from full illumination plus the real `1/cos` path enhancement without the competing overlap loss). Assumes a zero-divergence collimated beam; off-face electrons are pure misses (no side-face clipping model). Fresh-context re-derivation matches: closed form `M = I + (1/cosθ − 1) â âᵀ`, ray–plane intersection, Rodrigues rotation, and `n_missed`/`Ne` wiring agree symbolically and numerically; at `θ=85°, φ=0` the analytic lab-frame acceptance `P(miss) = 1 − erf(w cosθ/(σ√2)) erf(w/(σ√2))` predicts `0.9378` against measured `0.93775`, and the `φ=90°` square-footprint symmetry point gives `0.93525`. Human sign-off pending. [validation write-up](geometry/grazing-beam-projection.md)
 
 ### `finite-transverse-crystal`
 
 - **Claim:** optional finite rectangular footprint: first electron exit from its six-face prism and Beer--Lambert attenuation to the first photon face, normalized per incident electron including beam spillover
 - **Code:** `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/spectrum/lines.py::mc_spectrum`; `montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source:** rectangular-prism ray intersection + Beer--Lambert
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** paired positive mm dimensions; `1 mm = 1e7 Å`; all-`None` legacy slab recovery; first-forward-face/tie rule; lateral `n_z=0` layer residence; capped z-layer paths; misses remain in `Ne`
 - **Anchor:** `tests/montecarlo/test_finite_transverse_geometry.py::test_first_prism_exit_selects_nearest_face_and_deterministic_corner`, `::test_first_prism_exit_ignores_parallel_faces_and_falls_back_to_slab`, `::test_validate_transverse_dimensions_rejects_invalid_pairs`; `tests/montecarlo/test_montecarlo.py::test_finite_footprint_truncates_lateral_transport_and_counts_side_exit`, `::test_finite_footprint_counts_missed_gaussian_entries_without_changing_ne`, `::test_all_missed_entries_return_typed_empty_segment_arrays`, `::test_omitted_footprint_is_bitwise_legacy_transport`, `::test_finite_footprint_rejects_invalid_dimension_pairs`; `tests/montecarlo/test_spectrum_escape_helpers.py::test_segment_escape_distance_prefers_near_side_face`, `::test_finite_side_exit_shortens_coherent_and_brem_self_absorption`, `::test_finite_brem_pure_lateral_escape_has_no_divide_by_zero_warning`, `::test_finite_side_exit_layered_absorption_stays_in_emission_layer`, `::test_all_none_footprint_retains_z_only_spectrum_results`; `tests/montecarlo/test_multilayer.py::test_layer_path_length_keeps_lateral_ray_in_current_layer`, `::test_stack_tau_with_side_exit_stops_before_substrate`; `tests/montecarlo/test_chunk_invariance.py::test_finite_line_spectrum_chunk_invariant`, `::test_finite_brem_spectrum_chunk_invariant`; `tests/scan/test_sweep.py::test_build_cases_sweeps_rectangular_footprints_and_labels_them`, `::test_build_cases_rejects_invalid_footprint`, `::test_build_cases_preserves_legacy_name_for_omitted_footprint`; `tests/scan/test_run.py::test_transport_case_forwards_finite_footprint_to_both_trajectories`, `::test_brem_for_case_forwards_finite_footprint`
-- **Notes:** Implementation-side record only. An independent fresh-context verifier must author `geometry/finite-transverse-crystal.md` and may suggest a status change; the implementation author must not advance this row.
+- **Notes:** Fresh-context re-derivation matches — no divergent factor, sign, exponent, unit, or tie convention. Filters pass on units, limits (all-`None` legacy recovery, misses, lateral residence, capped z-layer crossings), and conventions (strictly forward minimum, parallel-face exclusion, deterministic lowest-constant ties, `exp(−τ)`); the cited anchor selections were re-run green (22 + 8 + 8 + 3 passed). Human sign-off pending. [validation write-up](geometry/finite-transverse-crystal.md)
 
 ### `blazed-groove-geometry`
 
@@ -1028,11 +1028,11 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 
 - **Claim:** film-on-substrate transport + absorption
 - **Code:** `montecarlo/transport.py::simulate_trajectories` (`layers=`)
-- **Source:** `../physics/materials/multilayer-materials.md`
-- **Status:** unverified
-- **Checks:** —
+- **Source:** `../physics/materials/multilayer-materials.md` §(3) option A (CASINO-style boundary-aware multilayer transport)
+- **Status:** rederived
+- **Checks:** units; limits (one-layer reduction, identical-sublayer invariance, substrate backscatter); signs/conventions (entrance-first ordering, outer-face-only termination); one-layer `layers=` vs `composition=` bit-for-bit on every segment array and counter; 16-seed subdivision-invariance matrix
 - **Anchor:** `checks/multilayer_validation_check.py`
-- **Notes:** substrate-dominance prediction lives here
+- **Notes:** substrate-dominance prediction lives here. Fresh-context derivation: boundary truncation with a fresh per-layer exponential draw is the exact sampler for the inhomogeneous collision density `exp[−∫Σ(z(s))ds]` by memorylessness; implementation matches term-for-term (right-side `searchsorted` layer lookup, layer-indexed rates/stopping, no collision at an internal crossing, outer-face-only exit, per-segment `layer` tag). Artificial subdivision of a 3 µm C slab into three identical sub-layers leaves backscatter/transmission/stopped/path-length/path-weighted-depth invariant while segment count `+0.77%` and mean segment length `−0.76%` move oppositely at fixed path length (the expected extra-truncation signature). The one physical residual — transmission `−0.73%` (`z=−2.38`) under `energy_model="frozen"` — vanishes under `"midpoint"` (`−0.06%`, `z=−0.17`), attributing it to the left-endpoint energy rule (`transport-midpoint-stopping`, `energy-step-convergence`), not boundary handling. Segment midpoints never straddle their labelled layer; 100 nm C on Si raises `η` 0.0335→0.1090 vs 0.0330 for bulk C. Cross-stack escape factor is the separate `self-absorption` row. Human sign-off pending. [validation write-up](materials/multilayer-stack.md)
 
 
 ## Detector forward models (downstream — lower risk)

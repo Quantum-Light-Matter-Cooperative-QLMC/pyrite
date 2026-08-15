@@ -34,6 +34,7 @@ atomic-physics/structure-factor
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
+beam-transport/electron-transport
 beam-transport/energy-step-convergence
 beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
@@ -74,6 +75,7 @@ materials/hbn-structure
 materials/hfs2-structure
 materials/mosaic-analytic
 materials/mosaic-mc
+materials/multilayer-stack
 materials/oriented-v2o5-tis2
 materials/pdte2-debye-waller-001
 materials/surface-hkl-orientation

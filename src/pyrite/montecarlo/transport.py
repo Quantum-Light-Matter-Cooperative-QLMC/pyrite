@@ -3209,7 +3209,7 @@ def simulate_trajectories(
     histories raise ``RuntimeError`` rather than returning these arrays/counts.
 
     Validation: electron-transport, finite-beam-size, finite-transverse-crystal,
-    grazing-beam-projection
+    grazing-beam-projection, multilayer-stack
     """
     if not np.isfinite(E0_keV) or E0_keV <= 0.0:
         raise ValueError("E0_keV must be finite and strictly positive")
