@@ -74,6 +74,7 @@ scope as a fix.
 
 ## Implementation evidence
 
+- Checkpoint commit: `91438fa` (`fix(physics): correct line absorption interpolation`).
 - Pre-fix regression: canonical collection failed because the corrected helper
   surface was absent. The prior-method numerical evidence remains HOPG
   `2.72e-1` maximum relative coefficient error and `5.23e-1` relative
