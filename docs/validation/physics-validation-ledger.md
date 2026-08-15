@@ -748,6 +748,16 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 - **Anchor:** `tests/materials/test_crystallography.py::test_2ha_niobium_dichalcogenide_structure`, `::test_2ha_niobium_dichalcogenide_couplings_are_finite`
 - **Notes:** room-temperature unmodulated cell; [validation write-up](materials/2ha-niobium-dichalcogenides.md)
 
+### `fes2-pyrite-structure`
+
+- **Claim:** cubic pyrite FeS2 Pa-3 lattice + explicit 4a(Fe)/8c(S) conventional-cell basis
+- **Code:** `data/cifs/fes2.cif`; `data/materials.toml::crystals.fes2`
+- **Source:** Finklea, Cathey & Amma, Acta Crystallogr. A32, 529 (1976); a=5.4166 A, x(S)=0.386
+- **Status:** unverified
+- **Checks:** cell volume; 4 Fe + 8 S; idealized x gives S-S dimer ~2.14 A and Fe-S ~2.27 A (lit. ~2.16 A / ~2.26 A); finite `(200)` `F_g`, `chi_g`, `U_g`
+- **Anchor:** `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`, `::test_catalog_matches_serialized_physics_for_every_crystal`
+- **Notes:** cubic, non-vdW pyrite structure catalogued as a thin/"2D-FeS2" entry alongside the layered dichalcogenides; Pa-3 systematic absences (`h00: h=2n`) motivate the `(200)` reference beam direction; no independent Wyckoff-generator rederivation against a second source.
+
 ### `v2o5-010-structure`
 
 - **Claim:** alpha-V2O5 standard-Pmmn lattice + explicit two-formula-unit basis for the layered cut conventionally indexed as (010)

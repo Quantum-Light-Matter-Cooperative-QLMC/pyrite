@@ -1,4 +1,4 @@
-# TODO / Backlog
+ TODO / Backlog
 
 ---
 
@@ -123,32 +123,11 @@ file. Edit and drop items on `main`.
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
-3. **Pixel-detector acquisition, visualization, and Timepix spectra.** Build on
-   the landed positioned-filter path so user-defined grids expose total-hit
-   images and Timepix per-pixel measured-energy histograms from bounded coarse
-   angular calculations. Add exposure, threshold, and measured-bin settings;
-   persist factorized observation artifacts; visualize images/spectra in the
-   analysis app; and configure physical detectors and ordered filters through
-   profiles/CLI. Validate angular reconstruction and hit/charge-sharing
-   semantics; keep dense spectral cubes and CCD/grating inference out of scope.
-   → `feature/timepix-pixel-spectra`;
-   [`agentdocs/tasks/feature/timepix-pixel-spectra/`](agentdocs/tasks/feature/timepix-pixel-spectra/).
-4. **Result interchange for microscopy tooling.** Optional
-   `pyrite[interchange]` writer exporting per-case spectra to `.hspy`/`.emd`/
-   `.nxs` via standalone RosettaSciIO, with the identity digest in the signal
-   metadata, so microscopists can open PyRITE output beside measured data
-   without installing PyRITE. One-way export, never a checkpoint replacement;
-   only worth building after exported artifacts carry provenance (P2 3).
-   Decision recorded: **HyperSpy itself is rejected as a dependency** — sweeps
-   are sparse (99 of 108 cells in the measured `hopg` checkpoint) and the signal
-   axis varies per navigation position (four distinct `E_grid` definitions, one
-   per beam energy), which HyperSpy's dense single-signal-axis array model
-   cannot express without NaN-padding and lossy resampling; it also costs 18 new
-   packages and its `exspy` EDS layer duplicates the ledgered detector model
-   empirically. Revisit xarray, not HyperSpy, only if `results/selection.py`
-   keeps growing. Review:
-   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
-   §5.
+3. **Positioned photon filters and pixel-resolved detection.** Add standalone
+   finite material filter plates with pose and analytic attenuation between the
+   target and a planar pixel detector, including partial coverage without a
+   general geometry engine. → `feature/positioned-photon-filters`;
+   [`agentdocs/tasks/feature/positioned-photon-filters/`](agentdocs/tasks/feature/positioned-photon-filters/).
 
 ## Inbox - >user< to be triaged
 
@@ -171,6 +150,7 @@ file. Edit and drop items on `main`.
    SLURM installation (and, if available, report GPU usage statistics), if it exists.
 6. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
    This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
+7. Add consistent naming, labelling, and reporting of material, chemical name, crystal phase, and crystal cut
 
 ## CLI backlog
 
@@ -186,6 +166,7 @@ Nothing yet.
    [`agentdocs/tasks/fix/chunked-checkpoint-lifecycle/`](agentdocs/tasks/fix/chunked-checkpoint-lifecycle/).
 2. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
+3. Rerunning a recently run & pulled `pyrite run <profile> -R` on a profile with remotely cached cases will correctly skip the cached ones for rerun, but it will then re-pull ALL the cases, including those that are identical to the stems held locally.
 
 ### Ergonomics (ship anytime)
 
@@ -203,6 +184,7 @@ Nothing here yet.
 1. When a profile parameter is set, CLI should print out something along the lines of "< changed from <old_value(s))> to <new_value(s))>" if there were old values, otherwise just "< set to <new_value(s))>"
 2. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard Performance Profile for MoS2" [progress bar + absolute progress]`.
+3. Add optional tags to materials that marks them for inclusion/exclusion in profiles or sweeps, e.g., 'high-energy', '
 
 ## Long-term plans
 

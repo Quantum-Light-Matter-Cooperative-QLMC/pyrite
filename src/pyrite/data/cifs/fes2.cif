@@ -1,0 +1,37 @@
+data_fes2
+# Phase identity: cxr-mc crystal catalog entry [fes2].
+# Bundled full-basis P1 CIF used by the declarative material catalog.
+# Catalog provenance and assumptions:
+# Cubic pyrite FeS2, Pa-3 (#205, origin choice 2): Fe occupies 4a at
+# inversion centers and S occupies 8c at (x,x,x)-type positions with
+# x=0.386. a=5.4166 A per Finklea, Cathey, and Amma, Acta Crystallogr. A32,
+# 529 (1976). Assumes a stoichiometric, unmodulated room-temperature cell.
+# Limiting checks: four Fe + eight S, V=a^3, S-S dimer bond ~2.14 A and
+# Fe-S octahedral bond ~2.27 A from the idealized x. Validation: fes2-pyrite-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 5.4166
+_cell_length_b 5.4166
+_cell_length_c 5.4166
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Fe1 Fe 0.0 0.0 0.0 1.0
+Fe2 Fe 0.0 0.5 0.5 1.0
+Fe3 Fe 0.5 0.0 0.5 1.0
+Fe4 Fe 0.5 0.5 0.0 1.0
+S1 S 0.386 0.386 0.386 1.0
+S2 S 0.886 0.114 0.614 1.0
+S3 S 0.614 0.886 0.114 1.0
+S4 S 0.114 0.614 0.886 1.0
+S5 S 0.614 0.614 0.614 1.0
+S6 S 0.114 0.886 0.386 1.0
+S7 S 0.386 0.114 0.886 1.0
+S8 S 0.886 0.386 0.114 1.0

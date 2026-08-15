@@ -49,6 +49,7 @@
     "2h_tase2",
     "tate2",
     "fete",
+    "fes2",
     "wte2",
     "zrte3",
     "zrte5"
@@ -98,6 +99,7 @@
     "2h_tase2",
     "tate2",
     "fete",
+    "fes2",
     "wte2",
     "zrte3",
     "zrte5"
@@ -136,6 +138,7 @@
     "2h_tase2",
     "tate2",
     "fete",
+    "fes2",
     "wte2",
     "zrte3",
     "zrte5",
@@ -8086,6 +8089,229 @@
         ]
       }
     },
+    "fes2": {
+      "lattice": {
+        "system": "general",
+        "a": 5.4166,
+        "b": 5.4166,
+        "c": 5.4166,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 90.0
+      },
+      "basis": [
+        [
+          "Fe",
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        [
+          "Fe",
+          [
+            0.0,
+            0.5,
+            0.5
+          ]
+        ],
+        [
+          "Fe",
+          [
+            0.5,
+            0.0,
+            0.5
+          ]
+        ],
+        [
+          "Fe",
+          [
+            0.5,
+            0.5,
+            0.0
+          ]
+        ],
+        [
+          "S",
+          [
+            0.114,
+            0.614,
+            0.886
+          ]
+        ],
+        [
+          "S",
+          [
+            0.114,
+            0.886,
+            0.386
+          ]
+        ],
+        [
+          "S",
+          [
+            0.386,
+            0.114,
+            0.886
+          ]
+        ],
+        [
+          "S",
+          [
+            0.386,
+            0.386,
+            0.386
+          ]
+        ],
+        [
+          "S",
+          [
+            0.614,
+            0.614,
+            0.614
+          ]
+        ],
+        [
+          "S",
+          [
+            0.614,
+            0.886,
+            0.114
+          ]
+        ],
+        [
+          "S",
+          [
+            0.886,
+            0.114,
+            0.614
+          ]
+        ],
+        [
+          "S",
+          [
+            0.886,
+            0.386,
+            0.114
+          ]
+        ]
+      ],
+      "V_cell": 158.92063664629597,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        [
+          "Fe",
+          0.025169795971196982
+        ],
+        [
+          "S",
+          0.050339591942393964
+        ]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [
+          2,
+          0,
+          0
+        ],
+        "surface_hkl": null,
+        "E_grid": {
+          "shape": [
+            1050
+          ],
+          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
+        },
+        "hkl_list": [],
+        "hkl_reason": null,
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [
+          -2,
+          0,
+          0
+        ],
+        "g_mag": 2.3199738977142808,
+        "structure_factor": [
+          78.1457383128421,
+          45.85712692543852
+        ],
+        "dominant_reflections": [
+          [
+            -2,
+            0,
+            0
+          ],
+          [
+            0,
+            -2,
+            0
+          ],
+          [
+            0,
+            0,
+            -2
+          ],
+          [
+            0,
+            0,
+            2
+          ],
+          [
+            0,
+            2,
+            0
+          ],
+          [
+            2,
+            0,
+            0
+          ],
+          [
+            -1,
+            -1,
+            -1
+          ],
+          [
+            -1,
+            -1,
+            1
+          ],
+          [
+            -1,
+            1,
+            -1
+          ],
+          [
+            -1,
+            1,
+            1
+          ],
+          [
+            1,
+            -1,
+            -1
+          ],
+          [
+            1,
+            -1,
+            1
+          ],
+          [
+            1,
+            1,
+            -1
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ]
+      }
+    },
     "wte2": {
       "lattice": {
         "system": "general",
@@ -8806,9 +9032,9 @@
         },
         "E_grid_brem": {
           "shape": [
-            1600
+            996
           ],
-          "sha256": "999c7e2d2689d386b60c95531d74b0df74aad57c63d0b18b343be31db7fd2084"
+          "sha256": "f33a3b889cb8d5c01f2ef4435a89d5c35d1b9e3878e224f05553b29041f399eb"
         }
       }
     },
@@ -8902,9 +9128,9 @@
         },
         "E_grid_brem": {
           "shape": [
-            1620
+            1004
           ],
-          "sha256": "45a029ef547bf597f9f666c106d3f77e8e57f5c6bee01f7f5d43a688089c8975"
+          "sha256": "9d3d7f933fc65ba7ff3301f4903aa02fab188b68ef7eb034cc34947705ace69b"
         }
       }
     },
@@ -11899,6 +12125,105 @@
             2172
           ],
           "sha256": "88905d757a1384cc25aba1b184f1daaefc6b88a67767e0d7778ed2197acfbaef"
+        }
+      }
+    },
+    "fes2": {
+      "label": "FeS2 (pyrite)",
+      "profile": "standard",
+      "crystal_key": "fes2",
+      "substrate": null,
+      "validation": {
+        "crystal_database_match": "unverified"
+      },
+      "stack": [],
+      "scan": {
+        "thickness_ang": {
+          "shape": [
+            9
+          ],
+          "sha256": "9743fbc4f38942468cb76297f3ebc91be09eb7936644ba6e99998eeeae2cc32a"
+        },
+        "energy_keV": {
+          "shape": [
+            9
+          ],
+          "sha256": "5a70af6978e762f2c142dbbcb626aa6ee7e1180a17705f26625a444982cd7afa"
+        },
+        "tilt_deg": {
+          "shape": [
+            7
+          ],
+          "sha256": "77befd9328e7f800e61cb1d65c7a098f2f03f3533631edc592aefce242a68583"
+        },
+        "tilt_azim_deg": {
+          "shape": [
+            7
+          ],
+          "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
+        },
+        "E_grid_line": null,
+        "E_grid_line_by_energy": {
+          "30.0": {
+            "shape": [
+              831
+            ],
+            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
+          },
+          "40.0": {
+            "shape": [
+              931
+            ],
+            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
+          },
+          "50.0": {
+            "shape": [
+              998
+            ],
+            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
+          },
+          "60.0": {
+            "shape": [
+              1398
+            ],
+            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
+          },
+          "100.0": {
+            "shape": [
+              2983
+            ],
+            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
+          },
+          "150.0": {
+            "shape": [
+              3917
+            ],
+            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
+          },
+          "200.0": {
+            "shape": [
+              4517
+            ],
+            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
+          },
+          "250.0": {
+            "shape": [
+              4917
+            ],
+            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
+          },
+          "300.0": {
+            "shape": [
+              5451
+            ],
+            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
+          }
+        },
+        "E_grid_brem": {
+          "shape": [
+            1200
+          ],
+          "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
         }
       }
     },

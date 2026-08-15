@@ -879,8 +879,8 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
     from pyrite.materials import CATALOG, MaterialCatalog
 
     assert isinstance(CATALOG, MaterialCatalog)
-    assert len(CATALOG.crystals) == 48
-    assert len(CATALOG.materials) == 49
+    assert len(CATALOG.crystals) == 49
+    assert len(CATALOG.materials) == 50
     assert CATALOG.material_keys == tuple(CATALOG.materials)
     assert CATALOG.crystal("hbn") is CATALOG.crystals["hbn"]
     assert CATALOG.material("mote2") is CATALOG.materials["mote2"]
