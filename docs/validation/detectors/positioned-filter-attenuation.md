@@ -201,6 +201,14 @@ implementation context before human sign-off.
 comparison, and retain the missing-marker finding until repaired. This is not
 human `signed-off` status.
 
+### Post-validation remediation
+
+Commit `4b40378` resolved the verifier's traceability finding by adding
+`Validation: positioned-filter-attenuation` to the `ray_box_path_lengths`
+docstring. The historical finding and verdict above are retained as the
+validation record. The ledger remains `unverified` pending the human-applied
+`unverified` to `rederived` transition; this note does not claim human sign-off.
+
 ## Independent verification contract
 
 A fresh-context verifier must derive the equations and units without using the

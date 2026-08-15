@@ -409,7 +409,9 @@ Checkpoint commits:
   tile-flux conservation;
 - `033ace1` — factorized spatial results, bounded materialization and detector
   scoring, physical simulation wiring, separate observation identity, public
-  exports, and worked partial-coverage guide.
+  exports, and worked partial-coverage guide;
+- `4b40378` — independent validation record, remediated validation marker,
+  corrected public result contracts, and consistent spatial chunk validation.
 
 Acceptance evidence:
 
@@ -425,7 +427,9 @@ Acceptance evidence:
 - repository-wide lint remains blocked by the pre-existing undefined `seen` in
   `tests/scan/test_scan_budget.py`.
 
-The `positioned-filter-attenuation` ledger row deliberately remains
-`unverified`. Its implementation-side checks are green, but a separate
-fresh-context physics validator must audit the prepared packet before status
-advances. No profile/CLI or checkpoint-schema surface was added.
+Independent validation completed with verdict `rederived`; the source-level
+numeric comparison had a maximum relative difference of
+`1.08e-8`. Commit `4b40378` remediated the verifier's missing validation marker.
+The `positioned-filter-attenuation` ledger row remains `unverified` pending the
+human-applied `unverified` to `rederived` transition. No profile/CLI or
+checkpoint-schema surface was added.
