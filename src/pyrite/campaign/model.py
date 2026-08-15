@@ -12,6 +12,8 @@ from typing import Any, Literal
 import numpy as np
 
 from ..detectors import Detector
+from ..instrument import FilterPlate, PixelScorer, PlanarDetector
+from ..instrument.model import validate_downstream_scene
 from .geometry import Slab, Stack, Target
 from .sweep import BeamSpec
 
@@ -119,7 +121,9 @@ class Scene:
 
     beam: BeamSpec
     target: Target
-    detector: Detector = field(default_factory=Detector)
+    detector: Detector | PlanarDetector = field(default_factory=Detector)
+    filters: tuple[FilterPlate, ...] = ()
+    pixel_scorer: PixelScorer | None = None
     emission: EmissionMode = "incoherent"
     xray_dispersion: XrayDispersion = "vacuum"
     brem_source: BremSource = "mc"
@@ -127,8 +131,35 @@ class Scene:
     def __post_init__(self) -> None:
         if not isinstance(self.beam, BeamSpec):
             raise TypeError("Scene.beam must be a BeamSpec")
-        if not isinstance(self.detector, Detector):
-            raise TypeError("Scene.detector must be a Detector")
+        if not isinstance(self.detector, (Detector, PlanarDetector)):
+            raise TypeError("Scene.detector must be a Detector or PlanarDetector")
+        try:
+            filters = tuple(self.filters)
+        except TypeError as exc:
+            raise TypeError("Scene.filters must be an iterable of FilterPlate") from exc
+        if any(not isinstance(plate, FilterPlate) for plate in filters):
+            raise TypeError("Scene.filters must contain only FilterPlate objects")
+        object.__setattr__(self, "filters", filters)
+        if self.pixel_scorer is not None and not isinstance(self.pixel_scorer, PixelScorer):
+            raise TypeError("Scene.pixel_scorer must be a PixelScorer or None")
+        if filters and not isinstance(self.detector, PlanarDetector):
+            raise TypeError("Scene.filters require a physical PlanarDetector")
+        if self.pixel_scorer is not None:
+            if not isinstance(self.detector, PlanarDetector):
+                raise TypeError("Scene.pixel_scorer requires a physical PlanarDetector")
+            if self.detector.pixels is None:
+                raise ValueError("Scene.pixel_scorer requires PlanarDetector.pixels")
+            if any(
+                requested > available
+                for requested, available in zip(
+                    self.pixel_scorer.angular_shape,
+                    self.detector.pixels.shape,
+                    strict=True,
+                )
+            ):
+                raise ValueError("pixel scorer angular shape cannot exceed detector pixel shape")
+        if isinstance(self.detector, PlanarDetector):
+            validate_downstream_scene(filters, self.detector)
         object.__setattr__(
             self,
             "beam",

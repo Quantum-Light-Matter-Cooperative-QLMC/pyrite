@@ -20,6 +20,7 @@ from .campaign.profiles import case_content_key
 from .campaign.sweep import Sweep as LegacySweep
 from .campaign.sweep import build_cases
 from .detectors import Detector
+from .instrument import FilterPlate, PixelScorer, PlanarDetector
 from .montecarlo import Case, run_case
 from .montecarlo._backend import BACKEND
 from .results.model import Result
@@ -28,11 +29,16 @@ from .results.model import Result
 def build_case(scene: Scene, numerics: Numerics) -> Case:
     """Lower one resolved scene to the existing typed transport input."""
     convergence = numerics.convergence
+    scalar_detector = (
+        scene.detector.scalar_detector()
+        if isinstance(scene.detector, PlanarDetector)
+        else scene.detector
+    )
     legacy = LegacySweep(
         material=scene.target.material,
         beam=scene.beam,
         target=scene.target,
-        detector=scene.detector,
+        detector=scalar_detector,
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
         spec_chunk=numerics.spec_chunk,
@@ -83,12 +89,14 @@ def build_legacy_cases(old_sweep: Any, settings: Any) -> list[Case]:
 def simulate(
     beam: Any,
     target: Any,
-    detector: Detector,
+    detector: Detector | PlanarDetector,
     *,
     numerics: Numerics | None = None,
     emission: EmissionMode = "incoherent",
     xray_dispersion: XrayDispersion = "vacuum",
     brem_source: BremSource = "mc",
+    filters: tuple[FilterPlate, ...] = (),
+    pixel_scorer: PixelScorer | None = None,
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
@@ -103,10 +111,14 @@ def simulate(
         beam=beam,
         target=target,
         detector=detector,
+        filters=filters,
+        pixel_scorer=pixel_scorer,
         emission=emission,
         xray_dispersion=xray_dispersion,
         brem_source=brem_source,
     )
+    if scene.filters or scene.pixel_scorer is not None:
+        raise NotImplementedError("positioned filters and pixel scoring require the spatial runner")
     if resolved_numerics.backend not in {"auto", BACKEND.name}:
         raise ValueError(
             f"Numerics.backend={resolved_numerics.backend!r} does not match the active "

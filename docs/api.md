@@ -18,10 +18,10 @@ between in-memory results and checkpoint campaigns, see the
 ## Scene simulation
 
 The root package exposes the preferred high-level API. A `Scene` contains one
-scalar `Beam`, target, and `Detector`; `Numerics` contains sampling and execution
-controls. `simulate` lowers those objects to the established typed `Case` and
-calls the existing Monte Carlo runner directly. It neither reads nor writes a
-checkpoint.
+scalar `Beam`, target, and either the compatibility scalar `Detector` or a
+physical `PlanarDetector`; `Numerics` contains sampling and execution controls.
+`simulate` lowers those objects to the established typed `Case` and calls the
+existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
 
 ```python
 import pyrite as pr
@@ -83,6 +83,11 @@ lowering or compatibility seams.
    pyrite.Layer
    pyrite.Footprint
    pyrite.BlazedGrooves
+   pyrite.PlanarPose
+   pyrite.PixelGrid
+   pyrite.FilterPlate
+   pyrite.PlanarDetector
+   pyrite.PixelScorer
    pyrite.Scene
    pyrite.Sweep
    pyrite.Convergence

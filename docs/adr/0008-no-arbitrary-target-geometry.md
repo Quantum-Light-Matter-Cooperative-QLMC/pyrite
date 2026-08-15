@@ -59,6 +59,13 @@ register pressure, and the response was a
 [GPU-friendly surface model](https://www.epj-conferences.org/articles/epjconf/abs/2025/22/epjconf_chep2025_01207/epjconf_chep2025_01207.html)
 in VecGeom — a substantial project in its own right.
 
+This restriction is specifically about target/electron-transport geometry. A
+bounded downstream photon instrument may contain reviewed analytic plane or box
+elements after emission, such as a finite attenuation plate and planar pixel
+detector. Those objects remain outside `Target`, use closed concrete types, and
+perform no boundary queries in the electron CPU/CUDA navigator. They do not
+create a general geometry protocol or weaken this decision.
+
 Interoperability, not generality, was the sanctioned answer to a user who needs
 arbitrary geometry. The original decision specified required MCPL export so a
 code that has already solved general geometry could consume PyRITE's emitted

@@ -45,7 +45,7 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 ```text
 Components (a + b denotes a static import cycle):
   p0: _entry
-  p1: apps + campaign + checkpoints + cli + detectors + energy_grid + materials + montecarlo + plots + remote + results + runs + validation
+  p1: apps + campaign + checkpoints + cli + detectors + energy_grid + instrument + materials + montecarlo + plots + remote + results + runs + validation
   p2: devtools
   p3: perf
 Edges (importer -> imported):
@@ -609,7 +609,14 @@ submodule DAG (leaf → driver):
   `render` owns cached animation export over the Plotly trajectory builder.
 - Deps: `detectors`, `montecarlo`, `results`.
 
-## Detector forward models
+## Downstream instrument and detector forward models
+
+### `instrument/`
+Closed, analytic post-emission photon geometry. `model.py` owns frozen
+`PlanarPose`, `PixelGrid`, `FilterPlate`, physical `PlanarDetector`, and the
+narrow `PixelScorer` request. `Scene` owns ordered plates and accepts either the
+legacy scalar `Detector` or physical `PlanarDetector`; instrument objects never
+enter the electron-transport navigator. Deps: `detectors.spec`, `materials`.
 
 ### `detectors/`
 Detector configuration, read-time scoring, and detector-adjacent forward
