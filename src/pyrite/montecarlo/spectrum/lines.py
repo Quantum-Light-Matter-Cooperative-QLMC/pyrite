@@ -599,6 +599,7 @@ def mc_spectrum(
     electron_limit=None,
     E_cut_keV=None,
     xray_dispersion="vacuum",
+    _table_cache=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -1414,46 +1415,99 @@ def mc_spectrum(
         pad = 0.2 * (e_hi - e_lo)  # keep sinc tails that reach into the window
         lo_keep, hi_keep = e_lo - pad, e_hi + pad
 
-        # -- stack all (hkl, orientation) g-vectors + per-reflection tabulations --
-        _nsys_push("cxr.lines.tab")
-        g_rows, es_rows, ep_rows, wm_rows = [], [], [], []
-        cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
-        orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
-        for hkl in hkl_list:
-            g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
-            if R_orient is not None:
-                g_vec = R_orient @ g_vec
-            chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
-            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
-            # Store U_g/m_e once instead of dividing every interpolated pair.
-            for R_m, wm in orients:
-                gd = g_vec if R_m is None else R_m @ g_vec
-                e_s, e_p = _polarization_pair(n_hat, gd)
-                g_rows.append(gd)
-                es_rows.append(e_s)
-                ep_rows.append(e_p)
-                wm_rows.append(wm)
-                cr_rows.append(chi_tab.real)
-                ci_rows.append(chi_tab.imag)
-                ur_rows.append(u_tab.real)
-                ui_rows.append(u_tab.imag)
-        G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
-        ES = xp.asarray(np.array(es_rows), dtype=REAL)
-        EP = xp.asarray(np.array(ep_rows), dtype=REAL)
-        WM = xp.asarray(np.array(wm_rows), dtype=REAL)[None, :]  # (1, N_g)
-        CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_g, N_tab)
-        CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
-        U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
-        U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
-        _nsys_pop()
+        # The live runner evaluates incoherent and coherent spectra back-to-back
+        # over the same case.  Their reflection/orientation tables are identical,
+        # so retain this preparation in the pair-local cache instead of rebuilding
+        # and re-uploading it for the second kernel.
+        table_key = (
+            "batched",
+            id(E_grid_eV),
+            crystal,
+            tuple(tuple(hkl) for hkl in hkl_list),
+            float(B_ang2),
+            bool(use_henke),
+            None if beam_uvw is None else tuple(beam_uvw),
+            None if surface_hkl is None else tuple(surface_hkl),
+            float(azimuth_rad),
+            None if recip_miscut_rad is None else tuple(recip_miscut_rad),
+            None if mosaic_fwhm_rad is None else float(mosaic_fwhm_rad),
+            int(mosaic_nodes),
+            tuple(float(value) for value in n_hat),
+        )
+        tables = None if _table_cache is None else _table_cache.get(table_key)
+        if tables is None:
+            _nsys_push("cxr.lines.tab")
+            g_rows, es_rows, ep_rows, wm_rows = [], [], [], []
+            cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
+            orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
+            for hkl in hkl_list:
+                g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
+                if R_orient is not None:
+                    g_vec = R_orient @ g_vec
+                chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
+                u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
+                # Store U_g/m_e once instead of dividing every interpolated pair.
+                for R_m, wm in orients:
+                    gd = g_vec if R_m is None else R_m @ g_vec
+                    e_s, e_p = _polarization_pair(n_hat, gd)
+                    g_rows.append(gd)
+                    es_rows.append(e_s)
+                    ep_rows.append(e_p)
+                    wm_rows.append(wm)
+                    cr_rows.append(chi_tab.real)
+                    ci_rows.append(chi_tab.imag)
+                    ur_rows.append(u_tab.real)
+                    ui_rows.append(u_tab.imag)
+            G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
+            ES = xp.asarray(np.array(es_rows), dtype=REAL)
+            EP = xp.asarray(np.array(ep_rows), dtype=REAL)
+            WM = xp.asarray(np.array(wm_rows), dtype=REAL)[None, :]  # (1, N_g)
+            CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_g, N_tab)
+            CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
+            U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
+            U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
+            G2 = _rowdot3(G, G)
+            N_DOT_G = _matvec3(G, n_hat_d)
+            G_DOT_ES = _rowdot3(G, ES)
+            G_DOT_EP = _rowdot3(G, EP)
+            tables = (
+                G,
+                ES,
+                EP,
+                WM,
+                CHI_RE,
+                CHI_IM,
+                U_RE,
+                U_IM,
+                G2,
+                N_DOT_G,
+                G_DOT_ES,
+                G_DOT_EP,
+                wm_rows,
+            )
+            if _table_cache is not None:
+                _table_cache[table_key] = tables
+            _nsys_pop()
+        else:
+            (
+                G,
+                ES,
+                EP,
+                WM,
+                CHI_RE,
+                CHI_IM,
+                U_RE,
+                U_IM,
+                G2,
+                N_DOT_G,
+                G_DOT_ES,
+                G_DOT_EP,
+                wm_rows,
+            ) = tables
 
         N_g = G.shape[0]
         gx, gy, gz = G[:, 0][None, :], G[:, 1][None, :], G[:, 2][None, :]  # (1, N_g)
         nz = float(n_hat[2])
-        G2 = _rowdot3(G, G)
-        N_DOT_G = _matvec3(G, n_hat_d)
-        G_DOT_ES = _rowdot3(G, ES)
-        G_DOT_EP = _rowdot3(G, EP)
         g2 = G2[None, :]
         n_dot_g = N_DOT_G[None, :]
 

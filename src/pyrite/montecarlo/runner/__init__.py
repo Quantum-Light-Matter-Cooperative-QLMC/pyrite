@@ -758,6 +758,7 @@ def _lines_for_segments(
     *,
     coherent=None,
     Ne=None,
+    table_cache=None,
 ):
     """Coherent line spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
@@ -811,6 +812,7 @@ def _lines_for_segments(
             xray_dispersion=xray_dispersion,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
+            _table_cache=table_cache,
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -840,6 +842,7 @@ def _lines_for_segments(
             xray_dispersion=xray_dispersion,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
+            _table_cache=table_cache,
             **mosaic_kw,
         )
     return spec
@@ -911,6 +914,7 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
     # sweep does rather than uploading the pair separately.
     segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
+    table_cache = {}
     spec = _lines_for_segments(
         segs,
         E_grid,
@@ -920,10 +924,19 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
         groove,
         coherent=False,
         Ne=Ne_lines,
+        table_cache=table_cache,
     )
     spec_coherent = (
         _lines_for_segments(
-            segs, E_grid, case, n_hat, abs_layers, groove, coherent=True, Ne=Ne_lines
+            segs,
+            E_grid,
+            case,
+            n_hat,
+            abs_layers,
+            groove,
+            coherent=True,
+            Ne=Ne_lines,
+            table_cache=table_cache,
         )
         if want_coherent
         else None
@@ -1067,6 +1080,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # complex coherent grid too.
     want_coherent = bool(case.get("coherent_emission", False))
     spec_coherent = None
+    line_table_cache = {}
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(
@@ -1078,6 +1092,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 tp.get("groove"),
                 coherent=False,
                 Ne=Ne_lines,
+                table_cache=line_table_cache,
             )
 
             if want_coherent:
@@ -1090,6 +1105,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     tp.get("groove"),
                     coherent=True,
                     Ne=Ne_lines,
+                    table_cache=line_table_cache,
                 )
         except _GPU_OOM as error:
             raise _SpectrumPhaseOOM("line", error) from error

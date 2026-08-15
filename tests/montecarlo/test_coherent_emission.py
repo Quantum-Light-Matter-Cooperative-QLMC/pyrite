@@ -302,13 +302,24 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     `mc_spectrum` on the SAME segments -- the single-transport / dual-kernel
     invariant."""
     import pyrite.montecarlo.runner as runner
+    from pyrite.montecarlo.spectrum import lines as line_spectrum
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
+    real_chi_g = line_spectrum.chi_g
+    chi_g_calls = 0
+
+    def counted_chi_g(*args, **kwargs):
+        nonlocal chi_g_calls
+        chi_g_calls += 1
+        return real_chi_g(*args, **kwargs)
+
+    monkeypatch.setattr(line_spectrum, "chi_g", counted_chi_g)
     segs = _segments(2)
     tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
 
     case = _runner_case(coherent=True)
     out = runner._spectrum_case_impl(case, tp)
+    assert chi_g_calls == len(KWARGS["hkl_list"])
 
     direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
     direct_coherent = mc_spectrum(segs, E_GRID, coherent=True, **KWARGS)
