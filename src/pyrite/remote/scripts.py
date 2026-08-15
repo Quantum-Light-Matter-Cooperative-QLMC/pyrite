@@ -1223,10 +1223,12 @@ def _prune_checkpoint_stems_command(
     *,
     all_profiles: bool = False,
     catalog_profile: str | None = None,
+    obsolete_stems: list[str] | None = None,
     yes: bool = False,
 ) -> str:
-    """Reserve exact current stems while running ``pyrite prune`` remotely."""
-    transport._check_shell_tokens([jobid, *stems])
+    """Reserve exact stems while pruning current and obsolete profile data."""
+    obsolete_stems = obsolete_stems or []
+    transport._check_shell_tokens([jobid, *stems, *obsolete_stems])
     if all_profiles and catalog_profile is not None:
         raise ValueError("all_profiles and catalog_profile are mutually exclusive")
     reserve = _reserve_checkpoint_stems_command(jobid, stems)
@@ -1239,12 +1241,31 @@ def _prune_checkpoint_stems_command(
     if yes:
         args.append("--yes")
     command = " ".join(config.shell_arg(arg) for arg in args)
-    return (
+    base = (
         f"{reserve}; "
         f"release_prune() {{ {release}; }}; trap release_prune EXIT; "
         f"cd {config.shell_remote_dir()} || exit $?; "
         f"{config.shell_remote_uv()} run --no-sync pyrite {command}"
     )
+    if not obsolete_stems:
+        return base
+    obsolete_words = " ".join(obsolete_stems)
+    checkpoint_dir = config.shell_remote_path("checkpoints")
+    if yes:
+        reclaim = (
+            f"cd {checkpoint_dir} 2>/dev/null || exit 0; "
+            f"for stem in {obsolete_words}; do "
+            '[ -d "$stem" ] || continue; rm -rf -- "$stem" || exit $?; '
+            "printf 'CLEARED obsolete profile checkpoint: checkpoints/%s/\\n' \"$stem\"; done"
+        )
+    else:
+        reclaim = (
+            f"cd {checkpoint_dir} 2>/dev/null || exit 0; "
+            f"for stem in {obsolete_words}; do "
+            '[ -d "$stem" ] || continue; '
+            "printf 'would delete obsolete profile checkpoint: checkpoints/%s/\\n' \"$stem\"; done"
+        )
+    return f'{base}; status=$?; [ "$status" -eq 0 ] || exit "$status"; {reclaim}'
 
 
 def _reap_job_command(jobid: str) -> str:
