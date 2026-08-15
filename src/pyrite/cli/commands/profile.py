@@ -429,7 +429,7 @@ def show_command(name, json_output):
     "source",
     metavar="SOURCE",
     shell_complete=_cli_completion.complete_profile,
-    help="Clone range, beam, and detector defaults from SOURCE; defaults to standard.",
+    help="Clone ranges, beam, detector, and material membership from SOURCE; defaults to standard.",
 )
 @_range_cli_options
 @_ne_cli_options
@@ -481,11 +481,10 @@ def create_command(
     """Create a new profile, cloning defaults from --from (standard).
 
     Range options replace individual cloned grids; beam and detector options
-    replace individual cloned fields. Overrides and material membership are not
-    cloned. Without --material, the new profile starts with implicit all-catalog
-    membership and no per-material overrides. --beam NAME attaches a named
-    [beams.NAME] reference and is mutually exclusive with the inline beam
-    flags, which are deprecated in its favor.
+    replace individual cloned fields. Material membership is cloned and
+    ``--material`` replaces it. Per-material overrides are not cloned. --beam
+    NAME attaches a named [beams.NAME] reference and is mutually exclusive with
+    the inline beam flags, which are deprecated in its favor.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)

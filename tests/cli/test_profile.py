@@ -293,10 +293,10 @@ def test_create_clones_source_and_applies_range_overrides(tmp_path, monkeypatch)
     text = catalog.read_text()
     assert "[profiles.sub_200keV]" in text
     assert "energy_keV = {values = [150.0, 200.0]}" in text
-    # Cloned grids carry over; membership and overrides are not cloned.
+    # Cloned grids and membership carry over; per-material overrides do not.
     assert "tilt_deg = {values = [5.0]}" in text
     section = text.split("[profiles.sub_200keV]", 1)[1].split("\n[", 1)[0]
-    assert "materials" not in section
+    assert 'materials = ["hopg"]' in section
 
 
 def test_create_clones_energy_grid_refs_without_copying_artifact_bytes(tmp_path, monkeypatch):

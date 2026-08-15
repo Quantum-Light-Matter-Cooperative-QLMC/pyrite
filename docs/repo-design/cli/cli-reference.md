@@ -1090,14 +1090,14 @@ Usage: pyrite profile create [OPTIONS] NAME
   Create a new profile, cloning defaults from --from (standard).
 
   Range options replace individual cloned grids; beam and detector options replace
-  individual cloned fields. Overrides and material membership are not cloned. Without
-  --material, the new profile starts with implicit all-catalog membership and no per-
-  material overrides. --beam NAME attaches a named [beams.NAME] reference and is
-  mutually exclusive with the inline beam flags, which are deprecated in its favor.
+  individual cloned fields. Material membership is cloned and ``--material`` replaces
+  it. Per-material overrides are not cloned. --beam NAME attaches a named [beams.NAME]
+  reference and is mutually exclusive with the inline beam flags, which are deprecated
+  in its favor.
 
 Options:
-  --from SOURCE                   Clone range, beam, and detector defaults from SOURCE;
-                                  defaults to standard.
+  --from SOURCE                   Clone ranges, beam, detector, and material membership
+                                  from SOURCE; defaults to standard.
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to

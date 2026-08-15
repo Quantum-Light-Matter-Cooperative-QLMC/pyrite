@@ -368,7 +368,7 @@ def create_profile(
         raise ValueError(f"unknown source profile: {source_name}")
     target = tomlkit.table()
     for key, value in profiles[source_name].items():
-        if key not in ("materials", "overrides"):
+        if key != "overrides":
             target[key] = clone_grid(value)
     for label, values in updates.items():
         target[catalog_key(label)] = values_item(values)

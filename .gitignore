@@ -264,6 +264,8 @@ utils/
 
 sgconfig.yml
 *.local.md
+checkpoints/*.h5
+checkpoints/**/*.h5
 checkpoints/*.pkl
 checkpoints/**/*.pkl
 checkpoints/**/*.tmp
