@@ -247,6 +247,38 @@ def test_load_reads_gzip_pickle(tmp_path):
     assert set(loaded) == set(payload)
 
 
+def test_dump_load_roundtrips_a_long_uniform_list_payload(tmp_path):
+    """A cross-material comparison cache is a flat list of thousands of record
+    dicts, not a `{config: {E0: record}}` mapping, so it takes the generic
+    typed-tree path rather than the record-table encoder. That path used to
+    pack each entry's kind tag into one `kinds` *attribute*; past a few
+    thousand entries the attribute's encoded size exceeds HDF5's ~64 KiB
+    object-header message ceiling and raises ``OSError: Unable to
+    synchronously create attribute (object header message is too large)``."""
+    path = tmp_path / "comparison.pkl"
+    payload = [{"E0_keV": float(i), "line_eV": i * 1.5, "quality": 0.5} for i in range(6000)]
+    ckio.dump(payload, str(path))
+    loaded = ckio.load(str(path))
+    assert loaded == payload
+
+
+def test_load_reads_legacy_attribute_packed_kinds(tmp_path):
+    """``kinds`` moved from an attribute to a dataset (see above); an archive
+    written before the change stored it as an attribute and must still load."""
+    path = tmp_path / "legacy_kinds.pkl"
+    with h5py.File(path, "w") as h5:
+        h5.attrs["schema"] = "pyrite.result"
+        h5.attrs["schema_version"] = 2
+        h5.attrs["identity_version"] = 1
+        node = h5.create_group("value")
+        node.attrs["kind"] = "list"
+        node.attrs["kinds"] = np.array(["int", "int"], dtype=object)
+        node.attrs["v:00000000"] = 1
+        node.attrs["v:00000001"] = 2
+    loaded = ckio.load(str(path))
+    assert loaded == [1, 2]
+
+
 def test_load_reads_zstd_pickle(tmp_path):
     path = tmp_path / "zstd.pkl"
     payload = _payload()

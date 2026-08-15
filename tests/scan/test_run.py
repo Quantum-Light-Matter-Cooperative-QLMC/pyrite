@@ -588,6 +588,36 @@ def test_checkpoint_manifest_fresh_sidecar_skips_unpickling(tmp_path, monkeypatc
     assert manifest == {"energies_keV": [30.0], "n_records": 1, "sweep": {}}
 
 
+def test_checkpoint_manifest_prefers_component_store_over_stale_legacy_pkl(tmp_path):
+    """A leftover legacy ``<material>.pkl`` monolith beside a migrated
+    ``<material>/line.h5`` component checkpoint (mid-migration: `save()`
+    leaves the old .pkl in place) must not shadow the component data --
+    `_manifest_path_for` has to recognize `line.h5`, not just `line.pkl`, as
+    "already migrated", or it reads/writes the wrong (legacy) sidecar and
+    stale results win."""
+    legacy_results = {
+        "cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}
+    }
+    pkl = tmp_path / "hopg.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(legacy_results, f)
+
+    fresh_results = {
+        "cfg_a": {
+            30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])},
+            45.0: {"case": _fake_case("cfg_a", 45.0), "spec": np.array([1.0])},
+        }
+    }
+    _checkpoint_store.save("hopg", tmp_path, fresh_results)
+
+    manifest = checkpoint_manifest("hopg", checkpoint_dir=str(tmp_path))
+
+    assert manifest["n_records"] == 2
+    assert manifest["energies_keV"] == [30.0, 45.0]
+    assert (tmp_path / "hopg" / "meta.json").is_file()
+    assert not (tmp_path / "hopg.meta.json").exists()
+
+
 def test_manifest_save_coerces_numpy_scalars_to_json_safe(tmp_path):
     case = _fake_case("cfg_a", 30.0)
     case["thickness_ang"] = np.float64(1e4)  # simulate a numpy scalar in a case field

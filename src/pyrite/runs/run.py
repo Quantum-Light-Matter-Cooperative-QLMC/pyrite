@@ -51,7 +51,9 @@ def _manifest_path_for(checkpoint_path):
     """Manifest path for a component directory or legacy checkpoint pickle."""
     if not str(checkpoint_path).endswith(".pkl"):
         legacy = Path(checkpoint_path).with_suffix(".pkl")
-        if legacy.is_file() and not (Path(checkpoint_path) / "line.pkl").is_file():
+        path = Path(checkpoint_path)
+        migrated = _checkpoint_store.component_path(path.name, "line", path.parent).is_file()
+        if legacy.is_file() and not migrated:
             return str(legacy.with_suffix(".meta.json"))
         return os.path.join(checkpoint_path, "meta.json")
     base, _ = os.path.splitext(checkpoint_path)

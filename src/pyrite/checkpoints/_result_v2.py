@@ -341,7 +341,15 @@ class _Writer:
         self._write_entries(group, names, list(value.values()))
 
     def _write_entries(self, group: h5py.Group, names: list[str], values: list[Any]) -> None:
-        """Pack scalar entries into ``group``'s attributes; write the rest as children."""
+        """Pack scalar entries into ``group``'s attributes; write the rest as children.
+
+        ``kinds`` is a dataset, not an attribute: for a long sequence or mapping
+        (e.g. a cross-material comparison cache with thousands of records) it
+        grows large enough to exceed HDF5's ~64 KiB object-header
+        attribute-message ceiling, raising ``OSError: Unable to synchronously
+        create attribute (object header message is too large)`` -- a limit that
+        does not apply to dataset storage.
+        """
         kinds: list[str] = []
         for name, value in zip(names, values, strict=True):
             tag = _scalar_tag(value)
@@ -352,7 +360,7 @@ class _Writer:
                 kinds.append(tag)
                 if tag != "null":
                     group.attrs[f"v:{name}"] = value
-        group.attrs["kinds"] = _str_array(kinds)
+        group.create_dataset("kinds", data=_str_array(kinds), track_times=False)
 
     # -- record table ----------------------------------------------------
     def _write_table(
@@ -579,8 +587,13 @@ class _Reader:
             names = _read_strs(node.attrs["names"])
             return dict(zip(keys, self._read_entries(group, names), strict=True))
         if kind in {"list", "tuple"}:
-            names = [f"{i:08d}" for i in range(len(node.attrs["kinds"]))]
-            values = self._read_entries(cast(h5py.Group, node), names)
+            group = cast(h5py.Group, node)
+            # "kinds" moved from attribute to dataset (a long sequence can
+            # exceed HDF5's attribute-message size ceiling); read either
+            # generation so archives written before the change still load.
+            kinds_len = len(group["kinds"]) if "kinds" in group else len(group.attrs["kinds"])
+            names = [f"{i:08d}" for i in range(kinds_len)]
+            values = self._read_entries(group, names)
             return tuple(values) if kind == "tuple" else values
         if kind == "packed-sequence":
             tag = node.attrs["tag"]
@@ -599,7 +612,8 @@ class _Reader:
         raise ValueError(f"unsupported result node kind: {kind!r}")
 
     def _read_entries(self, group: h5py.Group, names: list[str]) -> list[Any]:
-        kinds = _read_strs(group.attrs["kinds"])
+        raw_kinds = group["kinds"][...] if "kinds" in group else group.attrs["kinds"]
+        kinds = _read_strs(raw_kinds)
         values: list[Any] = []
         for name, tag in zip(names, kinds, strict=True):
             if tag == "node":
