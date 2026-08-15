@@ -9,7 +9,60 @@ the total linear attenuation summed over elements, and the layered
 
 import numpy as np
 
+from . import CATALOG, MediumSpec
 from .crystal import absorption_length_ang
+
+
+def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> np.ndarray:
+    """Return total linear X-ray attenuation on a positive energy grid [mm^-1].
+
+    Element contributions add as
+    ``mu(E) = sum_i 1 / L_abs,i(E)``. The underlying Henke/Chantler
+    absorption lengths assume homogeneous, passive primary-beam attenuation;
+    this helper adds no scattering, fluorescence, diffraction, or secondary
+    production. As every elemental absorption coefficient tends to zero, so
+    does the returned coefficient.
+
+    ``material`` is either a catalog crystal/medium key or an explicit
+    :class:`~pyrite.materials.catalog.MediumSpec`. Runnable target-material
+    keys are intentionally rejected because their film/stack composition is
+    not a single homogeneous filter medium.
+
+    Validation: positioned-filter-attenuation
+    """
+    try:
+        energy = np.asarray(energy_eV, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise TypeError("energy_eV must be a one-dimensional real array") from exc
+    if energy.ndim != 1:
+        raise ValueError("energy_eV must be one-dimensional")
+    if energy.size == 0:
+        raise ValueError("energy_eV must not be empty")
+    if not np.all(np.isfinite(energy)) or np.any(energy <= 0.0):
+        raise ValueError("energy_eV must contain only finite positive values")
+
+    if isinstance(material, str):
+        if material in CATALOG.media:
+            composition = CATALOG.media[material].composition
+        elif material in CATALOG.crystals:
+            composition = CATALOG.crystals[material].composition
+        else:
+            raise ValueError(
+                f"unknown filter material {material!r}; expected a catalog crystal or medium key"
+            )
+    elif isinstance(material, MediumSpec):
+        composition = material.composition
+    else:
+        raise TypeError("material must be a catalog key or MediumSpec")
+
+    if not composition or any(
+        not element or not np.isfinite(float(density)) or float(density) <= 0.0
+        for element, density in composition
+    ):
+        raise ValueError("filter composition must contain positive element number densities")
+    coefficient = np.asarray(_mu_total_inv_ang(composition, energy), dtype=float) * 1.0e7
+    coefficient.setflags(write=False)
+    return coefficient
 
 
 def _normalize_composition(element, n_atoms_per_ang3, composition):
@@ -107,3 +160,6 @@ def _stack_tau(layers, z_mid, n_z, E, *, exit_distance_ang=None):
         dz = _layer_dz(z_mid, n_z, float(z_top), float(z_bot))
         tau = tau + _mu_total_inv_ang(comp, E) * dz * inv
     return tau
+
+
+__all__ = ["linear_attenuation_inv_mm"]

@@ -190,7 +190,7 @@ class FilterPlate:
 
     def __post_init__(self) -> None:
         if isinstance(self.material, str):
-            known = CATALOG.media.keys() | CATALOG.crystals.keys() | CATALOG.materials.keys()
+            known = CATALOG.media.keys() | CATALOG.crystals.keys()
             if self.material not in known:
                 raise ValueError(f"unknown FilterPlate material {self.material!r}")
         elif isinstance(self.material, MediumSpec):

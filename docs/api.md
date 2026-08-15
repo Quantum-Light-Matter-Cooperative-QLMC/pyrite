@@ -126,6 +126,7 @@ not independent registries and not part of the supported API.
    pyrite.materials.crystal.U_g
    pyrite.materials.crystal.absorption_length_ang
    pyrite.materials.crystal.dominant_reflections
+   pyrite.materials.attenuation.linear_attenuation_inv_mm
 ```
 
 ## Simulation kernels

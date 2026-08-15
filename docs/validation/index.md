@@ -97,6 +97,7 @@ detectors/alexs-qe-absorption
 detectors/detector-eaglexo
 detectors/detector-line-broadening
 detectors/grazing-reflectivity
+detectors/positioned-filter-attenuation
 ```
 
 ```{toctree}

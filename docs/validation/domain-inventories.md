@@ -129,6 +129,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 
 | ID | Claim | Status |
 |---|---|---|
+| [`positioned-filter-attenuation`](physics-validation-ledger.md#positioned-filter-attenuation) | primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)` | `unverified` |
 | [`detector-eaglexo`](physics-validation-ledger.md#detector-eaglexo) | `solid_angle(Ω) × QE(E)` CCD operator | `filtered` |
 | [`detector-timepix`](physics-validation-ledger.md#detector-timepix) | Si charge model, diffusion, ~1.9 keV counting threshold | `blocked` |
 | [`detector-line-broadening`](physics-validation-ledger.md#detector-line-broadening) | EDS polar-aperture line broadening `FWHM = (2√(2ln2)/3)·(∂Ep/∂θobs)·Δθobs` | `rederived` |
