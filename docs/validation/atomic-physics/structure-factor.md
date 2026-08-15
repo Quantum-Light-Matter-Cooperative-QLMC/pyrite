@@ -16,10 +16,10 @@ displacement along the scattering vector).
 **Code.** `src/pyrite/materials/crystal.py::structure_factor`,
 `src/pyrite/materials/crystal.py::debye_waller`
 **Source (as handed).** Standard kinematical structure factor
-\(F(\mathbf g) = \sum_j f_j\exp(i\mathbf g\cdot\mathbf r_j)
-\exp\left(-\dfrac{Bg^2}{16\pi^2}\right)\). The flagged trap is the
-Debye–Waller exponent convention: \(B\) vs \(\langle u^2\rangle\), and the
-factor \(16\pi^2\) vs \(4\).
+$F(\mathbf g) = \sum_j f_j\exp(i\mathbf g\cdot\mathbf r_j)
+\exp\left(-\dfrac{Bg^2}{16\pi^2}\right)$. The flagged trap is the
+Debye–Waller exponent convention: $B$ vs $\langle u^2\rangle$, and the
+factor $16\pi^2$ vs $4$.
 **Anchor.** none in the ledger row.
 **Verifier context.** Fresh, independent session. Derivation below was written
 from the standard kinematical-diffraction result and the module's stated
@@ -33,113 +33,113 @@ was only diffed afterward.
 ### 1.1 Reciprocal-space convention used by this module
 
 The module fixes the crystallographer's 2π convention throughout:
-`_reciprocal_basis` builds `b_i` with the \(2\pi\) prefactor so that
-\(\mathbf b_i\cdot\mathbf a_j=2\pi\delta_{ij}\), and
-`reciprocal_g_vector`/`g_mag` document \(|\mathbf g|=2\pi/d_{hkl}\). With
-Bragg \(\lambda=2d\sin\theta\),
+`_reciprocal_basis` builds `b_i` with the $2\pi$ prefactor so that
+$\mathbf b_i\cdot\mathbf a_j=2\pi\delta_{ij}$, and
+`reciprocal_g_vector`/`g_mag` document $|\mathbf g|=2\pi/d_{hkl}$. With
+Bragg $\lambda=2d\sin\theta$,
 
-\[
+$$
 g=\frac{2\pi}{d}=\frac{4\pi\sin\theta}{\lambda}
-\]
+$$
 
-(so \(g\) here is the physics momentum transfer \(q\)), hence
+(so $g$ here is the physics momentum transfer $q$), hence
 
-\[
+$$
 s\equiv\frac{\sin\theta}{\lambda}=\frac{g}{4\pi}.
-\]
+$$
 
-This is the pivot for the entire "\(16\pi^2\) vs \(4\)" trap: it is *only*
-correct to write \(W=Bg^2/16\pi^2\) when \(g=2\pi/d\). Had the module used the
-no-2π crystallographic convention \(g=1/d=2\sin\theta/\lambda\), the correct
-exponent would instead be \(W=B(g/2)^2=Bg^2/4\). So the two candidate
-denominators are not both "styles"; each belongs to exactly one \(g\)
+This is the pivot for the entire "$16\pi^2$ vs $4$" trap: it is *only*
+correct to write $W=Bg^2/16\pi^2$ when $g=2\pi/d$. Had the module used the
+no-2π crystallographic convention $g=1/d=2\sin\theta/\lambda$, the correct
+exponent would instead be $W=B(g/2)^2=Bg^2/4$. So the two candidate
+denominators are not both "styles"; each belongs to exactly one $g$
 convention. I must therefore check that the same `g` fed to `debye_waller` is
-the \(2\pi/d\) one.
+the $2\pi/d$ one.
 
 ### 1.2 Phase term
 
-Write atom \(j\) at fractional coordinates \(\mathbf R_j=(x_j,y_j,z_j)\), i.e.
-\(\mathbf r_j=x_j\mathbf a_1+y_j\mathbf a_2+z_j\mathbf a_3\), and
-\(\mathbf g=h\mathbf b_1+k\mathbf b_2+l\mathbf b_3\). Then
+Write atom $j$ at fractional coordinates $\mathbf R_j=(x_j,y_j,z_j)$, i.e.
+$\mathbf r_j=x_j\mathbf a_1+y_j\mathbf a_2+z_j\mathbf a_3$, and
+$\mathbf g=h\mathbf b_1+k\mathbf b_2+l\mathbf b_3$. Then
 
-\[
+$$
 \mathbf g\cdot\mathbf r_j
 =2\pi(hx_j+ky_j+lz_j)
 =2\pi(hkl\cdot\mathbf R_j).
-\]
+$$
 
-So \(\exp(i\mathbf g\cdot\mathbf r_j)=\exp(2\pi i(hkl\cdot\mathbf R_j))\). The
-global sign (\(+i\) vs \(-i\)) is a pure convention choice; it conjugates `S`
-and leaves the only physical observable \(|S|^2\) invariant, provided the
+So $\exp(i\mathbf g\cdot\mathbf r_j)=\exp(2\pi i(hkl\cdot\mathbf R_j))$. The
+global sign ($+i$ vs $-i$) is a pure convention choice; it conjugates `S`
+and leaves the only physical observable $|S|^2$ invariant, provided the
 same sign is used for every atom.
 
 ### 1.3 Debye–Waller factor (the trap)
 
-For a Gaussian-distributed thermal displacement \(\mathbf u\) (zero mean),
+For a Gaussian-distributed thermal displacement $\mathbf u$ (zero mean),
 the coherent amplitude from a vibrating atom is
 
-\[
+$$
 f_{\rm thermal}=f_0\langle\exp(i\mathbf g\cdot\mathbf u)\rangle
 =f_0\exp\!\left(-\tfrac12\langle(\mathbf g\cdot\mathbf u)^2\rangle\right).
-\]
+$$
 
-Hence the *amplitude* attenuation is \(\exp(-W)\) with
+Hence the *amplitude* attenuation is $\exp(-W)$ with
 
-\[
+$$
 W=\tfrac12\langle(\mathbf g\cdot\mathbf u)^2\rangle
 =\tfrac12 g^2\langle u_g^2\rangle,
-\]
+$$
 
-where \(\langle u_g^2\rangle\) is the mean-square displacement resolved
-along \(\mathbf g\). The crystallographic isotropic displacement parameter
+where $\langle u_g^2\rangle$ is the mean-square displacement resolved
+along $\mathbf g$. The crystallographic isotropic displacement parameter
 is *defined* as
 
-\[
+$$
 B=8\pi^2\langle u_g^2\rangle
 \quad\Rightarrow\quad
 \langle u_g^2\rangle=\frac{B}{8\pi^2}.
-\]
+$$
 
-Substituting, and using \(g=4\pi s\):
+Substituting, and using $g=4\pi s$:
 
-\[
+$$
 W=\tfrac12 g^2\cdot\frac{B}{8\pi^2}
 =\tfrac12(4\pi s)^2\frac{B}{8\pi^2}
 =\tfrac12\cdot16\pi^2 s^2\cdot\frac{B}{8\pi^2}
 =Bs^2.
-\]
+$$
 
 Therefore the amplitude Debye–Waller factor is
 
-\[
+$$
 \boxed{\exp(-W)=\exp(-Bs^2)=\exp\!\left(-B\left(\frac{g}{4\pi}\right)^2\right)
 =\exp\!\left(-\frac{Bg^2}{16\pi^2}\right)}.
 \qquad(\star)
-\]
+$$
 
 Cross-check of the two traps:
-- **\(B\) vs \(\langle u^2\rangle\):** \(B=8\pi^2\langle u_g^2\rangle\) (one
-  Cartesian/along-\(\mathbf g\) component, *not* the 3-D total
-  \(\langle u^2\rangle=3\langle u_x^2\rangle\)). Using the 3-D total here
+- **$B$ vs $\langle u^2\rangle$:** $B=8\pi^2\langle u_g^2\rangle$ (one
+  Cartesian/along-$\mathbf g$ component, *not* the 3-D total
+  $\langle u^2\rangle=3\langle u_x^2\rangle$). Using the 3-D total here
   would introduce a spurious factor of 3.
-- **\(16\pi^2\) vs \(4\):** with \(g=2\pi/d\) (this module) the correct
-  denominator is \(16\pi^2\). The \(4\) would only be correct for
-  \(g=1/d\).
+- **$16\pi^2$ vs $4$:** with $g=2\pi/d$ (this module) the correct
+  denominator is $16\pi^2$. The $4$ would only be correct for
+  $g=1/d$.
 
-The **intensity** carries \(\exp(-2W)=\exp(-2Bs^2)\); the amplitude carries
-one factor of \(\exp(-W)\). `structure_factor` returns an *amplitude* `S`,
-so it must apply \(\exp(-W)\) exactly once per atom.
+The **intensity** carries $\exp(-2W)=\exp(-2Bs^2)$; the amplitude carries
+one factor of $\exp(-W)$. `structure_factor` returns an *amplitude* `S`,
+so it must apply $\exp(-W)$ exactly once per atom.
 
 ### 1.4 Limiting cases I expect
 
-- \(B\to0\) or \(g\to0\): \(\exp(-W)\to1\) (no thermal suppression).
-- \(g\to\infty\) / large \(B\): \(\exp(-W)\to0^+\) (high-angle reflections
+- $B\to0$ or $g\to0$: $\exp(-W)\to1$ (no thermal suppression).
+- $g\to\infty$ / large $B$: $\exp(-W)\to0^+$ (high-angle reflections
   damped — attenuation, so the exponent sign **must be negative**).
-- \(g\to0\): \(S(0)=\sum_j f_j(0)\approx\sum_j Z_j\) (forward scattering =
+- $g\to0$: $S(0)=\sum_j f_j(0)\approx\sum_j Z_j$ (forward scattering =
   total electrons).
 - Diamond-structure selection rule: FCC lattice with 2-atom basis at
-  \((0,0,0)\) and \((\tfrac14,\tfrac14,\tfrac14)\) gives
-  \(S\propto(1+i^{h+k+l})\) on top of the all-even/all-odd FCC rule. So
+  $(0,0,0)$ and $(\tfrac14,\tfrac14,\tfrac14)$ gives
+  $S\propto(1+i^{h+k+l})$ on top of the all-even/all-odd FCC rule. So
   `(111)` and `(400)` are allowed, `(222)` and `(200)` are extinct. This is a
   strong, sign-of-phase-sensitive test.
 
@@ -157,9 +157,9 @@ def debye_waller(g_invang, B_ang2):
     return np.exp(-B_ang2 * s**2)
 ```
 
-\(s=g/(4\pi)\), return \(\exp(-Bs^2)=\exp(-Bg^2/16\pi^2)\). This is
-**exactly** \((\star)\). The docstring states \(B=8\pi^2\langle
-u_x^2\rangle\) and that intensities take \(\exp(-2W)\) — both match my
+$s=g/(4\pi)$, return $\exp(-Bs^2)=\exp(-Bg^2/16\pi^2)$. This is
+**exactly** $(\star)$. The docstring states $B=8\pi^2\langle
+u_x^2\rangle$ and that intensities take $\exp(-2W)$ — both match my
 derivation. Sign is negative (attenuation). ✓
 
 ### 2.2 `structure_factor`
@@ -196,13 +196,13 @@ cited equation.
 
 | filter | result |
 |--------|--------|
-| **Units** | \(B\ [\text{Å}^2]\cdot g^2\ [\text{Å}^{-2}]\) → dimensionless exponent ✓; `S` dimensionless (electron units): \(f_j\) (electrons) × phase × DW ✓ |
-| **Limit \(B\to0\) / \(g\to0\)** | `debye_waller` \(\to1\) ✓ (numeric below) |
-| **Limit \(g\to\infty\) / large \(B\)** | \(\exp(-W)\to0^+\), high-angle damping ✓; sign of exponent negative ✓ |
-| **Forward scattering** | \(S(000)\approx\sum Z_j\) ✓ (numeric below) |
+| **Units** | $B\ [\text{Å}^2]\cdot g^2\ [\text{Å}^{-2}]$ → dimensionless exponent ✓; `S` dimensionless (electron units): $f_j$ (electrons) × phase × DW ✓ |
+| **Limit $B\to0$ / $g\to0$** | `debye_waller` $\to1$ ✓ (numeric below) |
+| **Limit $g\to\infty$ / large $B$** | $\exp(-W)\to0^+$, high-angle damping ✓; sign of exponent negative ✓ |
+| **Forward scattering** | $S(000)\approx\sum Z_j$ ✓ (numeric below) |
 | **Selection rules (phase)** | diamond `(222)`,`(200)` extinct; `(111)`,`(400)` allowed ✓ (numeric below) |
-| **\(16\pi^2\) vs \(4\)** | code uses \(16\pi^2\), consistent with its own \(g=2\pi/d\); \(4\) would be wrong here ✓ |
-| **\(B\) vs \(\langle u^2\rangle\)** | \(B=8\pi^2\langle u_g^2\rangle\) (1-component), standard crystallographic ✓ |
+| **$16\pi^2$ vs $4$** | code uses $16\pi^2$, consistent with its own $g=2\pi/d$; $4$ would be wrong here ✓ |
+| **$B$ vs $\langle u^2\rangle$** | $B=8\pi^2\langle u_g^2\rangle$ (1-component), standard crystallographic ✓ |
 
 ---
 
@@ -221,9 +221,9 @@ g= 6.2832  code=0.88249709  16pi2=0.88249709  factor4=0.00719194
 W_code = 0.028496583   B*s^2 = 0.028496583   u2 = B/(8pi^2) = 0.0063326
 ```
 
-Code reproduces \(\exp(-Bg^2/16\pi^2)\) to 8 decimals and is *nowhere near*
-the `factor4` trap. \(W_{\rm code}=Bs^2\) confirms \((\star)\) and the
-\(B=8\pi^2\langle u^2\rangle\) mapping.
+Code reproduces $\exp(-Bg^2/16\pi^2)$ to 8 decimals and is *nowhere near*
+the `factor4` trap. $W_{\rm code}=Bs^2$ confirms $(\star)$ and the
+$B=8\pi^2\langle u^2\rangle$ mapping.
 
 ### 4.2 Structure-factor selection rules (silicon, diamond structure)
 
@@ -237,10 +237,10 @@ S(000)= 113.98 + 2.67j   (expect 8·Z_Si = 8·14 = 112; f0(0)=Z)
 ```
 
 `(222)` and `(200)` extinct to machine zero while `(111)`/`(400)` are strong —
-this only happens if the \(\exp(2\pi i\,hkl\cdot\mathbf R)\) phases (and
+this only happens if the $\exp(2\pi i\,hkl\cdot\mathbf R)$ phases (and
 their relative signs) are implemented correctly, so the phase convention is
-verified. \(S(000)\approx114\) matches \(\sum Z_j=112\) (the small excess +
-imaginary part are Si's anomalous \(f'+if''\) at 8 keV, since Si is
+verified. $S(000)\approx114$ matches $\sum Z_j=112$ (the small excess +
+imaginary part are Si's anomalous $f'+if''$ at 8 keV, since Si is
 edge-prone → complex form factor). ✓
 
 ---
@@ -261,10 +261,10 @@ numerical defect.
 ## 6. Adjudication
 
 All cheap filters pass. The independent derivation reproduces the code
-term-for-term: the phase \(\exp(2\pi i\,hkl\cdot\mathbf R)\), the single
-amplitude Debye–Waller factor \(\exp(-Bg^2/16\pi^2)\) with
-\(B=8\pi^2\langle u_g^2\rangle\), and the \(g=2\pi/d\) convention that
-makes \(16\pi^2\) (not \(4\)) the correct denominator. Both flagged traps are handled
+term-for-term: the phase $\exp(2\pi i\,hkl\cdot\mathbf R)$, the single
+amplitude Debye–Waller factor $\exp(-Bg^2/16\pi^2)$ with
+$B=8\pi^2\langle u_g^2\rangle$, and the $g=2\pi/d$ convention that
+makes $16\pi^2$ (not $4$) the correct denominator. Both flagged traps are handled
 correctly. Numerics confirm the DW value to 8 digits and the phase convention via
 diamond selection rules. The only caveats are (a) a single scalar `B` shared across
 all basis atoms (a documented isotropic approximation consistent with the cited

@@ -18,19 +18,19 @@
 Let `r=(x,y,z)` and `d=(d_x,d_y,d_z)`. For each coordinate `q` with lower
 and upper faces `q_-`, `q_+`, the only forward face candidate is
 
-\[
+$$
 t_q = \begin{cases}
  (q_+-r_q)/d_q,&d_q>0,\\
  (q_--r_q)/d_q,&d_q<0,\\
  +\infty,&d_q=0.
 \end{cases}
-\]
+$$
 
 Thus, for a finite prism,
 
-\[
+$$
 t_{\\rm exit}=\\min(t_x,t_y,t_z),\qquad r_{\\rm exit}=r+t_{\\rm exit}d.
-\]
+$$
 
 All finite candidates are positive for a strictly interior origin. Equal
 candidates are a geometrical corner/edge; they have the same distance, so a
@@ -42,10 +42,10 @@ a transverse face if the footprint is finite.
 
 The public conversion is
 
-\[
+$$
 W_{\\mathring{\\rm A}}=10^7 W_{\\rm mm},\qquad
 H_{\\mathring{\\rm A}}=10^7 H_{\\rm mm},
-\]
+$$
 
 because `1 mm = 10^7 Angstrom`; it must occur once before the ray calculation.
 
@@ -54,11 +54,11 @@ For a photon emitted at `r_0` in direction `n`, use the same expression with
 attenuation coefficient `mu_j [Angstrom^-1]` in z layer `j`, the independent
 Beer--Lambert result is
 
-\[
+$$
 A=\\exp(-\\tau),\qquad
 \\tau=\\int_0^T\\mu(z_0+s n_z)\\,ds
      =\\sum_j\\mu_j L_j,
-\]
+$$
 
 where `L_j` is the length of `[0,T]` whose z coordinate lies in layer `j`.
 For `n_z != 0`, layer-boundary parameters are

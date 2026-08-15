@@ -14,24 +14,24 @@
 
 The source CIF gives unit-occupancy sites with
 
-\[
+$$
 U_{33,\mathrm{Pd}}=0.0074(4)\ {\rm \AA^2},\qquad
 U_{33,\mathrm{Te}}=0.0079(3)\ {\rm \AA^2}.
-\]
+$$
 
 For one Pd and two Te atoms per formula unit, the declared common-site
 approximation is the multiplicity-weighted projection
 
-\[
+$$
 \bar U_{33}=\frac{U_{33,\mathrm{Pd}}+2U_{33,\mathrm{Te}}}{3}
            =0.0077333\ {\rm \AA^2}.
-\]
+$$
 
 Using the crystallographic convention `B = 8 pi^2 U`,
 
-\[
+$$
 B_{33}=8\pi^2\bar U_{33}=0.61062\ {\rm \AA^2},
-\]
+$$
 
 which rounds to `0.61 Ang^2`. Independent propagation of the quoted
 uncertainties gives `sigma(U33) = 0.000240 Ang^2` and
@@ -41,11 +41,11 @@ within one combined standard uncertainty.
 
 For a basal `(00l)` reflection with `g = 2 pi l / c`, the amplitude factor is
 
-\[
+$$
 \exp\left(-\frac{B_{33}g^2}{16\pi^2}\right)
 =\exp\left(-\frac{B_{33}l^2}{4c^2}\right)
 =\exp\left(-\frac{2\pi^2U_{33}l^2}{c^2}\right).
-\]
+$$
 
 This equivalence fixes the direction and rules out interpreting `0.61` as
 `U33` or applying a second Debye--Waller factor.

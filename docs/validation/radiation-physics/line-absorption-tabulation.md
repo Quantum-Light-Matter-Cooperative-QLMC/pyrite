@@ -13,7 +13,7 @@ y(E)=\exp\!\left[(1-t)\log y_0+t\log y_1\right],
 t=\frac{\log E-\log E_0}{\log E_1-\log E_0}.
 ```
 
-For element \(i\), the Beer--Lambert coefficient used by PyRITE is
+For element $i$, the Beer--Lambert coefficient used by PyRITE is
 
 ```{math}
 :label: eq-line-elemental-mu
@@ -22,8 +22,8 @@ For element \(i\), the Beer--Lambert coefficient used by PyRITE is
 =2r_e hc\,n_i\frac{f_{2,i}(E)}{E}.
 ```
 
-Because both \(\log f_{2,i}\) and \(\log E\) are affine in \(t\),
-\(\log\mu_i\) is affine on the same native interval:
+Because both $\log f_{2,i}$ and $\log E$ are affine in $t$,
+$\log\mu_i$ is affine on the same native interval:
 
 ```{math}
 :label: eq-line-elemental-log-interpolation
@@ -40,8 +40,8 @@ The compound coefficient must then be formed after interpolation,
 \exp\!\left[(1-t)\log\mu_i(E_0)+t\log\mu_i(E_1)\right]}.
 ```
 
-Interpolating either \(\sum_i\mu_i\) or
-\(\log(\sum_i\mu_i)\) is not equivalent to {eq}`eq-line-compound-mu`, because
+Interpolating either $\sum_i\mu_i$ or
+$\log(\sum_i\mu_i)$ is not equivalent to {eq}`eq-line-compound-mu`, because
 different elements have different slopes between their native nodes.
 
 The implementation evaluates the fraction without subtracting close logarithms:
@@ -60,26 +60,26 @@ from another element only subdivides an interval on which
 
 ## Units, assumptions, and limits
 
-- \(E,E_0,E_1\) are positive energies in eV, so \(t\) is dimensionless.
-- \(r_e\), \(\lambda\), and \(n_i\) carry Å, Å, and Å\(^{-3}\), respectively;
-  therefore each \(\mu_i\) and their sum carry Å\(^{-1}\).
+- $E,E_0,E_1$ are positive energies in eV, so $t$ is dimensionless.
+- $r_e$, $\lambda$, and $n_i$ carry Å, Å, and Å$^{-3}$, respectively;
+  therefore each $\mu_i$ and their sum carry Å$^{-1}$.
 - The material is homogeneous along the selected single-slab escape path and
   attenuation is passive. Layered and grooved paths continue to evaluate their
   piecewise coefficients exactly per resonance energy.
 - At a native or inserted table node, the interpolated coefficient is the
   tabulated coefficient. Queries beyond the shared table retain endpoint
-  clamping. As \(L_{\rm esc}\to0\),
-  \(\exp[-L_{\rm esc}\mu(E)]\to1\). As an elemental number density or
-  \(f_2\) tends to zero from above, that element's contribution tends to
+  clamping. As $L_{\rm esc}\to0$,
+  $\exp[-L_{\rm esc}\mu(E)]\to1$. As an elemental number density or
+  $f_2$ tends to zero from above, that element's contribution tends to
   zero.
 - Every positive elemental contribution remains positive; their compound sum
   is positive. The correction changes only numerical evaluation of
-  \(\mu(E)\), not the sign in \(\tau=L_{\rm esc}\mu\) or \(T=\exp(-\tau)\).
+  $\mu(E)$, not the sign in $\tau=L_{\rm esc}\mu$ or $T=\exp(-\tau)$.
 
 ## Implementation comparison
 
-The old line table stored one compound \(\mu(E)\) row and blended it linearly
-in energy. At the HOPG C K edge this overestimated \(\mu\) by 27.2% at
+The old line table stored one compound $\mu(E)$ row and blended it linearly
+in energy. At the HOPG C K edge this overestimated $\mu$ by 27.2% at
 283.7351 eV;
 for a 10000 Å escape path the transmission changed from 0.06593 (exact) to
 0.03148 (old table), a 52.3% relative error.

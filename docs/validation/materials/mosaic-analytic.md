@@ -15,23 +15,23 @@
 At fixed electron velocity and detector direction, rotating the reciprocal
 vector changes only the numerator of
 
-\[
+$$
 E=C\,\mathbf v\cdot\mathbf g=Cvg\cos\psi,
 \qquad C=\frac{\hbar c}{1-\mathbf v\cdot\hat{\mathbf n}}.
-\]
+$$
 
 For a small longitudinal mosaic rotation `dpsi`,
 
-\[
+$$
 \frac{dE}{E}=d\ln(\cos\psi)=-\tan\psi\,d\psi.
-\]
+$$
 
 A linear scaling of a Gaussian scales its FWHM by the absolute scale factor.
 If the rocking-curve angular FWHM is `eta`, the energy FWHM is therefore
 
-\[
+$$
 \Delta E_{FWHM}=E\,|\tan\psi|\,\eta.
-\]
+$$
 
 No `2 sqrt(2 ln 2)` conversion appears because input and output widths are
 both FWHM, not standard deviations.

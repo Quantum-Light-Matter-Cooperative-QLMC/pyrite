@@ -92,3 +92,21 @@ def test_literal_documentation_path_check_ignores_agentdocs_substring(tmp_path: 
     source.write_text("See agentdocs/README.md.\n", encoding="utf-8")
 
     check_doc_paths(tmp_path)
+
+
+def test_validation_writeups_use_rendering_math_delimiters() -> None:
+    """`\\(...\\)` and `\\[...\\]` reach the HTML build as literal text, with no warning."""
+    root = Path(__file__).parents[2] / "docs" / "validation"
+    offenders: list[str] = []
+    for page in sorted(root.rglob("*.md")):
+        if page.name == "formatting-style.md":
+            continue
+        fence: str | None = None
+        for number, line in enumerate(page.read_text(encoding="utf-8").splitlines(), 1):
+            marker = line.lstrip()[:3]
+            if marker in {"```", "~~~"}:
+                fence = None if fence == marker else fence or marker
+                continue
+            if fence is None and (r"\(" in line or (r"\[" in line and r"\\[" not in line)):
+                offenders.append(f"{page.relative_to(root)}:{number}")
+    assert not offenders, f"non-rendering math delimiters: {offenders}"

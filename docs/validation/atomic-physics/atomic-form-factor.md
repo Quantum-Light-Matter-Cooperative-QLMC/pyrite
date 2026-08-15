@@ -16,17 +16,17 @@ Away from resonances, the single-atom elastic scattering amplitude is the
 Fourier transform of the bound-electron density, `f0(q)`. Causality adds a
 complex, energy-dependent anomalous correction:
 
-\[
+$$
 F(q,E)=f_0(q)+f'(E)+i f''(E).
-\]
+$$
 
 For crystallographic momentum transfer
 `g = 2 pi/d = 4 pi sin(theta)/lambda`, the tabulated xraydb/Waasmaier argument
 is therefore
 
-\[
+$$
 q=\frac{\sin\theta}{\lambda}=\frac{g}{4\pi}.
-\]
+$$
 
 The Chantler functions supply `f'` directly, not `Z+f'`, and positive `f''`.
 Thus neither an additional atomic number nor a sign flip belongs in the sum.

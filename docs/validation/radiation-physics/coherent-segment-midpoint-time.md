@@ -8,21 +8,21 @@
 Feranchuk--Spence (2000), Eqs. (8), (10), (12)--(14), already derived under
 `coherent-emission`:
 
-\[
+$$
 \int_{-T/2}^{T/2} e^{i 2P\tau}\,d\tau
 =T\,\operatorname{sinc}(PT/\pi),
 \qquad T=L/\beta.
-\]
+$$
 
 The phase multiplying that real centered integral must be evaluated at the
 same center event as `r_mid`. Therefore
 
-\[
+$$
 \boxed{t_{\rm mid}=t_{\rm ang}+{L_{\rm ang}\over2\beta}},
 \qquad
 \Phi_j=\omega(t_{\rm mid}+t_{0,j}-\hat{\mathbf n}\cdot\mathbf r_{\rm mid})
 -\mathbf g\cdot\mathbf r_{\rm mid}.
-\]
+$$
 
 All time-like lengths are in Angstrom with `c=1`; `omega`, `g`, and photon
 wavenumber are in inverse Angstrom, so the phase is dimensionless. `t0_ang`
@@ -45,10 +45,10 @@ trajectory ordering and compatibility.
 For one straight flight over `[0,T]` with constant amplitude, splitting at
 `T/2` gives
 
-\[
+$$
 \int_0^T e^{i a t}\,dt
 =\int_0^{T/2}e^{i a t}\,dt+\int_{T/2}^{T}e^{i a t}\,dt.
-\]
+$$
 
 Writing each integral as a real sinc times its center phase makes this identity
 exact: the full segment uses center `T/2`; the halves use centers `T/4` and
@@ -80,20 +80,20 @@ the split flight interferes incorrectly with the fixed reference emitter.
 ## Fresh-context adjudication
 
 An independent fresh-context review rederived the correction from the cited
-finite-time phase. With \(\mathbf K=\omega\hat{\mathbf n}+\mathbf g\),
-\(T=L/\beta\), \(t_m=t_s+T/2\), and
-\(\mathbf r_m=\mathbf r_s+\mathbf vT/2\), centering the integration variable
+finite-time phase. With $\mathbf K=\omega\hat{\mathbf n}+\mathbf g$,
+$T=L/\beta$, $t_m=t_s+T/2$, and
+$\mathbf r_m=\mathbf r_s+\mathbf vT/2$, centering the integration variable
 at the flight midpoint yields
-\(\exp[i(\omega t_m-\mathbf K\cdot\mathbf r_m)]\,
-T\operatorname{sinc}(\Delta T/(2\pi))\), where
-\(\Delta=\omega-\mathbf v\cdot\mathbf K=2P\). This is identical to
-\(\sin(PT)/P\) and requires
-\(t_m=t_{\rm ang}+L_{\rm ang}/(2\beta)\).
+$\exp[i(\omega t_m-\mathbf K\cdot\mathbf r_m)]\,
+T\operatorname{sinc}(\Delta T/(2\pi))$, where
+$\Delta=\omega-\mathbf v\cdot\mathbf K=2P$. This is identical to
+$\sin(PT)/P$ and requires
+$t_m=t_{\rm ang}+L_{\rm ang}/(2\beta)$.
 
-Units, sign, and the repository's \(c=1\) convention agree. Two half-flight
-centers at \(T/4\) and \(3T/4\) reproduce the full integral exactly; the
+Units, sign, and the repository's $c=1$ convention agree. Two half-flight
+centers at $T/4$ and $3T/4$ reproduce the full integral exactly; the
 deterministic subdivision anchor is green for both coherent reduction routes.
-The \(L\to0\) and single-segment self-term limits also pass.
+The $L\to0$ and single-segment self-term limits also pass.
 
 Status: **rederived**. The independent derivation found no factor, sign, unit,
 or convention discrepancy. Human `signed-off` remains pending.

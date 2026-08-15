@@ -14,24 +14,24 @@
 
 The source CIF gives unit-occupancy sites with
 
-\[
+$$
 U_{33,\mathrm{Ta}}=0.0065(2)\ {\rm \AA^2},\qquad
 U_{33,\mathrm{S}}=0.0068(8)\ {\rm \AA^2}.
-\]
+$$
 
 For two Ta and four S atoms in the conventional cell, equivalently one Ta and
 two S atoms per formula unit, the declared common-site approximation is
 
-\[
+$$
 \bar U_{33}=\frac{U_{33,\mathrm{Ta}}+2U_{33,\mathrm{S}}}{3}
            =0.0067000\ {\rm \AA^2}.
-\]
+$$
 
 With `B = 8 pi^2 U`,
 
-\[
+$$
 B_{33}=8\pi^2\bar U_{33}=0.52900\ {\rm \AA^2},
-\]
+$$
 
 which rounds to `0.53 Ang^2`. Independent propagation of the quoted
 uncertainties gives `sigma(U33) = 0.000537 Ang^2` and
@@ -41,11 +41,11 @@ uncertainty.
 
 For basal `(002)`, `g = 4 pi / c`, so the amplitude factor becomes
 
-\[
+$$
 \exp\left(-\frac{B_{33}g^2}{16\pi^2}\right)
 =\exp\left(-\frac{B_{33}}{c^2}\right)
 =\exp\left(-\frac{8\pi^2U_{33}}{c^2}\right).
-\]
+$$
 
 This is the `l = 2` specialization of the standard anisotropic basal
 projection. The odd `(001)` extinction comes from 2H stacking, not from the

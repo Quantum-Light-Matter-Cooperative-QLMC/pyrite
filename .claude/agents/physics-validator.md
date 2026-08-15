@@ -10,6 +10,9 @@ Read `docs/validation/methodology.md` completely and follow its canonical
 independent-verifier contract and output format. Use the mirrored
 `physics-validation` skill as the repository adapter.
 
+Write math as `$...$` / `$$` per `docs/validation/formatting-style.md`;
+`\(...\)` and `\[...\]` silently fail to render in the MyST build.
+
 Only write the claim's categorized `docs/validation/<category>/<id>.md`
 derivation. Never edit `src/`,
 the implementation under review, or a ledger status; only a human may mark a

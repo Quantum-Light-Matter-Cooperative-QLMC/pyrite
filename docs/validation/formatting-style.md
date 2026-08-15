@@ -6,10 +6,11 @@ content, sign, factor, or wording change. A worker applying this ruleset to an
 existing write-up touches markup only — if a fix looks like it also changes
 what the document claims, stop and flag it instead of editing.
 
-The Sphinx build (`docs/conf.py`) enables MyST `dollarmath` and `amsmath`, so
-`\(...\)`, `\[...\]`, `$...$`, `$$...$$`, and the ```` ```{math} ```` directive
-all render. This repo picks one convention per content type below so every
-write-up reads the same way.
+The Sphinx build (`docs/conf.py`) enables MyST `dollarmath` and `amsmath`.
+Only `$...$`, `$$...$$`, and the ```` ```{math} ```` directive render.
+`\(...\)` and `\[...\]` do **not**: CommonMark eats the backslash escape, MyST
+tags the page `mathjax_ignore`, and the LaTeX source lands in the page as
+literal text. Never use them.
 
 ## Three content types, three markups
 
@@ -31,28 +32,30 @@ A write-up mixes three different things. Keep them visually distinct:
 
 When prose needs both — the code identifier and the physics symbol it
 represents — give both: "the docstring's `B_ang2` is the Debye–Waller
-parameter \(B\)."
+parameter $B$."
 
 ## LaTeX conventions for content type 1
 
-- **Inline math:** `\(...\)`. Example: `\(\chi_{\mathbf g}\)`.
-- **Display math:** `\[...\]` for one unnumbered equation or a short aligned
-  block. Example:
+- **Inline math:** `$...$`, on one line, with no space just inside either
+  delimiter. Example: `$\chi_{\mathbf g}$`.
+- **Display math:** `$$` on its own line, above and below one unnumbered
+  equation or a short aligned block. Example:
 
   ```text
-  \[
+  $$
   \chi_{\mathbf g}
   =-\frac{4\pi r_e}{k^2V_{\rm cell}}S_{\mathbf g}.
-  \]
+  $$
   ```
 
 - **Numbered/cross-referenced equations only:** the ```` ```{math} ```` +
   `:label:` directive. Most write-ups never need a cross-reference; default to
-  `\[...\]`.
-- **Never** use `$...$` / `$$...$$` in new or cleaned-up prose — both render,
-  but mixing delimiter families across the corpus is exactly the
-  inconsistency this ruleset removes. Existing `$`-delimited math gets
-  converted to `\(\)`/`\[\]` when a file is touched.
+  `$$`.
+- **Never** use `\(...\)` / `\[...\]` — they are silently dropped to literal
+  text in the HTML build. A LaTeX line break inside display math stays
+  `\\[2pt]`; it is not a delimiter.
+- Math inside a `{list-table}` or other directive body is still parsed as
+  markdown, so it takes `$...$` too.
 - **Do not** write bare-ASCII pseudo-math (`k=omega/c=2 pi/lambda`,
   `beta_i^2`, `S(g)`) inside inline code spans as a substitute for LaTeX. If
   it is an equation, it gets LaTeX delimiters and macros (`\omega`, `\pi`,
@@ -64,7 +67,7 @@ parameter \(B\)."
   the bold symbol: `\hat{\mathbf{n}}`.
 - Greek letters and named constants always use their macro inside math mode:
   `\alpha`, `\beta`, `\pi`, `\omega`, `\hbar`, `\gamma` — never the spelled-out
-  ASCII form (`alpha`, `pi`, `hbar`) once inside `\(...\)`/`\[...\]`.
+  ASCII form (`alpha`, `pi`, `hbar`) once inside `$...$`/`$$`.
   Spelled-out ASCII is fine in code fences/spans (content types 2–3) because
   that is what the source literally says.
 - Subscripts/superscripts: `\beta_i`, `\beta_i^2`, `T_f`, not `beta_i`,
@@ -81,7 +84,7 @@ parameter \(B\)."
 
 ### Tables
 
-Inline math (`\(...\)`) renders inside GFM table cells as long as the cell
+Inline math (`$...$`) renders inside GFM table cells as long as the cell
 contains no literal `|`. Prefer this over ASCII pseudo-math in comparison
 tables (units/limits/term-by-term diff tables are common in these write-ups).
 
@@ -102,22 +105,22 @@ Using `r_e=e^2/(mc^2)`, `k=omega/c=2 pi/lambda`,
 After:
 
 ```text
-Using \(r_e = e^2/(mc^2)\) and \(k = \omega/c = 2\pi/\lambda\),
+Using $r_e = e^2/(mc^2)$ and $k = \omega/c = 2\pi/\lambda$,
 
-\[
+$$
 \chi_{\mathbf g}
 =-\frac{4\pi r_e}{k^2 V_{\rm cell}}S_{\mathbf g}
 =-\frac{r_e\lambda^2}{\pi V_{\rm cell}}S_{\mathbf g}.
-\]
+$$
 ```
 
 Only the markup changed — same symbols, same factors, same sign.
 
 ## Checklist for a cleanup pass
 
-- [ ] Every abstract-physics expression uses `\(...\)`/`\[...\]`, not a code
-      span or ASCII-only code fence.
-- [ ] No `$`/`$$` delimiters remain.
+- [ ] Every abstract-physics expression uses `$...$`/`$$`, not a code span or
+      ASCII-only code fence.
+- [ ] No `\(`/`\[` delimiters remain.
 - [ ] Greek letters, vectors, and operators use LaTeX macros inside math mode.
 - [ ] Literal source pseudocode stays in a fenced code block, untouched.
 - [ ] Code identifiers stay as exact-spelling inline code, not converted to
@@ -127,3 +130,8 @@ Only the markup changed — same symbols, same factors, same sign.
       substitution.
 - [ ] `uv run pyrite-dev docs` builds without new Sphinx/MyST warnings for the
       touched file.
+- [ ] The rendered page proves it: every expression in the built
+      `docs/_build/html/validation/<domain>/<id>.html` sits inside a
+      `class="math notranslate"` element, and no `$` survives in the article
+      body. An unrendered equation raises no warning, so this positive check is
+      the only one that catches it.

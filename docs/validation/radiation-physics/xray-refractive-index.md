@@ -10,162 +10,162 @@ refractive index `n(E) = √(1 + χ₀(E)) ≈ 1 − δ − iβ`. **Signature**:
 ### From Maxwell's equations to the dispersion relation
 
 In a source-free, linear, homogeneous, isotropic medium with polarization
-\(\mathbf P=\varepsilon_0\chi\mathbf E\), Maxwell's equations give the wave
+$\mathbf P=\varepsilon_0\chi\mathbf E$, Maxwell's equations give the wave
 equation
 
-\[
+$$
 \nabla\times(\nabla\times\mathbf E)=-\mu_0\varepsilon_0(1+\chi)\,
 \partial_t^2\mathbf E .
-\]
+$$
 
-A plane-wave ansatz \(\mathbf E\propto\exp[i(\mathbf k\cdot\mathbf r-\omega
-t)]\) (or, with the sign convention adopted below,
-\(\exp[i(\omega t-\mathbf k\cdot\mathbf r)]\) — the dispersion relation itself
+A plane-wave ansatz $\mathbf E\propto\exp[i(\mathbf k\cdot\mathbf r-\omega
+t)]$ (or, with the sign convention adopted below,
+$\exp[i(\omega t-\mathbf k\cdot\mathbf r)]$ — the dispersion relation itself
 does not depend on which sign is chosen for the spatial/temporal cross term)
 turns this into
 
-\[
+$$
 k^2=(1+\chi)\,\frac{\omega^2}{c^2}.
-\]
+$$
 
-In the natural units used throughout this module (\(c=1\), lengths in
-Angstrom, \(\omega\) in Å⁻¹, i.e. `E/ħc`), and specializing to the
-forward-scattering (\(g=0\)) susceptibility \(\chi_0\) of the crystal,
+In the natural units used throughout this module ($c=1$, lengths in
+Angstrom, $\omega$ in Å⁻¹, i.e. `E/ħc`), and specializing to the
+forward-scattering ($g=0$) susceptibility $\chi_0$ of the crystal,
 
-\[
+$$
 k^2=(1+\chi_0)\,\omega^2 .
-\]
+$$
 
 ### Definition of the refractive index
 
-By definition, the phase velocity in the medium is \(\omega/k\), and the
-refractive index is \(n\equiv c\,k/\omega = k/\omega\) (with \(c=1\)). Taking
+By definition, the phase velocity in the medium is $\omega/k$, and the
+refractive index is $n\equiv c\,k/\omega = k/\omega$ (with $c=1$). Taking
 the (principal-branch) square root of the dispersion relation,
 
-\[
+$$
 \boxed{\,n(\omega)=\sqrt{1+\chi_0(\omega)}\,}.
-\]
+$$
 
 This is exact — no smallness assumption has been used yet. Everything past
 this point is Taylor expansion, not new physics.
 
 ### Linearization and the δ, β convention
 
-Write \(\chi_0=\chi_0'+i\chi_0''\). Because \(|\chi_0|\ll1\) in the X-ray
+Write $\chi_0=\chi_0'+i\chi_0''$. Because $|\chi_0|\ll1$ in the X-ray
 regime, expand the square root about 1:
 
-\[
+$$
 n=\sqrt{1+\chi_0}=1+\tfrac12\chi_0-\tfrac18\chi_0^2+\tfrac{1}{16}\chi_0^3-\cdots
-\]
+$$
 
-Define \(\delta,\beta\) by \(n\equiv1-\delta-i\beta\) (the sign convention is
+Define $\delta,\beta$ by $n\equiv1-\delta-i\beta$ (the sign convention is
 fixed below). To first order,
 
-\[
+$$
 1-\delta-i\beta \;\approx\; 1+\tfrac12(\chi_0'+i\chi_0'')
 \quad\Longrightarrow\quad
 \delta=-\tfrac12\chi_0',\qquad \beta=-\tfrac12\chi_0''.
-\]
+$$
 
-For a passive medium (`xray-chi-zero`: \(\chi_0'<0\), \(\chi_0''<0\) off
-resonance, since \(\chi_0=-\frac{r_e\lambda^2}{\pi V}\sum_i(f_{1,i}+if_{2,i})\)
-with \(f_1\approx Z>0\), \(f_2>0\)), this gives \(\delta>0\), \(\beta>0\),
+For a passive medium (`xray-chi-zero`: $\chi_0'<0$, $\chi_0''<0$ off
+resonance, since $\chi_0=-\frac{r_e\lambda^2}{\pi V}\sum_i(f_{1,i}+if_{2,i})$
+with $f_1\approx Z>0$, $f_2>0$), this gives $\delta>0$, $\beta>0$,
 matching the textbook X-ray convention (Als-Nielsen & McMorrow;
 Attwood & Sakdinawat) and the sibling claim `grazing-optical-constants`.
 
-**Exact remainder.** Substituting \(\chi_0=-2\delta_0-2i\beta_0\) (using the
-first-order δ₀, β₀ as the expansion parameter) into the \(-\chi_0^2/8\) term:
+**Exact remainder.** Substituting $\chi_0=-2\delta_0-2i\beta_0$ (using the
+first-order δ₀, β₀ as the expansion parameter) into the $-\chi_0^2/8$ term:
 
-\[
+$$
 \chi_0^2=4\delta_0^2-4\beta_0^2+8i\delta_0\beta_0,
 \qquad
 -\tfrac18\chi_0^2=-\tfrac12\delta_0^2+\tfrac12\beta_0^2-i\delta_0\beta_0 .
-\]
+$$
 
 So, to next order,
 
-\[
+$$
 n=\bigl(1-\delta_0-\tfrac12\delta_0^2+\tfrac12\beta_0^2\bigr)
 -i\bigl(\beta_0+\delta_0\beta_0\bigr)+O(\chi_0^3).
-\]
+$$
 
-For an off-edge medium (\(\delta_0\gg\beta_0\)), the fractional correction to
+For an off-edge medium ($\delta_0\gg\beta_0$), the fractional correction to
 the real part is
 
-\[
+$$
 \frac{\Delta\mathrm{Re}(n)}{\delta_0}\approx\frac{\delta_0}{2},
-\]
+$$
 
 and to the imaginary part,
 
-\[
+$$
 \frac{\Delta\mathrm{Im}(n)}{\beta_0}\approx\delta_0 .
-\]
+$$
 
 These are the two closed-form residuals the ledger cites ("measured residuals
 δ/2 and δ").
 
 ### Sign / time-factor convention check
 
-Adopt the module-wide time factor \(\exp(+i\omega t)\) with propagation phase
-\(\exp\{i[\omega t-\mathbf k\cdot\mathbf r]\}\) (stated in the ledger row and
-matched by the implementation docstring). With \(n=1-\delta-i\beta\)
-(\(\delta,\beta>0\)) and \(\mathbf k=n\omega\hat{\mathbf n}\),
+Adopt the module-wide time factor $\exp(+i\omega t)$ with propagation phase
+$\exp\{i[\omega t-\mathbf k\cdot\mathbf r]\}$ (stated in the ledger row and
+matched by the implementation docstring). With $n=1-\delta-i\beta$
+($\delta,\beta>0$) and $\mathbf k=n\omega\hat{\mathbf n}$,
 
-\[
+$$
 k=(1-\delta)\omega-i\beta\omega .
-\]
+$$
 
-Writing \(z=\hat{\mathbf n}\cdot\mathbf r\),
+Writing $z=\hat{\mathbf n}\cdot\mathbf r$,
 
-\[
+$$
 -ikz=-i\bigl[(1-\delta)\omega-i\beta\omega\bigr]z
 =-\beta\omega z-i(1-\delta)\omega z,
-\]
+$$
 
 so
 
-\[
+$$
 \exp\{i[\omega t-kz]\}=\exp(i\omega t)\,\exp(-i(1-\delta)\omega z)\,
 \exp(-\beta\omega z).
-\]
+$$
 
-The amplitude decays as \(\exp(-\beta\omega z)\) with increasing propagation
-distance \(z\) (β>0), which is the physically required behavior for a passive
+The amplitude decays as $\exp(-\beta\omega z)$ with increasing propagation
+distance $z$ (β>0), which is the physically required behavior for a passive
 (absorbing) medium under this sign convention. This is self-consistent with
-`absorption-length`'s independently derived \(\mu=2\beta k\approx2\beta\omega\)
-(intensity ∝ |amplitude|² ⇒ \(\exp(-2\beta\omega z)=\exp(-\mu z)\)), so the
+`absorption-length`'s independently derived $\mu=2\beta k\approx2\beta\omega$
+(intensity ∝ |amplitude|² ⇒ $\exp(-2\beta\omega z)=\exp(-\mu z)$), so the
 δ, β sign convention used here is the same one that produces a positive,
 physical absorption coefficient elsewhere in the module — internally
 consistent, not merely asserted.
 
 ### Summary of the independent result
 
-\[
+$$
 n(E)=\sqrt{1+\chi_0(E)}\ \ \text{(exact, principal branch)},\qquad
 n(E)\approx1-\delta(E)-i\beta(E)\ \ \text{(linearized, error }O(\chi_0^2)\text{)},
-\]
-with \(\delta=-\chi_0'/2\), \(\beta=-\chi_0''/2\) at leading order, residuals
-\(\sim\delta/2\) (real part, fractional) and \(\sim\delta\) (imaginary part,
-fractional), and \(n\to1\) as \(\chi_0\to0\) (vacuum / far off any edge).
+$$
+with $\delta=-\chi_0'/2$, $\beta=-\chi_0''/2$ at leading order, residuals
+$\sim\delta/2$ (real part, fractional) and $\sim\delta$ (imaginary part,
+fractional), and $n\to1$ as $\chi_0\to0$ (vacuum / far off any edge).
 
 ## Units, conventions, and limiting cases
 
-- **Units**: \(\chi_0\) is dimensionless (`xray-chi-zero`: \(r_e\lambda^2/V\)
-  is dimensionless), so \(n\) is dimensionless. Pass.
-- **Sign**: off resonance, \(\delta>0\), \(\beta>0\), \(\delta\gg\beta\)
-  (since \(f_1\sim Z\gg f_2\) away from an edge). Pass.
-- **Time-factor / propagation-phase convention**: \(\exp(+i\omega t)\) with
-  \(n=1-\delta-i\beta\) gives amplitude decay \(\exp(-\beta\omega z)\) along
+- **Units**: $\chi_0$ is dimensionless (`xray-chi-zero`: $r_e\lambda^2/V$
+  is dimensionless), so $n$ is dimensionless. Pass.
+- **Sign**: off resonance, $\delta>0$, $\beta>0$, $\delta\gg\beta$
+  (since $f_1\sim Z\gg f_2$ away from an edge). Pass.
+- **Time-factor / propagation-phase convention**: $\exp(+i\omega t)$ with
+  $n=1-\delta-i\beta$ gives amplitude decay $\exp(-\beta\omega z)$ along
   the propagation direction — physical for a passive medium, and consistent
   with the independently derived `absorption-length` coefficient
-  \(\mu=2\beta\omega\) (in these natural units). Pass.
-- **Limiting case, χ₀→0**: \(n\to\sqrt{1}=1\) exactly (vacuum / asymptotically
+  $\mu=2\beta\omega$ (in these natural units). Pass.
+- **Limiting case, χ₀→0**: $n\to\sqrt{1}=1$ exactly (vacuum / asymptotically
   high energy, no expansion needed — this limit holds for the exact square
   root, not just the linearization). Pass.
 - **Limiting case, exact vs. linearized**: the two forms agree to
-  \(O(\chi_0^2)\); the leading fractional residuals are \(\delta/2\) (real
-  part) and \(\delta\) (imaginary part), derived above from a plain Taylor
+  $O(\chi_0^2)$; the leading fractional residuals are $\delta/2$ (real
+  part) and $\delta$ (imaginary part), derived above from a plain Taylor
   expansion of the square root — no implementation input was used to obtain
   these coefficients.
 
@@ -252,8 +252,8 @@ beta_lin  = -Im(chi_0)/2 = 7.3809112936e-06
 ```
 
 Both measured residuals match the closed-form predictions
-(\(\Delta\mathrm{Re}(n)/\delta\approx\delta/2\),
-\(\Delta\mathrm{Im}(n)/\beta\approx\delta\)) derived independently above to
+($\Delta\mathrm{Re}(n)/\delta\approx\delta/2$,
+$\Delta\mathrm{Im}(n)/\beta\approx\delta$) derived independently above to
 better than 1%, and reproduce the ledger's cited figures ("9.2e-5 and 1.8e-4
 rel at 1.5 keV in Si") to 4 significant figures. `n → 1` was also confirmed
 in the `χ₀ → 0` high-energy limit (already anchored by

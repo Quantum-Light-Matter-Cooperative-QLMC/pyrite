@@ -16,6 +16,16 @@ contract and report format. That document is the canonical specification.
 - Treat the equation, identified by its validation id, as the unit of trust.
 - Only a human may mark a ledger claim `signed-off`.
 
+## Write-up math must render
+
+- Format the write-up per `docs/validation/formatting-style.md`: math is
+  `$...$` inline and `$$` display. `\(...\)` and `\[...\]` are dropped to
+  literal text by the MyST build and raise no warning.
+- Before reporting, run `uv run pyrite-dev test tests/dev/test_docs.py` and
+  confirm the built
+  `docs/_build/html/validation/<domain>/<id>.html` shows every expression
+  inside a `class="math notranslate"` element with no `$` left in the body.
+
 ## Repository anchors
 
 - Ledger: `docs/validation/physics-validation-ledger.md`

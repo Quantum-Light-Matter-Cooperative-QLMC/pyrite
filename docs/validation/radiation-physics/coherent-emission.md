@@ -4,119 +4,119 @@
 
 **Claim.** For one reciprocal reflection and polarization, radiation from
 transport segments and electrons is added as a complex field. The intended
-quantity is \(d^2N/(dE\,d\Omega)\) in
+quantity is $d^2N/(dE\,d\Omega)$ in
 photons / (eV sr incident-electron), with the historical incoherent result
 recovered when coherent summation is disabled.
 
 **Sources and convention.** Feranchuk--Spence (2000), Eqs. (10), (12)--(14),
 supplies the finite-interaction PXR+CBS amplitude and resonance; the repository
 Zhai derivation writes
-\(\epsilon(\mathbf r)=\epsilon_0+\sum_{\mathbf g}\chi_{\mathbf g}
-\exp(+i\mathbf g\cdot\mathbf r)\) and its PXR delta function as
-\(\delta[\omega-\mathbf k\cdot\mathbf v+\mathbf g\cdot\mathbf v]\).
+$\epsilon(\mathbf r)=\epsilon_0+\sum_{\mathbf g}\chi_{\mathbf g}
+\exp(+i\mathbf g\cdot\mathbf r)$ and its PXR delta function as
+$\delta[\omega-\mathbf k\cdot\mathbf v+\mathbf g\cdot\mathbf v]$.
 The repository crystallographic coefficient instead is
 
-\[
+$$
 S(\mathbf g)=\sum_a F_a(\mathbf g)
              \exp(+i\mathbf g\cdot\mathbf R_a).
-\]
+$$
 
 This coefficient belongs to the **opposite spatial harmonic**. Directly
 Fourier-transforming translated atomic densities gives
 
-\[
+$$
 \chi(\mathbf r)
  =\sum_{\mathbf q}\widetilde\chi_{\mathbf q}
    e^{+i\mathbf q\cdot\mathbf r},\qquad
 \widetilde\chi_{\mathbf q}\propto
 \sum_a F_a(\mathbf q)e^{-i\mathbf q\cdot\mathbf R_a}
 =S(-\mathbf q).
-\]
+$$
 
-Therefore the value named \(\chi_{\mathbf g}\propto S(\mathbf g)\) in this
+Therefore the value named $\chi_{\mathbf g}\propto S(\mathbf g)$ in this
 repository reconstructs in real space as
 
-\[
+$$
 \boxed{\chi_{\mathbf g}\exp(-i\mathbf g\cdot\mathbf r)}.
-\]
+$$
 
 This coefficient-to-harmonic mapping is the sign pivot. It is not equivalent
-to inserting \(S(\mathbf g)\) beside \(e^{+i\mathbf g\cdot\mathbf r}\).
+to inserting $S(\mathbf g)$ beside $e^{+i\mathbf g\cdot\mathbf r}$.
 
 Take an outgoing positive-frequency wave
-\(\exp[i(\mathbf k\cdot\mathbf r-\omega t)]\),
-\(\mathbf k=\omega\hat{\mathbf n}\), with \(c=1\). Projection onto that
+$\exp[i(\mathbf k\cdot\mathbf r-\omega t)]$,
+$\mathbf k=\omega\hat{\mathbf n}$, with $c=1$. Projection onto that
 outgoing mode supplies its conjugate phase
-\(\exp[i(\omega t-\mathbf k\cdot\mathbf r)]\). Multiplication by the
+$\exp[i(\omega t-\mathbf k\cdot\mathbf r)]$. Multiplication by the
 repository susceptibility harmonic gives the source phase
 
-\[
+$$
 \boxed{\Phi_{\mathbf g}(t,\mathbf r)
 =\omega t-(\mathbf k+\mathbf g)\cdot\mathbf r}
 =\omega(t-\hat{\mathbf n}\cdot\mathbf r)
 -\mathbf g\cdot\mathbf r .
-\]
+$$
 
 For a straight trajectory
-\(\mathbf r(t)=\mathbf r_c+\mathbf v(t-t_c)\), the time-dependent part is
+$\mathbf r(t)=\mathbf r_c+\mathbf v(t-t_c)$, the time-dependent part is
 
-\[
+$$
 \Phi_{\mathbf g}(t)
 =\Phi_{\mathbf g,c}
 +\bigl\{\omega(1-\hat{\mathbf n}\cdot\mathbf v)
 -\mathbf g\cdot\mathbf v\bigr\}(t-t_c).
-\]
+$$
 
 Stationarity therefore gives
 
-\[
+$$
 \boxed{\omega_{\rm res}
 =\frac{\mathbf g\cdot\mathbf v}
        {1-\hat{\mathbf n}\cdot\mathbf v}} .
-\]
+$$
 
 Thus the segment-centre phase
 
-\[
+$$
 \boxed{\exp\{i[\omega(t_{\rm abs,j}
 -\hat{\mathbf n}\cdot\mathbf r_j)
 -\mathbf g\cdot\mathbf r_j]\}}
-\]
+$$
 
 and the repository's positive-numerator resonance must occur together. At
-\(\omega=\omega_{\rm res}\), phase advance along a straight trajectory is
-exactly zero. Using \(+\mathbf g\cdot\mathbf r_j\) with that resonance would
-leave a spurious \(2\mathbf g\cdot\mathbf v\) phase slope. Conversely, the
-Zhai coefficient multiplying \(e^{+i\mathbf g_{\rm Z}\cdot\mathbf r}\) has
-\(\mathbf g_{\rm Z}=-\mathbf g_{\rm repo}\), so its
-\(\omega=-\mathbf g_{\rm Z}\cdot\mathbf v/(1-\hat{\mathbf n}\cdot\mathbf v)\)
+$\omega=\omega_{\rm res}$, phase advance along a straight trajectory is
+exactly zero. Using $+\mathbf g\cdot\mathbf r_j$ with that resonance would
+leave a spurious $2\mathbf g\cdot\mathbf v$ phase slope. Conversely, the
+Zhai coefficient multiplying $e^{+i\mathbf g_{\rm Z}\cdot\mathbf r}$ has
+$\mathbf g_{\rm Z}=-\mathbf g_{\rm repo}$, so its
+$\omega=-\mathbf g_{\rm Z}\cdot\mathbf v/(1-\hat{\mathbf n}\cdot\mathbf v)$
 is identical.
 
-For a centered constant-amplitude segment of duration \(t_L\), let
+For a centered constant-amplitude segment of duration $t_L$, let
 
-\[
+$$
 P={1\over2}(1-\hat{\mathbf n}\cdot\mathbf v)
 (\omega-\omega_{\rm res}).
-\]
+$$
 
 The exact segment integral is
 
-\[
+$$
 \int_{-t_L/2}^{t_L/2}e^{i\,2P\tau}\,d\tau
 =t_L\,\operatorname{sinc}\!\left({P t_L\over\pi}\right)
 \equiv Q_j,
-\]
+$$
 
 where NumPy's normalized sinc is
-\(\operatorname{sinc}(x)=\sin(\pi x)/(\pi x)\). Hence coherent summation must
-use one unsquared real \(Q_j\); squaring the total field yields the historical
-\(t_L^2\operatorname{sinc}^2(Pt_L/\pi)\) self-term. A windowed evaluation may
-omit grid points outside a cutoff, but it must use the same \(P\), argument,
-and unsquared \(Q_j\) on retained points as the full-grid path.
+$\operatorname{sinc}(x)=\sin(\pi x)/(\pi x)$. Hence coherent summation must
+use one unsquared real $Q_j$; squaring the total field yields the historical
+$t_L^2\operatorname{sinc}^2(Pt_L/\pi)$ self-term. A windowed evaluation may
+omit grid points outside a cutoff, but it must use the same $P$, argument,
+and unsquared $Q_j$ on retained points as the full-grid path.
 
-For polarization \(p\), the independently expected field is
+For polarization $p$, the independently expected field is
 
-\[
+$$
 \mathcal E_{p,\mathbf g}(\omega)=
 \sum_j
 \sqrt{\frac{\alpha\omega}{4\pi^2\hbar c}\,T_j}\,
@@ -125,7 +125,7 @@ e^{i\Phi_{\mathbf g,j}},
 \qquad
 \frac{d^2N}{dE\,d\Omega}
 =\sum_p|\mathcal E_{p,\mathbf g}|^2 .
-\]
+$$
 
 Different reciprocal vectors are assumed spectrally separated and mosaic
 crystallites are mutually incoherent. Therefore the phased segment/electron
@@ -135,31 +135,31 @@ polarization intensities add outside it.
 
 ## Cheap filters expected before code comparison
 
-- **Units.** \(\omega,t,\mathbf g,\mathbf r\) use reciprocal Angstrom and
-  Angstrom with \(c=1\), so every phase and sinc argument is dimensionless.
-  \(E=\hbar c\,\omega\). \(Q\) has Angstrom units; its square supplies the
+- **Units.** $\omega,t,\mathbf g,\mathbf r$ use reciprocal Angstrom and
+  Angstrom with $c=1$, so every phase and sinc argument is dimensionless.
+  $E=\hbar c\,\omega$. $Q$ has Angstrom units; its square supplies the
   historical finite-time factor.
 - **Single segment.** Only its self-term remains, exactly equal to incoherent
   accumulation.
 - **Straight-flight subdivision.** For constant velocity and amplitude, one
   segment and contiguous subsegments integrate the same phase interval when
   every `r_mid` is paired with `t_mid = t_ang + L_ang/(2 beta)`.
-- **Coincident in-phase emitters.** \(N\) equal fields give \(N^2\) intensity
+- **Coincident in-phase emitters.** $N$ equal fields give $N^2$ intensity
   before the existing per-electron normalization.
 - **Decoherent phases.** Independent broad/random per-electron `t0_ang`
   eliminates inter-electron cross terms in expectation, leaving
-  \(\sum_e|\sum_{j\in e}\mathcal E_{ej}|^2\); intra-electron segment cross
+  $\sum_e|\sum_{j\in e}\mathcal E_{ej}|^2$; intra-electron segment cross
   terms survive. Fully segmentwise-independent phases would instead leave
-  \(\sum_{e,j}|\mathcal E_{ej}|^2\).
+  $\sum_{e,j}|\mathcal E_{ej}|^2$.
 - **Gaussian bunch.** For longitudinal offset
-  \(t_0\sim N(0,\sigma_z^2)\),
-  \(|\langle e^{i\omega t_0}\rangle|^2
-  =e^{-\omega^2\sigma_z^2}\).
-- **Mosaic placement.** Phase uses the same rotated \(\mathbf g\) as that
+  $t_0\sim N(0,\sigma_z^2)$,
+  $|\langle e^{i\omega t_0}\rangle|^2
+  =e^{-\omega^2\sigma_z^2}$.
+- **Mosaic placement.** Phase uses the same rotated $\mathbf g$ as that
   orientation's resonance and amplitude; different orientations add
   incoherently with their quadrature weights.
-- **Absorption.** Since historical intensity contains \(T_j\), each coherent
-  field must contain \(\sqrt{T_j}\).
+- **Absorption.** Since historical intensity contains $T_j$, each coherent
+  field must contain $\sqrt{T_j}$.
 
 ## Implementation comparison
 
@@ -173,10 +173,10 @@ phase = exp(1j * ((t_mid + t0_ang - n_hat.r_mid) * omega_grid - g_phase))
 
 in both the full-grid and `sinc_cutoff` branches. This is exactly
 
-\[
+$$
 \exp\{i[\omega(t_{\rm abs}-\hat{\mathbf n}\cdot\mathbf r)
 -\mathbf g\cdot\mathbf r]\}.
-\]
+$$
 
 Here `t_ang` remains the segment-start transport age. The added half-flight
 time is required because `r_mid` is the segment-centre position and the real
@@ -186,16 +186,16 @@ finite-time factor is the integral centered on that same event. Pairing
 therefore changes interference with other emitters after subdivision.
 
 Its resonance is
-\(\omega_{\rm res}=\mathbf v\cdot\mathbf g/
-(1-\mathbf v\cdot\hat{\mathbf n})\). Therefore a straight segment-to-segment
-displacement \((\Delta t,\Delta\mathbf r)\) with
-\(\Delta\mathbf r=\mathbf v\Delta t\) has
+$\omega_{\rm res}=\mathbf v\cdot\mathbf g/
+(1-\mathbf v\cdot\hat{\mathbf n})$. Therefore a straight segment-to-segment
+displacement $(\Delta t,\Delta\mathbf r)$ with
+$\Delta\mathbf r=\mathbf v\Delta t$ has
 
-\[
+$$
 \Delta\Phi
 =\{\omega(1-\hat{\mathbf n}\cdot\mathbf v)
 -\mathbf g\cdot\mathbf v\}\Delta t=0
-\]
+$$
 
 at resonance. Sign and factor match exactly; there is no extra factor of two.
 The phase-stationarity regression verifies the resulting fourfold intensity
@@ -215,12 +215,12 @@ coefficient = sqrt[prefactor * T_abs] * t_L * A
 ```
 
 so both retain the unsquared
-\(Q=t_L\operatorname{sinc}(Pt_L/\pi)\). The cutoff path changes only the
-evaluated energy slice. The field contains \(\sqrt{T_{\rm abs}}\), and its
-self-term exactly reproduces the incoherent \(T_{\rm abs}\) factor.
+$Q=t_L\operatorname{sinc}(Pt_L/\pi)$. The cutoff path changes only the
+evaluated energy slice. The field contains $\sqrt{T_{\rm abs}}$, and its
+self-term exactly reproduces the incoherent $T_{\rm abs}$ factor.
 
 Mosaic placement also matches: `_accumulate` receives the rotated
-\(\mathbf g_m=R_m\mathbf g\); that same vector controls resonance, amplitude,
+$\mathbf g_m=R_m\mathbf g$; that same vector controls resonance, amplitude,
 polarization, and `g_phase`. Each orientation's complex field is squared
 before multiplication by its positive quadrature weight, so mosaic
 orientations remain incoherent.
@@ -231,30 +231,30 @@ per-electron spectrum, corresponding to the expected fourfold total intensity
 before normalization.
 
 The corrected **decoherent limit matches**. `t0_ang` is common to every
-segment belonging to electron \(e\). Writing all non-bunch factors as
-\(B_{ej}\), the field is
+segment belonging to electron $e$. Writing all non-bunch factors as
+$B_{ej}$, the field is
 
-\[
+$$
 \mathcal E=\sum_e e^{i\omega t_{0,e}}\sum_{j\in e}B_{ej}.
-\]
+$$
 
 For a broad or randomized bunch, averaging eliminates only terms with
-\(e\ne e'\):
+$e\ne e'$:
 
-\[
+$$
 \left\langle|\mathcal E|^2\right\rangle
 \longrightarrow
 \sum_e\left|\sum_{j\in e}B_{ej}\right|^2,
-\]
+$$
 
 not
-\(\sum_{e,j}|B_{ej}|^2\). This is now exactly the docstring's stated limit:
+$\sum_{e,j}|B_{ej}|^2$. This is now exactly the docstring's stated limit:
 cross terms between segments of the same electron survive because their
-common \(t_{0,e}\) cancels. Recovery of the historical segmentwise incoherent
+common $t_{0,e}$ cancels. Recovery of the historical segmentwise incoherent
 sum would additionally require one segment per electron, independent
 per-segment phase randomization, or an averaging mechanism that destroys
 intra-electron coherence. The Gaussian factor
-\(\exp[-\omega^2\sigma_z^2]\) is correct specifically for inter-electron cross
+$\exp[-\omega^2\sigma_z^2]$ is correct specifically for inter-electron cross
 terms.
 
 Focused CPU result after the midpoint-time regression:
@@ -274,10 +274,10 @@ analytic characteristic-function limit matches the corrected claim.
 **rederived**
 
 The coherent phase correction itself is rederived and matches exactly:
-\(\exp\{i[\omega(t-\hat{\mathbf n}\cdot\mathbf r)
--\mathbf g\cdot\mathbf r]\}\), with no divergent sign or factor. The corrected
+$\exp\{i[\omega(t-\hat{\mathbf n}\cdot\mathbf r)
+-\mathbf g\cdot\mathbf r]\}$, with no divergent sign or factor. The corrected
 long-bunch/scrambled-`t0_ang` statement also matches:
-\(\sum_e|\sum_{j\in e}B_{ej}|^2\). Bunch-length decoherence suppresses
+$\sum_e|\sum_{j\in e}B_{ej}|^2$. Bunch-length decoherence suppresses
 inter-electron cross terms only; intra-electron segment coherence survives.
 
 Suggested ledger action: advance `coherent-emission` to `rederived`; retain the

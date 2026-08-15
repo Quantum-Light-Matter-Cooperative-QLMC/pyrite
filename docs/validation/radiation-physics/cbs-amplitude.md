@@ -28,80 +28,80 @@ implementation bodies.
 Gaussian units. The crystal charge density is nuclei plus bound-electron
 clouds, periodic on the lattice:
 
-\[
+$$
 \rho(\mathbf r)=\sum_{\text{cells}}\sum_j
   \Big[Z_j e\,\delta(\mathbf r-\mathbf R-\mathbf r_j)
        -e\,n_j(\mathbf r-\mathbf R-\mathbf r_j)\Big],
-\]
+$$
 
-with \(\int n_j\,d^3r = Z_j\). Its reciprocal-lattice Fourier component (per
-unit cell volume \(V\)) is
+with $\int n_j\,d^3r = Z_j$. Its reciprocal-lattice Fourier component (per
+unit cell volume $V$) is
 
-\[
+$$
 \rho_{\mathbf g}=\frac{e}{V}\sum_j\big[Z_j-f_j(\mathbf g)\big]
   e^{i\mathbf g\cdot\mathbf r_j}\,e^{-W_j},
 \qquad
 f_j(\mathbf g)=\int n_j(\mathbf r)e^{i\mathbf g\cdot\mathbf r}\,d^3r,
-\]
+$$
 
-where \(f_j(\mathbf g)\) is the ordinary (non-dispersive) X-ray atomic form
-factor and \(\exp(-W_j)\) is the Debye–Waller factor.
+where $f_j(\mathbf g)$ is the ordinary (non-dispersive) X-ray atomic form
+factor and $\exp(-W_j)$ is the Debye–Waller factor.
 
 ### Poisson to potential
 
-\[
+$$
 \nabla^2\varphi=-4\pi\rho \;\Rightarrow\; -g^2\varphi_{\mathbf g}=-4\pi\rho_{\mathbf g}
 \;\Rightarrow\;
 \varphi_{\mathbf g}=\frac{4\pi}{g^2}\rho_{\mathbf g}
 =\frac{4\pi e}{V g^2}\sum_j\big[Z_j-f_j(\mathbf g)\big]
   e^{i\mathbf g\cdot\mathbf r_j}e^{-W_j}.
-\]
+$$
 
-The beam electron (charge \(-e\)) has potential energy \(U(\mathbf
-r)=-e\varphi\), so its Fourier magnitude is
+The beam electron (charge $-e$) has potential energy $U(\mathbf
+r)=-e\varphi$, so its Fourier magnitude is
 
-\[
+$$
 \boxed{\;\big|U_{\mathbf g}\big|=\frac{4\pi e^2}{V g^2}
   \sum_j\big[Z_j-f_j(\mathbf g)\big]e^{i\mathbf g\cdot\mathbf r_j}e^{-W_j}\;}
-\]
+$$
 
-(the physical potential energy carries a leading \(-\); see sign note below).
-Using the classical electron radius \(r_e=e^2/(mc^2)\) or, equivalently,
-\(e^2=\alpha\hbar c=14.3996\) eV·Å (Gaussian),
+(the physical potential energy carries a leading $-$; see sign note below).
+Using the classical electron radius $r_e=e^2/(mc^2)$ or, equivalently,
+$e^2=\alpha\hbar c=14.3996$ eV·Å (Gaussian),
 
-\[
+$$
 U_{\mathbf g}=\pm\frac{4\pi e^2}{V g^2}
   \sum_j\big[Z_j-f_j(\mathbf g)\big]e^{i\mathbf g\cdot\mathbf r_j}e^{-W_j}.
-\]
+$$
 
 This is the Mott--Bethe electron-scattering combination `(Z - f_x)`: nucleus
 minus electron cloud. It is the key structural distinction from PXR:
 
 - PXR susceptibility (`chi_g`, verified `pxr-amplitude` row):
-  \(\chi_{\mathbf g}\propto\sum_j f_j\) — the **electron** density only, with
-  a \(1/k^2\) (photon) denominator.
-- CBS potential (`U_g`, this row): \(U_{\mathbf g}\propto\sum_j(Z_j-f_j)\) —
-  the **net screened-nucleus** potential, with a \(1/g^2\)
+  $\chi_{\mathbf g}\propto\sum_j f_j$ — the **electron** density only, with
+  a $1/k^2$ (photon) denominator.
+- CBS potential (`U_g`, this row): $U_{\mathbf g}\propto\sum_j(Z_j-f_j)$ —
+  the **net screened-nucleus** potential, with a $1/g^2$
   (momentum-transfer) denominator.
 
 ### Anomalous corrections
 
 The electrostatic potential is a static Coulomb quantity, so only the real,
-energy-independent charge distribution should enter: \(f_j =
-f_{0,j}(\mathbf g)\). The resonant dispersion corrections \(f'(E)\),
-\(f''(E)\) are photon-frequency responses and do **not** belong in a static
-`U_g`. A physically clean `U_g` uses \(Z_j - f_{0,j}(\mathbf g)\), not
-\(Z_j - f_0 - f' - if''\). Flagged as a code check.
+energy-independent charge distribution should enter: $f_j =
+f_{0,j}(\mathbf g)$. The resonant dispersion corrections $f'(E)$,
+$f''(E)$ are photon-frequency responses and do **not** belong in a static
+`U_g`. A physically clean `U_g` uses $Z_j - f_{0,j}(\mathbf g)$, not
+$Z_j - f_0 - f' - if''$. Flagged as a code check.
 
 ## Cheap filters
 
-- **Units.** \(e^2/(Vg^2)\) carries units eV·Å / (Å³·Å⁻²) = eV. `U_g` is an
-  energy (eV); \((Z-f)\) is dimensionless. Pass.
-- **Forward / small-\(g\) limit.** As \(g\to0\), \(Z-f_0(g)\to0\) like
-  \(g^2\) (\(f_0(0)=Z\), neutral atom), cancelling \(1/g^2\) and keeping
-  \(U_0\) finite. For a reflection \(g\neq0\), \(f_0(g)<Z\), so
-  \(Z-f_0>0\) and `U_g` is finite. Pass.
-- **Extinction.** Extinct reflection → phased site sum → `U_g` \(\to0\).
+- **Units.** $e^2/(Vg^2)$ carries units eV·Å / (Å³·Å⁻²) = eV. `U_g` is an
+  energy (eV); $(Z-f)$ is dimensionless. Pass.
+- **Forward / small-$g$ limit.** As $g\to0$, $Z-f_0(g)\to0$ like
+  $g^2$ ($f_0(0)=Z$, neutral atom), cancelling $1/g^2$ and keeping
+  $U_0$ finite. For a reflection $g\neq0$, $f_0(g)<Z$, so
+  $Z-f_0>0$ and `U_g` is finite. Pass.
+- **Extinction.** Extinct reflection → phased site sum → `U_g` $\to0$.
   Pass.
 - **Sign / convention.** The electron sits in the attractive field of the net
   positive cores; only `|U_g|` and the PXR/CBS *relative* phase enter
@@ -114,26 +114,26 @@ f_{0,j}(\mathbf g)\). The resonant dispersion corrections \(f'(E)\),
 Required limiting behaviour, pinned without committing to the paper's exact
 algebra:
 
-- **Non-relativistic recovery (\(\gamma\to1\)).** For keV beams \(\gamma
-  \approx1\) (\(\gamma=1+T/mc^2\); 30 keV \(\to\gamma=1.059\)); the braced
+- **Non-relativistic recovery ($\gamma\to1$).** For keV beams $\gamma
+  \approx1$ ($\gamma=1+T/mc^2$; 30 keV $\to\gamma=1.059$); the braced
   factor must reduce to the plain PXR+CBS combination with no
   vanishing/blow-up.
 - **High-energy suppression.** The CBS weight (or shared formation factor)
-  carries \(1/\gamma\) or \(1/\gamma^2\) and must *decrease* as
-  \(\gamma\to\infty\). At 100 keV \(\gamma=1.196\), \(1/\gamma=0.836\),
-  \(1/\gamma^2=0.699\) — a 16–30% effect, consistent with "\(1/\gamma\)
+  carries $1/\gamma$ or $1/\gamma^2$ and must *decrease* as
+  $\gamma\to\infty$. At 100 keV $\gamma=1.196$, $1/\gamma=0.836$,
+  $1/\gamma^2=0.699$ — a 16–30% effect, consistent with "$1/\gamma$
   matters ≳100 keV."
-- **Physical origin of a \(\gamma\) power.** The photon formation region is
-  set by \(\theta_{\rm ph}^2=\gamma^{-2}+|\chi_0|\); a \(\gamma\) factor in
+- **Physical origin of a $\gamma$ power.** The photon formation region is
+  set by $\theta_{\rm ph}^2=\gamma^{-2}+|\chi_0|$; a $\gamma$ factor in
   the CBS amplitude/weight is the standard signature of this
   formation-length physics.
 
 **Ambiguity flagged up front.** The exact algebraic combination of `chi_g` and
-`U_g` inside the braces, and whether the suppression is \(1/\gamma\) or
-\(1/\gamma^2\) and multiplies CBS alone, PXR, or a shared prefactor, is
+`U_g` inside the braces, and whether the suppression is $1/\gamma$ or
+$1/\gamma^2$ and multiplies CBS alone, PXR, or a shared prefactor, is
 specific to Feranchuk--Spence 2000 Eq. (14) / Zhai SI Eq. (6). Without those
 equation texts reproduced in-repo I cannot re-derive that exact mapping from
-first principles; I verify the limiting behaviour, the \((Z-f)\) vs \(f\)
+first principles; I verify the limiting behaviour, the $(Z-f)$ vs $f$
 split, and dimensional consistency, and compare the remaining algebra against
 the code.
 
@@ -206,13 +206,13 @@ Filter results on the assembly:
   1/Å`, divided by `(v.g) ~ 1/Å` → `A_CBS` dimensionless. `A_PXR` is likewise
   dimensionless (`chi` dimensionless, numerator `1/Å^2` over `detuning ~
   1/Å^2`). The two amplitudes share units and are addable. Pass.
-- **High-energy suppression.** The prefactor is \(1/\gamma\) (single power);
-  combined with `U_g/(m c^2)` this is \(U_g/(\gamma mc^2)=U_g/E_{\rm
-  total}\), the natural CBS deflection scale. `A_CBS` \(\propto1/\gamma\)
-  decreases as \(\gamma\to\infty\). Pass; the ledger's "\(1/\gamma^2\) (or
-  \(1/\gamma\))" is resolved by the code to **\(1/\gamma\)** (cited to Zhai
+- **High-energy suppression.** The prefactor is $1/\gamma$ (single power);
+  combined with `U_g/(m c^2)` this is $U_g/(\gamma mc^2)=U_g/E_{\rm
+  total}$, the natural CBS deflection scale. `A_CBS` $\propto1/\gamma$
+  decreases as $\gamma\to\infty$. Pass; the ledger's "$1/\gamma^2$ (or
+  $1/\gamma$)" is resolved by the code to **$1/\gamma$** (cited to Zhai
   SI Eq. 6 / Feranchuk Eq. 14).
-- **Non-relativistic recovery.** \(\gamma\to1\) leaves the braced CBS
+- **Non-relativistic recovery.** $\gamma\to1$ leaves the braced CBS
   amplitude finite and reduces the prefactor to unity. Pass.
 - **Relative PXR/CBS sign.** `A_PXR` carries `chi_g < 0`; `A_CBS` carries an
   explicit leading `-` on `+U_g > 0`. The interference sign is therefore an
