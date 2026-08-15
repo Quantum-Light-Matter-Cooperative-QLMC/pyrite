@@ -22,6 +22,7 @@ file. Edit and drop items on `main`.
    `xray-refractive-index`, `xray-in-medium-resonance`,
    `xray-in-medium-propagation-phase`) and `coherent-segment-midpoint-time`
    (electron-transport correctness fix, implementation landed on `main`).
+
    1. **Rederivation Clean-up and Formatting.** Need a worker to go thru and clean up the math in
       completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
       Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
@@ -37,12 +38,7 @@ file. Edit and drop items on `main`.
    (F-I). →
    `feature/energy-controlled-electron-transport`;
    [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
-3. **Readable physics validation ledger.** Replace the squeezed eight-column
-   Sphinx table with one labeled record per validation ID, preserving all
-   scientific content and generated summaries. →
-   `docs/readable-physics-validation-ledger`;
-   [`agentdocs/tasks/docs/readable-physics-validation-ledger/`](agentdocs/tasks/docs/readable-physics-validation-ledger/).
-4. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
+3. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
    evidence: `qlmc` job `1638` (`hopg_hbn`) computed 5508 hopg cases in 195 s and
    5508 h-BN cases in 206 s — ~35-37 ms/case — while the box held ~5% CPU and
    10-15% GPU utilization with no burstiness, so the case loop is bound by
@@ -153,18 +149,6 @@ file. Edit and drop items on `main`.
    keeps growing. Review:
    [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
    §5.
-5. **Verify documented code blocks.** `docs/conf.py` loads `myst_parser` and
-   autodoc only, so every fenced example in `docs/guides/*.md` is unverified
-   prose that rots silently; abTEM, OpenMC, and HyperSpy all execute their
-   documented examples. Triage found only 4 of 49 guide blocks are `python`
-   and 37 are `bash`, so a doctest pass would reach ~8%; the plan instead
-   checks `pyrite`/`pyrite-dev` blocks against the live Click and argparse
-   trees and covers the Python narrative separately. →
-   `chore/verify-documented-code-blocks`;
-   [`agentdocs/tasks/chore/verify-documented-code-blocks/`](agentdocs/tasks/chore/verify-documented-code-blocks/).
-   Review:
-   [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
-   §4 G5.
 
 ## Inbox - >user< to be triaged
 
@@ -221,20 +205,10 @@ Nothing yet.
    [`agentdocs/tasks/fix/run-cache-flags-auto-pull/`](agentdocs/tasks/fix/run-cache-flags-auto-pull/).
 4. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-5. Related to below: when user runs `pyrite run <profile>`, but energy-grid bounds have
-   not been derived for that case:
-   1. Give them a suggestion on what to run. We could also add a flag that automatically runs
-      the derivation for their energy + mat before running their actual profile.
-   2. shorten up the lines that are spit out. currently, spits out list of ALL materials
-      in the entire repo (even ones marked non-standard in mats_to_sim.toml) which need to be
-      set up for this energy, along with a long boilerplate text string next to every material.
 
 ### Ergonomics (ship anytime)
 
-1. Delete the stale root `notebooks/` tree — it now holds only `__pycache__`
-   directories shadowing `analysis_ui` module names, left over from the move
-   into `src/pyrite/apps/`.
-2. Write new checkpoint payloads as `.h5`, not `line.pkl` / `brem.pkl`. The
+1. Write new checkpoint payloads as `.h5`, not `line.pkl` / `brem.pkl`. The
    content has been HDF5 since `checkpoints/_checkpoint_io.py:153`; the `.pkl`
    extension hides that from anyone with `h5py`. Readers already accept both.
 
@@ -252,11 +226,6 @@ Nothing yet.
 2. Golden data should be an optional installable, e.g. `uv add pyrite[golden]`
    or part of `uv add pyrite[all]`. Same with validation scripts/app -- not
    critically required.
-3. Clarify that: 'gc' stands for garbage collection, rm stands for 'remove'.
-   the `gc` help message could be a little more detailed, as well. functionality
-   is a little unclear to me (if there is an identical case on both
-   'standard' and 'sub_100keV' profiles, does `gc --profile standard` end up
-   dropping the sub_100 keV cases too? I hope not.)
 
 ## Long-term plans
 
