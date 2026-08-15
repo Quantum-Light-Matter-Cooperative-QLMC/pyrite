@@ -671,7 +671,10 @@ def run_coherent_prologue_kernel(
     _validate_threads(nthreads, "prologue_nthreads")
     n_g = int(n_g)
     n_tab = int(E_tab.size)
+    if log_mu_tab.ndim != 2 or int(log_mu_tab.shape[1]) != n_tab:
+        raise ValueError("log_mu_tab must have shape (elements, E_tab.size)")
     n_mu = int(log_mu_tab.shape[0])
+    log_mu_kernel = log_mu_tab.reshape(-1)
     n_seg = int(denom.size)
     if n_g <= 0 or n_tab < 2:
         raise ValueError("coherent prologue requires at least one g row and two tabulation points")
@@ -756,7 +759,7 @@ def run_coherent_prologue_kernel(
             chi_im_tab,
             u_re_kernel,
             u_im_kernel,
-            log_mu_tab,
+            log_mu_kernel,
             n_re_tab,
             E_r,
             aw_seg,
