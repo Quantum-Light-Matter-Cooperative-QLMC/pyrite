@@ -253,6 +253,37 @@ byte-identical. Across three warmed cases, the hot-line timing changed from
 approximately 20.9/20.9/30.9 ms to 17.9/17.6/18.9 ms. Focused path tests:
 192 passed, 2 skipped; the final local cutoff/spectrum subset passed 46 tests.
 
+### Follow-up mask reuse after the production rerun
+
+The user's next production run, `hopg_hbn-9` / SLURM `1641`, completed hopg in
+175 s and h-BN in 186 s but still showed roughly 10--15% GPU utilization. Do
+not compare its wall directly with the earlier `Ne=450` evidence: the current
+profile now uses `Ne=300`. Jobs `hopg_hbn-10` / `1642` (baseline) and
+`hopg_hbn-11` / `1643` (candidate) are the matched comparison: same 5,508
+uncached hopg cases, parameter digest `4135cde714d5`, `Ne=300`, `Ne_brem=150`,
+four lockstep transport workers, RTX 5080 CUDA backend, and full Nsight trace.
+
+The remaining trace signature was again repeated mask compaction: the batched
+incoherent line path tested a mask and then gathered three arrays with it;
+bremsstrahlung gathered four arrays with one mask. Both now resolve the mask to
+an integer index once and reuse it. Measured result:
+
+| metric | baseline | candidate | delta |
+| --- | ---: | ---: | ---: |
+| blocking synchronizations / D-to-H copies per case | 19 | 13 | -31.6% |
+| CUDA launches per case | 366 | 345 | -5.7% |
+| case-loop wall | 188 s | 181 s | -3.7% |
+| performance-session elapsed | 190.898 s | 184.274 s | -3.5% |
+| spectrum cumulative | 130.706 s | 125.012 s | -4.4% |
+| `cxr.lines` mean | 19.202 ms/case | 18.670 ms/case | -2.8% |
+| `cxr.brem` mean | 3.277 ms/case | 2.797 ms/case | -14.7% |
+
+The complete candidate `line.pkl` and `brem.pkl` artifacts are byte-identical
+to the baseline (matching SHA-256 for each). Local focused cutoff, spectrum,
+bremsstrahlung, and coherent-emission checks passed: 59 tests. The 13 remaining
+readbacks are no longer repeated gathers over the two masks fixed here; further
+reduction needs a broader result-transfer or kernel-interface change.
+
 Checkpoint time is a separate lifecycle issue, not part of this optimization.
 The job had 1,836 configurations and called `_save_part` once per config;
 final consolidation took only 2.68 s, leaving about 43.5 s in shard writes.

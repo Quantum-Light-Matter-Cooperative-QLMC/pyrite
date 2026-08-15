@@ -241,11 +241,14 @@ def mc_brem_spectrum(
         ]
 
     seg_elec_id = xp.asarray(segments["elec_id"])
-    brem_electron = seg_elec_id < Ne
+    # CuPy boolean gathers resolve the survivor count on the host every time.
+    # Resolve once, then reuse the known-size integer index for all segment
+    # arrays (including the finite-footprint escape distance below).
+    brem_idx = xp.flatnonzero(seg_elec_id < Ne)
 
-    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_electron]
-    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_electron]
-    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)[brem_electron]
+    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_idx]
+    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_idx]
+    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)[brem_idx]
 
     z_mid = seg_r[:, 2]
     finite_footprint = (
@@ -258,7 +261,7 @@ def mc_brem_spectrum(
             dtype=REAL,
         )
     elif finite_footprint:
-        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[brem_electron]
+        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[brem_idx]
     else:
         L_esc = _escape_length(z_mid, thickness, n_hat[2])
 

@@ -1812,12 +1812,15 @@ def mc_spectrum(
             a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
             weight = pref * A2 * WM
             good = keep & xp.isfinite(weight) & (weight > 0)
-            gm = good.reshape(-1)
-            if not bool(gm.any()):
+            # Resolve the mask once. CuPy otherwise performs one blocking
+            # survivor-count readback for ``any`` and one for every boolean
+            # gather below. Integer gathers preserve the same flattened order.
+            gm_idx = xp.flatnonzero(good.reshape(-1))
+            if gm_idx.size == 0:
                 continue
-            E_r_f = E_res.reshape(-1)[gm]
-            aw_f = a_width.reshape(-1)[gm]
-            w_f = weight.reshape(-1)[gm]
+            E_r_f = E_res.reshape(-1)[gm_idx]
+            aw_f = a_width.reshape(-1)[gm_idx]
+            w_f = weight.reshape(-1)[gm_idx]
 
             _nsys_push("cxr.lines.accum")
 
@@ -1838,7 +1841,7 @@ def mc_spectrum(
                     targets.append((pref * A2_pxr * WM, spec_pxr))
                     targets.append((pref * A2_cbs * WM, spec_cbs))
                 for w, tgt in targets:
-                    w_f = w.reshape(-1)[gm]
+                    w_f = w.reshape(-1)[gm_idx]
                     for j0 in range(0, E_r_f.size, chunk):
                         sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
                         S = _sincsq_lineshape(
