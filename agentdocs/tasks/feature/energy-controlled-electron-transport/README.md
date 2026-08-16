@@ -77,7 +77,7 @@ Numerical substeps are integration detail:
       representative energy; measured and ledgered as
       `substep-radiation-invariance`. Host-only, non-batched path; the ports are
       slice H.
-- [ ] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
+- [x] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
       CUDA paths without weakening deterministic/statistical parity contracts.
 - [ ] I -- Update public docs, validation ledger, checkpoint/schema handling,
       and golden data; run fresh-context physics validation.
@@ -326,9 +326,10 @@ the physical variation of `E` and `beta` along the flight.
 
 Implementation notes:
 
-- Grouping is detected from adjacent-row key changes (transport emits a
-  flight's substeps contiguously and every row transform preserves order). All
-  singleton groups means one row per flight, whose grouped reduction is
+- Grouping is keyed by `(electron_id, flight_id)` value (a `lexsort`), not by
+  adjacency. Slice G first used adjacency because `subdivide_flights` emits a
+  flight's substeps contiguously; slice H found that the lockstep core does not.
+  All singleton groups means one row per flight, whose grouped reduction is
   algebraically the incoherent one, so the proven path is kept and `grouped`
   stays `False`. Production frozen runs never take the new path.
 - The accumulation is `np.add.reduceat` over blocks whose boundaries are snapped
@@ -364,6 +365,66 @@ Acceptance evidence is `checks/substep_invariance.py`; derivation, tables,
 assumptions, and limits in
 `docs/validation/beam-transport/substep-radiation-invariance.md`;
 `Validation: substep-radiation-invariance`.
+
+## H -- porting the propagator to every core
+
+Slice F landed the controlled propagator on both lockstep cores. H carries it to
+the per-electron cores, the two CUDA rawkernels, and the grooved core, and drops
+both `energy_model="midpoint"` fail-closed gates.
+
+**Per-electron cores.** Same statement order as lockstep. `_dEds_packed_scalar`
+is new: the per-electron and CUDA cores read the padded `(n_layers,
+max_elements)` tables whose padding is zero-filled, so `_dEds_compound_scalar`
+would evaluate `log(1.166 (E + 0)/0)`; the loop is bounded by `n_el` instead.
+`_alloc_scratch` grew a `midpoint` flag and allocates the four end-state/identity
+buffers at length zero under the frozen rule, so the core signature is fixed
+while the frozen row stays exactly seven fields wide.
+
+**CUDA.** The transpiler has no `continue`, so step 5 became
+`if limited_j: substep_id += 1` / `else: <exit, boundary, collision>` with the
+flight-close reset hoisted into the non-terminal branch. Two new device
+functions, `_dEds_packed` and `_lut_lerp_at`, because the midpoint rule
+evaluates `dE/ds` and the LUT rows at three energies per flight rather than one
+(the frozen path indexes the energy grid once and reuses the index). The
+launcher signatures still match the per-electron cores positionally, pinned by
+`test_launcher_signature_tracks_the_reference_core`.
+
+**Grooved.** Electrons are visited round-robin, so the optical-depth budget and
+flight identity are per-electron arrays rather than loop locals: a substep must
+resume the flight the previous outer pass opened. A substep also suppresses the
+groove surface event, so `full_j` excludes it and no collision is sampled
+mid-flight. Substeps consume the material step budget, as in the ungrooved cores.
+
+**Frozen bit-for-bit.** `-lambda log(U)` became `(-log(U)) lambda`, which is
+exact (negation is exact, multiplication commutative). Verified against `main`
+by SHA-256 over the full row set: per-electron over C/W x 25/100 keV x LUT
+on/off, grooved over C at 30/60 keV x both elastic models including vacuum legs.
+
+**Found and fixed: flight grouping was adjacency-keyed.** Slice G's grouped
+incoherent CXR reduction detected groups from adjacent-row key changes, which
+holds for `subdivide_flights` output but not for the lockstep core -- it emits
+step-major, so a flight's substeps are separated by every other electron's row
+for that step. The reduction saw all-singleton groups, fell back to the plain
+incoherent path, and divided the line peak by the substep count: the exact
+failure the grouping exists to prevent, on the default core. Grouping is now
+keyed by `(electron_id, flight_id)` value and the reduction gathers each
+flight's rows with a stable sort, which leaves already grouped input and each
+group's internal order untouched.
+
+**Remainder, deliberately not in H.** The grouped reduction stays host-only and
+stays on the per-`hkl` loop:
+
+- The device port needs a segmented complex reduction with no CuPy `reduceat`;
+  cumsum-and-difference was already rejected on precision grounds in G. It fails
+  closed with an actionable message, so no result is silently wrong.
+- The batched path falls back to the proven per-`hkl` loop on grouped rows. That
+  is a launch-count cost on one configuration, not a correctness gap.
+
+Both need GPU evidence through `pyrite remote` and are performance ports of an
+already-correct path. The `components=True` and
+`xray_dispersion="refractive"`-with-`layers` guards are *not* ports: they are
+genuine modelling gaps (the PXR/CBS cross term survives the intra-flight sum;
+the per-layer dispersive propagation phase is unmodelled) and stay closed.
 
 ## B -- bounded transport diagnostics
 
