@@ -46,6 +46,7 @@ import numpy as np
 from tabulate import tabulate
 
 _HERE = Path(__file__).resolve().parent
+_PACKAGE_ROOT = _HERE.parent
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases  # noqa: E402
 from pyrite.detectors import Detector, EnergyBins, LegacyEDS  # noqa: E402
 from pyrite.materials.crystal import (  # noqa: E402
@@ -64,6 +65,7 @@ from pyrite.montecarlo import (  # noqa: E402
     simulate_trajectories,
 )
 from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
+from pyrite.paths import workspace_root  # noqa: E402
 from pyrite.validation._zhai import (  # noqa: E402
     ZHAI_CACHE_FORMAT,
     ZHAI_CACHE_SCHEMA,
@@ -662,9 +664,9 @@ def _zhai_cache_key(anchor: ZhaiAnchor, ne: int, ne_brem: int) -> str:
     # Anchor helpers live outside src/. Hash this whole module so changes to
     # case construction or component routing cannot reuse a stale v4 payload.
     digest.update(Path(__file__).read_bytes())
-    implementation_files = _HERE.parent.glob("src/pyrite/**/*.py")
+    implementation_files = _PACKAGE_ROOT.glob("**/*.py")
     for path in sorted(implementation_files):
-        digest.update(path.relative_to(_HERE.parent).as_posix().encode())
+        digest.update(path.relative_to(_PACKAGE_ROOT).as_posix().encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()[:20]
 
@@ -742,7 +744,7 @@ def cached_model_spectra(
     root = (
         Path(cache_dir)
         if cache_dir is not None
-        else _HERE.parent / "checkpoints" / "zhai_reproduction"
+        else workspace_root() / "checkpoints" / "zhai_reproduction"
     )
     path = root / f"zhai-v{ZHAI_CACHE_SCHEMA}-{_zhai_cache_key(anchor, ne, ne_brem)}.pkl"
     if path.exists() and not refresh:
@@ -892,8 +894,8 @@ def _supplementary_cache_key(
     }
     digest.update(json.dumps(inputs, sort_keys=True).encode())
     digest.update(Path(__file__).read_bytes())
-    for path in sorted(_HERE.parent.glob("src/pyrite/**/*.py")):
-        digest.update(path.relative_to(_HERE.parent).as_posix().encode())
+    for path in sorted(_PACKAGE_ROOT.glob("**/*.py")):
+        digest.update(path.relative_to(_PACKAGE_ROOT).as_posix().encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()[:20]
 
@@ -914,7 +916,7 @@ def cached_coherent_spectra(
     root = (
         Path(cache_dir)
         if cache_dir is not None
-        else _HERE.parent / "checkpoints" / "zhai_reproduction"
+        else workspace_root() / "checkpoints" / "zhai_reproduction"
     )
     key = _supplementary_cache_key(study, thickness_nm, ne, exploratory_azimuth_deg)
     path = root / f"zhai-supplement-v{ZHAI_CACHE_SCHEMA}-{key}.pkl"
@@ -1595,7 +1597,7 @@ def main(outdir: str = "figures", ne: int = 500, ne_brem: int = 200) -> None:
         f"(film transmitted {model['film']['n_transmitted']} electrons)"
     )
 
-    outpath = _HERE.parent / outdir
+    outpath = workspace_root() / outdir
     outpath.mkdir(exist_ok=True)
     figs = {
         "zhai_fig1c_spectra_vs_theory": figure_spectra(anchor, model, reference),
@@ -1605,7 +1607,7 @@ def main(outdir: str = "figures", ne: int = 500, ne_brem: int = 200) -> None:
     for name, fig in figs.items():
         for ext in ("png", "pdf"):
             fig.savefig(outpath / f"{name}.{ext}", dpi=150, bbox_inches="tight")
-        print("wrote", (outpath / f"{name}.png").relative_to(_HERE.parent))
+        print("wrote", (outpath / f"{name}.png").relative_to(workspace_root()))
 
 
 if __name__ == "__main__":
