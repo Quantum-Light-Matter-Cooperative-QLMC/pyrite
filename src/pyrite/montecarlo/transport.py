@@ -1469,6 +1469,8 @@ def _transport_core_grooved(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -1507,6 +1509,10 @@ def _transport_core_grooved(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     vac_start,
     vac_end,
     vac_E,
@@ -1538,6 +1544,14 @@ def _transport_core_grooved(
     zero_surface_events = np.zeros(Ne, dtype=np.int16)
     material_steps = np.zeros(Ne, dtype=np.int32)
     surface_events = np.zeros(Ne, dtype=np.int32)
+
+    # Electrons are visited round-robin, so unlike the ungrooved cores the
+    # optical-depth budget and flight identity have to survive across passes.
+    # -1.0 marks "no flight open", the only state in which a collision is drawn.
+    tau_left = np.full(Ne, -1.0)
+    flight_id = np.zeros(Ne, dtype=np.int64)
+    substep_id = np.zeros(Ne, dtype=np.int64)
+    energy_controlled = max_dE_frac > 0.0
 
     # One small reusable rate buffer; material layers can have different
     # element counts, bounded by the second Mott-table dimension.
@@ -1585,7 +1599,9 @@ def _transport_core_grooved(
                 total_rate += rate
 
             lam_ang = 1e8 / total_rate
-            step_j = -lam_ang * np.log(rng.random())
+            if tau_left[e] < 0.0:
+                tau_left[e] = -np.log(rng.random())
+            step_j = tau_left[e] * lam_ang
 
             if nseg >= max_segments:
                 raise RuntimeError("segment buffer exhausted")
@@ -1659,9 +1675,16 @@ def _transport_core_grooved(
 
             # 3. Record the radiating material segment.
             dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
-            beta_j = beta_from_keV_scalar(E_j)
             cutoff_j = False
-            cutoff_distance = (E_cut_e - E_j) / dEds
+            if energy_model_code == 1:
+                # The midpoint rule makes E_end = E_cut at the cutoff by
+                # definition, so the truncation distance solves the scheme at
+                # E_mid = (E_start + E_cut)/2, not its left-endpoint form.
+                cutoff_distance = (E_cut_e - E_j) / _dEds_compound_scalar(
+                    J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_cut_e)
+                )
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
             geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
             if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
                 step_j = cutoff_distance
@@ -1672,6 +1695,38 @@ def _transport_core_grooved(
                 exit_bot_j = False
                 exit_side_j = False
                 surface_first = False
+
+            # The numerical energy-loss cap is the only step limit that does not
+            # close a physical flight: it emits a row and resumes with the same
+            # optical-depth budget, direction, and `flight_id`.
+            limited_j = False
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    surface_first = False
+
+            if energy_model_code == 1:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    # Predictor-corrector for the implicit midpoint rule
+                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                    E_pred = E_j + dEds * step_j
+                    E_end_j = E_j + step_j * _dEds_compound_scalar(
+                        J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_pred)
+                    )
+                beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+            else:
+                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                beta_j = beta_from_keV_scalar(E_j)
+            t_end_j = clock[e] + step_j / beta_j
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -1684,14 +1739,29 @@ def _transport_core_grooved(
             seg_t0[nseg] = clock[e]
             seg_id[nseg] = e
             seg_lay[nseg] = L
+            if energy_model_code == 1:
+                seg_E_end[nseg] = E_end_j
+                seg_t_end[nseg] = t_end_j
+                seg_flight[nseg] = flight_id[e]
+                seg_substep[nseg] = substep_id[e]
             nseg += 1
 
             # 4. Advance through material and apply continuous stopping.
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
-            clock[e] += step_j / beta_j
+            E_keV[e] = E_end_j
+            clock[e] = t_end_j
+            tau_left[e] -= step_j / lam_ang
+            if tau_left[e] < 0.0:
+                tau_left[e] = 0.0
+
+            if limited_j:
+                substep_id[e] += 1
+            else:
+                flight_id[e] += 1
+                substep_id[e] = 0
+                tau_left[e] = -1.0
 
             active_surface = surface_first and not cutoff_j
             reentered = False
@@ -1793,8 +1863,15 @@ def _transport_core_grooved(
             if crossed_internal:
                 pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
 
-            # 7. Only a full material flight ends in an elastic collision.
-            full_j = not cross_up_j and not cross_dn_j and not exit_side_j and not surface_first
+            # 7. Only a full material flight ends in an elastic collision; a
+            #    numerical substep resumes the open one instead.
+            full_j = (
+                not cross_up_j
+                and not cross_dn_j
+                and not exit_side_j
+                and not surface_first
+                and not limited_j
+            )
             if full_j:
                 if Z_arr.size == 1:
                     i_el = 0
@@ -3549,8 +3626,6 @@ def simulate_trajectories(
             "keep_segments_on_device requires transport_core='cuda'; "
             f"{requested_core!r} resolved to {transport_core!r}"
         )
-    if energy_model == "midpoint" and groove is not None:
-        raise ValueError("energy_model='midpoint' is not implemented for grooved transport")
     max_dE_frac = float(max_dE_frac)
     if max_dE_frac < 0.0:
         raise ValueError("max_dE_frac must be non-negative")
@@ -4127,6 +4202,8 @@ def simulate_trajectories(
             n_layers,
             internal_bounds,
             elastic_model_code,
+            energy_model_code,
+            max_dE_frac,
             z_total,
             finite_footprint,
             0.0 if width_ang is None else float(width_ang),
@@ -4165,6 +4242,10 @@ def simulate_trajectories(
             seg_t0,
             seg_id,
             seg_lay,
+            seg_E_end,
+            seg_t_end,
+            seg_flight,
+            seg_substep,
             vac_start_buf,
             vac_end_buf,
             vac_E_buf,

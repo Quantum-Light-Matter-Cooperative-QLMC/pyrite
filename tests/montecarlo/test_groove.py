@@ -452,6 +452,10 @@ def _run_grooved(
     seg_t0 = np.empty(max_segments)
     seg_id = np.empty(max_segments, dtype=np.int64)
     seg_lay = np.empty(max_segments, dtype=np.int16)
+    seg_E_end = np.empty(0)
+    seg_t_end = np.empty(0)
+    seg_flight = np.empty(0, dtype=np.int64)
+    seg_substep = np.empty(0, dtype=np.int64)
     vac_start = np.empty((max_vac, 3))
     vac_end = np.empty((max_vac, 3))
     vac_E = np.empty(max_vac)
@@ -469,6 +473,8 @@ def _run_grooved(
             n_layers,
             internal_bounds,
             0,
+            0,  # energy_model_code
+            0.0,  # max_dE_frac
             z_total,
             finite_footprint,
             0.0 if width_ang is None else float(width_ang),
@@ -507,6 +513,10 @@ def _run_grooved(
             seg_t0,
             seg_id,
             seg_lay,
+            seg_E_end,
+            seg_t_end,
+            seg_flight,
+            seg_substep,
             vac_start,
             vac_end,
             vac_E,
@@ -877,3 +887,42 @@ def test_brem_groove_rejects_layers_and_wrong_direction():
             n_hat=[0.0, 0.0, -1.0],
             groove=SPEC,
         )
+
+
+def test_groove_midpoint_carries_the_flight_schema():
+    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, energy_model="midpoint")
+    for key in ("E_start_keV", "E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id"):
+        assert key in out
+    assert np.all(out["E_end_keV"] < out["E_start_keV"])
+    assert np.all(out["t_end_ang"] > out["t_start_ang"])
+    np.testing.assert_allclose(
+        out["E_repr_keV"], 0.5 * (out["E_start_keV"] + out["E_end_keV"]), rtol=1e-12
+    )
+    # No numerical cap, so every flight is one row.
+    np.testing.assert_array_equal(out["substep_id"], 0)
+
+
+def test_groove_substeps_resume_the_open_flight():
+    # The optical-depth budget is per electron here and has to survive the
+    # round-robin over electrons, so a substep must resume the open flight
+    # rather than redraw one: within a flight the substep ids run 0..k-1 and
+    # the rows chain end-to-end in energy and clock.
+    coarse = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, energy_model="midpoint")
+    fine = simulate_trajectories(
+        **_SIM_KW, **_tilt_kw(), groove=SPEC, energy_model="midpoint", max_dE_frac=0.02
+    )
+    assert (fine["substep_id"] > 0).any()
+    assert fine["L_ang"].size > coarse["L_ang"].size
+
+    order = np.lexsort((fine["substep_id"], fine["flight_id"], fine["elec_id"]))
+    flight = np.stack([fine["elec_id"][order], fine["flight_id"][order]], axis=1)
+    same = np.all(flight[1:] == flight[:-1], axis=1)
+    np.testing.assert_array_equal(
+        fine["substep_id"][order][1:][same], fine["substep_id"][order][:-1][same] + 1
+    )
+    np.testing.assert_allclose(
+        fine["E_start_keV"][order][1:][same], fine["E_end_keV"][order][:-1][same], rtol=1e-12
+    )
+    np.testing.assert_allclose(
+        fine["t_start_ang"][order][1:][same], fine["t_end_ang"][order][:-1][same], rtol=1e-12
+    )
