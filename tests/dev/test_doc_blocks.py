@@ -108,12 +108,13 @@ def _python_blocks() -> list[FencedBlock]:
 
 def test_python_api_workflow_executes_as_one_accumulating_namespace():
     blocks = _python_blocks()
-    assert len(blocks) == 4
+    assert len(blocks) == 5
 
     namespace: dict[str, object] = {}
     for block in blocks:
         code = compile(block.body, block.location, "exec")
         exec(code, namespace)  # noqa: S102 -- executing the documented example itself
+
 
     result = namespace["result"]
     assert result.energy_eV.shape == result.spectrum.shape
