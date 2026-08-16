@@ -7,7 +7,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+./src/pyrite/apps/.claude/settings.local.json
 .claude/settings.local.json
 .codex/*
 !.codex/config.toml
@@ -279,3 +279,4 @@ RTK.md
 .headroom_wrap_marker.json
 *.tar.gz
 checkpoints/**/cases.json
+src/pyrite/apps/.claude/settings.local.json
