@@ -198,8 +198,7 @@ Two qualifications belong with that number:
   slab has no internal boundary that closes a flight; in a multilayer stack the
   boundary crossings enter that count.
 - The claim covers *collision statistics*. Substep invariance of the emitted CXR
-  and bremsstrahlung is a separate claim owned by checklist step G; the coherent
-  line kernel is still row-incoherent at this point, so the spectra are not
-  substep-invariant yet and this row must not be read as saying they are.
+  and bremsstrahlung is a separate claim, `substep-radiation-invariance`; this
+  row must not be read as saying anything about the spectra.
 - Energy-loss straggling remains unmodeled (see `energy-step-convergence`), so
   the hazard is evaluated along a deterministic CSDA energy history.

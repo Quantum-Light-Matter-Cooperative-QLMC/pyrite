@@ -72,8 +72,11 @@ Numerical substeps are integration detail:
       energy-controlled propagator with collision optical-depth handling.
       Implemented on both lockstep cores; ensemble evidence measured and
       ledgered as `energy-controlled-propagation`.
-- [ ] G -- Make CXR and bremsstrahlung invariant to numerical substep refinement
-      at fixed physical flights.
+- [x] G -- Make CXR and bremsstrahlung invariant to numerical substep refinement
+      at fixed physical flights. Flight-grouped incoherent CXR plus an explicit
+      representative energy; measured and ledgered as
+      `substep-radiation-invariance`. Host-only, non-batched path; the ports are
+      slice H.
 - [ ] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
       CUDA paths without weakening deterministic/statistical parity contracts.
 - [ ] I -- Update public docs, validation ledger, checkpoint/schema handling,
@@ -299,6 +302,68 @@ difference. Derivation, tables, assumptions, and limits are in
 `Validation: energy-controlled-propagation`. The row's claim is scoped to
 collision statistics -- substep invariance of emitted CXR and bremsstrahlung is
 slice G and is explicitly not claimed there.
+
+## G -- substep-invariant radiation
+
+Two rules, both in the radiation kernels rather than in transport.
+
+**Representative energy.** Midpoint transport now returns `E_repr_keV =
+(E_start + E_end)/2`, the energy the implicit midpoint rule already evaluates
+`dE/ds` and `beta` at. `mc_spectrum` and `mc_brem_spectrum` read it when
+present and fall back to `E_keV` otherwise, so frozen rows are bit-for-bit. This
+turns each row's one-point path integral from a left-endpoint rule into a
+midpoint rule, and makes the line kernel's `t_L = L/beta(E_repr)` exactly the
+transported flight duration `t_end - t_start`.
+
+**Flight grouping.** The default incoherent CXR reduction now sums rows of one
+`(electron_id, flight_id)` as complex field and squares the sum; only whole
+flights add incoherently. Without it, splitting a flight into `N` substeps gives
+`N` rows each carrying `(t_L/N)^2` instead of one carrying `t_L^2`, so the line
+peak falls roughly as `1/N` -- tightening a numerical tolerance would dismantle
+the line. At frozen energy and clock the grouped sum recovers the unsplit row
+exactly by the Dirichlet-kernel identity, so all residual under refinement is
+the physical variation of `E` and `beta` along the flight.
+
+Implementation notes:
+
+- Grouping is detected from adjacent-row key changes (transport emits a
+  flight's substeps contiguously and every row transform preserves order). All
+  singleton groups means one row per flight, whose grouped reduction is
+  algebraically the incoherent one, so the proven path is kept and `grouped`
+  stays `False`. Production frozen runs never take the new path.
+- The accumulation is `np.add.reduceat` over blocks whose boundaries are snapped
+  to flight boundaries (`_flight_blocks`), so no flight is split across two
+  squarings. Rejected: cumsum-and-difference (precision) and a dense
+  group-indicator matmul (memory).
+- Grouped runs take the per-`hkl` `_accumulate` loop and reuse the coherent
+  prologue (`cdtype`, `seg_t_mid`, `d_all`, `omega_grid`, `delta_omega_grid`,
+  `pol_A`). The polarization amplitude list had been populated only under
+  `coherent`; the incoherent path uses the fused real kernel, so grouped runs
+  produced exactly zero until that guard was widened.
+- Fails closed rather than silently degrading: non-NumPy backend, `components=
+  True`, and `xray_dispersion="refractive"` with `layers` all raise on
+  substepped rows. Batched, grooved, per-electron, and CUDA ports are slice H.
+
+**Reversed decision.** `_clip_segments_to_cutoff` no longer drops `E_end_keV`/
+`t_end_ang`. Rows carrying an end state came from midpoint transport, so the
+truncation distance solves `E_end == E_cut` under that same rule and the end and
+representative states are reconstructed exactly rather than dropped. The
+radiation kernels need `E_repr_keV` to survive the population cutoff clip, and
+frozen rows keep the left-endpoint solve bit-for-bit.
+
+**`subdivide_flights`.** New public helper in `spectrum/diagnostics.py`: splits
+fixed physical flights along their own straight rays into equal-length substeps
+and rebuilds the full midpoint schema. This is what makes the measurement a
+quadrature measurement -- re-running transport at a tighter `max_dE_frac` also
+moves the sampled collision points and decorrelates the trajectories. It
+duplicates the research helper `_subdivide` inside
+`checks/energy_step_convergence_matrix.py`, which was deliberately left
+untouched so slice E's already-ledgered evidence stays reproducible.
+
+Acceptance evidence is `checks/substep_invariance.py`; derivation, tables,
+assumptions, and limits in
+`docs/validation/beam-transport/substep-radiation-invariance.md`;
+`Validation: substep-radiation-invariance`.
 
 ## B -- bounded transport diagnostics
 

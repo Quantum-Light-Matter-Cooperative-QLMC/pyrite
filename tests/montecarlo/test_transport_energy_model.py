@@ -112,12 +112,19 @@ def test_midpoint_adds_end_state_without_adding_rows():
 
     assert set(midpoint) - set(frozen) == {
         "E_end_keV",
+        "E_repr_keV",
         "t_end_ang",
         "flight_id",
         "substep_id",
     }
-    for key in ("E_end_keV", "t_end_ang", "flight_id", "substep_id"):
+    for key in ("E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id"):
         assert midpoint[key].shape == midpoint["L_ang"].shape
+    np.testing.assert_allclose(
+        midpoint["E_repr_keV"],
+        0.5 * (midpoint["E_start_keV"] + midpoint["E_end_keV"]),
+        rtol=0,
+        atol=0,
+    )
     # Without a step cap every row is its flight's only substep.
     assert np.all(midpoint["substep_id"] == 0)
     # One radiating row per physical flight either way: the controlled rule
@@ -218,16 +225,31 @@ def test_row_transforms_keep_the_new_fields_in_step_with_the_rows():
         sliced = _segments_in_layer(segments, layer)
         mask = segments["layer"] == layer
         assert sliced["L_ang"].size == int(mask.sum()) > 0
-        for key in ("E_start_keV", "t_start_ang", "E_end_keV", "t_end_ang"):
+        for key in ("E_start_keV", "t_start_ang", "E_end_keV", "t_end_ang", "E_repr_keV"):
             np.testing.assert_array_equal(sliced[key], segments[key][mask])
 
-    clipped = _clip_segments_to_cutoff(segments, 12.0, CARBON, layers=layers)
-    keep = segments["E_keV"] >= 12.0
+    # 39 keV binds on this 40 keV run; a lower floor clips nothing here.
+    clipped = _clip_segments_to_cutoff(segments, 39.0, CARBON, layers=layers)
+    keep = segments["E_keV"] >= 39.0
     np.testing.assert_array_equal(clipped["E_start_keV"], segments["E_keV"][keep])
-    # Shortened flights have no reconstructable end state, so it is dropped
-    # rather than left stale.
-    assert "E_end_keV" not in clipped
-    assert "t_end_ang" not in clipped
+    # The clip reapplies the transport core's own midpoint cutoff solve, so a
+    # shortened flight ends exactly on the floor and its representative energy
+    # is the midpoint of the shortened flight -- reconstructed, never stale.
+    shortened = clipped["L_ang"] < segments["L_ang"][keep]
+    assert shortened.any()
+    np.testing.assert_allclose(clipped["E_end_keV"][shortened], 39.0, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(
+        clipped["E_repr_keV"],
+        0.5 * (clipped["E_start_keV"] + clipped["E_end_keV"]),
+        rtol=1e-12,
+    )
+    untouched = ~shortened
+    np.testing.assert_array_equal(
+        clipped["E_end_keV"][untouched], segments["E_end_keV"][keep][untouched]
+    )
+    np.testing.assert_array_equal(
+        clipped["t_end_ang"][untouched], segments["t_end_ang"][keep][untouched]
+    )
 
 
 @pytest.mark.parametrize(

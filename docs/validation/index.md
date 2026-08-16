@@ -40,6 +40,7 @@ beam-transport/energy-step-convergence
 beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
 beam-transport/radiation-error-estimators
+beam-transport/substep-radiation-invariance
 beam-transport/transport-midpoint-stopping
 ```
 

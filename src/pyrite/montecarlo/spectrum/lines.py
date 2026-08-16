@@ -43,6 +43,7 @@ _SEG_ARRAYS = (
     "E_keV",
     "E_start_keV",
     "E_end_keV",
+    "E_repr_keV",
     "t_ang",
     "t_start_ang",
     "t_end_ang",
@@ -508,10 +509,16 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     """Clip terminal material flights to a population-specific energy floor.
 
     Transport may be shared by radiation populations with different cutoffs.
-    Reapply the transport core's left-endpoint constant-stopping rule here so a
-    higher-cutoff consumer cannot recover radiation from the lower-cutoff tail.
-    Segment start time and energy remain unchanged; length and midpoint are
-    shortened from the original start point.
+    Reapply the transport core's stopping rule here so a higher-cutoff consumer
+    cannot recover radiation from the lower-cutoff tail. Segment start time and
+    energy remain unchanged; length and midpoint are shortened from the original
+    start point.
+
+    Rows carrying ``E_end_keV`` came from ``energy_model="midpoint"``, so the
+    truncation distance solves ``E_end == E_cut`` under that rule (as the
+    transport core does) and the shortened flight's end/representative state is
+    reconstructed exactly rather than dropped. Frozen rows keep the historical
+    left-endpoint solve bit-for-bit.
     """
     if E_cut_keV is None:
         return segments
@@ -538,32 +545,52 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     E = xp.asarray(out["E_keV"], dtype=REAL)
     old_L = xp.asarray(out["L_ang"], dtype=REAL)
     layer_index = xp.asarray(out["layer"])
-    stopping = xp.zeros_like(E)
     layer_compositions = [composition] if layers is None else [item[2] for item in layers]
-    for index, comp in enumerate(layer_compositions):
-        total = xp.zeros_like(E)
-        for element, n_i in comp:
-            params = TRANSPORT_ELEMENTS[element]
-            Z = REAL(params["Z"])
-            J = REAL(params["J_keV"])
-            k = REAL(0.731 + 0.0688 * np.log10(float(Z)))
-            coeff = REAL((n_i / 0.602214076) * float(Z))
-            total += coeff * xp.log(REAL(1.166) * (E + k * J) / J)
-        layer_stopping = REAL(7.85e-4) * total / E
-        stopping = xp.where(layer_index == index, layer_stopping, stopping)
 
-    cutoff_L = (E - REAL(E_cut_keV)) / stopping
+    def _stopping_at(E_eval):
+        """Joy--Luo |dE/ds| [keV/Ang] per row at the given evaluation energy."""
+        stopping = xp.zeros_like(E_eval)
+        for index, comp in enumerate(layer_compositions):
+            total = xp.zeros_like(E_eval)
+            for element, n_i in comp:
+                params = TRANSPORT_ELEMENTS[element]
+                Z = REAL(params["Z"])
+                J = REAL(params["J_keV"])
+                k = REAL(0.731 + 0.0688 * np.log10(float(Z)))
+                coeff = REAL((n_i / 0.602214076) * float(Z))
+                total += coeff * xp.log(REAL(1.166) * (E_eval + k * J) / J)
+            layer_stopping = REAL(7.85e-4) * total / E_eval
+            stopping = xp.where(layer_index == index, layer_stopping, stopping)
+        return stopping
+
+    midpoint_rows = "E_end_keV" in out and "E_repr_keV" in out
+    E_cut = REAL(E_cut_keV)
+    if midpoint_rows:
+        E_repr_cut = REAL(0.5) * (E + E_cut)
+        cutoff_L = (E - E_cut) / _stopping_at(E_repr_cut)
+    else:
+        cutoff_L = (E - E_cut) / _stopping_at(E)
     new_L = xp.minimum(old_L, xp.maximum(REAL(0.0), cutoff_L))
     direction = xp.asarray(out["v_hat"], dtype=REAL)
     old_mid = xp.asarray(out["r_mid"], dtype=REAL)
     start = old_mid - REAL(0.5) * old_L[:, None] * direction
     out["L_ang"] = new_L
     out["r_mid"] = start + REAL(0.5) * new_L[:, None] * direction
-    # A clipped flight is a shorter flight, so the transported end state no
-    # longer describes it. Drop it rather than hand on a stale value; the
-    # left-endpoint clip rule cannot reconstruct a midpoint-integrated end.
-    out.pop("E_end_keV", None)
-    out.pop("t_end_ang", None)
+    if midpoint_rows:
+        # A clipped flight is a shorter flight, so the transported end state no
+        # longer describes it -- but the clip rule above is the transport core's
+        # own cutoff solve, whose end state is E_cut by construction.
+        shortened = new_L < old_L
+        out["E_end_keV"] = xp.where(shortened, E_cut, xp.asarray(out["E_end_keV"], dtype=REAL))
+        out["E_repr_keV"] = xp.where(
+            shortened, E_repr_cut, xp.asarray(out["E_repr_keV"], dtype=REAL)
+        )
+        if "t_end_ang" in out:
+            t_start = xp.asarray(out["t_start_ang"], dtype=REAL)
+            t_end_clipped = t_start + new_L / beta_from_keV(E_repr_cut)
+            out["t_end_ang"] = xp.where(
+                shortened, t_end_clipped, xp.asarray(out["t_end_ang"], dtype=REAL)
+            )
     return out
 
 
@@ -650,6 +677,24 @@ def _segment_escape_distance(segments, n_hat, *, xp):
         xp=xp,
     )
     return distance
+
+
+def _flight_blocks(bounds, chunk):
+    """Split flight groups into row blocks of at most ``chunk`` rows.
+
+    ``bounds`` holds the group start offsets plus the total row count. Yields
+    ``(first_group, last_group_exclusive)`` pairs whose row spans never split a
+    group, which is what keeps a flight's substeps inside one coherent sum. A
+    single group larger than ``chunk`` is emitted whole rather than split.
+    """
+    n_groups = bounds.size - 1
+    ka = 0
+    for kb in range(1, n_groups + 1):
+        if bounds[kb] - bounds[ka] >= chunk:
+            yield ka, kb
+            ka = kb
+    if ka < n_groups:
+        yield ka, n_groups
 
 
 def mc_spectrum(
@@ -941,7 +986,16 @@ def mc_spectrum(
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
     spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
 
-    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)
+    # Every per-row emission coefficient is evaluated at ONE energy along the
+    # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
+    # own representative energy, so the row becomes a midpoint evaluation of its
+    # emission integral rather than a left-endpoint one; the resulting t_L =
+    # L/beta(E_repr) is then exactly the transported flight duration
+    # ``t_end - t_start``, and ``t_ang + t_L/2`` exactly its midpoint age.
+    # Frozen rows carry no representative energy and stay bit-for-bit.
+    # Validation: substep-radiation-invariance
+    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    seg_E = xp.asarray(segments[E_field], dtype=REAL)
     seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
@@ -949,6 +1003,53 @@ def mc_spectrum(
     line_electron = seg_elec_id < Ne
     beta_all = beta_from_keV(seg_E)  # speed/c per segment
     v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
+
+    # Physical-flight grouping for the DEFAULT (incoherent) reduction. Numerical
+    # substeps of one flight are integration detail: summing |A_j Q_j|^2 over
+    # them treats each as an independent emitter and divides the line peak by
+    # the substep count (each row carries (t_L/N)^2 where the flight carries
+    # t_L^2), so a tighter energy tolerance would silently destroy the line.
+    # Rows of one flight therefore add COHERENTLY and only whole flights add
+    # incoherently. A group starts wherever the ``(electron_id, flight_id)`` key
+    # changes between adjacent rows -- transport emits a flight's substeps
+    # contiguously and every row transform preserves order.
+    # Validation: substep-radiation-invariance
+    gid_all = None
+    grouped = False
+    if not coherent and segments.get("flight_id") is not None and seg_E.size:
+        flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
+        electron_key = _to_cpu(xp.asarray(segments["elec_id"]))
+        new_group = np.empty(flight_key.size, dtype=bool)
+        new_group[0] = True
+        new_group[1:] = (flight_key[1:] != flight_key[:-1]) | (
+            electron_key[1:] != electron_key[:-1]
+        )
+        # All-singleton groups are the one-row-per-flight case, whose grouped
+        # reduction is algebraically the incoherent one; keep the proven path.
+        grouped = not bool(new_group.all())
+        if grouped:
+            gid_all = np.cumsum(new_group) - 1
+    if grouped and getattr(xp, "__name__", "") != "numpy":
+        raise ValueError(
+            "flight-grouped incoherent CXR is host-only: the segmented complex "
+            "reduction over numerical substeps has no device port yet. Run the "
+            "spectrum on the NumPy backend, or transport without max_dE_frac."
+        )
+    if grouped and refractive and layers is not None:
+        # Same unmodelled per-layer delta as the coherent path: the grouped
+        # reduction carries the dispersive propagation phase too.
+        raise NotImplementedError(
+            "xray_dispersion='refractive' does not cover numerical substeps "
+            "through a LAYERED absorber: the intra-flight coherent sum needs "
+            "the per-layer dispersive propagation phase, which is not modelled."
+        )
+    if grouped and components:
+        raise ValueError(
+            "components=True is incompatible with numerical substeps: the "
+            "PXR/CBS split is ambiguous once a flight's substep fields add "
+            "coherently (the A_PXR*A_CBS cross term survives). Request the "
+            "total, or transport without max_dE_frac."
+        )
 
     # chi_g / U_g are smooth in energy AWAY from absorption edges, so evaluate
     # them on a tabulation grid and interpolate at the per-segment resonance
@@ -1005,8 +1106,9 @@ def mc_spectrum(
     # both coherent reduction routes. Validation: coherent-segment-midpoint-time.
     # Each reflection adds its spatial susceptibility phase -g.r_j inside
     # _accumulate. All-zero t0_ang leaves the physical trajectory phase.
-    # Inert unless coherent=True.
-    if coherent:
+    # Inert unless a complex per-row field is actually reduced, i.e. under
+    # coherent=True or the flight-grouped incoherent path.
+    if coherent or grouped:
         cdtype = xp.result_type(REAL, 1j)
         seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
         seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
@@ -1138,10 +1240,10 @@ def mc_spectrum(
         pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
         for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
             v_dot_e = _matvec3(v, e_d)
-            if coherent:
-                # Complex amplitudes retained verbatim -- the coherent path sums
-                # phased fields, so it keeps the un-reassociated expression and
-                # its goldens are unaffected.
+            if coherent or grouped:
+                # Complex amplitudes retained verbatim -- the phased-field paths
+                # (global-coherent and flight-grouped) keep the un-reassociated
+                # expression and their goldens are unaffected.
                 A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
                 braced_ge = g_dot_e - vdg * v_dot_e
                 braced_kg = k_dot_g - k_dot_v * vdg
@@ -1210,6 +1312,43 @@ def mc_spectrum(
             else:
                 tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
         T_abs = xp.exp(-tau)
+
+        # -- 7b. flight-grouped incoherent accumulation ---------------------------
+        # The same complex per-row field the coherent path builds, but reduced
+        # per PHYSICAL FLIGHT: substeps of one flight add coherently, whole
+        # flights add incoherently. At frozen energy and clock this is an exact
+        # algebraic identity with the unsplit row (the substep sinc times the
+        # Dirichlet sum over substep offsets rebuilds the parent's
+        # ``t_L sinc(P t_L / pi)``), so refining the energy tolerance changes
+        # only the quadrature of the energy sweep along the flight -- which is
+        # the point -- and not the number of independent emitters.
+        if gid_all is not None:  # i.e. ``grouped``, narrowed for the gather below
+            amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
+            a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+            d = d_all[idx]
+            g_phase = _matvec3(seg_r[idx], g_vec_d)
+            coefs = [(amp * t_L) * A_e for A_e in pol_A]
+            good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+            sel = np.flatnonzero(good)
+            if sel.size == 0:
+                return
+            gid = gid_all[idx[sel]]
+            starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
+            bounds = np.append(starts, sel.size)
+            for ka, kb in _flight_blocks(bounds, chunk):
+                rows = sel[bounds[ka] : bounds[kb]]
+                x = a_width[rows][:, None] * (E_grid[None, :] - E_r[rows][:, None]) / xp.pi
+                arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
+                if delta_omega_grid is not None:
+                    arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
+                SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
+                # Blocks break only on flight boundaries, so no flight is split
+                # across two reductions and squared twice.
+                offsets = bounds[ka:kb] - bounds[ka]
+                for c in coefs:
+                    field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                    spec[:] += (xp.abs(field) ** 2).sum(axis=0) * wm
+            return
 
         # -- 7c. coherent (phased) accumulation -----------------------------------
         # Build the complex field per polarization within THIS reflection and
@@ -1380,7 +1519,16 @@ def mc_spectrum(
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
-    if (coherent and sinc_cutoff is not None) or groove is not None or layers is not None:
+    # The flight-grouped reduction lives on the per-hkl loop only: its segmented
+    # complex sum has no batched or device counterpart yet (slice H owns those
+    # ports), and correctness of the default incoherent yield outranks the
+    # batched path's launch-count win on the substepped configuration.
+    if (
+        (coherent and sinc_cutoff is not None)
+        or groove is not None
+        or layers is not None
+        or grouped
+    ):
         # Stacking prologue: every host->device transfer this path needs is done
         # ONCE per case here, not once per (reflection, orientation) inside the
         # loop. Previously each pass re-uploaded the four chi/U tabulations plus

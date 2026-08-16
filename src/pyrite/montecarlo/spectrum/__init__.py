@@ -20,6 +20,7 @@ from .diagnostics import (
     DEFAULT_RESONANCE_DRIFT_WARN,
     brem_endpoint_quadrature_error,
     cxr_endpoint_resonance_drift,
+    subdivide_flights,
 )
 from .lines import (
     REAL,
@@ -65,6 +66,7 @@ for _function in (
     mc_brem_spectrum,
     mc_spectrum,
     mc_spectrum_solid_angle,
+    subdivide_flights,
 ):
     _function.__module__ = __name__
 

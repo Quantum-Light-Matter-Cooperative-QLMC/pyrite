@@ -37,7 +37,7 @@ from ...materials.crystal import HBARC_EV_ANG
 from .._backend import _to_cpu
 from ..transport import TRANSPORT_ELEMENTS, _percentile_summary, beta_from_keV
 from .brem import _brem_dsigma_dk
-from .lines import _observation_direction
+from .lines import _SEG_ARRAYS, _observation_direction
 
 # Measured calibration defaults; see the validation doc named above. Drift is
 # in units of the flight's sinc half-width to its first zero; the brem error
@@ -92,6 +92,152 @@ def _flight_E_end_keV(segments, composition, layers):
         mask = layer_index == index
         E_end[mask] = E_start[mask] + _stopping_keV_per_ang(E_start[mask], comp) * length[mask]
     return E_end
+
+
+def subdivide_flights(segments, composition=None, layers=None, max_dE_frac=0.0, max_substeps=64):
+    """Split each physical flight into numerical substeps at fixed geometry.
+
+    The instrument for the substep-invariance contract: a physical flight is a
+    straight constant-direction ray, so a substep's midpoint and length follow
+    exactly from its parent's without any transport state. Only the numerical
+    sampling of the energy and clock along the flight refines. That is what
+    separates this from re-running transport at a tighter ``max_dE_frac``, which
+    also moves the sampled collision points and so decorrelates the trajectories
+    (``docs/validation/beam-transport/energy-controlled-propagation.md``).
+
+    Each substep chain reproduces the lockstep core's midpoint rule: predictor-
+    corrector ``E_end = E_start + (dE/ds)((E_start + E_end)/2) ds`` and clock
+    ``ds / beta(E_repr)``, so the emitted rows carry the same
+    ``E_start_keV``/``E_end_keV``/``E_repr_keV``/``t_start_ang``/``t_end_ang``
+    schema an energy-controlled transport run would have produced for the same
+    flights.
+
+    ``max_dE_frac=0.0`` returns one row per flight, i.e. the caller's input
+    row set with a rebuilt (and identical) end state. Substep counts are
+    ``ceil(|dE|/E / max_dE_frac)`` per flight, clipped at ``max_substeps``, and
+    substeps are equal in LENGTH rather than in energy loss -- a uniform
+    refinement of the same integral, not a replay of the core's step control.
+
+    Returns ``(rows, parent)`` where ``parent[i]`` is the input row index that
+    emitted output row ``i``.
+
+    Validation: substep-radiation-invariance
+    """
+    if max_dE_frac < 0.0:
+        raise ValueError("max_dE_frac must be >= 0")
+    if max_substeps < 1:
+        raise ValueError("max_substeps must be >= 1")
+    compositions = [composition] if layers is None else [item[2] for item in layers]
+    if compositions[0] is None:
+        raise ValueError("pass composition (or layers) so the substep chain can be integrated")
+
+    E_start = _host(segments["E_keV"]).astype(float, copy=False)
+    length = _host(segments["L_ang"]).astype(float, copy=False)
+    v_hat = _host(segments["v_hat"]).astype(float, copy=False)
+    r_mid = _host(segments["r_mid"]).astype(float, copy=False)
+    t_start = _host(segments["t_ang"]).astype(float, copy=False)
+    layer_index = _host(segments["layer"]).astype(np.int64, copy=False)
+    n_rows = E_start.size
+
+    def _stopping(E_keV, rows):
+        """Layer-resolved Joy--Luo stopping for the given row selection."""
+        if layers is None:
+            return _stopping_keV_per_ang(E_keV, compositions[0])
+        out = np.empty_like(E_keV)
+        for index, comp in enumerate(compositions):
+            mask = layer_index[rows] == index
+            if mask.any():
+                out[mask] = _stopping_keV_per_ang(E_keV[mask], comp)
+        return out
+
+    all_rows = np.arange(n_rows)
+    if max_dE_frac == 0.0:
+        n_sub = np.ones(n_rows, dtype=np.int64)
+    else:
+        loss = np.maximum(0.0, -_stopping(E_start, all_rows) * length / E_start)
+        n_sub = np.minimum(
+            np.maximum(1.0, np.ceil(loss / max_dE_frac)), float(max_substeps)
+        ).astype(np.int64)
+
+    offsets = np.concatenate(([0], np.cumsum(n_sub)[:-1]))
+    total = int(n_sub.sum())
+    parent = np.repeat(all_rows, n_sub)
+    within = np.arange(total) - np.repeat(offsets, n_sub)
+
+    step_len = length / n_sub
+    r_entry = r_mid - 0.5 * length[:, None] * v_hat
+    sub_r_mid = r_entry[parent] + v_hat[parent] * ((within + 0.5) * step_len[parent])[:, None]
+
+    sub_E_start = np.empty(total)
+    sub_E_end = np.empty(total)
+    sub_t_start = np.empty(total)
+    sub_t_end = np.empty(total)
+    E_cur = E_start.copy()
+    t_cur = t_start.copy()
+    for k in range(int(n_sub.max()) if n_rows else 0):
+        active = np.nonzero(n_sub > k)[0]
+        slot = offsets[active] + k
+        E_here = E_cur[active]
+        ds = step_len[active]
+        E_pred = E_here + _stopping(E_here, active) * ds
+        E_next = E_here + _stopping(0.5 * (E_here + E_pred), active) * ds
+        E_repr = 0.5 * (E_here + E_next)
+        sub_E_start[slot] = E_here
+        sub_E_end[slot] = E_next
+        sub_t_start[slot] = t_cur[active]
+        t_cur[active] += ds / beta_from_keV(E_repr)
+        sub_t_end[slot] = t_cur[active]
+        E_cur[active] = E_next
+
+    flight_id = (
+        _host(segments["flight_id"]).astype(np.int64, copy=False)
+        if segments.get("flight_id") is not None
+        else _flight_index_within_electron(_host(segments["elec_id"]))
+    )
+    elec_id = _host(segments["elec_id"]).astype(np.int64, copy=False)
+    # Every per-row array is rebuilt; scalars and per-electron arrays pass
+    # through. A parent-length row array left in place would survive a row mask
+    # at the wrong length and silently desynchronize.
+    out = {key: value for key, value in segments.items() if key not in _SEG_ARRAYS}
+    out.update(
+        {
+            "r_mid": sub_r_mid,
+            "v_hat": v_hat[parent],
+            "L_ang": step_len[parent],
+            "E_keV": sub_E_start,
+            "E_start_keV": sub_E_start,
+            "E_end_keV": sub_E_end,
+            "E_repr_keV": 0.5 * (sub_E_start + sub_E_end),
+            "t_ang": sub_t_start,
+            "t_start_ang": sub_t_start,
+            "t_end_ang": sub_t_end,
+            "t0_ang": _host(segments["t0_ang"]).astype(float, copy=False)[parent],
+            "elec_id": elec_id[parent],
+            "electron_id": elec_id[parent],
+            "flight_id": flight_id[parent],
+            "substep_id": within,
+            "layer": layer_index[parent],
+        }
+    )
+    return out, parent
+
+
+def _flight_index_within_electron(elec_id):
+    """Zero-based monotonic flight index per electron for unlabelled rows.
+
+    Transport emits rows grouped by electron and ordered along each trajectory,
+    which is the ordering this reproduces. Only used when the producer predates
+    ``flight_id`` -- an energy-controlled run supplies its own.
+    """
+    elec_id = np.asarray(elec_id).astype(np.int64, copy=False)
+    index = np.zeros(elec_id.size, dtype=np.int64)
+    if elec_id.size:
+        new_electron = np.empty(elec_id.size, dtype=bool)
+        new_electron[0] = True
+        new_electron[1:] = elec_id[1:] != elec_id[:-1]
+        run_start = np.maximum.accumulate(np.where(new_electron, np.arange(elec_id.size), 0))
+        index = np.arange(elec_id.size) - run_start
+    return index
 
 
 def cxr_endpoint_resonance_drift(

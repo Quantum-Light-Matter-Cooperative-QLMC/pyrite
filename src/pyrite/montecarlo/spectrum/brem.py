@@ -168,9 +168,12 @@ def mc_brem_spectrum(
     """
     Incoherent bremsstrahlung background d2N/dE dOmega
     [photons / eV / sr / electron] from the same Monte Carlo segments as
-    mc_spectrum: each segment radiates n * dsigma/dk * L_seg photons/eV at
-    its (start) kinetic energy, attenuated by the Beer-Lambert escape factor
-    from the segment midpoint along the observation direction.
+    mc_spectrum: each segment radiates n * dsigma/dk * L_seg photons/eV at its
+    representative kinetic energy, attenuated by the Beer-Lambert escape factor
+    from the segment midpoint along the observation direction. Under
+    ``energy_model="midpoint"`` that representative energy is the transported
+    ``E_repr_keV`` (the flight's midpoint energy), making each row a midpoint
+    quadrature of its own path integral; frozen rows use the start energy.
 
     Approximations: emission taken isotropic (1/4pi) -- the standard
     assumption at weakly relativistic energies once electron directions are
@@ -248,7 +251,16 @@ def mc_brem_spectrum(
 
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_idx]
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_idx]
-    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)[brem_idx]
+    # The row's path integral is a one-point quadrature of n * dsigma/dk(E(s))
+    # over its length, so evaluate it at the propagator's representative energy
+    # when transport supplied one. That makes an unsplit flight a midpoint rule
+    # (second order in its length) instead of a left-endpoint rule (first
+    # order), which is what makes the yield insensitive to how many numerical
+    # substeps the flight was integrated in. Frozen rows carry no representative
+    # energy and keep the historical start-energy evaluation bit-for-bit.
+    # Validation: substep-radiation-invariance
+    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    seg_E = xp.asarray(segments[E_field], dtype=REAL)[brem_idx]
 
     z_mid = seg_r[:, 2]
     finite_footprint = (

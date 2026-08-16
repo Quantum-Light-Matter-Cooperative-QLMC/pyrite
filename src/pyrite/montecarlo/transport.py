@@ -3242,9 +3242,12 @@ def simulate_trajectories(
           rule ``E_end = E_start + (dE/ds)((E_start + E_end)/2) * s``, with the
           transport clock advanced by ``s / beta((E_start + E_end)/2)`` and the
           cutoff truncation distance solved for ``E_end == E_cut``. Adds
-          ``E_end_keV`` and ``t_end_ang`` to the returned rows and leaves one
-          radiating row per physical flight. Elastic hazard stays frozen at the
-          start energy; only stopping and the clock are controlled here.
+          ``E_end_keV``, ``t_end_ang``, and ``E_repr_keV`` to the returned rows
+          and leaves one radiating row per physical flight. ``E_repr_keV`` is
+          the rule's own representative energy ``(E_start + E_end)/2``, the
+          energy at which radiation kernels evaluate the row. Elastic hazard
+          stays frozen at the start energy; only stopping and the clock are
+          controlled here.
           Currently implemented for the ungrooved lockstep core only -- any
           other core or a grooved run raises rather than returning the frozen
           schema under a midpoint request.
@@ -3291,7 +3294,8 @@ def simulate_trajectories(
       "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
       "layer" (M,) [emitting layer index]
     with "E_start_keV"/"t_start_ang" as the canonical spellings of "E_keV"/
-    "t_ang", plus "E_end_keV" (M,) and "t_end_ang" (M,) under
+    "t_ang", plus "E_end_keV" (M,), "t_end_ang" (M,), and the propagator's
+    representative energy "E_repr_keV" (M,) = (E_start + E_end)/2 under
     energy_model="midpoint"
     incident phase-space diagnostics (one row per sampled electron, including
     missed entries): "initial_r_ang" (Ne,3), "initial_v_hat" (Ne,3),
@@ -4045,6 +4049,10 @@ def simulate_trajectories(
     if energy_model == "midpoint":
         result["E_end_keV"] = seg_E_end[:nseg]
         result["t_end_ang"] = seg_t_end[:nseg]
+        # The propagator's own representative energy: the implicit midpoint rule
+        # evaluates stopping and beta at (E_start + E_end)/2, so radiation and
+        # quadrature consumers read that value instead of re-deriving one.
+        result["E_repr_keV"] = 0.5 * (E_seg + seg_E_end[:nseg])
         # `(electron_id, flight_id)` is the stable physical key; `substep_id`
         # indexes numerical rows inside one flight and is integration detail.
         result["flight_id"] = seg_flight[:nseg]
