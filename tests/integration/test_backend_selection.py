@@ -5,6 +5,7 @@ import types
 import numpy as np
 import pytest
 
+from pyrite._compat import env_value
 from pyrite.montecarlo import _backend, runner
 from pyrite.montecarlo._resources import GIB, admitted_chunk, resolve_resource_policy
 
@@ -443,8 +444,8 @@ pytestmark = [
 
 
 @pytest.mark.skipif(
-    os.environ.get("CXR_RUN_INTEL_SYCL_TESTS") != "1",
-    reason="set CXR_RUN_INTEL_SYCL_TESTS=1 to run Intel SYCL hardware tests",
+    env_value("CXR_RUN_INTEL_SYCL_TESTS") != "1",
+    reason="set PYRITE_RUN_INTEL_SYCL_TESTS=1 to run Intel SYCL hardware tests",
 )
 def test_intel_machine_selects_sycl_backend() -> None:
     script = textwrap.dedent(
@@ -469,9 +470,15 @@ def test_intel_machine_selects_sycl_backend() -> None:
         """
     )
 
+    # Drop the test session's CPU pin so the subprocess exercises the real
+    # auto-selection probe against the machine's hardware.
+    env = os.environ.copy()
+    env.pop("PYRITE_MC_BACKEND", None)
+    env.pop("CXR_MC_BACKEND", None)
+
     result = subprocess.run(
         [sys.executable, "-c", script],
-        env=os.environ.copy(),
+        env=env,
         capture_output=True,
         text=True,
         check=False,
