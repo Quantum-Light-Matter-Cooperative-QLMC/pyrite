@@ -241,9 +241,7 @@ def test_resume_loading_preserves_previous_progress_counts(monkeypatch, tmp_path
     snapshots = []
 
     def fake_run_sweep(*_args, **kwargs):
-        kwargs["on_activity"](
-            {"phase": "loading", "case": None, "in_flight_case_count": 0}
-        )
+        kwargs["on_activity"]({"phase": "loading", "case": None, "in_flight_case_count": 0})
         snapshots.append(json.loads(progress.read_text()))
         return False
 

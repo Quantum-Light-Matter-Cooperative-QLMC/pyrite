@@ -758,8 +758,10 @@ def run_sweep(
             )
         requested_proof = _case_set_proof_from_cases(cases)
         signature = _checkpoint_signature(checkpoint_path)
-        manifest_fresh = bool(signature) and os.path.isfile(manifest_path) and (
-            os.stat(manifest_path).st_mtime_ns >= max(item[1] for item in signature)
+        manifest_fresh = (
+            bool(signature)
+            and os.path.isfile(manifest_path)
+            and (os.stat(manifest_path).st_mtime_ns >= max(item[1] for item in signature))
         )
         if (
             metadata_only_complete
@@ -779,9 +781,7 @@ def run_sweep(
                 if on_runtime is not None:
                     on_runtime(runner.runtime_plan([], max_workers))
                 total_cost = (
-                    sum(case_cost_fn(case) for case in cases)
-                    if case_cost_fn is not None
-                    else None
+                    sum(case_cost_fn(case) for case in cases) if case_cost_fn is not None else None
                 )
                 if on_cost is not None and total_cost is not None:
                     on_cost(total_cost, total_cost)

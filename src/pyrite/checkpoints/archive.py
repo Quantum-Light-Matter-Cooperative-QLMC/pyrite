@@ -177,8 +177,7 @@ def list_archives(root=DEFAULT_ROOT):
         {
             entry.name
             for entry in Path(adir).iterdir()
-            if entry.is_dir()
-            and _checkpoint_store.checkpoint_exists(entry.name, Path(adir))
+            if entry.is_dir() and _checkpoint_store.checkpoint_exists(entry.name, Path(adir))
         }
         | {entry.stem for entry in Path(adir).glob("*.pkl")}
     )

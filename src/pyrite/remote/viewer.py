@@ -469,9 +469,7 @@ def _live_status(jobid, detail):
             f"  Logs     pyrite job logs {jobid}"
         )
         return False
-    print(
-        f"\nJOB {jobid} · FINISHED\n  State   {state_}\n  Inspect pyrite job status {jobid} -vv"
-    )
+    print(f"\nJOB {jobid} · FINISHED\n  State   {state_}\n  Inspect pyrite job status {jobid} -vv")
     return True
 
 

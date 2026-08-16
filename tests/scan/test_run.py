@@ -595,9 +595,7 @@ def test_checkpoint_manifest_prefers_component_store_over_stale_legacy_pkl(tmp_p
     `_manifest_path_for` has to recognize `line.h5`, not just `line.pkl`, as
     "already migrated", or it reads/writes the wrong (legacy) sidecar and
     stale results win."""
-    legacy_results = {
-        "cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}
-    }
+    legacy_results = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
     pkl = tmp_path / "hopg.pkl"
     with open(pkl, "wb") as f:
         pickle.dump(legacy_results, f)
@@ -921,7 +919,10 @@ def test_checkpoint_shards_win_over_stale_monolith(tmp_path):
         {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([9.0])}},
     )
     _checkpoint_store.save_part(
-        "hopg", tmp_path, "cfg_b", {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}}
+        "hopg",
+        tmp_path,
+        "cfg_b",
+        {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}},
     )
     loaded = _checkpoint_load(str(tmp_path / "hopg"))
     assert np.array_equal(loaded["cfg_a"][30.0]["spec"], np.array([9.0]))

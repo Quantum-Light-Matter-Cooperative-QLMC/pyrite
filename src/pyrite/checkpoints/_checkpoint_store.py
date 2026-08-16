@@ -199,7 +199,10 @@ def save(
     if old.is_file():
         legacy = None
         for component in COMPONENTS:
-            if component not in components and not component_read_path(stem, component, root).is_file():
+            if (
+                component not in components
+                and not component_read_path(stem, component, root).is_file()
+            ):
                 legacy = _checkpoint_io.load(str(old)) if legacy is None else legacy
                 _atomic_dump(
                     component_path(stem, component, root),

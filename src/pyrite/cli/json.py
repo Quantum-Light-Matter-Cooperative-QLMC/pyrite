@@ -444,8 +444,7 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
             [
                 path
                 for path in archive_dir.iterdir()
-                if path.is_dir()
-                and ((path / "line.h5").is_file() or (path / "line.pkl").is_file())
+                if path.is_dir() and ((path / "line.h5").is_file() or (path / "line.pkl").is_file())
             ],
             key=lambda path: path.name,
         )

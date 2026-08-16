@@ -3847,7 +3847,7 @@ def test_clear_profile_previews_partial_previous_identity_directory(monkeypatch,
 
     lifecycle.clear_remote(["hopg", "hbn"], catalog_profile="hopg_hbn")
 
-    assert f'for stem in {old}' in commands[-1]
+    assert f"for stem in {old}" in commands[-1]
     assert f"checkpoints/{old}/" in capsys.readouterr().out
 
 
@@ -3984,9 +3984,7 @@ def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
     assert "would prune remote" in capsys.readouterr().out
 
 
-def test_prune_remote_reserves_previous_profile_identity_for_reclamation(
-    monkeypatch, capsys
-):
+def test_prune_remote_reserves_previous_profile_identity_for_reclamation(monkeypatch, capsys):
     current = type(
         "Target",
         (),
@@ -4032,8 +4030,7 @@ def test_prune_remote_obsolete_only_confirmation_reuses_exact_selection(monkeypa
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda command: commands.append(command)
-        or "would delete obsolete profile checkpoint",
+        lambda command: commands.append(command) or "would delete obsolete profile checkpoint",
     )
     monkeypatch.setattr(lifecycle._cli_core, "confirm_destructive", lambda *_args: True)
 

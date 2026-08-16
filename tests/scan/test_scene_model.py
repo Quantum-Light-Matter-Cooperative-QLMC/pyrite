@@ -55,9 +55,7 @@ def test_path_axes_expand_nested_and_indexed_fields_mechanically() -> None:
         2_850.0,
         5_000.0,
     ]
-    assert expanded[-1][0] == (
-        "beam.energy_keV=45 target.layers[1].thickness_ang=5000"
-    )
+    assert expanded[-1][0] == ("beam.energy_keV=45 target.layers[1].thickness_ang=5000")
 
 
 @pytest.mark.parametrize(

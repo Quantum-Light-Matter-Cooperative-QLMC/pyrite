@@ -422,7 +422,9 @@ def _format_case_progress(records, materials=()):
             label += " [CPU]"
         labels[key] = label
     label_width = max(len("MATERIAL"), *(len(label) for label in labels.values()))
-    lines = [f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    ACTIVITY / NOW TESTING"]
+    lines = [
+        f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    ACTIVITY / NOW TESTING"
+    ]
     for material in order:
         record = records[material]
         completed = record["cached_cases"] + record["completed_new_cases"]
@@ -443,7 +445,11 @@ def _format_case_progress(records, materials=()):
             "saving": "saving checkpoint",
             "handoff": "handoff",
         }.get(activity, "")
-        tail = activity_label or now or f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
+        tail = (
+            activity_label
+            or now
+            or f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
+        )
         lines.append(
             f"  {labels[material]:<{label_width}}  {accent}  "
             f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  {tail}"

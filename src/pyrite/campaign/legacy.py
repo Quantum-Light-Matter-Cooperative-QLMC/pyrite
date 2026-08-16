@@ -53,9 +53,7 @@ def sweep_from_legacy(old_sweep: Any, settings: Any) -> Sweep:
         layers = list(target.layers)
         layers[0] = replace(
             layers[0],
-            thickness_ang=_axis(
-                axes, "target.layers[0].thickness_ang", layers[0].thickness_ang
-            ),
+            thickness_ang=_axis(axes, "target.layers[0].thickness_ang", layers[0].thickness_ang),
         )
         footprint = target.footprint
         footprint_values = None

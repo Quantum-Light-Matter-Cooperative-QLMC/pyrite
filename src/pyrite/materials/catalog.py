@@ -133,9 +133,7 @@ class MaterialConfigError(ValueError):
         self.errors = tuple(errors)
         super().__init__(
             "invalid material catalog:\n"
-            + "\n".join(
-                f"- {e}" for e in _grouped_error_lines(self.errors, profile=profile)
-            )
+            + "\n".join(f"- {e}" for e in _grouped_error_lines(self.errors, profile=profile))
         )
 
 
@@ -1348,9 +1346,7 @@ def _parse_materials(
         override: Mapping[str, object] = (
             cast(Mapping[str, object], override_raw) if isinstance(override_raw, Mapping) else {}
         )
-        values = {
-            name: resolving_profile[name] for name in _SCAN_KEYS if name in resolving_profile
-        }
+        values = {name: resolving_profile[name] for name in _SCAN_KEYS if name in resolving_profile}
         if "thickness_ang" in override or "thickness_layers" in override:
             values.pop("thickness_ang", None)
             values.pop("thickness_layers", None)

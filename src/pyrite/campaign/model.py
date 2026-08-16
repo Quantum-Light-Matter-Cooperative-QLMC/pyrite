@@ -183,14 +183,19 @@ def _parts(path: str) -> tuple[tuple[str, tuple[int, ...]], ...]:
         if match is None:
             raise ValueError(f"invalid axis path {path!r}: malformed segment {raw!r}")
         parts.append(
-            (match.group("name"), tuple(int(value) for value in _INDEX.findall(match.group("indexes"))))
+            (
+                match.group("name"),
+                tuple(int(value) for value in _INDEX.findall(match.group("indexes"))),
+            )
         )
     return tuple(parts)
 
 
 def _descend(value: Any, name: str, indexes: tuple[int, ...], path: str) -> Any:
     if not hasattr(value, name):
-        raise ValueError(f"invalid axis path {path!r}: {type(value).__name__} has no field {name!r}")
+        raise ValueError(
+            f"invalid axis path {path!r}: {type(value).__name__} has no field {name!r}"
+        )
     child = getattr(value, name)
     for index in indexes:
         if not isinstance(child, Sequence) or isinstance(child, (str, bytes)):
@@ -214,7 +219,9 @@ def _replace_indexes(container: Any, indexes: tuple[int, ...], leaf: Any, path: 
     return tuple(values) if isinstance(container, tuple) else values
 
 
-def _replace_path(value: Any, parts: tuple[tuple[str, tuple[int, ...]], ...], leaf: Any, path: str) -> Any:
+def _replace_path(
+    value: Any, parts: tuple[tuple[str, tuple[int, ...]], ...], leaf: Any, path: str
+) -> Any:
     name, indexes = parts[0]
     child = _descend(value, name, indexes, path)
     replacement = leaf if len(parts) == 1 else _replace_path(child, parts[1:], leaf, path)
@@ -271,7 +278,14 @@ class Sweep:
             scene = self.base
             for path, value in zip(paths, values, strict=True):
                 scene = _replace_path(scene, _parts(path), value, path)
-            expanded.append((" ".join(_axis_label(path, value) for path, value in zip(paths, values, strict=True)), scene))
+            expanded.append(
+                (
+                    " ".join(
+                        _axis_label(path, value) for path, value in zip(paths, values, strict=True)
+                    ),
+                    scene,
+                )
+            )
         return tuple(expanded)
 
     def cases(self, numerics: Numerics | None = None) -> list[Any]:

@@ -161,9 +161,7 @@ def test_add_file_keeps_named_profile_beam_energies(tmp_path, monkeypatch):
     monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path, **kwargs: None)
 
-    digest = apply.add_file(
-        json_path, catalog_path=toml_path, profile="hopg_hbn"
-    )["hopg"]
+    digest = apply.add_file(json_path, catalog_path=toml_path, profile="hopg_hbn")["hopg"]
     stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
 
     assert stored.identity["beam_energies_keV"] == [30.0, 35.0, 40.0]

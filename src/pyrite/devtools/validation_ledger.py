@@ -57,8 +57,7 @@ def parse_ledger(text: str, part: str = "") -> tuple[LedgerEntry, ...]:
         missing = [name for name in _FIELD_ORDER if name not in fields]
         if missing:
             raise ValueError(
-                f"malformed ledger record for {validation_id}: missing "
-                + ", ".join(missing)
+                f"malformed ledger record for {validation_id}: missing " + ", ".join(missing)
             )
         status = fields["status"]
         if status not in STATUS_ORDER:
@@ -123,13 +122,9 @@ def part_paths(index: Path) -> tuple[Path, ...]:
     missing = [path.name for path in paths if not path.is_file()]
     if missing:
         raise ValueError(f"ledger index lists missing parts: {', '.join(missing)}")
-    unlisted = sorted(
-        path.name for path in index.parent.glob(_PART_GLOB) if path not in set(paths)
-    )
+    unlisted = sorted(path.name for path in index.parent.glob(_PART_GLOB) if path not in set(paths))
     if unlisted:
-        raise ValueError(
-            f"ledger parts missing from the index toctree: {', '.join(unlisted)}"
-        )
+        raise ValueError(f"ledger parts missing from the index toctree: {', '.join(unlisted)}")
     return tuple(paths)
 
 

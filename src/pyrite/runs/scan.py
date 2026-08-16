@@ -672,10 +672,11 @@ def _run_material(args, material, max_seconds=None):
             if (
                 previous.get("material") == material
                 and previous.get("total_cases") == len(cases)
-                and all(isinstance(previous.get(key), int) for key in ("cached_cases", "completed_new_cases"))
-                and 0
-                <= previous["cached_cases"] + previous["completed_new_cases"]
-                <= len(cases)
+                and all(
+                    isinstance(previous.get(key), int)
+                    for key in ("cached_cases", "completed_new_cases")
+                )
+                and 0 <= previous["cached_cases"] + previous["completed_new_cases"] <= len(cases)
             ):
                 latest_progress.update(
                     cached_cases=previous["cached_cases"],
@@ -932,9 +933,7 @@ def _run_material(args, material, max_seconds=None):
                 else None
             ),
             deadline=deadline,
-            max_seconds=(
-                None if deadline is None else max(0.0, deadline - time.monotonic())
-            ),
+            max_seconds=(None if deadline is None else max(0.0, deadline - time.monotonic())),
             dataset_identity=identity,
             case_cost_fn=(
                 case_cost

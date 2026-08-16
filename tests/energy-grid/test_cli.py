@@ -301,10 +301,7 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
 
     assert_clean_result(
         result,
-        stdout=(
-            "pulled bounds.json\n"
-            "installed derived grids for profile hopg_hbn\n"
-        ),
+        stdout=("pulled bounds.json\ninstalled derived grids for profile hopg_hbn\n"),
     )
     assert seen["host"] == "box-a"
     assert seen["brem_step"] == 12.5
@@ -451,9 +448,7 @@ def test_click_apply_alias_adds_artifact_without_touching_legacy_payload(tmp_pat
     )
     # BASE_TOML is a single-material stub, so skip the full-catalog re-parse the
     # way the other add_file tests do; production still validates the real one.
-    monkeypatch.setattr(
-        energy_grid.apply, "load_material_catalog", lambda path, **kwargs: None
-    )
+    monkeypatch.setattr(energy_grid.apply, "load_material_catalog", lambda path, **kwargs: None)
 
     result = _invoke_grid(["apply", str(json_path)])
 
