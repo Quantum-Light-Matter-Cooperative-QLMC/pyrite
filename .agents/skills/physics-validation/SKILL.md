@@ -28,7 +28,9 @@ contract and report format. That document is the canonical specification.
 
 ## Repository anchors
 
-- Ledger: `docs/validation/physics-validation-ledger.md`
+- Ledger: `docs/validation/physics-validation-ledger.md` (index) with one
+  domain part per `docs/validation/ledger-*.md`; edit the part, then run
+  `uv run pyrite-dev validation-ledger --write`
 - Derivations: ledgered `docs/validation/<domain>/<id>.md`
 - Fast anchors: `tests/`
 - Heavier or external comparisons: `checks/`

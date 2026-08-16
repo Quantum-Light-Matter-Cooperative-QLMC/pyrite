@@ -9,9 +9,9 @@ from pyrite.devtools.validation_ledger import parse_ledger, render_status_summar
 
 def test_parser_extracts_domains_and_statuses() -> None:
     entries = parse_ledger(
-        """# Ledger
-## Radiation
-### `line`
+        """# Radiation
+
+## `line`
 
 - **Claim:** `\\|A\\|²`
 - **Code:** `code::line`
@@ -31,7 +31,7 @@ def test_parser_extracts_domains_and_statuses() -> None:
 
 
 def test_parser_rejects_duplicate_ids() -> None:
-    row = """### `same`
+    record = """## `same`
 - **Claim:** claim
 - **Code:** code
 - **Source:** source
@@ -41,12 +41,13 @@ def test_parser_rejects_duplicate_ids() -> None:
 - **Notes:** —
 """
     with pytest.raises(ValueError, match="duplicate validation IDs"):
-        parse_ledger("## One\n" + row + "## Two\n" + row)
+        parse_ledger("# One\n" + record + record)
 
 
 def test_parser_rejects_malformed_records() -> None:
-    record = """## Domain
-### `missing-notes`
+    record = """# Domain
+
+## `missing-notes`
 - **Claim:** claim
 - **Code:** code
 - **Source:** source
@@ -60,8 +61,8 @@ def test_parser_rejects_malformed_records() -> None:
 
 def test_status_summary_is_derived_from_rows() -> None:
     entries = parse_ledger(
-        "## Domain\n"
-        + """### `one`
+        "# Domain\n"
+        + """## `one`
 - **Claim:** claim
 - **Code:** code
 - **Source:** source
@@ -69,7 +70,7 @@ def test_status_summary_is_derived_from_rows() -> None:
 - **Checks:** checks
 - **Anchor:** test
 - **Notes:** note
-### `two`
+## `two`
 - **Claim:** claim
 - **Code:** code
 - **Source:** source
@@ -90,8 +91,28 @@ def test_domain_inventory_links_to_detailed_record() -> None:
     from pyrite.devtools.validation_ledger import render_domain_inventories
 
     entries = parse_ledger(
-        """## Domain
-### `deep-link`
+        """# Domain
+
+## `deep-link`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** filtered
+- **Checks:** checks
+- **Anchor:** test
+- **Notes:** note
+""",
+        part="ledger-domain.md",
+    )
+
+    inventory = render_domain_inventories(entries)
+    assert "(ledger-domain.md#deep-link)" in inventory
+
+
+def _part(domain: str, validation_id: str) -> str:
+    return f"""# {domain}
+
+## `{validation_id}`
 - **Claim:** claim
 - **Code:** code
 - **Source:** source
@@ -100,10 +121,50 @@ def test_domain_inventory_links_to_detailed_record() -> None:
 - **Anchor:** test
 - **Notes:** note
 """
-    )
 
-    inventory = render_domain_inventories(entries)
-    assert "(physics-validation-ledger.md#deep-link)" in inventory
+
+def _write_index(root: Path, *parts: str) -> Path:
+    index = root / "physics-validation-ledger.md"
+    listed = "\n".join(parts)
+    index.write_text(f"# Ledger\n\n```{{toctree}}\n\n{listed}\n```\n", encoding="utf-8")
+    return index
+
+
+def test_parse_ledger_parts_follows_index_order(tmp_path: Path) -> None:
+    from pyrite.devtools.validation_ledger import parse_ledger_parts
+
+    (tmp_path / "ledger-second.md").write_text(_part("Second", "b"), encoding="utf-8")
+    (tmp_path / "ledger-first.md").write_text(_part("First", "a"), encoding="utf-8")
+    index = _write_index(tmp_path, "ledger-second", "ledger-first")
+
+    entries = parse_ledger_parts(index)
+
+    assert [(e.domain, e.validation_id, e.part) for e in entries] == [
+        ("Second", "b", "ledger-second.md"),
+        ("First", "a", "ledger-first.md"),
+    ]
+
+
+def test_parse_ledger_parts_rejects_unlisted_part(tmp_path: Path) -> None:
+    from pyrite.devtools.validation_ledger import parse_ledger_parts
+
+    (tmp_path / "ledger-first.md").write_text(_part("First", "a"), encoding="utf-8")
+    (tmp_path / "ledger-orphan.md").write_text(_part("Orphan", "b"), encoding="utf-8")
+    index = _write_index(tmp_path, "ledger-first")
+
+    with pytest.raises(ValueError, match="missing from the index toctree"):
+        parse_ledger_parts(index)
+
+
+def test_parse_ledger_parts_rejects_ids_duplicated_across_parts(tmp_path: Path) -> None:
+    from pyrite.devtools.validation_ledger import parse_ledger_parts
+
+    (tmp_path / "ledger-first.md").write_text(_part("First", "same"), encoding="utf-8")
+    (tmp_path / "ledger-second.md").write_text(_part("Second", "same"), encoding="utf-8")
+    index = _write_index(tmp_path, "ledger-first", "ledger-second")
+
+    with pytest.raises(ValueError, match="duplicate validation IDs"):
+        parse_ledger_parts(index)
 
 
 def test_checked_in_views_are_current() -> None:

@@ -14,8 +14,9 @@ alone marks `signed-off`). Read-only: report findings, edit nothing.
 
 ## Inputs
 
-- `docs/validation/physics-validation-ledger.md` -- one row per claim: `id`, `code`
-  (`file::symbol` anchors), `status`, `checks`, `anchor` (test), `notes`.
+- `docs/validation/ledger-*.md` -- the ledger parts listed by the index
+  `docs/validation/physics-validation-ledger.md`. One record per claim: `id`,
+  `code` (`file::symbol` anchors), `status`, `checks`, `anchor` (test), `notes`.
 - `docs/validation/methodology.md` -- the status lifecycle and marker convention.
 - In-code `Validation: <id>` markers in derivation docstrings under `src/pyrite/`.
 

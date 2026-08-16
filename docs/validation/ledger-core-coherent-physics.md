@@ -1,0 +1,173 @@
+# Core coherent physics (highest risk — verify first)
+
+Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
+
+## `coherent-line-spectrum`
+
+- **Claim:** `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`
+- **Source:** Feranchuk–Spence 2000 Eq.(10),(12); Zhai 2025
+- **Status:** rederived
+- **Checks:** units; prefactor, squaring, summation order, per-electron normalization, and mosaic weighting reproduced term for term (absolute normalization to `6.7e-10` relative, whose entire budget is the repository's truncated fine-structure literal); incoherence structure confirmed by exact `1/N` subdivision falloff, bitwise reflection additivity, and invariance of the per-electron spectrum under electron replication; mosaic average is a unit-weight Gauss–Hermite intensity average collapsing to the perfect crystal as `η→0`
+- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (not a CI-green regression test on this row's normalization; it compares against `feranchuk_line_flux`, the `discrepancy` `closed-form-flux` row)
+- **Notes:** interference is non-separable; highest priority; **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — simulated **intensities** at positive-θ grids differ from the old negative-θ (mirror) outputs by ~2× at peak; any intensity-dependent check of this row needs re-verification in fresh context. **2026-08-15**: fresh-context re-derivation matches with no divergent factor, sign, exponent, or unit. This row certifies how `\|A\|²` is *used*, not `A` itself (see `cbs-amplitude`). Integrated yield is exact but **line peak height is segmentation dependent**, so absolute peak comparisons against a paper inherit an implicit dependence on the transport's segment-length distribution. The prefactor is frozen at `ω_res` rather than the grid frequency — consistent with the existing narrow-line freezing of `χ_g`/`U_g`/`μ`, odd about line centre, cancels to first order on integration. `components=True` is **not** an additive split: `spec_pxr + spec_cbs` differs from `spec` by the interference term (+22% at the checked point), and the docstring says so only for the coherent path. Stands on the unresolved `line-energy-dispersion` harmonic sign, which fixes where each line sits, not how it is squared or summed. Human sign-off pending. [validation write-up](radiation-physics/coherent-line-spectrum.md)
+
+## `coherent-emission`
+
+- **Claim:** opt-in phased segment sum `dN/dE dΩ ∝ \|Σ_j A_j·exp{i[ω(t_abs,j−n̂·r_j)−g·r_j]}\|²`; intra-electron plus inter-electron/superradiant cross terms and Gaussian inter-electron form factor `exp[−(ωσ_z)²]`
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`); CLI `pyrite run --coherent`; profile `FidelityPreset.coherent_emission`
+- **Source:** Feranchuk–Spence 2000; Zhai 2025; far-field phased-array sum; Gaussian characteristic function
+- **Status:** rederived
+- **Checks:** units/sign; repository `S(+g)` ↔ `χ_g exp(−ig·r)` mapping; straight-trajectory phase stationarity at `ω=v·g/(1−v·n̂)`; full/cutoff sinc paths; mosaic placement; self/coincident/qualified decoherent limits
+- **Anchor:** `tests/montecarlo/test_coherent_emission.py`
+- **Notes:** Fresh-context derivation matches exact phase with no divergent sign/factor. Broad per-electron `t0` removes only inter-electron terms, giving `Σ_e\|Σ_{j∈e}E_j\|²`; intra-electron segment coherence survives. Coherent/incoherent identities remain distinct; physical-charge/macro-particle weighting is a separate unfinished claim. [validation write-up](radiation-physics/coherent-emission.md)
+
+## `coherent-segment-midpoint-time`
+
+- **Claim:** coherent finite-segment phase pairs stored midpoint position with midpoint transport age `t_mid = t_ang + L_ang/(2β)` while preserving `t_ang` as segment-start age
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`)
+- **Source:** centered constant-amplitude finite-time integral; Feranchuk–Spence 2000 Eqs. (8), (10), (12)--(14) as derived under `coherent-emission`
+- **Status:** rederived
+- **Checks:** units; `L→0`; single-segment self-term; one straight flight versus two contiguous halves, including interference with a fixed reference emitter
+- **Anchor:** `tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments`
+- **Notes:** Fresh-context derivation matches with no factor, sign, unit, or convention discrepancy; the deterministic subdivision anchor is green for both coherent routes. Human sign-off remains pending. [derivation record](radiation-physics/coherent-segment-midpoint-time.md)
+
+## `coherent-line-hkl-batch`
+
+- **Claim:** batched `(n_seg, N_g)` evaluation of the coherent line path: steps 1–6 (kinematics, detuning, gathered interpolation, escape length) are shared with the incoherent batch, the complex per-polarization amplitude `A_PXR + A_CBS` is kept on the full grid, and `\|Σ_j\|²` is taken per `(reflection, mosaic orientation)` row — so reflections and mosaic orientations stay **incoherent** while the segment sum inside a row keeps its phase. No new equation; identical to the per-hkl `_accumulate` loop up to float reassociation
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (batched branch, `coherent=True`)
+- **Source:** none — amplitudes unchanged from `coherent-emission` / `cbs-amplitude`; this is an evaluation-order claim
+- **Status:** filtered
+- **Checks:** limiting cases inherited and re-run green: single-segment coherent == incoherent self-term, `N²` in-phase build-up, on-resonance phase cancellation. Direct numerical diff vs the per-hkl loop on hopg 30 keV / Ne=10000 / 1.83e6 segments / 4 reflections / 831 bins, float32: max abs `2.58e-14` = `1.7e-6` of peak, max relative `2.0e-5` on bins above peak×1e-6, sum relative difference `0.0` — inside the `√N·eps ≈ 1.6e-4` float32 reassociation envelope
+- **Anchor:** `tests/montecarlo/test_coherent_emission.py`; `tests/montecarlo/test_chunk_invariance.py`
+- **Notes:** Routing: coherent runs with `sinc_cutoff`, `groove`, or `layers` stay on the proven per-hkl loop, bit-for-bit. `coherent_jit_kernel.run_coherent_reduction_kernel` signature is **unchanged** (per-`(reflection, orientation)`); squaring is intrinsically per-row so a g-batched kernel cannot fuse the reduction. Perf: line phase 0.3600 s → 0.1820 s (1.98×) on a 3060 Ti. Fresh-context verification + human sign-off pending
+
+## `line-hkl-batch`
+
+- **Claim:** batched `(n_seg, N_g)` evaluation of the **incoherent** line path: kinematics, detuning, the shared interpolation bracket for `chi`/`U`/`mu`, escape length, both polarization amplitudes, and the `\|A\|²` accumulation run ONCE over an `(n_seg, N_g)` grid instead of `N_g` separate per-hkl `_accumulate` passes. `g`-independent segment quantities are hoisted out of the pass, length-3 contractions are spelled elementwise (see `line-gemv-elementwise`), and the sinc reduction is taken over the union bin order. No new equation; identical to the per-hkl `_accumulate` loop up to float reassociation
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (batched branch, `coherent=False`)
+- **Source:** none — amplitudes unchanged from `pxr-amplitude` / `cbs-amplitude` / `finite-time-lineshape`; this is an evaluation-order claim
+- **Status:** filtered
+- **Checks:** Direct A/B against the per-hkl `_accumulate` reference loop, reached by source-patching the branch gate (the loop is otherwise unreachable for an ungrooved, unlayered, incoherent run). hopg, CPU `REAL = float64`, 250 bins: 25 keV / Ne=40 / 14,970 segments at 2 and 4 reflections, and 60 keV / Ne=120 / 96,478 segments at 2 reflections. Max abs difference `1.70e-15`–`1.15e-14` of peak; max relative `6.26e-15`–`1.59e-14` on bins above peak×1e-6; integral relative difference `0.0`–`7.83e-16` — all inside the `√n_seg·eps ≈ 2.7e-14`–`6.9e-14` float64 reassociation envelope. `components=True` PXR/CBS split agrees to `2.34e-14`. **Single-segment / single-reflection limit is bitwise identical between the two arms.** Shared-bracket gather: at-node identity exact, below/above-grid endpoint clamps exact, float32 gather vs per-reflection `np.interp` max relative `3.31e-07` (float64 `2.10e-16`)
+- **Anchor:** `tests/montecarlo/test_chunk_invariance.py`; `tests/montecarlo/test_montecarlo.py`
+- **Notes:** Routing: grooved, layered, and coherent-with-`sinc_cutoff` runs stay on the per-hkl loop, bit-for-bit. The A/B above is float64 — the CPU backend's `REAL`; there is no way to force float32 without a CUDA device, so the production float32 envelope is inferred (`eps` ratio ≈ 2e7, so ~1e-7 expected) and the sibling `coherent-line-hkl-batch` measured `2.0e-5` on device. Golden regen for the float32 spectrum goldens is still owed. Absorption is tabulated on **both** arms of the A/B, so this row does not cover `line-absorption-tabulation`. Fresh-context verification + human sign-off pending
+
+## `line-amplitude-fusion`
+
+- **Claim:** incoherent `\|A_PXR + A_CBS\|²` evaluated by expanding the complex amplitude onto real/imaginary components with REAL scalar shape factors `f_pxr = [(v·k_g)(g·e) − ω²(v·e)] / detuning` and `f_cbs = −[{g·e − (v·g)(v·e)} + (v·e){k·g − (k·v)(v·g)}/(v·g)] / [γ (v·g)]`, so `Re A = χ_re f_pxr + u_re f_cbs`, `Im A = χ_im f_pxr + u_im f_cbs`, `\|A\|² = Re² + Im²`, and the components as `\|χ\|² f_pxr²` and `\|eU_g/m\|² f_cbs²`. One fused real kernel; algebraically identical to the complex expression, reassociated (`χ·(N/detuning)` vs `(χ/detuning)·N`)
+- **Code:** `montecarlo/spectrum/lines.py::_line_amp_sq_core` (+ its call site in `mc_spectrum`'s batched incoherent branch)
+- **Source:** none new — same `A_PXR`/`A_CBS` as `pxr-amplitude` / `cbs-amplitude`; algebraic expansion of `\|z\|²` for `z = χ f_pxr + (eU_g/m) f_cbs`
+- **Status:** filtered
+- **Checks:** Against the retained complex expression (the coherent branch's verbatim form), 2e6 adversarial samples per dtype. float32: `\|A\|²` median `1.06e-07` (0.9 eps), p99 `5.58e-07`, max `3.12e-04` = 2613 eps; `\|A_PXR\|²` max `6.66e-07` (5.6 eps); `\|A_CBS\|²` max `7.39e-07` (6.2 eps). float64: `\|A\|²` median `1.92e-16`, max `3.83e-13` (1725 eps). The `\|A\|²` tail is entirely PXR/CBS near-cancellation — at the worst sample `\|A\|² / max(\|A_PXR\|², \|A_CBS\|²) = 7.3e-07`; restricted to the 98.3% of samples with `\|A\|² > 0.1 max(…)` the float32 max falls to `1.46e-06` (12 eps). Limits: `U_g→0` zeroes `\|A_CBS\|²` exactly and reproduces `\|A_PXR\|²` to `6.21e-16`; `χ→0` zeroes `\|A_PXR\|²` exactly and reproduces `\|A_CBS\|²` to `6.57e-16`; `χ = U = 0` is identically zero; `\|A\|²` is quadratic in `(χ, U)` to `6.93e-14` under a ×3 rescale. All three outputs non-negative by construction
+- **Anchor:** `tests/montecarlo/test_chunk_invariance.py`; end-to-end via the `line-hkl-batch` A/B
+- **Notes:** Incoherent path only: the coherent branch keeps the un-reassociated complex expression (`pol_A.append(A_PXR + A_CBS)`), so coherent goldens are unaffected. Wrapped in `xp.fuse()` on CuPy; plain elementwise arithmetic on NumPy. The float32 tail is a property of the *cancellation regime*, not of the fusion — the complex arm loses the same digits, the two just lose different ones. Golden regen for the line/PXR/CBS float32 goldens is still owed. Fresh-context verification + human sign-off pending
+
+## `line-gemv-elementwise`
+
+- **Claim:** the length-3 contractions of the line path (`v·g`, `v·n̂`, `k·g`, `v·e`, the `k_g·k_g` / `v·k_g` einsums, and the `r·g` phase) evaluated as `a₀b₀ + a₁b₁ + a₂b₂` rather than as a cuBLAS GEMV/GEMM with inner dimension 3. One helper serves both `M @ v` (scalar `b`) and the row-wise `einsum('ij,ij->i')` (columns of a second `(N,3)`). No new equation; a fixed left-to-right association of a three-term inner product
+- **Code:** `montecarlo/spectrum/lines.py::_dot3_core` (via `::_matvec3`, `::_rowdot3`)
+- **Source:** none — definition of the Euclidean inner product in 3-D
+- **Status:** filtered
+- **Checks:** 2e6 random `(N,3)` rows on the NumPy backend. float32: **bitwise identical** to both `np.einsum('ij,ij->i', A, B)` and `A @ v`. float64: max relative `2.50e-11` (row dot) and `9.06e-11` (matvec) against the BLAS-backed reference — reassociation only, no term dropped. Symmetry `a·b == b·a` bitwise; `a·a ≥ 0` everywhere; the orthogonality limit `e_x·e_y` is exactly `0.0` with no drift. Units inherit from the operands (the helper is dimensionless bookkeeping)
+- **Anchor:** `tests/montecarlo/test_chunk_invariance.py` (via the batched path)
+- **Notes:** Motivation is launch cost, not arithmetic: cuBLAS is tuned for large `K`, so the skinny `K=3` contractions were dispatched as ~6.3k `internal::gemvx` launches carrying ~24% of the 300 keV line-path GPU time; spelled elementwise they fuse into a single CuPy kernel with no cuBLAS handle. The docstring's "runs bit-for-bit identical on NumPy" is confirmed for float32 and **false for float64**, where NumPy's reference dispatches through BLAS — production `REAL` is float32 on device, so the claim holds where it is load-bearing. On-device float32 behaviour is not covered by the CPU measurement and needs a CUDA-box confirmation. Fresh-context verification + human sign-off pending
+
+## `line-absorption-tabulation`
+
+- **Claim:** self-absorption `τ = L_esc · μ(E_res)` from per-element `log(μ_i)` tables interpolated linearly in `log(E)` and summed as `μ = Σ_i μ_i`. The shared grid is a 1 eV mesh unioned with native Chantler nodes from both the crystal basis and explicit absorber composition. Applies to the single-slab and finite-footprint branches, coherent and incoherent alike; layered `_stack_tau` and grooved escape keep exact per-point `μ`
+- **Code:** `montecarlo/spectrum/lines.py::_elemental_log_mu_table`, `::_log_interp_fraction`, `::_interp_elemental_mu`, and `::mc_spectrum`; `montecarlo/spectrum/coherent_stream_jit_kernel.py::_interp_elemental_mu`
+- **Source:** xraydb 4.5.8 `XrayDB._from_chantler`: non-`f1` data are interpolated linearly in `log(y)` versus `log(E)`; with `μ_i = 2 r_e hc n_i f₂_i/E`, `log(μ_i)` is linear on the same intervals. Compound coefficients add only after elemental interpolation
+- **Status:** rederived
+- **Checks:** Pre-fix HOPG error was `2.72e-1` in `μ` and `5.23e-1` in 10000 Å transmission. Corrected adversarial midpoint checks cover HOPG, MoS2, and MoSe2: float64 direct-xraydb agreement `≤2e-12` relative; explicit float32 HOPG agreement `≤1e-4`. Units remain 1/Å; positivity, exact-node identity, endpoint clamps, zero-path transmission, and a Si absorber absent from the HOPG basis are anchored. Focused CPU and neighboring chunk-invariance checks pass
+- **Anchor:** `tests/montecarlo/test_line_absorption_tabulation.py`
+- **Notes:** Fresh-context independent verification rederived the pinned xraydb log-log rule through `μ_i ∝ f₂_i/E`, checked the per-element-then-sum source-to-code mapping, units, signs, and limiting cases, and found no physics divergence. The old divergent convention interpolated the compound total linearly in energy; interpolating the compound total in log space also leaves compound residuals because a sum of elemental power laws is not itself one power law. The corrected table adds no per-segment CPU/device synchronization. CUDA runtime/numerical/performance evidence and a spectrum-level exact-vs-tabulated A/B remain open; no remote job was authorized. Human sign-off required. [implementation-context derivation](radiation-physics/line-absorption-tabulation.md)
+
+## `finite-time-lineshape`
+
+- **Claim:** `\|Q\|² = t_L²·sinc_N²(P·t_L/π)`, `sinc_N(x)=sin(πx)/(πx)` (replaces absorption-limited δ)
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`
+- **Source:** Feranchuk 2000 (finite interaction length)
+- **Status:** anchored
+- **Checks:** units and NumPy sinc convention; exact area `πt_L`; peak/width scaling and `t_L→∞` delta limit; energy-coordinate Jacobian
+- **Anchor:** `tests/notebooks/test_anchor_figures.py::test_single_segment_lineshape_converges_to_closed_form`
+- **Notes:** independent derivation matches the implementation's factor of two, `π`, `1−v·n̂`, and `ℏc`; [validation write-up](radiation-physics/finite-time-lineshape.md)
+
+## `pxr-amplitude`
+
+- **Claim:** `χ_g` PXR susceptibility amplitude
+- **Code:** `materials/crystal.py::chi_g`
+- **Source:** Feranchuk 2000 Eq.(3)
+- **Status:** rederived
+- **Checks:** units, extinct/high-energy limits, sign, Debye--Waller placement, and every prefactor independently checked; LiF (200) at 3890 eV agrees to `6.78e-21` absolute
+- **Anchor:** —
+- **Notes:** independent derivation matches; [validation write-up](radiation-physics/pxr-amplitude.md)
+
+## `cbs-amplitude`
+
+- **Claim:** `U_g` CBS potential amplitude + relativistic 1/γ braced terms
+- **Code:** `materials/crystal.py::U_g` (+ amplitude assembly in `montecarlo/spectrum/lines.py`)
+- **Source:** Feranchuk 2000
+- **Status:** rederived
+- **Checks:** units+limits+signs (`U_g` rederived from Poisson); braced `A_CBS` tensor prefactor, single `1/γ`, `(v·g)` / `(v·g)²` denominator placement, and the PXR+CBS relative sign independently rederived from the relativistic equation of motion plus the Liénard–Wiechert radiation integral, with `A_PXR` rederived in the same normalization; certified numerically against direct RK4 trajectory integration (rel. dev. `<3e-6` at 30/100/300 keV, both polarizations; the `1/γ²` variant is rejected by exactly a factor `γ`)
+- **Anchor:** — (needs a regression test pinning `A_CBS` at one fixed geometry plus its `1/γ` scaling before this can reach `anchored`)
+- **Notes:** `U_g` independently rederived term-for-term from Poisson: `(4π e²/V g²) Σ(Z−f) e^{ig·r} e^{−W}`, Mott–Bethe `Z−f`, single Debye–Waller, eV units (Si(111) \|U_g\|≈5.2 eV). **2026-08-15**: the braced assembly is now rederived too. Code's **single `1/γ`** is correct — the exact equation of motion `a = (1/γm)(1 − ββ)·F` pairs one `1/γ` with the transverse projector, so `1/γ²` would double-count the longitudinal suppression the projector already carries. Relative PXR/CBS sign is correct via two cancelling flips (the `+e φ_g` branch of `U_g`, and the explicit leading `−` in `A_CBS`), leaving a shared overall `−1` that `\|·\|²` removes. `1/γ` vs `1/γ²` changes the CBS amplitude by 5.5 / 16.4 / 37.0 % and a real Si(111) line intensity by 3.3 / 9.9 / 21.1 % at 30 / 100 / 300 keV — **distinguishable from ~10 keV up, not only ≳100 keV** as previously recorded. Convention notes: returns `+\|U_g\|` (`−U_electron`) branch, phase fixed downstream; edge-prone atoms fold anomalous `f'` into a static potential (spurious near-edge energy dependence; `f''` dropped via `.real`). **Transcription caveat:** neither Feranchuk Eq.(14) nor Zhai SI Eq.(6) text is in-repo, so what is certified is that coded `A_CBS` is the correct CBS amplitude with the correct relative normalization against coded `A_PXR` — *not* that it faithfully transcribes those equations; a human with the papers should confirm the citation. Human sign-off pending. [write-up](radiation-physics/cbs-amplitude.md)
+
+## `line-energy-dispersion`
+
+- **Claim:** `ω = v·g / (1 − v·n̂)` tunable line energy
+- **Code:** `montecarlo/geometry.py::tilted_geometry` / `src/pyrite/apps/anchor_figures.py::line_energy_eV`
+- **Source:** Zhai 2025 Eq.(10)
+- **Status:** discrepancy
+- **Checks:** units and positive Doppler denominator agree; zero-velocity, orthogonal-harmonic, reciprocal-vector reversal, and opposite-tilt limits checked; numerator sign cannot be certified because the spatial-Fourier/opposite-harmonic mapping from the documented `exp(+i g·R_j)` structure-factor phase is unspecified
+- **Anchor:** `src/pyrite/apps/anchor_figures.py::theory_line_energies` (same-convention regression only)
+- **Notes:** unresolved reciprocal-harmonic/Fourier reconstruction sign mapping: the independent `exp(+i g·r)` derivation gives `−v·g/(1−v·n̂)` while production uses `+v·g/(1−v·n̂)`; [validation write-up](radiation-physics/line-energy-dispersion.md). **2026-07-11**: tilt convention flipped to Zhai's positive θ; the default beam-aligned line energy is even in opposite polar tilt, but that does not resolve the harmonic-sign discrepancy
+
+## `longitudinal-target-timing`
+
+- **Claim:** conditional positive-basal-harmonic target timing: `kγ = β\|g\|cos(tilt)/(1−βcos(theta_obs))`, `Eγ=ℏc kγ`, `T=h/Eγ`, and Gaussian `σt=sqrt(−ln η)/Ω` with `Ω=2π/T`
+- **Code:** `campaign/longitudinal.py::resolve_longitudinal_distribution`
+- **Source:** Zhai 2025 Eq.(10); Gaussian characteristic function
+- **Status:** anchored
+- **Checks:** units distinguish `kγ` [Å⁻¹] from `Ω` [rad/fs]; `η→1`, `η→0+`, `β→0`, and `ΩT=2π` limits; independent HOPG/h-BN × 30/100 keV values at `theta_obs=90°`, `tilt=45°`
+- **Anchor:** `tests/montecarlo/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`
+- **Notes:** Independent re-derivation and four CODATA/CIF numeric anchors match. Conditional on the task-approved positive catalog-pinned `(002)` branch; does not resolve the upstream `line-energy-dispersion` harmonic-sign discrepancy. [validation write-up](beam-transport/longitudinal-target-timing.md)
+
+## `closed-form-flux`
+
+- **Claim:** Eq.(12) closed-form line flux (single-segment reference)
+- **Code:** `src/pyrite/apps/anchor_figures.py::feranchuk_line_flux`
+- **Source:** Feranchuk 2000 Eq.(12)
+- **Status:** discrepancy
+- **Checks:** prefactor, `α`/`ℏc` bookkeeping, solid-angle and energy-bin conventions, return units, and the `1/(1−β cos θ_obs)` Jacobian all reproduce the independent derivation symbolically and to twelve digits, and are corroborated by the Monte Carlo at sub-percent (anchor ratio `0.99735` at 17.5 keV, `0.99673` at 25 keV). Escape length fails
+- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (ratio≈1; **structurally blind to the defect** — it passes `L_abs_ang=1e12` against `L_seg_ang=290`, so the geometry factor cancels to first order)
+- **Notes:** reference, not pipeline. **2026-08-15 DISCREPANCY:** the escape length omits a geometric `\|cos θ_obs\|`. Code (`apps/feranchuk_spence.py::photons_per_electron`) computes `L_eff = L_abs[1 − exp(−t/L_abs)]`; the escape integral `∫₀ᵗ exp(−μ(t−z)/\|n_z\|) dz` gives `\|n_z\| L_abs [1 − exp(−t/(\|n_z\| L_abs))]`. `n_z` *is* computed in the function but is used only in the Jacobian, never in `L_eff`. At the anchor's `θ_obs=119°` this reaches `1/0.4848 = 2.06×` in the thick-target limit, growing monotonically with `t/L_abs`; the two agree only for `t≪L_abs`, which is the sole regime the anchor exercises. **Production `mc_spectrum` does NOT share the error** — it computes a real per-segment escape path; feeding it contiguous segments recovers `\|n_z\|=0.4848` to four digits. Since this expression is the yardstick the MC bulk results are compared against, a bulk-regime comparison against it overstates flux by up to 2.06×. Secondary: `absorption_length_ang("C", …)` is hardcoded while number density follows `anchor.crystal`, so any non-carbon override silently mixes carbon `f₂` with that crystal's density; neither `feranchuk_line_flux` nor `photons_per_electron` carries a `Validation:` marker; the equation actually lives in `apps/feranchuk_spence.py::photons_per_electron`, not the ledgered wrapper. `figure_enhancement` recomputes the same bare expression (ceiling 68.5 vs escape-weighted 33.5) — that is the separate `enhancement-bulk-film` row, but the defect is shared. [validation write-up](radiation-physics/closed-form-flux.md)
+
+## `enhancement-bulk-film`
+
+- **Claim:** bulk-vs-film line enhancement
+- **Code:** `src/pyrite/apps/anchor_figures.py::figure_enhancement`
+- **Source:** Zhai 2025
+- **Status:** unverified
+- **Checks:** —
+- **Anchor:** `src/pyrite/apps/anchor_figures.py::figure_enhancement`
+- **Notes:** **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — enhancement is an intensity ratio, so any prior number here was computed at the old negative-θ (mirror) grids; in the reproduced WSe₂ spot check the old negative tilt had roughly twice the positive-tilt peak (`I(+10°)/I(−10°)≈0.505`), but the enhancement itself still needs regeneration + fresh-context re-verification, not signed-off
+
+## `zhai-material-screen-reconstruction`
+
+- **Claim:** material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays
+- **Code:** retired material-survey research note (Git history)
+- **Source:** Zhai 2025 Fig. 2a, SI Table 5, and deposited data DOI 10.21979/N9/WZAMZ0
+- **Status:** unverified
+- **Checks:** raw workbook split into 84 ordered plane series and checked against the 21 × 4 SI table shape; ratios are dimensionless and use the source's 10 eV integration window
+- **Anchor:** —
+- **Notes:** research-screening claim only; source workbook rows are unlabeled and SI Table 5 duplicates CrPS4, so the two ambiguous blocks are excluded; requires independent reproduction before use as a project prediction
+
+## `zhai-hbn-921-detected`
+
+- **Claim:** end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°)
+- **Code:** `src/pyrite/apps/anchor_figures.py::_supplementary_detected_spectrum` (+ `model_coherent_spectra`)
+- **Source:** Zhai 2025 SI Fig. S5b
+- **Status:** discrepancy
+- **Checks:** —
+- **Anchor:** —
+- **Notes:** **2026-07-11 UNEXPLAINED GAP** — after fixing the aperture-FWHM transcription error and applying window QE, simulation remains 1.35–1.76× above the paper, growing with beam energy (sim 1.15/1.20/1.24/1.23 vs paper ≈0.85/0.80/0.75/0.70 Phs/eV/s/nA at 17.5/20/22.5/25 keV). Transport elastic-model choice ruled out (<10%). **2026-07-25:** h-BN's placeholder `B=0.6 Å²` was replaced by Pease's room-temperature basal-reflection value `B33=3.45 Å²`; this lowers isolated `(002)` and `(004)` intensities by factors 0.879 and 0.598, respectively, but the mixed detected spectrum has not been regenerated. Remaining candidates: intrinsic `mc_spectrum` prefactor vs SI Eq. (2), thickness uncertainty, whether Zhai efficiency-corrects experiment. Do not trust absolute supplementary-panel normalization until regenerated and independently checked.
