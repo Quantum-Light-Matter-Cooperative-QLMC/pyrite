@@ -1010,25 +1010,27 @@ def mc_spectrum(
     # the substep count (each row carries (t_L/N)^2 where the flight carries
     # t_L^2), so a tighter energy tolerance would silently destroy the line.
     # Rows of one flight therefore add COHERENTLY and only whole flights add
-    # incoherently. A group starts wherever the ``(electron_id, flight_id)`` key
-    # changes between adjacent rows -- transport emits a flight's substeps
-    # contiguously and every row transform preserves order.
+    # incoherently. Groups are keyed by ``(electron_id, flight_id)`` VALUE, not
+    # by adjacency: the lockstep core emits step-major, so one flight's substeps
+    # are separated by every other electron's rows for that step.
     # Validation: substep-radiation-invariance
     gid_all = None
     grouped = False
     if not coherent and segments.get("flight_id") is not None and seg_E.size:
         flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
         electron_key = _to_cpu(xp.asarray(segments["elec_id"]))
+        order = np.lexsort((flight_key, electron_key))
         new_group = np.empty(flight_key.size, dtype=bool)
         new_group[0] = True
-        new_group[1:] = (flight_key[1:] != flight_key[:-1]) | (
-            electron_key[1:] != electron_key[:-1]
+        new_group[1:] = (flight_key[order][1:] != flight_key[order][:-1]) | (
+            electron_key[order][1:] != electron_key[order][:-1]
         )
         # All-singleton groups are the one-row-per-flight case, whose grouped
         # reduction is algebraically the incoherent one; keep the proven path.
         grouped = not bool(new_group.all())
         if grouped:
-            gid_all = np.cumsum(new_group) - 1
+            gid_all = np.empty(flight_key.size, dtype=np.int64)
+            gid_all[order] = np.cumsum(new_group) - 1
     if grouped and getattr(xp, "__name__", "") != "numpy":
         raise ValueError(
             "flight-grouped incoherent CXR is host-only: the segmented complex "
@@ -1333,6 +1335,11 @@ def mc_spectrum(
             if sel.size == 0:
                 return
             gid = gid_all[idx[sel]]
+            # Gather this flight's rows together; a stable sort leaves already
+            # grouped input (and each group's internal row order) untouched.
+            perm = np.argsort(gid, kind="stable")
+            sel = sel[perm]
+            gid = gid[perm]
             starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
             bounds = np.append(starts, sel.size)
             for ka, kb in _flight_blocks(bounds, chunk):

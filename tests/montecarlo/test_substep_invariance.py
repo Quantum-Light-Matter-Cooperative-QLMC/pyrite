@@ -231,3 +231,51 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
         monkeypatch.setattr(lines, "xp", _FakeCupy())
         with pytest.raises(ValueError, match="host-only"):
             mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+
+
+@pytest.mark.parametrize("core", ["lockstep", "per-electron"])
+def test_transport_substeps_reach_the_grouped_reduction(core):
+    """Slice G's rules were proven on post-hoc splits; transport emits its own.
+
+    Only the row-consumption contract is checked here: the grouped path is taken
+    and equals the per-flight coherent sum. It has to hold for the lockstep core
+    too, whose rows are step-major, so a flight's substeps are NOT adjacent.
+    Convergence under refinement is a separate claim and cannot be read off two
+    transported ensembles, which decorrelate.
+    """
+    rows = simulate_trajectories(
+        E0_keV=25.0,
+        Ne=6,
+        thickness_ang=4000.0,
+        composition=CARBON,
+        seed=7,
+        transport_core=core,
+        energy_model="midpoint",
+        E_cut_keV=1.0,
+        max_dE_frac=1e-3,
+    )
+    assert (rows["substep_id"] > 0).any()
+
+    key = np.stack([rows["elec_id"], rows["flight_id"]])
+    if core == "lockstep":
+        # Every adjacent pair differs, i.e. no flight's substeps are neighbours:
+        # this is the row order an adjacency-keyed grouping would silently miss.
+        changes = np.any(key[:, 1:] != key[:, :-1], axis=0)
+        assert changes.all()
+
+    grouped = mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+    flights, gid = np.unique(key, axis=1, return_inverse=True)
+    per_flight = np.zeros_like(grouped)
+    row_keys = [k for k in rows if isinstance(rows[k], np.ndarray) and rows[k].shape]
+    for g in range(flights.shape[1]):
+        take = np.flatnonzero(gid == g)
+        one = dict(rows)
+        for name in row_keys:
+            if rows[name].shape[0] == rows["L_ang"].size:
+                one[name] = rows[name][take]
+        one["elec_id"] = np.zeros(take.size, dtype=np.int64)
+        one["Ne"] = 1
+        per_flight += mc_spectrum(one, CXR_GRID_EV, coherent=True, **CXR_KWARGS)
+    per_flight /= rows["Ne"]
+
+    np.testing.assert_allclose(grouped, per_flight, rtol=1e-9, atol=1e-9 * grouped.max())
