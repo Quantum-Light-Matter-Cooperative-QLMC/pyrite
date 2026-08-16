@@ -9,7 +9,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 
 | ID | Claim | Status |
 |---|---|---|
-| [`coherent-line-spectrum`](physics-validation-ledger.md#coherent-line-spectrum) | `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average | `unverified` |
+| [`coherent-line-spectrum`](physics-validation-ledger.md#coherent-line-spectrum) | `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average | `rederived` |
 | [`coherent-emission`](physics-validation-ledger.md#coherent-emission) | opt-in phased segment sum `dN/dE dΩ ∝ \|Σ_j A_j·exp{i[ω(t_abs,j−n̂·r_j)−g·r_j]}\|²`; intra-electron plus inter-electron/superradiant cross terms and Gaussian inter-electron form factor `exp[−(ωσ_z)²]` | `rederived` |
 | [`coherent-segment-midpoint-time`](physics-validation-ledger.md#coherent-segment-midpoint-time) | coherent finite-segment phase pairs stored midpoint position with midpoint transport age `t_mid = t_ang + L_ang/(2β)` while preserving `t_ang` as segment-start age | `rederived` |
 | [`coherent-line-hkl-batch`](physics-validation-ledger.md#coherent-line-hkl-batch) | batched `(n_seg, N_g)` evaluation of the coherent line path: steps 1–6 (kinematics, detuning, gathered interpolation, escape length) are shared with the incoherent batch, the complex per-polarization amplitude `A_PXR + A_CBS` is kept on the full grid, and `\|Σ_j\|²` is taken per `(reflection, mosaic orientation)` row — so reflections and mosaic orientations stay **incoherent** while the segment sum inside a row keeps its phase. No new equation; identical to the per-hkl `_accumulate` loop up to float reassociation | `filtered` |
@@ -19,10 +19,10 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`line-absorption-tabulation`](physics-validation-ledger.md#line-absorption-tabulation) | self-absorption `τ = L_esc · μ(E_res)` from per-element `log(μ_i)` tables interpolated linearly in `log(E)` and summed as `μ = Σ_i μ_i`. The shared grid is a 1 eV mesh unioned with native Chantler nodes from both the crystal basis and explicit absorber composition. Applies to the single-slab and finite-footprint branches, coherent and incoherent alike; layered `_stack_tau` and grooved escape keep exact per-point `μ` | `rederived` |
 | [`finite-time-lineshape`](physics-validation-ledger.md#finite-time-lineshape) | `\|Q\|² = t_L²·sinc_N²(P·t_L/π)`, `sinc_N(x)=sin(πx)/(πx)` (replaces absorption-limited δ) | `anchored` |
 | [`pxr-amplitude`](physics-validation-ledger.md#pxr-amplitude) | `χ_g` PXR susceptibility amplitude | `rederived` |
-| [`cbs-amplitude`](physics-validation-ledger.md#cbs-amplitude) | `U_g` CBS potential amplitude + relativistic 1/γ braced terms | `filtered` |
+| [`cbs-amplitude`](physics-validation-ledger.md#cbs-amplitude) | `U_g` CBS potential amplitude + relativistic 1/γ braced terms | `rederived` |
 | [`line-energy-dispersion`](physics-validation-ledger.md#line-energy-dispersion) | `ω = v·g / (1 − v·n̂)` tunable line energy | `discrepancy` |
 | [`longitudinal-target-timing`](physics-validation-ledger.md#longitudinal-target-timing) | conditional positive-basal-harmonic target timing: `kγ = β\|g\|cos(tilt)/(1−βcos(theta_obs))`, `Eγ=ℏc kγ`, `T=h/Eγ`, and Gaussian `σt=sqrt(−ln η)/Ω` with `Ω=2π/T` | `anchored` |
-| [`closed-form-flux`](physics-validation-ledger.md#closed-form-flux) | Eq.(12) closed-form line flux (single-segment reference) | `unverified` |
+| [`closed-form-flux`](physics-validation-ledger.md#closed-form-flux) | Eq.(12) closed-form line flux (single-segment reference) | `discrepancy` |
 | [`enhancement-bulk-film`](physics-validation-ledger.md#enhancement-bulk-film) | bulk-vs-film line enhancement | `unverified` |
 | [`zhai-material-screen-reconstruction`](physics-validation-ledger.md#zhai-material-screen-reconstruction) | material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays | `unverified` |
 | [`zhai-hbn-921-detected`](physics-validation-ledger.md#zhai-hbn-921-detected) | end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°) | `discrepancy` |

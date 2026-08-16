@@ -20,10 +20,10 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 - **Claim:** `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average
 - **Code:** `montecarlo/spectrum/lines.py::mc_spectrum`
 - **Source:** Feranchuk–Spence 2000 Eq.(10),(12); Zhai 2025
-- **Status:** unverified
-- **Checks:** —
-- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor`
-- **Notes:** interference is non-separable; highest priority; **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — simulated **intensities** at positive-θ grids differ from the old negative-θ (mirror) outputs by ~2× at peak; any intensity-dependent check of this row needs re-verification in fresh context
+- **Status:** rederived
+- **Checks:** units; prefactor, squaring, summation order, per-electron normalization, and mosaic weighting reproduced term for term (absolute normalization to `6.7e-10` relative, whose entire budget is the repository's truncated fine-structure literal); incoherence structure confirmed by exact `1/N` subdivision falloff, bitwise reflection additivity, and invariance of the per-electron spectrum under electron replication; mosaic average is a unit-weight Gauss–Hermite intensity average collapsing to the perfect crystal as `η→0`
+- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (not a CI-green regression test on this row's normalization; it compares against `feranchuk_line_flux`, the `discrepancy` `closed-form-flux` row)
+- **Notes:** interference is non-separable; highest priority; **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — simulated **intensities** at positive-θ grids differ from the old negative-θ (mirror) outputs by ~2× at peak; any intensity-dependent check of this row needs re-verification in fresh context. **2026-08-15**: fresh-context re-derivation matches with no divergent factor, sign, exponent, or unit. This row certifies how `\|A\|²` is *used*, not `A` itself (see `cbs-amplitude`). Integrated yield is exact but **line peak height is segmentation dependent**, so absolute peak comparisons against a paper inherit an implicit dependence on the transport's segment-length distribution. The prefactor is frozen at `ω_res` rather than the grid frequency — consistent with the existing narrow-line freezing of `χ_g`/`U_g`/`μ`, odd about line centre, cancels to first order on integration. `components=True` is **not** an additive split: `spec_pxr + spec_cbs` differs from `spec` by the interference term (+22% at the checked point), and the docstring says so only for the coherent path. Stands on the unresolved `line-energy-dispersion` harmonic sign, which fixes where each line sits, not how it is squared or summed. Human sign-off pending. [validation write-up](radiation-physics/coherent-line-spectrum.md)
 
 ### `coherent-emission`
 
@@ -120,10 +120,10 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 - **Claim:** `U_g` CBS potential amplitude + relativistic 1/γ braced terms
 - **Code:** `materials/crystal.py::U_g` (+ amplitude assembly in `montecarlo/spectrum/lines.py`)
 - **Source:** Feranchuk 2000
-- **Status:** filtered
-- **Checks:** units+limits+signs (`U_g` rederived from Poisson; braced 1/γ factor filtered)
-- **Anchor:** —
-- **Notes:** `U_g` independently rederived term-for-term from Poisson: `(4π e²/V g²) Σ(Z−f) e^{ig·r} e^{−W}`, Mott–Bethe `Z−f`, single Debye–Waller, eV units (Si(111) \|U_g\|≈5.2 eV). Braced PXR+CBS assembly capped at `filtered`: structure/units/limits pass but exact `A_CBS` tensor prefactor + cross term unverified pending Feranchuk Eq.(14)/Zhai SI Eq.(6) text. Code uses a **single `1/γ`** power (not `1/γ²`). Convention notes: returns `+\|U_g\|` (`−U_electron`) branch, phase fixed downstream; edge-prone atoms fold anomalous `f'` into a static potential (spurious near-edge energy dependence; `f''` dropped via `.real`). 1/γ matters ≳100 keV; [write-up](radiation-physics/cbs-amplitude.md)
+- **Status:** rederived
+- **Checks:** units+limits+signs (`U_g` rederived from Poisson); braced `A_CBS` tensor prefactor, single `1/γ`, `(v·g)` / `(v·g)²` denominator placement, and the PXR+CBS relative sign independently rederived from the relativistic equation of motion plus the Liénard–Wiechert radiation integral, with `A_PXR` rederived in the same normalization; certified numerically against direct RK4 trajectory integration (rel. dev. `<3e-6` at 30/100/300 keV, both polarizations; the `1/γ²` variant is rejected by exactly a factor `γ`)
+- **Anchor:** — (needs a regression test pinning `A_CBS` at one fixed geometry plus its `1/γ` scaling before this can reach `anchored`)
+- **Notes:** `U_g` independently rederived term-for-term from Poisson: `(4π e²/V g²) Σ(Z−f) e^{ig·r} e^{−W}`, Mott–Bethe `Z−f`, single Debye–Waller, eV units (Si(111) \|U_g\|≈5.2 eV). **2026-08-15**: the braced assembly is now rederived too. Code's **single `1/γ`** is correct — the exact equation of motion `a = (1/γm)(1 − ββ)·F` pairs one `1/γ` with the transverse projector, so `1/γ²` would double-count the longitudinal suppression the projector already carries. Relative PXR/CBS sign is correct via two cancelling flips (the `+e φ_g` branch of `U_g`, and the explicit leading `−` in `A_CBS`), leaving a shared overall `−1` that `\|·\|²` removes. `1/γ` vs `1/γ²` changes the CBS amplitude by 5.5 / 16.4 / 37.0 % and a real Si(111) line intensity by 3.3 / 9.9 / 21.1 % at 30 / 100 / 300 keV — **distinguishable from ~10 keV up, not only ≳100 keV** as previously recorded. Convention notes: returns `+\|U_g\|` (`−U_electron`) branch, phase fixed downstream; edge-prone atoms fold anomalous `f'` into a static potential (spurious near-edge energy dependence; `f''` dropped via `.real`). **Transcription caveat:** neither Feranchuk Eq.(14) nor Zhai SI Eq.(6) text is in-repo, so what is certified is that coded `A_CBS` is the correct CBS amplitude with the correct relative normalization against coded `A_PXR` — *not* that it faithfully transcribes those equations; a human with the papers should confirm the citation. Human sign-off pending. [write-up](radiation-physics/cbs-amplitude.md)
 
 ### `line-energy-dispersion`
 
@@ -150,10 +150,10 @@ heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`,
 - **Claim:** Eq.(12) closed-form line flux (single-segment reference)
 - **Code:** `src/pyrite/apps/anchor_figures.py::feranchuk_line_flux`
 - **Source:** Feranchuk 2000 Eq.(12)
-- **Status:** unverified
-- **Checks:** —
-- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (ratio≈1)
-- **Notes:** reference, not pipeline
+- **Status:** discrepancy
+- **Checks:** prefactor, `α`/`ℏc` bookkeeping, solid-angle and energy-bin conventions, return units, and the `1/(1−β cos θ_obs)` Jacobian all reproduce the independent derivation symbolically and to twelve digits, and are corroborated by the Monte Carlo at sub-percent (anchor ratio `0.99735` at 17.5 keV, `0.99673` at 25 keV). Escape length fails
+- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (ratio≈1; **structurally blind to the defect** — it passes `L_abs_ang=1e12` against `L_seg_ang=290`, so the geometry factor cancels to first order)
+- **Notes:** reference, not pipeline. **2026-08-15 DISCREPANCY:** the escape length omits a geometric `\|cos θ_obs\|`. Code (`apps/feranchuk_spence.py::photons_per_electron`) computes `L_eff = L_abs[1 − exp(−t/L_abs)]`; the escape integral `∫₀ᵗ exp(−μ(t−z)/\|n_z\|) dz` gives `\|n_z\| L_abs [1 − exp(−t/(\|n_z\| L_abs))]`. `n_z` *is* computed in the function but is used only in the Jacobian, never in `L_eff`. At the anchor's `θ_obs=119°` this reaches `1/0.4848 = 2.06×` in the thick-target limit, growing monotonically with `t/L_abs`; the two agree only for `t≪L_abs`, which is the sole regime the anchor exercises. **Production `mc_spectrum` does NOT share the error** — it computes a real per-segment escape path; feeding it contiguous segments recovers `\|n_z\|=0.4848` to four digits. Since this expression is the yardstick the MC bulk results are compared against, a bulk-regime comparison against it overstates flux by up to 2.06×. Secondary: `absorption_length_ang("C", …)` is hardcoded while number density follows `anchor.crystal`, so any non-carbon override silently mixes carbon `f₂` with that crystal's density; neither `feranchuk_line_flux` nor `photons_per_electron` carries a `Validation:` marker; the equation actually lives in `apps/feranchuk_spence.py::photons_per_electron`, not the ledgered wrapper. `figure_enhancement` recomputes the same bare expression (ceiling 68.5 vs escape-weighted 33.5) — that is the separate `enhancement-bulk-film` row, but the defect is shared. [validation write-up](radiation-physics/closed-form-flux.md)
 
 ### `enhancement-bulk-film`
 

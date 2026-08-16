@@ -49,7 +49,9 @@ beam-transport/transport-midpoint-stopping
 radiation-physics/absorption-length
 radiation-physics/brem-spectrum
 radiation-physics/cbs-amplitude
+radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
+radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/external-brem-subtraction
 radiation-physics/finite-time-lineshape
