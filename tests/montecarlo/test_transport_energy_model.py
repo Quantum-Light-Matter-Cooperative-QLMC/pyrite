@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from pyrite.montecarlo.groove import GrooveSpec
 from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
 
 CARBON = [("C", 0.1136)]
@@ -256,7 +257,13 @@ def test_row_transforms_keep_the_new_fields_in_step_with_the_rows():
     ("kwargs", "message"),
     [
         ({"energy_model": "left"}, "energy_model must be"),
-        ({"energy_model": "midpoint", "transport_core": "cuda"}, "cuda core"),
+        (
+            {
+                "energy_model": "midpoint",
+                "groove": GrooveSpec(spacing_ang=1.0e4, depth_ang=1.0e3, tilt_polar_rad=0.2),
+            },
+            "grooved transport",
+        ),
     ],
 )
 def test_unsupported_energy_model_requests_fail_closed(kwargs, message):

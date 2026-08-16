@@ -3549,13 +3549,6 @@ def simulate_trajectories(
             "keep_segments_on_device requires transport_core='cuda'; "
             f"{requested_core!r} resolved to {transport_core!r}"
         )
-    # Fail closed rather than return the frozen schema under a midpoint request:
-    # the CUDA kernels do not carry the controlled propagator yet.
-    if energy_model == "midpoint" and transport_core == "cuda":
-        raise ValueError(
-            "energy_model='midpoint' is not implemented for the cuda core; "
-            f"{requested_core!r} resolved to {transport_core!r}"
-        )
     if energy_model == "midpoint" and groove is not None:
         raise ValueError("energy_model='midpoint' is not implemented for grooved transport")
     max_dE_frac = float(max_dE_frac)

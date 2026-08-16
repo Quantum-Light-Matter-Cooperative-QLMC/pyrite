@@ -141,6 +141,52 @@ def _rate_sr(E_i, sr_rate_numer, sr_joy_numer):
 
 
 @jit.rawkernel(device=True)
+def _dEds_packed(L_Js, L_ks, L_coeffs, row, n_el, E_i):
+    """Joy--Luo stopping power over one layer's flattened element row.
+
+    The midpoint rule needs ``dE/ds`` at three energies per flight, so the
+    element loop is a device function here rather than inlined as it was under
+    the frozen rule.
+    """
+    total = F64_ZERO
+    i_el = I32_ZERO
+    while i_el < n_el:
+        J = L_Js[row + i_el]
+        k = L_ks[row + i_el]
+        coeff = L_coeffs[row + i_el]
+        total += coeff * xp.log(np.float64(1.166) * (E_i + k * J) / J)
+        i_el += I32_ONE
+    return -np.float64(7.85e-4) / E_i * total
+
+
+@jit.rawkernel(device=True)
+def _lut_lerp_at(table, row_base, lut_n_energy, lut_E_min_keV, lut_inv_dE_keV, E_i):
+    """Interpolate a flattened LUT row at an arbitrary energy.
+
+    The frozen path indexes the grid once per flight and reuses the index for
+    every table, so it stays inlined. The midpoint rule evaluates the same
+    tables at the cutoff, predictor, and midpoint energies, which needs the
+    clamped index lookup as a callable. Same arithmetic as the host
+    ``_lut_index_frac_scalar`` / ``_lut_lerp_2d`` pair; ``row_base`` is
+    ``L * lut_n_energy`` for a per-layer table and zero for a 1-D one.
+    """
+    x = (E_i - lut_E_min_keV) * lut_inv_dE_keV
+    last = lut_n_energy - I32_ONE
+    if x <= F64_ZERO:
+        i = I32_ZERO
+        f = F64_ZERO
+    elif x >= last:
+        i = last - I32_ONE
+        f = F64_ONE
+    else:
+        i = np.int32(x)
+        f = x - i
+    base = row_base + i
+    v0 = table[base]
+    return v0 + f * (table[base + I32_ONE] - v0)
+
+
+@jit.rawkernel(device=True)
 def _interp_mott_log_alpha(logE_eV, logE_flat, logA_flat, start, length):
     """Linear interpolation with ``np.interp`` endpoint clamping."""
     first = start
@@ -190,6 +236,8 @@ def _transport_kernel(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -225,6 +273,10 @@ def _transport_kernel(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     seg_count,
     exit_code,
 ):
@@ -256,6 +308,12 @@ def _transport_kernel(
     draw = U64_ZERO
     local_nseg = I32_ZERO
     E_cut_e = E_cut_by_electrons[e]
+    # Per-thread optical-depth budget and flight identity; -1.0 marks "no flight
+    # open", the only state in which a collision is drawn.
+    tau_left = -F64_ONE
+    flight_id = I32_ZERO
+    substep_id = I32_ZERO
+    energy_controlled = max_dE_frac > F64_ZERO
 
     step = I32_ZERO
     running = True
@@ -289,8 +347,10 @@ def _transport_kernel(
             i_el += I32_ONE
 
         lam_ang = np.float64(1e8) / total_rate
-        step_j = -lam_ang * xp.log(_stream_uniform(key, draw))
-        draw = draw + U64_ONE
+        if tau_left < F64_ZERO:
+            tau_left = -xp.log(_stream_uniform(key, draw))
+            draw = draw + U64_ONE
+        step_j = tau_left * lam_ang
 
         # 2. Truncate the flight at this layer's z boundaries.
         dx = dirs[e3]
@@ -364,18 +424,17 @@ def _transport_kernel(
         # 3. Record the radiating material segment. An electron that overflows
         #    `cap` keeps transporting so `seg_count` reports the capacity the
         #    replay needs.
-        dEds = F64_ZERO
-        i_el = I32_ZERO
-        while i_el < n_el:
-            J = L_Js[row + i_el]
-            k = L_ks[row + i_el]
-            coeff = L_coeffs[row + i_el]
-            dEds += coeff * xp.log(np.float64(1.166) * (E_j + k * J) / J)
-            i_el += I32_ONE
-        dEds = -np.float64(7.85e-4) / E_j * dEds
-        beta_j = _beta_from_keV(E_j)
+        dEds = _dEds_packed(L_Js, L_ks, L_coeffs, row, n_el, E_j)
         cutoff_j = False
-        cutoff_distance = (E_cut_e - E_j) / dEds
+        if energy_model_code == I32_ONE:
+            # The midpoint rule makes E_end = E_cut at the cutoff by definition,
+            # so the truncation distance solves the scheme at
+            # E_mid = (E_start + E_cut)/2, not its left-endpoint linearization.
+            cutoff_distance = (E_cut_e - E_j) / _dEds_packed(
+                L_Js, L_ks, L_coeffs, row, n_el, F64_HALF * (E_j + E_cut_e)
+            )
+        else:
+            cutoff_distance = (E_cut_e - E_j) / dEds
         geometry_event = cross_up_j or cross_dn_j or exit_side_j
         if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
             step_j = cutoff_distance
@@ -385,6 +444,40 @@ def _transport_kernel(
             exit_top_j = False
             exit_bot_j = False
             exit_side_j = False
+
+        # The numerical energy-loss cap is the only step limit that does not
+        # close a physical flight: it emits a row and resumes with the same
+        # optical-depth budget, direction, and `flight_id`.
+        limited_j = False
+        if energy_controlled and not cutoff_j:
+            step_energy = max_dE_frac * E_j / (-dEds)
+            if step_energy < step_j:
+                step_j = step_energy
+                limited_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+
+        if energy_model_code == I32_ONE:
+            if cutoff_j:
+                E_end_j = E_cut_e
+            else:
+                # Predictor-corrector for the implicit midpoint rule
+                # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                E_pred = E_j + dEds * step_j
+                E_end_j = E_j + step_j * _dEds_packed(
+                    L_Js, L_ks, L_coeffs, row, n_el, F64_HALF * (E_j + E_pred)
+                )
+            beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
+        else:
+            if cutoff_j:
+                E_end_j = E_cut_e
+            else:
+                E_end_j = E_j + dEds * step_j
+            beta_j = _beta_from_keV(E_j)
+        t_end_j = clock[e] + step_j / beta_j
 
         if local_nseg < cap:
             slot = i * cap + local_nseg
@@ -400,122 +493,137 @@ def _transport_kernel(
             seg_t0[slot] = clock[e]
             seg_id[slot] = e
             seg_lay[slot] = L
+            if energy_model_code == I32_ONE:
+                seg_E_end[slot] = E_end_j
+                seg_t_end[slot] = t_end_j
+                seg_flight[slot] = flight_id
+                seg_substep[slot] = substep_id
         local_nseg += I32_ONE
 
-        # 4. Advance position, energy, and transport clock.
+        # 4. Advance position, energy, transport clock, and optical depth.
         pos[e3] = px + step_j * dx
         pos[e3 + I32_ONE] = py + step_j * dy
         pos[e3 + I32_TWO] = pz + step_j * dz
-        if cutoff_j:
-            E_keV[e] = E_cut_e
-        else:
-            E_keV[e] = E_j + dEds * step_j
-        clock[e] += step_j / beta_j
+        E_keV[e] = E_end_j
+        clock[e] = t_end_j
+        tau_left -= step_j / lam_ang
+        if tau_left < F64_ZERO:
+            tau_left = F64_ZERO
 
-        # 5. Exit, internal-boundary, or collision handling.
-        if exit_top_j:
-            exit_code[i] = I8_BACKSCATTERED
-        elif exit_bot_j:
-            exit_code[i] = I8_TRANSMITTED
-        elif exit_side_j:
-            exit_code[i] = I8_SIDE
-        elif cutoff_j:
-            exit_code[i] = I8_CUTOFF_STOPPED
-
-        if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
-            running = False
-        elif cross_up_j or cross_dn_j:
-            if dirs[e3 + I32_TWO] > F64_ZERO:
-                pos[e3 + I32_TWO] += F64_EPS
-            else:
-                pos[e3 + I32_TWO] -= F64_EPS
+        # 5. Exit, internal-boundary, or collision handling. A numerical
+        #    substep skips all of it and resumes the same physical flight.
+        if limited_j:
+            substep_id += I32_ONE
         else:
-            # A full flight ended in an elastic collision. Pick the element with
-            # probability proportional to n_i sigma_i(E). Rates are recomputed
-            # rather than buffered so no per-thread local array is needed; a
-            # recomputation that lands exactly on the sampled boundary could
-            # select a neighbouring element, which the CPU reference reproduces
-            # because it recomputes identically.
-            if n_el == I32_ONE:
-                sel = I32_ZERO
+            if exit_top_j:
+                exit_code[i] = I8_BACKSCATTERED
+            elif exit_bot_j:
+                exit_code[i] = I8_TRANSMITTED
+            elif exit_side_j:
+                exit_code[i] = I8_SIDE
+            elif cutoff_j:
+                exit_code[i] = I8_CUTOFF_STOPPED
+
+            if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
+                running = False
             else:
-                u = _stream_uniform(key, draw) * total_rate
-                draw = draw + U64_ONE
-                cumulative = F64_ZERO
-                sel = n_el - I32_ONE
-                k_el = I32_ZERO
-                picked = False
-                while k_el < n_el:
-                    if elastic_model_code == I32_ONE:
-                        cumulative += _rate_mott(
-                            E_j,
-                            L_mott_numer[row + k_el],
-                            L_mott_denom1[row + k_el],
-                            L_mott_denom2[row + k_el],
-                        )
+                # Every remaining outcome closes the physical flight, so the
+                # next iteration opens a new one and redraws the collision.
+                flight_id += I32_ONE
+                substep_id = I32_ZERO
+                tau_left = -F64_ONE
+                if cross_up_j or cross_dn_j:
+                    if dirs[e3 + I32_TWO] > F64_ZERO:
+                        pos[e3 + I32_TWO] += F64_EPS
                     else:
-                        cumulative += _rate_sr(
-                            E_j, L_sr_rate_numer[row + k_el], L_sr_joy_numer[row + k_el]
+                        pos[e3 + I32_TWO] -= F64_EPS
+                else:
+                    # A full flight ended in an elastic collision. Pick the element with
+                    # probability proportional to n_i sigma_i(E). Rates are recomputed
+                    # rather than buffered so no per-thread local array is needed; a
+                    # recomputation that lands exactly on the sampled boundary could
+                    # select a neighbouring element, which the CPU reference reproduces
+                    # because it recomputes identically.
+                    if n_el == I32_ONE:
+                        sel = I32_ZERO
+                    else:
+                        u = _stream_uniform(key, draw) * total_rate
+                        draw = draw + U64_ONE
+                        cumulative = F64_ZERO
+                        sel = n_el - I32_ONE
+                        k_el = I32_ZERO
+                        picked = False
+                        while k_el < n_el:
+                            if elastic_model_code == I32_ONE:
+                                cumulative += _rate_mott(
+                                    E_j,
+                                    L_mott_numer[row + k_el],
+                                    L_mott_denom1[row + k_el],
+                                    L_mott_denom2[row + k_el],
+                                )
+                            else:
+                                cumulative += _rate_sr(
+                                    E_j, L_sr_rate_numer[row + k_el], L_sr_joy_numer[row + k_el]
+                                )
+                            if cumulative > u and not picked:
+                                sel = k_el
+                                picked = True
+                            k_el += I32_ONE
+
+                    if elastic_model_code == I32_ONE and mott_has_table[row + sel] == np.uint8(1):
+                        log_alpha = _interp_mott_log_alpha(
+                            xp.log10(E_keV[e] * np.float64(1e3)),
+                            mott_logE_flat,
+                            mott_logA_flat,
+                            mott_start[row + sel],
+                            mott_len[row + sel],
                         )
-                    if cumulative > u and not picked:
-                        sel = k_el
-                        picked = True
-                    k_el += I32_ONE
+                        alpha = F64_TEN**log_alpha
+                    else:
+                        alpha = _alpha_sr_joy(L_sr_joy_numer[row + sel], E_keV[e])
 
-            if elastic_model_code == I32_ONE and mott_has_table[row + sel] == np.uint8(1):
-                log_alpha = _interp_mott_log_alpha(
-                    xp.log10(E_keV[e] * np.float64(1e3)),
-                    mott_logE_flat,
-                    mott_logA_flat,
-                    mott_start[row + sel],
-                    mott_len[row + sel],
-                )
-                alpha = F64_TEN**log_alpha
-            else:
-                alpha = _alpha_sr_joy(L_sr_joy_numer[row + sel], E_keV[e])
+                    R_ang = _stream_uniform(key, draw)
+                    draw = draw + U64_ONE
+                    cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
+                    phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
+                    draw = draw + U64_ONE
 
-            R_ang = _stream_uniform(key, draw)
-            draw = draw + U64_ONE
-            cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
-            phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
-            draw = draw + U64_ONE
-
-            # Inlined `_rotate_direction_scalar`: build an orthonormal frame
-            # about the current direction and rotate by (cos_t, phi).
-            odx = dirs[e3]
-            ody = dirs[e3 + I32_ONE]
-            odz = dirs[e3 + I32_TWO]
-            sin2 = F64_ONE - cos_t * cos_t
-            if sin2 < F64_ZERO:
-                sin2 = F64_ZERO
-            sin_t = xp.sqrt(sin2)
-            cos_phi = xp.cos(phi)
-            sin_phi = xp.sin(phi)
-            if xp.abs(odx) < np.float64(0.9):
-                refx = F64_ONE
-                refy = F64_ZERO
-            else:
-                refx = F64_ZERO
-                refy = F64_ONE
-            ux = -odz * refy
-            uy = odz * refx
-            uz = odx * refy - ody * refx
-            u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
-            ux /= u_mag
-            uy /= u_mag
-            uz /= u_mag
-            wx = ody * uz - odz * uy
-            wy = odz * ux - odx * uz
-            wz = odx * uy - ody * ux
-            a_rot = sin_t * cos_phi
-            b_rot = sin_t * sin_phi
-            outx = cos_t * odx + a_rot * ux + b_rot * wx
-            outy = cos_t * ody + a_rot * uy + b_rot * wy
-            outz = cos_t * odz + a_rot * uz + b_rot * wz
-            mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
-            dirs[e3] = outx / mag
-            dirs[e3 + I32_ONE] = outy / mag
-            dirs[e3 + I32_TWO] = outz / mag
+                    # Inlined `_rotate_direction_scalar`: build an orthonormal frame
+                    # about the current direction and rotate by (cos_t, phi).
+                    odx = dirs[e3]
+                    ody = dirs[e3 + I32_ONE]
+                    odz = dirs[e3 + I32_TWO]
+                    sin2 = F64_ONE - cos_t * cos_t
+                    if sin2 < F64_ZERO:
+                        sin2 = F64_ZERO
+                    sin_t = xp.sqrt(sin2)
+                    cos_phi = xp.cos(phi)
+                    sin_phi = xp.sin(phi)
+                    if xp.abs(odx) < np.float64(0.9):
+                        refx = F64_ONE
+                        refy = F64_ZERO
+                    else:
+                        refx = F64_ZERO
+                        refy = F64_ONE
+                    ux = -odz * refy
+                    uy = odz * refx
+                    uz = odx * refy - ody * refx
+                    u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
+                    ux /= u_mag
+                    uy /= u_mag
+                    uz /= u_mag
+                    wx = ody * uz - odz * uy
+                    wy = odz * ux - odx * uz
+                    wz = odx * uy - ody * ux
+                    a_rot = sin_t * cos_phi
+                    b_rot = sin_t * sin_phi
+                    outx = cos_t * odx + a_rot * ux + b_rot * wx
+                    outy = cos_t * ody + a_rot * uy + b_rot * wy
+                    outz = cos_t * odz + a_rot * uz + b_rot * wz
+                    mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
+                    dirs[e3] = outx / mag
+                    dirs[e3 + I32_ONE] = outy / mag
+                    dirs[e3 + I32_TWO] = outz / mag
 
     seg_count[i] = local_nseg
 
@@ -531,6 +639,8 @@ def _transport_lut_kernel(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -559,6 +669,10 @@ def _transport_lut_kernel(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     seg_count,
     exit_code,
 ):
@@ -579,6 +693,12 @@ def _transport_lut_kernel(
     draw = U64_ZERO
     local_nseg = I32_ZERO
     E_cut_e = E_cut_by_electrons[e]
+    # Per-thread optical-depth budget and flight identity; -1.0 marks "no flight
+    # open", the only state in which a collision is drawn.
+    tau_left = -F64_ONE
+    flight_id = I32_ZERO
+    substep_id = I32_ZERO
+    energy_controlled = max_dE_frac > F64_ZERO
 
     step = I32_ZERO
     running = True
@@ -611,8 +731,10 @@ def _transport_lut_kernel(
         total0 = lut_total_rate[layer_lut]
         total_rate = total0 + lut_f * (lut_total_rate[layer_lut + I32_ONE] - total0)
         lam_ang = np.float64(1e8) / total_rate
-        step_j = -lam_ang * xp.log(_stream_uniform(key, draw))
-        draw = draw + U64_ONE
+        if tau_left < F64_ZERO:
+            tau_left = -xp.log(_stream_uniform(key, draw))
+            draw = draw + U64_ONE
+        step_j = tau_left * lam_ang
 
         dx = dirs[e3]
         dy = dirs[e3 + I32_ONE]
@@ -684,8 +806,19 @@ def _transport_lut_kernel(
         dEds = dE0 + lut_f * (lut_dEds[layer_lut + I32_ONE] - dE0)
         b0 = lut_inv_beta[lut_i]
         inv_beta_j = b0 + lut_f * (lut_inv_beta[lut_i + I32_ONE] - b0)
+        layer_base = L * lut_n_energy
         cutoff_j = False
-        cutoff_distance = (E_cut_e - E_j) / dEds
+        if energy_model_code == I32_ONE:
+            cutoff_distance = (E_cut_e - E_j) / _lut_lerp_at(
+                lut_dEds,
+                layer_base,
+                lut_n_energy,
+                lut_E_min_keV,
+                lut_inv_dE_keV,
+                F64_HALF * (E_j + E_cut_e),
+            )
+        else:
+            cutoff_distance = (E_cut_e - E_j) / dEds
         geometry_event = cross_up_j or cross_dn_j or exit_side_j
         if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
             step_j = cutoff_distance
@@ -695,6 +828,48 @@ def _transport_lut_kernel(
             exit_top_j = False
             exit_bot_j = False
             exit_side_j = False
+
+        # The numerical energy-loss cap is the only step limit that does not
+        # close a physical flight.
+        limited_j = False
+        if energy_controlled and not cutoff_j:
+            step_energy = max_dE_frac * E_j / (-dEds)
+            if step_energy < step_j:
+                step_j = step_energy
+                limited_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+
+        if energy_model_code == I32_ONE:
+            if cutoff_j:
+                E_end_j = E_cut_e
+            else:
+                E_pred = E_j + dEds * step_j
+                E_end_j = E_j + step_j * _lut_lerp_at(
+                    lut_dEds,
+                    layer_base,
+                    lut_n_energy,
+                    lut_E_min_keV,
+                    lut_inv_dE_keV,
+                    F64_HALF * (E_j + E_pred),
+                )
+            t_end_j = clock[e] + step_j * _lut_lerp_at(
+                lut_inv_beta,
+                I32_ZERO,
+                lut_n_energy,
+                lut_E_min_keV,
+                lut_inv_dE_keV,
+                F64_HALF * (E_j + E_end_j),
+            )
+        else:
+            if cutoff_j:
+                E_end_j = E_cut_e
+            else:
+                E_end_j = E_j + dEds * step_j
+            t_end_j = clock[e] + step_j * inv_beta_j
 
         if local_nseg < cap:
             slot = i * cap + local_nseg
@@ -710,106 +885,122 @@ def _transport_lut_kernel(
             seg_t0[slot] = clock[e]
             seg_id[slot] = e
             seg_lay[slot] = L
+            if energy_model_code == I32_ONE:
+                seg_E_end[slot] = E_end_j
+                seg_t_end[slot] = t_end_j
+                seg_flight[slot] = flight_id
+                seg_substep[slot] = substep_id
         local_nseg += I32_ONE
 
         pos[e3] = px + step_j * dx
         pos[e3 + I32_ONE] = py + step_j * dy
         pos[e3 + I32_TWO] = pz + step_j * dz
-        if cutoff_j:
-            E_keV[e] = E_cut_e
+        E_keV[e] = E_end_j
+        clock[e] = t_end_j
+        tau_left -= step_j / lam_ang
+        if tau_left < F64_ZERO:
+            tau_left = F64_ZERO
+
+        # A numerical substep resumes the same physical flight, so it skips
+        # every exit, boundary, and collision outcome below.
+        if limited_j:
+            substep_id += I32_ONE
         else:
-            E_keV[e] = E_j + dEds * step_j
-        clock[e] += step_j * inv_beta_j
+            if exit_top_j:
+                exit_code[i] = I8_BACKSCATTERED
+            elif exit_bot_j:
+                exit_code[i] = I8_TRANSMITTED
+            elif exit_side_j:
+                exit_code[i] = I8_SIDE
+            elif cutoff_j:
+                exit_code[i] = I8_CUTOFF_STOPPED
 
-        if exit_top_j:
-            exit_code[i] = I8_BACKSCATTERED
-        elif exit_bot_j:
-            exit_code[i] = I8_TRANSMITTED
-        elif exit_side_j:
-            exit_code[i] = I8_SIDE
-        elif cutoff_j:
-            exit_code[i] = I8_CUTOFF_STOPPED
-
-        if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
-            running = False
-        elif cross_up_j or cross_dn_j:
-            if dirs[e3 + I32_TWO] > F64_ZERO:
-                pos[e3 + I32_TWO] += F64_EPS
+            if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
+                running = False
             else:
-                pos[e3 + I32_TWO] -= F64_EPS
-        else:
-            row = L * max_el
-            if n_el == I32_ONE:
-                sel = I32_ZERO
-            else:
-                u = _stream_uniform(key, draw)
-                draw = draw + U64_ONE
-                sel = n_el - I32_ONE
-                k_el = I32_ZERO
-                picked = False
-                while k_el < n_el:
-                    cdf_base = (row + k_el) * lut_n_energy + lut_i
-                    c0 = lut_cdf[cdf_base]
-                    cumulative = c0 + lut_f * (lut_cdf[cdf_base + I32_ONE] - c0)
-                    if cumulative > u and not picked:
-                        sel = k_el
-                        picked = True
-                    k_el += I32_ONE
+                # Every remaining outcome closes the physical flight, so the
+                # next iteration opens a new one and redraws the collision.
+                flight_id += I32_ONE
+                substep_id = I32_ZERO
+                tau_left = -F64_ONE
+                if cross_up_j or cross_dn_j:
+                    if dirs[e3 + I32_TWO] > F64_ZERO:
+                        pos[e3 + I32_TWO] += F64_EPS
+                    else:
+                        pos[e3 + I32_TWO] -= F64_EPS
+                else:
+                    row = L * max_el
+                    if n_el == I32_ONE:
+                        sel = I32_ZERO
+                    else:
+                        u = _stream_uniform(key, draw)
+                        draw = draw + U64_ONE
+                        sel = n_el - I32_ONE
+                        k_el = I32_ZERO
+                        picked = False
+                        while k_el < n_el:
+                            cdf_base = (row + k_el) * lut_n_energy + lut_i
+                            c0 = lut_cdf[cdf_base]
+                            cumulative = c0 + lut_f * (lut_cdf[cdf_base + I32_ONE] - c0)
+                            if cumulative > u and not picked:
+                                sel = k_el
+                                picked = True
+                            k_el += I32_ONE
 
-            alpha_x = (E_keV[e] - lut_E_min_keV) * lut_inv_dE_keV
-            if alpha_x <= F64_ZERO:
-                alpha_i = I32_ZERO
-                alpha_f = F64_ZERO
-            elif alpha_x >= lut_last:
-                alpha_i = lut_last - I32_ONE
-                alpha_f = F64_ONE
-            else:
-                alpha_i = np.int32(alpha_x)
-                alpha_f = alpha_x - alpha_i
-            alpha_base = (row + sel) * lut_n_energy + alpha_i
-            a0 = lut_alpha[alpha_base]
-            alpha = a0 + alpha_f * (lut_alpha[alpha_base + I32_ONE] - a0)
+                    alpha_x = (E_keV[e] - lut_E_min_keV) * lut_inv_dE_keV
+                    if alpha_x <= F64_ZERO:
+                        alpha_i = I32_ZERO
+                        alpha_f = F64_ZERO
+                    elif alpha_x >= lut_last:
+                        alpha_i = lut_last - I32_ONE
+                        alpha_f = F64_ONE
+                    else:
+                        alpha_i = np.int32(alpha_x)
+                        alpha_f = alpha_x - alpha_i
+                    alpha_base = (row + sel) * lut_n_energy + alpha_i
+                    a0 = lut_alpha[alpha_base]
+                    alpha = a0 + alpha_f * (lut_alpha[alpha_base + I32_ONE] - a0)
 
-            R_ang = _stream_uniform(key, draw)
-            draw = draw + U64_ONE
-            cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
-            phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
-            draw = draw + U64_ONE
+                    R_ang = _stream_uniform(key, draw)
+                    draw = draw + U64_ONE
+                    cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
+                    phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
+                    draw = draw + U64_ONE
 
-            odx = dirs[e3]
-            ody = dirs[e3 + I32_ONE]
-            odz = dirs[e3 + I32_TWO]
-            sin2 = F64_ONE - cos_t * cos_t
-            if sin2 < F64_ZERO:
-                sin2 = F64_ZERO
-            sin_t = xp.sqrt(sin2)
-            cos_phi = xp.cos(phi)
-            sin_phi = xp.sin(phi)
-            if xp.abs(odx) < np.float64(0.9):
-                refx = F64_ONE
-                refy = F64_ZERO
-            else:
-                refx = F64_ZERO
-                refy = F64_ONE
-            ux = -odz * refy
-            uy = odz * refx
-            uz = odx * refy - ody * refx
-            u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
-            ux /= u_mag
-            uy /= u_mag
-            uz /= u_mag
-            wx = ody * uz - odz * uy
-            wy = odz * ux - odx * uz
-            wz = odx * uy - ody * ux
-            a_rot = sin_t * cos_phi
-            b_rot = sin_t * sin_phi
-            outx = cos_t * odx + a_rot * ux + b_rot * wx
-            outy = cos_t * ody + a_rot * uy + b_rot * wy
-            outz = cos_t * odz + a_rot * uz + b_rot * wz
-            mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
-            dirs[e3] = outx / mag
-            dirs[e3 + I32_ONE] = outy / mag
-            dirs[e3 + I32_TWO] = outz / mag
+                    odx = dirs[e3]
+                    ody = dirs[e3 + I32_ONE]
+                    odz = dirs[e3 + I32_TWO]
+                    sin2 = F64_ONE - cos_t * cos_t
+                    if sin2 < F64_ZERO:
+                        sin2 = F64_ZERO
+                    sin_t = xp.sqrt(sin2)
+                    cos_phi = xp.cos(phi)
+                    sin_phi = xp.sin(phi)
+                    if xp.abs(odx) < np.float64(0.9):
+                        refx = F64_ONE
+                        refy = F64_ZERO
+                    else:
+                        refx = F64_ZERO
+                        refy = F64_ONE
+                    ux = -odz * refy
+                    uy = odz * refx
+                    uz = odx * refy - ody * refx
+                    u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
+                    ux /= u_mag
+                    uy /= u_mag
+                    uz /= u_mag
+                    wx = ody * uz - odz * uy
+                    wy = odz * ux - odx * uz
+                    wz = odx * uy - ody * ux
+                    a_rot = sin_t * cos_phi
+                    b_rot = sin_t * sin_phi
+                    outx = cos_t * odx + a_rot * ux + b_rot * wx
+                    outy = cos_t * ody + a_rot * uy + b_rot * wy
+                    outz = cos_t * odz + a_rot * uz + b_rot * wz
+                    mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
+                    dirs[e3] = outx / mag
+                    dirs[e3 + I32_ONE] = outy / mag
+                    dirs[e3 + I32_TWO] = outz / mag
 
     seg_count[i] = local_nseg
 
@@ -824,6 +1015,8 @@ def run_transport_lut_kernel(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -851,6 +1044,10 @@ def run_transport_lut_kernel(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     seg_count,
     exit_code,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
@@ -878,6 +1075,8 @@ def run_transport_lut_kernel(
             np.int32(n_layers),
             internal_bounds,
             np.int32(elastic_model_code),
+            np.int32(energy_model_code),
+            np.float64(max_dE_frac),
             np.float64(z_total),
             np.int32(1 if finite_footprint else 0),
             np.float64(width_ang),
@@ -906,6 +1105,10 @@ def run_transport_lut_kernel(
             seg_t0,
             seg_id,
             seg_lay,
+            seg_E_end,
+            seg_t_end,
+            seg_flight,
+            seg_substep,
             seg_count,
             exit_code,
         ),
@@ -931,6 +1134,8 @@ def run_transport_kernel(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -965,6 +1170,10 @@ def run_transport_kernel(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     seg_count,
     exit_code,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
@@ -997,6 +1206,8 @@ def run_transport_kernel(
             np.int32(n_layers),
             internal_bounds,
             np.int32(elastic_model_code),
+            np.int32(energy_model_code),
+            np.float64(max_dE_frac),
             np.float64(z_total),
             np.int32(1 if finite_footprint else 0),
             np.float64(width_ang),
@@ -1032,6 +1243,10 @@ def run_transport_kernel(
             seg_t0,
             seg_id,
             seg_lay,
+            seg_E_end,
+            seg_t_end,
+            seg_flight,
+            seg_substep,
             seg_count,
             exit_code,
         ),

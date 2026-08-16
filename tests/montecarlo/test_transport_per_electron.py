@@ -16,6 +16,7 @@ from pyrite.montecarlo.transport import (
     CUDA_TRANSPORT_MIN_ELECTRONS,
     TRANSPORT_ELEMENTS,
     PerElectronTransportConfig,
+    TransportLUTConfig,
     _splitmix64,
     _stream_key_scalar,
     _stream_uniform_scalar,
@@ -418,6 +419,32 @@ def test_cuda_matches_the_cpu_reference_in_aggregate():
         b = np.array([fn(r) for r in gpu])
         spread = np.hypot(a.std(ddof=1), b.std(ddof=1)) / np.sqrt(len(a))
         assert abs(a.mean() - b.mean()) < 4.0 * spread, name
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize("use_lut", [False, True])
+def test_cuda_midpoint_first_flight_agrees_with_the_cpu_reference(use_lut):
+    # Same argument as the frozen first-step test: only the opening segment of
+    # each electron is comparable across libm implementations. Here it also
+    # pins the flight identity and end-state fields the controlled propagator
+    # adds, so a mis-ordered kernel draw or a dropped substep shows up.
+    controlled = dict(
+        energy_model="midpoint",
+        max_dE_frac=0.05,
+        transport_lut_config=TransportLUTConfig(enabled=use_lut),
+    )
+    cpu = _run(transport_core="per-electron", **controlled)
+    gpu = _run(transport_core="cuda", **controlled)
+
+    assert set(gpu) >= {"E_end_keV", "t_end_ang", "E_repr_keV", "flight_id", "substep_id"}
+    first = np.flatnonzero(np.diff(cpu["elec_id"], prepend=-1))
+    gpu_first = np.flatnonzero(np.diff(gpu["elec_id"], prepend=-1))
+    assert np.array_equal(first, gpu_first)
+    for key in ("flight_id", "substep_id", "layer"):
+        np.testing.assert_array_equal(cpu[key][first], gpu[key][first])
+    for key in ("L_ang", "E_start_keV", "E_end_keV", "E_repr_keV", "t_end_ang"):
+        np.testing.assert_allclose(cpu[key][first], gpu[key][first], rtol=1e-12)
 
 
 @pytest.mark.hardware
