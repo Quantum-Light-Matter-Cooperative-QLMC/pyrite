@@ -1,4 +1,5 @@
- TODO / Backlog
+
+# TODO / Backlog
 
 ---
 
@@ -24,24 +25,12 @@ file. Edit and drop items on `main`.
    (F-I). →
    `feature/energy-controlled-electron-transport`;
    [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
-3. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
-   evidence: `qlmc` job `1638` (`hopg_hbn`) computed 5508 hopg cases in 195 s and
-   5508 h-BN cases in 206 s — ~35-37 ms/case — while the box held ~5% CPU and
-   10-15% GPU utilization with no burstiness, so the case loop is bound by
-   neither CPU nor GPU. Checkpoint I/O is no longer the suspect: after the
-   record-table encoding (`543394b`) that job saved 5508 records per material in
-   ~11 s and ~6 s, against the 152 s version-1 decodes that returned zero work in
-   jobs `1635`/`1636` and were SIGTERM-killed in `1637`. Remaining work is what
-   W3 item 2 and W4 already scoped and gated on a CUDA box: one authorized remote
-   job exercising the ported `pyrite run -R --cpu`/`--cpu-only` profiler, NVTX
-   ranges in `transport.py`, and attribution of the host-side transport remainder
-   (`.capsync` was 28.5 ms of a 64.3 ms local hopg case). →
-   `feature/compute-performance-optimization`;
-   [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
 
-## P1 - top-priority back burner
+## Triaged
 
-### Ready
+### P1 - top-priority back burner
+
+#### Ready
 
 1. **Add support for characteristic X-rays**
 2. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
@@ -60,7 +49,7 @@ file. Edit and drop items on `main`.
    → `chore/physics-boundary-typing`;
    [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
 
-### Gated
+#### Gated
 
 1. **Reference elastic scattering data.** Replace out-of-range Browning totals
    in `mott` mode with provenance-controlled NIST totals and adopt DCS CDFs or a
@@ -76,12 +65,12 @@ file. Edit and drop items on `main`.
 3. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/physics/materials/crystal-mosaicity.md`](docs/physics/materials/crystal-mosaicity.md).
 4. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/physics/radiation-physics/coherent-emission.md`](docs/physics/radiation-physics/coherent-emission.md).
 
-### Paused / on hold
+#### Paused / on hold
 
 1. **High-energy electron/channeling support.** Start with REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
 2. **Bent Crystals (After add channeling + relativistic electrons)**
 
-## P2 - medium-priority back burner
+### P2 - medium-priority back burner
 
 1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
 2. **Detector profiles and Zhai validation modernization.** Add profile-owned
@@ -129,8 +118,22 @@ file. Edit and drop items on `main`.
    and instrument geometry. CUDA-only is acceptable with its dpnp/SYCL cost
    recorded. → `docs/geometry-engine-evaluation`;
    [`agentdocs/tasks/docs/geometry-engine-evaluation/`](agentdocs/tasks/docs/geometry-engine-evaluation/).
+6. **Compute performance optimization — remainder.** Reopened 2026-08-14 on new
+   evidence: `qlmc` job `1638` (`hopg_hbn`) computed 5508 hopg cases in 195 s and
+   5508 h-BN cases in 206 s — ~35-37 ms/case — while the box held ~5% CPU and
+   10-15% GPU utilization with no burstiness, so the case loop is bound by
+   neither CPU nor GPU. Checkpoint I/O is no longer the suspect: after the
+   record-table encoding (`543394b`) that job saved 5508 records per material in
+   ~11 s and ~6 s, against the 152 s version-1 decodes that returned zero work in
+   jobs `1635`/`1636` and were SIGTERM-killed in `1637`. Remaining work is what
+   W3 item 2 and W4 already scoped and gated on a CUDA box: one authorized remote
+   job exercising the ported `pyrite run -R --cpu`/`--cpu-only` profiler, NVTX
+   ranges in `transport.py`, and attribution of the host-side transport remainder
+   (`.capsync` was 28.5 ms of a 64.3 ms local hopg case). →
+   `feature/compute-performance-optimization`;
+   [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
 
-## P3 - lower-priority / exploratory back burner
+### P3 - lower-priority / exploratory back burner
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`; proposal: [`docs/research/workflows/parameter-space-sampling.md`](docs/research/workflows/parameter-space-sampling.md).
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/research/instrumentation/grazing-grating.md`](docs/research/instrumentation/grazing-grating.md).
@@ -139,6 +142,8 @@ file. Edit and drop items on `main`.
    target and a planar pixel detector, including partial coverage without a
    general geometry engine. → `feature/positioned-photon-filters`;
    [`agentdocs/tasks/feature/positioned-photon-filters/`](agentdocs/tasks/feature/positioned-photon-filters/).
+
+## General backlogs
 
 ## Inbox - >user< to be triaged
 
@@ -163,11 +168,12 @@ file. Edit and drop items on `main`.
    This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
 7. Add consistent naming, labelling, and reporting of material, chemical name, crystal phase, and crystal cut
 
-## CLI backlog
+### CLI
 
-Nothing yet.
+1. Add support for user-definition of FilterPlate (material, dims [simple rect dims], position, orientation)
+2. Add more clear support for user control of calculation numerics
 
-## Bugs (fix + regression test)
+### Bugs (fix + regression test)
 
 1. Rerunning a recently run & pulled `pyrite run <profile> -R` on a profile with remotely cached cases will correctly skip the cached ones for rerun, but it will then re-pull ALL the cases, including those that are identical to the stems held locally.
 
@@ -175,19 +181,60 @@ Nothing yet.
 
 Nothing here yet.
 
-## Notebook backlog
+### Notebooks
 
 1. Make it so 'narrow_auto' in make_axis_controls from `src/pyrite/apps/analysis_ui/controls.py`
    auto-sets the x-axis lims according to the Min/Max x-values of the widest *line energy*
    grid being plotted. Right now it goes off the brem grid, which makes it run to 10's or 100's
    of keV, defeating the whole purpose of the *narrow* plot.
+2. Fix validation app:
+   1. Fix broken anchors
 
-## UI backlog
+      1. Detector: Solid Angle integration PASSES (no fix)
+      2. Mosaic: exact orientation average PASSES (no fix)
+      3. Multilayer: absorption + transport FAILS
+      4. Multilayer: escape + backscatter FAILS
+      5. Multilayer: crystalline substrate radiation FAILS
+3. When trying to run supplementary Zhai checks for currently non-existent cases (new azims), we just get this:
+   "Zhai cache missing or stale: /home/alex/dev/pyrite/checkpoints/zhai_reproduction/zhai-supplement-v4-9ae6e14b73b038b27138.pkl;
+   populate it with `pyrite run --preset zhai --remote`". Trying to then use the recompute remotely feature, we get:
+
+```JOB
+  SLURM     1665
+  Host      qlmc
+  Workload  Zhai reproduction
+  Monitor   pyrite job attach 20260816-084051-40a80198
+  Status    pyrite job status 20260816-084051-40a80198 -vv
+  Logs      pyrite job logs 20260816-084051-40a80198 --follow
+  Pull      pyrite remote pull --preset zhai  (after completion)
+[E 260816 08:40:58 notification_utils:257] (error_id=837366ce-6440-4722-9f63-5bfd67a026c8) remote launch did not report a job id:
+    + scp /tmp/tmp8rvx8pue/cxr_code.tgz qlmc:/tmp/cxr_code.tgz
+    + ssh -n qlmc mkdir -p "/home/aamador/dev/pyrite" && cd "/home/aamador/dev/pyrite" && tar xzf /tmp/cxr_code.tgz &&...<truncated></truncated>
+    + ssh -n qlmc R="/home/aamador/dev/pyrite/jobs/reservations"; J="20260816-084051-40a80198"; mkdir -p "$R"; claimed...<truncated></truncated>
+
+    JOB 20260816-084051-40a80198 · SUBMITTED
+      SLURM     1665
+      Host      qlmc
+      Workload  Zhai reproduction
+      Monitor   pyrite job attach 20260816-084051-40a80198
+      Status    pyrite job status 20260816-084051-40a80198 -vv
+      Logs      pyrite job logs 20260816-084051-40a80198 --follow
+      Pull      pyrite remote pull --preset zhai  (after completion)
+[E 260816 08:40:58 notification_utils:257] (error_id=84e77df3-6663-4da1-931b-59c16760cbcd) An ancestor raised an exception (RuntimeError):`
+```
+
+### UI backlog
 
 1. When a profile parameter is set, CLI should print out something along the lines of "< changed from <old_value(s))> to <new_value(s))>" if there were old values, otherwise just "< set to <new_value(s))>"
 2. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard Performance Profile for MoS2" [progress bar + absolute progress]`.
 3. Add optional tags to materials that marks them for inclusion/exclusion in profiles or sweeps, e.g., 'high-energy', '
+
+### Docs
+
+1. Add explanation of substep splitting for CSDA
+
+### Tests
 
 ## Long-term plans
 
