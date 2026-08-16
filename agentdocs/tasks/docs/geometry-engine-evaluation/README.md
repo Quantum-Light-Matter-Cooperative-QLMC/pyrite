@@ -12,12 +12,14 @@ region algebra, no navigator protocol, no imported meshes (STL, STEP, GDML), no
 conditional escape hatch. `Target` is a closed variant set (`Slab | Stack`).
 
 This task is therefore **a decision-support survey, not an implementation**. Its
-output is a research write-up plus an explicit ADR outcome. Reaffirming ADR-0008
-with better-documented evidence is a legitimate and likely result; adopting an
-engine requires a superseding ADR and a separate implementation task that does
-not exist yet.
+output is a research write-up plus an explicit ADR outcome. Per the 2026-08-15
+review, **reversing ADR-0008 is permitted**, so a superseding ADR-0011 is a live
+outcome alongside reaffirmation; either way the implementation is a separate
+task that does not exist yet.
 
-Nothing in this task changes `src/`.
+Nothing in this task changes `src/` except an optional, explicitly bounded
+throwaway benchmark under `scratch/` (see "Authorized spike" below), which is
+never merged.
 
 ### The three consumers must not be conflated
 
@@ -113,8 +115,10 @@ Every candidate scored against the same axes; the matrix goes in the write-up.
   must be measured against the current Numba path before it is called a
   replacement.
 - **Backend portability.** `montecarlo/_backend.py` supports NumPy, CuPy
-  (CUDA/ROCm), and Intel dpnp/SYCL. A CUDA-only engine narrows that. State the
-  cost explicitly rather than assuming the Intel path is expendable.
+  (CUDA/ROCm), and Intel dpnp/SYCL. CUDA-only is accepted per the review, so
+  this axis is no longer a veto — but each candidate must still say what happens
+  to the dpnp/SYCL path and to local (Intel) development. See "Backend reality
+  check".
 - **Determinism and identity.** Per-electron RNG stream reproducibility
   (`stream_keys`, `_splitmix64`), and whether geometry changes perturb
   `case_content_key` / `dataset_identity` / checkpoint stems
@@ -135,9 +139,10 @@ Every candidate scored against the same axes; the matrix goes in the write-up.
   rejection, `target_from_flat` / `target_flat_fields` / `target_replace`, the
   flat geometry vocabulary in catalog TOML and profile overrides, and the
   golden/regression data that pins current behavior.
-- **Scientific driver.** Which concrete experiment or user need requires
-  non-slab target geometry? If none can be named, the survey says so and the
-  answer is candidate 8.
+- **Driver coverage.** How much of each driver geometry above does the candidate
+  actually deliver? Score per driver, not overall. A candidate that navigates
+  arbitrary meshes but cannot express a bent crystal's orientation field scores
+  low on driver 1 however good its ray tracing is.
 
 ## Checklist
 
@@ -150,65 +155,142 @@ Every candidate scored against the same axes; the matrix goes in the write-up.
    general engine would have to reproduce exactly.
 3. Establish the consumer split (A/B/C) with the specific call sites that would
    change for each.
-4. Screen the candidate table. For each: current status, license, packaging,
+4. Settle the bent-crystal question in "Driver geometries" before scoring: is
+   driver 1 a navigation problem, an orientation-field problem, or both? Check
+   `docs/research/physics/channeling-radiation-physics.md`,
+   `relativistic-electron-transport.md`, and `materials/crystal.py`. Record the
+   answer prominently; it conditions the recommendation.
+5. Screen the candidate table. For each: current status, license, packaging,
    device story, and whether it can satisfy ADR-0008's flat-region-table bar.
    Use Context7 for library facts; cite primary sources for the rest. Do not
    assert version-specific capability from memory.
-5. Fill the criteria matrix. Mark unknowns as unknown rather than guessing.
-6. Quantify the baseline: what would candidate 1 (in-house region table) cost,
+6. Fill the criteria matrix, scoring driver coverage per driver. Mark unknowns as
+   unknown rather than guessing.
+7. Quantify the baseline: what would candidate 1 (in-house region table) cost,
    in the same units as the external options? An external engine that does not
    beat the in-house table on the axes above is not worth its dependency.
-7. Write the recommendation, separately for A, B, and C, with the scientific
-   driver question answered explicitly.
-8. Draft the ADR outcome (supersede or reaffirm-with-amendment) and update
-   `docs/adr/index.md` and `docs/research/index.md`.
-9. Propose `TODO.md` follow-ups for `main`; do not create implementation tasks.
-10. Run `uv run pyrite-dev docs`.
+8. Run the authorized spike only if the matrix leaves a genuine tie or a load-
+   bearing unknown that measurement can close. A spike is evidence, not a
+   default step; skip it and say why if the paper comparison already decides.
+9. Write the recommendation, separately for A, B, and C, staged against the
+   driver list — including the sequencing answer, since driver 1 sits behind
+   channeling and relativistic electrons in the backlog.
+10. Draft the ADR outcome — a superseding ADR-0011 or a dated amendment on
+    ADR-0008 — and update `docs/adr/index.md` and `docs/research/index.md`. If
+    ADR-0011 supersedes, set ADR-0008's status to `Superseded by ADR-0011` per
+    the ADR index's append-only rule, and carry forward the parts that survive:
+    the named seam, the flat-region-table requirement, and the bounded
+    post-emission carve-out.
+11. Propose `TODO.md` follow-ups for `main`; do not create implementation tasks.
+12. Run `uv run pyrite-dev docs`.
 
-## Decisions and open questions
+## Decisions
 
 Decided at triage:
 
-- This task produces documentation and an ADR outcome only. No `src/` change, no
-  prototype merged to a branch that touches transport.
+- This task produces documentation and an ADR outcome. No merged `src/` change.
 - The three-consumer split is mandatory structure, not a stylistic choice.
   ADR-0008 already draws the A/B line; the survey must respect it.
-- Reaffirming ADR-0008 is an acceptable and possibly correct outcome. The task
-  is not scoped as "choose an engine".
+- Consumer B (instrument geometry) is *evaluated* here and *implemented* under
+  `feature/positioned-photon-filters` / P3 item 3, not here.
 
-Open — **user input needed before any slice can be called `one-shot`**:
+Resolved by user review, 2026-08-15:
 
-1. **Is reversing ADR-0008 actually on the table**, or is the deliverable
-   decision-support that may well reaffirm it? This changes the write-up's
-   framing and the ADR deliverable.
-2. **Is there a concrete scientific driver?** Which target geometry does a real
-   planned measurement need that `Slab`/`Stack` cannot express? Without one, the
-   survey can only conclude "no change, revisit when a driver exists".
-3. **Is the Intel dpnp/SYCL backend expendable?** Several credible candidates are
-   CUDA-only.
-4. **Is a bounded prototype spike authorized?** If yes, on what hardware — a
-   local spike is fine at NumPy scale, but any GPU timing must go through
-   `pyrite remote` per the repo rule, and that needs explicit approval.
-5. **Does consumer B (instrument geometry) get folded in here or stay with
-   `feature/positioned-photon-filters` / P3 item 3?** Recommend: evaluate here,
-   implement there.
+1. **ADR-0008 may be reversed.** A superseding ADR-0011 is an allowed outcome.
+   The survey is genuinely open; it is not scoped to reach reaffirmation. It is
+   also not scoped to reach adoption — "the engines evaluated do not pay for
+   themselves yet" remains a valid finding, and must be reported as such if
+   that is where the evidence lands.
+2. **No present scientific driver; future support is wanted.** This is the
+   awkward case: with no driver, "general" is underdetermined and the criteria
+   have nothing to bite on. The survey resolves this by evaluating against the
+   **latent drivers already in the backlog** rather than an abstract notion of
+   generality. See "Driver geometries" below.
+3. **CUDA-only is acceptable** where it is the most straightforward GPU route —
+   but the cost must be stated, not assumed away. See "Backend reality check".
+4. **A bounded spike is authorized** on the home setup or the lab box. See
+   "Authorized spike".
+
+### Driver geometries
+
+The survey scores candidates against these, in priority order, instead of
+against unbounded generality. Each is already in `TODO.md` or `docs/`:
+
+1. **Bent crystals** — `TODO.md` P1 "Paused / on hold" item 2, sequenced after
+   channeling and relativistic electrons. This is the clearest future
+   target-geometry driver in the backlog and the canonical stress test.
+2. **Finite/irregular target shapes** — targets that are not an axis-aligned
+   rectangular prism. `_first_prism_exit_scalar` assumes exactly that
+   (`transport.py:3082`); this is the cheapest possible generalization and the
+   honest low bar.
+3. **Multi-object scenes** — several materials at arbitrary relative pose, the
+   literal ADR-0008 non-goal wording.
+4. **Downstream instrument geometry** — collimators, apertures, non-rectangular
+   foils, multi-chip detector mounts (consumer B; no ADR reversal needed).
+
+**A finding to establish early, because it may decide the whole question:** a
+bent crystal is not primarily a region-navigation problem. It needs a spatially
+varying lattice orientation field feeding structure factors, reciprocal-lattice
+vectors, and emission phase. No general geometry engine supplies that — it is a
+materials/orientation concern, adjacent to `materials/crystal.py` and the
+`>user<` "user-defined crystal cuts" inbox item, not to `locate` /
+`distance_to_boundary`. If driver 1 is mostly an orientation-field problem, then
+adopting a geometry engine buys much less than it appears to, and the survey
+must say so plainly rather than letting the engine comparison carry the
+conclusion. Verify this against the channeling and relativistic-transport
+research notes (`docs/research/physics/`) before scoring candidates.
+
+### Backend reality check
+
+CUDA-only is accepted, with two consequences that go in the write-up:
+
+- `pyproject.toml:37` ships an `intel` extra (`dpnp>=0.20.0`) and
+  `montecarlo/_backend.py` supports dpnp/SYCL. A CUDA-only engine either strands
+  that path or forces a permanent two-implementation split for target geometry —
+  the exact "one algorithm" invariant ADR-0008 leans on. State which.
+- **The development box is Intel-only**: `lspci` reports Intel UHD Graphics and
+  an Arc A370M, with no `nvidia-smi`. If the "home setup" is this machine, a
+  CUDA-only candidate cannot be exercised locally at all, and every GPU
+  measurement must go to the lab box. Confirm which machine is meant before
+  planning the spike; if the home setup does have an NVIDIA card, record it
+  here and this constraint relaxes.
+
+### Authorized spike
+
+Bounded, and throwaway:
+
+- Scope is a **standalone geometry microbenchmark** — ray/region queries at
+  representative electron counts and step rates — not a port of the transport
+  core and not a physics run. If it grows into a transport port, stop and return
+  to the supervisor.
+- Lives in ignored `scratch/`; results are transcribed into the write-up. No
+  spike code merges to this branch.
+- CPU-side spikes run locally. Any CUDA timing goes to the lab box through
+  `pyrite remote` per the repo rule; use the `remote-gpu-jobs` skill. Never run
+  GPU sweeps locally.
+- Numbers must be reported with hardware, driver, and library versions, or they
+  are not usable evidence.
 
 ## Delegation
 
 - Owner: `lead-task`. The work is a judgement call against an accepted ADR that
   constrains every later geometry proposal; it is not a mechanical slice.
 - Required skills: `repo-orientation`, `documentation-maintenance`,
-  `scientific-library`. `performance` if a spike is authorized;
-  `remote-gpu-jobs` if any GPU measurement is authorized.
+  `scientific-library`; `performance` and `remote-gpu-jobs` for the spike.
 - Slices:
-  - S1 — seam inventory and consumer split (steps 1-3). Self-contained and
-    evidence-driven, but not `one-shot`: it feeds the framing that open
-    question 1 controls.
-  - S2 — candidate screening and criteria matrix (steps 4-6). Not `one-shot`;
-    open questions 2 and 3 change which candidates survive.
-  - S3 — recommendation and ADR outcome (steps 7-10). Requires all open
-    questions resolved.
-- No slice is `one-shot` while questions 1-3 are open. Do not label one.
+  - S1 — seam inventory, consumer split, and the bent-crystal driver question
+    (steps 1-4). **`one-shot`**: the inputs are named files at named anchors and
+    the review resolved the framing. Deliverable is a draft section, not a
+    verdict.
+  - S2 — candidate screening and criteria matrix (steps 5-7). Not `one-shot`:
+    library facts need Context7 lookups per candidate and the driver-coverage
+    scoring depends on S1's answer.
+  - S3 — spike, if S2 leaves a decidable unknown (step 8). Separate slice under
+    `remote-gpu-jobs`; needs the machine question in "Backend reality check"
+    answered first.
+  - S4 — recommendation and ADR outcome (steps 9-12). Not `one-shot`: choosing
+    between superseding and reaffirming ADR-0008 is the judgement this whole
+    task exists to make.
 
 ## Acceptance checks
 
@@ -220,11 +302,17 @@ Open — **user input needed before any slice can be called `one-shot`**:
   drops are recorded with justification.
 - Every library capability claim carries a source; no version-specific behavior
   is asserted from memory.
-- The criteria matrix is complete, with unknowns marked as unknown.
+- The criteria matrix is complete, with unknowns marked as unknown, and driver
+  coverage is scored per driver rather than as a single verdict.
+- The bent-crystal navigation-versus-orientation-field question is answered
+  explicitly, with sources, and its effect on the recommendation is stated.
+- Any spike number carries hardware, driver, and library versions; no spike code
+  is merged.
 - The in-house region table (candidate 1) is costed on the same axes as the
   external options.
 - Coherent-emission fitness and identity/determinism are addressed for every
   candidate that reaches consumer A, not just the device story.
-- The ADR outcome exists as a file: a superseding ADR or a dated amendment on
-  ADR-0008. `docs/adr/index.md` and `docs/research/index.md` are updated.
+- The ADR outcome exists as a file: a superseding ADR-0011 or a dated amendment
+  on ADR-0008, with ADR-0008's status updated if superseded.
+  `docs/adr/index.md` and `docs/research/index.md` are updated.
 - `uv run pyrite-dev docs` passes. No `src/` diff.

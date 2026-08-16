@@ -119,14 +119,15 @@ file. Edit and drop items on `main`.
    libraries) against the device, determinism, coherent-emission, packaging, and
    migration axes, separately for target/electron-transport geometry,
    post-emission instrument geometry, and visualization. Documentation and ADR
-   outcome only — no `src/` change. Runs against
-   [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md) (arbitrary target
-   geometry is an accepted non-goal), so reaffirming it with engine-by-engine
-   evidence is an acceptable result; adopting an engine would need a superseding
-   ADR plus a separate implementation task. Blocked on user answers to the open
-   questions in the task doc (is ADR reversal on the table, is there a concrete
-   scientific driver, is the Intel dpnp backend expendable).
-   → `docs/geometry-engine-evaluation`;
+   outcome only; a bounded throwaway microbenchmark is authorized under
+   `scratch/`, with CUDA timing on the lab box via `pyrite remote`. Reversing
+   [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md) is permitted, so a
+   superseding ADR-0011 and a reaffirming amendment are both live outcomes; the
+   implementation is a separate task either way. No present scientific driver,
+   so candidates are scored against latent backlog drivers — bent crystals
+   first (P1 paused item 2), then finite/irregular targets, multi-object scenes,
+   and instrument geometry. CUDA-only is acceptable with its dpnp/SYCL cost
+   recorded. → `docs/geometry-engine-evaluation`;
    [`agentdocs/tasks/docs/geometry-engine-evaluation/`](agentdocs/tasks/docs/geometry-engine-evaluation/).
 
 ## P3 - lower-priority / exploratory back burner
@@ -168,15 +169,7 @@ Nothing yet.
 
 ## Bugs (fix + regression test)
 
-1. **Chunked checkpoint lifecycle and truthful progress.** Eliminate full checkpoint
-   decode/rewrite stalls for cached and budget-paused remote sweeps, make shards a
-   first-class resumable/pullable state, account setup/finalization in slice budgets,
-   and report loading/computing/saving activity without stale "NOW TESTING" cases. →
-   `fix/chunked-checkpoint-lifecycle`;
-   [`agentdocs/tasks/fix/chunked-checkpoint-lifecycle/`](agentdocs/tasks/fix/chunked-checkpoint-lifecycle/).
-2. Running `pyrite profile create <new_profile> --from <source_profile>` doesn't copy the
-   source profile's materials list. Fix this, and check if other aspects are copied properly.
-3. Rerunning a recently run & pulled `pyrite run <profile> -R` on a profile with remotely cached cases will correctly skip the cached ones for rerun, but it will then re-pull ALL the cases, including those that are identical to the stems held locally.
+1. Rerunning a recently run & pulled `pyrite run <profile> -R` on a profile with remotely cached cases will correctly skip the cached ones for rerun, but it will then re-pull ALL the cases, including those that are identical to the stems held locally.
 
 ### Ergonomics (ship anytime)
 
