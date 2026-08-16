@@ -48,6 +48,9 @@ _SEG_ARRAYS = (
     "t_end_ang",
     "t0_ang",
     "elec_id",
+    "electron_id",
+    "flight_id",
+    "substep_id",
     "layer",
 )
 _USE_JIT_LINE_REDUCTION = True

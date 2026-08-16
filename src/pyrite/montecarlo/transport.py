@@ -845,6 +845,7 @@ def _transport_core_ungrooved(
     internal_bounds,
     elastic_model_code,
     energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -881,6 +882,8 @@ def _transport_core_ungrooved(
     seg_lay,
     seg_E_end,
     seg_t_end,
+    seg_flight,
+    seg_substep,
 ):
     """Compiled ungrooved transport core, with optional finite x/y footprint.
 
@@ -895,8 +898,21 @@ def _transport_core_ungrooved(
     evaluated at the flight's midpoint energy instead of its start energy, and
     ``seg_E_end``/``seg_t_end`` (sized 0 under the frozen rule) record the
     flight's end state.
+
+    ``max_dE_frac`` above zero caps one row's fractional energy loss, splitting a
+    physical flight into numerical substeps. The collision draw is then an
+    optical-depth budget carried across those substeps and consumed at each
+    substep's own hazard, so refining the cap neither redraws the collision nor
+    shifts its statistics; ``seg_flight``/``seg_substep`` carry the resulting
+    ``(flight_id, substep_id)`` identity.
     """
     EPS = 1e-6
+    # ``tau_left`` is the current physical flight's unconsumed optical depth;
+    # -1.0 marks "no flight open", which is the only place a collision is drawn.
+    tau_left = np.full(Ne, -1.0)
+    flight_of = np.zeros(Ne, dtype=np.int64)
+    substep_of = np.zeros(Ne, dtype=np.int64)
+    energy_controlled = max_dE_frac > 0.0
     nseg = 0
     n_back = 0
     n_trans = 0
@@ -947,7 +963,9 @@ def _transport_core_ungrooved(
                 total_rate += rate
 
             lam_ang = 1e8 / total_rate
-            step_j = -lam_ang * np.log(rng.random())
+            if tau_left[e] < 0.0:
+                tau_left[e] = -np.log(rng.random())
+            step_j = tau_left[e] * lam_ang
 
             if nseg >= max_segments:
                 raise RuntimeError("segment buffer exhausted")
@@ -1011,6 +1029,21 @@ def _transport_core_ungrooved(
                 exit_bot_j = False
                 exit_side_j = False
 
+            # The numerical energy-loss cap is the only step limit that does not
+            # close a physical flight: it emits a row and resumes with the same
+            # optical-depth budget, direction, and ``flight_id``.
+            limited_j = False
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
             if energy_model_code == 1:
                 if cutoff_j:
                     E_end_j = E_cut_e
@@ -1046,14 +1079,23 @@ def _transport_core_ungrooved(
             if energy_model_code == 1:
                 seg_E_end[nseg] = E_end_j
                 seg_t_end[nseg] = t_end_j
+                seg_flight[nseg] = flight_of[e]
+                seg_substep[nseg] = substep_of[e]
             nseg += 1
 
-            # 4. Advance position, energy, and transport clock.
+            # 4. Advance position, energy, transport clock, and optical depth.
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
             E_keV[e] = E_end_j
             clock[e] = t_end_j
+            tau_left[e] -= step_j / lam_ang
+            if tau_left[e] < 0.0:
+                tau_left[e] = 0.0
+
+            if limited_j:
+                substep_of[e] += 1
+                continue
 
             # 5. Exit, internal-boundary, or collision handling.
             died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
@@ -1069,6 +1111,12 @@ def _transport_core_ungrooved(
                 alive[e] = False
                 n_alive -= 1
                 continue
+
+            # Every remaining outcome closes the physical flight, so the next
+            # iteration opens a new one and redraws the collision.
+            flight_of[e] += 1
+            substep_of[e] = 0
+            tau_left[e] = -1.0
 
             crossed_internal = cross_up_j or cross_dn_j
             if crossed_internal:
@@ -1121,6 +1169,7 @@ def _transport_core_ungrooved_lut(
     internal_bounds,
     elastic_model_code,
     energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -1151,14 +1200,21 @@ def _transport_core_ungrooved_lut(
     seg_lay,
     seg_E_end,
     seg_t_end,
+    seg_flight,
+    seg_substep,
 ):
     """Ungrooved lockstep CPU core using pretabulated energy-dependent physics.
 
     ``energy_model_code`` matches the exact core: 0 for the frozen
     left-endpoint rule, 1 for the midpoint predictor-corrector rule, which also
-    records ``seg_E_end``/``seg_t_end`` per flight.
+    records ``seg_E_end``/``seg_t_end`` per flight. ``max_dE_frac`` matches the
+    exact core's energy-controlled substepping and optical-depth budget.
     """
     EPS = 1e-6
+    tau_left = np.full(Ne, -1.0)
+    flight_of = np.zeros(Ne, dtype=np.int64)
+    substep_of = np.zeros(Ne, dtype=np.int64)
+    energy_controlled = max_dE_frac > 0.0
     nseg = 0
     n_back = 0
     n_trans = 0
@@ -1188,7 +1244,9 @@ def _transport_core_ungrooved_lut(
             # 1. Sample the next elastic-collision distance.
             total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
             lam_ang = 1e8 / total_rate
-            step_j = -lam_ang * np.log(rng.random())
+            if tau_left[e] < 0.0:
+                tau_left[e] = -np.log(rng.random())
+            step_j = tau_left[e] * lam_ang
 
             if nseg >= max_segments:
                 raise RuntimeError("segment buffer exhausted")
@@ -1257,6 +1315,21 @@ def _transport_core_ungrooved_lut(
                 exit_bot_j = False
                 exit_side_j = False
 
+            # The numerical energy-loss cap is the only step limit that does not
+            # close a physical flight: it emits a row and resumes with the same
+            # optical-depth budget, direction, and ``flight_id``.
+            limited_j = False
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
             if energy_model_code == 1:
                 if cutoff_j:
                     E_end_j = E_cut_e
@@ -1298,14 +1371,23 @@ def _transport_core_ungrooved_lut(
             if energy_model_code == 1:
                 seg_E_end[nseg] = E_end_j
                 seg_t_end[nseg] = t_end_j
+                seg_flight[nseg] = flight_of[e]
+                seg_substep[nseg] = substep_of[e]
             nseg += 1
 
-            # 4. Advance position, energy, and transport clock.
+            # 4. Advance position, energy, transport clock, and optical depth.
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
             E_keV[e] = E_end_j
             clock[e] = t_end_j
+            tau_left[e] -= step_j / lam_ang
+            if tau_left[e] < 0.0:
+                tau_left[e] = 0.0
+
+            if limited_j:
+                substep_of[e] += 1
+                continue
 
             # 5. Exit, internal-boundary, or collision handling.
             died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
@@ -1321,6 +1403,12 @@ def _transport_core_ungrooved_lut(
                 alive[e] = False
                 n_alive -= 1
                 continue
+
+            # Every remaining outcome closes the physical flight, so the next
+            # iteration opens a new one and redraws the collision.
+            flight_of[e] += 1
+            substep_of[e] = 0
+            tau_left[e] = -1.0
 
             crossed_internal = cross_up_j or cross_dn_j
             if crossed_internal:
@@ -2960,6 +3048,7 @@ def simulate_trajectories(
     transport_lut_config=DEFAULT_TRANSPORT_LUT_CONFIG,
     collect_diagnostics=False,
     energy_model="frozen",
+    max_dE_frac=0.0,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -3159,6 +3248,14 @@ def simulate_trajectories(
           Currently implemented for the ungrooved lockstep core only -- any
           other core or a grooved run raises rather than returning the frozen
           schema under a midpoint request.
+    max_dE_frac: numerical cap on one row's fractional energy loss, splitting a
+      physical flight into substeps when the cap binds before any physical
+      event. 0.0 (default) disables substepping, leaving one row per flight.
+      Requires ``energy_model="midpoint"``. The collision is drawn once per
+      physical flight as an optical depth and consumed across its substeps at
+      each substep's own hazard, so refining the cap does not resample the
+      collision. Rows then carry ``flight_id``/``substep_id``; a substep keeps
+      the flight's direction and identity and never scatters.
 
     Validation: transport-midpoint-stopping
 
@@ -3257,6 +3354,14 @@ def simulate_trajectories(
         )
     if energy_model == "midpoint" and groove is not None:
         raise ValueError("energy_model='midpoint' is not implemented for grooved transport")
+    max_dE_frac = float(max_dE_frac)
+    if max_dE_frac < 0.0:
+        raise ValueError("max_dE_frac must be non-negative")
+    # Substepping a frozen flight is exactly the mis-phased configuration the
+    # slice-E convergence study rejected: it multiplies rows without improving
+    # the clock, so the two options are not independently selectable.
+    if max_dE_frac > 0.0 and energy_model != "midpoint":
+        raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
 
     if E_cut_by_electrons is None:
         E_cut_by_electrons = np.full(
@@ -3559,6 +3664,8 @@ def simulate_trajectories(
     n_end_rows = n_rows if energy_model == "midpoint" else 0
     seg_E_end = np.empty(n_end_rows, dtype=float)
     seg_t_end = np.empty(n_end_rows, dtype=float)
+    seg_flight = np.empty(n_end_rows, dtype=np.int64)
+    seg_substep = np.empty(n_end_rows, dtype=np.int64)
     _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
@@ -3630,6 +3737,7 @@ def simulate_trajectories(
             internal_bounds,
             elastic_model_code,
             energy_model_code,
+            max_dE_frac,
             z_total,
             finite_footprint,
             0.0 if width_ang is None else float(width_ang),
@@ -3660,6 +3768,8 @@ def simulate_trajectories(
             seg_lay,
             seg_E_end,
             seg_t_end,
+            seg_flight,
+            seg_substep,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -3743,6 +3853,7 @@ def simulate_trajectories(
             internal_bounds,
             elastic_model_code,
             energy_model_code,
+            max_dE_frac,
             z_total,
             finite_footprint,
             0.0 if width_ang is None else float(width_ang),
@@ -3779,6 +3890,8 @@ def simulate_trajectories(
             seg_lay,
             seg_E_end,
             seg_t_end,
+            seg_flight,
+            seg_substep,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -3906,7 +4019,9 @@ def simulate_trajectories(
         "t_ang": t_ang,  # segment-start age sum(L/beta) [Ang, c=1]
         "t_start_ang": t_ang,
         "t0_ang": t0_ang,  # per-electron longitudinal bunch offset [Ang, c=1]
+        # `elec_id` is an unscheduled compatibility alias of `electron_id`.
         "elec_id": elec_id,  # emitting electron index in [0, Ne)
+        "electron_id": elec_id,
         "layer": layer,  # emitting layer index in [0, n_layers)
         "vacuum_start_ang": vacuum_start_ang,
         "vacuum_end_ang": vacuum_end_ang,
@@ -3930,6 +4045,10 @@ def simulate_trajectories(
     if energy_model == "midpoint":
         result["E_end_keV"] = seg_E_end[:nseg]
         result["t_end_ang"] = seg_t_end[:nseg]
+        # `(electron_id, flight_id)` is the stable physical key; `substep_id`
+        # indexes numerical rows inside one flight and is integration detail.
+        result["flight_id"] = seg_flight[:nseg]
+        result["substep_id"] = seg_substep[:nseg]
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

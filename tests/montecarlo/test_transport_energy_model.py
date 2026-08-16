@@ -110,9 +110,16 @@ def test_midpoint_adds_end_state_without_adding_rows():
     frozen = simulate_trajectories(**common)
     midpoint = simulate_trajectories(**common, energy_model="midpoint")
 
-    assert set(midpoint) - set(frozen) == {"E_end_keV", "t_end_ang"}
-    for key in ("E_end_keV", "t_end_ang"):
+    assert set(midpoint) - set(frozen) == {
+        "E_end_keV",
+        "t_end_ang",
+        "flight_id",
+        "substep_id",
+    }
+    for key in ("E_end_keV", "t_end_ang", "flight_id", "substep_id"):
         assert midpoint[key].shape == midpoint["L_ang"].shape
+    # Without a step cap every row is its flight's only substep.
+    assert np.all(midpoint["substep_id"] == 0)
     # One radiating row per physical flight either way: the controlled rule
     # changes each flight's end state, never the flight decomposition itself.
     assert midpoint["E_end_keV"].size == midpoint["E_start_keV"].size
@@ -240,3 +247,79 @@ def test_unsupported_energy_model_requests_fail_closed(kwargs, message):
             seed=7,
             **kwargs,
         )
+
+
+_STEP_COMMON = dict(
+    E0_keV=25.0,
+    Ne=200,
+    thickness_ang=4000.0,
+    composition=CARBON,
+    seed=7,
+    E_cut_keV=1.0,
+    transport_core="lockstep",
+    energy_model="midpoint",
+)
+
+
+def _flight_keys(result):
+    return set(zip(result["electron_id"].tolist(), result["flight_id"].tolist(), strict=True))
+
+
+def test_substeps_subdivide_flights_without_scattering_or_redrawing():
+    coarse = simulate_trajectories(**_STEP_COMMON)
+    fine = simulate_trajectories(**_STEP_COMMON, max_dE_frac=2e-3)
+
+    assert coarse["substep_id"].max() == 0
+    assert fine["substep_id"].max() > 0
+    assert fine["L_ang"].size > coarse["L_ang"].size
+
+    # Substeps are integration detail: they add rows inside a flight, never
+    # flights, and every row of a flight keeps the flight's direction.
+    for result in (coarse, fine):
+        order = np.lexsort((result["substep_id"], result["flight_id"], result["electron_id"]))
+        keys = np.stack([result["electron_id"], result["flight_id"]])[:, order]
+        substep = result["substep_id"][order]
+        same_flight = np.all(keys[:, 1:] == keys[:, :-1], axis=0)
+        # substep_id restarts at 0 per flight and increments by one within it.
+        assert np.all(substep[1:][same_flight] == substep[:-1][same_flight] + 1)
+        assert np.all(substep[1:][~same_flight] == 0)
+        assert substep[0] == 0
+
+    for eid, fid in _flight_keys(fine):
+        rows = (fine["electron_id"] == eid) & (fine["flight_id"] == fid)
+        if rows.sum() < 2:
+            continue
+        directions = fine["v_hat"][rows]
+        np.testing.assert_array_equal(directions, np.broadcast_to(directions[0], directions.shape))
+        break
+
+
+def test_substep_rows_tile_their_flight_in_length_energy_and_clock():
+    fine = simulate_trajectories(**_STEP_COMMON, max_dE_frac=2e-3)
+    split = 0
+    for eid, fid in _flight_keys(fine):
+        rows = np.flatnonzero((fine["electron_id"] == eid) & (fine["flight_id"] == fid))
+        if rows.size < 2:
+            continue
+        rows = rows[np.argsort(fine["substep_id"][rows])]
+        split += 1
+        # Each substep starts exactly where the previous one ended.
+        np.testing.assert_allclose(
+            fine["E_start_keV"][rows][1:], fine["E_end_keV"][rows][:-1], rtol=1e-12
+        )
+        np.testing.assert_allclose(
+            fine["t_start_ang"][rows][1:], fine["t_end_ang"][rows][:-1], rtol=1e-12
+        )
+        # and no substep exceeds the requested fractional energy loss.
+        # The cap is applied to the left-endpoint loss prediction; the realized
+        # midpoint loss is slightly larger because |dE/ds| grows as E falls.
+        loss = fine["E_start_keV"][rows] - fine["E_end_keV"][rows]
+        assert np.all(loss[:-1] / fine["E_start_keV"][rows][:-1] <= 2e-3 * 1.01)
+    assert split > 0
+
+
+def test_step_cap_requires_the_controlled_propagator():
+    with pytest.raises(ValueError, match="max_dE_frac > 0 requires"):
+        simulate_trajectories(**{**_STEP_COMMON, "energy_model": "frozen"}, max_dE_frac=1e-2)
+    with pytest.raises(ValueError, match="max_dE_frac must be non-negative"):
+        simulate_trajectories(**_STEP_COMMON, max_dE_frac=-1.0)

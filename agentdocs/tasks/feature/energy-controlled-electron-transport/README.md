@@ -68,8 +68,10 @@ Numerical substeps are integration detail:
       thin/thick, low/high-Z, and 1--300 keV cases. Measured; the headline
       result is that a fractional-loss cap is the wrong control variable and
       the binding tolerance is an absolute emission phase.
-- [ ] F -- Introduce physical-flight and numerical-substep identity and an
+- [~] F -- Introduce physical-flight and numerical-substep identity and an
       energy-controlled propagator with collision optical-depth handling.
+      Implemented on both lockstep cores; the ensemble-statistics evidence that
+      refinement does not move collision statistics is still owed (see F notes).
 - [ ] G -- Make CXR and bremsstrahlung invariant to numerical substep refinement
       at fixed physical flights.
 - [ ] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
@@ -185,9 +187,25 @@ Numerical substeps are integration detail:
   tolerance. Numerical precision has outrun the transport model there. Out of
   scope for F--H; needs its own task if coherent absolute phase is ever claimed
   to that accuracy.
-- **Open:** integrated optical-depth inversion versus bounded piecewise-constant
-  hazard. Choose from correctness, convergence, Numba/CUDA feasibility, and
-  measured cost.
+- **Decided (F):** the collision draw is a **per-physical-flight optical-depth
+  budget**, consumed across substeps at each substep's own hazard
+  (`tau -= ds / lambda(E_substep)`), rather than an analytic inversion of
+  `int ds / lambda(E(s))`. Browning/Mott `lambda(E)` is tabulated, so no closed
+  form exists to invert; the budget is one extra float of per-electron state,
+  needs no RNG per substep, and reduces exactly to the current draw when the cap
+  is disabled. This is the discretized integrated inversion, not the
+  bounded-piecewise-constant alternative: the *total* optical depth is
+  integrated, only the hazard within one substep is held constant.
+- **Open (raised by F):** refining `max_dE_frac` **decorrelates trajectories**,
+  so per-realization flight counts do not converge — measured 2568 / 2882 / 2599
+  / 2553 / 2605 distinct flights at f = 1e-2 / 5e-3 / 2e-3 / 1e-3 / 5e-4 (C,
+  25 keV, 4000 Ang, Ne = 200, seed 7). Changing the substep grid changes the
+  energies at which the hazard is evaluated, which changes the sampled collision
+  point, which changes the whole downstream trajectory. The acceptance criterion
+  "tightening the tolerance does not change physical collision statistics" must
+  therefore be measured the way slice E measured Part A: ensemble means with
+  Monte Carlo standard errors over seed replicates, not a single-seed count.
+  That measurement is the remaining F deliverable.
 
 ## A -- segment-schema consumer inventory
 
@@ -224,6 +242,36 @@ are separate shapes/scalars.
 - Tests and fixtures under `tests/helpers/segments.py`, `tests/montecarlo/`,
   `tests/plots/`, and `tests/notebooks/` construct or assert the current mapping;
   schema/staging/coherence/cutoff tests must migrate with their owning paths.
+
+## F -- flight/substep identity and the energy-controlled propagator
+
+`simulate_trajectories(..., energy_model="midpoint", max_dE_frac=f)` caps one
+row's fractional energy loss. When that cap binds before any physical event the
+core emits a row and resumes the same physical flight: same direction, same
+`flight_id`, `substep_id + 1`, no scatter, no new collision draw. `f = 0.0`
+(default) leaves one row per flight, and `max_dE_frac > 0` requires
+`energy_model="midpoint"` — substepping a frozen flight is exactly the
+mis-phased configuration slice E rejected, so the two are not independently
+selectable.
+
+The collision is drawn once per physical flight as an optical depth
+`tau = -log(U)` and consumed as `tau -= ds / lambda(E_substep)` per substep;
+the flight closes when `tau` is exhausted, at a boundary, at the cutoff, or on
+termination. With the cap disabled every iteration is a whole flight, one draw
+each, and `-lam * log(U)` is replaced by the bit-identical `(-log(U)) * lam`,
+so **frozen mode is bit-for-bit unchanged** (verified by hashing `r_mid`,
+`v_hat`, `L_ang`, `E_keV`, `t_ang`, `elec_id`, `layer` and the exit counts over
+C/W x 25/100 keV against `main`).
+
+Rows carry `flight_id` (zero-based, monotonic per electron) and `substep_id`
+(zero-based within the flight) under midpoint mode only; `electron_id` is added
+as the canonical spelling of `elec_id`. All three are registered in
+`_SEG_ARRAYS`, so layer filtering, cutoff clipping, and device staging carry
+them with the rows.
+
+Owned by `_transport_core_ungrooved` and `_transport_core_ungrooved_lut`. The
+grooved, per-electron, and CUDA cores still raise on a midpoint request; that
+port is slice H.
 
 ## B -- bounded transport diagnostics
 
