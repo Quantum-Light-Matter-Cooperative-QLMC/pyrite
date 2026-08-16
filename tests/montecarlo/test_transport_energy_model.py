@@ -256,7 +256,7 @@ def test_row_transforms_keep_the_new_fields_in_step_with_the_rows():
     ("kwargs", "message"),
     [
         ({"energy_model": "left"}, "energy_model must be"),
-        ({"energy_model": "midpoint", "transport_core": "per-electron"}, "lockstep core"),
+        ({"energy_model": "midpoint", "transport_core": "cuda"}, "cuda core"),
     ],
 )
 def test_unsupported_energy_model_requests_fail_closed(kwargs, message):
@@ -278,18 +278,22 @@ _STEP_COMMON = dict(
     composition=CARBON,
     seed=7,
     E_cut_keV=1.0,
-    transport_core="lockstep",
     energy_model="midpoint",
 )
+
+# Every core that carries the controlled propagator. The CUDA kernel is checked
+# against the per-electron core on hardware, in `test_transport_per_electron.py`.
+_MIDPOINT_CORES = ("lockstep", "per-electron")
 
 
 def _flight_keys(result):
     return set(zip(result["electron_id"].tolist(), result["flight_id"].tolist(), strict=True))
 
 
-def test_substeps_subdivide_flights_without_scattering_or_redrawing():
-    coarse = simulate_trajectories(**_STEP_COMMON)
-    fine = simulate_trajectories(**_STEP_COMMON, max_dE_frac=2e-3)
+@pytest.mark.parametrize("core", _MIDPOINT_CORES)
+def test_substeps_subdivide_flights_without_scattering_or_redrawing(core):
+    coarse = simulate_trajectories(**_STEP_COMMON, transport_core=core)
+    fine = simulate_trajectories(**_STEP_COMMON, transport_core=core, max_dE_frac=2e-3)
 
     assert coarse["substep_id"].max() == 0
     assert fine["substep_id"].max() > 0
@@ -316,8 +320,9 @@ def test_substeps_subdivide_flights_without_scattering_or_redrawing():
         break
 
 
-def test_substep_rows_tile_their_flight_in_length_energy_and_clock():
-    fine = simulate_trajectories(**_STEP_COMMON, max_dE_frac=2e-3)
+@pytest.mark.parametrize("core", _MIDPOINT_CORES)
+def test_substep_rows_tile_their_flight_in_length_energy_and_clock(core):
+    fine = simulate_trajectories(**_STEP_COMMON, transport_core=core, max_dE_frac=2e-3)
     split = 0
     for eid, fid in _flight_keys(fine):
         rows = np.flatnonzero((fine["electron_id"] == eid) & (fine["flight_id"] == fid))
@@ -345,3 +350,55 @@ def test_step_cap_requires_the_controlled_propagator():
         simulate_trajectories(**{**_STEP_COMMON, "energy_model": "frozen"}, max_dE_frac=1e-2)
     with pytest.raises(ValueError, match="max_dE_frac must be non-negative"):
         simulate_trajectories(**_STEP_COMMON, max_dE_frac=-1.0)
+
+
+@pytest.mark.parametrize("use_lut", [False, True])
+def test_per_electron_midpoint_carries_the_lockstep_schema(use_lut):
+    common = dict(
+        E0_keV=25.0,
+        Ne=40,
+        thickness_ang=4000.0,
+        composition=CARBON,
+        seed=7,
+        E_cut_keV=1.0,
+        transport_core="per-electron",
+        transport_lut_config=TransportLUTConfig(enabled=use_lut),
+    )
+    frozen = simulate_trajectories(**common)
+    midpoint = simulate_trajectories(**common, energy_model="midpoint")
+
+    assert set(midpoint) - set(frozen) == {
+        "E_end_keV",
+        "E_repr_keV",
+        "t_end_ang",
+        "flight_id",
+        "substep_id",
+    }
+    for key in ("E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id"):
+        assert midpoint[key].shape == midpoint["L_ang"].shape
+    assert np.all(midpoint["substep_id"] == 0)
+    assert np.all(midpoint["E_end_keV"] < midpoint["E_start_keV"])
+    assert np.all(midpoint["t_end_ang"] > midpoint["t_start_ang"])
+    # Output is electron-major and step-minor, so without a step cap each
+    # electron's flight ids are exactly its zero-based row index.
+    for e in np.unique(midpoint["electron_id"]):
+        rows = midpoint["electron_id"] == e
+        np.testing.assert_array_equal(midpoint["flight_id"][rows], np.arange(int(rows.sum())))
+
+
+@pytest.mark.parametrize("core", _MIDPOINT_CORES)
+def test_midpoint_cutoff_lands_on_the_floor_for_every_ported_core(core):
+    result = simulate_trajectories(
+        E0_keV=10.0,
+        Ne=64,
+        thickness_ang=40000.0,
+        composition=CARBON,
+        seed=7,
+        E_cut_keV=1.0,
+        transport_core=core,
+        energy_model="midpoint",
+    )
+    assert result["n_cutoff_stopped"] > 0
+    stopped = result["E_end_keV"][result["E_end_keV"] <= 1.0 + 1e-9]
+    assert stopped.size == result["n_cutoff_stopped"]
+    np.testing.assert_allclose(stopped, 1.0, rtol=0, atol=1e-12)

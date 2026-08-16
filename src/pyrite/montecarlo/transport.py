@@ -498,6 +498,23 @@ def _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_i):
 
 
 @njit(cache=True)
+def _dEds_packed_scalar(L_Js, L_ks, L_coeffs, L, n_el, E_i):
+    """Joy--Luo stopping power read from the padded per-layer tables.
+
+    Same arithmetic as :func:`_dEds_compound_scalar`, but indexing the
+    ``(n_layers, max_elements)`` rows the per-electron and CUDA cores use. The
+    padding is zero-filled and not a valid element, so ``n_el`` bounds the loop.
+    """
+    total = 0.0
+    for i in range(n_el):
+        J = L_Js[L, i]
+        k = L_ks[L, i]
+        coeff = L_coeffs[L, i]
+        total += coeff * np.log(1.166 * (E_i + k * J) / J)
+    return -7.85e-4 / E_i * total
+
+
+@njit(cache=True)
 def _dEds_compound(J_arr, k_arr, coeff_arr, E_keV):
     out = np.empty_like(E_keV)
 
@@ -1859,6 +1876,8 @@ def _transport_core_ungrooved_perelectron(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -1893,6 +1912,10 @@ def _transport_core_ungrooved_perelectron(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     seg_count,
     exit_code,
 ):
@@ -1917,6 +1940,13 @@ def _transport_core_ungrooved_perelectron(
 
     Per-layer element data is passed as ``(n_layers, max_elements)`` padded rows
     with live lengths in ``L_nel``, the layout the CUDA kernel needs.
+
+    ``energy_model_code`` (0 frozen, 1 midpoint) and ``max_dE_frac`` carry the
+    same meaning as in :func:`_transport_core_ungrooved`: the midpoint rule
+    records ``seg_E_end``/``seg_t_end``, and a positive cap splits a physical
+    flight into numerical substeps that share one optical-depth budget. Both are
+    per-thread scalars here rather than the lockstep core's per-electron arrays,
+    which is what the CUDA port needs.
     """
     EPS = 1e-6
 
@@ -1932,6 +1962,13 @@ def _transport_core_ungrooved_perelectron(
         draw = _SM64_ZERO
         local_nseg = 0
         E_cut_e = E_cut_by_electrons[e]
+        # ``tau_left`` is the open physical flight's unconsumed optical depth;
+        # -1.0 marks "no flight open", the only state in which a collision is
+        # drawn. Substeps of one flight share that draw and the flight identity.
+        tau_left = -1.0
+        flight_id = 0
+        substep_id = 0
+        energy_controlled = max_dE_frac > 0.0
 
         for _step in range(max_steps):
             if n_layers == 1:
@@ -1961,9 +1998,10 @@ def _transport_core_ungrooved_perelectron(
                 total_rate += rate
 
             lam_ang = 1e8 / total_rate
-            R_step = _stream_uniform_scalar(key, draw)
-            draw += _SM64_ONE
-            step_j = -lam_ang * np.log(R_step)
+            if tau_left < 0.0:
+                tau_left = -np.log(_stream_uniform_scalar(key, draw))
+                draw += _SM64_ONE
+            step_j = tau_left * lam_ang
 
             # 2. Truncate the flight at this layer's z boundaries.
             dx = dirs[e, 0]
@@ -2004,16 +2042,18 @@ def _transport_core_ungrooved_perelectron(
             # 3. Record the radiating material segment. Overflowing electrons
             #    keep transporting so `seg_count` reports the capacity actually
             #    needed for the replay.
-            dEds = 0.0
-            for i_el in range(n_el):
-                J = L_Js[L, i_el]
-                k = L_ks[L, i_el]
-                coeff = L_coeffs[L, i_el]
-                dEds += coeff * np.log(1.166 * (E_j + k * J) / J)
-            dEds = -7.85e-4 / E_j * dEds
-            beta_j = beta_from_keV_scalar(E_j)
+            dEds = _dEds_packed_scalar(L_Js, L_ks, L_coeffs, L, n_el, E_j)
             cutoff_j = False
-            cutoff_distance = (E_cut_e - E_j) / dEds
+            if energy_model_code == 1:
+                # The midpoint rule makes E_end = E_cut at the cutoff by
+                # definition, so the truncation distance solves the scheme at
+                # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
+                # linearization -- same construction as the lockstep core.
+                cutoff_distance = (E_cut_e - E_j) / _dEds_packed_scalar(
+                    L_Js, L_ks, L_coeffs, L, n_el, 0.5 * (E_j + E_cut_e)
+                )
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
             if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
                 step_j = cutoff_distance
@@ -2023,6 +2063,37 @@ def _transport_core_ungrooved_perelectron(
                 exit_top_j = False
                 exit_bot_j = False
                 exit_side_j = False
+
+            # The numerical energy-loss cap is the only step limit that does not
+            # close a physical flight: it emits a row and resumes with the same
+            # optical-depth budget, direction, and ``flight_id``.
+            limited_j = False
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+            if energy_model_code == 1:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    # Predictor-corrector for the implicit midpoint rule
+                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                    E_pred = E_j + dEds * step_j
+                    E_end_j = E_j + step_j * _dEds_packed_scalar(
+                        L_Js, L_ks, L_coeffs, L, n_el, 0.5 * (E_j + E_pred)
+                    )
+                beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+            else:
+                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                beta_j = beta_from_keV_scalar(E_j)
+            t_end_j = clock[e] + step_j / beta_j
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg
@@ -2037,14 +2108,26 @@ def _transport_core_ungrooved_perelectron(
                 seg_t0[slot] = clock[e]
                 seg_id[slot] = e
                 seg_lay[slot] = L
+                if energy_model_code == 1:
+                    seg_E_end[slot] = E_end_j
+                    seg_t_end[slot] = t_end_j
+                    seg_flight[slot] = flight_id
+                    seg_substep[slot] = substep_id
             local_nseg += 1
 
-            # 4. Advance position, energy, and transport clock.
+            # 4. Advance position, energy, transport clock, and optical depth.
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
-            clock[e] += step_j / beta_j
+            E_keV[e] = E_end_j
+            clock[e] = t_end_j
+            tau_left -= step_j / lam_ang
+            if tau_left < 0.0:
+                tau_left = 0.0
+
+            if limited_j:
+                substep_id += 1
+                continue
 
             # 5. Exit, internal-boundary, or collision handling.
             if exit_top_j:
@@ -2057,6 +2140,12 @@ def _transport_core_ungrooved_perelectron(
                 exit_code[i] = EXIT_CUTOFF_STOPPED
             if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
                 break
+
+            # Every remaining outcome closes the physical flight, so the next
+            # iteration opens a new one and redraws the collision.
+            flight_id += 1
+            substep_id = 0
+            tau_left = -1.0
 
             if cross_up_j or cross_dn_j:
                 pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
@@ -2124,6 +2213,8 @@ def _transport_core_ungrooved_perelectron_lut(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -2151,10 +2242,20 @@ def _transport_core_ungrooved_perelectron_lut(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     seg_count,
     exit_code,
 ):
-    """Per-electron CPU reference for the CUDA LUT transport kernel."""
+    """Per-electron CPU reference for the CUDA LUT transport kernel.
+
+    ``energy_model_code`` and ``max_dE_frac`` match
+    :func:`_transport_core_ungrooved_perelectron`; the LUT variant reads the
+    midpoint stopping power and inverse speed from the same interpolation the
+    lockstep LUT core uses.
+    """
     EPS = 1e-6
 
     for i in range(e_count):
@@ -2169,6 +2270,12 @@ def _transport_core_ungrooved_perelectron_lut(
         draw = _SM64_ZERO
         local_nseg = 0
         E_cut_e = E_cut_by_electrons[e]
+        # Per-thread optical-depth budget and flight identity; -1.0 marks "no
+        # flight open", the only state in which a collision is drawn.
+        tau_left = -1.0
+        flight_id = 0
+        substep_id = 0
+        energy_controlled = max_dE_frac > 0.0
 
         for _step in range(max_steps):
             if n_layers == 1:
@@ -2184,9 +2291,10 @@ def _transport_core_ungrooved_perelectron_lut(
 
             total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
             lam_ang = 1e8 / total_rate
-            R_step = _stream_uniform_scalar(key, draw)
-            draw += _SM64_ONE
-            step_j = -lam_ang * np.log(R_step)
+            if tau_left < 0.0:
+                tau_left = -np.log(_stream_uniform_scalar(key, draw))
+                draw += _SM64_ONE
+            step_j = tau_left * lam_ang
 
             dx = dirs[e, 0]
             dy = dirs[e, 1]
@@ -2226,7 +2334,13 @@ def _transport_core_ungrooved_perelectron_lut(
             dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
             inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
             cutoff_j = False
-            cutoff_distance = (E_cut_e - E_j) / dEds
+            if energy_model_code == 1:
+                cut_i, cut_f = _lut_index_frac_scalar(
+                    0.5 * (E_j + E_cut_e), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                )
+                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
             if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
                 step_j = cutoff_distance
@@ -2236,6 +2350,37 @@ def _transport_core_ungrooved_perelectron_lut(
                 exit_top_j = False
                 exit_bot_j = False
                 exit_side_j = False
+
+            # The numerical energy-loss cap is the only step limit that does not
+            # close a physical flight.
+            limited_j = False
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+            if energy_model_code == 1:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    E_pred = E_j + dEds * step_j
+                    mid_i, mid_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_pred), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                    )
+                    E_end_j = E_j + step_j * _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
+                clk_i, clk_f = _lut_index_frac_scalar(
+                    0.5 * (E_j + E_end_j), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                )
+                t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+            else:
+                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                t_end_j = clock[e] + step_j * inv_beta_j
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg
@@ -2250,13 +2395,25 @@ def _transport_core_ungrooved_perelectron_lut(
                 seg_t0[slot] = clock[e]
                 seg_id[slot] = e
                 seg_lay[slot] = L
+                if energy_model_code == 1:
+                    seg_E_end[slot] = E_end_j
+                    seg_t_end[slot] = t_end_j
+                    seg_flight[slot] = flight_id
+                    seg_substep[slot] = substep_id
             local_nseg += 1
 
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
-            clock[e] += step_j * inv_beta_j
+            E_keV[e] = E_end_j
+            clock[e] = t_end_j
+            tau_left -= step_j / lam_ang
+            if tau_left < 0.0:
+                tau_left = 0.0
+
+            if limited_j:
+                substep_id += 1
+                continue
 
             if exit_top_j:
                 exit_code[i] = EXIT_BACKSCATTERED
@@ -2268,6 +2425,12 @@ def _transport_core_ungrooved_perelectron_lut(
                 exit_code[i] = EXIT_CUTOFF_STOPPED
             if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
                 break
+
+            # Every remaining outcome closes the physical flight, so the next
+            # iteration opens a new one and redraws the collision.
+            flight_id += 1
+            substep_id = 0
+            tau_left = -1.0
 
             if cross_up_j or cross_dn_j:
                 pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
@@ -2621,6 +2784,8 @@ def _run_per_electron_transport_lut(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -2642,6 +2807,10 @@ def _run_per_electron_transport_lut(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
 ):
@@ -2671,7 +2840,10 @@ def _run_per_electron_transport_lut(
     d_alpha = to_dev(lut.alpha)
     _nsys_pop()
 
+    midpoint = energy_model_code == 1
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
+    if midpoint:
+        out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep)
     batches = []
 
     cap = max(1, int(config.seg_capacity))
@@ -2686,7 +2858,7 @@ def _run_per_electron_transport_lut(
 
         while True:
             _nsys_push("cxr.transport.scratch")
-            scratch = _alloc_scratch(xp, m, cap)
+            scratch = _alloc_scratch(xp, m, cap, midpoint)
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
             _nsys_pop()
@@ -2701,6 +2873,8 @@ def _run_per_electron_transport_lut(
                 n_layers,
                 d_bounds,
                 elastic_model_code,
+                energy_model_code,
+                max_dE_frac,
                 z_total,
                 finite_footprint,
                 width_ang,
@@ -2744,7 +2918,7 @@ def _run_per_electron_transport_lut(
             raise RuntimeError("segment buffer exhausted")
         _nsys_push("cxr.transport.compact")
         keep = xp.arange(cap)[None, :] < seg_count[:, None]
-        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
+        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch[:7]
         slots = (
             s_dir.reshape(m, cap, 3),
             s_mid.reshape(m, cap, 3),
@@ -2754,6 +2928,8 @@ def _run_per_electron_transport_lut(
             s_id.reshape(m, cap),
             s_lay.reshape(m, cap),
         )
+        if midpoint:
+            slots += tuple(a.reshape(m, cap) for a in scratch[7:])
         if keep_on_device:
             batches.append(tuple(a[keep] for a in slots))
         else:
@@ -2778,7 +2954,7 @@ def _run_per_electron_transport_lut(
     joined = None
     if keep_on_device:
         _nsys_push("cxr.transport.join")
-        empty = _alloc_scratch(xp, 0, 1)
+        empty = _alloc_scratch(xp, 0, 1, midpoint)
         joined = tuple(
             xp.concatenate([b[i] for b in batches]) if batches else empty[i]
             for i in range(len(out_bufs))
@@ -2798,6 +2974,8 @@ def _run_per_electron_transport(
     n_layers,
     internal_bounds,
     elastic_model_code,
+    energy_model_code,
+    max_dE_frac,
     z_total,
     finite_footprint,
     width_ang,
@@ -2819,6 +2997,10 @@ def _run_per_electron_transport(
     seg_t0,
     seg_id,
     seg_lay,
+    seg_E_end,
+    seg_t_end,
+    seg_flight,
+    seg_substep,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
 ):
@@ -2875,7 +3057,10 @@ def _run_per_electron_transport(
     d_mott = tuple(to_dev(a) for a in mott)
     _nsys_pop()
 
+    midpoint = energy_model_code == 1
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
+    if midpoint:
+        out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep)
     batches = []
 
     cap = max(1, int(config.seg_capacity))
@@ -2892,7 +3077,7 @@ def _run_per_electron_transport(
 
         while True:
             _nsys_push("cxr.transport.scratch")
-            scratch = _alloc_scratch(xp, m, cap)
+            scratch = _alloc_scratch(xp, m, cap, midpoint)
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
             _nsys_pop()
@@ -2907,6 +3092,8 @@ def _run_per_electron_transport(
                 n_layers,
                 d_bounds,
                 elastic_model_code,
+                energy_model_code,
+                max_dE_frac,
                 z_total,
                 finite_footprint,
                 width_ang,
@@ -2950,7 +3137,7 @@ def _run_per_electron_transport(
             raise RuntimeError("segment buffer exhausted")
         _nsys_push("cxr.transport.compact")
         keep = xp.arange(cap)[None, :] < seg_count[:, None]
-        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
+        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch[:7]
         slots = (
             s_dir.reshape(m, cap, 3),
             s_mid.reshape(m, cap, 3),
@@ -2960,6 +3147,8 @@ def _run_per_electron_transport(
             s_id.reshape(m, cap),
             s_lay.reshape(m, cap),
         )
+        if midpoint:
+            slots += tuple(a.reshape(m, cap) for a in scratch[7:])
         if keep_on_device:
             # No preallocation here: `max_segments` is Ne*max_steps rows, a bound
             # no run comes near and no device would hold. The batch list is the
@@ -2992,7 +3181,7 @@ def _run_per_electron_transport(
         _nsys_push("cxr.transport.join")
         # An empty run has no batch to take shapes and dtypes from; borrow them
         # from a zero-length scratch, which is where they came from anyway.
-        empty = _alloc_scratch(xp, 0, 1)
+        empty = _alloc_scratch(xp, 0, 1, midpoint)
         joined = tuple(
             xp.concatenate([b[i] for b in batches]) if batches else empty[i]
             for i in range(len(out_bufs))
@@ -3002,8 +3191,15 @@ def _run_per_electron_transport(
     return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined
 
 
-def _alloc_scratch(xp, m, cap):
+def _alloc_scratch(xp, m, cap, midpoint=False):
+    """Slot buffers for one batch, in the segment field order.
+
+    The four flight end-state/identity buffers exist only under the midpoint
+    rule; frozen runs allocate them at length zero so the core signature stays
+    fixed while the frozen row schema stays exactly seven fields wide.
+    """
     n = m * cap
+    n_end = n if midpoint else 0
     return (
         xp.empty((n, 3), dtype=xp.float64),
         xp.empty((n, 3), dtype=xp.float64),
@@ -3012,6 +3208,10 @@ def _alloc_scratch(xp, m, cap):
         xp.empty(n, dtype=xp.float64),
         xp.empty(n, dtype=xp.int64),
         xp.empty(n, dtype=xp.int16),
+        xp.empty(n_end, dtype=xp.float64),
+        xp.empty(n_end, dtype=xp.float64),
+        xp.empty(n_end, dtype=xp.int64),
+        xp.empty(n_end, dtype=xp.int64),
     )
 
 
@@ -3350,10 +3550,10 @@ def simulate_trajectories(
             f"{requested_core!r} resolved to {transport_core!r}"
         )
     # Fail closed rather than return the frozen schema under a midpoint request:
-    # only the lockstep core carries the controlled propagator so far.
-    if energy_model == "midpoint" and transport_core != "lockstep":
+    # the CUDA kernels do not carry the controlled propagator yet.
+    if energy_model == "midpoint" and transport_core == "cuda":
         raise ValueError(
-            "energy_model='midpoint' is only implemented for the lockstep core; "
+            "energy_model='midpoint' is not implemented for the cuda core; "
             f"{requested_core!r} resolved to {transport_core!r}"
         )
     if energy_model == "midpoint" and groove is not None:
@@ -3700,6 +3900,8 @@ def simulate_trajectories(
                 n_layers,
                 internal_bounds,
                 elastic_model_code,
+                energy_model_code,
+                max_dE_frac,
                 z_total,
                 finite_footprint,
                 0.0 if width_ang is None else float(width_ang),
@@ -3721,6 +3923,10 @@ def simulate_trajectories(
                 seg_t0,
                 seg_id,
                 seg_lay,
+                seg_E_end,
+                seg_t_end,
+                seg_flight,
+                seg_substep,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
             )
@@ -3816,6 +4022,8 @@ def simulate_trajectories(
                 n_layers,
                 internal_bounds,
                 elastic_model_code,
+                energy_model_code,
+                max_dE_frac,
                 z_total,
                 finite_footprint,
                 0.0 if width_ang is None else float(width_ang),
@@ -3837,6 +4045,10 @@ def simulate_trajectories(
                 seg_t0,
                 seg_id,
                 seg_lay,
+                seg_E_end,
+                seg_t_end,
+                seg_flight,
+                seg_substep,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
             )
@@ -3990,7 +4202,9 @@ def simulate_trajectories(
         layer = seg_lay[:nseg]
     else:
         # Already sized to `nseg` by the join, in the scratch's field order.
-        v_hat, r_mid, L_ang, E_seg, t_ang, elec_id, layer = dev_segs
+        v_hat, r_mid, L_ang, E_seg, t_ang, elec_id, layer = dev_segs[:7]
+        if energy_model == "midpoint":
+            seg_E_end, seg_t_end, seg_flight, seg_substep = dev_segs[7:]
 
     vacuum_start_ang = vac_start
     vacuum_end_ang = vac_end

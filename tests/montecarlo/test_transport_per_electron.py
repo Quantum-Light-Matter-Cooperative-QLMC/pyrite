@@ -180,9 +180,9 @@ def _core_calls(monkeypatch, **config_kwargs):
     seen = []
     real = tr._alloc_scratch
 
-    def counting(xp, m, cap):
+    def counting(xp, m, cap, midpoint=False):
         seen.append((m, cap))
-        return real(xp, m, cap)
+        return real(xp, m, cap, midpoint)
 
     monkeypatch.setattr(tr, "_alloc_scratch", counting)
     try:
