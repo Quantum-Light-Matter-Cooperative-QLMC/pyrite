@@ -91,14 +91,14 @@ half_filter = pr.FilterPlate(
     pose=filter_pose,
 )
 
-result = pr.simulate(
+pixel_result = pr.simulate(
     beam,
     target,
     detector,
     filters=(half_filter,),
     pixel_scorer=pr.PixelScorer(angular_shape=(2, 2)),
 )
-spatial = result.spatial
+spatial = pixel_result.spatial
 assert spatial is not None
 
 energy_eV, selected = spatial.spectra(

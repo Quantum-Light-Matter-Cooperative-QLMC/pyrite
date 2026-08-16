@@ -1179,8 +1179,9 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
     assert "· SUBMITTED" in output
     assert "SLURM" in output
     assert "48291" in output
-    assert "pyrite remote status" in output
-    assert "--attach" in output
+    assert "pyrite job status" in output
+    assert "pyrite job attach" in output
+    assert "pyrite remote status" not in output
     assert "pyrite remote attach" not in output
 
 
@@ -4448,8 +4449,8 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
 
     remote.pull(["hopg"], grid=True, level9=True, no_sync=True)
 
-    assert (tmp_path / "checkpoints" / "hopg" / "line.pkl").is_file()
-    assert (tmp_path / "checkpoints" / "hopg" / "brem.pkl").is_file()
+    assert (tmp_path / "checkpoints" / "hopg" / "line.h5").is_file()
+    assert (tmp_path / "checkpoints" / "hopg" / "brem.h5").is_file()
     loaded = _checkpoint_store.load("hopg", tmp_path / "checkpoints")
     assert np.array_equal(loaded["cfg"][30.0]["spec"], np.array([3.0, 4.0]))
     assert len(transfers) == 1

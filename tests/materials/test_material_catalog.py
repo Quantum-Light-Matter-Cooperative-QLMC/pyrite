@@ -805,12 +805,13 @@ def test_bundled_crystal_validation_ids_are_ledgered():
         for row in raw["crystals"].values()
         if isinstance(row.get("validation_id"), str) and row["validation_id"].strip()
     }
-    ledger = (
-        Path(__file__).parents[2] / "docs" / "validation" / "physics-validation-ledger.md"
-    ).read_text()
+    from pyrite.devtools.validation_ledger import part_paths
+
+    index = Path(__file__).parents[2] / "docs" / "validation" / "physics-validation-ledger.md"
+    ledger = "\n".join(path.read_text() for path in part_paths(index))
 
     missing = sorted(
-        validation_id for validation_id in validation_ids if f"| `{validation_id}` |" not in ledger
+        validation_id for validation_id in validation_ids if f"`{validation_id}`" not in ledger
     )
     assert not missing, f"catalog validation IDs missing from ledger: {missing}"
 

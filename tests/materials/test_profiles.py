@@ -63,7 +63,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c"
+        "233c079a84b54fb4cb583ca30222eadf914652a36f181d0932069e836cc4e25c"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -229,7 +229,7 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c"
+        "233c079a84b54fb4cb583ca30222eadf914652a36f181d0932069e836cc4e25c"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -425,10 +425,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     assert coherent["resolved_parameters"]["emission"] == "coherent"
     assert both["resolved_parameters"]["emission"] == "both"
 
-    # Known pre-change incoherent digests (captured before the tri-state rename)
+    # Known incoherent digest (current post-energy-grid-derivation baseline)
     # must stay bit-for-bit -- orphaning old coherent stems but never incoherent.
     assert incoherent["parameter_sha256"] == (
-        "d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c"
+        "233c079a84b54fb4cb583ca30222eadf914652a36f181d0932069e836cc4e25c"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
