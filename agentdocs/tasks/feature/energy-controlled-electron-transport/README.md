@@ -68,10 +68,10 @@ Numerical substeps are integration detail:
       thin/thick, low/high-Z, and 1--300 keV cases. Measured; the headline
       result is that a fractional-loss cap is the wrong control variable and
       the binding tolerance is an absolute emission phase.
-- [~] F -- Introduce physical-flight and numerical-substep identity and an
+- [x] F -- Introduce physical-flight and numerical-substep identity and an
       energy-controlled propagator with collision optical-depth handling.
-      Implemented on both lockstep cores; the ensemble-statistics evidence that
-      refinement does not move collision statistics is still owed (see F notes).
+      Implemented on both lockstep cores; ensemble evidence measured and
+      ledgered as `energy-controlled-propagation`.
 - [ ] G -- Make CXR and bremsstrahlung invariant to numerical substep refinement
       at fixed physical flights.
 - [ ] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
@@ -196,7 +196,24 @@ Numerical substeps are integration detail:
   is disabled. This is the discretized integrated inversion, not the
   bounded-piecewise-constant alternative: the *total* optical depth is
   integrated, only the hazard within one substep is held constant.
-- **Open (raised by F):** refining `max_dE_frac` **decorrelates trajectories**,
+- **Decided (F):** the collision-statistics acceptance criterion is **met at a
+  stated resolution, not proved**. Over C 25 keV (4000 Ang and thick), W 25 keV
+  thick, and C 100 keV thick at Ne = 1000 x 12 independent seeds per rung, all
+  160 paired shifts against the finest rung are below 2.3 sigma and none reaches
+  the 3 sigma flag. The predicted bias is real and one-signed -- freezing
+  `lambda` at `E_start` understates a hazard that rises as `E` falls, so
+  unrefined flights are slightly too long -- and its largest appearance (2.25
+  sigma on mean flight length, C 25 keV thick, correct sign, the case slice E
+  found has the matrix's largest per-flight fractional loss) is consistent with
+  a small convergent bias that a larger ensemble would resolve rather than
+  contradict. Recording it as a null result at a resolution, not as invariance,
+  is the honest reading.
+- **Decided (F):** rungs are compared by the **paired** per-seed difference.
+  Paired and unpaired shifts differ by at most ~0.7 sigma with the paired ones
+  larger, so a little variance survives the shared seed and pairing is the more
+  sensitive test; the small margin independently confirms the decorrelation
+  claim below.
+- **Resolved (was open, raised by F):** refining `max_dE_frac` **decorrelates trajectories**,
   so per-realization flight counts do not converge — measured 2568 / 2882 / 2599
   / 2553 / 2605 distinct flights at f = 1e-2 / 5e-3 / 2e-3 / 1e-3 / 5e-4 (C,
   25 keV, 4000 Ang, Ne = 200, seed 7). Changing the substep grid changes the
@@ -205,7 +222,7 @@ Numerical substeps are integration detail:
   "tightening the tolerance does not change physical collision statistics" must
   therefore be measured the way slice E measured Part A: ensemble means with
   Monte Carlo standard errors over seed replicates, not a single-seed count.
-  That measurement is the remaining F deliverable.
+  Measured; see the F decisions above.
 
 ## A -- segment-schema consumer inventory
 
@@ -272,6 +289,16 @@ them with the rows.
 Owned by `_transport_core_ungrooved` and `_transport_core_ungrooved_lut`. The
 grooved, per-electron, and CUDA cores still raise on a midpoint request; that
 port is slice H.
+
+`checks/collision_statistics_refinement.py` supplies the acceptance evidence:
+per-electron flight counts, mean physical flight length, path, retained energy,
+transit clock, and exit fractions over the ladder `none`/1%/0.5%/0.2%/0.1%/0.05%
+at Ne = 1000 x 12 independent seeds per rung, compared by paired per-seed
+difference. Derivation, tables, assumptions, and limits are in
+`docs/validation/beam-transport/energy-controlled-propagation.md`;
+`Validation: energy-controlled-propagation`. The row's claim is scoped to
+collision statistics -- substep invariance of emitted CXR and bremsstrahlung is
+slice G and is explicitly not claimed there.
 
 ## B -- bounded transport diagnostics
 

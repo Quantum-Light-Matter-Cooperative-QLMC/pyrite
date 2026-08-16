@@ -3257,7 +3257,7 @@ def simulate_trajectories(
       collision. Rows then carry ``flight_id``/``substep_id``; a substep keeps
       the flight's direction and identity and never scatters.
 
-    Validation: transport-midpoint-stopping
+    Validation: transport-midpoint-stopping, energy-controlled-propagation
 
     collect_diagnostics: opt in to fixed-size percentile summaries of the
     per-flight fractional energy loss, relative elastic-hazard change,
