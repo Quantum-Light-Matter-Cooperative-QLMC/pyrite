@@ -1,4 +1,3 @@
-
 # TODO / Backlog
 
 ---
@@ -235,6 +234,8 @@ Nothing here yet.
 1. Add explanation of substep splitting for CSDA
 
 ### Tests
+
+1. Fix the many failing intel SYCL tests
 
 ## Long-term plans
 

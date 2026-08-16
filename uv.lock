@@ -3410,6 +3410,7 @@ notebooks = [
 ]
 oracle = [
     { name = "dans-diffraction" },
+    { name = "mp-api" },
 ]
 test = [
     { name = "pytest" },
@@ -3485,7 +3486,10 @@ notebooks = [
     { name = "vegafusion", specifier = ">=2.0.3" },
     { name = "vl-convert-python", specifier = ">=1.9.0.post1" },
 ]
-oracle = [{ name = "dans-diffraction", specifier = "==3.4.0" }]
+oracle = [
+    { name = "dans-diffraction", specifier = "==3.4.0" },
+    { name = "mp-api", specifier = ">=0.46.4" },
+]
 test = [
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
