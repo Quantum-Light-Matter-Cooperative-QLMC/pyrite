@@ -113,6 +113,21 @@ file. Edit and drop items on `main`.
    ledger sign-off (Active 1). Review:
    [`agentdocs/plans/analysis-surface-review.md`](agentdocs/plans/analysis-surface-review.md)
    §4 G3.
+5. **General 3D geometry engine evaluation.** Survey candidate engines
+   (in-house quadric/CSG region table, NVIDIA Warp, Celeritas ORANGE/VecGeom,
+   Geant4/pyg4ometry, OpenMC CSG + DAGMC, Embree/OptiX, mesh/CAD authoring
+   libraries) against the device, determinism, coherent-emission, packaging, and
+   migration axes, separately for target/electron-transport geometry,
+   post-emission instrument geometry, and visualization. Documentation and ADR
+   outcome only — no `src/` change. Runs against
+   [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md) (arbitrary target
+   geometry is an accepted non-goal), so reaffirming it with engine-by-engine
+   evidence is an acceptable result; adopting an engine would need a superseding
+   ADR plus a separate implementation task. Blocked on user answers to the open
+   questions in the task doc (is ADR reversal on the table, is there a concrete
+   scientific driver, is the Intel dpnp backend expendable).
+   → `docs/geometry-engine-evaluation`;
+   [`agentdocs/tasks/docs/geometry-engine-evaluation/`](agentdocs/tasks/docs/geometry-engine-evaluation/).
 
 ## P3 - lower-priority / exploratory back burner
 
@@ -202,7 +217,8 @@ Direction notes only; not prioritized backlog or active commitments.
   candidate for particle-transport consumers. Arbitrary in-simulation geometry
   (multiple materials at arbitrary position, shape, and orientation; STL/STEP
   import) remains a recorded **non-goal** —
-  [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md).
+  [ADR-0008](docs/adr/0008-no-arbitrary-target-geometry.md); P2 item 5
+  re-examines that non-goal against named engines without presuming reversal.
 - **Custom detector tooling.** Extend the existing detector model with CLI
   tools for defining, loading, saving, and editing detector responses,
   geometries, and resolution for photon and charged-particle detectors.
