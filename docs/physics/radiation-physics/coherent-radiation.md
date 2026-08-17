@@ -38,6 +38,21 @@ from one transport. The cross-electron coherent path is experimental and
 currently unverified. See [Coherent emission](coherent-emission.md) for its
 phase convention and validation boundary.
 
+When transport has split flights into numerical substeps, the physical emitter
+is the flight, not the row. The `incoherent` policy then sums the rows of one
+`(electron_id, flight_id)` as a complex field before squaring, so only whole
+flights add incoherently; each row is evaluated at the flight's representative
+energy `E_repr_keV` rather than its start energy, which makes its one-point path
+integral a midpoint rule. Without the grouping, splitting a flight into $N$
+substeps would give $N$ rows carrying $(t_L/N)^2$ in place of one carrying
+$t_L^2$ and the line peak would fall roughly as $1/N$ — tightening a numerical
+tolerance would dismantle the line. At frozen energy and clock the grouped sum
+recovers the unsplit row exactly by the Dirichlet-kernel identity, so all
+residual under refinement is the physical variation of $E$ and $\beta$ along the
+flight. The grouped reduction is host-only and non-batched; substepped rows on a
+device backend, with `components=True`, or with refractive dispersion across
+`layers` raise rather than silently degrading to a row-incoherent sum.
+
 ## Assumptions and limits
 
 - kinematic/Born treatment; no dynamical diffraction or photon multiple
@@ -49,7 +64,8 @@ phase convention and validation boundary.
 - detector response is downstream and must not be folded into source physics.
 
 Validation: `pxr-amplitude`, `cbs-amplitude`, `finite-time-lineshape`,
-`line-energy-dispersion`, and `self-absorption`. Follow those rows in the
+`line-energy-dispersion`, `self-absorption`, and — for the representative energy
+and flight grouping — `substep-radiation-invariance`. Follow those rows in the
 [validation ledger](../../validation/physics-validation-ledger.md) for source
 derivations and current status. Implementation owners:
 `pyrite.materials.crystal.chi_g`, `U_g`, and

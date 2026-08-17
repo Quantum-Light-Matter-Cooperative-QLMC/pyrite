@@ -416,8 +416,11 @@ Two independent fixes, cheapest first:
    uploads whether or not this particular case reads them. The remaining 16
    copies are the energy tabulations, not segments.
 2. **Never come down.** *Done.* `simulate_trajectories(...,
-   keep_segments_on_device=True)` returns the eight per-segment arrays where the
-   CUDA core made them, and staging then only casts them to `REAL` in place. The
+   keep_segments_on_device=True)` returns the eight per-segment arrays of the
+   frozen schema where the CUDA core made them, and staging then only casts them
+   to `REAL` in place. `energy_model="midpoint"` adds `E_end_keV`, `t_end_ang`,
+   `E_repr_keV`, and the `flight_id`/`substep_id` identifiers to that set; the
+   byte accounting above is quoted for the frozen default. The
    driver stops copying each compacted batch into the caller's host buffers and
    instead joins the batches with one `concatenate` — which is also what sizes the
    output, since the segment total is not known until the last batch has run. It

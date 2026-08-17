@@ -251,6 +251,40 @@ def test_row_transforms_keep_the_new_fields_in_step_with_the_rows():
         clipped["t_end_ang"][untouched], segments["t_end_ang"][keep][untouched]
     )
 
+def test_every_per_row_array_is_registered_in_the_owning_field_registry():
+    """`_SEG_ARRAYS` is the registry every per-row transform loops over, so a new
+    per-row array that skips it survives a row mask at full length and silently
+    desynchronizes layer filtering, cutoff clipping, and device staging. The
+    named-field assertions above cannot catch a field nobody thought to add."""
+    from pyrite.montecarlo.spectrum.lines import _SEG_ARRAYS
+
+    n_electrons = 24
+    segments = simulate_trajectories(
+        E0_keV=40.0,
+        Ne=n_electrons,
+        thickness_ang=4000.0,
+        composition=CARBON,
+        seed=7,
+        transport_core="lockstep",
+        energy_model="midpoint",
+        max_dE_frac=5e-3,
+    )
+
+    n_rows = segments["L_ang"].shape[0]
+    # Substepping must not collapse to one row per electron, or the length test
+    # below would confuse the per-electron arrays for per-row ones.
+    assert n_rows > n_electrons
+    per_row = {
+        key
+        for key, value in segments.items()
+        if isinstance(value, np.ndarray)
+        and value.ndim >= 1
+        and value.shape[0] == n_rows
+        and not key.startswith(("initial_", "vacuum_"))
+    }
+
+    assert per_row - set(_SEG_ARRAYS) == set()
+
 
 @pytest.mark.parametrize(
     ("kwargs", "message"),

@@ -37,12 +37,19 @@ The returned quantity is photons/(eV sr incident-electron).
   depends on the configured low-energy bound;
 - Born alone vanishes at the tip, while Born times Elwert approaches a finite
   value immediately below the hard cutoff;
-- segment contributions and incident electrons are summed incoherently.
+- segment contributions and incident electrons are summed incoherently;
+- each row contributes one evaluation of the integrand rather than a quadrature
+  along the flight. Under `energy_model="midpoint"` that evaluation uses the
+  representative energy `E_repr_keV`, making it a midpoint rule; frozen rows keep
+  the left-endpoint one. `brem_endpoint_quadrature_error` measures the
+  difference, opt-in and read-only.
 
 Self-absorption uses the same layered escape model as line radiation; see
 [Multilayer materials](../materials/multilayer-materials.md).
 
-Validation: `brem-spectrum`. The full derivation, dimensional analysis, limits,
+Validation: `brem-spectrum`; the representative-energy evaluation is
+`substep-radiation-invariance` and the estimator is
+`radiation-error-estimators`. The full derivation, dimensional analysis, limits,
 and numeric comparison are in [Bremsstrahlung spectrum
 validation](../../validation/radiation-physics/brem-spectrum.md). Implementation
 owner: `pyrite.montecarlo.spectrum.brem.mc_brem_spectrum`.

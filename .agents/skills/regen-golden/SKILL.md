@@ -13,8 +13,7 @@ git status --short data/materials.toml src/pyrite/materials/catalog.py
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev regen-golden
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
   tests/materials/test_material_catalog.py -k golden
-UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
-  tests/test_line_grid_golden.py
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/energy-grid/
 git diff --stat tests/data/material_catalog_golden.json
 ```
 
