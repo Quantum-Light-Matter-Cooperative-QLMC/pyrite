@@ -8,6 +8,7 @@ import pytest
 from tests.helpers.external_db_fixtures import (
     MPQueryError,
     fetch_external,
+    fetch_mp_candidate_lattices,
     fetch_mp_lattice,
     resolve_mp_api_key,
 )
@@ -70,6 +71,37 @@ def test_fetch_mp_lattice_uses_supported_client_contract() -> None:
         90.0,
     )
     assert calls == ["test-key"]
+
+
+def test_fetch_mp_candidate_lattices_includes_prerelaxation_cells() -> None:
+    class Lattice:
+        def __init__(self, a: float) -> None:
+            self.abc = (a, a, a)
+            self.angles = (90.0, 90.0, 90.0)
+
+    class Structure:
+        def __init__(self, a: float) -> None:
+            self.lattice = Lattice(a)
+
+    class Rester:
+        def __init__(self, _api_key: str) -> None:
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def get_structure_by_material_id(self, material_id: str, final: bool = True):
+            assert material_id == "mp-149"
+            return Structure(5.43) if final else [Structure(5.5), Structure(5.6)]
+
+    assert fetch_mp_candidate_lattices("mp-149", "test-key", rester_factory=Rester) == [
+        (5.43, 5.43, 5.43, 90.0, 90.0, 90.0),
+        (5.5, 5.5, 5.5, 90.0, 90.0, 90.0),
+        (5.6, 5.6, 5.6, 90.0, 90.0, 90.0),
+    ]
 
 
 def test_fetch_mp_lattice_surfaces_configured_key_failure_without_secret() -> None:

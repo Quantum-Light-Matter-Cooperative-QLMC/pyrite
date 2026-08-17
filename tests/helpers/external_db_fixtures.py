@@ -99,6 +99,11 @@ def _mp_rester(api_key: str) -> object:
     return MPRester(api_key)
 
 
+def _structure_lattice_tuple(structure: object) -> Lattice:
+    lattice = structure.lattice  # type: ignore[attr-defined]
+    return tuple(float(value) for value in (*lattice.abc, *lattice.angles))  # type: ignore[return-value]
+
+
 def fetch_mp_lattice(
     mp_id: str, api_key: str, *, rester_factory: Callable[[str], object] | None = None
 ) -> Lattice:
@@ -107,10 +112,7 @@ def fetch_mp_lattice(
     try:
         with factory(api_key) as rester:  # type: ignore[union-attr]
             structure = rester.get_structure_by_material_id(mp_id)  # type: ignore[attr-defined]
-        lattice = structure.lattice
-        lengths = lattice.abc
-        angles = lattice.angles
-        return tuple(float(value) for value in (*lengths, *angles))  # type: ignore[return-value]
+        return _structure_lattice_tuple(structure)
     except MPQueryError:
         raise
     except Exception as exc:
@@ -118,6 +120,44 @@ def fetch_mp_lattice(
             f"Materials Project query failed for {mp_id} ({type(exc).__name__}); "
             "verify MP_API_KEY access and retry."
         ) from exc
+
+
+def fetch_mp_candidate_lattices(
+    mp_id: str, api_key: str, *, rester_factory: Callable[[str], object] | None = None
+) -> list[Lattice]:
+    """Final relaxed lattice plus every pre-relaxation (initial) lattice.
+
+    MP's initial structures are the experimental inputs a local CIF may
+    legitimately derive from -- ``hfte2`` matches the mp-32887 pre-relaxation
+    cell exactly -- so the live cross-check accepts a match against any of
+    them rather than the final relaxed cell alone.
+    """
+    factory = _mp_rester if rester_factory is None else rester_factory
+    try:
+        with factory(api_key) as rester:  # type: ignore[union-attr]
+            final = rester.get_structure_by_material_id(mp_id)  # type: ignore[attr-defined]
+            initials = rester.get_structure_by_material_id(mp_id, final=False)  # type: ignore[attr-defined]
+        if not isinstance(initials, list):
+            initials = [initials]
+        return [_structure_lattice_tuple(structure) for structure in (final, *initials)]
+    except MPQueryError:
+        raise
+    except Exception as exc:
+        raise MPQueryError(
+            f"Materials Project query failed for {mp_id} ({type(exc).__name__}); "
+            "verify MP_API_KEY access and retry."
+        ) from exc
+
+
+# MP-pinned entries whose ``mp_id`` is a provenance pointer only: their local
+# geometry deliberately tracks experimental literature (``mose2``: Bronsema
+# 1986; ``gese2``: Dittmar & Schaefer 1976 via the 2018 MP snapshot) or a
+# historical MP relaxation (``res2``: 2018 snapshot), none of which current MP
+# final or initial cells reproduce. See the "MP live audit" section of
+# docs/validation/materials/crystal-db-comparison.md. The live cross-check
+# skips the geometry assertion for these rather than failing on MP's
+# re-relaxed cell.
+MP_PROVENANCE_ONLY = frozenset({"gese2", "mose2", "res2"})
 
 
 def external_specs() -> list[tuple[str, int | None, str | None]]:

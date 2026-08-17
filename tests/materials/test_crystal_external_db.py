@@ -23,16 +23,19 @@ import pytest
 
 from tests.helpers.external_db_fixtures import (
     MP_API_KEY_ENV,
+    MP_PROVENANCE_ONLY,
     TOL_ANGLE_DEG,
     TOL_COD_ANG,
     TOL_MP_REL,
     Lattice,
     cached_lattice_tuple,
     fetch_external,
+    fetch_mp_candidate_lattices,
     iter_specs_sorted,
     lattice_tuple,
     load_cached_lattices,
     local_lattice_tuple,
+    resolve_mp_api_key,
 )
 
 _ALL_SPECS = list(iter_specs_sorted())
@@ -113,13 +116,38 @@ def test_local_lattice_matches_live_external(
 ) -> None:
     """Re-fetch the external record live and diff against the local catalog.
 
-    Also catches drift in the committed reference itself. MP entries skip when
-    no API key is configured.
+    Also catches drift in the committed reference itself. MP entries accept a
+    match against the final relaxed cell or any pre-relaxation (initial)
+    structure, and skip when no API key is configured. MP ids documented as
+    provenance-only pointers (``MP_PROVENANCE_ONLY``) skip when no candidate
+    cell matches, instead of failing on MP's re-relaxed geometry.
     """
-    crystal = fetch_external(cod_id, mp_id)
-    if crystal is None:
-        pytest.skip(f"{key}: mp-only entry and no {MP_API_KEY_ENV} set")
-    live = lattice_tuple(crystal)
     local = local_lattice_tuple(key)
-    source = f"cod:{cod_id}" if cod_id is not None else f"mp:{mp_id}"
-    _assert_geometry_agrees(local, live, source=source)
+    if cod_id is not None:
+        crystal = fetch_external(cod_id, None)
+        assert crystal is not None
+        _assert_geometry_agrees(local, lattice_tuple(crystal), source=f"cod:{cod_id}")
+        return
+    api_key = resolve_mp_api_key()
+    if not api_key:
+        pytest.skip(f"{key}: mp-only entry and no {MP_API_KEY_ENV} set")
+    assert mp_id is not None
+    mismatches: list[str] = []
+    for candidate in fetch_mp_candidate_lattices(mp_id, api_key):
+        try:
+            _assert_geometry_agrees(local, candidate, source=f"mp:{mp_id}")
+        except AssertionError as exc:
+            mismatches.append(str(exc))
+        else:
+            return
+    if key in MP_PROVENANCE_ONLY:
+        pytest.skip(
+            f"{key}: mp_id is a provenance pointer only; local geometry tracks "
+            "experimental literature or a historical MP snapshot that current MP "
+            "data do not reproduce "
+            "(docs/validation/materials/crystal-db-comparison.md)"
+        )
+    pytest.fail(
+        f"{key}: local lattice matches neither the final nor any pre-relaxation "
+        f"MP structure for {mp_id} within tolerance:\n" + "\n".join(mismatches[:3])
+    )

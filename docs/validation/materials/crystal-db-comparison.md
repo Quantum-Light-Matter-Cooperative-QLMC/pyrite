@@ -93,10 +93,16 @@ cross-database validation recorded below.
   length / `1°` angle for MP.
 - **MP live audit.** With `mp-api` 0.46.4 against MP database 2026.04.13,
   all seven pinned MP ids resolve. None of their current final relaxed cells
-  satisfy the 2% full-cell tolerance. Searching each record's pre-relaxation
-  structures recovers an exact match for `hfte2`; `gese2`, `mose2`, `pdse2`,
-  `pts2`, `res2`, and `wse2` still exceed tolerance. Their ids remain valid
-  provenance pointers, but those six are not geometry-validated.
+  satisfy the 2% full-cell tolerance. The live cross-check therefore accepts a
+  match against the final cell *or any pre-relaxation (initial) structure* —
+  MP's initial structures are the experimental inputs a local CIF may derive
+  from. That recovers an exact match for `hfte2`; `gese2`, `mose2`, `pdse2`,
+  `pts2`, `res2`, and `wse2` still exceed tolerance. Of those, `pdse2`,
+  `pts2`, and `wse2` were re-pinned to experimental COD records (below);
+  `gese2`, `mose2`, and `res2` have no defensible external geometry source, so
+  their ids remain provenance pointers only (`MP_PROVENANCE_ONLY` in
+  `tests/helpers/external_db_fixtures.py`) and the live test skips the geometry
+  assertion for them rather than failing on MP's re-relaxed cell.
 - **Provenance resolution for MP mismatches.**
   - `mose2`: retained Bronsema's 1986 single-crystal refinement
     (doi:10.1002/zaac.19865400904), which exactly supplies the local
