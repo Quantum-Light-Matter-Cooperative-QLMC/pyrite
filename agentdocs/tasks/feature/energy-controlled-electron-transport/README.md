@@ -79,8 +79,12 @@ Numerical substeps are integration detail:
       slice H.
 - [x] H -- Port the accepted algorithm to lockstep, grooved, per-electron, and
       CUDA paths without weakening deterministic/statistical parity contracts.
-- [ ] I -- Update public docs, validation ledger, checkpoint/schema handling,
-      and golden data; run fresh-context physics validation.
+- [x] I -- Update public docs, validation ledger, checkpoint/schema handling,
+      and golden data; run fresh-context physics validation. All five rows are
+      now `rederived` by independent fresh contexts. No checkpoint or golden
+      migration was needed: checkpoints store reduced spectra, and the new row
+      fields appear only under the non-default `energy_model="midpoint"`.
+      Human sign-off is the only remaining ledger transition.
 
 ## Decisions and open questions
 
