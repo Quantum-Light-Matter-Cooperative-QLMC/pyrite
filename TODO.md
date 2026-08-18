@@ -13,17 +13,6 @@ file. Edit and drop items on `main`.
 ## Active
 
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/validation/physics-validation-ledger.md`](docs/validation/physics-validation-ledger.md); method: [`docs/validation/methodology.md`](docs/validation/methodology.md).
-2. **Energy-controlled electron transport.** Schema inventory, per-flight
-   diagnostics, midpoint predictor-corrector stopping/clock, radiation error
-   estimators, and convergence matrices are done (A-E): the binding control
-   variable is absolute emission phase, not fractional energy loss, and the
-   midpoint rule is a prerequisite for coherent CXR. Remaining: the
-   energy-controlled propagator with collision optical-depth handling,
-   CXR/bremsstrahlung invariance to substep refinement, porting the accepted
-   algorithm to all four execution paths, and ledger/docs/golden-data closure
-   (F-I). →
-   `feature/energy-controlled-electron-transport`;
-   [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
 
 ## Triaged
 
