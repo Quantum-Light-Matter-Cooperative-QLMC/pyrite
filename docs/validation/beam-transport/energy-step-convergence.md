@@ -21,9 +21,14 @@ x 5--300 keV matrix.
 
 2. **The 2%/1%/0.5% fractional-loss ladder named in the checklist does not
    exercise these cases.** The elastic mean free path already holds the
-   per-flight fractional energy loss below 2% for ~99% of flights, so the 2%
-   and 1% rungs subdivide almost nothing and reproduce the unrefined result
-   bit for bit. A fractional-loss cap is the wrong control variable.
+   per-flight fractional energy loss below 2% for ~99% of flights *matrix-wide*,
+   so the 2% and 1% rungs subdivide almost nothing. This is not case-universal:
+   individual cases carry a per-flight p99 above 2% (C 5 keV thin 6.2%, C 5 keV
+   thick 9.9%, W 5 keV thin/thick 3.6%/5.0%, C 25 keV thick 3.0%, W 25 keV
+   thick 2.3%), and two of the five Part B radiation cases are not bit-for-bit
+   no-ops at the 2% rung. The conclusion is unaffected: where the ladder does
+   refine, the frozen rule still misses the 0.1 rad tolerance by two to three
+   orders of magnitude. A fractional-loss cap is the wrong control variable.
 
 3. **For coherent CXR the binding constraint is the absolute emission phase,
    and it is met by the propagation rule rather than by the substep count.**
@@ -402,4 +407,156 @@ case's hopg (0,0,2) resonance.
 
 ## Independent verification
 
-Pending. Fresh-context rederivation and human sign-off have not been performed.
+Fresh-context rederivation (2026-08-18, verifier context separate from the
+implementation, from the ledger row and this write-up's Claim section only).
+This row is a measurement + step-control decision, not a new equation, so the
+unit of trust is the measurement's validity and the honesty of its
+conclusions.
+
+**Filters.** Units `pass`: accumulated phase is reported in rad
+($\Delta\phi=\omega\Delta t=(E_{\rm res}/\hbar c)\Delta t$, with
+$E_{\rm res}/\hbar c$ in $\mathrm{\mathring A}^{-1}$ and $\Delta t$ in
+$\mathrm{\mathring A}$ under $c=1$, matching the ledgered clock convention of
+`transport-midpoint-stopping`); fractional loss and the L1/shift ratios are
+dimensionless. Limits `pass`: a lossless flight makes `dE/ds=0`, so the two
+propagation rules coincide exactly and every tabulated entry is identically
+zero, as claimed. Pure row splitting at frozen energy and clock was checked
+by an independent re-derivation of the Dirichlet composition identity before
+reading the script: writing $u=Pt_L/n$, $s_k=(k+\tfrac12)t_L/n$, and using
+$\operatorname{sinc}(u/\pi)=\sin(u)/u$,
+
+$$
+\sum_{k=0}^{n-1}\frac{t_L}{n}\operatorname{sinc}(u/\pi)\,e^{2iPs_k}
+=\frac{t_L}{n}\frac{\sin u}{u}\,e^{iu}\sum_{k=0}^{n-1}e^{i2uk}
+=\frac{t_L}{n}\frac{\sin u}{u}\,e^{iu}\,e^{iu(n-1)}\frac{\sin(nu)}{\sin u}
+=\frac{\sin(Pt_L)}{P}e^{iPt_L}
+=t_L\operatorname{sinc}\!\left(\frac{Pt_L}{\pi}\right)e^{2iP(t_L/2)},
+$$
+
+using $nu=Pt_L$ and the geometric-series identity
+$\sum_{k=0}^{n-1}e^{i2uk}=e^{iu(n-1)}\sin(nu)/\sin(u)$. This reproduces the
+write-up's stated identity term for term, so subdivision at frozen energy and
+clock is exactly the parent row's own amplitude and midpoint phase, and any
+measured residual there is the kernel's own per-row escape-factor
+approximation, not an energy-step effect. Signs/conventions `pass`: Joy–Luo
+$dE/ds<0$ makes the frozen (left-endpoint) rule evaluate $\beta$ too high and
+$\Delta t=s/\beta$ too low on every row, a one-signed bias, matching the
+"systematic, not random" characterization used later in the write-up.
+
+**Step-control reasoning, derived before reading the check script.** A
+coherent kernel's row weight is $e^{i\omega t_{\rm abs}}$ with
+$t_{\rm abs}$ the running sum of per-flight $\Delta t$ along one electron's
+whole trajectory. Because Joy–Luo's sign is fixed, the frozen rule's
+per-flight clock error is not a random, cancelling perturbation but a
+same-sign local truncation term; summed over the $M\sim10$–$10^2$ flights
+that make up a $10^3$–$10^4\,\mathrm{\mathring A}$ trajectory, the
+accumulated error grows roughly linearly in $M$ rather than being suppressed
+by any $\sqrt M$ averaging. A per-flight fractional-loss cap $|dE|/E<f$
+bounds only the *local* truncation term of the flight it is applied to; it is
+blind to $M$ and to the fact that refining within the same left-endpoint
+substep rule leaves the sign unchanged, so it does not bound the
+*accumulated* quantity that actually enters the exponent. An absolute,
+trajectory-accumulated phase tolerance is therefore the dimensionally and
+causally correct control variable, and switching propagation rule (frozen to
+midpoint) attacks the sign of the local term directly, which a smaller $f$
+cannot. This reasoning is self-consistent and is exactly what the Part B
+phase-criterion table subsequently shows: `cum dphi p99` under the frozen
+rule falls only slowly down the $f$ ladder (e.g. C 25 keV thick:
+433, 308, 215, 130 rad at flight/2%/1%/0.5%) while the midpoint rule already
+clears 0.1 rad at zero refinement (`5.15e-02` rad, same case, `flight` rung).
+
+**Re-derivation vs. the write-up and script.** Read after the above:
+`checks/energy_step_convergence_matrix.py` and Parts A–D.
+
+- *Part A path-length bias.* Correctly treated as a detected bias, not a
+  null: the write-up explicitly separates the "98 comparisons, isolated 2–3σ
+  expected" look-elsewhere caveat from the one entry (`C 5 keV thick` path
+  length, +4.3σ) that is replicated at +4.3/+4.9/+4.6/+4.9σ across four
+  independent seeds, with the sign and case predicted in advance by
+  Joy–Luo's `1/E` growth. `shift/sig` uses
+  $(\text{value}_{\rm frozen}-\text{value}_{\rm midpoint})/\sqrt{\sigma_f^2+\sigma_m^2}$
+  (`checks/energy_step_convergence_matrix.py:565`), and because both rules
+  share one seed and the same first scatter, the true correlated-difference
+  variance is at most this independent-sum value, so if anything the quoted
+  σ is conservative (understates significance) rather than inflated — a
+  favourable direction for a "detected bias" claim. Exit-fraction SEs use the
+  binomial $\sqrt{p(1-p)/N_e}$ and continuous observables use
+  `std(ddof=1)/sqrt(Ne)`, both correct sample-SE forms.
+- *2%/1% no-op claim.* Supported but imprecisely scoped. Several individual
+  cases have per-flight fractional-loss p99 above 2% (`C 5 keV thin` 6.2%,
+  `C 5 keV thick` 9.9%, `C 25 keV thick` 3.0%, `W 5 keV thin/thick` 3.6%/5.0%,
+  `W 25 keV thick` 2.3%), and Part B shows the 2% rung is *not* a bit-for-bit
+  no-op for two of the five measured radiation cases (`C 25 keV thick`:
+  18944→19620 rows; `W 25 keV thick`: 120242→122173 rows). The "~99% of
+  flights" figure is true as a matrix-wide statement but reads as
+  case-universal in the Claim section; this is a minor overstatement of
+  precision, not of substance — the ladder's own phase table shows that even
+  where it does refine (down to the 0.5% rung), the frozen rule still misses
+  the 0.1 rad tolerance by two to three orders of magnitude, so the
+  conclusion "the ladder is the wrong control variable" survives regardless.
+- *`coherent=True` ill-conditioning defect.* Correctly scoped as not an
+  energy-step effect: `part_d`'s docstring and the Dirichlet identity above
+  both establish that subdivision at frozen energy/clock is exact, so a
+  large, non-vanishing residual under refinement is a statement about the
+  reduction's own conditioning (a small residual of a large complex-valued
+  cancellation), independent of any propagation-rule choice. "Ill-conditioned"
+  is the right diagnosis. The specific "54% residual at 100 keV thick" figure
+  quoted in the ledger row's Notes, however, is not traceable to any printed
+  number in this write-up; the closest analogue is the Part B `cxrC`/`cxrCfz`
+  L1 residual for `C 100 keV thick`, which sits at 46.6–47.1% across the
+  unrefined-to-0.5% rungs (same order of magnitude, same qualitative
+  "residual does not shrink under refinement" signature, but not an exact
+  match to "54%"). This is a numeric-provenance gap between the ledger prose
+  and the linked record, not a physics error.
+- *Near-grazing floor independent of `energy_model`.* Verified by
+  construction: `part_d` never passes `energy_model` to `simulate_trajectories`
+  and holds energy and clock frozen while only subdividing rows, so the
+  measured floor cannot depend on the propagation rule by the same Dirichlet
+  argument used above. Numerically, however, the write-up's own Part D table
+  (`8.71e-02`, `3.38e-01` for `f=1%`/`f=0.125%` at the grazing geometry) does
+  not match the ledger row's quoted `1.7e-1–3.5e-1`; a `--quick` (`Ne=25`)
+  rerun of `--part d` here reproduced `1.66e-01`/`3.50e-01`, i.e. the ledger
+  prose matches a smaller-`Ne` run rather than the `Ne=200` numbers tabulated
+  in this file. Both runs land in the same qualitative regime (tens of
+  percent, roughly one to two orders above the ~1% default-take-off floor),
+  so the substantive conclusion is unaffected, but the exact figures in the
+  ledger Notes should be re-pulled from a single, stated run.
+- *Systematic vs. random argument for the 0.1 rad tolerance.* Sound. A
+  same-sign per-row error rotates the ensemble's coherent sum coherently
+  (a bias on the line position/amplitude), whereas independent per-row
+  jitter enters as an ensemble-averaged Debye–Waller-type suppression
+  $\exp(-\sigma_\phi^2/2)$ that reduces visibility without displacing the
+  line. These are different observables (a shift vs. a multiplicative
+  suppression), so bounding the numerical bias tightly is meaningful
+  independent of the size of the unmodeled random jitter, and the write-up
+  is explicit that this is a bound on numerical error against the CSDA
+  clock, not a claim that physical phase fidelity is achieved (the Jensen's-
+  inequality mean-arrival-time bias from straggling, ~0.3 rad at the
+  25 keV/1 keV point, is correctly flagged as an open gap above the 0.1 rad
+  tolerance, not folded into "converged").
+
+**Other findings.** The ledger row's Notes attribute this claim with a
+statement that `elec_id` is a row mask, not a grouping key, in `lines.py`.
+That is correct — `lines.py:1003` computes `line_electron = seg_elec_id < Ne`,
+matching the check script's own comment
+(`checks/energy_step_convergence_matrix.py:28-29`) — but neither `elec_id`
+nor `lines.py` appears anywhere in this write-up's body; the supporting
+evidence lives only in the script docstring and the ledger prose. No other
+stale wording was found beyond the grooved/per-electron/CUDA note already
+flagged as known-stale.
+
+**Verdict.** `rederived`: the Dirichlet identity, the phase-tolerance
+reasoning, and the statistical methods (SE formulas, paired-seed shift,
+seed-replication of the one significant bias) all check out on independent
+re-derivation, and every headline conclusion (systematic frozen-rule bias,
+ineffectiveness of the fractional-loss ladder as a control variable, exact
+row-splitting invariance, correct scoping of the two open defects as
+non-energy-step effects, near-grazing-independent-of-`energy_model` floor,
+and the systematic/random tolerance argument) is honestly and correctly
+characterized. Outstanding items for the ledger editor: (1) the "54%" and
+"1.7e-1–3.5e-1" figures in the ledger Notes should be re-pulled from one
+specific run and matched to numbers actually printed in this file; (2) the
+"~99% of flights below 2%" framing in the Claim section should note it is a
+matrix-wide, not per-case, statistic, since two of five Part B cases are not
+in fact no-ops at the 2% rung. Neither item changes the physics verdict.
+`signed-off` remains a human decision.
