@@ -131,7 +131,7 @@ cross-database validation recorded below.
   use `mp_api.client.MPRester.get_structure_by_material_id`, not
   `crystals.Crystal.from_mp`'s unsupported legacy REST-v2 endpoint. Install its optional
   client with `uv sync --extra external-db`; then run
-  `CXR_ONLINE_TESTS=1 uv run --extra external-db cxr-dev test tests/materials/test_crystal_external_db.py`.
+  `PYRITE_ONLINE_TESTS=1 uv run --extra external-db pyrite-dev test tests/materials/test_crystal_external_db.py`.
   Missing keys skip MP-only online cases; configured-key query failures fail
   with an actionable diagnostic and the refresh script retains cached values.
 - Item #1 (Debye–Waller) untouched, as required.
