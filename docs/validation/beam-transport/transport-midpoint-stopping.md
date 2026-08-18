@@ -101,7 +101,10 @@ evaluated outside its range. No clamp is needed and none is applied.
 ## Limiting cases
 
 - `s → 0`: `E_mid → E_start`, so both the energy and clock updates reduce to the
-  frozen rule, and the difference between the two schemes vanishes as `s³`.
+  frozen rule. The two schemes' mutual difference vanishes as `s²`, not `s³`:
+  it *is* the frozen rule's own local truncation term. `s³` is the midpoint
+  rule's local error against the exact solution, which is the quantity the
+  numerical evidence below measures.
 - `dE/ds` constant in `E` (a hypothetical energy-independent stopping power):
   `(dE/ds)(E_mid) = (dE/ds)(E_start)` identically and the two schemes agree
   exactly, as does the clock when `β` is likewise constant.
@@ -148,3 +151,59 @@ Pinned by `tests/montecarlo/test_transport_energy_model.py`:
   fact that the new fields are masked in step with the rows they belong to, are
   pinned by
   `::test_row_transforms_keep_the_new_fields_in_step_with_the_rows`.
+
+## Independent verification
+
+Fresh-context rederivation (2026-08-18, verifier context separate from the
+implementation). Filters: units `pass` (`dE/ds` keV/Å, clock in Å with
+$c=1$); signs/conventions `pass` ($dE/ds<0$, $E_{\rm end}<E_{\rm start}$);
+limits `pass` ($s\to0$ and constant $dE/ds$ both collapse to the frozen rule).
+
+Re-derived the scheme from the Joy–Luo `dE/ds` and the clock integral before
+reading `transport.py`. The predictor-corrector
+$E_{\rm pred}=E_{\rm start}+s\,f(E_{\rm start})$,
+$E_{\rm mid}=(E_{\rm start}+E_{\rm pred})/2$,
+$E_{\rm end}=E_{\rm start}+s\,f(E_{\rm mid})$
+is algebraically the textbook explicit-midpoint (RK2) update
+$E_{\rm end}=E_{\rm start}+s\,f\!\left(E_{\rm start}+\tfrac{s}{2}f(E_{\rm start})\right)$,
+since $(E_{\rm start}+E_{\rm pred})/2=E_{\rm start}+\tfrac{s}{2}f(E_{\rm start})$.
+Taylor expansion gives $O(s^3)$ local / $O(s^2)$ global truncation error in
+$E_{\rm end}$ (frozen Euler: $O(s^2)$ local), and the clock rule
+$\Delta t=s/\beta((E_{\rm start}+E_{\rm end})/2)$ independently expands to the
+same $O(s^3)$ local order as the matching midpoint quadrature of
+$\int ds'/\beta(E(s'))$. Solving $E_{\rm end}=E_{\rm cut}$ algebraically
+reproduces
+$s_{\rm cut}=(E_{\rm cut}-E_{\rm start})/(dE/ds)((E_{\rm start}+E_{\rm cut})/2)$
+exactly, with no approximation — consistent with the code's cutoff branch
+assigning `E_end_j = E_cut_e` directly rather than routing `s_cut` back
+through the general predictor-corrector, which would *not* reproduce
+`E_cut` exactly (the exactness is a construction property of the direct
+assignment, not of the RK2 formula).
+
+Read `_transport_core_ungrooved` (`transport.py:1027-1079`) after the
+derivation: `E_pred`/`E_mid`/`E_end`, `cutoff_distance`, and
+`beta_j = beta_from_keV_scalar(0.5*(E_j+E_end_j))` match term for term. A
+standalone reimplementation of `dE/ds` and $\beta$ from the governing
+equations (independent of `transport.py`; $J=78$ eV,
+`coeff=(0.1136/0.602214076)*6` for the ledger row's carbon case) against a
+200000-step RK4 reference reproduced the ledger's numeric-evidence table to
+3-4 significant figures without consulting it for the arithmetic beforehand
+($E_{\rm end}$ errors 2.668e-4/6.655e-5/1.662e-5 keV frozen and
+5.785e-7/7.199e-8/8.978e-9 keV midpoint at 600/300/150 Å; clock errors
+2.347/0.586/0.146 Å frozen and 1.161e-4/1.511e-5/1.925e-6 Å midpoint; ratios
+~4.0/4.0 and ~8.0/8.0), and confirmed
+$s_{\rm cut}(\text{frozen})>s_{\rm cut}(\text{midpoint})$ from the same
+monotone-$\lvert dE/ds\rvert$ trend the doc's predictor-boundedness argument
+uses. `tests/montecarlo/test_transport_energy_model.py` (20 cases) passes.
+
+One wording note, not a computed discrepancy: "Limiting cases" states that as
+$s\to0$ "the difference between the two schemes vanishes as $s^3$." Read
+literally this is imprecise — $E_{\rm end}(\text{midpoint})-E_{\rm end}(\text{frozen})$
+is generically $O(s^2)$ (it reduces to the frozen rule's own local truncation
+term), confirmed above by a ratio of 4.0 under halving, not 8.0. Each
+scheme's own error against the true solution is $O(s^2)$/$O(s^3)$
+respectively, which is what the numeric-evidence table and this verification
+both correctly report; only the phrase describing the two schemes'
+mutual difference is loose.
+
+Verdict `rederived`. `signed-off` remains a human decision.
