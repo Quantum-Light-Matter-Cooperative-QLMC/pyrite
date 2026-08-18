@@ -280,7 +280,11 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `beta_from_keV`, scattering/stopping helpers; `TRANSPORT_ELEMENTS`
   registry. NumPy/Numba, plus a device core: `resolve_transport_core` picks the
   CUDA one above `CUDA_TRANSPORT_MIN_ELECTRONS` (1000) electrons on a CUDA box,
-  pinnable with `PYRITE_MC_TRANSPORT_CORE`. Deps: `materials.attenuation`,
+  pinnable with `PYRITE_MC_TRANSPORT_CORE`. `energy_model` selects the
+  propagation rule (`"frozen"` default left-endpoint, `"midpoint"`
+  predictor--corrector); `max_dE_frac` splits a physical flight into numerical
+  substeps under `"midpoint"` and adds the `E_end_keV`/`t_end_ang`/`E_repr_keV`
+  and `flight_id`/`substep_id` row fields. Deps: `materials.attenuation`,
   `DATA_DIR`.
 - `transport_jit_kernel` — the `cupyx.jit` port of
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
@@ -293,7 +297,10 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   owns `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
   average) and `mc_spectrum_solid_angle`; `brem.py` owns
   `mc_brem_spectrum` and `load_external_brem`; `coherent.py` groups the
-  CUDA-only coherent-kernel surface. Line, brem, and coherent CUDA kernels are
+  CUDA-only coherent-kernel surface; `diagnostics.py` owns the opt-in,
+  host-only radiation error estimators `cxr_endpoint_resonance_drift` and
+  `brem_endpoint_quadrature_error` plus `subdivide_flights`, none of which sit
+  on a default call path. Line, brem, and coherent CUDA kernels are
   colocated in this package and remain lazy on CPU. Deps: `_backend`,
   `materials.attenuation`, `transport`, `geometry`, `materials.crystal`.
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
