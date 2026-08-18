@@ -12,9 +12,9 @@ Compact generated view of the [detailed validation ledger]
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 6 |
-| `rederived` | 35 |
+| `rederived` | 36 |
 | `filtered` | 6 |
-| `unverified` | 58 |
+| `unverified` | 57 |
 | `blocked` | 1 |
 | `discrepancy` | 4 |
 | **Total** | **110** |

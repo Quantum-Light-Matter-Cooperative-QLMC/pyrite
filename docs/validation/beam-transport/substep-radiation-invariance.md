@@ -216,8 +216,14 @@ peak matters.
 - **Host-only.** The grouped reduction is a segmented complex accumulation
   (`np.add.reduceat` over flight-boundary-snapped blocks) on the per-`hkl`
   accumulation path. A non-NumPy backend with substepped rows raises rather than
-  silently falling back to the row-incoherent sum. Porting the grouping to the
-  batched, grooved, per-electron, and CUDA paths is checklist step H.
+  silently falling back to the row-incoherent sum. Checklist step H completed
+  without porting the grouping to the batched or device paths: the device port
+  needs a segmented complex reduction with no CuPy `reduceat` (cumsum-and-
+  difference was rejected on precision grounds), and the batched path falls
+  back to the proven per-`hkl` loop on grouped rows. Both are performance ports
+  of an already-correct path, and both fail closed, so neither is a correctness
+  gap. Grooved and per-electron transport under substepping is supported; it is
+  the radiation-side grouping that stays host-only.
 - `components=True` raises on substepped rows: the per-component decomposition
   is defined per row and has no grouped form yet.
 - `xray_dispersion="refractive"` with `layers` raises on substepped rows, for
@@ -232,3 +238,111 @@ peak matters.
   escape-factor quadrature, which is unchanged here and is not a substep effect.
 - Energy-loss straggling remains unmodeled (see `energy-step-convergence`), so
   the flight energy history is deterministic CSDA.
+
+## Independent verification
+
+Fresh-context rederivation (2026-08-18, verifier context separate from the
+implementation). Filters: units `pass` -- $t_L$ carries Å (c = 1) and $P$
+carries $1/\text{Å}$, so $Q = t_L\operatorname{sinc}(Pt_L/\pi)$ has units of
+Å and $\lvert Q\rvert^2$ of Å$^2$, matching the kernel's own $t_L^2\operatorname{sinc}^2$
+prefactor; limits `pass` ($N=1$ is a grouping no-op by construction, a
+lossless flight is exactly invariant by the argument below); signs/conventions
+`pass` once `mc_spectrum`'s own convention is used for $P$ (below) -- reading
+the ledger's shorthand "$Q=t_L\operatorname{sinc}(Pt_L/\pi)$" with the bare
+detuning $D=(1-\beta\hat v\cdot\hat n)(\omega-\omega_{\rm res})$ in place of
+$P$ does not reproduce the code numerically; it does once $P=D/2$, exactly as
+`mc_spectrum`'s docstring defines it.
+
+**Rule (a), re-derived before reading `lines.py`.** The physical amplitude
+radiated by one flight is $\int_0^{t_L} e^{iDt}\,dt = (e^{iDt_L}-1)/(iD)$, with
+magnitude $2\sin(Dt_L/2)/D$. Writing $P=D/2$ this is $\sin(Pt_L)/P$, and since
+$t_L\operatorname{sinc}(Pt_L/\pi) = t_L\cdot\sin(\pi\cdot Pt_L/\pi)/(\pi\cdot
+Pt_L/\pi) = \sin(Pt_L)/P$ under NumPy's normalized $\operatorname{sinc}$, this
+is exactly $Q$. Splitting $[0,t_L]$ at frozen $D$ into any partition (equal or
+not) and summing each sub-interval's own closed-form integral reproduces the
+whole integral exactly, by linearity of a definite integral over a partition
+-- a general fact, not special to equal substeps. Specializing to $N$ equal
+substeps with midpoint-referenced phase offsets $D t_L(k-(N-1)/2)/N$
+reproduces the symmetric Dirichlet-kernel sum
+
+$$
+\sum_{k=0}^{N-1} e^{i\frac{Dt_L}{N}\left(k-\frac{N-1}{2}\right)}
+=\frac{\sin(Dt_L/2)}{\sin(Dt_L/(2N))},
+$$
+
+which multiplied by each substep's own weight $(t_L/N)\sin(Dt_L/(2N))/(Dt_L/(2N))$
+gives $2\sin(Dt_L/2)/D=Q$ for every $N$ -- the same value as the general
+argument, and term-for-term the identity the ledger's Checks row states. Both
+derivations were done before reading `lines.py`.
+
+**Rule (b), re-derived before reading `transport.py`.** Evaluating each row's
+one-point emission integral at $E_{\rm repr}=(E_{\rm start}+E_{\rm end})/2$
+turns a left-endpoint quadrature into a midpoint one (second order in the
+flight's length, matching `transport-midpoint-stopping`'s own RK2 accuracy
+argument). The stated identity $t_L=L/\beta(E_{\rm repr})=t_{\rm end}-t_{\rm
+start}$ is exact only if the SAME $\beta(E_{\rm repr})$ used by the clock is
+also what the radiation kernel reads for $t_L$ -- not merely close.
+
+Read the implementation after both derivations. `lines.py` builds each row's
+complex field from its own resonance $E_{r,j}$, escape phase, and a per-row
+midpoint time `seg_t_mid = seg_t + 0.5*t_L_all` (`lines.py:1117`) rather than
+a shared left-endpoint phase, so the flight-grouped sum
+(`lines.py:1327-1362`) is literally a partition sum of the exact per-row
+integrals derived above -- the general linearity argument applies directly,
+not only its $N$-equal special case. The docstring at `lines.py:736-748`
+defines $P=(1-\beta\hat v\cdot\hat n)(\omega-\omega_{\rm res})/2$ exactly and
+`a_width = dnm*t_L/(2*HBARC_EV_ANG)` (`lines.py:1329`) makes the `xp.sinc`
+argument $a_{\rm width}(E-E_r)/\pi = Pt_L/\pi$ term for term, confirming the
+convention above rather than the bare-detuning reading. `_transport_core_ungrooved`
+(`transport.py:1073-1091`) computes `beta_j = beta_from_keV_scalar(0.5*(E_j +
+E_end_j))`, `t_end_j = clock[e] + step_j/beta_j`, and `seg_len[nseg] =
+step_j` -- the SAME `step_j` and the SAME midpoint `beta_j` feed both the
+transported clock and the row's `L_ang`, and `E_repr_keV = 0.5*(E_seg +
+seg_E_end)` (`transport.py:4343`) is read back by `lines.py:997` as `seg_E`
+for `beta_all = beta_from_keV(seg_E)`. So `t_L = L_ang/beta(E_repr)` and
+`t_end - t_start` share every input bit-for-bit; rule (b) is confirmed, not
+merely close.
+
+**Grouping key and the slice-H regression.** `lines.py:1019-1030` groups by
+`(elec_id, flight_id)` VALUE via `np.lexsort` + a sorted-order boundary scan,
+not by adjacency in emission order, so a step-major lockstep trace (one
+flight's rows separated by every other electron's rows for that step) still
+groups correctly. `tests/montecarlo/test_substep_invariance.py::test_transport_substeps_reach_the_grouped_reduction`
+pins exactly this case for both `lockstep` and `per-electron` cores, asserting
+for `lockstep` that every adjacent row pair's `(elec_id, flight_id)` differs
+(`test_substep_invariance.py:257-262`) -- the row order an adjacency-keyed
+grouping would silently miss -- and that the grouped reduction still equals
+an independent per-flight coherent sum. The regression the slice cites cannot
+recur without this test failing first.
+
+**Fail-closed guards.** Read and confirmed as hard raises with no fallback
+branch: non-NumPy backend (`lines.py:1034-1039`, `"host-only"`,
+`components=True`) (`lines.py:1048-1053`) — both pinned by
+`test_substepped_rows_fail_closed_on_unported_options[cuda|components]`; and
+`xray_dispersion="refractive"` with `layers` under a grouped/substepped call
+(`lines.py:1040-1047`, `NotImplementedError`). This last guard has no
+regression test of its own -- only its `coherent=True` analogue is pinned
+(`tests/montecarlo/test_xray_dispersion.py::test_refractive_coherent_through_a_layer_stack_is_refused`).
+Anchor gap, not a physics finding; flagged for the ledger's `Checks`/`Anchor`
+row rather than fixed here.
+
+**Framing.** The write-up's own "Result" and "What refinement is expected to
+do" sections state the claim honestly: the unrefined line peak's 2.6-5.7%
+overstatement (Ne=200 matrix) is a one-point quadrature error that
+refinement removes, not evidence the unrefined answer is already correct.
+Confirmed, not refuted.
+
+**Numeric corroboration (independent run, today).**
+`uv run pyrite-dev test tests/montecarlo/test_substep_invariance.py` -- 11
+passed. `uv run python checks/substep_invariance.py --quick` (Ne=40, smaller
+statistics than the ledger's Ne=200 table) reproduces the same qualitative
+signature: `cxr`/`brem` L1-vs-finest-rung fall to 0 by `f=2e-4` in every case,
+`cxr_ungr` stays near 1.0 throughout (0.80-1.03), `ungr/gr` falls
+monotonically with refinement (1.0000 -> 0.11-0.30 across the three CXR
+cases), and the unrefined `peak` is high (1.14-1.17 at Ne=40 vs the ledger's
+2.6-5.7% at Ne=200 -- noisier at lower Ne, not a discrepancy).
+
+No stale wording found beyond the ledger note's already-flagged "checklist
+step H" phrasing (out of scope here).
+
+Verdict `rederived`. `signed-off` remains a human decision.
