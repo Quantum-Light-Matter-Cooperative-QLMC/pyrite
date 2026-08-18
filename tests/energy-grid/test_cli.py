@@ -260,13 +260,12 @@ def test_click_derive_forwards_brem_step(monkeypatch):
     result = _invoke_grid(["derive", "--brem-step", "12.5", "--profile", "survey"])
 
     assert_clean_result(result, stdout="installed derived grids for profile survey\n")
-    assert seen["argv"] == [
-        "--brem-step",
-        "12.5",
-        "--json-out",
-        energy_grid.job.DEFAULT_JSON_OUT,
-    ]
-    assert seen["path"] == energy_grid.job.DEFAULT_JSON_OUT
+    assert seen["argv"][:2] == ["--brem-step", "12.5"]
+    assert seen["argv"][2] == "--json-out"
+    json_out = Path(seen["argv"][3])
+    assert json_out.name == energy_grid.job.DEFAULT_JSON_OUT
+    assert json_out.parent != Path(), "derive must not write into the working directory"
+    assert seen["path"] == str(json_out)
     assert seen["profile"] == "survey"
 
 
@@ -282,7 +281,7 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
         _command.remote, "attach", lambda jobid: seen.update(attached=jobid) or True
     )
     monkeypatch.setattr(_command.remote, "_job_succeeded", lambda jobid: jobid == "job7")
-    monkeypatch.setattr(_command, "_pull_combined", lambda: "bounds.json")
+    monkeypatch.setattr(_command, "_pull_combined", lambda *, dest_dir: "bounds.json")
     monkeypatch.setattr(
         energy_grid.apply, "add_file", lambda path, **kwargs: seen.update(path=path, **kwargs)
     )
@@ -401,9 +400,38 @@ def test_click_derive_preserves_nonzero_status(monkeypatch, status):
     assert_clean_result(result, exit_code=status)
 
 
+def test_click_add_pull_stages_into_a_removed_temp_dir(monkeypatch, tmp_path):
+    """--pull must not leave the dated JSON in the working directory.
+
+    ``apply.add_file`` ingests the payload into the content-addressed artifact
+    store, so the pulled file is pure transport: it is staged in a temporary
+    directory that is gone once the command returns.
+    """
+    seen = {}
+
+    def fake_pull(json_name=None, *, dest_dir):
+        local = Path(dest_dir) / "combined.json"
+        local.write_text("{}")
+        seen["dest_dir"] = dest_dir
+        return str(local)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(_command, "_pull_combined", fake_pull)
+    monkeypatch.setattr(
+        energy_grid.apply, "add_file", lambda path, **kw: seen.update(existed=Path(path).is_file())
+    )
+
+    result = _invoke_grid(["add", "--pull"])
+
+    assert_clean_result(result)
+    assert seen["existed"] is True
+    assert not Path(seen["dest_dir"]).exists()
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_click_add_dispatches_with_pull_force_and_resolved_profile(monkeypatch):
     seen = {}
-    monkeypatch.setattr(_command, "_pull_combined", lambda: "combined.json")
+    monkeypatch.setattr(_command, "_pull_combined", lambda *, dest_dir: "combined.json")
     monkeypatch.setattr(
         energy_grid.apply, "add_file", lambda path, **kw: seen.update(path=path, **kw)
     )
@@ -733,10 +761,12 @@ def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     monkeypatch.setattr(_command.remote.config, "REMOTE_DIR", "/srv/cxr data")
     monkeypatch.setattr(_command.remote, "_run", lambda command: calls.append(command))
 
-    local = _command._pull_combined("bounds-result.json")
+    local = _command._pull_combined("bounds-result.json", dest_dir="/tmp/pull-dest")
 
-    assert local == "bounds-result.json"
-    assert calls == [["scp", "qlmc:'/srv/cxr data/bounds-result.json'", "bounds-result.json"]]
+    assert local == "/tmp/pull-dest/bounds-result.json"
+    assert calls == [
+        ["scp", "qlmc:'/srv/cxr data/bounds-result.json'", "/tmp/pull-dest/bounds-result.json"]
+    ]
 
 
 def test_click_stop_requires_explicit_target():

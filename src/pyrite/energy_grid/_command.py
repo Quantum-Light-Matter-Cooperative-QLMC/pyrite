@@ -9,6 +9,8 @@ modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 
 from __future__ import annotations
 
+import contextlib
+import tempfile
 from copy import copy
 from pathlib import Path
 from types import SimpleNamespace
@@ -61,11 +63,16 @@ _DEFAULT_FIELD_KEYS = {
 }
 
 
-def _pull_combined(json_name=None):
-    """scp the combined derivation JSON back from the remote box; return local path."""
+def _pull_combined(json_name=None, *, dest_dir):
+    """scp the combined derivation JSON into ``dest_dir``; return local path.
+
+    ``json_name`` is the remote-side basename; the payload is consumed by
+    ``apply.add_file`` and discarded, so callers pass a temporary directory
+    rather than leaving a dated JSON in the working directory.
+    """
     name = json_name or job.DEFAULT_JSON_OUT
     job._validate_remote_output_name(name)
-    local = name
+    local = str(Path(dest_dir) / name)
     remote_path = remote.remote_path(name)
     remote._run(["scp", remote.scp_remote_path(remote_path), local])
     return local
@@ -301,9 +308,10 @@ def _derive_local(
         argv.extend(("--brem-step", str(brem_step)))
     if set_default:
         argv.append("--set-default")
-    argv.extend(("--json-out", job.DEFAULT_JSON_OUT))
-    _invoke_callback(derive.main, argv)
-    _install_derived(job.DEFAULT_JSON_OUT, catalog_profile)
+    with tempfile.TemporaryDirectory() as workdir:
+        json_out = str(Path(workdir) / job.DEFAULT_JSON_OUT)
+        _invoke_callback(derive.main, [*argv, "--json-out", json_out])
+        _install_derived(json_out, catalog_profile)
     return 0
 
 
@@ -384,9 +392,10 @@ def _derive_remote(
             return 0
         if not remote._job_succeeded(jobid):
             raise CLIError("energy-grid derivation failed; skipping automatic pull")
-        path = _pull_combined()
-        emit_result(f"pulled {path}")
-        _install_derived(path, catalog_profile)
+        with tempfile.TemporaryDirectory() as workdir:
+            path = _pull_combined(dest_dir=workdir)
+            emit_result(f"pulled {Path(path).name}")
+            _install_derived(path, catalog_profile)
     return 0
 
 
@@ -580,20 +589,25 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
     Example:
       pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2
     """
-    path = _pull_combined() if pull else json_path
-    if not path:
-        raise click.UsageError("no JSON: pass a path or --pull")
-    resolved_profile = _cli_config.resolve("profile.current", catalog_profile).value
-    try:
-        apply.add_file(
-            path,
-            profile=resolved_profile,
-            materials=materials,
-            force=force,
-            dry_run=dry_run,
-        )
-    except (KeyError, ValueError, OSError) as exc:
-        _expected_failure(exc)
+    with contextlib.ExitStack() as stack:
+        if pull:
+            workdir = stack.enter_context(tempfile.TemporaryDirectory())
+            path = _pull_combined(dest_dir=workdir)
+        else:
+            path = json_path
+        if not path:
+            raise click.UsageError("no JSON: pass a path or --pull")
+        resolved_profile = _cli_config.resolve("profile.current", catalog_profile).value
+        try:
+            apply.add_file(
+                path,
+                profile=resolved_profile,
+                materials=materials,
+                force=force,
+                dry_run=dry_run,
+            )
+        except (KeyError, ValueError, OSError) as exc:
+            _expected_failure(exc)
     if regen_golden and not dry_run:
         from pyrite.energy_grid import golden
 
