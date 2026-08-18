@@ -192,8 +192,9 @@ Two qualifications belong with that number:
 ## Assumptions and limits
 
 - Ungrooved, single-layer slab, lockstep core, `energy_model="midpoint"`. The
-  grooved, per-electron, and CUDA cores still raise on a midpoint request
-  (checklist step H).
+  grooved, per-electron, and CUDA cores have since been ported by checklist
+  step H, which also dropped the fail-closed midpoint gates, so none of them
+  raises on a midpoint request; the measurement below remains lockstep.
 - `flights/e` equals collisions plus one only because a single-layer ungrooved
   slab has no internal boundary that closes a flight; in a multilayer stack the
   boundary crossings enter that count.
@@ -202,3 +203,101 @@ Two qualifications belong with that number:
   row must not be read as saying anything about the spectra.
 - Energy-loss straggling remains unmodeled (see `energy-step-convergence`), so
   the hazard is evaluated along a deterministic CSDA energy history.
+
+## Independent verification
+
+Fresh-context rederivation (2026-08-18, verifier context separate from the
+implementation).
+
+**Filters.** Units pass: $\tau$ and $ds/\lambda(E)$ are both dimensionless,
+`lam_ang` is a length. Limits pass: at `max_dE_frac = 0` the cap branch
+(`energy_controlled = max_dE_frac > 0.0`) is never taken, so every flight is a
+single row and `step_j = tau_left[e] * lam_ang` evaluates
+$(-\ln U)\cdot\lambda(E_{\rm start})$. IEEE-754 multiplication is exactly
+commutative and unary negation only flips the sign bit, so
+$(-\ln U)\cdot\lambda \equiv -(\lambda\cdot(-\ln U)) \equiv -\lambda\ln U$ is
+bit-identical to the historical draw for any representable $\lambda,\ln U$ —
+this holds by construction, independent of the doc's reported hash-vs-`main`
+check. Sign/convention passes: Browning's total elastic cross section (ledger
+`electron-transport`, screening parameter $\alpha=3.4\times10^{-3}Z^{0.67}/E$)
+falls with rising $E$, so $\lambda=10^8/\Sigma n\sigma$ *rises* with $E$; since
+a flight's energy only decreases, freezing $\lambda$ at $E_{\rm start}$
+under-weights the true (rising) hazard and lengthens the sampled flight — the
+claimed bias sign.
+
+**Re-derivation (before reading the implementation body).** Model the elastic
+collisions along one trajectory as an inhomogeneous Poisson process in path
+length $s$ with local rate $\mu(s)=1/\lambda(E(s))$. Survival to $s$ is
+$$
+S(s)=\exp\!\left[-\int_0^{s}\mu(s')\,ds'\right]
+=\exp\!\left[-\int_0^{s}\frac{ds'}{\lambda(E(s'))}\right].
+$$
+$S(s^*)$ is itself $\mathrm{Uniform}(0,1]$ for the random first-collision
+distance $s^*$ (probability integral transform), so drawing $U\sim
+\mathrm{Uniform}(0,1]$ and solving
+$$
+\int_0^{s^*}\frac{ds'}{\lambda(E(s'))}=-\ln U \equiv \tau
+$$
+for $s^*$ samples exactly one collision event, consuming exactly one uniform
+variate regardless of how the integral is evaluated. Substepping the integral
+as $\tau\mathrel{-{=}}ds_k/\lambda(E_{{\rm substep},k})$, with $E_{{\rm
+substep},k}$ the energy at the *start* of substep $k$, is the left-endpoint
+(piecewise-constant-$\lambda$) Riemann sum for that same integral; it is a
+pure quadrature refinement of a single fixed draw, not a new sampling event —
+no substep consumes an RNG call, so the flight's *physical identity*
+(which $U$ selected it) cannot change under refinement, only the resolved
+location of $s^*$ within it.
+
+**Comparison with the implementation** (`transport.py:926-1176`, both
+non-LUT and LUT ungrooved cores share this structure). `tau_left[e] = -1.0` is
+the "no flight open" sentinel; a fresh draw `tau_left[e] = -np.log(rng.random())`
+fires only when `tau_left[e] < 0.0` (line 984), i.e. once per physical flight,
+matching $\tau=-\ln U$ exactly. Each iteration computes `total_rate`
+from `E_j = E_keV[e]`, the substep's own start energy (`E_keV[e]` was last set
+to the previous substep's `E_end_j`), giving `lam_ang` $=\lambda(E_{\rm
+substep})$ — the claimed left-endpoint evaluation. `step_j = tau_left[e] *
+lam_ang` proposes the distance to exhaust the remaining budget at that
+substep's hazard; boundary, cutoff, and (if `energy_controlled`) the
+`max_dE_frac` energy cap can each shorten it before it is committed. Every
+committed row unconditionally consumes `tau_left[e] -= step_j / lam_ang`
+(line 1109) — the claimed $\tau\mathrel{-{=}}ds/\lambda(E_{\rm substep})$ —
+clipped at zero for floating-point residue. On a cap-limited row
+(`limited_j`, line 1053-1062) the code increments `substep_of[e]` and
+`continue`s (line 1113-1115) *before* the collision-draw/exit-handling block:
+`dirs[e]`, `flight_of[e]`, and the carried `tau_left[e]` are all left
+untouched, and no `rng.random()` call is reachable on that path — direction,
+`flight_id`, and remaining budget are preserved and no scatter is drawn, as
+claimed. Only a row that is not cap-limited can close the flight
+(`flight_of[e] += 1`, `substep_of[e] = 0`, `tau_left[e] = -1.0`, line
+1134-1136), at which point the next iteration's `tau_left[e] < 0.0` check
+correctly triggers exactly one fresh draw. This is a term-for-term match to
+the derivation above.
+
+**Statistical evidence.** Recomputing `checks/collision_statistics_refinement.py
+--quick` (250 electrons × 4 seeds/rung, well below the doc's Ne=1000×12)
+reproduces the qualitative story at reduced power — no shift over 3σ, several
+in the low single-digit sigma with mixed sign, consistent with the doc's
+framing that single-seed/low-`Ne` flight counts are noise-dominated and only
+the paired, replicated statistic is informative. The doc's headline numbers
+were re-checked arithmetically: the C-25-keV-thick `L_flight` shift
+(none $278.1\pm0.88$ vs finest $275.9\pm0.99\,\text{\AA}$) is one-signed with
+the predicted bias (unrefined longer), and $160=4\ \text{cases}\times5\
+\text{rungs}\times8\ \text{observables}$ is consistent with the script's full
+per-case metric set (`flights/e`, `L_flight`, `path/e`, `E_ret`, `clock`,
+`trans`, `back`, `stop`) even though the published tables display only the
+non-degenerate exit channels per case for brevity. The "null result at this
+resolution, not proof of invariance" framing is honest: the one qualification
+the doc could be faulted for softening — that no committed regression test
+independently re-derives the $f=0$ bit-for-bit identity against a frozen
+pre-refactor reference (`test_frozen_energy_model_is_the_bit_for_bit_default`
+checks default-vs-explicit-`"frozen"` `energy_model`, not the historical
+single-draw formula against `max_dE_frac=0`) — does not affect the physics
+verdict, since the identity is guaranteed by IEEE-754 multiplication
+commutativity independent of any particular commit.
+
+`tests/montecarlo/test_transport_energy_model.py::test_substeps_subdivide_flights_without_scattering_or_redrawing`,
+`::test_substep_rows_tile_their_flight_in_length_energy_and_clock`, and
+`::test_step_cap_requires_the_controlled_propagator` (6/6 passing) directly
+pin the no-redraw/no-scatter/budget-carry bookkeeping checked above.
+
+Verdict: `rederived`. `signed-off` remains a human decision.

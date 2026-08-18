@@ -142,12 +142,14 @@ Pinned by `tests/montecarlo/test_transport_energy_model.py`:
 - Nothing about emitted spectra. Line and bremsstrahlung kernels still read the
   flight-start energy; migrating them to an explicit representative energy and
   proving substep invariance are checklist steps D and G.
-- Nothing about the grooved, per-electron, or CUDA cores. A midpoint request on
-  any of them raises rather than silently returning the frozen schema; the port
-  is checklist step H.
-- `_clip_segments_to_cutoff` drops `E_end_keV`/`t_end_ang` when it shortens a
-  flight, because its left-endpoint clip rule cannot reconstruct a
-  midpoint-integrated end state for the shortened flight. That drop, and the
+- Nothing measured here about the grooved, per-electron, or CUDA cores. The
+  numerical evidence above is lockstep. Checklist step H has since ported the
+  rule to those cores and dropped the fail-closed midpoint gates, so a midpoint
+  request no longer raises on any of them.
+- `_clip_segments_to_cutoff` now *reconstructs* `E_end_keV`/`E_repr_keV`/
+  `t_end_ang` when it shortens a flight, by reapplying the core's own cutoff
+  solve — which is exact, since that solve lands on `E_end == E_cut` by
+  construction. It no longer drops them. That reconstruction, and the
   fact that the new fields are masked in step with the rows they belong to, are
   pinned by
   `::test_row_transforms_keep_the_new_fields_in_step_with_the_rows`.
