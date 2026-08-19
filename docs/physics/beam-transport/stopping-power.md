@@ -126,10 +126,10 @@ overstates how far an electron travels for a given loss — measurably, 1.2% on
 mean path length in the thick 5 keV carbon case. See
 [Electron transport](electron-transport.md#energy-controlled-propagation).
 
-## The cutoff
+# Transport cutoff
 
 Transport of an electron ends when its kinetic energy falls to `E_cut_keV`
-(default 5 keV). The cutoff is a **model boundary**, not a physical one:
+(default 5 keV):
 
 - segments below the cutoff radiate essentially nothing in the spectral window of
   interest, so the discarded path length does not carry the observables, while

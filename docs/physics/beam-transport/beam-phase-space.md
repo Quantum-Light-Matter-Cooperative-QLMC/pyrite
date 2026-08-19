@@ -56,16 +56,16 @@ numbers per plane is over-determined.
 **Canonical input is the Twiss triplet per plane**, with *normalized*
 emittance:
 
-| symbol | field | unit |
-| --- | --- | --- |
-| `eps_n` | `normalized_emittance_mm_mrad` | mm·mrad |
-| `beta`  | `beta_twiss_m` | m |
-| `alpha` | `alpha_twiss` | dimensionless, signed |
+| symbol  | field                          | unit                  |
+| --------- | -------------------------------- | ----------------------- |
+| `eps_n` | `normalized_emittance_mm_mrad` | mm·mrad              |
+| `beta`  | `beta_twiss_m`                 | m                     |
+| `alpha` | `alpha_twiss`                  | dimensionless, signed |
 
 ### Why normalized, not geometric
 
 `energy_keV` is the primary swept axis, and this repo spans 30 keV
-(`beta*gamma ≈ 0.34`) to the REGAE-scale 3–5 MeV case (`beta*gamma ≈ 7`) in the
+({math}`\beta\gamma \approx 0.34`) to the REGAE-scale 3–5 MeV case ({math}`\beta\gamma \approx 7`) in the
 backlog. Geometric emittance is not invariant under acceleration, so a single
 geometric value attached to a multi-energy `BeamSpec` silently means a
 *different beam at every energy* — the sweep would confound emittance with
@@ -73,13 +73,13 @@ energy. Normalized emittance is the invariant, so it is what gets stored.
 
 Geometric emittance is derived per case:
 
-```
-gamma_rel  = 1 + T_keV / 510.99895
-beta*gamma = sqrt(gamma_rel² − 1)
-eps_geom   = eps_n / (beta*gamma)
+```{math}
+\gamma  = 1 + \frac{T}{510.99895} \\
+\beta\gamma = \sqrt{\gamma_{\mathrm{rel}}^2 − 1} \\
+\epsilon_{\mathrm{geom}}   = \epsilon_n / (\beta\gamma)
 ```
 
-with `T_keV` the case kinetic energy. This is the same relation
+with {math}`T` the case kinetic energy in keV. This is the same relation
 `beam_metrics.py` already uses in the opposite direction when it reports
 `normalized_emittance_mm_rad = beta_gamma * geometric_emittance_mm_rad`.
 
@@ -88,11 +88,11 @@ with `T_keV` the case kinetic energy. This is the same relation
 The input units above are the accelerator-conventional ones. The diagnostics
 module works in mm·rad and mm/rad, so the round trip carries two conversions:
 
-| quantity | input | `beam_metrics` output |
-| --- | --- | --- |
+| quantity             | input     | `beam_metrics` output                         |
+| -------------------- | --------- | --------------------------------------------- |
 | normalized emittance | `mm·mrad` | `normalized_emittance_mm_rad` = input × 1e−3 |
-| Twiss beta | `m` | `beta_mm_per_rad` = input × 1e3 |
-| Twiss alpha | — | `alpha`, same value |
+| Twiss beta           | `m`        | `beta_mm_per_rad` = input × 1e3               |
+| Twiss alpha          | —         | `alpha`, same value                            |
 
 `alpha` is sign-preserved and its sign convention is `alpha = −<x x'>/eps`,
 matching `beam_metrics._plane_metrics`. Negative `alpha` is a diverging beam
@@ -105,12 +105,12 @@ and drop the correlation entirely. Allowing all three with a precedence rule
 produces a plausible-looking beam that is not the one the user asked for, with
 no diagnostic. So:
 
-| spelling | status | meaning |
-| --- | --- | --- |
-| `transverse` block (Twiss triplet per plane) | canonical | full three-moment description |
-| `transverse_fwhm_x_mm` / `_y_mm` | legacy convenience | zero-emittance waist: `alpha = 0`, zero divergence |
-| `divergence_mrad` | derived, read-only | RMS slope at the case energy |
-| `energy_spread_frac` | canonical | longitudinal only; no Twiss equivalent |
+| spelling                                     | status             | meaning                                           |
+| -------------------------------------------- | ------------------ | ------------------------------------------------- |
+| `transverse` block (Twiss triplet per plane) | canonical          | full three-moment description                     |
+| `transverse_fwhm_x_mm` / `_y_mm`             | legacy convenience | zero-emittance waist:`alpha = 0`, zero divergence |
+| `divergence_mrad`                            | derived, read-only | RMS slope at the case energy                      |
+| `energy_spread_frac`                         | canonical          | longitudinal only; no Twiss equivalent            |
 
 Setting the `transverse` block **and** a spot FWHM is a hard error, not a
 precedence resolution. Same rule the `longitudinal` policy already applies
@@ -119,7 +119,7 @@ against the flat legacy bunch fields.
 `divergence_mrad` becomes a derived property rather than a stored input,
 because as a stored input it is energy-independent, which contradicts the
 normalized-emittance argument above: the physical RMS slope of a fixed beam
-falls as `1/sqrt(beta*gamma)`, so a constant `divergence_mrad` across an energy
+falls as {math}`1/\sqrt(\beta\gamma)`, so a constant `divergence_mrad` across an energy
 sweep is not one beam.
 
 `energy_spread_frac` survives as a real input. It is not a transverse quantity
@@ -127,34 +127,34 @@ and has no Twiss equivalent.
 
 ## Sampling
 
-Given the resolved per-case `(eps_geom, beta, alpha)` for a plane, and two
-independent standard normal draws `u1, u2 ~ N(0,1)`:
+Given the resolved per-case {math}`(\epsilon_\mathrm{geom}, \beta, \alpha)` for a plane, and two
+independent standard normal draws {math}`u_1, u_2 ~ N(0,1)`:
 
-```
-sigma_x = sqrt(eps_geom * beta)
-x       = sigma_x * u1
-x'      = sqrt(eps_geom / beta) * (u2 − alpha * u1)
+```{math}
+\sigma_x = sqrt(\epsilon_\mathrm{geom} \beta) \\
+x       = \sigma_x u_1 \\
+x'      = \sqrt{\frac{\epsilon_\mathrm{geom}}{beta}} (u_2 − \alpha u_1)
 ```
 
 which reproduces the three target moments exactly:
 
-```
-<x²>   = eps_geom * beta
-<x'²>  = eps_geom * (1 + alpha²) / beta = eps_geom * gamma_twiss
-<x x'> = −eps_geom * alpha
+```{math}
+\langle x^2 \rangle   = \epsilon_\mathrm{geom} \beta \\
+\langle x'^2 \rangle  = \epsilon_\mathrm{geom} \frac{1 + \alpha^2}{\beta} = \epsilon_\mathrm{geom} \gamma_\mathrm{twiss} \\
+\langle x x'\rangle = − \epsilon_\mathrm{geom} \alpha
 ```
 
-so `sqrt(<x²><x'²> − <x x'>²) = eps_geom` as required. The `x` and `y` planes
-are sampled independently — there is no `<x y>` coupling term and no
+so {math}`\sqrt{\langle x^2 \rangle \langle x'^2\rangle − \langle x x' \rangle^2} = \epsilon_\mathrm{geom}` as required. The $x$ and $y$ planes
+are sampled independently — there is no {math}`\langle x y \rangle` coupling term and no
 skew/solenoid model.
 
 Slopes become directions by tilting the nominal `beam_dir` about the two
-transverse axes of the beam frame. For the small slopes involved (`x'` of order
+transverse axes of the beam frame. For the small slopes involved ({math}`x'` of order
 1e−3), the direction is normalized after tilting rather than approximated.
 
 ### Energy spread
 
-```
+```{python}
 delta_i ~ N(0, energy_spread_frac)
 E_i     = E0_keV * (1 + delta_i)
 ```
@@ -217,8 +217,8 @@ explicitly:
    `omega = v.g / (1 - n.v)` in `beta` gives a fractional line shift of
    `S * delta` with
 
-   ```
-   S = (gamma - 1) / (gamma^3 beta^2 (1 - beta cos(theta_obs)))
+   ```{math}
+   S = \frac{\gamma - 1}{\gamma^3 \beta^2 (1 - \beta \cos\theta_\mathrm{obs})}
    ```
 
    (`energy_grid.bounds.line_shift_fraction`). `S` is largest at the *low*

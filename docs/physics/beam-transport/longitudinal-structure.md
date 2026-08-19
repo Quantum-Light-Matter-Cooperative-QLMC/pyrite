@@ -26,7 +26,7 @@ never mixed:
     centroid. A property of the beam, constant along the trajectory.
 ```
 
-Both are in ångström with $c = 1$. The radiation kernels form the absolute
+Both are in $\AA$ with $c = 1$. The radiation kernels form the absolute
 emission time as $t_{\rm abs} = t_{\rm ang} + L_{\rm ang}/(2\beta) + t_{0,\rm ang}$
 — age, half-flight correction to the segment midpoint, and bunch offset.
 
@@ -88,7 +88,7 @@ surface normal, the emitted photon wavenumber is
 :label: eq-longitudinal-photon-wavenumber
 
 k_\gamma =
-\frac{\beta\,|\mathbf g|\cos(\text{tilt})}{1 - \beta\cos\theta_{\rm obs}}
+\frac{ \beta \, |\mathbf g| \cos\theta_\mathrm{tilt}}{1 - \beta\cos\theta_\mathrm{obs}}
 \quad[\AA^{-1}],
 ```
 
