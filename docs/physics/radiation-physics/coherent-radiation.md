@@ -1,7 +1,10 @@
 # Coherent PXR and CBS radiation
 
-The line-spectrum kernel is the core radiation model of PyRITE. It combines
-parametric X-ray radiation (PXR) and coherent bremsstrahlung (CBS) amplitudes
+The line-spectrum kernel is the core radiation model of PyRITE. It follows the
+nonrelativistic PXR/CBS treatment of {cite:t}`feranchuk2000`, in the form used
+by {cite:t}`zhai2025` for van der Waals crystals; {cite:t}`baryshevsky2005` is
+the book-length treatment of the same theory. It combines parametric X-ray
+radiation (PXR) and coherent bremsstrahlung (CBS) amplitudes
 for a set of reciprocal-lattice reflections, evaluates them once per transported
 trajectory segment, applies the finite-flight-time line profile, attenuates the
 photon on its way out of the sample, and sums the result over segments,
@@ -30,16 +33,19 @@ $\hat{\mathbf n}$ therefore carries no error at all — slab depth is exact — 
 the validity condition involves the transverse extent of the emitting volume
 alone:
 
-$$
-r_\perp\ll\sqrt{\frac{\lambda R}{\pi}},
-$$
+```{math}
+:label: eq-coherent-radiation-far-field
 
-the radius at which the neglected phase reaches one radian. For the reference
+r_\perp\ll\sqrt{\frac{\lambda R}{\pi}},
+```
+
+the radius at which the neglected phase reaches one radian.
+{eq}`eq-coherent-radiation-far-field` bounds the **phase** error only. For the reference
 HOPG case the emitting volume is $\approx6.5\,\mu$m across at 25 keV, against a
 one-radian patch of 12.7 µm at the 400 mm Timepix distance (0.066 rad neglected,
 negligible) but only 3.5 µm at the 30 mm `detector_directions` default
 (0.87 rad) and 2.0 µm at 10 mm (2.6 rad). Short working distances need the
-condition checked, not assumed. This bounds the **phase** error and so matters
+condition checked, not assumed. It therefore matters
 only under the coherent policy; for incoherent sums the induced observation-angle
 error $\delta\theta\approx r_\perp/R$ shifts the line by $\ll0.1$ eV, some two
 orders of magnitude below the detector-acceptance broadening it sits inside.
@@ -66,13 +72,15 @@ ledgered claim.
 
 For a segment with velocity $\mathbf v$ (in units of $c$) and a reflection
 $\mathbf g$, the stationary-phase condition on a straight flight fixes the
-emitted frequency,
+emitted frequency {cite:p}`feranchuk2000`,
 
-$$
+```{math}
+:label: eq-coherent-radiation-resonance
+
 \omega_{\rm res}=\frac{\mathbf v\cdot\mathbf g}
 {1-\hat{\mathbf n}\cdot\mathbf v},
 \qquad E_{\rm res}=\hbar c\,\omega_{\rm res},
-$$
+```
 
 with $\omega$ carried in inverse Ångström ($c=1$, lengths and times both in Å).
 Only positive roots radiate, so of the $\pm\mathbf g$ pair exactly one member
@@ -92,24 +100,30 @@ relation $k=n(\omega)\,\omega$, which makes the resonance implicit; see
 
 PXR couples through the X-ray susceptibility Fourier component
 
-$$
+```{math}
+:label: eq-coherent-radiation-chi-g
+
 \chi_{\mathbf g}=-\frac{r_e\lambda^2}{\pi V_{\rm cell}}S_{\mathbf g},
 \qquad
 S_{\mathbf g}=\sum_j f_j(\mathbf g,E)\,
 e^{i\mathbf g\cdot\mathbf r_j}\,e^{-W_j},
-$$
+```
 
 the Debye–Waller-weighted unit-cell structure factor over the *electron*
-density. CBS couples through the screened crystal-potential component
+density, with the per-element $f_j$ taken from the {cite:t}`chantler1995`
+tabulation. CBS couples through the screened crystal-potential component
 
-$$
+```{math}
+:label: eq-coherent-radiation-u-g
+
 U_{\mathbf g}=\frac{4\pi e^2}{V_{\rm cell}\,g^2}
 \sum_j\bigl[Z_j-f_j(\mathbf g)\bigr]
 e^{i\mathbf g\cdot\mathbf r_j}e^{-W_j},
-$$
+```
 
-the Mott–Bethe *net screened-nucleus* combination, returned in eV and used as
-the dimensionless $eU_{\mathbf g}/m_ec^2$. The two differ structurally: PXR
+the Mott–Bethe *net screened-nucleus* combination — {eq}`eq-coherent-radiation-u-g`
+is the Poisson solution for the screened lattice potential — returned in eV and
+used as the dimensionless $eU_{\mathbf g}/m_ec^2$. The two differ structurally: PXR
 carries $\sum_j f_j$ with a photon $1/k^2$ denominator, CBS carries
 $\sum_j(Z_j-f_j)$ with a momentum-transfer $1/g^2$ denominator. The repository's
 amplitude sign convention fixes their **relative** phase; only
@@ -131,7 +145,8 @@ data provenance in
 Both couplings, the attenuation coefficient, and the refractive index are
 evaluated on a shared tabulation grid — a 1 eV mesh unioned with the native
 Chantler nodes of every basis and absorber element, so absorption edges are
-densely sampled — and interpolated at each segment's own resonance energy. The
+densely sampled — and interpolated at each segment's own resonance energy
+{cite:p}`chantler1995,chantler2000`. The
 couplings are frozen at $\omega_{\rm res}$ across the line rather than
 re-evaluated per grid bin: the residual is odd about line centre and cancels to
 first order on integration.
@@ -148,20 +163,39 @@ Per polarization $\hat{\mathbf e}$, with $\mathbf k=\omega\hat{\mathbf n}$,
 detuning $\Delta=|\mathbf k+\mathbf g|^2-k^2=g^2+2\,\mathbf k\cdot\mathbf g$,
 and the transverse-to-velocity product
 $\{\mathbf a;\mathbf b\}=\mathbf a\cdot\mathbf b-(\mathbf a\cdot\mathbf v)(\mathbf b\cdot\mathbf v)$,
+the two amplitudes are {cite:p}`feranchuk2000`
 
-$$
+```{math}
+:label: eq-coherent-radiation-a-pxr
+
 A_{\rm PXR}=\frac{\chi_{\mathbf g}}{\Delta}
 \Bigl[\bigl(\mathbf v\cdot(\mathbf k+\mathbf g)\bigr)
 (\mathbf g\cdot\hat{\mathbf e})-k^2(\mathbf v\cdot\hat{\mathbf e})\Bigr],
-$$
+```
 
-$$
+```{math}
+:label: eq-coherent-radiation-a-cbs
+
 A_{\rm CBS}=-\frac{eU_{\mathbf g}/m_ec^2}{\gamma\,(\mathbf v\cdot\mathbf g)}
 \left[\{\mathbf g;\hat{\mathbf e}\}
 +(\mathbf v\cdot\hat{\mathbf e})
 \frac{\{\mathbf k;\mathbf g\}}{\mathbf v\cdot\mathbf g}\right],
 \qquad \gamma=(1-\beta^2)^{-1/2}.
-$$
+```
+
+{eq}`eq-coherent-radiation-a-pxr` corresponds to Eq. (13) of
+{cite:t}`feranchuk2000` and {eq}`eq-coherent-radiation-a-cbs` to its Eq. (14),
+also given as Eq. (6) of the {cite:t}`zhai2025` supplement.
+
+```{warning}
+The equation numbers above are recorded from the ledger's `Source` fields, not
+from the papers themselves — neither source text is held in the repository. What
+the `cbs-amplitude` row certifies is that
+{eq}`eq-coherent-radiation-a-cbs` is the correct CBS amplitude at the correct
+relative normalization against {eq}`eq-coherent-radiation-a-pxr`, **not** that it
+faithfully transcribes those numbered equations. A reader with the papers should
+confirm the correspondence.
+```
 
 They are summed as a **complex** amplitude, $A=A_{\rm PXR}+A_{\rm CBS}$, so
 PXR/CBS interference is retained inside one segment/reflection contribution. The
@@ -172,17 +206,21 @@ Both amplitudes are dimensionless.
 
 ## Finite interaction time
 
-A segment of length $L$ traversed at speed $\beta$ radiates for
+The finite flight replaces the infinite-crystal delta function of the idealized
+treatment by the finite-time factor of Eq. (8) of {cite:t}`feranchuk2000`. A
+segment of length $L$ traversed at speed $\beta$ radiates for
 $t_L=L/\beta$ (in Å, $c=1$). Integrating a constant amplitude over that centered
 duration gives the unsquared factor $Q=t_L\,{\rm sinc}(Pt_L/\pi)$ with
 $P=(1-\beta\hat{\mathbf v}\cdot\hat{\mathbf n})(\omega-\omega_{\rm res})/2$, so
 the incoherent intensity carries
 
-$$
-|Q|^2=t_L^2\,{\rm sinc}^2\!\left(\frac{P t_L}{\pi}\right),
-$$
+```{math}
+:label: eq-coherent-radiation-lineshape
 
-using the normalized-sinc convention. At zero detuning this is $t_L^2$; in the
+|Q|^2=t_L^2\,{\rm sinc}^2\!\left(\frac{P t_L}{\pi}\right),
+```
+
+using the normalized-sinc convention. At zero detuning {eq}`eq-coherent-radiation-lineshape` is $t_L^2$; in the
 long-duration limit $|Q|^2/(\pi t_L)\to\delta(P)$ distributionally. The
 half-width to the first zero is
 $W=2\pi\hbar c/[(1-\hat{\mathbf n}\cdot\mathbf v)\,t_L]$, which is what sets the
@@ -197,14 +235,17 @@ segment over the full grid exactly.
 
 ## Spectral weight and units
 
-Collecting the pieces, one segment and reflection contributes
+Collecting the pieces, one segment and reflection contributes — Eqs. (10) and
+(12) of {cite:t}`feranchuk2000` —
 
-$$
+```{math}
+:label: eq-coherent-radiation-spectral-weight
+
 \frac{d^2N}{dE\,d\Omega}
 =\frac{\alpha\,\omega_{\rm res}}{4\pi^2\hbar c}\,
 |A|^2\,t_L^2\,
 {\rm sinc}^2\!\left(\frac{Pt_L}{\pi}\right)T_{\rm abs},
-$$
+```
 
 summed over the two polarizations, all segments, all electrons, all reflections,
 and all mosaic orientations, then divided by the electron count. $T_{\rm abs}$ is

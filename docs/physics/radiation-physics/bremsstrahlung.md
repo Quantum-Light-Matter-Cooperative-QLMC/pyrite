@@ -1,8 +1,9 @@
 # Bremsstrahlung
 
 PyRITE models the smooth incoherent background emitted along transported
-electron segments with a Born Bethe--Heitler cross-section and Elwert Coulomb
-correction. It shares the transport segments, the escape geometry, and the
+electron segments with a Born Bethe--Heitler cross-section and the
+{cite:t}`elwert1939` Coulomb correction; {cite:t}`kochmotz1959` is the standard
+compilation of the cross-section forms. It shares the transport segments, the escape geometry, and the
 per-electron normalization with the [line
 kernel](coherent-radiation.md), and is evaluated on the same spectral grid, so
 line and continuum can be added directly.
@@ -28,8 +29,8 @@ f_E = \frac{\beta_i}{\beta_f} \frac{1-e^{-2\pi\alpha Z/\beta_i}} {1-e^{-2\pi\alp
 
 Momenta are carried in units of {math}`m_ec`, built from the exact relativistic
 relation {math}`p=\sqrt{T(T+2m_ec^2)}/m_ec` and {math}`\beta=p/(1+T/m_ec^2)`, with
- {math}`T_f=T_i-k`. The Born form itself is the nonrelativistic dipole result (cf. Koch
-& Motz, *Rev. Mod. Phys.* **31**, 920 (1959)); using relativistic momenta inside
+ {math}`T_f=T_i-k`. The Born form itself is the nonrelativistic dipole result
+{cite:p}`kochmotz1959`; using relativistic momenta inside
 it is a weakly relativistic extension, not a relativistic derivation. The
 combination is adequate for {math}`Z\lesssim30` and {math}`T\lesssim100` keV; Seltzer--Berger
 tables would be the accuracy upgrade.

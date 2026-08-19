@@ -1,4 +1,4 @@
-# Sample-tilt convention (Zhai et al.'s)
+# Sample-tilt convention
 
 PyRITE reports and grids sample tilt in Zhai et al.'s convention. This note is
 the canonical reference; {math}`montecarlo/geometry.py::tilted_geometry` and
@@ -57,7 +57,7 @@ Empirical check (WSe₂, 55 nm, {math}`\theta_\mathrm{obs} = 119\deg`, identical
 These are full-model observations for this configuration, not consequences of
 the default zero-scattering {math}`v_0 \cdot g` scalar or a universal monotonic tilt rule.
 
-## The {math}`n`/{math}`g` split (written, currently unused)
+## The {math}`n`/ {math}`g` split (written, currently unused)
 
 `_orientation_R` and {math}`mc_spectrum` carry an optional parameter that lets the
 **reciprocal vector {math}`g`** tilt independently of the **physical slab normal
