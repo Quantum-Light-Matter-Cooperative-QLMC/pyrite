@@ -728,8 +728,9 @@ def mc_spectrum(
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
     on E_grid_eV, summed incoherently over the trajectory segments and the
-    listed reflections (their resonances are spectrally separated, so
-    cross-g coherence is negligible).
+    listed reflections (their resonances are spectrally separated and their
+    relative phase decorrelates over the segment midpoints, so cross-g
+    coherence is negligible -- bounded under `cross-reflection-coherence`).
 
     Per segment and reflection (Zhai SI Eqs. 5-7, nonrelativistic):
       omega_res = beta v_hat.g / (1 - beta v_hat.n)         [Eq. 10 resonance]
@@ -901,12 +902,21 @@ def mc_spectrum(
     assumption as the finite-time factor. The reciprocal-harmonic spatial phase
     ``g.r_j`` follows the repository's structure-factor convention
     ``S(g)=sum F exp(+i g.R)``, whose susceptibility harmonic is
-    ``chi_g exp(-i g.r)``. Distinct reflections are spectrally separated, so
-    the coherent sum runs WITHIN each reflection and orientation and
-    reflections/orientations still add incoherently.
+    ``chi_g exp(-i g.r)``. The coherent sum runs WITHIN each reflection and
+    orientation; reflections/orientations still add incoherently, i.e. the
+    cross-reflection terms of ``|sum_g F_g|^2`` are DROPPED. Two independent
+    mechanisms suppress them -- spectral separation (each reflection's sinc
+    line is narrow against the harmonic spacing, so the Cauchy-Schwarz bound
+    ``2 sqrt(S_g S_g')`` collapses wherever either line is strong) and
+    reciprocal-lattice decorrelation (the residual ``exp[-i(g-g').r_j]`` phase
+    random-walks to ~``1/sqrt(n_seg)`` over midpoints spread across thousands
+    of lattice spacings, which the diagonal ``|F_g|^2`` does not carry). Over
+    the catalog's basal-plane families the dropped term bounds below ~1.6% of
+    the integrated yield, and below ~1.4e-2 at the line centres of the forward
+    harmonics that carry it; a reflection set with near-degenerate resonances
+    at the observation angle is NOT covered.
 
-    # TODO: To be confirmed numerically that lines are sufficiently separated to ignore cross-g coherence.
-    # TODO: This needs to be added to the validation ledger/documentation.
+    Validation: cross-reflection-coherence
 
     Two coherence scales fall
     out of the one sum: intra-electron

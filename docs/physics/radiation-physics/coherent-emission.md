@@ -114,8 +114,11 @@ evaluation route `coherent-line-hkl-batch` is only `filtered`.
 **Human sign-off is still pending on all of them**, and the following remain open
 before scientific use:
 
-1. cross-reflection ($\mathbf g\neq\mathbf g'$) coherence is assumed negligible
-   and has neither been quantified numerically nor entered in the ledger;
+1. cross-reflection ($\mathbf g\neq\mathbf g'$) coherence is dropped. It is now
+   ledgered and bounded (`cross-reflection-coherence`, `filtered`) below ~1.6% of
+   the integrated yield over the catalog's basal-plane families, but only
+   `filtered`: the bound is worst-case in relative phase, and a reflection set
+   with near-degenerate resonances at the observation angle is not covered;
 2. physical-charge / macro-particle weighting of the bunch is a separate,
    unfinished claim — the stored spectrum is still per incident electron;
 3. representative CPU/GPU cases are not anchored and the complex-grid memory cost

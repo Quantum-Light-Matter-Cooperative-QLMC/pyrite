@@ -55,6 +55,7 @@ radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
+radiation-physics/cross-reflection-coherence
 radiation-physics/external-brem-subtraction
 radiation-physics/finite-time-lineshape
 radiation-physics/line-absorption-tabulation

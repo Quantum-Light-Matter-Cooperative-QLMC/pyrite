@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-emission`
 
 - **Claim:** opt-in phased segment sum `dN/dE dΩ ∝ \|Σ_j A_j·exp{i[ω(t_abs,j−n̂·r_j)−g·r_j]}\|²`; intra-electron plus inter-electron/superradiant cross terms and Gaussian inter-electron form factor `exp[−(ωσ_z)²]`
-- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`); CLI `pyrite run --coherent`; profile `FidelityPreset.coherent_emission`
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`); profile policy `campaign/profiles.py::FidelityPreset.emission` (`"coherent"`/`"both"`, surfaced by `pyrite profile set --emission` and `pyrite profile add/remove --coherent`)
 - **Source:** Feranchuk–Spence 2000; Zhai 2025; far-field phased-array sum; Gaussian characteristic function
 - **Status:** rederived
 - **Checks:** units/sign; repository `S(+g)` ↔ `χ_g exp(−ig·r)` mapping; straight-trajectory phase stationarity at `ω=v·g/(1−v·n̂)`; full/cutoff sinc paths; mosaic placement; self/coincident/qualified decoherent limits
@@ -31,6 +31,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** units; `L→0`; single-segment self-term; one straight flight versus two contiguous halves, including interference with a fixed reference emitter
 - **Anchor:** `tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments`
 - **Notes:** Fresh-context derivation matches with no factor, sign, unit, or convention discrepancy; the deterministic subdivision anchor is green for both coherent routes. Human sign-off remains pending. [derivation record](radiation-physics/coherent-segment-midpoint-time.md)
+
+## `cross-reflection-coherence`
+
+- **Claim:** the coherent segment sum drops the cross-reflection terms of `\|Σ_g F_g\|²`, keeping `Σ_g \|F_g\|²` — distinct reflections (and mosaic orientations) add as intensities while the segment sum inside a row keeps its phase
+- **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`, the per-`(reflection, orientation)` squaring); inherited by `montecarlo/spectrum/coherent_jit_kernel.py::run_coherent_reduction_kernel`
+- **Source:** none — an approximation to the phased-array sum derived under `coherent-emission`, not a separate equation
+- **Status:** filtered
+- **Checks:** per-reflection coherent spectra re-sum to the shipped all-reflections call to `1.2e-07`–`2.7e-07` of peak (float32 reassociation), so the split is a faithful decomposition. Two independent suppression mechanisms measured over hopg 30 keV/500 nm, h-BN 30 keV/921 nm, and hopg 100 keV/10 µm: the Cauchy–Schwarz bound `2√(S_g S_g')/Σ_g S_g` is `9.4e-04`–`1.4e-02` at the line centres of the forward harmonics `(0,0,2)`/`(0,0,4)` that carry the yield (the anti-parallel `(0,0,±)` partners carry `≤1.8e-05` of peak and their own maxima sit where the bound is vacuous at `1.2`–`1.5`), `9.3e-02`/`1.9e-01`/`4.7e-01` at the worst bin above `1e-3` of peak (all of them inter-line valleys carrying `1`–`3e-3` of peak), and `1.0e-02`/`1.4e-02`/`1.6e-02` of the integrated yield; the independent reciprocal-lattice decorrelation factor `\|⟨exp(−i Δg·r)⟩\|` is `8.3e-03`/`8.4e-03`/`4.0e-02`, consistent with the `1/√n_seg` random walk that makes the dropped term zero-mean rather than merely bounded
+- **Anchor:** `checks/cross_reflection_coherence.py` (diagnostic, not a CI-green regression test)
+- **Notes:** Closes the long-standing `mc_spectrum` docstring assertion that "their resonances are spectrally separated, so cross-g coherence is negligible", which was previously an in-code `TODO` with no ledger row. Measured only on the catalog's basal-plane families `{(0,0,±2),(0,0,±4)}`, whose harmonics are separated by roughly their own resonance energy — a reflection set with near-degenerate resonances at the chosen observation angle is **not** covered and would break the approximation. The bound is worst-case in relative phase and the decorrelation factor is a Monte Carlo quantity; the two columns are read together, not multiplied. Promotion to `rederived` needs a fresh-context derivation carrying the decorrelation factor explicitly rather than the bound used here. [validation write-up](radiation-physics/cross-reflection-coherence.md)
 
 ## `coherent-line-hkl-batch`
 
@@ -111,6 +121,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** units+limits+signs (`U_g` rederived from Poisson); braced `A_CBS` tensor prefactor, single `1/γ`, `(v·g)` / `(v·g)²` denominator placement, and the PXR+CBS relative sign independently rederived from the relativistic equation of motion plus the Liénard–Wiechert radiation integral, with `A_PXR` rederived in the same normalization; certified numerically against direct RK4 trajectory integration (rel. dev. `<3e-6` at 30/100/300 keV, both polarizations; the `1/γ²` variant is rejected by exactly a factor `γ`)
 - **Anchor:** — (needs a regression test pinning `A_CBS` at one fixed geometry plus its `1/γ` scaling before this can reach `anchored`)
 - **Notes:** `U_g` independently rederived term-for-term from Poisson: `(4π e²/V g²) Σ(Z−f) e^{ig·r} e^{−W}`, Mott–Bethe `Z−f`, single Debye–Waller, eV units (Si(111) \|U_g\|≈5.2 eV). **2026-08-15**: the braced assembly is now rederived too. Code's **single `1/γ`** is correct — the exact equation of motion `a = (1/γm)(1 − ββ)·F` pairs one `1/γ` with the transverse projector, so `1/γ²` would double-count the longitudinal suppression the projector already carries. Relative PXR/CBS sign is correct via two cancelling flips (the `+e φ_g` branch of `U_g`, and the explicit leading `−` in `A_CBS`), leaving a shared overall `−1` that `\|·\|²` removes. `1/γ` vs `1/γ²` changes the CBS amplitude by 5.5 / 16.4 / 37.0 % and a real Si(111) line intensity by 3.3 / 9.9 / 21.1 % at 30 / 100 / 300 keV — **distinguishable from ~10 keV up, not only ≳100 keV** as previously recorded. Convention notes: returns `+\|U_g\|` (`−U_electron`) branch, phase fixed downstream; edge-prone atoms fold anomalous `f'` into a static potential (spurious near-edge energy dependence; `f''` dropped via `.real`). **Transcription caveat:** neither Feranchuk Eq.(14) nor Zhai SI Eq.(6) text is in-repo, so what is certified is that coded `A_CBS` is the correct CBS amplitude with the correct relative normalization against coded `A_PXR` — *not* that it faithfully transcribes those equations; a human with the papers should confirm the citation. Human sign-off pending. [write-up](radiation-physics/cbs-amplitude.md)
+
+## `relativistic-ceiling`
+
+- **Claim:** beam kinetic energies above `BEAM_ENERGY_CEILING_KEV = 300` keV are refused (raise) rather than extrapolated, because the Zhai/Feranchuk PXR/CBS kernels are a nonrelativistic derivation
+- **Code:** `campaign/sweep.py::BEAM_ENERGY_CEILING_KEV`, `campaign/sweep.py::_reject_relativistic_energies`
+- **Source:** validity domain of Feranchuk–Spence 2000 / Zhai 2025 SI Eqs. 5–7, not an equation of their own
+- **Status:** unverified
+- **Checks:** none. The ceiling's *mechanism* is sound — a strict `>` refusal on the hottest requested energy, with no silent clamp or warning path — but the **value is a placeholder**: 300 keV is the top of the current catalog working range (hopg), not a derived bound on where the nonrelativistic amplitudes lose accuracy
+- **Anchor:** none
+- **Notes:** The in-code marker is annotated `(placeholder)` at the constant and bare at the guard; both resolve here. Setting a defensible number needs a physics call — the relativistic correction to `A_PXR`/`A_CBS` evaluated against a stated accuracy target, which would also fix whether the ceiling belongs on `γ`, on `β`, or on the beam energy it is currently written in. Relativistic / channeling support (REGAE 3–5 MeV) is separate future work (TODO On-Hold #1/#2). Until then this row exists so the placeholder is visible in the ledger rather than only in a source comment
 
 ## `line-energy-dispersion`
 
