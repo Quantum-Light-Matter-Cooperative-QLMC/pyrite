@@ -36,6 +36,22 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
+5. **Energy-loss straggling.** Transport is pure CSDA: `_dEds_compound_scalar`
+   returns a mean loss rate and every core applies it deterministically, so the
+   fluctuation about it is discarded by construction. `energy-step-convergence`
+   already measures the cost — by Jensen's inequality straggling biases the
+   *mean* arrival time, ~0.3 rad at 25 keV over 1 um at 1 keV photon energy,
+   above the 0.1 rad tolerance the midpoint propagator reaches — so numerical
+   precision has outrun the transport model there. Not a drop-in sampler: the
+   same write-up records of order one inelastic event per flight in carbon at
+   25 keV, so the per-flight regime is single-collision rather than Gaussian or
+   even Vavilov, and unrestricted Joy--Luo already carries the mean of the hard
+   Moller tail whose fluctuation a full Landau draw would restore. The blocking
+   decision is therefore model form — restricted stopping power plus explicit
+   hard inelastic events, versus unrestricted CSDA plus a straggling
+   distribution — not the sampler. Straggling off stays bit-for-bit on all four
+   cores. → `feature/energy-loss-straggling`;
+   [`agentdocs/tasks/feature/energy-loss-straggling/`](agentdocs/tasks/feature/energy-loss-straggling/).
 
 #### Gated
 
