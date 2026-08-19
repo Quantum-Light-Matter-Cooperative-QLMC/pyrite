@@ -52,14 +52,12 @@ def test_case_round_trips_conditional_divergence_keys_in_legacy_order():
         n_electrons=2,
         n_electrons_brem=1,
         coherent_emission=True,
-        xray_dispersion="refractive",
     )[0]
 
     case = Case(**legacy)
 
     assert list(case.to_dict()) == list(legacy)
     assert case.to_dict()["coherent_emission"] is True
-    assert case.to_dict()["xray_dispersion"] == "refractive"
 
 
 def test_case_is_frozen():
@@ -92,7 +90,6 @@ def test_case_rejects_unknown_field():
         ({"E0_keV": -1.0}, "E0_keV must be finite and positive"),
         ({"crystal_width_mm": None}, "crystal_width_mm and crystal_height_mm"),
         ({"coherent_emission": False}, "coherent_emission must be absent or True"),
-        ({"xray_dispersion": "vacuum"}, "xray_dispersion must be absent or 'refractive'"),
     ],
 )
 def test_case_validates_physical_and_divergence_invariants(change, message):

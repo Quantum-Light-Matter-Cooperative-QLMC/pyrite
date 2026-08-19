@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 EmissionMode = Literal["incoherent", "coherent", "both"]
-XrayDispersion = Literal["vacuum", "refractive"]
 
 import numpy as np
 
@@ -93,14 +92,6 @@ class Settings:
     # "incoherent" (divergence-only rule); an incoherent run's parameter_sha256
     # -- and its checkpoint stem -- stays unchanged.
     emission: EmissionMode = "incoherent"
-    # Photon dispersion relation of the line kinematics. "vacuum" (default) is
-    # k = omega, bit-for-bit; "refractive" is the in-medium k = Re n(omega) omega
-    # from the crystal's bulk chi_0. Run-affecting, so it follows the SAME
-    # divergence-only identity rule as ``emission``: hashed only when it is not
-    # "vacuum", which keeps every pre-existing parameter_sha256 unchanged while
-    # giving a refractive run its own digest (and checkpoint stem) instead of
-    # silently resuming into its vacuum twin's checkpoint.
-    xray_dispersion: XrayDispersion = "vacuum"
 
     @property
     def coherent_emission(self) -> bool:

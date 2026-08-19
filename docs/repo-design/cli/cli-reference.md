@@ -1239,15 +1239,15 @@ Options:
 ```text
 Usage: pyrite profile set [OPTIONS] NAME
 
-  Replace range grids, beam fields, detector scalars, emission, or dispersion.
+  Replace range grids, beam fields, detector scalars, or emission.
 
   NAME must already exist (create it with ``pyrite profile create``); unknown names
   error with suggestions. Editing 'standard' prompts for confirmation unless --yes is
-  given; --dry-run never prompts. Detector scalars, emission and --xray-dispersion
-  replace supplied fields; unlike range grids, they are not accepted by add/remove --
-  except emission, which add/remove also accept via --coherent/--incoherent for
-  incremental switching. --beam NAME attaches a named [beams.NAME] reference and is
-  mutually exclusive with the inline beam flags, which are deprecated in its favor.
+  given; --dry-run never prompts. Detector scalars and emission replace supplied fields;
+  unlike range grids, they are not accepted by add/remove -- except emission, which
+  add/remove also accept via --coherent/--incoherent for incremental switching. --beam
+  NAME attaches a named [beams.NAME] reference and is mutually exclusive with the inline
+  beam flags, which are deprecated in its favor.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1297,9 +1297,6 @@ Options:
   --emission [incoherent|coherent|both]
                                   Replace the emission policy
                                   (incoherent/coherent/both).
-  --xray-dispersion [vacuum|refractive]
-                                  Replace the photon dispersion model
-                                  (vacuum/refractive).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

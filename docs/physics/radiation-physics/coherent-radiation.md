@@ -84,9 +84,8 @@ convention, and the independent derivation and the implementation currently
 disagree on it — this is the open `line-energy-dispersion` row. It fixes
 **where** each line sits, not how the amplitude is squared or summed.
 
-Under `xray_dispersion="refractive"` the vacuum relation $k=\omega$ is replaced
-by the bulk Maxwell relation $k=n(\omega)\,\omega$, making the resonance
-implicit; see
+The vacuum relation $k=\omega$ is replaced throughout by the bulk Maxwell
+relation $k=n(\omega)\,\omega$, which makes the resonance implicit; see
 [Photon escape and in-medium dispersion](photon-escape-and-dispersion.md).
 
 ## Crystal couplings

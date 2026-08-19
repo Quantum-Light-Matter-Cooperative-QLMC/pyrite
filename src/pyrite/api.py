@@ -18,7 +18,6 @@ from .campaign.model import (
     Numerics,
     Scene,
     Sweep,
-    XrayDispersion,
 )
 from .campaign.profiles import case_content_key
 from .campaign.sweep import Sweep as LegacySweep
@@ -163,7 +162,6 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         n_electrons=numerics.n_electrons,
         n_electrons_brem=numerics.n_electrons_brem,
         coherent_emission=scene.emission in {"coherent", "both"},
-        xray_dispersion=scene.xray_dispersion,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -179,7 +177,6 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             n_electrons=settings.n_electrons,
             n_electrons_brem=settings.n_electrons_brem,
             coherent_emission=settings.coherent_emission,
-            xray_dispersion=settings.xray_dispersion,
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []
@@ -205,7 +202,6 @@ def simulate(
     *,
     numerics: Numerics | None = None,
     emission: EmissionMode = "incoherent",
-    xray_dispersion: XrayDispersion = "vacuum",
     brem_source: BremSource = "mc",
     filters: tuple[FilterPlate, ...] = (),
     pixel_scorer: PixelScorer | None = None,
@@ -229,7 +225,6 @@ def simulate(
         filters=filters,
         pixel_scorer=pixel_scorer,
         emission=emission,
-        xray_dispersion=xray_dispersion,
         brem_source=brem_source,
     )
     if resolved_numerics.backend not in {"auto", BACKEND.name}:

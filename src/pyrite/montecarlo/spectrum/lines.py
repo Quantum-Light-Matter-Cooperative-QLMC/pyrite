@@ -20,7 +20,6 @@ from ...materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
     M_E_EV,
-    XRAY_DISPERSION_MODELS,
     U_g,
     chi_g,
     reciprocal_g_vector,
@@ -422,10 +421,10 @@ def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
     segment. The identities are exact; floating-point association differs from
     the expanded vector form at rounding level.
 
-    Under ``xray_dispersion="refractive"`` the caller passes the in-medium
-    ``denom`` and ``n_dot_g`` (the latter carrying its factor of ``Re n``), both
-    per (segment, g) rather than hoisted. Every identity above survives that
-    substitution unchanged -- see ``_in_medium_kinematics``.
+    The caller passes the in-medium ``denom`` and ``n_dot_g`` (the latter
+    carrying its factor of ``Re n``), both per (segment, g) rather than hoisted.
+    Every identity above survives that substitution unchanged -- see
+    ``_in_medium_kinematics``.
     """
     v_dot_g = vx * gx + vy * gy + vz * gz
     omega_res = v_dot_g / denom
@@ -722,7 +721,6 @@ def mc_spectrum(
     coherent=False,
     electron_limit=None,
     E_cut_keV=None,
-    xray_dispersion="vacuum",
     _table_cache=None,
 ):
     """
@@ -859,20 +857,19 @@ def mc_spectrum(
 
     Validation: blazed-groove-geometry
 
-    xray_dispersion: photon dispersion relation used by the line kinematics.
-    ``"vacuum"`` (default) keeps ``k = omega`` everywhere and reproduces the
-    existing goldens bit-for-bit. ``"refractive"`` uses the bulk crystal
-    dielectric response, ``k = n(omega) omega`` with
+    The line kinematics always run on the IN-MEDIUM photon dispersion: the bulk
+    crystal dielectric response gives ``k = n(omega) omega`` with
     ``n = sqrt(1 + chi_0)`` (materials.crystal.refractive_index), which shifts
     the resonance denominator to ``1 - Re n (v.n_hat)`` and carries the
     corresponding ``n`` powers into ``k.g`` and the PXR numerator's ``k^2``.
     Only the real part is applied: ``Im n`` is the same absorption already
     carried by the Beer-Lambert ``mu(E)`` escape factor. Bulk response only --
     interface/Fresnel refraction is not modelled, so grazing observation
-    geometry is out of scope.
+    geometry is out of scope. There is no vacuum-dispersion switch; ``k = omega``
+    is recovered only in the physical ``chi_0 -> 0`` (high-energy) limit.
 
-    With ``coherent=True`` the segment-to-segment propagation phase moves onto
-    the same dispersion relation: each segment's field picks up
+    With ``coherent=True`` the segment-to-segment propagation phase rides the
+    same dispersion relation: each segment's field picks up
     ``-delta(E) omega(E) L_esc,j`` over its in-crystal escape path, the real
     partner of the Beer-Lambert amplitude factor already applied over that same
     path. Refused for LAYERED absorbers, whose per-layer delta is not modelled.
@@ -952,17 +949,11 @@ def mc_spectrum(
             "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
             "pass the material's value (no silent default)."
         )
-    if xray_dispersion not in XRAY_DISPERSION_MODELS:
-        raise ValueError(
-            f"mc_spectrum: xray_dispersion must be one of {XRAY_DISPERSION_MODELS}, "
-            f"got {xray_dispersion!r}."
-        )
-    refractive = xray_dispersion == "refractive"
-    if refractive and coherent and layers is not None:
+    if coherent and layers is not None:
         raise NotImplementedError(
-            "xray_dispersion='refractive' does not cover the coherent path "
-            "through a LAYERED absorber: the dispersive propagation phase needs "
-            "a per-layer delta accumulated along the escape path -- the real "
+            "the in-medium dispersion does not cover the coherent path through "
+            "a LAYERED absorber: the dispersive propagation phase needs a "
+            "per-layer delta accumulated along the escape path -- the real "
             "partner of _stack_tau's per-layer mu -- which is not modelled. "
             "Single-slab absorbers (with or without a groove or a finite "
             "footprint) are supported."
@@ -1047,13 +1038,13 @@ def mc_spectrum(
             "reduction over numerical substeps has no device port yet. Run the "
             "spectrum on the NumPy backend, or transport without max_dE_frac."
         )
-    if grouped and refractive and layers is not None:
+    if grouped and layers is not None:
         # Same unmodelled per-layer delta as the coherent path: the grouped
         # reduction carries the dispersive propagation phase too.
         raise NotImplementedError(
-            "xray_dispersion='refractive' does not cover numerical substeps "
-            "through a LAYERED absorber: the intra-flight coherent sum needs "
-            "the per-layer dispersive propagation phase, which is not modelled."
+            "the in-medium dispersion does not cover numerical substeps through "
+            "a LAYERED absorber: the intra-flight coherent sum needs the "
+            "per-layer dispersive propagation phase, which is not modelled."
         )
     if grouped and components:
         raise ValueError(
@@ -1091,14 +1082,11 @@ def mc_spectrum(
 
     # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
     # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
-    # its own edge structure, from the f1 cusp). Only built for the refractive
-    # model; the vacuum model leaves every k = omega expression untouched and so
-    # stays bit-for-bit.
-    n_re_tab_g = None
-    if refractive:
-        n_re_tab_g = xp.asarray(
-            np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
-        )
+    # its own edge structure, from the f1 cusp). The in-medium dispersion is
+    # unconditional, so this table is always built.
+    n_re_tab_g = xp.asarray(
+        np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
+    )
 
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
 
@@ -1148,19 +1136,15 @@ def mc_spectrum(
         # segment-independent constant, i.e. a global phase).
         #
         # Tabulated on the OUTPUT grid: it is a propagation phase read across the
-        # whole spectrum, not a coupling frozen at the line energy. Left None
-        # under the vacuum model, whose phase expressions are then untouched and
-        # so stay bit-for-bit.
+        # whole spectrum, not a coupling frozen at the line energy.
         # Validation: xray-in-medium-propagation-phase
-        delta_omega_grid = None
-        if refractive:
-            delta_omega_grid = (
-                xp.asarray(
-                    1.0 - np.asarray(refractive_index(crystal, E_grid_eV, use_henke).real),
-                    dtype=REAL,
-                )
-                * omega_grid
+        delta_omega_grid = (
+            xp.asarray(
+                1.0 - np.asarray(refractive_index(crystal, E_grid_eV, use_henke).real),
+                dtype=REAL,
             )
+            * omega_grid
+        )
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
@@ -1188,11 +1172,7 @@ def mc_spectrum(
         # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
         #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
         v_dot_g = _matvec3(v_all, g_vec_d)
-        if n_re_tab_g is None:
-            denom = denom_all
-            n_re_seg = None
-        else:
-            denom, n_re_seg = _in_medium_kinematics(v_dot_n_all, v_dot_g, n_re_tab_g, E_tab_g)
+        denom, n_re_seg = _in_medium_kinematics(v_dot_n_all, v_dot_g, n_re_tab_g, E_tab_g)
         omega_res = v_dot_g / denom
         E_res = HBARC_EV_ANG * omega_res  # -> eV
 
@@ -1356,8 +1336,7 @@ def mc_spectrum(
                 rows = sel[bounds[ka] : bounds[kb]]
                 x = a_width[rows][:, None] * (E_grid[None, :] - E_r[rows][:, None]) / xp.pi
                 arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
-                if delta_omega_grid is not None:
-                    arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
+                arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
                 SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
                 # Blocks break only on flight boundaries, so no flight is split
                 # across two reductions and squared twice.
@@ -1419,16 +1398,8 @@ def mc_spectrum(
                         xp.ascontiguousarray(E_grid, dtype=REAL),
                         out=spec,
                         mosaic_weight=wm,
-                        L_esc=(
-                            None
-                            if delta_omega_grid is None
-                            else xp.ascontiguousarray(L_esc[sel], dtype=REAL)
-                        ),
-                        delta_omega=(
-                            None
-                            if delta_omega_grid is None
-                            else xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
-                        ),
+                        L_esc=xp.ascontiguousarray(L_esc[sel], dtype=REAL),
+                        delta_omega=xp.ascontiguousarray(delta_omega_grid, dtype=REAL),
                         config=DEFAULT_COHERENT_KERNEL_CONFIG,
                     )
                 return
@@ -1442,8 +1413,7 @@ def mc_spectrum(
                         continue
                     x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
                     arg = d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]
-                    if delta_omega_grid is not None:
-                        arg = arg - L_esc[sl][m, None] * delta_omega_grid[None, :]
+                    arg = arg - L_esc[sl][m, None] * delta_omega_grid[None, :]
                     ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
@@ -1469,8 +1439,7 @@ def mc_spectrum(
                         continue
                     x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
                     arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
-                    if delta_omega_grid is not None:
-                        arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
+                    arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
                     ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
@@ -1811,13 +1780,9 @@ def mc_spectrum(
             _coh_chi_im = CHI_IM.reshape(-1)
             _coh_u_re = U_RE.reshape(-1)
             _coh_u_im = U_IM.reshape(-1)
-            # Vacuum hoists the half-width per segment; the refractive prologue
-            # has to build it per (segment, g) from the in-medium denominator.
-            _coh_aw = (
-                None
-                if n_re_tab_g is not None
-                else xp.ascontiguousarray(denom_all * t_L_all / (2.0 * HBARC_EV_ANG), dtype=REAL)
-            )
+            # The in-medium prologue builds the sinc half-width per (segment, g)
+            # from the in-medium denominator, so it cannot be hoisted per segment
+            # the way a vacuum k = omega kernel would (``aw_seg`` stays unset).
             _coh_phase_slope = xp.ascontiguousarray(d_all / HBARC_EV_ANG, dtype=REAL)
             coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
         else:
@@ -1921,8 +1886,7 @@ def mc_spectrum(
                     n_dot_g=_coh_n_dot_g,
                     g_dot_es=_coh_g_dot_es,
                     g_dot_ep=_coh_g_dot_ep,
-                    aw_seg=(None if _coh_aw is None else _coh_aw[sb]),
-                    v_dot_n=(None if n_re_tab_g is None else v_dot_n_all[sb]),
+                    v_dot_n=v_dot_n_all[sb],
                     n_re_tab=n_re_tab_g,
                     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
                 )
@@ -1936,7 +1900,7 @@ def mc_spectrum(
                     n_seg=sb.stop - sb.start,
                     # g-independent, so it stays segment-sized here even though
                     # the prologue's other outputs are pair-sized.
-                    L_esc=(None if delta_omega_grid is None else L_esc_full[sb].reshape(-1)),
+                    L_esc=L_esc_full[sb].reshape(-1),
                     delta_omega=delta_omega_grid,
                     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
                 )
@@ -1947,21 +1911,17 @@ def mc_spectrum(
             vx = v_all[sb, 0][:, None]  # (nb, 1)F
             vy = v_all[sb, 1][:, None]
             vz = v_all[sb, 2][:, None]
-            denom = denom_full[sb]
-            n_dot_g_blk = n_dot_g
-            n_re_blk = None
-            if n_re_tab_g is not None:
-                # The in-medium root depends on g through E_res, so denom stops
-                # being a hoisted column and n.g stops being a hoisted row: both
-                # become (nb, N_g). _line_kin_core is elementwise, so it takes
-                # them unchanged.
-                denom, n_re_blk = _in_medium_kinematics(
-                    v_dot_n_all[sb][:, None],
-                    vx * gx + vy * gy + vz * gz,
-                    n_re_tab_g,
-                    E_tab_g,
-                )
-                n_dot_g_blk = n_re_blk * n_dot_g
+            # The in-medium root depends on g through E_res, so denom stops being
+            # a hoisted column and n.g stops being a hoisted row: both become
+            # (nb, N_g). _line_kin_core is elementwise, so it takes them
+            # unchanged.
+            denom, n_re_blk = _in_medium_kinematics(
+                v_dot_n_all[sb][:, None],
+                vx * gx + vy * gy + vz * gz,
+                n_re_tab_g,
+                E_tab_g,
+            )
+            n_dot_g_blk = n_re_blk * n_dot_g
             gamma = gamma_full[sb]
             t_L = t_L_full[sb]
             L_esc = L_esc_full[sb]
@@ -1973,7 +1933,7 @@ def mc_spectrum(
                 vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk
             )
             vdg = v_dot_g
-            k_mag = omega_res if n_re_blk is None else omega_res * n_re_blk
+            k_mag = omega_res * n_re_blk
             E_res = HBARC_EV_ANG * omega_res
 
             line_electron_block = line_electron[sb][:, None]
@@ -2048,10 +2008,9 @@ def mc_spectrum(
                     c_p.real,
                     c_p.imag,
                 )
-                if delta_omega_grid is not None:
-                    # Escape distance rides along as the second phase slope, the
-                    # one that multiplies delta(E) omega(E) instead of E.
-                    per_line = (*per_line, L_esc)
+                # Escape distance rides along as the second phase slope, the one
+                # that multiplies delta(E) omega(E) instead of E.
+                per_line = (*per_line, L_esc)
                 coh_blocks.append(
                     [
                         xp.ascontiguousarray(xp.broadcast_to(f, shape).T).reshape(-1)[gm]
@@ -2176,7 +2135,7 @@ def mc_spectrum(
                 else:
                     row = [xp.concatenate(parts) for parts in zip(*blocks, strict=True)]
                 E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = row[:8]
-                L_i = row[8] if len(row) > 8 else None  # escape distance, refractive only
+                L_i = row[8]  # escape distance for the in-medium phase
                 wm_i = float(wm_rows[i_row])
                 if _use_jit_coherent_reduction:
                     run_coherent_reduction_kernel(
@@ -2202,8 +2161,7 @@ def mc_spectrum(
                     sl = slice(j0, min(j0 + chunk, E_r_i.size))
                     x = aw_i[sl][:, None] * (E_grid[None, :] - E_r_i[sl][:, None]) / xp.pi
                     arg = ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]
-                    if L_i is not None and delta_omega_grid is not None:
-                        arg = arg - L_i[sl][:, None] * delta_omega_grid[None, :]
+                    arg = arg - L_i[sl][:, None] * delta_omega_grid[None, :]
                     ph = xp.exp(1j * arg)
                     SP = xp.sinc(x).astype(cdtype) * ph
                     f_s += (csr[sl] + 1j * csi[sl]) @ SP

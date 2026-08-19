@@ -18,7 +18,6 @@ from .geometry import Slab, Stack, Target
 from .sweep import BeamSpec
 
 EmissionMode = Literal["incoherent", "coherent", "both"]
-XrayDispersion = Literal["vacuum", "refractive"]
 BremSource = Literal["mc", "external", "none"]
 MosaicRoute = Literal["analytic", "mc"]
 
@@ -125,7 +124,6 @@ class Scene:
     filters: tuple[FilterPlate, ...] = ()
     pixel_scorer: PixelScorer | None = None
     emission: EmissionMode = "incoherent"
-    xray_dispersion: XrayDispersion = "vacuum"
     brem_source: BremSource = "mc"
 
     def __post_init__(self) -> None:
@@ -168,8 +166,6 @@ class Scene:
         object.__setattr__(self, "target", _scalar_target(self.target))
         if self.emission not in {"incoherent", "coherent", "both"}:
             raise ValueError("emission must be 'incoherent', 'coherent', or 'both'")
-        if self.xray_dispersion not in {"vacuum", "refractive"}:
-            raise ValueError("xray_dispersion must be 'vacuum' or 'refractive'")
         if self.brem_source not in {"mc", "external", "none"}:
             raise ValueError("brem_source must be 'mc', 'external', or 'none'")
 

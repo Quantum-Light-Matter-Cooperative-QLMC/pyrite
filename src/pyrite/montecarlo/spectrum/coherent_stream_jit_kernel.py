@@ -659,7 +659,7 @@ def run_coherent_prologue_kernel(
     hoists. When omitted they are constructed once here, preserving older direct
     callers while the main line path avoids rebuilding them per segment block.
 
-    Under ``xray_dispersion="refractive"`` the caller supplies the per-segment
+    Under the in-medium dispersion the caller supplies the per-segment
     ``v_dot_n = v.n_hat`` together with ``n_re_tab``, the real refractive index
     on the ``E_tab`` grid. The kernel then solves the implicit in-medium
     resonance per (segment, g) instead of reading the hoisted vacuum ``denom``,
@@ -811,7 +811,7 @@ def run_coherent_field_accumulation_kernel(
     while ``phase_slope`` stays segment-sized. This also keeps direct kernel
     tests/callers, which pass both in one layout, source-compatible.
 
-    Under ``xray_dispersion="refractive"`` the caller supplies the block's
+    Under the in-medium dispersion the caller supplies the block's
     per-segment escape distance ``L_esc`` (Angstrom, length ``n_seg``; it is
     g-independent, so it never takes the pair layout) and the per-energy table
     ``delta_omega[k] = (1 - Re n(E_k)) * omega(E_k)``. Together they add

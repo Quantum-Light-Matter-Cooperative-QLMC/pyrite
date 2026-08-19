@@ -1,7 +1,7 @@
-"""``xray_dispersion`` switch: vacuum baseline vs in-medium line kinematics.
+"""In-medium line kinematics, the only photon dispersion the kernels run.
 
-The refractive model replaces ``k = omega`` with the Maxwell dispersion relation
-``k = n(omega) omega`` in the bulk crystal, which moves the CXR resonance from
+The Maxwell dispersion relation in the bulk crystal replaces ``k = omega`` with
+``k = n(omega) omega``, which moves the CXR resonance from
 ``omega_res = v.g / (1 - v.n_hat)`` to ``omega_res = v.g / (1 - Re n (v.n_hat))``.
 For ``delta = 1 - Re n << 1`` that is a fractional line shift of
 ``-delta (v.n_hat) / (1 - v.n_hat)``, which is what the first tests measure.
@@ -12,12 +12,18 @@ leg runs at the medium's phase velocity, so segment ``j`` accumulates
 partner of the Beer-Lambert amplitude already applied over that same path. Its
 observable is the RELATIVE phase between segments at different depths, which the
 later tests extract from the two-segment interference term.
+
+There is no vacuum-dispersion switch to difference against any more, so every
+check here compares the kernel to a CLOSED FORM built from the same source
+equations rather than to a second run. That is the stronger comparison: it pins
+the absolute in-medium resonance and the absolute interference phase, not just
+the increment between two code paths.
 """
 
 import numpy as np
 import pytest
 
-from pyrite.materials.crystal import CRYSTALS, refractive_index
+from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector, refractive_index
 from pyrite.montecarlo.spectrum import mc_spectrum
 from pyrite.montecarlo.spectrum.lines import _observation_direction
 from pyrite.montecarlo.transport import beta_from_keV
@@ -27,11 +33,19 @@ HKL = (0, 0, 2)
 B_ANG2 = 0.4
 E_KEV = 100.0
 THICKNESS_ANG = 1e5
+HBARC_EV_ANG = 1973.269804
 
 # Long segment -> narrow sinc envelope, so the spectral peak resolves a shift of
 # order delta * E_res (~6e-2 eV here) instead of drowning in a ~100 eV wide line.
 SEG_LENGTH_ANG = 8000.0
 E_GRID = np.linspace(1599.0, 1601.5, 100_001)
+
+N_HAT = _observation_direction(np.deg2rad(119.0), None)
+N_Z = float(N_HAT[2])  # detector looks upstream, out the entrance face
+G_Z = float(reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])[0][2])
+BETA = float(beta_from_keV(np.array([E_KEV]))[0])
+V_DOT_G = BETA * G_Z
+V_DOT_N = BETA * N_Z
 
 
 def _segments():
@@ -65,41 +79,59 @@ def _spectrum(**kwargs):
     return mc_spectrum(_segments(), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, **kwargs)
 
 
-def _predicted_relative_shift(E_res_eV):
-    v_dot_n = float(beta_from_keV(np.array([E_KEV]))[0]) * float(
-        np.array([0.0, 0.0, 1.0]) @ _observation_direction(np.deg2rad(119.0), None)
-    )
-    delta = 1.0 - float(refractive_index(CRYSTAL, E_res_eV).real)
-    return -delta * v_dot_n / (1.0 - v_dot_n)
+def _vacuum_resonance_eV():
+    """``omega_res = v.g / (1 - v.n_hat)``, the retired k = omega root."""
+    return HBARC_EV_ANG * V_DOT_G / (1.0 - V_DOT_N)
 
 
-def test_vacuum_is_the_default_and_leaves_the_spectrum_untouched():
-    np.testing.assert_array_equal(_spectrum(), _spectrum(xray_dispersion="vacuum"))
+def _in_medium_resonance_eV(passes=6):
+    """``omega_res = v.g / (1 - Re n(omega_res) (v.n_hat))``, solved by iteration.
+
+    The root is implicit because ``Re n`` is evaluated at the resonance itself;
+    the map contracts at rate ~delta ~ 1e-4 per pass, so a handful of passes is
+    already at float64 rounding.
+    """
+    E = _vacuum_resonance_eV()
+    for _ in range(passes):
+        n_re = float(refractive_index(CRYSTAL, np.array([E])).real[0])
+        E = HBARC_EV_ANG * V_DOT_G / (1.0 - n_re * V_DOT_N)
+    return E
 
 
 @pytest.mark.parametrize("layers", [None, _single_layer()], ids=["batched", "per_hkl"])
-def test_refractive_shifts_the_line_by_the_in_medium_denominator(layers):
-    vac = _spectrum(layers=layers)
-    ref = _spectrum(layers=layers, xray_dispersion="refractive")
-    assert vac.max() > 0.0
+def test_line_sits_on_the_in_medium_resonance_not_the_vacuum_one(layers):
+    """Validation: xray-in-medium-resonance.
 
-    E_vac = E_GRID[vac.argmax()]
-    E_ref = E_GRID[ref.argmax()]
-    measured = (E_ref - E_vac) / E_vac
-    # Positive: the detector looks upstream (v.n_hat < 0), so the in-medium
-    # denominator is larger than the vacuum one and the line moves up in energy.
-    assert measured > 0.0
-    np.testing.assert_allclose(measured, _predicted_relative_shift(E_vac), rtol=2e-3)
+    Absolute check: the spectral peak lands on the in-medium root, which sits
+    ABOVE the vacuum root (the detector looks upstream, ``v.n_hat < 0``, so the
+    in-medium denominator is the larger one) by the first-order shift
+    ``-delta (v.n_hat)/(1 - v.n_hat)``.
+    """
+    spec = _spectrum(layers=layers)
+    assert spec.max() > 0.0
+    measured = float(E_GRID[spec.argmax()])
+
+    E_vac = _vacuum_resonance_eV()
+    E_med = _in_medium_resonance_eV()
+    assert E_med > E_vac  # the sign the geometry demands
+
+    # The peak is the in-medium root to well inside one grid step (2.5e-5 eV).
+    np.testing.assert_allclose(measured, E_med, atol=2.0 * float(E_GRID[1] - E_GRID[0]))
+
+    # ... and the displacement from the vacuum root is the closed-form shift.
+    delta = 1.0 - float(refractive_index(CRYSTAL, np.array([E_med])).real[0])
+    np.testing.assert_allclose(
+        (measured - E_vac) / E_vac,
+        -delta * V_DOT_N / (1.0 - V_DOT_N),
+        rtol=2e-3,
+    )
 
 
-def test_unknown_dispersion_model_is_rejected():
-    with pytest.raises(ValueError, match="xray_dispersion must be one of"):
-        _spectrum(xray_dispersion="in_medium")
-
-
-def test_refractive_coherent_through_a_layer_stack_is_refused():
+def test_coherent_through_a_layer_stack_is_refused():
+    """The per-layer delta along the escape path is not modelled, so the coherent
+    layered combination refuses rather than silently dropping the phase."""
     with pytest.raises(NotImplementedError, match="LAYERED absorber"):
-        _spectrum(xray_dispersion="refractive", coherent=True, layers=_single_layer())
+        _spectrum(coherent=True, layers=_single_layer())
 
 
 # --- in-medium coherent propagation phase ---------------------------------
@@ -109,8 +141,6 @@ def test_refractive_coherent_through_a_layer_stack_is_refused():
 # Only DIFFERENCES matter, so the observable is the relative phase between two
 # segments at different depths -- which is also the design brief's question:
 # does a delta ~ 1e-4 accumulate into an order-unity phase over microns?
-
-N_Z = float(np.cos(np.deg2rad(119.0)))  # detector looks upstream, out the entrance face
 
 
 def _two_segments(z1, z2):
@@ -148,37 +178,46 @@ def _relative_phase(z1, z2, i_E, **kwargs):
     return (i_both - i_1 - i_2) / (2.0 * np.sqrt(i_1 * i_2))
 
 
-@pytest.mark.parametrize("sinc_cutoff", [None, 200.0], ids=["batched", "per_hkl"])
-def test_vacuum_coherent_is_untouched_by_the_dispersion_switch(sinc_cutoff):
-    seg = _two_segments(5_000.0, 15_000.0)
-    kw = dict(coherent=True, sinc_cutoff=sinc_cutoff)
-    base = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, **kw)
-    same = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, xray_dispersion="vacuum", **kw)
-    assert base.max() > 0.0
-    np.testing.assert_array_equal(base, same)
+def _phase_terms(z1, z2, E_eV):
+    """Closed-form (vacuum-part, in-medium-part) of the two segments' phase gap.
+
+    Both segments carry the same velocity, age and length, so the whole gap is
+    linear in the depth separation:
+
+      far-field retardation   ``omega d_j``     -> -omega n_z (z1 - z2)
+      reciprocal harmonic     ``-g.r_j``        -> -g_z (z1 - z2)
+      in-medium escape leg    ``-delta omega L`` -> -delta omega (z1 - z2)/(-n_z)
+
+    with ``L_esc = z / (-n_z)`` out the entrance face.
+    """
+    dz = z1 - z2
+    omega = E_eV / HBARC_EV_ANG
+    delta = 1.0 - float(refractive_index(CRYSTAL, E_eV).real)
+    vacuum_part = -dz * (omega * N_Z + G_Z)
+    medium_part = -dz * delta * omega / (-N_Z)
+    return vacuum_part, medium_part
 
 
 @pytest.mark.parametrize("sinc_cutoff", [None, 200.0], ids=["batched", "per_hkl"])
-def test_refractive_adds_the_escape_path_phase_between_two_depths(sinc_cutoff):
-    z1, z2 = 5_000.0, 10_000.0
+def test_interference_phase_matches_the_in_medium_closed_form(sinc_cutoff):
+    """Validation: xray-in-medium-propagation-phase.
+
+    The measured two-segment interference term reproduces the closed-form total
+    phase -- geometry, sign, and delta(E) on the OUTPUT grid all pinned -- and
+    the in-medium leg is a required part of it: dropping that one term misses
+    the measurement by far more than the agreement tolerance.
+    """
     kw = dict(sinc_cutoff=sinc_cutoff)
     i_E = int(_spectrum(coherent=True, **kw).argmax())
     E = float(E_GRID[i_E])
 
-    cos_vac = _relative_phase(z1, z2, i_E, **kw)
-    cos_ref = _relative_phase(z1, z2, i_E, xray_dispersion="refractive", **kw)
-
-    # -delta(E) omega(E) (L1 - L2) with L_esc = z / (-n_z) out the entrance face.
-    delta = 1.0 - float(refractive_index(CRYSTAL, E).real)
-    d_phase = -delta * (E / 1973.269804) * (z1 - z2) / (-N_Z)
-    assert 0.3 < abs(d_phase) < np.pi - 0.3  # resolvable, and no arccos branch cut
-
-    # arccos is even, so compare the shift's magnitude on both branches and take
-    # the one the phase actually sits on.
-    got = np.arccos(np.clip(cos_ref, -1.0, 1.0)) - np.arccos(np.clip(cos_vac, -1.0, 1.0))
-    # Exact to rounding: the geometry (L_esc = z / -n_z), the sign, and delta(E)
-    # on the output grid are all pinned, not just the order of magnitude.
-    np.testing.assert_allclose(min(abs(got - d_phase), abs(got + d_phase)), 0.0, atol=1e-9)
+    for z2 in (7_000.0, 10_000.0, 12_000.0, 14_900.0):
+        z1 = 5_000.0
+        vacuum_part, medium_part = _phase_terms(z1, z2, E)
+        measured = _relative_phase(z1, z2, i_E, **kw)
+        np.testing.assert_allclose(measured, np.cos(vacuum_part + medium_part), atol=1e-6)
+        # The in-medium leg is not a rounding-level correction here.
+        assert abs(np.cos(vacuum_part) - measured) > 1e-3
 
 
 def test_micron_scale_depth_separation_inverts_the_interference():
@@ -191,24 +230,21 @@ def test_micron_scale_depth_separation_inverts_the_interference():
     z1, z2 = 5_000.0, 5_000.0 + 9_900.0  # escape paths ~1 micron apart
     i_E = int(_spectrum(coherent=True).argmax())
     E = float(E_GRID[i_E])
-    delta = 1.0 - float(refractive_index(CRYSTAL, E).real)
-    d_phase = -delta * (E / 1973.269804) * (z1 - z2) / (-N_Z)
-    assert abs(abs(d_phase) - np.pi) < 0.05  # this geometry is tuned to half a cycle
+    vacuum_part, medium_part = _phase_terms(z1, z2, E)
+    assert abs(abs(medium_part) - np.pi) < 0.05  # this geometry is tuned to half a cycle
 
-    # A half-cycle shift flips the interference term's sign, whatever the vacuum
-    # phase happened to be: cos(x +- pi) = -cos(x). No arccos branch to pick.
-    cos_vac = _relative_phase(z1, z2, i_E)
-    cos_ref = _relative_phase(z1, z2, i_E, xray_dispersion="refractive")
-    assert abs(cos_vac) > 0.2  # the vacuum interference term is not already ~0
-    np.testing.assert_allclose(cos_ref, -cos_vac, atol=0.05)
+    # A half-cycle shift flips the interference term's sign, whatever the rest of
+    # the phase happened to be: cos(x +- pi) = -cos(x).
+    measured = _relative_phase(z1, z2, i_E)
+    assert abs(np.cos(vacuum_part)) > 0.2  # the vacuum-part term is not already ~0
+    np.testing.assert_allclose(measured, -np.cos(vacuum_part), atol=0.05)
 
 
 def test_single_segment_coherent_is_pure_phase_under_refraction():
     """One segment has no relative phase, so the new factor must cancel in |.|^2."""
     seg = _one_segment(9_000.0)
-    kw = dict(xray_dispersion="refractive")
-    coh = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True, **kw)
-    inc = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, **kw)
+    coh = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True)
+    inc = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
     assert coh.max() > 0.0
     np.testing.assert_allclose(coh, inc, rtol=1e-10, atol=1e-14 * inc.max())
 
@@ -216,49 +252,22 @@ def test_single_segment_coherent_is_pure_phase_under_refraction():
 # --- case-dict plumbing ----------------------------------------------------
 
 
-def _runner_case(**extra):
-    return dict(
+def test_runner_and_cases_carry_no_dispersion_selector():
+    """The model is unconditional, so nothing downstream may still select it."""
+    from pyrite.campaign.sweep import Sweep, build_cases
+    from pyrite.montecarlo.runner import _lines_for_segments
+
+    case = dict(
         crystal=CRYSTAL,
         hkl_list=[HKL],
         B_ang2=B_ANG2,
         composition=None,
         E_cut_lines_keV=None,
-        **extra,
     )
-
-
-def _runner_lines(**extra):
-    from pyrite.montecarlo.runner import _lines_for_segments
-
-    return _lines_for_segments(
-        _segments(),
-        E_GRID,
-        _runner_case(**extra),
-        _observation_direction(np.deg2rad(119.0), None),
-        None,
-        None,
+    lines = _lines_for_segments(
+        _segments(), E_GRID, case, _observation_direction(np.deg2rad(119.0), None), None, None
     )
+    np.testing.assert_array_equal(lines, _spectrum())
 
-
-@pytest.mark.parametrize("model", [None, "vacuum", "refractive"])
-def test_runner_takes_the_dispersion_model_from_the_case(model):
-    """``_lines_for_segments`` reads ``case["xray_dispersion"]`` the same way it
-    reads ``coherent_emission``; absent means vacuum."""
-    case_kw = {} if model is None else {"xray_dispersion": model}
-    expected = _spectrum(xray_dispersion=model or "vacuum")
-    np.testing.assert_array_equal(_runner_lines(**case_kw), expected)
-
-
-def test_build_cases_omits_the_key_for_the_vacuum_default():
-    from pyrite.campaign.sweep import Sweep, build_cases
-
-    sweep = Sweep(material="mose2", thickness_ang=1e4)
-    assert "xray_dispersion" not in build_cases(sweep)[0]
-    assert build_cases(sweep, xray_dispersion="refractive")[0]["xray_dispersion"] == "refractive"
-
-
-def test_build_cases_rejects_an_unknown_dispersion_model():
-    from pyrite.campaign.sweep import Sweep, build_cases
-
-    with pytest.raises(ValueError, match="xray_dispersion must be one of"):
-        build_cases(Sweep(material="mose2", thickness_ang=1e4), xray_dispersion="in_medium")
+    built = build_cases(Sweep(material="mose2", thickness_ang=1e4))[0]
+    assert "xray_dispersion" not in built

@@ -41,10 +41,6 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
 #: to avoid coupling this CLI module to that private catalog constant).
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
-#: Mirrors ``materials.catalog._XRAY_DISPERSION_VALUES`` (and, through it,
-#: ``materials.crystal.XRAY_DISPERSION_MODELS``), kept local for the same reason.
-_XRAY_DISPERSION_VALUES = ("vacuum", "refractive")
-
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
     ("energy", "--energy", ENERGY_CSV_RANGE, "KEV,..."),
@@ -247,7 +243,6 @@ def _emit_show(payload):
         display = "unspecified" if value is None else f"{value:g} {unit}"
         emit_result(f"    {label}: {display}")
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
-    emit_result(f"  xray dispersion: {payload['xray_dispersion'] or 'vacuum (default)'}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -566,11 +561,6 @@ def create_command(
     type=click.Choice(_EMISSION_VALUES),
     help="Replace the emission policy (incoherent/coherent/both).",
 )
-@click.option(
-    "--xray-dispersion",
-    type=click.Choice(_XRAY_DISPERSION_VALUES),
-    help="Replace the photon dispersion model (vacuum/refractive).",
-)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 @click.pass_context
@@ -599,20 +589,19 @@ def set_command(
     beam_name,
     all_materials,
     emission,
-    xray_dispersion,
     yes,
     dry_run,
 ):
-    """Replace range grids, beam fields, detector scalars, emission, or dispersion.
+    """Replace range grids, beam fields, detector scalars, or emission.
 
     NAME must already exist (create it with ``pyrite profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
-    unless --yes is given; --dry-run never prompts. Detector scalars, emission
-    and --xray-dispersion replace supplied fields; unlike range grids, they are
-    not accepted by add/remove -- except emission, which add/remove also accept
-    via --coherent/--incoherent for incremental switching. --beam NAME attaches
-    a named [beams.NAME] reference and is mutually exclusive with the inline
-    beam flags, which are deprecated in its favor.
+    unless --yes is given; --dry-run never prompts. Detector scalars and
+    emission replace supplied fields; unlike range grids, they are not accepted
+    by add/remove -- except emission, which add/remove also accept via
+    --coherent/--incoherent for incremental switching. --beam NAME attaches a
+    named [beams.NAME] reference and is mutually exclusive with the inline beam
+    flags, which are deprecated in its favor.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
     beam_updates = _collect_beam_updates(
@@ -654,7 +643,6 @@ def set_command(
         and materials is None
         and not all_materials
         and emission is None
-        and xray_dispersion is None
     ):
         raise click.UsageError("provide a range, beam, detector, membership, or emission option")
     try:
@@ -669,7 +657,6 @@ def set_command(
             materials=materials,
             all_materials=all_materials,
             emission=emission,
-            xray_dispersion=xray_dispersion,
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -681,15 +668,12 @@ def set_command(
         or materials is not None
         or all_materials
         or emission is not None
-        or xray_dispersion is not None
     ):
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
         if beam_updates or beam_name is not None:
             action_fields.append("beam")
         if emission is not None:
             action_fields.append("emission")
-        if xray_dispersion is not None:
-            action_fields.append("xray_dispersion")
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
     return _write(document, original, dry_run, f"updated profile {name}")
 

@@ -47,9 +47,8 @@ not create another profile.
 Named beam references resolve to beam values before hashing. Detector settings
 inherit the selected profile's block, then the `standard` detector block, then
 the built-in detector defaults. An explicit emission policy overrides the
-fidelity preset's default, and an explicit `xray_dispersion`
-(`vacuum`/`refractive`) overrides its photon dispersion model the same way.
-Energy-grid references are verified and resolved
+fidelity preset's default. The photon dispersion model is not configurable: the
+in-medium relation always applies. Energy-grid references are verified and resolved
 for the selected profile before a material sweep is built.
 
 ## Run resolution order

@@ -85,7 +85,7 @@ one dataclass:
 
 `Settings` ({file}`src/pyrite/results/store.py` line 69) is documented as
 "analysis / detector / unit knobs shared by post-processing and plots" but owns
-`emission`, `xray_dispersion`, `n_electrons`, `n_electrons_brem`, and
+`emission`, `n_electrons`, `n_electrons_brem`, and
 `brem_source` — all of which change the simulation result, not its
 presentation.
 
@@ -94,10 +94,10 @@ The diagnostic symptom is the `build_cases` signature
 
 ```python
 def build_cases(sweep, n_electrons=450, n_electrons_brem=100,
-                coherent_emission=False, xray_dispersion="vacuum"):
+                coherent_emission=False):
 ```
 
-Four run-affecting parameters have to be re-threaded as loose keyword
+Three run-affecting parameters have to be re-threaded as loose keyword
 arguments because they live on the wrong object. Every future run-affecting
 option inherits that pattern.
 
@@ -119,9 +119,10 @@ docstring ({file}`src/pyrite/montecarlo/runner/__init__.py` line 453).
 
 The **divergence-only key rule** compounds this. A run-affecting key is
 *omitted* from the payload when it holds its historical default, so that
-previously computed digests stay valid — see the `coherent_emission` and
-`xray_dispersion` blocks in `build_cases`, and the `Settings.xray_dispersion`
-comment. The consequence is that the payload schema is a function of the
+previously computed digests stay valid — see the `coherent_emission` block in
+`build_cases`. (The `xray_dispersion` key that used to sit beside it is gone:
+the in-medium dispersion became unconditional physics, and the payload now
+hashes a constant `line_kinematics` marker instead.) The consequence is that the payload schema is a function of the
 project's commit history rather than of the physical configuration, and each
 new option adds another permanent conditional.
 
@@ -278,8 +279,7 @@ fields sweepable without new plumbing, and gives case naming a single
 mechanical rule — the axis path and its value — instead of the current
 hand-written label concatenation.
 
-`Settings` dissolves: its run-affecting fields (`emission`, `xray_dispersion`,
-`brem_source`) move to `Scene` or `Numerics` by whether they describe the
+`Settings` dissolves: its run-affecting fields (`emission`, `brem_source`) move to `Scene` or `Numerics` by whether they describe the
 physical configuration or the sampling of it; its presentation fields move to
 `Analysis`.
 

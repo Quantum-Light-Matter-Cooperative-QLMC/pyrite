@@ -346,3 +346,21 @@ No stale wording found beyond the ledger note's already-flagged "checklist
 step H" phrasing (out of scope here).
 
 Verdict `rederived`. `signed-off` remains a human decision.
+
+## Addendum 2026-08-19: the vacuum-dispersion switch was removed
+
+`xray_dispersion` no longer exists, so the guard described above as
+`xray_dispersion="refractive"` with `layers` is now simply *layers* under a
+grouped/substepped call: it fires unconditionally rather than only under an
+opt-in model. Its `coherent=True` analogue is pinned by
+`tests/montecarlo/test_xray_dispersion.py::test_coherent_through_a_layer_stack_is_refused`;
+the substepped-grouped guard remains the anchor gap flagged above.
+
+The convergence figures in this record were measured under the retired vacuum
+kinematics. The in-medium escape-path phase varies WITHIN a segment in a way the
+sinc finite-time factor does not carry, so refinement is now first-order rather
+than near-exact. Re-measured on the committed hopg 25 keV ladder
+(`none`/5e-3/1e-3/3e-4): grid L1 4.7e-2 / 1.0e-2 / 2.0e-3 / 2.1e-4 and peak
+error 13% / 9.8e-3 / 5.4e-4 / 2.7e-5. Convergence itself is unaffected --
+monotone down the ladder -- but reaching a given accuracy now needs a tighter
+`max_dE_frac` than this record's numbers imply.

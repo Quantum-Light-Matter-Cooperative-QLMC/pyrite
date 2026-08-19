@@ -63,7 +63,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "233c079a84b54fb4cb583ca30222eadf914652a36f181d0932069e836cc4e25c"
+        "06a4172f1c18e0b2da026f2e1bc91779af301902c4fe8a3f4cdfaf3235dfd937"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -194,34 +194,17 @@ def test_catalog_profile_leaves_standard_hash_bit_for_bit():
     assert "catalog_profile" not in implicit["resolved_parameters"]
 
 
-def test_vacuum_dispersion_leaves_the_hash_bit_for_bit_and_refractive_diverges():
-    """``Settings.xray_dispersion`` follows the emission divergence-only rule:
-    the "vacuum" default adds no key (so historical digests survive the new
-    field), while "refractive" gets its OWN digest -- otherwise a refractive run
-    would resume into its vacuum twin's checkpoint."""
-    settings = default_settings()
-    sweep = material_sweep("hopg")
-    vacuum = dataset_identity("hopg", "full", settings, sweep)
-    refractive = dataset_identity(
-        "hopg", "full", replace(settings, xray_dispersion="refractive"), sweep
-    )
+def test_line_kinematics_marker_is_a_constant_that_orphans_vacuum_era_digests():
+    """The in-medium dispersion is unconditional physics, so it is not a
+    divergence key any more -- but every digest minted before it became
+    mandatory described the retired vacuum kinematics. The payload therefore
+    carries a CONSTANT generation marker, hashed on every run, so those
+    checkpoints cannot be resumed into (rev-and-re-run)."""
+    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
 
-    assert "xray_dispersion" not in vacuum["resolved_parameters"]
-    assert "xray_dispersion" not in vacuum["resolved_parameters"]["settings"]
-    assert refractive["resolved_parameters"]["xray_dispersion"] == "refractive"
-    assert refractive["parameter_sha256"] != vacuum["parameter_sha256"]
-
-
-def test_xray_dispersion_value_mirrors_agree():
-    """``_XRAY_DISPERSION_VALUES`` is copied into the catalog and the profile CLI
-    because ``crystal`` cannot be imported from ``catalog`` (import cycle). Pin
-    the copies to the kernels' own list so they cannot drift apart."""
-    from pyrite.cli.commands.profile import _XRAY_DISPERSION_VALUES as cli_values
-    from pyrite.materials.catalog import _XRAY_DISPERSION_VALUES as catalog_values
-    from pyrite.materials.crystal import XRAY_DISPERSION_MODELS
-
-    assert catalog_values == XRAY_DISPERSION_MODELS
-    assert cli_values == XRAY_DISPERSION_MODELS
+    assert identity["resolved_parameters"]["line_kinematics"] == "in-medium"
+    assert "xray_dispersion" not in identity["resolved_parameters"]
+    assert "xray_dispersion" not in identity["resolved_parameters"]["settings"]
 
 
 def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
@@ -229,7 +212,7 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "233c079a84b54fb4cb583ca30222eadf914652a36f181d0932069e836cc4e25c"
+        "06a4172f1c18e0b2da026f2e1bc91779af301902c4fe8a3f4cdfaf3235dfd937"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -243,42 +226,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "5822690aeba1edf5bcea74ca53cd0504788bb6694dd9145f8af61016fd835865",
+            "a20452c45d984673e006ceaebe9c4ed8b63f0d27d35181359c976eb08ceb999b",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "c4c14c13bb588154984dc41f8563e9334a73686471cb82651ff853988f64364a",
+            "23807511da4dfcb794877a8a269e329c43bb6141dd0b41bcc510f9b92957dd05",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "5ac000d15c7ac4315508e45d74851ec359a917f6986c6934c5ca5c8dff9cdb70",
+            "53f3ecd504c5e6b4bca19f0d3d31d30e67c4992b00b8fb02b13cfbf3205d4d84",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "6a7c899190fc56618bb9e32bfb851a1567b552e0fa4990d252719055f178eaf4",
+            "253dbc30a3b967910f3875b147ad02e40eecd6911f2e85bb2d4809f9e9953fda",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "230e7c1e58aaa127ff55bad3eea403ea7523f6d2f16660731af24f15af2235fc",
+            "641849847fdadc46f0647468a8bcf83aecbc498a96347cf14691b2d3666964e3",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "08c8328a65eb3decbf53f84fca257bab9225a6d14b2b65944c5393fe020b7deb",
+            "378defa7db076c74f3602159aec571e32882941b574bf66855b0e03aa7c61a58",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "6822cad824a6e6f0147e9a5aa675e77dfd7e12c010f844d67d73a68f6ef75180",
+            "437e0daef89eb42f61b6e79dc4aa05f19bec3bce3f15c853a68c0e6df7246b0a",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "2232f2f65ad43ec50aee27cf89021b557e97bf17edc22d84a077a916551e4722",
+            "41a7792e7494348f3f311aafcb13de22b592c5cac875cbb355a0b7d062c2b24a",
         ),
     ],
 )
@@ -287,8 +270,10 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 ):
     """Every shipped profile that carried an inline ``[profiles.NAME.beam]`` block
     now carries ``beam = "NAME"`` instead. The reference resolves to values before
-    hashing, so these digests -- and therefore every existing checkpoint stem --
-    are the pre-migration ones."""
+    hashing, so the migration itself moved no digest. These pins were re-minted
+    once when the in-medium line kinematics became unconditional, which
+    deliberately orphaned every vacuum-era checkpoint stem; they must stay
+    bit-for-bit from here."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
     assert identity["parameter_sha256"] == digest
@@ -405,8 +390,7 @@ def test_emission_mode_resolves_through_profile_to_settings(emission, coherent):
 
 def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     """dataset_identity emits a distinct digest per emission mode, and the
-    incoherent digest is bit-for-bit identical to the pre-rename default (the
-    incoherent path adds no key to the hashed payload)."""
+    incoherent path still adds no key of its own to the hashed payload."""
     sweep = material_sweep("hopg")
     base = default_settings()
     incoherent = dataset_identity("hopg", "full", replace(base, emission="incoherent"), sweep)
@@ -425,16 +409,16 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     assert coherent["resolved_parameters"]["emission"] == "coherent"
     assert both["resolved_parameters"]["emission"] == "both"
 
-    # Known incoherent digest (current post-energy-grid-derivation baseline)
-    # must stay bit-for-bit -- orphaning old coherent stems but never incoherent.
+    # Known incoherent digest (current baseline, re-minted once when the
+    # in-medium line kinematics became unconditional) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "233c079a84b54fb4cb583ca30222eadf914652a36f181d0932069e836cc4e25c"
+        "06a4172f1c18e0b2da026f2e1bc91779af301902c4fe8a3f4cdfaf3235dfd937"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "a6d8116bf5f0aef9b61f0b43cc4e4e4522e6e8d51167e51450d0fc3232417a7e"
+        "44c2645d739156a813d72cc71d57a143c4f00c46806f2890129fa2eb417bd0c5"
     )
 
 

@@ -136,7 +136,6 @@ def profile_payload(document, name):
         "beam_ref": beam_ref,
         "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
         "emission": profile.get("emission"),
-        "xray_dispersion": profile.get("xray_dispersion"),
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()
@@ -396,7 +395,6 @@ def set_profile(
     materials,
     all_materials,
     emission,
-    xray_dispersion,
 ):
     """Replace supplied profile fields and return overwritten field labels."""
     target = existing_profile(document, name)
@@ -433,8 +431,6 @@ def set_profile(
         target.pop("materials", None)
     if emission is not None:
         target["emission"] = emission
-    if xray_dispersion is not None:
-        target["xray_dispersion"] = xray_dispersion
     return overwriting, detector_labels
 
 

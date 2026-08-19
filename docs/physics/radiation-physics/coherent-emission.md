@@ -57,8 +57,8 @@ $S(\mathbf g)=\sum F\exp(+i\mathbf g\cdot\mathbf R)$, whose susceptibility
 harmonic is $\chi_{\mathbf g}\exp(-i\mathbf g\cdot\mathbf r)$; this mapping was
 checked as part of the ledger re-derivation.
 
-Under `xray_dispersion="refractive"` the segment-to-segment propagation phase
-moves onto the same dispersion relation: each field picks up
+The segment-to-segment propagation phase rides the same dispersion relation:
+each field picks up
 $-\delta(E)\,\omega(E)\,L_{{\rm esc},j}$ over its in-crystal escape path — the
 real partner of the Beer–Lambert amplitude factor already applied over that same
 path. This is refused for layered absorbers, whose per-layer $\delta$ is not

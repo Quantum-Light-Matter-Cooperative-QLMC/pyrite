@@ -524,12 +524,6 @@ def _resolved_run(args, material):
     catalog_emission = CATALOG.profile_emission(catalog_profile)
     if catalog_emission is not None:
         settings = replace(settings, emission=catalog_emission)
-    # xray_dispersion is profile-owned on the same terms, and deliberately has no
-    # `cxr run` flag either: it is a physics model choice, not a per-invocation
-    # knob, and it feeds the same divergence-only dataset_identity key.
-    catalog_dispersion = CATALOG.profile_xray_dispersion(catalog_profile)
-    if catalog_dispersion is not None:
-        settings = replace(settings, xray_dispersion=catalog_dispersion)
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line
@@ -609,7 +603,6 @@ def _resolved_run(args, material):
         and not getattr(args, "quick", False)
         and catalog_profile == "standard"
         and settings.emission == "incoherent"
-        and settings.xray_dispersion == "vacuum"
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem
@@ -641,7 +634,6 @@ def _run_material(args, material, max_seconds=None):
         f"[profile={fidelity}, parameters={identity['parameter_sha256'][:12]}]"
         + (" (quick grid)" if args.quick else "")
         + ("" if settings.emission == "incoherent" else f" ({settings.emission})")
-        + ("" if settings.xray_dispersion == "vacuum" else f" ({settings.xray_dispersion})")
     )
     # read the RESOLVED orientation off the first case, not the Sweep request:
     # HOPG/h-BN hand-pin hkl_list and bypass dominant_reflections entirely, so

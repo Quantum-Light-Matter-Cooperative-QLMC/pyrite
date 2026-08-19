@@ -304,3 +304,20 @@ propagate here.
 
 Suggested ledger action: advance `xray-in-medium-resonance` from `filtered`
 to `rederived`. Human applies the ledger edit.
+
+## Addendum 2026-08-19: the vacuum-dispersion switch was removed
+
+`xray_dispersion` no longer exists; the in-medium resonance is unconditional.
+The derivation and its agreement with the implementation are unaffected, and the
+`rederived` determination stands. Two evidence changes:
+
+- The limiting case `xray_dispersion="vacuum"` -> `k = omega`, bit-for-bit, is
+  no longer a production code path. It survives at kernel level, where the CUDA
+  prologue still accepts `Re n = 1` and collapses onto the vacuum kinematics
+  exactly (`test_prologue_unit_index_reproduces_the_vacuum_kinematics`).
+- The host anchor no longer differences a refractive run against a vacuum one.
+  It solves the implicit in-medium root in closed form and asserts the spectral
+  peak lands on it to inside one grid step, then checks the displacement from
+  the vacuum root against `-delta (v.n_hat)/(1 - v.n_hat)`
+  (`test_line_sits_on_the_in_medium_resonance_not_the_vacuum_one`). That pins
+  the root itself, which the differential form did not.

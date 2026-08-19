@@ -36,7 +36,6 @@ from ..detectors import Detector
 from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
 from ..materials._transport_data import TRANSPORT_ELEMENTS
-from ..materials.crystal import XRAY_DISPERSION_MODELS
 from ..montecarlo.case import Case
 from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     BlazedGrooves,
@@ -529,7 +528,6 @@ def build_cases(
     n_electrons=450,
     n_electrons_brem=100,
     coherent_emission=False,
-    xray_dispersion="vacuum",
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -547,16 +545,7 @@ def build_cases(
     ``n_electrons_brem`` sweep grids (catalog profile settings) cross
     electron-count statistics into the product and suffix the case name with
     ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
-    ``xray_dispersion`` selects the photon dispersion relation of the line
-    kinematics ("vacuum" or "refractive", see
-    :func:`montecarlo.spectrum.mc_spectrum`); it is a divergence-only key, so
-    the default leaves the case payload bit-for-bit.
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
-    if xray_dispersion not in XRAY_DISPERSION_MODELS:
-        raise ValueError(
-            f"build_cases: xray_dispersion must be one of {XRAY_DISPERSION_MODELS}, "
-            f"got {xray_dispersion!r}."
-        )
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     target = sweep.target
     cp = crystal_params(target.material, sweep.n_families)
@@ -759,13 +748,6 @@ def build_cases(
                         # coherent segment sum: divergence-only key (absent -> the
                         # incoherent default, bit-for-bit case payload).
                         **({"coherent_emission": True} if coherent_emission else {}),
-                        # in-medium line kinematics: divergence-only key too
-                        # ("vacuum" -> absent -> the bit-for-bit default).
-                        **(
-                            {"xray_dispersion": xray_dispersion}
-                            if xray_dispersion != "vacuum"
-                            else {}
-                        ),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

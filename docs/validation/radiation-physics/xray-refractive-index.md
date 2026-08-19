@@ -280,3 +280,11 @@ between exact and linearized forms was found in the code paths this claim
 covers.
 
 Suggested ledger disposition: `rederived`.
+
+## Addendum 2026-08-19: the vacuum-dispersion switch was removed
+
+`xray_dispersion` no longer exists, so the code path named above as
+`xray_dispersion="refractive"` is simply *the* line-kinematics and coherent
+propagation path. Nothing in this claim changes: `refractive_index` and its
+exact square root are untouched, and the consumers named here are the same ones,
+now reached unconditionally.

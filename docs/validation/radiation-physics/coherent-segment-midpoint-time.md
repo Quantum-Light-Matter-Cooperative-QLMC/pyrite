@@ -97,3 +97,23 @@ The $L\to0$ and single-segment self-term limits also pass.
 
 Status: **rederived**. The independent derivation found no factor, sign, unit,
 or convention discrepancy. Human `signed-off` remains pending.
+
+## Addendum 2026-08-19: subdivision invariance is now first-order
+
+The one-flight-versus-two-halves identity checked in this record is exact only
+for the vacuum phase, whose linear variation along a segment is precisely what
+the sinc finite-time factor sums. Since the in-medium dispersion became
+unconditional (`xray_dispersion` removed), each segment also carries
+`-delta(E) omega(E) L_esc,j`, whose within-segment variation the sinc does not
+carry, so splitting a flight moves the coherent result at first order in
+`delta omega dL_esc`.
+
+Measured on the anchor's geometry (hopg 002, 30 keV, near-grazing exit, so
+`L_esc` is ~100x the depth step): 7.8e-6 of peak at a 40 Ang flight, falling to
+4.0e-6 / 2.9e-6 / 1.1e-6 at 20 / 10 / 5 Ang. That is a discretization artifact
+that shrinks with the segment length, not a modelling error, and the anchor now
+gates both the bound and the shrinkage. The independent centered-segment
+integral in the same test carries no in-medium leg and still matches to 1e-11
+rel, so the midpoint pairing this record derives is still pinned exactly.
+
+Re-validation of this row against the unconditional model is warranted.

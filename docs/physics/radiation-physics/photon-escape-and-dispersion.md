@@ -72,10 +72,9 @@ periodic.
 
 ## In-medium dispersion
 
-`xray_dispersion` selects the photon dispersion relation used by the line
-kinematics. The default `"vacuum"` keeps $k=\omega$ everywhere.
-
-`"refractive"` uses the bulk crystal dielectric response. The $g=0$ susceptibility
+The line kinematics always run on the bulk crystal dielectric response; there
+is no vacuum-dispersion setting, and $k=\omega$ is recovered only in the
+physical $\chi_0\to0$ (high-energy) limit. The $g=0$ susceptibility
 
 $$
 \chi_0(E)=-\frac{r_e\lambda^2}{\pi V_{\rm cell}}\sum_i\bigl[(Z_i+f'_i)+if''_i\bigr]

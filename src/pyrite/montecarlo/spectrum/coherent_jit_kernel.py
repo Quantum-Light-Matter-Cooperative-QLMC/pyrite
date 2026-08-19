@@ -469,7 +469,7 @@ def run_coherent_reduction_kernel(
     ``(t_abs - n_hat.r) / HBARC_EV_ANG`` so the per-cell phase is
     ``phase_slope[j] * E_grid[k] - g_phase[j]``.
 
-    Under ``xray_dispersion="refractive"`` the caller also supplies the
+    Under the in-medium dispersion the caller also supplies the
     per-line escape distance ``L_esc`` (Angstrom) and the per-energy table
     ``delta_omega[k] = (1 - Re n(E_k)) * omega(E_k)``, which add the in-medium
     term ``- L_esc[j] * delta_omega[k]`` to that phase. This is a second

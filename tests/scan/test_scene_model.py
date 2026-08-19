@@ -120,7 +120,6 @@ def test_legacy_bridge_preserves_expanded_cases_exactly() -> None:
         settings.n_electrons,
         settings.n_electrons_brem,
         coherent_emission=settings.coherent_emission,
-        xray_dispersion=settings.xray_dispersion,
     )
     assert _case_bytes(build_sweep_cases(converted)) == _case_bytes(expected)
 
@@ -138,6 +137,5 @@ def test_every_catalog_profile_round_trips_a_resolved_case_list() -> None:
             settings.n_electrons,
             settings.n_electrons_brem,
             coherent_emission=settings.coherent_emission,
-            xray_dispersion=settings.xray_dispersion,
         )
         assert _case_bytes(build_sweep_cases(converted)) == _case_bytes(expected), profile

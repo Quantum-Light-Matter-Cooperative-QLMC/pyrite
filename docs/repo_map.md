@@ -441,9 +441,9 @@ derived `coherent_emission`) is the preset-owned emission policy;
 distinct digests (incoherent unchanged, bit-for-bit). Detector response and
 nested energy bins project back to the historical payload vocabulary, so
 read-time scoring does not perturb transport/checkpoint identity.
-`Settings.xray_dispersion`
-(`vacuum`/`refractive`) gets the same divergence key, so an in-medium run never
-resumes into its vacuum twin's checkpoint.
+The in-medium photon dispersion is unconditional (no setting, no divergence
+key); the payload instead hashes a constant `line_kinematics` generation marker,
+which orphaned every vacuum-era digest exactly once.
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
   `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.

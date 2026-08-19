@@ -303,3 +303,29 @@ statement about the CUDA streaming route falling back for `refractive` is
 now outdated as of commit `4d40255`; recommend updating that sentence when
 the row is edited (see Suggested ledger change below). This does not affect
 the `rederived` determination, which concerns the phase formula itself.
+
+
+## Addendum 2026-08-19: the vacuum-dispersion switch was removed
+
+`xray_dispersion` no longer exists. The in-medium relation is unconditional, so
+every statement above about the `"vacuum"` model as a *selectable* code path is
+historical. What the removal changed, and what it did not:
+
+- **Unchanged:** the phase formula itself, its derivation, and its agreement
+  with the implementation. The `rederived` determination stands.
+- **Retired evidence:** the limiting-case check "`xray_dispersion="vacuum"`
+  leaves the phase expressions untouched and is bit-for-bit" is no longer
+  expressible in production code. The kernel-level version survives — the JIT
+  reduction and stream-field kernels keep their optional `(L_esc, delta_omega)`
+  pair, and the CUDA-gated tests still pin that omitting it, or feeding
+  `Re n = 1`, reproduces the vacuum arithmetic exactly.
+- **Replacement evidence:** the host anchors no longer difference two runs. They
+  compare the measured two-segment interference term against a CLOSED FORM built
+  from the same source equations (`test_interference_phase_matches_the_in_medium_closed_form`),
+  which pins the absolute phase over four depth separations rather than an
+  increment between two code paths.
+- **New consequence:** because the in-medium leg varies WITHIN a segment in a
+  way the sinc finite-time factor does not carry, coherent subdivision
+  invariance became first-order rather than exact. See the addendum on
+  `coherent-segment-midpoint-time` and the re-measured convergence figures on
+  `substep-radiation-invariance`.

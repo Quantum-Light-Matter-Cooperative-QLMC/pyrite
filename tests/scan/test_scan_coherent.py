@@ -127,26 +127,6 @@ def test_catalog_profile_emission_key_reaches_resolved_settings(monkeypatch):
     assert stem.startswith("hopg@full-")
 
 
-def test_catalog_profile_xray_dispersion_key_reaches_resolved_settings(monkeypatch):
-    """End-to-end wiring check for ``CATALOG.profile_xray_dispersion`` (set via
-    ``cxr profile set --xray-dispersion``). Mirrors the emission wiring check
-    above: the profile key overrides the fidelity preset and reaches both
-    ``Settings.xray_dispersion`` and the dataset-identity divergence key."""
-    catalog = materials.CATALOG
-    refractive_catalog = replace(
-        catalog,
-        profile_xray_dispersions={**catalog.profile_xray_dispersions, "standard": "refractive"},
-    )
-    monkeypatch.setattr(materials, "CATALOG", refractive_catalog)
-
-    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
-
-    assert settings.xray_dispersion == "refractive"
-    assert identity["resolved_parameters"].get("xray_dispersion") == "refractive"
-    assert stem != "hopg"
-    assert stem.startswith("hopg@full-")
-
-
 def test_quick_run_is_incoherent_quick_stem(monkeypatch):
     # --quick resolves to the digest-free <material>_quick stem; emission stays
     # the profile default (incoherent). No coherent-quick collision to reject now

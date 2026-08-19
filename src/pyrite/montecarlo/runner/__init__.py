@@ -825,9 +825,8 @@ def _lines_for_segments(
     dual-spectra runner passes both flags in turn over the SAME ``segs`` so one
     transport yields both the incoherent ``spec`` and the ``spec_coherent``.
 
-    ``case["xray_dispersion"]`` selects the photon dispersion relation of the
-    line kinematics (absent -> ``"vacuum"``, bit-for-bit); ``"refractive"``
-    uses the crystal's bulk in-medium ``k = Re n(omega) omega``."""
+    Line kinematics always run on the crystal's bulk in-medium dispersion
+    ``k = Re n(omega) omega``; there is no vacuum switch."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
@@ -841,7 +840,6 @@ def _lines_for_segments(
         coherent = bool(case.get("coherent_emission", False))
     else:
         coherent = bool(coherent)
-    xray_dispersion = case.get("xray_dispersion", "vacuum")
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -860,7 +858,6 @@ def _lines_for_segments(
             layers=abs_layers,
             groove=groove,
             coherent=coherent,
-            xray_dispersion=xray_dispersion,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
@@ -890,7 +887,6 @@ def _lines_for_segments(
             chunk=spec_chunk,
             layers=abs_layers,
             coherent=coherent,
-            xray_dispersion=xray_dispersion,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,

@@ -382,18 +382,19 @@ def _identity_v1(
     settings_payload = resolved["settings"]
     if isinstance(settings_payload, Mapping):
         emission = str(settings_payload.pop("emission", "incoherent"))
-        dispersion = str(settings_payload.pop("xray_dispersion", "vacuum"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
-        dispersion = str(getattr(settings, "xray_dispersion", "vacuum"))
     if emission != "incoherent":
         resolved["emission"] = emission
-    # xray_dispersion (run-affecting) follows the same divergence-only rule, for
-    # the same reason: hashing it unconditionally would perturb every existing
-    # digest, while dropping it would let a refractive run resume into its
-    # vacuum twin's checkpoint.
-    if dispersion != "vacuum":
-        resolved["xray_dispersion"] = dispersion
+    # The in-medium photon dispersion is unconditional physics now, not an opt-in
+    # model, so it no longer earns a divergence-only key. Every digest minted
+    # before that change was computed under the retired vacuum k = omega
+    # kinematics, though, so the payload carries a permanent line-kinematics
+    # generation marker. It is a CONSTANT, not a selector: it perturbs every
+    # digest exactly once, orphaning the vacuum-era checkpoints (rev-and-re-run,
+    # matching how the emission rename was handled) instead of letting them
+    # resume into a run that computes different numbers.
+    resolved["line_kinematics"] = "in-medium"
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,

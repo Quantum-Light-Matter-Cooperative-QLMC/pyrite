@@ -28,7 +28,7 @@ CXR_KWARGS = {
 # the line peak.
 CXR_GRID_EV = np.arange(880.0, 1070.0, 0.5)
 BREM_GRID_EV = np.linspace(200.0, 20000.0, 400)
-REFINEMENT_LADDER = (0.0, 5e-3, 1e-3)
+REFINEMENT_LADDER = (0.0, 5e-3, 1e-3, 3e-4)
 FINEST_FRAC = 2e-4
 MAX_SUBSTEPS = 256
 
@@ -154,12 +154,16 @@ def test_incoherent_cxr_converges_under_substep_refinement():
         errors.append(_grid_l1(refined, ref_spec))
         peak_errors.append(abs(refined.max() / ref_spec.max() - 1.0))
 
-    # Measured grid L1 3.5e-2 / 1.7e-3 / 3.4e-5 and peak error 13% / 1.2e-3 /
-    # 2e-5 down the ladder.
-    assert errors[2] < errors[1] < errors[0]
-    assert errors[2] < 1e-4
-    assert peak_errors[2] < peak_errors[1] < peak_errors[0]
-    assert peak_errors[2] < 1e-3
+    # Measured grid L1 4.7e-2 / 1.0e-2 / 2.0e-3 / 2.1e-4 and peak error
+    # 13% / 9.8e-3 / 5.4e-4 / 2.7e-5 down the ladder. The mandatory in-medium
+    # escape-path phase varies WITHIN a segment in a way the sinc finite-time
+    # factor does not carry, so refinement is now first-order rather than
+    # near-exact: reaching a given accuracy takes a tighter max_dE_frac than the
+    # retired vacuum kinematics needed. Convergence itself is unaffected.
+    assert errors[3] < errors[2] < errors[1] < errors[0]
+    assert errors[3] < 1e-3
+    assert peak_errors[3] < peak_errors[2] < peak_errors[1] < peak_errors[0]
+    assert peak_errors[3] < 1e-4
 
 
 def test_treating_substeps_as_independent_emitters_destroys_the_line():

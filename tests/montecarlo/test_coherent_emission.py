@@ -61,10 +61,9 @@ def _segments(count=1):
     }
 
 
-def _straight_flight_segments(*, split: bool, reference: bool = False):
+def _straight_flight_segments(*, split: bool, reference: bool = False, length: float = 40.0):
     """One constant-velocity flight, optionally split and paired with a reference."""
     beta = float(beta_from_Ee(30e3))
-    length = 40.0
     starts = np.array([0.0, 0.5 * length]) if split else np.array([0.0])
     lengths = np.full(starts.size, length / starts.size)
     elec_id = np.zeros(starts.size, dtype=int)
@@ -132,40 +131,60 @@ def test_identical_in_phase_electrons_reach_n_squared_limit():
     np.testing.assert_allclose(pair, 2.0 * single, rtol=RTOL)
 
 
+# Subdivision invariance is EXACT only for the vacuum phase, whose linear
+# variation along a segment is exactly what the sinc finite-time factor sums.
+# The mandatory in-medium leg adds ``-delta(E) omega(E) L_esc,j``, whose
+# within-segment variation the sinc does not carry, so splitting a flight now
+# moves the coherent result at first order in ``delta * omega * dL_esc``.
+# Measured on this geometry (hopg 002, 30 keV, near-grazing exit so L_esc is
+# ~100x the depth step): 7.8e-6 of peak at the full 40 Ang flight, falling to
+# 4.0e-6 / 2.9e-6 / 1.1e-6 as the flight is shortened to 20 / 10 / 5 Ang. The
+# gate therefore checks the residual is bounded AND shrinks with the segment
+# length, which is what "discretization artifact, not a modelling error" means.
+SPLIT_RESIDUAL_TOL = 2e-5
+
+
+def _split_residual(length, sinc_cutoff):
+    energy_grid = np.arange(1050.0, 1400.0, 0.5)
+    spectra = [
+        mc_spectrum(
+            _straight_flight_segments(split=split, reference=True, length=length),
+            energy_grid,
+            coherent=True,
+            sinc_cutoff=sinc_cutoff,
+            **KWARGS,
+        )
+        for split in (False, True)
+    ]
+    peak = float(max(np.max(np.abs(s)) for s in spectra))
+    assert peak > 0.0
+    return float(np.max(np.abs(spectra[1] - spectra[0]))) / peak
+
+
 @pytest.mark.parametrize("sinc_cutoff", [None, 1.0e6])
 def test_straight_flight_is_invariant_to_two_half_segments(sinc_cutoff):
     """Validation: coherent-segment-midpoint-time.
 
     A constant-velocity segment integral is independent of numerical
     subdivision when each stored midpoint position is paired with midpoint
-    transport age.  ``None`` selects the batched route; a very large finite
-    cutoff selects the per-reflection route without removing this grid's tails.
+    transport age -- exactly for the vacuum phase, and to first order in the
+    in-medium escape-path phase.  ``None`` selects the batched route; a very
+    large finite cutoff selects the per-reflection route without removing this
+    grid's tails.
     """
     single = _straight_flight_segments(split=False)
     halves = _straight_flight_segments(split=True)
     energy_grid = np.arange(1050.0, 1400.0, 0.5)
 
+    # The independent centered-segment integral carries no in-medium leg, so it
+    # keeps the exact identity and still pins the midpoint pairing itself.
     single_field = _constant_velocity_field(single, energy_grid)
     halves_field = _constant_velocity_field(halves, energy_grid)
     np.testing.assert_allclose(halves_field, single_field, rtol=1e-11, atol=1e-12)
 
-    single_with_reference = _straight_flight_segments(split=False, reference=True)
-    halves_with_reference = _straight_flight_segments(split=True, reference=True)
-    single_spectrum = mc_spectrum(
-        single_with_reference,
-        energy_grid,
-        coherent=True,
-        sinc_cutoff=sinc_cutoff,
-        **KWARGS,
-    )
-    halves_spectrum = mc_spectrum(
-        halves_with_reference,
-        energy_grid,
-        coherent=True,
-        sinc_cutoff=sinc_cutoff,
-        **KWARGS,
-    )
-    _assert_batch_close(halves_spectrum, single_spectrum)
+    residuals = [_split_residual(length, sinc_cutoff) for length in (40.0, 20.0, 10.0, 5.0)]
+    assert max(residuals) < SPLIT_RESIDUAL_TOL
+    assert residuals[-1] < 0.5 * residuals[0]  # shrinks with the segment length
 
 
 @pytest.mark.parametrize("sinc_cutoff", [None, 4.0])

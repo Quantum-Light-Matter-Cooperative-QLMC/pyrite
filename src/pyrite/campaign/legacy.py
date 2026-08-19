@@ -81,7 +81,6 @@ def sweep_from_legacy(old_sweep: Any, settings: Any) -> Sweep:
         target=target,
         detector=old_sweep.detector,
         emission=getattr(settings, "emission", "incoherent"),
-        xray_dispersion=getattr(settings, "xray_dispersion", "vacuum"),
         brem_source=getattr(settings, "brem_source", "mc"),
     )
     return Sweep(base=scene, axes=axes)

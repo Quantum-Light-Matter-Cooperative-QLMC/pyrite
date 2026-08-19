@@ -28,9 +28,9 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Code:** `montecarlo/spectrum/lines.py::mc_spectrum` (`coherent=True`)
 - **Source:** centered constant-amplitude finite-time integral; Feranchuk–Spence 2000 Eqs. (8), (10), (12)--(14) as derived under `coherent-emission`
 - **Status:** rederived
-- **Checks:** units; `L→0`; single-segment self-term; one straight flight versus two contiguous halves, including interference with a fixed reference emitter
+- **Checks:** units; `L→0`; single-segment self-term; one straight flight versus two contiguous halves, including interference with a fixed reference emitter — the independent centered-segment integral still matches to 1e-11 rel, while the full kernel now agrees to first order in the in-medium leg (see Notes)
 - **Anchor:** `tests/montecarlo/test_coherent_emission.py::test_straight_flight_is_invariant_to_two_half_segments`
-- **Notes:** Fresh-context derivation matches with no factor, sign, unit, or convention discrepancy; the deterministic subdivision anchor is green for both coherent routes. Human sign-off remains pending. [derivation record](radiation-physics/coherent-segment-midpoint-time.md)
+- **Notes:** Fresh-context derivation matches with no factor, sign, unit, or convention discrepancy. SUBDIVISION INVARIANCE IS NO LONGER EXACT: it was an exact algebraic identity only for the vacuum phase, whose linear variation along a segment is precisely what the sinc finite-time factor sums. Since the in-medium dispersion became unconditional (`xray-in-medium-propagation-phase`), each segment also carries `−δ(E) ω(E) L_esc,j`, whose within-segment variation the sinc does not carry, so splitting a flight moves the coherent result at first order in `δ ω ΔL_esc`. Measured on the anchor's geometry (hopg 002, 30 keV, near-grazing exit): 7.8e-6 of peak at a 40 Å flight, falling to 4.0e-6 / 2.9e-6 / 1.1e-6 at 20 / 10 / 5 Å — i.e. a discretization artifact that shrinks with the segment length, not a modelling error. The anchor now gates both the bound and that shrinkage. Re-validation of this row against the unconditional model is warranted. Human sign-off remains pending. [derivation record](radiation-physics/coherent-segment-midpoint-time.md)
 
 ## `cross-reflection-coherence`
 

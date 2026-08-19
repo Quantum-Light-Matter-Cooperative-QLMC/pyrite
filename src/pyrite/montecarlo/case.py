@@ -62,7 +62,6 @@ _CASE_KEY_ORDER = (
     "tilt_azim_deg",
     "groove_spacing_ang",
     "coherent_emission",
-    "xray_dispersion",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -147,7 +146,6 @@ class Case(Mapping[str, Any]):
     transverse_distribution: dict[str, object] | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
-    xray_dispersion: Literal["refractive"] | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -191,8 +189,6 @@ class Case(Mapping[str, Any]):
                 _positive_int(name, value)
         if self.coherent_emission is not _ABSENT and self.coherent_emission is not True:
             raise ValueError("coherent_emission must be absent or True")
-        if self.xray_dispersion is not _ABSENT and self.xray_dispersion != "refractive":
-            raise ValueError("xray_dispersion must be absent or 'refractive'")
 
     def to_dict(self) -> dict[str, Any]:
         """Return the exact legacy mapping shape and insertion order."""
