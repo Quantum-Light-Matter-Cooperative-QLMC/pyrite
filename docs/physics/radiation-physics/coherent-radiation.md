@@ -121,7 +121,11 @@ non-dispersive $f_0(\mathbf g)$ belongs in it. For edge-prone constituents the
 implementation uses $Z_j-(f_0+f')$, which makes $U_{\mathbf g}$ weakly
 photon-energy dependent near an edge; away from edges it is energy-independent
 as expected. This is a recorded, bounded inconsistency, not a factor error.
-Atomic inputs and their provenance are documented in
+The per-atom factors $f_j$ are defined in
+[Atomic form factors](../atomic-physics/atomic-form-factors.md), the cell sum
+$S_{\mathbf g}$ in
+[Structure factor and Debye--Waller](../materials/structure-factor.md), and the
+data provenance in
 [Atomic data sources](../atomic-physics/atomic-data-sources.md).
 
 Both couplings, the attenuation coefficient, and the refractive index are

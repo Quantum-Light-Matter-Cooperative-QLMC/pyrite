@@ -75,7 +75,7 @@ compound.
 $J$ comes from the PDG *Atomic and Nuclear Properties* elemental tables, which
 follow the ICRU stopping-power compilation, alongside CIAAW 2024 standard atomic
 weights for $A$ (`materials/_transport_data.py`); see
-[Atomic data sources](../atomic-physics/atomic-data-sources.md).
+[Elemental transport data](../atomic-physics/elemental-transport-data.md).
 
 This is **not** the source Joy and Luo fitted $k$ against, which used
 Berger–Seltzer values. The two disagree for light elements: carbon is 78 eV here

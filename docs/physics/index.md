@@ -8,6 +8,8 @@ These pages describe **how the simulated physical system is represented**. For e
 :maxdepth: 1
 :caption: Atomic physics
 
+atomic-physics/atomic-form-factors
+atomic-physics/elemental-transport-data
 atomic-physics/atomic-data-sources
 ```
 
@@ -54,6 +56,10 @@ detectors/detector-response
 :maxdepth: 1
 :caption: Materials and crystallography
 
+materials/crystal-structure
+materials/structure-factor
+materials/reflection-selection
+materials/material-composition
 materials/crystal-mosaicity
 materials/multilayer-materials
 ```
@@ -67,8 +73,8 @@ For example:
 * **Beam and electron transport** covers the specification of the incident beam, its per-electron sampling, and the elastic-scattering and stopping models that propagate it through matter.
 * **Radiation physics** covers the mechanisms by which radiation is produced and propagated.
 * **Geometry and orientation** defines crystal, sample, and multilayer geometry, and the boundaries that constrain transport.
-* **Atomic physics** documents the atomic quantities and external data on which higher-level models depend.
-* **Materials and crystallography** documents material definitions and crystallographic data.
+* **Atomic physics** documents the per-element quantities and external data on which higher-level models depend: the complex atomic form factor that every X-ray coupling is built from, and the transport constants used for stopping and bremsstrahlung.
+* **Materials and crystallography** documents how a material is represented — lattice, basis, structure factor, reflection choice, composition — and the departures from an ideal single crystal: mosaicity and layered stacks.
 * **Detectors and optics** covers the physical models used after radiation leaves the source.
 
 Validation documents are intentionally kept separate from these reference pages so that the current model description does not become mixed with the historical record of how the model was checked.

@@ -1,5 +1,12 @@
 # Atomic data: hard-coded tables vs. an external library
 
+> This page is a **provenance and decision record**: which external dataset
+> supplies the atomic numbers is answered here. For the model those numbers feed
+> — the definition of $F(g,E)$, its conventions, its domain, and its limits —
+> see [Atomic form factors](atomic-form-factors.md). For the separate
+> electron-transport constants, see
+> [Elemental transport data](elemental-transport-data.md).
+
 Evaluation of whether to replace the project's hand-maintained atomic scattering data with
 an external library, and which one. **Conclusion: `xraydb` is the best fit, and it was
 ADOPTED on 2026-06-23** — `src/pyrite/materials/atomic.py` now sources f0/f′/f″/Z from xraydb
