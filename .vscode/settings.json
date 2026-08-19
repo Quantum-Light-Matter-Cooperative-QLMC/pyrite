@@ -4,5 +4,13 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "myst.preview.enable": true,
+    "myst.preview.extensions": [
+        "amsmath",
+        "colon_fence",
+        "deflist",
+        "dollarmath",
+        "tasklist"
+    ]
 }

@@ -65,7 +65,27 @@ napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 
 # -- MyST --------------------------------------------------------------------
-myst_enable_extensions = ["dollarmath", "amsmath", "deflist", "colon_fence"]
+
+
+myst_enable_extensions = [
+    "alert",
+    "amsmath",
+    "attrs_inline",
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "fieldlist",
+    "gfm_autolink",
+    "html_admonition",
+    "html_image",
+    "linkify",
+    "replacements",
+    "smartquotes",
+    "strikethrough",
+    "substitution",
+    "tasklist",
+]
+
 myst_heading_anchors = 3
 myst_ref_domains = ["std"]
 
