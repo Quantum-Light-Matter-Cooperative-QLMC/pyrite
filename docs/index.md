@@ -15,6 +15,7 @@ remains the canonical scientific overview and installation reference.
 
 guides/index
 physics/index
+computation/index
 validation/index
 research/index
 repo-design/index

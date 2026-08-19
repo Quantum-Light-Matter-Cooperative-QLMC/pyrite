@@ -13,10 +13,14 @@ atomic-physics/atomic-data-sources
 
 ```{toctree}
 :maxdepth: 1
-:caption: Electron transport
+:caption: Beam and electron transport
 
 beam-transport/beam-phase-space
+beam-transport/longitudinal-structure
 beam-transport/electron-transport
+beam-transport/elastic-scattering
+beam-transport/stopping-power
+beam-transport/transport-outputs
 ```
 
 ```{toctree}
@@ -35,6 +39,7 @@ radiation-physics/spectral-observables
 :caption: Geometry and orientation
 
 geometry/tilt-convention
+geometry/transport-geometry
 ```
 
 ```{toctree}
@@ -59,9 +64,9 @@ If you are trying to understand **what physical model Pyrite uses**, start here.
 
 For example:
 
-* **Electron transport** covers the representation and propagation of the incident electron beam.
+* **Beam and electron transport** covers the specification of the incident beam, its per-electron sampling, and the elastic-scattering and stopping models that propagate it through matter.
 * **Radiation physics** covers the mechanisms by which radiation is produced and propagated.
-* **Geometry and orientation** defines crystal, sample, and multilayer geometry.
+* **Geometry and orientation** defines crystal, sample, and multilayer geometry, and the boundaries that constrain transport.
 * **Atomic physics** documents the atomic quantities and external data on which higher-level models depend.
 * **Materials and crystallography** documents material definitions and crystallographic data.
 * **Detectors and optics** covers the physical models used after radiation leaves the source.

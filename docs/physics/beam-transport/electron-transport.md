@@ -5,6 +5,16 @@ layered matter as piecewise-linear segments. Each segment records position,
 direction, kinetic energy, path length, material, and elapsed flight time for
 the radiation kernels.
 
+This page is the section overview: it states the transport loop and the
+propagation rules that control it. The models it calls are documented separately
+in [Elastic scattering](elastic-scattering.md) and
+[Stopping power and the energy cutoff](stopping-power.md), the beam it starts
+from in [Beam phase space](beam-phase-space.md) and
+[Longitudinal bunch structure](longitudinal-structure.md), the boundaries that
+confine it in
+[Transport geometry and boundaries](../geometry/transport-geometry.md), and what
+it hands downstream in [Transport outputs](transport-outputs.md).
+
 ## Model
 
 At each material step the transport samples an elastic free path, advances the
@@ -72,14 +82,20 @@ The selected beam supplies kinetic-energy spread, entrance position,
 direction, and optional bunch timing. These inputs are sampled on independent
 random streams so enabling an otherwise inert distribution does not perturb
 transport draws. Coordinate and phase-space conventions are documented in
-[Beam phase space](beam-phase-space.md).
+[Beam phase space](beam-phase-space.md), and arrival-time structure in
+[Longitudinal bunch structure](longitudinal-structure.md).
 
 Finite transverse dimensions, surface tilt, multilayer interfaces, and optional
 blazed-groove facets constrain crossings. The flat, single-material slab is the
-compatibility limit. See [Multilayer materials](../materials/multilayer-materials.md)
-and [Tilt convention](../geometry/tilt-convention.md).
+compatibility limit. See
+[Transport geometry and boundaries](../geometry/transport-geometry.md),
+[Multilayer materials](../materials/multilayer-materials.md), and
+[Tilt convention](../geometry/tilt-convention.md).
 
 ## Outputs and coupling
+
+The full returned schema and its normalization semantics are documented in
+[Transport outputs](transport-outputs.md).
 
 Segments are Monte Carlo histories, not detector events. The line and
 bremsstrahlung kernels consume them separately. Default spectra add segment and
