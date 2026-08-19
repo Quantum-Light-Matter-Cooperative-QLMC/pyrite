@@ -9,39 +9,42 @@ line and continuum can be added directly.
 
 ## Cross section
 
-For element atomic number $Z$, electron kinetic energy $T$, and photon
-energy $k$, the implemented energy-differential form is
+For element atomic number {math}`Z`, electron kinetic energy {math}`T`, and photon
+energy {math}`k`, the implemented energy-differential form is
 
-$$
+```{math}
 \frac{d\sigma}{dk} = \frac{16}{3}\alpha r_e^2 Z^2
 \frac{1}{k p_i^2} \ln \! \left( \frac{p_i+p_f}{p_i-p_f} \right)f_E,
 \qquad 0<k<T,
-$$
+
+```
 
 with relativistic momenta used as a weakly relativistic extension and
 
-$$
+```{math}
 f_E = \frac{\beta_i}{\beta_f} \frac{1-e^{-2\pi\alpha Z/\beta_i}} {1-e^{-2\pi\alpha Z/\beta_f}}
-$$
 
-Momenta are carried in units of $m_ec$, built from the exact relativistic
-relation $p=\sqrt{T(T+2m_ec^2)}/m_ec$ and $\beta=p/(1+T/m_ec^2)$, with
-$T_f=T_i-k$. The Born form itself is the nonrelativistic dipole result (cf. Koch
+```
+
+Momenta are carried in units of {math}`m_ec`, built from the exact relativistic
+relation {math}`p=\sqrt{T(T+2m_ec^2)}/m_ec` and {math}`\beta=p/(1+T/m_ec^2)`, with
+ {math}`T_f=T_i-k`. The Born form itself is the nonrelativistic dipole result (cf. Koch
 & Motz, *Rev. Mod. Phys.* **31**, 920 (1959)); using relativistic momenta inside
 it is a weakly relativistic extension, not a relativistic derivation. The
-combination is adequate for $Z\lesssim30$ and $T\lesssim100$ keV; Seltzer--Berger
+combination is adequate for {math}`Z\lesssim30` and {math}`T\lesssim100` keV; Seltzer--Berger
 tables would be the accuracy upgrade.
 
 ## Per-segment yield
 
-Emission is taken **isotropic**. For a segment of length $L$ traversed in an
-element of number density $n_Z$, the contribution to the observed spectrum is
+Emission is taken **isotropic**. For a segment of length {math}`L` traversed in an
+element of number density {math}`n_Z`, the contribution to the observed spectrum is
 
-$$
+```{math}
 \frac{d^2N}{dE\,d\Omega}=\frac{1}{4\pi}\,n_Z\,L\,\frac{d\sigma}{dk}\,T_{\rm abs},
-$$
 
-with $T_{\rm abs}$ the Beer--Lambert escape transmission from the segment
+```
+
+with {math}`T_{\rm abs}` the Beer--Lambert escape transmission from the segment
 midpoint along the observation direction. Contributions are summed over segments
 and electrons and divided by the electron count, so the returned quantity is
 **photons per eV per steradian per incident electron** — the same units as the
@@ -54,7 +57,7 @@ of the continuum — which is what forms the CBS lines — is **not** subtracted
 here, so adding the line and continuum spectra slightly double counts that
 fraction.
 
-Compound targets add element contributions with their own $Z^2$ weighting at
+Compound targets add element contributions with their own {math}`Z^2` weighting at
 their own number densities, while the self-absorption uses the summed
 attenuation of the whole composition. In a layered stack each layer's segments
 radiate with that layer's composition and every photon is attenuated across the
@@ -65,7 +68,7 @@ whole stack.
 The escape path reuses the line kernel's geometry: a flat slab uses the z-only
 distance to the exit face, a finite rectangular footprint takes the nearest of
 the prism's six faces along the fixed observation direction, a layered absorber
-sums $\mu_i\,\Delta z_i$ across the stack, and a blazed groove replaces the
+sums {math}`\mu_i\,\Delta z_i` across the stack, and a blazed groove replaces the
 distance with the exact periodic working-facet path. Grooved escape is
 single-slab only and requires the exact working-facet normal; other combinations
 raise rather than silently using flat attenuation. Details and limits are in
@@ -77,7 +80,7 @@ do not radiate.
 ## Energy range and cutoffs
 
 - `k <= 0` and `k >= T` are hard-zero bins.
-- The infrared spectrum rises approximately as $\ln(4T/k)/k$ and therefore
+- The infrared spectrum rises approximately as {math}`\ln(4T/k)/k` and therefore
   depends on the configured low-energy bound; the integrated background is not a
   cutoff-independent number.
 - Born alone vanishes at the tip, while Born times Elwert approaches a finite
@@ -88,12 +91,12 @@ do not radiate.
   each kernel re-applies the stopping rule to a population-specific energy floor.
   Rows starting below the floor are dropped; a terminal flight that crosses it is
   shortened — start time and energy unchanged, length and midpoint truncated —
-  with the truncation distance solving $E_{\rm end}=E_{\rm cut}$ under the
+  with the truncation distance solving {math}`E_{\rm end}=E_{\rm cut}` under the
   midpoint rule, so the shortened flight's state is reconstructed rather than
   lost. A higher-cutoff consumer therefore cannot recover radiation from the
   lower-cutoff tail.
 - The Henke/Chantler attenuation tables span roughly 20 eV--30 keV. Outside that
-  range $\mu$ is unavailable, and the wide background grid treats it as **zero**
+  range {math}`\mu` is unavailable, and the wide background grid treats it as **zero**
   (fully transparent) rather than propagating NaN through the integrated count
   rate. Hard X-rays do escape essentially unattenuated, but the softest bins
   below the table floor are also silently unattenuated — read the extremes of a
@@ -125,7 +128,7 @@ The intensity must already be in the detected units of the plot it joins.
 
 - emission is isotropic, appropriate only to the intended weakly relativistic
   regime, and carries no polarization;
-- the unscreened Born form is approximate, especially for high $Z$ or outside
+- the unscreened Born form is approximate, especially for high {math}`Z` or outside
   the tens-of-keV regime — atomic screening is absent, so the soft end is
   overestimated where screening matters;
 - the Elwert factor is a low-energy Coulomb correction and is not a substitute
