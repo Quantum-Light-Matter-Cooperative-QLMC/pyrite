@@ -45,7 +45,7 @@ factor-of-$4\pi$ or factor-of-4 trap.
 
 ```{list-table} Form-factor conventions used throughout PyRITE.
 :name: tbl-form-factor-conventions
-:header-1
+:header-rows: 1
 
 * - Symbol
   - Definition
@@ -220,7 +220,7 @@ Chantler.
 
 [^wk]: D. Waasmaier and A. Kirfel, *Acta Crystallogr. A* **51**, 416 (1995),
     [doi:10.1107/S0108767394013292](https://doi.org/10.1107/S0108767394013292).
-    
+
 [^chantler]: C. T. Chantler, *J. Phys. Chem. Ref. Data* **24**, 71 (1995) and
     **29**, 597 (2000); NIST FFAST database,
     [https://physics.nist.gov/ffast](https://physics.nist.gov/ffast). Delivered through

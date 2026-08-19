@@ -23,7 +23,7 @@ def _available_mem_mb():
 def _mem_worker_cap(per_worker_mb=None):
     """Max workers host RAM allows at ``per_worker_mb`` each.
 
-    ``min(MemAvailable, 0.85 * MemTotal) // per_worker_mb``. Binds BOTH worker
+    ``min(MemAvailable, 0.9 * MemTotal) // per_worker_mb``. Binds BOTH worker
     pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
     oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
