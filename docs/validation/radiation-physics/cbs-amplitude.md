@@ -511,7 +511,7 @@ non-cancelling choice, not a dangling convention.
 
 | filter | result |
 | --- | --- |
-| Units | `eUg_over_m` dimensionless; $\{\mathbf g;\boldsymbol\epsilon\}\sim$ Å$^{-1}$; $\{\mathbf k;\mathbf g\}/(\mathbf v\cdot\mathbf g)\sim$ Å$^{-1}$; overall $1/(\mathbf v\cdot\mathbf g)\sim$ Å. `A_CBS` dimensionless, same as `A_PXR`. Pass |
+| Units | `eUg_over_m` dimensionless; $\{\mathbf g;\boldsymbol\epsilon\}\sim$ $\AA^{-1}$; $\{\mathbf k;\mathbf g\}/(\mathbf v\cdot\mathbf g)\sim$ $\AA^{-1}$; overall $1/(\mathbf v\cdot\mathbf g)\sim$ Å. `A_CBS` dimensionless, same as `A_PXR`. Pass |
 | $\gamma\to1$ | $A_{\rm CBS}\to-(U^{\rm code}_{\mathbf g}/mc^2)(\mathbf g\cdot\boldsymbol\epsilon)/(\mathbf v\cdot\mathbf g)+O(\beta)$ — finite and non-vanishing. CBS survives non-relativistically, which is the source paper's entire premise. Pass |
 | $\gamma\to\infty$ | $\chi_{\mathbf g}$, $\mathbf v\cdot\mathbf g$ and $\omega$ all saturate as $\beta\to1$, so $A_{\rm CBS}/A_{\rm PXR}\propto1/\gamma\to0$: PXR wins at high energy, CBS is the low-energy mechanism. Pass, and consistent with the cited paper's scope |
 | $\mathbf v\cdot\mathbf g\to0$ | $A_{\rm CBS}$ diverges as $(\mathbf v\cdot\mathbf g)^{-2}$. This is physical within first-order perturbation theory (an adiabatically slow modulation drives an unboundedly large excursion) and is exactly where the expansion fails: validity needs $\lvert\mathbf g\cdot\delta\mathbf r\rvert\ll1$, i.e. $\lvert U_{\mathbf g}\rvert g^2/(\gamma mc^2(\mathbf v\cdot\mathbf g)^2)\ll1$. The same limit sends $\omega\to0$, and `lines.py:1084-1089` drops every segment with $E_{\rm res}<10$ eV (and outside the padded grid), which bounds $\mathbf v\cdot\mathbf g=\omega(1-\mathbf v\cdot\hat{\mathbf n})$ away from zero. Pass, with the cutoff noted as load-bearing |
@@ -561,7 +561,7 @@ then evaluate the radiation integral
 $I=\int dt\,(-\boldsymbol\epsilon\cdot\boldsymbol\beta)\,
 e^{i\omega(t-\hat{\mathbf n}\cdot\mathbf r)}$ numerically and extract the
 coefficient that grows linearly in $T$. Geometry:
-$\mathbf g=(1.5,-0.7,2.3)$ Å$^{-1}$, $\hat{\mathbf n}\parallel(0.6,0.3,-0.5)$,
+$\mathbf g=(1.5,-0.7,2.3)$ $\AA^{-1}$, $\hat{\mathbf n}\parallel(0.6,0.3,-0.5)$,
 $\hat{\mathbf v}\parallel(0.1,0.2,1.0)$, $U=0.5$ eV, 400 driving periods at 400
 steps per period, both polarizations. Initial conditions are placed on the
 steady-state solution — otherwise the free $\delta\mathbf v=\text{const}$ mode

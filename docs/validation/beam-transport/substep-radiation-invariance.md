@@ -244,7 +244,7 @@ peak matters.
 Fresh-context rederivation (2026-08-18, verifier context separate from the
 implementation). Filters: units `pass` -- $t_L$ carries Å (c = 1) and $P$
 carries $1/\text{Å}$, so $Q = t_L\operatorname{sinc}(Pt_L/\pi)$ has units of
-Å and $\lvert Q\rvert^2$ of Å$^2$, matching the kernel's own $t_L^2\operatorname{sinc}^2$
+Å and $\lvert Q\rvert^2$ of $\AA^2$, matching the kernel's own $t_L^2\operatorname{sinc}^2$
 prefactor; limits `pass` ($N=1$ is a grouping no-op by construction, a
 lossless flight is exactly invariant by the argument below); signs/conventions
 `pass` once `mc_spectrum`'s own convention is used for $P$ (below) -- reading

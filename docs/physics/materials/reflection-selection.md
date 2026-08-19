@@ -13,7 +13,7 @@ The default path enumerates candidate reflections and keeps the strongest
 *families*.
 
 **Enumeration.** All integer triples with $|\mathbf g| \le g_{\max}$ are
-generated, with $g_{\max} = 8$ Å$^{-1}$ by default. The per-axis index bound is
+generated, with $g_{\max} = 8$ $\AA^{-1}$ by default. The per-axis index bound is
 exact rather than a guess:
 
 ```{math}
@@ -110,7 +110,7 @@ needs its families pinned by hand.
   reflections would merge them into one family. Since both members would then be
   returned together and both would be summed, the consequence is a family-count
   accounting artifact, not a dropped reflection.
-* The $g_{\max} = 8$ Å$^{-1}$ cap corresponds to $s = 0.64$ Å$^{-1}$, well inside
+* The $g_{\max} = 8$ $\AA^{-1}$ cap corresponds to $s = 0.64$ $\AA^{-1}$, well inside
   the fitted range of the form-factor parameterization, but it is a hard
   truncation: reflections above it are never considered.
 * Cost scales with the number of returned reflections, so raising the family

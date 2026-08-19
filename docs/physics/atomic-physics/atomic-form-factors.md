@@ -45,17 +45,17 @@ factor-of-$4\pi$ or factor-of-4 trap.
 
 ```{list-table} Form-factor conventions used throughout PyRITE.
 :name: tbl-form-factor-conventions
-:header-rows: 1
+:header-1
 
 * - Symbol
   - Definition
   - Units
 * - $g$
-  - $|\mathbf g| = 2\pi/d_{hkl}$ — **not** $1/d$
-  - Å$^{-1}$
+  - $|\mathbf g| = 2\pi/d_{hkl}$
+  - $\AA^{-1}$
 * - $s$
   - $\sin\theta/\lambda = g/(4\pi)$, the crystallographic argument of $f_0$
-  - Å$^{-1}$
+  - $\AA^{-1}$
 * - $E$
   - photon energy
   - eV
@@ -95,9 +95,9 @@ fitted to relativistic Hartree–Fock free-atom densities. Two properties of
   forward sum from $Z + f'$ rather than from $f_0(0) + f'$ — see
   [Photon escape and in-medium dispersion](../radiation-physics/photon-escape-and-dispersion.md).
 * **Fit range.** The Waasmaier–Kirfel coefficients are fitted over
-  $0 \le s \le 6$ Å$^{-1}$, a far wider window than the Cromer–Mann fit they
-  replaced ($s \le 2$ Å$^{-1}$). PyRITE's reflection search caps momentum
-  transfer at $g \le 8$ Å$^{-1}$, i.e. $s \le 0.637$ Å$^{-1}$, so every
+  $0 \le s \le 6$ $\AA^{-1}$, a far wider window than the Cromer–Mann fit they
+  replaced ($s \le 2$ $\AA^{-1}$). PyRITE's reflection search caps momentum
+  transfer at $g \le 8$ $\AA^{-1}$, i.e. $s \le 0.637$ $\AA^{-1}$, so every
   reflection the code can select sits deep inside the fitted region.
 
 $f_0$ describes a **spherical, neutral, isolated** atom. Bonding charge
@@ -220,8 +220,8 @@ Chantler.
 
 [^wk]: D. Waasmaier and A. Kirfel, *Acta Crystallogr. A* **51**, 416 (1995),
     [doi:10.1107/S0108767394013292](https://doi.org/10.1107/S0108767394013292).
-
+    
 [^chantler]: C. T. Chantler, *J. Phys. Chem. Ref. Data* **24**, 71 (1995) and
     **29**, 597 (2000); NIST FFAST database,
-    <https://physics.nist.gov/ffast>. Delivered through
+    [https://physics.nist.gov/ffast](https://physics.nist.gov/ffast). Delivered through
     [XrayDB](https://github.com/xraypy/XrayDB).

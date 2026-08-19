@@ -29,7 +29,7 @@ The output is the set of straight radiating segments (midpoint, direction,
 length, energy, flight clock) consumed by the line and bremsstrahlung kernels.
 
 Units at the physics boundary: energies keV, lengths Å, number densities
-Å$^{-3}$, cross sections cm$^2$, macroscopic cross sections cm$^{-1}$.
+$\AA^{-3}$, cross sections cm$^2$, macroscopic cross sections cm$^{-1}$.
 
 ## 2. Independent derivation
 
@@ -51,7 +51,7 @@ and the element-dependent $k = 0.731 + 0.0688\log_{10} Z$.
 
 For a compound, Bragg additivity applies per atom. Writing the elemental factor
 $\rho Z/A$ in terms of the atomic number density $n$ [cm$^{-3}$],
-$\rho = nA/N_A$, so $\rho Z/A = nZ/N_A$, and with $n_i$ in Å$^{-3}$
+$\rho = nA/N_A$, so $\rho Z/A = nZ/N_A$, and with $n_i$ in $\AA^{-3}$
 ($n = 10^{24} n_i$),
 
 $$
@@ -59,7 +59,7 @@ $$
 \;=\; \frac{n_i Z}{0.602214076}.
 $$
 
-Hence the compound form, in keV Å$^{-1}$ (the $10^{-8}$ cm→Å conversion
+Hence the compound form, in keV $\AA^{-1}$ (the $10^{-8}$ cm→Å conversion
 turns the 78500 prefactor into $7.85\times10^{-4}$),
 
 $$
@@ -194,7 +194,7 @@ Two implementation details worth recording, neither a divergence:
 
 - **Units.** $\rho Z/(AE)$ is mol cm$^{-3}$ keV$^{-1}$ against the
   78500 keV$^2$ cm$^2$ mol$^{-1}$ prefactor → keV cm$^{-1}$; the
-  $10^{-8}$ factor gives keV Å$^{-1}$. The compound rewrite is exact (§2.1).
+  $10^{-8}$ factor gives keV $\AA^{-1}$. The compound rewrite is exact (§2.1).
   $n\sigma$ is cm$^{-1}$; $10^{8}/\Sigma$ is Å. Pass.
 - **Limits.** $\alpha \to 0$ recovers unscreened Rutherford
   ($\langle 1-\cos\theta\rangle \to 0$, forward peaking);

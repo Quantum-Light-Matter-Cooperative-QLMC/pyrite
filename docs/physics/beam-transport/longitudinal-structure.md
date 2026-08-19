@@ -35,7 +35,7 @@ Input is in femtoseconds and converts once through
 ```{math}
 :label: eq-longitudinal-time-unit
 
-c = 2997.924580~\text{Å\,fs}^{-1}.
+c = 2997.924580~\AA\text{\,fs}^{-1}.
 ```
 
 ## Policies
@@ -89,7 +89,7 @@ surface normal, the emitted photon wavenumber is
 
 k_\gamma =
 \frac{\beta\,|\mathbf g|\cos(\text{tilt})}{1 - \beta\cos\theta_{\rm obs}}
-\quad[\text{Å}^{-1}],
+\quad[\AA^{-1}],
 ```
 
 giving photon energy $E_\gamma = \hbar c\,k_\gamma$, optical period

@@ -120,7 +120,7 @@ reflection selection, attenuation, and transport all stay in PyRITE.
 
 Two quantities are computed from the structure and used everywhere downstream.
 
-**Cell volume** $V_{\rm cell}$ [Å$^3$] normalizes both couplings
+**Cell volume** $V_{\rm cell}$ [$\AA^3$] normalizes both couplings
 ($\chi_{\mathbf g}$ and $U_{\mathbf g}$ each carry $1/V_{\rm cell}$) and is taken
 from the CIF rather than recomputed from the lattice parameters.
 

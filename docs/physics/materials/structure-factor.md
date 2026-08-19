@@ -44,7 +44,7 @@ W = B\left(\frac{\sin\theta}{\lambda}\right)^{2}
   = \frac{B\,g^2}{16\pi^2},
 ```
 
-with the tabulated isotropic $B$ factor in Å$^2$, related to the mean-square
+with the tabulated isotropic $B$ factor in $\AA^2$, related to the mean-square
 displacement by $B = 8\pi^2\langle u_x^2\rangle$.
 
 Two normalization traps live in {eq}`eq-structure-factor-debye-waller` and are
@@ -152,7 +152,7 @@ concurring fresh-context derivations agree.
 
 `debye-waller-catalog-provenance` is a recorded **`discrepancy`**, and anyone
 using absolute line intensities should read it: of 48 catalog entries, 37
-chemically diverse crystals reuse the same $0.6$ Å$^2$ value, four legacy values
+chemically diverse crystals reuse the same $0.6$ $\AA^2$ value, four legacy values
 have no value-level provenance, and the crystal-wide scalar is known to be
 insufficient where sites differ or where nonparallel reflections probe an
 anisotropic displacement tensor. The scalar approximation is a stated scope

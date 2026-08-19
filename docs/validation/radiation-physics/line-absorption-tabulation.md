@@ -61,8 +61,8 @@ from another element only subdivides an interval on which
 ## Units, assumptions, and limits
 
 - $E,E_0,E_1$ are positive energies in eV, so $t$ is dimensionless.
-- $r_e$, $\lambda$, and $n_i$ carry Å, Å, and Å$^{-3}$, respectively;
-  therefore each $\mu_i$ and their sum carry Å$^{-1}$.
+- $r_e$, $\lambda$, and $n_i$ carry Å, Å, and $\AA^{-3}$, respectively;
+  therefore each $\mu_i$ and their sum carry $\AA^{-1}$.
 - The material is homogeneous along the selected single-slab escape path and
   attenuation is passive. Layered and grooved paths continue to evaluate their
   piecewise coefficients exactly per resonance energy.

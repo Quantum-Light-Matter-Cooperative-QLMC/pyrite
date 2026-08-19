@@ -1,7 +1,7 @@
 # Material composition
 
 Away from the crystallography, PyRITE describes matter with exactly one currency:
-a list of `(element, number density)` pairs, densities in atoms per Å$^3$.
+a list of `(element, number density)` pairs, densities in atoms per $\AA^3$.
 Attenuation, stopping power, bremsstrahlung, and elastic scattering all consume
 that list and nothing else. This page defines it, states where each composition
 comes from, and records the additivity assumption every consumer relies on.
@@ -30,8 +30,8 @@ therefore the CIF's, at the CIF's refinement conditions, and cannot drift from
 the lattice used for the coherent sum.
 
 **Amorphous media** carry theirs as configured data, because there is no cell to
-count. Fused silica is entered directly as $n_{\rm Si} = 0.02205$ Å$^{-3}$ and
-$n_{\rm O} = 0.04410$ Å$^{-3}$ — the 1:2 stoichiometry at 2.2 g cm$^{-3}$. A
+count. Fused silica is entered directly as $n_{\rm Si} = 0.02205$ $\AA^{-3}$ and
+$n_{\rm O} = 0.04410$ $\AA^{-3}$ — the 1:2 stoichiometry at 2.2 g cm$^{-3}$. A
 medium is a pure absorber and scatterer: it has no lattice, no reflections, and
 radiates no coherent lines.
 
