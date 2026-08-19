@@ -3387,7 +3387,7 @@ def simulate_trajectories(
     crossing, or the self-absorption path in mc_spectrum -- reads pos[:, :2],
     and a finite beam spot is a pure geometry/visualization refinement with zero
     effect on the emitted spectrum UNDER THE INCOHERENT EMISSION POLICY, which
-    reads only |A|^2 per segment.
+    reads only ``|A|^2`` per segment.
 
     This is NOT true under mc_spectrum(coherent=True). The coherent phase reads
     r_mid directly, so the constant per-electron transverse offset enters every
