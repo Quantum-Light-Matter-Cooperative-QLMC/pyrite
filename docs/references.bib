@@ -1,0 +1,162 @@
+% PyRITE documentation bibliography.
+%
+% One entry per external source cited from docs/. Cite with the MyST roles
+% ``{cite:t}`key``` (textual: "Feranchuk et al. [1]") or ``{cite:p}`key```
+% (parenthetical: "[1]"). The rendered list lives in ``docs/references.md``.
+%
+% Keys are ``firstauthor+year`` lowercase, disambiguated by a trailing letter.
+% Every entry carries a DOI or a stable URL: a reference that cannot be
+% resolved is not a citation.
+
+% -- Coherent radiation: PXR and CBS ----------------------------------------
+
+@article{feranchuk2000,
+  author  = {Feranchuk, I. D. and Ulyanenkov, A. and Harada, J. and Spence, J. C. H.},
+  title   = {Parametric x-ray radiation and coherent bremsstrahlung from
+             nonrelativistic electrons in crystals},
+  journal = {Phys. Rev. E},
+  volume  = {62},
+  pages   = {4225},
+  year    = {2000},
+  doi     = {10.1103/PhysRevE.62.4225},
+}
+
+@article{zhai2025,
+  author  = {Zhai, W. and others},
+  title   = {Coherent x-ray radiation from free electrons in van der Waals crystals},
+  journal = {Nat. Commun.},
+  volume  = {16},
+  pages   = {11218},
+  year    = {2025},
+  doi     = {10.1038/s41467-025-66063-6},
+}
+
+@book{baryshevsky2005,
+  author    = {Baryshevsky, V. G. and Feranchuk, I. D. and Ulyanenkov, A. P.},
+  title     = {Parametric X-Ray Radiation in Crystals: Theory, Experiment and
+               Applications},
+  series    = {Springer Tracts in Modern Physics},
+  volume    = {213},
+  publisher = {Springer},
+  year      = {2005},
+  doi       = {10.1007/b106242},
+}
+
+% -- Bremsstrahlung ---------------------------------------------------------
+
+@article{kochmotz1959,
+  author  = {Koch, H. W. and Motz, J. W.},
+  title   = {Bremsstrahlung Cross-Section Formulas and Related Data},
+  journal = {Rev. Mod. Phys.},
+  volume  = {31},
+  pages   = {920},
+  year    = {1959},
+  doi     = {10.1103/RevModPhys.31.920},
+}
+
+@article{elwert1939,
+  author  = {Elwert, G.},
+  title   = {Versch{\"a}rfte Berechnung von Intensit{\"a}t und Polarisation im
+             kontinuierlichen R{\"o}ntgenspektrum},
+  journal = {Ann. Phys.},
+  volume  = {426},
+  pages   = {178},
+  year    = {1939},
+  doi     = {10.1002/andp.19394260206},
+}
+
+% -- Atomic form factors and X-ray optical constants ------------------------
+
+@article{waasmaier1995,
+  author  = {Waasmaier, D. and Kirfel, A.},
+  title   = {New analytical scattering-factor functions for free atoms and ions},
+  journal = {Acta Crystallogr. A},
+  volume  = {51},
+  pages   = {416},
+  year    = {1995},
+  doi     = {10.1107/S0108767394013292},
+}
+
+@article{chantler1995,
+  author  = {Chantler, C. T.},
+  title   = {Theoretical Form Factor, Attenuation, and Scattering Tabulation
+             for Z=1--92 from E=1--10 eV to E=0.4--1.0 MeV},
+  journal = {J. Phys. Chem. Ref. Data},
+  volume  = {24},
+  pages   = {71},
+  year    = {1995},
+  doi     = {10.1063/1.555974},
+}
+
+@article{chantler2000,
+  author  = {Chantler, C. T.},
+  title   = {Detailed Tabulation of Atomic Form Factors, Photoelectric
+             Absorption and Scattering Cross Section, and Mass Attenuation
+             Coefficients in the Vicinity of Absorption Edges},
+  journal = {J. Phys. Chem. Ref. Data},
+  volume  = {29},
+  pages   = {597},
+  year    = {2000},
+  doi     = {10.1063/1.1321055},
+}
+
+@misc{ffast,
+  author       = {Chantler, C. T. and others},
+  title        = {{FFAST}: X-Ray Form Factor, Attenuation and Scattering Tables},
+  howpublished = {NIST Standard Reference Database 66},
+  url          = {https://physics.nist.gov/ffast},
+}
+
+@misc{xraydb,
+  author       = {Newville, M. and others},
+  title        = {{XrayDB}: X-ray Reference Data in a {SQLite} Database},
+  howpublished = {Software},
+  url          = {https://github.com/xraypy/XrayDB},
+}
+
+% -- Electron transport -----------------------------------------------------
+
+@article{joyluo1989,
+  author  = {Joy, D. C. and Luo, S.},
+  title   = {An empirical stopping power relationship for low-energy electrons},
+  journal = {Scanning},
+  volume  = {11},
+  pages   = {176},
+  year    = {1989},
+  doi     = {10.1002/sca.4950110404},
+}
+
+@article{browning1994,
+  author  = {Browning, R. and Li, T. Z. and Chui, B. and Ye, J. and
+             Pease, R. F. W. and Czy{\.z}ewski, Z. and Joy, D. C.},
+  title   = {Empirical forms for the electron/atom elastic scattering cross
+             sections from 0.1 to 30 keV},
+  journal = {J. Appl. Phys.},
+  volume  = {76},
+  pages   = {2016},
+  year    = {1994},
+  doi     = {10.1063/1.357651},
+}
+
+@misc{srd64,
+  author       = {Powell, C. J. and Jablonski, A. and Salvat, F.},
+  title        = {{NIST} Electron Elastic-Scattering Cross-Section Database},
+  howpublished = {NIST Standard Reference Database 64},
+  url          = {https://srdata.nist.gov/srd64/},
+}
+
+% -- Elemental constants ----------------------------------------------------
+
+@misc{ciaaw2024,
+  author       = {{Commission on Isotopic Abundances and Atomic Weights}},
+  title        = {Standard Atomic Weights},
+  howpublished = {2024 revision},
+  url          = {https://ciaaw.org/atomic-weights.htm},
+}
+
+@misc{pdg2025,
+  author       = {{Particle Data Group}},
+  title        = {Atomic and Nuclear Properties of Materials},
+  year         = {2025},
+  url          = {https://pdg.lbl.gov/2025/AtomicNuclearProperties/},
+}

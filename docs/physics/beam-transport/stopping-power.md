@@ -7,7 +7,7 @@ single mean energy-loss rate $dE/ds$, evaluated along the flight.
 
 ## Joy–Luo modified Bethe law
 
-The stopping power is the Joy–Luo modification of the Bethe expression[^joyluo]
+The stopping power is the Joy–Luo modification of the Bethe expression{cite:p}`joyluo1989`
 
 ```{math}
 :label: eq-stopping-joy-luo
@@ -180,6 +180,3 @@ rule, and the mean excitation energies;
 {eq}`eq-stopping-cutoff-distance`;
 `Validation: energy-step-convergence` for the measured path-length bias. See the
 [physics validation ledger](../../validation/physics-validation-ledger.md).
-
-[^joyluo]: D. C. Joy and S. Luo, *Scanning* **11**, 176 (1989),
-    [doi:10.1002/sca.4950110404](https://doi.org/10.1002/sca.4950110404).

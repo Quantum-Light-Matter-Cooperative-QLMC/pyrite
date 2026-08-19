@@ -76,7 +76,7 @@ implementation is explicit about which one each consumer receives.
 
 ## Non-resonant term
 
-$f_0(g)$ is the Waasmaier–Kirfel parameterization,[^wk] an eleven-parameter
+$f_0(g)$ is the Waasmaier–Kirfel parameterization,{cite:p}`waasmaier1995` an eleven-parameter
 Gaussian fit
 
 ```{math}
@@ -110,7 +110,7 @@ crystals.
 ## Anomalous terms
 
 $f'(E)$ and $f''(E)$ come from the Chantler/FFAST self-consistent
-Dirac–Hartree–Fock calculation.[^chantler] They are returned as the anomalous
+Dirac–Hartree–Fock calculation.{cite:p}`chantler1995,chantler2000,ffast,xraydb` They are returned as the anomalous
 parts **directly**, not in the Henke $f_1 = Z + f'$ form; the adapter adds $Z$
 back where a consumer wants $f_1$.
 
@@ -217,11 +217,3 @@ Implementation owner: `pyrite.materials.atomic` — `atomic_form_factor`,
 `cromer_mann_f0` and `henke_dispersion` are retained API spellings from the
 pre-migration implementation; the data behind them is Waasmaier–Kirfel and
 Chantler.
-
-[^wk]: D. Waasmaier and A. Kirfel, *Acta Crystallogr. A* **51**, 416 (1995),
-    [doi:10.1107/S0108767394013292](https://doi.org/10.1107/S0108767394013292).
-
-[^chantler]: C. T. Chantler, *J. Phys. Chem. Ref. Data* **24**, 71 (1995) and
-    **29**, 597 (2000); NIST FFAST database,
-    [https://physics.nist.gov/ffast](https://physics.nist.gov/ffast). Delivered through
-    [XrayDB](https://github.com/xraypy/XrayDB).

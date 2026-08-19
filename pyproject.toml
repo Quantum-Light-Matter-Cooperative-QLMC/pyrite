@@ -79,6 +79,7 @@ docs = [
     "myst-parser[linkify]>=4.0",
     "sphinx-autobuild>=2025.8.25",
     "pydata-sphinx-theme>=0.20.0",
+    "sphinxcontrib-bibtex>=2.6",
 ]
 
 # Independent crystallography oracle. Validation-only; never imported by the

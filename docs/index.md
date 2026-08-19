@@ -21,4 +21,5 @@ research/index
 repo-design/index
 adr/index
 api
+references
 ```

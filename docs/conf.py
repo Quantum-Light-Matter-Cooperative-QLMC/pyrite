@@ -46,7 +46,16 @@ extensions = [
     "sphinx.ext.napoleon",  # Google/NumPy docstring styles
     "sphinx.ext.viewcode",  # [source] links
     "sphinx.ext.mathjax",  # the docstrings carry LaTeX
+    "sphinxcontrib.bibtex",  # one references.bib for every external source
 ]
+
+# -- Bibliography ------------------------------------------------------------
+# Single shared bibliography. Cite with ``{cite:t}`key``` / ``{cite:p}`key```;
+# the rendered list is ``references.md``. ``label`` style keeps numeric marks
+# stable regardless of which pages a build includes.
+bibtex_bibfiles = ["references.bib"]
+bibtex_default_style = "unsrt"
+bibtex_reference_style = "label"
 
 # -- Autodoc / autosummary ---------------------------------------------------
 autosummary_generate = True

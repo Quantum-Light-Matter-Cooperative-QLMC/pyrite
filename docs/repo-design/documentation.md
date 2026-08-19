@@ -101,6 +101,37 @@ State assumptions and limiting cases when they affect the interpretation or doma
 
 Physics functions and claims subject to the project's formal verification process should also follow the conventions defined in the [physics validation methodology](../validation/methodology.md).
 
+## Citations
+
+External sources are cited through a single BibTeX bibliography,
+`docs/references.bib`, rendered at [References](../references.md). Do **not**
+write a full reference inline or as a Markdown footnote: the same source is
+cited from several pages, and duplicated reference text drifts.
+
+Add the entry to `docs/references.bib` with a `firstauthor+year` key, then cite
+it with the MyST roles:
+
+````markdown
+The stopping power is the Joy--Luo modification of the Bethe expression{cite:p}`joyluo1989`.
+
+{cite:t}`feranchuk2000` derive the PXR and CBS amplitudes together.
+````
+
+`{cite:p}` is parenthetical (a bare numeric mark, for a claim already stated in
+the prose) and `{cite:t}` is textual (renders the author names, for when the
+source is the grammatical subject). Every entry carries a DOI or a stable URL —
+a reference that cannot be resolved is not a citation.
+
+Cite the source for any equation reproduced from the literature, any tabulated
+dataset, and any number a model is compared against. When a page states a
+source's *equation number*, that number must be traceable to something the
+repository actually holds; if it comes from a ledger `Source` field rather than
+from the paper itself, say so rather than implying the transcription was checked.
+
+Per-material provenance is not literature: individual catalog crystals record
+their refinements in the [crystal structure provenance
+ledger](../validation/ledger-crystal-structure-provenance.md).
+
 ## Units
 
 Use unambiguous unit spellings and place a space between the value and unit:

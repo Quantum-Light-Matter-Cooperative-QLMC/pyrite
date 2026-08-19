@@ -79,7 +79,7 @@ propagator — it is resolved, if at all, by `max_dE_frac` substepping.
 ```
 
 with $E$ in keV. This is the Browning empirical fit to tabulated Mott total
-elastic cross sections.[^browning]
+elastic cross sections.{cite:p}`browning1994,srd64`
 
 **Stated validity is 0.1–30 keV and $Z \le 92$.** PyRITE evaluates it above
 30 keV with no guard, because the sweep axis runs to the 300 keV model ceiling.
@@ -222,8 +222,3 @@ and the angular draw; see [Transport geometry](../geometry/transport-geometry.md
 the [write-up](../../validation/beam-transport/electron-transport.md), which
 records measured backscatter coefficients for both models against
 Hunger–Küchler and states the extrapolation ceiling above.
-
-[^browning]: R. Browning et al., *J. Appl. Phys.* **76**, 2016 (1994),
-    [doi:10.1063/1.357651](https://doi.org/10.1063/1.357651). Mott transport
-    cross sections are from NIST Standard Reference Database 64,
-    <https://srdata.nist.gov/srd64/>.

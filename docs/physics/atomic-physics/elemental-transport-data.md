@@ -29,8 +29,8 @@ it, where each number comes from, and what the table's existence constrains.
   - the logarithm argument of the Joy–Luo stopping power
 ```
 
-$Z$ and $A$ use the CIAAW 2024 standard atomic weights.[^ciaaw] $J$ uses the PDG
-*Atomic and Nuclear Properties* elemental tables,[^pdg] which follow the ICRU
+$Z$ and $A$ use the CIAAW 2024 standard atomic weights.{cite:p}`ciaaw2024` $J$ uses the PDG
+*Atomic and Nuclear Properties* elemental tables,{cite:p}`pdg2025` which follow the ICRU
 stopping-power compilation.
 
 The table currently covers 24 elements: B, C, N, O, Al, Si, P, S, Ti, V, Fe, Ge,
@@ -140,10 +140,3 @@ Implementation owners: `pyrite.materials._transport_data.TRANSPORT_ELEMENTS`;
 consumed by `pyrite.montecarlo.transport`,
 `pyrite.montecarlo.spectrum.brem`, and the catalog validator in
 `pyrite.materials.catalog`.
-
-[^ciaaw]: Commission on Isotopic Abundances and Atomic Weights, standard atomic
-    weights (2024 revision), <https://ciaaw.org/atomic-weights.htm>.
-
-[^pdg]: Particle Data Group, *Atomic and Nuclear Properties of Materials*,
-    <https://pdg.lbl.gov/2025/AtomicNuclearProperties/>, following the ICRU
-    stopping-power compilation.
