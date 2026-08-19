@@ -108,23 +108,46 @@ low-energy branch rather than being invalidated.
 
 ## Checklist
 
-- [ ] A — Implement Berger--Seltzer/ICRU-37 collision stopping as scalar and
+- [x] A — Implement Berger--Seltzer/ICRU-37 collision stopping as scalar and
       vectorized helpers beside the Joy--Luo pair, additive over elements by the
       existing coefficient rewrite, without the density-effect term. Unit-check
       the prefactor conversion to keV/Angstrom against the existing
       `7.85e-4` path, and pin the non-relativistic limit.
-- [ ] B — Quantify the density-effect correction `delta` over 1--300 keV for the
-      catalog materials. For electrons `beta gamma = 1` at ~212 keV, and typical
+      **Done.** `_dEds_bs_keV_per_ang`, `_dEds_bs_compound_scalar`,
+      `_dEds_bs_packed_scalar`, `_dEds_bs_compound` in `montecarlo/transport.py`.
+      Prefactor `1.535e-6 keV/Ang` derived from `0.1535 MeV cm^2/mol` and pinned
+      against Joy--Luo: `1.535e-6 * mc^2 = 7.844e-4` vs `7.85e-4`, 0.08% -- the
+      rounding in the conventional constant. Non-relativistic limit converges
+      monotonically with `O(tau)` residual. `delta` is carried as a per-layer
+      scalar (it is a bulk property, so it factors out of the Bragg sum) and
+      every call site passes `0.0`, so B lands as a data change, not a signature
+      change.
+- [~] B — Quantify the density-effect correction `delta` over 1--300 keV for the
+      catalog materials. **Sized, not measured -- blocked on source data.** For electrons `beta gamma = 1` at ~212 keV, and typical
       solid `X_0` puts the onset near the top of the swept range, so this may be
       bounded and omitted with a stated error — but low-Z solids have low `X_0`
       and graphite is a primary material, so measure rather than assume. If it
       exceeds the accuracy target, add Sternheimer parameters from the PDG
       tables already cited for `J`.
-- [ ] C — Splice policy. Choose the crossover energy, verify per material that
-      the two branches agree there to a stated tolerance, and decide whether the
-      midpoint solve (`eq-stopping-cutoff-distance`) needs continuity of the
-      derivative or only of the value. A kink inside the cutoff solve is the
-      failure mode to check for.
+- [x] C — Splice policy. **Decided: per element, not global.**
+      Measured crossovers span 2.66 keV (B) to 10.46 keV (Bi), monotone in `I`;
+      every catalog element crosses exactly once, well above the energy where the
+      Berger--Seltzer bracket changes sign (below 0.71 keV for all 24). The task
+      doc's premise that "the two forms agree to 2% at 10 keV" is a *carbon*
+      number and does not generalize: at 10 keV the ratio runs 0.976 (B) to 1.003
+      (Bi). The best single global splice energy is 8.0 keV and it still steps by
+      1.84% in the worst element; no global choice does better than 1.5%.
+      Because stopping is additive over elements, the splice does not have to be
+      global -- switching each element at its own crossover makes every term
+      continuous by construction, hence the compound too, for any material, with
+      no per-material tuning and no fitted blend. Verified to `1e-12` relative
+      for all 24 elements and all 50 catalog materials.
+      Continuity of value only: the splice is C0, not C1. The log-slope steps by
+      0.0145 (B, 2.0% of the local slope) to 0.0587 (Bi, 8.9%), worst at high `Z`.
+      The midpoint solve needs only the value, so this is acceptable, but the
+      cutoff bracket must be checked against the kink when D wires the cores in.
+      Implemented as `_bs_joy_luo_crossover_keV`, `_dEds_spliced_compound_scalar`,
+      `_dEds_spliced_compound`.
 - [ ] D — Integrate across all four cores, both LUT variants, and the CUDA
       kernels. Update `build_transport_energy_lut` in the same slice. Re-sync
       the `campaign/sweep.py` cost-estimation copy or make it delegate.
@@ -151,9 +174,13 @@ low-energy branch rather than being invalidated.
   Berger--Seltzer omits shell corrections and the default cutoff is 5 keV.
 - **Decided:** this does not close the reference-stopping task, which still owns
   provenance-controlled data, uncertainty budgets, and radiative stopping.
-- **Open:** splice energy, and whether it is global or per material.
-- **Open:** whether `delta` needs Sternheimer parameters over 1--300 keV
-  (checklist B decides).
+- **Decided:** splice is **per element**, each at its own Joy--Luo/Berger--Seltzer
+  crossover, computed once at table-build time. Continuous by construction for
+  every material; a global splice cannot be (best case 1.84% step). See C.
+- **Open:** whether `delta` needs Sternheimer parameters over 1--300 keV.
+  Bounded to the small-correction regime (`beta*gamma <= 1.24` across the whole
+  swept range) but not closed -- needs `x_0, x_1, a, m` per material from PDG.
+  See B.
 - **Open:** the 1--10 keV region remains served by a fit neither form validates
   well. With `E_cut_keV` defaulting to 5 keV the exposure is bounded, but the
   accepted uncertainty there should be stated rather than inherited silently.
@@ -161,6 +188,25 @@ low-energy branch rather than being invalidated.
   unconditional. Unconditional is simpler and matches the `xray_dispersion`
   precedent (commit `500a1dc` made in-medium dispersion unconditional); a
   selector adds identity surface for a branch nobody should choose.
+
+## Status
+
+A and C are implemented, tested, and green; B is sized but blocked on PDG
+Sternheimer parameters; D--G are untouched.
+
+**Nothing is wired in.** No core, LUT builder, or CUDA kernel evaluates the new
+model, so every simulation result is bit-identical to before. That is checklist
+D, and it is the point at which goldens move and `sweep.py`'s cost mirror has to
+be re-synced.
+
+Ledger row `relativistic-bethe-stopping` added to
+`docs/validation/ledger-transport-background.md` at status `filtered` --
+in-context units/limits/signs plus regression anchors only. Fresh-context
+`physics-validation` has **not** run and is the required next step before D.
+
+`docs/physics/beam-transport/stopping-power.md` is deliberately **unchanged**:
+its validity-ceiling warning still accurately describes what the transport does
+today. Rewriting it is checklist G, and it must not land before D.
 
 ## Delegation slices and required skills
 

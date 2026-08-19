@@ -43,6 +43,10 @@ FROZEN_EXPORTS = frozenset(
         "_sample_cos_theta",
         "_dEds_keV_per_ang",
         "_dEds_compound",
+        "_dEds_bs_keV_per_ang",
+        "_dEds_bs_compound",
+        "_dEds_bs_compound_scalar",
+        "_dEds_bs_packed_scalar",
         "_rotate_directions",
         "simulate_trajectories",
         # geometry
