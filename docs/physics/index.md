@@ -23,9 +23,11 @@ beam-transport/electron-transport
 :maxdepth: 1
 :caption: Radiation physics
 
+radiation-physics/coherent-radiation
 radiation-physics/coherent-emission
 radiation-physics/bremsstrahlung
-radiation-physics/coherent-radiation
+radiation-physics/photon-escape-and-dispersion
+radiation-physics/spectral-observables
 ```
 
 ```{toctree}
