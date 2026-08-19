@@ -31,30 +31,58 @@ observable consequences. It does **not** own the mean stopping power itself
 (→ `feature/reference-elastic-scattering-data`), radiative stopping, or
 bremsstrahlung angular distributions.
 
-### Why this is not a drop-in sampler
+### Sequencing: this is not the first transport fix
 
-The obvious implementation — add a Gaussian Bohr fluctuation per flight — is
-very likely wrong here, and the repository's own numbers say so. Two facts must
-be reconciled before any code:
+**Do the mean before the fluctuation.** Joy--Luo under-stops by 6% at 25 keV and
+roughly a factor of two at 300 keV
+(`stopping-power.md`, table `tbl-stopping-validity-ceiling`). That error is
+first-order and **systematic** — same sign for every electron, accumulating
+coherently across the ensemble, displacing the coherent line. Straggling's
+contribution to the mean arrival time is a second-order Jensen bias off a
+~300 eV spread, and its direct effect is random: it suppresses the line via
+`exp(-sigma_phi^2/2)` rather than moving it. Sampling a fluctuation about a mean
+that is itself 6--50% low is out of order.
 
-1. **The per-flight regime is not Gaussian.** `energy-step-convergence` measures
-   `kappa = 0.015` for carbon at 25 keV over **1 um**, already strongly skewed
-   and outside the Gaussian (Bohr) limit. Flights are elastic-mean-free-path
-   scale, and the same write-up records of order **one** inelastic event per
-   flight in carbon at 25 keV (~0.11 in tungsten). Per flight the process is
-   therefore in the single-collision limit, where neither Bohr nor even Vavilov
-   is the right distribution and the "many events per step" premise behind every
-   condensed-history straggling sampler fails.
-2. **Unrestricted CSDA plus full straggling double-counts.** Joy--Luo is an
-   *unrestricted* stopping power: it already contains the mean of the hard
-   Moller `1/T^2` tail. Sampling the full Landau distribution on top of it
-   restores the tail's fluctuation while the tail's mean is applied twice. The
-   standard resolution (EGSnrc, Geant4, PENELOPE) is a *restricted* collisional
-   stopping power below a production threshold plus explicit hard inelastic
-   events above it — which is a larger change than "add straggling", and touches
-   the recorded non-goal that delta rays are not transported particles.
+`feature/relativistic-bethe-stopping` closes the systematic error with a
+published closed-form expression and no licensing exposure. **This task should
+be sequenced behind it**, and its acceptance numbers re-measured against the
+corrected clock — the ~0.3 rad straggling estimate was computed against a CSDA
+clock built on the biased stopping power, so the figure itself is provisional.
 
-Slices A and B exist to close exactly this, before anything is implemented.
+Nobody has yet computed the systematic phase error implied by the 6% stopping
+bias at the same 25 keV / 1 keV operating point. That comparison is cheap and
+belongs in slice A, because it is what decides whether straggling is the
+limiting error at all once the mean is fixed.
+
+### What the model-form question actually is
+
+An earlier draft of this record claimed that unrestricted CSDA plus
+full-distribution sampling double-counts the hard Moller tail. **That was
+wrong** and is corrected here: replacing a deterministic `<dE/ds> * s` with a
+random variable of the *same mean* has the right mean and the right variance and
+is self-consistent. Double-counting would arise only if delta rays were also
+produced as separate loss events on top of unrestricted stopping.
+
+EGSnrc, Geant4, and PENELOPE use restricted stopping plus explicit hard
+inelastic events because they want to *transport* the resulting delta rays.
+PyRITE does not, and deposits that energy locally, so it does not inherit that
+requirement. Restricted stopping is available as an option, not a prerequisite.
+
+What does survive is the **regime** constraint. `energy-step-convergence`
+measures `kappa = 0.015` for carbon at 25 keV over **1 um** — already strongly
+skewed and outside the Gaussian (Bohr) limit — and records of order **one**
+inelastic event per flight in carbon at 25 keV (~0.11 in tungsten). Flights are
+elastic-mean-free-path scale, so per flight the process sits in the
+few-collision limit where neither Bohr nor Vavilov applies.
+
+That is a model-*selection* constraint with a known answer, not a blocker.
+Geant4's Urban fluctuation model exists precisely for the regime where Landau
+and Gaussian both fail, and is the leading candidate. Note also that the
+observable in question — coherent phase — accumulates over the *whole
+trajectory*, not one flight, so the many-collision limit is closer to applicable
+at the level that matters than the per-flight statistics alone suggest. The
+sampler still has to be correct per flight, which is what makes Urban-style
+models the right family.
 
 ## Implementation path and likely owners
 
@@ -110,20 +138,24 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Checklist
 
-- [ ] A — Regime audit. Instrument existing transport runs to measure the
-      distribution of per-flight path length, per-flight inelastic event count,
-      and the Vavilov `kappa` per flight and per CSDA range, across
-      representative low-/high-Z catalog materials over 1--300 keV. Produce the
-      table that decides which straggling regime — if any — a per-flight
-      sampler may legitimately assume.
-- [ ] B — Model-form decision (**blocking**). Choose between (i) restricted
-      collisional stopping power plus explicit hard inelastic events above a
-      production threshold, and (ii) unrestricted CSDA plus a straggling
-      distribution, with the double-counting argument written out and the choice
-      justified against A's measured regime. Decide in the same slice whether
-      delta rays become transported particles or remain a recorded non-goal with
-      their energy deposited locally, and whether straggling is accumulated over
-      a path longer than one flight if the per-flight regime forbids sampling.
+- [ ] A — Regime audit **and priority check**. Measure the distribution of
+      per-flight path length, per-flight inelastic event count, and the Vavilov
+      `kappa` per flight and per CSDA range, across low-/high-Z catalog
+      materials over 1--300 keV. In the same slice, compute the systematic phase
+      error implied by the Joy--Luo stopping bias at the 25 keV / 1 keV point
+      and compare it against the ~0.3 rad straggling estimate. If the systematic
+      term dominates, this task waits on
+      `feature/relativistic-bethe-stopping` and its acceptance numbers are
+      re-measured against the corrected clock.
+- [ ] B — Distribution selection. Choose the fluctuation model for the measured
+      few-collision regime — Urban-style (the leading candidate, built for
+      exactly this regime), Vavilov, or Blunck--Leisegang-corrected Gaussian —
+      justified against A's numbers. Decide whether to use unrestricted stopping
+      with a full-distribution sampler (the simpler path, self-consistent while
+      delta rays are untransported) or restricted stopping with explicit hard
+      inelastic events (larger, and only warranted if delta-ray production
+      becomes observable). Confirm whether delta rays remain a recorded
+      non-goal.
 - [ ] C — Sampler derivation and unit test. Derive the selected distribution's
       sampler from its source (Landau via Boersch-Supan/Koelbig--Schorr, Vavilov
       via Rotondi--Montagna or Chibani, Bohr/Blunck--Leisegang Gaussian —
@@ -165,44 +197,47 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Decisions and open questions
 
-- **Open/blocking:** model form (checklist B). Restricted stopping power plus
-  explicit hard inelastic events, versus unrestricted CSDA plus a straggling
-  distribution. Nothing downstream of B is dispatchable until this is decided,
-  because it determines whether this task adds a sampler or adds an interaction
-  channel.
-- **Open:** whether the per-flight regime measured in A permits per-flight
-  sampling at all. If flights carry of order one inelastic event, the honest
-  options are explicit discrete events or accumulating the fluctuation over a
-  longer path — both change the shape of E and F substantially.
+- **Open/blocking:** sequencing (checklist A). The first-order systematic
+  stopping error very likely dominates the second-order straggling bias at the
+  operating point that motivates this task. If A confirms that, this waits on
+  `feature/relativistic-bethe-stopping`. This is the gate, not the model form.
+- **Open:** distribution choice for the few-collision regime (checklist B).
+  Urban-style is the leading candidate; this is model selection against measured
+  `kappa`, not an open-ended design question.
+- **Corrected:** an earlier draft treated unrestricted-CSDA-plus-straggling as
+  double-counting the Moller tail and therefore blocking. It is not — same mean,
+  correct variance, self-consistent while delta rays are untransported. Slice B
+  is correspondingly smaller than first scoped.
 - **Open:** whether delta rays become transported particles. Currently a
-  recorded non-goal ("No delta rays", `stopping-power.md`); option (i) in B
-  makes their production explicit even if their transport is not.
+  recorded non-goal ("No delta rays", `stopping-power.md`). Only the restricted-
+  stopping branch of B forces the question; the unrestricted branch leaves the
+  non-goal intact.
 - **Open:** production reachability (G). Today `energy_model` is API-only, so
   straggling could land as a research capability with no `Numerics` field, or as
   a production toggle with checkpoint-identity consequences. Cheaper to decide
   before E than to retrofit after F.
-- **Open:** energy ceiling for the acceptance claim. Joy--Luo under-stops by
-  roughly a factor of two at 300 keV
-  (`stopping-power.md`, table `tbl-stopping-validity-ceiling`), so sampling a
-  fluctuation about a mean that is itself 50% low is not defensible at the top
-  of the range. Either bound the accepted range to where the mean is trustworthy
-  (~<50 keV), or sequence behind `feature/reference-electron-stopping-data`.
+- **Decided:** sequence behind `feature/relativistic-bethe-stopping` rather
+  than bounding the accepted range to ~<50 keV. That task is small, unblocked,
+  and removes the constraint entirely; capping the range would leave the
+  systematic error in place across most of the sweep.
 - **Decided:** straggling defaults **off** and the off path is bit-for-bit
   identical to current transport on all four cores. Every existing ledger row,
   golden, and validation write-up must stay valid unchanged with the feature
   present.
-- **Decided:** this task does not modify the mean stopping power. If
-  `feature/reference-electron-stopping-data` lands first, C and E consume its
-  model rather than re-deriving one; if this lands first, that task inherits the
-  fluctuation hook.
+- **Decided:** this task does not modify the mean stopping power. It consumes
+  whatever model `feature/relativistic-bethe-stopping` (and later
+  `feature/reference-electron-stopping-data`) establishes, rather than
+  re-deriving one.
 
 ## Delegation slices and required skills
 
-- **A--B** — `lead-task` with `physics-review`, `monte-carlo`, and
-  `repo-orientation`. **Not `one-shot`**: B is the blocking model-form decision
-  and A is the evidence it rests on.
+- **A** — `lead-task` with `physics-review`, `monte-carlo`, and
+  `repo-orientation`. This is the sequencing gate and should run before anything
+  else in this task is dispatched; it may conclude the task waits.
+- **B** — `physics-review` with `monte-carlo`. Model selection against A's
+  measured `kappa`, not an open-ended design slice.
 - **C** — `physics:implement` / `scientific-library` plus `monte-carlo`, then
-  fresh-context `physics-validation`. `one-shot` only after B closes.
+  fresh-context `physics-validation`. `one-shot` once B names the distribution.
 - **D--E** — `implement-task` with `monte-carlo` and `regression-testing`. The
   bit-for-bit and stream-independence tests in D are the gate for E.
 - **F** — `implement-task` with `monte-carlo`, `performance`, and
@@ -224,8 +259,10 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev typecheck
 UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 ```
 
-- The model-form decision is written down with its double-counting argument and
-  its supporting regime measurements, not asserted.
+- The sequencing check in A is computed, not asserted: the systematic phase
+  error from the stopping bias is compared against the straggling estimate at
+  the same operating point, and the distribution choice in B is justified
+  against measured `kappa`.
 - Straggling off reproduces current transport bit-for-bit on lockstep, grooved,
   per-electron, and CUDA cores, pinned by test.
 - Straggling on consumes only its own counter-addressed stream: free-path and

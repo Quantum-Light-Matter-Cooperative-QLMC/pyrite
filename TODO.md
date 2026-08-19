@@ -36,21 +36,39 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
-5. **Energy-loss straggling.** Transport is pure CSDA: `_dEds_compound_scalar`
+5. **Relativistic Bethe collision stopping.** Joy--Luo under-stops by 6% at
+   25 keV and ~2x at 300 keV (`stopping-power.md`,
+   `tbl-stopping-validity-ceiling`), with no guard and no switch to a
+   relativistic form. This is a first-order *systematic* error in the
+   energy-vs-depth curve — same sign every electron, accumulating coherently,
+   displacing the coherent line — and the midpoint propagator was refined to a
+   0.1 rad tolerance against a clock built on it. Unlike the gated
+   reference-stopping item, this needs **no packaged tables**: Berger--Seltzer/
+   ICRU-37 is closed-form, and `Z`, `A`, and `J` are already in
+   `materials/_transport_data.py` from CIAAW/PDG, with Sternheimer
+   density-effect coefficients in the same PDG tables if needed. No
+   redistribution gate. Joy--Luo stays as the low-energy branch (the two agree
+   to 2% at 10 keV, so the splice is well-conditioned). Consumes no random
+   draws, so all four cores adopt it in one slice — but `build_transport_energy_lut`
+   bakes `dE/ds` and `campaign/sweep.py:831` mirrors the constants, and both
+   drift silently if missed. Does not close
+   `feature/reference-electron-stopping-data`, which still owns provenance and
+   radiative stopping. → `feature/relativistic-bethe-stopping`;
+   [`agentdocs/tasks/feature/relativistic-bethe-stopping/`](agentdocs/tasks/feature/relativistic-bethe-stopping/).
+6. **Energy-loss straggling.** Transport is pure CSDA: `_dEds_compound_scalar`
    returns a mean loss rate and every core applies it deterministically, so the
    fluctuation about it is discarded by construction. `energy-step-convergence`
-   already measures the cost — by Jensen's inequality straggling biases the
-   *mean* arrival time, ~0.3 rad at 25 keV over 1 um at 1 keV photon energy,
-   above the 0.1 rad tolerance the midpoint propagator reaches — so numerical
-   precision has outrun the transport model there. Not a drop-in sampler: the
-   same write-up records of order one inelastic event per flight in carbon at
-   25 keV, so the per-flight regime is single-collision rather than Gaussian or
-   even Vavilov, and unrestricted Joy--Luo already carries the mean of the hard
-   Moller tail whose fluctuation a full Landau draw would restore. The blocking
-   decision is therefore model form — restricted stopping power plus explicit
-   hard inelastic events, versus unrestricted CSDA plus a straggling
-   distribution — not the sampler. Straggling off stays bit-for-bit on all four
-   cores. → `feature/energy-loss-straggling`;
+   measures the cost — by Jensen's inequality straggling biases the *mean*
+   arrival time, ~0.3 rad at 25 keV over 1 um at 1 keV photon energy, above the
+   0.1 rad tolerance the midpoint propagator reaches. **Sequenced behind item 5:**
+   that ~0.3 rad was computed against a clock built on a stopping power that is
+   itself 6% low at the same point, and the systematic term is first-order where
+   straggling's mean-bias is second-order — so the mean gets fixed first and
+   these numbers get re-measured. The remaining model question is distribution
+   selection for the few-collision per-flight regime (of order one inelastic
+   event per flight in carbon at 25 keV, so neither Bohr nor Vavilov applies;
+   Urban-style is the leading candidate), not model form. Straggling off stays
+   bit-for-bit on all four cores. → `feature/energy-loss-straggling`;
    [`agentdocs/tasks/feature/energy-loss-straggling/`](agentdocs/tasks/feature/energy-loss-straggling/).
 
 #### Gated
@@ -66,6 +84,9 @@ file. Edit and drop items on `main`.
    redistribution, compound, and low-energy splice decisions.
    → `feature/reference-electron-stopping-data`;
    [`agentdocs/tasks/feature/reference-electron-stopping-data/`](agentdocs/tasks/feature/reference-electron-stopping-data/).
+   Priority lowered by P1 Ready item 5, which buys most of the accuracy from a
+   closed-form relativistic model with no redistribution gate; this item still
+   owns provenance, uncertainty budgets, and radiative stopping.
 3. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/physics/materials/crystal-mosaicity.md`](docs/physics/materials/crystal-mosaicity.md).
 4. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/physics/radiation-physics/coherent-emission.md`](docs/physics/radiation-physics/coherent-emission.md).
 
