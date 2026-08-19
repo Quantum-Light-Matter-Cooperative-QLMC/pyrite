@@ -154,7 +154,7 @@ transverse axes of the beam frame. For the small slopes involved ({math}`x'` of 
 
 ### Energy spread
 
-```{python}
+```text
 delta_i ~ N(0, energy_spread_frac)
 E_i     = E0_keV * (1 + delta_i)
 ```
