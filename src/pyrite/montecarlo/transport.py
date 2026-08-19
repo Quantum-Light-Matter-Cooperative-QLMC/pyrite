@@ -3386,7 +3386,19 @@ def simulate_trajectories(
     downstream physics -- elastic scattering, stopping power, layer-boundary
     crossing, or the self-absorption path in mc_spectrum -- reads pos[:, :2],
     and a finite beam spot is a pure geometry/visualization refinement with zero
-    effect on the emitted spectrum.
+    effect on the emitted spectrum UNDER THE INCOHERENT EMISSION POLICY, which
+    reads only |A|^2 per segment.
+
+    This is NOT true under mc_spectrum(coherent=True). The coherent phase reads
+    r_mid directly, so the constant per-electron transverse offset enters every
+    cross-electron term as exp[-i(omega n_hat + g).dr]. Turning on a 1 um spot
+    drops the coherent peak height by ~43x against the beam_fwhm_mm=None point
+    source, and the residual single-n_hat result is one speckle realization
+    whose peak scatters 30-41% seed to seed -- a contrast that does NOT fall as
+    Ne grows. The transverse form factor that should average those terms away
+    is not implemented; see the discrepancy row transverse-bunch-form-factor and
+    docs/physics/radiation-physics/coherent-emission.md before using a finite
+    spot with emission="coherent"/"both".
 
     With a finite crystal footprint, the sampled transverse positions classify
     missed entries and can cause side-face exits. Segment positions also affect

@@ -62,6 +62,7 @@ radiation-physics/line-absorption-tabulation
 radiation-physics/line-energy-dispersion
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption
+radiation-physics/transverse-bunch-form-factor
 radiation-physics/xray-chi-zero
 radiation-physics/xray-in-medium-propagation-phase
 radiation-physics/xray-in-medium-resonance

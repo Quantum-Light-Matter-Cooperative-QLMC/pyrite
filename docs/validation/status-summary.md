@@ -6,7 +6,7 @@ Compact generated view of the [detailed validation ledger]
 (physics-validation-ledger.md). Regenerate with
 `pyrite-dev validation-ledger --write` after editing detailed records.
 
-**Publication gate:** 0 / 112 claims signed off.
+**Publication gate:** 0 / 113 claims signed off.
 
 | Status | Claims |
 |---|---:|
@@ -16,8 +16,8 @@ Compact generated view of the [detailed validation ledger]
 | `filtered` | 7 |
 | `unverified` | 57 |
 | `blocked` | 1 |
-| `discrepancy` | 4 |
-| **Total** | **112** |
+| `discrepancy` | 5 |
+| **Total** | **113** |
 
 Status meanings and promotion rules are defined in the
 [validation methodology](methodology.md).

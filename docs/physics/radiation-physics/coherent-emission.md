@@ -86,6 +86,54 @@ One sum produces both:
   $|\langle e^{i\omega t_0}\rangle|^2$ is the Gaussian bunch form factor
   $\exp[-(\omega\sigma_z)^2]$.
 
+### The transverse partner is missing
+
+The inter-electron scale above covers only the **longitudinal** offset $t_0$. A
+bunch with a finite transverse spot (`beam_fwhm_mm`) also gives each electron a
+constant transverse displacement $\Delta\mathbf r_\perp$, which the spatial
+phase reads directly through $\mathbf r_j$. Every cross-electron term therefore
+carries $\exp[-i(\omega\hat{\mathbf n}+\mathbf g)\cdot\Delta\mathbf r_\perp]$,
+and averaging over a Gaussian spot of r.m.s. width $\sigma_\perp$ gives the
+transverse form factor
+
+$$
+\bigl|\langle e^{-i\mathbf q_\perp\cdot\Delta\mathbf r_\perp}\rangle\bigr|^2
+=\exp\bigl[-(q_\perp\sigma_\perp)^2\bigr],
+\qquad
+\mathbf q_\perp=\bigl(\omega\hat{\mathbf n}+\mathbf g\bigr)_\perp,
+$$
+
+the exact analogue of $\exp[-(\omega\sigma_z)^2]$. With
+$q_\perp\sim1\,\text{Å}^{-1}$ and any spot above a nanometre this factor is
+numerically zero, so the ensemble observable keeps **only** the intra-electron
+sum $\sum_e\bigl|\sum_{j\in e}E_j\bigr|^2$.
+
+**The implementation does not take that average.** It evaluates one realization
+of the sampled offsets at one $\hat{\mathbf n}$, so the stored spectrum is a
+single speckle draw rather than the ensemble mean. Measured on the reference
+HOPG case, the coherent peak height scatters 30–41% seed to seed with a finite
+spot against a 7% Monte Carlo counting-noise floor on the incoherent path, and
+that contrast does **not** fall as the electron count grows — speckle contrast
+is independent of the number of randomly phased emitters. Averaging over seeds
+recovers the correct spot-independent intra-electron enhancement (2.83–3.25 at
+$N_e=300$, stable across 1 µm, 50 µm and 1 mm spots and across electron counts),
+which is what the form factor would deliver deterministically and for free.
+
+Integrating over the detector face does not rescue it numerically: the speckle
+angular scale $\lambda/D_\perp\approx2\times10^{-4}$ rad is far finer than any
+affordable tile spacing, so the face integral plateaus at ~11% of the reference
+by `n_side=9` where the incoherent one has converged to 0.01%. Convergence would
+need $n_{\rm side}\approx\Delta\theta/(\lambda/D_\perp)\approx180$, some 32000
+directions per case. The fix is the analytic average above, not more tiles.
+
+Until it lands, treat `beam_fwhm_mm` with `emission="coherent"`/`"both"` as
+unvalidated; see the `transverse-bunch-form-factor` discrepancy row. The
+`beam_fwhm_mm=None` point source is not a safe substitute — it is the fully
+degenerate limit whose cross-electron terms are maximally constructive, giving
+an enhancement that grows linearly with the simulated electron count (33.2× at
+$N_e=80$, 107.5× at $N_e=300$) and is therefore a property of the sampling, not
+of the physics.
+
 ## Expected limits
 
 - `incoherent` (the default) preserves the previous path bit-for-bit.
@@ -124,7 +172,13 @@ before scientific use:
 3. representative CPU/GPU cases are not anchored and the complex-grid memory cost
    is not quantified;
 4. the coherent path inherits the open `line-energy-dispersion` harmonic-sign
-   discrepancy, which sets where each line sits.
+   discrepancy, which sets where each line sits;
+5. the transverse bunch form factor is not applied, so a finite `beam_fwhm_mm`
+   makes the stored spectrum one speckle realization instead of the ensemble
+   observable (`transverse-bunch-form-factor`, **discrepancy**). The far-field
+   phase itself is exact in the linear term; its dropped curvature is a separate
+   and much smaller effect, bounded in
+   [Coherent PXR and CBS radiation](coherent-radiation.md#emission-geometry).
 
 Track status in the [`coherent-emission` ledger
 row](../../validation/physics-validation-ledger.md) and the [validation

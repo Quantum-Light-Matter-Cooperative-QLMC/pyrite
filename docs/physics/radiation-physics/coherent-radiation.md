@@ -22,6 +22,29 @@ $\hat{\mathbf n}$ is fixed for the whole sample, the model is a far-field one:
 every segment radiates toward the same direction and no per-segment detector
 parallax is taken.
 
+The far-field expansion keeps the linear retardation $-\omega\hat{\mathbf n}
+\cdot\mathbf r$ exactly and drops only the curvature term $\omega r_\perp^2/2R$,
+where $R$ is the source-to-detector distance and $r_\perp$ is the component of
+the emission point transverse to $\hat{\mathbf n}$. Separation **along**
+$\hat{\mathbf n}$ therefore carries no error at all — slab depth is exact — and
+the validity condition involves the transverse extent of the emitting volume
+alone:
+
+$$
+r_\perp\ll\sqrt{\frac{\lambda R}{\pi}},
+$$
+
+the radius at which the neglected phase reaches one radian. For the reference
+HOPG case the emitting volume is $\approx6.5\,\mu$m across at 25 keV, against a
+one-radian patch of 12.7 µm at the 400 mm Timepix distance (0.066 rad neglected,
+negligible) but only 3.5 µm at the 30 mm `detector_directions` default
+(0.87 rad) and 2.0 µm at 10 mm (2.6 rad). Short working distances need the
+condition checked, not assumed. This bounds the **phase** error and so matters
+only under the coherent policy; for incoherent sums the induced observation-angle
+error $\delta\theta\approx r_\perp/R$ shifts the line by $\ll0.1$ eV, some two
+orders of magnitude below the detector-acceptance broadening it sits inside.
+Measured by `checks/coherent_transverse_coherence.py`.
+
 Reciprocal vectors are oriented before the sum. `beam_uvw` names the direct-lattice
 axis placed along $+z$; `surface_hkl` instead names the reciprocal-lattice plane
 normal placed along $+z$, which is the exact cleavage-plane contract for
