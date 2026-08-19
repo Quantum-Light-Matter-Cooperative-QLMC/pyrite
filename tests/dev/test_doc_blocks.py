@@ -115,7 +115,6 @@ def test_python_api_workflow_executes_as_one_accumulating_namespace():
         code = compile(block.body, block.location, "exec")
         exec(code, namespace)  # noqa: S102 -- executing the documented example itself
 
-
     result = namespace["result"]
     assert result.energy_eV.shape == result.spectrum.shape
     assert result.background_energy_eV.shape == result.background.shape

@@ -251,6 +251,7 @@ def test_row_transforms_keep_the_new_fields_in_step_with_the_rows():
         clipped["t_end_ang"][untouched], segments["t_end_ang"][keep][untouched]
     )
 
+
 def test_every_per_row_array_is_registered_in_the_owning_field_registry():
     """`_SEG_ARRAYS` is the registry every per-row transform loops over, so a new
     per-row array that skips it survives a row mask at full length and silently
