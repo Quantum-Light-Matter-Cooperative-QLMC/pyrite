@@ -138,15 +138,75 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Checklist
 
-- [ ] A — Regime audit **and priority check**. Measure the distribution of
-      per-flight path length, per-flight inelastic event count, and the Vavilov
-      `kappa` per flight and per CSDA range, across low-/high-Z catalog
-      materials over 1--300 keV. In the same slice, compute the systematic phase
-      error implied by the Joy--Luo stopping bias at the 25 keV / 1 keV point
-      and compare it against the ~0.3 rad straggling estimate. If the systematic
-      term dominates, this task waits on
-      `feature/relativistic-bethe-stopping` and its acceptance numbers are
-      re-measured against the corrected clock.
+- [x] A — Regime audit **and priority check**. **Done. Gate outcome: PROCEED —
+      the systematic term did dominate, and the task it gated on has already
+      landed.** Instrument:
+      `agentdocs/tasks/feature/energy-loss-straggling/slice_a_regime_audit.py`
+      (`--part regime|mc|gate`), reusing the repository's own Browning elastic
+      cross section, `spliced_stopping_keV_per_ang`, and the
+      `_element_crossover_keV -> inf` seam that reproduces the retired
+      pure-Joy--Luo model bit-for-bit.
+
+      **Regime, 9 catalog materials (hopg, diamond, hbn, 4h_sic, silicon, mos2,
+      ws2, wse2, ptbi2) plus bare `C(0.1136)` / `W(0.06305)`, at 1, 2, 5, 10,
+      25, 50, 100, 200, 300 keV.**
+
+      | quantity | range over the whole matrix |
+      |---|---|
+      | flight length `lam_el` | 4.3 Ang (W, 1 keV) to 4211 Ang (C, 300 keV) |
+      | `kappa` per flight | 2.0e-5 (ptbi2, 300 keV) to 2.9e-2 (ptbi2, 1 keV) |
+      | `kappa` over the CSDA range | **0.080 to 0.16, at every energy and material** |
+      | hard (`eps^-2`) collisions per flight | 0.003 (ptbi2) to 0.16 (C, 300 keV) |
+      | all inelastic per flight, `S lam / I` | 0.03 (W) to 2.6 (C, 300 keV) |
+
+      Two results decide slice B. **(i)** Per flight the process is not merely
+      sub-Gaussian, it is sub-*Landau*: `kappa <~ 6e-3` above 2 keV everywhere,
+      with **well under one** close collision per flight (0.003--0.16). Landau
+      theory assumes many collisions in the `eps^-2` tail; that assumption fails
+      by two orders of magnitude. **(ii)** Integrating over the *entire* CSDA
+      range does **not** rescue it: `kappa_R` is 0.080--0.16 across all 50-material
+      chemistry and all 1--300 keV, essentially flat, and never approaches the
+      `kappa >~ 10` Gaussian limit. So Bohr/Gaussian straggling is inadmissible
+      at every point in the catalog, per flight *and* integrated, and the
+      few-collision family (Urban-style) is the only admissible one.
+
+      **Measured flight-length distribution** (production `mott` core, frozen
+      energy model, 400 electrons x 4 seeds, slab = 2x `R_CSDA`, 1.3e5--4.0e6
+      flights per cell). Normalized to the analytic `lam_el(E0)`: mean
+      0.47--0.83, median 0.29--0.46, p10 0.06--0.09, p90 1.4--1.7, p99 3.0--3.6.
+      Broadly exponential (median/mean ~0.62 against `ln 2` = 0.693) contracted
+      by slowing-down, since the Browning hazard rises as `E` falls.
+
+      **Gate, at `energy-step-convergence`'s own 25 keV / 1 um / 1 keV-photon
+      point in graphite**, both clocks integrated exactly (RK4 on `dE/ds`,
+      `t = int ds/beta`) rather than linearized:
+
+      | term | value |
+      |---|---|
+      | systematic, retired Joy--Luo vs current splice | **24.6 rad** |
+      | the same, linearized cross-check | 22.0 rad |
+      | straggling Jensen bias, full Moller `T_max = E/2` (`sigma_E` = 1.54 keV) | 13.4 rad |
+      | straggling Jensen bias, soft collisions only (`sigma_E` = 0.68 keV) | 2.6 rad |
+      | `energy-step-convergence`'s stated figure (implies `sigma_E` ~ 0.3 keV) | ~0.3 rad |
+
+      The systematic term dominated the straggling term by 1.8x against the
+      loosest straggling estimate and by ~80x against the doc's own figure, so
+      the gate fires: **this task waits on `feature/relativistic-bethe-stopping`.**
+      That wait is already discharged — `2c51754`, `dcdb1cd`, `d15a8ef` are
+      ancestors of both `main` and this branch, and that task's checklist A--G is
+      complete. Nothing is blocked.
+
+      **Acceptance numbers re-measured against the corrected clock.** With the
+      splice in place the systematic channel is no longer 6%; what remains is the
+      accuracy of the mean stopping power itself. On the corrected clock a
+      residual stopping error of 0.1% / 0.5% / 1% / 2% costs **0.35 / 1.76 /
+      3.51 / 7.02 rad** at the same operating point. The straggling bias
+      (2.6 rad soft, 13.4 rad upper bound) is therefore no longer subdominant to
+      anything that is *fixed*: it is comparable to a ~1% residual mean-stopping
+      uncertainty and an order of magnitude above the 0.1 rad numerical
+      tolerance. The `~0.3 rad` figure that motivates this task is a soft-collision
+      underestimate by roughly 10--50x; the motivation is strengthened, not
+      weakened.
 - [ ] B — Distribution selection. Choose the fluctuation model for the measured
       few-collision regime — Urban-style (the leading candidate, built for
       exactly this regime), Vavilov, or Blunck--Leisegang-corrected Gaussian —
@@ -222,10 +282,50 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Decisions and open questions
 
-- **Open/blocking:** sequencing (checklist A). The first-order systematic
-  stopping error very likely dominates the second-order straggling bias at the
-  operating point that motivates this task. If A confirms that, this waits on
-  `feature/relativistic-bethe-stopping`. This is the gate, not the model form.
+- **Closed by A — sequencing. Gate outcome: PROCEED.** Measured, not asserted.
+  The systematic stopping error *did* dominate (24.6 rad against 0.3--13.4 rad
+  at 25 keV / 1 um / 1 keV photon), so the gate condition fired and this task
+  waits on `feature/relativistic-bethe-stopping` — but that task landed on
+  `main` before slice A ran (`2c51754`, `dcdb1cd`, `d15a8ef`; checklist A--G
+  complete). The dependency is satisfied, so nothing is blocked and slice B may
+  be dispatched. The prior entries in this section that read "sequence behind
+  `feature/relativistic-bethe-stopping`" and "this waits on" are superseded by
+  this line; they were written before that branch merged.
+- **Recorded by A — the motivating figure was an underestimate.** The `~0.3 rad`
+  Jensen bias in `energy-step-convergence.md` corresponds to a `sigma_E` of
+  ~0.3 keV over 1 um at 25 keV in graphite, which is a *soft-collision-only*
+  spread. The Moller-cutoff variance the transport actually discards is
+  `sigma_E` = 1.54 keV, and the Jensen bias 2.6 rad (soft) to 13.4 rad (full
+  cutoff, an upper bound because the second-moment expansion is not valid on a
+  heavy-tailed loss distribution). Slice H's acceptance target should be stated
+  against this range, not against `~0.3 rad`.
+- **Open, and NOT owned here — residual mean-stopping accuracy.** On the
+  corrected clock a residual stopping error of 1% still costs 3.5 rad at the
+  same operating point, the same order as the straggling bias. That residual
+  belongs to `feature/reference-electron-stopping-data` (checklist entirely
+  open). It does not re-block this task, because straggling owns a channel —
+  the `exp(-sigma_phi^2/2)` suppression of the coherent line — that no
+  mean-stopping work can supply. But slice H must not claim to have closed the
+  phase budget while that term is outstanding.
+- **Contradicted by A — the "whole trajectory is closer to many-collision"
+  premise is false.** The scope section above argues that because coherent phase
+  accumulates over the whole trajectory, "the many-collision limit is closer to
+  applicable at the level that matters". Measured: `kappa` integrated over the
+  *entire* CSDA range is 0.080--0.16 for every catalog material at every energy
+  from 10 to 300 keV — flat, and three orders of magnitude below the `kappa >~ 10`
+  Gaussian threshold. Integrating over the trajectory moves the process from
+  sub-Landau to Vavilov, never to Gaussian. Slice B must select for the Vavilov/
+  few-collision regime end to end and may not fall back on a whole-trajectory
+  central-limit argument.
+- **Contradicted by A — `energy-step-convergence.md`'s tungsten event count.**
+  That page's "about 0.11 [inelastic events per flight] in tungsten at 25 keV"
+  does not reproduce from the repository's own stopping power and mean excitation
+  energy: `W(0.06305)` gives **0.03**, a factor of 3.7 low. The carbon figure
+  reproduces exactly (measured 1.03 against the stated "about 1.0"), so the
+  method is right and the tungsten number looks like an arithmetic slip. The
+  page's conclusion — fewer than one inelastic event per flight in tungsten — is
+  unaffected and in fact stronger. Fixing that sentence belongs to slice I, not
+  here; slice A does not edit docs pages.
 - **Open:** distribution choice for the few-collision regime (checklist B).
   Urban-style is the leading candidate; this is model selection against measured
   `kappa`, not an open-ended design question.
@@ -241,10 +341,13 @@ Interactions that need explicit design rather than incremental patching:
   straggling could land as a research capability with no `Numerics` field, or as
   a production toggle with checkpoint-identity consequences. Cheaper to decide
   before E than to retrofit after F.
-- **Decided:** sequence behind `feature/relativistic-bethe-stopping` rather
-  than bounding the accepted range to ~<50 keV. That task is small, unblocked,
-  and removes the constraint entirely; capping the range would leave the
-  systematic error in place across most of the sweep.
+- **Decided, and now satisfied:** sequence behind
+  `feature/relativistic-bethe-stopping` rather than bounding the accepted range
+  to ~<50 keV. That task is small, unblocked, and removes the constraint
+  entirely; capping the range would leave the systematic error in place across
+  most of the sweep. **It has since landed on `main`, so this is a discharged
+  dependency, not a live one** — see the gate outcome at the top of this
+  section.
 - **Decided:** straggling defaults **off** and the off path is bit-for-bit
   identical to current transport on all four cores. Every existing ledger row,
   golden, and validation write-up must stay valid unchanged with the feature
@@ -253,6 +356,31 @@ Interactions that need explicit design rather than incremental patching:
   whatever model `feature/relativistic-bethe-stopping` (and later
   `feature/reference-electron-stopping-data`) establishes, rather than
   re-deriving one.
+
+## Next slice
+
+**Recommendation: dispatch B now.** Not "hold". The gate's own condition fired,
+but the task it gated on is already merged, so the only thing that could have
+held this task is gone. B is also the slice A most directly de-risks: it was
+scoped as "model selection against measured `kappa`", and `kappa` is now
+measured across the full catalog and energy sweep rather than at the single
+carbon/25 keV/1 um point the scope section quotes.
+
+B should be run knowing three things slice A established:
+
+1. `kappa` per flight is 2e-5--3e-2 with **under one** close collision per
+   flight. Landau is inadmissible per flight, not merely inaccurate.
+2. `kappa` over the whole CSDA range is 0.080--0.16 and flat in `Z` and energy.
+   Gaussian/Bohr is inadmissible everywhere too, and the whole-trajectory
+   central-limit escape hatch in the scope section does not exist.
+3. That leaves the few-collision family. Urban-style was already the leading
+   candidate on prior reasoning; A converts that from a guess to the only
+   option that covers the measured matrix, and B's real work is deriving and
+   pinning the specific variant rather than re-litigating the family.
+
+Slices J and K remain late doc slices as scoped; nothing in A changes their
+dependency order, though K's rewrite of `electron-transport.md` should also
+carry A's correction to the tungsten event count if slice I has not already.
 
 ## Delegation slices and required skills
 
