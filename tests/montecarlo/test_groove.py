@@ -464,6 +464,12 @@ def _run_grooved(
     vac_E = np.empty(max_vac)
     vac_t0 = np.empty(max_vac)
     vac_id = np.empty(max_vac, dtype=np.int64)
+    # Slice D straggling plumbing: off by construction here, this helper only
+    # exercises groove geometry. `_transport_core_grooved` never touches
+    # `stream_keys_arr`/`stragg_dE` when `straggle_on` is False.
+    straggle_on = False
+    stream_keys_arr = np.zeros(Ne, dtype=np.uint64)
+    stragg_dE = np.zeros(Ne)
 
     tp = float(spec.tilt_polar_rad)
     nseg, nvac, n_back, n_trans, n_side, n_cutoff, n_step_limited = (
@@ -526,6 +532,9 @@ def _run_grooved(
             vac_E,
             vac_t0,
             vac_id,
+            straggle_on,
+            stream_keys_arr,
+            stragg_dE,
         )
     )
     return dict(

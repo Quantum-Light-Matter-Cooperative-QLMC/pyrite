@@ -1606,6 +1606,9 @@ def _transport_core_ungrooved(
     seg_t_end,
     seg_flight,
     seg_substep,
+    straggle_on,
+    stream_keys_arr,
+    stragg_dE,
 ):
     """Compiled ungrooved transport core, with optional finite x/y footprint.
 
@@ -1788,6 +1791,22 @@ def _transport_core_ungrooved(
                 beta_j = beta_from_keV_scalar(E_j)
             t_end_j = clock[e] + step_j / beta_j
 
+            # Straggling (slice D): sample the Urban compound loss for this
+            # row's own (electron, flight, substep) key, for test purposes
+            # only -- NOT applied to E_end_j/E_keV. That integration, the
+            # redefined cutoff crossing, and the max_dE_frac interaction are
+            # slice E's job. The key domain is disjoint from every draw above
+            # (own salted rehash of the electron's stream key, own counter
+            # starting at 0), so this can never perturb the free-path /
+            # scattering-angle draws, on or off.
+            if straggle_on:
+                urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
+                flight_key = _urban_flight_key_scalar(urban_key, flight_of[e], substep_of[e])
+                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
+                    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j, step_j, flight_key, _SM64_ZERO
+                )
+                stragg_dE[e] += stragg_loss
+
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
             seg_dir[nseg, 2] = dz
@@ -1925,6 +1944,14 @@ def _transport_core_ungrooved_lut(
     seg_t_end,
     seg_flight,
     seg_substep,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_E_cross,
+    straggle_on,
+    stream_keys_arr,
+    stragg_dE,
 ):
     """Ungrooved lockstep CPU core using pretabulated energy-dependent physics.
 
@@ -1932,6 +1959,13 @@ def _transport_core_ungrooved_lut(
     left-endpoint rule, 1 for the midpoint predictor-corrector rule, which also
     records ``seg_E_end``/``seg_t_end`` per flight. ``max_dE_frac`` matches the
     exact core's energy-controlled substepping and optical-depth budget.
+
+    ``L_Js``/``L_Zs``/``L_ks``/``L_coeffs``/``L_E_cross`` are the exact-core
+    per-element tables (slice D): the LUT bakes ``dE/ds`` as a single
+    per-layer interpolant and carries no per-element split, but the Urban
+    sampler needs one, so straggling re-derives its own per-element ``C_i``
+    from these tables via :func:`_urban_sample_compound_keV` rather than the
+    LUT's interpolated total. Unused when ``straggle_on`` is false.
     """
     EPS = 1e-6
     tau_left = np.full(Ne, -1.0)
@@ -2080,6 +2114,19 @@ def _transport_core_ungrooved_lut(
                 E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
                 t_end_j = clock[e] + step_j * inv_beta_j
 
+            # Straggling (slice D): see the comment in _transport_core_ungrooved.
+            # Uses the exact per-element tables, not the LUT's interpolated
+            # total dE/ds -- see the docstring above. Not applied to
+            # E_end_j/E_keV; for test purposes only.
+            if straggle_on:
+                urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
+                flight_key = _urban_flight_key_scalar(urban_key, flight_of[e], substep_of[e])
+                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
+                    L_Zs[L], L_Js[L], L_ks[L], L_coeffs[L], L_E_cross[L], 0.0, E_j, step_j,
+                    flight_key, _SM64_ZERO,
+                )
+                stragg_dE[e] += stragg_loss
+
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
             seg_dir[nseg, 2] = dz
@@ -2225,6 +2272,9 @@ def _transport_core_grooved(
     vac_E,
     vac_t0,
     vac_id,
+    straggle_on,
+    stream_keys_arr,
+    stragg_dE,
 ):
     """Compiled groove-aware scalar transport.
 
@@ -2435,6 +2485,17 @@ def _transport_core_grooved(
                 E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
                 beta_j = beta_from_keV_scalar(E_j)
             t_end_j = clock[e] + step_j / beta_j
+
+            # Straggling (slice D): see the identical comment in
+            # _transport_core_ungrooved. Same disjoint key domain, same
+            # for-test-purposes-only scope; not applied to E_end_j/E_keV.
+            if straggle_on:
+                urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
+                flight_key = _urban_flight_key_scalar(urban_key, flight_id[e], substep_id[e])
+                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
+                    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j, step_j, flight_key, _SM64_ZERO
+                )
+                stragg_dE[e] += stragg_loss
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -2704,6 +2765,8 @@ def _transport_core_ungrooved_perelectron(
     seg_substep,
     seg_count,
     exit_code,
+    straggle_on,
+    stragg_dE,
 ):
     """Run electrons ``[e_start, e_start + e_count)`` to completion, independently.
 
@@ -2740,6 +2803,12 @@ def _transport_core_ungrooved_perelectron(
         e = e_start + i
         seg_count[i] = 0
         exit_code[i] = EXIT_NOT_ENTERED
+        # A capacity replay re-runs this whole per-electron loop from the
+        # snapshotted start state, so the accumulator is reset here (like
+        # seg_count above) rather than trusting a stale value from a discarded
+        # attempt.
+        if straggle_on:
+            stragg_dE[e] = 0.0
         if not alive[e]:
             continue
         exit_code[i] = EXIT_STEP_LIMITED
@@ -2880,6 +2949,20 @@ def _transport_core_ungrooved_perelectron(
                 E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
                 beta_j = beta_from_keV_scalar(E_j)
             t_end_j = clock[e] + step_j / beta_j
+
+            # Straggling (slice D): see the comment in _transport_core_ungrooved.
+            # Reuses this electron's own stream key `key` through the disjoint
+            # salted-rehash domain, so it draws no uniforms from `key`'s own
+            # counter `draw` and cannot perturb the free-path / scattering-angle
+            # draws above. Not applied to E_end_j/E_keV; for test purposes only.
+            if straggle_on:
+                urban_key = _urban_stream_key_scalar(key)
+                flight_key = _urban_flight_key_scalar(urban_key, flight_id, substep_id)
+                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
+                    L_Zs[L, :n_el], L_Js[L, :n_el], L_ks[L, :n_el], L_coeffs[L, :n_el],
+                    L_E_cross[L, :n_el], 0.0, E_j, step_j, flight_key, _SM64_ZERO,
+                )
+                stragg_dE[e] += stragg_loss
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg
@@ -3034,6 +3117,13 @@ def _transport_core_ungrooved_perelectron_lut(
     seg_substep,
     seg_count,
     exit_code,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_E_cross,
+    straggle_on,
+    stragg_dE,
 ):
     """Per-electron CPU reference for the CUDA LUT transport kernel.
 
@@ -3041,6 +3131,13 @@ def _transport_core_ungrooved_perelectron_lut(
     :func:`_transport_core_ungrooved_perelectron`; the LUT variant reads the
     midpoint stopping power and inverse speed from the same interpolation the
     lockstep LUT core uses.
+
+    ``L_Js``/``L_Zs``/``L_ks``/``L_coeffs``/``L_E_cross`` are the same padded
+    ``(n_layers, max_elements)`` per-element tables
+    :func:`_transport_core_ungrooved_perelectron` receives, threaded in here
+    only for straggling (slice D): the LUT carries no per-element split (see
+    :func:`_transport_core_ungrooved_lut`). Unused when ``straggle_on`` is
+    false.
     """
     EPS = 1e-6
 
@@ -3048,6 +3145,8 @@ def _transport_core_ungrooved_perelectron_lut(
         e = e_start + i
         seg_count[i] = 0
         exit_code[i] = EXIT_NOT_ENTERED
+        if straggle_on:
+            stragg_dE[e] = 0.0
         if not alive[e]:
             continue
         exit_code[i] = EXIT_STEP_LIMITED
@@ -3167,6 +3266,19 @@ def _transport_core_ungrooved_perelectron_lut(
             else:
                 E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
                 t_end_j = clock[e] + step_j * inv_beta_j
+
+            # Straggling (slice D): see the comment in
+            # _transport_core_ungrooved_perelectron. Uses the exact per-element
+            # tables threaded in above, not the LUT's interpolated total dE/ds.
+            # Not applied to E_end_j/E_keV; for test purposes only.
+            if straggle_on:
+                urban_key = _urban_stream_key_scalar(key)
+                flight_key = _urban_flight_key_scalar(urban_key, flight_id, substep_id)
+                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
+                    L_Zs[L, :n_el], L_Js[L, :n_el], L_ks[L, :n_el], L_coeffs[L, :n_el],
+                    L_E_cross[L, :n_el], 0.0, E_j, step_j, flight_key, _SM64_ZERO,
+                )
+                stragg_dE[e] += stragg_loss
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg
@@ -3601,10 +3713,21 @@ def _run_per_electron_transport_lut(
     seg_t_end,
     seg_flight,
     seg_substep,
+    stragg_layer_tables,
+    straggle_on,
+    stragg_dE,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
 ):
-    """Drive the CPU/CUDA LUT per-electron core with capacity replay."""
+    """Drive the CPU/CUDA LUT per-electron core with capacity replay.
+
+    ``stragg_layer_tables`` is the ``(L_Js, L_Zs, L_ks, L_coeffs, L_E_cross)``
+    padded per-element tables (slice D straggling; see
+    :func:`_transport_core_ungrooved_perelectron_lut`), ``straggle_on`` gates
+    it, and ``stragg_dE`` is the Ne-sized per-electron accumulator the core
+    writes into -- downloaded once at the end like the compacted segments,
+    since it lives outside the capacity-replay scratch/compaction path.
+    """
     on_device = xp is not np
     to_dev = xp.asarray if on_device else (lambda a: a)
     to_host = xp.asnumpy if on_device else (lambda a: a)
@@ -3628,6 +3751,8 @@ def _run_per_electron_transport_lut(
     d_inv_beta = to_dev(lut.inv_beta)
     d_cdf = to_dev(lut.cdf)
     d_alpha = to_dev(lut.alpha)
+    d_stragg_layers = tuple(to_dev(a) for a in stragg_layer_tables)
+    d_stragg = to_dev(stragg_dE)
     _nsys_pop()
 
     midpoint = energy_model_code == 1
@@ -3688,6 +3813,9 @@ def _run_per_electron_transport_lut(
                 *scratch,
                 seg_count,
                 exit_code,
+                *d_stragg_layers,
+                straggle_on,
+                d_stragg,
             )
             _nsys_pop()
 
@@ -3751,7 +3879,7 @@ def _run_per_electron_transport_lut(
         )
         _nsys_pop()
 
-    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined
+    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
 
 
 def _run_per_electron_transport(
@@ -3791,10 +3919,17 @@ def _run_per_electron_transport(
     seg_t_end,
     seg_flight,
     seg_substep,
+    straggle_on,
+    stragg_dE,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
 ):
     """Drive ``core`` over electron batches and compact the result.
+
+    ``straggle_on``/``stragg_dE`` are slice D's straggling gate and Ne-sized
+    per-electron accumulator; see the LUT driver's docstring
+    (:func:`_run_per_electron_transport_lut`) for why it is downloaded
+    separately from the compacted segments.
 
     ``core`` is either :func:`_transport_core_ungrooved_perelectron` or the CUDA
     kernel launcher; ``xp`` is the matching array module. The two share this
@@ -3819,8 +3954,9 @@ def _run_per_electron_transport(
     the pageable host copy it replaces, that is roughly two orders of magnitude
     of bandwidth -- and holds both copies of the payload while it runs.
 
-    Returns ``(nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited,
-    joined)``, where ``joined`` is ``None`` unless ``keep_on_device``.
+    Returns ``(nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined,
+    stragg_dE)``, where ``joined`` is ``None`` unless ``keep_on_device`` and
+    ``stragg_dE`` is all-zero unless ``straggle_on``.
     """
     on_device = xp is not np
     to_dev = xp.asarray if on_device else (lambda a: a)
@@ -3845,6 +3981,7 @@ def _run_per_electron_transport(
     d_bot = to_dev(L_bot)
     d_layers = tuple(to_dev(a) for a in layer_tables)
     d_mott = tuple(to_dev(a) for a in mott)
+    d_stragg = to_dev(stragg_dE)
     _nsys_pop()
 
     midpoint = energy_model_code == 1
@@ -3900,6 +4037,8 @@ def _run_per_electron_transport(
                 *scratch,
                 seg_count,
                 exit_code,
+                straggle_on,
+                d_stragg,
             )
             _nsys_pop()
             # Split from the launch above because on CUDA the launch returns
@@ -3978,7 +4117,7 @@ def _run_per_electron_transport(
         )
         _nsys_pop()
 
-    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined
+    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
 
 
 def _alloc_scratch(xp, m, cap, midpoint=False):
@@ -4039,6 +4178,7 @@ def simulate_trajectories(
     collect_diagnostics=False,
     energy_model="frozen",
     max_dE_frac=0.0,
+    straggling=False,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -4263,6 +4403,22 @@ def simulate_trajectories(
       the flight's direction and identity and never scatters.
 
     Validation: transport-midpoint-stopping, energy-controlled-propagation
+
+    straggling: slice D plumbing only -- False (default, BIT-FOR-BIT with every
+      run before this parameter existed) skips the Urban sampler entirely on
+      every core, touching neither its RNG stream nor any output array. True
+      samples the per-flight/-substep Urban compound loss (slice C) on a
+      counter-addressed stream disjoint from the free-path/scattering-angle
+      draws -- keyed on this electron's own stream key via a salted rehash, so
+      turning it on can never perturb those draws -- and returns the summed
+      per-electron sampled loss as ``result["straggle_dE_keV"]``. The sampled
+      loss is diagnostic only: it is NOT subtracted from any electron's energy,
+      so ``E_keV``/``E_end_keV`` and every downstream quantity are unaffected
+      whether this is on or off. Applying it to transport (the cutoff-crossing
+      redefinition and the ``max_dE_frac`` substep interaction) is slice E.
+      Raises if requested on a core slice D has not wired it into -- there is
+      none such today; all five cores (ungrooved/grooved lockstep, both LUT
+      variants, per-electron) implement the sampling call.
 
     collect_diagnostics: opt in to fixed-size percentile summaries of the
     per-flight fractional energy loss, relative elastic-hazard change,
@@ -4677,6 +4833,44 @@ def simulate_trajectories(
     dev_segs = None
     energy_model_code = 1 if energy_model == "midpoint" else 0
 
+    # Straggling (slice D). ``straggle_on`` is a plain bool -- every core
+    # branches on it before touching the Urban sampler's own stream, so False
+    # (the default) costs nothing beyond the Ne-sized zero allocations below
+    # and is BIT-FOR-BIT with a run compiled before this parameter existed.
+    # ``stragg_stream_keys`` feeds the lockstep/grooved cores, which have no
+    # per-electron counter stream of their own (see the module-level "counter-
+    # based per-electron RNG" comment); the per-electron cores instead reuse
+    # their own ``stream_key``/``d_keys`` directly. ``stragg_layer_tables``
+    # supplies the per-electron LUT core with the per-element split the LUT
+    # itself does not carry (see `_transport_core_ungrooved_perelectron_lut`).
+    straggle_on = bool(straggling)
+    stragg_dE = np.zeros(Ne) if straggle_on else np.zeros(0)
+    stragg_stream_keys = stream_keys(seed, Ne) if straggle_on else np.zeros(1, dtype=np.uint64)
+    if straggle_on:
+        _stragg_packed = pack_layer_tables(
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_E_cross,
+            L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
+        )
+        stragg_layer_tables = _stragg_packed[:5]
+    else:
+        _stragg_dummy = np.zeros((1, 1), dtype=np.float64)
+        stragg_layer_tables = (
+            _stragg_dummy,
+            _stragg_dummy,
+            _stragg_dummy,
+            _stragg_dummy,
+            _stragg_dummy,
+        )
+
     _nsys_push("cxr.transport.core")
     if groove is None and transport_lut is not None and transport_core != "lockstep":
         if transport_core == "cuda":
@@ -4688,7 +4882,7 @@ def simulate_trajectories(
         if keep_segments_on_device:
             seg_xp = core_xp
 
-        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs = (
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs, stragg_dE = (
             _run_per_electron_transport_lut(
                 core,
                 core_xp,
@@ -4726,6 +4920,9 @@ def simulate_trajectories(
                 seg_t_end,
                 seg_flight,
                 seg_substep,
+                stragg_layer_tables,
+                straggle_on,
+                stragg_dE,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
             )
@@ -4779,6 +4976,14 @@ def simulate_trajectories(
             seg_t_end,
             seg_flight,
             seg_substep,
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_E_cross,
+            straggle_on,
+            stragg_stream_keys,
+            stragg_dE,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -4811,7 +5016,7 @@ def simulate_trajectories(
             L_mott_denom2,
             L_sr_joy_numer,
         )
-        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs = (
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs, stragg_dE = (
             _run_per_electron_transport(
                 core,
                 core_xp,
@@ -4849,6 +5054,8 @@ def simulate_trajectories(
                 seg_t_end,
                 seg_flight,
                 seg_substep,
+                straggle_on,
+                stragg_dE,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
             )
@@ -4909,6 +5116,9 @@ def simulate_trajectories(
             seg_t_end,
             seg_flight,
             seg_substep,
+            straggle_on,
+            stragg_stream_keys,
+            stragg_dE,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -4985,6 +5195,9 @@ def simulate_trajectories(
             vac_E_buf,
             vac_t0_buf,
             vac_id_buf,
+            straggle_on,
+            stragg_stream_keys,
+            stragg_dE,
         )
         vac_start = vac_start_buf[:nvac]
         vac_end = vac_end_buf[:nvac]
@@ -5068,6 +5281,11 @@ def simulate_trajectories(
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
+    if straggle_on:
+        # Diagnostic only (slice D): the summed per-electron Urban-sampled
+        # loss, NOT subtracted from E_keV/E_end_keV anywhere above. Applying
+        # it to transport is slice E.
+        result["straggle_dE_keV"] = stragg_dE
     if energy_model == "midpoint":
         result["E_end_keV"] = seg_E_end[:nseg]
         result["t_end_ang"] = seg_t_end[:nseg]
