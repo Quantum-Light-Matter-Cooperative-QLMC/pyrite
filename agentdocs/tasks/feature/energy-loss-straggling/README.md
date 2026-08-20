@@ -194,6 +194,31 @@ Interactions that need explicit design rather than incremental patching:
       "No straggling" block in `stopping-power.md`; and update the four
       write-ups that currently cite straggling as unmodeled so none of them
       still asserts an omission that has been closed.
+- [ ] J — Computational/statistical techniques docs. Update
+      `docs/computation/random-streams.md` for the new per-flight
+      counter-addressed straggling stream: which counter tuple it is keyed on
+      (`(electron, flight, substep)`), where it sits relative to the
+      `SeedSequence` child tree and the existing counter-addressed streams, what
+      the draw-order contract now guarantees, and the off-path bit-for-bit
+      inertness claim — following that page's own "Adding a new random input"
+      procedure rather than bolting on a section. Update
+      `docs/computation/statistical-methods.md` where the added per-flight
+      variance changes what the estimators see (error bars, seed replication,
+      paired-seed shift, and the coherent-vs-incoherent split, since the
+      `exp(-sigma_phi^2/2)` suppression lands on the coherent term). Check
+      `docs/computation/precision-and-tolerances.md` for tolerance statements
+      that assumed a deterministic loss, and correct or explicitly re-affirm
+      each.
+- [ ] K — Electron transport physics docs. Rewrite
+      `docs/physics/beam-transport/electron-transport.md` for a stochastic loss:
+      the "Model" and "Energy-controlled propagation" sections (the loss per
+      flight is now a random variable of the stated mean), "Physical flights and
+      numerical substeps" (substep invariance is distributional, not algebraic —
+      carry E's re-derivation), the redefined cutoff crossing and its
+      `n_cutoff_stopped` bookkeeping, and line 125's standing claim that
+      straggling is unmodelled. State the source equation, assumptions, limiting
+      case, and `Validation: energy-loss-straggling` marker per the physics-doc
+      contract. Cross-link J so the RNG plumbing is documented once, not twice.
 
 ## Decisions and open questions
 
@@ -248,6 +273,11 @@ Interactions that need explicit design rather than incremental patching:
   `physics-validation`.
 - **I** — `documentation-maintenance` and `physics-review`; `one-shot` once H
   reports numbers.
+- **J** — `documentation-maintenance`; depends on D (stream design settled) and
+  H (numbers). `one-shot`.
+- **K** — `documentation-maintenance` with `physics-review`; depends on B, E,
+  and H. `one-shot` once H reports numbers. J and K touch disjoint files and may
+  run in parallel, but both land after I so the ledger row exists to cite.
 
 ## Acceptance checks
 
@@ -281,3 +311,14 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
 - `Validation: energy-loss-straggling` exists with a ledger row and
   fresh-context validation; every write-up asserting straggling is unmodeled is
   updated or explicitly still true.
+- `docs/computation/random-streams.md` documents the straggling stream through
+  that page's own "Adding a new random input" procedure, including the
+  off-path inertness claim; `statistical-methods.md` and
+  `precision-and-tolerances.md` no longer assume a deterministic per-flight
+  loss.
+- `docs/physics/beam-transport/electron-transport.md` describes a stochastic
+  loss end to end — model, energy-controlled propagation, substep semantics,
+  cutoff crossing — carries the `Validation: energy-loss-straggling` marker, and
+  retains no claim that straggling is unmodelled.
+- `uv run pyrite-dev docs` passes and cross-references between the computation
+  and physics pages resolve.
