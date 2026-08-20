@@ -22,7 +22,10 @@ os.environ.setdefault("MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "pyrit
 
 # Make the package importable for autodoc even from a non-installed checkout
 # (an editable ``uv sync`` also puts it on the path).
-sys.path.insert(0, os.path.abspath("../src"))
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 
 from pyrite import __version__
 
