@@ -293,6 +293,16 @@ The practical size of the change is the CSDA range at the default
 Ranges shorten, as they must: Joy–Luo under-stopped above its validated range.
 At 300 keV graphite's CSDA range goes from 643 to 416 μm.
 
+### Catalog-wide spread
+
+The range change is nearly material-independent: measured over all 50 catalog
+materials it spans −4.2% to −2.6% at 25 keV, −15.1% to −14.1% at 100 keV, and
+−35.4% to −34.6% at 300 keV — a band under 1.1 points wide at every energy. It
+has to be narrow, because the only material dependence in the ratio of the two
+laws enters through the mean excitation energies, and only logarithmically.
+Low-$Z$ materials sit at the strongly-shortened end (graphite and diamond are
+the extreme) and high-$Z$ at the weakly-shortened end.
+
 One thing stays open, and one is now closed. $\delta$ is measured: omitting it
 costs at most 0.13% of $|dE/ds|$ at 25 keV and 1.50% at 300 keV
 ({numref}`tbl-stopping-density-effect`), so it stays omitted with that error
@@ -301,6 +311,129 @@ the higher-crossover elements it sits above where Joy–Luo fits best and below
 where Berger–Seltzer is used. `E_cut_keV` defaults to 5 keV, which bounds most
 of that exposure, but the residual uncertainty there is stated rather than
 inherited silently.
+
+## What the change does downstream
+
+{numref}`tbl-stopping-splice-range-change` is the input, not the answer. The
+quantities the campaign reports respond very differently to it depending on how
+much of the range the target actually occupies.
+
+**Thin films are almost untouched.** At the catalog's 1000 Å production
+thickness — about 1/60 of the 25 keV CSDA range — an electron crosses the film
+having lost a per-mille fraction of its energy, so which stopping law was used
+barely enters. Measured on graphite, silicon, and WSe₂ at 30, 100, and 300 keV,
+the total bremsstrahlung yield, its mean photon energy, the characteristic-line
+yield, and the coherent-line peak position all move by less than 1%, and the
+shape of the normalized bremsstrahlung spectrum by less than 0.1% in any bin.
+The largest single shift is the coherent yield at 30 keV, +0.97%, which is a
+path-length effect: the electron's in-film trajectory is very slightly shorter,
+so the phase it accumulates changes.
+
+**Thick targets change materially.** Once the target is a sizeable fraction of
+the range, the shortened range redistributes the electron fates. Measured with
+20 000 electrons per model per seed, four seeds, on a slab about half the old
+CSDA range thick:
+
+```{list-table} Electron fates under Joy–Luo versus the splice. Slab thickness ≈ half the retired model's CSDA range; $E_\mathrm{cut}$ = 5 keV, Mott elastic scattering.
+:name: tbl-stopping-splice-fates
+:header-rows: 1
+
+* - Case
+  - Backscattered $\eta$
+  - Transmitted
+  - Stopped in target
+* - Graphite, 25 keV, 3 μm
+  - 0.0441 → 0.0402 (−8.7%)
+  - 0.742 → 0.726 (−2.2%)
+  - 0.214 → 0.234 (+9.4%)
+* - Graphite, 100 keV, 40 μm
+  - 0.0473 → 0.0379 (−19.8%)
+  - 0.694 → 0.603 (−13.1%)
+  - 0.258 → 0.359 (+38.9%)
+* - Graphite, 300 keV, 250 μm
+  - 0.0658 → 0.0336 (−48.9%)
+  - 0.763 → 0.556 (−27.2%)
+  - 0.171 → 0.410 (+140.1%)
+* - Silicon, 100 keV, 40 μm
+  - 0.165 → 0.138 (−16.1%)
+  - 0.404 → 0.310 (−23.2%)
+  - 0.431 → 0.551 (+28.0%)
+* - WSe₂, 100 keV, 40 μm
+  - 0.521 → 0.485 (−6.9%)
+  - 0 → 0
+  - 0.479 → 0.515 (+7.5%)
+```
+
+Both loss channels shrink and the stopped fraction absorbs the difference,
+which is the expected signature of a shorter range: fewer electrons reach the
+far face, and fewer survive the walk back out to be counted as backscattered.
+Backscatter falls even in the semi-infinite WSe₂ case, where transmission is
+identically zero, so this is not a thickness artifact — an electron that loses
+energy faster on the outbound leg has less left for the return.
+
+Mean deposition depth moves much less than the range does (−0.1% to −2.2% for
+graphite and silicon, −22% for WSe₂ at 300 keV), because in a target thinner
+than the range the depth distribution is truncated by geometry rather than set
+by the range.
+
+## Checking against ESTAR
+
+The collision stopping power here is the same quantity NIST's
+[ESTAR](https://physics.nist.gov/PhysRefData/Star/Text/ESTAR.html) tabulates,
+so ESTAR is available as an external oracle. Querying the web service is not
+redistribution, so this needs no licensing determination — but for that reason
+the comparison is run by hand rather than wired into the test suite, and the
+repository packages no ESTAR data.
+
+Two things must be matched before the numbers are comparable:
+
+- ESTAR's CSDA range integrates to zero energy; the ranges here integrate down
+  to `E_cut_keV`. Compare against ESTAR's $R(E_0) - R(5\ \mathrm{keV})$, not
+  $R(E_0)$.
+- ESTAR's *total* CSDA range includes radiative stopping, which this model
+  omits entirely. Below ~300 keV the radiative term is well under a percent for
+  low $Z$ but not for tungsten or bismuth, so use ESTAR's collision-only
+  column, and expect the residual disagreement to grow with $Z$.
+
+Spliced-model ranges from `E_cut_keV` = 5 keV, in μm, for that comparison:
+
+```{list-table} Spliced-model CSDA ranges [μm], integrated from 5 keV.
+:name: tbl-stopping-csda-estar
+:header-rows: 1
+
+* - Material
+  - 25 keV
+  - 100 keV
+  - 300 keV
+* - Graphite (HOPG)
+  - 5.92
+  - 70.3
+  - 415.4
+* - Diamond
+  - 3.81
+  - 45.3
+  - 267.7
+* - Hexagonal BN
+  - 6.10
+  - 72.4
+  - 427.8
+* - Silicon
+  - 6.77
+  - 77.9
+  - 452.3
+* - MoS₂
+  - 3.84
+  - 43.0
+  - 246.2
+* - WSe₂
+  - 2.63
+  - 28.5
+  - 160.1
+```
+
+`tests/montecarlo/test_stopping_csda_range.py` pins these, and pins the retired
+model's values beside them, so a regression that moved both together would
+still be caught.
 
 ## Evaluation along a flight
 

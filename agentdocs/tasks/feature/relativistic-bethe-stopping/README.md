@@ -122,13 +122,33 @@ low-energy branch rather than being invalidated.
       scalar (it is a bulk property, so it factors out of the Bragg sum) and
       every call site passes `0.0`, so B lands as a data change, not a signature
       change.
-- [~] B — Quantify the density-effect correction `delta` over 1--300 keV for the
-      catalog materials. **Sized, not measured -- blocked on source data.** For electrons `beta gamma = 1` at ~212 keV, and typical
-      solid `X_0` puts the onset near the top of the swept range, so this may be
-      bounded and omitted with a stated error — but low-Z solids have low `X_0`
-      and graphite is a primary material, so measure rather than assume. If it
-      exceeds the accuracy target, add Sternheimer parameters from the PDG
-      tables already cited for `J`.
+- [x] B — Quantify the density-effect correction `delta` over 1--300 keV for the
+      catalog materials. **Done -- measured, and `delta` stays 0.**
+      Unblocked by finding the Sternheimer coefficients in the headers of the
+      PDG's per-element muon energy-loss tables (`MUE/muE_<slug>.txt`) -- the
+      same tables already cited for `J_keV`, so no new source and no
+      redistribution question. `STERNHEIMER_DENSITY_EFFECT` in
+      `materials/_transport_data.py` carries `a, k, x0, x1, C_bar, delta0` for
+      all 24 catalog elements; `transport.sternheimer_delta` evaluates it. **No
+      transport path calls either** -- they exist to bound the omission.
+      Measured `delta/[...]`: worst 0.13% at 25 keV (Pd), 0.44% at 100 keV (C),
+      1.50% at 300 keV (C). Monotone in `beta*gamma`, so 300 keV bounds the
+      swept range. At 25 keV that is ~45x smaller than the 6% Joy--Luo error
+      this branch removes, and below the unmodelled shell corrections,
+      straggling, and delta rays. **Decision: keep `delta = 0`, now measured
+      rather than assumed.**
+      Two corrections fell out. The doc's old justification cited the wrong
+      threshold -- it read `beta gamma <= 1.24` as below the Sternheimer onset,
+      but the onset is `x_0`, not `x_1`, and graphite's `x_0 = -0.009` puts the
+      swept range *above* onset for the repository's primary material. The
+      conclusion survives; the reasoning did not. And the Sternheimer--Peierls
+      general rules cannot serve as the bound: they reproduce PDG's fitted
+      `C_bar` from `I` and `hbar omega_p` to better than `1e-3` for all 24
+      elements (validating `hbar omega_p = 28.816 sqrt(rho Z/A)` eV), but place
+      `x_0 >= 0.2`, above the swept range, so they return `delta = 0`
+      throughout -- not conservative.
+      `delta` is a bulk property and does **not** Bragg-add, so the per-element
+      table bounds a compound's `delta` without composing it.
 - [x] C — Splice policy. **Decided: per element, not global.**
       Measured crossovers span 2.66 keV (B) to 10.46 keV (Bi), monotone in `I`;
       every catalog element crosses exactly once, well above the energy where the
@@ -178,14 +198,94 @@ low-energy branch rather than being invalidated.
       are **not** a substitute for running the kernel: it needs a `pyrite
       remote` run before it can be trusted, and that is the first thing F should
       do.
-- [ ] E — Model selection and identity: expose which branch/model produced a run
-      in result metadata, and extend checkpoint/case identity so Joy--Luo and
-      Berger--Seltzer records cannot collide in the CAS.
-- [ ] F — Measure. CSDA range, backscatter and transmission fractions,
-      bremsstrahlung spectral shape, and coherent-line phase, before and after.
-      Validate CSDA ranges against ESTAR as a **user-run oracle** — comparing
-      against a web service is not redistribution, so this is available now and
-      needs no license determination. Heavy matrices via `pyrite remote`.
+- [x] E — Model selection and identity. **Done. Decided: unconditional, not
+      user-selectable** -- closing the open question below. The splice is
+      physics, not a preference; a selector would add identity surface for a
+      branch nobody should choose. So `transport.STOPPING_MODEL =
+      "joy-luo/berger-seltzer-splice"` is a **generation marker**, following the
+      `line_kinematics` precedent (commit `500a1dc`): hashed *unconditionally*
+      rather than under the divergence-only rule, which moves every digest
+      exactly once and orphans the Joy--Luo-era records (rev-and-re-run).
+      Wired into three surfaces: `campaign/profiles.py::_identity_v1` (dataset
+      identity), `::case_content_key` (the CAS content key), and
+      `api.Result.provenance`.
+      The `case_content_key` half is a **gap the precedent did not cover** and
+      is the part that actually matters. `xray_dispersion` was a Case *field*,
+      so removing it moved the content key automatically. `STOPPING_MODEL` is
+      not a case field: without hashing it explicitly the CAS would happily
+      serve a Joy--Luo-era blob for a case that now transports differently.
+      Fallout: 13 golden digests in `tests/materials/test_profiles.py` re-minted
+      (12 identity + 1 survey), which is the intended once-only move; two new
+      tests pin that the marker is what moved them.
+- [~] F — Measure. **Done for everything a local CPU can carry; the heavy
+      matrix and the CUDA verification are not, and need `pyrite remote`.**
+      The comparison is against the *retired model*, reproduced exactly rather
+      than approximately: forcing `transport._element_crossover_keV` to `+inf`
+      is the single seam both the layer-table builder and the host helper read,
+      so every element stays on Joy--Luo and the spliced form degenerates to
+      the old one bit-for-bit (verified: `-0.0002106718886166231`, equal to
+      `_dEds_compound_scalar` to the last bit).
+
+      **CSDA range, all 50 catalog materials.** Shortening spans -4.2% to -2.6%
+      at 25 keV, -15.1% to -14.1% at 100 keV, -35.4% to -34.6% at 300 keV --
+      a band under 1.1 points wide at every energy, because the only material
+      dependence is logarithmic in `I`. Low-`Z` at the strong end (diamond,
+      graphite), high-`Z` at the weak end (PtBi2). This reproduces and extends
+      the three-material table below, which is how the harness was checked.
+
+      **Emitted spectra at production thickness: nothing moves.** At the
+      catalog's 1000 Ang film -- about 1/60 of the 25 keV CSDA range -- graphite,
+      silicon and WSe2 at 30/100/300 keV all shift by <1% in brem yield, brem
+      mean energy, line yield and coherent peak position, and by <0.1% per bin
+      in normalized brem shape. Largest single shift: coherent yield +0.97%,
+      graphite at 30 keV, which is a path-length/phase effect. **This is the
+      campaign-relevant answer and it is reassuring** -- the splice does not
+      invalidate thin-film results.
+
+      **Thick targets move a lot.** Slab ~ half the retired model's CSDA range,
+      2e4 electrons x 4 seeds per model, Mott elastic, `E_cut` 5 keV:
+
+      | case | backscatter | transmission | stopped |
+      |---|---|---|---|
+      | graphite 25 keV, 3 um | 0.0441 -> 0.0402 (-8.7%) | 0.742 -> 0.726 (-2.2%) | 0.214 -> 0.234 (+9.4%) |
+      | graphite 100 keV, 40 um | 0.0473 -> 0.0379 (-19.8%) | 0.694 -> 0.603 (-13.1%) | 0.258 -> 0.359 (+38.9%) |
+      | graphite 300 keV, 250 um | 0.0658 -> 0.0336 (-48.9%) | 0.763 -> 0.556 (-27.2%) | 0.171 -> 0.410 (+140.1%) |
+      | silicon 100 keV, 40 um | 0.165 -> 0.138 (-16.1%) | 0.404 -> 0.310 (-23.2%) | 0.431 -> 0.551 (+28.0%) |
+      | silicon 300 keV, 250 um | 0.206 -> 0.129 (-37.5%) | 0.487 -> 0.253 (-48.0%) | 0.307 -> 0.618 (+101.1%) |
+      | WSe2 100 keV, 40 um | 0.521 -> 0.485 (-6.9%) | 0 -> 0 | 0.479 -> 0.515 (+7.5%) |
+      | WSe2 300 keV, 250 um | 0.548 -> 0.464 (-15.2%) | 0 -> 0 | 0.452 -> 0.536 (+18.4%) |
+
+      Every shift is >3 sigma over the seed spread. Both loss channels shrink
+      and the stopped fraction absorbs the difference. Backscatter falls even in
+      semi-infinite WSe2, where transmission is identically zero, so it is not a
+      thickness artifact: an electron that loses energy faster outbound has less
+      left for the walk back out. Mean deposition depth moves far less than the
+      range does (-0.1% to -2.2% for graphite/silicon; -22% for WSe2 at 300 keV),
+      because in a target thinner than the range the depth distribution is
+      truncated by geometry, not set by the range.
+
+      **Durable artifact:** `tests/montecarlo/test_stopping_csda_range.py` pins
+      the new ranges *and* the retired model's ranges beside them, so a
+      regression that moved both together is still caught, plus the catalog-wide
+      band. `docs/physics/beam-transport/stopping-power.md` gained
+      `## What the change does downstream` and `## Checking against ESTAR`.
+
+      **Not done, and why:**
+      - *Thick-target spectral yields with error bars.* A single-seed Ne=400
+        probe gives graphite at 10 um: brem total -4.8%, line total -6.1% at
+        30 keV, and about -1.4% at 100/300 keV (where 10 um is thin relative to
+        the range). These are indicative only -- getting error bars on them
+        exceeded the local CPU budget repeatedly. Heavy matrix -> `pyrite remote`,
+        which is what AGENTS.md requires anyway.
+      - *ESTAR cross-check.* By design a **user-run oracle**: querying the web
+        service is not redistribution, but that is also why it is not wired into
+        the suite and no ESTAR data is packaged. The procedure and the numbers
+        to compare against are written up in `## Checking against ESTAR`,
+        including the two matching conditions that are easy to get wrong
+        (ESTAR integrates to zero energy, so compare `R(E0) - R(5 keV)`; and use
+        the collision-only column, since radiative stopping is out of scope
+        here and is not negligible for W or Bi).
+      - *CUDA verification (the D half).* Still not run. No GPU here.
 - [x] G — Docs, ledger, goldens. **Done.** The `Validation: relativistic-bethe-stopping`
       ledger row and the `electron-transport` narrowing were already in place
       from D; what remained was `stopping-power.md`, which still described only
@@ -218,46 +318,59 @@ low-energy branch rather than being invalidated.
 - **Decided:** splice is **per element**, each at its own Joy--Luo/Berger--Seltzer
   crossover, computed once at table-build time. Continuous by construction for
   every material; a global splice cannot be (best case 1.84% step). See C.
-- **Open:** whether `delta` needs Sternheimer parameters over 1--300 keV.
-  Bounded to the small-correction regime (`beta*gamma <= 1.24` across the whole
-  swept range) but not closed -- needs `x_0, x_1, a, m` per material from PDG.
+- **Decided:** `delta` stays 0, and that is now a measurement rather than an
+  assumption. Sternheimer coefficients for all 24 catalog elements are in the
+  tree (`STERNHEIMER_DENSITY_EFFECT`) purely to bound the omission -- no
+  transport path reads them. Worst cost 0.13% at 25 keV, 1.50% at 300 keV.
   See B.
 - **Open:** the 1--10 keV region remains served by a fit neither form validates
   well. With `E_cut_keV` defaulting to 5 keV the exposure is bounded, but the
   accepted uncertainty there should be stated rather than inherited silently.
-- **Open:** whether the model becomes user-selectable or the splice is
-  unconditional. Unconditional is simpler and matches the `xray_dispersion`
-  precedent (commit `500a1dc` made in-medium dispersion unconditional); a
-  selector adds identity surface for a branch nobody should choose.
+- **Decided:** the splice is **unconditional**, not user-selectable, matching
+  the `xray_dispersion` / `line_kinematics` precedent. `STOPPING_MODEL` is a
+  generation marker hashed into dataset identity, the CAS content key, and run
+  provenance. See E.
 
 ## Status
 
-A, C, G, and the CPU half of D are implemented, tested, and green. B is sized
-but blocked on PDG Sternheimer parameters. E and F are untouched.
+A, B, C, E, G and the CPU half of D are implemented, tested and green. F is
+done for every measurement a local CPU can carry.
+
+**Two things remain, and both need `pyrite remote`:**
+
+1. **Verify the CUDA kernel.** This is the real gap. `transport_jit_kernel`
+   imports `cupy` at module scope, so locally it cannot even be imported and
+   its tests skip. Two source-text pins were added (see D) and they catch a
+   constant or a branch edited on one side only, but they do not run the
+   kernel. Until a GPU run agrees with the CPU cores, the CUDA path is
+   *written*, not *verified*.
+2. **The thick-target spectral matrix with error bars** (see F).
+
+Neither is blocked on design; both are blocked on hardware and on explicit
+authorization to submit remote jobs.
+
+**Still owed, and unchanged:** fresh-context `physics-validation` on the
+derivation. The ledger row `relativistic-bethe-stopping` stays at `filtered` --
+in-context units/limits/signs plus regression anchors only. This was the stated
+next step before D, and D, E, B and F have all landed ahead of it on direct
+instruction, so the verification debt is larger now, not smaller. Only a human
+marks `signed-off`.
+
+**Separate follow-up, deliberately not fixed here:** PDG reads Pd
+`I = 470.0 eV`; `_transport_data.py` carries `477.0 eV`. Pre-existing data this
+branch does not otherwise touch; moving it would have confounded every
+before/after measurement in F. Affects PdS2/PdTe2/PdSe2 by roughly 0.1-0.2% of
+`dE/ds`. Recorded in the ledger and in `_transport_data.py`.
 
 **The model is now wired in and results have changed** above each element's
-crossover (2.66--10.46 keV). Nineteen existing tests moved; every one was a
-stale Joy--Luo oracle or a signature, and each is recorded below under
-"Test fallout" rather than silently retuned.
-
-Ledger row `relativistic-bethe-stopping` in
-`docs/validation/ledger-transport-background.md` stays at `filtered` --
-in-context units/limits/signs plus regression anchors only. Fresh-context
-`physics-validation` has **not** run. It was the stated next step before D and
-it still has not happened; D landed ahead of it on direct instruction, so the
-verification debt is now larger, not smaller.
+crossover (2.66--10.46 keV). Nineteen existing tests moved in D and thirteen
+golden digests were re-minted in E; every one was a stale Joy--Luo oracle, a
+signature, or the intended once-only digest move, and each is recorded rather
+than silently retuned.
 
 The `electron-transport` ledger row was narrowed in place: its claim now says
 Joy--Luo is the low-energy branch only, and its "Validity ceiling" note is
 labelled superseded above the crossover.
-
-`docs/physics/beam-transport/stopping-power.md` now documents the
-Berger--Seltzer branch and the per-element splice, and its "Validity ceiling"
-section is rewritten to state what the transport does today rather than what
-it used to do. `pyrite-dev docs` passes clean (offline, warnings-as-errors).
-This closes the doc-vs-code gap; it does not substitute for the fresh-context
-`physics-validation` pass still owed on the derivation (see above), nor for F's
-measurement work.
 
 ### Test fallout from D
 
