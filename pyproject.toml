@@ -3,7 +3,7 @@ name = "pyrite-xray"
 version = "0.2.0"
 description = "Coherent X-ray radiation and electron transport in crystals."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.1",
     "crystals>=1.7,<2",
