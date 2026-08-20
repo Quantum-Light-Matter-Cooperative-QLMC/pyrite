@@ -28,7 +28,14 @@ from ...materials.crystal import (
 from .._backend import REAL, _to_cpu, xp
 from ..geometry import _mosaic_quadrature, _orientation_R, first_prism_exit
 from ..groove import _THETA_TOL, escape_distance_ang
-from ..transport import TRANSPORT_ELEMENTS, beta_from_keV
+from ..transport import (
+    _BS_PREFACTOR,
+    _LN2,
+    _MC2_KEV,
+    TRANSPORT_ELEMENTS,
+    _element_crossover_keV,
+    beta_from_keV,
+)
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
 # Owning registry for every per-row transform: layer filtering, population
@@ -504,6 +511,57 @@ def _segments_in_layer(segments, L):
     return out
 
 
+def _spliced_stopping_magnitude_xp(E_eval, layer_index, layer_compositions):
+    """Spliced |dE/ds| [keV/Ang] per row at the given evaluation energy.
+
+    This is the device-array twin of
+    ``transport.spliced_stopping_keV_per_ang``: the rows here may live on
+    the GPU, so it cannot delegate to the host helper. It must stay in step
+    with it -- ``test_stopping_mirrors_agree`` pins the two together.
+    """
+    tau = E_eval / REAL(_MC2_KEV)
+    gamma = REAL(1.0) + tau
+    beta_sq = REAL(1.0) - REAL(1.0) / (gamma * gamma)
+    f_minus = (
+        REAL(1.0)
+        - beta_sq
+        + (tau * tau / REAL(8.0) - (REAL(2.0) * tau + REAL(1.0)) * REAL(_LN2)) / (gamma * gamma)
+    )
+
+    stopping = xp.zeros_like(E_eval)
+    for index, comp in enumerate(layer_compositions):
+        joy_luo_total = xp.zeros_like(E_eval)
+        bs_total = xp.zeros_like(E_eval)
+        for element, n_i in comp:
+            params = TRANSPORT_ELEMENTS[element]
+            Z = REAL(params["Z"])
+            J = REAL(params["J_keV"])
+            k = REAL(0.731 + 0.0688 * np.log10(float(Z)))
+            coeff = REAL((n_i / 0.602214076) * float(Z))
+            E_cross = REAL(
+                _element_crossover_keV(
+                    element, float(Z), float(params["A"]), float(params["J_keV"])
+                )
+            )
+            I_rel = J / REAL(_MC2_KEV)
+            use_bs = E_eval >= E_cross
+            joy_luo_total += xp.where(
+                use_bs, REAL(0.0), coeff * xp.log(REAL(1.166) * (E_eval + k * J) / J)
+            )
+            bs_total += xp.where(
+                use_bs,
+                coeff
+                * (xp.log(tau * tau * (tau + REAL(2.0)) / (REAL(2.0) * I_rel * I_rel)) + f_minus),
+                REAL(0.0),
+            )
+        # magnitude: callers divide an energy drop by it
+        layer_stopping = (
+            REAL(7.85e-4) / E_eval * joy_luo_total + REAL(_BS_PREFACTOR) / beta_sq * bs_total
+        )
+        stopping = xp.where(layer_index == index, layer_stopping, stopping)
+    return stopping
+
+
 def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     """Clip terminal material flights to a population-specific energy floor.
 
@@ -547,20 +605,7 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     layer_compositions = [composition] if layers is None else [item[2] for item in layers]
 
     def _stopping_at(E_eval):
-        """Joy--Luo |dE/ds| [keV/Ang] per row at the given evaluation energy."""
-        stopping = xp.zeros_like(E_eval)
-        for index, comp in enumerate(layer_compositions):
-            total = xp.zeros_like(E_eval)
-            for element, n_i in comp:
-                params = TRANSPORT_ELEMENTS[element]
-                Z = REAL(params["Z"])
-                J = REAL(params["J_keV"])
-                k = REAL(0.731 + 0.0688 * np.log10(float(Z)))
-                coeff = REAL((n_i / 0.602214076) * float(Z))
-                total += coeff * xp.log(REAL(1.166) * (E_eval + k * J) / J)
-            layer_stopping = REAL(7.85e-4) * total / E_eval
-            stopping = xp.where(layer_index == index, layer_stopping, stopping)
-        return stopping
+        return _spliced_stopping_magnitude_xp(E_eval, layer_index, layer_compositions)
 
     midpoint_rows = "E_end_keV" in out and "E_repr_keV" in out
     E_cut = REAL(E_cut_keV)

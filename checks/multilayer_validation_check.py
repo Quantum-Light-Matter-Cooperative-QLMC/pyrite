@@ -42,12 +42,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from pyrite.campaign.sweep import crystal_params, substrate_composition  # noqa: E402
 from pyrite.montecarlo import (  # noqa: E402
     TRANSPORT_ELEMENTS,
-    _dEds_compound,
     _mu_total_inv_ang,
     mc_spectrum,
     simulate_trajectories,
     tilted_geometry,
 )
+from pyrite.montecarlo.transport import spliced_stopping_keV_per_ang  # noqa: E402
 
 _N_A = 6.02214076e23  # rho[g/cm^3] = n[1/Ang^3] * A[g/mol] * 1e24 / N_A
 
@@ -151,7 +151,9 @@ def _dose_depths(element, n_per_ang3, E0_keV, slab_ang, Ne=300, seed=0):
         elastic_model="sr",  # analytic screened-Rutherford: no Mott table needed
     )
     z = segs["r_mid"][:, 2]
-    dep = np.abs(_dEds_compound(comp, segs["E_keV"])) * segs["L_ang"]  # keV per segment
+    # keV per segment; _dEds_compound took per-element arrays, not a composition,
+    # so this call had been broken -- the host helper is the signature it wanted.
+    dep = np.abs(spliced_stopping_keV_per_ang(comp, segs["E_keV"])) * segs["L_ang"]
     d_bar = float(np.sum(dep * z) / np.sum(dep))
     return d_bar, float(z.max()), segs["n_transmitted"] / Ne
 

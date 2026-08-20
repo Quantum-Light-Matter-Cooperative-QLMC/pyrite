@@ -78,6 +78,13 @@ I8_STEP_LIMITED = np.int8(4)
 I8_NOT_ENTERED = np.int8(5)
 
 F64_ONE_OVER_511 = 1 / np.float64(510.99895)
+# Berger-Seltzer / ICRU-37 constants, mirroring montecarlo.transport.
+F64_MC2_KEV = np.float64(510.99895)
+F64_BS_PREFACTOR = np.float64(1.535e-6)
+F64_LN2 = np.float64(0.6931471805599453)
+F64_JL_PREFACTOR = np.float64(7.85e-4)
+F64_JL_166 = np.float64(1.166)
+F64_EIGHT = np.float64(8.0)
 
 
 @dataclass(frozen=True)
@@ -141,22 +148,45 @@ def _rate_sr(E_i, sr_rate_numer, sr_joy_numer):
 
 
 @jit.rawkernel(device=True)
-def _dEds_packed(L_Js, L_ks, L_coeffs, row, n_el, E_i):
-    """Joy--Luo stopping power over one layer's flattened element row.
+def _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_i):
+    """Spliced Joy--Luo/Berger--Seltzer stopping over one layer's element row.
 
     The midpoint rule needs ``dE/ds`` at three energies per flight, so the
     element loop is a device function here rather than inlined as it was under
-    the frozen rule.
+    the frozen rule. Each element switches at its own crossover, exactly as in
+    ``transport._dEds_spliced_packed_scalar`` -- this must stay bit-comparable
+    with the CPU cores, so the arithmetic is written in the same order.
+
+    No density-effect term: the CPU twin carries a ``delta`` parameter that every
+    call site passes ``0.0``, and ``x - 0.0`` is exactly ``x``, so the two agree
+    bit-for-bit today. Whoever lands the density effect (checklist B) has to add
+    it *here* as well, which is the one place the shared signature does not force.
     """
-    total = F64_ZERO
+    tau = E_i / F64_MC2_KEV
+    gamma = F64_ONE + tau
+    beta_sq = F64_ONE - F64_ONE / (gamma * gamma)
+    f_minus = (
+        F64_ONE
+        - beta_sq
+        + (tau * tau / F64_EIGHT - (F64_TWO * tau + F64_ONE) * F64_LN2) / (gamma * gamma)
+    )
+
+    joy_luo_total = F64_ZERO
+    bs_total = F64_ZERO
     i_el = I32_ZERO
     while i_el < n_el:
         J = L_Js[row + i_el]
-        k = L_ks[row + i_el]
         coeff = L_coeffs[row + i_el]
-        total += coeff * xp.log(np.float64(1.166) * (E_i + k * J) / J)
+        if E_i < L_E_cross[row + i_el]:
+            k = L_ks[row + i_el]
+            joy_luo_total += coeff * xp.log(F64_JL_166 * (E_i + k * J) / J)
+        else:
+            I_rel = J / F64_MC2_KEV
+            bs_total += coeff * (
+                xp.log(tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)) + f_minus
+            )
         i_el += I32_ONE
-    return -np.float64(7.85e-4) / E_i * total
+    return -F64_JL_PREFACTOR / E_i * joy_luo_total - F64_BS_PREFACTOR / beta_sq * bs_total
 
 
 @jit.rawkernel(device=True)
@@ -250,6 +280,7 @@ def _transport_kernel(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     L_sr_rate_numer,
     L_mott_numer,
@@ -424,14 +455,14 @@ def _transport_kernel(
         # 3. Record the radiating material segment. An electron that overflows
         #    `cap` keeps transporting so `seg_count` reports the capacity the
         #    replay needs.
-        dEds = _dEds_packed(L_Js, L_ks, L_coeffs, row, n_el, E_j)
+        dEds = _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_j)
         cutoff_j = False
         if energy_model_code == I32_ONE:
             # The midpoint rule makes E_end = E_cut at the cutoff by definition,
             # so the truncation distance solves the scheme at
             # E_mid = (E_start + E_cut)/2, not its left-endpoint linearization.
             cutoff_distance = (E_cut_e - E_j) / _dEds_packed(
-                L_Js, L_ks, L_coeffs, row, n_el, F64_HALF * (E_j + E_cut_e)
+                L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_cut_e)
             )
         else:
             cutoff_distance = (E_cut_e - E_j) / dEds
@@ -468,7 +499,7 @@ def _transport_kernel(
                 # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
                 E_pred = E_j + dEds * step_j
                 E_end_j = E_j + step_j * _dEds_packed(
-                    L_Js, L_ks, L_coeffs, row, n_el, F64_HALF * (E_j + E_pred)
+                    L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_pred)
                 )
             beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
         else:
@@ -1148,6 +1179,7 @@ def run_transport_kernel(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     L_sr_rate_numer,
     L_mott_numer,
@@ -1220,6 +1252,7 @@ def run_transport_kernel(
             L_Zs.reshape(-1),
             L_ks.reshape(-1),
             L_coeffs.reshape(-1),
+            L_E_cross.reshape(-1),
             L_ncm3.reshape(-1),
             L_sr_rate_numer.reshape(-1),
             L_mott_numer.reshape(-1),

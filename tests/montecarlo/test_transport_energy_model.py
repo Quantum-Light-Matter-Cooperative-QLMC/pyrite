@@ -1,18 +1,25 @@
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import TransportLUTConfig, simulate_trajectories
+from pyrite.montecarlo.transport import (
+    TransportLUTConfig,
+    simulate_trajectories,
+    spliced_stopping_keV_per_ang,
+)
 
 CARBON = [("C", 0.1136)]
-_Z = 6.0
-_J_KEV = 0.078
-_K = 0.731 + 0.0688 * np.log10(_Z)
-_COEFF = (CARBON[0][1] / 0.602214076) * _Z
 
 
 def _dEds(E_keV):
-    """Joy--Luo continuous slowing down [keV/Ang], independent of the core."""
-    return -7.85e-4 / E_keV * _COEFF * np.log(1.166 * (E_keV + _K * _J_KEV) / _J_KEV)
+    """Continuous slowing down [keV/Ang], independent of the core.
+
+    What these tests exercise is the *integrator* -- midpoint versus the frozen
+    rule, and the order of its error -- so the reference has to use the same
+    ``dE/ds`` the core does. Independence comes from the host helper being a
+    separate implementation from the Numba/CUDA kernels, not from a different
+    stopping model.
+    """
+    return float(spliced_stopping_keV_per_ang(CARBON, E_keV))
 
 
 def _beta(E_keV):
@@ -150,8 +157,21 @@ def test_midpoint_end_energy_and_clock_beat_the_frozen_rule():
     assert abs(float(result["t_end_ang"][0]) - t_ref) < 0.01 * abs(frozen_t - t_ref)
 
 
-@pytest.mark.parametrize("field", ["E_end_keV", "t_end_ang"])
-def test_midpoint_end_state_error_is_third_order_in_flight_length(field):
+@pytest.mark.parametrize(
+    ("field", "lengths"),
+    [
+        ("E_end_keV", (600.0, 300.0, 150.0)),
+        # The clock reaches its asymptote later than the energy does. Its error
+        # arrives through beta(E(s)) -- one more composition than the energy
+        # error -- so the O(s^4) term stays comparable to the O(s^3) term at
+        # flight lengths where the energy ratio is already 8.02. Measured over
+        # 600 -> 4.7 Ang the clock ratio falls 12.3, 10.9, 9.8, 9.0, 8.5, 8.3,
+        # 8.07: third order, approached from above. These lengths are where it
+        # has arrived.
+        ("t_end_ang", (18.75, 9.375, 4.6875)),
+    ],
+)
+def test_midpoint_end_state_error_is_third_order_in_flight_length(field, lengths):
     """One flight is one step, so its local truncation error is O(s^3).
 
     Halving the flight length must cut that error by ~8. The frozen rule is one
@@ -159,7 +179,7 @@ def test_midpoint_end_state_error_is_third_order_in_flight_length(field):
     `test_midpoint_end_energy_and_clock_beat_the_frozen_rule` pins in amplitude.
     """
     errors = []
-    for length in (600.0, 300.0, 150.0):
+    for length in lengths:
         result = _single_flight(length)
         E_start = float(result["E_start_keV"][0])
         E_ref, t_ref = _reference_flight(E_start, float(result["L_ang"][0]))

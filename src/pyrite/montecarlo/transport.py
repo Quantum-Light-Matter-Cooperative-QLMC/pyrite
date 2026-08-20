@@ -498,23 +498,6 @@ def _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_i):
 
 
 @njit(cache=True)
-def _dEds_packed_scalar(L_Js, L_ks, L_coeffs, L, n_el, E_i):
-    """Joy--Luo stopping power read from the padded per-layer tables.
-
-    Same arithmetic as :func:`_dEds_compound_scalar`, but indexing the
-    ``(n_layers, max_elements)`` rows the per-electron and CUDA cores use. The
-    padding is zero-filled and not a valid element, so ``n_el`` bounds the loop.
-    """
-    total = 0.0
-    for i in range(n_el):
-        J = L_Js[L, i]
-        k = L_ks[L, i]
-        coeff = L_coeffs[L, i]
-        total += coeff * np.log(1.166 * (E_i + k * J) / J)
-    return -7.85e-4 / E_i * total
-
-
-@njit(cache=True)
 def _dEds_compound(J_arr, k_arr, coeff_arr, E_keV):
     out = np.empty_like(E_keV)
 
@@ -738,6 +721,91 @@ def _dEds_spliced_compound(J_arr, k_arr, coeff_arr, E_cross_arr, delta, E_keV):
     return out
 
 
+@njit(cache=True)
+def _dEds_spliced_packed_scalar(L_Js, L_ks, L_coeffs, L_E_cross, delta, L, n_el, E_i):
+    """Spliced stopping power read from the padded per-layer tables.
+
+    Same arithmetic as :func:`_dEds_spliced_compound_scalar`, but indexing the
+    ``(n_layers, max_elements)`` rows the per-electron and CUDA cores use. The
+    padding is zero-filled and not a valid element, so ``n_el`` bounds the loop.
+    """
+    tau = E_i / _MC2_KEV
+    gamma = 1.0 + tau
+    beta_sq = 1.0 - 1.0 / (gamma * gamma)
+    f_minus = 1.0 - beta_sq + (tau * tau / 8.0 - (2.0 * tau + 1.0) * _LN2) / (gamma * gamma)
+
+    joy_luo_total = 0.0
+    bs_total = 0.0
+    for i in range(n_el):
+        J = L_Js[L, i]
+        coeff = L_coeffs[L, i]
+        if E_i < L_E_cross[L, i]:
+            joy_luo_total += coeff * np.log(1.166 * (E_i + L_ks[L, i] * J) / J)
+        else:
+            I_rel = J / _MC2_KEV
+            bs_total += coeff * (
+                np.log(tau * tau * (tau + 2.0) / (2.0 * I_rel * I_rel)) + f_minus - delta
+            )
+
+    return -7.85e-4 / E_i * joy_luo_total - _BS_PREFACTOR / beta_sq * bs_total
+
+
+# The crossover is a bisection, far too expensive for a hot loop, and it depends
+# only on (Z, J) -- A and rho cancel in the ratio because both laws carry the
+# same rho Z/A. Solve it once per element and reuse it for every layer that
+# contains that element.
+_CROSSOVER_CACHE: dict[str, float] = {}
+
+
+def _element_crossover_keV(element, Z, A, J_keV):
+    """Memoized Joy--Luo/Berger--Seltzer crossover energy [keV] for one element."""
+    cached = _CROSSOVER_CACHE.get(element)
+    if cached is None:
+        cached = _bs_joy_luo_crossover_keV(Z, A, J_keV)
+        _CROSSOVER_CACHE[element] = cached
+    return cached
+
+
+def spliced_stopping_keV_per_ang(composition, E_keV):
+    """Spliced stopping power [keV/Angstrom] (negative) for a normalized composition.
+
+    The host-side entry point for code outside the transport cores that needs
+    the *same* model the cores evaluate: the cost proxy in ``campaign.sweep``
+    and the frozen-rule replay in ``spectrum.diagnostics``. Both previously
+    carried their own copy of the Joy--Luo constants and drifted the moment the
+    model changed; delegating here is what keeps them honest.
+
+    ``composition`` is the ``(element, n_i)`` sequence used everywhere else,
+    with ``n_i`` in Angstrom^-3. Plain NumPy, no Numba: these are cold paths and
+    should not pay a compile.
+    """
+    E = np.asarray(E_keV, dtype=float)
+    tau = E / _MC2_KEV
+    gamma = 1.0 + tau
+    beta_sq = 1.0 - 1.0 / (gamma * gamma)
+    f_minus = 1.0 - beta_sq + (tau * tau / 8.0 - (2.0 * tau + 1.0) * _LN2) / (gamma * gamma)
+
+    joy_luo_total = np.zeros_like(E)
+    bs_total = np.zeros_like(E)
+    for element, n_i in composition:
+        params = TRANSPORT_ELEMENTS[element]
+        Z = float(params["Z"])
+        A = float(params["A"])
+        J = float(params["J_keV"])
+        k = 0.731 + 0.0688 * np.log10(Z)
+        coeff = (n_i / 0.602214076) * Z
+        I_rel = J / _MC2_KEV
+        use_bs = E >= _element_crossover_keV(element, Z, A, J)
+        joy_luo_total += np.where(use_bs, 0.0, coeff * np.log(1.166 * (E + k * J) / J))
+        bs_total += np.where(
+            use_bs,
+            coeff * (np.log(tau * tau * (tau + 2.0) / (2.0 * I_rel * I_rel)) + f_minus),
+            0.0,
+        )
+
+    return -7.85e-4 / E * joy_luo_total - _BS_PREFACTOR / beta_sq * bs_total
+
+
 @dataclass(frozen=True)
 class TransportLUTConfig:
     """Energy-grid policy for the ungrooved transport hot loops.
@@ -808,6 +876,7 @@ def build_transport_energy_lut(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_sr_rate_numer,
     L_mott_numer,
     L_mott_denom1,
@@ -861,13 +930,16 @@ def build_transport_energy_lut(
         n = int(n_el[L])
         rates = np.empty((n, n_energy), dtype=np.float64)
 
-        stop_sum = np.zeros(n_energy, dtype=np.float64)
-        for i_el in range(n):
-            J = float(L_Js[L][i_el])
-            k = float(L_ks[L][i_el])
-            coeff = float(L_coeffs[L][i_el])
-            stop_sum += coeff * np.log(1.166 * (E_grid + k * J) / J)
-        dEds[L] = -7.85e-4 / E_grid * stop_sum
+        # The LUT bakes dE/ds, so it must carry the same spliced model the direct
+        # cores evaluate or the LUT paths would silently keep the old physics.
+        dEds[L] = _dEds_spliced_compound(
+            np.asarray(L_Js[L], dtype=np.float64),
+            np.asarray(L_ks[L], dtype=np.float64),
+            np.asarray(L_coeffs[L], dtype=np.float64),
+            np.asarray(L_E_cross[L], dtype=np.float64),
+            0.0,
+            E_grid.copy(),
+        )
 
         for i_el in range(n):
             sr_joy = float(L_sr_joy_numer[L][i_el])
@@ -1082,6 +1154,7 @@ def _transport_core_ungrooved(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     L_sr_rate_numer,
     L_mott_numer,
@@ -1164,6 +1237,7 @@ def _transport_core_ungrooved(
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
             coeff_arr = L_coeffs[L]
+            E_cross_arr = L_E_cross[L]
             sr_rate_numer = L_sr_rate_numer[L]
             mott_numer = L_mott_numer[L]
             mott_denom1 = L_mott_denom1[L]
@@ -1230,15 +1304,15 @@ def _transport_core_ungrooved(
             exit_bot_j = cross_dn_j and z_bot_L >= z_total
 
             # 3. Close the flight's energy and clock, then record its row.
-            dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
+            dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
             cutoff_j = False
             if energy_model_code == 1:
                 # The midpoint rule makes E_end = E_cut at the cutoff by
                 # definition, so E_mid there is (E_start + E_cut)/2 exactly and
                 # the truncation distance solves the scheme rather than its
                 # left-endpoint linearization.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_compound_scalar(
-                    J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_cut_e)
+                cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_compound_scalar(
+                    J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
                 )
             else:
                 cutoff_distance = (E_cut_e - E_j) / dEds
@@ -1277,8 +1351,8 @@ def _transport_core_ungrooved(
                     # the predictor never undershoots E_cut and the Joy-Luo log
                     # argument stays in range.
                     E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_compound_scalar(
-                        J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_pred)
+                    E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
+                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
                     )
                 # One representative energy per flight also drives the clock:
                 # s / beta(E_mid) is the midpoint rule for int ds / beta(E(s)).
@@ -1694,6 +1768,7 @@ def _transport_core_grooved(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     L_sr_rate_numer,
     L_mott_numer,
@@ -1783,6 +1858,7 @@ def _transport_core_grooved(
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
             coeff_arr = L_coeffs[L]
+            E_cross_arr = L_E_cross[L]
             sr_rate_numer = L_sr_rate_numer[L]
             mott_numer = L_mott_numer[L]
             mott_denom1 = L_mott_denom1[L]
@@ -1880,14 +1956,14 @@ def _transport_core_grooved(
                 exit_side_j = False
 
             # 3. Record the radiating material segment.
-            dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
+            dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
             cutoff_j = False
             if energy_model_code == 1:
                 # The midpoint rule makes E_end = E_cut at the cutoff by
                 # definition, so the truncation distance solves the scheme at
                 # E_mid = (E_start + E_cut)/2, not its left-endpoint form.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_compound_scalar(
-                    J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_cut_e)
+                cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_compound_scalar(
+                    J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
                 )
             else:
                 cutoff_distance = (E_cut_e - E_j) / dEds
@@ -1925,8 +2001,8 @@ def _transport_core_grooved(
                     # Predictor-corrector for the implicit midpoint rule
                     # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
                     E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_compound_scalar(
-                        J_arr, k_arr, coeff_arr, 0.5 * (E_j + E_pred)
+                    E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
+                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
                     )
                 beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
             else:
@@ -2173,6 +2249,7 @@ def _transport_core_ungrooved_perelectron(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     L_sr_rate_numer,
     L_mott_numer,
@@ -2325,15 +2402,15 @@ def _transport_core_ungrooved_perelectron(
             # 3. Record the radiating material segment. Overflowing electrons
             #    keep transporting so `seg_count` reports the capacity actually
             #    needed for the replay.
-            dEds = _dEds_packed_scalar(L_Js, L_ks, L_coeffs, L, n_el, E_j)
+            dEds = _dEds_spliced_packed_scalar(L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_j)
             cutoff_j = False
             if energy_model_code == 1:
                 # The midpoint rule makes E_end = E_cut at the cutoff by
                 # definition, so the truncation distance solves the scheme at
                 # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
                 # linearization -- same construction as the lockstep core.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_packed_scalar(
-                    L_Js, L_ks, L_coeffs, L, n_el, 0.5 * (E_j + E_cut_e)
+                cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_packed_scalar(
+                    L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_cut_e)
                 )
             else:
                 cutoff_distance = (E_cut_e - E_j) / dEds
@@ -2369,8 +2446,8 @@ def _transport_core_ungrooved_perelectron(
                     # Predictor-corrector for the implicit midpoint rule
                     # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
                     E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_packed_scalar(
-                        L_Js, L_ks, L_coeffs, L, n_el, 0.5 * (E_j + E_pred)
+                    E_end_j = E_j + step_j * _dEds_spliced_packed_scalar(
+                        L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_pred)
                     )
                 beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
             else:
@@ -2752,6 +2829,7 @@ def pack_layer_tables(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     L_sr_rate_numer,
     L_mott_numer,
@@ -2771,6 +2849,7 @@ def pack_layer_tables(
     Zs = np.zeros((n_layers, max_el), dtype=np.float64)
     ks = np.zeros((n_layers, max_el), dtype=np.float64)
     coeffs = np.zeros((n_layers, max_el), dtype=np.float64)
+    E_cross = np.zeros((n_layers, max_el), dtype=np.float64)
     ncm3 = np.zeros((n_layers, max_el), dtype=np.float64)
     sr_rate_numers = np.zeros((n_layers, max_el), dtype=np.float64)
     mott_numers = np.zeros((n_layers, max_el), dtype=np.float64)
@@ -2790,6 +2869,7 @@ def pack_layer_tables(
         mott_denom2s[L, :n] = L_mott_denom2[L]
         sr_joy_numers[L, :n] = L_sr_joy_numer[L]
         coeffs[L, :n] = L_coeffs[L]
+        E_cross[L, :n] = L_E_cross[L]
         ncm3[L, :n] = L_ncm3[L]
 
     packed_tables = (
@@ -2797,6 +2877,7 @@ def pack_layer_tables(
         Zs,
         ks,
         coeffs,
+        E_cross,
         ncm3,
         sr_rate_numers,
         mott_numers,
@@ -2832,6 +2913,7 @@ def _flight_diagnostic_summary(
     L_Zs,
     L_ks,
     L_coeffs,
+    L_E_cross,
     L_ncm3,
     elastic_model,
 ):
@@ -2854,15 +2936,14 @@ def _flight_diagnostic_summary(
     n_flights = E_start.size
 
     stopping = np.zeros(n_flights, dtype=float)
-    for L, (J_arr, k_arr, coeff_arr) in enumerate(zip(L_Js, L_ks, L_coeffs, strict=True)):
+    for L, (J_arr, k_arr, coeff_arr, E_cross_arr) in enumerate(
+        zip(L_Js, L_ks, L_coeffs, L_E_cross, strict=True)
+    ):
         mask = layer_index == L
         E = E_start[mask]
         if E.size == 0:
             continue
-        total = np.zeros(E.size, dtype=float)
-        for J, k, coeff in zip(J_arr, k_arr, coeff_arr, strict=True):
-            total += coeff * np.log(1.166 * (E + k * J) / J)
-        stopping[mask] = -7.85e-4 * total / E
+        stopping[mask] = _dEds_spliced_compound(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E.copy())
 
     E_end = E_start + stopping * length
     hazard_start = np.zeros(n_flights, dtype=float)
@@ -3888,6 +3969,7 @@ def simulate_trajectories(
     L_ncm3 = []
     L_ks = []
     L_coeffs = []
+    L_E_cross = []
     mott_tables = []
 
     for _, _, lc in layers:
@@ -3897,12 +3979,14 @@ def simulate_trajectories(
         J_arr = []
         k_arr = []
         coeff_arr = []
+        E_cross_arr = []
         layer_mott_tables = []
 
         for el, n_i in lc:
             elements.append(el)
             params = TRANSPORT_ELEMENTS[el]
             Z_i = float(params["Z"])
+            A_i = float(params["A"])
             J_i = float(params["J_keV"])
             k_i = 0.731 + 0.0688 * np.log10(Z_i)
             coeff_i = (n_i / 0.602214076) * Z_i
@@ -3912,6 +3996,7 @@ def simulate_trajectories(
             J_arr.append(J_i)
             k_arr.append(k_i)
             coeff_arr.append(coeff_i)
+            E_cross_arr.append(_element_crossover_keV(el, Z_i, A_i, J_i))
 
             table = None
             if elastic_model == "mott" and el not in _NO_MOTT:
@@ -3927,6 +4012,7 @@ def simulate_trajectories(
         L_ncm3.append(np.asarray(ncm3_arr, dtype=float))
         L_ks.append(np.asarray(k_arr, dtype=float))
         L_coeffs.append(np.asarray(coeff_arr, dtype=float))
+        L_E_cross.append(np.asarray(E_cross_arr, dtype=float))
         mott_tables.append(layer_mott_tables)
 
     L_sr_rate_numer = []
@@ -4124,6 +4210,7 @@ def simulate_trajectories(
             L_Zs,
             L_ks,
             L_coeffs,
+            L_E_cross,
             L_sr_rate_numer,
             L_mott_numer,
             L_mott_denom1,
@@ -4290,6 +4377,7 @@ def simulate_trajectories(
             L_Zs,
             L_ks,
             L_coeffs,
+            L_E_cross,
             L_ncm3,
             L_sr_rate_numer,
             L_mott_numer,
@@ -4369,6 +4457,7 @@ def simulate_trajectories(
             L_Zs,
             L_ks,
             L_coeffs,
+            L_E_cross,
             L_ncm3,
             L_sr_rate_numer,
             L_mott_numer,
@@ -4439,6 +4528,7 @@ def simulate_trajectories(
             L_Zs,
             L_ks,
             L_coeffs,
+            L_E_cross,
             L_ncm3,
             L_sr_rate_numer,
             L_mott_numer,
@@ -4574,6 +4664,7 @@ def simulate_trajectories(
             L_Zs,
             L_ks,
             L_coeffs,
+            L_E_cross,
             L_ncm3,
             elastic_model,
         )

@@ -25,6 +25,8 @@ from pyrite.montecarlo.transport import (
     _dEds_keV_per_ang,
     _dEds_spliced_compound,
     _dEds_spliced_compound_scalar,
+    _dEds_spliced_packed_scalar,
+    spliced_stopping_keV_per_ang,
 )
 
 # Carbon at the graphite number density the transport tests use.
@@ -297,3 +299,174 @@ def test_spliced_vectorized_agrees_with_the_scalar_form():
     for idx in (0, 7, 123, 400):
         expected = _dEds_spliced_compound_scalar(J, k, coeff, E_cross, 0.0, grid[idx])
         assert vector[idx] == pytest.approx(expected, rel=1e-14)
+
+
+# ---- the four evaluation paths must agree ------------------------------------
+# Integration (checklist D) put the spliced model behind four separate
+# implementations: the compound-scalar form the lockstep and grooved cores call,
+# the padded form the per-electron core calls, the host NumPy helper the cost
+# proxy and the diagnostics replay call, and the device-array twin in
+# ``spectrum.lines``. They are separate code, so nothing but a test keeps them
+# in step -- and the copies that used to live in ``campaign.sweep`` and
+# ``spectrum.diagnostics`` are exactly how the last model change drifted.
+
+
+def test_host_helper_matches_the_compiled_compound_form():
+    composition = [("C", 0.1136), ("Si", 0.05)]
+    J, k, coeff, E_cross = _spliced_inputs(composition)
+    for E in _SWEEP_KEV:
+        compiled = _dEds_spliced_compound_scalar(J, k, coeff, E_cross, 0.0, E)
+        host = float(spliced_stopping_keV_per_ang(composition, E))
+        assert host == pytest.approx(compiled, rel=1e-14)
+
+
+def test_host_helper_matches_the_padded_form():
+    """The per-electron and CUDA cores index padded rows; padding must not leak."""
+    composition = [("C", 0.1136), ("Si", 0.05)]
+    J, k, coeff, E_cross = _spliced_inputs(composition)
+    max_el = 4  # deliberately over-wide: rows 2 and 3 are zero-filled padding
+    L_Js = np.zeros((1, max_el))
+    L_ks = np.zeros((1, max_el))
+    L_coeffs = np.zeros((1, max_el))
+    L_E_cross = np.zeros((1, max_el))
+    L_Js[0, :2], L_ks[0, :2] = J, k
+    L_coeffs[0, :2], L_E_cross[0, :2] = coeff, E_cross
+
+    for E in _SWEEP_KEV:
+        packed = _dEds_spliced_packed_scalar(L_Js, L_ks, L_coeffs, L_E_cross, 0.0, 0, 2, E)
+        assert packed == pytest.approx(
+            float(spliced_stopping_keV_per_ang(composition, E)), rel=1e-14
+        )
+
+
+def test_stopping_mirrors_agree():
+    """``spectrum.lines`` carries a device-array twin that cannot delegate.
+
+    Its rows may live on the GPU, so it re-implements the model against ``xp``
+    instead of calling the host helper. This is the pin that keeps the two from
+    drifting; ``campaign.sweep`` and ``spectrum.diagnostics`` need no such pin
+    because they now delegate outright.
+    """
+    from pyrite.montecarlo._backend import REAL
+    from pyrite.montecarlo.spectrum import lines
+
+    composition = [("C", 0.1136), ("Si", 0.05)]
+    grid = np.linspace(1.0, 300.0, 97)
+    layer_index = np.zeros(grid.size, dtype=np.int64)
+
+    mirrored = lines._spliced_stopping_magnitude_xp(
+        np.asarray(grid, dtype=REAL), layer_index, [composition]
+    )
+    expected = -spliced_stopping_keV_per_ang(composition, grid)
+    np.testing.assert_allclose(mirrored, expected, rtol=1e-6)
+
+
+def test_cost_proxy_delegates_to_the_transport_model():
+    """``campaign.sweep``'s CSDA range must track the model it predicts runtime for."""
+    from pyrite.campaign.sweep import _dEds_magnitude_keV_per_ang
+
+    composition = [("C", 0.1136)]
+    grid = np.linspace(5.0, 300.0, 64)
+    np.testing.assert_allclose(
+        _dEds_magnitude_keV_per_ang(composition, grid),
+        -spliced_stopping_keV_per_ang(composition, grid),
+        rtol=0,
+        atol=0,
+    )
+
+
+def test_frozen_rule_replay_delegates_to_the_transport_model():
+    """``spectrum.diagnostics`` must reapply the rule the cores actually used."""
+    from pyrite.montecarlo.spectrum.diagnostics import _stopping_keV_per_ang
+
+    composition = [("C", 0.1136), ("Si", 0.05)]
+    grid = np.linspace(5.0, 300.0, 64)
+    np.testing.assert_allclose(
+        _stopping_keV_per_ang(grid, composition),
+        spliced_stopping_keV_per_ang(composition, grid),
+        rtol=0,
+        atol=0,
+    )
+
+
+# ---- the cutoff solve across the splice --------------------------------------
+
+
+@pytest.mark.parametrize("transport_core", ["lockstep", "per-electron"])
+def test_cutoff_solve_is_well_posed_across_the_crossover(transport_core):
+    """The midpoint cutoff solve evaluates dE/ds at (E_start + E_cut)/2.
+
+    That midpoint can land on the slope kink: tungsten crosses at 9.72 keV, so
+    an ``E_cut`` of 5 keV puts the evaluation energy right on the crossover for
+    every flight starting near 14.4 keV. The splice is C0, so the *value* is
+    single-valued there and the solve stays well posed -- but this is the check
+    checklist C asked for rather than assumed.
+    """
+    from pyrite.montecarlo.transport import simulate_trajectories
+
+    tungsten = [("W", 0.0632)]
+    result = simulate_trajectories(
+        E0_keV=14.5,
+        Ne=256,
+        thickness_ang=1.0e8,
+        composition=tungsten,
+        E_cut_keV=5.0,
+        elastic_model="sr",
+        seed=11,
+        energy_model="midpoint",
+        transport_core=transport_core,
+    )
+    assert result["n_cutoff_stopped"] > 0
+    # Flights land exactly on the floor, never through it, and every recorded
+    # length stays positive and finite across the kink.
+    assert np.all(result["E_end_keV"] >= 5.0)
+    assert int((result["E_end_keV"] == 5.0).sum()) == result["n_cutoff_stopped"]
+    assert np.all(np.isfinite(result["L_ang"]))
+    assert np.all(result["L_ang"] > 0.0)
+
+
+# ---- the CUDA twin ----------------------------------------------------------
+# transport_jit_kernel imports cupy at module scope, so without a GPU it cannot
+# even be imported, let alone run -- its own tests skip. The repository's
+# existing precedent for this (test_cuda_source_uses_cpu_reference_cutoff_and_
+# termination_rules) is to read the source as text; that check covers the cutoff
+# and termination control flow but says nothing about the stopping arithmetic.
+# These pin the part that changed. They are NOT a substitute for running the
+# kernel on a device.
+
+
+def _jit_kernel_source():
+    from pathlib import Path
+
+    from pyrite.montecarlo import transport
+
+    return Path(transport.__file__).with_name("transport_jit_kernel.py").read_text()
+
+
+def test_cuda_stopping_constants_match_the_cpu_values():
+    """A constant edited on one side only is the drift this path is exposed to."""
+    import re
+
+    source = _jit_kernel_source()
+    declared = dict(re.findall(r"^(F64_\w+) = np\.float64\(([^)]+)\)", source, re.MULTILINE))
+    assert float(declared["F64_MC2_KEV"]) == _MC2_KEV
+    assert float(declared["F64_BS_PREFACTOR"]) == _BS_PREFACTOR
+    assert float(declared["F64_LN2"]) == _LN2
+    assert float(declared["F64_JL_PREFACTOR"]) == 7.85e-4
+    assert float(declared["F64_JL_166"]) == 1.166
+
+
+def test_cuda_stopping_keeps_the_per_element_splice():
+    """The device loop must branch per element on its own crossover, not globally."""
+    source = _jit_kernel_source()
+    start = source.index("def _dEds_packed(")
+    body = source[start : source.index("\n@", start)]
+
+    # per-element branch on that element's own crossover, inside the element loop
+    assert "if E_i < L_E_cross[row + i_el]:" in body
+    # both branches accumulate separately and are combined with their own prefactor
+    assert "joy_luo_total" in body and "bs_total" in body
+    assert "-F64_JL_PREFACTOR / E_i * joy_luo_total" in body
+    assert "F64_BS_PREFACTOR / beta_sq * bs_total" in body
+    # the Berger-Seltzer bracket, with tau^2 (tau + 2) / (2 (I/mc^2)^2)
+    assert "tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)" in body

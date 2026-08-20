@@ -66,10 +66,13 @@ def test_trajectory_volume_figure_contains_volume_tracks_and_direction_arrows():
 
 
 def _hopg_thin_slab_case():
-    """30 keV / hopg / 4 um slab at normal incidence: with Ne=80, seed=0 (the
-    ``trajectory_volume_figure`` defaults) this mix produces BOTH backscattered
-    (top-face) and transmitted (bottom-face) terminal segments, so it exercises
-    both exit-path branches."""
+    """30 keV / hopg / 4 um slab at normal incidence.
+
+    Transmission dominates here, and backscatter is rare enough (0--3 of 80
+    across the first six seeds) that which seeds show it is not robust. Any test
+    that needs BOTH exit-path branches must pick a seed that has one and say so;
+    ``seed=0`` does not. Measured back/trans over seeds 0--5: 0/60, 0/56, 3/67,
+    1/64, 2/62, 1/57."""
     from pyrite.campaign.config import default_settings, trajectory_sweep
     from pyrite.campaign.sweep import build_cases
 
@@ -85,7 +88,9 @@ def test_exit_paths_drawn_once_for_backscatter_and_transmission():
     from pyrite.plots.plotly.trajectories import trajectory_volume_figure
 
     case = _hopg_thin_slab_case()
-    fig = trajectory_volume_figure(case, Ne=80)
+    # seed=0 transmits every exiting electron here; seed=2 is the nearest seed
+    # with backscattered tracks (3 of 80), which is what this test needs.
+    fig = trajectory_volume_figure(case, Ne=80, seed=2)
 
     exit_traces = [trace for trace in fig.data if trace.name == "exit path"]
     assert len(exit_traces) == 1  # one legend entry for every electron's exit dash

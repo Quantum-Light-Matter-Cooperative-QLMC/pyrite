@@ -59,7 +59,7 @@ def test_subdivide_at_zero_tolerance_returns_the_input_flights():
         np.testing.assert_allclose(rows[key], segments[key], rtol=1e-12)
     assert np.all(rows["substep_id"] == 0)
     # The rebuilt end state reproduces the core's own predictor-corrector. It is
-    # the host Joy--Luo evaluation rather than the compiled per-layer scalar the
+    # the host stopping evaluation rather than the compiled per-layer scalar the
     # core uses, so the two agree to rounding (measured 2.6e-9 relative), not
     # bit-for-bit.
     np.testing.assert_allclose(rows["E_end_keV"], segments["E_end_keV"], rtol=1e-7)
@@ -262,10 +262,16 @@ def test_transport_substeps_reach_the_grouped_reduction(core):
 
     key = np.stack([rows["elec_id"], rows["flight_id"]])
     if core == "lockstep":
-        # Every adjacent pair differs, i.e. no flight's substeps are neighbours:
-        # this is the row order an adjacency-keyed grouping would silently miss.
+        # Rows are step-major, so a flight's substeps are interleaved with other
+        # electrons' rows rather than adjacent -- except in the tail, where the
+        # last electron still alive has nobody to interleave with. One split
+        # flight is already enough to make an adjacency-keyed grouping wrong, so
+        # pin that directly: keying on adjacency would report more groups than
+        # there are distinct flights.
         changes = np.any(key[:, 1:] != key[:, :-1], axis=0)
-        assert changes.all()
+        groups_if_keyed_on_adjacency = int(changes.sum()) + 1
+        distinct_flights = np.unique(key, axis=1).shape[1]
+        assert groups_if_keyed_on_adjacency > distinct_flights
 
     grouped = mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
     flights, gid = np.unique(key, axis=1, return_inverse=True)

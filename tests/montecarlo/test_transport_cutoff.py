@@ -11,18 +11,18 @@ from pyrite.montecarlo.spectrum import (
     mc_brem_spectrum,
     mc_spectrum,
 )
-from pyrite.montecarlo.transport import TRANSPORT_ELEMENTS, simulate_trajectories
+from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
 
 CARBON = [("C", 0.1136)]
 
 
 def _carbon_stopping_keV_per_ang(E_keV):
-    params = TRANSPORT_ELEMENTS["C"]
-    Z = params["Z"]
-    J = params["J_keV"]
-    k = 0.731 + 0.0688 * np.log10(Z)
-    coeff = CARBON[0][1] / 0.602214076 * Z
-    return 7.85e-4 / E_keV * coeff * np.log(1.166 * (E_keV + k * J) / J)
+    """Stopping magnitude [keV/Ang], taken from the model the cores evaluate.
+
+    5 keV is already above carbon's Joy--Luo/Berger--Seltzer crossover, so an
+    oracle that restated one branch would not describe what transport does.
+    """
+    return -spliced_stopping_keV_per_ang(CARBON, E_keV)
 
 
 @pytest.mark.parametrize("transport_core", ["lockstep", "per-electron"])

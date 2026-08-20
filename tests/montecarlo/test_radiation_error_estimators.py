@@ -18,19 +18,16 @@ from pyrite.montecarlo.spectrum import (
     brem_endpoint_quadrature_error,
     cxr_endpoint_resonance_drift,
 )
-from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
 
 CARBON = [("C", 0.1136)]
 _Z = 6.0
-_J_KEV = 0.078
-_K = 0.731 + 0.0688 * np.log10(_Z)
-_COEFF = (CARBON[0][1] / 0.602214076) * _Z
 _MC2_KEV = 510.99895
 
 
 def _dEds(E_keV):
-    """Joy--Luo continuous slowing down [keV/Ang], independent of the core."""
-    return -7.85e-4 / E_keV * _COEFF * np.log(1.166 * (E_keV + _K * _J_KEV) / _J_KEV)
+    """Continuous slowing down [keV/Ang], independent of the core."""
+    return spliced_stopping_keV_per_ang(CARBON, E_keV)
 
 
 def _beta(E_keV):

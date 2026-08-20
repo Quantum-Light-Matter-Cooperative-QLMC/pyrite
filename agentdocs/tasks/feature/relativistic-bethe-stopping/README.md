@@ -148,9 +148,36 @@ low-energy branch rather than being invalidated.
       cutoff bracket must be checked against the kink when D wires the cores in.
       Implemented as `_bs_joy_luo_crossover_keV`, `_dEds_spliced_compound_scalar`,
       `_dEds_spliced_compound`.
-- [ ] D — Integrate across all four cores, both LUT variants, and the CUDA
-      kernels. Update `build_transport_energy_lut` in the same slice. Re-sync
-      the `campaign/sweep.py` cost-estimation copy or make it delegate.
+- [~] D — Integrate across all cores, both LUT variants, and the CUDA kernels.
+      **Done on CPU; the CUDA kernel is written but unverified.**
+      Three cores evaluate stopping directly (`_transport_core_ungrooved`,
+      `_transport_core_grooved`, `_transport_core_ungrooved_perelectron`); the
+      two `_lut` cores read `lut.dEds`, so `build_transport_energy_lut` was the
+      only change they needed. A fourth per-element array `L_E_cross` is
+      threaded beside `L_ks`/`L_coeffs` through the table builder, the LUT
+      builder, `pack_layer_tables`, every core signature, the flight
+      diagnostics, and the CUDA kernel + launcher; `delta` stays a scalar
+      parameter passed `0.0` so B lands as a data change.
+      The `campaign/sweep.py` and `spectrum/diagnostics.py` copies were
+      **deleted, not re-synced** -- both now delegate to the new host helper
+      `transport.spliced_stopping_keV_per_ang`. `spectrum/lines.py` keeps a
+      device-array twin (`_spliced_stopping_magnitude_xp`) because its rows may
+      live on the GPU; `test_stopping_mirrors_agree` pins it to the host helper.
+      The `sweep.py` docstring's claim that it "imports only the leaf
+      `TRANSPORT_ELEMENTS` table" was already stale -- it imports
+      `montecarlo.case`, which pulls in the whole package -- so delegating cost
+      nothing.
+      **Not verified:** the CUDA kernel. There is no GPU here --
+      `transport_jit_kernel` imports `cupy` at module scope, so it cannot even
+      be imported locally and its tests skip. Two source-text pins were added
+      (`test_cuda_stopping_constants_match_the_cpu_values`,
+      `test_cuda_stopping_keeps_the_per_element_splice`) following the
+      repository's existing precedent for this, and the pre-existing
+      `test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules` still
+      passes. Those catch a constant or a branch edited on one side only. They
+      are **not** a substitute for running the kernel: it needs a `pyrite
+      remote` run before it can be trusted, and that is the first thing F should
+      do.
 - [ ] E — Model selection and identity: expose which branch/model produced a run
       in result metadata, and extend checkpoint/case identity so Joy--Luo and
       Berger--Seltzer records cannot collide in the CAS.
@@ -191,22 +218,75 @@ low-energy branch rather than being invalidated.
 
 ## Status
 
-A and C are implemented, tested, and green; B is sized but blocked on PDG
-Sternheimer parameters; D--G are untouched.
+A, C, and the CPU half of D are implemented, tested, and green. B is sized but
+blocked on PDG Sternheimer parameters. E--G are untouched.
 
-**Nothing is wired in.** No core, LUT builder, or CUDA kernel evaluates the new
-model, so every simulation result is bit-identical to before. That is checklist
-D, and it is the point at which goldens move and `sweep.py`'s cost mirror has to
-be re-synced.
+**The model is now wired in and results have changed** above each element's
+crossover (2.66--10.46 keV). Nineteen existing tests moved; every one was a
+stale Joy--Luo oracle or a signature, and each is recorded below under
+"Test fallout" rather than silently retuned.
 
-Ledger row `relativistic-bethe-stopping` added to
-`docs/validation/ledger-transport-background.md` at status `filtered` --
+Ledger row `relativistic-bethe-stopping` in
+`docs/validation/ledger-transport-background.md` stays at `filtered` --
 in-context units/limits/signs plus regression anchors only. Fresh-context
-`physics-validation` has **not** run and is the required next step before D.
+`physics-validation` has **not** run. It was the stated next step before D and
+it still has not happened; D landed ahead of it on direct instruction, so the
+verification debt is now larger, not smaller.
 
-`docs/physics/beam-transport/stopping-power.md` is deliberately **unchanged**:
-its validity-ceiling warning still accurately describes what the transport does
-today. Rewriting it is checklist G, and it must not land before D.
+The `electron-transport` ledger row was narrowed in place: its claim now says
+Joy--Luo is the low-energy branch only, and its "Validity ceiling" note is
+labelled superseded above the crossover. That is the minimum needed to stop the
+row over-claiming; the fuller rewrite is still G.
+
+`docs/physics/beam-transport/stopping-power.md` is still **unchanged** and is
+now **wrong**: its validity-ceiling section describes behaviour the transport no
+longer has. Rewriting it is checklist G and is the first thing that should
+happen next.
+
+### Test fallout from D
+
+- Signature only (6 in `test_groove.py`, 2 in `test_transport_lut.py`): the
+  synthetic layer tables needed `L_E_cross`.
+- Stale Joy--Luo oracle, repointed at `spliced_stopping_keV_per_ang`
+  (`test_transport_cutoff.py`, `test_transport_diagnostics.py`,
+  `test_radiation_error_estimators.py`, `test_transport_energy_model.py`, and
+  one assertion in `test_groove.py`).
+- `test_midpoint_end_state_error_is_third_order_in_flight_length[t_end_ang]` --
+  the clock's convergence order is unchanged but it reaches its asymptote at
+  shorter flights than before, because the stronger stopping enlarges the
+  O(s^4) term. Measured 600 -> 4.7 Ang: 12.3, 10.9, 9.8, 9.0, 8.5, 8.3, 8.07.
+  The energy ratio is untouched at 8.04/8.02/8.01. Lengths are now
+  per-field; the band is not widened.
+- `test_transport_substeps_reach_the_grouped_reduction[lockstep]` -- asserted
+  that *no* flight's substeps are ever adjacent rows. Electrons now stop
+  sooner, so the tail where one electron runs alone got longer and its substeps
+  are adjacent. Replaced with the assertion the test actually exists to make:
+  adjacency-keyed grouping would report more groups than there are flights.
+
+### Size of the change (CSDA range, `E_cut` 5 keV)
+
+Analytic `int dE / |dE/ds|`, Joy--Luo versus the spliced model. This is the
+magnitude every downstream measurement in F has to account for; it is not itself
+F, which wants transported ranges validated against ESTAR.
+
+| material | 25 keV | 100 keV | 300 keV |
+|---|---|---|---|
+| graphite | -4.2% | -15.1% | -35.4% |
+| silicon | -4.0% | -14.9% | -35.2% |
+| tungsten | -2.8% | -14.2% | -34.6% |
+
+Ranges shorten, as they must: the old model under-stopped. At 300 keV graphite
+goes 643 -> 416 um. The 25 keV figure is the one that matters most right now --
+that is the operating point where the propagator was tuned to 0.1 rad against a
+clock built on this stopping power.
+
+### Not regenerated
+
+The material-catalog golden is driven by `data/materials.toml` and
+`materials/catalog.py`, neither of which this touches, and
+`tests/materials/test_material_catalog.py` passes unchanged. Per `regen-golden`,
+regenerating without a catalog-source change would mask drift. The task doc's
+"goldens regenerate" expectation does not apply to this golden.
 
 ## Delegation slices and required skills
 

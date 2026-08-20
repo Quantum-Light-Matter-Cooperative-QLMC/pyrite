@@ -17,8 +17,10 @@ from pyrite.montecarlo.groove import (
 from pyrite.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum
 from pyrite.montecarlo.transport import (
     TRANSPORT_ELEMENTS,
+    _element_crossover_keV,
     beta_from_keV,
     simulate_trajectories,
+    spliced_stopping_keV_per_ang,
 )
 
 TP = np.deg2rad(45.0)
@@ -396,7 +398,7 @@ def _run_grooved(
     if layers is None:
         layers = [(0.0, float(thickness_ang), n_atoms_per_ang3)]
     n_layers = len(layers)
-    L_Zs, L_Js, L_ks, L_coeffs, L_ncm3 = [], [], [], [], []
+    L_Zs, L_Js, L_ks, L_coeffs, L_E_cross, L_ncm3 = [], [], [], [], [], []
     L_sr_rate_numer, L_mott_numer, L_mott_denom1, L_mott_denom2, L_sr_joy_numer = [], [], [], [], []
     L_top, L_bot = [], []
     for top, bot, n_i in layers:
@@ -405,6 +407,7 @@ def _run_grooved(
         L_Js.append(np.array([J]))
         L_ks.append(np.array([k]))
         L_coeffs.append(np.array([coeff]))
+        L_E_cross.append(np.array([_element_crossover_keV("C", Z, float(el["A"]), J)]))
         L_ncm3.append(np.array([n_i * 1e24]))
         L_top.append(top)
         L_bot.append(bot)
@@ -492,6 +495,7 @@ def _run_grooved(
             L_Zs,
             L_ks,
             L_coeffs,
+            L_E_cross,
             L_ncm3,
             L_sr_rate_numer,
             L_mott_numer,
@@ -551,7 +555,7 @@ def test_surface_cutoff_stops_before_vacuum_reentry():
     d /= np.linalg.norm(d)
     p0 = np.array([0.15 * spacing, 0.0, 0.4 * spec.depth_ang])
 
-    # Real Joy-Luo stopping over the exit flight loses ~1 eV; E_cut sits
+    # Real stopping over the exit flight loses ~1 eV; E_cut sits
     # strictly between the pre- and post-step energies so below_cut is only
     # ever true AFTER this exact surface-truncated step.
     out = _run_grooved(
@@ -569,12 +573,10 @@ def test_surface_cutoff_stops_before_vacuum_reentry():
     assert out["n_stopped"] == 1
     assert out["n_step_limited"] == 0
     E_start = out["E_keV"][-1]
-    carbon = TRANSPORT_ELEMENTS["C"]
-    Z = carbon["Z"]
-    J = carbon["J_keV"]
-    k = 0.731 + 0.0688 * np.log10(Z)
-    coeff = 1e-4 / 0.602214076 * Z
-    stopping = 7.85e-4 / E_start * coeff * np.log(1.166 * (E_start + k * J) / J)
+    # 60 keV is above carbon's Joy-Luo/Berger-Seltzer crossover, so the truncated
+    # length is set by the relativistic branch; take the oracle from the model
+    # itself rather than restating one branch of it.
+    stopping = -spliced_stopping_keV_per_ang([("C", 1e-4)], E_start)
     assert out["L_ang"][-1] == pytest.approx((E_start - 59.9995) / stopping)
 
 

@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.transport import beta_from_keV_scalar, simulate_trajectories
+from pyrite.montecarlo.transport import (
+    beta_from_keV_scalar,
+    simulate_trajectories,
+    spliced_stopping_keV_per_ang,
+)
 
 CARBON = [("C", 0.1136)]
 
@@ -30,13 +34,8 @@ def test_flight_diagnostics_summarize_frozen_state_error_without_changing_transp
 
     summary = diagnosed["transport_diagnostics"]
     assert summary["n_flights"] == diagnosed["E_keV"].size
-    params = {"Z": 6.0, "J_keV": 0.078}
-    k = 0.731 + 0.0688 * np.log10(params["Z"])
-    coeff = CARBON[0][1] / 0.602214076 * params["Z"]
     starts = diagnosed["E_keV"]
-    stopping = (
-        7.85e-4 / starts * coeff * np.log(1.166 * (starts + k * params["J_keV"]) / params["J_keV"])
-    )
+    stopping = -spliced_stopping_keV_per_ang(CARBON, starts)
     ends = starts - stopping * diagnosed["L_ang"]
     expected_loss = (starts - ends) / starts
     assert summary["fractional_energy_loss"]["p50"] == pytest.approx(

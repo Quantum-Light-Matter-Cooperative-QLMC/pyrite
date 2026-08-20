@@ -17,12 +17,20 @@ def _synthetic_layer(two_elements=False):
     mott_denom1 = 0.005 * z17
     mott_denom2 = 0.0007 * Z * Z
     sr_joy_numer = 3.4e-3 * Z**0.67
+    # rho, Z and A all cancel in the Joy-Luo/Berger-Seltzer ratio (both laws
+    # carry the same rho Z/A), so the crossover depends only on Z -- through k --
+    # and J. The mass number below is a placeholder that never reaches the answer.
+    E_cross = np.array(
+        [t._bs_joy_luo_crossover_keV(Z_i, 2.0 * Z_i, J_i) for Z_i, J_i in zip(Z, J, strict=True)],
+        dtype=np.float64,
+    )
 
     return (
         [J],
         [Z],
         [k],
         [coeff],
+        [E_cross],
         [sr_rate_numer],
         [mott_numer],
         [mott_denom1],
@@ -47,7 +55,7 @@ def _interp_2d(table, row, lut, E):
 
 def test_sr_transport_lut_matches_direct_scalar_physics():
     tables = _synthetic_layer()
-    L_Js, L_Zs, L_ks, L_coeffs, L_sr, L_mn, L_d1, L_d2, L_sj = tables
+    L_Js, L_Zs, L_ks, L_coeffs, L_xc, L_sr, L_mn, L_d1, L_d2, L_sj = tables
     lut = t.build_transport_energy_lut(
         5.0,
         30.0,
@@ -56,6 +64,7 @@ def test_sr_transport_lut_matches_direct_scalar_physics():
         L_Zs,
         L_ks,
         L_coeffs,
+        L_xc,
         L_sr,
         L_mn,
         L_d1,
@@ -69,7 +78,10 @@ def test_sr_transport_lut_matches_direct_scalar_physics():
     energies = rng.uniform(5.0, 30.0, 2000)
     rate_exact = np.array([t._scatter_rates_sr_scalar(E, L_sr[0][0], L_sj[0][0]) for E in energies])
     dEds_exact = np.array(
-        [t._dEds_compound_scalar(L_Js[0], L_ks[0], L_coeffs[0], E) for E in energies]
+        [
+            t._dEds_spliced_compound_scalar(L_Js[0], L_ks[0], L_coeffs[0], L_xc[0], 0.0, E)
+            for E in energies
+        ]
     )
     inv_beta_exact = 1.0 / np.array([t.beta_from_keV_scalar(E) for E in energies])
 
@@ -80,7 +92,7 @@ def test_sr_transport_lut_matches_direct_scalar_physics():
 
 def test_transport_lut_cdf_is_normalized_and_monotone():
     tables = _synthetic_layer(two_elements=True)
-    L_Js, L_Zs, L_ks, L_coeffs, L_sr, L_mn, L_d1, L_d2, L_sj = tables
+    L_Js, L_Zs, L_ks, L_coeffs, L_xc, L_sr, L_mn, L_d1, L_d2, L_sj = tables
     lut = t.build_transport_energy_lut(
         5.0,
         60.0,
@@ -89,6 +101,7 @@ def test_transport_lut_cdf_is_normalized_and_monotone():
         L_Zs,
         L_ks,
         L_coeffs,
+        L_xc,
         L_sr,
         L_mn,
         L_d1,

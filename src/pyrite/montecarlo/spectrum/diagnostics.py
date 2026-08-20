@@ -14,8 +14,8 @@ any spectrum is computed:
   integral and a midpoint evaluation, per spectral grid.
 
 Both read ``E_end_keV`` when transport supplied it (``energy_model="midpoint"``)
-and otherwise predict the end energy with the same left-endpoint Joy--Luo
-stopping rule the transport diagnostics use, so they apply to frozen runs
+and otherwise predict the end energy with the same left-endpoint stopping rule
+the transport diagnostics use, so they apply to frozen runs
 unchanged. They are opt-in, host-only passes: calling them is the only path
 that downloads resident device segment fields, mirroring
 ``simulate_trajectories(collect_diagnostics=True)``.
@@ -35,7 +35,12 @@ import numpy as np
 from ...materials.attenuation import _normalize_composition
 from ...materials.crystal import HBARC_EV_ANG
 from .._backend import _to_cpu
-from ..transport import TRANSPORT_ELEMENTS, _percentile_summary, beta_from_keV
+from ..transport import (
+    TRANSPORT_ELEMENTS,
+    _percentile_summary,
+    beta_from_keV,
+    spliced_stopping_keV_per_ang,
+)
 from .brem import _brem_dsigma_dk
 from .lines import _SEG_ARRAYS, _observation_direction
 
@@ -56,15 +61,12 @@ def _host(array):
 
 
 def _stopping_keV_per_ang(E_keV, composition):
-    """Joy--Luo CSDA stopping power [keV/Ang] (negative), matching transport."""
-    total = np.zeros_like(E_keV)
-    for element, n_i in composition:
-        params = TRANSPORT_ELEMENTS[element]
-        Z = params["Z"]
-        J = params["J_keV"]
-        k = 0.731 + 0.0688 * np.log10(float(Z))
-        total += (n_i / 0.602214076) * float(Z) * np.log(1.166 * (E_keV + k * J) / J)
-    return -7.85e-4 * total / E_keV
+    """CSDA stopping power [keV/Ang] (negative), matching transport exactly.
+
+    The frozen-rule replay below is only meaningful if it reapplies the *same*
+    rule the cores used, so this delegates rather than restating the model.
+    """
+    return spliced_stopping_keV_per_ang(composition, E_keV)
 
 
 def _flight_E_end_keV(segments, composition, layers):
@@ -140,7 +142,7 @@ def subdivide_flights(segments, composition=None, layers=None, max_dE_frac=0.0, 
     n_rows = E_start.size
 
     def _stopping(E_keV, rows):
-        """Layer-resolved Joy--Luo stopping for the given row selection."""
+        """Layer-resolved stopping for the given row selection."""
         if layers is None:
             return _stopping_keV_per_ang(E_keV, compositions[0])
         out = np.empty_like(E_keV)

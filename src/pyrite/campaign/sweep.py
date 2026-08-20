@@ -35,8 +35,8 @@ import numpy as np
 from ..detectors import Detector
 from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
-from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..montecarlo.case import Case
+from ..montecarlo.transport import spliced_stopping_keV_per_ang
 from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     BlazedGrooves,
     Footprint,
@@ -825,24 +825,18 @@ def geometry_table(cases):
 _COST_E_CUT_KEV = 5.0  # matches transport.simulate_trajectories' default E_cut_keV
 
 
-def _joy_luo_dEds_keV_per_ang(composition, E_keV):
-    """Joy-Luo modified-Bethe stopping-power magnitude [keV/Angstrom].
+def _dEds_magnitude_keV_per_ang(composition, E_keV):
+    """Transport stopping-power magnitude [keV/Angstrom].
 
-    Mirrors ``montecarlo.transport._dEds_compound`` (same constants) so the cost
-    proxy's CSDA range tracks the transport model whose runtime it predicts,
-    while importing only the leaf ``TRANSPORT_ELEMENTS`` table -- ``sweep.py``
-    stays GPU-free and cheap to import. Additive over elements with number
-    densities ``n_i`` [1/Angstrom^3]; ``E_keV`` may be a scalar or an array."""
-    E_keV = np.asarray(E_keV, dtype=float)
-    total = np.zeros_like(E_keV)
-    for el, n_i in composition:
-        p = TRANSPORT_ELEMENTS[el]
-        Z = p["Z"]
-        k = 0.731 + 0.0688 * np.log10(Z)
-        total = total + (n_i / 0.602214076) * Z * np.log(
-            1.166 * (E_keV + k * p["J_keV"]) / p["J_keV"]
-        )
-    return 7.85e-4 / E_keV * total  # magnitude only (transport uses the negative)
+    Delegates to ``montecarlo.transport.spliced_stopping_keV_per_ang`` rather
+    than re-stating the constants, so the cost proxy's CSDA range cannot drift
+    from the transport model whose runtime it predicts -- the copy that used to
+    live here went stale the moment the stopping model changed. ``sweep.py``
+    already imports ``montecarlo.case``, so this adds no import cost.
+    Additive over elements with number densities ``n_i`` [1/Angstrom^3];
+    ``E_keV`` may be a scalar or an array."""
+    # magnitude only (transport uses the negative)
+    return -spliced_stopping_keV_per_ang(composition, E_keV)
 
 
 def _csda_profile(composition, E0_keV, e_cut_keV=_COST_E_CUT_KEV, n_quad=64):
@@ -854,7 +848,7 @@ def _csda_profile(composition, E0_keV, e_cut_keV=_COST_E_CUT_KEV, n_quad=64):
     ``E0``. Monotonic in ``E0``; used both for the range and to invert it (how
     far a slab lets an electron travel before it enters the next layer)."""
     E = np.linspace(e_cut_keV, E0_keV, n_quad)
-    inv_dEds = 1.0 / _joy_luo_dEds_keV_per_ang(composition, E)
+    inv_dEds = 1.0 / _dEds_magnitude_keV_per_ang(composition, E)
     cum = np.concatenate([[0.0], np.cumsum(0.5 * (inv_dEds[1:] + inv_dEds[:-1]) * np.diff(E))])
     return E, cum
 
