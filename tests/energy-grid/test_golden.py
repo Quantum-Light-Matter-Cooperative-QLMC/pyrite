@@ -1,6 +1,7 @@
 import ast
 import inspect
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -14,10 +15,30 @@ def test_regen_recognizes_source_checkout():
     assert golden._is_source_checkout()
 
 
+def _approx_equal(a, b, rel_tol=2e-12, abs_tol=2e-12):
+    """Recursive equality tolerant of platform/BLAS-dependent float ULP noise.
+
+    Crystal geometry (``crystals.Crystal.from_cif``) and the structure-factor
+    physics it feeds resolve through third-party linear algebra whose last-bit
+    rounding is not guaranteed reproducible across CPU/BLAS builds -- CI has
+    observed 1-2 ULP drift here that isn't real catalog drift. Mirrors the
+    tolerance ``tests/materials/test_material_catalog.py`` already uses against
+    this same golden file (``test_catalog_matches_serialized_physics_for_every_crystal``).
+    """
+    if isinstance(a, float) and isinstance(b, float):
+        return math.isclose(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_approx_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_approx_equal(x, y) for x, y in zip(a, b, strict=True))
+    return a == b
+
+
 def test_build_reproduces_checked_in_golden():
     checked_in = json.loads(golden.GOLDEN_PATH.read_text())
     rebuilt = golden.build_golden()
-    assert rebuilt == checked_in
+    if not _approx_equal(rebuilt, checked_in):
+        assert rebuilt == checked_in  # not close either -> real drift, get the rich diff
 
 
 def test_check_flags_drift(tmp_path, monkeypatch):
