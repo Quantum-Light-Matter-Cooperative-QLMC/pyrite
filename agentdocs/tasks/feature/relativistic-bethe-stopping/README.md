@@ -186,11 +186,25 @@ low-energy branch rather than being invalidated.
       Validate CSDA ranges against ESTAR as a **user-run oracle** — comparing
       against a web service is not redistribution, so this is available now and
       needs no license determination. Heavy matrices via `pyrite remote`.
-- [ ] G — Docs, ledger, goldens. Add `Validation: relativistic-bethe-stopping`;
-      rewrite the "Validity ceiling" section of `stopping-power.md`, which
-      currently exists to warn about precisely the defect this closes; narrow
-      `Validation: electron-transport` to the low-energy branch; regenerate
-      catalog goldens.
+- [x] G — Docs, ledger, goldens. **Done.** The `Validation: relativistic-bethe-stopping`
+      ledger row and the `electron-transport` narrowing were already in place
+      from D; what remained was `stopping-power.md`, which still described only
+      Joy–Luo. Added `## Berger–Seltzer relativistic branch` ({eq}`eq-stopping-bs`,
+      `eq-stopping-bs-fminus`, prefactor derivation pinned against Joy–Luo,
+      density-effect $\delta$ status) and `## Per-element splice` (crossover
+      range, C0-not-C1 continuity, why the kink is harmless to the cutoff
+      solve); rewrote "Validity ceiling" to state the table is a historical
+      record superseded above each element's crossover, added the CSDA
+      range-change table, and named the two items still open ($\delta$
+      unmeasured; the 1–10 keV window unowned by either form). Updated the
+      `Assumptions and limits` and `Validation` sections to reference both
+      branches. Added `icru37` and `bergerseltzer1982` to `references.bib`.
+      Catalog goldens: confirmed **not applicable**, per the "Not regenerated"
+      note above — `data/materials.toml`/`materials/catalog.py` are untouched
+      by this task and `test_material_catalog.py` passes unchanged.
+      `pyrite-dev docs` (clean, offline, warnings-as-errors) and
+      `pyrite-dev lint` pass; `test-suite core` (1589 passed) is unaffected, as
+      expected for a docs-only change.
 
 ## Decisions and open questions
 
@@ -218,8 +232,8 @@ low-energy branch rather than being invalidated.
 
 ## Status
 
-A, C, and the CPU half of D are implemented, tested, and green. B is sized but
-blocked on PDG Sternheimer parameters. E--G are untouched.
+A, C, G, and the CPU half of D are implemented, tested, and green. B is sized
+but blocked on PDG Sternheimer parameters. E and F are untouched.
 
 **The model is now wired in and results have changed** above each element's
 crossover (2.66--10.46 keV). Nineteen existing tests moved; every one was a
@@ -235,13 +249,15 @@ verification debt is now larger, not smaller.
 
 The `electron-transport` ledger row was narrowed in place: its claim now says
 Joy--Luo is the low-energy branch only, and its "Validity ceiling" note is
-labelled superseded above the crossover. That is the minimum needed to stop the
-row over-claiming; the fuller rewrite is still G.
+labelled superseded above the crossover.
 
-`docs/physics/beam-transport/stopping-power.md` is still **unchanged** and is
-now **wrong**: its validity-ceiling section describes behaviour the transport no
-longer has. Rewriting it is checklist G and is the first thing that should
-happen next.
+`docs/physics/beam-transport/stopping-power.md` now documents the
+Berger--Seltzer branch and the per-element splice, and its "Validity ceiling"
+section is rewritten to state what the transport does today rather than what
+it used to do. `pyrite-dev docs` passes clean (offline, warnings-as-errors).
+This closes the doc-vs-code gap; it does not substitute for the fresh-context
+`physics-validation` pass still owed on the derivation (see above), nor for F's
+measurement work.
 
 ### Test fallout from D
 
