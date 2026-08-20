@@ -533,3 +533,57 @@ def test_grooved_cutoff_beats_a_facet_crossing_on_the_material_side():
         if np.any(vac):
             assert np.all(out["vacuum_t0_ang"][vac] < t_last), e
     assert n_terminal > 0.5 * Ne
+
+
+# --- per-electron replay and batching, under an applied loss -----------------
+#
+# The per-electron cores run electrons in batches sized from a scratch budget,
+# and replay a whole batch at a larger capacity when any electron overflows its
+# segment slots. Applying the loss changes how many segments an electron needs,
+# so it changes which electrons overflow -- which makes both mechanisms worth
+# re-pinning rather than inheriting from the deterministic tests. Replay is
+# exact only because the streams are counter-addressed, and the straggling
+# accumulator is reset per attempt (`stragg_dE[e] = 0.0` at the top of the
+# per-electron loop) rather than trusting a stale value from a discarded one.
+
+
+@pytest.mark.parametrize("name", ["perelectron-exact", "perelectron-lut"])
+@pytest.mark.parametrize("capacity", [4, 37, 4096])
+def test_capacity_replay_reproduces_the_straggled_run(name, capacity):
+    """A capacity far below what an electron needs forces a replay of the whole
+    batch. Every capacity must give the same trajectories *and* the same
+    accumulated ``straggle_dE_keV``; a stale accumulator from the discarded
+    attempt would double-count and show up here."""
+    from pyrite.montecarlo.transport import PerElectronTransportConfig
+
+    core_kwargs = WIRED_CORES[name]
+    common = dict(Ne=60, seed=5, straggling=True)
+    base = _run(core_kwargs, **common)
+    replayed = _run(
+        core_kwargs,
+        **common,
+        per_electron_config=PerElectronTransportConfig(seg_capacity=capacity),
+    )
+    for key in ("L_ang", "E_start_keV", "E_keV", "electron_id", "straggle_dE_keV"):
+        np.testing.assert_array_equal(base[key], replayed[key], err_msg=f"{name}:{key}")
+    assert base["n_cutoff_stopped"] == replayed["n_cutoff_stopped"]
+
+
+@pytest.mark.parametrize("name", ["perelectron-exact", "perelectron-lut"])
+@pytest.mark.parametrize("budget", [1 << 18, 1 << 27])
+def test_straggled_results_do_not_depend_on_batch_size(name, budget):
+    """``stragg_dE`` is indexed by the *global* electron index while the cores
+    are handed a batch slice, so a batching change is exactly the kind of thing
+    that would corrupt it. Pinned against the default batching."""
+    from pyrite.montecarlo.transport import PerElectronTransportConfig
+
+    core_kwargs = WIRED_CORES[name]
+    common = dict(Ne=60, seed=5, straggling=True)
+    base = _run(core_kwargs, **common)
+    rebatched = _run(
+        core_kwargs,
+        **common,
+        per_electron_config=PerElectronTransportConfig(scratch_budget_bytes=budget),
+    )
+    for key in ("L_ang", "E_start_keV", "E_keV", "electron_id", "straggle_dE_keV"):
+        np.testing.assert_array_equal(base[key], rebatched[key], err_msg=f"{name}:{key}")
