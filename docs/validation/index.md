@@ -36,10 +36,12 @@ beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
 beam-transport/electron-transport
 beam-transport/energy-controlled-propagation
+beam-transport/energy-loss-straggling
 beam-transport/energy-step-convergence
 beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
 beam-transport/radiation-error-estimators
+beam-transport/relativistic-bethe-stopping
 beam-transport/substep-radiation-invariance
 beam-transport/transport-midpoint-stopping
 ```
