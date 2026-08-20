@@ -598,9 +598,7 @@ def _transport_kernel(
         # (see the prism-exit comment in the step-2 boundary block above).
         if straggle_on == I32_ONE:
             urban_key = _urban_stream_key(key)
-            flight_key = _urban_flight_key(
-                urban_key, np.uint64(flight_id), np.uint64(substep_id)
-            )
+            flight_key = _urban_flight_key(urban_key, np.uint64(flight_id), np.uint64(substep_id))
             stragg_counter = U64_ZERO
             i_el2 = I32_ZERO
             while i_el2 < n_el:
@@ -653,7 +651,9 @@ def _transport_kernel(
                         f_2_u = F64_ZERO
 
                     soft_u = Cc * (F64_ONE - URBAN_RATE) / L_I_u
-                    sigma_1_u = soft_u * (f_1_u / E_1_u) * (xp.log(two_mc2_bg2_u / E_1_u) - beta_sq_u)
+                    sigma_1_u = (
+                        soft_u * (f_1_u / E_1_u) * (xp.log(two_mc2_bg2_u / E_1_u) - beta_sq_u)
+                    )
                     sigma_2_u = F64_ZERO
                     if f_2_u > F64_ZERO:
                         sigma_2_u = (
