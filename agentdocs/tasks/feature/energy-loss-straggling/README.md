@@ -438,13 +438,92 @@ Interactions that need explicit design rather than incremental patching:
       claim should be stated as few-ulp, not bit-for-bit: `_urban_poisson_scalar`
       branches on a `log`/`exp` comparison, so a last-bit difference in `lam` can
       move `n` by one at a CDF boundary.
-- [ ] D — RNG plumbing. Add a counter-addressed straggling stream keyed on
-      `(electron, flight, substep)`, reusing the `stream_keys` / `_splitmix64`
-      machinery. Required properties, each with a test: straggling off is
-      bit-for-bit identical to today on all four cores; straggling on never
-      perturbs the free-path or scattering-angle draws; the same
-      `(seed, electron, flight)` yields the same loss on lockstep, per-electron,
-      and CUDA cores up to libm ulp.
+- [x] D — RNG plumbing. **Done on all five host cores; CUDA key derivation
+      duplicated but the sampler itself is unverified (no cupy/GPU on the
+      dispatching machine).** Owners: `montecarlo/transport.py`
+      (`_urban_stream_key_scalar`, `_urban_flight_key_scalar`, the five
+      `_transport_core_*` cores, `_run_per_electron_transport{,_lut}`,
+      `simulate_trajectories`'s new `straggling=False` kwarg),
+      `montecarlo/transport_jit_kernel.py` (`_urban_stream_key`,
+      `_urban_flight_key`, `_urban_ionisation`, `_dEds_spliced_element`,
+      `_transport_kernel`/`run_transport_kernel`), and
+      `tests/montecarlo/test_straggling_rng_plumbing.py` (17 cases).
+
+      **Key scheme, exactly as C recommended and confirming its salt
+      constant.** `urban_key = _urban_stream_key_scalar(stream_key)` once per
+      electron (`stream_key = stream_keys(seed, Ne)[e]`, the SAME array every
+      core already uses or now receives), then
+      `flight_key = _urban_flight_key_scalar(urban_key, flight, substep)`
+      once per row, sampling from `(flight_key, counter=0)`. `flight`/
+      `substep` are each core's own internal `flight_of[e]`/`substep_of[e]`
+      (or per-electron `flight_id`/`substep_id`), tracked unconditionally
+      regardless of `energy_model`, so no `energy_model="midpoint"` request is
+      needed to address the stream correctly. The sampled loss accumulates
+      into a new diagnostic `result["straggle_dE_keV"]` (Ne-sized, only
+      present when `straggling=True`) and is **not** applied to
+      `E_keV`/`E_end_keV` anywhere — integration is E/F's job, untouched here.
+
+      **Host: all five cores.** `_transport_core_ungrooved`,
+      `_transport_core_ungrooved_lut`, `_transport_core_grooved`,
+      `_transport_core_ungrooved_perelectron`,
+      `_transport_core_ungrooved_perelectron_lut`. The two LUT cores gained
+      new `L_Js`/`L_Zs`/`L_ks`/`L_coeffs`/`L_E_cross` parameters (used only
+      for straggling): the LUT bakes one interpolated `dE/ds` per layer and
+      carries no per-element split, so straggling always evaluates the exact
+      per-element stopping power via `_dEds_spliced_element_scalar` regardless
+      of which core calls it — the LUT's own approximation error is
+      irrelevant to the sampler's mean, only to the (unrelated) flight length
+      that transport under that core produces.
+
+      **Tests, one per "Done when" property, on every host core (including
+      grooved) via `simulate_trajectories`, not core-internals:**
+
+      1. `straggling=False` is bit-for-bit identical to a call that never
+         passes the keyword — the default is a provable no-op.
+      2. `straggling=True` never changes any pre-existing returned array
+         (every field but the new diagnostic checked); `straggle_dE_keV` is
+         finite, non-negative, and nonzero on at least one electron at 25 keV
+         graphite (not a vacuous pass).
+      3. `straggle_dE_keV` is reproduced bit-for-bit **offline**, on every
+         core, from nothing but the run's own recorded `(E_start, L_ang)` per
+         segment and each segment's position within its electron's own
+         segment list (the flight index; substep is always 0 at the default
+         `max_dE_frac=0`) — proving the core actually addressed the sampler
+         with the documented key, not merely that the shared function is a
+         pure function of its inputs.
+
+      **CUDA.** Duplicated `_urban_stream_key`/`_urban_flight_key` (trivial,
+      hand-verified integer ops) and the full sampler (channels, three
+      Poisson draws, continuum quanta) inlined into `_transport_kernel`'s
+      per-row body — device functions in this file return one value, so the
+      multi-output channel computation and the mutable draw counter could not
+      be factored out, matching the file's own established idiom (see the
+      prism-exit inlining comment it already carries).
+      `run_transport_kernel`'s new trailing `straggle_on`/`stragg_dE`
+      parameters match `_transport_core_ungrooved_perelectron`'s positionally,
+      which `test_launcher_signature_tracks_the_reference_core` enforces.
+      **`_transport_lut_kernel` was NOT wired** (out of budget; no test
+      enforces its parity); `simulate_trajectories` raises
+      `NotImplementedError` for `straggling=True` + `transport_core="cuda"`
+      with the LUT enabled (the default) rather than risk a silent
+      unstraggled result or an opaque `TypeError`.
+
+      **This machine has no cupy and no CUDA device** — `transport_jit_kernel`
+      does not even import. The CUDA sampler code was cross-checked by hand
+      against the tested host implementation and could not be compiled or
+      executed. Slice D's own "up to libm ulp" CUDA claim is therefore
+      asserted by construction (identical formulas, identical draw order,
+      identical key scheme) but **not empirically verified**; whoever picks up
+      F should verify it on hardware (`pyrite remote`) before relying on it,
+      and should decide then whether to also wire `_transport_lut_kernel` or
+      keep the LUT path CUDA-only-when-disabled.
+
+      **Acceptance run:** `pyrite-dev test-suite core` (1761 passed),
+      `pyrite-dev test --numba tests/montecarlo/` (681 passed), `lint`,
+      `typecheck` — all clean. No existing test was weakened;
+      `tests/montecarlo/test_groove.py`'s `_run_grooved` helper was updated
+      for the grooved core's three new trailing parameters (mechanical, no
+      behavior change since it passes `straggle_on=False`).
 - [ ] E — CPU integration on the ungrooved lockstep core, including the
       redefined cutoff crossing and the `max_dE_frac` substep interaction.
       Re-derive rather than re-run `substep-radiation-invariance` for the
