@@ -207,22 +207,142 @@ Interactions that need explicit design rather than incremental patching:
       tolerance. The `~0.3 rad` figure that motivates this task is a soft-collision
       underestimate by roughly 10--50x; the motivation is strengthened, not
       weakened.
-- [ ] B — Distribution selection. Choose the fluctuation model for the measured
-      few-collision regime — Urban-style (the leading candidate, built for
-      exactly this regime), Vavilov, or Blunck--Leisegang-corrected Gaussian —
-      justified against A's numbers. Decide whether to use unrestricted stopping
-      with a full-distribution sampler (the simpler path, self-consistent while
-      delta rays are untransported) or restricted stopping with explicit hard
-      inelastic events (larger, and only warranted if delta-ray production
-      becomes observable). Confirm whether delta rays remain a recorded
-      non-goal.
-- [ ] C — Sampler derivation and unit test. Derive the selected distribution's
-      sampler from its source (Landau via Boersch-Supan/Koelbig--Schorr, Vavilov
-      via Rotondi--Montagna or Chibani, Bohr/Blunck--Leisegang Gaussian —
-      whichever B selects), check units, limits, and signs, and pin its first two
-      moments against the analytic mean and variance. Include the limiting case
-      that the sampler reduces to the current deterministic loss as its width
-      parameter goes to zero.
+- [x] B — Distribution selection. **Done. Selected: the Geant4 Urban
+      energy-loss fluctuation model, unrestricted (`T_up = T_max = E/2`),
+      applied per element.** Instrument: `slice_a_regime_audit.py --part b0`
+      (the stale-figure audit) and `--part urban` (the parameterisation and its
+      validity boundaries), both extending slice A's harness rather than
+      duplicating it.
+
+      **Source.** Geant4 Physics Reference Manual, "Energy loss fluctuations",
+      Urban model (`G4UniversalFluctuation`), after Bichsel, *Rev. Mod. Phys.*
+      **60**, 663 (1988).
+
+      **Parameterisation**, per element so it matches the Bragg-additive form
+      the spliced mean stopping power already uses:
+
+      | symbol | value |
+      |---|---|
+      | ionisation level `E_0` | 10 eV |
+      | ionisation ceiling `T_up` | `T_max = E/2` (Moller; unrestricted) |
+      | K-shell level `E_2` | `10 Z^2` eV |
+      | K-shell strength `f_2` | `2/Z` (`Z >= 2`), `f_1 = 1 - f_2` |
+      | loose level `E_1` | from `f_1 ln E_1 + f_2 ln E_2 = ln I`, `I` = transport's own `J_keV` |
+      | normalisation `C` | **`|dE/dx|` itself** |
+      | rate parameter `r` | 0.55 |
+
+      `Sigma_i = C (f_i/E_i) [ln(2 mc^2 (beta gamma)^2 / E_i) - beta^2] /
+      [ln(2 mc^2 (beta gamma)^2 / I) - beta^2] (1 - r)` for `i = 1, 2`;
+      `Sigma_3 = C r (T_up - E_0) / (E_0 T_up ln(T_up/E_0))`;
+      `dE = n_1 E_1 + n_2 E_2 + sum_k E_k` with `n_i ~ Poisson(s Sigma_i)` and
+      `E_k = E_0 / (1 - u (T_up - E_0)/T_up)`, `u` uniform.
+
+      **Why this and not the alternatives, against A's measured numbers.**
+
+      1. *Landau is inadmissible per flight.* A measured 0.003--0.16 close
+         (`eps^-2`) collisions per flight. The sharper form of the same
+         statement is `xi/I`, which Landau requires to be `>> 1`: measured
+         **0.087** for carbon at 25 keV (`xi` = 6.79 eV against `I` = 78 eV) and
+         **0.004** for tungsten (2.9 eV against 727 eV).
+      2. *Gaussian/Bohr is inadmissible everywhere.* `kappa` per flight
+         2e-5--2.9e-2; `kappa` over the entire CSDA range 0.080--0.16. Never
+         near the `kappa >~ 10` threshold, per flight or integrated.
+      3. *Vavilov is inadmissible per flight* for the same reason, and
+         separately because it assumes the free-electron `eps^-2` spectrum down
+         to `eps -> 0`, which is exactly where atomic binding dominates once
+         `xi <~ I`.
+      4. **The decisive property is `C = dE/dx`.** Urban is the only candidate
+         whose mean is *normalised to* the supplied stopping power rather than
+         derived from its own `xi`. Measured: the closure ratio
+         (model mean loss)/(`S s`) is **1.0000** in every cell where the
+         parameterisation is intact. That is what makes it compatible with the
+         *spliced* Joy--Luo / Berger--Seltzer mean — including the empirical
+         Joy--Luo branch below each element's crossover, where no
+         Bethe-consistent `xi` exists at all. Landau, Vavilov and Bohr each
+         double-specify the mean and would disagree with the splice.
+      5. *It resolves the regime rather than approximating it.* Measured Poisson
+         means per flight: `n_1` = 0.015--1.80, `n_2` <= 0.070,
+         `n_3` = 0.069--1.15 — under ~2.5 discrete events per flight and
+         typically well under one, which is exactly the countable-collision
+         picture A measured, sampled as such instead of replaced by a limit law.
+      6. *Variance closes without tuning.* Urban's compound-Poisson variance
+         `sum_i <n_i> <E^2>_i` (with `<E^2>_3 = E_0 T_up` exactly) against the
+         analytic Moller second moment `xi T_max`: ratio **0.73--1.42** in
+         variance (`sigma_E` within -14%/+19%) over the whole matrix, and within
+         5% for carbon above 5 keV. High-`Z` runs ~26% low in variance, low
+         energy runs high.
+      7. *Infinite divisibility comes free.* A compound Poisson sum is
+         infinitely divisible, so subdividing a flight at frozen energy is
+         **exactly** distribution-preserving. That is the strongest available
+         form of the `max_dE_frac` substep invariance E and K must re-derive;
+         the only residual is the energy dependence of `Sigma_i`.
+
+      **Domain of validity, measured, with two boundaries Geant4 never hits.**
+
+      - `E_2 = 10 Z^2` eV sits below the Moller ceiling `T_max = E/2` only for
+        `E > 20 Z^2` eV: C above **0.72 keV**, Si above **3.92 keV**, S above
+        **5.12 keV**, W only above **109.5 keV**. So the K-shell channel is an
+        unphysical level over most of the 1--300 keV sweep in high `Z`. Measured
+        cost of dropping it: the `E_2` channel carries **0.0013--0.0047** of
+        tungsten's mean loss.
+      - Below `(beta gamma)^2 = E_2 / 2 mc^2` the `E_2` logarithm goes
+        non-positive. A naive clamp to zero makes the mean **overshoot** —
+        measured closure 1.0187 / 1.0098 / 1.0038 / 1.0010 for W at 1 / 2 / 5 /
+        10 keV — because the clamp deletes a negative contribution.
+        **Prescription for C:** whenever `E_2` is inadmissible on either
+        boundary, re-solve the sum rules with `f_1 = 1`, `E_1 = I`. That
+        restores closure to exactly 1.000 and preserves the mean bit-for-bit.
+      - The PRM's own shape floor ("reliable distributions require the mean loss
+        to be at least a few multiples of `I_exc`") is **violated in nearly
+        every cell**: measured `dE/I` per flight is 0.017 (W in ws2 at 1 keV) to
+        2.58 (C at 300 keV). Recorded honestly rather than argued away: below
+        that floor the loss is a countable number of discrete events, so what is
+        at stake is the two-level-plus-continuum *atomic parameterisation*, not
+        a smooth spectral shape. The mean stays exact regardless and the
+        variance is measured good to +-20%, so C must pin the first two moments
+        against `xi` and `xi T_max` rather than trust the shape.
+
+      **Unrestricted, not restricted.** `T_up = T_max = E/2`, no delta-ray
+      production cut. A restricted sampler would require a *restricted*
+      `dE/dx`, i.e. modifying the mean stopping power, which this task
+      explicitly does not own. Both branches of the current splice are
+      unrestricted, so unrestricted Urban is the self-consistent choice.
+      **The "No delta rays" non-goal in `stopping-power.md` stays intact and
+      unchanged**: replacing a deterministic `<dE/ds> s` with a random variable
+      of the same mean creates no secondary particles. Slice I rewrites the
+      "No straggling" bullet only; it must leave the delta-ray bullet alone.
+      Consequence to carry into C and E: a single flight can now sample a loss
+      up to `E/2`, so the cutoff-crossing solve (`eq-stopping-cutoff-distance`)
+      and the `n_cutoff_stopped` bookkeeping must handle a flight that jumps
+      straight past `E_cut`, and with `n_3` up to 1.15 per flight that is not a
+      rare corner.
+- [ ] C — Sampler derivation and unit test. **Rescoped by B.** The
+      distribution is the Geant4 Urban model, so no special-function sampler is
+      needed: **drop** the Landau (Boersch-Supan / Koelbig--Schorr), Vavilov
+      (Rotondi--Montagna, Chibani) and Blunck--Leisegang alternatives from this
+      slice. What is left is elementary — three Poisson variates plus `n_3`
+      inverse-CDF draws `E = E_0 / (1 - u (T_up - E_0)/T_up)`. Three additions
+      B did not remove but created:
+
+      1. **The `E_2` admissibility re-solve**, which Geant4 never needs. When
+         `E_2 = 10 Z^2` eV exceeds `T_max = E/2` (i.e. `E < 20 Z^2` eV; W below
+         109.5 keV, Si below 3.92 keV) or its logarithm goes non-positive,
+         re-solve the sum rules with `f_1 = 1`, `E_1 = I`. A naive clamp to zero
+         instead makes the mean overshoot by up to 1.87% (measured, W at 1 keV).
+      2. **Per-element Bragg application.** Geant4 uses a material-level
+         effective `Z`; PyRITE's stopping power and its crossover splice are
+         both per element, so Urban must be too. That is what keeps
+         `C = dE/dx` exact for each element and the total mean bit-for-bit.
+      3. **Moment pins against `xi` and `xi T_max`**, not against the model's
+         own shape — the PRM's "mean loss at least a few multiples of `I_exc`"
+         floor is violated in nearly every cell (measured `dE/I` = 0.017--2.58
+         per flight). C decides whether to accept the measured -26% variance
+         deficit in high `Z` or apply the PRM's width correction.
+
+      Keep the original requirements: check units, limits and signs, pin the
+      first two moments, and include the limiting case that the sampler reduces
+      to the current deterministic loss as the step (hence every `<n_i>`) goes
+      to zero.
 - [ ] D — RNG plumbing. Add a counter-addressed straggling stream keyed on
       `(electron, flight, substep)`, reusing the `stream_keys` / `_splitmix64`
       machinery. Required properties, each with a test: straggling off is
@@ -298,7 +418,17 @@ Interactions that need explicit design rather than incremental patching:
   `sigma_E` = 1.54 keV, and the Jensen bias 2.6 rad (soft) to 13.4 rad (full
   cutoff, an upper bound because the second-moment expansion is not valid on a
   heavy-tailed loss distribution). Slice H's acceptance target should be stated
-  against this range, not against `~0.3 rad`.
+  against this range, not against `~0.3 rad`. **Sharpened by B0 and B.** B0
+  identified the `~0.3 rad` figure as a plasmon-only Poisson estimate
+  (`sigma_E = sqrt(dE eps_p)` = 0.237 keV at a 25 eV quantum), so it is a
+  correctly computed number for a model that omits shell ionisation and the
+  whole Moller tail. B then selected **unrestricted** Urban with
+  `T_up = T_max = E/2`, so the sampler's own variance is the full-Moller one:
+  **slice H's baseline is the 13.4 rad end**, scaled by Urban's measured
+  0.73--1.42 variance ratio, i.e. **9.8--19 rad**, against the 0.1 rad
+  numerical tolerance. H reports the *residual* against that baseline, and
+  must carry A's caveat that the free-space clock spread is not the
+  coherent-sum Debye--Waller exponent.
 - **Open, and NOT owned here — residual mean-stopping accuracy.** On the
   corrected clock a residual stopping error of 1% still costs 3.5 rad at the
   same operating point, the same order as the straggling bias. That residual
@@ -317,26 +447,74 @@ Interactions that need explicit design rather than incremental patching:
   sub-Landau to Vavilov, never to Gaussian. Slice B must select for the Vavilov/
   few-collision regime end to end and may not fall back on a whole-trajectory
   central-limit argument.
-- **Contradicted by A — `energy-step-convergence.md`'s tungsten event count.**
-  That page's "about 0.11 [inelastic events per flight] in tungsten at 25 keV"
-  does not reproduce from the repository's own stopping power and mean excitation
-  energy: `W(0.06305)` gives **0.03**, a factor of 3.7 low. The carbon figure
-  reproduces exactly (measured 1.03 against the stated "about 1.0"), so the
-  method is right and the tungsten number looks like an arithmetic slip. The
-  page's conclusion — fewer than one inelastic event per flight in tungsten — is
-  unaffected and in fact stronger. Fixing that sentence belongs to slice I, not
-  here; slice A does not edit docs pages.
-- **Open:** distribution choice for the few-collision regime (checklist B).
-  Urban-style is the leading candidate; this is model selection against measured
-  `kappa`, not an open-ended design question.
+- **Closed by B0 — the contested `energy-step-convergence.md` figures, each
+  classified by measurement.** The hypothesis under test was that the page's
+  figures were measured against the retired pure-Joy--Luo model and never
+  re-measured after the splice landed (`2c51754`, `dcdb1cd`, `d15a8ef`). The
+  commit dates are consistent with it — the figures landed in `79f071b` on
+  2026-08-11, the splice on 2026-08-19 — but the dates are not the test. Every
+  figure was recomputed under **both** models through the
+  `_element_crossover_keV -> inf` seam (`--part b0`). **The hypothesis is
+  rejected for all four.** Verdicts, for slice I to execute without
+  re-deriving:
+
+  | doc figure | splice | retired Joy--Luo | verdict |
+  |---|---|---|---|
+  | "about 1.0" inelastic/flight, C at 25 keV | 1.026 | 0.962 | **reproduces; no change** |
+  | "about 0.11" inelastic/flight, W at 25 keV | 0.029 | 0.028 | **real discrepancy** |
+  | `kappa` = 0.015, C at 25 keV over 1 um | 0.01526 | 0.01526 | **reproduces; no change** |
+  | ~0.3 rad Jensen bias, hopg 25 keV / 1 um / 1 keV | 2.596 (soft), 13.431 (full) | 2.564, 13.292 | **real, and explained** |
+
+  - *Carbon event count and `kappa`: not contradicted at all.* Both reproduce.
+    `kappa` is splice-independent **by construction** —
+    `xi = 2 pi r_e^2 mc^2 n_e s / beta^2` contains no stopping power — so no
+    stopping-model change could ever have moved it.
+  - *Tungsten event count: a real discrepancy, and NOT a live transport bug.*
+    The splice moves it by 3% (0.028 -> 0.029), nowhere near the 3.7x needed,
+    and it cannot: the flight length is the *elastic* mean free path, which the
+    splice does not touch. The repository's own `S`, `lambda_el` and `I` for
+    tungsten are mutually consistent under both models; reaching 0.11 would
+    require `I` = 193 eV (the transport table's `J_keV` for W is **727 eV**) or
+    a flight length 3.76x longer. This is a documentation arithmetic error, not
+    code. **Slice I:** restate as ~0.03. The page's conclusion — fewer than one
+    inelastic event per flight in tungsten — is unaffected and strengthened.
+  - *The ~0.3 rad Jensen bias: not a splice artifact, and its origin is now
+    identified.* Joy--Luo and the splice agree to ~1%. The figure is an
+    **under-scoped variance model**, not an error: it is a plasmon-only Poisson
+    estimate. Measured, the mean loss over 1 um in hopg at 25 keV is
+    **2.247 keV**; with the page's own 25 eV plasmon quantum that is `N` = 90
+    events and `sigma_E = sqrt(dE eps_p)` = **0.237 keV -> 0.317 rad**, against
+    the page's stated "order 300 eV of loss spread" and "most probable loss
+    25--33 eV in graphite". At 33 eV: 0.272 keV -> 0.419 rad. The `sigma_E`
+    that gives exactly 0.3 rad is 0.230 keV. So the doc's arithmetic is correct
+    for a model that omits all shell ionisation and the entire Moller tail.
+    This confirms A's "underestimate by 10--50x" and supplies the mechanism.
+    **Slice I:** the fix is to state which spread the figure describes, not to
+    change the number in place.
+- **Closed by B — distribution choice.** The **Geant4 Urban model**,
+  unrestricted (`T_up = T_max = E/2`), applied per element. Selected against
+  measured numbers, not general practice: `xi/I` per flight is 0.004--0.087 so
+  Landau fails; `kappa` never exceeds 0.16 even integrated so Bohr fails;
+  Vavilov's free-electron spectrum is invalid where `xi <~ I`. The decisive
+  property is `C = dE/dx` — Urban's mean is *normalised to* the supplied
+  stopping power (measured closure 1.0000), which is the only way to stay
+  consistent with a **spliced** mean whose low-energy branch is an empirical
+  Joy--Luo fit with no Bethe-consistent `xi`. Full justification,
+  parameterisation and validity boundaries in checklist item B.
 - **Corrected:** an earlier draft treated unrestricted-CSDA-plus-straggling as
   double-counting the Moller tail and therefore blocking. It is not — same mean,
   correct variance, self-consistent while delta rays are untransported. Slice B
   is correspondingly smaller than first scoped.
-- **Open:** whether delta rays become transported particles. Currently a
-  recorded non-goal ("No delta rays", `stopping-power.md`). Only the restricted-
-  stopping branch of B forces the question; the unrestricted branch leaves the
-  non-goal intact.
+- **Closed by B — delta rays stay a non-goal.** B selected the unrestricted
+  branch, so the question is not forced. `stopping-power.md`'s "No delta rays —
+  all inelastic loss is local and continuous, so knock-on electrons do not
+  exist as transported particles" was re-read and is still true with straggling
+  present: a random loss of the same mean creates no secondary particles.
+  **Slice I rewrites the "No straggling" bullet only and must leave the
+  delta-ray bullet untouched.** A restricted sampler was rejected because it
+  would require a *restricted* `dE/dx`, i.e. modifying the mean stopping power,
+  which this task explicitly does not own; both branches of the current splice
+  are unrestricted.
 - **Open:** production reachability (G). Today `energy_model` is API-only, so
   straggling could land as a research capability with no `Numerics` field, or as
   a production toggle with checkpoint-identity consequences. Cheaper to decide
@@ -359,28 +537,37 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Recommendation: dispatch B now.** Not "hold". The gate's own condition fired,
-but the task it gated on is already merged, so the only thing that could have
-held this task is gone. B is also the slice A most directly de-risks: it was
-scoped as "model selection against measured `kappa`", and `kappa` is now
-measured across the full catalog and energy sweep rather than at the single
-carbon/25 keV/1 um point the scope section quotes.
+**Recommendation: dispatch C now.** B named the distribution, so C's dependency
+is discharged. C's scope **changed** in both directions and its checklist entry
+above has been rewritten accordingly:
 
-B should be run knowing three things slice A established:
+- *Narrower.* No Landau/Vavilov/Blunck--Leisegang special-function sampler.
+  Urban is Poisson counts plus an analytic inverse CDF, so the derivation is
+  elementary and the "derive the sampler from its source" work is mostly
+  transcription plus the moment pins.
+- *Wider.* Three PyRITE-specific pieces Geant4 does not carry: the `E_2`
+  admissibility re-solve (high `Z` at these energies puts an unphysical
+  K-shell level above `T_max`), per-element Bragg application to match the
+  spliced mean, and moment pins against `xi`/`xi T_max` because the model is
+  being run below its own stated shape-reliability floor.
 
-1. `kappa` per flight is 2e-5--3e-2 with **under one** close collision per
-   flight. Landau is inadmissible per flight, not merely inaccurate.
-2. `kappa` over the whole CSDA range is 0.080--0.16 and flat in `Z` and energy.
-   Gaussian/Bohr is inadmissible everywhere too, and the whole-trajectory
-   central-limit escape hatch in the scope section does not exist.
-3. That leaves the few-collision family. Urban-style was already the leading
-   candidate on prior reasoning; A converts that from a guess to the only
-   option that covers the measured matrix, and B's real work is deriving and
-   pinning the specific variant rather than re-litigating the family.
+Two things C should carry forward that B established but does not own:
 
-Slices J and K remain late doc slices as scoped; nothing in A changes their
-dependency order, though K's rewrite of `electron-transport.md` should also
-carry A's correction to the tungsten event count if slice I has not already.
+1. **Cost for F is already bounded.** The measured expected number of discrete
+   events per flight is <= 2.5 and typically < 1 (`n_1` 0.015--1.80, `n_2` <=
+   0.070, `n_3` 0.069--1.15). The variable-length sampling loop therefore has an
+   `O(1)` trip count, so Urban is affordable inside the CUDA kernel; the device
+   cost is three Poisson generators, not a table.
+2. **E's substep invariance is stronger than the task doc assumed.** Urban's
+   loss is a compound Poisson sum, which is infinitely divisible, so
+   subdividing a flight at frozen energy is *exactly* distribution-preserving —
+   not merely "distributional at best". The only residual is the energy
+   dependence of `Sigma_i` across the substeps. E and K should re-derive
+   `substep-radiation-invariance` on that basis.
+
+Slices J and K remain late doc slices as scoped. Slice I now has four B0
+verdicts to execute (see "Decisions and open questions"), of which two are "no
+change" and two are restatements; it must not touch the "No delta rays" bullet.
 
 ## Delegation slices and required skills
 

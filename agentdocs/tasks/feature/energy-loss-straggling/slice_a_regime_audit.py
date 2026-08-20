@@ -94,6 +94,7 @@ decision, not a new model.  No `Validation:` marker.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -271,6 +272,19 @@ def joy_luo_only(on: bool) -> None:
     else:
         transport._element_crossover_keV = joy_luo_only._saved  # type: ignore[attr-defined]
     transport._CROSSOVER_CACHE = {}
+
+
+@contextmanager
+def retired_model(on: bool):
+    """Evaluate a block under the retired pure-Joy--Luo model when ``on``."""
+    if not on:
+        yield
+        return
+    joy_luo_only(True)
+    try:
+        yield
+    finally:
+        joy_luo_only(False)
 
 
 def omega_over_c(E_photon_keV: float) -> float:
@@ -505,11 +519,283 @@ def report_gate() -> None:
         print(f"  {frac * 100:>5.1f}% stopping error -> {lin:>8.3f} rad")
 
 
+def report_b0() -> None:
+    """Slice B0: are the doc's contested figures artifacts of the stopping splice?
+
+    ``docs/validation/beam-transport/energy-step-convergence.md`` states four
+    numbers that slice A's measurements did not all reproduce.  The hypothesis
+    under test is that they were measured against the retired pure-Joy--Luo
+    stopping power and never re-measured after ``2c51754`` / ``dcdb1cd`` /
+    ``d15a8ef`` spliced Berger--Seltzer in above each element's crossover.  Every
+    figure is therefore recomputed under BOTH models through the
+    ``_element_crossover_keV -> inf`` seam, so "explained by the splice" is a
+    measured verdict and not an inference from the commit dates.
+    """
+    print()
+    print("=" * 100)
+    print("PART 4  B0: contested doc figures, current splice vs retired Joy--Luo")
+    print("=" * 100)
+
+    print("\n--- Figures 1 and 2: inelastic events per flight at 25 keV ---")
+    print("doc: 'about 1.0 [per flight] in carbon at 25 keV ... about 0.11 in tungsten'")
+    print(
+        f"\n{'material':>12} {'model':>9} {'lam_el':>8} {'I[keV]':>9} {'S[keV/A]':>10} "
+        f"{'N_hard':>9} {'N_tot':>8} {'doc':>7}"
+    )
+    for material, doc_value in (("C(0.1136)", 1.0), ("W(0.06305)", 0.11)):
+        comp = BARE[material]
+        lam = elastic_mfp_ang(comp, 25.0)  # elastic only: the splice cannot move it
+        I_keV = mean_excitation_keV(comp)
+        for label, on in (("splice", False), ("joy_luo", True)):
+            with retired_model(on):
+                S = stopping_keV_per_ang(comp, 25.0)
+                n_hard, n_tot = collision_bracket(comp, 25.0, lam)
+            print(
+                f"{material:>12} {label:>9} {lam:>8.2f} {I_keV:>9.5f} {S:>10.5f} "
+                f"{n_hard:>9.3f} {n_tot:>8.3f} {doc_value:>7.2f}"
+            )
+
+    print("\n  Sensitivity: which single input would have to move to reach the doc value?")
+    for material, doc_value in (("C(0.1136)", 1.0), ("W(0.06305)", 0.11)):
+        comp = BARE[material]
+        lam = elastic_mfp_ang(comp, 25.0)
+        I_keV = mean_excitation_keV(comp)
+        S = stopping_keV_per_ang(comp, 25.0)
+        n_tot = S * lam / I_keV
+        print(
+            f"  {material:>12}  N_tot={n_tot:.3f} vs doc {doc_value:.2f}: "
+            f"needs S x{doc_value / n_tot:.2f}, or lam x{doc_value / n_tot:.2f}, "
+            f"or I x{n_tot / doc_value:.2f} ({I_keV * n_tot / doc_value * 1e3:.1f} eV)"
+        )
+
+    print("\n--- Figure 3: kappa = 0.015, carbon at 25 keV over 1 um ---")
+    comp_c = BARE["C(0.1136)"]
+    for label in ("splice", "joy_luo"):
+        with retired_model(label == "joy_luo"):
+            xi = xi_keV(comp_c, 25.0, 1.0e4)
+            k = kappa(comp_c, 25.0, 1.0e4)
+        print(f"  {label:>9}: xi = {xi:.5f} keV, T_max = 12.5 keV, kappa = {k:.5f}")
+    print("  (xi depends on n_e, s and beta only -- no stopping power enters, so the")
+    print("   two models are identical by construction, not by coincidence.)")
+
+    print("\n--- Figure 4: the ~0.3 rad Jensen bias, hopg / 25 keV / 1 um / 1 keV photon ---")
+    comp = composition("hopg")
+    E0, L, E_photon = 25.0, 1.0e4, 1.0
+    eps_soft = 30.0 * mean_excitation_keV(comp)
+    print(f"{'model':>9} {'cutoff':>12} {'sigma_E[keV]':>13} {'dphi[rad]':>10}")
+    for label in ("splice", "joy_luo"):
+        with retired_model(label == "joy_luo"):
+            for cut_label, cut in (("Moller E/2", None), (f"soft {eps_soft:.2f} keV", eps_soft)):
+                dphi, sigma = straggling_phase_rad(comp, E0, L, E_photon, eps_max_keV=cut)
+                print(f"{label:>9} {cut_label:>12} {sigma:>13.4f} {abs(dphi):>10.3f}")
+
+    # Invert the bias for the sigma_E the doc's figure implies, and compare it
+    # against a Poisson plasmon estimate: N = S L / eps_p events of size eps_p
+    # gives sigma_E = sqrt(N) eps_p = sqrt(S L eps_p).  This is the "order 300 eV
+    # of loss spread" sentence's own microphysics ("plasmons, most probable loss
+    # 25--33 eV in graphite"), so it is the arithmetic the figure most likely used.
+    dphi_ref, sigma_ref = straggling_phase_rad(comp, E0, L, E_photon)
+    sigma_for_03 = sigma_ref * np.sqrt(0.3 / abs(dphi_ref))
+    print(f"\n  sigma_E that would give exactly 0.3 rad: {sigma_for_03:.4f} keV")
+    S_c = stopping_keV_per_ang(comp, E0)
+    print(f"  mean loss over 1 um in hopg: {S_c * L:.3f} keV (S = {S_c:.5f} keV/Ang)")
+    for eps_p_eV in (25.0, 33.0):
+        eps_p = eps_p_eV * 1e-3
+        sigma_p = np.sqrt(S_c * L * eps_p)
+        dphi_p = abs(dphi_ref) * (sigma_p / sigma_ref) ** 2
+        print(
+            f"  Poisson plasmon, eps_p = {eps_p_eV:.0f} eV: N = {S_c * L / eps_p:.0f}, "
+            f"sigma_E = {sigma_p:.4f} keV -> {dphi_p:.3f} rad"
+        )
+
+
+# --- slice B: the Urban parameterisation in the measured regime --------------
+
+URBAN_E0_KEV = 10.0e-3  # ionisation level E_0 = 10 eV (Geant4 PRM)
+URBAN_RATE = 0.55  # r, the model's single tuned parameter
+
+
+def urban_levels(Z: float, I_keV: float):
+    """``(f_1, E_1, f_2, E_2)`` from the Urban sum rules [keV].
+
+    Geant4 Physics Reference Manual, "Energy loss fluctuations", Urban model
+    (after Bichsel 1988).  ``E_2 = 10 Z^2`` eV approximates the K-shell binding
+    energy and ``Z f_2 = 2`` recovers its occupancy; ``f_1 + f_2 = 1`` and
+    ``f_1 ln E_1 + f_2 ln E_2 = ln I`` then fix the loosely bound level.
+    """
+    f_2 = 0.0 if Z <= 1.0 else 2.0 / Z
+    f_1 = 1.0 - f_2
+    E_2 = 10.0e-3 * Z * Z
+    E_1 = float(np.exp((np.log(I_keV) - f_2 * np.log(E_2)) / f_1))
+    return f_1, E_1, f_2, E_2
+
+
+def urban_channels(Z: float, I_keV: float, S_keV_per_ang: float, E_keV: float, s_ang: float):
+    """Mean Urban collision counts over a step, and the mean-loss closure check.
+
+    Returns ``(n_1, n_2, n_3, closure, frac_E2)``: the Poisson means
+    ``<n_i> = s Sigma_i`` for the two excitation channels and the ionisation
+    channel, the ratio of the model's own mean loss to ``S s`` (exactly 1 when
+    the sum rules hold -- the limiting-case check), and the fraction of the mean
+    loss carried by the ``E_2`` K-shell channel.
+
+    ``C = dE/dx`` is the model's normalisation, so the mean is inherited from
+    whatever stopping power the transport supplies rather than re-derived.
+    """
+    f_1, E_1, f_2, E_2 = urban_levels(Z, I_keV)
+    b2 = float(beta_sq(E_keV))
+    two_mc2_bg2 = 2.0 * MC2_KEV * (b2 / (1.0 - b2))
+    T_up = 0.5 * E_keV  # unrestricted: no delta-ray cut, so T_up = T_max
+
+    def L(level):
+        return np.log(two_mc2_bg2 / level) - b2
+
+    L_I = L(I_keV)
+    # Geant4 drops a level whose logarithmic factor has gone non-positive; the
+    # count is then zero rather than negative.
+    sig_1 = max(S_keV_per_ang * (f_1 / E_1) * L(E_1) / L_I * (1.0 - URBAN_RATE), 0.0)
+    sig_2 = max(S_keV_per_ang * (f_2 / E_2) * L(E_2) / L_I * (1.0 - URBAN_RATE), 0.0)
+    sig_3 = (
+        S_keV_per_ang
+        * (T_up - URBAN_E0_KEV)
+        / (URBAN_E0_KEV * T_up * np.log(T_up / URBAN_E0_KEV))
+        * URBAN_RATE
+    )
+    mean_ion = URBAN_E0_KEV * T_up / (T_up - URBAN_E0_KEV) * np.log(T_up / URBAN_E0_KEV)
+    mean_loss = (sig_1 * E_1 + sig_2 * E_2 + sig_3 * mean_ion) * s_ang
+    return (
+        sig_1 * s_ang,
+        sig_2 * s_ang,
+        sig_3 * s_ang,
+        mean_loss / (S_keV_per_ang * s_ang),
+        sig_2 * E_2 / (S_keV_per_ang) if S_keV_per_ang else float("nan"),
+    )
+
+
+def urban_variance_keV2(
+    Z: float, I_keV: float, S_keV_per_ang: float, E_keV: float, s_ang: float
+) -> float:
+    """Urban's variance of the loss over a step [keV^2].
+
+    Urban's loss is a compound Poisson sum, so its variance is
+    ``sum_i <n_i> <E^2>_i`` with no cross terms.  The two excitation channels
+    deposit a fixed quantum, giving ``<E^2>_i = E_i^2``; the ionisation channel's
+    ``1/E^2`` spectrum on ``[E_0, T_up]`` has ``<E^2>_3 = E_0 T_up`` exactly.
+
+    The comparator is the analytic second moment of the same ``eps^-2`` spectrum
+    truncated at the Moller ceiling, ``xi T_max`` -- the electron analogue of
+    Bohr straggling and the quantity slice A already integrates for its Jensen
+    bias.  Agreement here is what makes the selected sampler usable for the
+    phase observable; a mismatch is a variance the sampler would have to be
+    corrected for, and is slice C's to close.
+    """
+    f_1, E_1, f_2, E_2 = urban_levels(Z, I_keV)
+    n_1, n_2, n_3, _, _ = urban_channels(Z, I_keV, S_keV_per_ang, E_keV, s_ang)
+    T_up = 0.5 * E_keV
+    var_urban = n_1 * E_1 * E_1 + n_2 * E_2 * E_2 + n_3 * URBAN_E0_KEV * T_up
+    return float(var_urban)
+
+
+def report_urban() -> None:
+    """Slice B: does the Urban parameterisation resolve the measured regime?
+
+    Urban is applied per element, matching the Bragg-additive form the mean
+    stopping power already uses, so each element carries its own ``Z``, ``I``
+    and its own share ``C_i`` of ``dE/dx``.
+
+    Two failure modes are checked by measurement rather than assumed away:
+
+    - ``E_2 = 10 Z^2`` eV exceeds the Moller ceiling ``T_max = E/2`` whenever
+      ``E < 20 Z^2`` eV.  The model was built for HEP energies where that never
+      happens; here it demands ``E > 1.1 MeV`` for tungsten.  Exciting a level
+      above the available energy is unphysical, so the column is flagged.
+    - ``ln(2 mc^2 (beta gamma)^2 / E_2) - beta^2`` goes non-positive below
+      ``(beta gamma)^2 = E_2 / 2 mc^2``, at which point Geant4 drops the level.
+
+    ``closure`` is the limiting-case check: the sum rules make the model's mean
+    loss identically ``S s``, so any departure from 1.000 is an implementation
+    error, not physics.
+    """
+    print()
+    print("=" * 100)
+    print("PART 5  B: Urban parameterisation against the measured per-flight regime")
+    print("=" * 100)
+    print(
+        "Per element, step = the analytic elastic mean free path of the host material.\n"
+        "n1,n2,n3 are Poisson means per flight; dE/I is the mean loss in units of I,\n"
+        "which is the quantity the PRM's own 'a few multiples of I_exc' floor bounds.\n"
+        "!T flags E_2 > T_max (unphysical level); !L flags the dropped E_2 channel.\n"
+    )
+    hosts = {
+        "C(0.1136)": BARE["C(0.1136)"],
+        "W(0.06305)": BARE["W(0.06305)"],
+        "silicon": composition("silicon"),
+        "ws2": composition("ws2"),
+    }
+    header = (
+        f"{'host':>11} {'el':>3} {'E[keV]':>7} {'I[eV]':>8} {'E_1[eV]':>9} {'E_2[eV]':>10} "
+        f"{'f_2':>7} {'n1':>8} {'n2':>9} {'n3':>8} {'dE/I':>7} {'E2 frac':>8} "
+        f"{'closure':>8} {'flags':>6}"
+    )
+    for host, comp in hosts.items():
+        print()
+        print(header)
+        for E0 in ENERGIES_KEV:
+            lam = elastic_mfp_ang(comp, E0)
+            for element, n_i in comp:
+                Z = float(TRANSPORT_ELEMENTS[element]["Z"])
+                I_keV = float(TRANSPORT_ELEMENTS[element]["J_keV"])
+                S_i = stopping_keV_per_ang([(element, n_i)], E0)
+                f_1, E_1, f_2, E_2 = urban_levels(Z, I_keV)
+                n_1, n_2, n_3, closure, frac = urban_channels(Z, I_keV, S_i, E0, lam)
+                flags = ("!T" if E_2 > 0.5 * E0 else "") + ("!L" if n_2 == 0.0 else "")
+                print(
+                    f"{host:>11} {element:>3} {E0:>7.0f} {I_keV * 1e3:>8.1f} "
+                    f"{E_1 * 1e3:>9.1f} {E_2 * 1e3:>10.1f} {f_2:>7.4f} "
+                    f"{n_1:>8.4f} {n_2:>9.2e} {n_3:>8.4f} {S_i * lam / I_keV:>7.3f} "
+                    f"{frac:>8.4f} {closure:>8.4f} {flags:>6}"
+                )
+
+    print()
+    print("Domain boundary: the E_2 = 10 Z^2 eV level is below the Moller ceiling")
+    print("T_max = E/2 only for E > 20 Z^2 eV.  Per element:")
+    seen = set()
+    for comp in hosts.values():
+        for element, _ in comp:
+            if element in seen:
+                continue
+            seen.add(element)
+            Z = float(TRANSPORT_ELEMENTS[element]["Z"])
+            print(
+                f"  {element:>3}  Z={Z:>5.1f}  E_2 = {10.0 * Z * Z:>9.1f} eV  "
+                f"needs E > {20.0 * Z * Z * 1e-3:>9.2f} keV"
+            )
+
+    print()
+    print("Variance closure: Urban's compound-Poisson variance against the analytic")
+    print("Moller second moment xi T_max, per flight, summed Bragg-additively.")
+    print(f"{'host':>11} {'E[keV]':>7} {'sig_urban[keV]':>15} {'sig_moller[keV]':>16} {'ratio':>8}")
+    for host, comp in hosts.items():
+        for E0 in ENERGIES_KEV:
+            lam = elastic_mfp_ang(comp, E0)
+            var_u = 0.0
+            for element, n_i in comp:
+                Z = float(TRANSPORT_ELEMENTS[element]["Z"])
+                I_keV = float(TRANSPORT_ELEMENTS[element]["J_keV"])
+                S_i = stopping_keV_per_ang([(element, n_i)], E0)
+                var_u += urban_variance_keV2(Z, I_keV, S_i, E0, lam)
+            var_a = xi_keV(comp, E0, lam) * 0.5 * E0
+            print(
+                f"{host:>11} {E0:>7.0f} {np.sqrt(var_u):>15.5f} {np.sqrt(var_a):>16.5f} "
+                f"{var_u / var_a:>8.3f}"
+            )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--part",
-        choices=("regime", "mc", "gate", "all"),
+        choices=("regime", "mc", "gate", "b0", "urban", "all"),
         default="all",
         help="run one section (the Monte Carlo section is the slow one)",
     )
@@ -520,6 +806,10 @@ def main() -> None:
         report_mc()
     if args.part in ("gate", "all"):
         report_gate()
+    if args.part in ("b0", "all"):
+        report_b0()
+    if args.part in ("urban", "all"):
+        report_urban()
 
 
 if __name__ == "__main__":
