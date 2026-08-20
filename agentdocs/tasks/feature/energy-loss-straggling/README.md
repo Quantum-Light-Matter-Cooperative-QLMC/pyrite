@@ -958,11 +958,48 @@ Interactions that need explicit design rather than incremental patching:
          `Numerics` plumbs both, which is the coupling the task doc's
          "Implementation path" section flagged as a scope decision rather than
          an oversight. G should state it as a decision, not discover it.
-- [ ] G — Surface decision and plumbing. Decide whether straggling reaches
-      production runs; if yes, thread it (and, unavoidably, the `energy_model`
-      selector it depends on) through `Numerics` → case → runner, and extend
-      checkpoint/case identity so straggled and unstraggled records cannot
-      collide in the CAS.
+- [x] G — Surface decision and plumbing. **Done. Straggling is a production
+      profile control, default-off; `energy_model` and `max_dE_frac` travel with
+      it.** Owners: `campaign/model.py::Numerics`, legacy `results.Settings`,
+      `campaign/sweep.py::build_cases`, `montecarlo/case.py::Case`,
+      `montecarlo/runner::_transport_case`, the profile catalog/editor/CLI, and
+      dataset identity. Checkpoint: `e3172b3b`.
+
+      The public controls are `straggling: bool = False`,
+      `energy_model: "frozen" | "midpoint" = "frozen"`, and
+      `max_dE_frac: float = 0.0`; a positive cap requires midpoint. They lower
+      as divergence-only case keys, so existing case payloads and content keys
+      remain byte-for-byte unchanged. Dataset identity likewise removes the
+      three inert defaults from the historical `settings` payload and adds a
+      `transport_numerics` block only when a value diverges. Existing hashes
+      therefore remain stable, while active straggling cannot collide with an
+      unstraggled record. The canonical bare-material checkpoint stem is also
+      denied to a non-default transport profile.
+
+      Profiles own production selection through flat catalog keys and
+      `cxr profile create|set`: `--straggling/--no-straggling`,
+      `--energy-model`, and `--max-de-frac`. `profile show` reports their
+      resolved/default values. Catalog validation enforces type, finiteness,
+      range, and the midpoint coupling before run resolution; the same rules
+      are enforced by both typed settings surfaces. Regenerating the material
+      catalog golden produced no diff, confirming default catalog semantics did
+      not move. The generated CLI reference changed only for the new options.
+
+      **CUDA-LUT decision: automatic exact-kernel fallback at the runner.** If
+      the resolved core is CUDA and straggling is on, the runner supplies
+      `TransportLUTConfig(enabled=False)`. This uses F's already-transcribed
+      exact CUDA implementation and adds no unverifiable LUT-kernel sampler.
+      The low-level direct `simulate_trajectories` CUDA-LUT request remains
+      fail-closed, preserving F's diagnostic contract. CUDA itself remains
+      hardware-unverified and still requires the remote-GPU follow-up recorded
+      in F.
+
+      **Acceptance:** focused production/catalog/identity surface 204 passed;
+      CLI suite 1216 passed; core 1811 passed and 74 skipped (the sole sandbox
+      forkserver failure passed when rerun with socket permission); focused
+      Numba straggling matrix 188 passed; catalog golden/energy-grid checks 5
+      passed; `lint`, `typecheck`, CLI reference/deprecation checks, and offline
+      docs build clean. No golden data changed.
 - [ ] H — Observable measurement. Quantify the effect on backscatter and
       transmission fractions, CSDA range and range straggling, the
       bremsstrahlung spectral shape, and the coherent line. The load-bearing
@@ -1127,10 +1164,12 @@ Interactions that need explicit design rather than incremental patching:
   would require a *restricted* `dE/dx`, i.e. modifying the mean stopping power,
   which this task explicitly does not own; both branches of the current splice
   are unrestricted.
-- **Open:** production reachability (G). Today `energy_model` is API-only, so
-  straggling could land as a research capability with no `Numerics` field, or as
-  a production toggle with checkpoint-identity consequences. Cheaper to decide
-  before E than to retrofit after F.
+- **Closed by G — production reachability.** Straggling is available through
+  production profiles and `Numerics`, with coupled `energy_model` and
+  `max_dE_frac` controls. All defaults preserve historical case and dataset
+  identities; divergent values participate explicitly. CUDA production runs
+  fall back from LUT to the exact kernel when straggling is enabled, while the
+  direct low-level CUDA-LUT combination remains fail-closed.
 - **Decided, and now satisfied:** sequence behind
   `feature/relativistic-bethe-stopping` rather than bounding the accepted range
   to ~<50 keV. That task is small, unblocked, and removes the constraint
@@ -1149,24 +1188,18 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Next: decide G's production surface before implementation.** A--F are done.
-The unresolved choice is whether straggling remains a direct transport-API
-research capability or reaches production through `Numerics`. If it reaches
-production, G must also choose the CUDA-LUT behavior. Slice F recommends an
-automatic fallback to the exact CUDA kernel: it avoids shipping a second
-unverified sampler transcription, and the measured LUT speed advantage is
-already roughly halved when straggling is enabled.
+**Next: H — observable measurement.** G is complete: production profiles and
+`Numerics` now provide the canonical straggled-run request, identity cannot
+collide with the default path, and CUDA production selection falls back to the
+exact kernel. H is therefore unblocked.
 
-If production reachability is selected, G owns all three coupled identity and
-execution changes: add `straggling`, `energy_model`, and `max_dE_frac` to
-`Numerics` and the lowered case; include them in checkpoint/CAS identity; and
-make the runner's CUDA-LUT behavior explicit. Straggling stays default-off and
-the existing production path remains bit-for-bit unchanged.
-
-H remains blocked on G because the observable campaign needs a canonical way
-to request straggled runs. I, J, and K remain late documentation slices as
-scoped; I must preserve B0's two no-change verdicts and leave the "No delta
-rays" bullet untouched.
+H must quantify backscatter/transmission, CSDA range and range straggling,
+bremsstrahlung shape, and coherent-line effects, including the corrected
+9.8--19 rad Jensen-bias baseline and the outstanding residual mean-stopping
+uncertainty recorded above. Heavy/GPU matrices use `pyrite remote`; the CUDA
+path remains unverified until its hardware tests run. I, J, and K remain late
+documentation slices as scoped; I must preserve B0's two no-change verdicts
+and leave the "No delta rays" bullet untouched.
 
 ## Delegation slices and required skills
 
