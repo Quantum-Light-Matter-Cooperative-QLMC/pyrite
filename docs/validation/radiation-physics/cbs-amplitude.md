@@ -514,7 +514,7 @@ non-cancelling choice, not a dangling convention.
 | Units | `eUg_over_m` dimensionless; $\{\mathbf g;\boldsymbol\epsilon\}\sim$ $\AA^{-1}$; $\{\mathbf k;\mathbf g\}/(\mathbf v\cdot\mathbf g)\sim$ $\AA^{-1}$; overall $1/(\mathbf v\cdot\mathbf g)\sim$ Å. `A_CBS` dimensionless, same as `A_PXR`. Pass |
 | $\gamma\to1$ | $A_{\rm CBS}\to-(U^{\rm code}_{\mathbf g}/mc^2)(\mathbf g\cdot\boldsymbol\epsilon)/(\mathbf v\cdot\mathbf g)+O(\beta)$ — finite and non-vanishing. CBS survives non-relativistically, which is the source paper's entire premise. Pass |
 | $\gamma\to\infty$ | $\chi_{\mathbf g}$, $\mathbf v\cdot\mathbf g$ and $\omega$ all saturate as $\beta\to1$, so $A_{\rm CBS}/A_{\rm PXR}\propto1/\gamma\to0$: PXR wins at high energy, CBS is the low-energy mechanism. Pass, and consistent with the cited paper's scope |
-| $\mathbf v\cdot\mathbf g\to0$ | $A_{\rm CBS}$ diverges as $(\mathbf v\cdot\mathbf g)^{-2}$. This is physical within first-order perturbation theory (an adiabatically slow modulation drives an unboundedly large excursion) and is exactly where the expansion fails: validity needs $\lvert\mathbf g\cdot\delta\mathbf r\rvert\ll1$, i.e. $\lvert U_{\mathbf g}\rvert g^2/(\gamma mc^2(\mathbf v\cdot\mathbf g)^2)\ll1$. The same limit sends $\omega\to0$, and `lines.py:1084-1089` drops every segment with $E_{\rm res}<10$ eV (and outside the padded grid), which bounds $\mathbf v\cdot\mathbf g=\omega(1-\mathbf v\cdot\hat{\mathbf n})$ away from zero. Pass, with the cutoff noted as load-bearing |
+| $\mathbf v\cdot\mathbf g\to0$ | $A_{\rm CBS}$ diverges as $(\mathbf v\cdot\mathbf g)^{-2}$. This is physical within first-order perturbation theory (an adiabatically slow modulation drives an unboundedly large excursion) and is exactly where the expansion fails: validity needs $\lvert\mathbf g\cdot\delta\mathbf r\rvert\ll1$, i.e. $\lvert U_{\mathbf g}\rvert g^2/(\gamma mc^2(\mathbf v\cdot\mathbf g)^2)\ll1$. The same limit sends $\omega\to0$, and the line path drops every segment with $E_{\rm res}<10$ eV (and outside the padded grid). **Corrected 2026-08-20:** that cut does **not** bound $\mathbf v\cdot\mathbf g$ — it bounds $\mathbf v\cdot\mathbf g=\omega\,{\rm denom}$, so it stops bounding $\mathbf v\cdot\mathbf g$ as ${\rm denom}\to0$, and a real sample was found at $\mathbf v\cdot\mathbf g=1.727\times10^{-3}$ with $E_{\rm res}=4942.7$ eV, comfortably inside the window, at which point the validity condition above is violated by a factor $15.6$. What bounds the limit is the in-medium resonance solve's convergence guard (`xray-in-medium-resonance`), which rejects exactly those samples. Pass, on the guard rather than on the energy cut — see the addendum at the end of this write-up |
 | $U_{\mathbf g}\to0$ | extinct reflection: `A_CBS` $\to0$, sum reduces to pure PXR. Pass |
 | $\chi_{\mathbf g}\to0$ | `A_PXR` $\to0$, sum reduces to pure CBS. Pass |
 | Sign/convention | relative PXR/CBS sign derived, not assumed; see table above. Pass |
@@ -689,3 +689,41 @@ $1/\gamma$ and not $1/\gamma^2$ across two beam energies.
   geometry and its `1/γ` scaling before this can reach `anchored`.
 
 A human applies these.
+
+## Addendum 2026-08-20: the 10 eV cut is not the bound on `v·g`
+
+The `v·g → 0` filter above passed on the strength of the production
+`E_res > 10` eV keep window, "with the cutoff noted as load-bearing." That
+reasoning does not hold, and the failure was observed in production spectra
+rather than inferred: the cut bounds `v·g = ω denom`, not `v·g`, so it stops
+constraining `v·g` as `denom = 1 - Re n (v·n̂)` collapses toward zero.
+
+On the traced sample (graphite, 100 μm, 300 keV) the in-medium resonance solve
+returned a non-converged root — `denom = 5.94e-4`, `E_res = 4942.7 eV` — with
+`v·g = 1.727e-3`, four orders below the median `|v·g|` of 1.27. `E_res` cleared
+the 10 eV window by two and a half orders while `v·g` was in exactly the regime
+the window was believed to exclude. `A_CBS ~ 1/(γ (v·g)²)` then gave
+`f_cbs = -4.9e5` and `|A|² = 81.5` against a median `1e-10`, and the integrated
+characteristic line came out ten orders too large — finite, so nothing
+downstream flagged it.
+
+This row's own validity condition detects the sample correctly: with
+`U_g/mc² = 1.842e-5`, `g² = 3.506 Å⁻²`, `γ = 1.392` and `v·g = 1.727e-3`,
+`|U_g| g²/(γ mc² (v·g)²) = 15.6`, not `≪ 1`. The expansion has failed there, so
+there is no correct `A_CBS` to compute and the sample must be dropped.
+
+**What actually bounds the limit now.** `_in_medium_kinematics` (and its CUDA
+prologue twin) check that the resonance fixed point converged — the last pass
+must move `denom` by less than `_RESONANCE_ROOT_RTOL = 1e-3` — and carry NaN out
+for failures, which drop on the caller's existing finite mask. That guard
+rejects the near-Cherenkov roots that produce the unbounded `1/(v·g)²`, and it
+is ledgered under `xray-in-medium-resonance`, whose 2026-08-20 addendum carries
+the full trace. The 10 eV cut remains, but as an out-of-grid/energy-window
+filter, not as this row's guarantee.
+
+Scope of this addendum: it corrects the **justification** recorded for one cheap
+filter. The `U_g` derivation, the braced `A_CBS` assembly, the single `1/γ` and
+the relative PXR/CBS sign are untouched, and the `rederived` verdict stands. The
+filter table row above wants rewording alongside a fresh-context re-run of this
+row by whoever owns it; it was corrected in place rather than rewritten by the
+branch (`feature/relativistic-bethe-stopping`) that found the defect.

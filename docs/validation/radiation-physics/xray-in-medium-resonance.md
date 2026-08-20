@@ -129,6 +129,15 @@ started at the vacuum root `ω_res^(0) = v·g/(1-v·n̂)` therefore gains
 and the third is margin, matching the docstring's stated "three passes
 taken."
 
+```{warning}
+The premise of this subsection — `Re n(ω) = 1-δ` with `δ ~ 10⁻⁵–10⁻³`, and
+`|v·n̂|<1` keeping the denominator bounded away from zero — was falsified on
+2026-08-20. It holds off-edge in the X-ray regime, and the argument above is
+correct there, but it is not unconditional: see **Addendum 2026-08-20: the
+contraction is conditional**, at the end of this write-up. The code no longer
+relies on it.
+```
+
 ### 3. Downstream kinematic identities in terms of the same `denom`
 
 From (C), `k·v = Re n(ω) ω (n̂·v)`. Using the definition of `denom`,
@@ -321,3 +330,70 @@ The derivation and its agreement with the implementation are unaffected, and the
   the vacuum root against `-delta (v.n_hat)/(1 - v.n_hat)`
   (`test_line_sits_on_the_in_medium_resonance_not_the_vacuum_one`). That pins
   the root itself, which the differential form did not.
+
+## Addendum 2026-08-20: the contraction is conditional
+
+Section 2's fixed-point rate is derived off-edge, from `Re n(ω) = 1-δ` with
+`δ ~ 10⁻⁵–10⁻³`, and from `|v·n̂|<1` keeping `denom = 1 - Re n (v·n̂)` bounded
+away from zero. Both premises fail together outside the X-ray regime, and the
+resulting defect was found downstream on `feature/relativistic-bethe-stopping`
+while measuring thick-target spectra: a small fraction of seeds returned a
+characteristic-line total ~10 orders of magnitude too large, finite rather than
+NaN, so nothing flagged it.
+
+How it happens, on the traced sample (graphite, 100 μm, 300 keV):
+
+1. A segment scattered nearly perpendicular to `g` gives `v·g = 1.727e-3`
+   against a median `|v·g|` of 1.27, so the vacuum root
+   `E_res = ħc (v·g)/(1 - v·n̂)` is only 6.57 eV.
+2. At 6.57 eV carbon's tabulated `Re n` reads **2.07** — correct physics, not a
+   data defect. The tabulation runs down to 1 eV and carries `Re n > 1` over
+   6.24–285 eV, peaking at 4.766 at 6.40 eV. This is the optical/UV regime, not
+   the regime the solve was derived for.
+3. With `v·n̂ = 0.4815`, `Re n (v·n̂) = 0.99931`, so `denom = 6.9e-4`: a spurious
+   Cherenkov-like near-zero, reachable whenever `Re n > 1/(v·n̂)`.
+4. The map is then not a contraction but an **expansive 2-cycle**, oscillating
+   between `E_res ~ 6.57 eV` (`Re n ~ 2.07`, `denom ~ 1e-3`) and a keV-scale root
+   (`Re n ~ 1`, `denom ~ 0.5186`). Three hard-coded passes return whichever half
+   of the cycle pass 3 lands on — here `denom = 5.94e-4`, `E_res = 4942.7 eV`,
+   matching the observed peak bin to the bin.
+5. That root clears the `E_res > 10` eV keep window, so the cut
+   `cbs-amplitude` names load-bearing for keeping `v·g` away from zero does not
+   stop it: the cut bounds `v·g = ω denom`, so as `denom → 0` it stops bounding
+   `v·g` at all.
+6. `A_CBS ~ 1/(γ (v·g)²)` then gives `|A|² = 81.5` against a median `1e-10`.
+
+The perturbative expansion has genuinely failed on such samples, by
+`cbs-amplitude`'s own stated validity condition
+`|U_g| g²/(γ mc² (v·g)²) ≪ 1`: with `U_g/mc² = 1.842e-5`, `g² = 3.506 Å⁻²`,
+`γ = 1.392` and `v·g = 1.727e-3`, the left-hand side is **15.6**. So the correct
+handling is to reject them, not to solve the root more carefully.
+
+**What the implementation now does.** `_in_medium_kinematics` checks convergence
+instead of assuming it: the last fixed-point pass must move `denom` by less than
+`_RESONANCE_ROOT_RTOL = 1e-3`; pairs that fail carry NaN out of `denom` and drop
+on the caller's existing finite mask, the same route out-of-range tabulation
+energies already take. A genuine contraction moves `denom` by ~`δ³` ~ 1e-15 in
+float64 and is floored by float32 rounding (~1e-7) on the device twin, so the
+tolerance has five orders of margin either side. The CUDA prologue kernel in
+`coherent_stream_jit_kernel.py` carries the identical guard with the tolerance
+passed in, the way `hbarc` already is.
+
+Measured: the traced seed falls from 7602 to 8.03e-07, inside the healthy
+population (6.6e-07–1.05e-06), and healthy seeds are bit-identical. At the
+catalog's 1000 Å production thickness the guard rejects **zero** pairs
+(hopg 30 keV, hopg 300 keV, silicon 100 keV); at 1e6 Å it rejects 0.233%. No
+golden moved.
+
+New anchors, all in `tests/montecarlo/test_xray_dispersion.py`:
+`test_the_two_cycle_root_is_rejected_rather_than_returned`,
+`test_the_rejected_root_would_otherwise_have_passed_the_energy_window` (which
+pins that the 10 eV cut cannot serve as the guard),
+`test_a_converged_root_is_untouched_by_the_guard`, and
+`test_the_guard_is_inert_across_the_xray_regime`.
+
+**Still owed on this row.** Section 2 above still presents the contraction rate
+as unconditional; it wants rewriting to state the domain in which it holds, and
+the `rederived` verdict wants re-confirming in fresh context at the same time.
+That belongs to whoever owns this validation, not to the branch that found the
+defect. `cbs-amplitude` carries the matching correction for its `v·g → 0` row.

@@ -365,7 +365,8 @@ low-energy branch rather than being invalidated.
 ## Status
 
 **A through G are all implemented, tested, and green, on CPU and on GPU.**
-`pyrite-dev verify` passes 3453 / 43 skipped with CuPy installed; the CUDA suite
+`pyrite-dev verify` passes 3457 / 43 skipped with CuPy installed (3453 before the
+resonance-guard fix, plus its four regression tests; none moved); the CUDA suite
 passes 49/49 under `PYRITE_TEST_BACKEND=cuda`.
 
 **Still owed, and unchanged by any of this:** fresh-context
@@ -378,8 +379,8 @@ verification debt is larger now, not smaller. **Only a human marks
 
 ### Unrelated finding: thick-target characteristic-line blow-up
 
-Found while measuring F. **Pre-existing; not introduced by this branch and not
-fixed on it.**
+Found while measuring F. **Pre-existing; not introduced by this branch, traced
+and fixed on it.** The diagnosis is kept below as written, followed by the fix.
 
 In thick, high-energy cases -- graphite, 100 um, 100-300 keV -- a small fraction
 of seeds return a characteristic-line total about **ten orders of magnitude**
@@ -491,8 +492,9 @@ Measured:
 - At the catalog's 1000 Ang production thickness the guard rejects **zero**
   pairs (hopg 30 keV, hopg 300 keV, silicon 100 keV). At 1e6 Ang it rejects
   0.233%.
-- `verify` unchanged at 3453 passed / 43 skipped, and the GPU `-m hardware`
-  suite unchanged at 49 passed / 1 skipped, so no golden moved.
+- `verify` at 3457 passed / 43 skipped (3453 before, plus the four new tests;
+  none moved), and the GPU `-m hardware` suite unchanged at 49 passed / 1
+  skipped, so no golden moved.
 
 Regression coverage: four tests in `tests/montecarlo/test_xray_dispersion.py` --
 the 2-cycle is rejected, the unguarded iteration is shown to clear the 10 eV
@@ -500,16 +502,36 @@ window (so that cut cannot be the guard), a converged X-ray root is untouched,
 and the guard is inert across the whole sphere of directions with the
 tabulation floored at 10 eV.
 
-Still open for the follow-up task: the two ledgered claims above are still
-written as though the old premises held, and `cbs-amplitude`'s `v.g -> 0` row
-still cites the 10 eV cut as load-bearing. Those rows want rewording by whoever
-owns that validation, not by this branch.
+#### Docs closed out with the fix
 
-F's measurements drop such seeds by an explicit ">100x the median" rule and
-report the dropped count, rather than letting them contaminate a mean. **This
-deserves its own task** -- it is a correctness bug in the line kernel, it
-predates this work, and any thick-target campaign already run may have averaged
-one of these in.
+- `docs/physics/radiation-physics/photon-escape-and-dispersion.md` -- the
+  resonance section stated the contraction rate unconditionally; it now states
+  the domain, the near-Cherenkov failure, the guard and its rejection rate, plus
+  an assumptions bullet.
+- `docs/validation/ledger-crystallography-atomic-data.md`
+  (`xray-in-medium-resonance`) -- **Checks** now records convergence as verified
+  per sample rather than assumed, **Anchor** gains the four tests, **Notes**
+  carry the dated falsification and what is still owed to the row.
+- `docs/validation/radiation-physics/xray-in-medium-resonance.md` -- the
+  contraction subsection carries a warning admonition, and a
+  "2026-08-20: the contraction is conditional" addendum carries the full trace.
+- `docs/validation/ledger-core-coherent-physics.md` (`cbs-amplitude`) and
+  `docs/validation/radiation-physics/cbs-amplitude.md` -- the `v.g -> 0` cheap
+  filter's justification is corrected in place: the 10 eV cut is not what bounds
+  `v.g`; the resonance convergence guard is.
+- `docs/validation/ledger-transport-background.md` -- the finding is no longer
+  labelled "not fixed here", and the verify count is 3457 / 43.
+
+Left for the row owners, deliberately: both write-ups' *derivation* sections are
+annotated, not rewritten, and neither `rederived` status is re-confirmed here.
+Rewording the arguments and re-running the validations in fresh context belongs
+to whoever owns those rows, not to the branch that found the defect. Both ledger
+rows say so explicitly under **Owed to this row**.
+
+Also still open, and **deserving its own task**: F's measurements drop such
+seeds by an explicit ">100x the median" rule and report the dropped count, but
+any thick-target campaign already run before this fix may have averaged one of
+these in, and those results are not retroactively corrected by the guard.
 
 ### Separate follow-up, deliberately not fixed here
 

@@ -107,9 +107,30 @@ $$
 {1-\mathrm{Re}\,n(\omega_{\rm res})\,(\mathbf v\cdot\hat{\mathbf n})} .
 $$
 
-It is solved by fixed-point iteration from the vacuum root. The map's derivative
-is of order $\delta\sim10^{-5}$, so each pass gains about five digits and two are
-already at float64 rounding; three are taken for margin. The substitution leaves
+It is solved by fixed-point iteration from the vacuum root. In the X-ray regime
+the map's derivative is of order $\delta\sim10^{-5}$, so each pass gains about
+five digits and two are already at float64 rounding; three are taken for margin.
+
+**That contraction is conditional, and it is checked rather than assumed.** The
+rate above rests on $\mathrm{Re}\,n=1-\delta$, which only holds off-edge in the
+X-ray regime. A segment scattered nearly perpendicular to $\mathbf g$ puts the
+vacuum root down in the optical/UV, where the tabulations honestly carry
+$\mathrm{Re}\,n>1$ (carbon: $6.24$--$285$ eV, peaking at $4.766$). There
+$\mathrm{Re}\,n\,(\mathbf v\cdot\hat{\mathbf n})$ can approach unity, the
+denominator collapses toward a spurious Cherenkov-like zero, and the map becomes
+an expansive 2-cycle rather than a contraction — three passes then return
+whichever half of the cycle the last pass landed on. So the last pass must move
+the denominator by less than a relative $10^{-3}$; pairs that fail carry NaN out
+and drop on the same finite mask as out-of-range tabulation energies. A genuine
+contraction moves it by $\sim\delta^3$, five orders inside the tolerance. This
+is rejection, not repair: such samples violate the CBS amplitude's own
+perturbative validity condition
+$\lvert U_{\mathbf g}\rvert g^2/(\gamma mc^2(\mathbf v\cdot\mathbf g)^2)\ll1$, so
+there is no correct value to compute for them. At the catalog's 1000 Å
+production thickness the guard rejects no pairs at all; it fires only in thick,
+fast, many-segment cases (0.233% at $10^6$ Å).
+
+The substitution leaves
 every kinematic identity intact — $\mathbf k\cdot\mathbf v=\omega(1-{\rm denom})$
 still holds exactly, while $\mathbf k\cdot\mathbf g$ picks up one power of
 $\mathrm{Re}\,n$ and the PXR numerator's $k^2$ two. Out-of-range tabulation
@@ -135,6 +156,10 @@ modelled.
   re-emission, or scattering into the detector direction;
 - the escape path is taken from the segment **midpoint**, consistent with the
   finite-time factor's constant-velocity segment;
+- the in-medium resonance is only reported where its fixed point **converges**;
+  segment/reflection pairs whose root lands in the near-Cherenkov regime are
+  dropped rather than approximated, because the emission amplitude's own
+  perturbative expansion has failed there;
 - attenuation does not feed back on emission, and emission does not deplete the
   incident beam;
 - interfaces are sharp, static, and perpendicular to $z$;
