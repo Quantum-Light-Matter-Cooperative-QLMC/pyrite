@@ -168,8 +168,8 @@ low-energy branch rather than being invalidated.
       cutoff bracket must be checked against the kink when D wires the cores in.
       Implemented as `_bs_joy_luo_crossover_keV`, `_dEds_spliced_compound_scalar`,
       `_dEds_spliced_compound`.
-- [~] D — Integrate across all cores, both LUT variants, and the CUDA kernels.
-      **Done on CPU; the CUDA kernel is written but unverified.**
+- [x] D — Integrate across all cores, both LUT variants, and the CUDA kernels.
+      **Done, and the CUDA half is now verified on hardware.**
       Three cores evaluate stopping directly (`_transport_core_ungrooved`,
       `_transport_core_grooved`, `_transport_core_ungrooved_perelectron`); the
       two `_lut` cores read `lut.dEds`, so `build_transport_energy_lut` was the
@@ -187,17 +187,27 @@ low-energy branch rather than being invalidated.
       `TRANSPORT_ELEMENTS` table" was already stale -- it imports
       `montecarlo.case`, which pulls in the whole package -- so delegating cost
       nothing.
-      **Not verified:** the CUDA kernel. There is no GPU here --
-      `transport_jit_kernel` imports `cupy` at module scope, so it cannot even
-      be imported locally and its tests skip. Two source-text pins were added
-      (`test_cuda_stopping_constants_match_the_cpu_values`,
-      `test_cuda_stopping_keeps_the_per_element_splice`) following the
-      repository's existing precedent for this, and the pre-existing
-      `test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules` still
-      passes. Those catch a constant or a branch edited on one side only. They
-      are **not** a substitute for running the kernel: it needs a `pyrite
-      remote` run before it can be trusted, and that is the first thing F should
-      do.
+      **CUDA verified.** The machine does have an NVIDIA GPU (RTX 3060 Ti); it
+      simply had no `cupy` installed, so `uv sync --all-groups --extra nvidia`
+      was all that stood between the kernel and its tests. All 43 previously-
+      skipping GPU tests pass, including
+      `test_cuda_matches_the_cpu_reference_in_aggregate` and the LUT variant.
+      Stronger than the suite: a 300 keV / 100 um graphite case run through the
+      CUDA core and its CPU `per-electron` twin -- same models, same draw
+      semantics -- agrees to **6 significant figures** (line total 3.73794e-07
+      vs 3.73793e-07) even though the device path carries `REAL` as float32.
+      Two test fixes were needed, neither a kernel bug:
+      - `test_cuda_cutoff_crossing_truncates_the_terminal_flight` still built
+        its oracle from the Joy--Luo constants inline. 5 keV is above carbon's
+        crossover, so it was checking the kernel against the model this branch
+        retired; repointed at `spliced_stopping_keV_per_ang`, the same repoint
+        the CPU cutoff tests took in D.
+      - `test_device_resident_transport_feeds_the_kernels_the_same_spectra`
+        gated on "a CUDA device exists", but it stages CuPy arrays through the
+        SESSION's `xp`, and `tests/conftest.py` pins the session to NumPy. With
+        a GPU present it therefore failed on a CPU-pinned run rather than
+        skipping. Gate now also requires the resolved backend to be CuPy; run
+        it with `PYRITE_TEST_BACKEND=cuda`.
 - [x] E — Model selection and identity. **Done. Decided: unconditional, not
       user-selectable** -- closing the open question below. The splice is
       physics, not a preference; a selector would add identity surface for a
@@ -217,8 +227,7 @@ low-energy branch rather than being invalidated.
       Fallout: 13 golden digests in `tests/materials/test_profiles.py` re-minted
       (12 identity + 1 survey), which is the intended once-only move; two new
       tests pin that the marker is what moved them.
-- [~] F — Measure. **Done for everything a local CPU can carry; the heavy
-      matrix and the CUDA verification are not, and need `pyrite remote`.**
+- [x] F — Measure. **Done, including the heavy matrix -- run on the local GPU.**
       The comparison is against the *retired model*, reproduced exactly rather
       than approximately: forcing `transport._element_crossover_keV` to `+inf`
       is the single seam both the layer-table builder and the host helper read,
@@ -270,22 +279,44 @@ low-energy branch rather than being invalidated.
       band. `docs/physics/beam-transport/stopping-power.md` gained
       `## What the change does downstream` and `## Checking against ESTAR`.
 
-      **Not done, and why:**
-      - *Thick-target spectral yields with error bars.* A single-seed Ne=400
-        probe gives graphite at 10 um: brem total -4.8%, line total -6.1% at
-        30 keV, and about -1.4% at 100/300 keV (where 10 um is thin relative to
-        the range). These are indicative only -- getting error bars on them
-        exceeded the local CPU budget repeatedly. Heavy matrix -> `pyrite remote`,
-        which is what AGENTS.md requires anyway.
-      - *ESTAR cross-check.* By design a **user-run oracle**: querying the web
-        service is not redistribution, but that is also why it is not wired into
-        the suite and no ESTAR data is packaged. The procedure and the numbers
-        to compare against are written up in `## Checking against ESTAR`,
-        including the two matching conditions that are easy to get wrong
-        (ESTAR integrates to zero energy, so compare `R(E0) - R(5 keV)`; and use
-        the collision-only column, since radiative stopping is out of scope
-        here and is not negligible for W or Bi).
-      - *CUDA verification (the D half).* Still not run. No GPU here.
+      **Thick-target spectral yields (the heavy half).** 16 seeds x 4000
+      electrons per model on the CUDA core -- 3 s a point instead of the 10+
+      minutes that kept timing out on CPU. Graphite:
+
+      | thickness | 30 keV brem | 100 keV brem | 300 keV brem | 30 keV line | 100 keV line | 300 keV line |
+      |---|---|---|---|---|---|---|
+      | 0.1 um | +0.01+-0.13% | +0.00+-0.07% | +0.00+-0.01% | +0.09+-1.18% | +0.00+-0.78% | +0.00+-0.10% |
+      | 10 um | -5.00+-0.07% | +1.55+-0.43% | +0.47+-0.10% | -11.84+-4.05% | +2.00+-0.35% | +0.60+-0.61% |
+      | 100 um | -4.90+-0.05% | -14.55+-0.12% | +9.13+-0.49% | -7.63+-1.00% | -23.43+-0.61% | +9.60+-1.30% |
+
+      At production thickness every quantity is **consistent with zero at its
+      own Monte Carlo error** -- not merely small. The sign flip at 100 um is
+      the physically interesting result and both signs come from the same
+      shortened range on opposite sides of the target thickness: where the
+      target already exceeded the range (30 keV; 100 keV at 100 um) a shorter
+      range means fewer radiating segments, so yields fall; where the target was
+      thinner than the *old* range but comparable to the *new* one (300 keV at
+      100 um) electrons that used to escape now stop inside and keep radiating,
+      so yields rise +9% against a -35% change in the range itself. Mean brem
+      photon energy falls almost everywhere (-0.3% to -7.1%). Silicon tracks
+      graphite to a few tenths of a point.
+
+      **ESTAR** stays a **user-run oracle** by design: querying the web service
+      is not redistribution, but that is also why it is not wired into the suite
+      and no ESTAR data is packaged. `## Checking against ESTAR` in
+      `stopping-power.md` gives the ranges to compare and the two matching
+      conditions that are easy to get wrong (ESTAR integrates to zero energy, so
+      compare `R(E0) - R(5 keV)`; use the collision-only column, since radiative
+      stopping is out of scope here and is not negligible for W or Bi).
+
+      **Durable artifact:** `tests/montecarlo/test_stopping_csda_range.py` pins
+      the new ranges *and* the retired model's ranges beside them, so a
+      regression that moved both together is still caught, plus the catalog-wide
+      band. `docs/physics/beam-transport/stopping-power.md` gained
+      `## What the change does downstream` and `## Checking against ESTAR`.
+
+      **Found while measuring -- a pre-existing defect this branch did not
+      introduce and did not fix.** See "Unrelated finding" below.
 - [x] G — Docs, ledger, goldens. **Done.** The `Validation: relativistic-bethe-stopping`
       ledger row and the `electron-transport` narrowing were already in place
       from D; what remained was `stopping-power.md`, which still described only
@@ -333,39 +364,66 @@ low-energy branch rather than being invalidated.
 
 ## Status
 
-A, B, C, E, G and the CPU half of D are implemented, tested and green. F is
-done for every measurement a local CPU can carry.
+**A through G are all implemented, tested, and green, on CPU and on GPU.**
+`pyrite-dev verify` passes 3453 / 43 skipped with CuPy installed; the CUDA suite
+passes 49/49 under `PYRITE_TEST_BACKEND=cuda`.
 
-**Two things remain, and both need `pyrite remote`:**
+**Still owed, and unchanged by any of this:** fresh-context
+`physics-validation` on the derivation. The ledger row
+`relativistic-bethe-stopping` stays at `filtered` -- in-context units, limits and
+signs plus regression anchors only. This was the stated next step before D, and
+D, E, B and F have all landed ahead of it on direct instruction, so the
+verification debt is larger now, not smaller. **Only a human marks
+`signed-off`.**
 
-1. **Verify the CUDA kernel.** This is the real gap. `transport_jit_kernel`
-   imports `cupy` at module scope, so locally it cannot even be imported and
-   its tests skip. Two source-text pins were added (see D) and they catch a
-   constant or a branch edited on one side only, but they do not run the
-   kernel. Until a GPU run agrees with the CPU cores, the CUDA path is
-   *written*, not *verified*.
-2. **The thick-target spectral matrix with error bars** (see F).
+### Unrelated finding: thick-target characteristic-line blow-up
 
-Neither is blocked on design; both are blocked on hardware and on explicit
-authorization to submit remote jobs.
+Found while measuring F. **Pre-existing; not introduced by this branch and not
+fixed on it.**
 
-**Still owed, and unchanged:** fresh-context `physics-validation` on the
-derivation. The ledger row `relativistic-bethe-stopping` stays at `filtered` --
-in-context units/limits/signs plus regression anchors only. This was the stated
-next step before D, and D, E, B and F have all landed ahead of it on direct
-instruction, so the verification debt is larger now, not smaller. Only a human
-marks `signed-off`.
+In thick, high-energy cases -- graphite, 100 um, 100-300 keV -- a small fraction
+of seeds return a characteristic-line total about **ten orders of magnitude**
+too large: 4.8e3 against a 3.3e-7 median. The value is *finite*, not NaN, so
+nothing downstream flags it; it silently dominates any average it enters.
 
-**Separate follow-up, deliberately not fixed here:** PDG reads Pd
-`I = 470.0 eV`; `_transport_data.py` carries `477.0 eV`. Pre-existing data this
-branch does not otherwise touch; moving it would have confounded every
-before/after measurement in F. Affects PdS2/PdTe2/PdSe2 by roughly 0.1-0.2% of
-`dE/ds`. Recorded in the ledger and in `_transport_data.py`.
+Evidence that it is neither this branch's fault nor a device artifact:
+
+- It reproduces under **pure Joy--Luo** (1/24 seeds) as well as the splice
+  (3/24). The splice raises the rate -- shorter ranges put more electrons in the
+  regime that trips it -- but does not create it.
+- It reproduces on the **CPU `per-electron` core in float64** exactly as on
+  **CUDA in float32**, and the two agree on the pathological value to ~1%
+  (4820.62 vs 4781.55, seed 59, Ne=200). Healthy seeds on the same pair agree to
+  6 significant figures. So it is a deterministic computed value, not
+  precision loss and not a device bug.
+- The blown-up peak sits at ~4.94 keV, far from where healthy spectra peak
+  (~190-210 eV), which points at a resonant denominator rather than a
+  normalization slip. `spectrum/lines.py` warns
+  `invalid value encountered in divide` at the `A_PXR = chi / detuning` line in
+  the same runs -- the obvious suspect, not yet confirmed as the cause.
+
+Reproducer: graphite, `thickness_ang=1e6`, `E0=300 keV`, `tilt_deg=30`,
+`Ne=200`, `seed=59`, either `transport_core="cuda"` or `"per-electron"`.
+
+F's measurements drop such seeds by an explicit ">100x the median" rule and
+report the dropped count, rather than letting them contaminate a mean. **This
+deserves its own task** -- it is a correctness bug in the line kernel, it
+predates this work, and any thick-target campaign already run may have averaged
+one of these in.
+
+### Separate follow-up, deliberately not fixed here
+
+PDG reads Pd `I = 470.0 eV`; `_transport_data.py` carries `477.0 eV`.
+Pre-existing data this branch does not otherwise touch; moving it would have
+confounded every before/after measurement in F. Affects PdS2/PdTe2/PdSe2 by
+roughly 0.1-0.2% of `dE/ds`. Recorded in the ledger and in
+`_transport_data.py`.
 
 **The model is now wired in and results have changed** above each element's
-crossover (2.66--10.46 keV). Nineteen existing tests moved in D and thirteen
-golden digests were re-minted in E; every one was a stale Joy--Luo oracle, a
-signature, or the intended once-only digest move, and each is recorded rather
+crossover (2.66--10.46 keV). Nineteen existing tests moved in D, thirteen golden
+digests were re-minted in E, and two CUDA tests were corrected when the GPU
+first ran them; every one was a stale Joy--Luo oracle, a signature, a wrong
+skip-gate, or the intended once-only digest move, and each is recorded rather
 than silently retuned.
 
 The `electron-transport` ledger row was narrowed in place: its claim now says

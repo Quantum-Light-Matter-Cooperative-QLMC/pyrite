@@ -327,7 +327,10 @@ yield, and the coherent-line peak position all move by less than 1%, and the
 shape of the normalized bremsstrahlung spectrum by less than 0.1% in any bin.
 The largest single shift is the coherent yield at 30 keV, +0.97%, which is a
 path-length effect: the electron's in-film trajectory is very slightly shorter,
-so the phase it accumulates changes.
+so the phase it accumulates changes. Repeated with 4000 electrons per seed over
+16 seeds, every one of those shifts is consistent with zero at its own Monte
+Carlo error — so at production thickness the splice is not merely small, it is
+unresolvable.
 
 **Thick targets change materially.** Once the target is a sizeable fraction of
 the range, the shortened range redistributes the electron fates. Measured with
@@ -375,6 +378,59 @@ Mean deposition depth moves much less than the range does (−0.1% to −2.2% fo
 graphite and silicon, −22% for WSe₂ at 300 keV), because in a target thinner
 than the range the depth distribution is truncated by geometry rather than set
 by the range.
+
+**Emitted yields follow the fates, and change sign with thickness.** The same
+16-seed ensembles, at 0.1, 10 and 100 μm:
+
+```{list-table} Change in emitted yields from the splice, graphite. 4000 electrons per seed, 16 seeds; uncertainties are the seed-to-seed standard error.
+:name: tbl-stopping-splice-yields
+:header-rows: 1
+
+* - Thickness
+  - 30 keV
+  - 100 keV
+  - 300 keV
+* - 0.1 μm, bremsstrahlung
+  - +0.01 ± 0.13%
+  - +0.00 ± 0.07%
+  - +0.00 ± 0.01%
+* - 0.1 μm, characteristic line
+  - +0.09 ± 1.18%
+  - +0.00 ± 0.78%
+  - +0.00 ± 0.10%
+* - 10 μm, bremsstrahlung
+  - −5.00 ± 0.07%
+  - +1.55 ± 0.43%
+  - +0.47 ± 0.10%
+* - 10 μm, characteristic line
+  - −11.84 ± 4.05%
+  - +2.00 ± 0.35%
+  - +0.60 ± 0.61%
+* - 100 μm, bremsstrahlung
+  - −4.90 ± 0.05%
+  - −14.55 ± 0.12%
+  - +9.13 ± 0.49%
+* - 100 μm, characteristic line
+  - −7.63 ± 1.00%
+  - −23.43 ± 0.61%
+  - +9.60 ± 1.30%
+```
+
+The sign flip is the physically interesting part, and both signs come from the
+same shortened range acting on different sides of the target thickness:
+
+- Where the target is **thicker than the range** (30 keV, 100 keV at 100 μm),
+  the electron was always going to stop inside. A shorter range simply means
+  fewer radiating segments, so yields **fall**.
+- Where the target is **thinner than the old range but comparable to the new
+  one** (300 keV at 100 μm), electrons that used to escape out the far side now
+  stop inside and keep radiating, so yields **rise** — +9% here, against a −35%
+  change in the range itself.
+
+Mean bremsstrahlung photon energy falls almost everywhere (−0.3% to −7.1%),
+which is the expected consequence of the electron spending proportionally more
+of its history at low energy. Silicon behaves the same way as graphite to within
+a few tenths of a point (−5.04% brem at 30 keV/10 μm, +2.14% at 100 keV).
 
 ## Checking against ESTAR
 

@@ -234,11 +234,19 @@ def test_a_case_reports_its_segment_counts_from_the_host_set(monkeypatch):
 try:  # pragma: no cover - depends on the machine, not the branch
     import cupy
 
-    _HAS_CUDA = cupy.cuda.runtime.getDeviceCount() > 0
+    from pyrite.montecarlo._backend import xp as _xp
+
+    # A device is not enough. This test hands CuPy arrays to `_segments_on_device`,
+    # which stages through the SESSION's `xp` -- and `tests/conftest.py` pins the
+    # session to NumPy, so on a CPU-pinned run the staging call would raise rather
+    # than measure anything. Run it with `PYRITE_TEST_BACKEND=cuda`.
+    _HAS_CUDA = cupy.cuda.runtime.getDeviceCount() > 0 and _xp.__name__ == "cupy"
 except Exception:
     _HAS_CUDA = False
 
-requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
+requires_cuda = pytest.mark.skipif(
+    not _HAS_CUDA, reason="no CUDA device, or the session is pinned to the NumPy backend"
+)
 
 
 @pytest.mark.hardware

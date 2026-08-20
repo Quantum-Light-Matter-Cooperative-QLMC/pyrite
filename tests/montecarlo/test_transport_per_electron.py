@@ -14,13 +14,13 @@ import pytest
 
 from pyrite.montecarlo.transport import (
     CUDA_TRANSPORT_MIN_ELECTRONS,
-    TRANSPORT_ELEMENTS,
     PerElectronTransportConfig,
     TransportLUTConfig,
     _splitmix64,
     _stream_key_scalar,
     _stream_uniform_scalar,
     simulate_trajectories,
+    spliced_stopping_keV_per_ang,
     stream_keys,
 )
 
@@ -465,15 +465,11 @@ def test_cuda_cutoff_crossing_truncates_the_terminal_flight():
     )
 
     terminal_start = out["E_keV"][-1]
-    params = TRANSPORT_ELEMENTS["C"]
-    k = 0.731 + 0.0688 * np.log10(params["Z"])
-    coeff = composition[0][1] / 0.602214076 * params["Z"]
-    stopping = (
-        7.85e-4
-        / terminal_start
-        * coeff
-        * np.log(1.166 * (terminal_start + k * params["J_keV"]) / params["J_keV"])
-    )
+    # The oracle has to be the model the kernel evaluates. 5 keV is already above
+    # carbon's Joy--Luo/Berger--Seltzer crossover, so restating the Joy--Luo
+    # branch here would describe the model this branch retired, not the CUDA
+    # core -- the same repointing the CPU cutoff tests took.
+    stopping = -spliced_stopping_keV_per_ang(composition, terminal_start)
     endpoint = terminal_start - stopping * out["L_ang"][-1]
 
     # Device transport stores REAL segments in float32; this is a roughly
