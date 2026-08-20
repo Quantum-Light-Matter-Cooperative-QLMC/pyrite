@@ -4490,221 +4490,170 @@ def simulate_trajectories(
     either surface or drop below E_cut_keV (segments below the cutoff don't
     radiate in the spectral window of interest anyway).
 
-    elastic_model:
-      "mott" (default) -- Browning fit to the Mott TOTAL cross sections for
-          the free path + screening parameter alpha(E) calibrated per element
-          to reproduce the NIST SRD 64 relativistic Mott TRANSPORT cross
-          section (so both the collision rate and the momentum-transfer rate
-          match Mott data). Requires the NIST table in
-          mott_transport_cross_sections/.
-      "sr" -- classic analytic screened-Rutherford model (Joy), no data files.
+    Full derivations, sources, and limiting-case checks for the physics below
+    live in docs/physics/beam-transport/*.md and are independently verified in
+    docs/validation/beam-transport/*.md and docs/validation/geometry/*.md;
+    this docstring states only the parameter contract and the BIT-FOR-BIT
+    limiting case each one must preserve.
+
+    elastic_model: "mott" (default, NIST SRD 64 Mott transport cross section
+      via a Browning fit) or "sr" (analytic screened-Rutherford, no data
+      files). See docs/physics/beam-transport/elastic-scattering.md.
+      Validation: electron-transport
 
     beam_dir: initial electron direction in the SLAB frame (default +z,
     i.e. normal incidence). For a tilted sample use tilted_geometry().
 
     composition: for COMPOUNDS, [(element, number_density_1_per_Ang3), ...]
-    overriding element/n_atoms_per_ang3. Free paths and stopping are
-    additive over elements; the scattering element at each collision is
-    chosen with probability n_i sigma_i / sum.
+    overriding element/n_atoms_per_ang3. Free paths and stopping are additive
+    over elements (Bragg's rule); the scattering element at each collision is
+    chosen with probability n_i sigma_i / sum. See
+    docs/physics/beam-transport/electron-transport.md.
+    Validation: electron-transport
 
     layers: optional film-on-substrate stack
     [(z_top, z_bot, composition), ...] (top/entrance first, contiguous, deepest
-    z_bot = total thickness). Each electron's free path / stopping / scattering
-    element switch by the layer it is currently in; a flight is truncated at an
-    internal boundary (no collision -- the electron continues into the neighbor),
-    so the substrate's higher-Z backscatter feeds electron path back into the
-    film. None -> a single layer over [0, thickness_ang] (the old single-material
-    transport, BIT-FOR-BIT). When given, thickness_ang is superseded by the
-    stack's total thickness.
+    z_bot = total thickness). Each electron's free path/stopping/scattering
+    element switches by the layer it is currently in; a flight is truncated at
+    an internal boundary with no collision (the electron continues into the
+    neighbor). None -> a single layer over [0, thickness_ang] (the old
+    single-material transport, BIT-FOR-BIT). When given, thickness_ang is
+    superseded by the stack's total thickness. See
+    docs/validation/materials/multilayer-stack.md.
+    Validation: multilayer-stack
 
     beam_fwhm_mm: transverse size of the incident electron beam -- an
-    azimuthally-symmetric Gaussian spot of the given FULL WIDTH AT HALF MAXIMUM
-    [mm] (same FWHM convention as mosaic_fwhm_rad / eds_fwhm_eV / aperture_fwhm_eV
-    elsewhere in this package). Each electron's entry point is drawn independently
-    as x0, y0 ~ Normal(0, sigma), sigma = beam_fwhm_mm / (2 sqrt(2 ln 2)) in the
-    LAB plane perpendicular to the fixed beam axis, then PROJECTED onto the
-    tilted sample entrance face by geometry.project_beam_entry (the spot
-    stretches by 1/cos(tilt_polar) along the tilt azimuth). At tilt_polar_rad=0
-    the projection is the identity, so the entry is x0, y0 exactly. The result is
-    used as the electron's initial transverse position. With a laterally infinite crystal,
-    this rigidly translates the whole trajectory; beam_dir, common to the whole
-    beam, is unaffected. None (default) is a strict no-op -- the old point-source
-    (delta-function) beam entering at the origin, BIT-FOR-BIT. Limiting case:
-    beam_fwhm_mm -> 0 recovers the point source exactly
-    (sigma -> 0 -> x0 = y0 = 0).
+    azimuthally-symmetric Gaussian spot of the given FULL WIDTH AT HALF
+    MAXIMUM [mm] (same FWHM convention as mosaic_fwhm_rad / eds_fwhm_eV /
+    aperture_fwhm_eV elsewhere), drawn per electron from an RNG stream
+    independent of `seed`'s main stream and projected onto the (possibly
+    tilted) sample entrance face via geometry.project_beam_entry. None
+    (default) is a strict no-op -- the old point-source beam, BIT-FOR-BIT.
+    Limiting case: beam_fwhm_mm -> 0 recovers the point source exactly. When
+    both crystal_width_mm and crystal_height_mm are None, enabling it never
+    perturbs the free-path/scattering-angle draws or any returned array
+    except r_mid.
 
-    The offset is drawn from an RNG stream independent of `seed`'s main stream
-    (a numpy SeedSequence child). When both crystal_width_mm and
-    crystal_height_mm are None, enabling it NEVER perturbs the free-path /
-    scattering-angle draws: every other returned array (E_keV, v_hat, L_ang,
-    t_ang, elec_id, layer, n_backscattered, n_transmitted, n_stopped) is
-    identical to the beam_fwhm_mm=None run; r_mid changes only by the constant
-    per-electron transverse offset. In this laterally infinite limit, no
-    downstream physics -- elastic scattering, stopping power, layer-boundary
-    crossing, or the self-absorption path in mc_spectrum -- reads pos[:, :2],
-    and a finite beam spot is a pure geometry/visualization refinement with zero
-    effect on the emitted spectrum UNDER THE INCOHERENT EMISSION POLICY, which
-    reads only ``|A|^2`` per segment.
-
-    This is NOT true under mc_spectrum(coherent=True). The coherent phase reads
-    r_mid directly, so the constant per-electron transverse offset enters every
-    cross-electron term as exp[-i(omega n_hat + g).dr]. Turning on a 1 um spot
-    drops the coherent peak height by ~43x against the beam_fwhm_mm=None point
-    source, and the residual single-n_hat result is one speckle realization
-    whose peak scatters 30-41% seed to seed -- a contrast that does NOT fall as
-    Ne grows. The transverse form factor that should average those terms away
-    is not implemented; see the discrepancy row transverse-bunch-form-factor and
+    NOT safe with mc_spectrum(coherent=True): the coherent phase reads r_mid
+    directly, so the per-electron offset enters every cross-electron term and
+    the transverse form factor that should average it away is unimplemented
+    (`transverse-bunch-form-factor` discrepancy) -- see
     docs/physics/radiation-physics/coherent-emission.md before using a finite
-    spot with emission="coherent"/"both".
+    spot with emission="coherent"/"both". See
+    docs/physics/beam-transport/beam-phase-space.md and
+    docs/validation/geometry/finite-beam-size.md.
+    Validation: finite-beam-size
 
-    With a finite crystal footprint, the sampled transverse positions classify
-    missed entries and can cause side-face exits. Segment positions also affect
-    the downstream six-face escape attenuation, so beam size can change the
-    emitted radiation spectrum.
-
-    beam_fwhm_y_mm: optional y-plane spot FWHM [mm] for an ELLIPTICAL beam
-    (decision 8). None -> equals beam_fwhm_mm (isotropic), which draws
-    sigma_x == sigma_y and is bit-for-bit with the historical scalar-spot path.
+    beam_fwhm_y_mm: optional y-plane spot FWHM [mm] for an ELLIPTICAL beam.
+    None -> equals beam_fwhm_mm (isotropic), which stays BIT-FOR-BIT with the
+    historical scalar-spot path.
 
     transverse_distribution: the resolved Courant-Snyder policy, mutually
     exclusive with the spot FWHMs above (a spot fixes <x^2> alone; a Twiss
-    triplet fixes <x^2>, <x x'> and <x'^2>, so accepting both would be
-    over-determined). It owns the entry positions AND the per-electron
-    directions: the drawn slopes (x', y') are dx/dz, dy/dz about the beam axis,
-    turned into unit vectors through geometry.beam_frame_basis, whose transverse
-    columns coincide with the lab x / y the spot uses. Until this key is set,
-    every direction is the shared beam_dir exactly, as before. Limiting case:
-    eps_n -> 0 gives sigma_position -> 0 and slopes -> 0, so positions and
-    directions both converge on the collimated point source; leaving the key
-    unset reproduces it BIT-FOR-BIT.
+    triplet fixes <x^2>, <x x'>, and <x'^2>). Owns both the entry positions
+    and the per-electron directions (via geometry.beam_frame_basis). Unset ->
+    every direction is the shared beam_dir exactly, BIT-FOR-BIT. Limiting
+    case: eps_n -> 0 recovers the collimated point source exactly. See
+    docs/physics/beam-transport/beam-phase-space.md.
     Validation: beam-phase-space-injection
 
     energy_spread_frac: RMS *relative* energy spread. Each electron starts at
-    ``E0_keV * (1 + f * u)``, u ~ Normal(0, 1), drawn uncorrelated with the
-    arrival time (decision 3: no chirp model). None/0 -> the monoenergetic beam,
-    bit-for-bit. Raises rather than transporting a non-positive energy, which a
-    Gaussian permits only for a spread near unity.
+    E0_keV * (1 + f * u), u ~ Normal(0, 1), drawn uncorrelated with the
+    arrival time. None/0 -> the monoenergetic beam, BIT-FOR-BIT. Raises
+    rather than transporting a non-positive drawn energy. See
+    docs/physics/beam-transport/beam-phase-space.md.
     Validation: beam-energy-spread-injection
 
-    Both draws use their own SeedSequence child streams (spawn(5)[4] and
-    spawn(6)[5], the indices after the bunch's spawn(4)[3]), so enabling either
-    never perturbs the free-path / scattering draws.
+    transverse_distribution and energy_spread_frac each use their own
+    SeedSequence child stream, so enabling either never perturbs the
+    free-path/scattering draws.
 
     bunch_length_fs, long_shape, long_offsets_fs, longitudinal_distribution:
-    longitudinal bunch sampling. Each electron gets an arrival offset
-    ``Delta t`` [Angstrom, c=1] via :func:`_sample_bunch_offsets`. The legacy
-    fields provide Gaussian/uniform RMS sampling or explicit per-particle
-    offsets. The mutually exclusive resolved distribution provides Gaussian,
-    compressed-Gaussian, or directly indexed finite-train sampling without
-    materializing its many centers. Offsets are centered on the bunch centroid
-    and returned as per-segment ``t0_ang`` (and ``vacuum_t0_ang``), kept
-    SEPARATE from relative-age ``t_ang``/``clock``. The independent RNG child
-    (``spawn(4)[3]``) never perturbs transport draws. With no legacy or resolved
-    distribution, offsets are all zero (the legacy point bunch, bit-for-bit).
+    longitudinal bunch sampling via :func:`_sample_bunch_offsets`; each
+    electron gets an arrival offset (its own independent RNG child stream)
+    returned as per-segment t0_ang, kept SEPARATE from relative-age
+    t_ang/clock. No legacy or resolved distribution -> all-zero offsets (the
+    legacy point bunch, BIT-FOR-BIT). See
+    docs/physics/beam-transport/longitudinal-structure.md.
+    Validation: longitudinal-bunch-sampling
 
     crystal_width_mm, crystal_height_mm: optional full transverse dimensions
-    [mm] of a rectangular prism centered at the beam origin. Both must be
-    supplied and strictly positive, or both omitted. Finite dimensions are
-    converted once to Angstrom and define the transport volume
-    ``[-width/2, width/2] x [-height/2, height/2] x [0, thickness]``. An
-    incident Gaussian entry point outside that footprint is counted in
-    ``n_missed`` and produces no segment, but remains in ``Ne`` so all yields
-    retain their per-incident-electron normalization. Side-face exits are
-    counted separately in ``n_side_exited``. The all-``None`` limiting case is
-    the original laterally infinite slab and follows its legacy free-flight
-    path without invoking the prism-exit helper. Each finite free flight is
-    capped at the smallest positive ray boundary solution ``p + s d`` on a
-    prism face; this assumes an axis-aligned rectangular footprint.
+    [mm] of a rectangular prism centered at the beam origin; both or neither.
+    An incident entry point outside that footprint is counted in n_missed
+    (no segment, Ne unchanged); side-face exits are counted separately in
+    n_side_exited. All-None -> the original laterally infinite slab, using
+    its legacy free-flight path (BIT-FOR-BIT). See
+    docs/validation/geometry/finite-transverse-crystal.md.
+    Validation: finite-transverse-crystal
 
     tilt_polar_rad, tilt_azim_rad: sample tilt (Zhai convention, same angles
-    passed to :func:`geometry.tilted_geometry`) used ONLY to project the
-    ``beam_fwhm_mm`` Gaussian spot onto the tilted entrance face via
-    :func:`geometry.project_beam_entry`. Both default to 0 (normal incidence),
-    making the projection the identity and leaving every ``beam_fwhm_mm`` result
-    bit-for-bit. They have no effect when ``beam_fwhm_mm`` is None.
+    passed to :func:`geometry.tilted_geometry`), used ONLY to project the
+    beam_fwhm_mm Gaussian spot onto the tilted entrance face via
+    :func:`geometry.project_beam_entry`. Both default to 0 (normal
+    incidence), the identity projection, BIT-FOR-BIT; no effect without
+    beam_fwhm_mm. See docs/validation/geometry/grazing-beam-projection.md.
+    Validation: grazing-beam-projection
 
-    groove: optional :class:`~pyrite.montecarlo.groove.GrooveSpec` describing a
-    blazed sawtooth material/vacuum boundary on the beam-entrance face. Initial
-    rays enter through relief facets via ``entry_points``.
-
-    Every later free flight is intersected with both periodic facet families
-
-        n . r = k*spacing*cos(tp),  b . r = k*spacing*sin(tp),
-
-    accepting only crossings in the physical depth band ``0 <= z <= h`` where
-    ``h = spacing*sin(tp)*cos(tp)``. A material-to-vacuum event truncates the
-    radiating segment at the facet. If the unchanged ray intersects a later
-    facet from the vacuum side, it advances to that re-entry point with no
-    scattering, stopping, or radiation, then resumes material transport.
-    Vacuum flight advances the electron clock by ``L_vacuum / beta``. Resampling
-    the elastic free path after re-entry is exact because the exponential
-    collision-distance distribution is memoryless. Valid exit/re-entry pairs
-    use a separate per-electron event counter and do not consume ``max_steps``
-    material iterations; exhausting that event bound raises ``RuntimeError``.
-
-    Groove gaps are returned as separate ``vacuum_*`` diagnostic arrays; they
-    never enter the material segment sum. A ray with no later re-entry is a
-    permanent entrance-face exit. When beam_fwhm_mm is None, lateral phase is
-    sampled uniformly over one groove period using an RNG stream independent of
-    the main transport draws. None is a strict no-op -- BIT-FOR-BIT identical to
-    the ungrooved slab. Source: exact periodic ray-plane intersections; see
-    ``docs/validation/geometry/blazed-groove-geometry.md``.
+    groove: optional :class:`~pyrite.montecarlo.groove.GrooveSpec` describing
+    a blazed sawtooth material/vacuum boundary on the beam-entrance face.
+    Initial rays enter through relief facets via entry_points; every later
+    free flight is intersected with both periodic facet families and
+    truncated at a material-to-vacuum crossing. A vacuum-side crossing
+    advances the electron to its next re-entry point with no scattering,
+    stopping, or radiation, then resumes material transport (resampling the
+    elastic free path after re-entry is exact -- the collision-distance law
+    is memoryless). Vacuum flights are returned as separate vacuum_*
+    diagnostic arrays and never enter the material segment sum; a ray with no
+    later re-entry is a permanent entrance-face exit. None is a strict
+    no-op -- BIT-FOR-BIT identical to the ungrooved slab. See
+    docs/validation/geometry/blazed-groove-geometry.md.
     Validation: blazed-groove-geometry
 
-    transport_core: which ungrooved core runs the electrons.
-      "auto" (default) -- the CUDA core when this process has a CUDA device, the
-          run is ungrooved, and Ne > CUDA_TRANSPORT_MIN_ELECTRONS (1000); the
-          lockstep core otherwise. See `resolve_transport_core`; pin the choice
-          for a whole process with `CXR_MC_TRANSPORT_CORE`.
-      "lockstep" -- the historical core: an outer step loop over an inner
-          electron loop, all draws taken from one shared Generator in step-major
-          order. BIT-FOR-BIT unchanged from before the other cores existed.
-      "per-electron" -- each electron runs to completion against its own
-          counter-addressed stream (see `_transport_core_ungrooved_perelectron`).
-      "cuda" -- the same algorithm as one CUDA thread per electron.
-
-    The two newer cores are NOT bit-for-bit with "lockstep": they consume
-    differently-ordered random streams, so they realize a different sample of
-    the same distribution. "cuda" is in turn not bit-for-bit with
-    "per-electron", because CUDA's libm differs from the host's by a few ulp and
-    transport amplifies that over hundreds of scattering events. What is
-    invariant is the physics: identical models, identical draw semantics, and
-    aggregate agreement across seeds (backscatter and transmit fractions,
-    segments per electron, mean segment length/energy/depth) -- so "auto"
-    changes a run's realization, not its distribution.
+    transport_core: which ungrooved core runs the electrons. "auto" (default) --
+    the CUDA core when this process has a CUDA device, the run is ungrooved,
+    and Ne > CUDA_TRANSPORT_MIN_ELECTRONS; the lockstep core otherwise (see
+    `resolve_transport_core`; pin with `CXR_MC_TRANSPORT_CORE`). "lockstep"
+    -- the historical core, one shared Generator in step-major order,
+    BIT-FOR-BIT unchanged. "per-electron" -- each electron on its own
+    counter-addressed stream. "cuda" -- one CUDA thread per electron. The
+    cores are NOT bit-for-bit with each other: they consume
+    differently-ordered (and, for CUDA, differently-rounded) random streams,
+    so each realizes a different sample of the SAME distribution --
+    identical models, draw semantics, and aggregate agreement across seeds.
+    Grooved transport always stays on the lockstep core. See
+    docs/physics/beam-transport/electron-transport.md.
     Validation: gpu-transport-core
-    Grooved transport is rejected for both new cores, so a grooved "auto" run
-    stays on the lockstep core rather than failing.
 
     per_electron_config: batching policy for the two new cores
-    (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
-    only bound memory and replay behavior; neither changes results.
+    (:class:`PerElectronTransportConfig`). Segment capacity and scratch
+    budget only bound memory and replay behavior; neither changes results.
 
     energy_model: how a physical flight's energy and clock advance along it.
       "frozen" (default) -- the historical left-endpoint rule: stopping power
-          and beta are evaluated once at the flight's start energy and held
+          and beta evaluated once at the flight's start energy and held
           constant over its whole length. BIT-FOR-BIT unchanged.
-      "midpoint" -- second-order predictor-corrector for the implicit midpoint
-          rule ``E_end = E_start + (dE/ds)((E_start + E_end)/2) * s``, with the
-          transport clock advanced by ``s / beta((E_start + E_end)/2)`` and the
-          cutoff truncation distance solved for ``E_end == E_cut``. Adds
-          ``E_end_keV``, ``t_end_ang``, and ``E_repr_keV`` to the returned rows
-          and leaves one radiating row per physical flight. ``E_repr_keV`` is
-          the rule's own representative energy ``(E_start + E_end)/2``, the
-          energy at which radiation kernels evaluate the row. Elastic hazard
-          stays frozen at the start energy; only stopping and the clock are
-          controlled here.
-          Currently implemented for the ungrooved lockstep core only -- any
-          other core or a grooved run raises rather than returning the frozen
-          schema under a midpoint request.
-    max_dE_frac: numerical cap on one row's fractional energy loss, splitting a
-      physical flight into substeps when the cap binds before any physical
+      "midpoint" -- second-order predictor-corrector for the implicit
+          midpoint rule E_end = E_start + (dE/ds)((E_start+E_end)/2)*s, with
+          the clock advanced by s/beta at that representative energy and the
+          cutoff truncation distance solved for E_end == E_cut. Adds
+          E_end_keV, t_end_ang, and E_repr_keV = (E_start+E_end)/2 (the
+          energy radiation kernels evaluate the row at) to the returned rows.
+          Elastic hazard stays frozen at the start energy; only stopping and
+          the clock are controlled here. Lockstep core only -- any other
+          core or a grooved run raises rather than returning the frozen
+          schema.
+    See docs/validation/beam-transport/transport-midpoint-stopping.md.
+    Validation: transport-midpoint-stopping
+
+    max_dE_frac: numerical cap on one row's fractional energy loss, splitting
+      a physical flight into substeps when the cap binds before any physical
       event. 0.0 (default) disables substepping, leaving one row per flight.
-      Requires ``energy_model="midpoint"``. The collision is drawn once per
-      physical flight as an optical depth and consumed across its substeps at
-      each substep's own hazard, so refining the cap does not resample the
-      collision. Rows then carry ``flight_id``/``substep_id``; a substep keeps
-      the flight's direction and identity and never scatters.
+      Requires energy_model="midpoint". The collision is drawn once per
+      physical flight as an optical depth and consumed across its substeps
+      at each substep's own hazard, so refining the cap never resamples the
+      collision. Rows carry flight_id/substep_id; a substep keeps the
+      flight's direction and identity and never scatters. See
+      docs/validation/beam-transport/energy-controlled-propagation.md.
 
     Validation: transport-midpoint-stopping, energy-controlled-propagation
 
@@ -4740,50 +4689,32 @@ def simulate_trajectories(
 
     collect_diagnostics: opt in to fixed-size percentile summaries of the
     per-flight fractional energy loss, relative elastic-hazard change,
-    left-endpoint versus midpoint clock estimate, and cutoff overshoot. The
-    diagnostic pass runs after transport, consumes no random draws, does not
-    alter propagation, and retains no per-flight arrays. A device-resident run
-    copies the four required segment arrays to the host only when explicitly
-    requested.
+    left-endpoint versus midpoint clock estimate, and cutoff overshoot. Runs
+    after transport, consumes no random draws, does not alter propagation,
+    and retains no per-flight arrays. A device-resident run copies the four
+    required segment arrays to the host only when explicitly requested.
 
-    keep_segments_on_device: return the eight per-segment arrays where the CUDA
-    core produced them instead of copying them to the host. Requires
-    ``transport_core="cuda"``; every other returned array (the incident
-    phase-space diagnostics, the groove-gap arrays) and every count stays NumPy,
-    since those are per-electron or scalar and no spectrum kernel reads them.
-    The VALUES are untouched -- same dtypes, same elements, same order -- so this
-    only moves the payload, and a run's segments are identical either way.
+    keep_segments_on_device: return the eight per-segment arrays as CUDA
+    device arrays instead of copying them to the host (same dtypes, elements,
+    and order -- only the payload's location moves). Requires
+    transport_core="cuda"; every other returned array (incident phase-space
+    diagnostics, groove-gap arrays) and every count stays NumPy. The caller's
+    spectrum backend must then also be CUDA (CXR_MC_BACKEND resolving to
+    CUDA) -- NumPy kernels refuse the implicit host conversion rather than
+    performing it silently. Segments are joined with one concatenate (holds
+    two copies transiently) and stay device-resident for as long as the
+    caller keeps the dict.
 
-    The point is the spectrum phase: a case's kernels then read the transport's
-    output in place rather than the transport pushing ~82 B/segment down and the
-    kernels pulling it back up. It follows that the caller's spectrum backend has
-    to be the same device (``CXR_MC_BACKEND`` resolving to CUDA). NumPy kernels
-    cannot consume these arrays; NumPy refuses the implicit conversion rather
-    than performing it silently, so the mismatch is an error, not a slow path.
-
-    Costs device memory: the segments are joined with one ``concatenate``, which
-    holds two copies of the payload while it runs, and the joined arrays then
-    stay resident for as long as the caller keeps the dict.
-
-    Returns dict of per-segment arrays:
-      "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
-      "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
-      "layer" (M,) [emitting layer index]
-    with "E_start_keV"/"t_start_ang" as the canonical spellings of "E_keV"/
-    "t_ang", plus "E_end_keV" (M,), "t_end_ang" (M,), and the propagator's
-    representative energy "E_repr_keV" (M,) = (E_start + E_end)/2 under
-    energy_model="midpoint"
-    incident phase-space diagnostics (one row per sampled electron, including
-    missed entries): "initial_r_ang" (Ne,3), "initial_v_hat" (Ne,3),
-      "initial_E_keV" (Ne,), "initial_t0_ang" (Ne,)
-    non-radiating groove-gap flights:
-      "vacuum_start_ang" (V,3), "vacuum_end_ang" (V,3),
-      "vacuum_E_keV" (V,), "vacuum_t_ang" (V,), "vacuum_t0_ang" (V,),
-      "vacuum_elec_id" (V,)
-    and diagnostics: "n_backscattered", "n_transmitted", "n_side_exited",
-    "n_missed", "n_cutoff_stopped", "n_step_limited", "n_stopped" (the
-    compatibility alias of ``n_cutoff_stopped``), and "n_layers". Incomplete
-    histories raise ``RuntimeError`` rather than returning these arrays/counts.
+    Returns dict of per-segment arrays (schema, including E_start_keV/
+    t_start_ang canonical aliases and the energy_model="midpoint" additions:
+    see docs/physics/beam-transport/transport-outputs.md), incident
+    phase-space diagnostics (one row per sampled electron, including missed
+    entries: initial_r_ang, initial_v_hat, initial_E_keV, initial_t0_ang),
+    and non-radiating groove-gap "vacuum_*" arrays. Also returns the scalar
+    diagnostics n_backscattered, n_transmitted, n_side_exited, n_missed,
+    n_cutoff_stopped, n_step_limited, n_stopped (compatibility alias of
+    n_cutoff_stopped), and n_layers. Incomplete histories raise RuntimeError
+    rather than returning these arrays/counts.
 
     Validation: electron-transport, finite-beam-size, finite-transverse-crystal,
     grazing-beam-projection, multilayer-stack
