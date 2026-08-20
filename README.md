@@ -37,7 +37,7 @@ slab faces. See [tilt convention](docs/physics/geometry/tilt-convention.md) befo
 
 ## Install
 
-Requires Python ≥3.13 and [uv](https://docs.astral.sh/uv/).
+Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
@@ -73,11 +73,12 @@ generated-file locations, removal, and troubleshooting.
 Base `pyrite-xray` is CPU-only. Install exactly one accelerator extra in a clean
 environment:
 
-| Hardware | Install | Backend |
-|---|---|---|
-| NVIDIA | `uv sync --extra nvidia` | CUDA CuPy |
-| AMD | `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd` | ROCm source-built CuPy |
-| Intel | `uv sync --extra intel` | oneAPI `dpnp` + `dpctl` |
+
+| Hardware | Install                                      | Backend                |
+| ---------- | ---------------------------------------------- | ------------------------ |
+| NVIDIA   | `uv sync --extra nvidia`                     | CUDA CuPy              |
+| AMD      | `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd` | ROCm source-built CuPy |
+| Intel    | `uv sync --extra intel`                      | oneAPI`dpnp` + `dpctl` |
 
 Do not combine `nvidia` and `amd`: both provide the `cupy` import. AMD's current
 `amd-cupy` wheels only support CPython 3.10, below PyRITE's Python requirement,
