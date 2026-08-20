@@ -250,6 +250,53 @@ def stream_keys(seed, Ne):
     return x ^ (x >> _SM64_S31)
 
 
+# ---- counter-based straggling RNG stream (slice D) ----------------------------
+# The Urban sampler (slice C) draws a variable number of uniforms per flight --
+# a Poisson channel with a nonzero count consumes exactly one, an empty one
+# consumes zero, and each continuum quantum consumes one more (see
+# `_urban_poisson_scalar`, `_urban_sample_element_keV`). Sharing the electron's
+# own counter (the free-path / scattering-angle stream above) would therefore
+# make those draws' addressing depend on whether straggling is on, which is
+# exactly the coupling the "off path is bit-for-bit" and "on path never
+# perturbs the existing draws" requirements forbid. So straggling gets a
+# disjoint key domain instead of a shared counter:
+#
+#   urban_key  = _urban_stream_key_scalar(stream_key)                  -- once
+#                                                                    per electron
+#   flight_key = _urban_flight_key_scalar(urban_key, flight, substep) -- once
+#                                                                    per flight
+#
+# and the sampler draws from `(flight_key, counter=0)`. Every `(seed, electron,
+# flight, substep)` tuple addresses its own SplitMix64 stream with no shared
+# state and no stride to overflow, so the sampler's own draw count can vary
+# freely per flight without perturbing anything else -- including itself on a
+# later flight. `_URBAN_STREAM_SALT` only has to differ from the other
+# constants in this module; XORing it into the electron's stream key before
+# re-hashing is what keeps this domain disjoint from `_stream_uniform_scalar`'s.
+_URBAN_STREAM_SALT = np.uint64(0xD6E8FEB86659FD93)
+
+
+@njit(uint64(uint64), cache=True)
+def _urban_stream_key_scalar(stream_key):
+    """Per-electron straggling key, disjoint from the electron's own stream."""
+    return _splitmix64(stream_key ^ _URBAN_STREAM_SALT)
+
+
+@njit(uint64(uint64, int64, int64), cache=True)
+def _urban_flight_key_scalar(urban_key, flight, substep):
+    """Per-``(flight, substep)`` straggling key.
+
+    ``(flight, substep)`` pack into one 64-bit index by a 32/32 bit split --
+    exact and collision-free for any flight count or substep count below
+    2**32, far beyond any reachable ``max_steps`` or ``max_dE_frac`` substep
+    count, and simpler than bounding a stride the way a shared counter would
+    need. The result is re-hashed through the same SplitMix64 finalizer as
+    every other stream in this module.
+    """
+    combined = (np.uint64(flight) << np.uint64(32)) + np.uint64(substep)
+    return _splitmix64(urban_key + _SM64_GOLDEN * combined)
+
+
 # ---- elastic scattering models ------------------------------------------------
 @njit(cache=True)
 def _sigma_browning_cm2(Z, E_keV):
