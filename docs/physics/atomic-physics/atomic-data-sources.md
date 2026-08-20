@@ -20,7 +20,7 @@ anchors (results below). xraylib was explicitly considered and rejected (see bel
 `src/pyrite/materials/atomic.py` provides, behind one clean seam:
 
 | Datum | Was | Now |
-|---|---|---|
+| ----- | --- | --- |
 | `Z_TABLE` | hand-typed dict | `xraydb.atomic_number` (any symbol, lazy) |
 | `cromer_mann_f0` f0(g) | Cromer–Mann (ITC Vol C 6.1.1.4) | Waasmaier–Kirfel (`xraydb.f0`) |
 | `henke_dispersion` f′,f″ | Henke/CXRO `.nff` CSVs, 10 eV–30 keV | Chantler/FFAST (`xraydb.f1_chantler`/`f2_chantler`) |
@@ -47,7 +47,7 @@ few percent and the validation anchors had to be re-run (they held — see below
 ## Candidates (June 2026, uv / Python 3.14)
 
 | Library | f0(q) | f1/f2 | Install | License | Verdict |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | **xraydb** 4.5.8 | Waasmaier–Kirfel | **Chantler** (FFAST) | ✅ pure-Python, `uv add xraydb` | MIT / CC0 | **ADOPTED** |
 | **xraylib** 4.2.1 | `FF_Rayl` (Waasmaier) | `Fi`/`Fii` (**Cromer–Liberman**) | ✅ wheels for 3.13/3.14 | BSD | Rejected (see below) |
 | **periodictable** | Cromer–Mann | **Henke/CXRO** (same as old) | ✅ pure-Python | BSD-like | Henke-preserving hybrid; not chosen |
@@ -83,12 +83,12 @@ Before = Henke/Cromer–Mann; after = xraydb/Chantler. CPU run (laptop has no CU
 the MC checks were forced onto numpy by masking `cupy`).
 
 | Anchor | Before | After | Shift |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `tests/` (form-factor unit tests) | pass | pass (+ new range/unknown tests) | — |
-| Feranchuk LiF (200) \|χ_g\| | 4.311e-05 | 4.306e-05 | −0.1 % |
-| Feranchuk LiF model flux | 2.812e+04 ph/s | 2.817e+04 ph/s | +0.2 % |
-| Feranchuk LiF \|A_PXR/A_CBS\| | 0.6088 | 0.6068 | −0.3 % |
-| **Zhai graphite 29 nm A/B line ratio** | **1.00** | **1.00** | **unchanged** |
+| Feranchuk et al. LiF (200) \|χ_g\| | 4.311e-05 | 4.306e-05 | −0.1 % |
+| Feranchuk et al. LiF model flux | 2.812e+04 ph/s | 2.817e+04 ph/s | +0.2 % |
+| Feranchuk et al. LiF \|A_PXR/A_CBS\| | 0.6088 | 0.6068 | −0.3 % |
+| **Zhai et al. graphite 29 nm A/B line ratio** | **1.00** | **1.00** | **unchanged** |
 | Zhai graphite 1 mm A/B line ratio | 2.54 | 2.57 | +1.2 % |
 | graphite L_abs @ 973 eV | 1.84 µm | 1.97 µm | +7 % |
 

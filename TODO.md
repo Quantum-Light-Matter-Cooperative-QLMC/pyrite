@@ -23,11 +23,7 @@ file. Edit and drop items on `main`.
 1. **Add support for characteristic X-rays**
 2. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
-3. **Validate batched coherent line accumulation.** The implementation and
-   `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
-   verification and human sign-off remain. → `feature/coherent-line-batching`;
-   [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-4. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+3. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
@@ -36,26 +32,7 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
-5. **Relativistic Bethe collision stopping.** Joy--Luo under-stops by 6% at
-   25 keV and ~2x at 300 keV (`stopping-power.md`,
-   `tbl-stopping-validity-ceiling`), with no guard and no switch to a
-   relativistic form. This is a first-order *systematic* error in the
-   energy-vs-depth curve — same sign every electron, accumulating coherently,
-   displacing the coherent line — and the midpoint propagator was refined to a
-   0.1 rad tolerance against a clock built on it. Unlike the gated
-   reference-stopping item, this needs **no packaged tables**: Berger--Seltzer/
-   ICRU-37 is closed-form, and `Z`, `A`, and `J` are already in
-   `materials/_transport_data.py` from CIAAW/PDG, with Sternheimer
-   density-effect coefficients in the same PDG tables if needed. No
-   redistribution gate. Joy--Luo stays as the low-energy branch (the two agree
-   to 2% at 10 keV, so the splice is well-conditioned). Consumes no random
-   draws, so all four cores adopt it in one slice — but `build_transport_energy_lut`
-   bakes `dE/ds` and `campaign/sweep.py:831` mirrors the constants, and both
-   drift silently if missed. Does not close
-   `feature/reference-electron-stopping-data`, which still owns provenance and
-   radiative stopping. → `feature/relativistic-bethe-stopping`;
-   [`agentdocs/tasks/feature/relativistic-bethe-stopping/`](agentdocs/tasks/feature/relativistic-bethe-stopping/).
-6. **Energy-loss straggling.** Transport is pure CSDA: `_dEds_compound_scalar`
+4. **Energy-loss straggling.** Transport is pure CSDA: `_dEds_compound_scalar`
    returns a mean loss rate and every core applies it deterministically, so the
    fluctuation about it is discarded by construction. `energy-step-convergence`
    measures the cost — by Jensen's inequality straggling biases the *mean*
@@ -261,7 +238,7 @@ Nothing here yet.
 
 ### Tests
 
-1. Fix the many failing intel SYCL tests
+1. Fix the warnings present in the full test suite
 
 ## Long-term plans
 

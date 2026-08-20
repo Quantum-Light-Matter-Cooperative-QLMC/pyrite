@@ -98,8 +98,8 @@ expression of ICRU Report 37{cite:p}`icru37,bergerseltzer1982`:
 \frac{dE}{ds} =
 -\frac{2\pi r_e^2 m c^2 N_{\rm A}}{\beta^2}\,\frac{\rho Z}{A}\,
 \left[
-\ln\!\frac{\tau^2(\tau+2)}{2\,(I/mc^2)^2}
-+ F^-(\tau) - \delta
+\ln\!\frac{T^2(T+2)}{2\,(I/mc^2)^2}
++ F^-(T) - \delta
 \right]
 \quad[\mathrm{keV\,Å^{-1}}],
 ```
@@ -109,18 +109,35 @@ with
 ```{math}
 :label: eq-stopping-bs-fminus
 
-F^-(\tau) = 1 - \beta^2 +
-\frac{\tau^2/8 - (2\tau+1)\ln 2}{(\tau+1)^2},
+F^-(T) = 1 - \beta^2 +
+\frac{T^2/8 - (2T+1)\ln 2}{(T+1)^2},
 ```
 
-$\tau = E/mc^2$ the kinetic energy in electron rest-mass units, $\beta^2 = 1 -
-(\tau+1)^{-2}$, and $2\pi r_e^2 m c^2 N_{\rm A} = 0.1535\ \mathrm{MeV\,cm^2\,mol^{-1}}$.
-Converting that constant to per-ångström units ($10^{3}$ keV/MeV times
+where $T = E/mc^2$ is the kinetic energy in electron rest-mass units, $\beta^2 = 1 -
+(T+1)^{-2}$, and $2\pi r_e^2 m c^2 N_{\rm A}$ is a constant with the value $0.1535\ \mathrm{MeV\,cm^2\,mol^{-1}}$.
+
+Converting that constant to per-$\AA$ units ($10^{3}$ keV/MeV times
 $10^{-8}$ cm/Å) gives the prefactor $1.535\times10^{-6}\ \mathrm{keV\,Å^{-1}}$
-used in code, in place of the $7.85\times10^{-4}$ of
-{eq}`eq-stopping-joy-luo`. As a check, the non-relativistic limit ($\tau\to0$:
-$\beta^2\to2\tau$, $(\tau+2)/2\to1$) reduces {eq}`eq-stopping-bs` to
-$-(1.535\times10^{-6}\,mc^2/E)\,\rho Z/A\,[2\ln(E/I) + 1 - \ln2]$, and
+used in the code, in place of the $7.85\times10^{-4}$ of
+{eq}`eq-stopping-joy-luo`.
+
+As a check, the non-relativistic limit
+
+```{math}
+T \to 0:
+\quad \beta^2 \to 2T,
+\quad \frac{T+2}{2} \to 1
+```
+
+reduces {eq}`eq-stopping-bs` to:
+
+```{math}
+:label: nonrel-eq-stopping-bs
+
+-1.535\times10^{-6}\,\frac{mc^2}{E}\frac{\rho Z}{A}\,[2\ln(E/I) + 1 - \ln2]
+```
+
+and
 $1.535\times10^{-6}\times mc^2 = 7.844\times10^{-4}$ against the conventional
 $7.85\times10^{-4}$ — 0.08%, the rounding in that constant.
 
@@ -191,7 +208,7 @@ top of the swept range, so they return $\delta = 0$ throughout and cannot serve
 as the bound. {eq}`eq-stopping-bs-fminus` also omits shell corrections, which is
 why NIST restricts ESTAR collision stopping to energies $\ge 10$ keV; that is a
 second reason, independent of $\delta$, the low-energy branch stays
-load-bearing rather than being replaced outright.
+in the critical path rather than being replaced outright.
 
 The compound rule reuses {eq}`eq-stopping-compound-coefficient` unchanged:
 $c_i = n_i Z_i / 0.602214076$ is an exact rewrite of $\rho Z/A$ regardless of
@@ -219,11 +236,11 @@ and therefore the compound sum for any material, with no per-material tuning
 and no fitted blend — verified to $10^{-12}$ relative for all 24 elements and
 all 50 catalog materials. The crossover is well posed because it sits far
 above the energy where the Berger–Seltzer bracket
-$\bigl[\ln(\cdot) + F^-(\tau)\bigr]$ changes sign (below 0.71 keV for every
+$\bigl[\ln(\cdot) + F^-(T)\bigr]$ changes sign (below 0.71 keV for every
 catalog element, versus a 2.66–10.46 keV crossover).
 
 The splice is continuous in *value* only — it is $C^0$, not $C^1$. The
-log-slope $d\ln|dE/ds|/d\ln E$ steps across the crossover by 0.0145 (B, 2.0%
+log-slope $\left(\mathrm{d}\ln|\frac{\mathrm{d}E}{\mathrm{d}s}| / \mathrm{d}\ln E \right)$ steps across the crossover by 0.0145 (B, 2.0%
 of the local slope) to 0.0587 (Bi, 8.9%), worst at high $Z$, where the
 crossover sits highest. {eq}`eq-stopping-cutoff-distance`, below, needs only
 the stopping-power value at one point, not its slope, so the kink does not
@@ -496,12 +513,12 @@ still be caught.
 Where {eq}`eq-stopping-compound` is evaluated is set by `energy_model`, not by
 this page: the frozen rule holds it at the flight-start energy, the midpoint rule
 evaluates it at $(E_{\rm start}+E_{\rm end})/2$ through one predictor–corrector
-pass. Because $|dE/ds|$ *grows* as $E$ falls, the frozen rule systematically
+pass. Because $|\frac{dE}{ds}|$ *grows* as $E$ falls, the frozen rule systematically
 overstates how far an electron travels for a given loss — measurably, 1.2% on
 mean path length in the thick 5 keV carbon case. See
 [Electron transport](electron-transport.md#energy-controlled-propagation).
 
-# Transport cutoff
+## Transport cutoff
 
 Transport of an electron ends when its kinetic energy falls to `E_cut_keV`
 (default 5 keV):
@@ -524,7 +541,7 @@ $E_{\rm end} = E_{\rm cut}$ exactly,
 
 s_{\rm cut} =
 \frac{E_{\rm cut} - E_{\rm start}}
-     {(dE/ds)\bigl((E_{\rm start}+E_{\rm cut})/2\bigr)},
+     {\frac{\mathrm{d}E}{\mathrm{d}s}\bigl((E_{\rm start}+E_{\rm cut})/2\bigr)},
 ```
 
 so the overshoot disappears. `E_cut_by_electrons` allows a per-electron cutoff
