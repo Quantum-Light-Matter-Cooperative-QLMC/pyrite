@@ -531,65 +531,24 @@ def _transport_kernel(
         #    replay needs.
         dEds = _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_j)
         cutoff_j = False
-        if energy_model_code == I32_ONE:
-            # The midpoint rule makes E_end = E_cut at the cutoff by definition,
-            # so the truncation distance solves the scheme at
-            # E_mid = (E_start + E_cut)/2, not its left-endpoint linearization.
-            cutoff_distance = (E_cut_e - E_j) / _dEds_packed(
-                L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_cut_e)
-            )
-        else:
-            cutoff_distance = (E_cut_e - E_j) / dEds
-        geometry_event = cross_up_j or cross_dn_j or exit_side_j
-        if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-            step_j = cutoff_distance
-            cutoff_j = True
-            cross_up_j = False
-            cross_dn_j = False
-            exit_top_j = False
-            exit_bot_j = False
-            exit_side_j = False
-
         # The numerical energy-loss cap is the only step limit that does not
         # close a physical flight: it emits a row and resumes with the same
         # optical-depth budget, direction, and `flight_id`.
         limited_j = False
-        if energy_controlled and not cutoff_j:
-            step_energy = max_dE_frac * E_j / (-dEds)
-            if step_energy < step_j:
-                step_j = step_energy
-                limited_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
+        geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
-        if energy_model_code == I32_ONE:
-            if cutoff_j:
-                E_end_j = E_cut_e
-            else:
-                # Predictor-corrector for the implicit midpoint rule
-                # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
-                E_pred = E_j + dEds * step_j
-                E_end_j = E_j + step_j * _dEds_packed(
-                    L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_pred)
-                )
-            beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
-        else:
-            if cutoff_j:
-                E_end_j = E_cut_e
-            else:
-                E_end_j = E_j + dEds * step_j
-            beta_j = _beta_from_keV(E_j)
-        t_end_j = clock[e] + step_j / beta_j
-
-        # Straggling (slice D). Own disjoint key domain -- a salted rehash of
-        # this thread's own `key`, then its own counter `stragg_counter`
-        # starting fresh at 0 for every flight -- so this draws no uniforms
-        # from `key`/`draw` above and cannot perturb the free-path /
-        # scattering-angle draws whether it runs or not. Not applied to
-        # E_end_j/E_keV; for test purposes only (integration is slice E/F).
+        # Straggling. Own disjoint key domain -- a salted rehash of this
+        # thread's own `key`, then its own counter `stragg_counter` starting
+        # fresh at 0 for every flight -- so this draws no uniforms from
+        # `key`/`draw` above and cannot perturb the free-path /
+        # scattering-angle draws whether it runs or not. Slice D inlined the
+        # sampler here as a diagnostic; slice F applies the loss and takes
+        # slice E's crossing rule, matching
+        # transport._transport_core_ungrooved_perelectron line for line --
+        # the cap before the draw, the cutoff test after it, the exact
+        # indicator `dE >= E_start - E_cut`, and the fluid crossing location
+        # `s_cut = s (E_start - E_cut) / dE`. `exit_code` is derived from the
+        # same local booleans below, so the flag clearing transcribes as is.
         # Mirrors transport._urban_sample_compound_keV /
         # _urban_sample_element_keV / _urban_channels_scalar /
         # _urban_poisson_scalar. Inlined rather than split into device
@@ -597,9 +556,29 @@ def _transport_kernel(
         # draw counter, and device functions in this file return one value
         # (see the prism-exit comment in the step-2 boundary block above).
         if straggle_on == I32_ONE:
+            # Deterministic step control on purpose: a substep grid chosen from
+            # the sampled loss would be a random partition and would forfeit
+            # the infinite-divisibility invariance slice E derived.
+            if energy_controlled:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    geometry_event = False
+
             urban_key = _urban_stream_key(key)
             flight_key = _urban_flight_key(urban_key, np.uint64(flight_id), np.uint64(substep_id))
             stragg_counter = U64_ZERO
+            # Accumulated per row into a thread-local before the single global
+            # update, matching the host's `_urban_sample_compound_keV`, which
+            # sums its per-element losses into a local starting at 0. The row
+            # total is also what the crossing rule needs.
+            stragg_loss = F64_ZERO
             i_el2 = I32_ZERO
             while i_el2 < n_el:
                 Zc = L_Zs[row + i_el2]
@@ -750,8 +729,91 @@ def _transport_kernel(
                         dE_elem += _urban_ionisation(uq, T_up_u)
                         kq += I32_ONE
 
-                stragg_dE[e] += dE_elem
+                stragg_loss += dE_elem
                 i_el2 += I32_ONE
+
+            # Diagnostic, unchanged from slice D: the SAMPLED loss, which on a
+            # cutoff row exceeds the applied loss by exactly the overshoot the
+            # truncation discards.
+            stragg_dE[e] += stragg_loss
+
+            # The loss process is non-decreasing, so "crosses E_cut somewhere
+            # inside this row" is equivalent to "total loss over the row reaches
+            # E_j - E_cut" -- an exact test. The tie-break matches the
+            # deterministic branch below: a crossing exactly at the row's end
+            # yields to a geometry event.
+            delta_cut = E_j - E_cut_e
+            if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                # Fluid interpolation at the row's own realized rate. The guard
+                # is load-bearing on the device: 0/0 is a silent NaN here, and
+                # it would propagate straight into `pos` rather than raising.
+                if stragg_loss > F64_ZERO:
+                    step_j = step_j * (delta_cut / stragg_loss)
+                else:
+                    step_j = F64_ZERO
+                cutoff_j = True
+                limited_j = False
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+                E_end_j = E_cut_e
+            else:
+                E_end_j = E_j - stragg_loss
+            if energy_model_code == I32_ONE:
+                beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
+            else:
+                beta_j = _beta_from_keV(E_j)
+        else:
+            if energy_model_code == I32_ONE:
+                # The midpoint rule makes E_end = E_cut at the cutoff by
+                # definition, so the truncation distance solves the scheme at
+                # E_mid = (E_start + E_cut)/2, not its left-endpoint
+                # linearization.
+                cutoff_distance = (E_cut_e - E_j) / _dEds_packed(
+                    L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_cut_e)
+                )
+            else:
+                cutoff_distance = (E_cut_e - E_j) / dEds
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+
+            if energy_controlled and not cutoff_j:
+                step_energy = max_dE_frac * E_j / (-dEds)
+                if step_energy < step_j:
+                    step_j = step_energy
+                    limited_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+            if energy_model_code == I32_ONE:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    # Predictor-corrector for the implicit midpoint rule
+                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                    E_pred = E_j + dEds * step_j
+                    E_end_j = E_j + step_j * _dEds_packed(
+                        L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_pred)
+                    )
+                beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
+            else:
+                if cutoff_j:
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j + dEds * step_j
+                beta_j = _beta_from_keV(E_j)
+        t_end_j = clock[e] + step_j / beta_j
 
         if local_nseg < cap:
             slot = i * cap + local_nseg
@@ -1461,12 +1523,25 @@ def run_transport_kernel(
     so ``_run_per_electron_transport`` can drive either. Flattening, dtype
     narrowing, and scalar typing happen here rather than in the kernel.
 
-    ``straggle_on``/``stragg_dE`` are slice D's straggling gate and Ne-sized
-    per-electron accumulator (see the reference core's docstring). CUDA parity
-    is not bit-for-bit here: ``_urban_poisson_scalar``'s host counterpart
-    branches on a ``log``/``exp`` comparison that a last-bit libm difference
-    can move across a Poisson CDF boundary, so the claim is few-ulp per flight,
-    per slice C's own recommendation.
+    ``straggle_on``/``stragg_dE`` are the straggling gate and Ne-sized
+    per-electron accumulator (see the reference core's docstring). As of slice F
+    the sampled loss is *applied* here, not merely accumulated, under slice E's
+    crossing rule. CUDA parity is not bit-for-bit: ``_urban_poisson_scalar``'s
+    host counterpart branches on a ``log``/``exp`` comparison that a last-bit
+    libm difference can move across a Poisson CDF boundary, so the claim is
+    few-ulp per flight, per slice C's own recommendation. Applying the loss
+    makes that a *divergence* claim rather than a per-row one: a flipped
+    Poisson count changes the electron's energy and the trajectory diverges
+    from there, so only the first row of each electron is comparable to the
+    host, exactly as ``test_cuda_first_step_agrees_with_the_cpu_reference``
+    already asserts for the deterministic path.
+
+    **UNVERIFIED on hardware.** Slices D, E and F all ran on a machine with no
+    ``cupy`` and no CUDA device, so this kernel has never been compiled or
+    executed with straggling on. The code is a transcription of the tested
+    :func:`_transport_core_ungrooved_perelectron`; the hardware-gated tests in
+    ``tests/montecarlo/test_straggling_cuda.py`` are the check, and they need a
+    GPU (``pyrite remote``) to run.
     """
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):

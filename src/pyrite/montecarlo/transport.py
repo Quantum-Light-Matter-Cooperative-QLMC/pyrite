@@ -5470,22 +5470,28 @@ def simulate_trajectories(
     if groove is None and transport_lut is not None and transport_core != "lockstep":
         if transport_core == "cuda":
             if straggle_on:
-                # Slice D wired straggling into the CUDA per-electron *exact*
-                # kernel (_transport_kernel/run_transport_kernel) only. The
-                # LUT CUDA kernel (_transport_lut_kernel) has no per-element
-                # split to sample from (see
-                # _transport_core_ungrooved_perelectron_lut's docstring) and
-                # slice D did not duplicate the Urban sampler there -- raise
-                # rather than silently returning an unstraggled
-                # straggle_dE_keV. Use transport_lut_config=TransportLUTConfig
-                # (enabled=False) to reach the exact CUDA kernel instead, or
-                # transport_core="per-electron" off CUDA.
+                # Straggling is wired into the CUDA per-electron *exact* kernel
+                # (_transport_kernel/run_transport_kernel) only: slice D
+                # duplicated the sampler there and slice F applied the loss.
+                # The LUT CUDA kernel (_transport_lut_kernel) has no
+                # per-element split to sample from (see
+                # _transport_core_ungrooved_perelectron_lut's docstring), no
+                # duplicated sampler, and `run_transport_lut_kernel` does not
+                # even accept the straggling parameters. Slice F deliberately
+                # left it that way rather than adding a second ~150-line
+                # transcription of the sampler to a kernel that cannot be
+                # compiled or run on the machine writing it -- see the slice F
+                # checklist entry. Raise rather than silently returning an
+                # unstraggled result or an opaque TypeError. Use
+                # transport_lut_config=TransportLUTConfig(enabled=False) to
+                # reach the exact CUDA kernel instead, or transport_core=
+                # "per-electron"/"lockstep" off CUDA.
                 raise NotImplementedError(
                     "straggling=True is not implemented on the CUDA LUT core "
                     "(transport_core='cuda' with the LUT enabled); disable the "
                     "LUT (transport_lut_config=TransportLUTConfig(enabled=False)) "
-                    "to reach the CUDA exact per-electron core, which slice D "
-                    "wired, or run off CUDA"
+                    "to reach the CUDA exact per-electron core, or run off CUDA "
+                    "with transport_core='per-electron' or 'lockstep'"
                 )
             from .transport_jit_kernel import make_cuda_transport_lut_core
 
