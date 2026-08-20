@@ -1556,6 +1556,195 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
     return best_t, best_face
 
 
+# ---- stochastic energy loss in transport (slice E) ----------------------------
+# Slice C built the Urban sampler and slice D addressed it per
+# `(electron, flight, substep)` without applying it. This block is the design
+# record for actually applying it inside `_transport_core_ungrooved`, i.e. for
+# the two questions the deterministic core answers by construction and a random
+# loss reopens: where the cutoff crossing is, and what `max_dE_frac` substepping
+# still guarantees. Both are gated behind `straggle_on`; with straggling off
+# every line below is unreachable and the deterministic code path is textually
+# unchanged.
+#
+# Source: Geant4 PRM "Energy loss fluctuations" (Urban model) for the loss
+# itself -- see the derivation block above `_urban_levels_scalar`. Nothing here
+# adds physics to that model; it is the transport-side integration of it.
+#
+# --- 1. The loss over a flight is a subordinator, not just a random number ----
+#
+# Urban's loss over a step of length s at frozen energy is the compound Poisson
+# sum dE(s) = sum_i sum_{k=1}^{n_i(s)} E_{i,k} with n_i(s) ~ Poisson(s Sigma_i).
+# Read as a function of s it is a Levy process with non-negative jumps: a
+# subordinator. Two of its properties do all the work below.
+#
+#   (P1) MONOTONE. dE(s) is non-decreasing in s, so the electron's energy
+#        E(s) = E_start - dE(s) is non-increasing, exactly as in the
+#        deterministic model. Therefore
+#            inf{ s' <= s : E(s') <= E_cut }  exists  <=>  dE(s) >= E_start-E_cut.
+#        The *indicator* of "this row crosses the cutoff" is a function of the
+#        total loss over the row alone -- which is precisely what the sampler
+#        returns. So the crossing decision, and hence `n_cutoff_stopped`, is
+#        EXACT under this model: no approximation enters it.
+#   (P2) INFINITELY DIVISIBLE. For any partition s = sum_m s_m,
+#            sum_m CP(s_m Sigma) =_d CP(s Sigma),
+#        because sum_m Poisson(s_m Sigma_i) = Poisson(s Sigma_i) and the marks
+#        are i.i.d. from the same law. At frozen Sigma this is exact, not
+#        asymptotic. It is the substep invariance, derived in 3 below.
+#
+# --- 2. Cutoff crossing: exact indicator, fluid-interpolated location ---------
+#
+# Let Delta = E_start - E_cut > 0 (every alive electron satisfies this; a row
+# that reaches E_cut is killed) and let dE be the sampled loss over the row's
+# length s. By (P1) the row crosses iff dE >= Delta, and the crossing distance
+# is the position of the jump that carries the running sum past Delta. The
+# sampler returns the total, not the jump ladder, so the *location* needs a
+# rule. The one used here places the crossing where the loss, accrued at the
+# row's own REALIZED average rate dE/s, reaches Delta:
+#
+#       s_cut = s * Delta / dE,        E_end = E_cut,        cutoff_j = True.
+#
+# Why this rule:
+#   - It degenerates ALGEBRAICALLY, not merely in gate, to the deterministic
+#     solve. Put dE -> |dE/ds| s (the zero-fluctuation limit): the crossing
+#     condition becomes s > Delta/|dE/ds| = cutoff_distance and
+#     s_cut = s Delta / (|dE/ds| s) = Delta/|dE/ds| = cutoff_distance, which is
+#     the frozen-model line `cutoff_distance = (E_cut - E_j) / dEds` verbatim.
+#   - It is the same approximation the surrounding transport already makes.
+#     The deterministic core spreads a flight's loss uniformly along the flight
+#     even though the loss is physically a handful of discrete collisions; the
+#     clock (`s / beta`) and `seg_mid` are built on that fluid picture. Using
+#     the realized rate instead of the mean rate changes which number is spread,
+#     not the spreading.
+#   - It handles the overshoot case -- slice C decision 3: the sampler does not
+#     clamp dE to E, and with n_3 up to 1.15 per flight a single row can sample
+#     a loss far above Delta -- with no special case and no unphysical result:
+#     dE >> Delta gives s_cut -> 0, i.e. "the electron ran out of energy right
+#     at the start of this row". E_end is E_cut exactly, never negative, never
+#     below the cutoff.
+#   - It consumes no additional random numbers, so slice D's stream layout,
+#     its off-path bit-for-bit claim, and its offline reproducibility of
+#     `straggle_dE_keV` from `(electron, flight, substep)` all survive unchanged.
+#
+# What it costs: the crossing LOCATION is biased inside the crossing row. The
+# true first-passage distance is the position of the crossing jump, which given
+# one jump is uniform on [0, s]; the rule returns the deterministic fraction
+# Delta/dE of the row instead, so a large overshoot places the stop earlier than
+# the truth. The bias is bounded by one row length and applies only to the row
+# that terminates the track, so it perturbs the end of the range straggling
+# distribution by at most the final flight length -- which at E ~ E_cut is the
+# elastic mean free path at a few keV, Angstroms to tens of Angstroms.
+#
+# Alternatives considered and rejected:
+#   (a) Travel the full row, then stop if E_end <= E_cut. Rejected: it does not
+#       degenerate to the deterministic solve at all (in the zero-fluctuation
+#       limit it still overshoots by s - cutoff_distance), and it lengthens
+#       every terminated track by half a flight on average, which is a
+#       systematic range bias present even with the fluctuation switched off.
+#   (b) Draw the crossing position uniformly on [0, s]. Exact for a single-jump
+#       crossing, but wrong for a multi-jump one, wrong in the deterministic
+#       limit (it would randomize a stopping point that is not random), and it
+#       consumes a stream draw whose count depends on the outcome.
+#   (c) Clamp the sampled loss to Delta and keep the analytic cutoff distance.
+#       Rejected: clamping breaks <dE> = C s, the single property Urban was
+#       selected for (slice B point 4), and makes `n_cutoff_stopped` blind to
+#       the fluctuation it is supposed to reflect.
+#   (d) Sample the jump ladder (counts and uniform positions) to get the exact
+#       first passage. Correct, but it requires the sampler to return per-
+#       element counts and to draw n_i extra position variates -- i.e. changing
+#       slice C's sampler, which slice E does not own.
+#
+# `n_cutoff_stopped` bookkeeping: `cutoff_j` keeps its exact meaning ("this row
+# ended because the electron reached E_cut"), so the increment, the `died_j`
+# kill, and the geometry-flag clearing are unchanged; only the test that sets it
+# is redefined. By (P1) the flag fires on exactly the rows on which the true
+# first passage lies inside the row, so the count is exact, not approximate.
+#
+# The energy model: under straggling the loss over a row is the sampled dE and
+# E_end = E_start - dE for BOTH `energy_model` codes. The midpoint
+# predictor-corrector is a second-order quadrature of the deterministic ODE
+# dE/ds = f(E); with a random loss there is no ODE to quadrature and the
+# sampler's own mean is the left-endpoint one, C(E_start) s. `energy_model`
+# therefore still selects the clock's representative energy -- beta at the row's
+# realized midpoint (E_start + E_end)/2 versus at E_start -- and the
+# `seg_E_end`/`seg_t_end` schema, but no longer the energy update itself. The
+# residual left-endpoint bias this leaves in the mean is exactly the O(s^2) term
+# derived in 3 below, and `max_dE_frac` is the lever that controls it.
+#
+# --- 3. Substep invariance under a stochastic loss ----------------------------
+#
+# `substep-radiation-invariance` currently states an ALGEBRAIC invariance:
+# subdividing a flight leaves the deterministic result unchanged. That claim
+# does not survive a random loss and is re-derived here as a DISTRIBUTIONAL one.
+# (Docs are slices J/K; this block is the derivation for them to transcribe.)
+#
+# Setup: one physical flight of length s at start energy E, either taken whole
+# (N = 1 row) or split by `max_dE_frac` into N substeps of lengths s_1..s_N with
+# sum_m s_m = s, substep m starting at energy E^(m), E^(1) = E,
+# E^(m+1) = E^(m) - X_m, and X_m the loss sampled over s_m at E^(m).
+#
+# (i) At frozen energy the invariance is EXACT. If every substep used the same
+#     rates Sigma_i(E), then by (P2) sum_m X_m =_d X, the unsplit draw, for any
+#     partition and any N. Not a limit, not a tolerance: the same distribution.
+#     It is *distributional*, not pathwise -- each substep addresses its own
+#     `(flight, substep)` key, so the realized numbers differ; only the law is
+#     preserved. This is the strongest form the invariance can take and it is
+#     what slice B's infinite-divisibility argument buys.
+#
+# (ii) The ONLY substep dependence is the drift of Sigma_i with E inside the
+#     flight. Write C(E) = |dE/dx|(E) for the mean loss per unit length and
+#     V(E) = Sigma_1 E_1^2 + Sigma_2 E_2^2 + Sigma_3 E_0 T_up for the variance
+#     per unit length (both from the block above `_urban_levels_scalar`). Then
+#         <sum_m X_m> = sum_m s_m C(E^(m)),   Var(sum_m X_m) = sum_m s_m V(E^(m))
+#     (no cross terms: the substeps are independent). Expanding
+#     C(E^(m)) = C(E) - C'(E) Y_{m-1} + O(Y^2) with Y_{m-1} = sum_{l<m} X_l and
+#     <Y_{m-1}> = C(E) sigma_{m-1}, sigma_{m-1} = sum_{l<m} s_l, gives
+#
+#         <sum_m X_m> - <X> = -C C' sum_m s_m sigma_{m-1} + O(s^3)
+#                           = -C C' s^2 (N-1)/(2N) + O(s^3)   [equal substeps]
+#
+#     and identically Var(sum_m X_m) - Var(X) = -V' C s^2 (N-1)/(2N) + O(s^3).
+#     Both are monotone in N, vanish at N = 1, and saturate at N -> infinity.
+#
+# (iii) The N -> infinity limit is the CORRECT moment, so substepping converges
+#     rather than drifting. The exactly integrated mean loss over the flight is
+#         int_0^s C(E(s')) ds' = C s - (1/2) C C' s^2 + O(s^3),
+#     since dC/ds = C'(E) dE/ds = -C C'. The N -> infinity substep mean above is
+#     C s - (1/2) C C' s^2: the same second-order term. So the whole substep
+#     dependence of the straggled loss is the pre-existing left-endpoint
+#     quadrature error of the frozen energy model, and refining `max_dE_frac`
+#     removes it at first order in the step, exactly as it does deterministically.
+#     STRAGGLING INTRODUCES NO SUBSTEP DEPENDENCE OF ITS OWN.
+#
+# (iv) Bound, in the form a caller can check. Dividing (ii) by the unsplit
+#     moments and using DeltaE = C s for the flight's own mean loss,
+#
+#         |<sum X_m> - <X>| / <X>   <=  (1/2) |dlnC/dlnE| (DeltaE / E)
+#         |Var(sum X_m) - Var(X)| / Var(X) <= (1/2) |dlnV/dlnE| (DeltaE / E)
+#
+#     both with the (N-1)/N <= 1 factor dropped. For the spliced stopping power
+#     over 1--300 keV |dlnC/dlnE| is of order 1 (Joy--Luo is C ~ ln(...)/E,
+#     Berger--Seltzer likewise), so the substep-induced shift in the mean is
+#     bounded by about half the flight's fractional energy loss -- which under
+#     `max_dE_frac = f` is at most f/2 per substep. `max_dE_frac` therefore
+#     bounds the invariance violation directly, which is the property the doc
+#     re-derivation needs.
+#
+# The step-length control itself stays DETERMINISTIC under straggling:
+# `max_dE_frac * E_j / (-dEds)` uses the mean rate, not the sampled loss. That
+# is deliberate. A substep grid chosen from the realized loss would be a random
+# partition, the partition and the increments would be dependent, and (P2) --
+# which holds for any FIXED partition -- would no longer apply. `max_dE_frac` is
+# a numerical control parameter and stays one.
+#
+# Ordering consequence: with straggling on the row's length must be settled
+# before the loss can be sampled over it, so the `max_dE_frac` cap is applied
+# BEFORE the sample and the cutoff test after it, the reverse of the
+# deterministic order (which can afford to solve the cutoff first because the
+# loss is a known function of distance). A substep cap that binds short of the
+# crossing simply emits its row and lets the next substep cross, which is the
+# same semantics, at finer resolution.
+
+
 @njit(cache=True)
 def _transport_core_ungrooved(
     Ne,
@@ -1630,6 +1819,18 @@ def _transport_core_ungrooved(
     substep's own hazard, so refining the cap neither redraws the collision nor
     shifts its statistics; ``seg_flight``/``seg_substep`` carry the resulting
     ``(flight_id, substep_id)`` identity.
+
+    ``straggle_on`` replaces the deterministic per-row loss with a draw from the
+    Urban compound-Poisson sampler, keyed on this row's own
+    ``(electron, flight, substep)``. It also redefines the cutoff crossing --
+    exact indicator, fluid-interpolated location -- and reverses the order of the
+    cutoff test and the ``max_dE_frac`` cap, since the row's length must be
+    settled before its loss can be sampled. See the module block comment
+    "stochastic energy loss in transport (slice E)" immediately above this
+    function for the derivation, the alternatives rejected, and the substep
+    invariance that survives. With ``straggle_on`` false none of it is reachable
+    and the deterministic path is bit-for-bit what it was before straggling
+    existed.
     """
     EPS = 1e-6
     # ``tau_left`` is the current physical flight's unconsumed optical depth;
@@ -1735,77 +1936,133 @@ def _transport_core_ungrooved(
             # 3. Close the flight's energy and clock, then record its row.
             dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
             cutoff_j = False
-            if energy_model_code == 1:
-                # The midpoint rule makes E_end = E_cut at the cutoff by
-                # definition, so E_mid there is (E_start + E_cut)/2 exactly and
-                # the truncation distance solves the scheme rather than its
-                # left-endpoint linearization.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_compound_scalar(
-                    J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
-                )
-            else:
-                cutoff_distance = (E_cut_e - E_j) / dEds
-            geometry_event = cross_up_j or cross_dn_j or exit_side_j
-            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-                step_j = cutoff_distance
-                cutoff_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-
             # The numerical energy-loss cap is the only step limit that does not
             # close a physical flight: it emits a row and resumes with the same
             # optical-depth budget, direction, and ``flight_id``.
             limited_j = False
-            if energy_controlled and not cutoff_j:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
+
+            if straggle_on:
+                # Slice E. The loss over this row is a draw from the Urban
+                # compound-Poisson subordinator (slice C) rather than a known
+                # function of distance, so the row's length has to be settled
+                # first and the cutoff decided afterwards from the realized
+                # loss. See the "stochastic energy loss in transport (slice E)"
+                # block above this function for the derivation of both the
+                # crossing rule and the substep invariance; every branch here is
+                # unreachable with ``straggle_on`` false.
+                if energy_controlled:
+                    # Deterministic step control on purpose: a substep grid
+                    # chosen from the sampled loss would be a random partition
+                    # and would forfeit the infinite-divisibility invariance.
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+                        geometry_event = False
+
+                urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
+                flight_key = _urban_flight_key_scalar(urban_key, flight_of[e], substep_of[e])
+                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
+                    Z_arr,
+                    J_arr,
+                    k_arr,
+                    coeff_arr,
+                    E_cross_arr,
+                    0.0,
+                    E_j,
+                    step_j,
+                    flight_key,
+                    _SM64_ZERO,
+                )
+                # Diagnostic, unchanged from slice D: the SAMPLED loss, which on
+                # a cutoff row exceeds the applied loss by exactly the overshoot
+                # the truncation discards.
+                stragg_dE[e] += stragg_loss
+
+                # The loss process is non-decreasing, so "crosses E_cut somewhere
+                # inside this row" is equivalent to "total loss over the row
+                # reaches E_j - E_cut" -- an exact test, hence an exact
+                # ``n_cutoff_stopped``. The tie-break matches the deterministic
+                # branch below: a crossing exactly at the row's end yields to a
+                # geometry event.
+                delta_cut = E_j - E_cut_e
+                if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                    # Fluid interpolation at the row's own realized rate. Reduces
+                    # to `cutoff_distance = (E_cut - E_j)/dEds` term by term when
+                    # the loss is deterministic, and sends an overshooting draw
+                    # to a vanishing step rather than a negative energy.
+                    step_j = step_j * (delta_cut / stragg_loss) if stragg_loss > 0.0 else 0.0
+                    cutoff_j = True
+                    limited_j = False
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j - stragg_loss
+                if energy_model_code == 1:
+                    beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+                else:
+                    beta_j = beta_from_keV_scalar(E_j)
+            else:
+                if energy_model_code == 1:
+                    # The midpoint rule makes E_end = E_cut at the cutoff by
+                    # definition, so E_mid there is (E_start + E_cut)/2 exactly
+                    # and the truncation distance solves the scheme rather than
+                    # its left-endpoint linearization.
+                    cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_compound_scalar(
+                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
+                    )
+                else:
+                    cutoff_distance = (E_cut_e - E_j) / dEds
+                if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                    step_j = cutoff_distance
+                    cutoff_j = True
                     cross_up_j = False
                     cross_dn_j = False
                     exit_top_j = False
                     exit_bot_j = False
                     exit_side_j = False
 
-            if energy_model_code == 1:
-                if cutoff_j:
-                    E_end_j = E_cut_e
-                else:
-                    # Predictor-corrector for the implicit midpoint rule
-                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
-                    # step_j <= cutoff_distance and |dE/ds| grows as E falls, so
-                    # the predictor never undershoots E_cut and the Joy-Luo log
-                    # argument stays in range.
-                    E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
-                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
-                    )
-                # One representative energy per flight also drives the clock:
-                # s / beta(E_mid) is the midpoint rule for int ds / beta(E(s)).
-                beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
-            else:
-                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
-                beta_j = beta_from_keV_scalar(E_j)
-            t_end_j = clock[e] + step_j / beta_j
+                if energy_controlled and not cutoff_j:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
 
-            # Straggling (slice D): sample the Urban compound loss for this
-            # row's own (electron, flight, substep) key, for test purposes
-            # only -- NOT applied to E_end_j/E_keV. That integration, the
-            # redefined cutoff crossing, and the max_dE_frac interaction are
-            # slice E's job. The key domain is disjoint from every draw above
-            # (own salted rehash of the electron's stream key, own counter
-            # starting at 0), so this can never perturb the free-path /
-            # scattering-angle draws, on or off.
-            if straggle_on:
-                urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
-                flight_key = _urban_flight_key_scalar(urban_key, flight_of[e], substep_of[e])
-                stragg_loss, _stragg_counter = _urban_sample_compound_keV(
-                    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j, step_j, flight_key, _SM64_ZERO
-                )
-                stragg_dE[e] += stragg_loss
+                if energy_model_code == 1:
+                    if cutoff_j:
+                        E_end_j = E_cut_e
+                    else:
+                        # Predictor-corrector for the implicit midpoint rule
+                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        # step_j <= cutoff_distance and |dE/ds| grows as E falls,
+                        # so the predictor never undershoots E_cut and the
+                        # Joy-Luo log argument stays in range.
+                        E_pred = E_j + dEds * step_j
+                        E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
+                            J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
+                        )
+                    # One representative energy per flight also drives the clock:
+                    # s / beta(E_mid) is the midpoint rule for int ds / beta(E(s)).
+                    beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+                else:
+                    E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                    beta_j = beta_from_keV_scalar(E_j)
+            t_end_j = clock[e] + step_j / beta_j
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -2122,8 +2379,16 @@ def _transport_core_ungrooved_lut(
                 urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
                 flight_key = _urban_flight_key_scalar(urban_key, flight_of[e], substep_of[e])
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
-                    L_Zs[L], L_Js[L], L_ks[L], L_coeffs[L], L_E_cross[L], 0.0, E_j, step_j,
-                    flight_key, _SM64_ZERO,
+                    L_Zs[L],
+                    L_Js[L],
+                    L_ks[L],
+                    L_coeffs[L],
+                    L_E_cross[L],
+                    0.0,
+                    E_j,
+                    step_j,
+                    flight_key,
+                    _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
 
@@ -2493,7 +2758,16 @@ def _transport_core_grooved(
                 urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
                 flight_key = _urban_flight_key_scalar(urban_key, flight_id[e], substep_id[e])
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
-                    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j, step_j, flight_key, _SM64_ZERO
+                    Z_arr,
+                    J_arr,
+                    k_arr,
+                    coeff_arr,
+                    E_cross_arr,
+                    0.0,
+                    E_j,
+                    step_j,
+                    flight_key,
+                    _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
 
@@ -2959,8 +3233,16 @@ def _transport_core_ungrooved_perelectron(
                 urban_key = _urban_stream_key_scalar(key)
                 flight_key = _urban_flight_key_scalar(urban_key, flight_id, substep_id)
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
-                    L_Zs[L, :n_el], L_Js[L, :n_el], L_ks[L, :n_el], L_coeffs[L, :n_el],
-                    L_E_cross[L, :n_el], 0.0, E_j, step_j, flight_key, _SM64_ZERO,
+                    L_Zs[L, :n_el],
+                    L_Js[L, :n_el],
+                    L_ks[L, :n_el],
+                    L_coeffs[L, :n_el],
+                    L_E_cross[L, :n_el],
+                    0.0,
+                    E_j,
+                    step_j,
+                    flight_key,
+                    _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
 
@@ -3275,8 +3557,16 @@ def _transport_core_ungrooved_perelectron_lut(
                 urban_key = _urban_stream_key_scalar(key)
                 flight_key = _urban_flight_key_scalar(urban_key, flight_id, substep_id)
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
-                    L_Zs[L, :n_el], L_Js[L, :n_el], L_ks[L, :n_el], L_coeffs[L, :n_el],
-                    L_E_cross[L, :n_el], 0.0, E_j, step_j, flight_key, _SM64_ZERO,
+                    L_Zs[L, :n_el],
+                    L_Js[L, :n_el],
+                    L_ks[L, :n_el],
+                    L_coeffs[L, :n_el],
+                    L_E_cross[L, :n_el],
+                    0.0,
+                    E_j,
+                    step_j,
+                    flight_key,
+                    _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
 
@@ -4404,21 +4694,35 @@ def simulate_trajectories(
 
     Validation: transport-midpoint-stopping, energy-controlled-propagation
 
-    straggling: slice D plumbing only -- False (default, BIT-FOR-BIT with every
-      run before this parameter existed) skips the Urban sampler entirely on
-      every core, touching neither its RNG stream nor any output array. True
-      samples the per-flight/-substep Urban compound loss (slice C) on a
-      counter-addressed stream disjoint from the free-path/scattering-angle
-      draws -- keyed on this electron's own stream key via a salted rehash, so
-      turning it on can never perturb those draws -- and returns the summed
-      per-electron sampled loss as ``result["straggle_dE_keV"]``. The sampled
-      loss is diagnostic only: it is NOT subtracted from any electron's energy,
-      so ``E_keV``/``E_end_keV`` and every downstream quantity are unaffected
-      whether this is on or off. Applying it to transport (the cutoff-crossing
-      redefinition and the ``max_dE_frac`` substep interaction) is slice E.
-      Raises if requested on a core slice D has not wired it into -- there is
-      none such today; all five cores (ungrooved/grooved lockstep, both LUT
-      variants, per-electron) implement the sampling call.
+    straggling: sample the per-flight Urban energy-loss fluctuation (slice C).
+      False (default) is BIT-FOR-BIT with every run before this parameter
+      existed: the sampler is skipped entirely on every core, touching neither
+      its RNG stream nor any output array. True samples the per-flight/-substep
+      Urban compound loss on a counter-addressed stream disjoint from the
+      free-path/scattering-angle draws -- keyed on this electron's own stream
+      key via a salted rehash, so turning it on can never perturb *those* draws
+      -- and returns the summed per-electron SAMPLED loss as
+      ``result["straggle_dE_keV"]``.
+
+      Whether that loss is applied to the electron depends on the core, and is
+      being staged deliberately:
+
+      - Ungrooved lockstep core, exact stopping (``transport_core="lockstep"``
+        with ``transport_lut_config=TransportLUTConfig(enabled=False)``):
+        APPLIED. ``E_keV``/``E_end_keV``, the cutoff crossing and
+        ``n_cutoff_stopped`` all reflect the sampled loss, so results differ
+        from a ``straggling=False`` run. See the module block comment
+        "stochastic energy loss in transport (slice E)" above
+        ``_transport_core_ungrooved`` for the crossing redefinition and the
+        substep-invariance derivation. On a cutoff row the applied loss is
+        ``E_start - E_cut``, i.e. less than the sampled loss recorded in the
+        diagnostic by the overshoot the truncation discards.
+      - Every other core (both LUT variants, grooved, per-electron, CUDA):
+        DIAGNOSTIC ONLY, exactly as slice D left it. The sampler is addressed
+        and its result returned, but no energy is subtracted, so ``E_keV`` and
+        every downstream quantity are unaffected whether this is on or off.
+        Applying it there is slice F, which will also decide which cores raise
+        instead.
 
     collect_diagnostics: opt in to fixed-size percentile summaries of the
     per-flight fractional energy loss, relative elastic-hazard change,
@@ -5300,9 +5604,10 @@ def simulate_trajectories(
         "n_layers": n_layers,
     }
     if straggle_on:
-        # Diagnostic only (slice D): the summed per-electron Urban-sampled
-        # loss, NOT subtracted from E_keV/E_end_keV anywhere above. Applying
-        # it to transport is slice E.
+        # The summed per-electron Urban-SAMPLED loss. Applied to the electron's
+        # energy only on the ungrooved lockstep exact core (slice E); diagnostic
+        # only on every other core until slice F. See the ``straggling``
+        # paragraph in this function's docstring.
         result["straggle_dE_keV"] = stragg_dE
     if energy_model == "midpoint":
         result["E_end_keV"] = seg_E_end[:nseg]

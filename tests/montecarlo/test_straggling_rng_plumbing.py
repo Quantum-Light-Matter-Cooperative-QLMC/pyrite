@@ -35,7 +35,12 @@ by ``simulate_trajectories``'s ``straggling`` docstring paragraph:
    never passes the keyword at all, on every host core.
 2. ``straggling=True`` never perturbs the free-path / scattering-angle draws:
    every returned array except the new ``straggle_dE_keV`` diagnostic is
-   identical whether the flag is on or off.
+   identical whether the flag is on or off. **Slice E narrowed this**: the
+   ungrooved lockstep *exact* core now applies the sampled loss, so its
+   downstream arrays legitimately differ and the property is restated there
+   as "every electron's first row is bit-for-bit identical" -- see
+   ``test_lockstep_exact_first_row_is_unperturbed_by_straggling``. The other
+   cores are diagnostic-only until slice F and keep the whole-array form.
 3. ``straggle_dE_keV`` is exactly reproducible offline from a run's own
    recorded per-segment ``(E_start, L_ang)`` and the *position* of each
    segment within its electron's own segment list (the physical-flight index,
@@ -168,7 +173,18 @@ def test_grooved_straggling_off_matches_the_unset_default():
     assert "straggle_dE_keV" not in default
 
 
-@pytest.mark.parametrize("name", sorted(CORE_CONFIGS))
+# Slice E applies the sampled loss on the ungrooved lockstep *exact* core, so
+# `straggling=True` legitimately changes that core's results and property 2 can
+# no longer be stated there as whole-array equality. It is restated for that
+# core in `test_lockstep_exact_first_row_is_unperturbed_by_straggling` below,
+# which pins the part of the run that is still provably untouched. Every other
+# core is diagnostic-only until slice F and keeps the original property.
+DIAGNOSTIC_ONLY_CONFIGS = {
+    name: cfg for name, cfg in CORE_CONFIGS.items() if name != "lockstep-exact"
+}
+
+
+@pytest.mark.parametrize("name", sorted(DIAGNOSTIC_ONLY_CONFIGS))
 def test_straggling_on_never_perturbs_existing_draws(name):
     """Property 2. Every pre-existing returned array is identical whether
     straggling is sampled or not; only the new ``straggle_dE_keV`` diagnostic
@@ -176,8 +192,11 @@ def test_straggling_on_never_perturbs_existing_draws(name):
     stream key, own counter starting at 0) never shares state with the
     free-path / scattering-angle draws, so this cannot be an accident of a
     particular seed -- but it is still asserted per seed rather than trusted
-    from inspection."""
-    core_kwargs = CORE_CONFIGS[name]
+    from inspection.
+
+    Restricted to the cores on which the sampled loss is still diagnostic
+    only; the ungrooved lockstep exact core applies it as of slice E."""
+    core_kwargs = DIAGNOSTIC_ONLY_CONFIGS[name]
     off = _run(core_kwargs, straggling=False)
     on = _run(core_kwargs, straggling=True)
     _assert_non_straggle_fields_equal(off, on)
@@ -189,6 +208,39 @@ def test_straggling_on_never_perturbs_existing_draws(name):
     # conditions (25 keV graphite, order-one inelastic events per flight per
     # slice A) or this test would pass vacuously.
     assert np.any(on["straggle_dE_keV"] > 0.0)
+
+
+def test_lockstep_exact_first_row_is_unperturbed_by_straggling():
+    """Property 2, restated for the one core that applies the loss (slice E).
+
+    Once the sampled loss changes the electron's energy the whole downstream
+    trajectory changes with it, so whole-array equality cannot express stream
+    disjointness there any more. What still can: the lockstep core walks
+    electrons in a fixed order and draws every electron's *first* free path
+    before any electron takes a second one, and the first row of every
+    electron is taken at the unperturbed start energy. So if the straggling
+    draw touched the shared ``Generator`` at all -- if it consumed from it, or
+    shifted its position -- the first row of some electron would move. Pinning
+    every electron's first row bit-for-bit is therefore a direct test of the
+    disjoint key domain, not a weakened version of property 2."""
+    off = _run(CORE_CONFIGS["lockstep-exact"], straggling=False)
+    on = _run(CORE_CONFIGS["lockstep-exact"], straggling=True)
+    for out in (off, on):
+        # One row per flight at max_dE_frac=0, so the first row of each
+        # electron's segment list is its first flight.
+        assert np.array_equal(np.unique(out["electron_id"]), np.arange(BASE_KWARGS["Ne"]))
+    first_off = np.array(
+        [np.flatnonzero(off["electron_id"] == e)[0] for e in range(BASE_KWARGS["Ne"])]
+    )
+    first_on = np.array(
+        [np.flatnonzero(on["electron_id"] == e)[0] for e in range(BASE_KWARGS["Ne"])]
+    )
+    for key in ("L_ang", "E_start_keV", "t0_ang"):
+        np.testing.assert_array_equal(off[key][first_off], on[key][first_on], err_msg=key)
+    np.testing.assert_array_equal(off["v_hat"][first_off], on["v_hat"][first_on])
+    np.testing.assert_array_equal(off["r_mid"][first_off], on["r_mid"][first_on])
+    # ... and the run really did diverge afterwards, or the above is vacuous.
+    assert not np.array_equal(off["L_ang"], on["L_ang"])
 
 
 def test_grooved_straggling_on_never_perturbs_existing_draws():
@@ -212,9 +264,7 @@ def _offline_straggle_dE_keV(out, seed, Ne, element, n_atoms_per_ang3):
     incidental one.
     """
     sk = stream_keys(seed, Ne)
-    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr = urban_element_table(
-        [(element, n_atoms_per_ang3)]
-    )
+    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr = urban_element_table([(element, n_atoms_per_ang3)])
     elec_id = out["electron_id"]
     E_start = out["E_start_keV"]
     L_ang = out["L_ang"]
@@ -254,6 +304,13 @@ def test_straggle_dE_keV_reproduces_from_seed_electron_flight(name):
     same CPU arithmetic the core did."""
     core_kwargs = CORE_CONFIGS[name]
     out = _run(core_kwargs, straggling=True)
+    # On the core that applies the loss (slice E), a cutoff row is truncated
+    # to the first-passage distance *after* the sampler has drawn over the
+    # untruncated length, so `L_ang` would no longer be the length sampled
+    # over. These operating conditions produce no cutoff at all (25 keV in
+    # 2000 Ang of graphite loses well under 1 keV against a 5 keV cutoff);
+    # assert that rather than rely on it silently.
+    assert out["n_cutoff_stopped"] == 0
     recomputed = _offline_straggle_dE_keV(
         out,
         BASE_KWARGS["seed"],
