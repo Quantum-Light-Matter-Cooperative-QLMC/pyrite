@@ -397,13 +397,76 @@ Evidence that it is neither this branch's fault nor a device artifact:
   6 significant figures. So it is a deterministic computed value, not
   precision loss and not a device bug.
 - The blown-up peak sits at ~4.94 keV, far from where healthy spectra peak
-  (~190-210 eV), which points at a resonant denominator rather than a
-  normalization slip. `spectrum/lines.py` warns
-  `invalid value encountered in divide` at the `A_PXR = chi / detuning` line in
-  the same runs -- the obvious suspect, not yet confirmed as the cause.
+  (~190-210 eV).
 
 Reproducer: graphite, `thickness_ang=1e6`, `E0=300 keV`, `tilt_deg=30`,
 `Ne=200`, `seed=59`, either `transport_core="cuda"` or `"per-electron"`.
+
+#### Root cause, traced
+
+The `A_PXR = chi / detuning` suspicion recorded above was **wrong**. On the
+worst sample `detuning = -6.23`, entirely ordinary, and `|A_PXR|^2 = 2.5e-9`
+against `|A_CBS|^2 = 81.5`. The blow-up is the CBS amplitude's
+`1/(gamma (v.g)^2)`, and what lets it fire is a non-convergent in-medium
+resonance solve. The chain, measured on seed 59 by wrapping
+`_line_amp_sq_core` and `_in_medium_kinematics`:
+
+1. A segment scatters nearly perpendicular to `g`: `v.g = 1.727e-3` against a
+   median `|v.g|` of 1.27. The vacuum-root estimate is then
+   `E_res = hbar c (v.g)/(1 - v.n) = 6.57 eV`.
+2. At 6.57 eV the carbon `Re n` tabulation reads **2.07** -- correct physics,
+   not a data bug. The table runs down to 1 eV, and `Re n > 1` over
+   6.24-285 eV, peaking at 4.766 at 6.40 eV. This is the optical/UV regime,
+   not the X-ray regime the solve was designed for.
+3. With `v.n = 0.4815`, `Re n (v.n) = 0.99931`, so
+   `denom = 1 - Re n (v.n) = 6.9e-4`: a spurious Cherenkov-like near-zero,
+   available whenever `Re n > 1/(v.n)`.
+4. `_in_medium_kinematics` iterates a hard-coded **three** passes. Here the map
+   is not a contraction but an expansive **2-cycle**, oscillating between
+   `E_res ~ 6.57 eV` (`Re n ~ 2.07`, `denom ~ 1e-3`) and a keV-scale root
+   (`Re n ~ 1`, `denom ~ 0.5186`). It never converges; the function returns
+   whichever half of the cycle pass 3 happens to land on. Here that is
+   `denom = 5.94e-4`, giving `E_res = hbar c (v.g)/denom = 4942.7 eV` -- the
+   observed 4942 eV peak bin, to the bin.
+5. 4942.7 eV clears the `E_res > 10 eV` keep window. That cut is exactly the one
+   `docs/validation/radiation-physics/cbs-amplitude.md` names **"load-bearing"**
+   for keeping `v.g` away from zero, and the argument does not hold: the cut
+   bounds `v.g = omega denom`, not `v.g`, so as `denom -> 0` it stops bounding
+   `v.g` at all.
+6. `A_CBS ~ 1/(gamma (v.g)^2)` then gives `f_cbs = -4.9e5` and `|A|^2 = 81.5`
+   against a median `1e-10` -- twelve orders, which is the ten orders seen in
+   the integrated total.
+
+Two ledgered claims are falsified by this:
+
+- `xray-in-medium-resonance` derives its contraction rate from
+  "off-edge, `Re n = 1 - delta` with `delta ~ 1e-5-1e-3`", giving `F' = O(delta)`
+  "whenever `|v.n| < 1` keeps the denominator bounded away from zero". Both
+  premises fail once the vacuum root lands in the 6-285 eV window: `Re n`
+  reaches 4.77, and the denominator is *not* bounded away from zero. The "three
+  passes taken, the third is margin" conclusion does not survive.
+- `cbs-amplitude`'s `v.g -> 0` row passes on the strength of the 10 eV cut
+  bounding `v.g`. It does not, per step 5.
+
+The perturbative expansion has genuinely failed on this sample, by that
+document's own stated validity condition
+`|U_g| g^2 / (gamma m c^2 (v.g)^2) << 1`: with `U_g/mc^2 = 1.842e-5`,
+`g^2 = 3.506 Ang^-2`, `gamma = 1.392`, `v.g = 1.727e-3`, the left side is
+**15.6**. So the right fix is to *reject* these samples, not to compute them
+more carefully.
+
+Why thick and high-energy: step 1 needs a segment nearly perpendicular to `g`,
+which multiple scattering supplies in proportion to path length, and step 3
+needs `v.n > 1/Re n`, which caps out at `beta > 0.21` for carbon's peak index
+but in practice needs the vacuum root to land in the narrow 6-285 eV window at
+the same time. Thick, fast, many segments.
+
+Fix directions, none applied here: detect non-convergence in
+`_in_medium_kinematics` (compare passes rather than trusting a fixed three) and
+drop the segment/`g` pair; or reject on `Re n (v.n) >= 1` directly, which is
+the condition that makes the root spurious; or gate on the CBS validity
+condition above. A raised `E_res` floor above 285 eV would also mask it, but
+that is a physics cut and would move every line spectrum.
 
 F's measurements drop such seeds by an explicit ">100x the median" rule and
 report the dropped count, rather than letting them contaminate a mean. **This
