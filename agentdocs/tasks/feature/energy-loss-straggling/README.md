@@ -690,10 +690,274 @@ Interactions that need explicit design rather than incremental patching:
       cutoff test must run against the material-side length only. Nothing here
       suggests a variant rule is needed; the geometry bookkeeping differs, the
       physics does not.
-- [ ] F — Remaining cores: grooved, per-electron, per-electron LUT, CUDA. Any
-      core not yet covered raises, matching the existing `energy_model`
-      fail-closed precedent, rather than silently returning unstraggled results.
-      Measure the per-step cost and device-register impact.
+- [x] F — Remaining cores: grooved, per-electron, per-electron LUT, CUDA.
+      **Done on all four host cores and the CUDA exact kernel; the CUDA LUT
+      kernel stays deliberately unwired behind a fail-closed raise, and the
+      CUDA leg as a whole is UNVERIFIED (still no cupy and no CUDA device).**
+      Owners: `montecarlo/transport.py` (`_transport_core_ungrooved_lut`,
+      `_transport_core_ungrooved_perelectron`,
+      `_transport_core_ungrooved_perelectron_lut`, `_transport_core_grooved`,
+      a ~90-line derivation block above the first of them, and
+      `simulate_trajectories`'s CUDA-LUT raise),
+      `montecarlo/transport_jit_kernel.py` (`_transport_kernel`,
+      `run_transport_kernel`'s docstring), and
+      `tests/montecarlo/test_straggling_remaining_cores.py` (29 cases),
+      `tests/montecarlo/test_straggling_cuda.py` (7 cases, 5 hardware-gated),
+      plus a narrowing of slice D's property-2 test to match slice E's.
+
+      **E's rule is ported, not revised.** The crossing indicator stays the
+      exact `dE >= E_start - E_cut` test, the location stays
+      `s_cut = s (E_start - E_cut) / dE` with `E_end = E_cut`, the
+      `max_dE_frac` cap stays deterministic and stays *before* the draw with
+      the cutoff test after it, and `energy_model` still selects only the
+      clock's representative energy. Not one line of E's derivation was
+      changed; F re-checked it against each core and found nothing that needs a
+      variant rule, exactly as E predicted. The three per-core questions and
+      their answers live in a block comment above
+      `_transport_core_ungrooved_lut` (for K to transcribe, per C's and E's
+      precedent; `docs/` untouched).
+
+      **(1) LUT cores — the crossing gets MORE accurate, and that is accepted.**
+      E flagged it: the deterministic LUT path solves its truncation distance
+      on the *interpolated* `dE/ds`, but the straggled crossing has no such
+      solve, and slice D already draws the loss from the *exact* per-element
+      stopping power (the LUT bakes one interpolated total per layer and
+      carries no per-element split). So the straggled LUT crossing does not
+      carry the LUT's interpolation error. **Decision: accept and document,
+      do not reintroduce the error.** Reintroducing it would mean degrading an
+      exact quantity to match an approximation that exists only for speed, and
+      there is no LUT-consistent loss to degrade it *to* — the loss is a draw,
+      not a function of an interpolated rate. E's alternative ("use the LUT rate
+      for the `max_dE_frac` cap only, for consistency") is **adopted in full**
+      and falls out naturally: under E's ordering the cap is a purely
+      deterministic step control evaluated before the draw, so it uses the LUT's
+      `dE/ds`, and the clock uses the LUT's `inv_beta` at whichever
+      representative energy `energy_model` selects. The LUT therefore still
+      governs the free-path rate, element selection, scattering angle, substep
+      grid and timing; only the energy loss and the crossing come from the exact
+      sampler — the same split slice D already shipped for the diagnostic.
+
+      **(2) Per-electron and CUDA cores — `exit_code` was a smaller problem
+      than it looked.** Those cores do carry an `exit_code` enum rather than
+      shared counters, but they still hold the same local
+      `cross_up_j`/`cross_dn_j`/`exit_top_j`/`exit_bot_j`/`exit_side_j`/
+      `cutoff_j` booleans through the row and only *derive* `exit_code[i]` from
+      them once at the end. E's flag clearing therefore transcribes literally,
+      and the derivation chain needs no change at all: clearing the geometry
+      booleans is precisely what makes the chain fall through to
+      `EXIT_CUTOFF_STOPPED`. `EXIT_STEP_LIMITED` is the loop's initial value,
+      overwritten only by a real exit, so a cutoff row that also cleared
+      `limited_j` still classifies correctly. Verified by test rather than by
+      inspection: the exit-channel sum is pinned to `Ne` on both cores.
+
+      **(3) Grooved — the facet-crossing interaction, designed and tested.**
+      The one genuinely new question. A grooved row can be cut short by a
+      groove facet crossing into vacuum, after which the electron travels a
+      vacuum leg to its re-entry point.
+      - *Which length the sampler sees.* The material-side one, and by
+        construction rather than by a new guard: step 2b truncates `step_j` to
+        `s_surface` **before** the energy close, so the length handed to
+        `_urban_sample_compound_keV` is already material-side. Sampling over the
+        untruncated collision distance would attribute vacuum path length to
+        material energy loss, which is simply wrong — vacuum has no stopping
+        power.
+      - *Precedence, and it is forced rather than chosen.* The loss is
+        non-decreasing along the material path (E's P1), so if the
+        material-side loss reaches `E_start - E_cut` the first passage lies
+        strictly inside the **material** part of the row, i.e. before the facet.
+        The electron therefore stops in material and never reaches the vacuum:
+        the crossing wins, `surface_first` is cleared alongside the other
+        geometry flags, and no vacuum segment is emitted. If it does not reach
+        it, the electron leaves through the facet at `E_start - dE` and the
+        vacuum leg proceeds losing nothing. Both branches are exactly what the
+        deterministic core already does with `cutoff_distance` compared against
+        the facet-truncated `step_j`, and `surface_first` joins
+        `geometry_event` for the tie-break for the same reason it already does
+        there. **Nothing in the sampler or the rule changes; only the flag list
+        grows by one.**
+      - *Recorded for H.* Because a facet crossing splits what would otherwise
+        be one flight into a shorter material row plus a vacuum leg, a grooved
+        geometry samples the straggling stream at a different
+        `(flight, substep)` cadence than a flat one. That is not a bias — the
+        per-row means still sum to `C` times the total material path, which is
+        what the closure test measures — but grooved and ungrooved runs at the
+        same seed address different straggling draws, exactly as they already
+        address different free-path draws.
+
+      **CUDA: exact kernel wired, LUT kernel deliberately not, both decisions
+      recorded.** `_transport_kernel` now applies the loss under E's rule
+      instead of only accumulating the diagnostic. Two mechanical changes were
+      needed beyond transcription: the per-element accumulation
+      (`stragg_dE[e] += dE_elem`) is folded into a thread-local row total
+      before a single global update — which the crossing rule needs and which
+      also matches the host's `_urban_sample_compound_keV`, so it is a parity
+      *improvement* — and the `stragg_loss > 0.0` division guard E flagged is
+      kept and commented as load-bearing, since `0/0` there is a silent NaN
+      into `pos` rather than a crash. **`_transport_lut_kernel` was NOT wired.**
+      It has no per-element split, no duplicated sampler, and
+      `run_transport_lut_kernel` does not even accept the straggling
+      parameters; adding a second ~150-line transcription of the sampler to a
+      kernel that cannot be compiled or executed on the machine writing it was
+      judged strictly worse than the existing fail-closed raise, whose message
+      is sharpened and is now **pinned by a device-free test** rather than only
+      documented. That test also pins that the guard does *not* fire with
+      straggling off.
+
+      **This machine still has no cupy and no CUDA device** —
+      `transport_jit_kernel` does not import, so nothing in it can be compiled
+      or run. **The CUDA straggling path is therefore transcribed-only and
+      UNVERIFIED, now including the applied loss and not merely the
+      diagnostic.** That is a real escalation of D's caveat: a transcription
+      error used to corrupt a diagnostic and now corrupts physics.
+      `tests/montecarlo/test_straggling_cuda.py` carries five
+      `@pytest.mark.hardware` tests written to close it the moment a GPU is
+      available (off-path bit-for-bit, determinism, energy conservation with an
+      explicit finite-`r_mid` check for the NaN guard, first-row host parity at
+      `rtol=1e-12`, and an ensemble closure at `rel=0.02`). **Whoever has
+      hardware should run them via `pyrite remote` before any GPU straggling
+      result is trusted.** Note also that the parity claim itself weakened by
+      construction, and the docstring now says so: slice C's few-ulp caveat
+      (`_urban_poisson_scalar` branches on a `log`/`exp` comparison, so a
+      last-bit difference can move `n` by one at a CDF boundary) used to
+      perturb only a diagnostic; with the loss applied it changes the energy and
+      the trajectory diverges from that row on, so only the **first row** of
+      each electron is host-comparable — the same scope
+      `test_cuda_first_step_agrees_with_the_cpu_reference` already uses for the
+      deterministic path.
+
+      **Per-step cost, measured.** 13th Gen Intel i7-13620H (16 threads),
+      Python 3.14.4, numba 0.66.0, numpy 2.4.6, single-threaded njit host
+      cores, warm (compile and cache primed by a discarded run), 5 repeats,
+      400 electrons, 25 keV graphite in a 6 um slab (60 keV / 200 um / blazed
+      groove for the grooved core), `seed` fixed per core, mean +- sd:
+
+      | core | rows | off [ms] | on [ms] | delta | per row [us] |
+      |---|---|---|---|---|---|
+      | lockstep exact | 1.12e5 | 27.3 +- 0.7 | 44.2 +- 0.7 | +62% | 0.15 |
+      | lockstep LUT | 1.12e5 | 9.2 +- 0.3 | 31.2 +- 0.6 | +238% | 0.20 |
+      | per-electron exact | 1.12e5 | 23.4 +- 0.6 | 45.2 +- 0.2 | +94% | 0.20 |
+      | per-electron LUT | 1.12e5 | 13.3 +- 0.3 | 34.0 +- 0.3 | +157% | 0.19 |
+      | grooved | 2.08e5 | 44.5 +- 0.4 | 75.3 +- 0.5 | +69% | 0.15 |
+
+      The added cost is **0.15--0.20 us per row and essentially
+      core-independent**, which is the right shape: it is the sampler's own
+      cost, and the sampler is the same function everywhere. The *relative*
+      figure is worst on the LUT cores precisely because the LUT made the
+      deterministic row cheap — straggling re-evaluates the exact per-element
+      stopping power that the LUT exists to avoid, so a LUT run pays the
+      absolute cost against a smaller base. **Consequence for G:** enabling
+      straggling roughly halves the LUT's speed advantage, so a production
+      toggle should not assume the LUT still buys what it buys today.
+
+      **Device-register impact, qualitative (no GPU to measure on).** Slice F
+      adds only two live values per thread over slice D's already-inlined
+      sampler: `stragg_loss` (one f64, live across the per-element loop) and
+      `delta_cut` (one f64, short-lived) — about four 32-bit registers, against
+      D's ~40-value inlined sampler body, most of which is short-lived inside
+      the element loop and coalescible. The one new branch is the crossing
+      test, whose bodies are register-light and which is taken at most once per
+      electron over a whole track, so its divergence contribution is
+      negligible. The real divergence source is D's variable-trip continuum
+      quanta loop, whose trip count slice B measured at `n_3` = 0.069--1.15 per
+      flight, i.e. `O(1)`. **All of this needs a real `nvcc`/`cuobjdump`
+      register count to confirm; flagged for the same `pyrite remote` follow-up
+      as the parity tests.**
+
+      **Tests, one per "Done when" property.**
+      1. *Off is inert.* `straggling=False` bit-for-bit against a call that
+         never mentions the keyword, on all four newly wired cores, across
+         frozen / midpoint / substepped (`max_dE_frac=0.02`), in a run with
+         >100 cutoff crossings and >2 rows per crossing — so both new orderings
+         would be taken if the gate leaked. Same for the grooved core in a run
+         carrying facet crossings as well as cutoffs.
+      2. *Energy conserved sensibly.* Per core: no row starts below `E_cut`,
+         all exit channels sum to `Ne`, and the summed sampled loss closes on
+         the transport's own mean stopping power to **1%** over ~1e5 rows.
+         Grooved closes against the **material** path length only, which is the
+         direct test that the vacuum leg was excluded.
+      3. *Cross-core parity.* Stated where it holds and no wider: the cores
+         realize different trajectories by construction, so whole-run equality
+         between them is meaningless, but the **sampled loss for a given
+         `(seed, electron, flight, substep, E_start, s)` and E's rule applied to
+         it** are the same function everywhere. Both are reconstructed offline
+         from each core's own recorded rows and demanded equal in **exact
+         float64** — including slice E's own core as the reference, so a future
+         change that moved the rule on one core but not another fails here. The
+         only tolerance is on the crossing row's loss recovered as a residual
+         of the accumulator (`rel=1e-9`, cancellation rounding), exactly as E's
+         own round trip does and for the same reason.
+      4. *Overshoot.* 6 keV against a 5 keV cutoff on every wired core: the
+         terminal row ends at `E_cut` exactly, the crossing loss reaches the
+         available energy on **every** track (the empirical form of the exact
+         indicator), and the median overshoot is >1.5x, so the rule is
+         genuinely exercised.
+      5. *Grooved-specific.* A 59 keV cutoff against a 60 keV beam in a blazed
+         groove, so cutoff crossings and facet crossings compete constantly:
+         every cutoff-terminated track ends at `E_cut` exactly and **no**
+         electron has a vacuum leg at or after its terminating row's clock —
+         the assertion that fails if `surface_first` is not cleared on a
+         crossing. Plus a direct check that every recorded `vacuum_E_keV`
+         equals some material row's `E_end_keV` exactly, i.e. vacuum legs lose
+         nothing.
+      6. *Fail-closed.* `straggling=True` + `transport_core="cuda"` + LUT
+         enabled raises `NotImplementedError` naming both escapes — asserted,
+         not merely documented — and the guard provably does not fire with
+         straggling off.
+      7. *Replay and batching.* Applying the loss changes how many segments an
+         electron needs and therefore which electrons overflow their slots, so
+         capacity replay (`seg_capacity` 4 / 37 / 4096) and batch size
+         (`scratch_budget_bytes` 2^18 / 2^27) are re-pinned on both
+         per-electron cores for trajectories *and* `straggle_dE_keV`. A stale
+         accumulator from a discarded attempt would double-count and is
+         invisible to the deterministic replay tests.
+
+      **Slice D's property-2 test was narrowed again, the same way E narrowed
+      it.** "Straggling on never changes any pre-existing array" is now false on
+      every core, so the whole-array form is gone and E's first-row form is
+      parametrized over all four ungrooved cores plus grooved. The argument
+      holds on each: every core takes an electron's first row at the
+      unperturbed start energy, the lockstep and grooved cores draw every
+      electron's first free path before any electron takes a second one, and
+      the per-electron cores have fully disjoint counter streams. Slice D's
+      property 1 (off is bit-for-bit) and property 3 (offline reproduction)
+      pass **unmodified** on every core, grooved included.
+
+      **Acceptance run:** `test-suite core` (1795 passed, 74 skipped — the
+      pre-existing 1770 plus this slice's 25 host-visible cases; the 5
+      hardware-gated CUDA cases account for the skip growth),
+      `test --numba`, `lint`, `typecheck` — all clean. No existing test was
+      weakened or deleted; `test_groove.py` needed no change this time.
+
+      **Checkpoints:** `5484cc49` (remaining host cores), `43fb19ab` (CUDA
+      exact kernel and fail-closed CUDA-LUT surface), and `3c5e2802` (capacity
+      replay and batching).
+
+      **Recommendation for G.** Three things F establishes that G inherits.
+      1. *The reachability question is now sharper, not softer.* Straggling is
+         live on every host core and on CUDA-exact, so `Numerics` is the only
+         thing standing between it and production. But it is **not** live on
+         CUDA-LUT, which is the *default* CUDA configuration — so a `Numerics`
+         toggle that reaches the runner would make a production GPU run raise
+         unless G also decides that question. **G must pick one of: wire
+         `_transport_lut_kernel` (needs a GPU to verify), have the runner fall
+         back to the exact CUDA kernel when straggling is on, or keep
+         straggling off the CUDA path entirely.** Recommend the fall-back: it
+         is the only one that needs no unverifiable new kernel code, and F's
+         cost measurement shows the LUT's advantage is roughly halved under
+         straggling anyway, so the fall-back costs less than it looks.
+      2. *Checkpoint identity must carry the flag, and cannot infer it.* The
+         off path is bit-for-bit identical to a pre-straggling run by
+         construction, which is exactly what makes a straggled and an
+         unstraggled record indistinguishable in the CAS unless `straggling` is
+         part of the case identity explicitly. It cannot be recovered from the
+         outputs.
+      3. *`energy_model` comes along whether G wants it or not.* Straggling
+         reads `energy_model` for the clock's representative energy and
+         `max_dE_frac` for the substep grid, and `max_dE_frac > 0` already
+         requires `energy_model="midpoint"`. So plumbing straggling through
+         `Numerics` plumbs both, which is the coupling the task doc's
+         "Implementation path" section flagged as a scope decision rather than
+         an oversight. G should state it as a decision, not discover it.
 - [ ] G — Surface decision and plumbing. Decide whether straggling reaches
       production runs; if yes, thread it (and, unavoidably, the `energy_model`
       selector it depends on) through `Numerics` → case → runner, and extend
@@ -885,37 +1149,24 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Recommendation: dispatch C now.** B named the distribution, so C's dependency
-is discharged. C's scope **changed** in both directions and its checklist entry
-above has been rewritten accordingly:
+**Next: decide G's production surface before implementation.** A--F are done.
+The unresolved choice is whether straggling remains a direct transport-API
+research capability or reaches production through `Numerics`. If it reaches
+production, G must also choose the CUDA-LUT behavior. Slice F recommends an
+automatic fallback to the exact CUDA kernel: it avoids shipping a second
+unverified sampler transcription, and the measured LUT speed advantage is
+already roughly halved when straggling is enabled.
 
-- *Narrower.* No Landau/Vavilov/Blunck--Leisegang special-function sampler.
-  Urban is Poisson counts plus an analytic inverse CDF, so the derivation is
-  elementary and the "derive the sampler from its source" work is mostly
-  transcription plus the moment pins.
-- *Wider.* Three PyRITE-specific pieces Geant4 does not carry: the `E_2`
-  admissibility re-solve (high `Z` at these energies puts an unphysical
-  K-shell level above `T_max`), per-element Bragg application to match the
-  spliced mean, and moment pins against `xi`/`xi T_max` because the model is
-  being run below its own stated shape-reliability floor.
+If production reachability is selected, G owns all three coupled identity and
+execution changes: add `straggling`, `energy_model`, and `max_dE_frac` to
+`Numerics` and the lowered case; include them in checkpoint/CAS identity; and
+make the runner's CUDA-LUT behavior explicit. Straggling stays default-off and
+the existing production path remains bit-for-bit unchanged.
 
-Two things C should carry forward that B established but does not own:
-
-1. **Cost for F is already bounded.** The measured expected number of discrete
-   events per flight is <= 2.5 and typically < 1 (`n_1` 0.015--1.80, `n_2` <=
-   0.070, `n_3` 0.069--1.15). The variable-length sampling loop therefore has an
-   `O(1)` trip count, so Urban is affordable inside the CUDA kernel; the device
-   cost is three Poisson generators, not a table.
-2. **E's substep invariance is stronger than the task doc assumed.** Urban's
-   loss is a compound Poisson sum, which is infinitely divisible, so
-   subdividing a flight at frozen energy is *exactly* distribution-preserving —
-   not merely "distributional at best". The only residual is the energy
-   dependence of `Sigma_i` across the substeps. E and K should re-derive
-   `substep-radiation-invariance` on that basis.
-
-Slices J and K remain late doc slices as scoped. Slice I now has four B0
-verdicts to execute (see "Decisions and open questions"), of which two are "no
-change" and two are restatements; it must not touch the "No delta rays" bullet.
+H remains blocked on G because the observable campaign needs a canonical way
+to request straggled runs. I, J, and K remain late documentation slices as
+scoped; I must preserve B0's two no-change verdicts and leave the "No delta
+rays" bullet untouched.
 
 ## Delegation slices and required skills
 
