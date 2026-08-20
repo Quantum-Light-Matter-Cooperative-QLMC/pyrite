@@ -402,6 +402,18 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Decisions and open questions
 
+- **Dependency noted 2026-08-20 (supervisor):** ELSEPA elastic-scattering data
+  is being set up under `feature/reference-elastic-scattering-data`. Flight
+  length is the elastic MFP, so every per-flight number slice A measured
+  (`kappa`, collision counts, `xi/I`) is conditioned on the current Browning
+  fit at `transport.py:255` and will shift when that cross section is replaced.
+  Re-run `slice_a_regime_audit.py` rather than re-deriving. B's model selection
+  is unaffected: readmitting Landau needs ~250x on tungsten's measured
+  `xi/I` = 0.004 and ~100x on carbon's 0.087, which an elastic refinement
+  cannot supply. Note also that ELSEPA redistribution is license-blocked per
+  that task's `ALTERNATIVE_SOURCE_REPORT.md`; generated tables must not be
+  committed without a written grant.
+
 - **Closed by A — sequencing. Gate outcome: PROCEED.** Measured, not asserted.
   The systematic stopping error *did* dominate (24.6 rad against 0.3--13.4 rad
   at 25 keV / 1 um / 1 keV photon), so the gate condition fired and this task
