@@ -86,6 +86,20 @@ F64_JL_PREFACTOR = np.float64(7.85e-4)
 F64_JL_166 = np.float64(1.166)
 F64_EIGHT = np.float64(8.0)
 
+# Urban energy-loss fluctuation sampler (slice C) / straggling stream (slice
+# D), duplicated from montecarlo.transport for the same reason
+# _splitmix64/_stream_uniform/_dEds_packed are: this file has no import of
+# that module, so host and device provably address the same arithmetic only
+# by transcription, not by sharing code. Mirrors
+# transport._URBAN_STREAM_SALT/_URBAN_E0_KEV/_URBAN_E2_KEV_PER_Z2/
+# _URBAN_RATE/_URBAN_POISSON_GAUSS_MIN exactly.
+URBAN_STREAM_SALT = np.uint64(0xD6E8FEB86659FD93)
+URBAN_E0_KEV = np.float64(1.0e-2)
+URBAN_E2_KEV_PER_Z2 = np.float64(1.0e-2)
+URBAN_RATE = np.float64(0.55)
+URBAN_POISSON_GAUSS_MIN = np.float64(100.0)
+I32_TEN_THOUSAND = np.int32(10000)
+
 
 @dataclass(frozen=True)
 class TransportKernelConfig:
@@ -187,6 +201,62 @@ def _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_i):
             )
         i_el += I32_ONE
     return -F64_JL_PREFACTOR / E_i * joy_luo_total - F64_BS_PREFACTOR / beta_sq * bs_total
+
+
+@jit.rawkernel(device=True)
+def _urban_stream_key(stream_key):
+    """Per-electron straggling key. Mirrors transport._urban_stream_key_scalar."""
+    return _splitmix64(stream_key ^ URBAN_STREAM_SALT)
+
+
+@jit.rawkernel(device=True)
+def _urban_flight_key(urban_key, flight, substep):
+    """Per-``(flight, substep)`` straggling key.
+
+    Mirrors transport._urban_flight_key_scalar: a 32/32 bit pack of
+    ``(flight, substep)`` re-hashed through the same SplitMix64 finalizer.
+    ``flight``/``substep`` arrive as ``uint64`` already (cast at the call
+    site from the kernel's ``int32`` counters), matching the host's
+    ``np.uint64(flight) << 32`` packing.
+    """
+    combined = (flight << np.uint64(32)) + substep
+    return _splitmix64(urban_key + SM64_GOLDEN * combined)
+
+
+@jit.rawkernel(device=True)
+def _urban_ionisation(u, T_up):
+    """Inverse CDF of the ``1/E^2`` continuum on ``[E_0, T_up]`` [keV].
+
+    Mirrors transport._urban_ionisation_keV.
+    """
+    return URBAN_E0_KEV / (F64_ONE - u * (T_up - URBAN_E0_KEV) / T_up)
+
+
+@jit.rawkernel(device=True)
+def _dEds_spliced_element(J, k, coeff, E_cross, E_i):
+    """One element's contribution to the spliced stopping power [keV/Ang].
+
+    Mirrors transport._dEds_spliced_element_scalar (one loop body of
+    ``_dEds_packed`` above, without the row accumulation): the Urban sampler
+    needs each element's own ``C_i = |dE/dx|_i``, not the layer total.
+    """
+    tau = E_i / F64_MC2_KEV
+    gamma = F64_ONE + tau
+    beta_sq = F64_ONE - F64_ONE / (gamma * gamma)
+    if E_i < E_cross:
+        return -F64_JL_PREFACTOR / E_i * coeff * xp.log(F64_JL_166 * (E_i + k * J) / J)
+    f_minus = (
+        F64_ONE
+        - beta_sq
+        + (tau * tau / F64_EIGHT - (F64_TWO * tau + F64_ONE) * F64_LN2) / (gamma * gamma)
+    )
+    I_rel = J / F64_MC2_KEV
+    return (
+        -F64_BS_PREFACTOR
+        / beta_sq
+        * coeff
+        * (xp.log(tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)) + f_minus)
+    )
 
 
 @jit.rawkernel(device=True)
@@ -310,6 +380,8 @@ def _transport_kernel(
     seg_substep,
     seg_count,
     exit_code,
+    straggle_on,
+    stragg_dE,
 ):
     """One electron per thread, run to completion.
 
@@ -330,6 +402,8 @@ def _transport_kernel(
     seg_count[i] = I32_ZERO
     exit_code[i] = I8_NOT_ENTERED
     e = e_start + i
+    if straggle_on == I32_ONE:
+        stragg_dE[e] = F64_ZERO
     if alive[e] == np.uint8(0):
         return
     exit_code[i] = I8_STEP_LIMITED
@@ -509,6 +583,175 @@ def _transport_kernel(
                 E_end_j = E_j + dEds * step_j
             beta_j = _beta_from_keV(E_j)
         t_end_j = clock[e] + step_j / beta_j
+
+        # Straggling (slice D). Own disjoint key domain -- a salted rehash of
+        # this thread's own `key`, then its own counter `stragg_counter`
+        # starting fresh at 0 for every flight -- so this draws no uniforms
+        # from `key`/`draw` above and cannot perturb the free-path /
+        # scattering-angle draws whether it runs or not. Not applied to
+        # E_end_j/E_keV; for test purposes only (integration is slice E/F).
+        # Mirrors transport._urban_sample_compound_keV /
+        # _urban_sample_element_keV / _urban_channels_scalar /
+        # _urban_poisson_scalar. Inlined rather than split into device
+        # functions: this needs several outputs per element plus a mutable
+        # draw counter, and device functions in this file return one value
+        # (see the prism-exit comment in the step-2 boundary block above).
+        if straggle_on == I32_ONE:
+            urban_key = _urban_stream_key(key)
+            flight_key = _urban_flight_key(
+                urban_key, np.uint64(flight_id), np.uint64(substep_id)
+            )
+            stragg_counter = U64_ZERO
+            i_el2 = I32_ZERO
+            while i_el2 < n_el:
+                Zc = L_Zs[row + i_el2]
+                Jc = L_Js[row + i_el2]
+                kc = L_ks[row + i_el2]
+                coeffc = L_coeffs[row + i_el2]
+                E_crossc = L_E_cross[row + i_el2]
+                Cc = -_dEds_spliced_element(Jc, kc, coeffc, E_crossc, E_j)
+
+                tau_u = E_j / F64_MC2_KEV
+                gamma_u = F64_ONE + tau_u
+                beta_sq_u = F64_ONE - F64_ONE / (gamma_u * gamma_u)
+                two_mc2_bg2_u = F64_TWO * F64_MC2_KEV * tau_u * (tau_u + F64_TWO)
+                T_up_u = F64_HALF * E_j
+
+                valid_u = T_up_u > URBAN_E0_KEV and Cc > F64_ZERO
+                L_I_u = F64_ZERO
+                if valid_u:
+                    L_I_u = xp.log(two_mc2_bg2_u / Jc) - beta_sq_u
+                    valid_u = L_I_u > F64_ZERO
+
+                dE_elem = F64_ZERO
+                if not valid_u:
+                    dE_elem = Cc * step_j
+                else:
+                    # Levels (transport._urban_levels_scalar): the K-shell
+                    # channel E_2 = 10 Z^2 eV re-solves to f_1=1, E_1=I
+                    # whenever it is inadmissible, which keeps <dE> = C s
+                    # exact rather than overshooting under a naive clamp.
+                    E_2_u = URBAN_E2_KEV_PER_Z2 * Zc * Zc
+                    f_2_u = F64_TWO / Zc if Zc > F64_TWO else F64_ONE
+                    f_1_u = F64_ONE
+                    E_1_u = Jc
+                    resolved_u = False
+                    if (
+                        Zc > F64_TWO
+                        and E_2_u < T_up_u
+                        and xp.log(two_mc2_bg2_u / E_2_u) - beta_sq_u > F64_ZERO
+                    ):
+                        f_1_cand = F64_ONE - f_2_u
+                        E_1_cand = xp.exp((xp.log(Jc) - f_2_u * xp.log(E_2_u)) / f_1_cand)
+                        if xp.log(two_mc2_bg2_u / E_1_cand) - beta_sq_u > F64_ZERO:
+                            f_1_u = f_1_cand
+                            E_1_u = E_1_cand
+                            resolved_u = True
+                    if not resolved_u:
+                        f_1_u = F64_ONE
+                        E_1_u = Jc
+                        f_2_u = F64_ZERO
+
+                    soft_u = Cc * (F64_ONE - URBAN_RATE) / L_I_u
+                    sigma_1_u = soft_u * (f_1_u / E_1_u) * (xp.log(two_mc2_bg2_u / E_1_u) - beta_sq_u)
+                    sigma_2_u = F64_ZERO
+                    if f_2_u > F64_ZERO:
+                        sigma_2_u = (
+                            soft_u * (f_2_u / E_2_u) * (xp.log(two_mc2_bg2_u / E_2_u) - beta_sq_u)
+                        )
+                    sigma_3_u = (
+                        Cc
+                        * URBAN_RATE
+                        * (T_up_u - URBAN_E0_KEV)
+                        / (URBAN_E0_KEV * T_up_u * xp.log(T_up_u / URBAN_E0_KEV))
+                    )
+
+                    # n_1: inverse-CDF Poisson below the Gaussian handoff,
+                    # exactly one uniform; Box-Muller above it, exactly two.
+                    # Mirrors transport._urban_poisson_scalar.
+                    lam1 = sigma_1_u * step_j
+                    n1 = I32_ZERO
+                    if lam1 > F64_ZERO:
+                        if lam1 < URBAN_POISSON_GAUSS_MIN:
+                            u1 = _stream_uniform(flight_key, stragg_counter)
+                            stragg_counter = stragg_counter + U64_ONE
+                            p1 = xp.exp(-lam1)
+                            cdf1 = p1
+                            while u1 >= cdf1 and n1 < I32_TEN_THOUSAND:
+                                n1 += I32_ONE
+                                p1 = p1 * lam1 / np.float64(n1)
+                                cdf1 += p1
+                        else:
+                            ua1 = _stream_uniform(flight_key, stragg_counter)
+                            ua2 = _stream_uniform(flight_key, stragg_counter + U64_ONE)
+                            stragg_counter = stragg_counter + U64_ONE + U64_ONE
+                            za = xp.sqrt(-F64_TWO * xp.log(F64_ONE - ua1)) * xp.cos(
+                                F64_TWO * F64_PI * ua2
+                            )
+                            n1 = np.int32(xp.floor(lam1 + xp.sqrt(lam1) * za + F64_HALF))
+                            if n1 < I32_ZERO:
+                                n1 = I32_ZERO
+                    dE_elem += np.float64(n1) * E_1_u
+
+                    # n_2, same recurrence.
+                    lam2 = sigma_2_u * step_j
+                    n2 = I32_ZERO
+                    if lam2 > F64_ZERO:
+                        if lam2 < URBAN_POISSON_GAUSS_MIN:
+                            u2 = _stream_uniform(flight_key, stragg_counter)
+                            stragg_counter = stragg_counter + U64_ONE
+                            p2 = xp.exp(-lam2)
+                            cdf2 = p2
+                            while u2 >= cdf2 and n2 < I32_TEN_THOUSAND:
+                                n2 += I32_ONE
+                                p2 = p2 * lam2 / np.float64(n2)
+                                cdf2 += p2
+                        else:
+                            ub1 = _stream_uniform(flight_key, stragg_counter)
+                            ub2 = _stream_uniform(flight_key, stragg_counter + U64_ONE)
+                            stragg_counter = stragg_counter + U64_ONE + U64_ONE
+                            zb = xp.sqrt(-F64_TWO * xp.log(F64_ONE - ub1)) * xp.cos(
+                                F64_TWO * F64_PI * ub2
+                            )
+                            n2 = np.int32(xp.floor(lam2 + xp.sqrt(lam2) * zb + F64_HALF))
+                            if n2 < I32_ZERO:
+                                n2 = I32_ZERO
+                    dE_elem += np.float64(n2) * E_2_u
+
+                    # n_3, then its continuum quanta: exact inverse CDF of the
+                    # 1/E^2 spectrum, one uniform each. Mirrors
+                    # transport._urban_sample_element_keV's tail loop.
+                    lam3 = sigma_3_u * step_j
+                    n3 = I32_ZERO
+                    if lam3 > F64_ZERO:
+                        if lam3 < URBAN_POISSON_GAUSS_MIN:
+                            u3 = _stream_uniform(flight_key, stragg_counter)
+                            stragg_counter = stragg_counter + U64_ONE
+                            p3 = xp.exp(-lam3)
+                            cdf3 = p3
+                            while u3 >= cdf3 and n3 < I32_TEN_THOUSAND:
+                                n3 += I32_ONE
+                                p3 = p3 * lam3 / np.float64(n3)
+                                cdf3 += p3
+                        else:
+                            uc1 = _stream_uniform(flight_key, stragg_counter)
+                            uc2 = _stream_uniform(flight_key, stragg_counter + U64_ONE)
+                            stragg_counter = stragg_counter + U64_ONE + U64_ONE
+                            zc = xp.sqrt(-F64_TWO * xp.log(F64_ONE - uc1)) * xp.cos(
+                                F64_TWO * F64_PI * uc2
+                            )
+                            n3 = np.int32(xp.floor(lam3 + xp.sqrt(lam3) * zc + F64_HALF))
+                            if n3 < I32_ZERO:
+                                n3 = I32_ZERO
+                    kq = I32_ZERO
+                    while kq < n3:
+                        uq = _stream_uniform(flight_key, stragg_counter)
+                        stragg_counter = stragg_counter + U64_ONE
+                        dE_elem += _urban_ionisation(uq, T_up_u)
+                        kq += I32_ONE
+
+                stragg_dE[e] += dE_elem
+                i_el2 += I32_ONE
 
         if local_nseg < cap:
             slot = i * cap + local_nseg
@@ -1208,6 +1451,8 @@ def run_transport_kernel(
     seg_substep,
     seg_count,
     exit_code,
+    straggle_on,
+    stragg_dE,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.
@@ -1215,6 +1460,13 @@ def run_transport_kernel(
     Signature matches :func:`_transport_core_ungrooved_perelectron` positionally
     so ``_run_per_electron_transport`` can drive either. Flattening, dtype
     narrowing, and scalar typing happen here rather than in the kernel.
+
+    ``straggle_on``/``stragg_dE`` are slice D's straggling gate and Ne-sized
+    per-electron accumulator (see the reference core's docstring). CUDA parity
+    is not bit-for-bit here: ``_urban_poisson_scalar``'s host counterpart
+    branches on a ``log``/``exp`` comparison that a last-bit libm difference
+    can move across a Poisson CDF boundary, so the claim is few-ulp per flight,
+    per slice C's own recommendation.
     """
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
@@ -1282,6 +1534,8 @@ def run_transport_kernel(
             seg_substep,
             seg_count,
             exit_code,
+            np.int32(1 if straggle_on else 0),
+            stragg_dE,
         ),
     )
 

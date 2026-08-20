@@ -4874,6 +4874,24 @@ def simulate_trajectories(
     _nsys_push("cxr.transport.core")
     if groove is None and transport_lut is not None and transport_core != "lockstep":
         if transport_core == "cuda":
+            if straggle_on:
+                # Slice D wired straggling into the CUDA per-electron *exact*
+                # kernel (_transport_kernel/run_transport_kernel) only. The
+                # LUT CUDA kernel (_transport_lut_kernel) has no per-element
+                # split to sample from (see
+                # _transport_core_ungrooved_perelectron_lut's docstring) and
+                # slice D did not duplicate the Urban sampler there -- raise
+                # rather than silently returning an unstraggled
+                # straggle_dE_keV. Use transport_lut_config=TransportLUTConfig
+                # (enabled=False) to reach the exact CUDA kernel instead, or
+                # transport_core="per-electron" off CUDA.
+                raise NotImplementedError(
+                    "straggling=True is not implemented on the CUDA LUT core "
+                    "(transport_core='cuda' with the LUT enabled); disable the "
+                    "LUT (transport_lut_config=TransportLUTConfig(enabled=False)) "
+                    "to reach the CUDA exact per-electron core, which slice D "
+                    "wired, or run off CUDA"
+                )
             from .transport_jit_kernel import make_cuda_transport_lut_core
 
             core, core_xp = make_cuda_transport_lut_core()
