@@ -86,8 +86,11 @@ def test_niobium_transport_parameters_and_fallback(monkeypatch):
         fallback_calls.append((Z, E_keV.copy(), R.copy()))
         return original_fallback(Z, E_keV, R)
 
-    monkeypatch.setattr(transport, "_mott_alpha_table", missing_mott_table)
-    monkeypatch.setattr(transport, "_sample_cos_theta_sr_numba", spy_fallback)
+    # Patched on the owning submodule, not the package re-export: `_sample_cos_theta`
+    # resolves `_mott_alpha_table`/`_sample_cos_theta_sr_numba` in its own module
+    # globals (transport.scattering), which a patch on the package object never touches.
+    monkeypatch.setattr(transport.scattering, "_mott_alpha_table", missing_mott_table)
+    monkeypatch.setattr(transport.scattering, "_sample_cos_theta_sr_numba", spy_fallback)
 
     previous_no_mott = set(transport._NO_MOTT)
     transport._NO_MOTT.discard("Nb")
@@ -135,8 +138,11 @@ def test_new_elements_use_analytic_fallback_without_mott_table(monkeypatch, elem
         fallback_calls.append((Z, E_keV.copy(), R.copy()))
         return original_fallback(Z, E_keV, R)
 
-    monkeypatch.setattr(transport, "_mott_alpha_table", missing_mott_table)
-    monkeypatch.setattr(transport, "_sample_cos_theta_sr_numba", spy_fallback)
+    # Patched on the owning submodule, not the package re-export: `_sample_cos_theta`
+    # resolves `_mott_alpha_table`/`_sample_cos_theta_sr_numba` in its own module
+    # globals (transport.scattering), which a patch on the package object never touches.
+    monkeypatch.setattr(transport.scattering, "_mott_alpha_table", missing_mott_table)
+    monkeypatch.setattr(transport.scattering, "_sample_cos_theta_sr_numba", spy_fallback)
 
     previous_no_mott = set(transport._NO_MOTT)
     transport._NO_MOTT.discard(element)

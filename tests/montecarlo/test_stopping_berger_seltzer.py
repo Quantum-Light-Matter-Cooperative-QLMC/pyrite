@@ -440,7 +440,10 @@ def _jit_kernel_source():
 
     from pyrite.montecarlo import transport
 
-    return Path(transport.__file__).with_name("transport_jit_kernel.py").read_text()
+    # transport.__file__ is the transport/ package's __init__.py; its parent is
+    # the transport/ package dir, and transport_jit_kernel.py is a sibling of
+    # that package (still directly under montecarlo/).
+    return Path(transport.__file__).parent.with_name("transport_jit_kernel.py").read_text()
 
 
 def test_cuda_stopping_constants_match_the_cpu_values():

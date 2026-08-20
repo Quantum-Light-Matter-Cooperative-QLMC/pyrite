@@ -185,7 +185,9 @@ def _core_calls(monkeypatch, **config_kwargs):
         seen.append((m, cap))
         return real(xp, m, cap, midpoint)
 
-    monkeypatch.setattr(tr, "_alloc_scratch", counting)
+    # The per-electron run loops resolve _alloc_scratch in their own module
+    # (transport.batching), not the package re-export.
+    monkeypatch.setattr(tr.batching, "_alloc_scratch", counting)
     try:
         out = _run(
             transport_core="per-electron",

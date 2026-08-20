@@ -44,8 +44,10 @@ def joy_luo_only(monkeypatch):
     Berger--Seltzer branch, so the spliced form degenerates to Joy--Luo
     bit-for-bit rather than approximately.
     """
-    monkeypatch.setattr(transport, "_element_crossover_keV", lambda *_: np.inf)
-    monkeypatch.setattr(transport, "_CROSSOVER_CACHE", {})
+    # Patched on transport.stopping (where spliced_stopping_keV_per_ang actually
+    # resolves these names), not the package re-export.
+    monkeypatch.setattr(transport.stopping, "_element_crossover_keV", lambda *_: np.inf)
+    monkeypatch.setattr(transport.stopping, "_CROSSOVER_CACHE", {})
     return None
 
 
