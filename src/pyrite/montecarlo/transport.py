@@ -2172,6 +2172,97 @@ def _transport_core_ungrooved(
     return nseg, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
 
 
+# ---- porting the slice-E crossing rule to the remaining cores (slice F) -------
+# Slice E applied the Urban loss and redefined the cutoff crossing inside
+# `_transport_core_ungrooved`. The rule itself is core-agnostic -- it needs only
+# `E_start`, `E_cut`, the row's material path length, the sampled loss, and the
+# geometry-event flag -- so this slice ports it verbatim to the remaining cores
+# and changes only the bookkeeping each core's own geometry and flag
+# representation forces. NO physics decision from E is revisited here; see the
+# "stochastic energy loss in transport (slice E)" block above
+# `_transport_core_ungrooved` for the derivation of both the crossing rule and
+# the substep invariance. Three per-core questions had to be answered.
+#
+# --- (1) LUT cores: the crossing no longer carries the LUT's own error --------
+#
+# The deterministic LUT cores solve the truncation distance on the INTERPOLATED
+# `dE/ds`, so their crossing point inherits the LUT's interpolation error. The
+# straggled crossing has no such solve: by (P1) the indicator is "does the row's
+# total sampled loss reach E_start - E_cut", and slice D already established
+# that the sampled loss on a LUT core is drawn from the EXACT per-element
+# stopping power (the LUT bakes one interpolated total per layer and carries no
+# per-element split, so `_urban_sample_compound_keV` is handed the exact tables
+# regardless of which core calls it). So under straggling the LUT core's
+# crossing is strictly MORE accurate than its own deterministic path.
+#
+# That is accepted, not reconciled. Reintroducing the LUT's interpolation error
+# into the crossing would mean deliberately degrading an exact quantity to match
+# an approximation whose only purpose is speed, and there is no LUT-consistent
+# loss to degrade it TO -- the loss is a draw, not a function of an interpolated
+# rate. What the LUT does keep is everything it exists to accelerate and
+# everything that is still deterministic:
+#   - the `max_dE_frac` step cap uses the LUT's `dE/ds` (E's ordering makes the
+#     cap a purely deterministic step control, evaluated before the draw), so
+#     the substep GRID a LUT run produces is the LUT's own, not the exact core's;
+#   - the clock uses the LUT's `inv_beta` at the representative energy the
+#     `energy_model` selects, exactly as the deterministic LUT path does;
+#   - the free-path rate, element selection and scattering angle are untouched.
+# The LUT therefore still governs step control, timing and geometry; only the
+# energy loss and the crossing come from the exact sampler, which is the same
+# split slice D already shipped for the diagnostic.
+#
+# --- (2) Per-electron and CUDA cores: `exit_code` instead of boolean flags ----
+#
+# Those cores return an `exit_code` enum per electron rather than accumulating
+# into shared counters. The re-expression is smaller than it looks: they still
+# carry the same local `cross_up_j`/`cross_dn_j`/`exit_top_j`/`exit_bot_j`/
+# `exit_side_j`/`cutoff_j` booleans through the row, and only DERIVE
+# `exit_code[i]` from them once at the end of the row. E's flag clearing on a
+# cutoff event therefore transcribes literally, and the derivation chain
+# (`EXIT_BACKSCATTERED` / `EXIT_TRANSMITTED` / `EXIT_SIDE` / `EXIT_CUTOFF_STOPPED`,
+# in that priority order) needs no change at all: clearing the geometry booleans
+# is exactly what makes the chain fall through to `EXIT_CUTOFF_STOPPED`.
+# `EXIT_STEP_LIMITED` is the loop's initial value, overwritten only by a real
+# exit, so a cutoff row that also cleared `limited_j` still classifies correctly.
+#
+# --- (3) Grooved core: the cutoff test runs on the MATERIAL-side length -------
+#
+# The grooved core is the one place a row can be cut short by leaving the
+# material entirely: a groove facet crossing into vacuum truncates the flight at
+# `s_surface` and the electron then travels a vacuum leg to its re-entry point.
+# Straggling must not see that vacuum leg, and it does not, because of where the
+# truncation already sits: `step_j` is truncated to `s_surface` in step 2b,
+# BEFORE the energy close, so the length handed to the sampler is the
+# material-side length by construction. Sampling over the untruncated collision
+# distance would attribute vacuum path length to material energy loss -- a
+# straightforward physics error, since vacuum has no stopping power -- and
+# sampling over the full material+vacuum path would do the same.
+#
+# The interaction with the crossing test is then a precedence question, and the
+# answer is forced by (P1) rather than chosen. The loss is non-decreasing along
+# the material path, so if the row's material-side loss reaches E_start - E_cut,
+# the first passage lies inside the MATERIAL part of the row, i.e. strictly
+# before the facet. The electron therefore stops in the material and never
+# reaches the vacuum: the crossing wins, `surface_first` is cleared alongside the
+# other geometry flags, and no vacuum segment is emitted. Conversely if the
+# material-side loss does not reach it, the electron leaves through the facet
+# with E_end = E_start - dE and the vacuum leg proceeds at that energy, losing
+# nothing. Both branches are exactly what the deterministic core does with
+# `cutoff_distance` compared against the already-facet-truncated `step_j`;
+# `surface_first` joins `geometry_event` for the tie-break for the same reason
+# it already does there, so a crossing landing exactly on the facet yields to
+# the facet. Nothing in the sampler or the crossing rule changes.
+#
+# One consequence worth recording for slice H: because the loss is sampled per
+# material row and a facet crossing splits what would otherwise be one flight
+# into a shorter material row plus a vacuum leg, a grooved geometry samples the
+# straggling stream at a different `(flight, substep)` cadence than a flat one.
+# That is not a bias -- the per-row means still sum to `C` times the total
+# material path -- but it does mean grooved and ungrooved runs at the same seed
+# address different straggling draws, exactly as they already address different
+# free-path draws.
+
+
 @njit(cache=True)
 def _transport_core_ungrooved_lut(
     Ne,
@@ -2237,6 +2328,14 @@ def _transport_core_ungrooved_lut(
     sampler needs one, so straggling re-derives its own per-element ``C_i``
     from these tables via :func:`_urban_sample_compound_keV` rather than the
     LUT's interpolated total. Unused when ``straggle_on`` is false.
+
+    ``straggle_on`` applies that sampled loss (slice F), using slice E's
+    crossing rule unchanged. The LUT keeps the ``max_dE_frac`` step cap and the
+    clock; the loss and the cutoff crossing come from the exact sampler, so the
+    straggled crossing does not carry the LUT's interpolation error. See part
+    (1) of the "porting the slice-E crossing rule" block above this function.
+    With ``straggle_on`` false the deterministic path is bit-for-bit what it
+    was before straggling existed.
     """
     EPS = 1e-6
     tau_left = np.full(Ne, -1.0)
@@ -2319,77 +2418,31 @@ def _transport_core_ungrooved_lut(
             dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
             inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
             cutoff_j = False
-            if energy_model_code == 1:
-                # The midpoint rule makes E_end = E_cut at the cutoff by
-                # definition, so the truncation distance solves the scheme at
-                # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
-                # linearization -- same construction as the exact core.
-                cut_i, cut_f = _lut_index_frac_scalar(
-                    0.5 * (E_j + E_cut_e),
-                    lut_E_min_keV,
-                    lut_inv_dE_keV,
-                    lut_n_energy,
-                )
-                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
-            else:
-                cutoff_distance = (E_cut_e - E_j) / dEds
-            geometry_event = cross_up_j or cross_dn_j or exit_side_j
-            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-                step_j = cutoff_distance
-                cutoff_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-
             # The numerical energy-loss cap is the only step limit that does not
             # close a physical flight: it emits a row and resumes with the same
             # optical-depth budget, direction, and ``flight_id``.
             limited_j = False
-            if energy_controlled and not cutoff_j:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
-            if energy_model_code == 1:
-                if cutoff_j:
-                    E_end_j = E_cut_e
-                else:
-                    # Predictor-corrector for the implicit midpoint rule
-                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
-                    E_pred = E_j + dEds * step_j
-                    mid_i, mid_f = _lut_index_frac_scalar(
-                        0.5 * (E_j + E_pred),
-                        lut_E_min_keV,
-                        lut_inv_dE_keV,
-                        lut_n_energy,
-                    )
-                    E_end_j = E_j + step_j * _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
-                # The clock uses the same representative energy: the midpoint
-                # rule for int ds / beta(E(s)) is s / beta(E_mid).
-                clk_i, clk_f = _lut_index_frac_scalar(
-                    0.5 * (E_j + E_end_j),
-                    lut_E_min_keV,
-                    lut_inv_dE_keV,
-                    lut_n_energy,
-                )
-                t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
-            else:
-                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
-                t_end_j = clock[e] + step_j * inv_beta_j
-
-            # Straggling (slice D): see the comment in _transport_core_ungrooved.
-            # Uses the exact per-element tables, not the LUT's interpolated
-            # total dE/ds -- see the docstring above. Not applied to
-            # E_end_j/E_keV; for test purposes only.
             if straggle_on:
+                # Slice F: slice E's crossing rule, ported unchanged. The cap
+                # runs before the draw and the cutoff test after it, and the cap
+                # uses the LUT's own interpolated rate while the loss and the
+                # crossing come from the exact per-element sampler -- see the
+                # "porting the slice-E crossing rule" block above this function,
+                # part (1). Unreachable with ``straggle_on`` false.
+                if energy_controlled:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+                        geometry_event = False
+
                 urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
                 flight_key = _urban_flight_key_scalar(urban_key, flight_of[e], substep_of[e])
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
@@ -2405,6 +2458,93 @@ def _transport_core_ungrooved_lut(
                     _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
+
+                delta_cut = E_j - E_cut_e
+                if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                    step_j = step_j * (delta_cut / stragg_loss) if stragg_loss > 0.0 else 0.0
+                    cutoff_j = True
+                    limited_j = False
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j - stragg_loss
+                # ``energy_model`` still selects the clock's representative
+                # energy, and the LUT still supplies the inverse speed.
+                if energy_model_code == 1:
+                    clk_i, clk_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_end_j),
+                        lut_E_min_keV,
+                        lut_inv_dE_keV,
+                        lut_n_energy,
+                    )
+                    t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+                else:
+                    t_end_j = clock[e] + step_j * inv_beta_j
+            else:
+                if energy_model_code == 1:
+                    # The midpoint rule makes E_end = E_cut at the cutoff by
+                    # definition, so the truncation distance solves the scheme at
+                    # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
+                    # linearization -- same construction as the exact core.
+                    cut_i, cut_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_cut_e),
+                        lut_E_min_keV,
+                        lut_inv_dE_keV,
+                        lut_n_energy,
+                    )
+                    cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
+                else:
+                    cutoff_distance = (E_cut_e - E_j) / dEds
+                if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                    step_j = cutoff_distance
+                    cutoff_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+                if energy_controlled and not cutoff_j:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+
+                if energy_model_code == 1:
+                    if cutoff_j:
+                        E_end_j = E_cut_e
+                    else:
+                        # Predictor-corrector for the implicit midpoint rule
+                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        E_pred = E_j + dEds * step_j
+                        mid_i, mid_f = _lut_index_frac_scalar(
+                            0.5 * (E_j + E_pred),
+                            lut_E_min_keV,
+                            lut_inv_dE_keV,
+                            lut_n_energy,
+                        )
+                        E_end_j = E_j + step_j * _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
+                    # The clock uses the same representative energy: the midpoint
+                    # rule for int ds / beta(E(s)) is s / beta(E_mid).
+                    clk_i, clk_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_end_j),
+                        lut_E_min_keV,
+                        lut_inv_dE_keV,
+                        lut_n_energy,
+                    )
+                    t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+                else:
+                    E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                    t_end_j = clock[e] + step_j * inv_beta_j
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -2562,6 +2702,15 @@ def _transport_core_grooved(
     Numba.  Material exit/re-entry pairs do not consume ``max_steps``; the same
     per-electron surface-event guard as the legacy implementation prevents
     pathological geometry from looping forever.
+
+    ``straggle_on`` applies the sampled Urban loss (slice F) using slice E's
+    crossing rule unchanged. The facet truncation in step 2b already reduces
+    ``step_j`` to the material-side length, so the sampler never sees the vacuum
+    leg, and a crossing beats a facet crossing because monotonicity puts the
+    first passage inside the material part of the row. See part (3) of the
+    "porting the slice-E crossing rule" block above
+    :func:`_transport_core_ungrooved_lut`. With ``straggle_on`` false the
+    deterministic path is bit-for-bit what it was before straggling existed.
     """
     EPS = 1e-6
     machine_eps = 2.220446049250313e-16
@@ -2713,62 +2862,37 @@ def _transport_core_grooved(
             # 3. Record the radiating material segment.
             dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
             cutoff_j = False
-            if energy_model_code == 1:
-                # The midpoint rule makes E_end = E_cut at the cutoff by
-                # definition, so the truncation distance solves the scheme at
-                # E_mid = (E_start + E_cut)/2, not its left-endpoint form.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_compound_scalar(
-                    J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
-                )
-            else:
-                cutoff_distance = (E_cut_e - E_j) / dEds
-            geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
-            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-                step_j = cutoff_distance
-                cutoff_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-                surface_first = False
-
             # The numerical energy-loss cap is the only step limit that does not
             # close a physical flight: it emits a row and resumes with the same
             # optical-depth budget, direction, and `flight_id`.
             limited_j = False
-            if energy_controlled and not cutoff_j:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
-                    surface_first = False
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
 
-            if energy_model_code == 1:
-                if cutoff_j:
-                    E_end_j = E_cut_e
-                else:
-                    # Predictor-corrector for the implicit midpoint rule
-                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
-                    E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
-                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
-                    )
-                beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
-            else:
-                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
-                beta_j = beta_from_keV_scalar(E_j)
-            t_end_j = clock[e] + step_j / beta_j
-
-            # Straggling (slice D): see the identical comment in
-            # _transport_core_ungrooved. Same disjoint key domain, same
-            # for-test-purposes-only scope; not applied to E_end_j/E_keV.
             if straggle_on:
+                # Slice F: slice E's crossing rule, ported unchanged. `step_j`
+                # has already been truncated at the groove facet in step 2b, so
+                # the length handed to the sampler is the MATERIAL-side length
+                # and the vacuum leg that may follow carries no loss. By the
+                # same monotonicity that makes the indicator exact, a crossing
+                # then lies strictly inside the material part of the row, so the
+                # electron stops in material and `surface_first` is cleared with
+                # the other geometry flags -- see part (3) of the "porting the
+                # slice-E crossing rule" block above
+                # `_transport_core_ungrooved_lut`. Unreachable with
+                # ``straggle_on`` false.
+                if energy_controlled:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+                        surface_first = False
+                        geometry_event = False
+
                 urban_key = _urban_stream_key_scalar(stream_keys_arr[e])
                 flight_key = _urban_flight_key_scalar(urban_key, flight_id[e], substep_id[e])
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
@@ -2784,6 +2908,72 @@ def _transport_core_grooved(
                     _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
+
+                delta_cut = E_j - E_cut_e
+                if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                    step_j = step_j * (delta_cut / stragg_loss) if stragg_loss > 0.0 else 0.0
+                    cutoff_j = True
+                    limited_j = False
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    surface_first = False
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j - stragg_loss
+                if energy_model_code == 1:
+                    beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+                else:
+                    beta_j = beta_from_keV_scalar(E_j)
+            else:
+                if energy_model_code == 1:
+                    # The midpoint rule makes E_end = E_cut at the cutoff by
+                    # definition, so the truncation distance solves the scheme at
+                    # E_mid = (E_start + E_cut)/2, not its left-endpoint form.
+                    cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_compound_scalar(
+                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
+                    )
+                else:
+                    cutoff_distance = (E_cut_e - E_j) / dEds
+                if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                    step_j = cutoff_distance
+                    cutoff_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    surface_first = False
+
+                if energy_controlled and not cutoff_j:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+                        surface_first = False
+
+                if energy_model_code == 1:
+                    if cutoff_j:
+                        E_end_j = E_cut_e
+                    else:
+                        # Predictor-corrector for the implicit midpoint rule
+                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        E_pred = E_j + dEds * step_j
+                        E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
+                            J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
+                        )
+                    beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+                else:
+                    E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                    beta_j = beta_from_keV_scalar(E_j)
+            t_end_j = clock[e] + step_j / beta_j
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -3084,6 +3274,13 @@ def _transport_core_ungrooved_perelectron(
     flight into numerical substeps that share one optical-depth budget. Both are
     per-thread scalars here rather than the lockstep core's per-electron arrays,
     which is what the CUDA port needs.
+
+    ``straggle_on`` applies the sampled Urban loss (slice F) using slice E's
+    crossing rule unchanged; ``exit_code`` is still derived from the same local
+    geometry booleans, so the rule transcribes literally (part (2) of the
+    "porting the slice-E crossing rule" block above
+    :func:`_transport_core_ungrooved_lut`). With ``straggle_on`` false the
+    deterministic path is bit-for-bit what it was before straggling existed.
     """
     EPS = 1e-6
 
@@ -3187,63 +3384,35 @@ def _transport_core_ungrooved_perelectron(
             #    needed for the replay.
             dEds = _dEds_spliced_packed_scalar(L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_j)
             cutoff_j = False
-            if energy_model_code == 1:
-                # The midpoint rule makes E_end = E_cut at the cutoff by
-                # definition, so the truncation distance solves the scheme at
-                # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
-                # linearization -- same construction as the lockstep core.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_packed_scalar(
-                    L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_cut_e)
-                )
-            else:
-                cutoff_distance = (E_cut_e - E_j) / dEds
-            geometry_event = cross_up_j or cross_dn_j or exit_side_j
-            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-                step_j = cutoff_distance
-                cutoff_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-
             # The numerical energy-loss cap is the only step limit that does not
             # close a physical flight: it emits a row and resumes with the same
             # optical-depth budget, direction, and ``flight_id``.
             limited_j = False
-            if energy_controlled and not cutoff_j:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
-            if energy_model_code == 1:
-                if cutoff_j:
-                    E_end_j = E_cut_e
-                else:
-                    # Predictor-corrector for the implicit midpoint rule
-                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
-                    E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_spliced_packed_scalar(
-                        L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_pred)
-                    )
-                beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
-            else:
-                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
-                beta_j = beta_from_keV_scalar(E_j)
-            t_end_j = clock[e] + step_j / beta_j
-
-            # Straggling (slice D): see the comment in _transport_core_ungrooved.
-            # Reuses this electron's own stream key `key` through the disjoint
-            # salted-rehash domain, so it draws no uniforms from `key`'s own
-            # counter `draw` and cannot perturb the free-path / scattering-angle
-            # draws above. Not applied to E_end_j/E_keV; for test purposes only.
             if straggle_on:
+                # Slice F: slice E's crossing rule, ported unchanged. This core
+                # derives ``exit_code[i]`` from the same local booleans the
+                # lockstep core uses, so E's flag clearing transcribes literally
+                # and the derivation chain below needs no change -- see part (2)
+                # of the "porting the slice-E crossing rule" block above
+                # `_transport_core_ungrooved_lut`. The straggling draw uses this
+                # electron's own stream key through the disjoint salted-rehash
+                # domain, so it draws no uniforms from `key`'s own counter
+                # `draw` and cannot perturb the free-path / scattering-angle
+                # draws above. Unreachable with ``straggle_on`` false.
+                if energy_controlled:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+                        geometry_event = False
+
                 urban_key = _urban_stream_key_scalar(key)
                 flight_key = _urban_flight_key_scalar(urban_key, flight_id, substep_id)
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
@@ -3259,6 +3428,70 @@ def _transport_core_ungrooved_perelectron(
                     _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
+
+                delta_cut = E_j - E_cut_e
+                if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                    step_j = step_j * (delta_cut / stragg_loss) if stragg_loss > 0.0 else 0.0
+                    cutoff_j = True
+                    limited_j = False
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j - stragg_loss
+                if energy_model_code == 1:
+                    beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+                else:
+                    beta_j = beta_from_keV_scalar(E_j)
+            else:
+                if energy_model_code == 1:
+                    # The midpoint rule makes E_end = E_cut at the cutoff by
+                    # definition, so the truncation distance solves the scheme at
+                    # E_mid = (E_start + E_cut)/2 rather than its left-endpoint
+                    # linearization -- same construction as the lockstep core.
+                    cutoff_distance = (E_cut_e - E_j) / _dEds_spliced_packed_scalar(
+                        L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_cut_e)
+                    )
+                else:
+                    cutoff_distance = (E_cut_e - E_j) / dEds
+                if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                    step_j = cutoff_distance
+                    cutoff_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+                if energy_controlled and not cutoff_j:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+
+                if energy_model_code == 1:
+                    if cutoff_j:
+                        E_end_j = E_cut_e
+                    else:
+                        # Predictor-corrector for the implicit midpoint rule
+                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        E_pred = E_j + dEds * step_j
+                        E_end_j = E_j + step_j * _dEds_spliced_packed_scalar(
+                            L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_pred)
+                        )
+                    beta_j = beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+                else:
+                    E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                    beta_j = beta_from_keV_scalar(E_j)
+            t_end_j = clock[e] + step_j / beta_j
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg
@@ -3434,6 +3667,13 @@ def _transport_core_ungrooved_perelectron_lut(
     only for straggling (slice D): the LUT carries no per-element split (see
     :func:`_transport_core_ungrooved_lut`). Unused when ``straggle_on`` is
     false.
+
+    ``straggle_on`` applies that sampled loss (slice F) using slice E's crossing
+    rule unchanged, combining both per-core adaptations: the LUT keeps the
+    ``max_dE_frac`` cap and the clock while the loss and the crossing come from
+    the exact sampler, and ``exit_code`` is still derived from the same local
+    geometry booleans. See parts (1) and (2) of the "porting the slice-E
+    crossing rule" block above :func:`_transport_core_ungrooved_lut`.
     """
     EPS = 1e-6
 
@@ -3515,59 +3755,31 @@ def _transport_core_ungrooved_perelectron_lut(
             dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
             inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
             cutoff_j = False
-            if energy_model_code == 1:
-                cut_i, cut_f = _lut_index_frac_scalar(
-                    0.5 * (E_j + E_cut_e), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
-                )
-                cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
-            else:
-                cutoff_distance = (E_cut_e - E_j) / dEds
-            geometry_event = cross_up_j or cross_dn_j or exit_side_j
-            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
-                step_j = cutoff_distance
-                cutoff_j = True
-                cross_up_j = False
-                cross_dn_j = False
-                exit_top_j = False
-                exit_bot_j = False
-                exit_side_j = False
-
             # The numerical energy-loss cap is the only step limit that does not
             # close a physical flight.
             limited_j = False
-            if energy_controlled and not cutoff_j:
-                step_energy = max_dE_frac * E_j / (-dEds)
-                if step_energy < step_j:
-                    step_j = step_energy
-                    limited_j = True
-                    cross_up_j = False
-                    cross_dn_j = False
-                    exit_top_j = False
-                    exit_bot_j = False
-                    exit_side_j = False
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
-            if energy_model_code == 1:
-                if cutoff_j:
-                    E_end_j = E_cut_e
-                else:
-                    E_pred = E_j + dEds * step_j
-                    mid_i, mid_f = _lut_index_frac_scalar(
-                        0.5 * (E_j + E_pred), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
-                    )
-                    E_end_j = E_j + step_j * _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
-                clk_i, clk_f = _lut_index_frac_scalar(
-                    0.5 * (E_j + E_end_j), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
-                )
-                t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
-            else:
-                E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
-                t_end_j = clock[e] + step_j * inv_beta_j
-
-            # Straggling (slice D): see the comment in
-            # _transport_core_ungrooved_perelectron. Uses the exact per-element
-            # tables threaded in above, not the LUT's interpolated total dE/ds.
-            # Not applied to E_end_j/E_keV; for test purposes only.
             if straggle_on:
+                # Slice F: slice E's crossing rule, ported unchanged. Combines
+                # the two per-core adaptations -- the LUT keeps the step cap and
+                # the clock while the loss and the crossing come from the exact
+                # sampler (part 1), and ``exit_code`` is still derived from these
+                # same local booleans (part 2). See the "porting the slice-E
+                # crossing rule" block above `_transport_core_ungrooved_lut`.
+                # Unreachable with ``straggle_on`` false.
+                if energy_controlled:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+                        geometry_event = False
+
                 urban_key = _urban_stream_key_scalar(key)
                 flight_key = _urban_flight_key_scalar(urban_key, flight_id, substep_id)
                 stragg_loss, _stragg_counter = _urban_sample_compound_keV(
@@ -3583,6 +3795,71 @@ def _transport_core_ungrooved_perelectron_lut(
                     _SM64_ZERO,
                 )
                 stragg_dE[e] += stragg_loss
+
+                delta_cut = E_j - E_cut_e
+                if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                    step_j = step_j * (delta_cut / stragg_loss) if stragg_loss > 0.0 else 0.0
+                    cutoff_j = True
+                    limited_j = False
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j - stragg_loss
+                if energy_model_code == 1:
+                    clk_i, clk_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_end_j), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                    )
+                    t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+                else:
+                    t_end_j = clock[e] + step_j * inv_beta_j
+            else:
+                if energy_model_code == 1:
+                    cut_i, cut_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_cut_e), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                    )
+                    cutoff_distance = (E_cut_e - E_j) / _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
+                else:
+                    cutoff_distance = (E_cut_e - E_j) / dEds
+                if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                    step_j = cutoff_distance
+                    cutoff_j = True
+                    cross_up_j = False
+                    cross_dn_j = False
+                    exit_top_j = False
+                    exit_bot_j = False
+                    exit_side_j = False
+
+                if energy_controlled and not cutoff_j:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j = step_energy
+                        limited_j = True
+                        cross_up_j = False
+                        cross_dn_j = False
+                        exit_top_j = False
+                        exit_bot_j = False
+                        exit_side_j = False
+
+                if energy_model_code == 1:
+                    if cutoff_j:
+                        E_end_j = E_cut_e
+                    else:
+                        E_pred = E_j + dEds * step_j
+                        mid_i, mid_f = _lut_index_frac_scalar(
+                            0.5 * (E_j + E_pred), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                        )
+                        E_end_j = E_j + step_j * _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
+                    clk_i, clk_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_end_j), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                    )
+                    t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+                else:
+                    E_end_j = E_cut_e if cutoff_j else E_j + dEds * step_j
+                    t_end_j = clock[e] + step_j * inv_beta_j
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg

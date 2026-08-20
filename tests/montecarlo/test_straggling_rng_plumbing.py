@@ -35,12 +35,12 @@ by ``simulate_trajectories``'s ``straggling`` docstring paragraph:
    never passes the keyword at all, on every host core.
 2. ``straggling=True`` never perturbs the free-path / scattering-angle draws:
    every returned array except the new ``straggle_dE_keV`` diagnostic is
-   identical whether the flag is on or off. **Slice E narrowed this**: the
-   ungrooved lockstep *exact* core now applies the sampled loss, so its
-   downstream arrays legitimately differ and the property is restated there
-   as "every electron's first row is bit-for-bit identical" -- see
-   ``test_lockstep_exact_first_row_is_unperturbed_by_straggling``. The other
-   cores are diagnostic-only until slice F and keep the whole-array form.
+   identical whether the flag is on or off. **Slices E and F narrowed this**:
+   E made the ungrooved lockstep *exact* core apply the sampled loss and F did
+   the same for the remaining cores, so downstream arrays legitimately differ
+   and the property is restated as "every electron's first row is bit-for-bit
+   identical" -- see ``test_first_row_is_unperturbed_by_straggling``. The
+   whole-array form survives only where a core is still diagnostic-only.
 3. ``straggle_dE_keV`` is exactly reproducible offline from a run's own
    recorded per-segment ``(E_start, L_ang)`` and the *position* of each
    segment within its electron's own segment list (the physical-flight index,
@@ -173,33 +173,37 @@ def test_grooved_straggling_off_matches_the_unset_default():
     assert "straggle_dE_keV" not in default
 
 
-# Slice E applies the sampled loss on the ungrooved lockstep *exact* core, so
-# `straggling=True` legitimately changes that core's results and property 2 can
-# no longer be stated there as whole-array equality. It is restated for that
-# core in `test_lockstep_exact_first_row_is_unperturbed_by_straggling` below,
-# which pins the part of the run that is still provably untouched. Every other
-# core is diagnostic-only until slice F and keeps the original property.
-DIAGNOSTIC_ONLY_CONFIGS = {
-    name: cfg for name, cfg in CORE_CONFIGS.items() if name != "lockstep-exact"
-}
+# Slice E applied the sampled loss on the ungrooved lockstep *exact* core and
+# slice F applied it on the remaining four, so `straggling=True` now
+# legitimately changes every core's results and property 2 can no longer be
+# stated anywhere as whole-array equality. It is restated below as
+# `test_first_row_is_unperturbed_by_straggling`, which pins the part of a run
+# that is still provably untouched on every core. No core is diagnostic-only
+# any more; that fact is asserted rather than left implicit, so a future core
+# addition that forgets to apply the loss fails here.
 
 
-@pytest.mark.parametrize("name", sorted(DIAGNOSTIC_ONLY_CONFIGS))
-def test_straggling_on_never_perturbs_existing_draws(name):
-    """Property 2. Every pre-existing returned array is identical whether
-    straggling is sampled or not; only the new ``straggle_dE_keV`` diagnostic
-    differs. The straggling stream (own salted rehash of the electron's
-    stream key, own counter starting at 0) never shares state with the
-    free-path / scattering-angle draws, so this cannot be an accident of a
-    particular seed -- but it is still asserted per seed rather than trusted
-    from inspection.
+def _first_row_indices(out, Ne):
+    """Index of each electron's first recorded row, in electron order."""
+    # One row per flight at max_dE_frac=0, so the first row of each electron's
+    # segment list is its first flight.
+    assert np.array_equal(np.unique(out["electron_id"]), np.arange(Ne))
+    return np.array([np.flatnonzero(out["electron_id"] == e)[0] for e in range(Ne)])
 
-    Restricted to the cores on which the sampled loss is still diagnostic
-    only; the ungrooved lockstep exact core applies it as of slice E."""
-    core_kwargs = DIAGNOSTIC_ONLY_CONFIGS[name]
-    off = _run(core_kwargs, straggling=False)
-    on = _run(core_kwargs, straggling=True)
-    _assert_non_straggle_fields_equal(off, on)
+
+def _assert_first_row_unperturbed(off, on):
+    Ne = BASE_KWARGS["Ne"]
+    first_off = _first_row_indices(off, Ne)
+    first_on = _first_row_indices(on, Ne)
+    for key in ("L_ang", "E_start_keV", "t0_ang"):
+        np.testing.assert_array_equal(off[key][first_off], on[key][first_on], err_msg=key)
+    np.testing.assert_array_equal(off["v_hat"][first_off], on["v_hat"][first_on])
+    np.testing.assert_array_equal(off["r_mid"][first_off], on["r_mid"][first_on])
+    # ... and the run really did diverge afterwards, or the above is vacuous.
+    assert not np.array_equal(off["L_ang"], on["L_ang"])
+
+
+def _assert_diagnostic_is_sane(on):
     assert "straggle_dE_keV" in on
     assert on["straggle_dE_keV"].shape == (BASE_KWARGS["Ne"],)
     assert np.all(np.isfinite(on["straggle_dE_keV"]))
@@ -210,46 +214,39 @@ def test_straggling_on_never_perturbs_existing_draws(name):
     assert np.any(on["straggle_dE_keV"] > 0.0)
 
 
-def test_lockstep_exact_first_row_is_unperturbed_by_straggling():
-    """Property 2, restated for the one core that applies the loss (slice E).
+@pytest.mark.parametrize("name", sorted(CORE_CONFIGS))
+def test_first_row_is_unperturbed_by_straggling(name):
+    """Property 2, restated for cores that apply the loss (slices E and F).
 
     Once the sampled loss changes the electron's energy the whole downstream
     trajectory changes with it, so whole-array equality cannot express stream
-    disjointness there any more. What still can: the lockstep core walks
-    electrons in a fixed order and draws every electron's *first* free path
-    before any electron takes a second one, and the first row of every
-    electron is taken at the unperturbed start energy. So if the straggling
-    draw touched the shared ``Generator`` at all -- if it consumed from it, or
-    shifted its position -- the first row of some electron would move. Pinning
+    disjointness any more. What still can: every core takes each electron's
+    *first* row at the unperturbed start energy, and takes it before that
+    electron's energy has been touched. On the lockstep cores the shared
+    ``Generator`` additionally draws every electron's first free path before
+    any electron takes a second one, so if the straggling draw consumed from
+    that ``Generator`` or shifted its position, some electron's first row would
+    move; on the per-electron cores the same holds per counter stream. Pinning
     every electron's first row bit-for-bit is therefore a direct test of the
     disjoint key domain, not a weakened version of property 2."""
-    off = _run(CORE_CONFIGS["lockstep-exact"], straggling=False)
-    on = _run(CORE_CONFIGS["lockstep-exact"], straggling=True)
-    for out in (off, on):
-        # One row per flight at max_dE_frac=0, so the first row of each
-        # electron's segment list is its first flight.
-        assert np.array_equal(np.unique(out["electron_id"]), np.arange(BASE_KWARGS["Ne"]))
-    first_off = np.array(
-        [np.flatnonzero(off["electron_id"] == e)[0] for e in range(BASE_KWARGS["Ne"])]
-    )
-    first_on = np.array(
-        [np.flatnonzero(on["electron_id"] == e)[0] for e in range(BASE_KWARGS["Ne"])]
-    )
-    for key in ("L_ang", "E_start_keV", "t0_ang"):
-        np.testing.assert_array_equal(off[key][first_off], on[key][first_on], err_msg=key)
-    np.testing.assert_array_equal(off["v_hat"][first_off], on["v_hat"][first_on])
-    np.testing.assert_array_equal(off["r_mid"][first_off], on["r_mid"][first_on])
-    # ... and the run really did diverge afterwards, or the above is vacuous.
-    assert not np.array_equal(off["L_ang"], on["L_ang"])
+    core_kwargs = CORE_CONFIGS[name]
+    off = _run(core_kwargs, straggling=False)
+    on = _run(core_kwargs, straggling=True)
+    _assert_first_row_unperturbed(off, on)
+    _assert_diagnostic_is_sane(on)
 
 
-def test_grooved_straggling_on_never_perturbs_existing_draws():
+def test_grooved_first_row_is_unperturbed_by_straggling():
+    """Property 2 for the grooved core, in the first-row form (slice F).
+
+    The grooved core visits electrons round-robin, so like the ungrooved
+    lockstep cores it takes every electron's first material row before any
+    electron takes a second one, at the unperturbed start energy."""
     groove = GrooveSpec(spacing_ang=1.0e4, depth_ang=1.0e3, tilt_polar_rad=0.2)
     off = _run({}, groove=groove, straggling=False)
     on = _run({}, groove=groove, straggling=True)
-    _assert_non_straggle_fields_equal(off, on)
-    assert "straggle_dE_keV" in on
-    assert np.any(on["straggle_dE_keV"] > 0.0)
+    _assert_first_row_unperturbed(off, on)
+    _assert_diagnostic_is_sane(on)
 
 
 def _offline_straggle_dE_keV(out, seed, Ne, element, n_atoms_per_ang3):
