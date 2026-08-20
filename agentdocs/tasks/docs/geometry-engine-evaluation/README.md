@@ -80,7 +80,7 @@ Deliverables, in order:
    reaffirmation. Update `docs/adr/index.md` either way. If the verdict is
    "reaffirm", the ADR gains the concrete engine-by-engine evidence it currently
    lacks (it cites only the AdePT/VecGeom experience).
-3. `TODO.md` follow-ups on `main` for whatever the survey recommends —
+3. GitHub issue follow-ups on `main` for whatever the survey recommends —
    implementation tasks are **not** created by this task.
 
 No `src/` owner. Read-only touchpoints for evidence gathering: `montecarlo/
@@ -181,7 +181,7 @@ Every candidate scored against the same axes; the matrix goes in the write-up.
     the ADR index's append-only rule, and carry forward the parts that survive:
     the named seam, the flat-region-table requirement, and the bounded
     post-emission carve-out.
-11. Propose `TODO.md` follow-ups for `main`; do not create implementation tasks.
+11. Propose GitHub issue follow-ups for `main`; do not create implementation tasks.
 12. Run `uv run pyrite-dev docs`.
 
 ## Decisions
@@ -214,9 +214,9 @@ Resolved by user review, 2026-08-15:
 ### Driver geometries
 
 The survey scores candidates against these, in priority order, instead of
-against unbounded generality. Each is already in `TODO.md` or `docs/`:
+against unbounded generality. Each is already in GitHub Issues or `docs/`:
 
-1. **Bent crystals** — `TODO.md` P1 "Paused / on hold" item 2, sequenced after
+1. **Bent crystals** — GitHub issue #14 (P1 "Paused / on hold"), sequenced after
    channeling and relativistic electrons. This is the clearest future
    target-geometry driver in the backlog and the canonical stress test.
 2. **Finite/irregular target shapes** — targets that are not an axis-aligned

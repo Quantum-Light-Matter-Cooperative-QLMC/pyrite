@@ -13,7 +13,7 @@ surfaces.
 
 Promote durable outcomes to `README.md`, `docs/`, an ADR, source documentation,
 or tests.
-Retire landed task directories once `TODO.md` and durable docs are correct.
+Retire landed task directories once the GitHub issue and durable docs are correct.
 
 ## Branch task records
 
@@ -30,42 +30,39 @@ on a shared leaf.
 
 ## Invariant
 
-- `main:TODO.md` is the single source of truth: one summary per item plus a
-  branch/task pointer. Branch copies are disposable and need not match.
-- Branch detail never enters `TODO.md` or durable `docs/`.
-- Merge/rebase never prompts for TODO.md conflict resolution. The
-  `.gitattributes` `TODO.md merge=ours` driver resolves conflicting hunks to the
-  current branch (main's copy when a task branch merges in, or the rebase base).
-  The driver lives in local git config — run `uv run pyrite-dev bootstrap` once per
-  clone; without it, git falls back to a 3-way merge and conflicts return.
-- Always have `dispatch-task` drop a completed task's line on `main` when
-  retiring landed work — the authoritative writer. The driver keeps main's copy for any hunk
-  main also touched, and adjacent list lines merge into one hunk, so a
-  branch-side removal is only honoured when main never edited that region.
-  Don't rely on it; drop on `main`.
+- Open GitHub Issues are the single source of truth: one issue per item,
+  labelled `priority:*`/`status:*`/`area:*`, with a branch/task pointer in the
+  body where one exists. Branch `agentdocs/tasks/` copies are disposable and
+  need not match the issue verbatim.
+- Branch detail never enters an issue body or durable `docs/`.
+- Always have `dispatch-task` close a completed task's issue when retiring
+  landed work — the authoritative writer (`gh issue close`, with a comment
+  pointing at the landing commit/PR).
 
 ## Workflow
 
-1. Use `triage` on existing `>user<` prose or invoke `/triage <text>` directly:
-   read linked design, split independently ownable tasks, draft each
-   `agentdocs/tasks/<branch-name>/README.md`, replace prose with a one-line
-   `TODO.md` pointer, and commit that setup on `main`.
+1. Use `triage` on existing `status:needs-triage` issues, `>user<` prose, or
+   invoke `/triage <text>` directly: read linked design, split independently
+   ownable tasks, draft each `agentdocs/tasks/<branch-name>/README.md`, open or
+   relabel the canonical GitHub issue (priority/area labels, branch/task-doc
+   pointer in the body), and commit the task-doc setup on `main`.
 2. Create each new branch/worktree from the setup commit, push `main` and the
    task branches, then stop for review. Address review through `triage` with a
    follow-up setup commit; advance each still-unstarted task branch to the
    reviewed commit before dispatch.
-3. Use `todo-sync` only to check `main:TODO.md` accuracy and confirm the merge
-   driver is installed — not to force branch equality.
+3. Use `todo-sync` only to audit open-issue/task-doc consistency (accurate
+   branch/task pointers, no orphaned `agentdocs/tasks/` directories) — not to
+   force branch equality.
 4. Use `dispatch-task` to verify approved/pushed setup, then assign an explicit
    slice.
    Choose `implement-task-lite`, `implement-task`, or `lead-task` by task
    scope/risk; model label is secondary. State acceptance checks, required
-   domain skills, commit/push/TODO/delegation authority, and stop conditions.
+   domain skills, commit/push/issue/delegation authority, and stop conditions.
    Portable prompt: `Use the dispatch-task skill for <task>`. Clients may also
    expose `$dispatch-task` or `/dispatch-task`.
 5. Commit independently valid checkpoints when authorized: focused checks
    pass, scoped diff reviewed, explicit paths staged. Never mix unrelated WIP.
 6. Ask `dispatch-task` to retire landed work: promote durable content to its
    owning artifact (`README.md`, `docs/`, ADR, source documentation, or tests),
-   remove the task directory, update/sync backlog, then remove branch/worktree
+   remove the task directory, close the issue, then remove branch/worktree
    only after verification.

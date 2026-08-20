@@ -1,6 +1,6 @@
 # 0004 — Package & repository structure
 
-- **Status:** Accepted — 2026-08-01 (document-location details partly superseded by ADR-0006)
+- **Status:** Accepted — 2026-08-01 (document-location details partly superseded by ADR-0006; backlog-authority clause superseded by ADR-0012)
 - **Date:** 2026-08-01
 
 ## Context

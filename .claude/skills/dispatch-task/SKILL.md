@@ -1,6 +1,6 @@
 ---
 name: dispatch-task
-description: Use when post-triage work needs approved task setup verification, worker selection/handoff, or landed task-record retirement; excludes implementation and general git cleanup.
+description: Use when post-triage work needs approved task setup verification, worker selection/handoff, or landed task-record/GitHub-issue retirement; excludes implementation and general git cleanup.
 ---
 
 # Dispatch Task
@@ -11,26 +11,27 @@ hygiene.
 
 ## Inventory
 
-1. Invoke `todo-sync`. Read the matching
+1. Invoke `todo-sync`. Read the issue (`gh issue view <n>`), the matching
    `agentdocs/tasks/<branch-name>/README.md`,
    worktree list, branch status, and relevant instructions.
 2. Invoke `repo-orientation` to confirm owners, dependencies, and tests.
-3. If item still contains `>user<`, invoke `triage`; stop for plan review.
+3. If the issue still carries `status:needs-triage`, invoke `triage`; stop for
+   plan review.
 4. Stop on unrelated dirty state, missing/inaccessible worktree, ambiguous
-   backlog ownership, or TODO divergence.
+   backlog ownership, or issue/task-doc divergence.
 
 ## Lifecycle
 
 ### Start approved task
 
-1. Verify reviewed task doc, one-line TODO pointer, branch, and worktree.
+1. Verify reviewed task doc, the issue's branch/task-doc pointer, branch, and
+   worktree.
 2. Create/reuse the approved worktree if missing; do not redesign the plan.
-3. Verify triage's setup commit (task doc + `main:TODO.md` pointer) exists and
-   `main` and the task branch are pushed with upstream. Branch `TODO.md` need
-   not match main — the `merge=ours` driver reconciles it on merge/rebase.
+3. Verify triage's setup commit (task doc + issue labels/pointer) exists and
+   `main` and the task branch are pushed with upstream.
 4. Dispatch only after clean status and remote setup verification.
 
-Setup commit/push belongs to `triage`; do not grant worker push, TODO, or
+Setup commit/push belongs to `triage`; do not grant worker push, issue, or
 delegation authority implicitly.
 
 ### Retire landed task
@@ -39,8 +40,8 @@ Only when explicitly asked:
 
 1. Verify branch landed and identify durable task content.
 2. Promote durable content to its owner (`README.md`, `docs/`, ADR, source
-   documentation, or tests); remove the task directory; drop the completed
-   item's line from main's `TODO.md`.
+   documentation, or tests); remove the task directory; close the issue
+   (`gh issue close <n> --comment "..."` pointing at the landing commit/PR).
 3. Commit and push authorized lifecycle changes.
 4. Hand physical worktree/ref removal to `repo-cleanup`; report its recovery
    SHAs.
@@ -84,14 +85,14 @@ Serena execution: one-shot active | one-shot contract (shared server) | interact
 Authority:
   commits: checkpoint | final | no
   push: yes | no
-  todo-writer: yes | no
+  issue-writer: yes | no
   delegate: yes | no
 Stop conditions:
 Report:
 ```
 
 Worker handoff from direct user invocation defaults to `commits: checkpoint`,
-`push: no`, `todo-writer: no`, `delegate: no`. A supervisor may pass only
+`push: no`, `issue-writer: no`, `delegate: no`. A supervisor may pass only
 authority it already has. Use one writer per worktree; parallelize read-only
 investigation or isolated branches, never overlapping edits.
 

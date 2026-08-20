@@ -1,26 +1,23 @@
 ---
 name: todo-sync
-description: Use when main's TODO.md accuracy or the local TODO merge driver needs a read-only audit; never edit backlog or task files.
+description: Use when open-GitHub-Issue backlog accuracy needs a read-only audit; never edit issues or task files.
 ---
 
-# TODO Sync
+# Backlog Sync
 
-`main:TODO.md` is the single source of truth. Branch `TODO.md` copies are
-disposable: the `.gitattributes` `TODO.md merge=ours` driver resolves every
-conflicting hunk to the current branch (main's copy when a task branch merges
-in, or the rebase base) with no manual resolution. You no longer force
-byte-equality across branches.
+Open GitHub Issues are the single source of truth. Branch
+`agentdocs/tasks/<branch-name>/` copies are disposable and need not match an
+issue verbatim.
 
-1. Confirm the merge driver is installed in this clone:
-   `git config --local --get merge.ours.driver` must print `true`. If missing,
-   run `uv run pyrite-dev bootstrap` (see `agentdocs/README.md`). Without it, git falls
-   back to a normal 3-way merge and TODO.md conflicts return.
-2. Read `main:TODO.md` once. Verify it is accurate: one summary line per active
-   item with a branch and `agentdocs/tasks/<branch-name>/` pointer; `>user<` text
-   preserved exactly until triaged.
-3. Report stale/missing pointers and merge-driver failures without editing.
-   `triage` owns new pointers; `dispatch-task` retirement owns completed-item
-   removal.
+1. `gh issue list --state open --limit 200` (add `--label` filters as needed).
+   Verify each issue tied to in-flight work carries an accurate branch and
+   `agentdocs/tasks/<branch-name>/` pointer in its body.
+2. Cross-check `agentdocs/tasks/` directories against open issues: flag a task
+   directory with no matching open issue, or an issue pointer naming a
+   directory that doesn't exist.
+3. Report stale/missing pointers, orphaned task directories, and label
+   inconsistencies (e.g. `status:needs-triage` on an issue that already has a
+   branch) without editing. `triage` owns new pointers; `dispatch-task`
+   retirement owns closing completed-item issues.
 
-Do not compare branch copies for equality, copy TODO between branches, stash or
-discard work, or edit any file.
+Do not open, close, edit, or label any issue; do not edit task files.

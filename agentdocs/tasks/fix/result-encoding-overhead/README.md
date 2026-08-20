@@ -125,7 +125,9 @@ Preserve:
 
 Non-goals:
 
-- renaming `.pkl` to `.h5` (separate `TODO.md` ergonomics item);
+- renaming `.pkl` to `.h5` (a separate ergonomics item; none currently open in
+  GitHub Issues — the TODO.md Ergonomics section was empty at the time of the
+  GitHub Issues migration);
 - shard lifecycle, consolidation policy, resume fast paths, or progress
   reporting — owned by `fix/chunked-checkpoint-lifecycle`;
 - physics, RNG, or spectrum changes;
@@ -295,7 +297,7 @@ store — 66x faster write, 89x faster read, 5.5x smaller than version 1.
    both slices, fills the ADR-promised throughput record, and re-measures the
    real pull.
 
-No slice may push, edit `TODO.md`, retire task records, or delegate further
+No slice may push, edit the GitHub issue, retire task records, or delegate further
 unless the dispatcher explicitly grants that authority.
 
 ## Acceptance checks

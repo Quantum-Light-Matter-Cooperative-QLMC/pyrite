@@ -2,11 +2,3 @@
 *.zpln filter=nbstripout
 *.ipynb diff=ipynb
 * text=auto eol=lf
-
-# TODO.md is authoritative on `main`. On merge/rebase, resolve conflicting
-# hunks in favour of the current branch's copy (= main's when merging a task
-# branch in, or the rebase base) instead of prompting for manual resolution.
-# The `ours` driver is `true` (a no-op that keeps the current version); it must
-# be registered in local git config via `uv run cxr-dev bootstrap`, otherwise
-# git silently falls back to a normal 3-way merge. See agentdocs/README.md.
-TODO.md merge=ours

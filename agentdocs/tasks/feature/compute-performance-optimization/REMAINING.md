@@ -88,8 +88,9 @@ assumptions, limiting case, checks), classed against the existing
 `coherent-line-hkl-batch` precedent. Fresh context verifies; only a human marks
 `signed-off`.
 
-This is the same work as `TODO.md` Active item 3 and should be dispatched there
-rather than here — it is listed in this plan only because W2 cannot be decided
+This is the same work as the Active physics-validation-ledger item (GitHub
+issue #4) and should be dispatched there rather than here — it is listed in
+this plan only because W2 cannot be decided
 before it lands.
 
 ## W2. Decide the fate of `_USE_JIT_LINE_PROLOGUE` — CLOSED 2026-08-09, deleted

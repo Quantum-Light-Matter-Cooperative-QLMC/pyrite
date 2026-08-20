@@ -26,7 +26,6 @@ Commands:
     energy-grid maintain derived detector energy-grid artifacts
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
-    bootstrap  configure per-clone local git state (TODO.md merge driver)
     verify     check skills, docs, imports, generated structure, lint, types, and tests
     cli-reference     write or --check docs/repo-design/cli/cli-reference.md
     cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
@@ -226,7 +225,6 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
         "uv run pyrite-dev repo-map --check",
         "uv run pyrite-dev sync-skills",
         "uv run pyrite-dev check-skills",
-        "uv run pyrite-dev bootstrap",
         "uv run pyrite-dev verify",
         "uv run pyrite-dev nbqa",
         "uv run pyrite-dev nbstrip",
@@ -458,46 +456,6 @@ def cmd_check_skills(_: argparse.Namespace) -> None:
     print("Skill mirror is valid and synchronized.")
 
 
-TODO_MERGE_DRIVER = "merge.ours.driver"
-
-
-def _git_config_get(key: str) -> str | None:
-    result = subprocess.run(
-        ["git", "config", "--local", "--get", key],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
-def todo_merge_driver_configured() -> bool:
-    """Whether the `ours` merge driver referenced by `.gitattributes` exists.
-
-    `.gitattributes` maps `TODO.md merge=ours`, but the driver definition lives
-    in local git config and cannot be committed. Without it, git silently falls
-    back to a normal 3-way merge and reintroduces TODO.md conflicts.
-    """
-    return _git_config_get(TODO_MERGE_DRIVER) == "true"
-
-
-def cmd_bootstrap(_: argparse.Namespace) -> None:
-    """Install per-clone local git state. Idempotent; safe to re-run."""
-    if todo_merge_driver_configured():
-        print(f"{TODO_MERGE_DRIVER}=true already configured.")
-        return
-    subprocess.run(
-        ["git", "config", "--local", TODO_MERGE_DRIVER, "true"],
-        cwd=ROOT,
-        check=True,
-    )
-    print(
-        f"Configured {TODO_MERGE_DRIVER}=true; conflicting TODO.md hunks now "
-        "resolve to the current branch's copy on merge/rebase."
-    )
-
-
 def cmd_imports(_: argparse.Namespace) -> None:
     subprocess.run(["lint-imports", "--no-cache"], cwd=ROOT, check=True)
 
@@ -535,12 +493,6 @@ def cmd_docs(args: argparse.Namespace) -> None:
 
 def cmd_verify(args: argparse.Namespace) -> None:
     cmd_check_skills(args)
-    if not todo_merge_driver_configured():
-        print(
-            "warning: TODO.md merge driver not configured; "
-            "run `uv run pyrite-dev bootstrap` (see agentdocs/README.md).",
-            file=sys.stderr,
-        )
     cmd_imports(args)
     cmd_repo_map(argparse.Namespace(check=True, write=False))
     cmd_docs(argparse.Namespace(linkcheck=False))
@@ -633,7 +585,6 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         ("nbstrip", cmd_nbstrip),
         ("sync-skills", cmd_sync_skills),
         ("check-skills", cmd_check_skills),
-        ("bootstrap", cmd_bootstrap),
         ("package-smoke", cmd_package_smoke),
     ]:
         sp = sub.add_parser(name)

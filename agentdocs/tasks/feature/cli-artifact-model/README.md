@@ -13,7 +13,7 @@ and accepted ADR
 ## Authority and boundaries
 
 - Implement and checkpoint coherent, verified phases on this branch.
-- Do not push, edit `main:TODO.md`, merge, or remove either worktree.
+- Do not push, edit the GitHub issue, merge, or remove either worktree.
 - Preserve existing checkpoint case-CAS and `checkpoint gc` semantics.
 - Pre-existing strict-Sphinx, CuPy JIT, geometry typing, and toctree failures are
   accepted baseline limits; new or changed-surface failures are not.

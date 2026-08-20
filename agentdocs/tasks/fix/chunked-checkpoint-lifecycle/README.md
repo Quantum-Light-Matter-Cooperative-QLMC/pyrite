@@ -221,7 +221,7 @@ bounded fix.
    `run-cxr-mc` + `remote-gpu-jobs` + `performance` +
    `documentation-maintenance`; integrate both slices and run the real smoke.
 
-No slice may push, edit `TODO.md`, retire task records, or delegate further
+No slice may push, edit the GitHub issue, retire task records, or delegate further
 unless the dispatcher explicitly grants that authority.
 
 ## Acceptance checks

@@ -1,6 +1,7 @@
 # Profile-owned observation angle
 
-Status: planning stub reconstructed from the canonical `TODO.md` pointer. Run
+Status: planning stub reconstructed from the canonical GitHub issue pointer
+(#16). Run
 `triage` and obtain review before implementation.
 
 Branch: `feature/profile-observation-angle` (not yet created).

@@ -65,8 +65,8 @@ _MISSING_LINE_GRID_RE = re.compile(
 
 def _derive_hint(message: str, paths: Sequence[str], profile: str | None) -> str | None:
     """A canonical energy-grid derivation suggestion for the affected materials when
-    ``message`` is the missing-line-grid error, else ``None`` (TODO.md Bugs
-    #3: point the user at the fix, not just the failure)."""
+    ``message`` is the missing-line-grid error, else ``None``: point the user
+    at the fix, not just the failure."""
     match = _MISSING_LINE_GRID_RE.match(message)
     if match is None:
         return None
@@ -93,7 +93,7 @@ def _grouped_error_lines(
     summary line each. A profile-wide setting invalid for every material
     (e.g. a beam energy with no material's line-grid store covering it)
     otherwise repeats the same message once per material -- unreadable at
-    catalog scale (TODO.md Bugs #3)."""
+    catalog scale."""
     grouped: dict[str, list[str]] = {}
     order: list[str] = []
     for entry in errors:

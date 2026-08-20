@@ -106,7 +106,7 @@ Non-goals:
    change. Self-contained enough for Serena `one-shot` only after slice 1 fixes
    the contract and specifies the exact smoke command.
 
-No slice may push, edit `TODO.md`, retire task records, or delegate further
+No slice may push, edit the GitHub issue, retire task records, or delegate further
 unless the dispatcher explicitly grants that authority.
 
 ## Acceptance checks

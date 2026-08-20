@@ -339,7 +339,7 @@ def test_missing_beam_energy_errors_without_default_store_coverage(tmp_path):
 def test_material_config_error_groups_identical_messages_across_materials(tmp_path):
     # A profile-wide setting invalid for every material (no E_grid_line, no
     # material store entry for the profile's beam energies) must not repeat
-    # one near-duplicate line per material (TODO.md Bugs #3).
+    # one near-duplicate line per material.
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog(

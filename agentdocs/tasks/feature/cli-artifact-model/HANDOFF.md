@@ -13,7 +13,7 @@ Paused at user request on 2026-08-05. Work remains uncommitted and unpushed.
 - Base: `feature/cli-vocab-controls` at `7b19402`
 - Slice 5 was not on `main`, so this branch intentionally starts from its
   closure commit.
-- No commit, push, merge, `TODO.md` edit, or worktree cleanup performed.
+- No commit, push, merge, issue edit, or worktree cleanup performed.
 - Existing slice-5 worktree was not modified.
 
 ## Implemented
@@ -224,7 +224,7 @@ All six items above are closed. Work is still uncommitted and unpushed.
 
 ## Important cautions
 
-- Do not edit branch `TODO.md`; `main:TODO.md` is authoritative.
+- Do not edit the GitHub issue; open issues on `main` are authoritative.
 - Do not commit, push, merge, or remove worktrees without new user authority.
 - Do not run heavy GPU/Monte Carlo work locally.
 - Preserve old mutable helper functions in `apply.py` during D7 compatibility;

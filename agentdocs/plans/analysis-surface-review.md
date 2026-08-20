@@ -1,7 +1,7 @@
 # Analysis surface review: notebooks, exports, and the HyperSpy question
 
 Status: review only. No code changed. Not authority for any branch; promote
-accepted items into `TODO.md` before acting.
+accepted items into GitHub Issues before acting.
 
 Two questions:
 
@@ -212,7 +212,9 @@ fall back.
 - `notebooks/` at repo root now contains nothing but `__pycache__` trees that
   shadow `analysis_ui` module names. Leftover from the move into
   `src/pyrite/apps/`. Delete.
-- `TODO.md:143` still points at `notebooks/analysis_ui/controls`.
+- `TODO.md` used to point at the stale `notebooks/analysis_ui/controls` path;
+  moot now that `TODO.md` is a short pointer stub (backlog moved to GitHub
+  Issues) with no per-item bodies left to go stale.
 - Checkpoint payloads are named `line.pkl` / `brem.pkl` while actually being
   HDF5 (or zstd-framed pickle for legacy generations). A collaborator with
   `h5py` will never think to open a `.pkl`. Writing new checkpoints as `.h5`
@@ -381,8 +383,8 @@ export path is only worth building once exports carry provenance.
 
 1. **G1 + G2 together.** Parameterise the export and stamp provenance into it.
    One change to `export.py` and one new cell. Unblocks everything else.
-2. **G7 housekeeping.** Delete stale `notebooks/`, fix the `TODO.md:143`
-   path, write new checkpoints as `.h5`.
+2. **G7 housekeeping.** Delete stale `notebooks/`, write new checkpoints as
+   `.h5` (the `TODO.md:143` path issue is now moot — see §4 G7).
 3. **G3.** Machine-readable check records; generate the validation status
    summary from them.
 4. **G4.** `--format {html,html-wasm,data}` and in-app data download.

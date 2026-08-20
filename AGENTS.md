@@ -15,7 +15,9 @@ prose keep required format.
 - `README.md`: science/install/primary workflow. Classify maintained pages under
   `docs/guides/`, `docs/physics/`, `docs/validation/`, `docs/research/`,
   `docs/repo-design/`, or `docs/adr/`; see
-  `docs/repo-design/documentation.md`. `TODO.md`: shared backlog.
+  `docs/repo-design/documentation.md`. Backlog: GitHub Issues
+  (`gh issue list`), labelled `priority:p1`/`p2`/`p3`/`long-term`,
+  `status:active`/`gated`/`paused`/`needs-triage`, and `area:*`.
 - Use Context7 only for current external-library docs. Headroom shapes agent and
   tool output; it is not a shell wrapper or code index. Do not use Tokensave or
   RTK.
@@ -52,7 +54,8 @@ If `uv run` cannot write project environment, add
 - Prefer reusable logic in `src/pyrite/`; keep marimo apps thin. Keep notebooks
   output-free. Run `uv run marimo check <app.py>` after marimo edits.
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
-  physics, docs, runtime, remote GPU, regression, catalog-golden, or TODO work.
+  physics, docs, runtime, remote GPU, regression, catalog-golden, or backlog
+  work.
 - CLI changes preserve documented command/help/output/exit contracts and
   regenerate `docs/repo-design/cli/cli-reference.md`.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
@@ -60,10 +63,11 @@ If `uv run` cannot write project environment, add
 
 ## Task dispatch
 
-- Use `triage` for new `>user<` prose or `/triage <text>` direct input. It
-  drafts task docs and local branches/worktrees, syncs TODO pointers, commits
-  that setup on `main`, pushes `main` and the task branches, then stops for
-  review.
+- Use `triage` for new `>user<` prose, `status:needs-triage` GitHub issues, or
+  `/triage <text>` direct input. It drafts task docs and local
+  branches/worktrees, opens/updates the canonical GitHub issue (labels,
+  branch/task-doc pointer in the body), commits task-doc setup on `main`,
+  pushes `main` and the task branches, then stops for review.
 - Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
   verifies approved setup, owns landed teardown, writes explicit
   authority/acceptance handoff, then selects:
@@ -72,29 +76,32 @@ If `uv run` cannot write project environment, add
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
   Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
 - Use `repo-cleanup` for git hygiene. It fans cheap subagents out per item to
-  rebase task branches onto `main` (clean or `TODO.md`-only conflicts only;
-  real conflicts are aborted and reported), prune stale worktree/tracking
-  entries, remove clean worktrees on merged branches, `-d` delete fully
-  merged locals, and delete fully merged remote branches. Never pushes
-  otherwise without explicit instruction.
+  rebase task branches onto `main`, prune stale worktree/tracking entries,
+  remove clean worktrees on merged branches, `-d` delete fully merged locals,
+  and delete fully merged remote branches. Never pushes otherwise without
+  explicit instruction.
 - Task type stays separate: workers also invoke matching CLI, notebook,
   physics, performance, docs, remote, regression, or scientific skill.
 - Direct user invocation of a worker skill permits task-local checkpoint
-  commits unless user says otherwise; never permits push, TODO ownership, or
+  commits unless user says otherwise; never permits push, issue ownership, or
   delegation. Supervisors may pass only authority they hold.
 - Checkpoint only independently valid slices: focused checks pass, scoped diff
   reviewed, explicit paths staged. Never `git add .`; never mix unrelated WIP.
 
 ## Backlog and physics
 
-`TODO.md` is authoritative on `main`; branch copies are disposable and
-auto-resolve to `main` on merge/rebase via the `TODO.md merge=ours` driver (run
-`uv run pyrite-dev bootstrap` once per clone). Edit and drop items on `main`.
-Tracked agent plans and handoffs live only in `agentdocs/`, outside the public
-documentation tree. Branch detail belongs in
-`agentdocs/tasks/<branch-name>/` (full task branch name; entry doc `README.md`);
-see `agentdocs/README.md`. `todo-sync` now only checks main's accuracy and that
-the driver is installed.
+Backlog is tracked in GitHub Issues (`gh issue list`/`gh issue view`), not a
+repo file. One issue per item, labelled `priority:*`/`status:*`/`area:*`, with
+a branch and `agentdocs/tasks/<branch-name>/` pointer in the body where one
+exists. `dispatch-task` closes an issue when its task lands. Tracked agent
+plans and handoffs live only in `agentdocs/`, outside the public documentation
+tree. Branch detail belongs in `agentdocs/tasks/<branch-name>/` (full task
+branch name; entry doc `README.md`); see `agentdocs/README.md`. `todo-sync`
+audits open-issue/task-doc consistency read-only.
+
+New/edited physics requires source equation, assumptions, limiting case,
+`Validation: <id>`, and ledger row. Fresh context verifies it; only human marks
+`signed-off`.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks

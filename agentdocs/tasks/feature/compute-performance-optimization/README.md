@@ -7,9 +7,10 @@ current entry point. Everything below is the accumulated per-slice record.
 
 Branch: `feature/compute-performance-optimization`
 
-TODO scope: Active item "Compute performance optimization." The formerly
-adopted Inbox item "CPU Performance Flag" is implemented (below) and its
-marker is already dropped from `main:TODO.md`; reconciliation is done.
+Backlog scope: tracked as GitHub issue #20, "Compute performance optimization
+— remainder." The formerly adopted Inbox item "CPU Performance Flag" is
+implemented (below) and its marker was already dropped from `TODO.md` before
+the GitHub Issues migration; reconciliation is done.
 
 Current open slice (2026-08-08): the Active item's own text — review whether
 the `cupyx.jit.rawkernel`/Numba `@njit` optimizations from

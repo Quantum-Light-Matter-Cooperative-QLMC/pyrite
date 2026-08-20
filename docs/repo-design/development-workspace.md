@@ -27,7 +27,6 @@ wheel. A third analysis/app member is deferred.
 ```bash
 # Normal contributor setup: root package and contributor tools.
 uv sync --locked
-uv run pyrite-dev bootstrap  # once per clone; configures TODO.md merge driver
 
 # Runtime-only environment, used by remote installations.
 uv sync --no-dev --locked

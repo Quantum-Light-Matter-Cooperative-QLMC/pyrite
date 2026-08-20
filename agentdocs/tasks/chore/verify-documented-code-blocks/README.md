@@ -1,6 +1,9 @@
 # Verify documented code blocks
 
-Backlog: `main:TODO.md` P3 5. Source review:
+Backlog: not currently tracked as a GitHub issue — this task doc predates the
+TODO.md→GitHub Issues migration and its old `TODO.md` P3 pointer was already
+gone by the time of that migration (no matching P3 item, no branch/worktree).
+Re-triage before dispatch. Source review:
 [`agentdocs/plans/analysis-surface-review.md`](../../../plans/analysis-surface-review.md)
 §4 G5.
 

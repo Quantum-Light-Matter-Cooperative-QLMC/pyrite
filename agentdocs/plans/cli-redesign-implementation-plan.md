@@ -15,7 +15,7 @@ plan is the *order* — the linearized cross-cutting sequence with gates and
 acceptance criteria, so an agent starts in the right place and never lands a
 slice before its prerequisite. Ephemeral: update it as slices land, retire it
 when the last one does. Each slice is an `agentdocs/tasks/<branch>/` record via the normal
-triage → dispatch flow; `TODO.md` stays authoritative for status.
+triage → dispatch flow; GitHub Issues stay authoritative for status.
 
 ## Sequence
 

@@ -6,7 +6,7 @@ source. For *why* (physics, validation, provenance) see
 and design notes in
 [`docs/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/tree/main/docs);
 backlog in
-[`TODO.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/TODO.md).
+[GitHub Issues](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues).
 Tracked agent task records and cross-task plans live under `agentdocs/`, never
 under the public documentation tree.
 Print current top-level directory inventory:

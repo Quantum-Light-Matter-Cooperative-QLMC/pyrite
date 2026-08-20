@@ -43,7 +43,6 @@ Requires Python ≥3.13 and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync
-uv run pyrite-dev bootstrap  # per-clone local git config (TODO.md merge driver)
 uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
@@ -70,11 +69,6 @@ Contributors who want the persistent command to follow source edits may use
 locked development and verification. See the
 [shell-completion guide](docs/guides/shell-completion.md) for zsh setup,
 generated-file locations, removal, and troubleshooting.
-
-`pyrite-dev bootstrap` is idempotent and only sets local git config that cannot be
-committed (it registers the `.gitattributes` `TODO.md merge=ours` driver so
-merge/rebase conflicts on `TODO.md` resolve to the current branch automatically).
-Run it once per clone; worktrees share the config.
 
 Base `pyrite-xray` is CPU-only. Install exactly one accelerator extra in a clean
 environment:
@@ -213,7 +207,7 @@ Eagle XO QE plus computed Timepix Si response.
 - [documentation authoring and maintenance](docs/repo-design/documentation.md)
 - [package ownership and dependency map](docs/repo_map.md)
 - [Python API](docs/api.md)
-- [backlog](TODO.md)
+- [backlog](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues)
 - [agent conventions](AGENTS.md)
 
 ## References
