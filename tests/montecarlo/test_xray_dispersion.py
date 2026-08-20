@@ -271,3 +271,109 @@ def test_runner_and_cases_carry_no_dispersion_selector():
 
     built = build_cases(Sweep(material="mose2", thickness_ang=1e4))[0]
     assert "xray_dispersion" not in built
+
+
+# --- Non-convergence of the in-medium root -----------------------------------
+#
+# The contraction argument behind the three-pass fixed point assumes the X-ray
+# regime, ``Re n = 1 - delta`` with ``delta ~ 1e-5-1e-3``. A segment scattered
+# nearly perpendicular to ``g`` puts the vacuum root down in the optical/UV,
+# where the tabulations honestly carry ``Re n > 1`` (carbon: 6.24-285 eV,
+# peaking at 4.766 at 6.40 eV). ``Re n (v.n_hat)`` can then approach unity,
+# ``denom`` collapses toward a spurious Cherenkov-like zero, and the map turns
+# into a 2-cycle: three passes return whichever half pass three lands on, and a
+# keV-scale ``E_res`` comes back attached to a ``v.g`` four orders below the
+# median. The CBS amplitude's ``1/(gamma (v.g)^2)`` then produced a line total
+# ten orders too large -- finite, so nothing downstream flagged it.
+#
+# Validation: xray-in-medium-resonance
+
+# One UV node above unity, X-ray nodes at the usual 1-delta. Linear-in-E interp
+# between nodes, matching _interp_gather1d.
+_CYCLE_E_TAB = np.array([1.0, 6.5, 20.0, 3000.0, 6000.0])
+_CYCLE_N_RE = np.array([1.0, 2.05, 1.0, 1.0 - 1e-5, 1.0 - 1e-5])
+# Sits just inside the spurious resonance: 2.05 * v_dot_n = 0.99901.
+_CYCLE_V_DOT_N = 0.999 / 2.05
+# Chosen so the VACUUM root lands exactly on the 6.5 eV node.
+_CYCLE_V_DOT_G = 6.5 * (1.0 - _CYCLE_V_DOT_N) / HBARC_EV_ANG
+
+
+def _root(v_dot_n, v_dot_g):
+    from pyrite.montecarlo.spectrum.lines import _in_medium_kinematics
+
+    denom, n_re = _in_medium_kinematics(
+        np.array([v_dot_n]), np.array([v_dot_g]), _CYCLE_N_RE, _CYCLE_E_TAB
+    )
+    return float(np.asarray(denom)[0]), float(np.asarray(n_re)[0])
+
+
+def test_the_two_cycle_root_is_rejected_rather_than_returned():
+    """The pathology itself: a root that oscillates comes back as NaN."""
+    denom, _ = _root(_CYCLE_V_DOT_N, _CYCLE_V_DOT_G)
+    assert np.isnan(denom)
+
+
+def test_the_rejected_root_would_otherwise_have_passed_the_energy_window():
+    """Why the ``E_res > 10 eV`` cut cannot be the guard.
+
+    ``cbs-amplitude`` leans on that cut to keep ``v.g`` away from zero. It does
+    not: the cut bounds ``v.g = omega denom``, so as ``denom -> 0`` it stops
+    bounding ``v.g`` at all. Run the unguarded iteration by hand and confirm it
+    returns a keV resonance -- comfortably inside the window -- built on a ``v.g``
+    of order 1e-3.
+    """
+    from pyrite.montecarlo.spectrum.lines import _interp_gather1d, _interp_index
+
+    denom = 1.0 - _CYCLE_V_DOT_N
+    for _ in range(3):
+        E_res = HBARC_EV_ANG * (_CYCLE_V_DOT_G / denom)
+        ix, fr, blw, abv = _interp_index(np.array([E_res]), _CYCLE_E_TAB)
+        n_re = float(np.asarray(_interp_gather1d(ix, fr, blw, abv, _CYCLE_N_RE))[0])
+        denom = 1.0 - n_re * _CYCLE_V_DOT_N
+    unguarded_E_res = HBARC_EV_ANG * (_CYCLE_V_DOT_G / denom)
+    assert unguarded_E_res > 1e3
+    assert _CYCLE_V_DOT_G < 1e-2
+
+
+def test_a_converged_root_is_untouched_by_the_guard():
+    """The control: an X-ray root contracts and must survive unchanged.
+
+    Same tabulation, same ``v.n_hat``; only ``v.g`` moves, enough to put the
+    resonance up at keV where ``Re n = 1 - 1e-5``.
+    """
+    v_dot_g = 3000.0 * (1.0 - _CYCLE_V_DOT_N) / HBARC_EV_ANG
+    denom, n_re = _root(_CYCLE_V_DOT_N, v_dot_g)
+    assert np.isfinite(denom)
+    assert denom == pytest.approx(1.0 - n_re * _CYCLE_V_DOT_N, rel=0, abs=0)
+    assert n_re == pytest.approx(1.0 - 1e-5, rel=1e-6)
+
+
+def test_the_guard_is_inert_across_the_xray_regime():
+    """Breadth control: the guard must cost nothing where the premise holds.
+
+    Real hopg dispersion, every direction on the sphere, but the tabulation
+    floored at 10 eV so ``Re n < 1`` throughout -- the regime the contraction
+    argument was written for. A converged root moves ``denom`` by ~``delta**3``
+    on the last pass, orders inside the tolerance, so nothing may be rejected.
+
+    The narrower run-level claim, that the catalog's 1000 Ang production
+    thickness rejects no pairs at all, is measured in the ledger rather than
+    here; it needs a full transport run.
+    """
+    g = reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])[0]
+    E_tab = np.geomspace(10.0, 30000.0, 512)
+    n_re_tab = np.real(refractive_index(CRYSTAL, E_tab))
+
+    rng = np.random.default_rng(0)
+    v = rng.normal(size=(4096, 3))
+    v /= np.linalg.norm(v, axis=1)[:, None]
+    v *= beta_from_keV(E_KEV)
+
+    from pyrite.montecarlo.spectrum.lines import _in_medium_kinematics
+
+    v_dot_g = v @ g
+    denom, _ = _in_medium_kinematics(v @ N_HAT, v_dot_g, n_re_tab, E_tab)
+    E_res = HBARC_EV_ANG * (v_dot_g / np.asarray(denom))
+    in_window = np.isfinite(E_res) & (E_res > 10.0) & (E_res < E_tab[-1])
+    assert in_window.sum() > 100
+    assert np.isfinite(np.asarray(denom)[in_window]).all()

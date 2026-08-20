@@ -152,6 +152,7 @@ def _coherent_prologue_kernel(
     lo_keep,
     hi_keep,
     hbarc,
+    root_rtol,
     alpha_fs,
     pref_c1,
     use_medium,
@@ -200,10 +201,17 @@ def _coherent_prologue_kernel(
     # contracts at rate ~delta ~1e-5, so two passes already sit past float32
     # rounding. Only Re n enters -- Im n is the absorption the Beer-Lambert
     # factor below already applies. Validation: xray-in-medium-resonance
+    #
+    # Convergence is checked, not assumed -- the same guard and tolerance as the
+    # CPU twin's _in_medium_kinematics. A root that falls in the optical/UV, where
+    # Re n > 1, drives denom toward a spurious Cherenkov-like zero and turns the
+    # map into a 2-cycle; pass three then returns a keV E_res attached to a v.g
+    # four orders below the median, which the CBS 1/(gamma (v.g)^2) blows up.
     n_re = F32_ONE
     if use_medium:
         vdn = v_dot_n[seg]
         dnm = F32_ONE - vdn
+        previous = dnm
         for _it in range(3):
             E_it = hbarc * (v_dot_g / dnm)
             below_it = E_it <= E_tab[U32_ZERO]
@@ -212,7 +220,13 @@ def _coherent_prologue_kernel(
             x0_it = E_tab[idx_it - U32_ONE]
             frac_it = (E_it - x0_it) / (E_tab[idx_it] - x0_it)
             n_re = _interp_shared(n_re_tab, idx_it, frac_it, below_it, above_it, n_tab)
+            previous = dnm
             dnm = F32_ONE - n_re * vdn
+        # `abs` is not a cupyx.jit builtin; `xp.abs` is. Written as `>` rather
+        # than `not (<=)` so a NaN root falls through to the existing NaN
+        # handling below instead of taking a new exit.
+        if xp.abs(dnm - previous) > root_rtol * xp.abs(dnm):
+            return
 
     omega = v_dot_g / dnm
     E_res = hbarc * omega
@@ -633,6 +647,7 @@ def run_coherent_prologue_kernel(
     lo_keep,
     hi_keep,
     hbarc,
+    root_rtol,
     electron_mass_eV,
     alpha_fs,
     pref_c1,
@@ -666,6 +681,11 @@ def run_coherent_prologue_kernel(
     and returns ``aw`` in the pair layout because the sinc half-width follows
     that denominator. Both must be given together or both omitted; when omitted
     the kernel evaluates the vacuum kinematics unchanged.
+
+    ``root_rtol`` is the CPU twin's ``_in_medium_kinematics._RESONANCE_ROOT_RTOL``,
+    passed in for the same reason ``hbarc`` is: this module cannot import the
+    line core. It bounds how far the last fixed-point pass may move ``denom``
+    before the pair is rejected as non-converged.
     """
     nthreads = int(config.prologue_nthreads)
     _validate_threads(nthreads, "prologue_nthreads")
@@ -771,6 +791,7 @@ def run_coherent_prologue_kernel(
             np.float32(lo_keep),
             np.float32(hi_keep),
             np.float32(hbarc),
+            np.float32(root_rtol),
             np.float32(alpha_fs),
             np.float32(pref_c1),
             np.uint32(1 if use_medium else 0),

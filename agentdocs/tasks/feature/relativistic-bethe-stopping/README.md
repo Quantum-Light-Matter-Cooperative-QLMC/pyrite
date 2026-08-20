@@ -461,12 +461,49 @@ needs `v.n > 1/Re n`, which caps out at `beta > 0.21` for carbon's peak index
 but in practice needs the vacuum root to land in the narrow 6-285 eV window at
 the same time. Thick, fast, many segments.
 
-Fix directions, none applied here: detect non-convergence in
-`_in_medium_kinematics` (compare passes rather than trusting a fixed three) and
-drop the segment/`g` pair; or reject on `Re n (v.n) >= 1` directly, which is
-the condition that makes the root spurious; or gate on the CBS validity
-condition above. A raised `E_res` floor above 285 eV would also mask it, but
-that is a physics cut and would move every line spectrum.
+#### Fix applied
+
+`_in_medium_kinematics` now checks convergence rather than assuming it. The last
+fixed-point pass must move `denom` by less than `_RESONANCE_ROOT_RTOL = 1e-3`;
+pairs that fail carry NaN out of `denom` and drop on the caller's existing
+finite mask, the same route out-of-range tabulation energies already take. A
+genuine contraction moves `denom` by ~`delta^3` ~ 1e-15 in float64 and is
+floored by float32 rounding (~1e-7) on the device twin, so the tolerance has
+five orders of margin either side. The CUDA prologue kernel in
+`coherent_stream_jit_kernel.py` carries the identical guard, with the tolerance
+passed in the way `hbarc` already is, since that module cannot import the line
+core.
+
+Rejection is the right handling, not a workaround: these samples violate the CBS
+amplitude's own perturbative validity condition, so there is no correct value to
+compute for them.
+
+Rejected on their merits: `Re n (v.n) >= 1` catches only the sign-flipped half of
+the cycle (on the traced sample `Re n (v.n) = 0.99941`, positive but collapsing),
+and a raised `E_res` floor above 285 eV would mask it but is a physics cut that
+would move every line spectrum.
+
+Measured:
+
+- The traced seed falls from 7602 to 8.03e-07, inside the healthy population
+  (6.6e-07 to 1.05e-06). Healthy seeds 1/2/3 are bit-identical to their
+  pre-fix values.
+- At the catalog's 1000 Ang production thickness the guard rejects **zero**
+  pairs (hopg 30 keV, hopg 300 keV, silicon 100 keV). At 1e6 Ang it rejects
+  0.233%.
+- `verify` unchanged at 3453 passed / 43 skipped, and the GPU `-m hardware`
+  suite unchanged at 49 passed / 1 skipped, so no golden moved.
+
+Regression coverage: four tests in `tests/montecarlo/test_xray_dispersion.py` --
+the 2-cycle is rejected, the unguarded iteration is shown to clear the 10 eV
+window (so that cut cannot be the guard), a converged X-ray root is untouched,
+and the guard is inert across the whole sphere of directions with the
+tabulation floored at 10 eV.
+
+Still open for the follow-up task: the two ledgered claims above are still
+written as though the old premises held, and `cbs-amplitude`'s `v.g -> 0` row
+still cites the 10 eV cut as load-bearing. Those rows want rewording by whoever
+owns that validation, not by this branch.
 
 F's measurements drop such seeds by an explicit ">100x the median" rule and
 report the dropped count, rather than letting them contaminate a mean. **This

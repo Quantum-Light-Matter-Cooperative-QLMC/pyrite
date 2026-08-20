@@ -459,6 +459,13 @@ if hasattr(xp, "fuse"):
     _line_weight_core = xp.fuse()(_line_weight_core)
 
 
+# Relative movement of ``denom`` on the last fixed-point pass that still counts
+# as converged. A genuine contraction moves it by ~delta**3 ~ 1e-15 in float64
+# and is floored by float32 rounding (~1e-7) on the device twin; the 2-cycle the
+# guard exists to catch moves it by O(1). Five orders of margin either side.
+_RESONANCE_ROOT_RTOL = 1e-3
+
+
 def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
     """In-medium resonance denominator and refractive factor per segment.
 
@@ -477,6 +484,27 @@ def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
     ``(v.n_hat) (dn/dE) (dE/ddenom) ~ delta ~ 1e-5``, so each pass gains ~5
     digits and two are already at float64 rounding; three are taken for margin.
 
+    That contraction rate assumes ``Re n = 1 - delta`` with ``delta ~ 1e-5-1e-3``,
+    which is only true in the X-ray regime. A segment scattered nearly
+    perpendicular to ``g`` puts the vacuum root down in the optical/UV, where the
+    tabulations are honest about ``Re n > 1`` (carbon: 6.24-285 eV, peaking at
+    4.766 at 6.40 eV). There ``Re n (v.n_hat)`` can approach unity, ``denom``
+    collapses toward a spurious Cherenkov-like zero, the map stops contracting,
+    and the iteration settles into a 2-cycle instead: three passes then return
+    whichever half of the cycle pass three lands on, and a keV-scale ``E_res``
+    comes back attached to a ``v.g`` four orders below the median. Downstream the
+    CBS amplitude's ``1/(gamma (v.g)^2)`` turns that into a line total ten orders
+    too large, and it is finite, so nothing flags it.
+
+    So convergence is checked rather than assumed: the last pass must have moved
+    ``denom`` by less than ``_RESONANCE_ROOT_RTOL``, which a genuine contraction
+    clears by five orders. Pairs that fail carry NaN out of ``denom`` and drop on
+    the caller's finite mask, the same route out-of-range tabulation energies
+    take. Rejection is the correct handling, not a workaround: those samples
+    violate the CBS amplitude's own perturbative validity condition
+    ``|U_g| g^2 / (gamma m c^2 (v.g)^2) << 1`` -- by a factor 15.6 on the sample
+    this was traced from.
+
     Returns ``(denom, n_re)`` with the shape of ``v_dot_g``: the caller forms the
     remaining in-medium scalars from ``n_re`` rather than re-deriving them, since
     ``k.v = omega (1 - denom)`` still holds exactly while ``k.g`` and ``k^2``
@@ -490,11 +518,17 @@ def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
     """
     denom = 1.0 - v_dot_n
     n_re = None
+    previous = denom
     for _ in range(3):
         E_res = HBARC_EV_ANG * (v_dot_g / denom)
         _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab)
         n_re = _interp_gather1d(_ix, _fr, _blw, _abv, n_re_tab)
+        previous = denom
         denom = 1.0 - n_re * v_dot_n
+    # NaN denominators compare False here and stay NaN, which is the wanted
+    # outcome: an out-of-range root is already a rejected pair.
+    settled = xp.abs(denom - previous) <= _RESONANCE_ROOT_RTOL * xp.abs(denom)
+    denom = xp.where(settled, denom, REAL(xp.nan))
     return denom, n_re
 
 
@@ -1922,6 +1956,7 @@ def mc_spectrum(
                     lo_keep=lo_keep,
                     hi_keep=hi_keep,
                     hbarc=HBARC_EV_ANG,
+                    root_rtol=_RESONANCE_ROOT_RTOL,
                     electron_mass_eV=1.0,  # U tables are already U_g/m_e
                     alpha_fs=ALPHA_FS,
                     pref_c1=_PREF_C1,

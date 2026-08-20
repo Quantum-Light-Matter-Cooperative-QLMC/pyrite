@@ -5,6 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
+
 cp = pytest.importorskip("cupy")
 
 try:
@@ -269,6 +271,7 @@ def test_coherent_prologue_returns_only_pair_dependent_planes():
         lo_keep=50.0,
         hi_keep=1600.0,
         hbarc=hbarc,
+        root_rtol=_RESONANCE_ROOT_RTOL,
         electron_mass_eV=1.0,
         alpha_fs=alpha,
         pref_c1=pref_c1,

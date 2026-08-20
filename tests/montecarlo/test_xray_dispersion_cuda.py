@@ -16,6 +16,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
+
 cp = pytest.importorskip("cupy")
 
 try:
@@ -340,6 +342,7 @@ def _run_prologue(d, *, n_re_tab=None):
         lo_keep=50.0,
         hi_keep=1600.0,
         hbarc=d["hbarc"],
+        root_rtol=_RESONANCE_ROOT_RTOL,
         electron_mass_eV=1.0,
         alpha_fs=d["alpha"],
         pref_c1=d["pref_c1"],
@@ -446,6 +449,7 @@ def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
         lo_keep=50.0,
         hi_keep=1600.0,
         hbarc=d["hbarc"],
+        root_rtol=_RESONANCE_ROOT_RTOL,
         electron_mass_eV=1.0,
         alpha_fs=d["alpha"],
         pref_c1=d["pref_c1"],
