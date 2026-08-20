@@ -193,6 +193,11 @@ def test_runtime_plan_reports_a_serial_device_transport(cuda, monkeypatch):
 def test_runtime_plan_keeps_the_pipeline_for_cpu_transport(cuda, monkeypatch):
     cuda(True)
     monkeypatch.setattr(runner, "_GPU", True)
+    # Pin the pool size instead of trusting live host RAM: _gpu_pipeline_workers
+    # clamps by real available memory (see pool.py), which on a RAM-constrained
+    # CI runner can cap below 2 and silently drop this to "serial" -- what's
+    # under test is the engine-selection decision, not the memory admission.
+    monkeypatch.setattr(runner, "_gpu_pipeline_workers", lambda *_args: 2)
     plan = runner.runtime_plan([_case(Ne=10), _case(Ne=10)], max_workers=8)
     assert plan["transport_core"] == "lockstep"
     assert plan["engine"] == "gpu-pipeline"

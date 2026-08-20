@@ -25,7 +25,7 @@ import h5py
 import numpy as np
 
 # stdlib since 3.14 (the version this project pins); ty's typeshed lags.
-from compression import zstd  # ty: ignore[unresolved-import]
+from compression import zstd
 
 from . import _result_v2
 
