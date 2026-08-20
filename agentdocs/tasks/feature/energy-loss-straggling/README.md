@@ -316,33 +316,128 @@ Interactions that need explicit design rather than incremental patching:
       and the `n_cutoff_stopped` bookkeeping must handle a flight that jumps
       straight past `E_cut`, and with `n_3` up to 1.15 per flight that is not a
       rare corner.
-- [ ] C — Sampler derivation and unit test. **Rescoped by B.** The
-      distribution is the Geant4 Urban model, so no special-function sampler is
-      needed: **drop** the Landau (Boersch-Supan / Koelbig--Schorr), Vavilov
-      (Rotondi--Montagna, Chibani) and Blunck--Leisegang alternatives from this
-      slice. What is left is elementary — three Poisson variates plus `n_3`
-      inverse-CDF draws `E = E_0 / (1 - u (T_up - E_0)/T_up)`. Three additions
-      B did not remove but created:
+- [x] C — Sampler derivation and unit test. **Done. Implemented as a standalone,
+      testable unit; nothing is wired into transport (D--F).** Owners:
+      `montecarlo/transport.py` (`_urban_levels_scalar`,
+      `_urban_channels_scalar`, `_urban_moments_element_scalar`,
+      `_urban_poisson_scalar`, `_urban_ionisation_keV`,
+      `_urban_sample_element_keV`, `_dEds_spliced_element_scalar`,
+      `_urban_sample_compound_keV`, `urban_element_table`,
+      `urban_loss_moments_keV`) and
+      `tests/montecarlo/test_energy_loss_straggling.py` (134 cases).
 
-      1. **The `E_2` admissibility re-solve**, which Geant4 never needs. When
-         `E_2 = 10 Z^2` eV exceeds `T_max = E/2` (i.e. `E < 20 Z^2` eV; W below
-         109.5 keV, Si below 3.92 keV) or its logarithm goes non-positive,
-         re-solve the sum rules with `f_1 = 1`, `E_1 = I`. A naive clamp to zero
-         instead makes the mean overshoot by up to 1.87% (measured, W at 1 keV).
-      2. **Per-element Bragg application.** Geant4 uses a material-level
-         effective `Z`; PyRITE's stopping power and its crossover splice are
-         both per element, so Urban must be too. That is what keeps
-         `C = dE/dx` exact for each element and the total mean bit-for-bit.
-      3. **Moment pins against `xi` and `xi T_max`**, not against the model's
-         own shape — the PRM's "mean loss at least a few multiples of `I_exc`"
-         floor is violated in nearly every cell (measured `dE/I` = 0.017--2.58
-         per flight). C decides whether to accept the measured -26% variance
-         deficit in high `Z` or apply the PRM's width correction.
+      **Source.** Geant4 PRM, "Energy loss fluctuations", Urban model
+      (`G4UniversalFluctuation`), after Bichsel, *Rev. Mod. Phys.* **60**, 663
+      (1988). Parameterisation exactly as selected in B; `T_up = T_max = E/2`,
+      per element, `C = |dE/dx|`.
 
-      Keep the original requirements: check units, limits and signs, pin the
-      first two moments, and include the limiting case that the sampler reduces
-      to the current deterministic loss as the step (hence every `<n_i>`) goes
-      to zero.
+      **Derivation, checked.** Units: `Sigma_i` is `C [keV/Ang]` over an energy
+      `[keV]`, so `<n_i> = s Sigma_i` is dimensionless and `dE` is keV; the
+      cores' `dE/dx` is negative and the sampler returns a positive loss, matching
+      `E -= |dEds| * s`. Mean, from the two sum rules `f_1 + f_2 = 1` and
+      `f_1 ln E_1 + f_2 ln E_2 = ln I`:
+
+          sum_{i=1,2} Sigma_i E_i = C (1-r)/L_I [f_1 L(E_1) + f_2 L(E_2)]
+                                  = C (1-r)/L_I [ln(2 mc^2 (bg)^2) - beta^2 - ln I]
+                                  = C (1-r),
+          Sigma_3 <E>_3           = C r,   <E>_3 = E_0 T_up ln(T_up/E_0)/(T_up-E_0),
+
+      so `<dE> = C s` **identically**, for any `r`, `Z`, `I`. Variance, compound
+      Poisson with no cross terms: `Var = s (Sigma_1 E_1^2 + Sigma_2 E_2^2 +
+      Sigma_3 E_0 T_up)`, using `<E^2>_3 = E_0 T_up` exactly on the `1/E^2`
+      spectrum. Continuum draw is that spectrum's exact inverse CDF, verified
+      against `F(E)` on a 257-point grid: `u = 0 -> E_0`, `u -> 1 -> T_up`,
+      monotone. **Limiting case:** every `<n_i>` is linear in `s`, so as `s -> 0`
+      both moments vanish linearly and `P(dE = 0) -> 1` — tested at `s = 1e-12`
+      Ang, where all 500 draws are identically 0.0, and the analytic mean equals
+      `C s` at every `s`. The sampler degenerates to the present deterministic
+      loss.
+
+      **Closure, measured.** `(model mean)/(S s)` over the 9 catalog materials
+      plus bare `C(0.1136)` / `W(0.06305)` at 1--300 keV: worst deviation from 1
+      is **4.4e-16**, i.e. one ulp. Not merely 1.0000 — bit-for-bit in float64
+      against the cores' own `_dEds_spliced_compound_scalar`. This is asserted by
+      test per element (`rel=1e-14`) and per compound against the splice
+      (`rel=1e-13`), plus a test that the new per-element split sums back to the
+      compound law (which is why the split had to be a deliberate duplicate of
+      that function's body rather than a factoring of it — re-associating the
+      Joy--Luo/Berger--Seltzer sums would move the last bits of every existing
+      transport result).
+
+      **`E_2` re-solve, implemented and tested at the boundaries.** The channel
+      switches off exactly at `E = 20 Z^2` eV (tested at +-0.1% of the boundary
+      for C/Si/S/W: 0.72 / 3.92 / 5.12 / 109.5 keV) and wherever `L(E_2) <= 0`;
+      the surviving level is then `f_1 = 1, E_1 = I`. B's clamp figures are
+      reproduced verbatim by a reference clamp written into the test file —
+      **1.0187 / 1.0098 / 1.0038 / 1.0010** for W at 1 / 2 / 5 / 10 keV — and the
+      re-solve returns closure to 1 at `rel=1e-14`, including a 41-point scan
+      straight through W's 109.5 keV boundary with no step in the mean.
+
+      **Variance deficit, accepted and recorded, and it MOVED.** With the
+      re-solve in place the ratio to the analytic Moller `xi T_max` over the same
+      matrix is **0.70 (ptbi2, 100 keV) to 1.55 (ptbi2, 1 keV)** — `sigma_E`
+      within **-16%/+24%** — against B's **0.73--1.42** measured with the naive
+      clamp. The widening is a consequence of the re-solve, not a regression: the
+      clamp leaves the surviving level at the sum-rule `E_1` (0.645 keV for W),
+      the re-solve raises it to `I` (0.727 keV), and `Var` carries `E_1^2` while
+      the mean carries `f_1 L(E_1)/L_I` and is invariant. B's number should be
+      read as the clamped variant's. The PRM's width correction is **not**
+      applied; the test pins the band `0.70 <= ratio <= 1.55` so any future
+      change to it is visible. Sampled first two moments close on the analytic
+      ones within 3% (mean) and 20% (variance) at 30k draws.
+
+      **Three decisions C made that D--F inherit.**
+
+      1. *Poisson variate advances the stream by an amount the caller can
+         predict.* Inverse CDF by the recurrence `p_{k+1} = p_k lam/(k+1)`
+         consumes exactly **one** uniform however large `n` comes out; Knuth's
+         product method would consume `n + 1` and make the counter layout
+         data-dependent. Above `lam = 100` it hands to the Gaussian limit
+         (skewness <= 0.1) at **two** uniforms via Box--Muller. A channel with
+         `lam = 0` consumes none. So a flight consumes `(#non-empty Poisson
+         channels) + n_3` draws per element — variable, but a pure function of
+         the inputs.
+      2. *Inadmissible cells fall back to the deterministic loss and consume no
+         stream.* `T_up <= E_0` (E below 20 eV) or `L(I) <= 0` (below ~0.18 keV
+         in tungsten) leaves no admissible parameterisation at all; the sampler
+         returns `C s` there rather than sampling a degenerate distribution. The
+         mean stays exact and the fallback is silent in every moment test.
+      3. *The sampler does not clamp `dE` to `E`.* `E_1 = I` can exceed
+         `T_up = E/2` at low energy after the re-solve (W below 1.45 keV), and
+         `n_3` can exceed 1, so a single flight can return a loss above the
+         electron's kinetic energy. Clamping would break the mean, which is the
+         one property the model was selected for. **E owns this**: the
+         cutoff-crossing solve and `n_cutoff_stopped` must handle it, as B
+         already flagged.
+
+      **No ledger row, deliberately.** `Validation: energy-loss-straggling` would
+      assert that PyRITE models straggling; after C nothing does — the sampler is
+      unreachable from every transport core and from `simulate_trajectories`, so
+      a row would describe behaviour no run has. The row belongs with the first
+      slice that makes it reachable (E/F) and lands in
+      `ledger-transport-background.md` under I. No `Validation:` marker was added
+      to the code either, so there is no orphan for the ledger auditor to find.
+      The derivation itself lives next to the code (a ~60-line block comment in
+      `transport.py` carrying source, sum rules, both moments, units, signs,
+      limiting case and the accepted limits) and in the test module docstring;
+      `docs/` is untouched, per I/J/K.
+
+      **Recommendation for D.** The sampler already takes `(key, counter)` and
+      returns the advanced counter, so D's remaining choice is how to *address*
+      it. Do **not** share the electron's existing counter: the per-flight draw
+      count is variable (see decision 1), so a shared counter makes the free-path
+      and scattering-angle draws depend on whether straggling is on, which
+      violates D's own second requirement. Recommend a **separate key domain per
+      flight**: `straggle_key = _splitmix64(stream_key ^ CONST)` once per
+      electron, then `flight_key = _splitmix64(straggle_key + GOLDEN * (flight,
+      substep index))`, drawing from counter 0 within it. That gives unbounded
+      per-flight consumption with no collisions and no stride to bound, keeps the
+      straggling-off path bit-for-bit by construction (the existing stream is
+      never touched), and reuses `_splitmix64` / `_stream_uniform_scalar`
+      unchanged so host and CUDA address the same streams. The host/CUDA parity
+      claim should be stated as few-ulp, not bit-for-bit: `_urban_poisson_scalar`
+      branches on a `log`/`exp` comparison, so a last-bit difference in `lam` can
+      move `n` by one at a CDF boundary.
 - [ ] D — RNG plumbing. Add a counter-addressed straggling stream keyed on
       `(electron, flight, substep)`, reusing the `stream_keys` / `_splitmix64`
       machinery. Required properties, each with a test: straggling off is
