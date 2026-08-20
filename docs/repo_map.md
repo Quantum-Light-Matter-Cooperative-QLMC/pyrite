@@ -443,7 +443,12 @@ nested energy bins project back to the historical payload vocabulary, so
 read-time scoring does not perturb transport/checkpoint identity.
 The in-medium photon dispersion is unconditional (no setting, no divergence
 key); the payload instead hashes a constant `line_kinematics` generation marker,
-which orphaned every vacuum-era digest exactly once.
+which orphaned every vacuum-era digest exactly once. The Joy--Luo/Berger--Seltzer
+collision-stopping splice follows the same pattern with a constant
+`stopping_model` marker, hashed by both `dataset_identity` and
+`case_content_key` -- the latter because the model is not a case field, so
+nothing else would stop the CAS serving a Joy--Luo-era blob for a case that now
+transports differently.
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
   `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.

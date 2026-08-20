@@ -8,6 +8,7 @@ from pyrite.campaign.sweep import Sweep as LegacySweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import run_case
+from pyrite.montecarlo.transport import STOPPING_MODEL
 
 
 def _inputs():
@@ -62,6 +63,9 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     assert seen["transport_core"] == "auto"
     assert result.provenance["scene"].target == target
     assert len(result.provenance["identity_digest"]) == 64
+    # Which collision-stopping model produced the numbers is part of the record,
+    # not just of the digest that separates the two models' checkpoints.
+    assert result.provenance["stopping_model"] == STOPPING_MODEL
 
 
 def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:

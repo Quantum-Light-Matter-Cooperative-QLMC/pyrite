@@ -2,14 +2,17 @@
 
 import json
 from dataclasses import replace
+from unittest import mock
 
 import numpy as np
 import pytest
 
+from pyrite.campaign import profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
     FIDELITY_NAMES,
     IDENTITY_MIGRATIONS,
+    STOPPING_MODEL,
     FidelityPreset,
     case_content_key,
     dataset_identity,
@@ -52,7 +55,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
 
     assert case_content_key(case) == case_content_key(case.to_dict())
     assert case_content_key(case) == (
-        "469035680a013567be35f189059e3b76eeb22acc2d49653592613c784fc9079b"
+        "a2bad855dc8b25a2fbb746a10ad333d22d424f097e6450a2cf648f5d56b88495"
     )
 
 
@@ -63,7 +66,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "06a4172f1c18e0b2da026f2e1bc91779af301902c4fe8a3f4cdfaf3235dfd937"
+        "1c84cd6e46538e7ccc8a173bbdb6b818bda0f1f1ffdee9bec0236237622158a7"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -207,12 +210,36 @@ def test_line_kinematics_marker_is_a_constant_that_orphans_vacuum_era_digests():
     assert "xray_dispersion" not in identity["resolved_parameters"]["settings"]
 
 
+def test_stopping_model_marker_is_a_constant_that_orphans_joy_luo_era_digests():
+    """The Joy--Luo/Berger--Seltzer splice is unconditional physics, so it is a
+    CONSTANT generation marker rather than a selector -- but every digest minted
+    before it landed described pure Joy--Luo transport, which under-stops above
+    each element's crossover. Hashing the marker moves every digest exactly once
+    so those checkpoints cannot be resumed into (rev-and-re-run)."""
+    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+
+    assert identity["resolved_parameters"]["stopping_model"] == STOPPING_MODEL
+    assert STOPPING_MODEL == "joy-luo/berger-seltzer-splice"
+
+
+def test_case_content_key_separates_stopping_models():
+    """The stopping model is not a case field, so nothing in the case dict keeps
+    a CAS blob computed under the retired pure Joy--Luo model from being served
+    for a case that now transports differently. The key hashes the marker."""
+    case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
+    current = case_content_key(case)
+    with mock.patch.object(profiles, "STOPPING_MODEL", "joy-luo-only"):
+        joy_luo_era = case_content_key(case)
+
+    assert joy_luo_era != current
+
+
 def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "06a4172f1c18e0b2da026f2e1bc91779af301902c4fe8a3f4cdfaf3235dfd937"
+        "1c84cd6e46538e7ccc8a173bbdb6b818bda0f1f1ffdee9bec0236237622158a7"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -226,42 +253,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "a20452c45d984673e006ceaebe9c4ed8b63f0d27d35181359c976eb08ceb999b",
+            "693508c066f3e2dbb919be8a1d15211fb41b49bf1e6c4373f9d8ba84fbf80def",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "23807511da4dfcb794877a8a269e329c43bb6141dd0b41bcc510f9b92957dd05",
+            "e097b0dc676f3e884f27ef2ad8e4cc17d9f57cb1cf59008d111989b4193b5042",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "53f3ecd504c5e6b4bca19f0d3d31d30e67c4992b00b8fb02b13cfbf3205d4d84",
+            "21badf3af80e3ff3c039e0b10087b7d357586c4bcf03b60a23b25247fbcaa62a",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "253dbc30a3b967910f3875b147ad02e40eecd6911f2e85bb2d4809f9e9953fda",
+            "c4e03c937d32ea935e6bf113bef04fffc12e2d6ae07299b9464b9c8842ce6bb8",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "641849847fdadc46f0647468a8bcf83aecbc498a96347cf14691b2d3666964e3",
+            "4130949363a1bebced6ce3f0a69ec7564e8748c52f2603f57163975591a8c0e2",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "378defa7db076c74f3602159aec571e32882941b574bf66855b0e03aa7c61a58",
+            "3ba0b3dc93db06ba5417c37b81f0f9a6bf08723cca4739ac1dd313d1e06d2697",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "437e0daef89eb42f61b6e79dc4aa05f19bec3bce3f15c853a68c0e6df7246b0a",
+            "3c3c2cfba2d1227b00864e3732e184a8e6fa3082d745d064ef78ce3759311e27",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "41a7792e7494348f3f311aafcb13de22b592c5cac875cbb355a0b7d062c2b24a",
+            "5c1896568c9690dc799976eecb9aa57cbc23b2290992997062d080759dd50465",
         ),
     ],
 )
@@ -409,16 +436,17 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     assert coherent["resolved_parameters"]["emission"] == "coherent"
     assert both["resolved_parameters"]["emission"] == "both"
 
-    # Known incoherent digest (current baseline, re-minted once when the
-    # in-medium line kinematics became unconditional) must stay bit-for-bit.
+    # Known incoherent digest (current baseline, re-minted when the in-medium
+    # line kinematics became unconditional and again when the Joy--Luo/
+    # Berger--Seltzer stopping splice did) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "06a4172f1c18e0b2da026f2e1bc91779af301902c4fe8a3f4cdfaf3235dfd937"
+        "1c84cd6e46538e7ccc8a173bbdb6b818bda0f1f1ffdee9bec0236237622158a7"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "44c2645d739156a813d72cc71d57a143c4f00c46806f2890129fa2eb417bd0c5"
+        "50e1aef56720b93c204c6ddeb6c7e1ae57c81f52e8cd3e17bd4897aac520b5ae"
     )
 
 

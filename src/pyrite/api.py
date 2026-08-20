@@ -35,6 +35,7 @@ from .montecarlo import Case, run_case
 from .montecarlo._backend import BACKEND
 from .montecarlo.geometry import directions_to_sample_frame
 from .montecarlo.runner import run_case_directions
+from .montecarlo.transport import STOPPING_MODEL
 from .results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
 
 
@@ -252,6 +253,7 @@ def simulate(
             "scene": scene,
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case),
+            "stopping_model": STOPPING_MODEL,
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {"pyrite": __version__, "numpy": np.__version__},
@@ -328,6 +330,7 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
             "identity_digest": source_digest,
             "observation_identity_digest": observation_digest,
             "observation": observation,
+            "stopping_model": STOPPING_MODEL,
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {

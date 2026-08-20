@@ -806,6 +806,17 @@ def spliced_stopping_keV_per_ang(composition, E_keV):
     return -7.85e-4 / E * joy_luo_total - _BS_PREFACTOR / beta_sq * bs_total
 
 
+# Generation marker for the collision-stopping model every core evaluates. The
+# splice is unconditional physics, not a selector, so this is a CONSTANT and
+# follows the ``line_kinematics`` precedent: identity payloads and the per-case
+# content key hash it, which moves every digest exactly once and orphans the
+# records minted under the retired pure Joy--Luo model (rev-and-re-run) rather
+# than letting them resume into -- or be served from the CAS for -- a run that
+# computes different numbers. Bump it whenever the evaluated model changes:
+# adding the density-effect term delta, or moving a crossover, is such a change.
+STOPPING_MODEL = "joy-luo/berger-seltzer-splice"
+
+
 @dataclass(frozen=True)
 class TransportLUTConfig:
     """Energy-grid policy for the ungrooved transport hot loops.

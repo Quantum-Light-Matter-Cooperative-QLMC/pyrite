@@ -22,6 +22,7 @@ import numpy as np
 
 from ..detectors import EnergyBins
 from ..montecarlo.case import Case
+from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from .sweep import (
     Sweep,
@@ -395,6 +396,12 @@ def _identity_v1(
     # matching how the emission rename was handled) instead of letting them
     # resume into a run that computes different numbers.
     resolved["line_kinematics"] = "in-medium"
+    # Same rule for the electron collision-stopping model. Joy--Luo alone is the
+    # retired model; the per-element Joy--Luo/Berger--Seltzer splice is what the
+    # cores evaluate now, and it changes energy-versus-depth for every run above
+    # the crossover (2.66-10.46 keV by element). Hashing the marker keeps
+    # Joy--Luo-era and Berger--Seltzer-era records in disjoint identities.
+    resolved["stopping_model"] = STOPPING_MODEL
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,
@@ -469,9 +476,15 @@ def case_content_key(case: Case | Mapping[str, Any]) -> str:
     exactly the case where the stored arrays are bit-identical. A shared physics
     case whose seed differs simply gets a distinct key and recomputes; the store
     never serves a mismatched-seed result.
+
+    The stopping model joins the payload as a constant alongside the case. It
+    is not a case field -- the splice is unconditional -- but it determines the
+    stored arrays, and without it a blob computed under the retired pure
+    Joy--Luo model would be served for a case that now transports differently.
     """
     payload = {
         "schema": CASE_CONTENT_KEY_SCHEMA,
+        "stopping_model": STOPPING_MODEL,
         "case": _jsonable(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),
