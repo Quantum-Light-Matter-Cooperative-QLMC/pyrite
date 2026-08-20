@@ -1718,8 +1718,8 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 # (iv) Bound, in the form a caller can check. Dividing (ii) by the unsplit
 #     moments and using DeltaE = C s for the flight's own mean loss,
 #
-#         |<sum X_m> - <X>| / <X>   <=  (1/2) |dlnC/dlnE| (DeltaE / E)
-#         |Var(sum X_m) - Var(X)| / Var(X) <= (1/2) |dlnV/dlnE| (DeltaE / E)
+#         |<sum X_m> - <X>| / <X>          ~  (1/2) |dlnC/dlnE| (DeltaE / E)
+#         |Var(sum X_m) - Var(X)| / Var(X)  ~  (1/2) |dlnV/dlnE| (DeltaE / E)
 #
 #     both with the (N-1)/N <= 1 factor dropped, and both to LEADING order --
 #     the dropped O(s^3) remainder is itself of relative size DeltaE/E, so the
@@ -1738,8 +1738,8 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 #         of 2.243 keV, i.e. consistent with the exact invariance of (i);
 #       - drifting, N = 32: shift +0.086 +- 0.015 keV against the leading-order
 #         prediction +0.075, a ratio of 1.15 -- the 15% excess being the
-#         O(s^3) term, which falls to ~1.30 at s = 1.5e4 (DeltaE/E = 0.135) as
-#         the expansion predicts;
+#         O(s^3) term, which grows to a ratio of 1.30 at s = 1.5e4
+#         (DeltaE/E = 0.135), as the expansion predicts;
 #       - in transport, 600 electrons at 25 keV with `max_dE_frac` 0 vs 0.02:
 #         mean per-electron straggled loss 19.61 vs 19.70 keV, 0.5%.
 #

@@ -524,10 +524,172 @@ Interactions that need explicit design rather than incremental patching:
       `tests/montecarlo/test_groove.py`'s `_run_grooved` helper was updated
       for the grooved core's three new trailing parameters (mechanical, no
       behavior change since it passes `straggle_on=False`).
-- [ ] E — CPU integration on the ungrooved lockstep core, including the
+- [x] E — CPU integration on the ungrooved lockstep core, including the
       redefined cutoff crossing and the `max_dE_frac` substep interaction.
-      Re-derive rather than re-run `substep-radiation-invariance` for the
-      straggled path.
+      **Done on `_transport_core_ungrooved` only** (the exact, non-LUT lockstep
+      core); every other core stays diagnostic-only until F. Owners:
+      `montecarlo/transport.py` (`_transport_core_ungrooved` and a ~215-line
+      derivation block above it; `simulate_trajectories`'s `straggling`
+      docstring) and `tests/montecarlo/test_straggling_transport_integration.py`
+      (9 cases), plus a narrowing of slice D's property-2 test.
+
+      **The loss is applied.** When `straggle_on`, `E_end = E_start - dE` with
+      `dE` the slice-C draw over the row's own length, replacing
+      `E_end = E + dEds*step` (frozen) and the midpoint predictor-corrector
+      alike. `energy_model` still selects the clock's representative energy
+      (`beta` at the realized `(E_start+E_end)/2` versus at `E_start`) and the
+      `seg_E_end`/`seg_t_end` schema, but no longer the energy update: the
+      corrector is a quadrature of a deterministic ODE that a random loss
+      replaces, and the sampler's own mean is the left-endpoint `C(E_start) s`.
+      The residual that leaves in the mean is exactly the O(s^2) term derived
+      below, and `max_dE_frac` is the lever that controls it.
+
+      **Cutoff crossing, redefined — and the indicator half is EXACT.** The
+      Urban loss is a compound-Poisson *subordinator*, hence non-decreasing in
+      the step length, so
+
+          first passage lies inside the row  <=>  dE(row) >= E_start - E_cut,
+
+      a function of the total loss alone, which is exactly what the sampler
+      returns. **`n_cutoff_stopped` therefore carries no approximation**; it
+      fires on precisely the rows whose true first passage is interior. Only
+      the crossing *location* needs a rule, and the rule is the fluid
+      interpolation at the row's own realized rate,
+      `s_cut = s (E_start - E_cut) / dE`, with `E_end = E_cut` exactly.
+      It reduces **algebraically**, term by term, to the deterministic
+      `cutoff_distance = (E_cut - E_j)/dEds` in the zero-fluctuation limit; it
+      is the same fluid picture the surrounding transport already uses for the
+      clock and `seg_mid` (it changes *which* number is spread along the
+      flight, not the spreading); it handles C's decision-3 overshoot with no
+      special case (`dE >> Delta` sends `s_cut -> 0`, never a negative energy);
+      and it consumes no extra random numbers, so D's stream layout and
+      off-path bit-for-bit claim survive untouched. Cost, recorded honestly:
+      the location is biased inside the crossing row — the true first passage
+      is the crossing jump's position, uniform on `[0, s]` given one jump — so
+      a large overshoot stops the track earlier than the truth, bounded by one
+      flight length on the terminating row only.
+
+      **Rejected, for the record.** (a) *Travel the full row, then stop* — does
+      not degenerate to the deterministic solve at all and lengthens every
+      terminated track by half a flight even with the fluctuation off.
+      (b) *Uniform crossing position* — exact for a single-jump crossing but
+      wrong for a multi-jump one, wrong in the deterministic limit, and
+      outcome-dependent stream consumption. (c) *Clamp `dE` to `Delta`* — breaks
+      `<dE> = C s`, the one property B selected Urban for. (d) *Sample the jump
+      ladder for the exact first passage* — correct, but needs per-element
+      counts and `n_i` extra position variates out of slice C's sampler, which E
+      does not own. **(d) is the only one that is strictly better physics, and
+      it is the recommended upgrade if range straggling near `E_cut` ever
+      becomes load-bearing.**
+
+      **Ordering.** With straggling on the `max_dE_frac` cap is applied
+      **before** the sample and the cutoff test **after** it — the reverse of
+      the deterministic order, which can afford to solve the cutoff first
+      because the loss is a known function of distance. The step control itself
+      stays deterministic (`max_dE_frac * E / |dEds|`, the mean rate): a
+      substep grid chosen from the realized loss would be a *random* partition,
+      the partition and the increments would be dependent, and the
+      infinite-divisibility argument below — which holds for any *fixed*
+      partition — would not apply.
+
+      **`substep-radiation-invariance` re-derived for the straggled path**
+      (in-code, for K to transcribe; `docs/` untouched). The invariance is
+      distributional, not algebraic, and comes in two exact halves.
+
+      1. *At frozen energy it is EXACT, not asymptotic.* `sum_m CP(s_m Sigma)
+         =_d CP(s Sigma)` for **any** partition and any `N`, since
+         `sum_m Poisson(s_m Sigma_i) = Poisson(s Sigma_i)` with i.i.d. marks.
+         Distributional, not pathwise: each substep addresses its own
+         `(flight, substep)` key, so the realized numbers differ.
+      2. *The only substep dependence is the drift of `Sigma_i` with `E` inside
+         the flight.* With `C(E) = |dE/dx|` and `V(E) = Sigma_1 E_1^2 +
+         Sigma_2 E_2^2 + Sigma_3 E_0 T_up` per unit length,
+         `<sum_m X_m> = sum_m s_m C(E^(m))` and likewise for `V`, so expanding
+         about `E`,
+
+             <sum_m X_m> - <X> = -C C' sum_m s_m sigma_{m-1} + O(s^3)
+                               = -C C' s^2 (N-1)/(2N) + O(s^3),
+
+         and identically `-V' C s^2 (N-1)/(2N)` for the variance. Positive,
+         since `C' < 0`: substeps at the lower energies earlier substeps left
+         behind lose more.
+      3. *Its `N -> infinity` limit is the CORRECT moment.* The exactly
+         integrated mean is `int_0^s C(E(s')) ds' = C s - (1/2) C C' s^2 +
+         O(s^3)`, whose second-order term is the `N -> infinity` limit above.
+         **So the entire substep dependence of the straggled loss is the
+         pre-existing left-endpoint quadrature error of the frozen energy
+         model; straggling introduces none of its own**, and refining
+         `max_dE_frac` removes it at first order exactly as it does
+         deterministically.
+      4. *Bound, leading order:* `|Delta<dE>|/<dE> ~ (1/2)|dlnC/dlnE|
+         (DeltaE/E)` and the same with `V` for the variance, `DeltaE = C s` the
+         flight's own mean loss. An estimate, not a hard inequality — the
+         dropped `O(s^3)` remainder is itself of relative size `DeltaE/E`.
+
+      **Verified statistically, not asserted.** Graphite, 25 keV, `s = 1e4` Ang
+      (`DeltaE/E = 0.09`), 20000 repetitions of a harness reproducing the
+      core's substep recursion: frozen `N = 1` vs `N = 32` shift
+      `-0.0014 +- 0.0150` keV on a mean of 2.243 keV (consistent with the exact
+      invariance); drifting `N = 32` shift `+0.086 +- 0.015` keV against the
+      leading-order prediction `+0.075`, ratio **1.15**, rising to 1.30 at
+      `s = 1.5e4` (`DeltaE/E = 0.135`) as the `O(s^3)` remainder predicts. In
+      transport, 600 electrons with `max_dE_frac` 0 vs 0.02: mean per-electron
+      straggled loss 19.61 vs 19.70 keV, **0.5%**.
+
+      **Tests, one per "Done when" property.** Off path: a cutoff- and
+      substep-heavy run (>100 crossings; >2 rows per crossing at
+      `max_dE_frac=0.02`) across frozen/midpoint/substepped, pinning
+      `straggling=False` bit-for-bit against a call that never mentions the
+      keyword, so both new orderings are covered as unreachable. On path:
+      2000 electrons at 25 keV graphite — energies never below `E_cut`, all
+      four exit channels sum to `Ne`, and the summed sampled loss closes on the
+      transport's own mean stopping power to **0.07%** over 5.6e5 rows; row by
+      row `E_end == E_start - dE` **exactly** against the sampler re-run
+      offline from the documented key. Overshoot: 6 keV against a 5 keV cutoff
+      (1 keV available, single quanta to `T_max = 3` keV) — median overshoot
+      **2x**, max **>2000x**, the crossing loss reaches the available energy on
+      **every** track without exception (the empirical form of the exact
+      indicator), and inverting the truncation recovers the untruncated length,
+      which re-drawn reproduces that very loss. Mutation-checked: travelling the
+      full row, halving the crossing fraction, and ignoring the draw each fail.
+
+      **Slice D's property-2 test was narrowed, deliberately.** "Straggling on
+      never changes any pre-existing array" is now false on the one core that
+      applies the loss, so that test runs on the four diagnostic-only cores and
+      is restated for the lockstep exact core as "every electron's **first row**
+      is bit-for-bit identical" — the lockstep core draws every electron's first
+      free path before any second one, at the unperturbed start energy, so that
+      still proves the straggling draw never touches the shared `Generator`.
+      Slice D's property-1 (off is bit-for-bit) and property-3 (offline
+      reproduction from `(seed, electron, flight, substep)`) pass **unmodified**;
+      property 3 gained an explicit `n_cutoff_stopped == 0` assertion, because a
+      crossing row is truncated *after* the sampler drew over the untruncated
+      length, so its `L_ang` is no longer the length sampled over.
+
+      **Acceptance run:** `test-suite core` (1770 passed, 69 skipped — the
+      pre-existing 1761 plus this slice's 9), `test --numba` (3574 passed,
+      69 skipped, 6m35s), `lint`, `typecheck` — all clean. No existing test was
+      weakened or deleted.
+
+      **Recommendation for F.** The crossing logic is core-agnostic: it needs
+      only `E_start`, `E_cut`, the row's length, the sampled loss, and the
+      geometry-event flag, and it is ~20 lines with no state. Both lockstep LUT
+      and grooved cores can take it verbatim. Two caveats. (1) *LUT cores*: the
+      cutoff distance there is solved on the interpolated `dE/ds`, but the
+      straggling branch does not use a cutoff distance at all, so the LUT's
+      interpolation error stops entering the crossing — F should decide whether
+      that is desirable (it makes the straggled LUT crossing *more* accurate
+      than the deterministic one) or whether the LUT rate should be used for the
+      `max_dE_frac` cap only, for consistency. (2) *Per-electron and CUDA
+      cores*: those carry an explicit `exit_code` (`EXIT_CUTOFF_STOPPED` /
+      `EXIT_STEP_LIMITED`) rather than the lockstep core's booleans, so the flag
+      clearing has to be re-expressed, and CUDA additionally needs the division
+      guard (`stragg_loss > 0.0`) kept — a `0/0` there is a silent NaN
+      propagating into `pos`. Grooved adds one genuinely new question E did not
+      face: a row can be truncated by a *facet* crossing into vacuum, and the
+      cutoff test must run against the material-side length only. Nothing here
+      suggests a variant rule is needed; the geometry bookkeeping differs, the
+      physics does not.
 - [ ] F — Remaining cores: grooved, per-electron, per-electron LUT, CUDA. Any
       core not yet covered raises, matching the existing `energy_model`
       fail-closed precedent, rather than silently returning unstraggled results.
