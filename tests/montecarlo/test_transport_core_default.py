@@ -27,8 +27,10 @@ def cuda(monkeypatch):
     """Answer the device probe without a device."""
 
     def _set(available=True):
+        # resolve_transport_core resolves _cuda_transport_available in its own
+        # module (transport.batching), not the package re-export.
         monkeypatch.setattr(
-            "pyrite.montecarlo.transport._cuda_transport_available",
+            "pyrite.montecarlo.transport.batching._cuda_transport_available",
             lambda: available,
         )
 

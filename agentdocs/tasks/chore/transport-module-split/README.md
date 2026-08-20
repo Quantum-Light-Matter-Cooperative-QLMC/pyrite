@@ -213,3 +213,24 @@ physics-claim editing, not just prose), `documentation-maintenance`.
 - No physics claim from the original docstring is lost: every sentence
   removed is either already present (linked) on a `docs/physics`/
   `docs/validation` page, or was migrated there in this same change.
+
+## Implementation progress (2026-08-20)
+
+- Rebased integration already includes `feature/energy-loss-straggling`; `main`
+  is an ancestor of the current branch.
+- Trimmed `simulate_trajectories` to the methodology shape in checkpoint
+  `5b1de5b8`; linked physics/validation pages retain the detailed model claims.
+- Split the monolith into `transport/{kinematics,scattering,stopping,
+  straggling,lut,cores,batching,api}.py`; `transport/__init__.py` preserves the
+  pre-split import surface and introspection owner for exported API objects.
+- Preserved the complete multiset of `Validation: <id>` markers. Existing
+  validation-ledger tests pass; no standalone `physics-ledger-auditor` command
+  exists in this checkout.
+- Updated repository/design ownership prose and the autodoc warning baseline.
+  Docs build and `pyrite.montecarlo.transport.simulate_trajectories`
+  autosummary resolution pass.
+- Verification: format, lint, typecheck, repo-map check, docs, CLI suite (1,214
+  passed), apps suite (295 passed), and core suite (1,769 passed, 69 skipped,
+  one process-pool test deselected). The deselected test passes separately
+  when allowed to create its forkserver Unix socket. JIT-disabled core suite:
+  1,769 passed, 69 skipped, with that same process-pool test deselected.

@@ -276,16 +276,18 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
 - `materials.attenuation` — `_normalize_composition`, `_mu_total_inv_ang`, `_layer_dz`,
   `_stack_tau` (composition + cross-stack self-absorption). Deps: `_backend`,
   `materials.crystal`.
-- `transport` — `simulate_trajectories` (multilayer-stack aware via `layers=`),
-  `beta_from_keV`, scattering/stopping helpers; `TRANSPORT_ELEMENTS`
-  registry. NumPy/Numba, plus a device core: `resolve_transport_core` picks the
-  CUDA one above `CUDA_TRANSPORT_MIN_ELECTRONS` (1000) electrons on a CUDA box,
-  pinnable with `PYRITE_MC_TRANSPORT_CORE`. `energy_model` selects the
-  propagation rule (`"frozen"` default left-endpoint, `"midpoint"`
-  predictor--corrector); `max_dE_frac` splits a physical flight into numerical
-  substeps under `"midpoint"` and adds the `E_end_keV`/`t_end_ang`/`E_repr_keV`
-  and `flight_id`/`substep_id` row fields. Deps: `materials.attenuation`,
-  `DATA_DIR`.
+- `transport/` — compatibility package for the former transport monolith;
+  `__init__.py` re-exports its complete pre-split surface. `api.py` owns
+  `simulate_trajectories` (multilayer-stack aware via `layers=`), while
+  `kinematics.py`, `scattering.py`, `stopping.py`, `straggling.py`, `lut.py`,
+  `cores.py`, and `batching.py` own the corresponding transport stages.
+  NumPy/Numba, plus a device core: `resolve_transport_core` picks the CUDA one
+  above `CUDA_TRANSPORT_MIN_ELECTRONS` (1000) electrons on a CUDA box, pinnable
+  with `PYRITE_MC_TRANSPORT_CORE`. `energy_model` selects the propagation rule
+  (`"frozen"` default left-endpoint, `"midpoint"` predictor--corrector);
+  `max_dE_frac` splits a physical flight into numerical substeps under
+  `"midpoint"` and adds the `E_end_keV`/`t_end_ang`/`E_repr_keV` and
+  `flight_id`/`substep_id` row fields. Deps: `materials.attenuation`, `DATA_DIR`.
 - `transport_jit_kernel` — the `cupyx.jit` port of
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
   run to completion, output slots addressed by electron index. Same arithmetic

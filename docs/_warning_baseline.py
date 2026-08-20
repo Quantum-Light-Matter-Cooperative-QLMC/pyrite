@@ -16,8 +16,8 @@ if TYPE_CHECKING:
     from sphinx.application import Sphinx
 
 
-EXPECTED_COUNT = 35
-EXPECTED_SHA256 = "a1b2da3ffc9ba01fa71f51c9d46be4e21b2ae303c74d95400c4a7c042d11adc4"
+EXPECTED_COUNT = 30
+EXPECTED_SHA256 = "4e7b17a721b37048b4353e98ef0265d4bb2e2d603362741afff67c0450ffcb96"
 _BASELINES: dict[int, AutodocWarningBaseline] = {}
 
 
