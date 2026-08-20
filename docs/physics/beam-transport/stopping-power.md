@@ -126,13 +126,69 @@ $7.85\times10^{-4}$ — 0.08%, the rounding in that constant.
 
 $\delta$ is the density-effect correction. It is a bulk property of the medium
 rather than of an element, so unlike $I$ it factors out of the Bragg sum and
-enters as one scalar per layer rather than per element. Over the 1–300 keV
-range this repository sweeps, $\beta\gamma \le 1.24$ at every energy, which
-sits below the onset $x_1$ tabulated by the same PDG Sternheimer parameters
-already cited for $I$ — so $\delta$ is expected to be small — but that is a
-bound, not a measurement, and $\delta$ is currently **omitted**: every call
-site passes $\delta = 0$ pending a per-material measurement from those
-parameters. {eq}`eq-stopping-bs-fminus` also omits shell corrections, which is
+enters as one scalar per layer rather than per element. It is **omitted**:
+every call site passes $\delta = 0$.
+
+That omission is now measured rather than assumed. With
+$x = \log_{10}\beta\gamma$, the Sternheimer parameterization is
+
+$$
+\delta(x) =
+\begin{cases}
+\delta_0\,10^{2(x - x_0)} & x < x_0\\
+2\ln(10)\,x - \bar{C} + a\,(x_1 - x)^k & x_0 \le x < x_1\\
+2\ln(10)\,x - \bar{C} & x \ge x_1
+\end{cases}
+$$ (eq-stopping-sternheimer)
+
+with $\delta_0 = 0$ for non-conductors. The coefficients are read from the PDG
+muon energy-loss table headers already cited for $I$ and land in
+`materials/_transport_data.py::STERNHEIMER_DENSITY_EFFECT`; nothing in the
+transport path reads them, and `transport.sternheimer_delta` exists only to
+size what is being dropped.
+
+An earlier version of this page argued $\delta$ was negligible because
+$\beta\gamma \le 1.24$ over the swept range "sits below the onset $x_1$".
+That reasoning was wrong: the onset is $x_0$, not $x_1$, and graphite's
+$x_0 = -0.009$, so the swept range sits *above* onset for this repository's
+primary material. The conclusion survives the correction, but only because the
+numbers are small, not because the range is below threshold.
+
+Measured over all 24 catalog elements, the fractional error in $|dE/ds|$ from
+dropping $\delta$ — that is, $\delta$ divided by the bracket of
+{eq}`eq-stopping-bs` — is
+
+```{list-table} Cost of omitting $\delta$, worst catalog element
+:name: tbl-stopping-density-effect
+:header-rows: 1
+
+* - Kinetic energy
+  - Worst fractional error
+  - Element
+* - 25 keV
+  - 0.13%
+  - Pd
+* - 100 keV
+  - 0.44%
+  - C
+* - 300 keV
+  - 1.50%
+  - C
+```
+
+$\delta$ rises monotonically with $\beta\gamma$, so the 300 keV row bounds the
+whole range. At 25 keV — the operating point that motivated this branch — the
+omission is about 45 times smaller than the 6% Joy–Luo error
+{eq}`eq-stopping-bs` was introduced to remove, and it is below the unmodeled
+shell corrections, straggling, and delta rays listed under *Assumptions and
+limits*. At the 300 keV ceiling it is 1.5%, which is stated rather than
+corrected. Applying $\delta$ properly would need per-*material* coefficients:
+it does not Bragg-add, so the per-element values above bound a compound's
+$\delta$ without being able to compose it. The Sternheimer–Peierls general
+rules reproduce the tabulated $\bar{C}$ from $I$ and $\hbar\omega_p$ exactly
+(better than $10^{-3}$ for all 24 elements) but place $x_0 \ge 0.2$, above the
+top of the swept range, so they return $\delta = 0$ throughout and cannot serve
+as the bound. {eq}`eq-stopping-bs-fminus` also omits shell corrections, which is
 why NIST restricts ESTAR collision stopping to energies $\ge 10$ keV; that is a
 second reason, independent of $\delta$, the low-energy branch stays
 load-bearing rather than being replaced outright.
@@ -237,10 +293,10 @@ The practical size of the change is the CSDA range at the default
 Ranges shorten, as they must: Joy–Luo under-stopped above its validated range.
 At 300 keV graphite's CSDA range goes from 643 to 416 μm.
 
-Two things stay open. First, $\delta$ is bounded ($\beta\gamma \le 1.24$ over
-the whole swept range sits below the Sternheimer onset for every catalog
-solid) but not yet measured per material — see the Berger–Seltzer branch,
-above. Second, the 1–10 keV window is not cleanly owned by either form: for
+One thing stays open, and one is now closed. $\delta$ is measured: omitting it
+costs at most 0.13% of $|dE/ds|$ at 25 keV and 1.50% at 300 keV
+({numref}`tbl-stopping-density-effect`), so it stays omitted with that error
+stated. Still open: the 1–10 keV window is not cleanly owned by either form: for
 the higher-crossover elements it sits above where Joy–Luo fits best and below
 where Berger–Seltzer is used. `E_cut_keV` defaults to 5 keV, which bounds most
 of that exposure, but the residual uncertainty there is stated rather than
@@ -299,8 +355,9 @@ where a study needs it.
   electrons do not exist as transported particles.
 - **No density-effect correction is applied, in either branch.** Joy–Luo has
   none by construction; {eq}`eq-stopping-bs` carries $\delta$ as a parameter,
-  but every call site passes $\delta = 0$ pending the per-material Sternheimer
-  measurement (see the Berger–Seltzer branch, above).
+  but every call site passes $\delta = 0$. Measured cost: under 0.13% of
+  $|dE/ds|$ at 25 keV, under 1.50% at 300 keV, worst in graphite
+  ({numref}`tbl-stopping-density-effect`).
 - **{eq}`eq-stopping-bs` omits shell corrections**, which is why it is used
   only above each element's crossover; below it, {eq}`eq-stopping-joy-luo`'s
   $kJ$ term is the only correction applied.

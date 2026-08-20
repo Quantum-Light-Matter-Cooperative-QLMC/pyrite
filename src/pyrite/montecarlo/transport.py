@@ -20,7 +20,7 @@ from numba import float64, int64, njit, uint64
 
 from .. import DATA_DIR
 from .._compat import env_value
-from ..materials._transport_data import TRANSPORT_ELEMENTS
+from ..materials._transport_data import STERNHEIMER_DENSITY_EFFECT, TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
 from ..transverse import resolved_from_mapping, sample_transverse
 from .geometry import (
@@ -804,6 +804,42 @@ def spliced_stopping_keV_per_ang(composition, E_keV):
         )
 
     return -7.85e-4 / E * joy_luo_total - _BS_PREFACTOR / beta_sq * bs_total
+
+
+def sternheimer_delta(element, E_keV):
+    """Sternheimer density-effect correction delta for one element at ``E_keV``.
+
+    Source: Sternheimer, Berger & Seltzer, *Atomic Data and Nuclear Data Tables*
+    **30**, 261 (1984), in the PDG's presentation, with coefficients read from
+    :data:`~pyrite.materials._transport_data.STERNHEIMER_DENSITY_EFFECT`. With
+    ``x = log10(beta gamma)``,
+
+        x < x_0:        delta = delta_0 * 10^(2 (x - x_0))
+        x_0 <= x < x_1: delta = 2 ln(10) x - C_bar + a (x_1 - x)^k
+        x >= x_1:       delta = 2 ln(10) x - C_bar
+
+    delta_0 is zero for non-conductors, so the first branch vanishes for them.
+
+    NO TRANSPORT PATH CALLS THIS. eq-stopping-bs carries delta as a parameter
+    and every call site passes 0.0; this function exists to measure how much
+    that omission costs, and is the instrument behind the bound quoted in
+    stopping-power.md and pinned by ``test_stopping_density_effect.py``.
+
+    Being per element it is not a compound's delta -- delta is a bulk property
+    of the medium and does not Bragg-add. Applying it per element would be
+    wrong; bounding a compound by its constituents is what it supports.
+    """
+    p = STERNHEIMER_DENSITY_EFFECT[element]
+    E = np.asarray(E_keV, dtype=float)
+    tau = E / _MC2_KEV
+    gamma = 1.0 + tau
+    x = np.log10(np.sqrt(1.0 - 1.0 / (gamma * gamma)) * gamma)
+    asymptote = 2.0 * np.log(10.0) * x - p["C_bar"]
+    return np.where(
+        x < p["x0"],
+        p["delta0"] * 10.0 ** (2.0 * (x - p["x0"])),
+        asymptote + np.where(x < p["x1"], p["a"] * np.abs(p["x1"] - x) ** p["k"], 0.0),
+    )
 
 
 # Generation marker for the collision-stopping model every core evaluates. The
