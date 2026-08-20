@@ -425,6 +425,27 @@ materials = ["mos2"]
     return _write_catalog(tmp_path, text)
 
 
+def test_profile_transport_numerics_are_validated_and_exposed(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    path = _catalog_with_two_profiles(tmp_path)
+    text = path.read_text().replace(
+        "[profiles.narrowed]\n",
+        '[profiles.narrowed]\nstraggling = true\nenergy_model = "midpoint"\nmax_dE_frac = 0.02\n',
+    )
+    path.write_text(text)
+    catalog = load_material_catalog(path)
+    assert dict(catalog.profile_numerics("narrowed")) == {
+        "straggling": True,
+        "energy_model": "midpoint",
+        "max_dE_frac": 0.02,
+    }
+
+    path.write_text(text.replace('energy_model = "midpoint"', 'energy_model = "frozen"'))
+    with pytest.raises(MaterialConfigError, match="requires energy_model"):
+        load_material_catalog(path)
+
+
 def test_profile_names_and_memberships_are_exposed(tmp_path):
     from pyrite.materials import load_material_catalog
 

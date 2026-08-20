@@ -93,6 +93,9 @@ class Numerics:
     brem_chunk: int | None = None
     transport_core: str = "auto"
     backend: str = "auto"
+    straggling: bool = False
+    energy_model: Literal["frozen", "midpoint"] = "frozen"
+    max_dE_frac: float = 0.0
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -103,6 +106,14 @@ class Numerics:
             value = getattr(self, name)
             if value is not None and value <= 0:
                 raise ValueError(f"{name} must be positive or None")
+        if not isinstance(self.straggling, bool):
+            raise ValueError("straggling must be a bool")
+        if self.energy_model not in {"frozen", "midpoint"}:
+            raise ValueError("energy_model must be 'frozen' or 'midpoint'")
+        if not np.isfinite(self.max_dE_frac) or self.max_dE_frac < 0.0:
+            raise ValueError("max_dE_frac must be finite and non-negative")
+        if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
+            raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
 
 
 @dataclass(frozen=True)

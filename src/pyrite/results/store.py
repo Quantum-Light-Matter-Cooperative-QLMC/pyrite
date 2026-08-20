@@ -85,6 +85,9 @@ class Settings:
     brem_source: str = "mc"  # "mc" | "external" | "none"
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
+    straggling: bool = False
+    energy_model: Literal["frozen", "midpoint"] = "frozen"
+    max_dE_frac: float = 0.0
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -92,6 +95,16 @@ class Settings:
     # "incoherent" (divergence-only rule); an incoherent run's parameter_sha256
     # -- and its checkpoint stem -- stays unchanged.
     emission: EmissionMode = "incoherent"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.straggling, bool):
+            raise ValueError("straggling must be a bool")
+        if self.energy_model not in {"frozen", "midpoint"}:
+            raise ValueError("energy_model must be 'frozen' or 'midpoint'")
+        if not np.isfinite(self.max_dE_frac) or self.max_dE_frac < 0.0:
+            raise ValueError("max_dE_frac must be finite and non-negative")
+        if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
+            raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
 
     @property
     def coherent_emission(self) -> bool:

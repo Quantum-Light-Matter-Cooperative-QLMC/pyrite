@@ -528,6 +528,9 @@ def build_cases(
     n_electrons=450,
     n_electrons_brem=100,
     coherent_emission=False,
+    straggling=False,
+    energy_model="frozen",
+    max_dE_frac=0.0,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -748,6 +751,9 @@ def build_cases(
                         # coherent segment sum: divergence-only key (absent -> the
                         # incoherent default, bit-for-bit case payload).
                         **({"coherent_emission": True} if coherent_emission else {}),
+                        **({"straggling": True} if straggling else {}),
+                        **({"energy_model": "midpoint"} if energy_model == "midpoint" else {}),
+                        **({"max_dE_frac": float(max_dE_frac)} if max_dE_frac > 0.0 else {}),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

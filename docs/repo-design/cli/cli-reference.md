@@ -1117,6 +1117,11 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --energy-model [frozen|midpoint]
+                                  Transport clock model (frozen or midpoint).
+  --max-de-frac FRACTION          Cap one transport row's fractional mean energy loss;
+                                  requires midpoint.  [x>=0.0]
   --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
                                   the spot FWHM.  [x>0.0]
   --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
@@ -1269,6 +1274,11 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --energy-model [frozen|midpoint]
+                                  Transport clock model (frozen or midpoint).
+  --max-de-frac FRACTION          Cap one transport row's fractional mean energy loss;
+                                  requires midpoint.  [x>=0.0]
   --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
                                   the spot FWHM.  [x>0.0]
   --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.

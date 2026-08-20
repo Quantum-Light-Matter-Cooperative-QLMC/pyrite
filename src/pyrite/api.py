@@ -163,6 +163,9 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         n_electrons=numerics.n_electrons,
         n_electrons_brem=numerics.n_electrons_brem,
         coherent_emission=scene.emission in {"coherent", "both"},
+        straggling=numerics.straggling,
+        energy_model=numerics.energy_model,
+        max_dE_frac=numerics.max_dE_frac,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -178,6 +181,9 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             n_electrons=settings.n_electrons,
             n_electrons_brem=settings.n_electrons_brem,
             coherent_emission=settings.coherent_emission,
+            straggling=getattr(settings, "straggling", False),
+            energy_model=getattr(settings, "energy_model", "frozen"),
+            max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

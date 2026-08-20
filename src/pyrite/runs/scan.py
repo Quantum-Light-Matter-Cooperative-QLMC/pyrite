@@ -524,6 +524,9 @@ def _resolved_run(args, material):
     catalog_emission = CATALOG.profile_emission(catalog_profile)
     if catalog_emission is not None:
         settings = replace(settings, emission=catalog_emission)
+    catalog_numerics = CATALOG.profile_numerics(catalog_profile)
+    if catalog_numerics:
+        settings = replace(settings, **dict(catalog_numerics))
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line
@@ -603,6 +606,9 @@ def _resolved_run(args, material):
         and not getattr(args, "quick", False)
         and catalog_profile == "standard"
         and settings.emission == "incoherent"
+        and not settings.straggling
+        and settings.energy_model == "frozen"
+        and settings.max_dE_frac == 0.0
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem

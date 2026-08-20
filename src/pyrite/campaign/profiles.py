@@ -383,10 +383,25 @@ def _identity_v1(
     settings_payload = resolved["settings"]
     if isinstance(settings_payload, Mapping):
         emission = str(settings_payload.pop("emission", "incoherent"))
+        straggling = bool(settings_payload.pop("straggling", False))
+        energy_model = str(settings_payload.pop("energy_model", "frozen"))
+        max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
+        straggling = bool(getattr(settings, "straggling", False))
+        energy_model = str(getattr(settings, "energy_model", "frozen"))
+        max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
     if emission != "incoherent":
         resolved["emission"] = emission
+    transport_numerics = {}
+    if straggling:
+        transport_numerics["straggling"] = True
+    if energy_model != "frozen":
+        transport_numerics["energy_model"] = energy_model
+    if max_dE_frac != 0.0:
+        transport_numerics["max_dE_frac"] = max_dE_frac
+    if transport_numerics:
+        resolved["transport_numerics"] = transport_numerics
     # The in-medium photon dispersion is unconditional physics now, not an opt-in
     # model, so it no longer earns a divergence-only key. Every digest minted
     # before that change was computed under the retired vacuum k = omega

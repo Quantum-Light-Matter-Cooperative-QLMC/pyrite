@@ -56,6 +56,8 @@ _SCAN_KEYS = (
 #: would cycle back through ``results/tables.py``'s ``from ..materials import
 #: CATALOG``.
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
+_ENERGY_MODEL_VALUES = ("frozen", "midpoint")
+_TRANSPORT_NUMERICS_KEYS = ("straggling", "energy_model", "max_dE_frac")
 
 
 _MISSING_LINE_GRID_RE = re.compile(
@@ -284,6 +286,9 @@ class MaterialCatalog:
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
     profile_emissions: Mapping[str, str] = MappingProxyType({})
+    #: Explicit transport-numerics overrides, keyed by profile. Missing fields
+    #: retain the inert Numerics defaults.
+    profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit immutable energy-grid artifact refs, keyed first by profile and
     #: then material. Legacy ``[energy_grids.*]`` fallback rows are deliberately
     #: absent: callers can distinguish migrated refs from compatibility input.
@@ -309,6 +314,10 @@ class MaterialCatalog:
         profile carries no emission key. Consumed by :func:`scan._resolved_run`
         to override the active fidelity preset's emission."""
         return self.profile_emissions.get(name)
+
+    def profile_numerics(self, name: str) -> Mapping[str, object] | None:
+        """Explicit result-affecting transport numerics for ``name``."""
+        return self.profile_transport_numerics.get(name)
 
     def profile_detector(self, name: str) -> Detector:
         """Resolved detector for ``name`` with standard then legacy fallback."""
@@ -1092,6 +1101,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "beam",
                 "detector",
                 "emission",
+                *_TRANSPORT_NUMERICS_KEYS,
                 "energy_grid_refs",
             },
         )
@@ -1118,6 +1128,22 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         emission = row.get("emission")
         if emission is not None and emission not in _EMISSION_VALUES:
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
+        straggling = row.get("straggling")
+        if straggling is not None and not isinstance(straggling, bool):
+            errors.add(f"{path}.straggling", "must be a boolean")
+        energy_model = row.get("energy_model", "frozen")
+        if energy_model not in _ENERGY_MODEL_VALUES:
+            errors.add(f"{path}.energy_model", f"must be one of {_ENERGY_MODEL_VALUES}")
+        max_dE_frac = row.get("max_dE_frac", 0.0)
+        if (
+            isinstance(max_dE_frac, bool)
+            or not isinstance(max_dE_frac, (int, float))
+            or not np.isfinite(max_dE_frac)
+            or max_dE_frac < 0.0
+        ):
+            errors.add(f"{path}.max_dE_frac", "must be finite and non-negative")
+        elif max_dE_frac > 0.0 and energy_model != "midpoint":
+            errors.add(f"{path}.max_dE_frac", "requires energy_model = 'midpoint'")
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         refs = row.get("energy_grid_refs")
@@ -1597,6 +1623,11 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("emission"), str)
     }
+    profile_transport_numerics = {
+        name: MappingProxyType({key: row[key] for key in _TRANSPORT_NUMERICS_KEYS if key in row})
+        for name, row in profiles.items()
+        if any(key in row for key in _TRANSPORT_NUMERICS_KEYS)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -1608,6 +1639,7 @@ def _load_material_catalog_cached(
         profile_beams=MappingProxyType(profile_beams),
         profile_detectors=MappingProxyType(profile_detectors),
         profile_emissions=MappingProxyType(profile_emissions),
+        profile_transport_numerics=MappingProxyType(profile_transport_numerics),
         profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
         resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
         beams=MappingProxyType(beams),

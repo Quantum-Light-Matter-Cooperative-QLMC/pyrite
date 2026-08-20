@@ -136,6 +136,11 @@ def profile_payload(document, name):
         "beam_ref": beam_ref,
         "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
         "emission": profile.get("emission"),
+        "transport_numerics": {
+            key: profile[key]
+            for key in ("straggling", "energy_model", "max_dE_frac")
+            if key in profile
+        },
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()
@@ -353,6 +358,7 @@ def create_profile(
     beam_name,
     beam_updates,
     detector_updates,
+    transport_updates,
     materials,
 ):
     """Create a profile row from a source row and validated CLI values."""
@@ -379,6 +385,15 @@ def create_profile(
         detector = detector_table(target)
         for key, value in detector_updates.items():
             detector[key] = value
+    if transport_updates:
+        final_energy_model = transport_updates.get(
+            "energy_model", target.get("energy_model", "frozen")
+        )
+        final_max_dE_frac = transport_updates.get("max_dE_frac", target.get("max_dE_frac", 0.0))
+        if final_max_dE_frac > 0.0 and final_energy_model != "midpoint":
+            raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+        for key, value in transport_updates.items():
+            target[key] = value
     if materials is not None:
         target["materials"] = validate_materials(document, csv_materials(materials))
     profiles[name] = target
@@ -392,6 +407,7 @@ def set_profile(
     beam_name,
     beam_updates,
     detector_updates,
+    transport_updates,
     materials,
     all_materials,
     emission,
@@ -425,6 +441,15 @@ def set_profile(
         detector = detector_table(target)
         for key, value in detector_updates.items():
             detector[key] = value
+    if transport_updates:
+        final_energy_model = transport_updates.get(
+            "energy_model", target.get("energy_model", "frozen")
+        )
+        final_max_dE_frac = transport_updates.get("max_dE_frac", target.get("max_dE_frac", 0.0))
+        if final_max_dE_frac > 0.0 and final_energy_model != "midpoint":
+            raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+        for key, value in transport_updates.items():
+            target[key] = value
     if material_keys is not None:
         target["materials"] = material_keys
     elif all_materials:

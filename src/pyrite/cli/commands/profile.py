@@ -41,6 +41,7 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
 #: to avoid coupling this CLI module to that private catalog constant).
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
+_ENERGY_MODEL_VALUES = ("frozen", "midpoint")
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
     ("energy", "--energy", ENERGY_CSV_RANGE, "KEV,..."),
@@ -72,6 +73,26 @@ def _ne_cli_options(function):
         type=COUNT_CSV,
         metavar="N,...",
         help="Line-spectrum transport electron counts; positive integers.",
+    )(function)
+    return function
+
+
+def _transport_cli_options(function):
+    function = click.option(
+        "--max-de-frac",
+        type=click.FloatRange(min=0.0),
+        metavar="FRACTION",
+        help="Cap one transport row's fractional mean energy loss; requires midpoint.",
+    )(function)
+    function = click.option(
+        "--energy-model",
+        type=click.Choice(_ENERGY_MODEL_VALUES),
+        help="Transport clock model (frozen or midpoint).",
+    )(function)
+    function = click.option(
+        "--straggling/--no-straggling",
+        default=None,
+        help="Enable or disable Urban energy-loss straggling.",
     )(function)
     return function
 
@@ -243,6 +264,10 @@ def _emit_show(payload):
         display = "unspecified" if value is None else f"{value:g} {unit}"
         emit_result(f"    {label}: {display}")
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
+    numerics = payload["transport_numerics"]
+    emit_result(f"  straggling: {numerics.get('straggling', False)}")
+    emit_result(f"  energy model: {numerics.get('energy_model', 'frozen')}")
+    emit_result(f"  max dE fraction: {numerics.get('max_dE_frac', 0.0):g}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -428,6 +453,7 @@ def show_command(name, json_output):
 )
 @_range_cli_options
 @_ne_cli_options
+@_transport_cli_options
 @_beam_cli_options
 @click.option(
     "--beam",
@@ -457,6 +483,9 @@ def create_command(
     azimuth,
     ne_line,
     ne_brem,
+    straggling,
+    energy_model,
+    max_de_frac,
     transverse_fwhm_mm,
     rep_rate_hz,
     bunch_charge_pc,
@@ -512,6 +541,15 @@ def create_command(
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
+    transport_updates = {
+        key: value
+        for key, value in (
+            ("straggling", straggling),
+            ("energy_model", energy_model),
+            ("max_dE_frac", max_de_frac),
+        )
+        if value is not None
+    }
     source_name = source or "standard"
     try:
         original, document = _catalog_io.catalog_text()
@@ -523,6 +561,7 @@ def create_command(
             beam_name=beam_name,
             beam_updates=beam_updates,
             detector_updates=detector_updates,
+            transport_updates=transport_updates,
             materials=materials,
         )
     except (OSError, ValueError, ParseError) as exc:
@@ -534,6 +573,7 @@ def create_command(
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
 @_ne_cli_options
+@_transport_cli_options
 @_beam_cli_options
 @click.option(
     "--beam",
@@ -573,6 +613,9 @@ def set_command(
     azimuth,
     ne_line,
     ne_brem,
+    straggling,
+    energy_model,
+    max_de_frac,
     transverse_fwhm_mm,
     rep_rate_hz,
     bunch_charge_pc,
@@ -633,6 +676,15 @@ def set_command(
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
+    transport_updates = {
+        key: value
+        for key, value in (
+            ("straggling", straggling),
+            ("energy_model", energy_model),
+            ("max_dE_frac", max_de_frac),
+        )
+        if value is not None
+    }
     if materials is not None and all_materials:
         raise click.UsageError("--material and --all-materials are mutually exclusive")
     if (
@@ -640,11 +692,14 @@ def set_command(
         and not beam_updates
         and beam_name is None
         and not detector_updates
+        and not transport_updates
         and materials is None
         and not all_materials
         and emission is None
     ):
-        raise click.UsageError("provide a range, beam, detector, membership, or emission option")
+        raise click.UsageError(
+            "provide a range, beam, detector, transport, membership, or emission option"
+        )
     try:
         original, document = _catalog_io.catalog_text()
         overwriting, detector_labels = _profile_edit.set_profile(
@@ -654,6 +709,7 @@ def set_command(
             beam_name=beam_name,
             beam_updates=beam_updates,
             detector_updates=detector_updates,
+            transport_updates=transport_updates,
             materials=materials,
             all_materials=all_materials,
             emission=emission,
@@ -665,6 +721,7 @@ def set_command(
         or beam_updates
         or beam_name is not None
         or detector_updates
+        or transport_updates
         or materials is not None
         or all_materials
         or emission is not None
@@ -674,6 +731,7 @@ def set_command(
             action_fields.append("beam")
         if emission is not None:
             action_fields.append("emission")
+        action_fields.extend(transport_updates)
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
     return _write(document, original, dry_run, f"updated profile {name}")
 

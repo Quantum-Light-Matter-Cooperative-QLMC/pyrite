@@ -641,6 +641,37 @@ def test_set_emission_invalid_value_rejected(tmp_path, monkeypatch):
     assert "not one of" in result.stderr.lower()
 
 
+def test_set_transport_numerics_round_trips_and_validates_coupling(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    invalid = invoke(profile.command, ["set", "sub_100keV", "--max-de-frac", "0.02"])
+    assert invalid.exit_code == 1
+    assert "requires energy_model='midpoint'" in invalid.stderr
+
+    result = invoke(
+        profile.command,
+        [
+            "set",
+            "sub_100keV",
+            "--straggling",
+            "--energy-model",
+            "midpoint",
+            "--max-de-frac",
+            "0.02",
+        ],
+    )
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    text = catalog.read_text()
+    assert "straggling = true" in text
+    assert 'energy_model = "midpoint"' in text
+    assert "max_dE_frac = 0.02" in text
+
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "straggling: True" in shown.stdout
+    assert "energy model: midpoint" in shown.stdout
+    assert "max dE fraction: 0.02" in shown.stdout
+
+
 def test_xray_dispersion_is_no_longer_a_selectable_field(tmp_path, monkeypatch):
     """The in-medium dispersion is unconditional physics now: no --xray-dispersion
     flag on set/add/remove, and nothing about it in ``profile show``."""
@@ -831,7 +862,7 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
     expected_by_verb = {
-        "set": "provide a range, beam, detector, membership, or emission option",
+        "set": "provide a range, beam, detector, transport, membership, or emission option",
         "add": "provide a range, membership, or emission option",
         "remove": "provide a range, membership, beam, or emission option",
     }

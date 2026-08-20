@@ -127,6 +127,33 @@ def test_full_profile_preserves_production_defaults_exactly():
     assert get_fidelity_preset("full").provisional is False
 
 
+def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
+    settings = default_settings()
+    sweep = material_sweep("hopg")
+    base = dataset_identity("hopg", "full", settings, sweep)
+    explicit_defaults = dataset_identity(
+        "hopg",
+        "full",
+        replace(settings, straggling=False, energy_model="frozen", max_dE_frac=0.0),
+        sweep,
+    )
+    active = dataset_identity(
+        "hopg",
+        "full",
+        replace(settings, straggling=True, energy_model="midpoint", max_dE_frac=0.02),
+        sweep,
+    )
+
+    assert explicit_defaults["parameter_sha256"] == base["parameter_sha256"]
+    assert "transport_numerics" not in base["resolved_parameters"]
+    assert active["parameter_sha256"] != base["parameter_sha256"]
+    assert active["resolved_parameters"]["transport_numerics"] == {
+        "straggling": True,
+        "energy_model": "midpoint",
+        "max_dE_frac": 0.02,
+    }
+
+
 def test_survey_profile_reduces_every_expensive_sweep_dimension():
     full = material_sweep("mose2")
     survey = material_sweep("mose2", fidelity="survey")

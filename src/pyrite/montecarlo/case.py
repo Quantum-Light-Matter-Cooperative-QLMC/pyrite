@@ -62,6 +62,9 @@ _CASE_KEY_ORDER = (
     "tilt_azim_deg",
     "groove_spacing_ang",
     "coherent_emission",
+    "straggling",
+    "energy_model",
+    "max_dE_frac",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -146,6 +149,9 @@ class Case(Mapping[str, Any]):
     transverse_distribution: dict[str, object] | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
+    straggling: Literal[True] | _Absent = _ABSENT
+    energy_model: Literal["midpoint"] | _Absent = _ABSENT
+    max_dE_frac: float | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -189,6 +195,14 @@ class Case(Mapping[str, Any]):
                 _positive_int(name, value)
         if self.coherent_emission is not _ABSENT and self.coherent_emission is not True:
             raise ValueError("coherent_emission must be absent or True")
+        if self.straggling is not _ABSENT and self.straggling is not True:
+            raise ValueError("straggling must be absent or True")
+        if self.energy_model is not _ABSENT and self.energy_model != "midpoint":
+            raise ValueError("energy_model must be absent or 'midpoint'")
+        if self.max_dE_frac is not _ABSENT:
+            _positive("max_dE_frac", self.max_dE_frac)
+            if self.energy_model != "midpoint":
+                raise ValueError("max_dE_frac requires energy_model='midpoint'")
 
     def to_dict(self) -> dict[str, Any]:
         """Return the exact legacy mapping shape and insertion order."""

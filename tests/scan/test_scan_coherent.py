@@ -64,6 +64,36 @@ def test_coherent_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
     assert identity["parameter_sha256"] != id_def["parameter_sha256"]
 
 
+def test_catalog_profile_transport_numerics_reach_run_identity(monkeypatch):
+    _s_default, _sw_default, id_default, _stem_default = _resolved_run(monkeypatch, [])
+    catalog = materials.CATALOG
+    straggled_catalog = replace(
+        catalog,
+        profile_transport_numerics={
+            **catalog.profile_transport_numerics,
+            "standard": {
+                "straggling": True,
+                "energy_model": "midpoint",
+                "max_dE_frac": 0.02,
+            },
+        },
+    )
+    monkeypatch.setattr(materials, "CATALOG", straggled_catalog)
+
+    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
+
+    assert settings.straggling is True
+    assert settings.energy_model == "midpoint"
+    assert settings.max_dE_frac == 0.02
+    assert identity["resolved_parameters"]["transport_numerics"] == {
+        "straggling": True,
+        "energy_model": "midpoint",
+        "max_dE_frac": 0.02,
+    }
+    assert stem.startswith("hopg@full-")
+    assert identity["parameter_sha256"] != id_default["parameter_sha256"]
+
+
 def test_both_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
     settings, _sweep, identity, stem = _resolved_run(monkeypatch, [], emission="both")
 

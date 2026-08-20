@@ -36,7 +36,7 @@ from ..spectrum import (
     mc_brem_spectrum,
     mc_spectrum,
 )
-from ..transport import resolve_transport_core, simulate_trajectories
+from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
 # see docs/repo-design/compute/compute-performance-optimization.md). With CXR_MC_TIMING set (to
@@ -641,6 +641,14 @@ def _transport_case(
 
     core = _case_transport_core(case, transport_core)
     resident = keep_segments_on_device and core == "cuda"
+    straggling = bool(case.get("straggling", False))
+    # The CUDA LUT kernel has no Urban sampler. Production straggling therefore
+    # selects the already-implemented exact CUDA kernel rather than failing or
+    # silently computing deterministic loss. Direct simulate_trajectories calls
+    # retain the fail-closed CUDA-LUT guard as a lower-level contract.
+    transport_lut_config = (
+        TransportLUTConfig(enabled=False) if core == "cuda" and straggling else None
+    )
 
     def _transport(keep):
         return simulate_trajectories(
@@ -660,6 +668,14 @@ def _transport_case(
             groove=groove,
             transport_core=core,
             keep_segments_on_device=keep,
+            energy_model=case.get("energy_model", "frozen"),
+            max_dE_frac=case.get("max_dE_frac", 0.0),
+            straggling=straggling,
+            **(
+                {"transport_lut_config": transport_lut_config}
+                if transport_lut_config is not None
+                else {}
+            ),
         )
 
     if resident:
