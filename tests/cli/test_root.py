@@ -78,6 +78,7 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         "profile",
         "material",
         "beam",
+        "detector",
     }
 
 

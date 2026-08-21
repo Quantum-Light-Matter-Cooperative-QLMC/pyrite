@@ -62,6 +62,27 @@ rep_rate_hz = 500.0
 """
 )
 
+_DETECTOR_CATALOG = (
+    _CATALOG
+    + """
+[profiles.attached]
+materials = ["hopg"]
+thickness_ang = { values = [500.0] }
+energy_keV = { values = [40.0] }
+tilt_deg = { values = [10.0] }
+tilt_azim_deg = { values = [45.0] }
+detector = "eds"
+
+[detectors.standard_90]
+observation_angle_deg = 90.0
+
+[detectors.eds]
+observation_angle_deg = 119.0
+polar_acceptance_deg = 16.6
+solid_angle_sr = 0.066
+"""
+)
+
 
 def _catalog(tmp_path, monkeypatch, text=_CATALOG):
     catalog = tmp_path / "materials.toml"
@@ -372,7 +393,14 @@ def test_create_and_show_round_trip_detector_scalars(tmp_path, monkeypatch):
     )
     shown = invoke(profile.command, ["show", "zhai", "-o", "json"])
 
-    assert_clean_result(created, stdout="created profile zhai\n")
+    assert_clean_result(
+        created,
+        stdout="created profile zhai\n",
+        stderr="".join(
+            flag_message("profile create", flag, f"pyrite detector create/set {flag}") + "\n"
+            for flag in ("--observation-angle", "--polar-acceptance", "--solid-angle")
+        ),
+    )
     assert_clean_result(shown)
     assert json.loads(shown.stdout)["payload"]["detector"] == {
         "observation_angle_deg": 119.0,
@@ -481,7 +509,14 @@ def test_set_replaces_detector_scalars_and_standard_prompts(tmp_path, monkeypatc
         input="n\n",
     )
 
-    assert_clean_result(updated, stdout="updated profile sub_100keV\n")
+    assert_clean_result(
+        updated,
+        stdout="updated profile sub_100keV\n",
+        stderr="".join(
+            flag_message("profile set", flag, f"pyrite detector create/set {flag}") + "\n"
+            for flag in ("--observation-angle", "--polar-acceptance", "--solid-angle")
+        ),
+    )
     assert declined.exit_code == 1
     assert "profile 'standard'" in declined.stderr
     text = catalog.read_text()
@@ -509,7 +544,15 @@ def test_detector_scalar_options_validate_domains_and_dry_run(tmp_path, monkeypa
         ["create", "bad", "--solid-angle", "13"],
     )
 
-    assert_clean_result(dry_run)
+    assert_clean_result(
+        dry_run,
+        stderr=flag_message(
+            "profile set",
+            "--observation-angle",
+            "pyrite detector create/set --observation-angle",
+        )
+        + "\n",
+    )
     assert "+observation_angle_deg = 91.0" in dry_run.stdout
     assert catalog.read_text() == original
     assert bad_acceptance.exit_code == 2
@@ -1330,6 +1373,60 @@ def test_create_beam_and_inline_flag_are_mutually_exclusive(tmp_path, monkeypatc
 
     assert result.exit_code == 2
     assert "--beam replaces the inline beam flags; pass only one" in result.stderr
+
+
+def test_set_and_create_attach_named_detector_and_show_resolved_geometry(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _DETECTOR_CATALOG)
+
+    updated = invoke(profile.command, ["set", "sub_100keV", "--detector", "eds"])
+    created = invoke(
+        profile.command,
+        ["create", "newprof", "--material", "hopg", "--detector", "standard_90"],
+    )
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+
+    assert_clean_result(updated, stdout="updated profile sub_100keV\n")
+    assert_clean_result(created, stdout="created profile newprof\n")
+    section = catalog.read_text().split("[profiles.sub_100keV]", 1)[1].split("\n[", 1)[0]
+    assert 'detector = "eds"' in section
+    payload = json.loads(shown.stdout)["payload"]
+    assert payload["detector_ref"] == "eds"
+    assert payload["detector"] == {
+        "observation_angle_deg": 119.0,
+        "polar_acceptance_deg": 16.6,
+        "solid_angle_sr": 0.066,
+    }
+
+
+def test_named_detector_unknown_conflict_and_inline_edit_compatibility(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _DETECTOR_CATALOG)
+
+    unknown = invoke(profile.command, ["set", "sub_100keV", "--detector", "ed"])
+    conflict = invoke(
+        profile.command,
+        ["set", "sub_100keV", "--detector", "eds", "--observation-angle", "90"],
+    )
+    inline = invoke(profile.command, ["set", "attached", "--observation-angle", "100"])
+
+    assert unknown.exit_code == 1
+    assert "Did you mean: eds" in unknown.stderr
+    assert "pyrite detector create ed" in unknown.stderr
+    assert conflict.exit_code == 2
+    assert "--detector replaces inline detector flags" in conflict.stderr
+    assert_clean_result(
+        inline,
+        stdout="updated profile attached\n",
+        stderr=flag_message(
+            "profile set",
+            "--observation-angle",
+            "pyrite detector create/set --observation-angle",
+        )
+        + "\n",
+    )
+    text = catalog.read_text()
+    assert "[profiles.attached.detector]" in text
+    assert "observation_angle_deg = 100.0" in text
+    assert "polar_acceptance_deg = 16.6" in text
 
 
 def test_set_inline_flag_onto_named_reference_errors(tmp_path, monkeypatch):

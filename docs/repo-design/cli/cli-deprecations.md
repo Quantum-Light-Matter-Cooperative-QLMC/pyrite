@@ -94,6 +94,9 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite checkpoint list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite checkpoint recompute brem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite checkpoint recompute line` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite detector delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite detector list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite detector show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid apply` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite energy-grid brem show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
@@ -137,7 +140,10 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile create` | `--envelope-rms-fs` | `pyrite beam create/set --envelope-rms-fs` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile create` | `--longitudinal` | `pyrite beam create/set --longitudinal` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile create` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile create` | `--observation-angle` | `pyrite detector create/set --observation-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
+| `pyrite profile create` | `--polar-acceptance` | `pyrite detector create/set --polar-acceptance` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
 | `pyrite profile create` | `--rep-rate-hz` | `pyrite beam create/set --rep-rate-hz` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
+| `pyrite profile create` | `--solid-angle` | `pyrite detector create/set --solid-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
 | `pyrite profile create` | `--transverse-fwhm-mm` | `pyrite beam create/set --transverse-fwhm-mm` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile create` | `--twiss-alpha` | `pyrite beam create/set --twiss-alpha` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile create` | `--twiss-beta` | `pyrite beam create/set --twiss-beta` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
@@ -154,7 +160,10 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile set` | `--envelope-rms-fs` | `pyrite beam create/set --envelope-rms-fs` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile set` | `--longitudinal` | `pyrite beam create/set --longitudinal` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile set` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile set` | `--observation-angle` | `pyrite detector create/set --observation-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
+| `pyrite profile set` | `--polar-acceptance` | `pyrite detector create/set --polar-acceptance` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
 | `pyrite profile set` | `--rep-rate-hz` | `pyrite beam create/set --rep-rate-hz` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
+| `pyrite profile set` | `--solid-angle` | `pyrite detector create/set --solid-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
 | `pyrite profile set` | `--transverse-fwhm-mm` | `pyrite beam create/set --transverse-fwhm-mm` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile set` | `--twiss-alpha` | `pyrite beam create/set --twiss-alpha` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile set` | `--twiss-beta` | `pyrite beam create/set --twiss-beta` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |

@@ -8,8 +8,8 @@ around it. That is new schema plumbing the task explicitly allows dropping
 (see the "verify documented code blocks" task doc, checklist step 6).
 
 This checks the two things derivable from the fragment alone: it parses as
-valid TOML, and any ``beam = "<name>"`` reference under ``[profiles.*]``
-names a ``[beams.<name>]`` table present in the same fragment.
+valid TOML, and any named beam or detector reference under ``[profiles.*]``
+names a corresponding top-level object present in the same fragment.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ def check_toml_block(block: FencedBlock) -> list[str]:
         return [f"{block.location}: invalid TOML: {exc}"]
 
     beams = document.get("beams", {})
+    detectors = document.get("detectors", {})
     profiles = document.get("profiles", {})
     errors: list[str] = []
     for profile_name, profile in profiles.items():
@@ -39,5 +40,11 @@ def check_toml_block(block: FencedBlock) -> list[str]:
             errors.append(
                 f"{block.location}: profile {profile_name!r} references "
                 f"undefined beam {beam_name!r}"
+            )
+        detector_name = profile.get("detector") if hasattr(profile, "get") else None
+        if isinstance(detector_name, str) and detector_name not in detectors:
+            errors.append(
+                f"{block.location}: profile {profile_name!r} references "
+                f"undefined detector {detector_name!r}"
             )
     return errors

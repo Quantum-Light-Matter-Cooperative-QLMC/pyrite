@@ -145,8 +145,8 @@ matter.
 
 Main surfaces:
 
-- `pyrite`: nine visible user nouns — `run`, `app`, `checkpoint`, `config`,
-  `remote`, `job`, `profile`, `material`, and `beam`. App launch/export lives
+- `pyrite`: ten visible user nouns — `run`, `app`, `checkpoint`, `config`,
+  `remote`, `job`, `profile`, `material`, `beam`, and `detector`. App launch/export lives
   below `pyrite app`. See the generated
   [CLI reference](docs/repo-design/cli/cli-reference.md).
 - `src/pyrite/apps/scan_app.py`: interactive sweep runner.

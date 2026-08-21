@@ -80,7 +80,8 @@ def test_frozen_click_contract_records_current_tree():
     # Slice 3 adds six canonical `job` help paths while retaining hidden
     # compatibility paths in the frozen tree during the deprecation window;
     # slice 6 adds the artifact-store commands (`energy-grid verify`/`gc`).
-    assert len(list(_help_cases(_FROZEN["root"]))) < 140
+    # Named detector tooling adds the visible group plus six verbs.
+    assert len(list(_help_cases(_FROZEN["root"]))) < 170
     assert len(_FROZEN["intentional_p0_corrections"]) == 10
 
 

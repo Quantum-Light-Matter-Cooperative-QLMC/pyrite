@@ -1,7 +1,7 @@
 # Materials catalog schema
 
 The bundled `pyrite/data/materials.toml` is the canonical schema-version-1
-catalog for crystals, media, runnable materials, beams, and campaign profiles.
+catalog for crystals, media, runnable materials, beams, detectors, and campaign profiles.
 `load_material_catalog()` validates the entire document and returns deeply
 immutable typed records. Invalid or unknown fields fail closed with grouped,
 location-qualified errors.
@@ -13,13 +13,14 @@ schema_version = 1
 
 [profiles.NAME]      # campaign defaults and membership
 [beams.NAME]         # reusable beam distribution
+[detectors.NAME]     # reusable detector geometry
 [crystals.NAME]      # CIF-backed crystalline phase
 [media.NAME]         # amorphous composition
 [materials.NAME]     # runnable film or stack
 ```
 
-`profiles`, `crystals`, `media`, and `materials` are required. `beams` is
-optional. `energy_grids` is accepted only as a legacy compatibility input;
+`profiles`, `crystals`, `media`, and `materials` are required. `beams` and
+`detectors` are optional. `energy_grids` is accepted only as a legacy compatibility input;
 new grids are immutable artifacts referenced from profiles.
 
 ## Crystals and media
@@ -92,14 +93,18 @@ parameters. Profiles attach it with `beam = "NAME"`; the name and label are
 removed during resolution so identity follows values. The full field and unit
 reference is [Beam phase space](../physics/beam-transport/beam-phase-space.md).
 
-Detector blocks define observation angle, polar acceptance, solid angle, and
-an optional instrument-response specification. Missing detector values inherit
-as described in [Configuration resolution](configuration-resolution.md).
+Named detector objects define observation angle, full polar acceptance, and
+solid angle. Profiles attach them with `detector = "NAME"`; names and labels are
+removed during resolution just like beam metadata. Legacy inline
+`[profiles.NAME.detector]` geometry remains readable. Response objects and
+detector energy bins are runtime configuration and do not yet have a portable
+catalog schema. Missing detector values inherit as described in
+[Configuration resolution](configuration-resolution.md).
 
 ## Validation and editing
 
-Prefer `pyrite profile`, `pyrite beam`, `pyrite material`, and `pyrite
-energy-grid` for supported mutations. Validate a complete alternate catalog
+Prefer `pyrite profile`, `pyrite beam`, `pyrite detector`, `pyrite material`,
+and `pyrite energy-grid` for supported mutations. Validate a complete alternate catalog
 without running simulation:
 
 ```bash

@@ -627,6 +627,71 @@ def test_named_beam_reference_resolves_to_same_payload_as_inline_block(tmp_path)
     assert ref_catalog.beams["rf_gun_200fs"]["label"] == "RF gun, 200 fs"
 
 
+def test_named_detector_reference_resolves_to_same_value_as_inline_block(tmp_path, monkeypatch):
+    from pyrite.campaign import config
+    from pyrite.campaign.config import default_settings
+    from pyrite.campaign.profiles import dataset_identity
+    from pyrite.detectors import Detector
+    from pyrite.materials import load_material_catalog
+
+    material_rows = """
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+"""
+    ref_text = _minimal_catalog(
+        material_rows=material_rows,
+        profile_extra='detector = "eds"',
+    ) + (
+        '\n[detectors.eds]\nlabel = "SEM EDS"\n'
+        "observation_angle_deg = 119.0\n"
+        "polar_acceptance_deg = 16.6\n"
+        "solid_angle_sr = 0.066\n"
+    )
+    inline_text = _minimal_catalog(material_rows=material_rows) + (
+        "\n[profiles.standard.detector]\n"
+        "observation_angle_deg = 119.0\n"
+        "polar_acceptance_deg = 16.6\n"
+        "solid_angle_sr = 0.066\n"
+    )
+    (tmp_path / "ref").mkdir()
+    (tmp_path / "inline").mkdir()
+    ref_catalog = load_material_catalog(_write_catalog(tmp_path / "ref", ref_text))
+    inline_catalog = load_material_catalog(_write_catalog(tmp_path / "inline", inline_text))
+
+    assert ref_catalog.profile_detector("standard") == inline_catalog.profile_detector("standard")
+    assert ref_catalog.profile_detector("standard") == Detector(119.0, 16.6, 0.066)
+    assert ref_catalog.detector_keys == ("eds",)
+    assert ref_catalog.detectors["eds"] == Detector(119.0, 16.6, 0.066)
+    assert ref_catalog.detector_labels["eds"] == "SEM EDS"
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
+    ref_sweep = config.material_sweep("mos2")
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inline_catalog)
+    inline_sweep = config.material_sweep("mos2")
+    assert (
+        dataset_identity("mos2", "full", default_settings(), ref_sweep)["parameter_sha256"]
+        == dataset_identity("mos2", "full", default_settings(), inline_sweep)["parameter_sha256"]
+    )
+
+
+def test_named_detector_unknown_reference_errors_with_profile_path(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+""",
+        profile_extra='detector = "missing"',
+    )
+
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert "profiles.standard.detector: unknown detector 'missing'" in str(caught.value)
+
+
 def test_named_beam_and_inline_block_together_is_a_decode_error(tmp_path):
     """Decision 4: a profile cannot spell both ``beam = "NAME"`` and an inline
     ``[profiles.NAME.beam]`` table. TOML's own duplicate-key rule (both

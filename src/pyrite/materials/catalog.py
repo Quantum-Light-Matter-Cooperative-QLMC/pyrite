@@ -303,6 +303,12 @@ class MaterialCatalog:
     beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Every ``[beams.*]`` name defined by the source TOML.
     beam_keys: tuple[str, ...] = ()
+    #: Named ``[detectors.*]`` geometry objects, keyed by detector name. Labels
+    #: are stored separately so display metadata cannot enter simulation state.
+    detectors: Mapping[str, Detector] = MappingProxyType({})
+    detector_labels: Mapping[str, str] = MappingProxyType({})
+    #: Every ``[detectors.*]`` name defined by the source TOML.
+    detector_keys: tuple[str, ...] = ()
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
@@ -1081,6 +1087,39 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector
         return None
 
 
+def _parse_detectors(raw: object, errors: _Errors) -> tuple[dict[str, Detector], dict[str, str]]:
+    """Parse named ``[detectors.NAME]`` geometry objects.
+
+    Named objects use the same decoder as legacy inline profile detector
+    blocks. ``label`` is display-only and is never part of the resolved
+    :class:`Detector` value.
+    """
+    table = _table(raw, "detectors", errors)
+    if table is None:
+        return {}, {}
+    detectors: dict[str, Detector] = {}
+    labels: dict[str, str] = {}
+    for key, value in table.items():
+        path = f"detectors.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        label = row.get("label")
+        if label is not None:
+            if not isinstance(label, str) or not label.strip():
+                errors.add(f"{path}.label", "must be a nonempty string")
+            else:
+                labels[key] = label
+        fields = {name: item for name, item in row.items() if name != "label"}
+        if not fields:
+            errors.add(path, "must define at least one detector geometry field")
+            continue
+        detector = _parse_profile_detector(fields, path, errors)
+        if detector is not None:
+            detectors[key] = detector
+    return detectors, labels
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -1187,11 +1226,17 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 else:
                     del row_out["beam"]
         if "detector" in row_out:
-            detector = _parse_profile_detector(row_out["detector"], f"{path}.detector", errors)
-            if detector is not None:
-                row_out["detector"] = detector
+            detector_raw = row_out["detector"]
+            if isinstance(detector_raw, str):
+                if not detector_raw:
+                    errors.add(f"{path}.detector", "must be a nonempty detector name")
+                    del row_out["detector"]
             else:
-                del row_out["detector"]
+                detector = _parse_profile_detector(detector_raw, f"{path}.detector", errors)
+                if detector is not None:
+                    row_out["detector"] = detector
+                else:
+                    del row_out["detector"]
         out[key] = row_out
     return out
 
@@ -1566,7 +1611,16 @@ def _load_material_catalog_cached(
     errors.keys(
         raw,
         "catalog",
-        {"schema_version", "profiles", "crystals", "media", "materials", "energy_grids", "beams"},
+        {
+            "schema_version",
+            "profiles",
+            "crystals",
+            "media",
+            "materials",
+            "energy_grids",
+            "beams",
+            "detectors",
+        },
     )
     version = raw.get("schema_version")
     if type(version) is not int or version != 1:
@@ -1576,6 +1630,7 @@ def _load_material_catalog_cached(
             errors.add(key, "missing required table")
     profiles = _parse_profiles(raw.get("profiles"), errors)
     beams = _parse_beams(raw.get("beams", {}), errors)
+    detectors, detector_labels = _parse_detectors(raw.get("detectors", {}), errors)
     profile_artifacts, profile_energy_grid_refs = _load_profile_artifacts(
         source, profiles, profile, errors
     )
@@ -1620,11 +1675,19 @@ def _load_material_catalog_cached(
             profile_beams[name] = MappingProxyType(dict(cast("Mapping[str, object]", beam_value)))
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
-    profile_detectors = {
-        name: cast("Detector", row["detector"])
-        for name, row in profiles.items()
-        if isinstance(row.get("detector"), Detector)
-    }
+    profile_detectors: dict[str, Detector] = {}
+    for name, row in profiles.items():
+        detector_value = row.get("detector")
+        if isinstance(detector_value, str):
+            named_detector = detectors.get(detector_value)
+            if named_detector is None:
+                errors.add(f"profiles.{name}.detector", f"unknown detector {detector_value!r}")
+                continue
+            profile_detectors[name] = named_detector
+        elif isinstance(detector_value, Detector):
+            profile_detectors[name] = detector_value
+    if errors.items:
+        raise MaterialConfigError(errors.items, profile=profile)
     profile_emissions = {
         name: cast(str, row["emission"])
         for name, row in profiles.items()
@@ -1651,6 +1714,9 @@ def _load_material_catalog_cached(
         resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
         beams=MappingProxyType(beams),
         beam_keys=tuple(beams),
+        detectors=MappingProxyType(detectors),
+        detector_labels=MappingProxyType(detector_labels),
+        detector_keys=tuple(detectors),
     )
 
 

@@ -90,6 +90,7 @@ Commands:
   profile     Manage named catalog campaigns and material membership.
   material    Inspect, validate, edit, and blaze individual materials.
   beam        Manage named beams, attachable to profiles by name.
+  detector    Manage named detector geometries.
 ```
 
 ## `pyrite run`
@@ -1138,6 +1139,8 @@ Options:
                                   policy.  [x>0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; replaces the
                                   inline beam flags.
+  --detector NAME                 Attach a named [detectors.NAME] reference; replaces
+                                  inline geometry flags.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
                                   replacement.  [0.0<=x<=180.0]
   --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
@@ -1295,6 +1298,8 @@ Options:
                                   policy.  [x>0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; replaces the
                                   inline beam flags.
+  --detector NAME                 Attach a named [detectors.NAME] reference; replaces
+                                  inline geometry flags.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
                                   replacement.  [0.0<=x<=180.0]
   --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
@@ -1750,6 +1755,129 @@ Options:
 Usage: pyrite beam show [OPTIONS] NAME
 
   Show one named beam's fields.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite detector`
+
+```text
+Usage: pyrite detector [OPTIONS] COMMAND [ARGS]...
+
+  Manage named detector geometries, attachable to profiles by name.
+
+  Named detectors currently carry observation angle, full polar acceptance, and solid
+  angle. Detector responses and energy bins are runtime objects and are not serialized
+  by these commands.
+
+  Examples:
+    pyrite detector list
+    pyrite detector show default
+    pyrite detector create standard-90 --observation-angle 90
+    pyrite detector set standard-90 --solid-angle 0.066
+    pyrite detector rename standard-90 eds
+    pyrite detector delete eds -y
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  create  Create a reusable named detector geometry NAME.
+  delete  Delete an unreferenced named detector; irreversible.
+  list    List named detectors with labels and profile-reference counts.
+  rename  Rename NAME and update every referencing profile atomically.
+  set     Update fields on an existing named detector NAME.
+  show    Show one named detector's geometry.
+```
+
+## `pyrite detector create`
+
+```text
+Usage: pyrite detector create [OPTIONS] NAME
+
+  Create a reusable named detector geometry NAME.
+
+Options:
+  --label TEXT             Display-only description; never affects parameter_sha256.
+  --observation-angle DEG  Detector observation angle in degrees [0, 180]; scalar
+                           replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG   Full detector polar acceptance span in degrees; scalar
+                           replacement.  [0.0<x<=180.0]
+  --solid-angle SR         Detector solid angle in sr; scalar replacement.
+                           [0.0<x<=12.566370614359172]
+  --dry-run                Print proposed TOML diff; write nothing.
+  -h, --help               Show this message and exit.
+```
+
+## `pyrite detector delete`
+
+```text
+Usage: pyrite detector delete [OPTIONS] NAME
+
+  Delete an unreferenced named detector; irreversible.
+
+Options:
+  -y, --yes                       Delete the exact previewed detector.
+  --dry-run                       Print proposed TOML diff; delete nothing.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite detector list`
+
+```text
+Usage: pyrite detector list [OPTIONS]
+
+  List named detectors with labels and profile-reference counts.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite detector rename`
+
+```text
+Usage: pyrite detector rename [OPTIONS] NAME NEW_NAME
+
+  Rename NAME and update every referencing profile atomically.
+
+Options:
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite detector set`
+
+```text
+Usage: pyrite detector set [OPTIONS] NAME
+
+  Update fields on an existing named detector NAME.
+
+Options:
+  --label TEXT             Display-only description; never affects parameter_sha256.
+  --observation-angle DEG  Detector observation angle in degrees [0, 180]; scalar
+                           replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG   Full detector polar acceptance span in degrees; scalar
+                           replacement.  [0.0<x<=180.0]
+  --solid-angle SR         Detector solid angle in sr; scalar replacement.
+                           [0.0<x<=12.566370614359172]
+  -y, --yes                Skip overwrite confirmation.
+  --dry-run                Print proposed TOML diff; write nothing.
+  -h, --help               Show this message and exit.
+```
+
+## `pyrite detector show`
+
+```text
+Usage: pyrite detector show [OPTIONS] NAME
+
+  Show one named detector's geometry.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

@@ -100,6 +100,25 @@ def beams_table(document):
     return beams
 
 
+def detector_rows(document):
+    """Return optional top-level ``[detectors.*]`` rows."""
+    detectors = document.get("detectors", {})
+    if not isinstance(detectors, dict):
+        raise ValueError("catalog detectors table must be a table")
+    return detectors
+
+
+def detectors_table(document):
+    """Return writable top-level ``[detectors]``, creating it if absent."""
+    detectors = document.get("detectors")
+    if detectors is None:
+        detectors = tomlkit.table()
+        document["detectors"] = detectors
+    elif not isinstance(detectors, dict):
+        raise ValueError("catalog detectors table must be a table")
+    return detectors
+
+
 def profile_overrides(profile):
     overrides = profile.get("overrides", {})
     if not isinstance(overrides, dict):

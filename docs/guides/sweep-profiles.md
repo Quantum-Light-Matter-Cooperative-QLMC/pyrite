@@ -65,6 +65,15 @@ envelope_rms_fs = 200.0
 
 [profiles.hopg_hbn_gaussian_200fs]
 beam = "gaussian_200fs"
+
+[detectors.eds]
+label = "SEM EDS geometry"
+observation_angle_deg = 119.0
+polar_acceptance_deg = 16.6
+solid_angle_sr = 0.066
+
+[profiles.validation]
+detector = "eds"
 ```
 
 `pyrite beam list|show|create|set|rename|delete` manages the objects;
@@ -81,6 +90,15 @@ share checkpoints; renaming a beam moves nothing.
 The older inline `[profiles.<name>.beam]` table still decodes and means exactly
 the same thing, but nothing writes it any more and all bundled profiles have
 been converted. A profile carrying both spellings fails to load.
+
+Detector geometry uses the same named-object pattern shown above. Use
+`pyrite detector list|show|create|set|rename|delete` to manage these
+objects and `pyrite profile set <profile> --detector NAME` to attach one.
+Rename updates every reference; delete names and refuses surviving referents.
+The name and label never enter checkpoint identity, but resolved geometry does.
+Legacy inline `[profiles.<name>.detector]` tables and the three equivalent
+profile flags remain readable during their deprecation window. Response models
+and detector energy bins are runtime objects and are not serialized here.
 
 ## Beam block
 

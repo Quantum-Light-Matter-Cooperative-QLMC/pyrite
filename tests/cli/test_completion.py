@@ -54,6 +54,18 @@ def test_beam_completion_reads_offline_catalog():
 
 def test_beam_completion_is_empty_when_catalog_read_fails(monkeypatch):
     _cli_completion._beam_keys.cache_clear()
+
+
+def test_detector_completion_reads_offline_catalog():
+    assert _values(_cli_completion.complete_detector(None, None, "def")) == ["default"]
+
+
+def test_detector_completion_is_empty_when_catalog_read_fails(monkeypatch):
+    _cli_completion._detector_keys.cache_clear()
+    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
+    assert _cli_completion.complete_detector(None, None, "") == []
+    monkeypatch.undo()
+    _cli_completion._detector_keys.cache_clear()
     monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
     assert _cli_completion.complete_beam(None, None, "") == []
     monkeypatch.undo()
@@ -318,4 +330,20 @@ def test_beam_commands_wire_catalog_completion_but_not_create():
     for name in ("create", "set"):
         assert (
             _callback(profile.command.commands[name], "beam_name") is _cli_completion.complete_beam
+        )
+
+
+def test_detector_commands_wire_catalog_completion_but_not_new_names():
+    from pyrite.cli.commands import detector, profile
+
+    for name in ("show", "set", "rename", "delete"):
+        assert (
+            _callback(detector.command.commands[name], "name") is _cli_completion.complete_detector
+        )
+    assert _callback(detector.command.commands["create"], "name") is None
+    assert _callback(detector.command.commands["rename"], "new_name") is None
+    for name in ("create", "set"):
+        assert (
+            _callback(profile.command.commands[name], "detector_name")
+            is _cli_completion.complete_detector
         )

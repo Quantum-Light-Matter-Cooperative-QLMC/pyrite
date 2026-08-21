@@ -57,6 +57,13 @@ def beam_rows(document):
     return beams
 
 
+def detector_rows(document):
+    detectors = document.get("detectors", {})
+    if not isinstance(detectors, dict):
+        raise ValueError("catalog detectors table must be a table")
+    return detectors
+
+
 def profile_overrides(profile):
     overrides = profile.get("overrides", {})
     if not isinstance(overrides, dict):
@@ -117,9 +124,17 @@ def profile_payload(document, name):
     beam_ref = str(beam) if isinstance(beam, str) else None
     beam_payload = beam.unwrap() if beam_ref is None and hasattr(beam, "unwrap") else None
     raw_detector = profile.get("detector")
-    if not isinstance(raw_detector, dict):
+    if raw_detector is None:
         standard = profiles.get("standard", {})
-        raw_detector = standard.get("detector", {}) if isinstance(standard, dict) else {}
+        raw_detector = standard.get("detector") if isinstance(standard, dict) else None
+    detector_ref = str(raw_detector) if isinstance(raw_detector, str) else None
+    if detector_ref is not None:
+        named = detector_rows(document).get(detector_ref)
+        if not isinstance(named, dict):
+            unknown_detector(document, detector_ref)
+        raw_detector = named
+    elif not isinstance(raw_detector, dict):
+        raw_detector = {}
     active_detector_keys = {key for key, _label, _unit in ACTIVE_DETECTOR_FIELDS}
     detector = Detector(
         **{key: value for key, value in raw_detector.items() if key in active_detector_keys}
@@ -134,6 +149,7 @@ def profile_payload(document, name):
         "materials": list(materials) if isinstance(materials, list) else None,
         "beam": beam_payload,
         "beam_ref": beam_ref,
+        "detector_ref": detector_ref,
         "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
         "emission": profile.get("emission"),
         "transport_numerics": {
@@ -167,9 +183,41 @@ def detector_table(profile):
     if detector is None:
         detector = tomlkit.table()
         profile["detector"] = detector
+    elif isinstance(detector, str):
+        raise ValueError(
+            f"profile has detector = {detector!r} (a named reference); edit it with "
+            f"'pyrite detector set {detector} ...', or replace the reference with "
+            "--detector NAME"
+        )
     elif not isinstance(detector, dict):
-        raise ValueError("profile detector must be a table")
+        raise ValueError("profile detector must be a table or named reference")
     return detector
+
+
+def apply_detector_updates(document, target, updates):
+    """Apply legacy inline geometry flags, detaching a named reference.
+
+    Detachment copies the named object's current geometry first, so changing one
+    scalar preserves the other resolved values. The CLI warns before calling
+    this compatibility path.
+    """
+    if not updates:
+        return
+    current = target.get("detector")
+    if isinstance(current, str):
+        named = detector_rows(document).get(current)
+        if not isinstance(named, dict):
+            unknown_detector(document, current)
+        detector = tomlkit.table()
+        active = {key for key, _label, _unit in ACTIVE_DETECTOR_FIELDS}
+        for key, value in named.items():
+            if key in active:
+                detector[key] = value
+        target["detector"] = detector
+    else:
+        detector = detector_table(target)
+    for key, value in updates.items():
+        detector[key] = value
 
 
 def unknown_beam(document, name):
@@ -179,6 +227,16 @@ def unknown_beam(document, name):
     if suggestions:
         message += f". Did you mean: {', '.join(suggestions)}?"
     message += f". Create it first with: pyrite beam create {name}"
+    raise ValueError(message)
+
+
+def unknown_detector(document, name):
+    known = detector_rows(document)
+    suggestions = difflib.get_close_matches(name, known, n=3, cutoff=0.5)
+    message = f"unknown detector: {name}"
+    if suggestions:
+        message += f". Did you mean: {', '.join(suggestions)}?"
+    message += f". Create it first with: pyrite detector create {name}"
     raise ValueError(message)
 
 
@@ -369,6 +427,7 @@ def create_profile(
     updates,
     beam_name,
     beam_updates,
+    detector_name,
     detector_updates,
     transport_updates,
     materials,
@@ -381,6 +440,8 @@ def create_profile(
         )
     if beam_name is not None and beam_name not in beam_rows(document):
         unknown_beam(document, beam_name)
+    if detector_name is not None and detector_name not in detector_rows(document):
+        unknown_detector(document, detector_name)
     if source_name not in profiles:
         raise ValueError(f"unknown source profile: {source_name}")
     target = tomlkit.table()
@@ -393,10 +454,10 @@ def create_profile(
         target["beam"] = beam_name
     else:
         apply_beam_updates(name, target, beam_updates)
-    if detector_updates:
-        detector = detector_table(target)
-        for key, value in detector_updates.items():
-            detector[key] = value
+    if detector_name is not None:
+        target["detector"] = detector_name
+    else:
+        apply_detector_updates(document, target, detector_updates)
     _apply_transport_updates(target, transport_updates)
     if materials is not None:
         target["materials"] = validate_materials(document, csv_materials(materials))
@@ -410,6 +471,7 @@ def set_profile(
     updates,
     beam_name,
     beam_updates,
+    detector_name,
     detector_updates,
     transport_updates,
     materials,
@@ -420,6 +482,8 @@ def set_profile(
     target = existing_profile(document, name)
     if beam_name is not None and beam_name not in beam_rows(document):
         unknown_beam(document, beam_name)
+    if detector_name is not None and detector_name not in detector_rows(document):
+        unknown_detector(document, detector_name)
     material_keys = (
         validate_materials(document, csv_materials(materials)) if materials is not None else None
     )
@@ -441,10 +505,10 @@ def set_profile(
         target["beam"] = beam_name
     else:
         apply_beam_updates(name, target, beam_updates)
-    if detector_updates:
-        detector = detector_table(target)
-        for key, value in detector_updates.items():
-            detector[key] = value
+    if detector_name is not None:
+        target["detector"] = detector_name
+    else:
+        apply_detector_updates(document, target, detector_updates)
     _apply_transport_updates(target, transport_updates)
     if material_keys is not None:
         target["materials"] = material_keys

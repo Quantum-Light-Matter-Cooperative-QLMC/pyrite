@@ -62,8 +62,9 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 ## Entry points
 
 - **`pyrite` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  lazy Click dispatch for the nine visible user nouns: `run`, `app`,
-  `checkpoint`, `config`, `remote`, `job`, `profile`, `material`, and `beam`.
+  lazy Click dispatch for the ten visible user nouns: `run`, `app`,
+  `checkpoint`, `config`, `remote`, `job`, `profile`, `material`, `beam`, and
+  `detector`.
   Retired top-level setup, completion, performance, energy-grid, scan,
   analyze/export, and flat checkpoint spellings remain hidden compatibility
   aliases where the D7 registry documents a replacement.
@@ -731,6 +732,14 @@ reference resolves to values in `materials/catalog.py` before `profiles.py`
 hashes, so beam names never reach `parameter_sha256`. See
 [sweep profiles](guides/sweep-profiles.md) and
 [beam phase space](physics/beam-transport/beam-phase-space.md).
+
+### `cli/commands/detector.py`
+Canonical `pyrite detector list|show|create|set|rename|delete` Click layer over
+top-level `[detectors.NAME]` geometry objects. Profiles attach one through
+`detector = "NAME"`; rename updates every referent and delete refuses while a
+reference survives. Names and display-only labels are removed during catalog
+resolution, so identity depends only on the resolved geometry. Detector
+responses and energy bins remain runtime objects outside this TOML schema.
 
 ### `cli/commands/job.py`
 Canonical `pyrite job list|status|logs|attach|stop` Click layer. Reuses the remote

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import difflib
-import math
 import re
 from pathlib import Path
 
@@ -35,6 +34,12 @@ from pyrite.cli.commands._beam_shared import (
 )
 from pyrite.cli.commands._beam_shared import (
     collect_beam_updates as _collect_beam_updates,
+)
+from pyrite.cli.commands._detector_shared import (
+    collect_detector_updates as _collect_detector_updates,
+)
+from pyrite.cli.commands._detector_shared import (
+    detector_cli_options as _detector_cli_options,
 )
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -118,31 +123,6 @@ def _range_cli_options(function):
     return function
 
 
-def _detector_cli_options(function):
-    function = click.option(
-        "--solid-angle",
-        "solid_angle_sr",
-        type=click.FloatRange(min=0.0, max=4.0 * math.pi, min_open=True),
-        metavar="SR",
-        help="Detector solid angle in sr; scalar replacement.",
-    )(function)
-    function = click.option(
-        "--polar-acceptance",
-        "polar_acceptance_deg",
-        type=click.FloatRange(min=0.0, max=180.0, min_open=True),
-        metavar="DEG",
-        help="Full detector polar acceptance span in degrees; scalar replacement.",
-    )(function)
-    function = click.option(
-        "--observation-angle",
-        "observation_angle_deg",
-        type=click.FloatRange(min=0.0, max=180.0),
-        metavar="DEG",
-        help="Detector observation angle in degrees [0, 180]; scalar replacement.",
-    )(function)
-    return function
-
-
 def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=None):
     return {
         label: value
@@ -153,18 +133,6 @@ def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=No
             "azimuth": flatten_option_values(azimuth),
             "ne_line": ne_line,
             "ne_brem": ne_brem,
-        }.items()
-        if value is not None
-    }
-
-
-def _collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr):
-    return {
-        key: value
-        for key, value in {
-            "observation_angle_deg": observation_angle_deg,
-            "polar_acceptance_deg": polar_acceptance_deg,
-            "solid_angle_sr": solid_angle_sr,
         }.items()
         if value is not None
     }
@@ -258,7 +226,10 @@ def _emit_show(payload):
                 emit_result(
                     f"  beam.longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}"
                 )
-    emit_result("  detector:")
+    if payload["detector_ref"] is not None:
+        emit_result(f"  detector: {payload['detector_ref']} (named reference)")
+    else:
+        emit_result("  detector:")
     for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
         value = payload["detector"][key]
         display = "unspecified" if value is None else f"{value:g} {unit}"
@@ -306,6 +277,19 @@ def _warn_inline_beam_flags(ctx, **beam_flag_values):
     for param_name, flag in _BEAM_FLAG_PARAMS.items():
         if beam_flag_values.get(param_name) is not None:
             warn_flag(ctx, flag, f"pyrite beam create/set {flag}")
+
+
+_DETECTOR_FLAG_PARAMS = {
+    "observation_angle_deg": "--observation-angle",
+    "polar_acceptance_deg": "--polar-acceptance",
+    "solid_angle_sr": "--solid-angle",
+}
+
+
+def _warn_inline_detector_flags(ctx, **detector_flag_values):
+    for param_name, flag in _DETECTOR_FLAG_PARAMS.items():
+        if detector_flag_values.get(param_name) is not None:
+            warn_flag(ctx, flag, f"pyrite detector create/set {flag}")
 
 
 class _ProfileGroup(LazyGroup):
@@ -462,6 +446,13 @@ def show_command(name, json_output):
     shell_complete=_cli_completion.complete_beam,
     help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
 )
+@click.option(
+    "--detector",
+    "detector_name",
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_detector,
+    help="Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+)
 @_detector_cli_options
 @canonical_option(
     "--material",
@@ -500,6 +491,7 @@ def create_command(
     solid_angle_sr,
     materials,
     beam_name,
+    detector_name,
     dry_run,
 ):
     """Create a new profile, cloning defaults from --from (standard).
@@ -541,6 +533,15 @@ def create_command(
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
+    if detector_name is not None and detector_updates:
+        raise click.UsageError("--detector replaces inline detector flags; pass only one")
+    if detector_updates:
+        _warn_inline_detector_flags(
+            ctx,
+            observation_angle_deg=observation_angle_deg,
+            polar_acceptance_deg=polar_acceptance_deg,
+            solid_angle_sr=solid_angle_sr,
+        )
     transport_updates = {
         key: value
         for key, value in (
@@ -560,6 +561,7 @@ def create_command(
             updates=updates,
             beam_name=beam_name,
             beam_updates=beam_updates,
+            detector_name=detector_name,
             detector_updates=detector_updates,
             transport_updates=transport_updates,
             materials=materials,
@@ -581,6 +583,13 @@ def create_command(
     metavar="NAME",
     shell_complete=_cli_completion.complete_beam,
     help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+)
+@click.option(
+    "--detector",
+    "detector_name",
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_detector,
+    help="Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
 )
 @_detector_cli_options
 @canonical_option(
@@ -630,6 +639,7 @@ def set_command(
     solid_angle_sr,
     materials,
     beam_name,
+    detector_name,
     all_materials,
     emission,
     yes,
@@ -676,6 +686,15 @@ def set_command(
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
+    if detector_name is not None and detector_updates:
+        raise click.UsageError("--detector replaces inline detector flags; pass only one")
+    if detector_updates:
+        _warn_inline_detector_flags(
+            ctx,
+            observation_angle_deg=observation_angle_deg,
+            polar_acceptance_deg=polar_acceptance_deg,
+            solid_angle_sr=solid_angle_sr,
+        )
     transport_updates = {
         key: value
         for key, value in (
@@ -691,6 +710,7 @@ def set_command(
         not updates
         and not beam_updates
         and beam_name is None
+        and detector_name is None
         and not detector_updates
         and not transport_updates
         and materials is None
@@ -708,6 +728,7 @@ def set_command(
             updates=updates,
             beam_name=beam_name,
             beam_updates=beam_updates,
+            detector_name=detector_name,
             detector_updates=detector_updates,
             transport_updates=transport_updates,
             materials=materials,
@@ -720,6 +741,7 @@ def set_command(
         overwriting
         or beam_updates
         or beam_name is not None
+        or detector_name is not None
         or detector_updates
         or transport_updates
         or materials is not None
@@ -729,6 +751,8 @@ def set_command(
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
         if beam_updates or beam_name is not None:
             action_fields.append("beam")
+        if detector_name is not None:
+            action_fields.append("detector")
         if emission is not None:
             action_fields.append("emission")
         action_fields.extend(transport_updates)

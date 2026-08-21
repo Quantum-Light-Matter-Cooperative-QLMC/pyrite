@@ -115,6 +115,25 @@ def complete_beam(ctx: object, param: object, incomplete: str) -> list[Completio
     return _items(_beam_keys(), incomplete)
 
 
+@lru_cache(maxsize=1)
+def _detector_keys() -> tuple[str, ...]:
+    """Read catalog ``[detectors.*]`` keys without scientific imports."""
+    try:
+        with (DATA_DIR / "materials.toml").open("rb") as source:
+            detectors = tomllib.load(source).get("detectors", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return ()
+    if not isinstance(detectors, dict):
+        return ()
+    return tuple(key for key in detectors if _SAFE_TOKEN_RE.fullmatch(key))
+
+
+def complete_detector(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
+    """Complete one catalog ``[detectors.*]`` name."""
+    del ctx, param
+    return _items(_detector_keys(), incomplete)
+
+
 def complete_profile(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete one catalog ``[profiles.*]`` name."""
     del ctx, param

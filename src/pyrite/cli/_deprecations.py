@@ -323,6 +323,14 @@ _BEAM_FLAG_NAMES: tuple[str, ...] = (
     "--emittance",
 )
 _BEAM_FLAG_NOTE = "Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`."
+_DETECTOR_FLAG_NAMES: tuple[str, ...] = (
+    "--observation-angle",
+    "--polar-acceptance",
+    "--solid-angle",
+)
+_DETECTOR_FLAG_NOTE = (
+    "Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`."
+)
 
 #: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
@@ -334,6 +342,16 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
             _flag(command, flag, f"pyrite beam create/set {flag}", note=_BEAM_FLAG_NOTE)
             for command in ("profile create", "profile set")
             for flag in _BEAM_FLAG_NAMES
+        ),
+        *(
+            _flag(
+                command,
+                flag,
+                f"pyrite detector create/set {flag}",
+                note=_DETECTOR_FLAG_NOTE,
+            )
+            for command in ("profile create", "profile set")
+            for flag in _DETECTOR_FLAG_NAMES
         ),
         # D5: one canonical name per quantity. The singular spellings were
         # already canonical on `material set`, `sweep set`, and `profile *`;
@@ -430,6 +448,9 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("beam delete", "--json", "--output json"),
         _flag("beam list", "--json", "--output json"),
         _flag("beam show", "--json", "--output json"),
+        _flag("detector delete", "--json", "--output json"),
+        _flag("detector list", "--json", "--output json"),
+        _flag("detector show", "--json", "--output json"),
     )
 }
 
@@ -438,7 +459,9 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
 #: calls `warn_flag` itself instead. Mirrors `SELF_WARNING`, one level down
 #: (flags rather than whole command paths).
 SELF_WARNING_FLAGS: frozenset[tuple[str, str]] = frozenset(
-    (command, flag) for command in ("profile create", "profile set") for flag in _BEAM_FLAG_NAMES
+    (command, flag)
+    for command in ("profile create", "profile set")
+    for flag in (*_BEAM_FLAG_NAMES, *_DETECTOR_FLAG_NAMES)
 )
 
 

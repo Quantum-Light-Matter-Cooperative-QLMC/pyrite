@@ -96,7 +96,7 @@
         "required": false
       }
     ],
-    "help": "Usage: pyrite [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``pyrite COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    pyrite setup\n    pyrite profile list\n    pyrite profile show sub_100keV\n    pyrite run sub_100keV -m hopg\n    pyrite run sub_100keV --remote --dry-run\n    pyrite app analysis launch\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write PYRITE_MC_BACKEND to .env (first\n               run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage PyRITE shell tab-completion.\n  config       Set and inspect current profile and remote-target defaults.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  job          List, inspect, follow, or stop asynchronous remote jobs.\n  energy-grid  Derive, inspect, and manage immutable photon-energy-grid\n               artifacts.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n  beam         Manage named beams, attachable to profiles by name.\n",
+    "help": "Usage: pyrite [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``pyrite COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    pyrite config setup\n    pyrite profile list\n    pyrite profile show sub_100keV\n    pyrite run sub_100keV -m hopg\n    pyrite run sub_100keV --remote --dry-run\n    pyrite app analysis launch\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run         Run a profile's MC sweeps and write checkpoints.\n  app         Launch or export interactive analysis notebooks.\n  checkpoint  Inspect, transform, recompute, archive, and reclaim checkpoints.\n  config      Set and inspect current profile and remote-target defaults.\n  remote      Run and manage MC sweeps on a remote GPU host.\n  job         List, inspect, follow, or stop asynchronous remote jobs.\n  profile     Manage named catalog campaigns and material membership.\n  material    Inspect, validate, edit, and blaze individual materials.\n  beam        Manage named beams, attachable to profiles by name.\n  detector    Manage named detector geometries.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -127,7 +127,7 @@
           },
           {
             "dest": "quick",
-            "help": "Use tiny smoke-test grid and write <material>_quick.pkl.",
+            "help": "Use a tiny smoke-test grid and write the <material>_quick/ component directory.",
             "option_strings": [
               "--quick"
             ],
@@ -143,7 +143,7 @@
           },
           {
             "dest": "checkpoint_dir",
-            "help": "Read and write checkpoint pickles in DIR.",
+            "help": "Read and write component checkpoints in DIR.",
             "option_strings": [
               "--checkpoint-dir"
             ],
@@ -396,7 +396,7 @@
             "required": false
           }
         ],
-        "help": "Usage: pyrite run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  -c, --cpu                       After the primary run, capture one bounded\n                                  serial CPU cProfile pass; implies --perf.\n                                  Requires -R/--remote.\n  --cpu-only                      Capture only the bounded serial CPU cProfile\n                                  pass; starts no primary GPU/Nsight scan and\n                                  implies --perf. Requires -R/--remote.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai\n                                  requires -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: pyrite run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes component data\n  beneath <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use a tiny smoke-test grid and write the\n                                  <material>_quick/ component directory.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write component checkpoints in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  -c, --cpu                       After the primary run, capture one bounded\n                                  serial CPU cProfile pass; implies --perf.\n                                  Requires -R/--remote.\n  --cpu-only                      Capture only the bounded serial CPU cProfile\n                                  pass; starts no primary GPU/Nsight scan and\n                                  implies --perf. Requires -R/--remote.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai\n                                  requires -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
@@ -422,7 +422,7 @@
           }
         ],
         "help": "Usage: pyrite setup [OPTIONS]\n\n  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  PYRITE_MC_BACKEND or its CXR_MC_BACKEND alias is already set in .env, unless\n  --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value\n              in .env.\n  -h, --help  Show this message and exit.\n",
-        "hidden": false,
+        "hidden": true,
         "path": "setup",
         "subcommands": []
       },
@@ -1639,8 +1639,8 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite completion [OPTIONS] COMMAND [ARGS]...\n\n  Manage pyrite shell tab-completion.\n\n  Example:\n    pyrite completion install\n    pyrite completion install --shell zsh --dry-run\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  install  Generate and persist pyrite shell tab-completion.\n  remove   Remove pyrite tab-completion setup and its generated script.\n",
-        "hidden": false,
+        "help": "Usage: pyrite completion [OPTIONS] COMMAND [ARGS]...\n\n  Manage pyrite shell tab-completion.\n\n  Example:\n    pyrite config completion install\n    pyrite config completion install --shell zsh --dry-run\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  install  Generate and persist pyrite shell tab-completion.\n  remove   Remove pyrite tab-completion setup and its generated script.\n",
+        "hidden": true,
         "path": "completion",
         "subcommands": [
           {
@@ -1727,7 +1727,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite config [OPTIONS] COMMAND [ARGS]...\n\n  Set and inspect environment-scoped CLI defaults.\n\n  Values resolve in one order everywhere: per-call flag, CXR_* environment,\n  config store, then built-in default.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  get   Print the effective value for KEY.\n  list  List effective values and the winning precedence source.\n  set   Persist VALUE for KEY.\n",
+        "help": "Usage: pyrite config [OPTIONS] COMMAND [ARGS]...\n\n  Set and inspect environment-scoped CLI defaults.\n\n  Values resolve in one order everywhere: per-call flag, CXR_* environment,\n  config store, then built-in default.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  get         Print the effective value for KEY.\n  list        List effective values and the winning...\n  set         Persist VALUE for KEY.\n  setup       Detect GPU hardware and persist the selected backend.\n  completion  Manage PyRITE shell tab-completion.\n",
         "hidden": false,
         "path": "config",
         "subcommands": [
@@ -1771,13 +1771,126 @@
             "hidden": false,
             "path": "config set",
             "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "yes",
+                "help": "Accept the top detected accelerator without an interactive prompt.",
+                "option_strings": [
+                  "-y",
+                  "--yes"
+                ],
+                "required": false
+              },
+              {
+                "dest": "force",
+                "help": "Re-run detection and write the canonical PYRITE_MC_BACKEND value in .env.",
+                "option_strings": [
+                  "--force"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite config setup [OPTIONS]\n\n  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  PYRITE_MC_BACKEND or its CXR_MC_BACKEND alias is already set in .env, unless\n  --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value\n              in .env.\n  -h, --help  Show this message and exit.\n",
+            "hidden": false,
+            "path": "config setup",
+            "subcommands": []
+          },
+          {
+            "actions": [],
+            "help": "Usage: pyrite config completion [OPTIONS] COMMAND [ARGS]...\n\n  Manage pyrite shell tab-completion.\n\n  Example:\n    pyrite config completion install\n    pyrite config completion install --shell zsh --dry-run\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  install  Generate and persist pyrite shell tab-completion.\n  remove   Remove pyrite tab-completion setup and its generated script.\n",
+            "hidden": false,
+            "path": "config completion",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "shell",
+                    "help": "Target shell. Defaults to detecting from $SHELL.",
+                    "option_strings": [
+                      "--shell"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "rc_file",
+                    "help": "Rc/config file to edit. Defaults to the shell's standard location.",
+                    "option_strings": [
+                      "--rc-file"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "completion_file",
+                    "help": "Generated script path. Defaults to PyRITE's user-data directory.",
+                    "option_strings": [
+                      "--completion-file"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print what would change without writing.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite config completion install [OPTIONS]\n\n  Generate a pyrite completion script and source it from a shell rc/config file.\n\n  The bare pyrite executable must remain on PATH across shell sessions; for uv\n  installations, use 'uv tool install' rather than project-only 'uv run'.\n  Idempotent: rerunning refreshes the generated script without duplicating the\n  rc block. With no --shell, detects from $SHELL.\n\nOptions:\n  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.\n  --rc-file FILE           Rc/config file to edit. Defaults to the shell's\n                           standard location.\n  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data\n                           directory.\n  --dry-run                Print what would change without writing.\n  -h, --help               Show this message and exit.\n",
+                "hidden": false,
+                "path": "config completion install",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "shell",
+                    "help": "Target shell. Defaults to detecting from $SHELL.",
+                    "option_strings": [
+                      "--shell"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "rc_file",
+                    "help": "Rc/config file to edit. Defaults to the shell's standard location.",
+                    "option_strings": [
+                      "--rc-file"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "completion_file",
+                    "help": "Generated script path. Defaults to PyRITE's user-data directory.",
+                    "option_strings": [
+                      "--completion-file"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print what would change without writing.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite config completion remove [OPTIONS]\n\n  Remove pyrite tab-completion setup and its generated script.\n\n  Idempotent: exact pyrite and retained cxr-managed blocks are removed. With no\n  --shell, detects from $SHELL.\n\nOptions:\n  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.\n  --rc-file FILE           Rc/config file to edit. Defaults to the shell's\n                           standard location.\n  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data\n                           directory.\n  --dry-run                Print what would change without writing.\n  -h, --help               Show this message and exit.\n",
+                "hidden": false,
+                "path": "config completion remove",
+                "subcommands": []
+              }
+            ]
           }
         ]
       },
       {
         "actions": [],
         "help": "Usage: pyrite performance [OPTIONS] COMMAND [ARGS]...\n\n  List, analyze, or delete local compute-performance artifacts.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  analyze  Analyze NAME's logs into CSV, Markdown, and PNG artifacts.\n  list     List local performance profiles with artifact counts and sizes.\n  rm       Delete explicitly selected local performance profiles; preview...\n",
-        "hidden": false,
+        "hidden": true,
         "path": "performance",
         "subcommands": [
           {
@@ -3393,6 +3506,22 @@
                 "required": false
               },
               {
+                "dest": "no_cache",
+                "help": "Neither read nor write the shared per-case checkpoint cache: an ephemeral run that recomputes every case and stores nothing shared.",
+                "option_strings": [
+                  "--no-cache"
+                ],
+                "required": false
+              },
+              {
+                "dest": "recompute",
+                "help": "Ignore cached cases and recompute fresh, but repopulate the shared per-case cache with the results.",
+                "option_strings": [
+                  "--recompute"
+                ],
+                "required": false
+              },
+              {
                 "dest": "no_sync",
                 "help": "Skip code upload.",
                 "option_strings": [
@@ -3457,7 +3586,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite remote run [OPTIONS] [PROFILE]\n\n  Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n  Use --headless to return after submission. Use --no-pull to track through\n  completion without automatically pulling checkpoints.\n\n  PROFILE selects the catalog campaign and its material membership; when omitted\n  it uses the current configured profile (standard built-in). Use -m/--material\n  to run one member only. Profiles without an explicit membership run every\n  catalog material.\n\n  A profile run names the job after PROFILE (NAME, then NAME-2 once a finished\n  run holds the bare name) and refuses while another job under the same profile\n  is live.\n\nOptions:\n  -m, --material TEXT          Run one material from PROFILE instead of its full\n                               membership.\n  --fidelity [full|survey]     Named settings/grid policy. survey is provisional\n                               and reduced.  [default: full]\n  --quick                      Use tiny smoke-test grid.\n  --workers NUMBER             Transport workers (default: auto; 0 runs\n                               serially).\n  --parallel-materials N       Simultaneous scans in one allocation; requires\n                               --chunk-minutes 0.  [1<=x<=4]\n  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; defaults to\n                               10, or 0 for --perf-reps >1, --nsys, and CPU\n                               profiling.\n  -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM,\n                               process, phase timing, queue, worker, chunk, and\n                               case metrics for PROFILE.\n  -r, --perf-reps N            Run N uncached sessions per material with\n                               isolated job-local checkpoints; requires --perf\n                               and --chunk-minutes 0. Profiling checkpoints are\n                               not pulled.  [default: 1; 1<=x<=20]\n  -i, --perf-interval SECONDS  Performance telemetry sampling interval; requires\n                               --perf.  [default: 5.0]\n  --spec-chunk N               Pin line-spectrum segments per GPU chunk;\n                               requires --perf.\n  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk;\n                               requires --perf.\n  --nsys                       Capture one uncached full-profile session with\n                               Nsight Systems CUDA/NVTX and Python-stack\n                               tracing; implies --perf, --perf-reps 1, and\n                               --chunk-minutes 0; requires one explicit\n                               -m/--material.\n  -c, --cpu                    After the primary run, capture one bounded serial\n                               CPU cProfile pass; implies --perf and --chunk-\n                               minutes 0.\n  --cpu-only                   Capture only the bounded serial CPU cProfile\n                               pass; starts no primary GPU/Nsight scan and\n                               implies --perf and --chunk-minutes 0.\n  --no-sync                    Skip code upload.\n  --dry-run                    Print submission preview; do not connect.\n  --headless                   Return after submission without attaching or\n                               pulling.\n  --no-pull                    Attach and track, but do not pull completed\n                               checkpoints or performance artifacts.\n  --grid                       Grid-filter checkpoint before pulling;\n                               incompatible with --quick.\n  --drop-wide-brem             With --grid, drop wide-brem.\n  --downcast                   With --grid, downcast to float32.\n  --level9                     Recompress completed checkpoints at max\n                               compression before automatic pull.\n  -h, --help                   Show this message and exit.\n",
+            "help": "Usage: pyrite remote run [OPTIONS] [PROFILE]\n\n  Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n  Use --headless to return after submission. Use --no-pull to track through\n  completion without automatically pulling checkpoints.\n\n  PROFILE selects the catalog campaign and its material membership; when omitted\n  it uses the current configured profile (standard built-in). Use -m/--material\n  to run one member only. Profiles without an explicit membership run every\n  catalog material.\n\n  A profile run names the job after PROFILE (NAME, then NAME-2 once a finished\n  run holds the bare name) and refuses while another job under the same profile\n  is live.\n\nOptions:\n  -m, --material TEXT          Run one material from PROFILE instead of its full\n                               membership.\n  --fidelity [full|survey]     Named settings/grid policy. survey is provisional\n                               and reduced.  [default: full]\n  --quick                      Use tiny smoke-test grid.\n  --workers NUMBER             Transport workers (default: auto; 0 runs\n                               serially).\n  --parallel-materials N       Simultaneous scans in one allocation; requires\n                               --chunk-minutes 0.  [1<=x<=4]\n  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; defaults to\n                               10, or 0 for --perf-reps >1, --nsys, and CPU\n                               profiling.\n  -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM,\n                               process, phase timing, queue, worker, chunk, and\n                               case metrics for PROFILE.\n  -r, --perf-reps N            Run N uncached sessions per material with\n                               isolated job-local checkpoints; requires --perf\n                               and --chunk-minutes 0. Profiling checkpoints are\n                               not pulled.  [default: 1; 1<=x<=20]\n  -i, --perf-interval SECONDS  Performance telemetry sampling interval; requires\n                               --perf.  [default: 5.0]\n  --spec-chunk N               Pin line-spectrum segments per GPU chunk;\n                               requires --perf.\n  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk;\n                               requires --perf.\n  --nsys                       Capture one uncached full-profile session with\n                               Nsight Systems CUDA/NVTX and Python-stack\n                               tracing; implies --perf, --perf-reps 1, and\n                               --chunk-minutes 0; requires one explicit\n                               -m/--material.\n  -c, --cpu                    After the primary run, capture one bounded serial\n                               CPU cProfile pass; implies --perf and --chunk-\n                               minutes 0.\n  --cpu-only                   Capture only the bounded serial CPU cProfile\n                               pass; starts no primary GPU/Nsight scan and\n                               implies --perf and --chunk-minutes 0.\n  --no-cache                   Neither read nor write the shared per-case\n                               checkpoint cache: an ephemeral run that\n                               recomputes every case and stores nothing shared.\n  --recompute                  Ignore cached cases and recompute fresh, but\n                               repopulate the shared per-case cache with the\n                               results.\n  --no-sync                    Skip code upload.\n  --dry-run                    Print submission preview; do not connect.\n  --headless                   Return after submission without attaching or\n                               pulling.\n  --no-pull                    Attach and track, but do not pull completed\n                               checkpoints or performance artifacts.\n  --grid                       Grid-filter checkpoint before pulling;\n                               incompatible with --quick.\n  --drop-wide-brem             With --grid, drop wide-brem.\n  --downcast                   With --grid, downcast to float32.\n  --level9                     Recompress completed checkpoints at max\n                               compression before automatic pull.\n  -h, --help                   Show this message and exit.\n",
             "hidden": true,
             "path": "remote run",
             "subcommands": []
@@ -3811,8 +3940,8 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and manage per-material photon-energy grids.\n\n  ``derive`` measures both coherent-line and bremsstrahlung upper bounds.\n  ``defaults`` controls that diagnostic derivation only; ``add`` stores\n  validated bounds and repoints a profile. Physical scan profile defaults belong\n  to ``pyrite profile``; per-material range overrides belong to ``pyrite\n  material``.\n\n  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost\n  and grid reduction; it never changes derivation or applied full bounds.\n\n  Command-line derivation values override persistent defaults for one run.\n\n  Examples:\n    pyrite energy-grid derive --material mose2,wse2 --energy 30,60\n    pyrite energy-grid derive --material mose2 --remote --dry-run\n    pyrite energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add           Add immutable derived-grid artifacts and repoint one profile.\n  brem          Inspect or manually set bremsstrahlung energy grids.\n  defaults      Show, update, or clear persistent derivation inputs.\n  derive        Derive line and bremsstrahlung energy-grid bounds locally...\n  gc            Reclaim unreachable immutable artifacts after a 14-day...\n  job           Inspect, follow, or stop remote energy-grid jobs.\n  line          Inspect or manually set coherent line-energy grids.\n  regen-golden  Regenerate or check material-catalog golden snapshot.\n  rm            Remove line rows by repointing a profile to a new immutable...\n  show          Show line and bremsstrahlung grids together.\n  verify        Verify stored and profile/lock-referenced immutable artifacts.\n",
-        "hidden": false,
+        "help": "Usage: pyrite energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and manage per-material photon-energy grids.\n\n  ``derive`` measures both coherent-line and bremsstrahlung upper bounds.\n  ``defaults`` controls that diagnostic derivation only; ``add`` stores\n  validated bounds and repoints a profile. Physical scan profile defaults belong\n  to ``pyrite profile``; per-material range overrides belong to ``pyrite\n  material``.\n\n  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost\n  and grid reduction; it never changes derivation or applied full bounds.\n\n  Command-line derivation values override persistent defaults for one run.\n\n  Examples:\n    pyrite material energy-grid derive --material mose2,wse2 --energy 30,60 --profile survey\n    pyrite material energy-grid derive --material mose2 --remote --dry-run\n    pyrite material energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add           Add immutable derived-grid artifacts and repoint one profile.\n  brem          Inspect or manually set bremsstrahlung energy grids.\n  defaults      Show, update, or clear persistent derivation inputs.\n  derive        Derive and install line and bremsstrahlung grids locally or...\n  gc            Reclaim unreachable immutable artifacts after a 14-day...\n  job           Inspect, follow, or stop remote energy-grid jobs.\n  line          Inspect or manually set coherent line-energy grids.\n  regen-golden  Regenerate or check material-catalog golden snapshot.\n  rm            Remove line rows by repointing a profile to a new immutable...\n  show          Show line and bremsstrahlung grids together.\n  verify        Verify stored and profile/lock-referenced immutable artifacts.\n",
+        "hidden": true,
         "path": "energy-grid",
         "subcommands": [
           {
@@ -3880,7 +4009,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid add [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid add [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid add",
             "subcommands": []
@@ -3950,7 +4079,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid apply [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid apply [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
             "hidden": true,
             "path": "energy-grid apply",
             "subcommands": []
@@ -4306,6 +4435,14 @@
                 "required": false
               },
               {
+                "dest": "catalog_profile",
+                "help": "Install derived grids for profile NAME; precedence: flag > configuration > standard.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
                 "dest": "remote_target",
                 "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
                 "option_strings": [
@@ -4315,7 +4452,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid derive [OPTIONS]\n\n  Derive line and bremsstrahlung energy-grid bounds locally or remotely.\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides\n                            persistent default.\n  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote\n                            slice.  [default: 10.0]\n  --no-sync                 Skip code upload before remote submission.\n  --dry-run                 Print remote batch script and submission command; do\n                            not connect or submit.\n  --wait                    Wait for remote completion and pull the result.\n  --detach                  Return after remote submission.\n  -R, --remote [TARGET]     Run remotely; bare uses the configured target,\n                            =TARGET overrides it.\n  -h, --help                Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid derive [OPTIONS]\n\n  Derive and install line and bremsstrahlung grids locally or remotely.\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides\n                            persistent default.\n  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote\n                            slice.  [default: 10.0]\n  --no-sync                 Skip code upload before remote submission.\n  --dry-run                 Print remote batch script and submission command; do\n                            not connect or submit.\n  --wait                    Wait for remote completion and pull the result.\n  --detach                  Return after remote submission.\n  --profile NAME            Install derived grids for profile NAME; precedence:\n                            flag > configuration > standard.\n  -R, --remote [TARGET]     Run remotely; bare uses the configured target,\n                            =TARGET overrides it.\n  -h, --help                Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid derive",
             "subcommands": []
@@ -4534,7 +4671,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite energy-grid line delete [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: pyrite energy-grid line delete [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite-dev energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": true,
                 "path": "energy-grid line delete",
                 "subcommands": []
@@ -4740,7 +4877,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid rm [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid rm [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite-dev energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid rm",
             "subcommands": []
@@ -5121,7 +5258,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all catalog materials.\n  Membership uses ``set|add|remove --material``; ``set --all-materials``\n  restores implicit membership. Per-material range overrides are managed by\n  ``pyrite material``. Energy grids are managed by ``pyrite energy-grid``.\n\n  Examples:\n    pyrite profile list\n    pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)\n    pyrite profile create sub_100keV --energy 30:100:10\n    pyrite profile set sub_100keV --observation-angle 119\n    pyrite profile add sub_100keV --energy 75\n    pyrite profile set sub_100keV --material hopg,mose2\n    pyrite profile rename sub_100keV sub100\n    pyrite profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add     Incrementally add values to profile grids, or emission modes.\n  create  Create a new profile, cloning defaults from --from (standard).\n  delete  Delete a profile; irreversible.\n  list    List catalog profiles with membership, override, and grid-ref...\n  remove  Remove values from an existing profile's grids, or emission modes.\n  rename  Rename profile NAME to NEW_NAME.\n  set     Replace range grids, beam fields, detector scalars, or emission...\n  show    Show one profile's ranges, beam, detector, membership, and...\n",
+        "help": "Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all catalog materials.\n  Membership uses ``set|add|remove --material``; ``set --all-materials``\n  restores implicit membership. Per-material range overrides and derived energy\n  grids are managed by ``pyrite material``.\n\n  Examples:\n    pyrite profile list\n    pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)\n    pyrite profile create sub_100keV --energy 30:100:10\n    pyrite profile set sub_100keV --observation-angle 119\n    pyrite profile add sub_100keV --energy 75\n    pyrite profile set sub_100keV --material hopg,mose2\n    pyrite profile rename sub_100keV sub100\n    pyrite profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add          Incrementally add values to profile grids,...\n  create       Create a new profile, cloning defaults...\n  delete       Delete a profile; irreversible.\n  list         List catalog profiles with membership,...\n  remove       Remove values from an existing profile's...\n  rename       Rename profile NAME to NEW_NAME.\n  set          Replace range grids, beam fields, detector...\n  show         Show one profile's ranges, beam, detector,...\n  energy-grid  Manage profile-scoped energy-grid derivation inputs.\n",
         "hidden": false,
         "path": "profile",
         "subcommands": [
@@ -5324,7 +5461,7 @@
               },
               {
                 "dest": "source",
-                "help": "Clone range, beam, and detector defaults from SOURCE; defaults to standard.",
+                "help": "Clone ranges, beam, detector, and material membership from SOURCE; defaults to standard.",
                 "option_strings": [
                   "--from"
                 ],
@@ -5377,6 +5514,31 @@
                 "option_strings": [
                   "-b",
                   "--ne-brem"
+                ],
+                "required": false
+              },
+              {
+                "dest": "straggling",
+                "help": "Enable or disable Urban energy-loss straggling.",
+                "option_strings": [
+                  "--straggling",
+                  "--no-straggling"
+                ],
+                "required": false
+              },
+              {
+                "dest": "energy_model",
+                "help": "Transport clock model (frozen or midpoint).",
+                "option_strings": [
+                  "--energy-model"
+                ],
+                "required": false
+              },
+              {
+                "dest": "max_de_frac",
+                "help": "Cap one transport row's fractional mean energy loss; requires midpoint.",
+                "option_strings": [
+                  "--max-de-frac"
                 ],
                 "required": false
               },
@@ -5461,6 +5623,14 @@
                 "required": false
               },
               {
+                "dest": "detector_name",
+                "help": "Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+                "option_strings": [
+                  "--detector"
+                ],
+                "required": false
+              },
+              {
                 "dest": "observation_angle_deg",
                 "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
                 "option_strings": [
@@ -5509,7 +5679,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite profile create [OPTIONS] NAME\n\n  Create a new profile, cloning defaults from --from (standard).\n\n  Range options replace individual cloned grids; beam and detector options\n  replace individual cloned fields. Overrides and material membership are not\n  cloned. Without --material, the new profile starts with implicit all-catalog\n  membership and no per-material overrides. --beam NAME attaches a named\n  [beams.NAME] reference and is mutually exclusive with the inline beam flags,\n  which are deprecated in its favor.\n\nOptions:\n  --from SOURCE                   Clone range, beam, and detector defaults from\n                                  SOURCE; defaults to standard.\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference;\n                                  replaces the inline beam flags.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --material KEY,...              Set explicit initial membership (comma-\n                                  separated material keys).\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite profile create [OPTIONS] NAME\n\n  Create a new profile, cloning defaults from --from (standard).\n\n  Range options replace individual cloned grids; beam and detector options\n  replace individual cloned fields. Material membership is cloned and\n  ``--material`` replaces it. Per-material overrides are not cloned. --beam NAME\n  attaches a named [beams.NAME] reference and is mutually exclusive with the\n  inline beam flags, which are deprecated in its favor.\n\nOptions:\n  --from SOURCE                   Clone ranges, beam, detector, and material\n                                  membership from SOURCE; defaults to standard.\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model (frozen or midpoint).\n  --max-de-frac FRACTION          Cap one transport row's fractional mean energy\n                                  loss; requires midpoint.  [x>=0.0]\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference;\n                                  replaces the inline beam flags.\n  --detector NAME                 Attach a named [detectors.NAME] reference;\n                                  replaces inline geometry flags.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --material KEY,...              Set explicit initial membership (comma-\n                                  separated material keys).\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile create",
             "subcommands": []
@@ -5964,6 +6134,31 @@
                 "required": false
               },
               {
+                "dest": "straggling",
+                "help": "Enable or disable Urban energy-loss straggling.",
+                "option_strings": [
+                  "--straggling",
+                  "--no-straggling"
+                ],
+                "required": false
+              },
+              {
+                "dest": "energy_model",
+                "help": "Transport clock model (frozen or midpoint).",
+                "option_strings": [
+                  "--energy-model"
+                ],
+                "required": false
+              },
+              {
+                "dest": "max_de_frac",
+                "help": "Cap one transport row's fractional mean energy loss; requires midpoint.",
+                "option_strings": [
+                  "--max-de-frac"
+                ],
+                "required": false
+              },
+              {
                 "dest": "normalized_emittance_mm_mrad",
                 "help": "Normalized transverse emittance in mm*mrad; replaces the spot FWHM.",
                 "option_strings": [
@@ -6044,6 +6239,14 @@
                 "required": false
               },
               {
+                "dest": "detector_name",
+                "help": "Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+                "option_strings": [
+                  "--detector"
+                ],
+                "required": false
+              },
+              {
                 "dest": "observation_angle_deg",
                 "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
                 "option_strings": [
@@ -6117,7 +6320,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite profile set [OPTIONS] NAME\n\n  Replace range grids, beam fields, detector scalars, or emission on a profile.\n\n  NAME must already exist (create it with ``pyrite profile create``); unknown\n  names error with suggestions. Editing 'standard' prompts for confirmation\n  unless --yes is given; --dry-run never prompts. Detector scalars and emission\n  replace supplied fields; unlike range grids, they are not accepted by\n  add/remove -- except emission, which add/remove also accept via\n  --coherent/--incoherent for incremental switching. --beam NAME attaches a\n  named [beams.NAME] reference and is mutually exclusive with the inline beam\n  flags, which are deprecated in its favor.\n\nOptions:\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference;\n                                  replaces the inline beam flags.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --material KEY,...              Replace explicit membership with comma-\n                                  separated material keys.\n  --all-materials                 Restore implicit membership in every catalog\n                                  material.\n  --emission [incoherent|coherent|both]\n                                  Replace the emission policy\n                                  (incoherent/coherent/both).\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite profile set [OPTIONS] NAME\n\n  Replace range grids, beam fields, detector scalars, or emission.\n\n  NAME must already exist (create it with ``pyrite profile create``); unknown\n  names error with suggestions. Editing 'standard' prompts for confirmation\n  unless --yes is given; --dry-run never prompts. Detector scalars and emission\n  replace supplied fields; unlike range grids, they are not accepted by\n  add/remove -- except emission, which add/remove also accept via\n  --coherent/--incoherent for incremental switching. --beam NAME attaches a\n  named [beams.NAME] reference and is mutually exclusive with the inline beam\n  flags, which are deprecated in its favor.\n\nOptions:\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model (frozen or midpoint).\n  --max-de-frac FRACTION          Cap one transport row's fractional mean energy\n                                  loss; requires midpoint.  [x>=0.0]\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference;\n                                  replaces the inline beam flags.\n  --detector NAME                 Attach a named [detectors.NAME] reference;\n                                  replaces inline geometry flags.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --material KEY,...              Replace explicit membership with comma-\n                                  separated material keys.\n  --all-materials                 Restore implicit membership in every catalog\n                                  material.\n  --emission [incoherent|coherent|both]\n                                  Replace the emission policy\n                                  (incoherent/coherent/both).\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile set",
             "subcommands": []
@@ -6152,12 +6355,125 @@
             "hidden": false,
             "path": "profile show",
             "subcommands": []
+          },
+          {
+            "actions": [],
+            "help": "Usage: pyrite profile energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Manage profile-scoped energy-grid derivation inputs.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  defaults  Show, update, or clear persistent derivation inputs.\n",
+            "hidden": false,
+            "path": "profile energy-grid",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "json_output",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--json"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "set_values",
+                    "help": "Persist supplied values; otherwise only show defaults.",
+                    "option_strings": [
+                      "--save-default"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_set_values___set",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--set"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "clear_fields",
+                    "help": "Reset one field to inherited/built-in behavior; repeatable. Fields: polar, azimuth, thickness, brem-step, energy, material.",
+                    "option_strings": [
+                      "--clear"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "reset",
+                    "help": "Reset every persistent derivation field to inherited/built-in behavior.",
+                    "option_strings": [
+                      "--reset"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "tilts",
+                    "help": "Persistent derivation polar tilts in degrees [0, 90).",
+                    "option_strings": [
+                      "--polar"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_tilts___tilts",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--tilts"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "azimuths",
+                    "help": "Persistent azimuths in degrees [0, 360].",
+                    "option_strings": [
+                      "--azimuth"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_azimuths___azimuths",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--azimuths"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "thickness",
+                    "help": "Persistent positive crystal thicknesses in angstrom.",
+                    "option_strings": [
+                      "--thickness"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "brem_step",
+                    "help": "Persistent derivation bremsstrahlung spacing in eV.",
+                    "option_strings": [
+                      "--brem-step"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile energy-grid defaults [OPTIONS]\n\n  Show, update, or clear persistent derivation inputs.\n\n  These values feed local and remote ``derive`` when matching options are\n  omitted. Geometry searches determine both line and bremsstrahlung upper\n  bounds; ``brem-step`` controls only applied bremsstrahlung spacing.\n\n  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile\n  angles. These are not physical scan defaults and do not select scan\n  ``--fidelity full|survey``.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --save-default                  Persist supplied values; otherwise only show\n                                  defaults.\n  --clear FIELD                   Reset one field to inherited/built-in\n                                  behavior; repeatable. Fields: polar, azimuth,\n                                  thickness, brem-step, energy, material.\n  --reset                         Reset every persistent derivation field to\n                                  inherited/built-in behavior.\n  --polar DEG,...                 Persistent derivation polar tilts in degrees\n                                  [0, 90).\n  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].\n  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in\n                                  angstrom.\n  --brem-step EV                  Persistent derivation bremsstrahlung spacing\n                                  in eV.\n  -h, --help                      Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile energy-grid defaults",
+                "subcommands": []
+              }
+            ]
           }
         ]
       },
       {
         "actions": [],
-        "help": "Usage: pyrite material [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, validate, edit, and blaze individual materials.\n\n  Profile membership remains under ``pyrite profile members``. ``validate``\n  checks the complete catalog; ``blaze`` writes a face-specific checkpoint.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set       Set or reset MATERIAL overrides without...\n  show      Show MATERIAL's effective ranges and...\n  blaze     Run a grooved-crystal sweep and write a checkpoint.\n  validate  Validate a material catalog without starting simulation.\n",
+        "help": "Usage: pyrite material [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, validate, edit, and blaze individual materials.\n\n  Profile membership remains under ``pyrite profile members``. ``validate``\n  checks the complete catalog; ``blaze`` writes a face-specific checkpoint.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set          Set or reset MATERIAL overrides without...\n  show         Show MATERIAL's effective ranges and...\n  blaze        Run a grooved-crystal sweep and write a checkpoint.\n  energy-grid  Derive and inspect detector energy-grid inputs.\n  validate     Validate a material catalog without starting simulation.\n",
         "hidden": false,
         "path": "material",
         "subcommands": [
@@ -6329,7 +6645,7 @@
               },
               {
                 "dest": "checkpoint_dir",
-                "help": "Read and write blazed checkpoint pickles in DIR.",
+                "help": "Read and write blazed component checkpoints in DIR.",
                 "option_strings": [
                   "--checkpoint-dir"
                 ],
@@ -6377,10 +6693,312 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite material blaze [OPTIONS] MATERIAL\n\n  Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan\n  checkpoints. Repeat --energy/--spacing/--polar for multiple values.\n\nOptions:\n  --energy E                      Beam energies in keV (one or more).\n                                  [required]\n  --spacing S                     Groove spacing(s) in meters (one, or one per\n                                  energy).  [required]\n  --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial).\n  --checkpoint-dir DIR            Read and write blazed checkpoint pickles in\n                                  DIR.  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite material blaze [OPTIONS] MATERIAL\n\n  Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n  Writes checkpoints/<material>_blazed/, separate from flat-face scan\n  checkpoints. Repeat --energy/--spacing/--polar for multiple values.\n\nOptions:\n  --energy E                      Beam energies in keV (one or more).\n                                  [required]\n  --spacing S                     Groove spacing(s) in meters (one, or one per\n                                  energy).  [required]\n  --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial).\n  --checkpoint-dir DIR            Read and write blazed component checkpoints in\n                                  DIR.  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "material blaze",
             "subcommands": []
+          },
+          {
+            "actions": [],
+            "help": "Usage: pyrite material energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and inspect detector energy-grid inputs by material.\n\n  Examples:\n    pyrite material energy-grid derive --material mose2 --energy 30,60\n    pyrite material energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  derive  Derive line and bremsstrahlung energy-grid bounds.\n  show    Show line and bremsstrahlung grids together.\n  line    Inspect coherent line-energy grids.\n  brem    Inspect bremsstrahlung energy grids.\n",
+            "hidden": false,
+            "path": "material energy-grid",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "materials",
+                    "help": "Material keys; comma-separated. Omit to use persistent defaults.",
+                    "option_strings": [
+                      "--material"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_materials___materials",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--materials"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "energies",
+                    "help": "Beam energies in keV; comma-separated and positive.",
+                    "option_strings": [
+                      "--energy"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_energies___energies",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--energies"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "tilts",
+                    "help": "Polar tilts in degrees [0, 90); comma-separated.",
+                    "option_strings": [
+                      "--polar"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_tilts___tilts",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--tilts"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "azimuths",
+                    "help": "Azimuths in degrees [0, 360]; comma-separated.",
+                    "option_strings": [
+                      "--azimuth"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_azimuths___azimuths",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--azimuths"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "thickness",
+                    "help": "Crystal thicknesses in angstrom; comma-separated and positive.",
+                    "option_strings": [
+                      "--thickness"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "set_default",
+                    "help": "Persist supplied geometry, energies, and materials as future defaults.",
+                    "option_strings": [
+                      "--save-default"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_set_default___set_default",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--set-default"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "brem_step",
+                    "help": "Derivation bremsstrahlung spacing in eV; overrides persistent default.",
+                    "option_strings": [
+                      "--brem-step"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "slice_minutes",
+                    "help": "Maximum duration of each self-resubmitting remote slice.",
+                    "option_strings": [
+                      "--slice-minutes"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "no_sync",
+                    "help": "Skip code upload before remote submission.",
+                    "option_strings": [
+                      "--no-sync"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print remote batch script and submission command; do not connect or submit.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "wait",
+                    "help": "Wait for remote completion and pull the result.",
+                    "option_strings": [
+                      "--wait"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detach",
+                    "help": "Return after remote submission.",
+                    "option_strings": [
+                      "--detach"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "catalog_profile",
+                    "help": "Install derived grids for profile NAME; precedence: flag > configuration > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "remote_target",
+                    "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
+                    "option_strings": [
+                      "-R",
+                      "--remote"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite material energy-grid derive [OPTIONS]\n\n  Derive and install line and bremsstrahlung grids locally or remotely.\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides\n                            persistent default.\n  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote\n                            slice.  [default: 10.0]\n  --no-sync                 Skip code upload before remote submission.\n  --dry-run                 Print remote batch script and submission command; do\n                            not connect or submit.\n  --wait                    Wait for remote completion and pull the result.\n  --detach                  Return after remote submission.\n  --profile NAME            Install derived grids for profile NAME; precedence:\n                            flag > configuration > standard.\n  -R, --remote [TARGET]     Run remotely; bare uses the configured target,\n                            =TARGET overrides it.\n  -h, --help                Show this message and exit.\n",
+                "hidden": false,
+                "path": "material energy-grid derive",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "json_output",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--json"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "material",
+                    "help": null,
+                    "option_strings": [],
+                    "required": false
+                  },
+                  {
+                    "dest": "catalog_profile",
+                    "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite material energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                "hidden": false,
+                "path": "material energy-grid show",
+                "subcommands": []
+              },
+              {
+                "actions": [],
+                "help": "Usage: pyrite material energy-grid line [OPTIONS] COMMAND [ARGS]...\n\n  Inspect coherent line-energy grids.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  show  Show coherent line-energy grids.\n",
+                "hidden": false,
+                "path": "material energy-grid line",
+                "subcommands": [
+                  {
+                    "actions": [
+                      {
+                        "dest": "json_output",
+                        "help": "Output format; only json is a stable automation contract.",
+                        "option_strings": [
+                          "-o",
+                          "--output"
+                        ],
+                        "required": false
+                      },
+                      {
+                        "dest": "_retired_json_output___json",
+                        "help": "<SUPPRESS>",
+                        "option_strings": [
+                          "--json"
+                        ],
+                        "required": false
+                      },
+                      {
+                        "dest": "material",
+                        "help": null,
+                        "option_strings": [],
+                        "required": false
+                      },
+                      {
+                        "dest": "catalog_profile",
+                        "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                        "option_strings": [
+                          "--profile"
+                        ],
+                        "required": false
+                      }
+                    ],
+                    "help": "Usage: pyrite material energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                    "hidden": false,
+                    "path": "material energy-grid line show",
+                    "subcommands": []
+                  }
+                ]
+              },
+              {
+                "actions": [],
+                "help": "Usage: pyrite material energy-grid brem [OPTIONS] COMMAND [ARGS]...\n\n  Inspect bremsstrahlung energy grids.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  show  Show bremsstrahlung energy grids.\n",
+                "hidden": false,
+                "path": "material energy-grid brem",
+                "subcommands": [
+                  {
+                    "actions": [
+                      {
+                        "dest": "json_output",
+                        "help": "Output format; only json is a stable automation contract.",
+                        "option_strings": [
+                          "-o",
+                          "--output"
+                        ],
+                        "required": false
+                      },
+                      {
+                        "dest": "_retired_json_output___json",
+                        "help": "<SUPPRESS>",
+                        "option_strings": [
+                          "--json"
+                        ],
+                        "required": false
+                      },
+                      {
+                        "dest": "material",
+                        "help": null,
+                        "option_strings": [],
+                        "required": false
+                      },
+                      {
+                        "dest": "catalog_profile",
+                        "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                        "option_strings": [
+                          "--profile"
+                        ],
+                        "required": false
+                      }
+                    ],
+                    "help": "Usage: pyrite material energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                    "hidden": false,
+                    "path": "material energy-grid brem show",
+                    "subcommands": []
+                  }
+                ]
+              }
+            ]
           },
           {
             "actions": [
@@ -6747,6 +7365,263 @@
             "help": "Usage: pyrite beam show [OPTIONS] NAME\n\n  Show one named beam's fields.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "beam show",
+            "subcommands": []
+          }
+        ]
+      },
+      {
+        "actions": [],
+        "help": "Usage: pyrite detector [OPTIONS] COMMAND [ARGS]...\n\n  Manage named detector geometries, attachable to profiles by name.\n\n  Named detectors currently carry observation angle, full polar acceptance, and\n  solid angle. Detector responses and energy bins are runtime objects and are\n  not serialized by these commands.\n\n  Examples:\n    pyrite detector list\n    pyrite detector show default\n    pyrite detector create standard-90 --observation-angle 90\n    pyrite detector set standard-90 --solid-angle 0.066\n    pyrite detector rename standard-90 eds\n    pyrite detector delete eds -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  create  Create a reusable named detector geometry NAME.\n  delete  Delete an unreferenced named detector; irreversible.\n  list    List named detectors with labels and profile-reference counts.\n  rename  Rename NAME and update every referencing profile atomically.\n  set     Update fields on an existing named detector NAME.\n  show    Show one named detector's geometry.\n",
+        "hidden": false,
+        "path": "detector",
+        "subcommands": [
+          {
+            "actions": [
+              {
+                "dest": "name",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "label",
+                "help": "Display-only description; never affects parameter_sha256.",
+                "option_strings": [
+                  "--label"
+                ],
+                "required": false
+              },
+              {
+                "dest": "observation_angle_deg",
+                "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
+                "option_strings": [
+                  "--observation-angle"
+                ],
+                "required": false
+              },
+              {
+                "dest": "polar_acceptance_deg",
+                "help": "Full detector polar acceptance span in degrees; scalar replacement.",
+                "option_strings": [
+                  "--polar-acceptance"
+                ],
+                "required": false
+              },
+              {
+                "dest": "solid_angle_sr",
+                "help": "Detector solid angle in sr; scalar replacement.",
+                "option_strings": [
+                  "--solid-angle"
+                ],
+                "required": false
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print proposed TOML diff; write nothing.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite detector create [OPTIONS] NAME\n\n  Create a reusable named detector geometry NAME.\n\nOptions:\n  --label TEXT             Display-only description; never affects\n                           parameter_sha256.\n  --observation-angle DEG  Detector observation angle in degrees [0, 180];\n                           scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG   Full detector polar acceptance span in degrees;\n                           scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR         Detector solid angle in sr; scalar replacement.\n                           [0.0<x<=12.566370614359172]\n  --dry-run                Print proposed TOML diff; write nothing.\n  -h, --help               Show this message and exit.\n",
+            "hidden": false,
+            "path": "detector create",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "name",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "yes",
+                "help": "Delete the exact previewed detector.",
+                "option_strings": [
+                  "-y",
+                  "--yes"
+                ],
+                "required": false
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print proposed TOML diff; delete nothing.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              },
+              {
+                "dest": "json_output",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite detector delete [OPTIONS] NAME\n\n  Delete an unreferenced named detector; irreversible.\n\nOptions:\n  -y, --yes                       Delete the exact previewed detector.\n  --dry-run                       Print proposed TOML diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "hidden": false,
+            "path": "detector delete",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "json_output",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite detector list [OPTIONS]\n\n  List named detectors with labels and profile-reference counts.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "hidden": false,
+            "path": "detector list",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "name",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "new_name",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print proposed TOML diff; write nothing.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite detector rename [OPTIONS] NAME NEW_NAME\n\n  Rename NAME and update every referencing profile atomically.\n\nOptions:\n  --dry-run   Print proposed TOML diff; write nothing.\n  -h, --help  Show this message and exit.\n",
+            "hidden": false,
+            "path": "detector rename",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "name",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "label",
+                "help": "Display-only description; never affects parameter_sha256.",
+                "option_strings": [
+                  "--label"
+                ],
+                "required": false
+              },
+              {
+                "dest": "observation_angle_deg",
+                "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
+                "option_strings": [
+                  "--observation-angle"
+                ],
+                "required": false
+              },
+              {
+                "dest": "polar_acceptance_deg",
+                "help": "Full detector polar acceptance span in degrees; scalar replacement.",
+                "option_strings": [
+                  "--polar-acceptance"
+                ],
+                "required": false
+              },
+              {
+                "dest": "solid_angle_sr",
+                "help": "Detector solid angle in sr; scalar replacement.",
+                "option_strings": [
+                  "--solid-angle"
+                ],
+                "required": false
+              },
+              {
+                "dest": "yes",
+                "help": "Skip overwrite confirmation.",
+                "option_strings": [
+                  "-y",
+                  "--yes"
+                ],
+                "required": false
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print proposed TOML diff; write nothing.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite detector set [OPTIONS] NAME\n\n  Update fields on an existing named detector NAME.\n\nOptions:\n  --label TEXT             Display-only description; never affects\n                           parameter_sha256.\n  --observation-angle DEG  Detector observation angle in degrees [0, 180];\n                           scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG   Full detector polar acceptance span in degrees;\n                           scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR         Detector solid angle in sr; scalar replacement.\n                           [0.0<x<=12.566370614359172]\n  -y, --yes                Skip overwrite confirmation.\n  --dry-run                Print proposed TOML diff; write nothing.\n  -h, --help               Show this message and exit.\n",
+            "hidden": false,
+            "path": "detector set",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "name",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "json_output",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite detector show [OPTIONS] NAME\n\n  Show one named detector's geometry.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "hidden": false,
+            "path": "detector show",
             "subcommands": []
           }
         ]
