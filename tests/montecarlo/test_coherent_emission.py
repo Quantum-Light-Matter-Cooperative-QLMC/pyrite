@@ -159,7 +159,9 @@ def test_coherent_decoherence_blend_matches_reference_formula():
     # (undo it); grouped_ref's two Ne=1 calls each divided by 1, a no-op, so
     # their sum is already the raw sum_e|S_e|^2.
     ne_total = active["Ne"]
-    flat_raw = mc_spectrum(_no_footprint(_segments(2)), energy_grid, coherent=True, **KWARGS) * ne_total
+    flat_raw = (
+        mc_spectrum(_no_footprint(_segments(2)), energy_grid, coherent=True, **KWARGS) * ne_total
+    )
     grouped_raw = sum(
         mc_spectrum(_no_footprint(_segments(1)), energy_grid, coherent=True, **KWARGS)
         for _ in range(2)
@@ -216,16 +218,12 @@ def test_coherent_decoherence_blend_holds_on_the_per_hkl_route():
         return segs
 
     active = _flat(2)
-    active.update(
-        t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3))
-    )
+    active.update(t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3)))
     actual = mc_spectrum(active, energy_grid, coherent=True, **kwargs)
 
     ne_total = active["Ne"]
     flat_raw = mc_spectrum(_flat(2), energy_grid, coherent=True, **kwargs) * ne_total
-    grouped_raw = sum(
-        mc_spectrum(_flat(1), energy_grid, coherent=True, **kwargs) for _ in range(2)
-    )
+    grouped_raw = sum(mc_spectrum(_flat(1), energy_grid, coherent=True, **kwargs) for _ in range(2))
     omega = energy_grid / HBARC_EV_ANG
     F = np.abs(np.mean(np.exp(1j * omega[:, None] * t0_values[None, :]), axis=1)) ** 2
 

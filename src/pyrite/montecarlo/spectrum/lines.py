@@ -1312,8 +1312,9 @@ def mc_spectrum(
             chi = chi_sum / decoherence_A_pop.size
             return (chi.real**2 + chi.imag**2).astype(REAL)
 
-        def _coherent_electron_grouped_row(elec_id_sel, a_width_sel, E_r_sel, d_geom_sel,
-                                            g_phase_sel, L_esc_sel, coefs_sel):
+        def _coherent_electron_grouped_row(
+            elec_id_sel, a_width_sel, E_r_sel, d_geom_sel, g_phase_sel, L_esc_sel, coefs_sel
+        ):
             """sum_e |sum_{j in e} E_j|^2 for one row's kept, finite segments,
             using the SAME group-then-reduce-then-square pattern as the
             flight-grouped incoherent path (7b) above, keyed by electron

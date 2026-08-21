@@ -13,6 +13,11 @@ See ledger ``xray-in-medium-propagation-phase``.
 
 from __future__ import annotations
 
+import os
+import pathlib
+import subprocess
+import sys
+
 import numpy as np
 import pytest
 
@@ -471,10 +476,22 @@ def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
 # ``sum_e|S_e|^2`` is one call per electron over that electron's own lines into
 # a zeroed buffer, and ``|sum_e S_e|^2`` is the single call these paths already
 # made -- both on the geometric (offset-free) phase, blended outside.
+#
+# Unlike the kernel-level tests above, these drive the whole ``mc_spectrum``
+# dispatch, so they need the CUDA backend ACTIVE -- and ``tests/conftest.py``
+# pins the session to CPU/NumPy on purpose.  ``test_..._device_suite`` below is
+# the driver: it re-runs this module in a child session with the pin lifted, so
+# the bodies still execute under an ordinary ``pyrite-dev test`` on a CUDA box.
 # ---------------------------------------------------------------------------
 
+_DEVICE_SESSION = os.environ.get("PYRITE_TEST_BACKEND") == "cuda"
+_device_only = pytest.mark.skipif(
+    not _DEVICE_SESSION,
+    reason="end-to-end mc_spectrum on the CUDA backend; driven by the device-suite test",
+)
+
 _DECOH_E_GRID = np.arange(700.0, 1500.0, 2.0)
-# O(1/omega)-scale so F sits well inside (0, 1) across the window; arbitrary.
+# O(1/omega)-scale so F sweeps nearly all of (0, 1) across the window; arbitrary.
 _DECOH_T0 = np.array([137.0, -412.0])  # Ang, c = 1
 _DECOH_DR = np.array([[35.0, -18.0], [-52.0, 27.0]])  # Ang, transverse entry offsets
 _DECOH_R_GEOM = np.array([[4.0, 0.0, 5.0], [1.5, -2.0, 7.5]])  # distinct S_e per electron
@@ -489,6 +506,10 @@ _DECOH_KWARGS = {
 # therefore whose q_perp, and therefore whose F) all differ -- the case a single
 # scalar F(E) applied to the row-summed spectrum would get wrong.
 _DECOH_MOSAIC = {"mosaic_fwhm_rad": 0.05, "mosaic_nodes": 3}
+# float32 device reductions against references assembled from separate launches:
+# the same order-of-eps latitude the other cross-path coherent gates use.
+_DECOH_RTOL = 2e-4
+_DECOH_ATOL_FRAC = 1e-5
 
 
 def _decoh_segments(r_mid):
@@ -569,6 +590,9 @@ def _decoh_route_kwargs(route, monkeypatch):
         monkeypatch.setattr(lines, "_USE_JIT_COHERENT_STREAM", False)
         return {}
     if route == "per-hkl":  # _accumulate's per-(reflection, orientation) reduction
+        # The grooved escape branch is the only coherent route off the batched
+        # path a nonzero bunch offset can still take: sinc_cutoff and layers
+        # both raise, and the flight-grouped route is host-only.
         from pyrite.montecarlo.geometry import tilted_geometry
         from pyrite.montecarlo.groove import blazed_groove_spec
 
@@ -585,7 +609,11 @@ def _decoh_route_kwargs(route, monkeypatch):
 
 
 def _count_kernel_calls(monkeypatch, route):
-    """Return a one-element list the patched kernel entry point increments."""
+    """Return a one-element list the patched kernel entry point increments.
+
+    ``lines`` imports these lazily, per call, so patching the owning module
+    intercepts them -- and doubles as the "which path ran" signal.
+    """
     if route == "stream":
         from pyrite.montecarlo.spectrum import coherent_stream_jit_kernel as mod
 
@@ -605,9 +633,15 @@ def _count_kernel_calls(monkeypatch, route):
     return calls
 
 
+@_device_only
 @pytest.mark.parametrize("route", ["stream", "row-reduction"])
 def test_coherent_decoherence_blend_matches_reference_formula_on_device(route, monkeypatch):
-    """The CUDA-JIT blend reproduces the closed form, not just itself.
+    """The CUDA-JIT blend reproduces the closed form, not merely itself.
+
+    The per-hkl route is absent on purpose: it is reachable here only through
+    the grooved escape branch, whose escape distance depends on the lateral
+    emission point, so the offset-free sub-calls this reference is built from
+    would not carry the same amplitudes.
 
     Validation: coherent-inter-electron-decoherence
     """
@@ -617,8 +651,7 @@ def test_coherent_decoherence_blend_matches_reference_formula_on_device(route, m
     assert getattr(xp, "__name__", "") == "cupy"
     assert np.dtype(REAL) == np.dtype(np.float32)
 
-    kwargs = _decoh_route_kwargs(route, monkeypatch)
-    call_kwargs = {**_DECOH_KWARGS, **kwargs}
+    call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
     calls = _count_kernel_calls(monkeypatch, route)
     actual = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert calls[0] > 0, "the CUDA-JIT fast path was not taken"
@@ -626,24 +659,25 @@ def test_coherent_decoherence_blend_matches_reference_formula_on_device(route, m
     expected = _decoh_reference(**call_kwargs)
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0
-    # float32 device reduction against a float32 reference assembled from
-    # separate launches: the same order-of-eps latitude the other cross-path
-    # coherent gates use.
-    np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=peak * 1e-5)
+    np.testing.assert_allclose(actual, expected, rtol=_DECOH_RTOL, atol=peak * _DECOH_ATOL_FRAC)
 
 
+@_device_only
 @pytest.mark.parametrize("route", ["stream", "row-reduction", "per-hkl"])
 def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkeypatch):
-    """Lockstep against the generic CuPy path these fast paths used to fall
-    back to whenever the blend was active -- across a 9-row mosaic cone, so
-    every row carries its own q_perp and therefore its own F.
+    """Lockstep against the generic CuPy path these three used to fall back to
+    whenever the blend was active -- across a 9-row mosaic cone, so every row
+    carries its own q_perp and therefore its own F.
 
     Validation: coherent-inter-electron-decoherence
     """
     from pyrite.montecarlo.spectrum import lines, mc_spectrum
 
-    route_kwargs = _decoh_route_kwargs(route, monkeypatch)
-    call_kwargs = {**_DECOH_KWARGS, **_DECOH_MOSAIC, **route_kwargs}
+    call_kwargs = {
+        **_DECOH_KWARGS,
+        **_DECOH_MOSAIC,
+        **_decoh_route_kwargs(route, monkeypatch),
+    }
 
     calls = _count_kernel_calls(monkeypatch, route)
     fast = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
@@ -657,11 +691,12 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
 
     peak = float(max(np.max(np.abs(fast)), np.max(np.abs(generic))))
     assert peak > 0.0
-    np.testing.assert_allclose(fast, generic, rtol=2e-4, atol=peak * 1e-5)
+    np.testing.assert_allclose(fast, generic, rtol=_DECOH_RTOL, atol=peak * _DECOH_ATOL_FRAC)
 
 
+@_device_only
 @pytest.mark.parametrize("route", ["stream", "row-reduction", "per-hkl"])
-def test_coherent_decoherence_inactive_device_path_is_bit_for_bit(route, monkeypatch):
+def test_coherent_decoherence_inactive_device_dispatch_is_bit_for_bit(route, monkeypatch):
     """An all-zero offset population must leave the fused kernels on their
     pre-existing dispatch: the geometric-phase swap that feeds the blend is a
     no-op there, so the result is bit-for-bit the offset-free one."""
@@ -676,3 +711,30 @@ def test_coherent_decoherence_inactive_device_path_is_bit_for_bit(route, monkeyp
     np.testing.assert_array_equal(
         plain, mc_spectrum(zeroed, _DECOH_E_GRID, coherent=True, **call_kwargs)
     )
+
+
+@pytest.mark.skipif(_DEVICE_SESSION, reason="this IS the child device session")
+def test_coherent_decoherence_device_suite():
+    """Run the device-backend bodies above in a child pytest session.
+
+    ``tests/conftest.py`` pins the session to CPU/NumPy so the fp64 bit-exact
+    majority of the suite stays reproducible; ``PYRITE_TEST_BACKEND`` is its
+    documented escape hatch. Spawning one child rather than relaxing the pin
+    keeps that guarantee for every other test in the run.
+    """
+    env = dict(os.environ)
+    env["PYRITE_TEST_BACKEND"] = "cuda"
+    env.pop("CXR_TEST_BACKEND", None)
+    completed = subprocess.run(  # noqa: S603
+        # No -q here: pyproject's addopts already carries one, and -qq drops
+        # the summary line this asserts on.
+        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", __file__, "-k", "decoherence"],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(pathlib.Path(__file__).resolve().parents[2]),
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    # Guard against the child silently skipping everything (e.g. the backend
+    # pin failing to lift), which would exit 0 and prove nothing.
+    assert " passed" in completed.stdout, completed.stdout

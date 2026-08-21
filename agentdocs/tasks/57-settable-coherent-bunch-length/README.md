@@ -123,19 +123,35 @@ longitudinal offset by the identical mechanism:
       parametrized `σ` — converges to the same boxed result, needs no
       per-policy `σ`-resolution logic, and extends for free to elliptical/
       Courant–Snyder transverse spots (see below).
-- [ ] Confirm/port the GPU reduction path
+- [x] Confirm/port the GPU reduction path
       (`coherent_jit_kernel.py`/`coherent_stream_jit_kernel.py`) to the same
-      structure; add/extend a CPU/GPU reproducibility check. **Confirmed, not
-      ported**: all three float32 CUDA-JIT fast paths fall back to the
-      generic (still CuPy-capable via `xp`) path whenever the blend is
-      active, guarded explicitly (`and not decoherence_active`). No CUDA
-      device is available in this local worktree to write/run a real
-      GPU-side parity test (repo rule: GPU work routes through `pyrite
-      remote`, never local) — native kernel support for the blend stays an
-      open, explicitly-documented performance follow-up
-      (`coherent-inter-electron-decoherence.md` Notes), not a correctness
-      gap. Leaving unchecked for a follow-on issue rather than closing
-      silently.
+      structure; add/extend a CPU/GPU reproducibility check. **Ported, with
+      no new device code.** Both kernel entry points already ACCUMULATE into
+      the caller's buffer, so `Σ_e|S_e|²` is the same kernel called once per
+      electron over that electron's own lines, at unit mosaic weight, into a
+      zeroed buffer (`_coherent_jit_grouped_row`, shared by `_accumulate`'s
+      reduction and the batched per-row fallback); the streaming path
+      re-streams one electron's segments at a time into the same field
+      planes and blends per row in plain CuPy array math rather than
+      `finalize_coherent_fields`, whose fused collapse would sum rows before
+      `F` could multiply them. The stream prologue now takes the geometric
+      (offset-free) position/phase slope like the other two paths — a no-op
+      swap when no offset is configured, so the inactive dispatch stays
+      bit-for-bit. Verified on the lab RTX 5080 via `pyrite remote sync` +
+      ssh: 8 device tests pass (closed-form reference on the streaming and
+      per-row-reduction routes; all three routes in lockstep against the
+      generic CuPy path they used to fall back to, across a 9-row mosaic
+      cone so each row carries its own `F`; offset-free dispatch bit-for-bit)
+      plus a real `simulate_trajectories` (300 electrons, 200 fs bunch,
+      0.1 mm spot) → `mc_spectrum(coherent=True)` smoke agreeing with the
+      generic path to 5.4e-4. **Measured trade-off, documented not tuned:**
+      the grouped floor is launch-bound at ~0.8 ms/electron, nearly
+      independent of segment and row count, so it is `0.22`–`0.26×` (slower)
+      at 2 rows and `2.0`–`10.2×` faster at 18–50 rows; the two per-row
+      routes pay `Nₑ` launches per row and do not amortize. A fused
+      segmented-reduction kernel and a calibrated dispatch heuristic are
+      named follow-ups in the ledger (a single-parameter threshold misroutes
+      — the crossover depends on `Nₑ` and `N_g` separately).
 - [x] Add limiting-case regression tests: point source/point bunch (`F→1`,
       recovers today's `N²` degenerate behavior bit-for-bit), large-σ floor
       (`F→0`, recovers `Σ_e|S_e|²` and matches the incoherent-per-electron

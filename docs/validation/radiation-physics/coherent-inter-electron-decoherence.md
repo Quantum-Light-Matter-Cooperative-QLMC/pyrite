@@ -172,12 +172,59 @@ group-then-reduce-then-square pattern the pre-existing flight-grouped
 incoherent path already uses, keyed by electron instead of flight.
 
 The three float32 CUDA-JIT fast paths (`coherent_jit_kernel.py`,
-`coherent_stream_jit_kernel.py`) fuse the reduction and the final squaring
-into one device kernel with no electron-grouped floor to blend against, so
-they fall back to the (already GPU-capable via CuPy) generic path whenever the
-blend is active. This trades the fused kernel's speed for correctness on this
-path; native kernel support for the blend is an unimplemented performance
-follow-up, not a correctness gap.
+`coherent_stream_jit_kernel.py`) carry the blend natively, with **no new
+device code**. Both entry points already *accumulate* their squared reduction
+into the caller's buffer rather than overwriting it
+(`run_coherent_reduction_kernel`'s `spec[k] += wm*(...)`,
+`run_coherent_field_accumulation_kernel`'s additive field planes), so
+$\sum_e|S_e|^2$ is the same kernel called once per electron over that
+electron's own lines, with unit mosaic weight, into one zeroed buffer;
+$|\sum_eS_e|^2$ is the single call these paths already made. Both are fed the
+geometric (offset-free) phase, and $F$ multiplies outside the kernel. Three
+call sites share this shape: `_accumulate`'s per-(reflection, orientation)
+reduction, the batched path's per-row reduction fallback, and the batched
+streaming field kernel. The streaming path re-streams one electron's segments
+at a time into the same field planes and squares; it deliberately does **not**
+use `finalize_coherent_fields`, whose fused collapse would sum the rows before
+$F$ could multiply them.
+
+**Cost.** The grouped floor spends one launch per electron per reduction, and
+each launch covers the full energy axis regardless of how few segments that
+electron contributes, so the blend's cost is set by $N_e$ and is nearly
+independent of segment count and row count. Measured on an RTX 5080 (float32,
+2000 energy bins, ~60 segments/electron, blend active), streaming path vs. the
+generic CuPy fallback it replaces:
+
+| $N_e$ | rows $N_g$ | JIT blend | generic blend | speedup |
+| ----: | ---------: | --------: | ------------: | ------: |
+|   300 |          2 |    0.24 s |        0.06 s |   0.26x |
+|   300 |         18 |    0.25 s |        0.50 s |   2.02x |
+|   300 |         50 |    0.26 s |        1.37 s |   5.26x |
+|  1000 |          2 |    0.77 s |        0.17 s |   0.22x |
+|  1000 |         18 |    0.80 s |        3.43 s |   4.27x |
+|  1000 |         50 |    0.84 s |        8.55 s |  10.15x |
+|  3000 |          2 |    2.31 s |        0.56 s |   0.24x |
+|  3000 |         18 |    2.36 s |       13.58 s |   5.75x |
+|  3000 |         50 |    2.47 s |       20.29 s |   8.22x |
+
+So the native path is a large win on the configurations real coherent runs
+use (several reflection families, optionally times a mosaic quadrature) and a
+loss on the narrow few-row case. The two per-row routes (`_accumulate` and the
+batched reduction fallback) pay $N_e$ launches *per row* rather than $N_e$
+total, which does not amortize: measured 0.76 s at $N_e=300$, $N_g=18$ against
+the streaming path's 0.25 s. Both remain correct and tested; they are only
+reachable when the streaming path is not (the grooved-escape branch, or
+`_USE_JIT_COHERENT_STREAM` disabled).
+
+Follow-ups, neither a correctness gap: a single fused segmented-reduction
+kernel that computes $\sum_e|S_e|^2$ in one launch would remove the $N_e$-launch
+floor entirely, and a calibrated dispatch heuristic could pick between the
+native blend and the generic fallback per case. No such heuristic is wired in
+here because the measured crossover depends on $N_e$ and $N_g$ separately (at
+$N_g\approx4$ the same segments-per-electron ratio wins at $N_e=2000$ and loses
+at $N_e=300$), so a single-parameter threshold would misroute; the existing
+`_USE_JIT_COHERENT_STREAM`/`_USE_JIT_COHERENT_REDUCTION` module switches remain
+the escape hatch.
 
 ## Assumptions and limits
 
@@ -193,6 +240,21 @@ follow-up, not a correctness gap.
   expectation as a fixed quantity multiplying $e^{i\varphi_e}$, breaking the
   very first algebraic step in the derivation. `mc_spectrum` raises rather
   than silently give a physically-incomplete answer.
+- **The blazed-groove escape branch has the same amplitude/phase coupling as
+  the finite-footprint branch, and is NOT currently rejected.**
+  `escape_distance_ang` places the emission point inside the sawtooth unit
+  cell, so a transverse offset moves the escape path length and therefore
+  $|S_e|$, exactly the step the finite-footprint exclusion above is about.
+  Measured directly while building the GPU parity tests: with a transverse
+  offset, the grooved coherent result departs from the boxed blend by ~130% of
+  peak, while with longitudinal offsets only it reproduces it to 4e-16.
+  `mc_spectrum` raises for `crystal_width_mm`/`crystal_height_mm` but not for
+  `groove`; that asymmetry is a pre-existing gap in the CPU implementation of
+  this row, carried forward unchanged here, and wants its own decision (reject,
+  or derive the grooved case) rather than a silent fix in a
+  performance-path change.
+  `test_coherent_decoherence_blend_holds_on_the_per_hkl_route` therefore pins
+  the grooved route with longitudinal offsets only.
 - **`sinc_cutoff` excluded when the blend is active, and rejected explicitly**
   — an implementation gap (the windowed-energy-range optimization is not
   implemented for the electron-grouped floor), not a physics one.
@@ -226,5 +288,15 @@ implementation against a reference built from already-validated,
 decoherence-inactive `mc_spectrum` sub-calls plus an independently-computed
 `F` — not a self-consistency check against the same code path.
 `test_coherent_decoherence_inactive_by_default` pins bit-for-bit equality with
-the pre-existing path whenever no offset population is supplied. Human
+the pre-existing path whenever no offset population is supplied.
+
+The CUDA paths are pinned by
+`tests/montecarlo/test_xray_dispersion_cuda.py`: the same closed-form
+reference on device for the streaming and per-row-reduction routes, a lockstep
+check of all three routes against the generic CuPy path they used to fall back
+to (across a 9-row mosaic cone, so each row carries its own $q_\perp$ and
+therefore its own $F$), and bit-for-bit identity of the offset-free dispatch.
+Those bodies need the CUDA backend active, which `tests/conftest.py` pins off
+by design, so `test_coherent_decoherence_device_suite` re-runs them in a child
+session with the pin lifted; verified on the lab RTX 5080 (8 passed). Human
 sign-off remains pending.
