@@ -1111,7 +1111,7 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector
 
 def _pair(
     raw: object, path: str, errors: _Errors, *, integer: bool = False
-) -> tuple[object, object] | None:
+) -> tuple[int | float, int | float] | None:
     if not isinstance(raw, list) or len(raw) != 2:
         errors.add(path, "must be a two-item array")
         return None
@@ -1119,12 +1119,13 @@ def _pair(
         if any(type(item) is not int or item <= 0 for item in raw):
             errors.add(path, "must contain two positive integers")
             return None
-        return tuple(raw)
-    values = tuple(_number(item) for item in raw)
-    if any(item is None for item in values):
+        return cast(tuple[int, int], (raw[0], raw[1]))
+    first = _number(raw[0])
+    second = _number(raw[1])
+    if first is None or second is None:
         errors.add(path, "must contain two finite numbers")
         return None
-    return values
+    return first, second
 
 
 def _parse_filter_rows(
