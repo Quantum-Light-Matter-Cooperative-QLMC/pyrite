@@ -695,6 +695,7 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
 
     from pyrite.campaign import config
     from pyrite.detectors import Detector, EnergyBins
+    from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
 
     text = (
@@ -711,8 +712,8 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     path = _write_catalog(tmp_path, text)
     catalog = load_material_catalog(path, profile="narrowed")
 
-    assert catalog.profile_detector("standard") == Detector(91.0, 12.0, 0.05)
-    selected = Detector(119.0, 16.6, 0.066)
+    assert catalog.profile_detector("standard") == Detector(91.0, 12.0, 0.05, response=Timepix3())
+    selected = Detector(119.0, 16.6, 0.066, response=Timepix3())
     assert catalog.profile_detector("narrowed") == selected
 
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
@@ -728,6 +729,7 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
 
 def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path):
     from pyrite.detectors import Detector
+    from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
 
     fallback = load_material_catalog(
@@ -742,14 +744,14 @@ crystal = "mos2"
             ),
         )
     )
-    assert fallback.profile_detector("standard") == Detector()
+    assert fallback.profile_detector("standard") == Detector(response=Timepix3())
 
     text = (
         _catalog_with_two_profiles(tmp_path).read_text()
         + "\n[profiles.standard.detector]\nobservation_angle_deg = 91.0\n"
     )
     inherited = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
-    assert inherited.profile_detector("narrowed") == Detector(91.0)
+    assert inherited.profile_detector("narrowed") == Detector(91.0, response=Timepix3())
 
 
 def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):

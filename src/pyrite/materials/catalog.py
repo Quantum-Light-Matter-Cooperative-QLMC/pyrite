@@ -13,7 +13,7 @@ import tomllib
 import warnings
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
@@ -22,7 +22,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
-from ..detectors.spec import Detector
+from ..detectors.spec import Detector, Timepix3
 from ..energy_grid import artifacts as _grid_artifacts
 from ._catalog_decode import (
     LineGridByEnergy,
@@ -280,7 +280,8 @@ class MaterialCatalog:
     #: here -- it stays the per-material ``ScanSpec.energy_keV`` scan grid.
     profile_beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit profile detector blocks. Missing selected-profile blocks inherit
-    #: ``standard``; missing standard falls back to :class:`Detector`.
+    #: ``standard``; missing standard falls back to a fully-defined Timepix3
+    #: detector at 90 deg (:data:`_DEFAULT_PROFILE_DETECTOR`).
     profile_detectors: Mapping[str, Detector] = MappingProxyType({})
     #: Explicit ``profiles.NAME.emission`` overrides ("incoherent"/"coherent"/
     #: "both"), keyed by profile; profiles with no emission key are absent (the
@@ -321,7 +322,9 @@ class MaterialCatalog:
 
     def profile_detector(self, name: str) -> Detector:
         """Resolved detector for ``name`` with standard then legacy fallback."""
-        return self.profile_detectors.get(name, self.profile_detectors.get("standard", Detector()))
+        return self.profile_detectors.get(
+            name, self.profile_detectors.get("standard", _DEFAULT_PROFILE_DETECTOR)
+        )
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the
@@ -830,6 +833,10 @@ _BEAM_KEYS = _BEAM_POSITIVE_KEYS | {
     "transverse",
 }
 _DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
+#: Fully-defined default profile detector: Timepix3 response at 90 deg, per
+#: issue #52. Profiles/blocks that omit a detector, or override only angle/
+#: acceptance/solid-angle fields, still resolve to this response.
+_DEFAULT_PROFILE_DETECTOR = Detector(response=Timepix3())
 _DEPRECATED_DETECTOR_KEYS = frozenset(
     {
         "response_model",
@@ -1068,7 +1075,7 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector
         )
     known = {key: value for key, value in table.items() if key in _DETECTOR_KEYS}
     try:
-        return Detector(**cast("dict[str, Any]", known))
+        return replace(_DEFAULT_PROFILE_DETECTOR, **cast("dict[str, Any]", known))
     except (TypeError, ValueError) as exc:
         errors.add(path, str(exc))
         return None
