@@ -244,6 +244,18 @@ emission = "both"
 energy_grid_refs = {hbn = "2273dc2d40d291ad35fc68df85f7dd602eb477b5e2cc4d545f204b2826170687", hopg = "1cf8476fa2938ab26c856a8ad9ea0c6493f2e9ba9d7a8ff4b81b1d3cf2a92699"}
 n_electrons = {values = [20000]}
 
+[profiles.hopg_hbn_straggling]
+thickness_ang = {values = [5000.0, 10000.0, 15000.0, 20000.0, 25000.0, 30000.0]}
+energy_keV = {values = [30.0, 35.0, 40.0]}
+tilt_deg = {values = [5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0, 85.0]}
+tilt_azim_deg = {values = [95.0, 100.0, 105.0, 110.0, 115.0, 120.0, 125.0, 130.0, 135.0, 140.0, 145.0, 150.0, 155.0, 160.0, 165.0, 170.0, 175.0, 180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+beam = "gaussian_200fs"
+materials = ["hopg", "hbn"]
+emission = "both"
+energy_grid_refs = {hbn = "2273dc2d40d291ad35fc68df85f7dd602eb477b5e2cc4d545f204b2826170687", hopg = "1cf8476fa2938ab26c856a8ad9ea0c6493f2e9ba9d7a8ff4b81b1d3cf2a92699"}
+n_electrons = {values = [20000]}
+straggling = true
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
