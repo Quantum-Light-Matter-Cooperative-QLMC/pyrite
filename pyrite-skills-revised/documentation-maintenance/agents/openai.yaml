@@ -1,4 +1,0 @@
-interface:
-  display_name: "Documentation Maintenance"
-  short_description: "Keep durable PyRITE docs accurate"
-  default_prompt: "Use $documentation-maintenance to update and verify documentation affected by this change."

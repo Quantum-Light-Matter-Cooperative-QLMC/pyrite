@@ -1,4 +1,0 @@
-interface:
-  display_name: "Triage"
-  short_description: "Turn task prose into a reviewable GitHub issue plan"
-  default_prompt: "Use $triage to turn this task into a reviewable canonical GitHub issue plan."

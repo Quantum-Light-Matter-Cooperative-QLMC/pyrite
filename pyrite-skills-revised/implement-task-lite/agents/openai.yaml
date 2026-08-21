@@ -1,4 +1,0 @@
-interface:
-  display_name: "Implement Task Lite"
-  short_description: "Implement one low-risk issue slice"
-  default_prompt: "Use $implement-task-lite to complete this tightly bounded PyRITE issue slice."

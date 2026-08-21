@@ -1,4 +1,0 @@
-interface:
-  display_name: "Dispatch Task"
-  short_description: "Create linked issue work and route a worker"
-  default_prompt: "Use $dispatch-task to start, assign, or retire this approved PyRITE GitHub issue."

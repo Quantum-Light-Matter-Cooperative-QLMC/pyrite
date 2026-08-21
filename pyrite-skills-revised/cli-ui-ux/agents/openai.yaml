@@ -1,4 +1,0 @@
-interface:
-  display_name: "CLI UI/UX"
-  short_description: "Design safe, clear, automation-ready CLIs"
-  default_prompt: "Use $cli-ui-ux to design and verify this CLI change."

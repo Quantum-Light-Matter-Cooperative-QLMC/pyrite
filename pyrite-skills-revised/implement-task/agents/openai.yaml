@@ -1,4 +1,0 @@
-interface:
-  display_name: "Implement Task"
-  short_description: "Implement a bounded GitHub issue slice"
-  default_prompt: "Use $implement-task to implement this bounded PyRITE issue slice."
