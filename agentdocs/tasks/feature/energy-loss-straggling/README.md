@@ -1000,12 +1000,54 @@ Interactions that need explicit design rather than incremental patching:
       Numba straggling matrix 188 passed; catalog golden/energy-grid checks 5
       passed; `lint`, `typecheck`, CLI reference/deprecation checks, and offline
       docs build clean. No golden data changed.
-- [ ] H — Observable measurement. Quantify the effect on backscatter and
-      transmission fractions, CSDA range and range straggling, the
-      bremsstrahlung spectral shape, and the coherent line. The load-bearing
-      number is whether the ~0.3 rad Jensen mean-arrival-time bias at the
-      25 keV/1 keV point closes, since that is the stated motivation; report the
-      residual either way. Heavy/GPU matrices via `pyrite remote`.
+- [x] H — Observable measurement. **Done at the corrected 25 keV HOPG / 1 keV
+      clock point with paired seed replicas; the fixed-path Jensen shift is
+      13.607 +/- 2.401 rad and falls inside the 9.8--19 rad target, leaving zero
+      interval residual.** Harness checkpoint: `f30df0a0`. Final remote run:
+      qlmc SLURM `1673`, 600 electrons x 8 independent seeds x straggling
+      off/on, CPU lockstep backend on a GPU-node allocation, 6.56 s measured
+      runtime. The committed harness is
+      `checks/energy_loss_straggling_observables.py`; its JSON report names the
+      exact revision and reports seed-replicate SEMs plus paired relative
+      changes.
+
+      The phase diagnostic reconstructs each represented electron's clock at
+      exactly 1 um of cumulative material path and converts it with
+      `phi = E_gamma t / (hbar c)`. This removes elastic geometric detours from
+      the Jensen comparison. Straggling moves the mean by +13.607 +/- 2.401 rad
+      and the phase standard deviation from 0.560 +/- 0.032 rad to
+      378.628 +/- 5.683 rad. The target residual is defined before inspection
+      as signed distance from the 9.8--19 rad interval, hence 0. This is only
+      the free clock term: it is not the coherent kernel's complete phase or a
+      Debye--Waller exponent, and it does not close the outstanding
+      mean-stopping uncertainty owned by `feature/reference-electron-stopping-data`.
+
+      At 1 um, endpoint fractions do not resolve a change: backscatter moves
+      +0.042 +/- 0.213 percentage points and transmission -0.188 +/- 0.249
+      points. At 5 um the distributional tail is observable: backscatter moves
+      +0.938 +/- 0.199 points, transmission +5.229 +/- 0.743 points, and cutoff
+      stopping -6.167 +/- 0.860 points. Among cutoff-stopped electrons the mean
+      path range moves by -606 +/- 175 Ang (-0.0606 +/- 0.0175 um), while its
+      standard deviation opens from 0.514 +/- 0.007 Ang (the deterministic
+      cutoff/truncation residual) to 11692 +/- 168 Ang (1.1692 +/- 0.0168 um).
+
+      The 250 eV--25 keV bremsstrahlung integral changes by +0.140% +/- 0.627%,
+      not resolved from zero; the normalized spectral total-variation distance
+      is 0.334% +/- 0.053%. In the production `coherent=True` HOPG (002)
+      pure-geometry limit (all bunch offsets zero), integrated line yield falls
+      12.52% +/- 2.54% and peak height falls 19.50% +/- 2.12%. The apparent
+      +2.5 eV peak displacement is exactly one grid bin and is not claimed as a
+      sub-grid line shift. These line numbers measure the named zero-bunch-offset
+      coherent limit, not an angle/bunch averaged experimental observable.
+
+      Fresh-context physics filters for the measurement definitions pass:
+      fractions are dimensionless and sum by terminal channel; stopped range
+      is a path length; `E_gamma t/(hbar c)` is dimensionless; normalized
+      spectral total variation lies in [0, 1]; and every on-minus-off quantity
+      vanishes when the two spectra/trajectory ensembles coincide. H adds no
+      production equation or ledger status; Slice I still owns the formal
+      `energy-loss-straggling` validation row/write-up. CUDA was not exercised
+      and remains unverified exactly as Slice F recorded.
 - [ ] I — Docs, ledger, and goldens. Add `Validation: energy-loss-straggling`
       with a ledger row in `ledger-transport-background.md`; rewrite the
       "No straggling" block in `stopping-power.md`; and update the four
@@ -1188,18 +1230,15 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Next: H — observable measurement.** G is complete: production profiles and
-`Numerics` now provide the canonical straggled-run request, identity cannot
-collide with the default path, and CUDA production selection falls back to the
-exact kernel. H is therefore unblocked.
-
-H must quantify backscatter/transmission, CSDA range and range straggling,
-bremsstrahlung shape, and coherent-line effects, including the corrected
-9.8--19 rad Jensen-bias baseline and the outstanding residual mean-stopping
-uncertainty recorded above. Heavy/GPU matrices use `pyrite remote`; the CUDA
-path remains unverified until its hardware tests run. I, J, and K remain late
-documentation slices as scoped; I must preserve B0's two no-change verdicts
-and leave the "No delta rays" bullet untouched.
+**Next: I — docs, ledger, and goldens.** H measured every required observable
+at committed revision `f30df0a0`; the +13.607 +/- 2.401 rad fixed-path clock
+shift closes the corrected 9.8--19 rad acceptance interval while retaining the
+separate mean-stopping caveat. I can now add the formal validation row/write-up
+and remove stale omission claims. It must preserve B0's two no-change verdicts,
+leave the "No delta rays" bullet untouched, and distinguish H's clock-only
+phase and zero-bunch-offset coherent-line limit from general experimental
+observables. J and K remain late documentation slices as scoped. CUDA remains
+unverified until its hardware tests run.
 
 ## Delegation slices and required skills
 
@@ -1254,7 +1293,7 @@ UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev verify
   unstraggled results.
 - The effect on backscatter/transmission, range straggling, bremsstrahlung
   shape, and the coherent-line phase is measured and reported, including the
-  residual on the ~0.3 rad Jensen bias.
+  residual against the corrected 9.8--19 rad Jensen-bias interval.
 - `Validation: energy-loss-straggling` exists with a ledger row and
   fresh-context validation; every write-up asserting straggling is unmodeled is
   updated or explicitly still true.
