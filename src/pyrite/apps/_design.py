@@ -159,21 +159,89 @@ def notebook_css() -> str:
     font: 500 .78rem/1.2 {TYPOGRAPHY["data"]}; letter-spacing: 0;
     text-transform: none;
   }}
-  /* Marimo dropdowns/popovers are rendered in portal layers outside the
-     notebook output subtree, so inherit the shared root palette explicitly. */
+  /* Marimo's dropdown/select contents are portalled to document.body, outside
+     the notebook subtree.  Target the actual Select/Radix portal surfaces and
+     win over Marimo/Tailwind utility classes explicitly. */
   html[data-pyrite-theme="light"] :is(
-    [role="listbox"], [role="menu"], [data-radix-popper-content-wrapper] > *
+    [data-slot="select-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-radix-select-content],
+    [role="listbox"],
+    [role="menu"],
+    [data-radix-popper-content-wrapper] > [data-side]
   ) {{
-    background-color: var(--popover, #FFFFFF);
-    color: var(--popover-foreground, #172832);
-    border-color: var(--border, #C6D2D8);
+    background: {light["surface"]} !important;
+    background-color: {light["surface"]} !important;
+    color: {light["text"]} !important;
+    border-color: {light["rule"]} !important;
+    color-scheme: light !important;
   }}
-  html[data-pyrite-theme="light"] :is([role="option"], [role="menuitem"]) {{
-    color: var(--popover-foreground, #172832);
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-viewport"],
+    [data-radix-select-viewport]
+  ) {{
+    background: {light["surface"]} !important;
+    color: {light["text"]} !important;
   }}
-  html[data-pyrite-theme="light"] :is([role="option"], [role="menuitem"]):is(:hover, [data-highlighted]) {{
-    background-color: var(--accent, #E3EEF1);
-    color: var(--accent-foreground, #172832);
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-item"],
+    [data-radix-select-item],
+    [role="option"],
+    [role="menuitem"]
+  ) {{
+    background: transparent !important;
+    color: {light["text"]} !important;
+  }}
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-item"],
+    [data-radix-select-item],
+    [role="option"],
+    [role="menuitem"]
+  ):is(:hover, :focus, [data-highlighted], [data-state="checked"]) {{
+    background: #E3EEF1 !important;
+    color: {light["text"]} !important;
+  }}
+  html[data-pyrite-theme="light"] :is(
+    button[role="combobox"],
+    button[aria-haspopup="listbox"]
+  ) {{
+    background: {light["surface"]} !important;
+    color: {light["text"]} !important;
+    border-color: {light["rule"]} !important;
+  }}
+  /* Compatibility with marimo releases that style selects through utility
+     classes instead of data-slot attributes, plus native <select> fallbacks. */
+  html[data-pyrite-theme="light"] :is(.bg-popover, .bg-background) {{
+    background-color: {light["surface"]} !important;
+  }}
+  html[data-pyrite-theme="light"] :is(.text-popover-foreground, .text-foreground) {{
+    color: {light["text"]} !important;
+  }}
+  html[data-pyrite-theme="light"] select,
+  html[data-pyrite-theme="light"] select option,
+  html[data-pyrite-theme="light"] select optgroup {{
+    background-color: {light["surface"]} !important;
+    color: {light["text"]} !important;
+    color-scheme: light !important;
+  }}
+  /* Marimo's tab strip (mo.ui.tabs) renders inline, not portalled, but reads
+     the same frozen dark palette as the select surfaces above -- its own
+     light/dark detection is captured once at load and never re-derives when
+     this switch flips body[data-theme] later. Target the stable ARIA roles
+     rather than Tailwind's generated utility classnames, which are not a
+     stable contract across marimo releases. */
+  html[data-pyrite-theme="light"] :is([role="tablist"], .bg-muted) {{
+    background-color: {light["surface"]} !important;
+  }}
+  html[data-pyrite-theme="light"] :is([role="tab"], .text-muted-foreground) {{
+    color: {light["muted"]} !important;
+  }}
+  html[data-pyrite-theme="light"] [role="tab"][data-state="active"] {{
+    background-color: {light["bg"]} !important;
+    color: {light["text"]} !important;
+  }}
+  html[data-pyrite-theme="light"] [role="tabpanel"] {{
+    color: {light["text"]} !important;
   }}
   .cxr-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
   .cxr-title__eyebrow {{
@@ -298,15 +366,16 @@ def apply_altair_theme(chart, theme: str):
     """Apply explicit Vega-Lite text/surface colors to an Altair chart.
 
     marimo applies its own frontend Vega theme from the configured display
-    theme.  PyRITE's runtime switch is independent of that config, so these
-    explicit chart settings keep labels and legends synchronized with the
-    selected PyRITE appearance.
+    theme. PyRITE's runtime switch is independent of that config, so these
+    explicit chart settings keep labels, legends, and titles synchronized with
+    the selected PyRITE appearance. Explicit chart titles are rewritten too,
+    because a title-level color beats ``configure_title`` in Vega-Lite.
     """
     if chart is None:
         return None
     mode = theme if theme in THEMES else "dark"
     palette = THEMES[mode]
-    return (
+    chart = (
         chart.configure(background=palette["surface"])
         .configure_axis(
             labelColor=palette["text"],
@@ -323,9 +392,90 @@ def apply_altair_theme(chart, theme: str):
             labelColor=palette["text"],
             titleColor=palette["text"],
         )
-        .configure_title(color=palette["text"])
+        .configure_title(
+            color=palette["text"],
+            subtitleColor=palette["muted"],
+        )
         .configure_view(stroke=palette["rule"])
     )
+
+    # ``configure_title`` does not override a color embedded directly in a
+    # chart's TitleParams. Spectrum charts use explicit titles, so normalize
+    # the top-level title while preserving its text and other properties.
+    try:
+        import altair as alt
+
+        spec = chart.to_dict(validate=False)
+        title = spec.get("title")
+        if isinstance(title, str):
+            chart = chart.properties(title=alt.TitleParams(text=title, color=palette["text"]))
+        elif isinstance(title, dict):
+            title = dict(title)
+            title["color"] = palette["text"]
+            title["subtitleColor"] = palette["muted"]
+            chart = chart.properties(title=alt.TitleParams(**title))
+    except (ImportError, TypeError, ValueError):
+        # The configure_* rules above still cover charts without a serializable
+        # top-level title (or environments where Altair is optional).
+        pass
+
+    return chart
+
+
+# A white canvas makes the yellow end of many scientific sequential maps hard
+# to distinguish.  This clipped, high-contrast sequential map keeps the full
+# energy trajectory visible without changing the underlying scalar values.
+_LIGHT_ENERGY_COLORSCALE = [
+    [0.00, "#352A86"],
+    [0.20, "#245DA8"],
+    [0.40, "#1687A7"],
+    [0.60, "#169878"],
+    [0.80, "#9A7412"],
+    [1.00, "#B23A32"],
+]
+
+
+def _colorbar_title_text(colorbar) -> str:
+    title = getattr(colorbar, "title", None)
+    text = getattr(title, "text", None) if title is not None else None
+    return "" if text is None else str(text)
+
+
+def _theme_plotly_colorbar(colorbar, *, text: str, surface: str, rule: str, mode: str):
+    """Theme a Plotly colorbar and keep its title on one readable line."""
+    raw_title = _colorbar_title_text(colorbar)
+    is_energy = "energy" in raw_title.lower() or "kev" in raw_title.lower()
+
+    title_text = raw_title
+    if is_energy:
+        # Plotly will happily wrap narrow colorbar titles into a pile of glyphs.
+        # Normalize common explicit breaks and use a short horizontal label.
+        title_text = (
+            raw_title.replace("<br />", " ")
+            .replace("<br/>", " ")
+            .replace("<br>", " ")
+            .replace("\n", " ")
+        )
+        title_text = " ".join(title_text.split()) or "Energy (keV)"
+        if len(title_text) > 24:
+            title_text = "Energy (keV)"
+
+    update: dict[str, object] = dict(
+        tickfont=dict(color=text, size=11),
+        outlinecolor=rule,
+        outlinewidth=1,
+        bgcolor="rgba(255,255,255,0.88)" if mode == "light" else "rgba(18,32,43,0.82)",
+    )
+    if raw_title:
+        update["title"] = dict(
+            text=title_text,
+            side="top",
+            font=dict(color=text, size=12),
+        )
+    if is_energy:
+        update.update(thickness=18, len=0.72, xpad=8, ypad=6)
+    colorbar.update(**update)
+    return is_energy
 
 
 def apply_plotly_theme(fig, theme: str):
@@ -376,23 +526,36 @@ def apply_plotly_theme(fig, theme: str):
     )
 
     # Some PyRITE traces own their own colorbars; layout.font does not always
-    # override those nested fonts.  Set them explicitly without touching the
-    # actual data colors.
+    # override those nested fonts. Set them explicitly and, for the energy
+    # trajectories, use a light-canvas-safe scale and a slightly stronger line.
     for trace in fig.data:
+        energy_owner = None
         for owner_name in ("marker", "line"):
             owner = getattr(trace, owner_name, None)
             colorbar = getattr(owner, "colorbar", None) if owner is not None else None
             if colorbar is not None:
-                colorbar.update(
-                    tickfont=dict(color=text),
-                    title=dict(font=dict(color=text)),
-                )
+                if _theme_plotly_colorbar(
+                    colorbar, text=text, surface=surface, rule=rule, mode=mode
+                ):
+                    energy_owner = owner
+
         colorbar = getattr(trace, "colorbar", None)
         if colorbar is not None:
-            colorbar.update(
-                tickfont=dict(color=text),
-                title=dict(font=dict(color=text)),
-            )
+            _theme_plotly_colorbar(colorbar, text=text, surface=surface, rule=rule, mode=mode)
+
+        if energy_owner is not None and mode == "light":
+            # Scatter3d energy trajectories carry the scalar mapping on
+            # ``line``; marker-based plots are handled equivalently.
+            try:
+                energy_owner.colorscale = _LIGHT_ENERGY_COLORSCALE
+            except (AttributeError, ValueError):
+                pass
+            if hasattr(energy_owner, "width"):
+                try:
+                    width = energy_owner.width
+                    energy_owner.width = max(4, float(width or 0))
+                except (TypeError, ValueError):
+                    pass
 
     if getattr(fig.layout, "annotations", None):
         for annotation in fig.layout.annotations:
