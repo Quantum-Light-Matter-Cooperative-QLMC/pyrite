@@ -236,8 +236,10 @@ peak matters.
 - Ungrooved single-layer slab, lockstep core, `energy_model="midpoint"`.
 - The residual after refinement is bounded by the kernel's own per-row
   escape-factor quadrature, which is unchanged here and is not a substep effect.
-- Energy-loss straggling remains unmodeled (see `energy-step-convergence`), so
-  the flight energy history is deterministic CSDA.
+- Energy-loss straggling is modeled optionally. This row's radiation-grouping
+  derivation remains conditional on a fixed set of realized transport rows;
+  distributional substep invariance of the Urban loss itself is validated by
+  `energy-loss-straggling`.
 
 ## Independent verification
 

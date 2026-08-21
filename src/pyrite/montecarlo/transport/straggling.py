@@ -144,6 +144,8 @@ def _urban_levels_scalar(Z, J_keV, T_up, two_mc2_bg2, beta_sq):
     keV. Instead the sum rules are re-solved on the single remaining level,
     ``f_1 = 1``, ``E_1 = I``, which satisfies ``f_1 ln E_1 = ln I`` identically
     and so restores <dE> = C s exactly.
+
+    Validation: energy-loss-straggling
     """
     E_2 = _URBAN_E2_KEV_PER_Z2 * Z * Z
     f_2 = 2.0 / Z if Z > 2.0 else 1.0
@@ -170,6 +172,8 @@ def _urban_channels_scalar(Z, J_keV, C_keV_per_ang, E_i):
     positive logarithmic factor, which fails once ``2 mc^2 (beta gamma)^2 <= I``
     (below ~0.18 keV for tungsten). Callers fall back to the deterministic loss
     there rather than sample a degenerate distribution.
+
+    Validation: energy-loss-straggling
     """
     tau = E_i / _MC2_KEV
     gamma = 1.0 + tau
@@ -206,6 +210,8 @@ def _urban_moments_element_scalar(Z, J_keV, C_keV_per_ang, E_i, s_ang):
     The mean is ``C s`` by the closure identity above; it is evaluated from the
     sampled channels rather than shortcut to ``C s`` so that the identity is what
     the tests measure.
+
+    Validation: energy-loss-straggling
     """
     valid, sigma_1, E_1, sigma_2, E_2, sigma_3 = _urban_channels_scalar(
         Z, J_keV, C_keV_per_ang, E_i
@@ -230,6 +236,8 @@ def _urban_poisson_scalar(lam, key, counter):
     starts from ``exp(-lam) ~ 1e-44`` and costs O(lam) iterations, so it hands
     over to the Gaussian limit (skewness ``lam^-1/2`` <= 0.1 there), which
     consumes two uniforms through Box-Muller.
+
+    Validation: energy-loss-straggling
     """
     if lam <= 0.0:
         return 0, counter
@@ -261,6 +269,8 @@ def _urban_ionisation_keV(u, T_up):
 
     ``F(E) = (E_0 T_up/(T_up - E_0)) (1/E_0 - 1/E)``, so ``u = 0`` returns ``E_0``
     and ``u -> 1`` returns ``T_up``. The denominator stays in ``(E_0/T_up, 1]``.
+
+    Validation: energy-loss-straggling
     """
     return _URBAN_E0_KEV / (1.0 - u * (T_up - _URBAN_E0_KEV) / T_up)
 
@@ -272,6 +282,8 @@ def _urban_sample_element_keV(Z, J_keV, C_keV_per_ang, E_i, s_ang, key, counter)
     ``dE`` is a positive loss in keV. Where the parameterisation has no admissible
     form the deterministic ``C s`` is returned instead, which keeps the mean exact
     and the fallback silent in every moment test.
+
+    Validation: energy-loss-straggling
     """
     valid, sigma_1, E_1, sigma_2, E_2, sigma_3 = _urban_channels_scalar(
         Z, J_keV, C_keV_per_ang, E_i
@@ -327,6 +339,8 @@ def _urban_sample_compound_keV(
     ``C_i = |dE/dx|_i``, ``Z_i`` and ``I_i``. Summing the per-element means
     reproduces the compound stopping power, so the compound closure is inherited
     from the elemental one rather than asserted separately.
+
+    Validation: energy-loss-straggling
     """
     dE = 0.0
     for i in range(Z_arr.size):
@@ -344,6 +358,8 @@ def urban_element_table(composition):
     The host-side table the Urban samplers index, built from the same
     :data:`TRANSPORT_ELEMENTS` entries and the same memoized crossover as
     :func:`spliced_stopping_keV_per_ang`, so the two cannot drift.
+
+    Validation: energy-loss-straggling
     """
     Z_arr = np.empty(len(composition))
     J_arr = np.empty(len(composition))
@@ -370,6 +386,8 @@ def urban_loss_moments_keV(composition, E_keV, s_ang, delta=0.0):
     that follows; the cores use the scalar helpers. The mean is the closure
     identity ``|dE/dx| s`` evaluated through the model's own channels, not
     shortcut to it.
+
+    Validation: energy-loss-straggling
     """
     Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr = urban_element_table(composition)
     mean = 0.0

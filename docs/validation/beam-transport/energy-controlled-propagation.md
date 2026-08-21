@@ -201,8 +201,10 @@ Two qualifications belong with that number:
 - The claim covers *collision statistics*. Substep invariance of the emitted CXR
   and bremsstrahlung is a separate claim, `substep-radiation-invariance`; this
   row must not be read as saying anything about the spectra.
-- Energy-loss straggling remains unmodeled (see `energy-step-convergence`), so
-  the hazard is evaluated along a deterministic CSDA energy history.
+- Energy-loss straggling is modeled optionally. The collision optical-depth
+  construction validated here is unchanged; when enabled, the hazard is
+  evaluated along the realized Urban-loss history. The loss stream and its
+  distributional substep semantics are validated by `energy-loss-straggling`.
 
 ## Independent verification
 

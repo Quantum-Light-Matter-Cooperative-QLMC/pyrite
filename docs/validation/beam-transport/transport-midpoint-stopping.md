@@ -85,8 +85,10 @@ evaluated outside its range. No clamp is needed and none is applied.
 
 ## Assumptions and limits of validity
 
-- The Joy–Luo law is continuous slowing down: no straggling, no discrete
-  inelastic events. Unchanged from `electron-transport`.
+- This row validates the deterministic `straggling=False` propagation rule.
+  With straggling enabled, the Urban draw replaces the deterministic row loss;
+  its mean is the same stopping-power integral, but its cutoff and substep
+  semantics are validated separately by `energy-loss-straggling`.
 - Elastic hazard remains frozen at `E_start`; the collision distance is still
   sampled from the start-energy mean free path. Only stopping and the clock are
   controlled here. Convergent hazard treatment is checklist step F of

@@ -80,6 +80,14 @@ for replication studies, where it is not.
 uses $\sigma = \sqrt{\sigma_1^2 + \sigma_2^2}$, and the comparison is reported
 as a shift in units of that combined error.
 
+**Straggled rows are not independent observations.** Energy-loss increments are
+independent only conditional on their row states and counter addresses. Rows
+from one electron share the evolving energy and geometry, so treating segment
+losses as an i.i.d. sample understates uncertainty. Form per-electron
+observables first, or replicate whole runs by seed. The Urban sampler adds
+physical variance to path length, terminal channel, clock and spectra; it does
+not change the denominator, which remains the full incident count.
+
 ### Propagating through a spectral reduction
 
 A spectrum bin is a sum over segments, and a coherent bin is a sum of squares of
@@ -143,6 +151,14 @@ independent, which is **conservative** given a shared seed — a reported shift 
 if anything understated, never inflated. Stating which direction an assumption
 errs in is part of reporting the comparison.
 
+Straggling on/off comparisons use this paired design deliberately. The two arms
+share incident sampling and the pre-existing free-path/scattering draws; after
+the first sampled loss changes the energy, later rows may decorrelate. Pairing
+therefore removes the common early-history variance without pretending the
+whole trajectories are identical. The committed observable check reports the
+mean and Bessel-corrected SEM of the eight seed-wise on-minus-off differences,
+not an error inferred from individual segments.
+
 ### Reading a shift table
 
 A shift table is read for **sign pattern**, not for individual entries. At a
@@ -183,6 +199,17 @@ and at the energies of interest that sum is a **small residual of a large
 cancellation**. Measured at 100 keV into a thick target, the residual is around
 47 % even with accurate phases.
 
+Energy-loss straggling acts differently on the two reductions. Incoherent
+intensities have no cross-row phase, so straggling changes them only through the
+realized energy/path distribution; the paired HOPG check resolves no change in
+the integrated bremsstrahlung yield and a $0.334\% \pm 0.053\%$ normalized
+spectral total-variation distance. Coherent fields retain the random clock
+phase. For independent Gaussian phase noise, ensemble averaging would multiply
+the coherent cross term by $\exp(-\sigma_\phi^2/2)$, but the implemented Urban
+loss is few-collision and strongly non-Gaussian, and row phases share a
+trajectory. The Gaussian factor is therefore an interpretation aid, not the
+estimator. Measure the complex reduction over independent seed replicas.
+
 Three consequences follow, and each one breaks an intuition that holds for the
 incoherent case.
 
@@ -209,6 +236,13 @@ own population.
 The structural mitigation — accumulating fields and squaring once, never
 reducing intensity per block — is described in
 [execution and acceleration](execution-and-acceleration.md#the-coherent-streaming-kernel).
+
+In the committed 25 keV HOPG (002), zero-bunch-offset pure-geometry check,
+straggling lowers integrated coherent-line yield by
+$12.52\% \pm 2.54\%$ and peak height by $19.50\% \pm 2.12\%$. This isolates a
+phase-sensitive limit; it is not an angle- or bunch-averaged experimental
+prediction. The free-clock phase shift reported by the same check is likewise
+not a substitute for evaluating the full coherent kernel.
 
 ## Convergence protocol
 
@@ -296,9 +330,12 @@ The statistical machinery here is exercised by the ledger rows
 shift, seed replication isolating a real one-signed bias, and the coherent
 ill-conditioning result), `substep-radiation-invariance` (convergence of a
 grouped reduction, reported as a bound), and `gpu-transport-core` (multi-seed
-aggregate comparison across a stream change).
+aggregate comparison across a stream change), plus `energy-loss-straggling`
+(paired-seed response of terminal fractions, range, clock and spectra).
 
 The reproducible drivers are `checks/energy_step_convergence_matrix.py` and
 `checks/collision_statistics_refinement.py`, which print every shift with its
 error rather than only the flagged ones — for the reason given in
 [reading a shift table](#reading-a-shift-table).
+The straggling counterpart is
+`checks/energy_loss_straggling_observables.py`.

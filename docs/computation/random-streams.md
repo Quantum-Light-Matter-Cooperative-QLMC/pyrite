@@ -5,9 +5,12 @@ achieved through **stream structure** rather than through a single global seed.
 
 The property the structure buys is unusually strong and worth stating up front:
 enabling an optional physical input — a finite beam spot, an energy spread, a
-bunch length — takes no draw from the transport stream and leaves every other
-array bit-for-bit identical. That is not an approximation that holds to
-rounding. It is exact, and it is tested as exact.
+bunch length, or energy-loss straggling — takes no draw from the pre-existing
+transport stream. For the input distributions this leaves otherwise unaffected
+arrays bit-for-bit identical. Straggling deliberately changes the later energy
+history, but its first-row free-path and scattering draws remain identical and
+the disabled path is bit-for-bit historical. These are exact, tested contracts,
+not rounding-scale approximations.
 
 ## Two independent mechanisms
 
@@ -24,12 +27,16 @@ The package uses two different constructions, for two different problems.
   - Beam and bunch sampling, host side
   - Keeping each optional physical input's draws off every other input's stream
 * - Counter-addressed SplitMix64
-  - Per-electron transport cores
-  - Letting a thread compute its own draws with no shared generator
+  - Per-electron transport cores and the Urban straggling sampler
+  - Letting a thread or row compute its own draws with no shared generator or
+    draw-order coupling
 ```
 
-They compose: the child tree partitions randomness *across physical inputs*, and
-counter addressing partitions it *across electrons* within the transport stream.
+They compose: the child tree partitions fixed-shape host-side input sampling,
+while counter addressing partitions in-core randomness across electrons and,
+for straggling, across physical flights and numerical substeps. The straggling
+namespace is derived from the counter-addressed electron key; it is not a
+`SeedSequence` child and never advances the run generator.
 
 ## The `SeedSequence` child tree
 
@@ -172,11 +179,43 @@ safe: an overflow costs time and nothing else. It is also what makes the
 device-OOM fallback safe, since replaying the same seed with segments downloaded
 is exact rather than merely equivalent.
 
+### The straggling namespace
+
+Urban straggling consumes a variable number of uniforms per material row, so a
+single per-electron counter would make the draw for a later row depend on every
+earlier Poisson count. Instead it creates two more address levels:
+
+1. `_urban_stream_key_scalar` hashes the electron's `stream_keys(seed, Ne)` key
+   with a fixed straggling salt. This makes the namespace disjoint from the
+   free-path and scattering counter while retaining the same per-electron root.
+2. `_urban_flight_key_scalar` packs `(flight_id, substep_id)` into a collision-
+   free 32/32-bit index and hashes it again. Each row starts its local draw
+   counter at zero.
+
+Thus a straggling variate is a pure function of
+`(seed, electron_id, flight_id, substep_id, local_counter)`. Variable Poisson
+and continuum loop lengths are confined to that row. They cannot shift another
+row, another electron, or a pre-existing transport draw. The 32-bit fields are
+far wider than any reachable `max_steps` or substep count.
+
+This addressing also defines the cross-core contract. Given the same row state
+and `(seed, electron, flight, substep)`, every host core calls the same sampler;
+the exact CUDA kernel carries a transcription of the same key derivation. The
+CUDA path still awaits hardware verification, so host/device equality is a
+written and hardware-gated contract rather than a completed validation claim.
+
 ## Draw order as a contract
 
 The lockstep and per-electron cores implement the same models with the same draw
 semantics, and consume differently-ordered streams. They therefore realize
 **different samples of the same distribution**.
+
+The straggling namespace does not make whole trajectories equal across those
+cores: their elastic streams already produce different rows. It guarantees the
+narrower property that the Urban draw attached to an otherwise identical row
+has the same address and that enabling straggling does not consume a free-path
+or scattering variate. Once the first random loss changes the energy, later
+trajectory states may diverge physically.
 
 This is structural and cannot be fixed. It also is not a defect — but it does
 determine what may be compared how:
@@ -212,8 +251,13 @@ by holding the stream order fixed while changing only the arithmetic.
 
 ## Adding a new random input
 
-The rule is short: **a new distribution takes a new child stream.** It never
-shares an existing child, and it never draws from the transport generator.
+Choose the mechanism from where the randomness is consumed:
+
+* a fixed-shape host-side input distribution takes a new `SeedSequence` child;
+* a variable-trip in-core process takes a new salted counter namespace, with
+  stable physical identifiers in its address.
+
+Neither shares an existing namespace or draws from the transport generator.
 
 The consequences the rule protects are worth restating, since sharing a stream
 is the tempting shortcut and its damage is invisible until someone tries to
@@ -232,6 +276,10 @@ The accompanying test shape has two parts, and both are required:
 2. **A limiting-case test** for the physics itself, per the
    [validation methodology](../validation/methodology.md).
 
+An in-core counter namespace additionally needs an offline address-replay test,
+plus invariance under batching and capacity replay. If it has a device twin,
+the host and device must reconstruct the same keys independently.
+
 One correlation caveat: when a single policy owns more than one moment of the
 same distribution, it must own them from **one** stream. The Courant–Snyder
 policy draws positions and slopes together for this reason — splitting them
@@ -243,8 +291,12 @@ encodes. "One child per physical input" is the rule, not "one child per array".
 The claims on this page are pinned by the ledger rows `gpu-transport-core`
 (counter addressing, host/device generator identity, invariance to launch
 geometry and batching), `beam-phase-space-injection` (the transverse child
-streams and their zero limits), and `longitudinal-bunch-sampling` (the bunch
-child stream and its point-bunch limit).
+streams and their zero limits), `longitudinal-bunch-sampling` (the bunch child
+stream and its point-bunch limit), and `energy-loss-straggling` (the salted
+per-row namespace, disabled-path inertness, and offline replay).
 
 The generator's own properties, the three invariances, and the pure-Python
-cross-check live in `tests/montecarlo/test_transport_per_electron.py`.
+cross-check live in `tests/montecarlo/test_transport_per_electron.py`;
+straggling replay and inertness live in
+`tests/montecarlo/test_straggling_rng_plumbing.py` and the remaining-core replay
+tests.

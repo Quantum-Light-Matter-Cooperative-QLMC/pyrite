@@ -197,8 +197,9 @@ $\delta$ rises monotonically with $\beta\gamma$, so the 300 keV row bounds the
 whole range. At 25 keV — the operating point that motivated this branch — the
 omission is about 45 times smaller than the 6% Joy–Luo error
 {eq}`eq-stopping-bs` was introduced to remove, and it is below the unmodeled
-shell corrections, straggling, and delta rays listed under *Assumptions and
-limits*. At the 300 keV ceiling it is 1.5%, which is stated rather than
+shell corrections and omitted delta-ray transport listed under *Assumptions
+and limits*. Straggling is modeled separately and preserves this mean stopping
+power exactly. At the 300 keV ceiling it is 1.5%, which is stated rather than
 corrected. Applying $\delta$ properly would need per-*material* coefficients:
 it does not Bragg-add, so the per-element values above bound a compound's
 $\delta$ without being able to compose it. The Sternheimer–Peierls general
@@ -549,11 +550,12 @@ where a study needs it.
 
 ## Assumptions and limits
 
-- **No straggling.** {eq}`eq-stopping-joy-luo` is a mean loss rate; the
-  fluctuation about it (Landau/Vavilov) is not sampled. This biases the mean
-  arrival time and not only its variance, at a level above the numerical
-  tolerance the midpoint rule reaches — so refining the propagator does not make
-  the timing exact, it makes an unmodeled physical spread the limiting error.
+- **Optional Urban straggling.** Both stopping branches define the mean loss
+  rate. With `straggling=True`, transport samples an unrestricted Urban
+  compound-Poisson loss whose expectation is exactly that same mean; with the
+  default `False`, the historical deterministic path is bit-for-bit unchanged.
+  See `Validation: energy-loss-straggling` and the
+  [derivation and observable checks](../../validation/beam-transport/energy-loss-straggling.md).
 - **No radiative stopping.** Energy carried off by emitted bremsstrahlung and
   characteristic photons is not removed from the electron. The radiation kernels
   read the trajectories; they never feed back.

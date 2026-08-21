@@ -1,18 +1,20 @@
 # `energy-loss-straggling`
 
-Ledger row: **none yet** — see [Ledger status](#ledger-status). The claim is
-expected to land in
-[`ledger-transport-background.md`](../ledger-transport-background.md) when the
-sampler becomes reachable from transport.
-Code: `montecarlo/transport.py::_urban_levels_scalar`,
+Ledger row: [`energy-loss-straggling`](../ledger-transport-background.md#energy-loss-straggling).
+Code: `montecarlo/transport/straggling.py::_urban_levels_scalar`,
 `::_urban_channels_scalar`, `::_urban_moments_element_scalar`,
 `::_urban_poisson_scalar`, `::_urban_ionisation_keV`,
 `::_urban_sample_element_keV`, `::_urban_sample_compound_keV`,
-`::urban_element_table`, `::urban_loss_moments_keV`.
-Anchors: `tests/montecarlo/test_energy_loss_straggling.py` (134 cases).
+`::urban_element_table`, `::urban_loss_moments_keV`;
+`montecarlo/transport/api.py::simulate_trajectories`.
+Anchors: `tests/montecarlo/test_energy_loss_straggling.py` (134 cases), the
+straggling transport/RNG/core tests, and
+`checks/energy_loss_straggling_observables.py`.
 Source: Geant4 Physics Reference Manual, *Energy loss fluctuations* (Urban
 model, `G4UniversalFluctuation`), after H. Bichsel, *Rev. Mod. Phys.* **60**,
 663 (1988).
+
+`Validation: energy-loss-straggling`
 
 ## Claim
 
@@ -33,7 +35,7 @@ $E_0$. The parameters are fixed by
 $$
 E_0 = 10\ \text{eV},\qquad
 E_2 = 10 Z^2\ \text{eV},\qquad
-f_2 = \frac{2}{Z}\ (Z>2),\qquad
+f_2 = \frac{2}{Z}\ (Z\ge 2),\qquad
 f_1 = 1 - f_2,
 $$
 
@@ -51,11 +53,12 @@ $$
 E_1 = \exp\!\left(\frac{\ln I - f_2 \ln E_2}{f_1}\right).
 $$
 
-For $Z \le 2$ the K-shell level is absent, $f_2 = 0$, $f_1 = 1$, and the sum
-rule collapses to $E_1 = I$. The single tuned parameter is $r = 0.55$, the
-fraction of the mean loss carried by the continuum. With no $\delta$-ray
-production cut the continuum ceiling is the Møller kinematic limit for
-indistinguishable electrons,
+The PRM separately states $f_2=0$ for $Z=1$. PyRITE uses the two-level branch
+only for $Z>2$ and re-solves $Z\le2$ to $f_2=0$, $f_1=1$, $E_1=I$; that is a
+source deviation for $Z=2$, outside the currently supported transport-element
+set. The single tuned parameter is $r = 0.55$, the fraction of the mean loss
+carried by the continuum. With no $\delta$-ray production cut the continuum
+ceiling is the Møller kinematic limit for indistinguishable electrons,
 
 $$
 T_{\rm up} = T_{\max} = \frac{E}{2}.
@@ -282,6 +285,70 @@ kinetic energy. The upper end of the accepted band ($\approx 1.5$) is thus set
 by a kinematically inadmissible channel, so it should not be read as evidence
 that the model's width is right there.
 
+## Fresh-context discrepancy audit
+
+The source equations and implementation agree for the channel rates,
+continuum moments, inverse CDF, units, and positive-loss convention. Three
+transport-wide exactness claims do not hold for the sampler as implemented.
+
+First, `_urban_poisson_scalar` is an exact inverse-CDF Poisson sampler only for
+$0<\lambda<100$ (apart from the bounded-loop tail in finding 4). At
+$\lambda\ge100$ it instead returns
+
+$$
+N_{\rm G}=\max\!\left(0,
+\left\lfloor \lambda+\sqrt{\lambda}\,Z+\frac12\right\rfloor\right),
+\qquad Z\sim\mathcal N(0,1),
+$$
+
+which is not Poisson. At $\lambda=100$ the rounded-normal branch is symmetric
+up to its negligible zero-clipping tail and has near-zero third cumulant,
+whereas two frozen-rate halves use two
+exact $\operatorname{Poisson}(50)$ counts whose sum is
+$\operatorname{Poisson}(100)$ and has third cumulant $100$. A direct
+300000-key comparison measured skewness $0.00379$ for the unsplit branch and
+$0.10207$ for the split branch (Poisson expectation $0.1$). Thus the sampler is
+compound Poisson, and frozen-energy subdivision is distributionally invariant,
+only while every channel stays on the exact Poisson branch and its inverse-CDF
+loop terminates normally. The source comment says production flights keep all
+means below about $2.5$, but the ledger and verdict do not state that
+assumption.
+
+Second, once energy updates between substeps, the residual is not identically
+the deterministic left-endpoint stopping-power quadrature error. Let
+$\nu_E(d\epsilon)$ be the frozen-energy jump-intensity measure and
+$C(E)=\int\epsilon\,\nu_E(d\epsilon)$. For two small substeps $h_1,h_2$, the
+mean relative to one frozen unsplit draw contains
+
+$$
+h_1h_2\int
+\bigl[C(E-\epsilon)-C(E)\bigr]\,\nu_E(d\epsilon)
+=-h_1h_2 C(E)C'(E)+h_1h_2 R(E),
+$$
+
+where
+
+$$
+R(E)=\int
+\bigl[C(E-\epsilon)-C(E)+\epsilon C'(E)\bigr]\,\nu_E(d\epsilon).
+$$
+
+$R(E)$ is generally nonzero at the same order because Urban jump sizes do not
+shrink with step length. The variance derivation also says there are no cross
+terms because substeps are independent, but they are only conditionally
+independent: the second draw uses $E-X_1$, so
+$\operatorname{Cov}(X_1,X_2)=h_2\operatorname{Cov}(X_1,C(E-X_1))$ is generally
+nonzero. Evolving-energy subdivision is a state-dependent jump-process
+discretization, not solely the pre-existing deterministic quadrature error.
+
+Finally, the ledger's cutoff condition uses $\Delta E\ge
+E_{\rm start}-E_{\rm cut}$ without qualification, while every host core uses
+strict $>$ when a geometry event ties the row end. Equality yields to geometry
+under that convention. Apart from this tie, nonnegative jumps make the
+total-loss threshold an exact indicator that passage occurs by the row end;
+the fluid-interpolated crossing location remains approximate as already
+disclosed.
+
 ## Findings
 
 | # | finding | severity |
@@ -292,25 +359,53 @@ that the model's width is right there.
 | 4 | `_urban_poisson_scalar`'s inverse-CDF loop is bounded by `k < 10000`. For $\lambda = 0.1$ and for $\lambda$ near 100 the accumulated `cdf` saturates two ulps below $1$, i.e. below the largest attainable uniform $1-2^{-53}$; a draw in that gap exits on the iteration bound and returns $n = 10000$, a finite but absurd loss. Probability per draw $\sim 2\times10^{-16}$. This is the same fail-open shape as the non-converged resonance root this branch just fixed elsewhere. | low, latent |
 | 5 | The claim that Geant4 clamps the negative count to zero could not be checked against Geant4 source in this environment; it is quoted from the task document. The PyRITE choice is mean-exact either way, so nothing downstream depends on it. | unverified |
 | 6 | `test_sigma_units_are_inverse_length_and_counts_scale_with_step` comments "`Sigma_i` [1/Ang] times `E_i` [keV] must recover `C`" but only asserts the sum is positive. Closure is asserted elsewhere, so this is a comment/assertion mismatch, not a coverage gap. | cosmetic |
-| 7 | No ledger row and no `Validation:` marker. See below. | process |
+| 7 | The sampler originally landed before production reachability and therefore had no ledger row or `Validation:` marker. Slice I closed both process gaps. | resolved |
+| 8 | For $\lambda\ge100$, `_urban_poisson_scalar` samples a rounded Gaussian count rather than a Poisson count. An unsplit $\lambda=100$ channel therefore differs from two exact $\lambda=50$ substeps, contradicting the unqualified compound-Poisson and frozen-energy infinite-divisibility claims. | discrepancy; outside the stated production regime but inside the reviewed function contract |
+| 9 | The evolving-energy derivation replaces $\int[C(E-\epsilon)-C(E)]\nu_E(d\epsilon)$ by $-C(E)C'(E)$ and declares unconditional independence. It omits the same-order jump remainder $R(E)$ and the covariance induced by using $E-X_1$ in the next draw. | discrepancy in the substep claim |
+| 10 | The ledger says cutoff occurs for $\Delta E\ge E_{\rm start}-E_{\rm cut}$, but the cores use strict $>$ when a geometry event ties the row end; equality yields to geometry. | convention discrepancy |
 
-## Ledger status
+## Production integration and observable evidence
 
-Slice C declines a ledger row on the ground that the sampler is unreachable
-from every transport core and from `simulate_trajectories`, so a row would
-describe behaviour no run has. That is a coherent reading of
-`docs/validation/methodology.md`'s "the unit of trust is the equation" — the
-equation exists but no result depends on it — and it avoids an orphan
-`Validation:` marker. It is nonetheless a deviation from
-"New physics lands **with** a ledger row + a limiting-case test, or it doesn't
-land": the limiting-case test exists, the row does not. The row and this
-document's `Validation: energy-loss-straggling` back-reference should land with
-the slice that makes the sampler reachable. Adding this file to the
-`Beam physics and electron transport` toctree in
-`docs/validation/index.md` is likewise a human edit; the verifier does not make
-it.
+The sampler is now applied by every host transport core and the exact CUDA
+kernel. The CUDA LUT combination raises rather than returning an unstraggled
+result; production selection routes a straggled CUDA run to the exact kernel.
+The CUDA implementation remains transcribed but unverified on hardware. With
+`straggling=False` (the default), every transport core remains bit-for-bit
+identical to the pre-feature path and no straggling output is emitted.
 
-Verdict from this verification: `rederived` (mean closure, both continuum
-moments, the inverse CDF, units, signs and the limiting case reproduce
-independently; the anchors are green), with findings 1 and 2 to be corrected in
-the comment and task document, and 4 to be judged by the author.
+Except for the geometry-event tie convention, the cutoff indicator is exact
+for a nonnegative frozen-row loss: $\Delta E \ge
+E_{\rm start}-E_{\rm cut}$ if and only if passage occurs by the row end. The
+crossing position uses the fluid interpolation
+$s_{\rm cut}=s(E_{\rm start}-E_{\rm cut})/\Delta E$ and ends at
+$E_{\rm cut}$ exactly. At frozen energy, splitting is distributionally
+invariant only on the exact-Poisson branch. With evolving energy, subdivision
+also discretizes the state-dependent jump kernel; it is not reducible to the
+deterministic stopping-power quadrature term.
+
+The committed paired-seed observable check used HOPG at 25 keV. At 1 um of
+fixed cumulative material path and 1 keV photon energy, straggling changes the
+mean free-clock phase by $+13.607 \pm 2.401$ rad, inside the predeclared
+9.8--19 rad interval, and changes its standard deviation from
+$0.560 \pm 0.032$ rad to $378.628 \pm 5.683$ rad. This is the free clock term
+$\phi=E_\gamma t/(\hbar c)$, not the coherent kernel's complete phase. At 5 um,
+backscatter changes by $+0.938 \pm 0.199$ percentage points, transmission by
+$+5.229 \pm 0.743$ points, cutoff stopping by $-6.167 \pm 0.860$ points, and
+the cutoff-stopped range standard deviation opens from
+$0.514 \pm 0.007$ Angstrom to $11692 \pm 168$ Angstrom.
+
+The 250 eV--25 keV bremsstrahlung integral changes by
+$+0.140\% \pm 0.627\%$ (not resolved from zero); normalized spectral total
+variation is $0.334\% \pm 0.053\%$. In the production coherent HOPG (002)
+pure-geometry, zero-bunch-offset limit, integrated line yield falls
+$12.52\% \pm 2.54\%$ and peak height falls $19.50\% \pm 2.12\%$. Those line
+figures are not an angle- or bunch-averaged experimental observable, and the
+separate mean-stopping uncertainty remains owned by
+`feature/reference-electron-stopping-data`.
+
+Verdict from this fresh-context verification: `discrepancy`. Mean closure, both
+continuum moments, the inverse CDF, units, signs, and the $s\to0$ limit rederive
+and match on the exact-Poisson branch, but findings 8--10 contradict the
+unqualified sampler, substep, and cutoff claims. Suggested human ledger edit:
+set the row to `discrepancy` and record those three exact qualifications. Only
+a human may adjudicate or move the claim to `signed-off`.

@@ -242,7 +242,7 @@ def simulate_trajectories(
 
     Validation: transport-midpoint-stopping, energy-controlled-propagation
 
-    straggling: sample the per-flight Urban energy-loss fluctuation (slice C).
+    straggling: sample the per-flight Urban energy-loss fluctuation.
       False (default) is BIT-FOR-BIT with every run before this parameter
       existed: the sampler is skipped entirely on every core, touching neither
       its RNG stream nor any output array. True samples the per-flight/-substep
@@ -252,25 +252,15 @@ def simulate_trajectories(
       -- and returns the summed per-electron SAMPLED loss as
       ``result["straggle_dE_keV"]``.
 
-      Whether that loss is applied to the electron depends on the core, and is
-      being staged deliberately:
+      The sampled loss is applied on every host core and the exact CUDA core.
+      The CUDA LUT combination raises rather than silently returning an
+      unstraggled result; production core selection falls back to exact CUDA
+      when straggling is enabled. ``E_keV``/``E_end_keV``, cutoff crossing and
+      ``n_cutoff_stopped`` reflect the sampled loss. On a cutoff row the
+      applied loss is ``E_start - E_cut``; the diagnostic retains the full
+      sampled loss, including the discarded overshoot.
 
-      - Ungrooved lockstep core, exact stopping (``transport_core="lockstep"``
-        with ``transport_lut_config=TransportLUTConfig(enabled=False)``):
-        APPLIED. ``E_keV``/``E_end_keV``, the cutoff crossing and
-        ``n_cutoff_stopped`` all reflect the sampled loss, so results differ
-        from a ``straggling=False`` run. See the module block comment
-        "stochastic energy loss in transport (slice E)" above
-        ``_transport_core_ungrooved`` for the crossing redefinition and the
-        substep-invariance derivation. On a cutoff row the applied loss is
-        ``E_start - E_cut``, i.e. less than the sampled loss recorded in the
-        diagnostic by the overshoot the truncation discards.
-      - Every other core (both LUT variants, grooved, per-electron, CUDA):
-        DIAGNOSTIC ONLY, exactly as slice D left it. The sampler is addressed
-        and its result returned, but no energy is subtracted, so ``E_keV`` and
-        every downstream quantity are unaffected whether this is on or off.
-        Applying it there is slice F, which will also decide which cores raise
-        instead.
+      Validation: energy-loss-straggling
 
     collect_diagnostics: opt in to fixed-size percentile summaries of the
     per-flight fractional energy loss, relative elastic-hazard change,
@@ -301,8 +291,8 @@ def simulate_trajectories(
     n_cutoff_stopped), and n_layers. Incomplete histories raise RuntimeError
     rather than returning these arrays/counts.
 
-    Validation: electron-transport, finite-beam-size, finite-transverse-crystal,
-    grazing-beam-projection, multilayer-stack
+    Validation: electron-transport, energy-loss-straggling, finite-beam-size,
+    finite-transverse-crystal, grazing-beam-projection, multilayer-stack
     """
     if not np.isfinite(E0_keV) or E0_keV <= 0.0:
         raise ValueError("E0_keV must be finite and strictly positive")

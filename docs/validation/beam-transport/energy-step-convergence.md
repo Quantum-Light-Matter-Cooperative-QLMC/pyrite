@@ -132,48 +132,58 @@ the `floor` rows report.
 - All CXR numbers use the kernel's default 119 degree take-off. Near-grazing
   geometries are dominated by a different, unrelated defect; see Part D.
 
-### The clock this row converges is CSDA's clock, not the electron's
+### The clock this row converges is the mean-stopping reference clock
 
-Everything below measures convergence to the continuous-slowing-down clock
-`t = integral ds / beta(s)`. That clock is a **mean-value construct**, and the
-tolerance set here bounds numerical error against it, not physical phase
-fidelity. Three consequences, none of which the measured numbers address:
+Everything below measures convergence to the continuous-slowing-down reference
+clock `t = integral ds / beta(s)`. The tolerance set here bounds numerical
+error against that mean-stopping reference. Energy-loss straggling has since
+been implemented and measured separately by `energy-loss-straggling`; the
+distinction between numerical convergence and physical phase fidelity remains.
 
 - **The microphysics is discrete.** Electrons lose energy in stochastic events
   -- plasmons (most probable loss 25--33 eV in graphite), shell ionization,
-  Moller delta rays with a `1/T^2` tail -- and travel at constant velocity
-  between them. CSDA is Berger's condensed-history average over that process.
-  The usual "many inelastic events per flight" defense does **not** apply at
-  these energies: the inelastic and elastic mean free paths are comparable, so
-  a flight contains of order one inelastic event in carbon (about 1.0 at
-  25 keV) and fewer than one in tungsten (about 0.11 at 25 keV). The smooth
-  velocity profile *within* a flight is a modeling choice, not a limit theorem.
-- **Straggling phase jitter is unmodeled.** Fluctuation about the mean loss
-  (Landau/Vavilov; `kappa` = 0.015 for carbon at 25 keV over 1 um, so strongly
-  skewed and not Gaussian) is genuine arrival-time randomness that CSDA
-  discards by construction. Order 300 eV of loss spread over 1 um at 25 keV in
-  graphite is ~60 as of timing jitter against a 4.1 as period at 1 keV. The
-  transport samples discrete elastic scattering, so angular decoherence is
-  captured; energy-loss decoherence is not. The omission enters the coherent
-  yield as a Debye--Waller factor `exp(-sigma_phi^2 / 2)` and is estimated at
-  1e-3--1e-5 of the multiple-scattering term in the exponent, which is why it
-  is tolerable -- but it is an omission, not a converged quantity.
+  Moller transfers with a `1/T^2` tail -- and travel at constant velocity
+  between events. CSDA is the condensed-history mean of that process. The
+  usual many-event defense does **not** apply per flight: at 25 keV the current
+  transport inputs imply about 1.026 inelastic events per flight in carbon and
+  about 0.029 in tungsten. The earlier `0.11` tungsten figure was an arithmetic
+  error; it would require a mean excitation energy of 193 eV rather than the
+  transport table's 727 eV, or a 3.76-times longer elastic flight.
+- **Straggling phase jitter is now modeled.** The selected unrestricted Urban
+  compound-Poisson law is normalized to the existing mean stopping power. The
+  earlier order-300 eV spread and approximately 0.3 rad Jensen-bias estimate
+  describe a plasmon-only Poisson model: at 25 keV over 1 um in HOPG the mean
+  loss is 2.247 keV, so a 25 eV quantum gives
+  $\sigma_E=\sqrt{\Delta E\epsilon_p}=0.237$ keV and 0.317 rad. It omits shell
+  ionization and the full Moller tail; it was correctly computed for that
+  narrower model, not a bound on the implemented Urban fluctuation.
+- **The measured physical effect is larger.** At the same fixed 1 um material
+  path and 1 keV photon-energy clock, paired-seed runs measure a mean phase
+  shift of $+13.607 \pm 2.401$ rad and a phase standard deviation of
+  $378.628 \pm 5.683$ rad with straggling, against
+  $0.560 \pm 0.032$ rad without it. The fixed-path shift lies inside the
+  predeclared 9.8--19 rad Urban target. This is the free clock term
+  $E_\gamma t/(\hbar c)$, not the coherent kernel's complete phase or a
+  Debye--Waller exponent.
 - **Why a 0.1 rad tolerance is still the right target.** The frozen rule's
   error is **systematic**: it evaluates `beta` at the flight's start, always
   overestimates speed, and the timing error is one-signed and accumulates
   coherently across every electron in the ensemble. Straggling jitter is
-  **random** and suppresses the line rather than displacing it. A tight bound
-  on a systematic bias is therefore meaningful even where the unmodeled random
-  jitter is larger, and the two must not be compared as if commensurate.
+  **random** and changes the distribution of the coherent sum. A tight bound on
+  a numerical bias remains meaningful because it controls a different error
+  channel and is measured against the same mean-stopping reference.
 
-One known gap sits above the tolerance. By Jensen's inequality
+By Jensen's inequality
 `<1/beta(E)> != 1/beta(<E>)` (curvature
 `d^2(1/beta)/dE^2 = 3 gamma / ((beta gamma)^5 (mc^2)^2)`), so straggling biases
-the mean arrival time, not just its variance. The estimate is ~0.3 rad at
-25 keV over 1 um at 1 keV photon energy -- larger than the 0.1 rad numerical
-tolerance. Numerical precision has outrun the transport model there. Closing it
-requires sampling energy-loss straggling, which is outside this row and outside
-slices F--H.
+the mean arrival time, not just its variance. That channel is now sampled; the
+paired fixed-path result above replaces the plasmon-only estimate as the
+relevant evidence. In the zero-bunch-offset coherent HOPG (002) pure-geometry
+limit, the same check measures integrated line yield down
+$12.52\% \pm 2.54\%$ and peak height down $19.50\% \pm 2.12\%$. Those are not
+angle- or bunch-averaged experimental observables, and residual uncertainty in
+the *mean* stopping power remains outside both this row and the straggling
+claim.
 
 Phase sensitivity to any energy error carries a `(beta gamma)^-3` prefactor,
 
@@ -185,8 +195,8 @@ delta(1/beta) = delta_E / ((beta gamma)^3 m c^2),
 with `(beta gamma)^3 m c^2` = 16.2 keV at 25 keV and 144 keV at 100 keV, rising
 to GeV scale at the tens-of-MeV energies of the PXR literature. That is why the
 published coherent-radiation literature does not treat energy-loss straggling
-as a decoherence channel, and why it is nearly -- but not quite -- a live
-concern here.
+  as a decoherence channel. The present low-energy calculation cannot inherit
+  that approximation; `energy-loss-straggling` measures the channel directly.
 
 ## Limiting cases
 
@@ -521,19 +531,13 @@ clears 0.1 rad at zero refinement (`5.15e-02` rad, same case, `flight` rung).
   percent, roughly one to two orders above the ~1% default-take-off floor),
   so the substantive conclusion is unaffected, but the exact figures in the
   ledger Notes should be re-pulled from a single, stated run.
-- *Systematic vs. random argument for the 0.1 rad tolerance.* Sound. A
-  same-sign per-row error rotates the ensemble's coherent sum coherently
-  (a bias on the line position/amplitude), whereas independent per-row
-  jitter enters as an ensemble-averaged Debye–Waller-type suppression
-  $\exp(-\sigma_\phi^2/2)$ that reduces visibility without displacing the
-  line. These are different observables (a shift vs. a multiplicative
-  suppression), so bounding the numerical bias tightly is meaningful
-  independent of the size of the unmodeled random jitter, and the write-up
-  is explicit that this is a bound on numerical error against the CSDA
-  clock, not a claim that physical phase fidelity is achieved (the Jensen's-
-  inequality mean-arrival-time bias from straggling, ~0.3 rad at the
-  25 keV/1 keV point, is correctly flagged as an open gap above the 0.1 rad
-  tolerance, not folded into "converged").
+- *Systematic vs. random argument for the 0.1 rad tolerance.* Still sound as a
+  separation of error channels: bounding the numerical bias tightly remains
+  meaningful even though the now-modeled random loss produces a much wider
+  clock distribution. The former approximately 0.3 rad open-gap estimate was
+  a plasmon-only model, not a full-loss bound; `energy-loss-straggling` replaces
+  it with the paired Urban measurement and keeps the result explicitly scoped
+  to the free clock and zero-bunch-offset coherent limit.
 
 **Other findings.** The ledger row's Notes attribute this claim with a
 statement that `elec_id` is a row mask, not a grouping key, in `lines.py`.

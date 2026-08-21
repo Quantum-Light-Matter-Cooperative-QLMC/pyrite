@@ -169,9 +169,11 @@ Bit-for-bit
 : Reserved for claims that are *structurally* exact rather than numerically
   close: the random generator across host and device (integer arithmetic only),
   invariance to launch geometry and batch size and capacity replay, the
-  zero-limit of every optional distribution, and staging changes that only move
-  where an identical cast happens. Where the documentation says bit-for-bit, a
-  test asserts equality rather than closeness.
+  zero-limit of every optional distribution, the default/explicitly-disabled
+  straggling path, and staging changes that only move where an identical cast
+  happens. Where the documentation says bit-for-bit, a test asserts equality
+  rather than closeness. This does not claim bit identity between a straggled
+  and deterministic trajectory: the physical inputs differ.
 
 4σ, aggregate over seeds
 : Used to compare two cores or two configurations that produce **different
@@ -188,6 +190,22 @@ The rule that ties them together: **choose the tolerance from what is claimed,
 not from what passes.** A comparison across a stream change cannot be rescued by
 loosening a numerical tolerance, because no tolerance is the right instrument
 for it.
+
+### Straggling does not relax numerical tolerances
+
+The Urban sampler adds physical variance; it does not turn arithmetic error
+into Monte Carlo error. Its key derivation and integer uniforms are exact. The
+channel rates, Poisson inversion and continuum marks use floating-point
+transcendentals, so host/device evaluation may differ by libm ulps even when the
+address is identical. After a loss changes the energy, transport chaos can
+amplify that rounding into a different later trajectory. Compare one draw or
+first-row state numerically, but compare whole straggled runs statistically.
+
+Conversely, a straggling on/off comparison at matched seeds is a paired physics
+comparison, not a numerical tolerance test. The disabled-path claim is the one
+that is bit-for-bit: the sampler, its keys and its output field are absent.
+CUDA straggling remains hardware-unverified, so no host/device tolerance is
+promoted here beyond the existing hardware-gated tests.
 
 ## Practical guidance
 
@@ -212,6 +230,9 @@ implementation rather than a physical claim. Where precision affects a ledgered
 claim, the row records it: `coherent-line-hkl-batch` documents the `float32`
 envelope and the owed golden regeneration, and `gpu-transport-core` documents
 the host/device arithmetic difference and its statistical consequence.
+`energy-loss-straggling` records disabled-path identity, address replay, and
+the statistical observable comparison without weakening any existing numeric
+tolerance.
 
 The tolerance conventions themselves serve the evidence standard in
 [validation methodology](../validation/methodology.md), which is what decides

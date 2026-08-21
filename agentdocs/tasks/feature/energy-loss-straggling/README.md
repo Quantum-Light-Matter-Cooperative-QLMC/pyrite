@@ -1048,38 +1048,67 @@ Interactions that need explicit design rather than incremental patching:
       production equation or ledger status; Slice I still owns the formal
       `energy-loss-straggling` validation row/write-up. CUDA was not exercised
       and remains unverified exactly as Slice F recorded.
-- [ ] I — Docs, ledger, and goldens. Add `Validation: energy-loss-straggling`
-      with a ledger row in `ledger-transport-background.md`; rewrite the
-      "No straggling" block in `stopping-power.md`; and update the four
-      write-ups that currently cite straggling as unmodeled so none of them
-      still asserts an omission that has been closed.
-- [ ] J — Computational/statistical techniques docs. Update
+- [x] I — Docs, ledger, and goldens. **Done.** Added
+      `Validation: energy-loss-straggling` markers, the formal transport ledger
+      row, check inventory, and generated domain/status views; rewrote the
+      `stopping-power.md` assumption while preserving the "No delta rays"
+      bullet verbatim; corrected the four stale validation write-ups, including
+      tungsten's inelastic count from the erroneous 0.11 to 0.029. No numerical
+      golden moved because straggling remains default-off. Fresh-context review
+      set the new ledger row to `discrepancy`, not `rederived`; exact findings
+      are recorded below and in the validation write-up.
+- [x] J — Computational/statistical techniques docs. **Done.** Updated
       `docs/computation/random-streams.md` for the new per-flight
       counter-addressed straggling stream: which counter tuple it is keyed on
       (`(electron, flight, substep)`), where it sits relative to the
       `SeedSequence` child tree and the existing counter-addressed streams, what
       the draw-order contract now guarantees, and the off-path bit-for-bit
       inertness claim — following that page's own "Adding a new random input"
-      procedure rather than bolting on a section. Update
+      procedure rather than bolting on a section. Also updated
       `docs/computation/statistical-methods.md` where the added per-flight
       variance changes what the estimators see (error bars, seed replication,
       paired-seed shift, and the coherent-vs-incoherent split, since the
-      `exp(-sigma_phi^2/2)` suppression lands on the coherent term). Check
+      `exp(-sigma_phi^2/2)` suppression lands on the coherent term). Reviewed
       `docs/computation/precision-and-tolerances.md` for tolerance statements
-      that assumed a deterministic loss, and correct or explicitly re-affirm
-      each.
-- [ ] K — Electron transport physics docs. Rewrite
+      that assumed a deterministic loss and corrected or explicitly reaffirmed
+      each. The result distinguishes fixed-shape `SeedSequence` children from
+      the salted in-core counter namespace, documents offline address replay and
+      disabled-path inertness, uses per-electron/seed-replicate errors rather
+      than treating rows as independent, and keeps the Gaussian
+      `exp(-sigma_phi^2/2)` factor as an interpretation aid rather than an Urban
+      estimator.
+- [x] K — Electron transport physics docs. **Done.** Rewrote
       `docs/physics/beam-transport/electron-transport.md` for a stochastic loss:
       the "Model" and "Energy-controlled propagation" sections (the loss per
       flight is now a random variable of the stated mean), "Physical flights and
       numerical substeps" (substep invariance is distributional, not algebraic —
-      carry E's re-derivation), the redefined cutoff crossing and its
+      including the corrected form of E's re-derivation), the redefined cutoff crossing and its
       `n_cutoff_stopped` bookkeeping, and line 125's standing claim that
-      straggling is unmodelled. State the source equation, assumptions, limiting
-      case, and `Validation: energy-loss-straggling` marker per the physics-doc
-      contract. Cross-link J so the RNG plumbing is documented once, not twice.
+      straggling is unmodelled. It states the source equation, assumptions,
+      limiting case, and `Validation: energy-loss-straggling` marker per the
+      physics-doc contract, and cross-links J so the RNG plumbing is documented
+      once, not twice.
+      Fresh-context review corrected E's inherited substep derivation: exact
+      infinite divisibility is qualified to the exact-Poisson branch, while the
+      evolving-energy process carries a same-order jump remainder and cross-step
+      covariance. The cutoff section now records geometry's strict tie
+      precedence rather than claiming an unqualified `>=` indicator.
 
 ## Decisions and open questions
+
+- **Fresh-context discrepancy, found in I/K.** The independent verifier
+  re-derived the Urban rates, analytic mean/variance, continuum inverse CDF,
+  units, sign and `s -> 0` limit, then found three narrower claims that do not
+  match the implementation. (1) `_urban_poisson_scalar` switches to a rounded
+  Gaussian at `lambda >= 100`, so exact compound-Poisson infinite divisibility
+  is only a production-domain statement (measured channel means stay below
+  about 2.5), not the function's full contract. (2) E's evolving-energy
+  expansion omits the state-dependent jump remainder and induced cross-step
+  covariance. (3) equality at a simultaneous geometry event yields to geometry,
+  whereas the draft ledger used unqualified `DeltaE >= Delta_cut`. The ledger
+  and maintained docs now say this explicitly and carry status `discrepancy`.
+  Fixing or formally bounding these implementation-level issues is a new
+  authority/scope decision; CUDA hardware validation remains separately open.
 
 - **Dependency noted 2026-08-20 (supervisor):** ELSEPA elastic-scattering data
   is being set up under `feature/reference-elastic-scattering-data`. Flight
@@ -1230,15 +1259,29 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Next: I — docs, ledger, and goldens.** H measured every required observable
-at committed revision `f30df0a0`; the +13.607 +/- 2.401 rad fixed-path clock
-shift closes the corrected 9.8--19 rad acceptance interval while retaining the
-separate mean-stopping caveat. I can now add the formal validation row/write-up
-and remove stale omission claims. It must preserve B0's two no-change verdicts,
-leave the "No delta rays" bullet untouched, and distinguish H's clock-only
-phase and zero-bunch-offset coherent-line limit from general experimental
-observables. J and K remain late documentation slices as scoped. CUDA remains
+**Next: adjudicate the fresh-context discrepancy before task closure.** Slices
+I--K are complete and the docs/ledger now reflect the implementation honestly.
+The remaining choice is whether to replace the rounded-Gaussian high-count
+branch with an exact/divisible sampler and derive/test the state-dependent jump
+discretization, or to constrain the supported contract to the measured
+production regime and retain the explicit discrepancy. That implementation
+decision is outside the documentation slice just completed. CUDA remains
 unverified until its hardware tests run.
+
+## Slice I--K verification
+
+- `pyrite-dev validation-ledger --write` followed by `--check`: clean.
+- `pyrite-dev docs`: clean; the rendered validation page contains 208 MathJax
+  nodes and no raw dollar delimiters.
+- `pyrite-dev test tests/dev/test_docs.py`: 5 passed.
+- Focused straggling tests: 195 passed, 5 hardware skips.
+- `pyrite-dev lint` and `pyrite-dev typecheck`: clean.
+- `pyrite-dev test --numba`: 3617 passed, 74 skipped. A sandboxed
+  `pyrite-dev verify` repeated all non-test checks successfully and reached
+  3616 passed / 74 skipped before the sole process-pool test was denied its
+  forkserver Unix socket; that exact test passes when run with the required
+  sandbox escalation.
+- CUDA hardware behavior remains unverified locally; no numerical golden moved.
 
 ## Delegation slices and required skills
 

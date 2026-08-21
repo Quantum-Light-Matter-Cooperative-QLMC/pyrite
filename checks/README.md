@@ -9,6 +9,7 @@ sign-off.
 |---|---|---|
 | `dans_diffraction_oracle.py` | `dans-diffraction-oracle` | Pinned external lattice, reciprocal-geometry, and structure-factor comparison. |
 | `detector_solid_angle_check.py` | `detector-eaglexo`, `detector-line-broadening` | Solid-angle integration and analytic aperture-width comparison; the integrated-spectrum route is not separately ledgered. |
+| `energy_loss_straggling_observables.py` | `energy-loss-straggling` | Paired-seed phase, terminal-fraction, stopped-range, bremsstrahlung, and coherent-line response to Urban straggling. |
 | `feranchuk_check_script.py` | `closed-form-flux`, `pxr-amplitude`, `cbs-amplitude` | Legacy Feranchuk–Spence LiF absolute-flux anchor. |
 | `feranchuk_vs_zhai_check.py` | `closed-form-flux`, `coherent-line-spectrum` | Analytic-versus-transport comparison through the maintained Zhai anchor pipeline. |
 | `kinematic_validity_check.py` | `coherent-line-spectrum`, `line-energy-dispersion` | Kinematic-approximation audit; its validity parameters are supporting diagnostics, not separate ledger claims. |
