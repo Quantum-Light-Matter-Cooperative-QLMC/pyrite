@@ -135,5 +135,10 @@ fits existing per-material action verbs.
 - Added focused CLI/catalog coverage for CRUD, detector preservation/validation,
   JSON output, and the single-scene API seam. CLI reference regenerated; the
   sweep-profile guide now documents the profile TOML and command workflow.
-- Remaining verification: CLI/core suites, docs build if its Sphinx dependency
-  is available, and the full `pyrite-dev verify` gate.
+- Final supervisor verification: the CLI suite passed (1234 tests); the core
+  suite passed (1814 tests, 74 skipped), including the exact multiprocessing
+  test rerun outside the sandbox; warning-as-error docs passed in a fresh
+  `/tmp` environment; and typecheck passed.
+- Elevated `pyrite-dev verify` passed: 3660 tests passed, 74 skipped, with
+  contracts, docs, lint, typecheck, generated checks, and skill sync green.
+- Checkpoints: `5737caee`, `e65fe66f`, `d0199eb3`, and `15c84021`.
