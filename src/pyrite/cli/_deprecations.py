@@ -443,6 +443,7 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("profile delete", "--json", "--output json"),
         _flag("profile list", "--json", "--output json"),
         _flag("profile show", "--json", "--output json"),
+        _flag("profile numerics show", "--json", "--output json"),
         _flag("profile filter list", "--json", "--output json"),
         _flag("profile filter show", "--json", "--output json"),
         _flag("material show", "--json", "--output json"),

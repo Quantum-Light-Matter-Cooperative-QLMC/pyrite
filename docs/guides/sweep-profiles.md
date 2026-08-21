@@ -33,12 +33,60 @@ without a fidelity setting and installs those full bounds for `--profile NAME`
 `pyrite run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.
 
+## Calculation numerics
+
+Use the nested profile workflow to inspect every result-affecting calculation
+control and the source of its effective value:
+
+```bash
+pyrite profile numerics show standard --fidelity full
+pyrite profile numerics show standard --fidelity survey -o json
+```
+
+The output groups sampling counts, reflection/mosaic convergence, and transport
+integration controls. Each field reports its explicit profile value, effective
+value, and source (`profile`, `fidelity`, or `built-in`). Resolution follows:
+
+```text
+per-run override > explicit profile value > fidelity preset > built-in
+```
+
+Set controls without editing TOML directly:
+
+```bash
+pyrite profile numerics set standard \
+  --line-electrons 500 --bremsstrahlung-electrons 200 \
+  --reflection-families 6 --maximum-reflections 12 \
+  --mosaic-route mc --mosaic-nodes 7 --yes
+
+pyrite profile numerics set standard \
+  --energy-model midpoint --maximum-fractional-energy-loss 0.02 --straggling --yes
+```
+
+`--dry-run` prints the exact TOML diff without writing. Reset named fields, or
+omit all field names to reset every explicit numeric to fidelity/built-in
+resolution:
+
+```bash
+pyrite profile numerics reset standard reflection-families mosaic-route --yes
+pyrite profile numerics reset standard --yes
+```
+
+Existing `profile create|set --ne-line/--ne-brem`, `--straggling`,
+`--energy-model`, and `--max-de-frac` spellings remain compatible. Worker,
+chunk, backend, core, and other execution-only tuning are intentionally absent:
+they affect runtime, not calculation results or checkpoint identity.
+
 ## Identity and storage
 
 Every profile-aware scan resolves settings and complete `Sweep` first, converts
 them to JSON-compatible values, and hashes that payload with SHA-256. Component
 checkpoint `meta.json` stores profile, hash, and exact resolved parameter
 payload under `dataset_identity`.
+
+Electron counts, reflection limits, mosaic quadrature, and transport integration
+settings are part of that resolved identity. Distinct effective numerics cannot
+resume into one checkpoint; execution-only tuning remains identity-neutral.
 
 Canonical, unmodified `full` runs retain `checkpoints/<material>/` for
 compatibility. Survey runs and explicitly overridden full runs use

@@ -446,6 +446,29 @@ def test_profile_transport_numerics_are_validated_and_exposed(tmp_path):
         load_material_catalog(path)
 
 
+def test_profile_convergence_numerics_are_validated_and_exposed(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    path = _catalog_with_two_profiles(tmp_path)
+    text = path.read_text().replace(
+        "[profiles.narrowed]\n",
+        "[profiles.narrowed]\nn_families = 3\nmax_reflections = 6\n"
+        'mosaic_nodes = 7\nmosaic_route = "mc"\n',
+    )
+    path.write_text(text)
+    catalog = load_material_catalog(path)
+    assert dict(catalog.profile_numerics("narrowed")) == {
+        "n_families": 3,
+        "max_reflections": 6,
+        "mosaic_nodes": 7,
+        "mosaic_route": "mc",
+    }
+
+    path.write_text(text.replace("n_families = 3", "n_families = 0"))
+    with pytest.raises(MaterialConfigError, match="profiles.narrowed.n_families"):
+        load_material_catalog(path)
+
+
 def test_profile_names_and_memberships_are_exposed(tmp_path):
     from pyrite.materials import load_material_catalog
 
@@ -873,6 +896,7 @@ offset_mm = [0.5, 0.0]
     assert catalog.profile_physical_detectors["standard"]["shape"] == (2, 3)
     assert catalog.profile_filters["standard"][0]["name"] == "half"
     assert catalog.profile_filters["standard"][0]["offset_mm"] == (0.5, 0.0)
+
 
 def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
     from pyrite.campaign import config

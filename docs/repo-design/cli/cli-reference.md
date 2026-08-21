@@ -1035,6 +1035,7 @@ Commands:
   delete       Delete a profile; irreversible.
   filter       Manage finite FilterPlate objects on a...
   list         List catalog profiles with membership,...
+  numerics     Inspect and edit result-affecting...
   remove       Remove values from an existing profile's...
   rename       Rename profile NAME to NEW_NAME.
   set          Replace range grids, beam fields, detector...
@@ -1273,6 +1274,80 @@ Usage: pyrite profile list [OPTIONS]
   List catalog profiles with membership, override, and grid-ref counts.
 
 Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics`
+
+```text
+Usage: pyrite profile numerics [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit result-affecting calculation controls.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Reset selected FIELDs, or every explicit numeric when none are named.
+  set    Set one or more explicit result-affecting controls on PROFILE.
+  show   Show explicit and effective PROFILE numerics with value sources.
+```
+
+## `pyrite profile numerics reset`
+
+```text
+Usage: pyrite profile numerics reset [OPTIONS] NAME [[line-electrons|bremsstrahlung-
+                                     electrons|reflection-families|maximum-
+                                     reflections|mosaic-nodes|mosaic-
+                                     route|straggling|energy-model|maximum-fractional-
+                                     energy-loss]]...
+
+  Reset selected FIELDs, or every explicit numeric when none are named.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics set`
+
+```text
+Usage: pyrite profile numerics set [OPTIONS] NAME
+
+  Set one or more explicit result-affecting controls on PROFILE.
+
+Options:
+  --line-electrons N              Line-spectrum samples.  [x>=1]
+  --bremsstrahlung-electrons N    Bremsstrahlung samples.  [x>=1]
+  --reflection-families N         Ranked reflection families to resolve.  [x>=1]
+  --maximum-reflections N         Cap resolved reflections after family expansion.
+                                  [x>=1]
+  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
+  --mosaic-route [analytic|mc]    Mosaic broadening route.
+  --straggling / --no-straggling  Enable or disable Urban energy-loss straggling.
+  --energy-model [frozen|midpoint]
+                                  Transport clock model.
+  --maximum-fractional-energy-loss FRACTION
+                                  Cap one row's fractional mean energy loss; positive
+                                  values require midpoint.  [x>=0.0]
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics show`
+
+```text
+Usage: pyrite profile numerics show [OPTIONS] NAME
+
+  Show explicit and effective PROFILE numerics with value sources.
+
+Options:
+  --fidelity [full|survey]        Resolve profile values against this fidelity preset.
+                                  [default: full]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

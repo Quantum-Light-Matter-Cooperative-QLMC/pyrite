@@ -11,6 +11,8 @@ from typing import Any, Literal
 
 import numpy as np
 
+from .._numerics import Convergence, Numerics
+from .._numerics import MosaicRoute as MosaicRoute
 from ..detectors import Detector
 from ..instrument import FilterPlate, PixelScorer, PlanarDetector
 from ..instrument.model import validate_downstream_scene
@@ -19,7 +21,6 @@ from .sweep import BeamSpec
 
 EmissionMode = Literal["incoherent", "coherent", "both"]
 BremSource = Literal["mc", "external", "none"]
-MosaicRoute = Literal["analytic", "mc"]
 
 _SEGMENT = re.compile(r"(?P<name>[A-Za-z_]\w*)(?P<indexes>(?:\[\d+\])*)\Z")
 _INDEX = re.compile(r"\[(\d+)\]")
@@ -61,59 +62,6 @@ def _scalar_target(target: Target) -> Target:
             tilt_azim_deg=_one_float("target.tilt_azim_deg", target.tilt_azim_deg),
         )
     raise TypeError("Scene.target must be a Slab or Stack")
-
-
-@dataclass(frozen=True)
-class Convergence:
-    """Result-affecting convergence and truncation controls."""
-
-    n_families: int = 4
-    max_reflections: int | None = None
-    mosaic_nodes: int = 5
-    mosaic_route: MosaicRoute = "analytic"
-
-    def __post_init__(self) -> None:
-        if self.n_families <= 0:
-            raise ValueError("n_families must be positive")
-        if self.max_reflections is not None and self.max_reflections <= 0:
-            raise ValueError("max_reflections must be positive or None")
-        if self.mosaic_nodes <= 0:
-            raise ValueError("mosaic_nodes must be positive")
-        if self.mosaic_route not in {"analytic", "mc"}:
-            raise ValueError("mosaic_route must be 'analytic' or 'mc'")
-
-
-@dataclass(frozen=True)
-class Numerics:
-    """Sampling and result-invariant execution controls."""
-
-    n_electrons: int = 450
-    n_electrons_brem: int = 100
-    spec_chunk: int | None = None
-    brem_chunk: int | None = None
-    transport_core: str = "auto"
-    backend: str = "auto"
-    straggling: bool = False
-    energy_model: Literal["frozen", "midpoint"] = "frozen"
-    max_dE_frac: float = 0.0
-    convergence: Convergence = field(default_factory=Convergence)
-
-    def __post_init__(self) -> None:
-        for name in ("n_electrons", "n_electrons_brem"):
-            if getattr(self, name) <= 0:
-                raise ValueError(f"{name} must be positive")
-        for name in ("spec_chunk", "brem_chunk"):
-            value = getattr(self, name)
-            if value is not None and value <= 0:
-                raise ValueError(f"{name} must be positive or None")
-        if not isinstance(self.straggling, bool):
-            raise ValueError("straggling must be a bool")
-        if self.energy_model not in {"frozen", "midpoint"}:
-            raise ValueError("energy_model must be 'frozen' or 'midpoint'")
-        if not np.isfinite(self.max_dE_frac) or self.max_dE_frac < 0.0:
-            raise ValueError("max_dE_frac must be finite and non-negative")
-        if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
-            raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
 
 
 @dataclass(frozen=True)

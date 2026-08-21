@@ -26,12 +26,13 @@ from typing import Any
 
 import numpy as np
 
+from .._numerics import CONVERGENCE_KEYS
 from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
-from .profiles import get_fidelity_preset
+from .profiles import get_fidelity_preset, resolve_numerics
 from .sweep import BeamSpec, Sweep, beam_replace, target_from_flat, target_replace
 from .transverse import TransverseDistribution
 
@@ -250,6 +251,13 @@ def material_sweep(
         n_electrons_brem=scan.n_electrons_brem,
     )
     sweep = get_fidelity_preset(fidelity).apply_sweep(sweep)
+    numerics = resolve_numerics(
+        _catalog(catalog_profile).profile_numerics(catalog_profile), fidelity=fidelity
+    )
+    sweep = replace(
+        sweep,
+        **{key: numerics.effective[key] for key in CONVERGENCE_KEYS},
+    )
     if not overrides:
         return sweep
     # Split beam-addressed overrides (energy_keV, spot/bunch fields) from

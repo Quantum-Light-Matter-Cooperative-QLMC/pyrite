@@ -810,6 +810,150 @@ def test_set_transport_numerics_round_trips_and_validates_coupling(tmp_path, mon
     assert "max dE fraction: 0.02" in shown.stdout
 
 
+def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    shown = invoke(profile.command, ["numerics", "show", "sub_100keV", "--fidelity", "survey"])
+    assert_clean_result(shown)
+    assert "sampling:" in shown.stdout
+    assert "line electrons: 60 (fidelity)" in shown.stdout
+    assert "reflection families: 2 (fidelity)" in shown.stdout
+    assert "mosaic nodes: 5 (built-in)" in shown.stdout
+    assert "energy model: frozen (built-in)" in shown.stdout
+
+    machine = invoke(
+        profile.command,
+        ["numerics", "show", "sub_100keV", "--fidelity", "survey", "-o", "json"],
+    )
+    assert_clean_result(machine)
+    envelope = json.loads(machine.stdout)
+    assert envelope["schema"] == "cxr.profile.numerics.show"
+    assert envelope["payload"]["profile"] == "sub_100keV"
+    fields = {row["key"]: row for group in envelope["payload"]["groups"] for row in group["fields"]}
+    assert fields["n_electrons"] == {
+        "key": "n_electrons",
+        "label": "line electrons",
+        "explicit": None,
+        "effective": 60,
+        "source": "fidelity",
+    }
+    assert fields["max_reflections"]["effective"] == 4
+    assert fields["max_reflections"]["source"] == "fidelity"
+
+
+def test_numerics_help_exposes_scientific_controls_not_execution_tuning():
+    group = invoke(profile.command, ["numerics", "--help"])
+    assert_clean_result(group)
+    assert "show" in group.stdout
+    assert "set" in group.stdout
+    assert "reset" in group.stdout
+
+    setting = invoke(profile.command, ["numerics", "set", "--help"])
+    assert_clean_result(setting)
+    for option in (
+        "--line-electrons",
+        "--bremsstrahlung-electrons",
+        "--reflection-families",
+        "--maximum-reflections",
+        "--mosaic-nodes",
+        "--mosaic-route",
+        "--maximum-fractional-energy-loss",
+    ):
+        assert option in setting.stdout
+    for excluded in ("--workers", "--backend", "--spec-chunk", "--transport-core"):
+        assert excluded not in setting.stdout
+
+
+def test_numerics_set_dry_run_write_validation_and_reset(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    dry_run = invoke(
+        profile.command,
+        [
+            "numerics",
+            "set",
+            "sub_100keV",
+            "--line-electrons",
+            "12",
+            "--reflection-families",
+            "3",
+            "--mosaic-nodes",
+            "7",
+            "--mosaic-route",
+            "mc",
+            "--dry-run",
+        ],
+    )
+    assert_clean_result(dry_run)
+    assert "+n_electrons = {values = [12]}" in dry_run.stdout
+    assert "+n_families = 3" in dry_run.stdout
+    assert catalog.read_text() == _CATALOG
+
+    invalid = invoke(
+        profile.command,
+        ["numerics", "set", "sub_100keV", "--maximum-fractional-energy-loss", "0.02"],
+    )
+    assert invalid.exit_code == 1
+    assert "requires energy_model='midpoint'" in invalid.stderr
+
+    written = invoke(
+        profile.command,
+        [
+            "numerics",
+            "set",
+            "sub_100keV",
+            "--energy-model",
+            "midpoint",
+            "--maximum-fractional-energy-loss",
+            "0.02",
+            "--maximum-reflections",
+            "6",
+        ],
+    )
+    assert_clean_result(written, stdout="updated numerics for profile sub_100keV\n")
+    assert 'energy_model = "midpoint"' in catalog.read_text()
+    assert "max_dE_frac = 0.02" in catalog.read_text()
+    assert "max_reflections = 6" in catalog.read_text()
+
+    shown = invoke(profile.command, ["numerics", "show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert "maximum reflections: 6 (profile); explicit: 6" in shown.stdout
+
+    reset = invoke(
+        profile.command,
+        [
+            "numerics",
+            "reset",
+            "sub_100keV",
+            "maximum-reflections",
+            "maximum-fractional-energy-loss",
+        ],
+    )
+    assert_clean_result(reset, stdout="reset numerics for profile sub_100keV\n")
+    assert "max_reflections" not in catalog.read_text()
+    assert "max_dE_frac" not in catalog.read_text()
+
+
+def test_numerics_standard_mutation_requires_confirmation(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    declined = invoke(
+        profile.command,
+        ["numerics", "set", "standard", "--reflection-families", "3"],
+        input="n\n",
+    )
+    assert declined.exit_code == 1
+    assert catalog.read_text() == original
+
+    accepted = invoke(
+        profile.command,
+        ["numerics", "set", "standard", "--reflection-families", "3", "--yes"],
+    )
+    assert_clean_result(accepted, stdout="updated numerics for profile standard\n")
+    assert "n_families = 3" in catalog.read_text()
+
+
 def test_xray_dispersion_is_no_longer_a_selectable_field(tmp_path, monkeypatch):
     """The in-medium dispersion is unconditional physics now: no --xray-dispersion
     flag on set/add/remove, and nothing about it in ``profile show``."""

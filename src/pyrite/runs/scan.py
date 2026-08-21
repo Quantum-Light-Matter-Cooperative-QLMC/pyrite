@@ -525,8 +525,14 @@ def _resolved_run(args, material):
     if catalog_emission is not None:
         settings = replace(settings, emission=catalog_emission)
     catalog_numerics = CATALOG.profile_numerics(catalog_profile)
-    if catalog_numerics:
-        settings = replace(settings, **dict(catalog_numerics))
+    from .._numerics import TRANSPORT_KEYS
+    from ..campaign.profiles import resolve_numerics
+
+    numerics = resolve_numerics(catalog_numerics, fidelity=fidelity)
+    settings = replace(
+        settings,
+        **{key: numerics.effective[key] for key in TRANSPORT_KEYS},
+    )
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line

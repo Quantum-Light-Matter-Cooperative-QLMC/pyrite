@@ -176,6 +176,46 @@ def test_survey_profile_reduces_every_expensive_sweep_dimension():
     assert all(len(case["hkl_list"]) <= 4 for case in cases)
 
 
+def test_profile_convergence_overrides_fidelity_and_forks_identity(monkeypatch):
+    from types import MappingProxyType
+
+    from pyrite.campaign import config
+    from pyrite.materials import CATALOG
+
+    baseline = material_sweep("hopg", fidelity="survey")
+    custom = replace(
+        CATALOG,
+        profile_transport_numerics=MappingProxyType(
+            {
+                **CATALOG.profile_transport_numerics,
+                "standard": MappingProxyType(
+                    {
+                        "n_families": 3,
+                        "max_reflections": 6,
+                        "mosaic_nodes": 7,
+                        "mosaic_route": "mc",
+                    }
+                ),
+            }
+        ),
+    )
+    monkeypatch.setattr(config, "CATALOG", custom)
+
+    resolved = config.material_sweep("hopg", fidelity="survey")
+    assert resolved.n_families == 3
+    assert resolved.max_reflections == 6
+    assert resolved.mosaic_nodes == 7
+    assert resolved.mosaic_route == "mc"
+    overridden = config.material_sweep("hopg", fidelity="survey", n_families=8)
+    assert overridden.n_families == 8
+    assert (
+        dataset_identity("hopg", "survey", default_settings("survey"), resolved)["parameter_sha256"]
+        != dataset_identity("hopg", "survey", default_settings("survey"), baseline)[
+            "parameter_sha256"
+        ]
+    )
+
+
 def test_dataset_identity_is_deterministic_and_resolved_parameter_sensitive():
     settings = default_settings("survey")
     sweep = material_sweep("mose2", fidelity="survey")

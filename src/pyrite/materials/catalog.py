@@ -22,6 +22,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
+from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS, validate_profile_numerics
 from ..detectors.spec import Detector, Timepix3
 from ..energy_grid import artifacts as _grid_artifacts
 from ._catalog_decode import (
@@ -56,8 +57,7 @@ _SCAN_KEYS = (
 #: would cycle back through ``results/tables.py``'s ``from ..materials import
 #: CATALOG``.
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
-_ENERGY_MODEL_VALUES = ("frozen", "midpoint")
-_TRANSPORT_NUMERICS_KEYS = ("straggling", "energy_model", "max_dE_frac")
+_PROFILE_SCALAR_NUMERICS_KEYS = (*CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
 _MISSING_LINE_GRID_RE = re.compile(
@@ -287,8 +287,8 @@ class MaterialCatalog:
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
     profile_emissions: Mapping[str, str] = MappingProxyType({})
-    #: Explicit transport-numerics overrides, keyed by profile. Missing fields
-    #: retain the inert Numerics defaults.
+    #: Explicit scalar result-affecting numerics, keyed by profile. Electron
+    #: count grids remain on each resolved :class:`ScanSpec`.
     profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Declarative finite filter plates, resolved by the single-scene CLI path.
     #: They intentionally remain plain schema data here: importing instrument
@@ -1275,7 +1275,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "filters",
                 "physical_detector",
                 "emission",
-                *_TRANSPORT_NUMERICS_KEYS,
+                *_PROFILE_SCALAR_NUMERICS_KEYS,
                 "energy_grid_refs",
             },
         )
@@ -1302,22 +1302,14 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         emission = row.get("emission")
         if emission is not None and emission not in _EMISSION_VALUES:
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
-        straggling = row.get("straggling")
-        if straggling is not None and not isinstance(straggling, bool):
-            errors.add(f"{path}.straggling", "must be a boolean")
-        energy_model = row.get("energy_model", "frozen")
-        if energy_model not in _ENERGY_MODEL_VALUES:
-            errors.add(f"{path}.energy_model", f"must be one of {_ENERGY_MODEL_VALUES}")
-        max_dE_frac = row.get("max_dE_frac", 0.0)
-        if (
-            isinstance(max_dE_frac, bool)
-            or not isinstance(max_dE_frac, (int, float))
-            or not np.isfinite(max_dE_frac)
-            or max_dE_frac < 0.0
-        ):
-            errors.add(f"{path}.max_dE_frac", "must be finite and non-negative")
-        elif max_dE_frac > 0.0 and energy_model != "midpoint":
-            errors.add(f"{path}.max_dE_frac", "requires energy_model = 'midpoint'")
+        scalar_numerics = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
+        try:
+            validate_profile_numerics(scalar_numerics)
+        except ValueError as exc:
+            message = str(exc)
+            field = message.split(maxsplit=1)[0]
+            detail = message.removeprefix(field).strip()
+            errors.add(f"{path}.{field}", detail)
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         refs = row.get("energy_grid_refs")
@@ -1835,11 +1827,19 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("emission"), str)
     }
-    profile_transport_numerics = {
-        name: MappingProxyType({key: row[key] for key in _TRANSPORT_NUMERICS_KEYS if key in row})
-        for name, row in profiles.items()
-        if any(key in row for key in _TRANSPORT_NUMERICS_KEYS)
-    }
+    profile_transport_numerics = {}
+    for name, row in profiles.items():
+        numerics = {key: row[key] for key in _PROFILE_SCALAR_NUMERICS_KEYS if key in row}
+        for key in ("n_electrons", "n_electrons_brem"):
+            if key not in row:
+                continue
+            grid = _grid(row[key], f"profiles.{name}.{key}", errors)
+            if grid is not None:
+                numerics[key] = tuple(int(value) for value in grid)
+        if numerics:
+            profile_transport_numerics[name] = MappingProxyType(numerics)
+    if errors.items:
+        raise MaterialConfigError(errors.items, profile=profile)
     profile_filters = {
         name: cast(tuple[Mapping[str, object], ...], row["filters"])
         for name, row in profiles.items()

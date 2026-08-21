@@ -20,6 +20,14 @@ from typing import Any
 
 import numpy as np
 
+from .._numerics import (
+    PROFILE_NUMERICS_KEYS,
+    SAMPLING_KEYS,
+    Convergence,
+    Numerics,
+    electron_counts,
+    validate_profile_numerics,
+)
 from ..detectors import EnergyBins
 from ..montecarlo.case import Case
 from ..montecarlo.transport import STOPPING_MODEL
@@ -37,6 +45,63 @@ FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
 CURRENT_IDENTITY_VERSION = 1
+
+NUMERICS_GROUPS = (
+    (
+        "sampling",
+        (
+            ("n_electrons", "line electrons"),
+            ("n_electrons_brem", "bremsstrahlung electrons"),
+        ),
+    ),
+    (
+        "convergence",
+        (
+            ("n_families", "reflection families"),
+            ("max_reflections", "maximum reflections"),
+            ("mosaic_nodes", "mosaic nodes"),
+            ("mosaic_route", "mosaic route"),
+        ),
+    ),
+    (
+        "transport",
+        (
+            ("energy_model", "energy model"),
+            ("max_dE_frac", "maximum fractional energy loss"),
+            ("straggling", "straggling"),
+        ),
+    ),
+)
+
+
+@dataclass(frozen=True)
+class NumericsResolution:
+    """Explicit and effective result-affecting numerics with provenance."""
+
+    fidelity: str
+    explicit: Mapping[str, object]
+    effective: Mapping[str, object]
+    sources: Mapping[str, str]
+
+    def groups(self) -> list[dict[str, object]]:
+        """Return stable, user-facing groups for CLI and JSON output."""
+        return [
+            {
+                "name": group,
+                "fields": [
+                    {
+                        "key": key,
+                        "label": label,
+                        "explicit": self.explicit.get(key),
+                        "effective": self.effective[key],
+                        "source": self.sources[key],
+                    }
+                    for key, label in fields
+                ],
+            }
+            for group, fields in NUMERICS_GROUPS
+        ]
+
 
 # Case-dict fields excluded from the per-case content key. EVERYTHING else in a
 # resolved ``build_cases`` case dict determines the stored spec/brem arrays and
@@ -224,6 +289,61 @@ def get_fidelity_preset(name: str = "full") -> FidelityPreset:
         raise ValueError(
             f"unknown fidelity preset {name!r} (choose from {FIDELITY_NAMES})"
         ) from None
+
+
+def resolve_numerics(
+    explicit: Mapping[str, object] | None = None,
+    *,
+    fidelity: str = "full",
+    overrides: Mapping[str, object] | None = None,
+) -> NumericsResolution:
+    """Resolve run overrides over profile, fidelity, then built-in numerics."""
+    preset = get_fidelity_preset(fidelity)
+    convergence = Convergence()
+    numerics = Numerics(convergence=convergence)
+    effective: dict[str, object] = {
+        "n_electrons": preset.n_electrons,
+        "n_electrons_brem": preset.n_electrons_brem,
+        "n_families": (convergence.n_families if preset.n_families is None else preset.n_families),
+        "max_reflections": preset.max_reflections,
+        "mosaic_nodes": convergence.mosaic_nodes,
+        "mosaic_route": convergence.mosaic_route,
+        "straggling": numerics.straggling,
+        "energy_model": numerics.energy_model,
+        "max_dE_frac": numerics.max_dE_frac,
+    }
+    sources = {
+        key: (
+            "fidelity"
+            if key in SAMPLING_KEYS
+            or (key == "n_families" and preset.n_families is not None)
+            or (key == "max_reflections" and preset.max_reflections is not None)
+            else "built-in"
+        )
+        for key in PROFILE_NUMERICS_KEYS
+    }
+    normalized: dict[str, object] = {}
+    for key, value in dict(explicit or {}).items():
+        if key not in PROFILE_NUMERICS_KEYS:
+            continue
+        if key in SAMPLING_KEYS:
+            counts = electron_counts(value)
+            value = counts[0] if len(counts) == 1 else list(counts)
+        normalized[key] = value
+        effective[key] = value
+        sources[key] = "profile"
+    run_overrides = dict(overrides or {})
+    validate_profile_numerics({**normalized, **run_overrides})
+    for key, value in run_overrides.items():
+        if key in PROFILE_NUMERICS_KEYS:
+            effective[key] = value
+            sources[key] = "run"
+    return NumericsResolution(
+        fidelity=fidelity,
+        explicit=normalized,
+        effective=effective,
+        sources=sources,
+    )
 
 
 def _jsonable(value: Any) -> Any:

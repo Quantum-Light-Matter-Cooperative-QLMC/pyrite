@@ -5,12 +5,14 @@ from __future__ import annotations
 import difflib
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite.campaign import profile_edit as _profile_edit
+from pyrite.campaign.profiles import FIDELITY_NAMES, resolve_numerics
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli import json as cli_json
@@ -53,6 +55,18 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: to avoid coupling this CLI module to that private catalog constant).
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
+_MOSAIC_ROUTE_VALUES = ("analytic", "mc")
+_NUMERICS_FIELD_NAMES = {
+    "line-electrons": "n_electrons",
+    "bremsstrahlung-electrons": "n_electrons_brem",
+    "reflection-families": "n_families",
+    "maximum-reflections": "max_reflections",
+    "mosaic-nodes": "mosaic_nodes",
+    "mosaic-route": "mosaic_route",
+    "straggling": "straggling",
+    "energy-model": "energy_model",
+    "maximum-fractional-energy-loss": "max_dE_frac",
+}
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
     ("energy", "--energy", ENERGY_CSV_RANGE, "KEV,..."),
@@ -368,6 +382,150 @@ def command():
       pyrite profile rename sub_100keV sub100
       pyrite profile delete sub_100keV -y
     """
+
+
+@command.group("numerics")
+def numerics_command():
+    """Inspect and edit result-affecting calculation controls."""
+
+
+@numerics_command.command("show")
+@click.argument("name", shell_complete=_cli_completion.complete_profile)
+@click.option(
+    "--fidelity",
+    type=click.Choice(FIDELITY_NAMES),
+    default="full",
+    show_default=True,
+    help="Resolve profile values against this fidelity preset.",
+)
+@output_option
+def numerics_show_command(name, fidelity, json_output):
+    """Show explicit and effective PROFILE numerics with value sources."""
+    try:
+        _text, document = _catalog_io.catalog_text()
+        target = _profile_edit.existing_profile(document, name)
+        resolution = resolve_numerics(
+            _profile_edit.profile_numerics_values(target), fidelity=fidelity
+        )
+        groups = resolution.groups()
+        payload = {"profile": name, "fidelity": fidelity, "groups": groups}
+    except (OSError, ValueError, ParseError) as exc:
+        if json_output:
+            emit_json_result(cli_json.failure("cxr.profile.numerics.show", {}, str(exc)))
+            return 1
+        raise CLIError(str(exc)) from None
+    if json_output:
+        emit_json_result(cli_json.JsonResult("cxr.profile.numerics.show", payload))
+        return 0
+    emit_result(f"[{name} numerics; fidelity={fidelity}]")
+    for group in groups:
+        emit_result(f"{group['name']}:")
+        fields = group["fields"]
+        if not isinstance(fields, list):  # pragma: no cover - internal payload invariant
+            raise AssertionError("numerics fields must be a list")
+        for row in fields:
+            if not isinstance(row, dict):  # pragma: no cover - internal payload invariant
+                raise AssertionError("numerics field must be a mapping")
+            row = cast(dict[str, Any], row)
+            value = row["effective"]
+            display = (
+                "none"
+                if value is None
+                else str(value).lower()
+                if isinstance(value, bool)
+                else value
+            )
+            explicit = row["explicit"]
+            explicit_display = "unset" if explicit is None else explicit
+            emit_result(
+                f"  {row['label']}: {display} ({row['source']}); explicit: {explicit_display}"
+            )
+    return 0
+
+
+@numerics_command.command("set")
+@click.argument("name", shell_complete=_cli_completion.complete_profile)
+@click.option(
+    "--line-electrons", type=click.IntRange(min=1), metavar="N", help="Line-spectrum samples."
+)
+@click.option(
+    "--bremsstrahlung-electrons",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help="Bremsstrahlung samples.",
+)
+@click.option(
+    "--reflection-families",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help="Ranked reflection families to resolve.",
+)
+@click.option(
+    "--maximum-reflections",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help="Cap resolved reflections after family expansion.",
+)
+@click.option(
+    "--mosaic-nodes",
+    type=click.IntRange(min=1),
+    metavar="N",
+    help="Gauss-Hermite nodes per mosaic tilt axis.",
+)
+@click.option(
+    "--mosaic-route",
+    type=click.Choice(_MOSAIC_ROUTE_VALUES),
+    help="Mosaic broadening route.",
+)
+@click.option(
+    "--straggling/--no-straggling",
+    default=None,
+    help="Enable or disable Urban energy-loss straggling.",
+)
+@click.option(
+    "--energy-model", type=click.Choice(_ENERGY_MODEL_VALUES), help="Transport clock model."
+)
+@click.option(
+    "--maximum-fractional-energy-loss",
+    type=click.FloatRange(min=0.0),
+    metavar="FRACTION",
+    help="Cap one row's fractional mean energy loss; positive values require midpoint.",
+)
+@click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def numerics_set_command(name, yes, dry_run, **values):
+    """Set one or more explicit result-affecting controls on PROFILE."""
+    updates = {
+        _NUMERICS_FIELD_NAMES[key.replace("_", "-")]: value
+        for key, value in values.items()
+        if value is not None
+    }
+    if not updates:
+        raise click.UsageError("provide at least one numerics option")
+    try:
+        original, document = _catalog_io.catalog_text()
+        _profile_edit.set_numerics(document, name, updates)
+    except (OSError, ValueError, ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    _confirm_standard(name, "set calculation numerics on", yes, dry_run)
+    return _write(document, original, dry_run, f"updated numerics for profile {name}")
+
+
+@numerics_command.command("reset")
+@click.argument("name", shell_complete=_cli_completion.complete_profile)
+@click.argument("fields", nargs=-1, type=click.Choice(tuple(_NUMERICS_FIELD_NAMES)))
+@click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def numerics_reset_command(name, fields, yes, dry_run):
+    """Reset selected FIELDs, or every explicit numeric when none are named."""
+    keys = tuple(_NUMERICS_FIELD_NAMES[field] for field in fields)
+    try:
+        original, document = _catalog_io.catalog_text()
+        _profile_edit.reset_numerics(document, name, keys)
+    except (OSError, ValueError, ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    _confirm_standard(name, "reset calculation numerics on", yes, dry_run)
+    return _write(document, original, dry_run, f"reset numerics for profile {name}")
 
 
 @command.group("filter")

@@ -85,26 +85,26 @@ old catalogs byte-semantically and keeps the CLI contract above.
 
 ## Checklist
 
-- [ ] Confirm the canonical nested profile workflow and scope boundary with the
+- [x] Confirm the canonical nested profile workflow and scope boundary with the
   user; this task is not one-shot while that decision is open.
-- [ ] Write CLI contract tests first: help, validation, effective-value/source
+- [x] Write CLI contract tests first: help, validation, effective-value/source
   reporting, JSON envelope, dry-run, reset, standard-profile confirmation, and
   compatibility paths.
-- [ ] Add one reusable resolver that returns explicit/effective numerics plus
+- [x] Add one reusable resolver that returns explicit/effective numerics plus
   provenance for both CLI display and run lowering.
-- [ ] Extend catalog/profile validation for the missing convergence fields by
+- [x] Extend catalog/profile validation for the missing convergence fields by
   reusing `Numerics`/`Convergence` domain validation rather than duplicating it
   in Click callbacks.
-- [ ] Implement `profile numerics show|set|reset`; preserve old flags and TOML.
-- [ ] Make fidelity/profile/per-invocation precedence consistent across line and
+- [x] Implement `profile numerics show|set|reset`; preserve old flags and TOML.
+- [x] Make fidelity/profile/per-invocation precedence consistent across line and
   bremsstrahlung counts, reflection limits, and mosaic controls.
-- [ ] Include every newly configurable result-affecting value in resolved
+- [x] Include every newly configurable result-affecting value in resolved
   provenance and dataset identity without perturbing implicit-default identity.
-- [ ] Add focused catalog, profile-resolution, dataset-identity, and CLI
+- [x] Add focused catalog, profile-resolution, dataset-identity, and CLI
   regressions.
-- [ ] Update the sweep-profile/configuration guide and regenerate the CLI
+- [x] Update the sweep-profile/configuration guide and regenerate the CLI
   reference and deprecation reference if compatibility aliases are added.
-- [ ] Run focused tests, CLI suite, core suite, docs checks, and final verify.
+- [x] Run focused tests, CLI suite, core suite, docs checks, and final verify.
 
 ## Likely owners
 
@@ -146,13 +146,18 @@ old catalogs byte-semantically and keeps the CLI contract above.
   identity; execution-only tuning remains identity-neutral.
 - Generated CLI docs are current and focused CLI/core/docs/verify checks pass.
 
-## Open review decision
+## Decision
 
-Approve the proposed nested `pyrite profile numerics` workflow, or choose one
-of these narrower alternatives before dispatch:
+The user approved proceeding with the proposed nested
+`pyrite profile numerics show|set|reset` workflow on 2026-08-21. Storage remains
+compatible flat profile keys; the shared resolver provides the nested user
+model without adding named `[numerics.NAME]` objects.
 
-1. Keep `profile create|set|show` as the only commands and improve grouping,
-   help, and missing convergence options there.
-2. Introduce reusable named `[numerics.NAME]` objects attachable to profiles,
-   analogous to named beams/detectors (larger schema and lifecycle surface).
+## Implementation evidence
 
+- Focused CLI, catalog, profile-resolution, scan, identity, documentation-block,
+  lint, type, import-contract, and repository-map checks pass.
+- Real `pyrite profile numerics` help/table/JSON smokes pass.
+- Final `pyrite-dev verify` passes outside the sandbox: 3669 tests passed, 74
+  skipped; docs, generated references, skills, import contracts, lint, and
+  typecheck also pass.

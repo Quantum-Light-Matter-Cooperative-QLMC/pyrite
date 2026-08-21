@@ -156,6 +156,7 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile filter list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile filter show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile numerics show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile remove` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile set` | `--bunch-charge-pc` | `pyrite beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile set` | `--emittance` | `pyrite beam create/set --emittance` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |

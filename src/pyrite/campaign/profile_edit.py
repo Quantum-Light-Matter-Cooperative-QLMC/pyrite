@@ -11,6 +11,11 @@ import difflib
 
 import tomlkit
 
+from pyrite._numerics import (
+    PROFILE_NUMERICS_KEYS,
+    SAMPLING_KEYS,
+    validate_profile_numerics,
+)
 from pyrite.detectors.spec import Detector
 
 RANGES = {
@@ -82,6 +87,47 @@ def values_item(values):
     item = tomlkit.inline_table()
     item["values"] = values
     return item
+
+
+def profile_numerics_values(profile):
+    """Return explicit profile numerics as plain Python values."""
+    values = {}
+    for key in PROFILE_NUMERICS_KEYS:
+        if key not in profile:
+            continue
+        value = profile[key]
+        if key in SAMPLING_KEYS:
+            if not isinstance(value, dict) or not isinstance(value.get("values"), list):
+                raise ValueError(f"{key} must be a values grid")
+            value = list(value["values"])
+        elif hasattr(value, "unwrap"):
+            value = value.unwrap()
+        values[key] = value
+    return values
+
+
+def set_numerics(document, name, updates):
+    """Validate and atomically stage supplied result-affecting numerics."""
+    target = existing_profile(document, name)
+    merged = {**profile_numerics_values(target), **updates}
+    validate_profile_numerics(merged)
+    for key, value in updates.items():
+        target[key] = values_item([value]) if key in SAMPLING_KEYS else value
+    return tuple(updates)
+
+
+def reset_numerics(document, name, fields=()):
+    """Remove selected explicit numerics, or every explicit field when empty."""
+    target = existing_profile(document, name)
+    selected = tuple(fields) or PROFILE_NUMERICS_KEYS
+    removed = tuple(key for key in selected if key in target)
+    remaining = profile_numerics_values(target)
+    for key in selected:
+        remaining.pop(key, None)
+    validate_profile_numerics(remaining)
+    for key in removed:
+        target.pop(key, None)
+    return removed
 
 
 def display(values):
@@ -473,10 +519,7 @@ def _apply_transport_updates(target, updates):
     """Validate coupled transport controls, then write supplied values."""
     if not updates:
         return
-    energy_model = updates.get("energy_model", target.get("energy_model", "frozen"))
-    max_dE_frac = updates.get("max_dE_frac", target.get("max_dE_frac", 0.0))
-    if max_dE_frac > 0.0 and energy_model != "midpoint":
-        raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+    validate_profile_numerics({**profile_numerics_values(target), **updates})
     for key, value in updates.items():
         target[key] = value
 
