@@ -11,12 +11,10 @@ Slice F of ``feature/energy-loss-straggling``. Two disjoint halves:
   opaque ``TypeError``, matching the ``energy_model`` fail-closed precedent the
   task doc names. Asserted here rather than merely documented.
 
-* **Hardware parity**, gated on an actual CUDA device. Slices D, E and F all
-  ran on a machine with no ``cupy`` and no CUDA device, so the straggling code
-  in ``transport_jit_kernel.py`` has never been compiled or executed. These
-  tests are the check that transcription is correct; they are the reason the
-  slice F report can name what is unverified rather than hand-waving it. Run
-  them on a GPU box (``pyrite remote``).
+* **Hardware parity**, gated on an actual CUDA device. Slices D, E and F were
+  authored on a machine without CUDA, so these tests close the transcription
+  gap. Post-fix validation passed all five tests on an RTX 5080 with driver
+  610.47 and CuPy 14.1.1 through ``pyrite remote``.
 
 The parity claim is deliberately *not* bit-for-bit and is not stated per row.
 ``_urban_poisson_scalar`` inverts a floating-point CDF, so a last-bit libm

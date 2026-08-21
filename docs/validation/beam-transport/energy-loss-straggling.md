@@ -390,8 +390,11 @@ fluid-interpolated crossing location remains approximate as disclosed.
 The sampler is now applied by every host transport core and the exact CUDA
 kernel. The CUDA LUT combination raises rather than returning an unstraggled
 result; production selection routes a straggled CUDA run to the exact kernel.
-The CUDA implementation remains transcribed but unverified on hardware. With
-`straggling=False` (the default), every transport core remains bit-for-bit
+The exact CUDA implementation is verified on hardware: all five straggling
+tests pass on an NVIDIA GeForce RTX 5080 (driver 610.47, CuPy 14.1.1), covering
+disabled-path bit identity, deterministic replay, finite/nonnegative energy
+bookkeeping, first-row host parity, and ensemble distributional agreement.
+With `straggling=False` (the default), every transport core remains bit-for-bit
 identical to the pre-feature path and no straggling output is emitted.
 
 Except for the geometry-event tie convention, the cutoff indicator is exact
@@ -428,7 +431,7 @@ Verdict from this fresh-context post-fix verification: `rederived`. Mean
 closure, both continuum moments, inverse CDF, units, signs, $s\to0$, exact
 bounded-rate Poisson additivity, evolving-energy generator/covariance
 semantics, and the geometry-tie convention reproduce independently. The
-covariance term is not separately numerically anchored, and exact CUDA awaits
-hardware re-validation. Suggested human ledger edit: move `discrepancy` to
-`rederived` and record those two anchor qualifications. Only a human may
-adjudicate or move the claim to `signed-off`.
+covariance term is not separately numerically anchored. Exact CUDA hardware
+re-validation passes. Suggested human ledger edit: retain `rederived` and the
+covariance-anchor qualification. Only a human may adjudicate or move the claim
+to `signed-off`.

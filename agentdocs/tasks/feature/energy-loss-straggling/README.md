@@ -1081,8 +1081,8 @@ Interactions that need explicit design rather than incremental patching:
       evolving-energy process carries a same-order jump remainder and cross-step
       covariance. The cutoff section now records geometry's strict tie
       precedence rather than claiming an unqualified `>=` indicator.
-- [x] L — Discrepancy adjudication. **Implemented and independently rederived;
-      CUDA hardware validation pending.** Replaced the rounded-Gaussian
+- [x] L — Discrepancy adjudication. **Implemented, independently rederived,
+      and CUDA-verified.** Replaced the rounded-Gaussian
       high-count branch with exact bounded-rate Poisson decomposition: a mean
       above 64 is split into equal independent chunks, each sampled by stable
       inverse CDF, and counts sum exactly by Poisson additivity. CDF saturation
@@ -1095,7 +1095,8 @@ Interactions that need explicit design rather than incremental patching:
       geometry-wins equality convention. Fresh-context re-validation passed
       units, limits, signs/conventions, Poisson additivity, tail termination,
       generator/covariance semantics, and the tie convention; ledger status is
-      `rederived`. Focused sampler tests: 135 passed.
+      `rederived`. Focused sampler tests: 135 passed. All five CUDA hardware
+      tests pass on `qlmc` (RTX 5080, driver 610.47, CuPy 14.1.1).
 
 ## Decisions and open questions
 
@@ -1112,8 +1113,8 @@ Interactions that need explicit design rather than incremental patching:
   and maintained docs said this explicitly and carried status `discrepancy`.
   Slice L replaces the approximate count branch, pins the full state-dependent
   generator remainder, and retains geometry-wins equality as an explicit
-  convention. Fresh-context re-validation moved the row to `rederived`; CUDA
-  hardware validation remains separately open.
+  convention. Fresh-context re-validation moved the row to `rederived`; all
+  five CUDA hardware tests subsequently passed on `qlmc`.
 
 - **Dependency noted 2026-08-20 (supervisor):** ELSEPA elastic-scattering data
   is being set up under `feature/reference-elastic-scattering-data`. Flight
@@ -1264,10 +1265,8 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Next: CUDA validation.** Slice L implemented the exact high-count sampler and
-full state-dependent jump-generator anchor, and fresh-context re-validation is
-green with ledger status `rederived`. Run the five hardware-gated CUDA tests on
-`qlmc`, then record the hardware evidence.
+**Next: task wrap-up.** Slice L is independently rederived and CUDA-verified.
+No implementation or validation gate remains; human `signed-off` is separate.
 
 ## Slice I--K verification
 
@@ -1283,6 +1282,21 @@ green with ledger status `rederived`. Run the five hardware-gated CUDA tests on
   forkserver Unix socket; that exact test passes when run with the required
   sandbox escalation.
 - CUDA hardware behavior remains unverified locally; no numerical golden moved.
+
+## Slice L verification
+
+- Fresh-context verdict: `rederived`; units, limits, signs/conventions,
+  bounded-rate Poisson additivity, CDF-tail termination, the full evolving-energy
+  generator/covariance semantics, and cutoff tie convention match.
+- Focused straggling suite: 196 passed, 5 hardware skips locally; lint and
+  typecheck clean.
+- Full `pyrite-dev test --numba`: 3614 passed, 74 skipped after excluding three
+  stale generated-view failures fixed by ledger regeneration; the sole other
+  failure was the restricted-sandbox forkserver socket, and its exact test
+  passed with escalation. Generated ledger checks, 44 docs/dev tests, and the
+  strict docs build then passed.
+- `qlmc` CUDA hardware suite: 5 passed on NVIDIA GeForce RTX 5080, driver
+  610.47, CuPy 14.1.1. No numerical golden moved.
 
 ## Delegation slices and required skills
 
