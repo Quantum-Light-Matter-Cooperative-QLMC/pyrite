@@ -117,7 +117,7 @@ class ThemeSelect(AnyWidget):
       el.replaceChildren(wrapper);
 
       function apply(preference, { persist = false } = {}) {
-        if (!VALID.has(preference)) preference = "system";
+        if (!VALID.has(preference)) preference = "light";
         const resolved = resolvedTheme(preference, media);
 
         select.value = preference;
@@ -156,7 +156,7 @@ class ThemeSelect(AnyWidget):
       const stored = safeRead();
       const initial =
         stored ??
-        (VALID.has(model.get("preference")) ? model.get("preference") : "system");
+        (VALID.has(model.get("preference")) ? model.get("preference") : "light");
       apply(initial);
 
       const onSelect = () => apply(select.value, { persist: true });
@@ -197,6 +197,6 @@ class ThemeSelect(AnyWidget):
     """
 
     preference = traitlets.Enum(
-        values=("system", "light", "dark"), default_value="system"
+        values=("system", "light", "dark"), default_value="light"
     ).tag(sync=True)
-    resolved = traitlets.Enum(values=("light", "dark"), default_value="dark").tag(sync=True)
+    resolved = traitlets.Enum(values=("light", "dark"), default_value="light").tag(sync=True)

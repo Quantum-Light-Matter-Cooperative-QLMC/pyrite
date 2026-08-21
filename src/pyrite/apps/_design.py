@@ -339,7 +339,7 @@ def theme_switch(mo):
     return mo.ui.anywidget(ThemeSelect())
 
 
-def resolved_theme(theme_ui, fallback: str = "dark") -> str:
+def resolved_theme(theme_ui, fallback: str = "light") -> str:
     """Resolved ``light``/``dark`` value from :func:`theme_switch`."""
     state = theme_ui.value or {}
     value = state.get("resolved") if isinstance(state, Mapping) else None
@@ -352,7 +352,7 @@ def configure_matplotlib_theme(theme: str) -> str:
     marimo intentionally does not restore Matplotlib defaults when switching
     from dark to light, so the app-level switch must do that explicitly.
     """
-    mode = theme if theme in THEMES else "dark"
+    mode = theme if theme in THEMES else "light"
     try:
         import matplotlib.style
 
@@ -373,7 +373,7 @@ def apply_altair_theme(chart, theme: str):
     """
     if chart is None:
         return None
-    mode = theme if theme in THEMES else "dark"
+    mode = theme if theme in THEMES else "light"
     palette = THEMES[mode]
     chart = (
         chart.configure(background=palette["surface"])
@@ -480,7 +480,7 @@ def _theme_plotly_colorbar(colorbar, *, text: str, surface: str, rule: str, mode
 
 def apply_plotly_theme(fig, theme: str):
     """Apply the shared palette to Plotly, including 2D/3D text and colorbars."""
-    mode = theme if theme in THEMES else "dark"
+    mode = theme if theme in THEMES else "light"
     palette = THEMES[mode]
     text = palette["text"]
     surface = palette["surface"]
