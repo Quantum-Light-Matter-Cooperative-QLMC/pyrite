@@ -1346,6 +1346,53 @@ def mc_spectrum(
                     row_total += (xp.abs(field) ** 2).sum(axis=0)
             return row_total
 
+        def _coherent_jit_grouped_row(elec_id_sel, per_line_sel, L_esc_sel, out):
+            """sum_e |sum_{j in e} E_j|^2 for one row on the float32 CUDA-JIT
+            reduction kernel -- the device counterpart of
+            ``_coherent_electron_grouped_row`` above.
+
+            No new device code is needed: ``run_coherent_reduction_kernel``
+            already computes |sum of the lines it is handed|^2 and ACCUMULATES
+            (``spec[k] += wm * ...``), so calling it once per electron over that
+            electron's own lines, with ``mosaic_weight=1``, into one zeroed
+            buffer sums the per-electron squares exactly. The cost is Ne extra
+            launches per row (the segments themselves are still touched once in
+            total); the mosaic weight is applied outside, by the blend.
+
+            ``per_line_sel`` is the 8-tuple the kernel takes (E_r, a_width,
+            phase_slope, g_phase, and the two complex polarization coefficients
+            split into real/imag), already restricted to this row's kept lines
+            and sharing one length with ``elec_id_sel``/``L_esc_sel``."""
+            from .coherent_jit_kernel import (
+                DEFAULT_COHERENT_KERNEL_CONFIG,
+                run_coherent_reduction_kernel,
+            )
+
+            gid = _to_cpu(elec_id_sel)
+            if gid.size == 0:
+                return out
+            perm = np.argsort(gid, kind="stable")
+            gid = gid[perm]
+            starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
+            bounds = np.append(starts, gid.size)
+            perm_xp = xp.asarray(perm)
+            cols = [xp.ascontiguousarray(a[perm_xp], dtype=REAL) for a in per_line_sel]
+            L_p = xp.ascontiguousarray(L_esc_sel[perm_xp], dtype=REAL)
+            E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
+            dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
+            for b0, b1 in zip(bounds[:-1], bounds[1:], strict=True):
+                sl = slice(int(b0), int(b1))
+                run_coherent_reduction_kernel(
+                    *(c[sl] for c in cols),
+                    E_grid_c,  # ty: ignore[too-many-positional-arguments]
+                    out=out,
+                    mosaic_weight=1.0,
+                    L_esc=L_p[sl],
+                    delta_omega=dom_c,
+                    config=DEFAULT_COHERENT_KERNEL_CONFIG,
+                )
+            return out
+
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
@@ -1578,13 +1625,14 @@ def mc_spectrum(
             # directly in a raw kernel. This avoids materializing the dense
             # complex SP[segment, energy] matrix and avoids both complex GEMVs.
             # The exact CuPy path below remains the fallback for CPU/other
-            # backends, float64, sinc_cutoff windowing, and (new) a nonzero
-            # bunch_length_fs/beam_fwhm_mm -- the fused kernel squares one
-            # realization internally with no electron-grouped floor to blend
-            # against, so it is only correct in the degenerate (offset-free)
-            # limit. Falling back here trades the float32 kernel's speed for
-            # correctness on this path; native kernel support for the
-            # decoherence blend is unimplemented (follow-up).
+            # backends, float64, and sinc_cutoff windowing. A nonzero
+            # bunch_length_fs/beam_fwhm_mm stays ON the kernel: the fused
+            # kernel squares whatever line set it is handed and ACCUMULATES,
+            # so the electron-grouped floor sum_e|S_e|^2 is just one call per
+            # electron into a zeroed buffer (``_coherent_jit_grouped_row``),
+            # and |sum_e S_e|^2 is the same single call this path already
+            # makes -- both on the geometric (offset-free) phase, blended by
+            # F(row, E) outside the kernel.
             # The reduction kernel folds the vacuum phase as ``slope_j * E``, a
             # single per-line scalar against the energy axis. The in-medium term
             # is a SECOND (per-segment scalar) x (per-energy table) product, so
@@ -1595,7 +1643,6 @@ def mc_spectrum(
                 and getattr(xp, "__name__", "") == "cupy"
                 and np.dtype(REAL) == np.dtype(np.float32)
                 and sinc_cutoff is None
-                and not decoherence_active
             )
             if _use_jit_coherent_reduction:
                 from .coherent_jit_kernel import (
@@ -1606,7 +1653,7 @@ def mc_spectrum(
                 sel = xp.flatnonzero(good)
                 if sel.size:
                     c_s, c_p = coefs
-                    run_coherent_reduction_kernel(
+                    per_line_sel = (
                         xp.ascontiguousarray(E_r[sel], dtype=REAL),
                         xp.ascontiguousarray(a_width[sel], dtype=REAL),
                         xp.ascontiguousarray(d[sel] / HBARC_EV_ANG, dtype=REAL),
@@ -1615,13 +1662,31 @@ def mc_spectrum(
                         xp.ascontiguousarray(c_s[sel].imag, dtype=REAL),
                         xp.ascontiguousarray(c_p[sel].real, dtype=REAL),
                         xp.ascontiguousarray(c_p[sel].imag, dtype=REAL),
-                        xp.ascontiguousarray(E_grid, dtype=REAL),
-                        out=spec,
-                        mosaic_weight=wm,
-                        L_esc=xp.ascontiguousarray(L_esc[sel], dtype=REAL),
-                        delta_omega=xp.ascontiguousarray(delta_omega_grid, dtype=REAL),
+                    )
+                    L_esc_sel = xp.ascontiguousarray(L_esc[sel], dtype=REAL)
+                    E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
+                    dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
+                    # Decoherence-inactive: unchanged single fused call
+                    # straight into spec with the row's mosaic weight.
+                    out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
+                    run_coherent_reduction_kernel(
+                        *per_line_sel,
+                        E_grid_c,
+                        out=out_flat,
+                        mosaic_weight=1.0 if decoherence_active else wm,
+                        L_esc=L_esc_sel,
+                        delta_omega=dom_c,
                         config=DEFAULT_COHERENT_KERNEL_CONFIG,
                     )
+                    if decoherence_active:
+                        grouped_total = _coherent_jit_grouped_row(
+                            seg_elec_id[idx][sel],
+                            per_line_sel,
+                            L_esc_sel,
+                            xp.zeros(E_grid.size, dtype=REAL),
+                        )
+                        F_row = _row_decoherence_factor(g_vec_d)
+                        spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm
                 return
 
             fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
@@ -1993,7 +2058,6 @@ def mc_spectrum(
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
             and sinc_cutoff is None
-            and not decoherence_active
         )
         if _use_jit_coherent_stream:
             from .coherent_stream_jit_kernel import (
@@ -2018,10 +2082,85 @@ def mc_spectrum(
             # The in-medium prologue builds the sinc half-width per (segment, g)
             # from the in-medium denominator, so it cannot be hoisted per segment
             # the way a vacuum k = omega kernel would (``aw_seg`` stays unset).
-            _coh_phase_slope = xp.ascontiguousarray(d_all / HBARC_EV_ANG, dtype=REAL)
+            # Geometric-only (offset-free) phase, matching _accumulate's 7c and
+            # the batched fallback below: identical to d_all/seg_r when no
+            # decoherence-relevant offset is configured, so this is a no-op swap
+            # in that (default) case. See the
+            # coherent-inter-electron-decoherence block above.
+            _coh_phase_slope = xp.ascontiguousarray(d_all_geom / HBARC_EV_ANG, dtype=REAL)
             coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
+
+            def _stream_segment_block(sel, n_sel):
+                """Prologue + field accumulation for ONE segment selection into
+                the persistent ``coherent_fields`` planes.
+
+                ``sel`` is a contiguous slice on the ordinary (flat) pass and an
+                electron's segment index array on the decoherence grouped pass;
+                the kernels only ever see a compact block either way."""
+                _nsys_push("cxr.lines.coherent_prologue")
+                coh_line_data = run_coherent_prologue_kernel(
+                    v_all[sel].reshape(-1),
+                    denom_full[sel].reshape(-1),
+                    gamma_full[sel].reshape(-1),
+                    t_L_full[sel].reshape(-1),
+                    L_esc_full[sel].reshape(-1),
+                    line_electron[sel],
+                    seg_r_geom[sel].reshape(-1),
+                    _coh_phase_slope[sel],
+                    _coh_g,
+                    _coh_es,
+                    _coh_ep,
+                    E_tab_g,
+                    _coh_chi_re,
+                    _coh_chi_im,
+                    _coh_u_re,
+                    _coh_u_im,
+                    log_mu_tab_g,
+                    lo_keep=lo_keep,
+                    hi_keep=hi_keep,
+                    hbarc=HBARC_EV_ANG,
+                    root_rtol=_RESONANCE_ROOT_RTOL,
+                    electron_mass_eV=1.0,  # U tables are already U_g/m_e
+                    alpha_fs=ALPHA_FS,
+                    pref_c1=_PREF_C1,
+                    n_hat=n_hat,
+                    n_g=N_g,
+                    g2=_coh_g2,
+                    n_dot_g=_coh_n_dot_g,
+                    g_dot_es=_coh_g_dot_es,
+                    g_dot_ep=_coh_g_dot_ep,
+                    v_dot_n=v_dot_n_all[sel],
+                    n_re_tab=n_re_tab_g,
+                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                )
+                _nsys_pop()
+                _nsys_push("cxr.lines.coherent_field")
+                run_coherent_field_accumulation_kernel(
+                    *coh_line_data,
+                    E_grid,  # ty: ignore[too-many-positional-arguments]
+                    fields=coherent_fields,
+                    n_g=N_g,
+                    n_seg=n_sel,
+                    # g-independent, so it stays segment-sized here even though
+                    # the prologue's other outputs are pair-sized.
+                    L_esc=L_esc_full[sel].reshape(-1),
+                    delta_omega=delta_omega_grid,
+                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                )
+                _nsys_pop()
+                del coh_line_data  # release scratch before the next block allocates
+
+            def _stream_field_mag2():
+                """|f_s|^2 + |f_p|^2 of the current field planes, as (N_g, n_E).
+
+                Deliberately NOT ``finalize_coherent_fields``: that kernel folds
+                the mosaic-weighted sum over rows into ``spec`` in the same
+                pass, but F depends on the row (through q_perp = (omega n + g)_perp)
+                and must multiply BEFORE the rows are summed."""
+                mag2 = sum(plane * plane for plane in coherent_fields)
+                return mag2.reshape(N_g, E_grid.size)
         else:
-            coherent_fields = None
+            coherent_fields = ()
 
         # Existing per-row coherent reducer remains the compatibility fallback for
         # non-streaming coherent execution (e.g. disabling the experimental stage).
@@ -2031,7 +2170,6 @@ def mc_spectrum(
             and _USE_JIT_COHERENT_REDUCTION
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
-            and not decoherence_active
         )
         if _use_jit_coherent_reduction:
             from .coherent_jit_kernel import (
@@ -2091,58 +2229,7 @@ def mc_spectrum(
             sb = slice(s0, min(s0 + seg_block, n_seg))
 
             if _use_jit_coherent_stream:
-                _nsys_push("cxr.lines.coherent_prologue")
-                coh_line_data = run_coherent_prologue_kernel(
-                    v_all[sb].reshape(-1),
-                    denom_full[sb].reshape(-1),
-                    gamma_full[sb].reshape(-1),
-                    t_L_full[sb].reshape(-1),
-                    L_esc_full[sb].reshape(-1),
-                    line_electron[sb],
-                    seg_r[sb].reshape(-1),
-                    _coh_phase_slope[sb],
-                    _coh_g,
-                    _coh_es,
-                    _coh_ep,
-                    E_tab_g,
-                    _coh_chi_re,
-                    _coh_chi_im,
-                    _coh_u_re,
-                    _coh_u_im,
-                    log_mu_tab_g,
-                    lo_keep=lo_keep,
-                    hi_keep=hi_keep,
-                    hbarc=HBARC_EV_ANG,
-                    root_rtol=_RESONANCE_ROOT_RTOL,
-                    electron_mass_eV=1.0,  # U tables are already U_g/m_e
-                    alpha_fs=ALPHA_FS,
-                    pref_c1=_PREF_C1,
-                    n_hat=n_hat,
-                    n_g=N_g,
-                    g2=_coh_g2,
-                    n_dot_g=_coh_n_dot_g,
-                    g_dot_es=_coh_g_dot_es,
-                    g_dot_ep=_coh_g_dot_ep,
-                    v_dot_n=v_dot_n_all[sb],
-                    n_re_tab=n_re_tab_g,
-                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
-                )
-                _nsys_pop()
-                _nsys_push("cxr.lines.coherent_field")
-                run_coherent_field_accumulation_kernel(
-                    *coh_line_data,
-                    E_grid,  # ty: ignore[too-many-positional-arguments]
-                    fields=coherent_fields,
-                    n_g=N_g,
-                    n_seg=sb.stop - sb.start,
-                    # g-independent, so it stays segment-sized here even though
-                    # the prologue's other outputs are pair-sized.
-                    L_esc=L_esc_full[sb].reshape(-1),
-                    delta_omega=delta_omega_grid,
-                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
-                )
-                _nsys_pop()
-                del coh_line_data  # release scratch before the next block allocates
+                _stream_segment_block(sb, sb.stop - sb.start)
                 continue
 
             vx = v_all[sb, 0][:, None]  # (nb, 1)F
@@ -2346,13 +2433,46 @@ def mc_spectrum(
 
         if _use_jit_coherent_stream:
             _nsys_push("cxr.lines.coherent_finalize")
-            finalize_coherent_fields(
-                coherent_fields,
-                WM.reshape(-1),
-                out=spec,
-                n_g=N_g,
-                config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
-            )
+            if decoherence_active:
+                # The planes now hold |sum_e S_e| per row (the "flat" term);
+                # snapshot its magnitude before the grouped passes reuse them.
+                flat_mag2 = _stream_field_mag2()
+                # sum_e |S_e|^2 with no new device code: re-stream one
+                # electron's segments at a time into the SAME planes (zeroed
+                # first) and square. Every segment is still touched once in
+                # total across the electron loop; the extra cost is Ne
+                # zero+square passes over the (N_g, n_E) planes plus Ne kernel
+                # launch pairs, traded for keeping this path on the fused
+                # float32 kernels instead of the dense-matrix CuPy fallback.
+                grouped_mag2 = xp.zeros((N_g, E_grid.size), dtype=REAL)
+                elec_cpu = _to_cpu(seg_elec_id)
+                order = np.argsort(elec_cpu, kind="stable")
+                gid_e = elec_cpu[order]
+                order = order[gid_e < Ne]  # secondaries never radiate a line
+                gid_e = gid_e[gid_e < Ne]
+                if gid_e.size:
+                    e_starts = np.flatnonzero(np.concatenate(([True], gid_e[1:] != gid_e[:-1])))
+                    e_bounds = np.append(e_starts, gid_e.size)
+                    for b0, b1 in zip(e_bounds[:-1], e_bounds[1:], strict=True):
+                        idx_e = order[int(b0) : int(b1)]
+                        for plane in coherent_fields:
+                            plane.fill(0)
+                        for j0 in range(0, idx_e.size, seg_block):
+                            sub = xp.asarray(idx_e[j0 : j0 + seg_block])
+                            _stream_segment_block(sub, int(sub.size))
+                        grouped_mag2 += _stream_field_mag2()
+                # F PER ROW, before the incoherent row sum.
+                F_rows = xp.stack([_row_decoherence_factor(G[i_row]) for i_row in range(N_g)])
+                blended = (1.0 - F_rows) * grouped_mag2 + F_rows * flat_mag2
+                spec[:] += (WM.reshape(-1)[:, None] * blended).sum(axis=0)
+            else:
+                finalize_coherent_fields(
+                    coherent_fields,
+                    WM.reshape(-1),
+                    out=spec,
+                    n_g=N_g,
+                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                )
             _nsys_pop()
         elif coherent:
             # -- 7c. per-(reflection, orientation) coherent reduction ----------
@@ -2387,22 +2507,26 @@ def mc_spectrum(
                 elec_id_i = row[9]  # emitting electron id (decoherence_active only)
                 wm_i = float(wm_rows[i_row])
                 if _use_jit_coherent_reduction:
+                    per_line_i = (E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi)
+                    out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
                     run_coherent_reduction_kernel(
-                        E_r_i,
-                        aw_i,
-                        ps_i,
-                        gp_i,
-                        csr,
-                        csi,
-                        cpr,
-                        cpi,
+                        *per_line_i,
                         E_grid,
-                        out=spec,
-                        mosaic_weight=wm_i,
+                        out=out_flat,
+                        mosaic_weight=1.0 if decoherence_active else wm_i,
                         L_esc=L_i,
                         delta_omega=delta_omega_grid,
                         config=DEFAULT_COHERENT_KERNEL_CONFIG,
                     )
+                    if decoherence_active:
+                        grouped_total = _coherent_jit_grouped_row(
+                            elec_id_i,
+                            per_line_i,
+                            L_i,
+                            xp.zeros(E_grid.size, dtype=REAL),
+                        )
+                        F_row = _row_decoherence_factor(G[i_row])
+                        spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm_i
                     continue
                 f_s = xp.zeros(E_grid.size, dtype=cdtype)
                 f_p = xp.zeros(E_grid.size, dtype=cdtype)
