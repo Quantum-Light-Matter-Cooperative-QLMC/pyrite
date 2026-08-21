@@ -1,8 +1,6 @@
 # PyRITE
 
-**a Python toolkit for Radiation from Interactions and Transport of Electrons**
-
-**Coherent X-ray radiation and electron transport in crystals.**
+a **Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons
 
 PyRITE predicts narrow, tunable X-ray lines from ~30–60 keV electrons in
 crystals, plus detector-visible flux. Active question: expected line flux and
@@ -72,7 +70,6 @@ generated-file locations, removal, and troubleshooting.
 
 Base `pyrite-xray` is CPU-only. Install exactly one accelerator extra in a clean
 environment:
-
 
 | Hardware | Install                                      | Backend                |
 | ---------- | ---------------------------------------------- | ------------------------ |
