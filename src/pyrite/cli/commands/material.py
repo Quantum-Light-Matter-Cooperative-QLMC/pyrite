@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import difflib
+from dataclasses import replace
+from pathlib import Path
 
 import click
+import numpy as np
 import tomlkit
 from tomlkit.exceptions import ParseError
 
@@ -23,6 +26,8 @@ from pyrite.cli._core import (
     flatten_option_values,
     output_option,
 )
+from pyrite.cli._deprecations import RetiredOption
+from pyrite.cli.commands._filter_shared import filter_from_row, physical_detector_from_row
 
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
 
@@ -37,6 +42,133 @@ _COMMAND_HELP = {
     "energy-grid": "Derive and inspect detector energy-grid inputs.",
     "validate": "Validate a material catalog without starting simulation.",
 }
+
+
+def _one(values, label):
+    values = np.asarray(values)
+    if values.size != 1:
+        raise ValueError(
+            f"material simulate requires profile {label!r} to resolve one value; "
+            "use a profile with singleton thickness, energy, polar, and azimuth grids"
+        )
+    return float(values.item())
+
+
+def _simulation_scene(document, material, profile_name):
+    """Resolve one profile case without constructing a Sweep or checkpoint."""
+    from pyrite.campaign import Beam, Numerics
+    from pyrite.campaign.longitudinal import LongitudinalDistribution
+    from pyrite.campaign.sweep import beam_replace, target_from_flat
+    from pyrite.campaign.transverse import TransverseDistribution
+    from pyrite.detectors import EnergyBins
+    from pyrite.instrument import PixelScorer
+    from pyrite.materials import load_material_catalog
+
+    _catalog_io.existing_profile(document, profile_name)
+    catalog = load_material_catalog(_catalog_io._MATERIALS_TOML, profile=profile_name)
+    try:
+        spec = catalog.material(material)
+    except KeyError:
+        _unknown_material(document, material)
+    membership = catalog.profile_materials(profile_name)
+    if membership is not None and material not in membership:
+        raise ValueError(f"material {material!r} is not a member of profile {profile_name!r}")
+    scan = spec.scan
+    energy = _one(scan.energy_keV, profile_name)
+    beam = Beam(energy_keV=energy)
+    fields = catalog.profile_beam(profile_name)
+    if fields:
+        changes = dict(fields)
+        if (longitudinal := changes.get("longitudinal")) is not None:
+            changes["longitudinal"] = LongitudinalDistribution(**dict(longitudinal))
+        if (transverse := changes.get("transverse")) is not None:
+            changes["transverse"] = TransverseDistribution(**dict(transverse))
+            changes.setdefault("transverse_fwhm_x_mm", None)
+            changes.setdefault("transverse_fwhm_y_mm", None)
+        beam = beam_replace(beam, **changes)
+    target = target_from_flat(
+        spec.crystal_key,
+        thickness_ang=_one(scan.thickness_ang, profile_name),
+        tilt_deg=_one(scan.tilt_deg, profile_name),
+        tilt_azim_deg=_one(scan.tilt_azim_deg, profile_name),
+        substrate=spec.substrate,
+        stack=spec.stack or None,
+    )
+    physical = catalog.profile_physical_detectors.get(
+        profile_name, catalog.profile_physical_detectors.get("standard")
+    )
+    if physical is None:
+        raise ValueError(
+            "material simulate requires [profiles.NAME.physical_detector]; "
+            "add one with 'pyrite profile filter add ... --detector-distance-mm MM'"
+        )
+    detector = physical_detector_from_row(physical)
+    detector = replace(
+        detector,
+        energy_bins=EnergyBins(
+            line=scan.E_grid_line,
+            line_by_energy=scan.E_grid_line_by_energy,
+            brem=scan.E_grid_brem,
+        ),
+    )
+    filters = tuple(filter_from_row(row) for row in catalog.profile_filters.get(profile_name, ()))
+    transport = catalog.profile_numerics(profile_name) or {}
+    numerics_values = dict(transport)
+    if scan.n_electrons is not None:
+        numerics_values["n_electrons"] = int(_one(scan.n_electrons, profile_name))
+    if scan.n_electrons_brem is not None:
+        numerics_values["n_electrons_brem"] = int(_one(scan.n_electrons_brem, profile_name))
+    return (
+        beam,
+        target,
+        detector,
+        filters,
+        PixelScorer(),
+        Numerics(**numerics_values),
+        catalog.profile_emission(profile_name) or "incoherent",
+    )
+
+
+def _simulation_payload(material, profile_name, result):
+    spatial = result.spatial
+    assert spatial is not None
+    return {
+        "material": material,
+        "profile": profile_name,
+        "line": {
+            "energy_eV": result.energy_eV.tolist(),
+            "density_per_sr": result.spectrum.tolist(),
+        },
+        "background": {
+            "energy_eV": result.background_energy_eV.tolist(),
+            "density_per_sr": result.background.tolist(),
+        },
+        "pixel_grid": {
+            "shape": list(spatial.ray_map.tile_index.shape),
+            "angular_shape": list(np.unique(spatial.ray_map.tile_index).shape),
+            "filter_count": int(spatial.ray_map.path_length_mm.shape[2]),
+        },
+        "observation_identity_digest": result.provenance["observation_identity_digest"],
+    }
+
+
+def _write_simulation_artifact(path, result):
+    if path.exists():
+        raise ValueError(f"output file already exists: {path}")
+    spatial = result.spatial
+    assert spatial is not None
+    np.savez_compressed(
+        path,
+        line_energy_eV=result.energy_eV,
+        line_density_per_sr=result.spectrum,
+        background_energy_eV=result.background_energy_eV,
+        background_density_per_sr=result.background,
+        tile_index=spatial.ray_map.tile_index,
+        solid_angle_sr=spatial.ray_map.solid_angle_sr,
+        path_length_mm=spatial.ray_map.path_length_mm,
+        line_intrinsic_by_tile=spatial.line.intrinsic_by_tile,
+        line_mu_by_filter_inv_mm=spatial.line.mu_by_filter_inv_mm,
+    )
 
 
 def _unknown_material(document, material):
@@ -204,6 +336,102 @@ def command():
     Profile membership remains under ``pyrite profile members``. ``validate``
     checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
     """
+
+
+@command.command("simulate")
+@click.argument("material", shell_complete=_cli_completion.complete_material)
+@click.option(
+    "--profile",
+    "profile_name",
+    default=_catalog_io.DEFAULT_PROFILE,
+    show_default=True,
+    shell_complete=_cli_completion.complete_profile,
+    help="Resolve one scene from profile NAME.",
+)
+@click.option(
+    "-o",
+    "--output",
+    "output_format",
+    type=click.Choice(("table", "json", "wide")),
+    default="table",
+    show_default=True,
+    is_eager=True,
+    help="Output format; json is the stable automation contract.",
+)
+@click.option(
+    "--json",
+    cls=RetiredOption,
+    dest="output_format",
+    replacement="--output json",
+    is_flag=True,
+    flag_value="json",
+)
+@click.option(
+    "--output-file",
+    type=click.Path(path_type=Path, dir_okay=False, writable=True),
+    help="Write full factorized spatial arrays as a new compressed .npz file.",
+)
+def simulate_command(material, profile_name, output_format, output_file):
+    """Simulate one material/profile scene on its physical detector.
+
+    This is intentionally filesystem-free except for an explicit --output-file:
+    it calls the public single-scene API and does not create a sweep or checkpoint.
+    """
+    schema = "cxr.material.simulate"
+    try:
+        _text, document = _catalog_io.catalog_text()
+        beam, target, detector, filters, scorer, numerics, emission = _simulation_scene(
+            document, material, profile_name
+        )
+        from pyrite.api import simulate
+
+        result = simulate(
+            beam,
+            target,
+            detector,
+            numerics=numerics,
+            emission=emission,
+            filters=filters,
+            pixel_scorer=scorer,
+        )
+        if output_file is not None:
+            _write_simulation_artifact(output_file, result)
+        payload = _simulation_payload(material, profile_name, result)
+        if output_file is not None:
+            payload["output_file"] = str(output_file)
+    except (OSError, ValueError, ParseError) as exc:
+        if output_format == "json":
+            emit_json_result(cli_json.failure(schema, {}, str(exc)))
+            return 1
+        raise CLIError(str(exc)) from None
+    if output_format == "json":
+        emit_json_result(cli_json.JsonResult(schema, payload))
+        return 0
+    if output_format == "wide":
+        emit_result(
+            f"material={material}\tprofile={profile_name}\tline_samples={len(result.energy_eV)}\t"
+            f"background_samples={len(result.background_energy_eV)}\t"
+            f"pixel_shape={tuple(payload['pixel_grid']['shape'])}\t"
+            f"filters={payload['pixel_grid']['filter_count']}"
+        )
+    else:
+        emit_result(f"{material}: profile {profile_name}")
+        emit_result("  component  samples  energy range (eV)")
+        emit_result(
+            f"  line       {len(result.energy_eV):7d}  {result.energy_eV[0]:g} .. {result.energy_eV[-1]:g}"
+        )
+        emit_result(
+            "  background "
+            f"{len(result.background_energy_eV):7d}  {result.background_energy_eV[0]:g} .. "
+            f"{result.background_energy_eV[-1]:g}"
+        )
+        emit_result(
+            f"  pixel grid {tuple(payload['pixel_grid']['shape'])}; "
+            f"filters: {payload['pixel_grid']['filter_count']}"
+        )
+        if output_file is not None:
+            emit_result(f"  full arrays: {output_file}")
+    return 0
 
 
 @command.command("show")

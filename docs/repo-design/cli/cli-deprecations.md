@@ -133,6 +133,7 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite material energy-grid line show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite material energy-grid show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite material show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite material simulate` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile create` | `--bunch-charge-pc` | `pyrite beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
 | `pyrite profile create` | `--emittance` | `pyrite beam create/set --emittance` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |
@@ -152,6 +153,8 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile energy-grid defaults` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile energy-grid defaults` | `--set` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile energy-grid defaults` | `--tilts` | `--polar` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile filter list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `pyrite profile filter show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile remove` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile set` | `--bunch-charge-pc` | `pyrite beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`. |

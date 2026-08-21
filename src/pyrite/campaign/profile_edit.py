@@ -114,6 +114,24 @@ def energy_grid_refs(profile):
     return {material: str(refs[material]) for material in sorted(refs)}
 
 
+def filter_rows(profile):
+    filters = profile.get("filters", [])
+    if not isinstance(filters, list) or not all(isinstance(row, dict) for row in filters):
+        raise ValueError("profile filters must be an array of tables")
+    return filters
+
+
+def physical_detector_row(profile, profiles):
+    """Return the selected physical detector, inheriting ``standard``."""
+    physical = profile.get("physical_detector")
+    if physical is None and profile is not profiles.get("standard"):
+        standard = profiles.get("standard", {})
+        physical = standard.get("physical_detector") if isinstance(standard, dict) else None
+    if physical is not None and not isinstance(physical, dict):
+        raise ValueError("profile physical_detector must be a table")
+    return physical
+
+
 def profile_payload(document, name):
     profile = existing_profile(document, name)
     profiles = profile_rows(document)
@@ -139,6 +157,10 @@ def profile_payload(document, name):
     detector = Detector(
         **{key: value for key, value in raw_detector.items() if key in active_detector_keys}
     )
+    filters = [
+        dict(row.unwrap() if hasattr(row, "unwrap") else row) for row in filter_rows(profile)
+    ]
+    physical = physical_detector_row(profile, profiles)
     return {
         "name": name,
         "ranges": [
@@ -151,6 +173,12 @@ def profile_payload(document, name):
         "beam_ref": beam_ref,
         "detector_ref": detector_ref,
         "detector": {key: getattr(detector, key) for key, _label, _unit in ACTIVE_DETECTOR_FIELDS},
+        "filters": filters,
+        "physical_detector": (
+            None
+            if physical is None
+            else dict(physical.unwrap() if hasattr(physical, "unwrap") else physical)
+        ),
         "emission": profile.get("emission"),
         "transport_numerics": {
             key: profile[key]
@@ -164,6 +192,40 @@ def profile_payload(document, name):
         },
         "energy_grid_refs": energy_grid_refs(profile),
     }
+
+
+def add_filter(document, profile_name, row, physical_detector=None):
+    profile = existing_profile(document, profile_name)
+    filters = filter_rows(profile)
+    name = row.get("name")
+    if name is not None and any(existing.get("name") == name for existing in filters):
+        raise ValueError(f"profile {profile_name!r} already has a filter named {name!r}")
+    if "filters" not in profile:
+        profile["filters"] = tomlkit.aot()
+        filters = profile["filters"]
+    filters.append(row)
+    if physical_detector is not None:
+        profile["physical_detector"] = physical_detector
+
+
+def remove_filter(document, profile_name, identifier):
+    profile = existing_profile(document, profile_name)
+    filters = filter_rows(profile)
+    index = None
+    if identifier.isdigit():
+        candidate = int(identifier) - 1
+        if 0 <= candidate < len(filters):
+            index = candidate
+    if index is None:
+        index = next((i for i, row in enumerate(filters) if row.get("name") == identifier), None)
+    if index is None:
+        raise ValueError(
+            f"profile {profile_name!r} has no filter {identifier!r}; use 'pyrite profile filter list {profile_name}'"
+        )
+    removed = filters.pop(index)
+    if not filters:
+        profile.pop("filters", None)
+    return dict(removed.unwrap() if hasattr(removed, "unwrap") else removed)
 
 
 def clone_grid(value):

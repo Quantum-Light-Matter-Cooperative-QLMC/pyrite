@@ -41,6 +41,12 @@ from pyrite.cli.commands._detector_shared import (
 from pyrite.cli.commands._detector_shared import (
     detector_cli_options as _detector_cli_options,
 )
+from pyrite.cli.commands._filter_shared import (
+    filter_cli_options,
+    filter_row,
+    physical_detector_cli_options,
+    physical_detector_row,
+)
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
@@ -234,6 +240,33 @@ def _emit_show(payload):
         value = payload["detector"][key]
         display = "unspecified" if value is None else f"{value:g} {unit}"
         emit_result(f"    {label}: {display}")
+    physical = payload["physical_detector"]
+    if physical is None:
+        emit_result("  physical detector: none")
+    else:
+        emit_result("  physical detector:")
+        for key in (
+            "distance_mm",
+            "polar_deg",
+            "azimuth_deg",
+            "roll_deg",
+            "offset_mm",
+            "shape",
+            "pitch_mm",
+        ):
+            if key in physical:
+                emit_result(f"    {key}: {physical[key]}")
+    filters = payload["filters"]
+    if not filters:
+        emit_result("  filters: none")
+    else:
+        emit_result("  filters:")
+        for index, row in enumerate(filters, start=1):
+            label = row.get("name") or f"#{index}"
+            emit_result(
+                f"    {label}: {row.get('material')}, {row.get('thickness_mm'):g} mm, "
+                f"{tuple(row.get('size_mm', ()))} mm"
+            )
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
     numerics = payload["transport_numerics"]
     emit_result(f"  straggling: {numerics.get('straggling', False)}")
@@ -335,6 +368,131 @@ def command():
       pyrite profile rename sub_100keV sub100
       pyrite profile delete sub_100keV -y
     """
+
+
+@command.group("filter")
+def filter_command():
+    """Manage finite FilterPlate objects on a profile.
+
+    ``add`` validates its plate through the public ``FilterPlate`` dataclass.
+    Supply ``--detector-distance-mm`` (and optionally ``--shape`` or
+    ``--pitch-mm``) to create or replace the profile's physical pixel detector.
+    Filters need that detector when running ``pyrite material simulate``.
+    """
+
+
+@filter_command.command("add")
+@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
+@filter_cli_options
+@physical_detector_cli_options
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def filter_add_command(profile_name, dry_run, **values):
+    """Add one finite filter plate to PROFILE."""
+    try:
+        original, document = _catalog_io.catalog_text()
+        row = filter_row(
+            name=values["name"],
+            material=values["material"],
+            thickness_mm=values["thickness_mm"],
+            size_mm=values["size_mm"],
+            distance_mm=values["distance_mm"],
+            polar_deg=values["polar_deg"],
+            azimuth_deg=values["azimuth_deg"],
+            roll_deg=values["roll_deg"],
+            offset_mm=values["offset_mm"],
+        )
+        detector = physical_detector_row(**values)
+        _profile_edit.add_filter(document, profile_name, row, detector)
+    except (OSError, ValueError, ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    return _write(document, original, dry_run, f"added filter to profile {profile_name}")
+
+
+def _filter_payload(document, profile_name):
+    profile = _profile_edit.existing_profile(document, profile_name)
+    rows = _profile_edit.filter_rows(profile)
+    return {
+        "profile": profile_name,
+        "filters": [
+            {"index": index, **dict(row.unwrap() if hasattr(row, "unwrap") else row)}
+            for index, row in enumerate(rows, start=1)
+        ],
+    }
+
+
+@filter_command.command("list")
+@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
+@output_option
+def filter_list_command(profile_name, json_output):
+    """List PROFILE's finite filter plates."""
+    try:
+        _text, document = _catalog_io.catalog_text()
+        payload = _filter_payload(document, profile_name)
+    except (OSError, ValueError, ParseError) as exc:
+        if json_output:
+            emit_json_result(cli_json.failure("cxr.profile.filter.list", {}, str(exc)))
+            return 1
+        raise CLIError(str(exc)) from None
+    if json_output:
+        emit_json_result(cli_json.JsonResult("cxr.profile.filter.list", payload))
+        return 0
+    if not payload["filters"]:
+        emit_result(f"{profile_name}: no filters")
+    for row in payload["filters"]:
+        label = row.get("name") or f"#{row['index']}"
+        emit_result(f"{row['index']}: {label} ({row['material']}, {row['thickness_mm']:g} mm)")
+    return 0
+
+
+@filter_command.command("show")
+@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
+@click.argument("identifier")
+@output_option
+def filter_show_command(profile_name, identifier, json_output):
+    """Show one PROFILE filter by its name or one-based list index."""
+    try:
+        _text, document = _catalog_io.catalog_text()
+        payload = _filter_payload(document, profile_name)
+        row = next(
+            (
+                item
+                for item in payload["filters"]
+                if str(item["index"]) == identifier or item.get("name") == identifier
+            ),
+            None,
+        )
+        if row is None:
+            raise ValueError(f"profile {profile_name!r} has no filter {identifier!r}")
+    except (OSError, ValueError, ParseError) as exc:
+        if json_output:
+            emit_json_result(cli_json.failure("cxr.profile.filter.show", {}, str(exc)))
+            return 1
+        raise CLIError(str(exc)) from None
+    if json_output:
+        emit_json_result(cli_json.JsonResult("cxr.profile.filter.show", row))
+        return 0
+    emit_result(f"{profile_name} filter {row.get('name') or '#' + str(row['index'])}:")
+    for key, value in row.items():
+        if key != "index":
+            emit_result(f"  {key}: {value}")
+    return 0
+
+
+@filter_command.command("rm")
+@click.argument("profile_name", shell_complete=_cli_completion.complete_profile)
+@click.argument("identifier")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def filter_rm_command(profile_name, identifier, dry_run):
+    """Remove one filter by its name or one-based list index."""
+    try:
+        original, document = _catalog_io.catalog_text()
+        removed = _profile_edit.remove_filter(document, profile_name, identifier)
+    except (OSError, ValueError, ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    label = removed.get("name") or identifier
+    return _write(
+        document, original, dry_run, f"removed filter {label} from profile {profile_name}"
+    )
 
 
 @command.command("analyze", hidden=True)

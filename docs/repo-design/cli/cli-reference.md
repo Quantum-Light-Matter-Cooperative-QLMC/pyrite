@@ -1033,6 +1033,7 @@ Commands:
   add          Incrementally add values to profile grids,...
   create       Create a new profile, cloning defaults...
   delete       Delete a profile; irreversible.
+  filter       Manage finite FilterPlate objects on a...
   list         List catalog profiles with membership,...
   remove       Remove values from an existing profile's...
   rename       Rename profile NAME to NEW_NAME.
@@ -1166,6 +1167,99 @@ Usage: pyrite profile delete [OPTIONS] NAME
 Options:
   -y, --yes                       Delete the exact previewed profile.
   --dry-run                       Print proposed TOML diff; delete nothing.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile filter`
+
+```text
+Usage: pyrite profile filter [OPTIONS] COMMAND [ARGS]...
+
+  Manage finite FilterPlate objects on a profile.
+
+  ``add`` validates its plate through the public ``FilterPlate`` dataclass. Supply
+  ``--detector-distance-mm`` (and optionally ``--shape`` or ``--pitch-mm``) to create or
+  replace the profile's physical pixel detector. Filters need that detector when running
+  ``pyrite material simulate``.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  add   Add one finite filter plate to PROFILE.
+  list  List PROFILE's finite filter plates.
+  rm    Remove one filter by its name or one-based list index.
+  show  Show one PROFILE filter by its name or one-based list index.
+```
+
+## `pyrite profile filter add`
+
+```text
+Usage: pyrite profile filter add [OPTIONS] PROFILE_NAME
+
+  Add one finite filter plate to PROFILE.
+
+Options:
+  --offset-mm X Y               Local x/y offset in mm.  [default: 0.0, 0.0]
+  --roll-deg FLOAT              Local-roll angle in degrees.  [default: 0.0]
+  --azimuth-deg FLOAT           Observation azimuth in degrees.  [default: 0.0]
+  --polar-deg FLOAT             Observation polar angle in degrees [0, 180].  [default:
+                                90.0]
+  --distance-mm MM              Source-to-plate distance in mm.  [x>0.0; required]
+  --size-mm WIDTH HEIGHT        Plate width and height in mm.  [required]
+  --thickness-mm MM             Plate thickness in mm.  [x>0.0; required]
+  --material KEY                Catalog crystal or medium key.  [required]
+  --name TEXT                   Optional display name; must be unique within the
+                                profile.
+  --pitch-mm Y X                Physical-detector pixel pitch (y, x) in mm.
+  --shape ROWS COLS             Physical-detector pixel shape; defaults to a Timepix3
+                                chip.
+  --detector-offset-mm X Y      Physical-detector local x/y offset in mm.  [default:
+                                0.0, 0.0]
+  --detector-roll-deg FLOAT     Physical-detector local roll in degrees.  [default: 0.0]
+  --detector-azimuth-deg FLOAT  Physical-detector azimuth in degrees.  [default: 0.0]
+  --detector-polar-deg FLOAT    Physical-detector polar angle in degrees [0, 180].
+                                [default: 90.0]
+  --detector-distance-mm MM     Source-to-physical-detector distance in mm.  [x>0.0]
+  --dry-run                     Print proposed TOML diff; write nothing.
+  -h, --help                    Show this message and exit.
+```
+
+## `pyrite profile filter list`
+
+```text
+Usage: pyrite profile filter list [OPTIONS] PROFILE_NAME
+
+  List PROFILE's finite filter plates.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile filter rm`
+
+```text
+Usage: pyrite profile filter rm [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Remove one filter by its name or one-based list index.
+
+Options:
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile filter show`
+
+```text
+Usage: pyrite profile filter show [OPTIONS] PROFILE_NAME IDENTIFIER
+
+  Show one PROFILE filter by its name or one-based list index.
+
+Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -1391,6 +1485,7 @@ Options:
 Commands:
   set          Set or reset MATERIAL overrides without...
   show         Show MATERIAL's effective ranges and...
+  simulate     Simulate one material/profile scene on its...
   blaze        Run a grooved-crystal sweep and write a checkpoint.
   energy-grid  Derive and inspect detector energy-grid inputs.
   validate     Validate a material catalog without starting simulation.
@@ -1440,6 +1535,26 @@ Options:
                                   [default: standard]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite material simulate`
+
+```text
+Usage: pyrite material simulate [OPTIONS] MATERIAL
+
+  Simulate one material/profile scene on its physical detector.
+
+  This is intentionally filesystem-free except for an explicit --output-file: it calls
+  the public single-scene API and does not create a sweep or checkpoint.
+
+Options:
+  --profile TEXT                  Resolve one scene from profile NAME.  [default:
+                                  standard]
+  -o, --output [table|json|wide]  Output format; json is the stable automation contract.
+                                  [default: table]
+  --output-file FILE              Write full factorized spatial arrays as a new
+                                  compressed .npz file.
   -h, --help                      Show this message and exit.
 ```
 

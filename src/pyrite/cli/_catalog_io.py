@@ -126,6 +126,14 @@ def profile_overrides(profile):
     return overrides
 
 
+def filter_rows(profile):
+    """Return ``[[profiles.NAME.filters]]`` rows, validating its TOML shape."""
+    filters = profile.get("filters", [])
+    if not isinstance(filters, list) or not all(isinstance(row, dict) for row in filters):
+        raise ValueError("profile filters must be an array of tables")
+    return filters
+
+
 def material_override_table(profile, material):
     """Return writable ``[profiles.NAME.overrides.MATERIAL]`` table."""
     overrides = profile.get("overrides")

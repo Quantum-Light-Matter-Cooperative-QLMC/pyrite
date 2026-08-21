@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
+
+import numpy as np
 
 from pyrite import cli
 from pyrite.cli import _catalog_io
@@ -238,3 +241,68 @@ def test_material_group_lazily_routes_validate_and_blaze():
     assert "Validate bundled material catalog" in validate_help.stdout
     assert_clean_result(blaze_help)
     assert "blazed-crystal MC sweep" in blaze_help.stdout
+
+
+def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
+    calls = []
+    spatial = SimpleNamespace(
+        ray_map=SimpleNamespace(
+            tile_index=np.zeros((1, 1), dtype=int),
+            solid_angle_sr=np.ones((1, 1)),
+            path_length_mm=np.zeros((1, 1, 1)),
+        ),
+        line=SimpleNamespace(
+            intrinsic_by_tile=np.array([[1.0, 2.0]]),
+            mu_by_filter_inv_mm=np.array([[0.0, 0.0]]),
+        ),
+    )
+    result = SimpleNamespace(
+        energy_eV=np.array([100.0, 200.0]),
+        spectrum=np.array([1.0, 2.0]),
+        background_energy_eV=np.array([50.0, 100.0]),
+        background=np.array([0.1, 0.2]),
+        spatial=spatial,
+        provenance={"observation_identity_digest": "abc"},
+    )
+    monkeypatch.setattr(_catalog_io, "catalog_text", lambda: ("", object()))
+    monkeypatch.setattr(
+        material,
+        "_simulation_scene",
+        lambda *_args: ("beam", "target", "detector", ("filter",), "scorer", "numerics", "incoherent"),
+    )
+
+    import pyrite.api
+
+    def fake_simulate(*args, **kwargs):
+        calls.append((args, kwargs))
+        return result
+
+    monkeypatch.setattr(pyrite.api, "simulate", fake_simulate)
+
+    machine = invoke(material.command, ["simulate", "hopg", "-o", "json"])
+    assert_clean_result(machine)
+    payload = json.loads(machine.stdout)["payload"]
+    assert payload["line"]["energy_eV"] == [100.0, 200.0]
+    assert payload["pixel_grid"]["filter_count"] == 1
+    assert calls[0][0][:3] == ("beam", "target", "detector")
+    assert calls[0][1]["filters"] == ("filter",)
+    assert calls[0][1]["pixel_scorer"] == "scorer"
+
+    wide = invoke(material.command, ["simulate", "hopg", "-o", "wide"])
+    assert_clean_result(wide)
+    assert "material=hopg" in wide.stdout
+
+
+def test_simulate_json_reports_resolution_errors(monkeypatch):
+    monkeypatch.setattr(_catalog_io, "catalog_text", lambda: ("", object()))
+    monkeypatch.setattr(
+        material,
+        "_simulation_scene",
+        lambda *_args: (_ for _ in ()).throw(ValueError("physical_detector is required")),
+    )
+
+    result = invoke(material.command, ["simulate", "hopg", "-o", "json"])
+    assert result.exit_code == 1
+    document = json.loads(result.stdout)
+    assert document["schema"] == "cxr.material.simulate"
+    assert "physical_detector is required" in document["errors"][0]["message"]

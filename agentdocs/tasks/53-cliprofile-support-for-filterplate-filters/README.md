@@ -125,3 +125,15 @@ fits existing per-material action verbs.
   material simulate <material> --profile <name>` end-to-end against a real
   profile, confirm attenuated spectrum differs from an unfiltered run.
 - `pyrite-dev verify` before calling it done (per `AGENTS.md`).
+
+## Implementation progress
+
+- Added profile-schema storage for `filters` and `physical_detector`, profile
+  filter CRUD, profile-show JSON/text exposure, and `material simulate` on the
+  existing planar `api.simulate` path. No `run`, checkpoint, or `Sweep` code
+  changed.
+- Added focused CLI/catalog coverage for CRUD, detector preservation/validation,
+  JSON output, and the single-scene API seam. CLI reference regenerated; the
+  sweep-profile guide now documents the profile TOML and command workflow.
+- Remaining verification: CLI/core suites, docs build if its Sphinx dependency
+  is available, and the full `pyrite-dev verify` gate.

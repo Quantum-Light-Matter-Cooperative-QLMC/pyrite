@@ -118,6 +118,54 @@ Both sub-tables join `parameter_sha256` only when they diverge from the inert
 defaults, so a profile that never sets them hashes exactly as it did before the
 keys existed and resumes into its existing checkpoints.
 
+## Finite filters and one physical detector
+
+Finite downstream filter plates are profile-local observation settings. They
+are not part of `pyrite run`, `Sweep`, or checkpoint identity. Use
+`pyrite material simulate` for a single in-memory scene on a physical pixel
+detector; it follows the validated planar pixel-ray path and records a separate
+observation digest.
+
+Each `[[profiles.NAME.filters]]` table describes one `FilterPlate`. Its pose
+uses the same source-centred observation fields as the Python API. A
+`[profiles.NAME.physical_detector]` table is required by `material simulate`;
+it supplies the detector pose and pixel geometry. Omitting `shape` and
+`pitch_mm` selects a 256 by 256 Timepix3-style grid at 0.055 mm pitch.
+
+```toml
+[profiles.filter_demo.physical_detector]
+distance_mm = 400.0
+polar_deg = 90.0
+
+[[profiles.filter_demo.filters]]
+name = "half_filter"
+material = "silicon"
+thickness_mm = 0.1
+size_mm = [7.04, 14.08]
+distance_mm = 200.0
+polar_deg = 90.0
+offset_mm = [3.52, 0.0]
+```
+
+Use `pyrite profile filter add|rm|list|show` to edit and inspect plates. The
+`add` command validates the plate with the same public object used by the
+Python API. It can also create or deliberately replace the physical-detector
+table with `--detector-distance-mm` and the prefixed pose flags; `--shape` and
+`--pitch-mm` require that distance. For example:
+
+```bash
+pyrite profile filter add filter_demo --name half_filter --material silicon \
+  --thickness-mm 0.1 --size-mm 7.04 14.08 --distance-mm 200 \
+  --detector-distance-mm 400
+```
+
+`pyrite material simulate MATERIAL --profile NAME` requires singleton
+thickness, energy, polar, and azimuth profile grids, because it runs exactly
+one scene. It prints a compact line/background and pixel-grid summary;
+`-o json` emits its stable envelope and `-o wide` emits one tab-separated
+summary line. Pass `--output-file PATH.npz` to write the complete factorized
+spatial arrays. The command never creates a checkpoint.
+
 The bundled `emittance_demo` beam is the worked example: a Courant-Snyder waist
 (`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized
 emittance and a 0.05 m beta function, plus a 0.1% energy spread, run by

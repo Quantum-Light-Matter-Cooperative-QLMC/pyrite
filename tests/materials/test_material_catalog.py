@@ -838,9 +838,41 @@ crystal = "mos2"
     )
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, text))
-
     assert "profiles.standard.detector" in str(caught.value)
 
+
+def test_profile_filter_and_physical_detector_blocks_decode_without_run_wiring(tmp_path):
+    from pyrite.materials import load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+"""
+        )
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+polar_deg = 90.0
+shape = [2, 3]
+pitch_mm = [0.1, 0.2]
+
+[[profiles.standard.filters]]
+name = "half"
+material = "sio2"
+thickness_mm = 0.1
+size_mm = [2.0, 3.0]
+distance_mm = 200.0
+offset_mm = [0.5, 0.0]
+"""
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert catalog.profile_physical_detectors["standard"]["shape"] == (2, 3)
+    assert catalog.profile_filters["standard"][0]["name"] == "half"
+    assert catalog.profile_filters["standard"][0]["offset_mm"] == (0.5, 0.0)
 
 def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
     from pyrite.campaign import config

@@ -290,6 +290,12 @@ class MaterialCatalog:
     #: Explicit transport-numerics overrides, keyed by profile. Missing fields
     #: retain the inert Numerics defaults.
     profile_transport_numerics: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Declarative finite filter plates, resolved by the single-scene CLI path.
+    #: They intentionally remain plain schema data here: importing instrument
+    #: objects would invert the materials -> instrument dependency boundary.
+    profile_filters: Mapping[str, tuple[Mapping[str, object], ...]] = MappingProxyType({})
+    #: Declarative planar-pixel detector geometry for ``material simulate``.
+    profile_physical_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit immutable energy-grid artifact refs, keyed first by profile and
     #: then material. Legacy ``[energy_grids.*]`` fallback rows are deliberately
     #: absent: callers can distinguish migrated refs from compatibility input.
@@ -853,6 +859,22 @@ _DEPRECATED_DETECTOR_KEYS = frozenset(
         "threshold_eV",
     }
 )
+_FILTER_KEYS = frozenset(
+    {
+        "name",
+        "material",
+        "thickness_mm",
+        "size_mm",
+        "distance_mm",
+        "polar_deg",
+        "azimuth_deg",
+        "roll_deg",
+        "offset_mm",
+    }
+)
+_PHYSICAL_DETECTOR_KEYS = frozenset(
+    {"distance_mm", "polar_deg", "azimuth_deg", "roll_deg", "offset_mm", "shape", "pitch_mm"}
+)
 _LONGITUDINAL_KINDS = frozenset({"gaussian", "microtrain", "compressed"})
 _LONGITUDINAL_KEYS = frozenset(
     {
@@ -1087,6 +1109,109 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector
         return None
 
 
+def _pair(
+    raw: object, path: str, errors: _Errors, *, integer: bool = False
+) -> tuple[object, object] | None:
+    if not isinstance(raw, list) or len(raw) != 2:
+        errors.add(path, "must be a two-item array")
+        return None
+    if integer:
+        if any(type(item) is not int or item <= 0 for item in raw):
+            errors.add(path, "must contain two positive integers")
+            return None
+        return tuple(raw)
+    values = tuple(_number(item) for item in raw)
+    if any(item is None for item in values):
+        errors.add(path, "must contain two finite numbers")
+        return None
+    return values
+
+
+def _parse_filter_rows(
+    raw: object, path: str, errors: _Errors
+) -> tuple[Mapping[str, object], ...] | None:
+    if not isinstance(raw, list):
+        errors.add(path, "must be an array of tables")
+        return None
+    rows: list[Mapping[str, object]] = []
+    for index, item in enumerate(raw):
+        row_path = f"{path}[{index}]"
+        row = _table(item, row_path, errors)
+        if row is None:
+            continue
+        errors.keys(row, row_path, set(_FILTER_KEYS))
+        material = row.get("material")
+        if not isinstance(material, str) or not material:
+            errors.add(f"{row_path}.material", "must be a nonempty catalog key")
+        name = row.get("name")
+        if name is not None and (not isinstance(name, str) or not name.strip()):
+            errors.add(f"{row_path}.name", "must be a nonempty string")
+        cleaned: dict[str, object] = {key: row[key] for key in ("name", "material") if key in row}
+        for key in ("thickness_mm", "distance_mm"):
+            value = _number(row.get(key))
+            if value is None or value <= 0:
+                errors.add(f"{row_path}.{key}", "must be a finite positive number")
+            else:
+                cleaned[key] = value
+        size = _pair(row.get("size_mm"), f"{row_path}.size_mm", errors)
+        if size is not None:
+            if any(float(item) <= 0 for item in size):
+                errors.add(f"{row_path}.size_mm", "must contain positive numbers")
+            else:
+                cleaned["size_mm"] = size
+        for key, default in (("polar_deg", 90.0), ("azimuth_deg", 0.0), ("roll_deg", 0.0)):
+            value = _number(row.get(key, default))
+            if value is None or key == "polar_deg" and not 0 <= value <= 180:
+                errors.add(
+                    f"{row_path}.{key}",
+                    "must be finite" if key != "polar_deg" else "must be between 0 and 180",
+                )
+            else:
+                cleaned[key] = value
+        offset = _pair(row.get("offset_mm", [0.0, 0.0]), f"{row_path}.offset_mm", errors)
+        if offset is not None:
+            cleaned["offset_mm"] = offset
+        rows.append(MappingProxyType(cleaned))
+    return tuple(rows)
+
+
+def _parse_physical_detector(
+    raw: object, path: str, errors: _Errors
+) -> Mapping[str, object] | None:
+    row = _table(raw, path, errors)
+    if row is None:
+        return None
+    errors.keys(row, path, set(_PHYSICAL_DETECTOR_KEYS))
+    cleaned: dict[str, object] = {}
+    distance = _number(row.get("distance_mm"))
+    if distance is None or distance <= 0:
+        errors.add(f"{path}.distance_mm", "must be a finite positive number")
+    else:
+        cleaned["distance_mm"] = distance
+    for key, default in (("polar_deg", 90.0), ("azimuth_deg", 0.0), ("roll_deg", 0.0)):
+        value = _number(row.get(key, default))
+        if value is None or key == "polar_deg" and not 0 <= value <= 180:
+            errors.add(
+                f"{path}.{key}",
+                "must be finite" if key != "polar_deg" else "must be between 0 and 180",
+            )
+        else:
+            cleaned[key] = value
+    offset = _pair(row.get("offset_mm", [0.0, 0.0]), f"{path}.offset_mm", errors)
+    if offset is not None:
+        cleaned["offset_mm"] = offset
+    shape = _pair(row.get("shape", [256, 256]), f"{path}.shape", errors, integer=True)
+    if shape is not None:
+        cleaned["shape"] = shape
+    pitch = _pair(row.get("pitch_mm", [0.055, 0.055]), f"{path}.pitch_mm", errors)
+    if pitch is not None:
+        if any(float(item) <= 0 for item in pitch):
+            errors.add(f"{path}.pitch_mm", "must contain positive numbers")
+        else:
+            cleaned["pitch_mm"] = pitch
+    return MappingProxyType(cleaned)
+
+
 def _parse_detectors(raw: object, errors: _Errors) -> tuple[dict[str, Detector], dict[str, str]]:
     """Parse named ``[detectors.NAME]`` geometry objects.
 
@@ -1146,6 +1271,8 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 "overrides",
                 "beam",
                 "detector",
+                "filters",
+                "physical_detector",
                 "emission",
                 *_TRANSPORT_NUMERICS_KEYS,
                 "energy_grid_refs",
@@ -1237,6 +1364,20 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                     row_out["detector"] = detector
                 else:
                     del row_out["detector"]
+        if "filters" in row_out:
+            filters = _parse_filter_rows(row_out["filters"], f"{path}.filters", errors)
+            if filters is not None:
+                row_out["filters"] = filters
+            else:
+                del row_out["filters"]
+        if "physical_detector" in row_out:
+            physical_detector = _parse_physical_detector(
+                row_out["physical_detector"], f"{path}.physical_detector", errors
+            )
+            if physical_detector is not None:
+                row_out["physical_detector"] = physical_detector
+            else:
+                del row_out["physical_detector"]
         out[key] = row_out
     return out
 
@@ -1698,6 +1839,16 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if any(key in row for key in _TRANSPORT_NUMERICS_KEYS)
     }
+    profile_filters = {
+        name: cast(tuple[Mapping[str, object], ...], row["filters"])
+        for name, row in profiles.items()
+        if isinstance(row.get("filters"), tuple)
+    }
+    profile_physical_detectors = {
+        name: cast(Mapping[str, object], row["physical_detector"])
+        for name, row in profiles.items()
+        if isinstance(row.get("physical_detector"), Mapping)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -1710,6 +1861,8 @@ def _load_material_catalog_cached(
         profile_detectors=MappingProxyType(profile_detectors),
         profile_emissions=MappingProxyType(profile_emissions),
         profile_transport_numerics=MappingProxyType(profile_transport_numerics),
+        profile_filters=MappingProxyType(profile_filters),
+        profile_physical_detectors=MappingProxyType(profile_physical_detectors),
         profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
         resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
         beams=MappingProxyType(beams),

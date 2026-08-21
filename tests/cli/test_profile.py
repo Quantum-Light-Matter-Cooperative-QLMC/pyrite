@@ -189,6 +189,97 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert payload["overrides"] == {"hopg": ["thickness_ang"]}
 
 
+def test_filter_crud_creates_physical_detector_and_exposes_json(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    added = invoke(
+        profile.command,
+        [
+            "filter",
+            "add",
+            "standard",
+            "--name",
+            "half",
+            "--material",
+            "silicon",
+            "--thickness-mm",
+            "0.1",
+            "--size-mm",
+            "7.04",
+            "14.08",
+            "--distance-mm",
+            "200",
+            "--offset-mm",
+            "3.52",
+            "0",
+            "--detector-distance-mm",
+            "300",
+            "--shape",
+            "2",
+            "3",
+            "--pitch-mm",
+            "0.1",
+            "0.2",
+        ],
+    )
+    assert_clean_result(added, stdout="added filter to profile standard\n")
+    assert "[[profiles.standard.filters]]" in catalog.read_text()
+    assert "[profiles.standard.physical_detector]" in catalog.read_text()
+
+    listed = invoke(profile.command, ["filter", "list", "standard", "-o", "json"])
+    assert_clean_result(listed)
+    row = json.loads(listed.stdout)["payload"]["filters"][0]
+    assert row["name"] == "half"
+    assert row["offset_mm"] == [3.52, 0.0]
+
+    shown = invoke(profile.command, ["show", "standard", "-o", "json"])
+    assert_clean_result(shown)
+    payload = json.loads(shown.stdout)["payload"]
+    assert payload["filters"][0]["material"] == "silicon"
+    assert payload["physical_detector"]["shape"] == [2, 3]
+
+    removed = invoke(profile.command, ["filter", "rm", "standard", "half"])
+    assert_clean_result(removed, stdout="removed filter half from profile standard\n")
+    assert "filters" not in catalog.read_text()
+
+
+def test_filter_add_preserves_detector_and_rejects_partial_detector_options(tmp_path, monkeypatch):
+    catalog = _catalog(
+        tmp_path,
+        monkeypatch,
+        _CATALOG
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+shape = [4, 5]
+""",
+    )
+    base = [
+        "filter",
+        "add",
+        "standard",
+        "--material",
+        "silicon",
+        "--thickness-mm",
+        "0.1",
+        "--size-mm",
+        "2",
+        "3",
+        "--distance-mm",
+        "200",
+    ]
+
+    added = invoke(profile.command, base)
+    assert_clean_result(added)
+    text = catalog.read_text()
+    assert "distance_mm = 400.0" in text
+    assert "shape = [4, 5]" in text
+
+    invalid = invoke(profile.command, [*base, "--shape", "2", "3"])
+    assert invalid.exit_code == 1
+    assert "--shape/--pitch-mm require --detector-distance-mm" in invalid.stderr
+
+
 def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
