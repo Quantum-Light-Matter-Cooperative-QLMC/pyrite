@@ -386,7 +386,8 @@ def filter_command():
 @filter_cli_options
 @physical_detector_cli_options
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def filter_add_command(profile_name, dry_run, **values):
+@click.pass_context
+def filter_add_command(ctx, profile_name, dry_run, **values):
     """Add one finite filter plate to PROFILE."""
     try:
         original, document = _catalog_io.catalog_text()
@@ -400,6 +401,18 @@ def filter_add_command(profile_name, dry_run, **values):
             azimuth_deg=values["azimuth_deg"],
             roll_deg=values["roll_deg"],
             offset_mm=values["offset_mm"],
+        )
+        values["detector_options_explicit"] = tuple(
+            flag
+            for key, flag in (
+                ("detector_shape", "--shape"),
+                ("detector_pitch_mm", "--pitch-mm"),
+                ("detector_polar_deg", "--detector-polar-deg"),
+                ("detector_azimuth_deg", "--detector-azimuth-deg"),
+                ("detector_roll_deg", "--detector-roll-deg"),
+                ("detector_offset_mm", "--detector-offset-mm"),
+            )
+            if ctx.get_parameter_source(key) is click.core.ParameterSource.COMMANDLINE
         )
         detector = physical_detector_row(**values)
         _profile_edit.add_filter(document, profile_name, row, detector)

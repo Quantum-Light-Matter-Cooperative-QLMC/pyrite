@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -306,3 +308,108 @@ def test_simulate_json_reports_resolution_errors(monkeypatch):
     document = json.loads(result.stdout)
     assert document["schema"] == "cxr.material.simulate"
     assert "physical_detector is required" in document["errors"][0]["message"]
+
+
+def _single_scene_catalog(tmp_path, monkeypatch, *, energies="[30.0]"):
+    from pyrite import DATA_DIR
+
+    data = tmp_path / "data"
+    shutil.copytree(DATA_DIR, data)
+    catalog = data / "materials.toml"
+    with catalog.open("a") as stream:
+        stream.write(
+            f"""
+[profiles.single]
+materials = ["hopg"]
+thickness_ang = {{ values = [1000.0] }}
+energy_keV = {{ values = {energies} }}
+tilt_deg = {{ values = [5.0] }}
+tilt_azim_deg = {{ values = [95.0] }}
+E_grid_line = {{ values = [100.0, 200.0] }}
+E_grid_brem = {{ values = [10.0, 20.0] }}
+n_electrons = {{ values = [7] }}
+n_electrons_brem = {{ values = [3] }}
+straggling = true
+energy_model = "midpoint"
+max_dE_frac = 0.1
+
+[profiles.single.physical_detector]
+distance_mm = 400.0
+polar_deg = 90.0
+shape = [2, 3]
+pitch_mm = [0.1, 0.2]
+
+[[profiles.single.filters]]
+name = "half"
+material = "silicon"
+thickness_mm = 0.1
+size_mm = [2.0, 3.0]
+distance_mm = 200.0
+polar_deg = 90.0
+"""
+        )
+    monkeypatch.setattr(_catalog_io, "_MATERIALS_TOML", catalog)
+    return _catalog_io.catalog_text()[1]
+
+
+def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
+    from pyrite.campaign.model import Beam, Numerics
+    from pyrite.instrument import FilterPlate, PlanarDetector
+
+    document = _single_scene_catalog(tmp_path, monkeypatch)
+    beam, target, detector, filters, scorer, numerics, emission = material._simulation_scene(
+        document, "hopg", "single"
+    )
+
+    assert isinstance(beam, Beam)
+    assert beam.energy_keV == 30.0
+    assert target.material == "hopg"
+    assert isinstance(detector, PlanarDetector)
+    assert detector.pixels.shape == (2, 3)
+    assert isinstance(filters[0], FilterPlate)
+    assert filters[0].name == "half"
+    assert isinstance(numerics, Numerics)
+    assert numerics.n_electrons == 7
+    assert numerics.n_electrons_brem == 3
+    assert numerics.straggling is True
+    assert numerics.energy_model == "midpoint"
+    assert emission == "incoherent"
+    assert scorer.angular_shape == (1, 1)
+
+
+def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypatch):
+    document = _single_scene_catalog(tmp_path, monkeypatch, energies="[30.0, 40.0]")
+
+    with np.testing.assert_raises_regex(ValueError, "requires profile 'single' to resolve one value"):
+        material._simulation_scene(document, "hopg", "single")
+
+
+def test_simulation_artifact_uses_exact_suffixless_path_and_never_overwrites(tmp_path):
+    spatial = SimpleNamespace(
+        ray_map=SimpleNamespace(
+            tile_index=np.zeros((1, 1), dtype=int),
+            solid_angle_sr=np.ones((1, 1)),
+            path_length_mm=np.zeros((1, 1, 1)),
+        ),
+        line=SimpleNamespace(
+            intrinsic_by_tile=np.array([[1.0, 2.0]]),
+            mu_by_filter_inv_mm=np.array([[0.0, 0.0]]),
+        ),
+    )
+    result = SimpleNamespace(
+        energy_eV=np.array([100.0, 200.0]),
+        spectrum=np.array([1.0, 2.0]),
+        background_energy_eV=np.array([50.0, 100.0]),
+        background=np.array([0.1, 0.2]),
+        spatial=spatial,
+    )
+    output = Path(tmp_path) / "spatial-output"
+
+    material._write_simulation_artifact(output, result)
+
+    assert output.is_file()
+    assert not output.with_suffix(".npz").exists()
+    with np.load(output) as archive:
+        np.testing.assert_array_equal(archive["line_energy_eV"], [100.0, 200.0])
+    with np.testing.assert_raises_regex(ValueError, "output file already exists"):
+        material._write_simulation_artifact(output, result)

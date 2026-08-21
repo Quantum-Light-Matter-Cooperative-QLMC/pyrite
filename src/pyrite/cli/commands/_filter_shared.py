@@ -209,8 +209,11 @@ def filter_row(**values):
 def physical_detector_row(**values):
     """Validate and serialize an optional physical-detector update."""
     if values["detector_distance_mm"] is None:
-        if values["detector_shape"] is not None or values["detector_pitch_mm"] is not None:
-            raise ValueError("--shape/--pitch-mm require --detector-distance-mm")
+        supplied = values.get("detector_options_explicit", ())
+        if supplied:
+            raise ValueError(
+                f"{', '.join(supplied)} require --detector-distance-mm"
+            )
         return None
     row_values = {
         "distance_mm": values["detector_distance_mm"],

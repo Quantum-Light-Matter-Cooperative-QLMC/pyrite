@@ -277,7 +277,11 @@ shape = [4, 5]
 
     invalid = invoke(profile.command, [*base, "--shape", "2", "3"])
     assert invalid.exit_code == 1
-    assert "--shape/--pitch-mm require --detector-distance-mm" in invalid.stderr
+    assert "--shape require --detector-distance-mm" in invalid.stderr
+
+    pose_invalid = invoke(profile.command, [*base, "--detector-roll-deg", "5"])
+    assert pose_invalid.exit_code == 1
+    assert "--detector-roll-deg require --detector-distance-mm" in pose_invalid.stderr
 
 
 def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch):

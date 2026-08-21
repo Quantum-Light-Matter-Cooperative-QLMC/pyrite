@@ -56,8 +56,8 @@ def _one(values, label):
 
 def _simulation_scene(document, material, profile_name):
     """Resolve one profile case without constructing a Sweep or checkpoint."""
-    from pyrite.campaign import Beam, Numerics
     from pyrite.campaign.longitudinal import LongitudinalDistribution
+    from pyrite.campaign.model import Beam, Numerics
     from pyrite.campaign.sweep import beam_replace, target_from_flat
     from pyrite.campaign.transverse import TransverseDistribution
     from pyrite.detectors import EnergyBins
@@ -145,7 +145,6 @@ def _simulation_payload(material, profile_name, result):
         },
         "pixel_grid": {
             "shape": list(spatial.ray_map.tile_index.shape),
-            "angular_shape": list(np.unique(spatial.ray_map.tile_index).shape),
             "filter_count": int(spatial.ray_map.path_length_mm.shape[2]),
         },
         "observation_identity_digest": result.provenance["observation_identity_digest"],
@@ -153,22 +152,24 @@ def _simulation_payload(material, profile_name, result):
 
 
 def _write_simulation_artifact(path, result):
-    if path.exists():
-        raise ValueError(f"output file already exists: {path}")
     spatial = result.spatial
     assert spatial is not None
-    np.savez_compressed(
-        path,
-        line_energy_eV=result.energy_eV,
-        line_density_per_sr=result.spectrum,
-        background_energy_eV=result.background_energy_eV,
-        background_density_per_sr=result.background,
-        tile_index=spatial.ray_map.tile_index,
-        solid_angle_sr=spatial.ray_map.solid_angle_sr,
-        path_length_mm=spatial.ray_map.path_length_mm,
-        line_intrinsic_by_tile=spatial.line.intrinsic_by_tile,
-        line_mu_by_filter_inv_mm=spatial.line.mu_by_filter_inv_mm,
-    )
+    try:
+        with path.open("xb") as stream:
+            np.savez_compressed(
+                stream,
+                line_energy_eV=result.energy_eV,
+                line_density_per_sr=result.spectrum,
+                background_energy_eV=result.background_energy_eV,
+                background_density_per_sr=result.background,
+                tile_index=spatial.ray_map.tile_index,
+                solid_angle_sr=spatial.ray_map.solid_angle_sr,
+                path_length_mm=spatial.ray_map.path_length_mm,
+                line_intrinsic_by_tile=spatial.line.intrinsic_by_tile,
+                line_mu_by_filter_inv_mm=spatial.line.mu_by_filter_inv_mm,
+            )
+    except FileExistsError:
+        raise ValueError(f"output file already exists: {path}") from None
 
 
 def _unknown_material(document, material):
