@@ -74,6 +74,19 @@ solid_angle_sr = 0.066
 
 [profiles.validation]
 detector = "eds"
+
+[profiles.filter_demo.physical_detector]
+distance_mm = 400.0
+polar_deg = 90.0
+
+[[profiles.filter_demo.filters]]
+name = "half_filter"
+material = "silicon"
+thickness_mm = 0.1
+size_mm = [7.04, 14.08]
+distance_mm = 200.0
+polar_deg = 90.0
+offset_mm = [3.52, 0.0]
 ```
 
 `pyrite beam list|show|create|set|rename|delete` manages the objects;
@@ -131,21 +144,6 @@ uses the same source-centred observation fields as the Python API. A
 `[profiles.NAME.physical_detector]` table is required by `material simulate`;
 it supplies the detector pose and pixel geometry. Omitting `shape` and
 `pitch_mm` selects a 256 by 256 Timepix3-style grid at 0.055 mm pitch.
-
-```toml
-[profiles.filter_demo.physical_detector]
-distance_mm = 400.0
-polar_deg = 90.0
-
-[[profiles.filter_demo.filters]]
-name = "half_filter"
-material = "silicon"
-thickness_mm = 0.1
-size_mm = [7.04, 14.08]
-distance_mm = 200.0
-polar_deg = 90.0
-offset_mm = [3.52, 0.0]
-```
 
 Use `pyrite profile filter add|rm|list|show` to edit and inspect plates. The
 `add` command validates the plate with the same public object used by the
