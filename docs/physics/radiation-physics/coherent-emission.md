@@ -86,9 +86,10 @@ One sum produces both:
   $|\langle e^{i\omega t_0}\rangle|^2$ is the Gaussian bunch form factor
   $\exp[-(\omega\sigma_z)^2]$.
 
-### The transverse partner is missing
+### The transverse partner
 
-The inter-electron scale above covers only the **longitudinal** offset $t_0$. A
+The inter-electron scale above, as originally implemented, covered only the
+**longitudinal** offset $t_0$. A
 bunch with a finite transverse spot (`beam_fwhm_mm`) also gives each electron a
 constant transverse displacement $\Delta\mathbf r_\perp$, which the spatial
 phase reads directly through $\mathbf r_j$. Every cross-electron term therefore
@@ -108,31 +109,41 @@ $q_\perp\sim1\,\text{Å}^{-1}$ and any spot above a nanometre this factor is
 numerically zero, so the ensemble observable keeps **only** the intra-electron
 sum $\sum_e\bigl|\sum_{j\in e}E_j\bigr|^2$.
 
-**The implementation does not take that average.** It evaluates one realization
-of the sampled offsets at one $\hat{\mathbf n}$, so the stored spectrum is a
-single speckle draw rather than the ensemble mean. Measured on the reference
-HOPG case, the coherent peak height scatters 30–41% seed to seed with a finite
-spot against a 7% Monte Carlo counting-noise floor on the incoherent path, and
-that contrast does **not** fall as the electron count grows — speckle contrast
-is independent of the number of randomly phased emitters. Averaging over seeds
-recovers the correct spot-independent intra-electron enhancement (2.83–3.25 at
-$N_e=300$, stable across 1 µm, 50 µm and 1 mm spots and across electron counts),
-which is what the form factor would deliver deterministically and for free.
+**The implementation originally did not take that average.** It evaluated one
+realization of the sampled offsets at one $\hat{\mathbf n}$, so the stored
+spectrum was a single speckle draw rather than the ensemble mean. Measured on
+the reference HOPG case, the coherent peak height scattered 30–41% seed to
+seed with a finite spot against a 7% Monte Carlo counting-noise floor on the
+incoherent path, and that contrast did **not** fall as the electron count
+grew — speckle contrast is independent of the number of randomly phased
+emitters. Averaging over seeds recovered the correct spot-independent
+intra-electron enhancement (2.83–3.25 at $N_e=300$, stable across 1 µm, 50 µm
+and 1 mm spots and across electron counts), which is what the form factor
+delivers deterministically and for free.
 
-Integrating over the detector face does not rescue it numerically: the speckle
-angular scale $\lambda/D_\perp\approx2\times10^{-4}$ rad is far finer than any
-affordable tile spacing, so the face integral plateaus at ~11% of the reference
-by `n_side=9` where the incoherent one has converged to 0.01%. Convergence would
-need $n_{\rm side}\approx\Delta\theta/(\lambda/D_\perp)\approx180$, some 32000
-directions per case. The fix is the analytic average above, not more tiles.
+Integrating over the detector face did not rescue it numerically either: the
+speckle angular scale $\lambda/D_\perp\approx2\times10^{-4}$ rad is far finer
+than any affordable tile spacing, so the face integral plateaued at ~11% of
+the reference by `n_side=9` where the incoherent one had converged to 0.01%.
+Convergence would need $n_{\rm side}\approx\Delta\theta/(\lambda/D_\perp)\approx180$,
+some 32000 directions per case — tiling was never going to be the fix.
 
-Until it lands, treat `beam_fwhm_mm` with `emission="coherent"`/`"both"` as
-unvalidated; see the `transverse-bunch-form-factor` discrepancy row. The
-`beam_fwhm_mm=None` point source is not a safe substitute — it is the fully
-degenerate limit whose cross-electron terms are maximally constructive, giving
-an enhancement that grows linearly with the simulated electron count (33.2× at
-$N_e=80$, 107.5× at $N_e=300$) and is therefore a property of the sampling, not
-of the physics.
+**As of 2026-08-21, both offsets are blended analytically.** The combined
+longitudinal $\times$ transverse form factor, its fresh-context derivation,
+and the implementation (an empirical characteristic function of the actual
+sampled per-electron offsets rather than a closed-form-parametrized $\sigma$,
+which extends unchanged to elliptical/Courant–Snyder spots) are in
+[Validation: `coherent-inter-electron-decoherence`](../../validation/radiation-physics/coherent-inter-electron-decoherence.md).
+The one case still explicitly excluded (rejected with an error, not silently
+mishandled) is a finite crystal footprint (`crystal_width_mm`/
+`crystal_height_mm`) combined with a nonzero bunch/spot, where the transverse
+offset also perturbs escape attenuation — an amplitude effect the phase-only
+form factor does not model. The `beam_fwhm_mm=None` point source remains what
+it always was: the fully degenerate limit whose cross-electron terms are
+maximally constructive, giving an enhancement that grows linearly with the
+simulated electron count (33.2× at $N_e=80$, 107.5× at $N_e=300$) — a property
+of the sampling, not of the physics, and not a stand-in for the analytic
+average.
 
 ## Expected limits
 
@@ -157,7 +168,9 @@ The `coherent-emission` and `coherent-segment-midpoint-time` rows are
 `rederived`: fresh-context derivations reproduced the phase, the midpoint pairing,
 and the decoherent limits with no divergent sign, factor, or unit, and the limits
 above are anchored in `tests/montecarlo/test_coherent_emission.py`. The batched
-evaluation route `coherent-line-hkl-batch` is only `filtered`.
+evaluation route `coherent-line-hkl-batch` is only `filtered`. The combined
+longitudinal/transverse decoherence blend is its own `rederived` row,
+`coherent-inter-electron-decoherence`.
 
 **Human sign-off is still pending on all of them**, and the following remain open
 before scientific use:

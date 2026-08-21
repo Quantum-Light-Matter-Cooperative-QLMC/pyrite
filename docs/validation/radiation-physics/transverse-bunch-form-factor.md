@@ -163,13 +163,15 @@ what drives the numbers above.
 
 ## Status
 
-`discrepancy`. The defect is a missing ensemble average with a closed-form
-answer, so the repair is cheap: drop the cross-electron terms analytically when
-$q_\perp\sigma_\perp\gg1$ and keep $\sum_e|\sum_{j\in e}E_j|^2$, with the general
-$\exp[-(q_\perp\sigma_\perp)^2]$ factor for the marginal regime. Promotion needs
-that implemented, a fresh-context derivation of the transverse characteristic
-function, and a limiting-case test pinning both endpoints
-($\sigma_\perp\to0$ point source, $\sigma_\perp$ large intra-electron floor).
-
-Blocks `signed-off` on `coherent-emission` for any run with a finite spot.
-Until then, `beam_fwhm_mm` with `emission="coherent"`/`"both"` is unvalidated.
+`rederived`, as of 2026-08-21. The cross-electron terms are now dropped
+analytically via the general $\exp[-(q_\perp\sigma_\perp)^2]$ factor for the
+marginal regime, combined with the longitudinal `coherent-emission` form
+factor into one joint $F$ — see
+[`coherent-inter-electron-decoherence`](coherent-inter-electron-decoherence.md)
+for the combined closed form, its fresh-context re-derivation, and the
+implementation (an empirical characteristic function of the actual sampled
+offsets, rather than a closed-form-parametrized $\sigma_\perp$, which extends
+this row's isotropic-Gaussian scope to elliptical/Courant–Snyder spots for
+free). The finite-footprint amplitude-coupling case noted above remains
+excluded, now with an explicit `mc_spectrum` error rather than silent
+mishandling. Human sign-off remains pending.

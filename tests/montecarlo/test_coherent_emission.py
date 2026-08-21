@@ -122,6 +122,89 @@ def test_single_segment_coherent_equals_incoherent_self_term():
     np.testing.assert_allclose(coherent, incoherent, rtol=RTOL, atol=peak * ATOL)
 
 
+def test_coherent_decoherence_blend_matches_reference_formula():
+    """Two electrons with distinct longitudinal offsets: the coherent output
+    must equal the closed-form blend (1-F)*sum_e|S_e|^2 + F*|sum_e S_e|^2.
+    Both reference terms come from mc_spectrum itself on ALREADY-validated
+    (offset-free, decoherence-inactive) sub-cases: the fully-coherent flat
+    term is mc_spectrum on the same two electrons with t0_ang=0 (the
+    degenerate limit locked in by test_identical_in_phase_electrons_reach_
+    n_squared_limit), and the intra-electron floor is the SUM of mc_spectrum
+    on each electron alone (Ne=1, always trivially self-coherent, per
+    test_single_segment_coherent_equals_incoherent_self_term). F is the
+    empirical characteristic function of the actual t0 offsets, computed
+    independently here.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    energy_grid = np.arange(700.0, 1500.0, 2.0)
+    t0_values = np.array([137.0, -412.0])  # Ang, c=1 -- O(1/omega)-scale, arbitrary
+
+    def _no_footprint(segs):
+        # decoherence_active rejects the finite-footprint branch (out of
+        # scope, see the rejection test below); an apples-to-apples
+        # comparison also needs the SAME footprint setting on every one of
+        # this test's three mc_spectrum calls, active or not.
+        segs.update(crystal_width_ang=None, crystal_height_ang=None)
+        return segs
+
+    active = _no_footprint(_segments(2))
+    active.update(t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3)))
+    actual = mc_spectrum(active, energy_grid, coherent=True, **KWARGS)
+
+    # mc_spectrum divides its row sum by Ne exactly once, at the very end --
+    # AFTER the (1-F)*grouped + F*flat blend, not per term. So the two
+    # reference terms must be un-normalized back to that same RAW (pre-/Ne)
+    # scale before blending: flat_ref's own Ne=2 call already divided by 2
+    # (undo it); grouped_ref's two Ne=1 calls each divided by 1, a no-op, so
+    # their sum is already the raw sum_e|S_e|^2.
+    ne_total = active["Ne"]
+    flat_raw = mc_spectrum(_no_footprint(_segments(2)), energy_grid, coherent=True, **KWARGS) * ne_total
+    grouped_raw = sum(
+        mc_spectrum(_no_footprint(_segments(1)), energy_grid, coherent=True, **KWARGS)
+        for _ in range(2)
+    )
+
+    omega = energy_grid / HBARC_EV_ANG
+    chi = np.mean(np.exp(1j * omega[:, None] * t0_values[None, :]), axis=1)
+    F = np.abs(chi) ** 2
+
+    expected = ((1.0 - F) * grouped_raw + F * flat_raw) / ne_total
+    peak = float(np.max(np.abs(expected)))
+    assert peak > 0.0
+    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
+
+
+def test_coherent_decoherence_inactive_by_default():
+    """No initial_t0_ang/initial_r_ang keys (every pre-existing fixture) ->
+    decoherence_active is False and the result is bit-for-bit the old,
+    already-validated fully-coherent path -- a direct regression guard on
+    the coherent-inter-electron-decoherence change itself."""
+    segments = _segments(2)
+    assert "initial_t0_ang" not in segments and "initial_r_ang" not in segments
+    coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
+    np.testing.assert_array_equal(
+        coherent, mc_spectrum(_segments(2), E_GRID, coherent=True, **KWARGS)
+    )
+
+
+def test_coherent_decoherence_rejects_finite_footprint():
+    """The electron-grouped floor does not model the transverse offset's
+    effect on escape attenuation under a finite footprint (docs/validation/
+    radiation-physics/coherent-inter-electron-decoherence.md) -- must error,
+    not silently give a physically-incomplete answer."""
+    segments = _segments(2)
+    segments.update(
+        t0_ang=np.array([137.0, -412.0]),
+        initial_t0_ang=np.array([137.0, -412.0]),
+        initial_r_ang=np.zeros((2, 3)),
+    )
+    assert segments["crystal_width_ang"] is not None
+    assert segments["crystal_height_ang"] is not None
+    with pytest.raises(ValueError, match="finite crystal footprint"):
+        mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
+
+
 def test_identical_in_phase_electrons_reach_n_squared_limit():
     single = mc_spectrum(_segments(), E_GRID, coherent=True, **KWARGS)
     pair = mc_spectrum(_segments(2), E_GRID, coherent=True, **KWARGS)

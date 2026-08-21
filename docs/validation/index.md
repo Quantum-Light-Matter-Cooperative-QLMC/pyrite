@@ -55,6 +55,7 @@ radiation-physics/brem-spectrum
 radiation-physics/cbs-amplitude
 radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
+radiation-physics/coherent-inter-electron-decoherence
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/cross-reflection-coherence

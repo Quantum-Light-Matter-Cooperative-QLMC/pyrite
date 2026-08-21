@@ -1224,6 +1224,128 @@ def mc_spectrum(
             )
             * omega_grid
         )
+
+    # Empirical inter-electron decoherence for the coherent path. Today's
+    # coherent sum bakes each electron's SAMPLED longitudinal offset
+    # (``t0_ang``) and transverse entry offset (via ``seg_r``'s trajectory
+    # position) into the segment phase and squares once -- one Monte Carlo
+    # realization. For a squared coherent sum that is speckle, not shot
+    # noise: the spurious enhancement does not shrink with electron count
+    # (Rayleigh statistics), unlike ordinary incoherent MC noise.
+    #
+    # Fresh-context result: per (row, energy), Total = (1-F)*Grouped +
+    # F*Flat, where Flat = |sum_e S_e|^2 is TODAY'S coherent reduction but
+    # fed the electron's INTRINSIC (offset-free) position/time -- so it
+    # needs no new reduction code, only feeding ``d_all_geom``/``seg_r_geom``
+    # in place of ``d_all``/``seg_r`` at the handful of points that build a
+    # row's phase -- and Grouped = sum_e|S_e|^2 groups the SAME segments by
+    # electron, squares each electron's own sum, then adds (new reduction,
+    # ``_coherent_electron_grouped_row`` below). F is the empirical
+    # characteristic function of the ACTUAL per-electron offsets transport
+    # already draws (``initial_t0_ang``/``initial_r_ang``, Ne-long
+    # population arrays, NOT the per-segment gathered/duplicated ones):
+    # F(row) = |mean_e exp(i*(omega*t0_e - q_perp(row).dr_perp,e))|^2. This
+    # needs no per-policy sigma-resolution logic (legacy gaussian/uniform
+    # bunch, long_offsets_fs, compressed, microtrain, and elliptical/
+    # Courant-Snyder transverse spots all fall out for free -- the only
+    # requirement is t0 sampled independently of the transverse offset,
+    # true here since they use independent RNG child streams), and it
+    # converges to the closed-form exp[-(omega sigma_z)^2-(q_perp
+    # sigma_perp)^2] via ordinary 1/sqrt(Ne) statistics rather than the
+    # non-converging speckle the naive sum shows.
+    #
+    # F must be applied PER ROW (reflection x mosaic orientation), before
+    # summing across rows: q_perp depends on g, which differs row to row,
+    # so a single scalar F(E) on the row-summed spectrum would be wrong
+    # whenever more than one row contributes to the same energy bin.
+    #
+    # Validation: coherent-inter-electron-decoherence
+    decoherence_active = False
+    if coherent:
+        seg_r_geom = seg_r
+        d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
+        t0_pop = xp.asarray(segments.get("initial_t0_ang", np.zeros(0)), dtype=REAL)[:Ne]
+        xy0_pop = xp.asarray(
+            np.asarray(segments.get("initial_r_ang", np.zeros((0, 3))))[:, :2], dtype=REAL
+        )[:Ne]
+        decoherence_active = bool(
+            (t0_pop.size and xp.any(t0_pop != 0.0)) or (xy0_pop.size and xp.any(xy0_pop != 0.0))
+        )
+        if decoherence_active:
+            finite_footprint_now = (
+                segments.get("crystal_width_ang") is not None
+                and segments.get("crystal_height_ang") is not None
+            )
+            if finite_footprint_now:
+                raise ValueError(
+                    "coherent emission with a finite crystal footprint "
+                    "(crystal_width_mm/crystal_height_mm) and a nonzero "
+                    "bunch_length_fs/beam_fwhm_mm is not yet supported: the "
+                    "transverse offset also perturbs escape attenuation "
+                    "there, which the inter-electron decoherence form "
+                    "factor does not model (see "
+                    "docs/validation/radiation-physics/"
+                    "coherent-inter-electron-decoherence.md)"
+                )
+            seg_r_geom = seg_r.copy()
+            seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+            seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
+            d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
+            # A_e = t0_e - n_hat_perp . dr_perp,e does not depend on g (the
+            # reciprocal vector varies per row; n_hat is fixed for the whole
+            # call), so hoist it once here; B_e(row) = g_perp . dr_perp,e is
+            # cheap and stays inside the per-row helper below.
+            decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
+
+        def _row_decoherence_factor(g_vec_d):
+            """Empirical |<e^{i*phase_e}>|^2 for one row's g, from the
+            actual per-electron offset population (chunked to bound peak
+            memory the same way the field reduction below already is)."""
+            if not decoherence_active:
+                return None
+            B_pop = xy0_pop @ g_vec_d[:2]
+            chi_sum = xp.zeros(E_grid.size, dtype=cdtype)
+            for j0 in range(0, decoherence_A_pop.size, chunk):
+                sl = slice(j0, min(j0 + chunk, decoherence_A_pop.size))
+                phase = omega_grid[None, :] * decoherence_A_pop[sl][:, None] - B_pop[sl][:, None]
+                chi_sum += xp.exp(1j * phase).sum(axis=0)
+            chi = chi_sum / decoherence_A_pop.size
+            return (chi.real**2 + chi.imag**2).astype(REAL)
+
+        def _coherent_electron_grouped_row(elec_id_sel, a_width_sel, E_r_sel, d_geom_sel,
+                                            g_phase_sel, L_esc_sel, coefs_sel):
+            """sum_e |sum_{j in e} E_j|^2 for one row's kept, finite segments,
+            using the SAME group-then-reduce-then-square pattern as the
+            flight-grouped incoherent path (7b) above, keyed by electron
+            instead of flight. Every ``*_sel`` array is already restricted
+            to this row's kept, finite segments and shares one length;
+            ``coefs_sel``: per-polarization complex per-segment
+            coefficients (same restriction)."""
+            gid = _to_cpu(elec_id_sel)
+            perm = np.argsort(gid, kind="stable")
+            gid = gid[perm]
+            starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
+            bounds = np.append(starts, gid.size)
+            row_total = xp.zeros(E_grid.size, dtype=REAL)
+            perm_xp = xp.asarray(perm)
+            aw_p = a_width_sel[perm_xp]
+            Er_p = E_r_sel[perm_xp]
+            d_p = d_geom_sel[perm_xp]
+            gp_p = g_phase_sel[perm_xp]
+            Lesc_p = L_esc_sel[perm_xp]
+            coefs_p = [c[perm_xp] for c in coefs_sel]
+            for ka, kb in _flight_blocks(bounds, chunk):
+                rows = slice(bounds[ka], bounds[kb])
+                x = aw_p[rows][:, None] * (E_grid[None, :] - Er_p[rows][:, None]) / xp.pi
+                arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
+                arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
+                SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
+                offsets = bounds[ka:kb] - bounds[ka]
+                for c in coefs_p:
+                    field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                    row_total += (xp.abs(field) ** 2).sum(axis=0)
+            return row_total
+
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
@@ -1435,16 +1557,34 @@ def mc_spectrum(
         if coherent:
             amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
             a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
-            d = d_all[idx]
-            g_phase = _matvec3(seg_r[idx], g_vec_d)
+            # Geometric-only (offset-free) phase: identical to d_all/seg_r
+            # when no decoherence-relevant offset is configured, so this is
+            # a no-op swap in that (default) case. See the
+            # coherent-inter-electron-decoherence block above.
+            d = d_all_geom[idx]
+            g_phase = _matvec3(seg_r_geom[idx], g_vec_d)
             coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
             good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+
+            if decoherence_active and sinc_cutoff is not None:
+                raise ValueError(
+                    "coherent emission with a nonzero bunch_length_fs/"
+                    "beam_fwhm_mm and sinc_cutoff together is not yet "
+                    "supported (the electron-grouped decoherence floor "
+                    "does not implement sinc_cutoff windowing)"
+                )
 
             # GPU float32 fast path: reduce the two complex polarization fields
             # directly in a raw kernel. This avoids materializing the dense
             # complex SP[segment, energy] matrix and avoids both complex GEMVs.
             # The exact CuPy path below remains the fallback for CPU/other
-            # backends, float64, and sinc_cutoff windowing.
+            # backends, float64, sinc_cutoff windowing, and (new) a nonzero
+            # bunch_length_fs/beam_fwhm_mm -- the fused kernel squares one
+            # realization internally with no electron-grouped floor to blend
+            # against, so it is only correct in the degenerate (offset-free)
+            # limit. Falling back here trades the float32 kernel's speed for
+            # correctness on this path; native kernel support for the
+            # decoherence blend is unimplemented (follow-up).
             # The reduction kernel folds the vacuum phase as ``slope_j * E``, a
             # single per-line scalar against the energy axis. The in-medium term
             # is a SECOND (per-segment scalar) x (per-energy table) product, so
@@ -1455,6 +1595,7 @@ def mc_spectrum(
                 and getattr(xp, "__name__", "") == "cupy"
                 and np.dtype(REAL) == np.dtype(np.float32)
                 and sinc_cutoff is None
+                and not decoherence_active
             )
             if _use_jit_coherent_reduction:
                 from .coherent_jit_kernel import (
@@ -1523,8 +1664,22 @@ def mc_spectrum(
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
                         f[i0:i1] += c[sel] @ SP
-            for f in fields:
-                spec[:] += xp.abs(f) ** 2 * wm
+            flat_total = sum(xp.abs(f) ** 2 for f in fields)
+            if decoherence_active:
+                sel_full = xp.flatnonzero(good)
+                grouped_total = _coherent_electron_grouped_row(
+                    seg_elec_id[idx][sel_full],
+                    a_width[sel_full],
+                    E_r[sel_full],
+                    d[sel_full],
+                    g_phase[sel_full],
+                    L_esc[sel_full],
+                    [c[sel_full] for c in coefs],
+                )
+                F_row = _row_decoherence_factor(g_vec_d)
+                spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm
+            else:
+                spec[:] += flat_total * wm
             return
 
         # -- 7. accumulate the finite-segment lineshape ---------------------------
@@ -1838,6 +1993,7 @@ def mc_spectrum(
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
             and sinc_cutoff is None
+            and not decoherence_active
         )
         if _use_jit_coherent_stream:
             from .coherent_stream_jit_kernel import (
@@ -1875,6 +2031,7 @@ def mc_spectrum(
             and _USE_JIT_COHERENT_REDUCTION
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
+            and not decoherence_active
         )
         if _use_jit_coherent_reduction:
             from .coherent_jit_kernel import (
@@ -2077,11 +2234,20 @@ def mc_spectrum(
                 # transfer itself.
                 gm = xp.ascontiguousarray(good.T).reshape(-1)
                 c_s, c_p = ((amp * t_L) * A_e for A_e in pol_A)
-                gxr, gyr, gzr = seg_r[sb, 0][:, None], seg_r[sb, 1][:, None], seg_r[sb, 2][:, None]
+                # Geometric-only (offset-free) phase: identical to
+                # d_all/seg_r when no decoherence-relevant offset is
+                # configured, so this is a no-op swap in that (default)
+                # case. See the coherent-inter-electron-decoherence block
+                # above (_accumulate's 7c does the same swap).
+                gxr, gyr, gzr = (
+                    seg_r_geom[sb, 0][:, None],
+                    seg_r_geom[sb, 1][:, None],
+                    seg_r_geom[sb, 2][:, None],
+                )
                 per_line = (
                     E_res,
                     a_width,
-                    (d_all[sb] / HBARC_EV_ANG)[:, None],  # phase slope vs E
+                    (d_all_geom[sb] / HBARC_EV_ANG)[:, None],  # phase slope vs E
                     gxr * gx + gyr * gy + gzr * gz,  # g.r_j
                     c_s.real,
                     c_s.imag,
@@ -2089,8 +2255,10 @@ def mc_spectrum(
                     c_p.imag,
                 )
                 # Escape distance rides along as the second phase slope, the one
-                # that multiplies delta(E) omega(E) instead of E.
-                per_line = (*per_line, L_esc)
+                # that multiplies delta(E) omega(E) instead of E. The emitting
+                # electron id rides along too, needed only when
+                # decoherence_active blends in the electron-grouped floor.
+                per_line = (*per_line, L_esc, seg_elec_id[sb][:, None])
                 coh_blocks.append(
                     [
                         xp.ascontiguousarray(xp.broadcast_to(f, shape).T).reshape(-1)[gm]
@@ -2216,6 +2384,7 @@ def mc_spectrum(
                     row = [xp.concatenate(parts) for parts in zip(*blocks, strict=True)]
                 E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = row[:8]
                 L_i = row[8]  # escape distance for the in-medium phase
+                elec_id_i = row[9]  # emitting electron id (decoherence_active only)
                 wm_i = float(wm_rows[i_row])
                 if _use_jit_coherent_reduction:
                     run_coherent_reduction_kernel(
@@ -2246,7 +2415,21 @@ def mc_spectrum(
                     SP = xp.sinc(x).astype(cdtype) * ph
                     f_s += (csr[sl] + 1j * csi[sl]) @ SP
                     f_p += (cpr[sl] + 1j * cpi[sl]) @ SP
-                spec[:] += (xp.abs(f_s) ** 2 + xp.abs(f_p) ** 2) * wm_i
+                flat_total = xp.abs(f_s) ** 2 + xp.abs(f_p) ** 2
+                if decoherence_active:
+                    grouped_total = _coherent_electron_grouped_row(
+                        elec_id_i,
+                        aw_i,
+                        E_r_i,
+                        ps_i * HBARC_EV_ANG,  # ps_i is d_geom/HBARC_EV_ANG; undo the fold
+                        gp_i,
+                        L_i,
+                        [csr + 1j * csi, cpr + 1j * cpi],
+                    )
+                    F_row = _row_decoherence_factor(G[i_row])
+                    spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm_i
+                else:
+                    spec[:] += flat_total * wm_i
             _nsys_pop()
 
     if components:
