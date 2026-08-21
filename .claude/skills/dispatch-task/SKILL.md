@@ -15,9 +15,8 @@ hygiene.
    `agentdocs/tasks/<branch-name>/README.md`,
    worktree list, branch status, and relevant instructions.
 2. Invoke `repo-orientation` to confirm owners, dependencies, and tests.
-3. If the issue still carries `status:needs-triage`, invoke `triage`; stop for
-   plan review.
-4. Stop on unrelated dirty state, missing/inaccessible worktree, ambiguous
+3. Stop on unrelated dirty state in the task worktree, missing/inaccessible
+   worktree, ambiguous
    backlog ownership, or issue/task-doc divergence.
 
 ## Lifecycle
@@ -27,9 +26,10 @@ hygiene.
 1. Verify reviewed task doc, the issue's branch/task-doc pointer, branch, and
    worktree.
 2. Create/reuse the approved worktree if missing; do not redesign the plan.
-3. Verify triage's setup commit (task doc + issue labels/pointer) exists and
+3. Verify triage's setup commit (task doc + issue pointer) exists and
    `main` and the task branch are pushed with upstream.
-4. Dispatch only after clean status and remote setup verification.
+4. Dispatch only after the task worktree is clean and remote setup is verified;
+   unrelated state in the `main` worktree is not a blocker.
 
 Setup commit/push belongs to `triage`; do not grant worker push, issue, or
 delegation authority implicitly.

@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Use when /triage is invoked with optional task-description text or a status:needs-triage GitHub issue or user-marked backlog prose must become reviewable, tracked PyRITE agent task records, task branches/worktrees, and a canonical GitHub issue before dispatch.
+description: Use when /triage is invoked with optional task-description text or an open GitHub issue or user-marked backlog prose must become reviewable, tracked PyRITE agent task records, task branches/worktrees, and a canonical GitHub issue before dispatch.
 ---
 
 # Triage
@@ -10,8 +10,7 @@ and branch push; stop before dispatch.
 
 ## Input
 
-- `/triage`: select existing `status:needs-triage` GitHub issues
-  (`gh issue list --label status:needs-triage`) or `>user<` prose still in a
+- `/triage`: select an open, unowned GitHub issue or `>user<` prose still in a
   task doc.
 - `/triage <text>`: treat arguments as fresh untriaged prose. Process only that
   text, not unrelated existing issues/markers. Split into multiple tasks only
@@ -36,19 +35,18 @@ and branch push; stop before dispatch.
      self-contained enough for Serena `one-shot`
    - acceptance checks
 
-4. For each task, open a new GitHub issue or relabel/update the existing
-   `status:needs-triage` one as the canonical record: set `priority:*` and
-   `area:*` labels, drop `status:needs-triage`, and put the branch and
+4. For each task, open a new GitHub issue or update the existing one as the
+   canonical record: set relevant `area:*` labels and put the branch and
    `agentdocs/tasks/<branch-name>/` pointers in the issue body
    (`gh issue create`/`gh issue edit`).
 5. Commit the task-doc setup on `main` in one commit: stage explicit paths only
-   (each new `agentdocs/tasks/<branch-name>/`); never `git add .`, never sweep
-   unrelated dirty state. Use a `docs(tasks): triage <branch-name>`-style
+   (each new `agentdocs/tasks/<branch-name>/`); never `git add .`. Preserve any
+   unrelated dirty state and use a `docs(tasks): triage <branch-name>`-style
    message.
 6. Create each new local task branch/worktree from that setup commit so the
-   worker's branch contains its task record. Stop on name collision, unrelated
-   dirty state, ambiguous intent, or missing design evidence; do not retouch a
-   branch that already owns work.
+   worker's branch contains its task record. Stop on name collision, ambiguous
+   intent, or missing design evidence; do not retouch a branch that already
+   owns work.
 7. Push `main` and each new task branch with upstream (`git push -u`). Verify
    remote refs before presenting.
 8. Show task docs, the issue (created/updated, with link), commit, pushed

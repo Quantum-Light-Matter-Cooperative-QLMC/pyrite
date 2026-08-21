@@ -1,5 +1,7 @@
 # CLI/profile support for FilterPlate (issue #53)
 
+Branch: `53-cliprofile-support-for-filterplate-filters`
+
 ## Context
 
 `FilterPlate` (rectangular attenuating plate: material, thickness_mm, size_mm,

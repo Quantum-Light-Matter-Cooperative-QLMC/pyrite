@@ -15,9 +15,8 @@ issue verbatim.
 2. Cross-check `agentdocs/tasks/` directories against open issues: flag a task
    directory with no matching open issue, or an issue pointer naming a
    directory that doesn't exist.
-3. Report stale/missing pointers, orphaned task directories, and label
-   inconsistencies (e.g. `status:needs-triage` on an issue that already has a
-   branch) without editing. `triage` owns new pointers; `dispatch-task`
-   retirement owns closing completed-item issues.
+3. Report stale/missing pointers and orphaned task directories without editing.
+   `triage` owns new pointers; `dispatch-task` retirement owns closing
+   completed-item issues.
 
 Do not open, close, edit, or label any issue; do not edit task files.
