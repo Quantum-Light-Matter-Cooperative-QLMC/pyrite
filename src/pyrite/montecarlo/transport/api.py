@@ -217,22 +217,26 @@ def simulate_trajectories(
       "frozen" (default) -- the historical left-endpoint rule: stopping power
           and beta evaluated once at the flight's start energy and held
           constant over its whole length. BIT-FOR-BIT unchanged.
-      "midpoint" -- second-order predictor-corrector for the implicit
-          midpoint rule E_end = E_start + (dE/ds)((E_start+E_end)/2)*s, with
+      "midpoint" -- explicit midpoint RK2:
+          E_pred = E_start + (dE/ds)(E_start)*s, then
+          E_end = E_start + (dE/ds)((E_start+E_pred)/2)*s, with
           the clock advanced by s/beta at that representative energy and the
           cutoff truncation distance solved for E_end == E_cut. Adds
           E_end_keV, t_end_ang, and E_repr_keV = (E_start+E_end)/2 (the
           energy radiation kernels evaluate the row at) to the returned rows.
-          Elastic hazard stays frozen at the start energy; only stopping and
-          the clock are controlled here. Lockstep core only -- any other
-          core or a grooved run raises rather than returning the frozen
-          schema.
+          Elastic hazard stays frozen at the start energy within each row;
+          `max_dE_frac` substeps re-evaluate it at the next row's start. The
+          lockstep, per-electron, grooved, and CUDA cores all implement the
+          midpoint schema; unsupported CUDA-LUT/straggling combinations fail
+          closed separately.
     See docs/validation/beam-transport/transport-midpoint-stopping.md.
     Validation: transport-midpoint-stopping
 
-    max_dE_frac: numerical cap on one row's fractional energy loss, splitting
-      a physical flight into substeps when the cap binds before any physical
-      event. 0.0 (default) disables substepping, leaving one row per flight.
+    max_dE_frac: numerical cap on one row's left-endpoint predicted mean loss
+      fraction, ``|dE/ds|(E_start)*s/E_start``. The realized midpoint loss may
+      be slightly larger, and an Urban draw is not bounded by this control.
+      A binding cap splits a physical flight before any physical event. 0.0
+      (default) disables substepping, leaving one row per flight.
       Requires energy_model="midpoint". The collision is drawn once per
       physical flight as an optical depth and consumed across its substeps
       at each substep's own hazard, so refining the cap never resamples the
@@ -1130,17 +1134,14 @@ def simulate_trajectories(
         "n_layers": n_layers,
     }
     if straggle_on:
-        # The summed per-electron Urban-SAMPLED loss. Applied to the electron's
-        # energy only on the ungrooved lockstep exact core (slice E); diagnostic
-        # only on every other core until slice F. See the ``straggling``
-        # paragraph in this function's docstring.
+        # The summed per-electron Urban-SAMPLED loss. Every host core and the
+        # exact CUDA core apply it; the CUDA LUT combination fails closed.
         result["straggle_dE_keV"] = stragg_dE
     if energy_model == "midpoint":
         result["E_end_keV"] = seg_E_end[:nseg]
         result["t_end_ang"] = seg_t_end[:nseg]
-        # The propagator's own representative energy: the implicit midpoint rule
-        # evaluates stopping and beta at (E_start + E_end)/2, so radiation and
-        # quadrature consumers read that value instead of re-deriving one.
+        # Representative energy used by the clock and radiation quadrature.
+        # The explicit RK2 stopping update itself uses (E_start + E_pred)/2.
         result["E_repr_keV"] = 0.5 * (E_seg + seg_E_end[:nseg])
         # `(electron_id, flight_id)` is the stable physical key; `substep_id`
         # indexes numerical rows inside one flight and is integration detail.

@@ -149,10 +149,7 @@ u(e, c) = \bigl(\operatorname{splitmix64}(k_e + \Phi\,(c+1)) \gg 11\bigr)\,2^{-5
 ```
 
 with $\Phi = \texttt{0x9E3779B97F4A7C15}$ and SplitMix64's finalizer, which is a
-bijection on 64 bits and passes BigCrush in counter mode.[^splitmix]
-
-[^splitmix]: Steele, Lea & Flood, *Fast splittable pseudorandom number
-    generators*, OOPSLA 2014. [DOI:10.1145/2660193.2660195](https://doi.org/10.1145/2660193.2660195)
+bijection on 64 bits and passes BigCrush in counter mode{cite:p}`steele2014`.
 
 Two implementation choices follow from the requirement that host and device
 agree exactly. Keys are built on the host, so device code needs no 64-bit
@@ -200,9 +197,13 @@ far wider than any reachable `max_steps` or substep count.
 
 This addressing also defines the cross-core contract. Given the same row state
 and `(seed, electron, flight, substep)`, every host core calls the same sampler;
-the exact CUDA kernel carries a transcription of the same key derivation. The
-CUDA path still awaits hardware verification, so host/device equality is a
-written and hardware-gated contract rather than a completed validation claim.
+the exact CUDA kernel carries a transcription of the same key derivation. Five
+hardware-gated tests pass on an RTX 5080 (driver 610.47, CuPy 14.1.1), covering
+disabled-path identity, replay, finite energy bookkeeping, first-row transport
+state, and ensemble agreement. The first-row test currently compares the state
+*entering* the loss update, not `E_end_keV`, so exact host/device parity of one
+sampled loss remains an anchor gap; whole trajectories retain only the
+distributional contract because libm rounding can change a Poisson quantile.
 
 ## Draw order as a contract
 
@@ -221,8 +222,11 @@ This is structural and cannot be fixed. It also is not a defect — but it does
 determine what may be compared how:
 
 * `per-electron` versus `cuda`: same stream addressing, so they may be compared
-  **numerically**, and at production scale they agree to 0.000 % on every
-  recorded field. What separates them is math-library rounding alone.
+  numerically on the first-row entering state and statistically over complete
+  straggled trajectories. The current hardware anchor bounds summed sampled
+  loss to 2% and cutoff counts to 5% (or two electrons); it does not establish
+  field-by-field equality. What separates the implementations before
+  trajectory divergence is math-library rounding alone.
 * Either versus `lockstep`: different stream order, so they may be compared only
   **statistically**, with ensemble means and error bars. The measured difference
   is not small — of order a percent on line spectra and tens of percent on

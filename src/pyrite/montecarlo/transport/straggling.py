@@ -134,14 +134,14 @@ def _urban_levels_scalar(Z, J_keV, T_up, two_mc2_bg2, beta_sq):
     """Urban's ``(f_1, E_1, f_2, E_2)`` for one element [keV], with the re-solve.
 
     The K-shell level ``E_2 = 10 Z^2`` eV is a *parameterisation*, not a measured
-    binding energy, and PyRITE runs it far below the energies Geant4 does. It is
+    binding energy, and PyRITE applies this thin-channel parameterisation at
+    unusually low energies. It is
     inadmissible when it sits above the Moller ceiling ``T_up = E/2`` (i.e. below
     ``E = 20 Z^2`` eV: C below 0.72 keV, Si below 3.92 keV, S below 5.12 keV, W
-    below 109.5 keV) or when its logarithmic factor has gone non-positive. Geant4
-    never reaches either boundary and simply clamps a negative count to zero;
-    clamping here would DELETE a negative contribution and make the mean
+    below 109.5 keV) or when its logarithmic factor has gone non-positive. A
+    simple clamp would delete a negative contribution and make the mean
     overshoot -- measured closure 1.0187/1.0098/1.0038/1.0010 for W at 1/2/5/10
-    keV. Instead the sum rules are re-solved on the single remaining level,
+    keV. PyRITE instead re-solves the sum rules on the single remaining level,
     ``f_1 = 1``, ``E_1 = I``, which satisfies ``f_1 ln E_1 = ln I`` identically
     and so restores <dE> = C s exactly.
 

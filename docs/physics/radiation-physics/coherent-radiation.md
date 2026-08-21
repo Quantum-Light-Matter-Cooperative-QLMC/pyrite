@@ -273,9 +273,11 @@ turns the one-point path integral into a midpoint rule.
 Without the grouping, splitting a flight into $N$ substeps would give $N$ rows
 carrying $(t_L/N)^2$ in place of one carrying $t_L^2$, and the line peak would
 fall roughly as $1/N$: tightening a numerical tolerance would dismantle the line.
-At frozen energy and clock the grouped sum recovers the unsplit row exactly by
-the Dirichlet-kernel identity, so all residual under refinement is the physical
-variation of $E$ and $\beta$ along the flight.
+At frozen energy and clock the grouped finite-time factor recovers the unsplit
+row exactly by the Dirichlet-kernel identity in the vacuum/zero-dispersion
+limit. With the production in-medium escape phase, the phase varies along the
+flight but is not part of that sinc factor; the grouped result therefore
+converges first-order under refinement rather than remaining exactly invariant.
 
 The grouped reduction is host-only and non-batched. Substepped rows on a device
 backend, with `components=True`, or with refractive dispersion across `layers`

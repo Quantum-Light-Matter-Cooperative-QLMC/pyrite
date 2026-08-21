@@ -796,8 +796,8 @@ def _transport_kernel(
                 if cutoff_j:
                     E_end_j = E_cut_e
                 else:
-                    # Predictor-corrector for the implicit midpoint rule
-                    # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                    # Explicit midpoint RK2: predict with the start rate,
+                    # then evaluate at (E_start + E_pred)/2.
                     E_pred = E_j + dEds * step_j
                     E_end_j = E_j + step_j * _dEds_packed(
                         L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_pred)
@@ -1538,12 +1538,11 @@ def run_transport_kernel(
     host, exactly as ``test_cuda_first_step_agrees_with_the_cpu_reference``
     already asserts for the deterministic path.
 
-    **UNVERIFIED on hardware.** Slices D, E and F all ran on a machine with no
-    ``cupy`` and no CUDA device, so this kernel has never been compiled or
-    executed with straggling on. The code is a transcription of the tested
-    :func:`_transport_core_ungrooved_perelectron`; the hardware-gated tests in
-    ``tests/montecarlo/test_straggling_cuda.py`` are the check, and they need a
-    GPU (``pyrite remote``) to run.
+    Hardware re-validation passed 5/5 straggling tests on an NVIDIA GeForce RTX
+    5080 (driver 610.47, CuPy 14.1.1). Those tests cover disabled-path identity,
+    replay, energy bookkeeping, first-row entering state, and ensemble
+    agreement. Direct parity of the first applied loss remains an anchor gap:
+    the current first-row test compares row-start ``E_keV``, not ``E_end_keV``.
     """
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):

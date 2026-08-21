@@ -656,8 +656,8 @@ def _transport_core_ungrooved(
                     if cutoff_j:
                         E_end_j = E_cut_e
                     else:
-                        # Predictor-corrector for the implicit midpoint rule
-                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        # Explicit midpoint RK2: predict with the start rate,
+                        # then evaluate at (E_start + E_pred)/2.
                         # step_j <= cutoff_distance and |dE/ds| grows as E falls,
                         # so the predictor never undershoots E_cut and the
                         # Joy-Luo log argument stays in range.
@@ -1118,8 +1118,8 @@ def _transport_core_ungrooved_lut(
                     if cutoff_j:
                         E_end_j = E_cut_e
                     else:
-                        # Predictor-corrector for the implicit midpoint rule
-                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        # Explicit midpoint RK2: predict with the start rate,
+                        # then evaluate at (E_start + E_pred)/2.
                         E_pred = E_j + dEds * step_j
                         mid_i, mid_f = _lut_index_frac_scalar(
                             0.5 * (E_j + E_pred),
@@ -1558,8 +1558,8 @@ def _transport_core_grooved(
                     if cutoff_j:
                         E_end_j = E_cut_e
                     else:
-                        # Predictor-corrector for the implicit midpoint rule
-                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        # Explicit midpoint RK2: predict with the start rate,
+                        # then evaluate at (E_start + E_pred)/2.
                         E_pred = E_j + dEds * step_j
                         E_end_j = E_j + step_j * _dEds_spliced_compound_scalar(
                             J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
@@ -2076,8 +2076,8 @@ def _transport_core_ungrooved_perelectron(
                     if cutoff_j:
                         E_end_j = E_cut_e
                     else:
-                        # Predictor-corrector for the implicit midpoint rule
-                        # E_end = E_start + (dE/ds)((E_start + E_end)/2) * s.
+                        # Explicit midpoint RK2: predict with the start rate,
+                        # then evaluate at (E_start + E_pred)/2.
                         E_pred = E_j + dEds * step_j
                         E_end_j = E_j + step_j * _dEds_spliced_packed_scalar(
                             L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_pred)

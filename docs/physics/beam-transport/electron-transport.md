@@ -36,7 +36,8 @@ With `straggling=False` (the default), a material row loses the deterministic
 mean $Cs$, where $C=\lvert dE/ds\rvert$ is the spliced stopping magnitude at
 the row's start energy and $s$ is its material path length. With
 `straggling=True`, that loss is replaced by the unrestricted Urban
-compound-Poisson draw
+compound-Poisson draw described by the Geant4 Physics Reference Manual and
+ultimately motivated by Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`:
 
 $$
 \Delta E
@@ -88,18 +89,22 @@ the whole flight. `Numerics`, campaign profiles and the CLI expose this setting,
 `max_dE_frac`, and `straggling`; their defaults preserve historical case and
 dataset identities.
 
-`"midpoint"` advances the flight by the implicit midpoint rule
+`"midpoint"` advances the flight with explicit midpoint RK2:
 
 $$
+E_{\rm pred}=E_{\rm start}
++\frac{dE}{ds}(E_{\rm start})s,
+\qquad
 E_{\rm end}=E_{\rm start}
-+\frac{dE}{ds}\!\left(\tfrac12(E_{\rm start}+E_{\rm end})\right)s,
++\frac{dE}{ds}\!\left(\tfrac12(E_{\rm start}+E_{\rm pred})\right)s,
 $$
 
-evaluated by one predictor--corrector pass, and advances the clock by
-$s/\beta(\tfrac12(E_{\rm start}+E_{\rm end}))$. It is third-order local and
+The clock advances by
+$s/\beta(\tfrac12(E_{\rm start}+E_{\rm end}))$. The update is third-order local and
 second-order global, one order above the frozen rule. A cutoff-stopped flight
-solves its truncation distance for $E_{\rm end}=E_{\rm cut}$ rather than
-extrapolating, so the frozen rule's CSDA range overshoot disappears.
+separately evaluates the stopping rate at
+$(E_{\rm start}+E_{\rm cut})/2$ and assigns $E_{\rm end}=E_{\rm cut}$, so the
+frozen rule's CSDA range overshoot disappears.
 
 With straggling enabled, the random draw replaces both deterministic energy
 updates: $E_{\rm end}=E_{\rm start}-\Delta E$. `energy_model` still selects the
@@ -115,8 +120,11 @@ the midpoint rule on the same flights.
 
 ### Physical flights and numerical substeps
 
-`max_dE_frac` caps one row's fractional energy loss and requires
-`energy_model="midpoint"`. When that cap binds before any physical event, the
+`max_dE_frac` caps one row's left-endpoint prediction
+$C(E_{\rm start})s/E_{\rm start}$ and requires `energy_model="midpoint"`.
+The realized midpoint loss is slightly larger when $C(E)$ rises as the
+electron slows, and an Urban draw is unbounded by this numerical control. When
+the predicted-mean cap binds before any physical event, the
 transport emits a row and resumes the same flight: same direction, same
 `flight_id`, `substep_id + 1`, no deflection, and no new collision draw.
 Numerical substeps are quadrature nodes of a flight's own integrals — never

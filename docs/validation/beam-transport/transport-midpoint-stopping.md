@@ -1,41 +1,54 @@
 # `transport-midpoint-stopping`
 
 Ledger row: [`transport-midpoint-stopping`](../physics-validation-ledger.md).
-Code: `montecarlo/transport.py::simulate_trajectories` (`energy_model`) and
-`::_transport_core_ungrooved`.
+Code: `montecarlo/transport/api.py::simulate_trajectories` (`energy_model`);
+host cores in `montecarlo/transport/cores.py`; exact CUDA core in
+`montecarlo/transport_jit_kernel.py`.
 
 ## Claim
 
-A physical flight of length `s` starting at energy `E_start` ends at
+A physical flight of length `s` starting at energy `E_start` uses explicit
+midpoint RK2:
 
-```
-E_end = E_start + (dE/ds)((E_start + E_end)/2) · s
-```
+$$
+E_{\rm pred}=E_{\rm start}+\frac{dE}{ds}(E_{\rm start})s,
+\qquad
+E_{\rm end}=E_{\rm start}
++\frac{dE}{ds}\!\left(\frac{E_{\rm start}+E_{\rm pred}}{2}\right)s.
+$$
 
 and advances the relative-age transport clock by
 
-```
-Δt = s / β((E_start + E_end)/2)          [Å, c = 1]
-```
+$$
+\Delta t=\frac{s}{\beta((E_{\rm start}+E_{\rm end})/2)}
+\quad [\text{\AA},\ c=1].
+$$
 
 replacing the left-endpoint ("frozen") rule `E_end = E_start + (dE/ds)(E_start)·s`,
 `Δt = s/β(E_start)` that held both coefficients at the flight's start energy.
 
 ## Governing equations and where they come from
 
-No new physical law enters. The stopping law is the existing Joy–Luo CSDA
-expression already ledgered under `electron-transport`,
+No new physical law enters. Current transport uses the per-element
+Joy--Luo/Berger--Seltzer splice ledgered under
+`relativistic-bethe-stopping`. The expression below is its low-energy Joy--Luo
+branch and was the stopping function used by the historical numerical table:
 
-```
-dE/ds (E) = -(7.85e-4 / E) · Σ_i (n_i/0.602214076) Z_i · ln(1.166 (E + k_i J_i)/J_i)
-```
+$$
+\frac{dE}{ds}(E)
+=-\frac{7.85\times10^{-4}}{E}
+\sum_i\frac{n_i}{0.602214076}Z_i
+\ln\!\left(\frac{1.166(E+k_iJ_i)}{J_i}\right).
+$$
 
 in keV/Å, with `k_i = 0.731 + 0.0688 log10 Z_i`, and the clock is the elementary
 kinematic integral
 
-```
-t(s) = ∫_0^s ds' / β(E(s')),   β(E) = sqrt(1 - (1 + E/511.0)^-2).
-```
+$$
+t(s)=\int_0^s\frac{ds'}{\beta(E(s'))},
+\qquad
+\beta(E)=\sqrt{1-(1+E/511.0)^{-2}}.
+$$
 
 Both are initial-value problems in the path length `s`. The frozen rule is the
 explicit Euler discretization of each with a single step of size `s`; this claim
@@ -43,14 +56,15 @@ replaces it with the midpoint rule for both.
 
 ## Discretization and its evaluation
 
-The energy update is the *implicit* midpoint rule, evaluated by one
-predictor-corrector pass, which is the standard explicit midpoint (RK2) scheme:
+The energy update is the standard explicit midpoint (RK2) scheme:
 
-```
-E_pred = E_start + (dE/ds)(E_start) · s
-E_mid  = (E_start + E_pred)/2
-E_end  = E_start + (dE/ds)(E_mid) · s
-```
+$$
+E_{\rm pred}=E_{\rm start}+\frac{dE}{ds}(E_{\rm start})s,
+\qquad
+E_{\rm mid}=\frac{E_{\rm start}+E_{\rm pred}}{2},
+\qquad
+E_{\rm end}=E_{\rm start}+\frac{dE}{ds}(E_{\rm mid})s.
+$$
 
 The clock uses the midpoint quadrature of `∫ ds'/β` with the *corrected*
 representative energy `(E_start + E_end)/2`, so a flight carries one
@@ -59,14 +73,18 @@ representative energy rather than two.
 ### Cutoff truncation
 
 A flight truncated by the population energy floor `E_cut` has `E_end = E_cut` by
-construction, so its midpoint energy is `(E_start + E_cut)/2` exactly and the
-truncation distance is not an extrapolation but the exact inverse of the scheme:
+construction. This branch evaluates the stopping rate at
+`(E_start + E_cut)/2` and defines the truncation distance as
 
-```
-s_cut = (E_cut - E_start) / (dE/ds)((E_start + E_cut)/2).
-```
+$$
+s_{\rm cut}
+=\frac{E_{\rm cut}-E_{\rm start}}
+{(dE/ds)((E_{\rm start}+E_{\rm cut})/2)}.
+$$
 
-The frozen rule instead uses `(dE/ds)(E_start)`. Because `|dE/ds|` grows as `E`
+This is a separate endpoint-average cutoff construction, not an inversion of
+the explicit RK2 update. The frozen rule instead uses `(dE/ds)(E_start)`.
+Because `|dE/ds|` grows as `E`
 falls over the whole range above the cutoff, `|(dE/ds)(E_mid)| ≥ |(dE/ds)(E_start)|`
 and therefore `s_cut(midpoint) ≤ s_cut(frozen)`: the frozen rule overshoots the
 electron's true residual range.
@@ -74,14 +92,20 @@ electron's true residual range.
 That same inequality is what keeps the corrector well posed. For any accepted
 step `s ≤ s_cut`,
 
-```
-E_pred = E_start + (dE/ds)(E_start)·s
-       ≥ E_start + [(dE/ds)(E_start) / (dE/ds)((E_start+E_cut)/2)] · (E_cut - E_start)
-       ≥ E_cut,
-```
+$$
+E_{\rm pred}
+=E_{\rm start}+\frac{dE}{ds}(E_{\rm start})s
+\ge E_{\rm start}
++\frac{(dE/ds)(E_{\rm start})}
+{(dE/ds)((E_{\rm start}+E_{\rm cut})/2)}
+(E_{\rm cut}-E_{\rm start})
+\ge E_{\rm cut}.
+$$
 
-so the predictor never falls below the cutoff and the Joy–Luo logarithm is never
-evaluated outside its range. No clamp is needed and none is applied.
+so the predictor never falls below the cutoff. The low-energy Joy--Luo branch
+therefore stays inside its logarithm's supported region; the higher-energy
+Berger--Seltzer branch is selected by the splice. No clamp is needed and none
+is applied.
 
 ## Assumptions and limits of validity
 
@@ -94,9 +118,9 @@ evaluated outside its range. No clamp is needed and none is applied.
   controlled here. Convergent hazard treatment is checklist step F of
   `feature/energy-controlled-electron-transport`.
 - `|dE/ds|` monotone in `E` is used only for the cutoff-overshoot direction and
-  the predictor bound above, and only over `E > E_cut`. Below
-  `E ≈ J/1.166 − kJ` the Joy–Luo logarithm changes sign and the law itself is
-  invalid; the cutoff keeps transport out of that region.
+  the predictor bound above, and only over `E > E_cut`. The transport cutoff
+  keeps the low-energy Joy--Luo branch away from its sign-changing logarithm;
+  above the per-element crossover the Berger--Seltzer branch applies.
 - The flight decomposition is untouched, so this is not yet the energy-limited
   substepping of checklist step F.
 
@@ -163,8 +187,9 @@ implementation). Filters: units `pass` (`dE/ds` keV/Å, clock in Å with
 $c=1$); signs/conventions `pass` ($dE/ds<0$, $E_{\rm end}<E_{\rm start}$);
 limits `pass` ($s\to0$ and constant $dE/ds$ both collapse to the frozen rule).
 
-Re-derived the scheme from the Joy–Luo `dE/ds` and the clock integral before
-reading `transport.py`. The predictor-corrector
+The 2026-08-18 verification re-derived the scheme from the then-documented
+Joy--Luo `dE/ds` and the clock integral before reading the implementation. The
+explicit midpoint update
 $E_{\rm pred}=E_{\rm start}+s\,f(E_{\rm start})$,
 $E_{\rm mid}=(E_{\rm start}+E_{\rm pred})/2$,
 $E_{\rm end}=E_{\rm start}+s\,f(E_{\rm mid})$
@@ -184,11 +209,11 @@ through the general predictor-corrector, which would *not* reproduce
 `E_cut` exactly (the exactness is a construction property of the direct
 assignment, not of the RK2 formula).
 
-Read `_transport_core_ungrooved` (`transport.py:1027-1079`) after the
+It then read `_transport_core_ungrooved` after the
 derivation: `E_pred`/`E_mid`/`E_end`, `cutoff_distance`, and
 `beta_j = beta_from_keV_scalar(0.5*(E_j+E_end_j))` match term for term. A
 standalone reimplementation of `dE/ds` and $\beta$ from the governing
-equations (independent of `transport.py`; $J=78$ eV,
+equations (independent of the transport implementation; $J=78$ eV,
 `coeff=(0.1136/0.602214076)*6` for the ledger row's carbon case) against a
 200000-step RK4 reference reproduced the ledger's numeric-evidence table to
 3-4 significant figures without consulting it for the arithmetic beforehand
@@ -210,4 +235,10 @@ respectively, which is what the numeric-evidence table and this verification
 both correctly report; only the phrase describing the two schemes'
 mutual difference is loose.
 
-Verdict `rederived`. `signed-off` remains a human decision.
+Verdict after the 2026-08-20 audit: `discrepancy`. The implementation and
+numeric convergence evidence are consistent with explicit midpoint RK2, but
+the prior ledger claim stated the implicit endpoint-average equation and the
+write-up's independent numeric table used the retired pure Joy--Luo branch
+rather than the current Joy--Luo/Berger--Seltzer splice. The corrected claim
+requires fresh-context re-validation before returning to `rederived`;
+`signed-off` remains a human decision.

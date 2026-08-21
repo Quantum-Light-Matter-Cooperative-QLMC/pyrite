@@ -1,28 +1,36 @@
 # `energy-controlled-propagation`
 
 Ledger row: [`energy-controlled-propagation`](../ledger-transport-background.md#energy-controlled-propagation).
-Code: `montecarlo/transport.py::simulate_trajectories` (`max_dE_frac`),
-`::_transport_core_ungrooved`, `::_transport_core_ungrooved_lut`.
+Code: `montecarlo/transport/api.py::simulate_trajectories` (`max_dE_frac`);
+host cores in `montecarlo/transport/cores.py`; exact CUDA core in
+`montecarlo/transport_jit_kernel.py`.
 Measurement: `checks/collision_statistics_refinement.py`.
 
 ## Claim
 
-A physical flight may be split into numerical substeps of at most `f`
-fractional energy loss (`max_dE_frac=f`, which requires
+A physical flight may be split into numerical substeps whose left-endpoint
+predicted mean loss is at most the fraction `f`
+(`max_dE_frac=f`, which requires
 `energy_model="midpoint"`) without changing the flight's *physical* identity or
 the statistics of where its terminating collision occurs.
 
+This is not a strict bound on the realized loss. The deterministic midpoint
+update is slightly larger when stopping rises as the electron slows, and an
+Urban compound-Poisson draw is unbounded. The control fixes a deterministic
+quadrature grid through $s_{\rm cap}=fE_{\rm start}/C(E_{\rm start})$.
+
 The elastic collision is drawn once per physical flight as an optical depth
 
-```
-tau = -ln(U),        U ~ Uniform(0, 1]
-```
+$$
+\tau=-\ln U,
+\qquad U\sim\operatorname{Uniform}(0,1].
+$$
 
 and consumed across that flight's substeps at each substep's own hazard,
 
-```
-tau  <-  tau - ds / lambda(E_substep),
-```
+$$
+\tau\leftarrow\tau-\frac{ds}{\lambda(E_{\rm substep})}.
+$$
 
 the flight closing when the budget is exhausted (collision), at a boundary, at
 the cutoff, or on termination. A substep that ends because the energy cap bound
@@ -34,9 +42,9 @@ first keeps the flight's direction, `flight_id`, and remaining `tau`, increments
 The exact statement of the inhomogeneous collision law along a flight is that
 the collision occurs at the path length `s*` solving
 
-```
-int_0^{s*} ds / lambda(E(s))  =  -ln(U),
-```
+$$
+\int_0^{s^*}\frac{ds}{\lambda(E(s))}=-\ln U.
+$$
 
 because the survival probability along a path of varying hazard is
 `exp[-int ds/lambda(E(s))]` and inverting a Uniform(0,1] through it is the
@@ -57,9 +65,10 @@ Two properties fall out and are relied on elsewhere:
   order, so frozen mode is **bit-for-bit unchanged** (verified by hashing
   `r_mid`, `v_hat`, `L_ang`, `E_keV`, `t_ang`, `elec_id`, `layer` and the exit
   counts over C/W × 25/100 keV against `main`).
-- **No resampling.** Refinement never draws additional randomness. There is one
-  `U` per physical flight at every `f`, so refining the cap cannot create or
-  destroy a collision event by consuming a different number of variates.
+- **No collision resampling.** Refinement never draws another elastic-collision
+  variate. There is one collision $U$ per physical flight at every $f$, so
+  refining the cap cannot create or destroy a collision event by shifting that
+  stream. Optional straggling has a separate per-substep stream.
 
 ## Limiting case
 
@@ -260,10 +269,12 @@ no substep consumes an RNG call, so the flight's *physical identity*
 (which $U$ selected it) cannot change under refinement, only the resolved
 location of {math}`s^*` within it.
 
-**Comparison with the implementation** (`transport.py:926-1176`, both
-non-LUT and LUT ungrooved cores share this structure). `tau_left[e] = -1.0` is
+**Comparison with the implementation** (the host cores in
+`montecarlo/transport/cores.py` and the CUDA core in
+`montecarlo/transport_jit_kernel.py` share this structure).
+`tau_left[e] = -1.0` is
 the "no flight open" sentinel; a fresh draw `tau_left[e] = -np.log(rng.random())`
-fires only when `tau_left[e] < 0.0` (line 984), i.e. once per physical flight,
+fires only when `tau_left[e] < 0.0`, i.e. once per physical flight,
 matching $\tau=-\ln U$ exactly. Each iteration computes `total_rate`
 from `E_j = E_keV[e]`, the substep's own start energy (`E_keV[e]` was last set
 to the previous substep's `E_end_j`), giving `lam_ang` $=\lambda(E_{\rm
@@ -271,16 +282,16 @@ substep})$ — the claimed left-endpoint evaluation. `step_j = tau_left[e] * lam
 substep's hazard; boundary, cutoff, and (if `energy_controlled`) the
 `max_dE_frac` energy cap can each shorten it before it is committed. Every
 committed row unconditionally consumes `tau_left[e] -= step_j / lam_ang`
-(line 1109) — the claimed $\tau\mathrel{-{=}}ds/\lambda(E_{\rm substep})$ —
+— the claimed $\tau\mathrel{-{=}}ds/\lambda(E_{\rm substep})$ —
 clipped at zero for floating-point residue. On a cap-limited row
-(`limited_j`, line 1053-1062) the code increments `substep_of[e]` and
-`continue`s (line 1113-1115) *before* the collision-draw/exit-handling block:
+(`limited_j`) the code increments `substep_of[e]` and `continue`s *before*
+the collision-draw/exit-handling block:
 `dirs[e]`, `flight_of[e]`, and the carried `tau_left[e]` are all left
 untouched, and no `rng.random()` call is reachable on that path — direction,
 `flight_id`, and remaining budget are preserved and no scatter is drawn, as
 claimed. Only a row that is not cap-limited can close the flight
-(`flight_of[e] += 1`, `substep_of[e] = 0`, `tau_left[e] = -1.0`, line
-1134-1136), at which point the next iteration's `tau_left[e] < 0.0` check
+(`flight_of[e] += 1`, `substep_of[e] = 0`, `tau_left[e] = -1.0`), at which
+point the next iteration's `tau_left[e] < 0.0` check
 correctly triggers exactly one fresh draw. This is a term-for-term match to
 the derivation above.
 

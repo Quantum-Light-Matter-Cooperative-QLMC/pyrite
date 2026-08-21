@@ -11,8 +11,8 @@ Anchors: `tests/montecarlo/test_energy_loss_straggling.py` (134 cases), the
 straggling transport/RNG/core tests, and
 `checks/energy_loss_straggling_observables.py`.
 Source: Geant4 Physics Reference Manual, *Energy loss fluctuations* (Urban
-model, `G4UniversalFluctuation`), after H. Bichsel, *Rev. Mod. Phys.* **60**,
-663 (1988).
+model, `G4UniversalFluctuation`), after Bichsel's thin-detector
+treatment{cite:p}`geant4prm,bichsel1988`.
 
 `Validation: energy-loss-straggling`
 
@@ -378,12 +378,13 @@ fluid-interpolated crossing location remains approximate as disclosed.
 | 2 | The task document attributes the whole band widening to raising the surviving level to $I$. That explains the upper end only; the lower end moves because the re-solve deletes a $E_2 > T_{\max}$ channel the clamp retained. | minor |
 | 3 | The admissibility test is asymmetric: $E_2 > T_{\rm up}$ disqualifies level 2, but the replacement $E_1 = I$ is never tested against $T_{\rm up}$ and exceeds it for tungsten below 1.45 keV. Disclosed in the comment ("`E_1` can sit above `T_up` after the re-solve"), and unavoidable if closure is to hold, but it means "inadmissible above the Møller ceiling" is applied to one level and not the other. | minor, disclosed |
 | 4 | The former `k < 10000` escape now terminates when adding the next recurrence term cannot advance the binary64 CDF, so no absurd count escapes. The largest uniform-grid atom can still differ by a few counts from an ideal real-arithmetic extreme-tail quantile; probability is at most a few times $2^{-53}$. | resolved safety defect; finite-precision tail qualification disclosed |
-| 5 | The claim that Geant4 clamps the negative count to zero could not be checked against Geant4 source in this environment; it is quoted from the task document. The PyRITE choice is mean-exact either way, so nothing downstream depends on it. | unverified |
+| 5 | Earlier prose attributed a simple negative-count clamp to Geant4. Current and legacy Geant4 implementations contain explicit low-energy branches, so that attribution is removed. PyRITE's re-solve is documented only as its own mean-preserving deviation. | resolved source attribution |
 | 6 | `test_sigma_units_are_inverse_length_and_counts_scale_with_step` comments "`Sigma_i` [1/Ang] times `E_i` [keV] must recover `C`" but only asserts the sum is positive. Closure is asserted elsewhere, so this is a comment/assertion mismatch, not a coverage gap. | cosmetic |
 | 7 | The sampler originally landed before production reachability and therefore had no ledger row or `Validation:` marker. Slice I closed both process gaps. | resolved |
 | 8 | Means above $64$ are now split into independent equal bounded-rate chunks. Poisson additivity restores the exact count law and frozen-energy infinite divisibility; host and CUDA transcribe the same recurrence and draw order. | resolved |
 | 9 | The evolving-energy derivation now retains $\int[C(E-\epsilon)-C(E)]\nu_E(d\epsilon)=-C(E)C'(E)+R(E)$ and the covariance induced by using $E-X_1$ in the next draw. The regression numerically pins the mean-generator remainder; the covariance identity remains symbolic rather than separately anchored. | resolved derivation; covariance anchor gap |
 | 10 | The ledger now states that geometry wins an exact row-end tie, matching the strict-$>$ branch used by every host core and CUDA. | resolved |
+| 11 | The CUDA first-row parity test compares `E_keV`, which is the row-start energy, rather than `E_end_keV`; it therefore anchors the entering transport state but not the applied sampled loss. | applied-loss parity anchor gap |
 
 ## Production integration and observable evidence
 
@@ -393,7 +394,9 @@ result; production selection routes a straggled CUDA run to the exact kernel.
 The exact CUDA implementation is verified on hardware: all five straggling
 tests pass on an NVIDIA GeForce RTX 5080 (driver 610.47, CuPy 14.1.1), covering
 disabled-path bit identity, deterministic replay, finite/nonnegative energy
-bookkeeping, first-row host parity, and ensemble distributional agreement.
+bookkeeping, first-row transport-state parity, and ensemble distributional
+agreement. Direct host/device parity of the first applied loss remains untested
+because that check compares the row-start `E_keV`, not `E_end_keV`.
 With `straggling=False` (the default), every transport core remains bit-for-bit
 identical to the pre-feature path and no straggling output is emitted.
 
@@ -433,5 +436,5 @@ bounded-rate Poisson additivity, evolving-energy generator/covariance
 semantics, and the geometry-tie convention reproduce independently. The
 covariance term is not separately numerically anchored. Exact CUDA hardware
 re-validation passes. Suggested human ledger edit: retain `rederived` and the
-covariance-anchor qualification. Only a human may adjudicate or move the claim
-to `signed-off`.
+covariance and CUDA applied-loss anchor qualifications. Only a human may
+adjudicate or move the claim to `signed-off`.

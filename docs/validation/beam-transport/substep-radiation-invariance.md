@@ -3,7 +3,7 @@
 Ledger row: [`substep-radiation-invariance`](../ledger-transport-background.md#substep-radiation-invariance).
 Code: `montecarlo/spectrum/lines.py::mc_spectrum` (flight grouping, `E_repr_keV`),
 `montecarlo/spectrum/brem.py::mc_brem_spectrum` (`E_repr_keV`),
-`montecarlo/transport.py::simulate_trajectories` (`E_repr_keV`),
+`montecarlo/transport/api.py::simulate_trajectories` (`E_repr_keV`),
 `montecarlo/spectrum/diagnostics.py::subdivide_flights`.
 Measurement: `checks/substep_invariance.py`.
 
@@ -18,25 +18,27 @@ that refinement. Two rules make this so.
 sharing an `(electron_id, flight_id)` key are summed as complex field and the
 sum is squared; only whole flights add incoherently:
 
-```
-I(E)  =  sum_flights | sum_{substeps k in flight} A_k Q_k |^2
-```
+$$
+I(E)=\sum_{\rm flights}
+\left\lvert\sum_{k\in\mathrm{flight}}A_kQ_k\right\rvert^2.
+$$
 
 replacing the previous per-row `sum_rows |A_j Q_j|^2`.
 
 **2. Every row is evaluated at the propagator's representative energy.** Under
 `energy_model="midpoint"` transport emits
 
-```
-E_repr = (E_start + E_end) / 2,
-```
+$$
+E_{\rm repr}=\frac{E_{\rm start}+E_{\rm end}}{2}.
+$$
 
-the energy at which the implicit midpoint rule already evaluates `dE/ds` and
-`beta` (`transport-midpoint-stopping`). Both the line kernel and the
+the endpoint-average energy used for the transport clock. The explicit RK2
+stopping update instead evaluates at `(E_start + E_pred)/2`; see
+`transport-midpoint-stopping`. Both the line kernel and the
 bremsstrahlung kernel read that field when it is present. Frozen rows carry no
 `E_repr_keV` and keep the historical start-energy evaluation bit-for-bit.
 
-## Why grouping, and why it is exact at frozen energy
+## Why grouping, and when its finite-time factor is exact
 
 The line kernel's per-row form factor is `Q = t_L sinc(P t_L / pi)` with `t_L`
 the row's duration and `P` its resonance detuning. Under `sum |A Q|^2` a flight
@@ -50,29 +52,31 @@ is the amplitude radiated by *one flight*; substeps are quadrature nodes of that
 amplitude's own time integral, and the intensity is the modulus squared of the
 completed integral.
 
-At frozen energy and constant clock rate the grouped sum recovers the unsplit
-row **exactly**. Substep `k` of `N` has duration `t_L/N` and a phase offset
+At frozen energy and constant clock rate the grouped finite-time factor
+recovers the unsplit row exactly in the vacuum/zero-dispersion limit. Substep
+`k` of `N` has duration `t_L/N` and a phase offset
 `P t_L (k - (N-1)/2) / N` about the flight's mid-time, so
 
-```
-sum_k Q_k = (t_L/N) sinc(P t_L / (N pi)) * sum_k exp[i P t_L (k - (N-1)/2)/N]
-          = (t_L/N) * sin(P t_L/(2N)) / (P t_L/(2N)) * sin(P t_L/2) / sin(P t_L/(2N))
-          = 2 sin(P t_L / 2) / P
-          = t_L sinc(P t_L / pi),
-```
+$$
+\sum_kQ_k
+=\frac{t_L}{N}\operatorname{sinc}\!\left(\frac{Pt_L}{N\pi}\right)
+\sum_k\exp\!\left[iPt_L\frac{k-(N-1)/2}{N}\right]
+=\frac{2\sin(Pt_L/2)}{P}
+=t_L\operatorname{sinc}\!\left(\frac{Pt_L}{\pi}\right).
+$$
 
 the Dirichlet-kernel identity, with the substep `sinc` cancelling the kernel's
-denominator term for term. Every residual under refinement is therefore carried
-by the *physical* variation of `E` and `beta` along the flight, which is the
-thing refinement is supposed to resolve — not by the act of splitting.
+denominator term for term. Under production in-medium propagation, the escape
+phase varies with row position outside this finite-time factor, leaving the
+first-order residual documented below.
 
 ## Why the representative energy
 
 A row's bremsstrahlung contribution is a one-point quadrature of
 
-```
-integral over the flight of  n * dsigma/dk(E(s)) ds.
-```
+$$
+\int_{\rm flight} n\,\frac{d\sigma}{dk}(E(s))\,ds.
+$$
 
 Evaluated at `E_start` this is a left-endpoint rule, first order in the flight's
 length; evaluated at `E_repr` it is a midpoint rule, second order. An unsplit
@@ -84,10 +88,12 @@ the line kernel's `t_L = L/beta(E_repr)` equal the transported flight duration
 ## Limiting cases
 
 - **Lossless flight** (`dE/ds -> 0`). Every substep shares one `E` and one
-  `beta`, so the Dirichlet identity above applies with no residual and the
-  grouped CXR is *exactly* the unsplit value for any subdivision. The
-  bremsstrahlung rows telescope, `n dsigma/dk(E) * sum_k L_k = n dsigma/dk(E) L`.
-  Both reductions are exactly substep-invariant.
+  `beta`, so the Dirichlet identity makes the grouped finite-time factor exact
+  in the vacuum/zero-dispersion limit. Under production in-medium propagation,
+  the position-dependent escape phase is outside that factor and leaves a
+  first-order refinement residual even for a lossless flight. Bremsstrahlung
+  still telescopes exactly,
+  `n dsigma/dk(E) * sum_k L_k = n dsigma/dk(E) L`.
 - **`N = 1`.** Grouping is a no-op: with one row per flight every group is a
   singleton, the grouped sum is the incoherent sum, and the code keeps the proven
   path (`grouped` is `False` unless some `(electron_id, flight_id)` key repeats).
@@ -247,8 +253,9 @@ Fresh-context rederivation (2026-08-18, verifier context separate from the
 implementation). Filters: units `pass` -- $t_L$ carries Å (c = 1) and $P$
 carries $1/\text{Å}$, so $Q = t_L\operatorname{sinc}(Pt_L/\pi)$ has units of
 Å and $\lvert Q\rvert^2$ of $\AA^2$, matching the kernel's own $t_L^2\operatorname{sinc}^2$
-prefactor; limits `pass` ($N=1$ is a grouping no-op by construction, a
-lossless flight is exactly invariant by the argument below); signs/conventions
+prefactor; limits `failure` for the current general claim ($N=1$ is a grouping
+no-op, but a lossless dispersive flight retains the escape-phase refinement
+residual); signs/conventions
 `pass` once `mc_spectrum`'s own convention is used for $P$ (below) -- reading
 the ledger's shorthand "$Q=t_L\operatorname{sinc}(Pt_L/\pi)$" with the bare
 detuning $D=(1-\beta\hat v\cdot\hat n)(\omega-\omega_{\rm res})$ in place of
@@ -277,7 +284,7 @@ gives $2\sin(Dt_L/2)/D=Q$ for every $N$ -- the same value as the general
 argument, and term-for-term the identity the ledger's Checks row states. Both
 derivations were done before reading `lines.py`.
 
-**Rule (b), re-derived before reading `transport.py`.** Evaluating each row's
+**Rule (b), re-derived before reading the transport cores.** Evaluating each row's
 one-point emission integral at $E_{\rm repr}=(E_{\rm start}+E_{\rm end})/2$
 turns a left-endpoint quadrature into a midpoint one (second order in the
 flight's length, matching `transport-midpoint-stopping`'s own RK2 accuracy
@@ -287,20 +294,23 @@ also what the radiation kernel reads for $t_L$ -- not merely close.
 
 Read the implementation after both derivations. `lines.py` builds each row's
 complex field from its own resonance $E_{r,j}$, escape phase, and a per-row
-midpoint time `seg_t_mid = seg_t + 0.5*t_L_all` (`lines.py:1117`) rather than
-a shared left-endpoint phase, so the flight-grouped sum
-(`lines.py:1327-1362`) is literally a partition sum of the exact per-row
-integrals derived above -- the general linearity argument applies directly,
-not only its $N$-equal special case. The docstring at `lines.py:736-748`
-defines $P=(1-\beta\hat v\cdot\hat n)(\omega-\omega_{\rm res})/2$ exactly and
-`a_width = dnm*t_L/(2*HBARC_EV_ANG)` (`lines.py:1329`) makes the `xp.sinc`
+midpoint time `seg_t_mid = seg_t + 0.5*t_L_all` rather than a shared
+left-endpoint phase. The finite-time sinc factor integrates the row's
+detuning phase exactly, but the separate in-medium escape phase is sampled
+at that midpoint and varies along a physical flight. Consequently the
+flight-grouped production sum is a first-order convergent quadrature, not an
+exact partition identity; exact subdivision survives only when the escape
+phase is constant, such as vacuum or zero dispersion. The line-kernel
+docstring defines $P=(1-\beta\hat v\cdot\hat n)(\omega-\omega_{\rm res})/2$ exactly and
+`a_width = dnm*t_L/(2*HBARC_EV_ANG)` makes the `xp.sinc`
 argument $a_{\rm width}(E-E_r)/\pi = Pt_L/\pi$ term for term, confirming the
 convention above rather than the bare-detuning reading. `_transport_core_ungrooved`
-(`transport.py:1073-1091`) computes `beta_j = beta_from_keV_scalar(0.5*(E_j +
-E_end_j))`, `t_end_j = clock[e] + step_j/beta_j`, and `seg_len[nseg] =
+in `montecarlo/transport/cores.py` computes
+`beta_j = beta_from_keV_scalar(0.5*(E_j + E_end_j))`,
+`t_end_j = clock[e] + step_j/beta_j`, and `seg_len[nseg] =
 step_j` -- the SAME `step_j` and the SAME midpoint `beta_j` feed both the
 transported clock and the row's `L_ang`, and `E_repr_keV = 0.5*(E_seg +
-seg_E_end)` (`transport.py:4343`) is read back by `lines.py:997` as `seg_E`
+seg_E_end)` is read back by `lines.py` as `seg_E`
 for `beta_all = beta_from_keV(seg_E)`. So `t_L = L_ang/beta(E_repr)` and
 `t_end - t_start` share every input bit-for-bit; rule (b) is confirmed, not
 merely close.
@@ -347,7 +357,12 @@ cases), and the unrefined `peak` is high (1.14-1.17 at Ne=40 vs the ledger's
 No stale wording found beyond the ledger note's already-flagged "checklist
 step H" phrasing (out of scope here).
 
-Verdict `rederived`. `signed-off` remains a human decision.
+Verdict after the 2026-08-20 audit: `discrepancy`. The grouping identity remains
+correct for the row finite-time factor and in the vacuum/zero-dispersion limit,
+and measured production output converges. The former general exactness claim
+omitted the within-flight in-medium escape-phase gradient. A lossless
+dispersive-flight anchor and fresh-context review are required before returning
+this row to `rederived`; `signed-off` remains a human decision.
 
 ## Addendum 2026-08-19: the vacuum-dispersion switch was removed
 

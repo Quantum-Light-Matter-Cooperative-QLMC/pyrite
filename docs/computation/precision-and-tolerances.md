@@ -204,8 +204,11 @@ first-row state numerically, but compare whole straggled runs statistically.
 Conversely, a straggling on/off comparison at matched seeds is a paired physics
 comparison, not a numerical tolerance test. The disabled-path claim is the one
 that is bit-for-bit: the sampler, its keys and its output field are absent.
-CUDA straggling remains hardware-unverified, so no host/device tolerance is
-promoted here beyond the existing hardware-gated tests.
+Five CUDA straggling tests pass on an RTX 5080. They establish disabled-path
+identity, deterministic replay, finite energy bookkeeping, first-row transport
+state, and ensemble agreement. They do not yet compare the first row's applied
+loss (`E_end_keV`) against the host, so the `rtol=1e-12` loss-parity claim is not
+promoted beyond the existing transport-state check.
 
 ## Practical guidance
 

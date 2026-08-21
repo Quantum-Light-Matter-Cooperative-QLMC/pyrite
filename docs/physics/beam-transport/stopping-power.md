@@ -553,7 +553,8 @@ where a study needs it.
 - **Optional Urban straggling.** Both stopping branches define the mean loss
   rate. With `straggling=True`, transport samples an unrestricted Urban
   compound-Poisson loss whose expectation is exactly that same mean; with the
-  default `False`, the historical deterministic path is bit-for-bit unchanged.
+  default `False`, the historical deterministic path is bit-for-bit unchanged
+  {cite:p}`geant4prm,bichsel1988`.
   See `Validation: energy-loss-straggling` and the
   [derivation and observable checks](../../validation/beam-transport/energy-loss-straggling.md).
 - **No radiative stopping.** Energy carried off by emitted bremsstrahlung and

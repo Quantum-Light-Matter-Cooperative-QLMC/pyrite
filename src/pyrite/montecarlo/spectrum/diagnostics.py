@@ -107,9 +107,10 @@ def subdivide_flights(segments, composition=None, layers=None, max_dE_frac=0.0, 
     also moves the sampled collision points and so decorrelates the trajectories
     (``docs/validation/beam-transport/energy-controlled-propagation.md``).
 
-    Each substep chain reproduces the lockstep core's midpoint rule: predictor-
-    corrector ``E_end = E_start + (dE/ds)((E_start + E_end)/2) ds`` and clock
-    ``ds / beta(E_repr)``, so the emitted rows carry the same
+    Each substep chain reproduces the transport core's explicit midpoint RK2:
+    predict from ``E_start``, evaluate stopping at
+    ``(E_start + E_pred)/2``, and advance the clock by
+    ``ds / beta(E_repr)``. The emitted rows carry the same
     ``E_start_keV``/``E_end_keV``/``E_repr_keV``/``t_start_ang``/``t_end_ang``
     schema an energy-controlled transport run would have produced for the same
     flights.
