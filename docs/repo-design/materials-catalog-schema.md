@@ -99,7 +99,10 @@ removed during resolution just like beam metadata. Legacy inline
 `[profiles.NAME.detector]` geometry remains readable. Response objects and
 detector energy bins are runtime configuration and do not yet have a portable
 catalog schema. Missing detector values inherit as described in
-[Configuration resolution](configuration-resolution.md).
+[Configuration resolution](configuration-resolution.md). Named and inline
+geometry use the same decoder and therefore both retain the catalog's default
+`Timepix3` response; choosing or serializing a different response remains out
+of scope for this schema.
 
 ## Validation and editing
 

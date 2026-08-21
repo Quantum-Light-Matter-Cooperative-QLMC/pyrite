@@ -632,6 +632,7 @@ def test_named_detector_reference_resolves_to_same_value_as_inline_block(tmp_pat
     from pyrite.campaign.config import default_settings
     from pyrite.campaign.profiles import dataset_identity
     from pyrite.detectors import Detector
+    from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
 
     material_rows = """
@@ -660,9 +661,10 @@ crystal = "mos2"
     inline_catalog = load_material_catalog(_write_catalog(tmp_path / "inline", inline_text))
 
     assert ref_catalog.profile_detector("standard") == inline_catalog.profile_detector("standard")
-    assert ref_catalog.profile_detector("standard") == Detector(119.0, 16.6, 0.066)
+    expected = Detector(119.0, 16.6, 0.066, response=Timepix3())
+    assert ref_catalog.profile_detector("standard") == expected
     assert ref_catalog.detector_keys == ("eds",)
-    assert ref_catalog.detectors["eds"] == Detector(119.0, 16.6, 0.066)
+    assert ref_catalog.detectors["eds"] == expected
     assert ref_catalog.detector_labels["eds"] == "SEM EDS"
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
     ref_sweep = config.material_sweep("mos2")

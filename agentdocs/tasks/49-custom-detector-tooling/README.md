@@ -17,7 +17,9 @@ rename/delete it safely. This is the immediate named-object slice of #49.
   `detector = "NAME"`; legacy inline `[profiles.NAME.detector]` remains readable.
 - Named and inline forms use the same geometry decoder and resolve to the same
   `Detector` value. Object name and display-only label never affect simulation
-  identity; resolved field values do.
+  identity; resolved field values do. Both forms preserve the catalog's
+  `Timepix3` default response introduced by issue #52 without serializing a
+  response choice in detector TOML.
 - Add visible `pyrite detector` with `list`, `show`, `create`, `set`, `rename`,
   and `delete`, matching established `pyrite beam` output, JSON, prompt,
   dry-run, completion, atomic-write, reference-update, and deletion-safety
@@ -78,9 +80,11 @@ Completed 2026-08-20 as the immediate named-geometry slice of #49.
   not. Root help exposes the noun without importing scientific or hardware
   modules.
 - Bundled `standard` now uses `detector = "default"` with
-  `[detectors.default] observation_angle_deg = 90.0`. Existing resolved
-  standard payload/digest/stem pins pass unchanged. Catalog golden regeneration
-  produced no diff because resolved physical data did not change.
+  `[detectors.default] observation_angle_deg = 90.0`. Named and inline geometry
+  both retain issue #52's default `Timepix3` response. Existing resolved
+  standard payload/digest/stem pins pass unchanged relative to that contract;
+  catalog golden regeneration produced no diff because the named-object
+  migration did not change resolved physical data.
 - Maintained documentation covers the tenth root noun, named-detector profile
   workflow, identity boundary, CLI owner, and runtime-only response/bin
   boundary. CLI reference, deprecation reference, and frozen Click contract
@@ -108,7 +112,8 @@ Checks:
 Named response objects, response-specific parameters, detector energy-bin
 objects, and any portable resource/provenance schema remain later #49 slices.
 This slice deliberately serializes only the three established geometry fields;
-it adds no detector physics or response behavior.
+it adds no detector physics or configurable response behavior. Geometry
+decoding preserves the existing issue #52 `Timepix3` default response.
 
 ## Acceptance
 

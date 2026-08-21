@@ -99,6 +99,9 @@ The name and label never enter checkpoint identity, but resolved geometry does.
 Legacy inline `[profiles.<name>.detector]` tables and the three equivalent
 profile flags remain readable during their deprecation window. Response models
 and detector energy bins are runtime objects and are not serialized here.
+Named and inline geometry nevertheless preserve the catalog's existing default
+`Timepix3` response; this named-object workflow does not make that response
+configurable.
 
 ## Beam block
 
