@@ -175,6 +175,66 @@ def test_coherent_decoherence_blend_matches_reference_formula():
     np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
 
 
+def test_coherent_decoherence_blend_holds_on_the_per_hkl_route():
+    """Same blend on the per-(reflection, orientation) ``_accumulate`` loop,
+    which owns its own reduction separate from the batched path the test above
+    exercises.  Reached here through the grooved-escape branch -- the only
+    coherent route off the batched path a nonzero bunch offset can still take
+    (``sinc_cutoff`` and ``layers`` both raise).
+
+    LONGITUDINAL offsets only: the groove's escape distance depends on the
+    lateral emission point, so a transverse offset would move S_e's amplitude
+    as well as its phase -- the same amplitude/phase coupling the
+    finite-footprint branch is excluded for (see the validation doc's limits).
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    from pyrite.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.groove import blazed_groove_spec
+
+    tilt = np.deg2rad(45.0)
+    _, n_hat = tilted_geometry(np.pi / 2, tilt, np.pi)
+    kwargs = {
+        "crystal": "hopg",
+        "hkl_list": [(0, 0, 2)],
+        "B_ang2": 0.8,
+        "n_hat": n_hat,
+        "theta_obs_rad": np.pi / 2,
+        "groove": blazed_groove_spec(
+            spacing_ang=2.0e4,
+            theta_obs_rad=np.pi / 2,
+            tilt_polar_rad=tilt,
+            tilt_azim_rad=np.pi,
+        ),
+    }
+    energy_grid = np.arange(700.0, 1500.0, 2.0)
+    t0_values = np.array([137.0, -412.0])
+
+    def _flat(count):
+        segs = _segments(count)
+        segs.update(crystal_width_ang=None, crystal_height_ang=None)
+        return segs
+
+    active = _flat(2)
+    active.update(
+        t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3))
+    )
+    actual = mc_spectrum(active, energy_grid, coherent=True, **kwargs)
+
+    ne_total = active["Ne"]
+    flat_raw = mc_spectrum(_flat(2), energy_grid, coherent=True, **kwargs) * ne_total
+    grouped_raw = sum(
+        mc_spectrum(_flat(1), energy_grid, coherent=True, **kwargs) for _ in range(2)
+    )
+    omega = energy_grid / HBARC_EV_ANG
+    F = np.abs(np.mean(np.exp(1j * omega[:, None] * t0_values[None, :]), axis=1)) ** 2
+
+    expected = ((1.0 - F) * grouped_raw + F * flat_raw) / ne_total
+    peak = float(np.max(np.abs(expected)))
+    assert peak > 0.0
+    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
+
+
 def test_coherent_decoherence_inactive_by_default():
     """No initial_t0_ang/initial_r_ang keys (every pre-existing fixture) ->
     decoherence_active is False and the result is bit-for-bit the old,

@@ -459,3 +459,220 @@ def _run_prologue_raw(d, *, v_dot_n, n_re_tab, aw_seg):
         v_dot_n=v_dot_n,
         n_re_tab=n_re_tab,
     )
+
+
+# ---------------------------------------------------------------------------
+# Inter-electron decoherence blend on the three float32 CUDA-JIT coherent
+# paths.  Validation: coherent-inter-electron-decoherence
+#
+# The blend is (1-F)*sum_e|S_e|^2 + F*|sum_e S_e|^2 per (reflection,
+# orientation) row.  None of it is new device code: the existing fused kernels
+# already ACCUMULATE their squared reduction into the caller's buffer, so
+# ``sum_e|S_e|^2`` is one call per electron over that electron's own lines into
+# a zeroed buffer, and ``|sum_e S_e|^2`` is the single call these paths already
+# made -- both on the geometric (offset-free) phase, blended outside.
+# ---------------------------------------------------------------------------
+
+_DECOH_E_GRID = np.arange(700.0, 1500.0, 2.0)
+# O(1/omega)-scale so F sits well inside (0, 1) across the window; arbitrary.
+_DECOH_T0 = np.array([137.0, -412.0])  # Ang, c = 1
+_DECOH_DR = np.array([[35.0, -18.0], [-52.0, 27.0]])  # Ang, transverse entry offsets
+_DECOH_R_GEOM = np.array([[4.0, 0.0, 5.0], [1.5, -2.0, 7.5]])  # distinct S_e per electron
+_DECOH_N_HAT = np.array([1.0, 0.0, 0.01])
+_DECOH_KWARGS = {
+    "crystal": "hopg",
+    "hkl_list": [(0, 0, 2)],
+    "B_ang2": 0.8,
+    "n_hat": _DECOH_N_HAT,
+}
+# A mosaic cone turns the single perfect-crystal row into 9 rows whose g (and
+# therefore whose q_perp, and therefore whose F) all differ -- the case a single
+# scalar F(E) applied to the row-summed spectrum would get wrong.
+_DECOH_MOSAIC = {"mosaic_fwhm_rad": 0.05, "mosaic_nodes": 3}
+
+
+def _decoh_segments(r_mid):
+    """Offset-free (decoherence-INACTIVE) segments at the given positions."""
+    r_mid = np.atleast_2d(np.asarray(r_mid, dtype=float))
+    count = len(r_mid)
+    return {
+        "r_mid": r_mid,
+        "v_hat": np.tile([0.0, 0.0, 1.0], (count, 1)),
+        "L_ang": np.full(count, 10.0),
+        "E_keV": np.full(count, 30.0),
+        "t_ang": np.zeros(count),
+        "t0_ang": np.zeros(count),
+        "elec_id": np.arange(count),
+        "layer": np.zeros(count, dtype=int),
+        "Ne": count,
+        "thickness_ang": 10.0,
+        # decoherence_active rejects the finite-footprint branch (the transverse
+        # offset would also perturb escape attenuation there), and the reference
+        # sub-calls must carry the SAME footprint setting either way.
+        "crystal_width_ang": None,
+        "crystal_height_ang": None,
+        "n_backscattered": 0,
+        "n_missed": 0,
+        "n_layers": 1,
+    }
+
+
+def _decoh_active_segments():
+    """The same electrons, now displaced by their sampled bunch/spot offsets."""
+    dr3 = np.column_stack([_DECOH_DR, np.zeros(len(_DECOH_DR))])
+    segments = _decoh_segments(_DECOH_R_GEOM + dr3)
+    segments.update(t0_ang=_DECOH_T0, initial_t0_ang=_DECOH_T0, initial_r_ang=dr3)
+    return segments
+
+
+def _decoh_reference(**kwargs):
+    """Closed-form blend built from decoherence-INACTIVE mc_spectrum sub-calls.
+
+    Both terms come from the already-validated offset-free path: the flat term
+    is one Ne=2 call on the geometric positions, the floor is the SUM of two
+    Ne=1 calls (a lone electron is trivially self-coherent).  mc_spectrum
+    divides by Ne once, at the very end and AFTER the blend, so the Ne=2 call
+    is un-normalized back to that raw scale before blending.  F is the
+    empirical characteristic function of the same offsets, computed here.
+    """
+    from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+    from pyrite.montecarlo.spectrum import mc_spectrum
+
+    ne = len(_DECOH_R_GEOM)
+    flat_raw = (
+        mc_spectrum(_decoh_segments(_DECOH_R_GEOM), _DECOH_E_GRID, coherent=True, **kwargs) * ne
+    )
+    grouped_raw = sum(
+        mc_spectrum(_decoh_segments(r), _DECOH_E_GRID, coherent=True, **kwargs)
+        for r in _DECOH_R_GEOM
+    )
+
+    g_vec, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS["hopg"]["lattice"])
+    n_hat = _DECOH_N_HAT / np.linalg.norm(_DECOH_N_HAT)
+    omega = _DECOH_E_GRID / HBARC_EV_ANG
+    # phi_e = omega*(t0_e - n_perp.dr_e) - g_perp.dr_e
+    A = _DECOH_T0 - _DECOH_DR @ n_hat[:2]
+    B = _DECOH_DR @ g_vec[:2]
+    chi = np.mean(np.exp(1j * (omega[:, None] * A[None, :] - B[None, :])), axis=1)
+    F = np.abs(chi) ** 2
+    assert 0.0 < float(F.min()) and float(F.max()) < 1.0  # genuinely partial coherence
+    return ((1.0 - F) * grouped_raw + F * flat_raw) / ne
+
+
+def _decoh_route_kwargs(route, monkeypatch):
+    """Select which of the three CUDA-JIT coherent fast paths runs."""
+    from pyrite.montecarlo.spectrum import lines
+
+    if route == "stream":  # batched (n_seg, N_g) streaming field kernel
+        return {}
+    if route == "row-reduction":  # batched path's per-row raw reduction fallback
+        monkeypatch.setattr(lines, "_USE_JIT_COHERENT_STREAM", False)
+        return {}
+    if route == "per-hkl":  # _accumulate's per-(reflection, orientation) reduction
+        from pyrite.montecarlo.geometry import tilted_geometry
+        from pyrite.montecarlo.groove import blazed_groove_spec
+
+        tilt = np.deg2rad(45.0)
+        _, n_hat = tilted_geometry(np.pi / 2, tilt, np.pi)
+        spec = blazed_groove_spec(
+            spacing_ang=2.0e4,
+            theta_obs_rad=np.pi / 2,
+            tilt_polar_rad=tilt,
+            tilt_azim_rad=np.pi,
+        )
+        return {"groove": spec, "n_hat": n_hat, "theta_obs_rad": np.pi / 2}
+    raise AssertionError(route)
+
+
+def _count_kernel_calls(monkeypatch, route):
+    """Return a one-element list the patched kernel entry point increments."""
+    if route == "stream":
+        from pyrite.montecarlo.spectrum import coherent_stream_jit_kernel as mod
+
+        name = "run_coherent_field_accumulation_kernel"
+    else:
+        from pyrite.montecarlo.spectrum import coherent_jit_kernel as mod
+
+        name = "run_coherent_reduction_kernel"
+    calls = [0]
+    original = getattr(mod, name)
+
+    def _spy(*args, **kwargs):
+        calls[0] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(mod, name, _spy)
+    return calls
+
+
+@pytest.mark.parametrize("route", ["stream", "row-reduction"])
+def test_coherent_decoherence_blend_matches_reference_formula_on_device(route, monkeypatch):
+    """The CUDA-JIT blend reproduces the closed form, not just itself.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    from pyrite.montecarlo._backend import REAL, xp
+    from pyrite.montecarlo.spectrum import mc_spectrum
+
+    assert getattr(xp, "__name__", "") == "cupy"
+    assert np.dtype(REAL) == np.dtype(np.float32)
+
+    kwargs = _decoh_route_kwargs(route, monkeypatch)
+    call_kwargs = {**_DECOH_KWARGS, **kwargs}
+    calls = _count_kernel_calls(monkeypatch, route)
+    actual = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    assert calls[0] > 0, "the CUDA-JIT fast path was not taken"
+
+    expected = _decoh_reference(**call_kwargs)
+    peak = float(np.max(np.abs(expected)))
+    assert peak > 0.0
+    # float32 device reduction against a float32 reference assembled from
+    # separate launches: the same order-of-eps latitude the other cross-path
+    # coherent gates use.
+    np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=peak * 1e-5)
+
+
+@pytest.mark.parametrize("route", ["stream", "row-reduction", "per-hkl"])
+def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkeypatch):
+    """Lockstep against the generic CuPy path these fast paths used to fall
+    back to whenever the blend was active -- across a 9-row mosaic cone, so
+    every row carries its own q_perp and therefore its own F.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    from pyrite.montecarlo.spectrum import lines, mc_spectrum
+
+    route_kwargs = _decoh_route_kwargs(route, monkeypatch)
+    call_kwargs = {**_DECOH_KWARGS, **_DECOH_MOSAIC, **route_kwargs}
+
+    calls = _count_kernel_calls(monkeypatch, route)
+    fast = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    assert calls[0] > 0, "the CUDA-JIT fast path was not taken"
+
+    monkeypatch.setattr(lines, "_USE_JIT_COHERENT_STREAM", False)
+    monkeypatch.setattr(lines, "_USE_JIT_COHERENT_REDUCTION", False)
+    generic_calls = _count_kernel_calls(monkeypatch, route)
+    generic = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    assert generic_calls[0] == 0
+
+    peak = float(max(np.max(np.abs(fast)), np.max(np.abs(generic))))
+    assert peak > 0.0
+    np.testing.assert_allclose(fast, generic, rtol=2e-4, atol=peak * 1e-5)
+
+
+@pytest.mark.parametrize("route", ["stream", "row-reduction", "per-hkl"])
+def test_coherent_decoherence_inactive_device_path_is_bit_for_bit(route, monkeypatch):
+    """An all-zero offset population must leave the fused kernels on their
+    pre-existing dispatch: the geometric-phase swap that feeds the blend is a
+    no-op there, so the result is bit-for-bit the offset-free one."""
+    from pyrite.montecarlo.spectrum import mc_spectrum
+
+    call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
+    plain = mc_spectrum(_decoh_segments(_DECOH_R_GEOM), _DECOH_E_GRID, coherent=True, **call_kwargs)
+
+    zeroed = _decoh_segments(_DECOH_R_GEOM)
+    zeroed.update(initial_t0_ang=np.zeros(2), initial_r_ang=np.zeros((2, 3)))
+    assert float(np.max(np.abs(plain))) > 0.0
+    np.testing.assert_array_equal(
+        plain, mc_spectrum(zeroed, _DECOH_E_GRID, coherent=True, **call_kwargs)
+    )
