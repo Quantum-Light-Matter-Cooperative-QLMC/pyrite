@@ -1451,7 +1451,13 @@ def make_cuda_transport_lut_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
     """Return the LUT CUDA core and CuPy array module for the shared driver."""
 
     def core(*args):
-        run_transport_lut_kernel(*args, config=config)
+        # Shared driver (_run_per_electron_transport_lut) appends the
+        # straggling params (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross,
+        # straggle_on, stragg_dE) for the CPU LUT core
+        # (_transport_core_ungrooved_perelectron_lut); the CUDA LUT kernel
+        # has no straggling support (see api.py's NotImplementedError for
+        # straggle_on=True on this path), so drop them before forwarding.
+        run_transport_lut_kernel(*args[:-7], config=config)
 
     return core, xp
 
