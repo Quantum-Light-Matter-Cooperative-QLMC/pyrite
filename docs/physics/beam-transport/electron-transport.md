@@ -57,12 +57,13 @@ $$
         +\Sigma_3E_0T_{\max}\right).
 $$
 
-These are the analytic Urban moments. For channel means $\lambda<100$, the
-implementation samples the Poisson counts by inverse CDF. At
-$\lambda\ge100$ it uses a rounded-Gaussian count approximation, so the sampled
-law no longer has exact Poisson higher moments or infinite divisibility. The
-measured production regime stays below about $\lambda=2.5$ per channel; the
-broader function contract remains a validation discrepancy.
+These are the analytic Urban moments. The implementation samples Poisson counts
+by inverse CDF. A mean above 64 is decomposed into equal independent chunks no
+larger than 64 and the counts are summed. Poisson additivity therefore preserves
+the exact count law, including its higher moments and infinite divisibility,
+without underflowing the recurrence's starting probability. The measured
+production regime stays below about $\lambda=2.5$ per channel, so chunking is a
+guard for deliberately oversized direct-sampler steps.
 
 The model is local and unrestricted: it changes the loss distribution without
 creating or transporting knock-on electrons. When the nominal K-shell level
@@ -140,9 +141,8 @@ salt and counter construction live in
 the physics page does not duplicate that plumbing.
 
 At frozen energy, substep invariance of the loss is exact in distribution for
-any fixed partition **while every channel remains on the exact-Poisson branch**
-and its inverse-CDF loop terminates normally, because compound-Poisson
-increments are infinitely divisible:
+any fixed partition because compound-Poisson increments are infinitely
+divisible:
 
 $$
 \sum_m \operatorname{CP}(s_m\Sigma)
@@ -170,10 +170,18 @@ $$
 
 Urban jump sizes do not shrink with the substep, so $R(E)$ is generally
 nonzero at the same order as the deterministic quadrature term. The increments
-are only conditionally independent: the second draw uses $E-X_1$, producing a
-cross-step covariance. Evolving-energy subdivision is therefore a
+are only conditionally independent: the second draw uses $E-X_1$, producing
+
+$$
+\operatorname{Cov}(X_1,X_2)
+=h_2\operatorname{Cov}\!\left(X_1,C(E-X_1)\right),
+$$
+
+which is generally nonzero. Evolving-energy subdivision is therefore a
 state-dependent jump-process discretization; its measured convergence cannot
-be reduced to deterministic stopping-power quadrature alone.
+be reduced to deterministic stopping-power quadrature alone. The regression
+anchor evaluates the full generator integral independently and resolves the
+finite-jump remainder rather than testing only the linearized $-CC'$ term.
 
 `(electron_id, flight_id)` is the stable physical key, independent of batching
 and backend row order; `flight_id` is zero-based and monotonic per electron and
@@ -190,10 +198,10 @@ $$
 \Delta E\ge E_{\rm start}-E_{\rm cut}.
 $$
 
-The implementation gives an exact equality to a simultaneous geometry event;
-geometry wins that tie, while equality without a geometry event counts as a
-cutoff. Under this convention `n_cutoff_stopped` is exact. The jump position is
-not retained, so a winning cutoff uses the realized-loss fluid interpolation
+The implementation defines exact equality at a simultaneous geometry event to
+belong to geometry; equality without a geometry event counts as a cutoff. Under
+this explicit convention `n_cutoff_stopped` is exact. The jump position is not
+retained, so a winning cutoff uses the realized-loss fluid interpolation
 
 $$
 s_{\rm cut}

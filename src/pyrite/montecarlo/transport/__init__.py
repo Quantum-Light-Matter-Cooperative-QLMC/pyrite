@@ -92,7 +92,7 @@ from .straggling import (
     _URBAN_E0_KEV,
     _URBAN_E2_KEV_PER_Z2,
     _URBAN_RATE,
-    _URBAN_POISSON_GAUSS_MIN,
+    _URBAN_POISSON_CHUNK_MAX,
     _urban_levels_scalar,
     _urban_channels_scalar,
     _urban_moments_element_scalar,

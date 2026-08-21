@@ -92,13 +92,12 @@ F64_EIGHT = np.float64(8.0)
 # that module, so host and device provably address the same arithmetic only
 # by transcription, not by sharing code. Mirrors
 # transport._URBAN_STREAM_SALT/_URBAN_E0_KEV/_URBAN_E2_KEV_PER_Z2/
-# _URBAN_RATE/_URBAN_POISSON_GAUSS_MIN exactly.
+# _URBAN_RATE/_URBAN_POISSON_CHUNK_MAX exactly.
 URBAN_STREAM_SALT = np.uint64(0xD6E8FEB86659FD93)
 URBAN_E0_KEV = np.float64(1.0e-2)
 URBAN_E2_KEV_PER_Z2 = np.float64(1.0e-2)
 URBAN_RATE = np.float64(0.55)
-URBAN_POISSON_GAUSS_MIN = np.float64(100.0)
-I32_TEN_THOUSAND = np.int32(10000)
+URBAN_POISSON_CHUNK_MAX = np.float64(64.0)
 
 
 @dataclass(frozen=True)
@@ -645,56 +644,54 @@ def _transport_kernel(
                         / (URBAN_E0_KEV * T_up_u * xp.log(T_up_u / URBAN_E0_KEV))
                     )
 
-                    # n_1: inverse-CDF Poisson below the Gaussian handoff,
-                    # exactly one uniform; Box-Muller above it, exactly two.
-                    # Mirrors transport._urban_poisson_scalar.
+                    # Exact Poisson counts by bounded-rate inverse-CDF chunks.
+                    # Poisson additivity preserves the law for oversized means;
+                    # mirrors transport._urban_poisson_scalar.
                     lam1 = sigma_1_u * step_j
                     n1 = I32_ZERO
                     if lam1 > F64_ZERO:
-                        if lam1 < URBAN_POISSON_GAUSS_MIN:
+                        chunks1 = np.int32(xp.ceil(lam1 / URBAN_POISSON_CHUNK_MAX))
+                        chunk_lam1 = lam1 / np.float64(chunks1)
+                        chunk1 = I32_ZERO
+                        while chunk1 < chunks1:
                             u1 = _stream_uniform(flight_key, stragg_counter)
                             stragg_counter = stragg_counter + U64_ONE
-                            p1 = xp.exp(-lam1)
+                            p1 = xp.exp(-chunk_lam1)
                             cdf1 = p1
-                            while u1 >= cdf1 and n1 < I32_TEN_THOUSAND:
-                                n1 += I32_ONE
-                                p1 = p1 * lam1 / np.float64(n1)
-                                cdf1 += p1
-                        else:
-                            ua1 = _stream_uniform(flight_key, stragg_counter)
-                            ua2 = _stream_uniform(flight_key, stragg_counter + U64_ONE)
-                            stragg_counter = stragg_counter + U64_ONE + U64_ONE
-                            za = xp.sqrt(-F64_TWO * xp.log(F64_ONE - ua1)) * xp.cos(
-                                F64_TWO * F64_PI * ua2
-                            )
-                            n1 = np.int32(xp.floor(lam1 + xp.sqrt(lam1) * za + F64_HALF))
-                            if n1 < I32_ZERO:
-                                n1 = I32_ZERO
+                            k1 = I32_ZERO
+                            while u1 >= cdf1:
+                                k1 += I32_ONE
+                                p1 = p1 * chunk_lam1 / np.float64(k1)
+                                next_cdf1 = cdf1 + p1
+                                if next_cdf1 <= cdf1:
+                                    break
+                                cdf1 = next_cdf1
+                            n1 += k1
+                            chunk1 += I32_ONE
                     dE_elem += np.float64(n1) * E_1_u
 
                     # n_2, same recurrence.
                     lam2 = sigma_2_u * step_j
                     n2 = I32_ZERO
                     if lam2 > F64_ZERO:
-                        if lam2 < URBAN_POISSON_GAUSS_MIN:
+                        chunks2 = np.int32(xp.ceil(lam2 / URBAN_POISSON_CHUNK_MAX))
+                        chunk_lam2 = lam2 / np.float64(chunks2)
+                        chunk2 = I32_ZERO
+                        while chunk2 < chunks2:
                             u2 = _stream_uniform(flight_key, stragg_counter)
                             stragg_counter = stragg_counter + U64_ONE
-                            p2 = xp.exp(-lam2)
+                            p2 = xp.exp(-chunk_lam2)
                             cdf2 = p2
-                            while u2 >= cdf2 and n2 < I32_TEN_THOUSAND:
-                                n2 += I32_ONE
-                                p2 = p2 * lam2 / np.float64(n2)
-                                cdf2 += p2
-                        else:
-                            ub1 = _stream_uniform(flight_key, stragg_counter)
-                            ub2 = _stream_uniform(flight_key, stragg_counter + U64_ONE)
-                            stragg_counter = stragg_counter + U64_ONE + U64_ONE
-                            zb = xp.sqrt(-F64_TWO * xp.log(F64_ONE - ub1)) * xp.cos(
-                                F64_TWO * F64_PI * ub2
-                            )
-                            n2 = np.int32(xp.floor(lam2 + xp.sqrt(lam2) * zb + F64_HALF))
-                            if n2 < I32_ZERO:
-                                n2 = I32_ZERO
+                            k2 = I32_ZERO
+                            while u2 >= cdf2:
+                                k2 += I32_ONE
+                                p2 = p2 * chunk_lam2 / np.float64(k2)
+                                next_cdf2 = cdf2 + p2
+                                if next_cdf2 <= cdf2:
+                                    break
+                                cdf2 = next_cdf2
+                            n2 += k2
+                            chunk2 += I32_ONE
                     dE_elem += np.float64(n2) * E_2_u
 
                     # n_3, then its continuum quanta: exact inverse CDF of the
@@ -703,25 +700,24 @@ def _transport_kernel(
                     lam3 = sigma_3_u * step_j
                     n3 = I32_ZERO
                     if lam3 > F64_ZERO:
-                        if lam3 < URBAN_POISSON_GAUSS_MIN:
+                        chunks3 = np.int32(xp.ceil(lam3 / URBAN_POISSON_CHUNK_MAX))
+                        chunk_lam3 = lam3 / np.float64(chunks3)
+                        chunk3 = I32_ZERO
+                        while chunk3 < chunks3:
                             u3 = _stream_uniform(flight_key, stragg_counter)
                             stragg_counter = stragg_counter + U64_ONE
-                            p3 = xp.exp(-lam3)
+                            p3 = xp.exp(-chunk_lam3)
                             cdf3 = p3
-                            while u3 >= cdf3 and n3 < I32_TEN_THOUSAND:
-                                n3 += I32_ONE
-                                p3 = p3 * lam3 / np.float64(n3)
-                                cdf3 += p3
-                        else:
-                            uc1 = _stream_uniform(flight_key, stragg_counter)
-                            uc2 = _stream_uniform(flight_key, stragg_counter + U64_ONE)
-                            stragg_counter = stragg_counter + U64_ONE + U64_ONE
-                            zc = xp.sqrt(-F64_TWO * xp.log(F64_ONE - uc1)) * xp.cos(
-                                F64_TWO * F64_PI * uc2
-                            )
-                            n3 = np.int32(xp.floor(lam3 + xp.sqrt(lam3) * zc + F64_HALF))
-                            if n3 < I32_ZERO:
-                                n3 = I32_ZERO
+                            k3 = I32_ZERO
+                            while u3 >= cdf3:
+                                k3 += I32_ONE
+                                p3 = p3 * chunk_lam3 / np.float64(k3)
+                                next_cdf3 = cdf3 + p3
+                                if next_cdf3 <= cdf3:
+                                    break
+                                cdf3 = next_cdf3
+                            n3 += k3
+                            chunk3 += I32_ONE
                     kq = I32_ZERO
                     while kq < n3:
                         uq = _stream_uniform(flight_key, stragg_counter)

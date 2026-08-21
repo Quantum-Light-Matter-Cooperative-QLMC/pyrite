@@ -254,8 +254,8 @@ def _reconstruct(out, seed, Ne, E_cut):
                 loss, _c = _urban_sample_compound_keV(
                     *table, 0.0, E_start, s_row, flight_key, np.uint64(0)
                 )
-                # The indicator is exact and this row did not cross, so the
-                # draw must have stayed strictly inside the available energy.
+                # Under the explicit geometry-tie convention this row did not
+                # cross, so the draw cannot exceed the available energy.
                 assert loss <= delta, f"non-crossing row sampled {loss} > available {delta}"
                 assert E_end == E_start - loss
                 sampled_total += loss

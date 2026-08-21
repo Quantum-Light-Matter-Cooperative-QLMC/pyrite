@@ -112,8 +112,8 @@ def _urban_flight_key_scalar(urban_key, flight, substep):
 #   - The PRM's own shape floor ("mean loss at least a few multiples of I") is
 #     violated in nearly every catalog cell (dE/I per flight 0.017--2.58). Only
 #     the first two moments are trusted here; the shape is not.
-#   - Variance against the analytic Moller second moment xi T_max runs 0.73--1.42
-#     over the catalog (sigma within -14%/+19%). The PRM's width correction is
+#   - Variance against the analytic Moller second moment xi T_max runs 0.70--1.55
+#     over the audited matrix. The PRM's width correction is
 #     deliberately NOT applied.
 #   - A sampled loss may exceed E_i (E_1 can sit above T_up after the re-solve at
 #     low E, and n_3 can exceed 1). Clamping would break the mean, so the sampler
@@ -121,12 +121,12 @@ def _urban_flight_key_scalar(urban_key, flight, substep):
 _URBAN_E0_KEV = 1.0e-2  # ionisation level E_0 = 10 eV
 _URBAN_E2_KEV_PER_Z2 = 1.0e-2  # E_2 = 10 Z^2 eV
 _URBAN_RATE = 0.55  # r, the model's single tuned parameter
-# Above this Poisson mean the inverse-CDF search is replaced by its Gaussian
-# limit. Both branches consume a fixed number of uniforms so the stream advances
-# deterministically; the regime this model was selected for keeps <n_i> under
-# ~2.5 per flight, so the threshold is a guard for oversized steps, not a path
-# the transport takes.
-_URBAN_POISSON_GAUSS_MIN = 100.0
+# Large Poisson means are split into independent chunks no larger than this.
+# Poisson additivity makes the summed count exact while keeping ``exp(-lam)``
+# and the inverse-CDF recurrence well conditioned. Production flights keep
+# <n_i> below ~2.5; chunking is the exact guard for deliberately oversized
+# direct-sampler steps.
+_URBAN_POISSON_CHUNK_MAX = 64.0
 
 
 @njit(cache=True)
@@ -229,38 +229,37 @@ def _urban_moments_element_scalar(Z, J_keV, C_keV_per_ang, E_i, s_ang):
 def _urban_poisson_scalar(lam, key, counter):
     """Poisson variate with mean ``lam``, returning ``(n, counter)``.
 
-    Inverse CDF by the recurrence ``p_{k+1} = p_k lam/(k+1)``, which consumes
-    exactly one uniform however large ``n`` comes out -- a counter-addressed
-    stream must advance by an amount known to the caller, and Knuth's product
-    method would advance it by ``n + 1``. Above ``lam = 100`` the recurrence
-    starts from ``exp(-lam) ~ 1e-44`` and costs O(lam) iterations, so it hands
-    over to the Gaussian limit (skewness ``lam^-1/2`` <= 0.1 there), which
-    consumes two uniforms through Box-Muller.
+    Each bounded-rate chunk uses inverse CDF via
+    ``p_{k+1} = p_k lam/(k+1)`` and consumes exactly one uniform. Means above
+    :data:`_URBAN_POISSON_CHUNK_MAX` are decomposed into equal independent
+    chunks and their counts summed; Poisson additivity preserves the exact law
+    and therefore frozen-energy infinite divisibility. If the floating-point
+    CDF saturates below the sampled uniform in its sub-ulp tail, the current
+    quantile is returned instead of allowing a bounded loop to escape with an
+    absurd count.
 
     Validation: energy-loss-straggling
     """
     if lam <= 0.0:
         return 0, counter
-    if lam < _URBAN_POISSON_GAUSS_MIN:
+    n_chunks = int(np.ceil(lam / _URBAN_POISSON_CHUNK_MAX))
+    chunk_lam = lam / n_chunks
+    total = 0
+    for _ in range(n_chunks):
         u = _stream_uniform_scalar(key, counter)
         counter = counter + _SM64_ONE
-        p = np.exp(-lam)
+        p = np.exp(-chunk_lam)
         cdf = p
         k = 0
-        while u >= cdf and k < 10000:
+        while u >= cdf:
             k += 1
-            p = p * lam / k
-            cdf += p
-        return k, counter
-    u1 = _stream_uniform_scalar(key, counter)
-    u2 = _stream_uniform_scalar(key, counter + _SM64_ONE)
-    counter = counter + _SM64_ONE + _SM64_ONE
-    # u1 is in [0, 1); shift it off the log's singularity.
-    z = np.sqrt(-2.0 * np.log(1.0 - u1)) * np.cos(2.0 * np.pi * u2)
-    n = int(np.floor(lam + np.sqrt(lam) * z + 0.5))
-    if n < 0:
-        n = 0
-    return n, counter
+            p = p * chunk_lam / k
+            next_cdf = cdf + p
+            if next_cdf <= cdf:
+                break
+            cdf = next_cdf
+        total += k
+    return total, counter
 
 
 @njit(cache=True)

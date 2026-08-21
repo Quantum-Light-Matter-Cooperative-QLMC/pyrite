@@ -363,7 +363,7 @@ def test_inadmissible_parameterisation_falls_back_to_the_deterministic_loss():
 
 
 def test_poisson_variate_matches_its_mean_and_variance():
-    """Both branches of the Poisson sampler, small-``lam`` and Gaussian."""
+    """Both single-chunk and decomposed exact-Poisson paths."""
     for lam, n_draws, tol in ((0.7, 40000, 0.03), (3.0, 40000, 0.02), (200.0, 8000, 0.03)):
         counts = np.empty(n_draws)
         keys = stream_keys(4242, n_draws)
@@ -376,9 +376,29 @@ def test_poisson_variate_matches_its_mean_and_variance():
 
 def test_poisson_variate_consumes_a_fixed_number_of_draws():
     """A counter-addressed stream must advance by an amount the caller knows."""
-    for lam, expected in ((0.0, 0), (2.5, 1), (500.0, 2)):
+    for lam, expected in ((0.0, 0), (2.5, 1), (64.0, 1), (200.0, 4), (500.0, 8)):
         _, counter = _urban_poisson_scalar(lam, np.uint64(9), np.uint64(17))
         assert int(counter) - 17 == expected
+
+
+def test_poisson_large_mean_keeps_poisson_skewness_and_split_law():
+    """The former rounded-Gaussian branch erased the third cumulant."""
+    lam = 200.0
+    n_draws = 80000
+    keys = stream_keys(8675309, n_draws)
+    counts = np.empty(n_draws)
+    split_counts = np.empty(n_draws)
+    for i in range(n_draws):
+        counts[i], _ = _urban_poisson_scalar(lam, keys[i], np.uint64(0))
+        left, counter = _urban_poisson_scalar(0.5 * lam, keys[i], np.uint64(0))
+        right, _ = _urban_poisson_scalar(0.5 * lam, keys[i], counter)
+        split_counts[i] = left + right
+
+    centered = counts - counts.mean()
+    skewness = np.mean(centered**3) / np.mean(centered**2) ** 1.5
+    assert skewness == pytest.approx(lam**-0.5, abs=0.015)
+    assert split_counts.mean() == pytest.approx(counts.mean(), rel=0.003)
+    assert split_counts.var() == pytest.approx(counts.var(), rel=0.015)
 
 
 @pytest.mark.parametrize(

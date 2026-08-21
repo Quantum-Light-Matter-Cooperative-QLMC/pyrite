@@ -13,10 +13,9 @@ rather than a function of distance. The replacement, derived in the
 ``_transport_core_ungrooved``, splits the question in two:
 
 * the Urban loss is a compound-Poisson *subordinator*, so it is non-decreasing
-  in the step length; "this row crosses ``E_cut``" is therefore EXACTLY
-  equivalent to "the row's total sampled loss reaches ``E_start - E_cut``".
-  The crossing indicator, and hence ``n_cutoff_stopped``, carries no
-  approximation at all;
+  in the step length; away from an exact row-end tie with geometry, "this row
+  crosses ``E_cut``" is equivalent to "the row's total sampled loss reaches
+  ``E_start - E_cut``". Geometry wins that exact tie by convention;
 * the crossing *location* is the fluid interpolation at the row's own realized
   rate, ``s_cut = s (E_start - E_cut) / dE``, which collapses term by term
   onto the deterministic ``cutoff_distance = (E_cut - E_j)/dEds`` when the
@@ -39,12 +38,12 @@ two parts, each tested here:
    CP(s Sigma)`` for any partition. It is distributional, not pathwise: each
    substep addresses its own ``(flight, substep)`` key, so the realized
    numbers differ and only the law is preserved;
-2. the only substep dependence is the drift of ``Sigma_i`` with ``E`` inside
-   the flight, which shifts the mean by ``-C C' s^2 (N-1)/(2N) + O(s^3)`` --
-   and the ``N -> infinity`` limit of that is the exactly integrated mean, so
-   substepping under straggling converges in the same direction and at the
-   same order as the deterministic frozen model's own left-endpoint quadrature
-   error. Straggling adds no substep dependence of its own.
+2. once energy evolves, the next jump kernel depends on the previous random
+   loss. The second-order mean shift contains the full jump generator
+   ``integral [C(E-epsilon)-C(E)] nu_E(d epsilon)``. Its linear Taylor term is
+   ``-C C'``; finite Urban jumps leave a same-order remainder, and the variance
+   also gains cross-step covariance. This is a state-dependent jump-process
+   discretization, not deterministic quadrature alone.
 
 Every test here pins the ungrooved lockstep core with the exact (non-LUT)
 stopping power, which is the only core slice E integrates; the remaining cores
@@ -56,6 +55,8 @@ import pytest
 
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
+    _dEds_spliced_element_scalar,
+    _urban_channels_scalar,
     _urban_flight_key_scalar,
     _urban_sample_compound_keV,
     _urban_stream_key_scalar,
@@ -237,8 +238,9 @@ def test_overshooting_rows_stop_exactly_at_the_cutoff():
       ``straggle_dE_keV`` after reconstructing every earlier row offline)
       always reaches the available energy ``E_start - E_cut``. That is the
       crossing condition, and it holding on every single track with no
-      exception is the empirical form of "the indicator is exact because the
-      loss process is non-decreasing";
+      exception is the empirical form of the non-decreasing-loss indicator;
+      exact equality with geometry is covered separately by the row-end
+      precedence tests;
     * the overshoot is severe and common rather than marginal, so the rule is
       genuinely exercised: a median of 2x the available energy here;
     * the crossing *location* is the fluid interpolation and nothing else.
@@ -404,56 +406,68 @@ def test_substep_split_is_distribution_preserving_at_frozen_energy():
         assert sample.var(ddof=1) == pytest.approx(analytic_var, rel=0.15)
 
 
-def test_substep_drift_shift_matches_the_derived_second_order_term():
-    """Part 2 of the re-derivation: the ONLY substep dependence is the drift
-    of the Poisson rates with ``E`` inside the flight, and it is second order
-    in the step.
+def test_substep_drift_shift_matches_the_full_jump_generator():
+    """The evolving-energy mean shift includes the finite-jump remainder.
 
     Derived: with ``C(E) = |dE/dx|``, equal substeps and ``Y_{m-1}`` the loss
     accumulated before substep ``m``,
 
-        <sum_m X_m> - <X> = -C C' sum_m s_m sigma_{m-1} + O(s^3)
-                          = -C C' s^2 (N-1)/(2N) + O(s^3),
+        <sum_m X_m> - <X>
+          = A(E) s^2 (N-1)/(2N) + O(s^3),
 
-    positive because ``C' = dC/dE < 0``: substeps taken at the lower energies
-    the earlier substeps left behind lose more. The ``N -> infinity`` limit,
-    ``-C C' s^2/2``, is exactly the second-order term of the true integral
-    ``int_0^s C(E(s')) ds' = C s - (1/2) C C' s^2 + O(s^3)``, so subdividing
-    moves the straggled mean toward the correct value and not away from it --
-    the same left-endpoint quadrature error the deterministic frozen model
-    already carries, and nothing new introduced by the fluctuation.
+        A(E) = integral [C(E-epsilon)-C(E)] nu_E(d epsilon)
+             = -C(E) C'(E) + R(E).
 
-    Tested rather than asserted: the measured shift is compared against the
-    leading-order prediction, and separately shown to be many standard errors
-    away from zero so the agreement is not an agreement between two numbers
-    that are both noise. The accepted band is 0.8--1.6 of the prediction: at
-    the ``dE/E = 0.09`` used here the measured ratio is ~1.15, the excess
-    being the ``O(s^3)`` remainder the expansion drops."""
+    The ``-C C'`` term is the deterministic linearization. ``R(E)`` is nonzero
+    at the same order because Urban marks remain finite as ``s -> 0``. The test
+    evaluates ``A(E)`` independently from the three channel rates and continuum
+    density, checks that the remainder is resolved, then compares the measured
+    recursion shift with the full coefficient.
+
+    The measured shift is compared against the full leading-order prediction
+    and separately shown to be many standard errors from zero. The broad band
+    retains room for the omitted ``O(s^3)`` terms at ``dE/E = 0.09``."""
     unsplit = _substep_samples(1, drift=False)
     drifted = _substep_samples(_SUBSTEP_N, drift=True)
     shift = drifted.mean() - unsplit.mean()
     stderr = np.sqrt(unsplit.var(ddof=1) / unsplit.size + drifted.var(ddof=1) / drifted.size)
 
-    # C and C' by central difference on the model's own analytic mean, which
-    # is |dE/dx| by the closure identity -- deliberately not the sampler.
+    # C and C' from the analytic mean, deliberately not from sampled losses.
     step = 1.0e-3
     per_ang = lambda energy: urban_loss_moments_keV(GRAPHITE, energy, 1.0)[0]  # noqa: E731
     c_value = per_ang(_SUBSTEP_E_KEV)
     c_prime = (per_ang(_SUBSTEP_E_KEV + step) - per_ang(_SUBSTEP_E_KEV - step)) / (2.0 * step)
-    predicted = (
-        -c_value * c_prime * _SUBSTEP_S_ANG * _SUBSTEP_S_ANG * (_SUBSTEP_N - 1) / (2.0 * _SUBSTEP_N)
+    factor = _SUBSTEP_S_ANG * _SUBSTEP_S_ANG * (_SUBSTEP_N - 1) / (2.0 * _SUBSTEP_N)
+    linear_prediction = -c_value * c_prime * factor
+
+    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr = urban_element_table(GRAPHITE)
+    C_element = -_dEds_spliced_element_scalar(
+        J_arr[0], k_arr[0], coeff_arr[0], E_cross_arr[0], 0.0, _SUBSTEP_E_KEV
     )
+    valid, sigma_1, E_1, sigma_2, E_2, sigma_3 = _urban_channels_scalar(
+        Z_arr[0], J_arr[0], C_element, _SUBSTEP_E_KEV
+    )
+    assert valid == 1.0
+
+    def delta_c(mark):
+        return per_ang(_SUBSTEP_E_KEV - mark) - c_value
+
+    # The normalized continuum density is N/epsilon^2 on [E0, E/2].
+    E0 = 1.0e-2
+    T_up = 0.5 * _SUBSTEP_E_KEV
+    continuum_marks = np.geomspace(E0, T_up, 8193)
+    norm = E0 * T_up / (T_up - E0)
+    continuum_integrand = np.array([delta_c(mark) for mark in continuum_marks])
+    continuum_integrand *= norm / continuum_marks**2
+    generator = sigma_1 * delta_c(E_1) + sigma_2 * delta_c(E_2)
+    generator += sigma_3 * np.trapezoid(continuum_integrand, continuum_marks)
+    predicted = generator * factor
+    remainder_prediction = predicted - linear_prediction
 
     assert c_prime < 0.0 and predicted > 0.0
+    assert abs(remainder_prediction) > 0.03 * linear_prediction
     assert shift > 3.0 * stderr, "substep drift shift is indistinguishable from Monte Carlo noise"
-    assert 0.8 * predicted < shift < 1.6 * predicted
-
-    # Same statement as a fractional bound a caller can apply without
-    # re-deriving: half the flight's own fractional energy loss times the
-    # logarithmic slope of the stopping power, to leading order.
-    mean_loss = c_value * _SUBSTEP_S_ANG
-    bound = 0.5 * abs(c_prime * _SUBSTEP_E_KEV / c_value) * (mean_loss / _SUBSTEP_E_KEV)
-    assert shift / unsplit.mean() < 1.3 * bound
+    assert 0.7 * predicted < shift < 1.4 * predicted
 
 
 def test_max_dE_frac_preserves_the_straggled_loss_in_transport():

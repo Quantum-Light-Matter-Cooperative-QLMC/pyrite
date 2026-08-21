@@ -19,10 +19,10 @@ Slice F of ``feature/energy-loss-straggling``. Two disjoint halves:
   them on a GPU box (``pyrite remote``).
 
 The parity claim is deliberately *not* bit-for-bit and is not stated per row.
-``_urban_poisson_scalar`` branches on a ``log``/``exp`` comparison, so a
-last-bit libm difference between the host and the device can move a Poisson
-count by one at a CDF boundary (slice C's own recommendation says few-ulp, not
-bit-for-bit). Before slice F that only perturbed a diagnostic; now it changes
+``_urban_poisson_scalar`` inverts a floating-point CDF, so a last-bit libm
+difference between the host and the device can move a Poisson count by one at a
+CDF boundary (slice C's own recommendation says few-ulp, not bit-for-bit).
+Before slice F that only perturbed a diagnostic; now it changes
 the electron's energy, so the trajectory diverges from that row onward. The
 comparable quantity is therefore the *first* row of each electron -- taken at
 the unperturbed start energy, before any straggling draw has been applied --

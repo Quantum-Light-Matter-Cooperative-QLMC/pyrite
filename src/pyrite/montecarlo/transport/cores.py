@@ -192,8 +192,9 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 #            inf{ s' <= s : E(s') <= E_cut }  exists  <=>  dE(s) >= E_start-E_cut.
 #        The *indicator* of "this row crosses the cutoff" is a function of the
 #        total loss over the row alone -- which is precisely what the sampler
-#        returns. So the crossing decision, and hence `n_cutoff_stopped`, is
-#        EXACT under this model: no approximation enters it.
+#        returns. Apart from an exact tie with a geometry event, the crossing
+#        decision is exact under this model. Geometry wins that tie by the
+#        transport's explicit row-end precedence convention.
 #   (P2) INFINITELY DIVISIBLE. For any partition s = sum_m s_m,
 #            sum_m CP(s_m Sigma) =_d CP(s Sigma),
 #        because sum_m Poisson(s_m Sigma_i) = Poisson(s Sigma_i) and the marks
@@ -207,7 +208,9 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 # length s. By (P1) the row crosses iff dE >= Delta, and the crossing distance
 # is the position of the jump that carries the running sum past Delta. The
 # sampler returns the total, not the jump ladder, so the *location* needs a
-# rule. The one used here places the crossing where the loss, accrued at the
+# rule. Equality at a simultaneous geometry event belongs to geometry; equality
+# without geometry belongs to the cutoff. The rule places a winning cutoff where
+# the loss, accrued at the
 # row's own REALIZED average rate dE/s, reaches Delta:
 #
 #       s_cut = s * Delta / dE,        E_end = E_cut,        cutoff_j = True.
@@ -266,7 +269,8 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 # ended because the electron reached E_cut"), so the increment, the `died_j`
 # kill, and the geometry-flag clearing are unchanged; only the test that sets it
 # is redefined. By (P1) the flag fires on exactly the rows on which the true
-# first passage lies inside the row, so the count is exact, not approximate.
+# first passage lies inside the row under the explicit tie convention, so the
+# count is exact within that convention, not approximate.
 #
 # The energy model: under straggling the loss over a row is the sampled dE and
 # E_end = E_start - dE for BOTH `energy_model` codes. The midpoint
@@ -299,56 +303,38 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 #     preserved. This is the strongest form the invariance can take and it is
 #     what slice B's infinite-divisibility argument buys.
 #
-# (ii) The ONLY substep dependence is the drift of Sigma_i with E inside the
-#     flight. Write C(E) = |dE/dx|(E) for the mean loss per unit length and
-#     V(E) = Sigma_1 E_1^2 + Sigma_2 E_2^2 + Sigma_3 E_0 T_up for the variance
-#     per unit length (both from the block above `_urban_levels_scalar`). Then
-#         <sum_m X_m> = sum_m s_m C(E^(m)),   Var(sum_m X_m) = sum_m s_m V(E^(m))
-#     (no cross terms: the substeps are independent). Expanding
-#     C(E^(m)) = C(E) - C'(E) Y_{m-1} + O(Y^2) with Y_{m-1} = sum_{l<m} X_l and
-#     <Y_{m-1}> = C(E) sigma_{m-1}, sigma_{m-1} = sum_{l<m} s_l, gives
+# (ii) Once energy evolves, the next jump kernel depends on the previous random
+#     loss. Let nu_E(d epsilon) be the frozen-energy jump-intensity measure and
+#     C(E) = integral epsilon nu_E(d epsilon). For two short rows h_1, h_2,
 #
-#         <sum_m X_m> - <X> = -C C' sum_m s_m sigma_{m-1} + O(s^3)
-#                           = -C C' s^2 (N-1)/(2N) + O(s^3)   [equal substeps]
+#       <X_1 + X_2> - <X_frozen>
+#         = h_1 h_2 integral [C(E-epsilon) - C(E)] nu_E(d epsilon) + O(h^3)
+#         = h_1 h_2 [-C(E) C'(E) + R(E)] + O(h^3),
 #
-#     and identically Var(sum_m X_m) - Var(X) = -V' C s^2 (N-1)/(2N) + O(s^3).
-#     Both are monotone in N, vanish at N = 1, and saturate at N -> infinity.
+#       R(E) = integral [C(E-epsilon)-C(E)+epsilon C'(E)] nu_E(d epsilon).
 #
-# (iii) The N -> infinity limit is the CORRECT moment, so substepping converges
-#     rather than drifting. The exactly integrated mean loss over the flight is
-#         int_0^s C(E(s')) ds' = C s - (1/2) C C' s^2 + O(s^3),
-#     since dC/ds = C'(E) dE/ds = -C C'. The N -> infinity substep mean above is
-#     C s - (1/2) C C' s^2: the same second-order term. So the whole substep
-#     dependence of the straggled loss is the pre-existing left-endpoint
-#     quadrature error of the frozen energy model, and refining `max_dE_frac`
-#     removes it at first order in the step, exactly as it does deterministically.
-#     STRAGGLING INTRODUCES NO SUBSTEP DEPENDENCE OF ITS OWN.
+#     Urban marks stay finite as h -> 0, so R(E) is generally nonzero at the
+#     same order as the deterministic linearization -C C'. For equal substeps,
+#     the generator coefficient is multiplied by s^2 (N-1)/(2N).
 #
-# (iv) Bound, in the form a caller can check. Dividing (ii) by the unsplit
-#     moments and using DeltaE = C s for the flight's own mean loss,
+# (iii) The substeps are conditionally, not unconditionally, independent. For
+#     two rows,
 #
-#         |<sum X_m> - <X>| / <X>          ~  (1/2) |dlnC/dlnE| (DeltaE / E)
-#         |Var(sum X_m) - Var(X)| / Var(X)  ~  (1/2) |dlnV/dlnE| (DeltaE / E)
+#       Cov(X_1, X_2) = h_2 Cov(X_1, C(E-X_1)),
 #
-#     both with the (N-1)/N <= 1 factor dropped, and both to LEADING order --
-#     the dropped O(s^3) remainder is itself of relative size DeltaE/E, so the
-#     bound is an estimate that tightens as the flight's fractional loss falls,
-#     not a hard inequality at large DeltaE/E. For the spliced stopping power
-#     over 1--300 keV |dlnC/dlnE| is of order 1 (Joy--Luo is C ~ ln(...)/E,
-#     Berger--Seltzer likewise), so the substep-induced shift in the mean is
-#     about half the flight's fractional energy loss -- which under
-#     `max_dE_frac = f` is at most f/2 per substep. `max_dE_frac` therefore
-#     bounds the invariance violation directly, which is the property the doc
-#     re-derivation needs.
+#     and the law of total variance also contributes
+#     E[h_2 V(E-X_1)] + Var(h_2 C(E-X_1)). Thus the evolving-energy variance is
+#     not sum_m s_m V(E^(m)) with cross terms discarded. `max_dE_frac` refines
+#     a state-dependent jump-process discretization; convergence cannot be
+#     reduced to deterministic stopping-power quadrature alone.
 #
 # (v) Measured (`tests/montecarlo/test_straggling_transport_integration.py`),
 #     graphite, E = 25 keV, s = 1e4 Ang (DeltaE/E = 0.09), 20000 repetitions:
 #       - frozen, N = 1 vs N = 32: mean shift -0.0014 +- 0.0150 keV on a mean
 #         of 2.243 keV, i.e. consistent with the exact invariance of (i);
-#       - drifting, N = 32: shift +0.086 +- 0.015 keV against the leading-order
-#         prediction +0.075, a ratio of 1.15 -- the 15% excess being the
-#         O(s^3) term, which grows to a ratio of 1.30 at s = 1.5e4
-#         (DeltaE/E = 0.135), as the expansion predicts;
+#       - drifting, N = 32: shift +0.086 +- 0.015 keV. The regression evaluates
+#         the full generator coefficient from the three Urban channels and
+#         resolves its finite-jump remainder beyond the -C C' linearization;
 #       - in transport, 600 electrons at 25 keV with `max_dE_frac` 0 vs 0.02:
 #         mean per-electron straggled loss 19.61 vs 19.70 keV, 0.5%.
 #

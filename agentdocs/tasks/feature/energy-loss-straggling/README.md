@@ -390,13 +390,12 @@ Interactions that need explicit design rather than incremental patching:
 
       1. *Poisson variate advances the stream by an amount the caller can
          predict.* Inverse CDF by the recurrence `p_{k+1} = p_k lam/(k+1)`
-         consumes exactly **one** uniform however large `n` comes out; Knuth's
-         product method would consume `n + 1` and make the counter layout
-         data-dependent. Above `lam = 100` it hands to the Gaussian limit
-         (skewness <= 0.1) at **two** uniforms via Box--Muller. A channel with
-         `lam = 0` consumes none. So a flight consumes `(#non-empty Poisson
-         channels) + n_3` draws per element — variable, but a pure function of
-         the inputs.
+         consumes one uniform per bounded-rate chunk. Slice L supersedes C's
+         rounded-Gaussian handoff: means above 64 are divided into
+         `ceil(lam/64)` equal independent chunks, so their summed count remains
+         exactly Poisson by additivity. A channel with `lam = 0` consumes none.
+         A flight's draw count remains variable but a pure function of inputs
+         and sampled continuum count.
       2. *Inadmissible cells fall back to the deterministic loss and consume no
          stream.* `T_up <= E_0` (E below 20 eV) or `L(I) <= 0` (below ~0.18 keV
          in tungsten) leaves no admissible parameterisation at all; the sampler
@@ -544,15 +543,17 @@ Interactions that need explicit design rather than incremental patching:
       The residual that leaves in the mean is exactly the O(s^2) term derived
       below, and `max_dE_frac` is the lever that controls it.
 
-      **Cutoff crossing, redefined — and the indicator half is EXACT.** The
+      **Cutoff crossing, redefined — exact under the row-end convention.** The
       Urban loss is a compound-Poisson *subordinator*, hence non-decreasing in
       the step length, so
 
           first passage lies inside the row  <=>  dE(row) >= E_start - E_cut,
 
       a function of the total loss alone, which is exactly what the sampler
-      returns. **`n_cutoff_stopped` therefore carries no approximation**; it
-      fires on precisely the rows whose true first passage is interior. Only
+      returns. Exact equality at a simultaneous geometry event belongs to
+      geometry; equality without geometry belongs to the cutoff.
+      **`n_cutoff_stopped` therefore carries no approximation within that
+      convention**. Only
       the crossing *location* needs a rule, and the rule is the fluid
       interpolation at the row's own realized rate,
       `s_cut = s (E_start - E_cut) / dE`, with `E_end = E_cut` exactly.
@@ -601,30 +602,17 @@ Interactions that need explicit design rather than incremental patching:
          `sum_m Poisson(s_m Sigma_i) = Poisson(s Sigma_i)` with i.i.d. marks.
          Distributional, not pathwise: each substep addresses its own
          `(flight, substep)` key, so the realized numbers differ.
-      2. *The only substep dependence is the drift of `Sigma_i` with `E` inside
-         the flight.* With `C(E) = |dE/dx|` and `V(E) = Sigma_1 E_1^2 +
-         Sigma_2 E_2^2 + Sigma_3 E_0 T_up` per unit length,
-         `<sum_m X_m> = sum_m s_m C(E^(m))` and likewise for `V`, so expanding
-         about `E`,
+      2. *Superseded by fresh-context review and slice L.* Energy drift makes
+         the next kernel depend on the previous random loss. The full
+         second-order mean coefficient is
 
-             <sum_m X_m> - <X> = -C C' sum_m s_m sigma_{m-1} + O(s^3)
-                               = -C C' s^2 (N-1)/(2N) + O(s^3),
+             integral [C(E-epsilon)-C(E)] nu_E(d epsilon)
+             = -C C' + R(E),
 
-         and identically `-V' C s^2 (N-1)/(2N)` for the variance. Positive,
-         since `C' < 0`: substeps at the lower energies earlier substeps left
-         behind lose more.
-      3. *Its `N -> infinity` limit is the CORRECT moment.* The exactly
-         integrated mean is `int_0^s C(E(s')) ds' = C s - (1/2) C C' s^2 +
-         O(s^3)`, whose second-order term is the `N -> infinity` limit above.
-         **So the entire substep dependence of the straggled loss is the
-         pre-existing left-endpoint quadrature error of the frozen energy
-         model; straggling introduces none of its own**, and refining
-         `max_dE_frac` removes it at first order exactly as it does
-         deterministically.
-      4. *Bound, leading order:* `|Delta<dE>|/<dE> ~ (1/2)|dlnC/dlnE|
-         (DeltaE/E)` and the same with `V` for the variance, `DeltaE = C s` the
-         flight's own mean loss. An estimate, not a hard inequality — the
-         dropped `O(s^3)` remainder is itself of relative size `DeltaE/E`.
+         and the variance carries induced cross-step covariance. Urban marks
+         stay finite as the row shrinks, so `R(E)` is same-order rather than an
+         `O(s^3)` deterministic remainder. Slice L's regression evaluates this
+         full generator coefficient independently.
 
       **Verified statistically, not asserted.** Graphite, 25 keV, `s = 1e4` Ang
       (`DeltaE/E = 0.09`), 20000 repetitions of a harness reproducing the
@@ -1089,14 +1077,29 @@ Interactions that need explicit design rather than incremental patching:
       physics-doc contract, and cross-links J so the RNG plumbing is documented
       once, not twice.
       Fresh-context review corrected E's inherited substep derivation: exact
-      infinite divisibility is qualified to the exact-Poisson branch, while the
+      infinite divisibility depends on exact Poisson counts, while the
       evolving-energy process carries a same-order jump remainder and cross-step
       covariance. The cutoff section now records geometry's strict tie
       precedence rather than claiming an unqualified `>=` indicator.
+- [x] L — Discrepancy adjudication. **Implemented and independently rederived;
+      CUDA hardware validation pending.** Replaced the rounded-Gaussian
+      high-count branch with exact bounded-rate Poisson decomposition: a mean
+      above 64 is split into equal independent chunks, each sampled by stable
+      inverse CDF, and counts sum exactly by Poisson additivity. CDF saturation
+      now returns the current tail quantile rather than escaping at count 10000.
+      The CUDA transcription uses the identical chunk/draw order. Added a
+      high-rate mean/variance/skewness/split-law regression and changed the
+      evolving-energy anchor to evaluate the full jump-generator coefficient,
+      including the nonzero finite-jump remainder beyond `-C C'`; source and
+      maintained docs now also state the induced covariance and explicit
+      geometry-wins equality convention. Fresh-context re-validation passed
+      units, limits, signs/conventions, Poisson additivity, tail termination,
+      generator/covariance semantics, and the tie convention; ledger status is
+      `rederived`. Focused sampler tests: 135 passed.
 
 ## Decisions and open questions
 
-- **Fresh-context discrepancy, found in I/K.** The independent verifier
+- **Adjudicated implementation discrepancy, found in I/K.** The independent verifier
   re-derived the Urban rates, analytic mean/variance, continuum inverse CDF,
   units, sign and `s -> 0` limit, then found three narrower claims that do not
   match the implementation. (1) `_urban_poisson_scalar` switches to a rounded
@@ -1106,9 +1109,11 @@ Interactions that need explicit design rather than incremental patching:
   expansion omits the state-dependent jump remainder and induced cross-step
   covariance. (3) equality at a simultaneous geometry event yields to geometry,
   whereas the draft ledger used unqualified `DeltaE >= Delta_cut`. The ledger
-  and maintained docs now say this explicitly and carry status `discrepancy`.
-  Fixing or formally bounding these implementation-level issues is a new
-  authority/scope decision; CUDA hardware validation remains separately open.
+  and maintained docs said this explicitly and carried status `discrepancy`.
+  Slice L replaces the approximate count branch, pins the full state-dependent
+  generator remainder, and retains geometry-wins equality as an explicit
+  convention. Fresh-context re-validation moved the row to `rederived`; CUDA
+  hardware validation remains separately open.
 
 - **Dependency noted 2026-08-20 (supervisor):** ELSEPA elastic-scattering data
   is being set up under `feature/reference-elastic-scattering-data`. Flight
@@ -1259,14 +1264,10 @@ Interactions that need explicit design rather than incremental patching:
 
 ## Next slice
 
-**Next: adjudicate the fresh-context discrepancy before task closure.** Slices
-I--K are complete and the docs/ledger now reflect the implementation honestly.
-The remaining choice is whether to replace the rounded-Gaussian high-count
-branch with an exact/divisible sampler and derive/test the state-dependent jump
-discretization, or to constrain the supported contract to the measured
-production regime and retain the explicit discrepancy. That implementation
-decision is outside the documentation slice just completed. CUDA remains
-unverified until its hardware tests run.
+**Next: CUDA validation.** Slice L implemented the exact high-count sampler and
+full state-dependent jump-generator anchor, and fresh-context re-validation is
+green with ledger status `rederived`. Run the five hardware-gated CUDA tests on
+`qlmc`, then record the hardware evidence.
 
 ## Slice I--K verification
 

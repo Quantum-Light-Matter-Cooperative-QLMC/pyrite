@@ -285,84 +285,105 @@ kinetic energy. The upper end of the accepted band ($\approx 1.5$) is thus set
 by a kinematically inadmissible channel, so it should not be read as evidence
 that the model's width is right there.
 
-## Fresh-context discrepancy audit
+## Fresh-context post-fix re-validation
 
 The source equations and implementation agree for the channel rates,
-continuum moments, inverse CDF, units, and positive-loss convention. Three
-transport-wide exactness claims do not hold for the sampler as implemented.
+continuum moments, inverse CDF, units, and positive-loss convention. The three
+previous transport-wide discrepancies have been addressed.
 
-First, `_urban_poisson_scalar` is an exact inverse-CDF Poisson sampler only for
-$0<\lambda<100$ (apart from the bounded-loop tail in finding 4). At
-$\lambda\ge100$ it instead returns
+### Bounded-rate exact Poisson counts
+
+For a requested mean $\lambda>0$, define
 
 $$
-N_{\rm G}=\max\!\left(0,
-\left\lfloor \lambda+\sqrt{\lambda}\,Z+\frac12\right\rfloor\right),
-\qquad Z\sim\mathcal N(0,1),
+q=\left\lceil\frac{\lambda}{64}\right\rceil,
+\qquad
+\mu=\frac{\lambda}{q}\le64.
 $$
 
-which is not Poisson. At $\lambda=100$ the rounded-normal branch is symmetric
-up to its negligible zero-clipping tail and has near-zero third cumulant,
-whereas two frozen-rate halves use two
-exact $\operatorname{Poisson}(50)$ counts whose sum is
-$\operatorname{Poisson}(100)$ and has third cumulant $100$. A direct
-300000-key comparison measured skewness $0.00379$ for the unsplit branch and
-$0.10207$ for the split branch (Poisson expectation $0.1$). Thus the sampler is
-compound Poisson, and frozen-energy subdivision is distributionally invariant,
-only while every channel stays on the exact Poisson branch and its inverse-CDF
-loop terminates normally. The source comment says production flights keep all
-means below about $2.5$, but the ledger and verdict do not state that
-assumption.
+If $N_j\sim\operatorname{Poisson}(\mu)$ are independent, their probability
+generating function gives
 
-Second, once energy updates between substeps, the residual is not identically
-the deterministic left-endpoint stopping-power quadrature error. Let
-$\nu_E(d\epsilon)$ be the frozen-energy jump-intensity measure and
+$$
+\prod_{j=1}^{q}\exp\!\bigl(\mu(z-1)\bigr)
+=\exp\!\bigl(\lambda(z-1)\bigr),
+$$
+
+so $\sum_jN_j\sim\operatorname{Poisson}(\lambda)$ exactly. Both the host
+sampler and all three CUDA channel transcriptions implement this decomposition,
+use one counter-addressed uniform per chunk, and sum the counts. A direct
+300000-key comparison at $\lambda=100$ gave mean $100.001277$, variance
+$99.846795$, and skewness $0.098979$ against the Poisson expectation $0.1$;
+the unsplit call was pathwise identical to two sequential
+$\operatorname{Poisson}(50)$ calls because both address the same two uniforms.
+
+The former `k < 10000` escape is gone. Each inverse-CDF recurrence now stops
+when `next_cdf <= cdf`, returning the current tail count if binary64 addition
+can no longer advance the CDF. This removes the absurd $n=10000$ escape. At the
+largest representable input uniform, the returned extreme-tail quantile can
+still differ from an ideal real-arithmetic Poisson quantile by a few counts
+(for example $137$ versus $139$ for $\lambda=64$); this affects one or a few
+$2^{-53}$ uniform-grid atoms and is ordinary finite-precision tail rounding,
+not the former Gaussian-law discrepancy.
+
+### Evolving-energy substeps
+
+Let $\nu_E(d\epsilon)$ be the frozen-energy jump-intensity measure and
 $C(E)=\int\epsilon\,\nu_E(d\epsilon)$. For two small substeps $h_1,h_2$, the
 mean relative to one frozen unsplit draw contains
 
 $$
 h_1h_2\int
 \bigl[C(E-\epsilon)-C(E)\bigr]\,\nu_E(d\epsilon)
-=-h_1h_2 C(E)C'(E)+h_1h_2 R(E),
+=h_1h_2\bigl[-C(E)C'(E)+R(E)\bigr],
 $$
 
-where
+with
 
 $$
 R(E)=\int
 \bigl[C(E-\epsilon)-C(E)+\epsilon C'(E)\bigr]\,\nu_E(d\epsilon).
 $$
 
-$R(E)$ is generally nonzero at the same order because Urban jump sizes do not
-shrink with step length. The variance derivation also says there are no cross
-terms because substeps are independent, but they are only conditionally
-independent: the second draw uses $E-X_1$, so
-$\operatorname{Cov}(X_1,X_2)=h_2\operatorname{Cov}(X_1,C(E-X_1))$ is generally
-nonzero. Evolving-energy subdivision is a state-dependent jump-process
-discretization, not solely the pre-existing deterministic quadrature error.
+The updated derivation retains this full generator rather than dropping
+$R(E)$. It also correctly uses conditional independence:
 
-Finally, the ledger's cutoff condition uses $\Delta E\ge
-E_{\rm start}-E_{\rm cut}$ without qualification, while every host core uses
-strict $>$ when a geometry event ties the row end. Equality yields to geometry
-under that convention. Apart from this tie, nonnegative jumps make the
-total-loss threshold an exact indicator that passage occurs by the row end;
-the fluid-interpolated crossing location remains approximate as already
-disclosed.
+$$
+\operatorname{Cov}(X_1,X_2)
+=h_2\operatorname{Cov}\!\bigl(X_1,C(E-X_1)\bigr),
+$$
+
+with the corresponding law-of-total-variance terms. The regression evaluates
+the full three-channel generator integral, resolves $R(E)$ from zero, and
+matches the sampled mean shift. The covariance identity is now correct in the
+derivation, but it is not separately asserted by a numerical regression.
+
+### Cutoff tie convention
+
+All five host applications and the CUDA transcription use
+
+    stragg_loss > delta_cut
+    or (stragg_loss == delta_cut and not geometry_event)
+
+matching the ledger's explicit convention that geometry wins an exact row-end
+tie. Away from that tie, monotonic nonnegative loss makes the total-loss
+threshold an exact indicator of passage by the row end. The
+fluid-interpolated crossing location remains approximate as disclosed.
 
 ## Findings
 
 | # | finding | severity |
 |---|---|---|
-| 1 | The code's block comment quotes the variance band as "0.73--1.42 ... sigma within -14%/+19%", which is the *pre-re-solve* (clamped) measurement. The code implements the re-solve, whose band is 0.70--1.55; the test and the task document both carry the corrected numbers. The shipped derivation comment contradicts the shipped test. | minor |
+| 1 | The code's block comment formerly quoted the pre-re-solve variance band. It now states the re-solved $0.70$--$1.55$ band pinned by the test. | resolved |
 | 2 | The task document attributes the whole band widening to raising the surviving level to $I$. That explains the upper end only; the lower end moves because the re-solve deletes a $E_2 > T_{\max}$ channel the clamp retained. | minor |
 | 3 | The admissibility test is asymmetric: $E_2 > T_{\rm up}$ disqualifies level 2, but the replacement $E_1 = I$ is never tested against $T_{\rm up}$ and exceeds it for tungsten below 1.45 keV. Disclosed in the comment ("`E_1` can sit above `T_up` after the re-solve"), and unavoidable if closure is to hold, but it means "inadmissible above the Møller ceiling" is applied to one level and not the other. | minor, disclosed |
-| 4 | `_urban_poisson_scalar`'s inverse-CDF loop is bounded by `k < 10000`. For $\lambda = 0.1$ and for $\lambda$ near 100 the accumulated `cdf` saturates two ulps below $1$, i.e. below the largest attainable uniform $1-2^{-53}$; a draw in that gap exits on the iteration bound and returns $n = 10000$, a finite but absurd loss. Probability per draw $\sim 2\times10^{-16}$. This is the same fail-open shape as the non-converged resonance root this branch just fixed elsewhere. | low, latent |
+| 4 | The former `k < 10000` escape now terminates when adding the next recurrence term cannot advance the binary64 CDF, so no absurd count escapes. The largest uniform-grid atom can still differ by a few counts from an ideal real-arithmetic extreme-tail quantile; probability is at most a few times $2^{-53}$. | resolved safety defect; finite-precision tail qualification disclosed |
 | 5 | The claim that Geant4 clamps the negative count to zero could not be checked against Geant4 source in this environment; it is quoted from the task document. The PyRITE choice is mean-exact either way, so nothing downstream depends on it. | unverified |
 | 6 | `test_sigma_units_are_inverse_length_and_counts_scale_with_step` comments "`Sigma_i` [1/Ang] times `E_i` [keV] must recover `C`" but only asserts the sum is positive. Closure is asserted elsewhere, so this is a comment/assertion mismatch, not a coverage gap. | cosmetic |
 | 7 | The sampler originally landed before production reachability and therefore had no ledger row or `Validation:` marker. Slice I closed both process gaps. | resolved |
-| 8 | For $\lambda\ge100$, `_urban_poisson_scalar` samples a rounded Gaussian count rather than a Poisson count. An unsplit $\lambda=100$ channel therefore differs from two exact $\lambda=50$ substeps, contradicting the unqualified compound-Poisson and frozen-energy infinite-divisibility claims. | discrepancy; outside the stated production regime but inside the reviewed function contract |
-| 9 | The evolving-energy derivation replaces $\int[C(E-\epsilon)-C(E)]\nu_E(d\epsilon)$ by $-C(E)C'(E)$ and declares unconditional independence. It omits the same-order jump remainder $R(E)$ and the covariance induced by using $E-X_1$ in the next draw. | discrepancy in the substep claim |
-| 10 | The ledger says cutoff occurs for $\Delta E\ge E_{\rm start}-E_{\rm cut}$, but the cores use strict $>$ when a geometry event ties the row end; equality yields to geometry. | convention discrepancy |
+| 8 | Means above $64$ are now split into independent equal bounded-rate chunks. Poisson additivity restores the exact count law and frozen-energy infinite divisibility; host and CUDA transcribe the same recurrence and draw order. | resolved |
+| 9 | The evolving-energy derivation now retains $\int[C(E-\epsilon)-C(E)]\nu_E(d\epsilon)=-C(E)C'(E)+R(E)$ and the covariance induced by using $E-X_1$ in the next draw. The regression numerically pins the mean-generator remainder; the covariance identity remains symbolic rather than separately anchored. | resolved derivation; covariance anchor gap |
+| 10 | The ledger now states that geometry wins an exact row-end tie, matching the strict-$>$ branch used by every host core and CUDA. | resolved |
 
 ## Production integration and observable evidence
 
@@ -379,9 +400,9 @@ E_{\rm start}-E_{\rm cut}$ if and only if passage occurs by the row end. The
 crossing position uses the fluid interpolation
 $s_{\rm cut}=s(E_{\rm start}-E_{\rm cut})/\Delta E$ and ends at
 $E_{\rm cut}$ exactly. At frozen energy, splitting is distributionally
-invariant only on the exact-Poisson branch. With evolving energy, subdivision
-also discretizes the state-dependent jump kernel; it is not reducible to the
-deterministic stopping-power quadrature term.
+invariant for all supported means because bounded-rate chunks preserve the
+Poisson law. With evolving energy, subdivision discretizes the state-dependent
+jump kernel through the full generator and covariance terms derived above.
 
 The committed paired-seed observable check used HOPG at 25 keV. At 1 um of
 fixed cumulative material path and 1 keV photon energy, straggling changes the
@@ -403,9 +424,11 @@ figures are not an angle- or bunch-averaged experimental observable, and the
 separate mean-stopping uncertainty remains owned by
 `feature/reference-electron-stopping-data`.
 
-Verdict from this fresh-context verification: `discrepancy`. Mean closure, both
-continuum moments, the inverse CDF, units, signs, and the $s\to0$ limit rederive
-and match on the exact-Poisson branch, but findings 8--10 contradict the
-unqualified sampler, substep, and cutoff claims. Suggested human ledger edit:
-set the row to `discrepancy` and record those three exact qualifications. Only
-a human may adjudicate or move the claim to `signed-off`.
+Verdict from this fresh-context post-fix verification: `rederived`. Mean
+closure, both continuum moments, inverse CDF, units, signs, $s\to0$, exact
+bounded-rate Poisson additivity, evolving-energy generator/covariance
+semantics, and the geometry-tie convention reproduce independently. The
+covariance term is not separately numerically anchored, and exact CUDA awaits
+hardware re-validation. Suggested human ledger edit: move `discrepancy` to
+`rederived` and record those two anchor qualifications. Only a human may
+adjudicate or move the claim to `signed-off`.
