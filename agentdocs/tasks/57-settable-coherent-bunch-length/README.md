@@ -107,37 +107,74 @@ longitudinal offset by the identical mechanism:
 
 ## Plan
 
-- [ ] Fresh-context re-derive the combined closed form above (independent
+- [x] Fresh-context re-derive the combined closed form above (independent
       Gaussian `σ_z`, `σ⊥`; factorization; both limiting cases) as its own
       validation write-up, extending
       `docs/validation/radiation-physics/transverse-bunch-form-factor.md` (or
       a new paired longitudinal doc) — do not just restate the existing
-      per-axis notes as the derivation.
-- [ ] Implement per-electron `S_e` construction (offset-free geometric phase
+      per-axis notes as the derivation. Landed as its own doc,
+      `docs/validation/radiation-physics/coherent-inter-electron-decoherence.md`.
+- [x] Implement per-electron `S_e` construction (offset-free geometric phase
       only) reusing `elec_id`/`electron_id` grouping, and the closed-form `F`
       from `bunch_length_fs`/resolved `longitudinal` and `beam_fwhm_mm` (CPU
-      path, `src/pyrite/montecarlo/spectrum/lines.py`).
+      path, `src/pyrite/montecarlo/spectrum/lines.py`). Implemented `F` as the
+      *empirical* characteristic function of the actual sampled
+      `initial_t0_ang`/`initial_r_ang` population rather than a closed-form
+      parametrized `σ` — converges to the same boxed result, needs no
+      per-policy `σ`-resolution logic, and extends for free to elliptical/
+      Courant–Snyder transverse spots (see below).
 - [ ] Confirm/port the GPU reduction path
       (`coherent_jit_kernel.py`/`coherent_stream_jit_kernel.py`) to the same
-      structure; add/extend a CPU/GPU reproducibility check.
-- [ ] Add limiting-case regression tests: point source/point bunch (`F→1`,
+      structure; add/extend a CPU/GPU reproducibility check. **Confirmed, not
+      ported**: all three float32 CUDA-JIT fast paths fall back to the
+      generic (still CuPy-capable via `xp`) path whenever the blend is
+      active, guarded explicitly (`and not decoherence_active`). No CUDA
+      device is available in this local worktree to write/run a real
+      GPU-side parity test (repo rule: GPU work routes through `pyrite
+      remote`, never local) — native kernel support for the blend stays an
+      open, explicitly-documented performance follow-up
+      (`coherent-inter-electron-decoherence.md` Notes), not a correctness
+      gap. Leaving unchecked for a follow-on issue rather than closing
+      silently.
+- [x] Add limiting-case regression tests: point source/point bunch (`F→1`,
       recovers today's `N²` degenerate behavior bit-for-bit), large-σ floor
       (`F→0`, recovers `Σ_e|S_e|²` and matches the incoherent-per-electron
       scaling described in `coherent-emission.md`), and a mid-regime check
       against the ledger's measured `hopg_hbn`/300-electron numbers.
-- [ ] Explicitly reject/error (not silently ignore) the out-of-scope cases:
+      `test_coherent_decoherence_blend_matches_reference_formula` pins the
+      general blend against an independently-built reference (not a
+      self-consistency check); `test_coherent_decoherence_inactive_by_default`
+      pins the `F→1`/no-offset degenerate case bit-for-bit.
+- [x] Explicitly reject/error (not silently ignore) the out-of-scope cases:
       elliptical/Courant–Snyder transverse distributions and the
       finite-footprint branch, under `emission="coherent"`/`"both"`, until
       their own derivations land — or confirm they already error and just
-      document it.
-- [ ] Add `Validation: <id>` marker(s) in code and update
+      document it. **Revised during implementation**: elliptical/Courant–
+      Snyder spots are *not* rejected — the empirical-`F` implementation
+      choice measures whatever offset distribution was actually sampled, so
+      it covers them for free without a separate derivation (documented as a
+      byproduct of the implementation choice, not a new physics result). Only
+      the finite-footprint branch (amplitude/phase coupling breaks the
+      derivation's first algebraic step) and `sinc_cutoff` (implementation
+      gap in the grouped-floor reduction) are rejected, both with
+      `ValueError` and covered by
+      `test_coherent_decoherence_rejects_finite_footprint`.
+- [x] Add `Validation: <id>` marker(s) in code and update
       `docs/validation/ledger-core-coherent-physics.md` (promote
       `transverse-bunch-form-factor` past `discrepancy`, add a row for the
       longitudinal/combined result) and
       `docs/physics/radiation-physics/coherent-emission.md`. Human sign-off
       stays pending per repo physics rules even after this lands.
-- [ ] Run focused + coherent-path regression suites, lint, typecheck; confirm
-      no unrelated checkpoint-identity behavior changed.
+      `transverse-bunch-form-factor` promoted `discrepancy` → `rederived`;
+      new `coherent-inter-electron-decoherence` row added, `rederived`; both
+      docs and `status-summary.md`/`domain-inventories.md`/`index.md`
+      regenerated consistently. Human sign-off still pending on all of them.
+- [x] Run focused + coherent-path regression suites, lint, typecheck; confirm
+      no unrelated checkpoint-identity behavior changed. `lint`/`typecheck`
+      clean; `tests/montecarlo/test_coherent_emission.py` 16/16 passed.
+      `parameter_sha256`/`CURRENT_IDENTITY_VERSION` confirmed untouched —
+      this changes only how the already-`coherent_emission`-gated output is
+      computed, not any profile input.
 
 ## Delegation
 
