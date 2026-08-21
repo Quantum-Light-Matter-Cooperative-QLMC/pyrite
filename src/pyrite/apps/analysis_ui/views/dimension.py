@@ -4,7 +4,7 @@ from pyrite.plots.altair.spectra import compare_spectrum_chart
 from pyrite.results import records, select_results, sweep_values
 
 from ..controls import axes_panel
-from .common import axis_warning_block, optional_selector, thickness_selector
+from .common import axis_warning_block, optional_selector, themed_chart, thickness_selector
 
 
 def render_dimension_comparison(
@@ -15,6 +15,7 @@ def render_dimension_comparison(
     values,
     axes,
     spec,
+    theme,
 ):
     results = context.results
     sweep = sweep_values(results) if records(results) else {}
@@ -92,6 +93,8 @@ def render_dimension_comparison(
         y_type=axes.broad.y_type,
         band="broad",
     )
+    narrow = themed_chart(narrow, theme)
+    broad = themed_chart(broad, theme)
 
     parts.extend(
         [

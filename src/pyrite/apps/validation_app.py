@@ -1,6 +1,6 @@
 # /// script
 # [tool.marimo.display]
-# theme = "dark"
+# theme = "system"
 # ///
 
 
@@ -20,7 +20,14 @@ def _():
 
     from pyrite.apps import anchor_figures as af
     from pyrite.apps import check as check_support
-    from pyrite.apps._design import page_title, status_badge, style_sheet
+    from pyrite.apps._design import (
+        configure_matplotlib_theme,
+        page_title,
+        resolved_theme,
+        status_badge,
+        style_sheet,
+        theme_switch,
+    )
     from pyrite.paths import workspace_root
 
     repo_dir = workspace_root()
@@ -93,25 +100,37 @@ def _():
     return (
         af,
         check_authorities,
+        configure_matplotlib_theme,
         check_support,
         mo,
         page_title,
+        resolved_theme,
         run_checks,
         status_badge,
         style_sheet,
+        theme_switch,
     )
 
 
 @app.cell(hide_code=True)
-def _(mo, page_title, status_badge, style_sheet):
+def _(mo, page_title, status_badge, style_sheet, theme_switch):
+    theme_ui = theme_switch(mo)
     mo.vstack(
         [
             style_sheet(mo),
-            page_title(
-                mo,
-                "CXR physics validation",
-                "Run evidence with explicit authority, inspect complete reports, and keep derivation provenance distinct from pass/fail claims.",
-                eyebrow="Beamline control / validation",
+            mo.hstack(
+                [
+                    page_title(
+                        mo,
+                        "CXR physics validation",
+                        "Run evidence with explicit authority, inspect complete reports, and keep derivation provenance distinct from pass/fail claims.",
+                        eyebrow="Beamline control / validation",
+                    ),
+                    theme_ui,
+                ],
+                justify="space-between",
+                align="start",
+                wrap=True,
             ),
             mo.hstack(
                 [
@@ -124,7 +143,14 @@ def _(mo, page_title, status_badge, style_sheet):
             ),
         ]
     )
-    return
+    return (theme_ui,)
+
+
+@app.cell
+def _(configure_matplotlib_theme, resolved_theme, theme_ui):
+    app_theme = resolved_theme(theme_ui)
+    configure_matplotlib_theme(app_theme)
+    return (app_theme,)
 
 
 @app.cell
@@ -444,6 +470,7 @@ def _(af, anchor, mo, ne_brem_ui, ne_ui, run_zhai_ui):
 def _(
     af,
     anchor,
+    app_theme,
     mo,
     zhai_cache_hit,
     zhai_cache_miss,
@@ -776,6 +803,7 @@ def _(
 @app.cell
 def _(
     af,
+    app_theme,
     mo,
     run_supplementary_ui,
     supplementary_azimuth_ui,

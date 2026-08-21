@@ -1,6 +1,6 @@
 # /// script
 # [tool.marimo.display]
-# theme = "dark"
+# theme = "system"
 # ///
 
 import marimo
@@ -16,7 +16,14 @@ def _():
     import numpy as np
 
     import pyrite as pr
-    from pyrite.apps._design import page_title, style_sheet
+    from pyrite.apps._design import (
+        apply_altair_theme,
+        apply_plotly_theme,
+        page_title,
+        resolved_theme,
+        style_sheet,
+        theme_switch,
+    )
     from pyrite.apps._widgets import MaterialSelect
 
     # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's
@@ -50,6 +57,8 @@ def _():
     return (
         CATALOG,
         MaterialSelect,
+        apply_altair_theme,
+        apply_plotly_theme,
         cached_render_path,
         crystal_lattice_figure,
         default_settings,
@@ -61,9 +70,11 @@ def _():
         penetration_survival_chart,
         pr,
         prune_render_cache,
+        resolved_theme,
         render_cache_key,
         render_reveal_animation,
         style_sheet,
+        theme_switch,
         trajectory_chart,
         trajectory_sweep,
         trajectory_volume_data,
@@ -72,19 +83,28 @@ def _():
 
 
 @app.cell
-def _(mo, page_title, style_sheet):
+def _(mo, page_title, style_sheet, theme_switch):
+    theme_ui = theme_switch(mo)
     mo.vstack(
         [
             style_sheet(mo),
-            page_title(
-                mo,
-                "3D trajectory and structure viewer",
-                "Watch electron cascades develop inside the crystal and inspect the lattice itself.",
-                eyebrow="PyRITE",
+            mo.hstack(
+                [
+                    page_title(
+                        mo,
+                        "3D trajectory and structure viewer",
+                        "Watch electron cascades develop inside the crystal and inspect the lattice itself.",
+                        eyebrow="PyRITE",
+                    ),
+                    theme_ui,
+                ],
+                justify="space-between",
+                align="start",
+                wrap=True,
             ),
         ]
     )
-    return
+    return (theme_ui,)
 
 
 @app.cell
@@ -337,6 +357,8 @@ def _(mo):
 @app.cell
 def _(
     MATERIAL,
+    apply_altair_theme,
+    apply_plotly_theme,
     cached_render_path,
     get_penetration_data,
     get_penetration_render_status,
@@ -375,7 +397,11 @@ def _(
     trajectory_sweep,
     trajectory_volume_data,
     trajectory_volume_figure_from_data,
+    resolved_theme,
+    theme_ui,
 ):
+    _theme = resolved_theme(theme_ui)
+
     def penetration_tab():
         _angle = penetration_tilt_deg
         _md = mo.md(
@@ -444,6 +470,7 @@ def _(
         else:
             _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle, width=420)
             set_penetration_survival((_survival_key, _survival))
+        _survival = apply_altair_theme(_survival, _theme)
 
         _seed = int(penetration_regen_ui.value)
         _Ne = int(penetration_ne_ui.value)
@@ -488,6 +515,7 @@ def _(
         # survival chart; widened past Plotly's 700 default now the colorbar
         # (restored below) has room without cramping the scene.
         if _volume is not None:
+            apply_plotly_theme(_volume, _theme)
             _volume.update_layout(width=900)
 
         _beam_metrics = initial_state_metrics(
@@ -605,7 +633,9 @@ def _(
         # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion.
         # Sits beside the survival chart now, not the 3D plot, so back to its
         # own 480 default width.
-        _cross_section_chart = trajectory_chart(_nc, Ne=40, width=420)
+        _cross_section_chart = apply_altair_theme(
+            trajectory_chart(_nc, Ne=40, width=420), _theme
+        )
         _cross_section_block = _cross_section_chart
 
         _bottom_cols = [p for p in (_cross_section_block, _survival) if p is not None]
@@ -757,6 +787,7 @@ def _(mo):
 def _(
     CATALOG,
     MATERIAL,
+    apply_plotly_theme,
     crystal_bonds_ui,
     crystal_lattice_figure,
     crystal_layers_ui,
@@ -765,7 +796,11 @@ def _(
     crystal_nc_ui,
     crystal_reciprocal_ui,
     mo,
+    resolved_theme,
+    theme_ui,
 ):
+    _theme = resolved_theme(theme_ui)
+
     def crystal_tab():
         _md = mo.md(
             "### Crystal structure\n"
@@ -787,6 +822,7 @@ def _(
             color_by="layer" if crystal_layers_ui.value else "element",
             n_reciprocal_vectors=crystal_reciprocal_ui.value,
         )
+        apply_plotly_theme(_fig, _theme)
         _fig.update_layout(height=680)
         _controls = mo.hstack(
             [

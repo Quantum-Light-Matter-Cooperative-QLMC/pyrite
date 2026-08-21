@@ -1,6 +1,6 @@
 # /// script
 # [tool.marimo.display]
-# theme = "dark"
+# theme = "system"
 # ///
 
 import marimo
@@ -12,7 +12,13 @@ with app.setup:
     import altair as alt
     import marimo as mo
 
-    from pyrite.apps._design import page_title, style_sheet
+    from pyrite.apps._design import (
+        configure_matplotlib_theme,
+        page_title,
+        resolved_theme,
+        style_sheet,
+        theme_switch,
+    )
     from pyrite.apps._widgets import MaterialSelect
     from pyrite.apps.analysis_ui import (
         DimensionComparisonSpec,
@@ -71,13 +77,22 @@ with app.setup:
 
 @app.cell(hide_code=True)
 def _():
+    theme_ui = theme_switch(mo)
     header = [
         style_sheet(mo),
-        page_title(
-            mo,
-            "Coherent X-ray radiation analysis",
-            "Explore spectra, optimize geometry, inspect instrument response, and compare materials.",
-            eyebrow="Electron transport and radiation from crystalline materials",
+        mo.hstack(
+            [
+                page_title(
+                    mo,
+                    "Coherent X-ray radiation analysis",
+                    "Explore spectra, optimize geometry, inspect instrument response, and compare materials.",
+                    eyebrow="Electron transport and radiation from crystalline materials",
+                ),
+                theme_ui,
+            ],
+            justify="space-between",
+            align="start",
+            wrap=True,
         ),
     ]
     if vegafusion_error is not None:
@@ -91,7 +106,14 @@ def _():
             )
         )
     mo.vstack(header)
-    return
+    return (theme_ui,)
+
+
+@app.cell
+def _(theme_ui):
+    app_theme = resolved_theme(theme_ui)
+    configure_matplotlib_theme(app_theme)
+    return (app_theme,)
 
 
 @app.cell
@@ -209,13 +231,14 @@ def _(pinned_results):
 
 
 @app.cell
-def _(context, heatmap_energy_ui, pinned_results):
+def _(app_theme, context, heatmap_energy_ui, pinned_results):
     heatmap_widget = make_heatmap_widget(
         mo,
         alt,
         pinned_results,
         context.settings,
         energy=heatmap_energy_ui.value,
+        theme=app_theme,
     )
     return (heatmap_widget,)
 
@@ -254,7 +277,7 @@ def _(scan_results):
 
 
 @app.cell
-def _(context, scan_heatmap_energy_ui, scan_results):
+def _(app_theme, context, scan_heatmap_energy_ui, scan_results):
     scan_heatmap_widgets = make_scan_heatmap_widgets(
         mo,
         alt,
@@ -262,6 +285,7 @@ def _(context, scan_heatmap_energy_ui, scan_results):
         context.settings,
         context.cases,
         energy=scan_heatmap_energy_ui.value,
+        theme=app_theme,
     )
     return (scan_heatmap_widgets,)
 
@@ -415,6 +439,7 @@ def _(compare_all_energies_ui, cross_material_energy_options):
 
 @app.cell
 def _(
+    app_theme,
     context,
     energy_controls,
     energy_values,
@@ -436,13 +461,14 @@ def _(
             heatmap_energy_ui=heatmap_energy_ui,
             heatmap_widget=heatmap_widget,
             heatmap_selection=heatmap_selection,
+            theme=app_theme,
         )
 
     return (energy_tab,)
 
 
 @app.cell
-def _(context, polar_controls):
+def _(app_theme, context, polar_controls):
     _values = polar_controls.value
     _axes = resolve_axis_pair(_values["axes"])
     _specification = DimensionComparisonSpec(
@@ -465,13 +491,14 @@ def _(context, polar_controls):
             values=_values,
             axes=_axes,
             spec=_specification,
+            theme=app_theme,
         )
 
     return (polar_tab,)
 
 
 @app.cell
-def _(azimuth_controls, context):
+def _(app_theme, azimuth_controls, context):
     _values = azimuth_controls.value
     _axes = resolve_axis_pair(_values["axes"])
     _specification = DimensionComparisonSpec(
@@ -494,6 +521,7 @@ def _(azimuth_controls, context):
             values=_values,
             axes=_axes,
             spec=_specification,
+            theme=app_theme,
         )
 
     return (azimuth_tab,)
@@ -501,6 +529,7 @@ def _(azimuth_controls, context):
 
 @app.cell
 def _(
+    app_theme,
     case_add_ui,
     case_clear_ui,
     case_controls,
@@ -527,6 +556,7 @@ def _(
             values=_values,
             axes=_axes,
             settings=context.settings,
+            theme=app_theme,
         )
 
     return (case_tab,)
@@ -534,6 +564,7 @@ def _(
 
 @app.cell
 def _(
+    app_theme,
     context,
     scan_heatmap_energy_ui,
     scan_heatmap_widgets,
@@ -554,6 +585,7 @@ def _(
             heatmap_energy_ui=scan_heatmap_energy_ui,
             heatmap_widgets=scan_heatmap_widgets,
             heatmap_selections=selections,
+            theme=app_theme,
         )
 
     def rankings_tab():
@@ -563,7 +595,7 @@ def _(
 
 
 @app.cell
-def _(context, detector_controls, detector_results, detector_values):
+def _(app_theme, context, detector_controls, detector_results, detector_values):
     _axes = resolve_axis_pair(detector_values["axes"], include_y_domain=True)
 
     def detector_tab():
@@ -574,13 +606,14 @@ def _(context, detector_controls, detector_results, detector_values):
             controls=detector_controls,
             values=detector_values,
             axes=_axes,
+            theme=app_theme,
         )
 
     return (detector_tab,)
 
 
 @app.cell
-def _(compare_all_energies_ui, context, cross_material_energy_ui):
+def _(app_theme, compare_all_energies_ui, context, cross_material_energy_ui):
     compare_all = compare_all_energies_ui.value
     energy = cross_material_energy_ui.value
 
@@ -594,6 +627,7 @@ def _(compare_all_energies_ui, context, cross_material_energy_ui):
             energy_ui=cross_material_energy_ui,
             compare_all=compare_all,
             energy=energy,
+            theme=app_theme,
         )
 
     return (cross_material_tab,)

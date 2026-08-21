@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pyrite.apps._design import apply_altair_theme
 from pyrite.campaign.sweep import fmt_thickness
 
 
@@ -11,6 +12,10 @@ def axis_warning_block(mo, axes):
         mo.md("\n".join(f"- {warning}" for warning in warnings)),
         kind="warn",
     )
+
+
+def themed_chart(chart, theme):
+    return apply_altair_theme(chart, theme) if chart is not None else None
 
 
 def optional_selector(mo, widget, values, formatter):

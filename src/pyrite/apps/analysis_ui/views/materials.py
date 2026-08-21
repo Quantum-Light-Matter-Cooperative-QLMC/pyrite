@@ -9,6 +9,8 @@ from pyrite.plots import (
 )
 from pyrite.plots.altair.spectra import material_comparison_chart
 
+from .common import themed_chart
+
 
 def render_cross_material(
     mo,
@@ -20,6 +22,7 @@ def render_cross_material(
     energy_ui,
     compare_all: bool,
     energy,
+    theme,
 ):
     description = mo.md(
         "For every material with a checkpoint, show the best dominant line selected "
@@ -79,12 +82,15 @@ def render_cross_material(
                     dropped[label] = reason
                 continue
             points.append((label, *point))
-        return material_comparison_chart(
-            points,
-            dropped,
-            select=select,
-            beam_energy_keV=beam_energy,
-            min_line_quality=0.5,
+        return themed_chart(
+            material_comparison_chart(
+                points,
+                dropped,
+                select=select,
+                beam_energy_keV=beam_energy,
+                min_line_quality=0.5,
+            ),
+            theme,
         )
 
     return mo.vstack(

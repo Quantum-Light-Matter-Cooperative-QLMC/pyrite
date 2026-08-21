@@ -5,13 +5,41 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from html import escape
 
+THEMES = {
+    "dark": {
+        "bg": "#12202B",
+        "surface": "#1D303D",
+        "text": "#DCEEF2",
+        "muted": "#91AEB7",
+        "subtle": "#B9D0D6",
+        "rule": "#41606F",
+        "focus": "#72C7D5",
+        "compute": "#D8A657",
+        "failure": "#D8787E",
+        "done": "#A6E4EF",
+    },
+    "light": {
+        "bg": "#F4F7F8",
+        "surface": "#FFFFFF",
+        "text": "#172832",
+        "muted": "#526B76",
+        "subtle": "#405A65",
+        "rule": "#C6D2D8",
+        "focus": "#187E91",
+        "compute": "#9A6516",
+        "failure": "#B44750",
+        "done": "#3A98AA",
+    },
+}
+
+# Backward-compatible named palette for code that imports COLORS directly.
 COLORS = {
-    "beamline_navy": "#12202B",
-    "instrument_slate": "#1D303D",
-    "xray_ice": "#DCEEF2",
-    "detector_cyan": "#72C7D5",
-    "tungsten_amber": "#D8A657",
-    "validation_rose": "#D8787E",
+    "beamline_navy": THEMES["dark"]["bg"],
+    "instrument_slate": THEMES["dark"]["surface"],
+    "xray_ice": THEMES["dark"]["text"],
+    "detector_cyan": THEMES["dark"]["focus"],
+    "tungsten_amber": THEMES["dark"]["compute"],
+    "validation_rose": THEMES["dark"]["failure"],
 }
 
 SPACING = {"xs": ".35rem", "sm": ".65rem", "md": "1rem", "lg": "1.5rem"}
@@ -20,8 +48,8 @@ TYPOGRAPHY = {
     "body": '"IBM Plex Sans", "Aptos", "Segoe UI", sans-serif',
     "data": '"IBM Plex Mono", monospace',
 }
-BORDERS = {"rule": "#41606f", "width": "1px", "radius": ".35rem"}
-FOCUS = {"color": COLORS["detector_cyan"], "width": "3px", "offset": "3px"}
+BORDERS = {"width": "1px", "radius": ".35rem"}
+FOCUS = {"width": "3px", "offset": "3px"}
 WIDTHS = {"prose": "72ch", "breakpoint": "768px"}
 
 STATUS_KINDS = {
@@ -36,44 +64,130 @@ STATUS_KINDS = {
 
 
 def notebook_css() -> str:
-    """Return scoped, export-safe CSS with no network dependencies."""
+    """Return shared light/dark CSS; the resolved mode lives on body[data-theme]."""
+    dark = THEMES["dark"]
+    light = THEMES["light"]
     return f"""
 <style>
+  html[data-pyrite-theme="dark"],
+  body[data-theme="dark"] {{
+    --cxr-bg: {dark["bg"]};
+    --cxr-surface: {dark["surface"]};
+    --cxr-text: {dark["text"]};
+    --cxr-muted: {dark["muted"]};
+    --cxr-subtle: {dark["subtle"]};
+    --cxr-rule: {dark["rule"]};
+    --cxr-focus: {dark["focus"]};
+    --cxr-compute: {dark["compute"]};
+    --cxr-failure: {dark["failure"]};
+    --cxr-done: {dark["done"]};
+    --background: {dark["bg"]};
+    --foreground: {dark["text"]};
+    --muted: {dark["surface"]};
+    --muted-foreground: {dark["muted"]};
+    --popover: {dark["surface"]};
+    --popover-foreground: {dark["text"]};
+    --card: {dark["surface"]};
+    --card-foreground: {dark["text"]};
+    --border: {dark["rule"]};
+    --input: {dark["surface"]};
+    --primary: {dark["focus"]};
+    --primary-foreground: {dark["bg"]};
+    --secondary: {dark["surface"]};
+    --secondary-foreground: {dark["text"]};
+    --accent: {dark["rule"]};
+    --accent-foreground: {dark["text"]};
+    --ring: {dark["focus"]};
+    color-scheme: dark;
+  }}
+  html[data-pyrite-theme="light"],
+  body[data-theme="light"] {{
+    --cxr-bg: {light["bg"]};
+    --cxr-surface: {light["surface"]};
+    --cxr-text: {light["text"]};
+    --cxr-muted: {light["muted"]};
+    --cxr-subtle: {light["subtle"]};
+    --cxr-rule: {light["rule"]};
+    --cxr-focus: {light["focus"]};
+    --cxr-compute: {light["compute"]};
+    --cxr-failure: {light["failure"]};
+    --cxr-done: {light["done"]};
+    --background: {light["bg"]};
+    --foreground: {light["text"]};
+    --muted: #EEF3F5;
+    --muted-foreground: {light["muted"]};
+    --popover: {light["surface"]};
+    --popover-foreground: {light["text"]};
+    --card: {light["surface"]};
+    --card-foreground: {light["text"]};
+    --border: {light["rule"]};
+    --input: {light["surface"]};
+    --primary: {light["focus"]};
+    --primary-foreground: #FFFFFF;
+    --secondary: #E8EFF2;
+    --secondary-foreground: {light["text"]};
+    --accent: #E3EEF1;
+    --accent-foreground: {light["text"]};
+    --ring: {light["focus"]};
+    color-scheme: light;
+  }}
   .cxr-shell {{
-    --cxr-bg: {COLORS["beamline_navy"]};
-    --cxr-surface: {COLORS["instrument_slate"]};
-    --cxr-text: {COLORS["xray_ice"]};
-    --cxr-focus: {COLORS["detector_cyan"]};
-    --cxr-compute: {COLORS["tungsten_amber"]};
-    --cxr-failure: {COLORS["validation_rose"]};
     color: var(--cxr-text);
     font-family: {TYPOGRAPHY["body"]};
     max-width: 100%;
   }}
   body:has(.cxr-shell) {{
-    background: var(--cxr-bg, #12202B);
-    color: var(--cxr-text, #DCEEF2);
+    background: var(--cxr-bg, {dark["bg"]});
+    color: var(--cxr-text, {dark["text"]});
   }}
   body:has(.cxr-shell) :is(button, input, select, [tabindex]):focus-visible {{
-    outline: {FOCUS["width"]} solid var(--cxr-focus, {FOCUS["color"]});
+    outline: {FOCUS["width"]} solid var(--cxr-focus, {dark["focus"]});
     outline-offset: {FOCUS["offset"]};
   }}
   body:has(.cxr-shell) :is(button, select, input:not([type="hidden"])) {{
     min-height: 44px;
   }}
+  .cxr-theme-select {{
+    display: inline-flex; align-items: center; gap: .55rem;
+    color: var(--cxr-muted); font: 600 .7rem/1.2 {TYPOGRAPHY["data"]};
+    letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  }}
+  .cxr-theme-select__control {{
+    min-height: 36px !important; padding: .25rem 1.8rem .25rem .55rem;
+    border: 1px solid var(--cxr-rule); border-radius: {BORDERS["radius"]};
+    background: var(--cxr-surface); color: var(--cxr-text);
+    font: 500 .78rem/1.2 {TYPOGRAPHY["data"]}; letter-spacing: 0;
+    text-transform: none;
+  }}
+  /* Marimo dropdowns/popovers are rendered in portal layers outside the
+     notebook output subtree, so inherit the shared root palette explicitly. */
+  html[data-pyrite-theme="light"] :is(
+    [role="listbox"], [role="menu"], [data-radix-popper-content-wrapper] > *
+  ) {{
+    background-color: var(--popover, #FFFFFF);
+    color: var(--popover-foreground, #172832);
+    border-color: var(--border, #C6D2D8);
+  }}
+  html[data-pyrite-theme="light"] :is([role="option"], [role="menuitem"]) {{
+    color: var(--popover-foreground, #172832);
+  }}
+  html[data-pyrite-theme="light"] :is([role="option"], [role="menuitem"]):is(:hover, [data-highlighted]) {{
+    background-color: var(--accent, #E3EEF1);
+    color: var(--accent-foreground, #172832);
+  }}
   .cxr-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
   .cxr-title__eyebrow {{
-    color: var(--cxr-focus); font: 600 .75rem/1.2 "IBM Plex Mono", monospace;
+    color: var(--cxr-focus); font: 600 .75rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .14em;
   }}
   .cxr-title h1 {{
     font-family: {TYPOGRAPHY["display"]};
     font-size: clamp(2rem, 4vw, 3.4rem); line-height: .98; margin: .35rem 0 .7rem;
   }}
-  .cxr-title p {{ color: #b9d0d6; line-height: 1.55; margin: 0; }}
+  .cxr-title p {{ color: var(--cxr-subtle); line-height: 1.55; margin: 0; }}
   .cxr-rail {{
     display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem 1.4rem;
-    border-block: {BORDERS["width"]} solid {BORDERS["rule"]};
+    border-block: {BORDERS["width"]} solid var(--cxr-rule);
     margin: .6rem 0 .9rem; padding: .5rem 0;
   }}
   .cxr-rail__item {{
@@ -81,58 +195,59 @@ def notebook_css() -> str:
     border-left: 2px solid var(--cxr-focus); padding-left: .6rem;
   }}
   .cxr-rail dt {{
-    color: #91aeb7; font: 600 .64rem/1.2 "IBM Plex Mono", monospace;
+    color: var(--cxr-muted); font: 600 .64rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
   }}
   .cxr-rail dd {{
-    color: var(--cxr-text); font: 500 .85rem/1.2 "IBM Plex Mono", monospace;
+    color: var(--cxr-text); font: 500 .85rem/1.2 {TYPOGRAPHY["data"]};
     margin: 0; white-space: nowrap;
   }}
   .cxr-badge {{
     border: 1px solid currentColor; border-radius: 999px; display: inline-block;
-    font: 600 .72rem/1 "IBM Plex Mono", monospace; padding: .38rem .62rem;
+    font: 600 .72rem/1 {TYPOGRAPHY["data"]}; padding: .38rem .62rem;
   }}
   .cxr-badge--failed {{ color: var(--cxr-failure); }}
   .cxr-badge--running, .cxr-badge--interpret {{ color: var(--cxr-compute); }}
   .cxr-badge--ready, .cxr-badge--cached, .cxr-badge--passed {{ color: var(--cxr-focus); }}
   .cxr-grid {{ display: grid; gap: .28rem; align-items: end; }}
   .cxr-grid__corner, .cxr-grid__col, .cxr-grid__row {{
-    color: #91aeb7; font: 600 .62rem/1.1 "IBM Plex Mono", monospace;
+    color: var(--cxr-muted); font: 600 .62rem/1.1 {TYPOGRAPHY["data"]};
     letter-spacing: .04em; white-space: nowrap;
   }}
   .cxr-grid__col {{ text-align: center; align-self: end; }}
   .cxr-grid__row {{ text-align: right; align-self: center; padding-right: .3rem; }}
   .cxr-grid__cell {{
     position: relative; aspect-ratio: 1 / 1; width: 100%; min-width: 12px;
-    border-radius: 2px; background: {COLORS["instrument_slate"]};
-    box-shadow: inset 0 0 0 1px {BORDERS["rule"]}; overflow: hidden;
+    border-radius: 2px; background: var(--cxr-surface);
+    box-shadow: inset 0 0 0 1px var(--cxr-rule); overflow: hidden;
     display: flex; align-items: center; justify-content: center;
   }}
   .cxr-grid__marker {{
     display: flex; flex-direction: column-reverse; border-radius: 1px;
-    box-shadow: inset 0 0 0 1px rgba(18, 32, 43, .55);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cxr-text) 25%, transparent);
   }}
   .cxr-grid__seg {{ width: 100%; }}
-  .cxr-grid__seg--cached {{ background: {COLORS["detector_cyan"]}; }}
-  .cxr-grid__seg--done {{ background: #A6E4EF; }}
-  .cxr-grid__seg--running {{ background: {COLORS["tungsten_amber"]}; }}
-  .cxr-grid__seg--excluded {{ background: {COLORS["validation_rose"]}; }}
+  .cxr-grid__seg--cached {{ background: var(--cxr-focus); }}
+  .cxr-grid__seg--done {{ background: var(--cxr-done); }}
+  .cxr-grid__seg--running {{ background: var(--cxr-compute); }}
+  .cxr-grid__seg--excluded {{ background: var(--cxr-failure); }}
   .cxr-grid__legend {{
     display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .6rem;
-    color: #91aeb7; font: 500 .68rem/1.2 "IBM Plex Mono", monospace;
+    color: var(--cxr-muted); font: 500 .68rem/1.2 {TYPOGRAPHY["data"]};
   }}
   .cxr-grid__legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
   .cxr-grid__swatch {{
     width: .72rem; height: .72rem; border-radius: 2px;
-    box-shadow: inset 0 0 0 1px {BORDERS["rule"]};
+    box-shadow: inset 0 0 0 1px var(--cxr-rule);
   }}
-  .cxr-group {{ border-left: 2px solid #41606f; padding: .35rem 0 .35rem 1rem; }}
+  .cxr-group {{ border-left: 2px solid var(--cxr-rule); padding: .35rem 0 .35rem 1rem; }}
   .cxr-group__label {{
-    color: #91aeb7; font: 600 .72rem/1.2 "IBM Plex Mono", monospace;
+    color: var(--cxr-muted); font: 600 .72rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .08em; margin-bottom: .65rem; text-transform: uppercase;
   }}
   @media (max-width: {WIDTHS["breakpoint"]}) {{
     .cxr-title h1 {{ font-size: 2rem; }}
+    .cxr-theme-select__label {{ display: none; }}
   }}
   @media (prefers-reduced-motion: reduce) {{
     body:has(.cxr-shell) *,
@@ -147,6 +262,146 @@ def notebook_css() -> str:
 
 def style_sheet(mo):
     return mo.Html(notebook_css())
+
+
+def theme_switch(mo):
+    """Return the shared appearance selector used by every PyRITE app."""
+    from pyrite.apps._widgets import ThemeSelect
+
+    return mo.ui.anywidget(ThemeSelect())
+
+
+def resolved_theme(theme_ui, fallback: str = "dark") -> str:
+    """Resolved ``light``/``dark`` value from :func:`theme_switch`."""
+    state = theme_ui.value or {}
+    value = state.get("resolved") if isinstance(state, Mapping) else None
+    return value if value in THEMES else fallback
+
+
+def configure_matplotlib_theme(theme: str) -> str:
+    """Set Matplotlib rcParams to the resolved PyRITE appearance.
+
+    marimo intentionally does not restore Matplotlib defaults when switching
+    from dark to light, so the app-level switch must do that explicitly.
+    """
+    mode = theme if theme in THEMES else "dark"
+    try:
+        import matplotlib.style
+
+        matplotlib.style.use("dark_background" if mode == "dark" else "default")
+    except ImportError:
+        pass
+    return mode
+
+
+def apply_altair_theme(chart, theme: str):
+    """Apply explicit Vega-Lite text/surface colors to an Altair chart.
+
+    marimo applies its own frontend Vega theme from the configured display
+    theme.  PyRITE's runtime switch is independent of that config, so these
+    explicit chart settings keep labels and legends synchronized with the
+    selected PyRITE appearance.
+    """
+    if chart is None:
+        return None
+    mode = theme if theme in THEMES else "dark"
+    palette = THEMES[mode]
+    return (
+        chart.configure(background=palette["surface"])
+        .configure_axis(
+            labelColor=palette["text"],
+            titleColor=palette["text"],
+            gridColor=palette["rule"],
+            domainColor=palette["muted"],
+            tickColor=palette["muted"],
+        )
+        .configure_legend(
+            labelColor=palette["text"],
+            titleColor=palette["text"],
+        )
+        .configure_header(
+            labelColor=palette["text"],
+            titleColor=palette["text"],
+        )
+        .configure_title(color=palette["text"])
+        .configure_view(stroke=palette["rule"])
+    )
+
+
+def apply_plotly_theme(fig, theme: str):
+    """Apply the shared palette to Plotly, including 2D/3D text and colorbars."""
+    mode = theme if theme in THEMES else "dark"
+    palette = THEMES[mode]
+    text = palette["text"]
+    surface = palette["surface"]
+    rule = palette["rule"]
+    muted = palette["muted"]
+
+    axis_2d = dict(
+        color=text,
+        tickfont=dict(color=text),
+        title=dict(font=dict(color=text)),
+        gridcolor=rule,
+        zerolinecolor=muted,
+        linecolor=muted,
+    )
+    axis_3d = dict(
+        backgroundcolor=surface,
+        gridcolor=rule,
+        zerolinecolor=muted,
+        color=text,
+        tickfont=dict(color=text),
+        title=dict(font=dict(color=text)),
+    )
+
+    fig.update_layout(
+        template="plotly_white" if mode == "light" else "plotly_dark",
+        paper_bgcolor=surface,
+        plot_bgcolor=surface,
+        font=dict(color=text),
+        title=dict(font=dict(color=text)),
+        legend=dict(
+            font=dict(color=text),
+            title=dict(font=dict(color=text)),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+        xaxis=axis_2d,
+        yaxis=axis_2d,
+        scene=dict(
+            bgcolor=surface,
+            xaxis=axis_3d,
+            yaxis=axis_3d,
+            zaxis=axis_3d,
+        ),
+    )
+
+    # Some PyRITE traces own their own colorbars; layout.font does not always
+    # override those nested fonts.  Set them explicitly without touching the
+    # actual data colors.
+    for trace in fig.data:
+        for owner_name in ("marker", "line"):
+            owner = getattr(trace, owner_name, None)
+            colorbar = getattr(owner, "colorbar", None) if owner is not None else None
+            if colorbar is not None:
+                colorbar.update(
+                    tickfont=dict(color=text),
+                    title=dict(font=dict(color=text)),
+                )
+        colorbar = getattr(trace, "colorbar", None)
+        if colorbar is not None:
+            colorbar.update(
+                tickfont=dict(color=text),
+                title=dict(font=dict(color=text)),
+            )
+
+    if getattr(fig.layout, "annotations", None):
+        for annotation in fig.layout.annotations:
+            annotation.font.color = text
+    if getattr(fig.layout.scene, "annotations", None):
+        for annotation in fig.layout.scene.annotations:
+            annotation.font.color = text
+
+    return fig
 
 
 def page_title(mo, title: str, intro: str, *, eyebrow: str = "PyRITE"):
@@ -175,7 +430,7 @@ def status_badge(mo, state: str):
 def control_group(mo, label: str, controls):
     return mo.vstack(
         [mo.Html(f'<div class="cxr-shell cxr-group__label">{escape(label)}</div>'), controls]
-    ).style({"border-left": "2px solid #41606f", "padding-left": "1rem"})
+    ).style({"border-left": "2px solid var(--cxr-rule)", "padding-left": "1rem"})
 
 
 def directional_state(mo, title: str, detail: str, action: str, *, kind: str = "info"):
@@ -189,11 +444,11 @@ def directional_state(mo, title: str, detail: str, action: str, *, kind: str = "
 #: (``.cxr-grid__seg--<state>``). Order is the reading order of the stack.
 SCAN_GRID_STATES = ("done", "cached", "running", "excluded")
 _SCAN_GRID_LEGEND = {
-    "done": ("This session", "#A6E4EF"),
-    "cached": ("Cached", COLORS["detector_cyan"]),
-    "running": ("Running", COLORS["tungsten_amber"]),
-    "excluded": ("Penetration-excluded", COLORS["validation_rose"]),
-    "remaining": ("Remaining", COLORS["instrument_slate"]),
+    "done": ("This session", "var(--cxr-done)"),
+    "cached": ("Cached", "var(--cxr-focus)"),
+    "running": ("Running", "var(--cxr-compute)"),
+    "excluded": ("Penetration-excluded", "var(--cxr-failure)"),
+    "remaining": ("Remaining", "var(--cxr-surface)"),
 }
 
 

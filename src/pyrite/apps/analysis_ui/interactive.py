@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from pyrite.apps._design import apply_altair_theme
 from pyrite.plots.altair.sweeps import heatmap_select_chart
 from pyrite.plots.mpl.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
 from pyrite.results import records
 
 
-def make_heatmap_widget(mo, alt, results, settings, *, energy):
+def make_heatmap_widget(mo, alt, results, settings, *, energy, theme):
     if not records(results):
         return None
     chart = heatmap_select_chart(
@@ -18,10 +19,14 @@ def make_heatmap_widget(mo, alt, results, settings, *, energy):
         return None
     # marimo needs the Vega-Lite selection params, which vegafusion compilation removes.
     with alt.data_transformers.enable("default"):
-        return mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+        return mo.ui.altair_chart(
+            apply_altair_theme(chart, theme),
+            chart_selection=False,
+            legend_selection=False,
+        )
 
 
-def make_scan_heatmap_widgets(mo, alt, results, settings, cases, *, energy):
+def make_scan_heatmap_widgets(mo, alt, results, settings, cases, *, energy, theme):
     specifications = list(HEATMAP_QUANTITIES) + [
         ("hit_frac", "electron footprint-hit fraction", "magma")
     ]
@@ -40,7 +45,11 @@ def make_scan_heatmap_widgets(mo, alt, results, settings, cases, *, energy):
                 color_domain=(0.0, 1.0) if key == "hit_frac" else None,
             )
             widgets[key] = (
-                mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+                mo.ui.altair_chart(
+                    apply_altair_theme(chart, theme),
+                    chart_selection=False,
+                    legend_selection=False,
+                )
                 if chart is not None
                 else None
             )

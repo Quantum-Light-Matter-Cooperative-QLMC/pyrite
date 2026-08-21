@@ -6,7 +6,7 @@ from pyrite.plots.altair.sweeps import metric_vs_chart, scan_charts
 from pyrite.plots.mpl.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
 from pyrite.results import records, select_results, sweep_values, top_geometries
 
-from .common import thickness_selector
+from .common import themed_chart, thickness_selector
 
 
 def render_rankings(mo, *, context):
@@ -44,6 +44,7 @@ def render_scans(
     heatmap_energy_ui,
     heatmap_widgets,
     heatmap_selections,
+    theme,
 ):
     tilts = {record["case"]["tilt_deg"] for record in records(scan_results)}
     azimuths = {record["case"]["tilt_azim_deg"] for record in records(scan_results)}
@@ -81,7 +82,7 @@ def render_scans(
                 band="broad",
             ),
         ]
-        charts = [chart for chart in charts if chart is not None]
+        charts = [themed_chart(chart, theme) for chart in charts if chart is not None]
         parts.append(mo.vstack(charts) if charts else mo.md("*No spectrum for that cell.*"))
         return mo.vstack(parts)
 
@@ -116,6 +117,7 @@ def render_scans(
             cases=context.cases,
             line_metric="prominence",
         )
+        charts = [themed_chart(chart, theme) for chart in charts if chart is not None]
         parts.append(mo.vstack(charts) if charts else mo.md("*No scan results.*"))
 
     parts.extend(
@@ -144,7 +146,7 @@ def render_scans(
         metric="peak_flux",
         hue="E0_keV",
     )
-    metric_charts = [chart for chart in (line, peak) if chart is not None]
+    metric_charts = [themed_chart(chart, theme) for chart in (line, peak) if chart is not None]
     parts.append(mo.vstack(metric_charts) if metric_charts else mo.md("*No metric results.*"))
     parts.append(
         mo.accordion(

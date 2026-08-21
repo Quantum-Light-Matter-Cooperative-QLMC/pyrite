@@ -3,7 +3,7 @@ from __future__ import annotations
 from pyrite.plots.altair.spectra import multi_case_spectrum_chart
 
 from ..controls import axes_panel
-from .common import axis_warning_block
+from .common import axis_warning_block, themed_chart
 
 CASE_BASKET_CAP = 12
 
@@ -21,6 +21,7 @@ def render_case_comparison(
     values,
     axes,
     settings,
+    theme,
 ):
     picker_block = mo.vstack(
         [
@@ -59,6 +60,8 @@ def render_case_comparison(
         y_type=axes.broad.y_type,
         band="broad",
     )
+    narrow = themed_chart(narrow, theme)
+    broad = themed_chart(broad, theme)
 
     rows = [
         {"label": entry["case"]["label"], "material": entry["case"]["material"]} for entry in basket

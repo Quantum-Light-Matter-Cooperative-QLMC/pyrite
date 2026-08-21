@@ -13,7 +13,7 @@ from pyrite.plots.altair.detectors import (
 from pyrite.results import records, sweep_values
 
 from ..controls import axes_panel
-from .common import axis_warning_block, optional_selector, thickness_selector
+from .common import axis_warning_block, optional_selector, themed_chart, thickness_selector
 
 
 def render_detectors(
@@ -24,6 +24,7 @@ def render_detectors(
     controls,
     values,
     axes,
+    theme,
 ):
     sweep = sweep_values(context.results) if records(context.results) else {}
     thickness_widget = thickness_selector(
@@ -66,7 +67,7 @@ def render_detectors(
             y_type=axes.broad.y_type,
             band="broad",
         )
-        return [chart for chart in (narrow, broad) if chart is not None]
+        return [themed_chart(chart, theme) for chart in (narrow, broad) if chart is not None]
 
     def eagle_view():
         parts = [

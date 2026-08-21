@@ -4,7 +4,7 @@ from pyrite.plots.altair.spectra import spectrum_chart
 from pyrite.results import records, select_results, sweep_values
 
 from ..controls import axes_panel
-from .common import axis_warning_block, thickness_selector
+from .common import axis_warning_block, themed_chart, thickness_selector
 
 
 def render_energy_comparison(
@@ -18,6 +18,7 @@ def render_energy_comparison(
     heatmap_energy_ui,
     heatmap_widget,
     heatmap_selection,
+    theme,
 ):
     results = context.results
     sweep = sweep_values(results) if records(results) else {}
@@ -74,6 +75,8 @@ def render_energy_comparison(
         y_type=axes.broad.y_type,
         band="broad",
     )
+    narrow_chart = themed_chart(narrow_chart, theme)
+    broad_chart = themed_chart(broad_chart, theme)
 
     parts = [
         mo.md(
@@ -153,7 +156,7 @@ def render_energy_comparison(
                 band="broad",
             ),
         ]
-        selected_charts = [chart for chart in selected_charts if chart is not None]
+        selected_charts = [themed_chart(chart, theme) for chart in selected_charts if chart is not None]
         parts.append(
             mo.vstack(selected_charts) if selected_charts else mo.md("*No spectrum for that cell.*")
         )

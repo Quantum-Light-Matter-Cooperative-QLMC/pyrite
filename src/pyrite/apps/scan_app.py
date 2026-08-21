@@ -1,6 +1,6 @@
 # /// script
 # [tool.marimo.display]
-# theme = "dark"
+# theme = "system"
 # ///
 
 
@@ -23,6 +23,7 @@ def _():
         page_title,
         scan_grid,
         style_sheet,
+        theme_switch,
     )
     from pyrite.campaign.config import (
         COLLAPSE_AZIMUTH,
@@ -63,24 +64,34 @@ def _():
         scan_grid_rows,
         style_sheet,
         sweep_cost_weights,
+        theme_switch,
         stream_chunk,
     )
 
 
 @app.cell(hide_code=True)
-def _(mo, page_title, style_sheet):
+def _(mo, page_title, style_sheet, theme_switch):
+    theme_ui = theme_switch(mo)
     mo.vstack(
         [
             style_sheet(mo),
-            page_title(
-                mo,
-                "Bulk-crystal CXR scan",
-                "Preview catalog-backed geometry, checkpoint state, and penetration exclusions before starting resumable Monte Carlo work.",
-                eyebrow="Beamline control / scan",
+            mo.hstack(
+                [
+                    page_title(
+                        mo,
+                        "Bulk-crystal CXR scan",
+                        "Preview catalog-backed geometry, checkpoint state, and penetration exclusions before starting resumable Monte Carlo work.",
+                        eyebrow="Beamline control / scan",
+                    ),
+                    theme_ui,
+                ],
+                justify="space-between",
+                align="start",
+                wrap=True,
             ),
         ]
     )
-    return
+    return (theme_ui,)
 
 
 @app.cell
