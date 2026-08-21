@@ -112,27 +112,29 @@ the rungs are fully decorrelated.
 
 ### C 25 keV, 4000 Å (the slice-F single-seed case)
 
-| `f` | flights/e | `L_flight` [Å] | path/e [Å] | `E_ret` [keV] | trans |
-| --- | --- | --- | --- | --- | --- |
-| none | 13.12 ± 0.075 | 321.8 ± 0.66 | 4221 ± 19 | 24.090 ± 0.005 | 0.9942 ± 0.0005 |
-| 1e-2 | 13.05 ± 0.040 | 322.3 ± 0.61 | 4205 ± 13 | 24.100 ± 0.003 | 0.9938 ± 0.0006 |
-| 5e-3 | 13.13 ± 0.072 | 320.9 ± 1.1 | 4212 ± 16 | 24.100 ± 0.004 | 0.9947 ± 0.0007 |
-| 2e-3 | 13.11 ± 0.049 | 321.0 ± 0.95 | 4209 ± 13 | 24.100 ± 0.003 | 0.9948 ± 0.0007 |
-| 1e-3 | 13.03 ± 0.047 | 321.5 ± 0.80 | 4187 ± 11 | 24.100 ± 0.003 | 0.9944 ± 0.0010 |
-| 5e-4 | 13.06 ± 0.056 | 321.2 ± 0.92 | 4195 ± 15 | 24.100 ± 0.004 | 0.9941 ± 0.0007 |
+
+| `f`  | flights/e      | `L_flight` [Å] | path/e [Å] | `E_ret` [keV]   | trans            |
+| ------ | ---------------- | ----------------- | ------------- | ----------------- | ------------------ |
+| none | 13.12 ± 0.075 | 321.8 ± 0.66   | 4221 ± 19  | 24.090 ± 0.005 | 0.9942 ± 0.0005 |
+| 1e-2 | 13.05 ± 0.040 | 322.3 ± 0.61   | 4205 ± 13  | 24.100 ± 0.003 | 0.9938 ± 0.0006 |
+| 5e-3 | 13.13 ± 0.072 | 320.9 ± 1.1    | 4212 ± 16  | 24.100 ± 0.004 | 0.9947 ± 0.0007 |
+| 2e-3 | 13.11 ± 0.049 | 321.0 ± 0.95   | 4209 ± 13  | 24.100 ± 0.003 | 0.9948 ± 0.0007 |
+| 1e-3 | 13.03 ± 0.047 | 321.5 ± 0.80   | 4187 ± 11  | 24.100 ± 0.003 | 0.9944 ± 0.0010 |
+| 5e-4 | 13.06 ± 0.056 | 321.2 ± 0.92   | 4195 ± 15  | 24.100 ± 0.004 | 0.9941 ± 0.0007 |
 
 Largest paired shift against `f = 5e-4`: 1.57σ.
 
 ### C 25 keV thick (2×10⁴ Å)
 
-| `f` | flights/e | `L_flight` [Å] | path/e [Å] | `E_ret` [keV] | back | stop |
-| --- | --- | --- | --- | --- | --- | --- |
-| none | 96.30 ± 0.52 | 278.1 ± 0.88 | 26780 ± 70 | 18.19 ± 0.03 | 0.0453 ± 0.0023 | 0.0488 ± 0.0018 |
-| 1e-2 | 96.45 ± 0.80 | 277.9 ± 1.2 | 26790 ± 110 | 18.18 ± 0.05 | 0.0409 ± 0.0014 | 0.0499 ± 0.0028 |
-| 5e-3 | 96.29 ± 0.49 | 278.0 ± 0.73 | 26770 ± 74 | 18.20 ± 0.03 | 0.0420 ± 0.0014 | 0.0488 ± 0.0013 |
-| 2e-3 | 97.15 ± 0.64 | 276.4 ± 0.98 | 26850 ± 85 | 18.16 ± 0.04 | 0.0443 ± 0.0022 | 0.0513 ± 0.0017 |
-| 1e-3 | 96.32 ± 0.50 | 277.3 ± 0.76 | 26700 ± 85 | 18.22 ± 0.03 | 0.0443 ± 0.0021 | 0.0478 ± 0.0015 |
-| 5e-4 | 97.45 ± 0.72 | 275.9 ± 0.99 | 26880 ± 110 | 18.14 ± 0.04 | 0.0444 ± 0.0024 | 0.0507 ± 0.0023 |
+
+| `f`  | flights/e     | `L_flight` [Å] | path/e [Å]  | `E_ret` [keV] | back             | stop             |
+| ------ | --------------- | ----------------- | -------------- | --------------- | ------------------ | ------------------ |
+| none | 96.30 ± 0.52 | 278.1 ± 0.88   | 26780 ± 70  | 18.19 ± 0.03 | 0.0453 ± 0.0023 | 0.0488 ± 0.0018 |
+| 1e-2 | 96.45 ± 0.80 | 277.9 ± 1.2    | 26790 ± 110 | 18.18 ± 0.05 | 0.0409 ± 0.0014 | 0.0499 ± 0.0028 |
+| 5e-3 | 96.29 ± 0.49 | 278.0 ± 0.73   | 26770 ± 74  | 18.20 ± 0.03 | 0.0420 ± 0.0014 | 0.0488 ± 0.0013 |
+| 2e-3 | 97.15 ± 0.64 | 276.4 ± 0.98   | 26850 ± 85  | 18.16 ± 0.04 | 0.0443 ± 0.0022 | 0.0513 ± 0.0017 |
+| 1e-3 | 96.32 ± 0.50 | 277.3 ± 0.76   | 26700 ± 85  | 18.22 ± 0.03 | 0.0443 ± 0.0021 | 0.0478 ± 0.0015 |
+| 5e-4 | 97.45 ± 0.72 | 275.9 ± 0.99   | 26880 ± 110 | 18.14 ± 0.04 | 0.0444 ± 0.0024 | 0.0507 ± 0.0023 |
 
 Largest paired shift against `f = 5e-4`: **2.25σ**, on `L_flight` at the
 unrefined rung — the matrix maximum, in the case with the largest per-flight
@@ -141,28 +143,30 @@ longer). It is not resolved at 12 000 electrons.
 
 ### W 25 keV thick (5×10³ Å), backscatter-dominated
 
-| `f` | flights/e | `L_flight` [Å] | path/e [Å] | back | stop |
-| --- | --- | --- | --- | --- | --- |
-| none | 610.7 ± 3.1 | 15.60 ± 0.016 | 9528 ± 41 | 0.5573 ± 0.0033 | 0.4007 ± 0.0037 |
-| 1e-2 | 604.9 ± 2.7 | 15.64 ± 0.015 | 9460 ± 39 | 0.5636 ± 0.0024 | 0.3931 ± 0.0027 |
-| 5e-3 | 605.4 ± 6.3 | 15.62 ± 0.027 | 9453 ± 84 | 0.5589 ± 0.0063 | 0.3968 ± 0.0064 |
-| 2e-3 | 607.9 ± 3.8 | 15.61 ± 0.019 | 9490 ± 50 | 0.5584 ± 0.0045 | 0.3970 ± 0.0039 |
-| 1e-3 | 600.5 ± 3.3 | 15.64 ± 0.019 | 9390 ± 46 | 0.5704 ± 0.0036 | 0.3891 ± 0.0034 |
-| 5e-4 | 607.4 ± 4.3 | 15.61 ± 0.019 | 9480 ± 60 | 0.5619 ± 0.0042 | 0.3958 ± 0.0038 |
+
+| `f`  | flights/e    | `L_flight` [Å] | path/e [Å] | back             | stop             |
+| ------ | -------------- | ----------------- | ------------- | ------------------ | ------------------ |
+| none | 610.7 ± 3.1 | 15.60 ± 0.016  | 9528 ± 41  | 0.5573 ± 0.0033 | 0.4007 ± 0.0037 |
+| 1e-2 | 604.9 ± 2.7 | 15.64 ± 0.015  | 9460 ± 39  | 0.5636 ± 0.0024 | 0.3931 ± 0.0027 |
+| 5e-3 | 605.4 ± 6.3 | 15.62 ± 0.027  | 9453 ± 84  | 0.5589 ± 0.0063 | 0.3968 ± 0.0064 |
+| 2e-3 | 607.9 ± 3.8 | 15.61 ± 0.019  | 9490 ± 50  | 0.5584 ± 0.0045 | 0.3970 ± 0.0039 |
+| 1e-3 | 600.5 ± 3.3 | 15.64 ± 0.019  | 9390 ± 46  | 0.5704 ± 0.0036 | 0.3891 ± 0.0034 |
+| 5e-4 | 607.4 ± 4.3 | 15.61 ± 0.019  | 9480 ± 60  | 0.5619 ± 0.0042 | 0.3958 ± 0.0038 |
 
 Largest paired shift against `f = 5e-4`: 2.21σ (`back`, at `f = 1e-3`, with no
 monotone pattern down the ladder).
 
 ### C 100 keV thick (2×10⁵ Å)
 
-| `f` | flights/e | `L_flight` [Å] | path/e [Å] | `E_ret` [keV] | trans |
-| --- | --- | --- | --- | --- | --- |
-| none | 216.5 ± 1.9 | 1187 ± 5.5 | 2.568e5 ± 1.2e3 | 80.85 ± 0.15 | 0.9432 ± 0.0024 |
-| 1e-2 | 215.0 ± 2.4 | 1190 ± 5.7 | 2.556e5 ± 1.6e3 | 80.97 ± 0.19 | 0.9474 ± 0.0025 |
-| 5e-3 | 217.5 ± 1.5 | 1184 ± 3.6 | 2.573e5 ± 9.8e2 | 80.77 ± 0.12 | 0.9436 ± 0.0023 |
-| 2e-3 | 218.8 ± 2.3 | 1181 ± 5.5 | 2.582e5 ± 1.6e3 | 80.68 ± 0.18 | 0.9423 ± 0.0023 |
-| 1e-3 | 215.2 ± 1.5 | 1187 ± 3.9 | 2.554e5 ± 9.8e2 | 80.97 ± 0.11 | 0.9463 ± 0.0018 |
-| 5e-4 | 218.4 ± 2.0 | 1181 ± 5.4 | 2.579e5 ± 1.2e3 | 80.71 ± 0.15 | 0.9439 ± 0.0024 |
+
+| `f`  | flights/e    | `L_flight` [Å] | path/e [Å]      | `E_ret` [keV] | trans            |
+| ------ | -------------- | ----------------- | ------------------ | --------------- | ------------------ |
+| none | 216.5 ± 1.9 | 1187 ± 5.5     | 2.568e5 ± 1.2e3 | 80.85 ± 0.15 | 0.9432 ± 0.0024 |
+| 1e-2 | 215.0 ± 2.4 | 1190 ± 5.7     | 2.556e5 ± 1.6e3 | 80.97 ± 0.19 | 0.9474 ± 0.0025 |
+| 5e-3 | 217.5 ± 1.5 | 1184 ± 3.6     | 2.573e5 ± 9.8e2 | 80.77 ± 0.12 | 0.9436 ± 0.0023 |
+| 2e-3 | 218.8 ± 2.3 | 1181 ± 5.5     | 2.582e5 ± 1.6e3 | 80.68 ± 0.18 | 0.9423 ± 0.0023 |
+| 1e-3 | 215.2 ± 1.5 | 1187 ± 3.9     | 2.554e5 ± 9.8e2 | 80.97 ± 0.11 | 0.9463 ± 0.0018 |
+| 5e-4 | 218.4 ± 2.0 | 1181 ± 5.4     | 2.579e5 ± 1.2e3 | 80.71 ± 0.15 | 0.9439 ± 0.0024 |
 
 Largest paired shift against `f = 5e-4`: 1.74σ.
 
@@ -230,25 +234,31 @@ claimed bias sign.
 **Re-derivation (before reading the implementation body).** Model the elastic
 collisions along one trajectory as an inhomogeneous Poisson process in path
 length $s$ with local rate $\mu(s)=1/\lambda(E(s))$. Survival to $s$ is
+
 $$
 S(s)=\exp\!\left[-\int_0^{s}\mu(s')\,ds'\right]
 =\exp\!\left[-\int_0^{s}\frac{ds'}{\lambda(E(s'))}\right].
+
 $$
+
 $S(s^*)$ is itself $\mathrm{Uniform}(0,1]$ for the random first-collision
 distance $s^*$ (probability integral transform), so drawing $U\sim
 \mathrm{Uniform}(0,1]$ and solving
+
 $$
 \int_0^{s^*}\frac{ds'}{\lambda(E(s'))}=-\ln U \equiv \tau
+
 $$
-for $s^*$ samples exactly one collision event, consuming exactly one uniform
+
+for {math}`s^*` samples exactly one collision event, consuming exactly one uniform
 variate regardless of how the integral is evaluated. Substepping the integral
-as $\tau\mathrel{-{=}}ds_k/\lambda(E_{{\rm substep},k})$, with $E_{{\rm
+as {math}`\tau\mathrel{-{=}}ds_k/\lambda(E_{{\rm substep},k})`, with $E_{{\rm
 substep},k}$ the energy at the *start* of substep $k$, is the left-endpoint
 (piecewise-constant-$\lambda$) Riemann sum for that same integral; it is a
 pure quadrature refinement of a single fixed draw, not a new sampling event —
 no substep consumes an RNG call, so the flight's *physical identity*
 (which $U$ selected it) cannot change under refinement, only the resolved
-location of $s^*$ within it.
+location of {math}`s^*` within it.
 
 **Comparison with the implementation** (`transport.py:926-1176`, both
 non-LUT and LUT ungrooved cores share this structure). `tau_left[e] = -1.0` is
@@ -257,8 +267,7 @@ fires only when `tau_left[e] < 0.0` (line 984), i.e. once per physical flight,
 matching $\tau=-\ln U$ exactly. Each iteration computes `total_rate`
 from `E_j = E_keV[e]`, the substep's own start energy (`E_keV[e]` was last set
 to the previous substep's `E_end_j`), giving `lam_ang` $=\lambda(E_{\rm
-substep})$ — the claimed left-endpoint evaluation. `step_j = tau_left[e] *
-lam_ang` proposes the distance to exhaust the remaining budget at that
+substep})$ — the claimed left-endpoint evaluation. `step_j = tau_left[e] * lam_ang` proposes the distance to exhaust the remaining budget at that
 substep's hazard; boundary, cutoff, and (if `energy_controlled`) the
 `max_dE_frac` energy cap can each shorten it before it is committed. Every
 committed row unconditionally consumes `tau_left[e] -= step_j / lam_ang`
@@ -275,15 +284,14 @@ claimed. Only a row that is not cap-limited can close the flight
 correctly triggers exactly one fresh draw. This is a term-for-term match to
 the derivation above.
 
-**Statistical evidence.** Recomputing `checks/collision_statistics_refinement.py
---quick` (250 electrons × 4 seeds/rung, well below the doc's Ne=1000×12)
+**Statistical evidence.** Recomputing `checks/collision_statistics_refinement.py --quick` (250 electrons × 4 seeds/rung, well below the doc's Ne=1000×12)
 reproduces the qualitative story at reduced power — no shift over 3σ, several
 in the low single-digit sigma with mixed sign, consistent with the doc's
 framing that single-seed/low-`Ne` flight counts are noise-dominated and only
 the paired, replicated statistic is informative. The doc's headline numbers
 were re-checked arithmetically: the C-25-keV-thick `L_flight` shift
 (none $278.1\pm0.88$ vs finest $275.9\pm0.99\,\text{\AA}$) is one-signed with
-the predicted bias (unrefined longer), and $160=4\ \text{cases}\times5\
+the predicted bias (unrefined longer), and $160=4\ \text{cases}\times5
 \text{rungs}\times8\ \text{observables}$ is consistent with the script's full
 per-case metric set (`flights/e`, `L_flight`, `path/e`, `E_ret`, `clock`,
 `trans`, `back`, `stop`) even though the published tables display only the
