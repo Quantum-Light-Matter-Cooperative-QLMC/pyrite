@@ -280,3 +280,4 @@ RTK.md
 *.tar.gz
 checkpoints/**/cases.json
 src/pyrite/apps/.claude/settings.local.json
+*.github-issues
