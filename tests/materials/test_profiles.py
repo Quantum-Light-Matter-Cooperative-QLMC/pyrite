@@ -87,6 +87,19 @@ def test_high_energy_profile_range_is_part_of_dataset_identity():
     ]
 
 
+def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():
+    sweep = material_sweep("hopg", catalog_profile="hopg_short")
+    case = build_cases(sweep, n_electrons=300, n_electrons_brem=150)[0]
+
+    assert sweep.target is not None
+    assert sweep.target.footprint is not None
+    assert case["crystal_width_mm"] == 5.0
+    assert case["crystal_height_mm"] == 5.0
+    longitudinal = case["longitudinal_distribution"]
+    assert longitudinal["kind"] == "gaussian"
+    assert longitudinal["rms_duration_fs"] == 0.001
+
+
 def test_case_content_key_excludes_label_perf_and_flux_scale_fields():
     case = next(iter(_cases_by_key("hopg", "standard").values()))
     base = case_content_key(case)

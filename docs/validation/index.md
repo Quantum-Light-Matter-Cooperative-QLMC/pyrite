@@ -60,6 +60,7 @@ radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time
 radiation-physics/cross-reflection-coherence
 radiation-physics/external-brem-subtraction
+radiation-physics/finite-footprint-longitudinal-decoherence
 radiation-physics/finite-time-lineshape
 radiation-physics/line-absorption-tabulation
 radiation-physics/line-energy-dispersion

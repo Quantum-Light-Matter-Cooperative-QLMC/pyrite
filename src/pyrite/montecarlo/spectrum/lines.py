@@ -1015,19 +1015,23 @@ def mc_spectrum(
     pure-geometry (position-phase) limit, still physics.
 
     ``longitudinal_rms_fs`` supplies the resolved RMS duration of a Gaussian
-    bunch. For a finite crystal footprint, the transverse offset also changes
-    escape attenuation, so the general phase-only form-factor blend does not
-    apply. The finite-footprint path is accepted only when the analytic
-    Gaussian longitudinal factor ``exp[-(omega*c*sigma_t)**2]`` vanishes on
-    every requested energy bin. Then all inter-electron terms are exactly zero
-    independently of transverse attenuation, and the CUDA-JIT/CPU grouped
-    reduction retains each sampled electron's actual first-face escape path.
-    ``hopg_hbn``'s 200 fs Gaussian beam is in this limit.
+    bunch. For a finite crystal footprint, the transverse launch offset also
+    changes escape attenuation, so the combined longitudinal/transverse
+    phase-only form factor does not apply. Longitudinal arrival time remains
+    independent of that geometry, however. Conditional on each sampled
+    transverse trajectory, its exact Gaussian average is
+    ``(1-F_z)*sum_e|S_e|^2 + F_z*|sum_e S_e|^2`` with
+    ``F_z=exp[-(omega*c*sigma_t)^2]``. Here each ``S_e`` retains its actual
+    transverse phase and finite-prism attenuation. Thus short bunches retain
+    inter-electron enhancement, while long bunches reduce continuously to the
+    grouped floor. An additional ensemble average over transverse bunch
+    realizations remains outside this conditional result.
 
     coherent is mutually exclusive with components (the PXR/CBS split is
     ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
 
-    Validation: coherent-emission, coherent-segment-midpoint-time
+    Validation: coherent-emission, coherent-segment-midpoint-time,
+    finite-footprint-longitudinal-decoherence
     """
     if coherent and components:
         raise ValueError(
@@ -1305,18 +1309,14 @@ def mc_spectrum(
                 # not run on float32 CUDA while the CPU rejects it.
                 omega_host = np.asarray(_to_cpu(omega_grid), dtype=float)
                 finite_footprint_F_host = np.exp(-((omega_host * sigma_z_ang) ** 2))
-                if np.any(finite_footprint_F_host != 0.0):
-                    raise ValueError(
-                        "coherent emission with a finite crystal footprint is "
-                        "supported only when the Gaussian longitudinal form "
-                        "factor vanishes across the requested energy grid"
-                    )
                 finite_footprint_F = xp.asarray(finite_footprint_F_host, dtype=REAL)
-                # In this limit all inter-electron terms vanish independently
-                # of transverse phase and attenuation. Keep each electron at
-                # its sampled transverse position so the grouped floor uses
-                # the actual first-face escape distance; remove only t0.
-                # The CUDA-JIT grouped reductions consume these same arrays.
+                # Average only the independent longitudinal arrival time. Keep
+                # each electron at its sampled transverse position in BOTH the
+                # flat and grouped terms: its phase, hit/miss history, and
+                # finite-prism attenuation are coupled and must stay together.
+                # F_z then blends those terms exactly, conditional on this
+                # transverse/transport realization. The CUDA-JIT grouped
+                # reductions consume these same arrays.
                 d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
             else:
                 seg_r_geom = seg_r.copy()
@@ -1330,9 +1330,12 @@ def mc_spectrum(
                 decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
 
         def _row_decoherence_factor(g_vec_d):
-            """Empirical |<e^{i*phase_e}>|^2 for one row's g, from the
-            actual per-electron offset population (chunked to bound peak
-            memory the same way the field reduction below already is)."""
+            """Inter-electron factor for one row.
+
+            Infinite slabs use the empirical joint longitudinal/transverse
+            characteristic function. Finite footprints retain their coupled
+            sampled transverse fields and use only analytic Gaussian ``F_z``.
+            """
             if not decoherence_active:
                 return None
             if finite_footprint_now:

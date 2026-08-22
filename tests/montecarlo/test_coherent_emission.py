@@ -11,6 +11,7 @@ from pyrite.materials.crystal import (
 )
 from pyrite.montecarlo import mc_spectrum
 from pyrite.montecarlo._backend import REAL
+from pyrite.montecarlo.transport import C_ANG_PER_FS
 
 E_GRID = np.arange(700.0, 1500.0)
 
@@ -282,21 +283,56 @@ def test_long_gaussian_bunch_supports_finite_footprint():
     np.testing.assert_allclose(actual, grouped_raw / 2.0, rtol=1e-12, atol=0.0)
 
 
-def test_finite_footprint_rejects_partially_coherent_longitudinal_form_factor():
+def test_finite_footprint_partially_coherent_longitudinal_blend():
+    """Arrival-time averaging remains exact when transverse position affects
+    amplitude: retain each sampled finite-footprint field and blend only its
+    independent longitudinal cross terms.
+
+    Validation: finite-footprint-longitudinal-decoherence
+    """
+    energy_grid = np.arange(700.0, 1500.0, 2.0)
+    longitudinal_rms_fs = 1.0e-3
     segments = _segments(2)
+    positions = np.array([[4.0, 0.0, 5.0], [1.0, 0.0, 5.0]])
     segments.update(
+        r_mid=positions,
         t0_ang=np.array([137.0, -412.0]),
         initial_t0_ang=np.array([137.0, -412.0]),
-        initial_r_ang=np.zeros((2, 3)),
+        initial_r_ang=np.array([[1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]]),
     )
-    with pytest.raises(ValueError, match="only when the Gaussian longitudinal form factor vanishes"):
+    actual = mc_spectrum(
+        segments,
+        energy_grid,
+        coherent=True,
+        longitudinal_rms_fs=longitudinal_rms_fs,
+        **KWARGS,
+    )
+
+    flat_raw = (
         mc_spectrum(
-            segments,
-            E_GRID,
+            {**_segments(2), "r_mid": positions},
+            energy_grid,
             coherent=True,
-            longitudinal_rms_fs=1.0e-6,
             **KWARGS,
         )
+        * 2.0
+    )
+    grouped_raw = sum(
+        mc_spectrum(
+            {**_segments(1), "r_mid": position[None, :]},
+            energy_grid,
+            coherent=True,
+            **KWARGS,
+        )
+        for position in positions
+    )
+    sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
+    F_z = np.exp(-((energy_grid / HBARC_EV_ANG * sigma_z_ang) ** 2))
+    expected = ((1.0 - F_z) * grouped_raw + F_z * flat_raw) / 2.0
+
+    peak = float(np.max(np.abs(expected)))
+    assert peak > 0.0
+    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
 
 
 def test_identical_in_phase_electrons_reach_n_squared_limit():

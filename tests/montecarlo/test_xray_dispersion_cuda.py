@@ -749,15 +749,18 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
 
 @_device_only
 @pytest.mark.parametrize("route", ["stream", "row-reduction"])
-def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floor(
-    route, monkeypatch
+@pytest.mark.parametrize("longitudinal_rms_fs", [200.0, 1.0e-3])
+def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
+    route, longitudinal_rms_fs, monkeypatch
 ):
-    """The ``hopg_hbn``-like 200 fs limit retains finite-prism attenuation
-    while both CUDA-JIT batched routes reduce the per-electron floor.
+    """Both CUDA-JIT batched routes retain finite-prism fields while the
+    Gaussian longitudinal factor spans the grouped-floor and partial regimes.
 
-    Validation: coherent-inter-electron-decoherence
+    Validation: finite-footprint-longitudinal-decoherence
     """
+    from pyrite.materials.crystal import HBARC_EV_ANG
     from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.transport import C_ANG_PER_FS
 
     segments = _decoh_active_segments()
     segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
@@ -779,7 +782,7 @@ def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floo
         segments,
         _DECOH_E_GRID,
         coherent=True,
-        longitudinal_rms_fs=200.0,
+        longitudinal_rms_fs=longitudinal_rms_fs,
         **call_kwargs,
     )
     assert calls[0] > 0, "the CUDA-JIT finite-footprint floor was not taken"
@@ -787,6 +790,11 @@ def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floo
         assert grouped_calls[0] == 1, "grouped reduction must be segment-block-, not electron-bound"
 
     ne = segments["Ne"]
+    flat_segments = _decoh_segments(np.asarray(segments["r_mid"]))
+    flat_segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
+    flat_raw = (
+        mc_spectrum(flat_segments, _DECOH_E_GRID, coherent=True, **call_kwargs) * ne
+    )
     grouped_raw = 0.0
     for position in np.asarray(segments["r_mid"]):
         single = _decoh_segments(position)
@@ -797,7 +805,9 @@ def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floo
             coherent=True,
             **call_kwargs,
         )
-    expected = grouped_raw / ne
+    sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
+    F_z = np.exp(-((_DECOH_E_GRID / HBARC_EV_ANG * sigma_z_ang) ** 2))
+    expected = ((1.0 - F_z) * grouped_raw + F_z * flat_raw) / ne
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0
     np.testing.assert_allclose(actual, expected, rtol=_DECOH_RTOL, atol=peak * _DECOH_ATOL_FRAC)

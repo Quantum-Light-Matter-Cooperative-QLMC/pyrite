@@ -136,14 +136,19 @@ which extends unchanged to elliptical/Courant–Snyder spots) are in
 [Validation: `coherent-inter-electron-decoherence`](../../validation/radiation-physics/coherent-inter-electron-decoherence.md).
 Finite crystal footprints (`crystal_width_mm`/`crystal_height_mm`) need one
 extra boundary. Their transverse offset also perturbs escape attenuation, so
-the general phase-only form-factor blend does not apply. A resolved Gaussian
-bunch is supported when its analytic longitudinal factor
-$\exp[-(\omega c\sigma_t)^2]$ vanishes throughout the requested X-ray grid:
-all inter-electron terms then vanish independently of transverse attenuation,
-and the CPU/CUDA-JIT grouped floor retains each sampled electron's actual
-first-face escape path. This includes `hopg_hbn`'s `gaussian_200fs` beam.
-Partially coherent finite-footprint cases still raise instead of silently
-using the incomplete phase-only blend. The `beam_fwhm_mm=None` point source remains what
+the combined phase-only form-factor blend does not apply. Longitudinal arrival
+time is independent of that geometry, however. The finite-footprint path keeps
+each sampled electron's transverse phase, hit/miss history, and attenuation in
+$S_e$, then applies the exact conditional Gaussian average
+$(1-F_z)\sum_e|S_e|^2+F_z|\sum_eS_e|^2$, with
+$F_z=\exp[-(\omega c\sigma_t)^2]$. A short bunch therefore retains
+cross-electron enhancement; a long bunch continuously reaches the grouped
+floor without the previous macroscopic longitudinal speckle. This conditional
+result does not additionally average over transverse bunch/transport
+realizations, so partially coherent finite-footprint output may retain
+transverse diffraction/speckle. See
+[Validation: `finite-footprint-longitudinal-decoherence`](../../validation/radiation-physics/finite-footprint-longitudinal-decoherence.md).
+The `beam_fwhm_mm=None` point source remains what
 it always was: the fully degenerate limit whose cross-electron terms are
 maximally constructive, giving an enhancement that grows linearly with the
 simulated electron count (33.2× at $N_e=80$, 107.5× at $N_e=300$) — a property
@@ -191,11 +196,12 @@ before scientific use:
    is not quantified;
 4. the coherent path inherits the open `line-energy-dispersion` harmonic-sign
    discrepancy, which sets where each line sits;
-5. the transverse bunch form factor is not applied, so a finite `beam_fwhm_mm`
-   makes the stored spectrum one speckle realization instead of the ensemble
-   observable (`transverse-bunch-form-factor`, **discrepancy**). The far-field
-   phase itself is exact in the linear term; its dropped curvature is a separate
-   and much smaller effect, bounded in
+5. the combined longitudinal/transverse ensemble blend is valid for the
+   infinite slab. A finite footprint instead uses the separately `filtered`
+   longitudinal average conditional on one sampled transverse/transport
+   realization; its transverse ensemble average remains open. The far-field
+   phase itself is exact in the linear term; its dropped curvature is a
+   separate, smaller effect bounded in
    [Coherent PXR and CBS radiation](coherent-radiation.md#emission-geometry).
 
 Track status in the [`coherent-emission` ledger

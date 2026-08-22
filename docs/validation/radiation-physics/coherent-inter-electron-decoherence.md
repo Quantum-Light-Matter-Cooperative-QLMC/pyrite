@@ -238,20 +238,30 @@ profile begins using them. The existing `_USE_JIT_COHERENT_STREAM` and
   electron) and **Assumption B** (i.i.d. across electrons) are both required;
   neither is checked at runtime (the sampler already satisfies them by
   construction — independent RNG child streams, one draw per electron).
-- **Finite-footprint branch: fully longitudinally decohered Gaussian limit
-  only.** `crystal_width_mm`/`crystal_height_mm` makes the transverse offset
-  perturb escape-path attenuation (an amplitude effect), so the general
-  phase-only factorization breaks. Longitudinal arrival time remains
-  independent, however. For a Gaussian RMS duration $\sigma_t$, its cross-term
-  factor $F_z=\exp[-(\omega c\sigma_t)^2]$ multiplies every transverse
-  amplitude/phase cross term. When $F_z$ underflows exactly to zero throughout
-  the requested grid, those terms vanish regardless of the transverse
-  coupling and the observable reduces to the sampled self-term estimator
-  $\sum_e|S_e(\Delta\mathbf r_{\perp,e})|^2$. The implementation keeps the
-  actual sampled position and finite-prism escape distance in this grouped
-  floor and removes only `t0_ang`. This covers `hopg_hbn`'s 200 fs Gaussian
-  profile. A partially coherent finite-footprint grid still raises rather than
-  silently use the incomplete phase-only result.
+- **Finite-footprint branch: longitudinal average conditional on sampled
+  transverse transport.** `crystal_width_mm`/`crystal_height_mm` makes the
+  transverse offset perturb escape-path attenuation (an amplitude effect), so
+  the combined longitudinal/transverse phase-only factorization above still
+  does not apply. Longitudinal arrival time remains independent, however. The
+  implementation therefore keeps each electron's sampled transverse phase,
+  hit/miss history, and finite-prism attenuation together in $S_e$, and averages
+  only the Gaussian arrival time:
+
+  $$
+  \left\langle |A|^2\right\rangle_{t_0\mid S}
+  = (1-F_z)\sum_e|S_e|^2 + F_z\left|\sum_e S_e\right|^2,
+  \qquad F_z=\exp[-(\omega c\sigma_t)^2].
+  $$
+
+  This continuously covers both endpoints: a short bunch retains the sampled
+  finite-crystal cross-electron enhancement; a long bunch removes every
+  cross-electron term and recovers the grouped floor. It does **not** perform an
+  additional ensemble average over transverse bunch/transport realizations;
+  partially coherent finite-footprint output may therefore retain physical
+  single-realization transverse diffraction/speckle. The conditional extension
+  is tracked separately as `finite-footprint-longitudinal-decoherence` because
+  it has not received the independent fresh-context verification of this row's
+  original combined factorization.
 - **The blazed-groove escape branch has the same amplitude/phase coupling as
   the finite-footprint branch, and is NOT currently rejected.**
   `escape_distance_ang` places the emission point inside the sawtooth unit
@@ -260,11 +270,9 @@ profile begins using them. The existing `_USE_JIT_COHERENT_STREAM` and
   Measured directly while building the GPU parity tests: with a transverse
   offset, the grooved coherent result departs from the boxed blend by ~130% of
   peak, while with longitudinal offsets only it reproduces it to 4e-16.
-  `mc_spectrum` raises for `crystal_width_mm`/`crystal_height_mm` but not for
-  `groove`; that asymmetry is a pre-existing gap in the CPU implementation of
-  this row, carried forward unchanged here, and wants its own decision (reject,
-  or derive the grooved case) rather than a silent fix in a
-  performance-path change.
+  The finite-footprint conditional-longitudinal result does not solve this
+  transverse ensemble-average problem; the grooved route retains the same
+  limitation.
   `test_coherent_decoherence_blend_holds_on_the_per_hkl_route` therefore pins
   the grooved route with longitudinal offsets only.
 - **`sinc_cutoff` excluded when the blend is active, and rejected explicitly**
