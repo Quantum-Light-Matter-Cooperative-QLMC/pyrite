@@ -856,6 +856,14 @@ def _lines_for_segments(
         coherent = bool(case.get("coherent_emission", False))
     else:
         coherent = bool(coherent)
+    longitudinal = case.get("longitudinal_distribution") or {}
+    longitudinal_kind = longitudinal.get("kind")
+    if longitudinal_kind in {"gaussian", "compressed"}:
+        longitudinal_rms_fs = longitudinal.get("rms_duration_fs")
+    elif longitudinal_kind is None and case.get("long_shape", "gaussian") == "gaussian":
+        longitudinal_rms_fs = case.get("bunch_length_fs")
+    else:
+        longitudinal_rms_fs = None
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -874,6 +882,7 @@ def _lines_for_segments(
             layers=abs_layers,
             groove=groove,
             coherent=coherent,
+            longitudinal_rms_fs=longitudinal_rms_fs,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
@@ -903,6 +912,7 @@ def _lines_for_segments(
             chunk=spec_chunk,
             layers=abs_layers,
             coherent=coherent,
+            longitudinal_rms_fs=longitudinal_rms_fs,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,

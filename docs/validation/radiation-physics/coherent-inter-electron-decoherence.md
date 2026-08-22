@@ -232,14 +232,20 @@ the escape hatch.
   electron) and **Assumption B** (i.i.d. across electrons) are both required;
   neither is checked at runtime (the sampler already satisfies them by
   construction — independent RNG child streams, one draw per electron).
-- **Finite-footprint branch excluded, and rejected explicitly.**
-  `crystal_width_mm`/`crystal_height_mm` makes the transverse offset also
-  perturb escape-path attenuation (an amplitude effect), coupling amplitude
-  and phase randomness — $S_e$ itself becomes a random function of
-  $\Delta\mathbf r_{\perp,e}$ and can no longer be factored out from under the
-  expectation as a fixed quantity multiplying $e^{i\varphi_e}$, breaking the
-  very first algebraic step in the derivation. `mc_spectrum` raises rather
-  than silently give a physically-incomplete answer.
+- **Finite-footprint branch: fully longitudinally decohered Gaussian limit
+  only.** `crystal_width_mm`/`crystal_height_mm` makes the transverse offset
+  perturb escape-path attenuation (an amplitude effect), so the general
+  phase-only factorization breaks. Longitudinal arrival time remains
+  independent, however. For a Gaussian RMS duration $\sigma_t$, its cross-term
+  factor $F_z=\exp[-(\omega c\sigma_t)^2]$ multiplies every transverse
+  amplitude/phase cross term. When $F_z$ underflows exactly to zero throughout
+  the requested grid, those terms vanish regardless of the transverse
+  coupling and the observable reduces to the sampled self-term estimator
+  $\sum_e|S_e(\Delta\mathbf r_{\perp,e})|^2$. The implementation keeps the
+  actual sampled position and finite-prism escape distance in this grouped
+  floor and removes only `t0_ang`. This covers `hopg_hbn`'s 200 fs Gaussian
+  profile. A partially coherent finite-footprint grid still raises rather than
+  silently use the incomplete phase-only result.
 - **The blazed-groove escape branch has the same amplitude/phase coupling as
   the finite-footprint branch, and is NOT currently rejected.**
   `escape_distance_ang` places the emission point inside the sawtooth unit

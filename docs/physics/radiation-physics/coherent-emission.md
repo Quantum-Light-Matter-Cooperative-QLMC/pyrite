@@ -134,11 +134,16 @@ and the implementation (an empirical characteristic function of the actual
 sampled per-electron offsets rather than a closed-form-parametrized $\sigma$,
 which extends unchanged to elliptical/Courant–Snyder spots) are in
 [Validation: `coherent-inter-electron-decoherence`](../../validation/radiation-physics/coherent-inter-electron-decoherence.md).
-The one case still explicitly excluded (rejected with an error, not silently
-mishandled) is a finite crystal footprint (`crystal_width_mm`/
-`crystal_height_mm`) combined with a nonzero bunch/spot, where the transverse
-offset also perturbs escape attenuation — an amplitude effect the phase-only
-form factor does not model. The `beam_fwhm_mm=None` point source remains what
+Finite crystal footprints (`crystal_width_mm`/`crystal_height_mm`) need one
+extra boundary. Their transverse offset also perturbs escape attenuation, so
+the general phase-only form-factor blend does not apply. A resolved Gaussian
+bunch is supported when its analytic longitudinal factor
+$\exp[-(\omega c\sigma_t)^2]$ vanishes throughout the requested X-ray grid:
+all inter-electron terms then vanish independently of transverse attenuation,
+and the CPU/CUDA-JIT grouped floor retains each sampled electron's actual
+first-face escape path. This includes `hopg_hbn`'s `gaussian_200fs` beam.
+Partially coherent finite-footprint cases still raise instead of silently
+using the incomplete phase-only blend. The `beam_fwhm_mm=None` point source remains what
 it always was: the fully degenerate limit whose cross-electron terms are
 maximally constructive, giving an enhancement that grows linearly with the
 simulated electron count (33.2× at $N_e=80$, 107.5× at $N_e=300$) — a property

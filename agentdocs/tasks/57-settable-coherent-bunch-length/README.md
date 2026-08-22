@@ -170,11 +170,16 @@ longitudinal offset by the identical mechanism:
       choice measures whatever offset distribution was actually sampled, so
       it covers them for free without a separate derivation (documented as a
       byproduct of the implementation choice, not a new physics result). Only
-      the finite-footprint branch (amplitude/phase coupling breaks the
-      derivation's first algebraic step) and `sinc_cutoff` (implementation
-      gap in the grouped-floor reduction) are rejected, both with
-      `ValueError` and covered by
-      `test_coherent_decoherence_rejects_finite_footprint`.
+      the finite-footprint branch's general partially coherent case
+      (amplitude/phase coupling breaks the derivation's first algebraic step)
+      and `sinc_cutoff` (implementation gap in the grouped-floor reduction)
+      are rejected. Follow-up implementation now supports the exact fully
+      longitudinally decohered Gaussian limit: the analytic longitudinal
+      factor vanishes, so the grouped CPU/CUDA-JIT floor keeps each sampled
+      electron's finite-prism attenuation. This covers `hopg_hbn`'s regular
+      200 fs Gaussian beam and is pinned by
+      `test_long_gaussian_bunch_supports_finite_footprint` plus the CUDA device
+      twin. Partially coherent finite-footprint grids still raise.
 - [x] Add `Validation: <id>` marker(s) in code and update
       `docs/validation/ledger-core-coherent-physics.md` (promote
       `transverse-bunch-form-factor` past `discrepancy`, add a row for the
@@ -191,6 +196,13 @@ longitudinal offset by the identical mechanism:
       `parameter_sha256`/`CURRENT_IDENTITY_VERSION` confirmed untouched —
       this changes only how the already-`coherent_emission`-gated output is
       computed, not any profile input.
+      Follow-up finite-footprint slice: coherent CPU suite 18/18, CUDA device
+      decoherence suite 10/10 on the lab GPU, lint/docs/ledger checks clean.
+      Core suite reached 1821 passed/74 skipped with only the sandbox-blocked
+      forkserver end-to-end test failing (`PermissionError: [Errno 1] Operation
+      not permitted`). Current full typecheck is blocked by 21 unrelated
+      pre-existing Altair diagnostics under `src/pyrite/plots/altair/`; changed
+      Monte Carlo files have no Serena diagnostics.
 
 ## Delegation
 

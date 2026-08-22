@@ -32,6 +32,7 @@ from ..transport import (
     _BS_PREFACTOR,
     _LN2,
     _MC2_KEV,
+    C_ANG_PER_FS,
     TRANSPORT_ELEMENTS,
     _element_crossover_keV,
     beta_from_keV,
@@ -801,6 +802,7 @@ def mc_spectrum(
     electron_limit=None,
     E_cut_keV=None,
     _table_cache=None,
+    longitudinal_rms_fs=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -1011,6 +1013,16 @@ def mc_spectrum(
     emitter together into the ``|sum A_j|^2`` N^2-scaling limit.
     ``bunch_length_fs=None`` (all ``t0_ang=0``) is the documented degenerate
     pure-geometry (position-phase) limit, still physics.
+
+    ``longitudinal_rms_fs`` supplies the resolved RMS duration of a Gaussian
+    bunch. For a finite crystal footprint, the transverse offset also changes
+    escape attenuation, so the general phase-only form-factor blend does not
+    apply. The finite-footprint path is accepted only when the analytic
+    Gaussian longitudinal factor ``exp[-(omega*c*sigma_t)**2]`` vanishes on
+    every requested energy bin. Then all inter-electron terms are exactly zero
+    independently of transverse attenuation, and the CUDA-JIT/CPU grouped
+    reduction retains each sampled electron's actual first-face escape path.
+    ``hopg_hbn``'s 200 fs Gaussian beam is in this limit.
 
     coherent is mutually exclusive with components (the PXR/CBS split is
     ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
@@ -1271,31 +1283,51 @@ def mc_spectrum(
         decoherence_active = bool(
             (t0_pop.size and xp.any(t0_pop != 0.0)) or (xy0_pop.size and xp.any(xy0_pop != 0.0))
         )
+        if longitudinal_rms_fs is not None:
+            longitudinal_rms_fs = float(longitudinal_rms_fs)
+            if not np.isfinite(longitudinal_rms_fs) or longitudinal_rms_fs <= 0.0:
+                raise ValueError("longitudinal_rms_fs must be finite and positive")
         if decoherence_active:
             finite_footprint_now = (
                 segments.get("crystal_width_ang") is not None
                 and segments.get("crystal_height_ang") is not None
             )
             if finite_footprint_now:
-                raise ValueError(
-                    "coherent emission with a finite crystal footprint "
-                    "(crystal_width_mm/crystal_height_mm) and a nonzero "
-                    "bunch_length_fs/beam_fwhm_mm is not yet supported: the "
-                    "transverse offset also perturbs escape attenuation "
-                    "there, which the inter-electron decoherence form "
-                    "factor does not model (see "
-                    "docs/validation/radiation-physics/"
-                    "coherent-inter-electron-decoherence.md)"
-                )
-            seg_r_geom = seg_r.copy()
-            seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
-            seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
-            d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
-            # A_e = t0_e - n_hat_perp . dr_perp,e does not depend on g (the
-            # reciprocal vector varies per row; n_hat is fixed for the whole
-            # call), so hoist it once here; B_e(row) = g_perp . dr_perp,e is
-            # cheap and stays inside the per-row helper below.
-            decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
+                if longitudinal_rms_fs is None:
+                    raise ValueError(
+                        "coherent emission with a finite crystal footprint and "
+                        "nonzero bunch offsets requires longitudinal_rms_fs; "
+                        "only the fully longitudinally decohered limit is "
+                        "supported"
+                    )
+                sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
+                # Decide support in host float64 so a borderline duration does
+                # not run on float32 CUDA while the CPU rejects it.
+                omega_host = np.asarray(_to_cpu(omega_grid), dtype=float)
+                finite_footprint_F_host = np.exp(-((omega_host * sigma_z_ang) ** 2))
+                if np.any(finite_footprint_F_host != 0.0):
+                    raise ValueError(
+                        "coherent emission with a finite crystal footprint is "
+                        "supported only when the Gaussian longitudinal form "
+                        "factor vanishes across the requested energy grid"
+                    )
+                finite_footprint_F = xp.asarray(finite_footprint_F_host, dtype=REAL)
+                # In this limit all inter-electron terms vanish independently
+                # of transverse phase and attenuation. Keep each electron at
+                # its sampled transverse position so the grouped floor uses
+                # the actual first-face escape distance; remove only t0.
+                # The CUDA-JIT grouped reductions consume these same arrays.
+                d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
+            else:
+                seg_r_geom = seg_r.copy()
+                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+                seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
+                d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
+                # A_e = t0_e - n_hat_perp . dr_perp,e does not depend on g (the
+                # reciprocal vector varies per row; n_hat is fixed for the whole
+                # call), so hoist it once here; B_e(row) = g_perp . dr_perp,e is
+                # cheap and stays inside the per-row helper below.
+                decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
 
         def _row_decoherence_factor(g_vec_d):
             """Empirical |<e^{i*phase_e}>|^2 for one row's g, from the
@@ -1303,6 +1335,8 @@ def mc_spectrum(
             memory the same way the field reduction below already is)."""
             if not decoherence_active:
                 return None
+            if finite_footprint_now:
+                return finite_footprint_F
             B_pop = xy0_pop @ g_vec_d[:2]
             chi_sum = xp.zeros(E_grid.size, dtype=cdtype)
             for j0 in range(0, decoherence_A_pop.size, chunk):

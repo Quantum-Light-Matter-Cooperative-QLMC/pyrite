@@ -246,21 +246,57 @@ def test_coherent_decoherence_inactive_by_default():
     )
 
 
-def test_coherent_decoherence_rejects_finite_footprint():
-    """The electron-grouped floor does not model the transverse offset's
-    effect on escape attenuation under a finite footprint (docs/validation/
-    radiation-physics/coherent-inter-electron-decoherence.md) -- must error,
-    not silently give a physically-incomplete answer."""
+def test_long_gaussian_bunch_supports_finite_footprint():
+    """A regular 200 fs bunch fully removes inter-electron terms on this
+    X-ray grid. The remaining per-electron floor must retain each sampled
+    transverse position's finite-prism escape attenuation.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    segments = _segments(2)
+    positions = np.array([[4.0, 0.0, 5.0], [1.0, 0.0, 5.0]])
+    segments.update(
+        r_mid=positions,
+        t0_ang=np.array([137.0, -412.0]),
+        initial_t0_ang=np.array([137.0, -412.0]),
+        initial_r_ang=np.array([[1.0, 0.0, 0.0], [-2.0, 0.0, 0.0]]),
+    )
+    assert segments["crystal_width_ang"] is not None
+    assert segments["crystal_height_ang"] is not None
+    actual = mc_spectrum(
+        segments,
+        E_GRID,
+        coherent=True,
+        longitudinal_rms_fs=200.0,
+        **KWARGS,
+    )
+    grouped_raw = sum(
+        mc_spectrum(
+            {**_segments(1), "r_mid": position[None, :]},
+            E_GRID,
+            coherent=True,
+            **KWARGS,
+        )
+        for position in positions
+    )
+    np.testing.assert_allclose(actual, grouped_raw / 2.0, rtol=1e-12, atol=0.0)
+
+
+def test_finite_footprint_rejects_partially_coherent_longitudinal_form_factor():
     segments = _segments(2)
     segments.update(
         t0_ang=np.array([137.0, -412.0]),
         initial_t0_ang=np.array([137.0, -412.0]),
         initial_r_ang=np.zeros((2, 3)),
     )
-    assert segments["crystal_width_ang"] is not None
-    assert segments["crystal_height_ang"] is not None
-    with pytest.raises(ValueError, match="finite crystal footprint"):
-        mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
+    with pytest.raises(ValueError, match="only when the Gaussian longitudinal form factor vanishes"):
+        mc_spectrum(
+            segments,
+            E_GRID,
+            coherent=True,
+            longitudinal_rms_fs=1.0e-6,
+            **KWARGS,
+        )
 
 
 def test_identical_in_phase_electrons_reach_n_squared_limit():

@@ -695,6 +695,48 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
 
 
 @_device_only
+@pytest.mark.parametrize("route", ["stream", "row-reduction"])
+def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floor(
+    route, monkeypatch
+):
+    """The ``hopg_hbn``-like 200 fs limit retains finite-prism attenuation
+    while both CUDA-JIT batched routes reduce the per-electron floor.
+
+    Validation: coherent-inter-electron-decoherence
+    """
+    from pyrite.montecarlo.spectrum import mc_spectrum
+
+    segments = _decoh_active_segments()
+    segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
+    call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
+    calls = _count_kernel_calls(monkeypatch, route)
+    actual = mc_spectrum(
+        segments,
+        _DECOH_E_GRID,
+        coherent=True,
+        longitudinal_rms_fs=200.0,
+        **call_kwargs,
+    )
+    assert calls[0] > 0, "the CUDA-JIT finite-footprint floor was not taken"
+
+    ne = segments["Ne"]
+    grouped_raw = 0.0
+    for position in np.asarray(segments["r_mid"]):
+        single = _decoh_segments(position)
+        single.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
+        grouped_raw = grouped_raw + mc_spectrum(
+            single,
+            _DECOH_E_GRID,
+            coherent=True,
+            **call_kwargs,
+        )
+    expected = grouped_raw / ne
+    peak = float(np.max(np.abs(expected)))
+    assert peak > 0.0
+    np.testing.assert_allclose(actual, expected, rtol=_DECOH_RTOL, atol=peak * _DECOH_ATOL_FRAC)
+
+
+@_device_only
 @pytest.mark.parametrize("route", ["stream", "row-reduction", "per-hkl"])
 def test_coherent_decoherence_inactive_device_dispatch_is_bit_for_bit(route, monkeypatch):
     """An all-zero offset population must leave the fused kernels on their
