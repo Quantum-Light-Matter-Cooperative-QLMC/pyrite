@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pyrite.apps._design import static_altair_chart
 from pyrite.plots.altair.spectra import spectrum_chart
 from pyrite.results import records, select_results, sweep_values
 
@@ -101,11 +102,11 @@ def render_energy_comparison(
     parts.extend(
         [
             mo.md("**Narrowband**"),
-            context.title_for_face(narrow_chart)
+            static_altair_chart(mo, context.title_for_face(narrow_chart))
             if narrow_chart is not None
             else mo.md("*No narrowband spectra — run the scan first.*"),
             mo.md("**Broadband**"),
-            context.title_for_face(broad_chart)
+            static_altair_chart(mo, context.title_for_face(broad_chart))
             if broad_chart is not None
             else mo.md("*No broadband spectra — run the scan first.*"),
             mo.md("---"),
@@ -158,7 +159,9 @@ def render_energy_comparison(
         ]
         selected_charts = [themed_chart(chart, theme) for chart in selected_charts if chart is not None]
         parts.append(
-            mo.vstack(selected_charts) if selected_charts else mo.md("*No spectrum for that cell.*")
+            mo.vstack([static_altair_chart(mo, chart) for chart in selected_charts])
+            if selected_charts
+            else mo.md("*No spectrum for that cell.*")
         )
 
     return mo.vstack(parts)

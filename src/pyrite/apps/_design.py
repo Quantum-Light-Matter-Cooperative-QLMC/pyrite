@@ -418,6 +418,23 @@ def apply_altair_theme(chart, theme: str):
     return chart
 
 
+def static_altair_chart(mo, chart):
+    """Render a non-selectable chart through marimo's schema-safe path.
+
+    Marimo's Arrow data transformer extends Vega-Lite with
+    ``format.type = "arrow"``. Altair's raw MIME renderer validates that
+    extension against the upstream schema and rejects it; ``mo.ui.altair_chart``
+    deliberately serializes Marimo transformers without that validation.
+    """
+    if chart is None:
+        return None
+    return mo.ui.altair_chart(
+        chart,
+        chart_selection=False,
+        legend_selection=False,
+    )
+
+
 # A white canvas makes the yellow end of many scientific sequential maps hard
 # to distinguish.  This clipped, high-contrast sequential map keeps the full
 # energy trajectory visible without changing the underlying scalar values.

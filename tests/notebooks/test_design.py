@@ -4,6 +4,8 @@ import tomllib
 from pathlib import Path
 
 import altair as alt
+import marimo as mo
+import pandas as pd
 import pytest
 
 from pyrite.apps import _design
@@ -73,6 +75,23 @@ def test_altair_light_theme_overrides_axis_and_embedded_title_colors() -> None:
     assert spec["config"]["axis"]["titleColor"] == light["text"]
     assert spec["config"]["text"]["color"] == light["text"]
     assert spec["title"]["color"] == light["text"]
+
+
+def test_static_altair_chart_bypasses_arrow_mime_validation() -> None:
+    def _arrow_transformer(_data, **_options):
+        return {"url": "memory://spectrum.arrow", "format": {"type": "arrow"}}
+
+    alt.data_transformers.register("marimo_test_arrow", _arrow_transformer)
+    chart = (
+        alt.Chart(pd.DataFrame({"energy": [1.0, 2.0], "photons": [2.0, 3.0]}))
+        .mark_line()
+        .encode(x="energy:Q", y="photons:Q")
+    )
+
+    with alt.data_transformers.enable("marimo_test_arrow"):
+        rendered = _design.static_altair_chart(mo, chart)
+
+    assert isinstance(rendered, mo.ui.altair_chart)
 
 
 def test_status_vocabulary_is_unique_and_explicit() -> None:
