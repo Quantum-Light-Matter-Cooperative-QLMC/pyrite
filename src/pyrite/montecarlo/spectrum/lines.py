@@ -2100,6 +2100,7 @@ def mc_spectrum(
                 allocate_coherent_fields,
                 finalize_coherent_fields,
                 run_coherent_field_accumulation_kernel,
+                run_coherent_grouped_intensity_kernel,
                 run_coherent_prologue_kernel,
             )
 
@@ -2125,13 +2126,8 @@ def mc_spectrum(
             _coh_phase_slope = xp.ascontiguousarray(d_all_geom / HBARC_EV_ANG, dtype=REAL)
             coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
 
-            def _stream_segment_block(sel, n_sel):
-                """Prologue + field accumulation for ONE segment selection into
-                the persistent ``coherent_fields`` planes.
-
-                ``sel`` is a contiguous slice on the ordinary (flat) pass and an
-                electron's segment index array on the decoherence grouped pass;
-                the kernels only ever see a compact block either way."""
+            def _stream_segment_block(sel, n_sel, *, group_starts=None, grouped_out=None):
+                """Run prologue, then flat-field or segmented grouped reduction."""
                 _nsys_push("cxr.lines.coherent_prologue")
                 coh_line_data = run_coherent_prologue_kernel(
                     v_all[sel].reshape(-1),
@@ -2170,18 +2166,30 @@ def mc_spectrum(
                 )
                 _nsys_pop()
                 _nsys_push("cxr.lines.coherent_field")
-                run_coherent_field_accumulation_kernel(
-                    *coh_line_data,
-                    E_grid,  # ty: ignore[too-many-positional-arguments]
-                    fields=coherent_fields,
-                    n_g=N_g,
-                    n_seg=n_sel,
+                common = {
+                    "n_g": N_g,
+                    "n_seg": n_sel,
                     # g-independent, so it stays segment-sized here even though
                     # the prologue's other outputs are pair-sized.
-                    L_esc=L_esc_full[sel].reshape(-1),
-                    delta_omega=delta_omega_grid,
-                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
-                )
+                    "L_esc": L_esc_full[sel].reshape(-1),
+                    "delta_omega": delta_omega_grid,
+                    "config": DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                }
+                if group_starts is None:
+                    run_coherent_field_accumulation_kernel(
+                        *coh_line_data,
+                        E_grid,  # ty: ignore[too-many-positional-arguments]
+                        fields=coherent_fields,
+                        **common,
+                    )
+                else:
+                    run_coherent_grouped_intensity_kernel(
+                        *coh_line_data,
+                        E_grid,  # ty: ignore[too-many-positional-arguments]
+                        group_starts,
+                        out=grouped_out,
+                        **common,
+                    )
                 _nsys_pop()
                 del coh_line_data  # release scratch before the next block allocates
 
@@ -2472,13 +2480,10 @@ def mc_spectrum(
                 # The planes now hold |sum_e S_e| per row (the "flat" term);
                 # snapshot its magnitude before the grouped passes reuse them.
                 flat_mag2 = _stream_field_mag2()
-                # sum_e |S_e|^2 with no new device code: re-stream one
-                # electron's segments at a time into the SAME planes (zeroed
-                # first) and square. Every segment is still touched once in
-                # total across the electron loop; the extra cost is Ne
-                # zero+square passes over the (N_g, n_E) planes plus Ne kernel
-                # launch pairs, traded for keeping this path on the fused
-                # float32 kernels instead of the dense-matrix CuPy fallback.
+                # sum_e |S_e|^2. Stable sorting makes each electron contiguous;
+                # whole-electron blocks then keep launch count O(n_seg/seg_block)
+                # instead of O(Ne). The segmented reducer assigns electron
+                # groups to threads and squares each field before block reduction.
                 grouped_mag2 = xp.zeros((N_g, E_grid.size), dtype=REAL)
                 elec_cpu = _to_cpu(seg_elec_id)
                 order = np.argsort(elec_cpu, kind="stable")
@@ -2488,14 +2493,23 @@ def mc_spectrum(
                 if gid_e.size:
                     e_starts = np.flatnonzero(np.concatenate(([True], gid_e[1:] != gid_e[:-1])))
                     e_bounds = np.append(e_starts, gid_e.size)
-                    for b0, b1 in zip(e_bounds[:-1], e_bounds[1:], strict=True):
-                        idx_e = order[int(b0) : int(b1)]
-                        for plane in coherent_fields:
-                            plane.fill(0)
-                        for j0 in range(0, idx_e.size, seg_block):
-                            sub = xp.asarray(idx_e[j0 : j0 + seg_block])
-                            _stream_segment_block(sub, int(sub.size))
-                        grouped_mag2 += _stream_field_mag2()
+                    group0 = 0
+                    n_groups = e_bounds.size - 1
+                    while group0 < n_groups:
+                        target = int(e_bounds[group0]) + seg_block
+                        group1 = int(np.searchsorted(e_bounds, target, side="right") - 1)
+                        group1 = max(group0 + 1, min(group1, n_groups))
+                        b0 = int(e_bounds[group0])
+                        b1 = int(e_bounds[group1])
+                        sub = xp.asarray(order[b0:b1])
+                        starts = xp.asarray(e_bounds[group0 : group1 + 1] - b0, dtype=xp.uint32)
+                        _stream_segment_block(
+                            sub,
+                            int(sub.size),
+                            group_starts=starts,
+                            grouped_out=grouped_mag2,
+                        )
+                        group0 = group1
                 # F PER ROW, before the incoherent row sum.
                 F_rows = xp.stack([_row_decoherence_factor(G[i_row]) for i_row in range(N_g)])
                 blended = (1.0 - F_rows) * grouped_mag2 + F_rows * flat_mag2

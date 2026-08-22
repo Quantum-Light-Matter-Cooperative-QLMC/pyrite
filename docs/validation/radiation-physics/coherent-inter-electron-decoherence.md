@@ -172,8 +172,8 @@ group-then-reduce-then-square pattern the pre-existing flight-grouped
 incoherent path already uses, keyed by electron instead of flight.
 
 The three float32 CUDA-JIT fast paths (`coherent_jit_kernel.py`,
-`coherent_stream_jit_kernel.py`) carry the blend natively, with **no new
-device code**. Both entry points already *accumulate* their squared reduction
+`coherent_stream_jit_kernel.py`) carry the blend natively. Both entry points
+already *accumulate* their squared reduction
 into the caller's buffer rather than overwriting it
 (`run_coherent_reduction_kernel`'s `spec[k] += wm*(...)`,
 `run_coherent_field_accumulation_kernel`'s additive field planes), so
@@ -183,12 +183,15 @@ $|\sum_eS_e|^2$ is the single call these paths already made. Both are fed the
 geometric (offset-free) phase, and $F$ multiplies outside the kernel. Three
 call sites share this shape: `_accumulate`'s per-(reflection, orientation)
 reduction, the batched path's per-row reduction fallback, and the batched
-streaming field kernel. The streaming path re-streams one electron's segments
-at a time into the same field planes and squares; it deliberately does **not**
+streaming field kernel. The streaming path uses a segmented CUDA reduction:
+stable electron grouping is packed into whole-electron segment blocks, threads
+form each electron field and square it, then each block reduces those
+intensities into the persistent per-row result. It deliberately does **not**
 use `finalize_coherent_fields`, whose fused collapse would sum the rows before
 $F$ could multiply them.
 
-**Cost.** The grouped floor spends one launch per electron per reduction, and
+**Historical cost and production fix.** The initial grouped floor spent one
+launch per electron per reduction, and
 each launch covers the full energy axis regardless of how few segments that
 electron contributes, so the blend's cost is set by $N_e$ and is nearly
 independent of segment count and row count. Measured on an RTX 5080 (float32,
@@ -207,24 +210,27 @@ generic CuPy fallback it replaces:
 |  3000 |         18 |    2.36 s |       13.58 s |   5.75x |
 |  3000 |         50 |    2.47 s |       20.29 s |   8.22x |
 
-So the native path is a large win on the configurations real coherent runs
-use (several reflection families, optionally times a mosaic quadrature) and a
-loss on the narrow few-row case. The two per-row routes (`_accumulate` and the
+These measurements describe the superseded per-electron streaming reducer.
+At the production `hopg_hbn` size ($N_e=20{,}000$), it caused ~0.05 cases/s
+and ~10% GPU utilization. The segmented streaming reducer makes launch count
+$O(N_{seg}/\mathrm{segment\_block})$ instead of $O(N_e)$. An uncached HOPG
+profile sample on the same lab RTX 5080 completed 431/5508 cases in 38 s
+(~11.3 cases/s), with 56–62% GPU utilization: about 225x the regressed
+throughput. CUDA tests cover the segmented kernel against an independent
+grouped-field reference for both one and two energies per block and assert one
+grouped launch for a two-electron one-block case.
+
+The two per-row routes (`_accumulate` and the
 batched reduction fallback) pay $N_e$ launches *per row* rather than $N_e$
 total, which does not amortize: measured 0.76 s at $N_e=300$, $N_g=18$ against
 the streaming path's 0.25 s. Both remain correct and tested; they are only
 reachable when the streaming path is not (the grooved-escape branch, or
 `_USE_JIT_COHERENT_STREAM` disabled).
 
-Follow-ups, neither a correctness gap: a single fused segmented-reduction
-kernel that computes $\sum_e|S_e|^2$ in one launch would remove the $N_e$-launch
-floor entirely, and a calibrated dispatch heuristic could pick between the
-native blend and the generic fallback per case. No such heuristic is wired in
-here because the measured crossover depends on $N_e$ and $N_g$ separately (at
-$N_g\approx4$ the same segments-per-electron ratio wins at $N_e=2000$ and loses
-at $N_e=300$), so a single-parameter threshold would misroute; the existing
-`_USE_JIT_COHERENT_STREAM`/`_USE_JIT_COHERENT_REDUCTION` module switches remain
-the escape hatch.
+Remaining performance follow-up, not a correctness gap: the two non-streaming
+per-row routes could adopt an equivalent segmented reduction if a production
+profile begins using them. The existing `_USE_JIT_COHERENT_STREAM` and
+`_USE_JIT_COHERENT_REDUCTION` module switches remain test escape hatches.
 
 ## Assumptions and limits
 

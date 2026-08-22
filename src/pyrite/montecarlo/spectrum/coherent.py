@@ -14,6 +14,7 @@ from .coherent_stream_jit_kernel import (
     CoherentStreamKernelConfig,
     finalize_coherent_fields,
     run_coherent_field_accumulation_kernel,
+    run_coherent_grouped_intensity_kernel,
     run_coherent_prologue_kernel,
 )
 
@@ -24,6 +25,7 @@ __all__ = [
     "DEFAULT_COHERENT_STREAM_KERNEL_CONFIG",
     "finalize_coherent_fields",
     "run_coherent_field_accumulation_kernel",
+    "run_coherent_grouped_intensity_kernel",
     "run_coherent_prologue_kernel",
     "run_coherent_reduction_kernel",
 ]

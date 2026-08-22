@@ -130,9 +130,9 @@ longitudinal offset by the identical mechanism:
       the caller's buffer, so `Σ_e|S_e|²` is the same kernel called once per
       electron over that electron's own lines, at unit mosaic weight, into a
       zeroed buffer (`_coherent_jit_grouped_row`, shared by `_accumulate`'s
-      reduction and the batched per-row fallback); the streaming path
-      re-streams one electron's segments at a time into the same field
-      planes and blends per row in plain CuPy array math rather than
+      reduction and the batched per-row fallback); the streaming path uses a
+      fused segmented reducer over whole-electron segment blocks and blends
+      per row in plain CuPy array math rather than
       `finalize_coherent_fields`, whose fused collapse would sum rows before
       `F` could multiply them. The stream prologue now takes the geometric
       (offset-free) position/phase slope like the other two paths — a no-op
@@ -144,14 +144,14 @@ longitudinal offset by the identical mechanism:
       cone so each row carries its own `F`; offset-free dispatch bit-for-bit)
       plus a real `simulate_trajectories` (300 electrons, 200 fs bunch,
       0.1 mm spot) → `mc_spectrum(coherent=True)` smoke agreeing with the
-      generic path to 5.4e-4. **Measured trade-off, documented not tuned:**
-      the grouped floor is launch-bound at ~0.8 ms/electron, nearly
-      independent of segment and row count, so it is `0.22`–`0.26×` (slower)
-      at 2 rows and `2.0`–`10.2×` faster at 18–50 rows; the two per-row
-      routes pay `Nₑ` launches per row and do not amortize. A fused
-      segmented-reduction kernel and a calibrated dispatch heuristic are
-      named follow-ups in the ledger (a single-parameter threshold misroutes
-      — the crossover depends on `Nₑ` and `N_g` separately).
+      generic path to 5.4e-4. The first production-scale `hopg_hbn` run exposed
+      the original grouped streaming floor as launch-bound at ~0.8 ms/electron.
+      The fused fix removes the `Nₑ` launch count: an uncached 20,000-electron
+      HOPG run on the lab RTX 5080 sustained 431 cases in 38 s (~11.3 cases/s),
+      versus ~0.05 cases/s for the regressed per-electron path, while GPU
+      utilization rose from ~10% to 56–62%. The two non-streaming per-row
+      routes retain their `Nₑ`-launch implementation because `hopg_hbn` does
+      not use them.
 - [x] Add limiting-case regression tests: point source/point bunch (`F→1`,
       recovers today's `N²` degenerate behavior bit-for-bit), large-σ floor
       (`F→0`, recovers `Σ_e|S_e|²` and matches the incoherent-per-electron
@@ -196,8 +196,9 @@ longitudinal offset by the identical mechanism:
       `parameter_sha256`/`CURRENT_IDENTITY_VERSION` confirmed untouched —
       this changes only how the already-`coherent_emission`-gated output is
       computed, not any profile input.
-      Follow-up finite-footprint slice: coherent CPU suite 18/18, CUDA device
-      decoherence suite 10/10 on the lab GPU, lint/docs/ledger checks clean.
+      Follow-up finite-footprint slice: coherent CPU suite 18/18. After the
+      production-scale launch regression fix, CUDA device decoherence suite
+      12/12 on the lab GPU; focused fused-kernel tests 4/4; lint clean.
       Core suite reached 1821 passed/74 skipped with only the sandbox-blocked
       forkserver end-to-end test failing (`PermissionError: [Errno 1] Operation
       not permitted`). Current full typecheck is blocked by 21 unrelated

@@ -242,6 +242,59 @@ def test_stream_field_kernel_vacuum_is_bit_for_bit_without_the_new_arguments(epb
     np.testing.assert_allclose(base, _stream_reference(d, use_medium=False), rtol=2e-5, atol=2e-5)
 
 
+@pytest.mark.parametrize("epb", [1, 2])
+def test_stream_grouped_decoherence_kernel_matches_independent_reference(epb):
+    from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
+        CoherentStreamKernelConfig,
+        run_coherent_grouped_intensity_kernel,
+    )
+
+    d = _stream_inputs()
+    starts = np.array([0, 2, 3], dtype=np.uint32)
+    expected = np.zeros((d["n_g"], d["E"].size), dtype=np.float64)
+    for g in range(d["n_g"]):
+        for k, energy in enumerate(d["E"]):
+            for b0, b1 in zip(starts[:-1], starts[1:], strict=True):
+                fs = 0.0j
+                fp = 0.0j
+                for seg in range(int(b0), int(b1)):
+                    line = g * d["n_seg"] + seg
+                    x = float(d["aw"][seg]) * (float(energy) - float(d["E_r"][line]))
+                    sinc = 1.0 if x == 0.0 else np.sin(x) / x
+                    phase = (
+                        float(d["phase_slope"][seg]) * float(energy)
+                        - float(d["g_phase"][line])
+                        - float(d["L_esc"][seg]) * float(d["delta_omega"][k])
+                    )
+                    ph = np.exp(1j * phase)
+                    fs += sinc * complex(d["cs_re"][line], d["cs_im"][line]) * ph
+                    fp += sinc * complex(d["cp_re"][line], d["cp_im"][line]) * ph
+                expected[g, k] += abs(fs) ** 2 + abs(fp) ** 2
+
+    config = CoherentStreamKernelConfig(reduction_nthreads=32, energies_per_block=epb)
+    out = cp.zeros_like(cp.asarray(expected, dtype=cp.float32))
+    run_coherent_grouped_intensity_kernel(
+        cp.asarray(d["E_r"]),
+        cp.asarray(d["aw"]),
+        cp.asarray(d["phase_slope"]),
+        cp.asarray(d["g_phase"]),
+        cp.asarray(d["cs_re"]),
+        cp.asarray(d["cs_im"]),
+        cp.asarray(d["cp_re"]),
+        cp.asarray(d["cp_im"]),
+        cp.asarray(d["E"]),
+        cp.asarray(starts),
+        out=out,
+        n_g=d["n_g"],
+        n_seg=d["n_seg"],
+        L_esc=cp.asarray(d["L_esc"]),
+        delta_omega=cp.asarray(d["delta_omega"]),
+        config=config,
+    )
+    cp.cuda.Stream.null.synchronize()
+    np.testing.assert_allclose(cp.asnumpy(out), expected, rtol=2e-5, atol=2e-5)
+
+
 def test_stream_field_kernel_requires_segment_sized_escape_lengths():
     """``L_esc`` is g-independent, so the pair layout accepted for ``aw`` and
     ``phase_slope`` is a caller error here rather than a supported alias."""
@@ -710,6 +763,18 @@ def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floo
     segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
     call_kwargs = {**_DECOH_KWARGS, **_decoh_route_kwargs(route, monkeypatch)}
     calls = _count_kernel_calls(monkeypatch, route)
+    grouped_calls = None
+    if route == "stream":
+        from pyrite.montecarlo.spectrum import coherent_stream_jit_kernel as stream_mod
+
+        grouped_calls = [0]
+        original_grouped = stream_mod.run_coherent_grouped_intensity_kernel
+
+        def _grouped_spy(*args, **kwargs):
+            grouped_calls[0] += 1
+            return original_grouped(*args, **kwargs)
+
+        monkeypatch.setattr(stream_mod, "run_coherent_grouped_intensity_kernel", _grouped_spy)
     actual = mc_spectrum(
         segments,
         _DECOH_E_GRID,
@@ -718,6 +783,8 @@ def test_coherent_decoherence_long_gaussian_bunch_finite_footprint_uses_jit_floo
         **call_kwargs,
     )
     assert calls[0] > 0, "the CUDA-JIT finite-footprint floor was not taken"
+    if grouped_calls is not None:
+        assert grouped_calls[0] == 1, "grouped reduction must be segment-block-, not electron-bound"
 
     ne = segments["Ne"]
     grouped_raw = 0.0
