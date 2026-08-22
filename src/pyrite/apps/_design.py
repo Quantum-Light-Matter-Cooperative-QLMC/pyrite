@@ -159,9 +159,9 @@ def notebook_css() -> str:
     font: 500 .78rem/1.2 {TYPOGRAPHY["data"]}; letter-spacing: 0;
     text-transform: none;
   }}
-  /* Marimo's dropdown/select contents are portalled to document.body, outside
-     the notebook subtree.  Target the actual Select/Radix portal surfaces and
-     win over Marimo/Tailwind utility classes explicitly. */
+  /* Legacy/non-shadow Marimo surfaces and native-select fallbacks. Current
+     Marimo custom elements are synchronized inside their open shadow roots by
+     ThemeSelect because document styles cannot cross the shadow boundary. */
   html[data-pyrite-theme="light"] :is(
     [data-slot="select-content"],
     [data-slot="dropdown-menu-content"],
@@ -224,12 +224,7 @@ def notebook_css() -> str:
     color: {light["text"]} !important;
     color-scheme: light !important;
   }}
-  /* Marimo's tab strip (mo.ui.tabs) renders inline, not portalled, but reads
-     the same frozen dark palette as the select surfaces above -- its own
-     light/dark detection is captured once at load and never re-derives when
-     this switch flips body[data-theme] later. Target the stable ARIA roles
-     rather than Tailwind's generated utility classnames, which are not a
-     stable contract across marimo releases. */
+  /* Legacy/non-shadow tab fallback; ThemeSelect owns current shadow roots. */
   html[data-pyrite-theme="light"] :is([role="tablist"], .bg-muted) {{
     background-color: {light["surface"]} !important;
   }}
@@ -396,6 +391,7 @@ def apply_altair_theme(chart, theme: str):
             color=palette["text"],
             subtitleColor=palette["muted"],
         )
+        .configure_text(color=palette["text"])
         .configure_view(stroke=palette["rule"])
     )
 

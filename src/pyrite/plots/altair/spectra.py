@@ -784,12 +784,7 @@ def material_comparison_chart(
             alt.Tooltip("tilt_azim_deg:Q", title="phi (deg)"),
         ],
     )
-    # The notebook pins display.theme = "dark" (marimo config header), so the
-    # default black text-mark fill is invisible against the dark chart
-    # background -- force a light fill instead of relying on a theme default.
-    labels_mark = base.mark_text(align="left", dx=7, fontSize=10, color="#e8e8e8").encode(
-        text="label:N"
-    )
+    labels_mark = base.mark_text(align="left", dx=7, fontSize=10).encode(text="label:N")
     chart = (points_mark + labels_mark).properties(width=width, height=height, title=title)
     if dropped:
         print(

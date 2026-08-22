@@ -15,6 +15,10 @@ class MaterialSelect(AnyWidget):
       label.appendChild(labelText);
       const select = document.createElement("select");
       select.setAttribute("aria-label", model.get("label"));
+      select.style.backgroundColor = "var(--cxr-surface, #FFFFFF)";
+      select.style.color = "var(--cxr-text, #172832)";
+      select.style.borderColor = "var(--cxr-rule, #C6D2D8)";
+      select.style.colorScheme = "light dark";
       for (const row of model.get("options")) {
         const option = document.createElement("option");
         option.value = row.value;
@@ -89,6 +93,17 @@ class ThemeSelect(AnyWidget):
       return preference === "system" ? (media.matches ? "dark" : "light") : preference;
     }
 
+    function syncMarimoShadowThemes(resolved) {
+      for (const element of document.querySelectorAll("*")) {
+        const shadow = element.shadowRoot;
+        if (!shadow) continue;
+        for (const wrapper of shadow.querySelectorAll(".marimo > .contents")) {
+          wrapper.classList.remove("light", "dark");
+          wrapper.classList.add(resolved);
+        }
+      }
+    }
+
     function render({ model, el }) {
       const media = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -102,6 +117,11 @@ class ThemeSelect(AnyWidget):
       const select = document.createElement("select");
       select.className = "cxr-theme-select__control";
       select.setAttribute("aria-label", "Appearance");
+      select.style.backgroundColor = "var(--cxr-surface, #FFFFFF)";
+      select.style.color = "var(--cxr-text, #172832)";
+      select.style.border = "1px solid var(--cxr-rule, #C6D2D8)";
+      select.style.borderRadius = "3px";
+      select.style.padding = ".25rem 1.8rem .25rem .55rem";
       for (const [value, label] of [
         ["system", "System"],
         ["light", "Light"],
@@ -132,6 +152,9 @@ class ThemeSelect(AnyWidget):
           document.body.dataset.theme = resolved;
           document.body.dataset.pyriteTheme = resolved;
         }
+        wrapper.style.color = "var(--cxr-muted, #526B76)";
+        syncMarimoShadowThemes(resolved);
+        window.requestAnimationFrame(() => syncMarimoShadowThemes(resolved));
 
         if (persist) safeWrite(preference);
 
@@ -167,11 +190,19 @@ class ThemeSelect(AnyWidget):
       const onSystemTheme = () => apply(select.value);
       const syncTimer = window.setInterval(() => {
         const shared = cookieRead();
-        if (shared && shared !== select.value) apply(shared);
+        if (shared && shared !== select.value) {
+          apply(shared);
+        } else {
+          syncMarimoShadowThemes(resolvedTheme(select.value, media));
+        }
       }, 750);
       const bodyObserver = new MutationObserver(() => {
         const expected = resolvedTheme(select.value, media);
-        if (document.body?.dataset.theme !== expected) apply(select.value);
+        if (document.body?.dataset.theme !== expected) {
+          apply(select.value);
+        } else {
+          window.requestAnimationFrame(() => syncMarimoShadowThemes(expected));
+        }
       });
 
       select.addEventListener("change", onSelect);
@@ -180,6 +211,8 @@ class ThemeSelect(AnyWidget):
       if (document.body) {
         bodyObserver.observe(document.body, {
           attributes: true,
+          childList: true,
+          subtree: true,
           attributeFilter: ["data-theme"],
         });
       }

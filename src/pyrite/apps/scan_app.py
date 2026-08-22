@@ -1,6 +1,6 @@
 # /// script
 # [tool.marimo.display]
-# theme = "system"
+# theme = "light"
 # ///
 
 

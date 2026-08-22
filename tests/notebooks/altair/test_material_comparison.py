@@ -93,3 +93,12 @@ def test_material_comparison_chart_is_point_and_text_layers():
     assert isinstance(chart, alt.LayerChart)
     mark_types = {layer["mark"]["type"] for layer in chart.to_dict()["layer"]}
     assert mark_types == {"point", "text"}
+
+
+def test_material_comparison_text_color_is_owned_by_app_theme():
+    chart = material_comparison_chart([_point("HOPG bulk")], [])
+    text_layer = next(
+        layer for layer in chart.to_dict()["layer"] if layer["mark"]["type"] == "text"
+    )
+
+    assert "color" not in text_layer["mark"]

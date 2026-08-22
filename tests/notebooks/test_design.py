@@ -1,10 +1,13 @@
 """Stable contracts for shared notebook presentation primitives."""
 
+import tomllib
 from pathlib import Path
 
+import altair as alt
 import pytest
 
 from pyrite.apps import _design
+from pyrite.apps._widgets import ThemeSelect
 
 
 def test_design_tokens_are_complete_and_export_safe() -> None:
@@ -33,6 +36,43 @@ def test_design_tokens_are_complete_and_export_safe() -> None:
     assert "body:has(.cxr-shell) *::before" in css
     assert "prefers-reduced-motion" in css
     assert "https://" not in css and "http://" not in css
+
+
+def test_marimo_starts_in_pyrite_default_light_theme() -> None:
+    root = Path(__file__).parents[2]
+    project = root / "pyproject.toml"
+    config = tomllib.loads(project.read_text())
+
+    assert config["tool"]["marimo"]["display"]["theme"] == "light"
+    for app in ("analysis_app.py", "scan_app.py", "trace_app.py", "validation_app.py"):
+        source = (root / "src" / "pyrite" / "apps" / app).read_text()
+        assert '# theme = "light"' in source
+        assert '# theme = "system"' not in source
+
+
+def test_theme_switch_updates_marimo_shadow_dom_controls() -> None:
+    source = ThemeSelect._esm
+
+    assert ".shadowRoot" in source
+    assert '.querySelectorAll(".marimo > .contents")' in source
+    assert 'classList.remove("light", "dark")' in source
+    assert "classList.add(resolved)" in source
+
+
+def test_altair_light_theme_overrides_axis_and_embedded_title_colors() -> None:
+    chart = (
+        alt.Chart(alt.Data(values=[{"energy": 1.0, "photons": 2.0}]))
+        .mark_line()
+        .encode(x="energy:Q", y="photons:Q")
+        .properties(title=alt.TitleParams(text="Spectrum", color="#FFFFFF"))
+    )
+
+    spec = _design.apply_altair_theme(chart, "light").to_dict()
+    light = _design.THEMES["light"]
+    assert spec["config"]["axis"]["labelColor"] == light["text"]
+    assert spec["config"]["axis"]["titleColor"] == light["text"]
+    assert spec["config"]["text"]["color"] == light["text"]
+    assert spec["title"]["color"] == light["text"]
 
 
 def test_status_vocabulary_is_unique_and_explicit() -> None:

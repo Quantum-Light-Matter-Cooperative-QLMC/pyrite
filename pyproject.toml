@@ -157,6 +157,9 @@ exclude_also = [
 #     `NUMBA_DISABLE_JIT=1` to measure them (~2x wall clock; transport.py
 #     37% -> 87%).
 
+[tool.marimo.display]
+theme = "light"
+
 [tool.marimo.runtime]
 watcher_on_save = "autorun"
 
