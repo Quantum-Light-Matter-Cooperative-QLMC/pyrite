@@ -46,6 +46,7 @@ from ..mpl.trajectories import (
     _trajectory_frame,
     groove_profile_knots,
 )
+from ._typing import _mark_chart
 
 # Mirrors plotly.trajectories._FIELD/_GRID/font.color so trajectory_chart's
 # panel reads as one system with the 3D volume it sits beside in the Trace tab.
@@ -130,8 +131,7 @@ def penetration_survival_chart(
         f"theta_tilt={t:g} deg -- electron penetration / survival"
     )
     chart = (
-        alt.Chart(df)
-        .mark_line(strokeWidth=1.9)
+        _mark_chart(alt.Chart(df).mark_line(strokeWidth=1.9))
         .encode(
             x=alt.X("depth:Q", title=x_title),
             y=alt.Y(
@@ -272,8 +272,7 @@ def _groove_profile_layer(case, data, frame, xscale, yscale):
     cy = (xk * e2[0] + zk * e2[2]) / u
     df = pd.DataFrame({"x": cx, "y": cy, "i": np.arange(len(cx), dtype=float)})
     return (
-        alt.Chart(df)
-        .mark_line(color=_GROOVE, strokeWidth=1.4, opacity=0.95)
+        _mark_chart(alt.Chart(df).mark_line(color=_GROOVE, strokeWidth=1.4, opacity=0.95))
         .encode(
             x=alt.X("x:Q", scale=xscale),
             y=alt.Y("y:Q", scale=yscale),
@@ -315,8 +314,7 @@ def trajectory_chart(
     # nothing in Vega-Lite (see track_segments_frame). x2/y2 give each segment its
     # end point; energy still colours along the path.
     tracks = (
-        alt.Chart(seg_df)
-        .mark_rule(strokeWidth=0.9, opacity=0.85)
+        _mark_chart(alt.Chart(seg_df).mark_rule(strokeWidth=0.9, opacity=0.85))
         .encode(
             x=alt.X("x:Q", scale=xscale, title=f"along beam ({data['ulab']})"),
             y=alt.Y("y:Q", scale=yscale, title=f"transverse ({data['ulab']})"),
@@ -330,8 +328,9 @@ def trajectory_chart(
         )
     )
     vacuum = (
-        alt.Chart(vacuum_df)
-        .mark_rule(color="#8E9AAF", strokeWidth=0.8, opacity=0.35)
+        _mark_chart(
+            alt.Chart(vacuum_df).mark_rule(color="#8E9AAF", strokeWidth=0.8, opacity=0.35)
+        )
         .encode(
             x=alt.X("x:Q", scale=xscale),
             y=alt.Y("y:Q", scale=yscale),
@@ -367,8 +366,9 @@ def trajectory_chart(
             {"x": _xs, "y": np.minimum(_yf, _yb), "y2": np.maximum(_yf, _yb)}
         )
         slab_shading = (
-            alt.Chart(_slab_band_df)
-            .mark_area(fill="#bbbbbb", opacity=0.22, stroke=None)
+            _mark_chart(
+                alt.Chart(_slab_band_df).mark_area(fill="#bbbbbb", opacity=0.22, stroke=None)
+            )
             .encode(
                 x=alt.X("x:Q", scale=xscale),
                 y=alt.Y("y:Q", scale=yscale),
@@ -378,8 +378,11 @@ def trajectory_chart(
     else:
         _x0, _x1 = min(0.0, thick) / nslab[0], max(0.0, thick) / nslab[0]
         slab_shading = (
-            alt.Chart(pd.DataFrame({"x": [_x0], "x2": [_x1], "y": [ylo], "y2": [yhi]}))
-            .mark_rect(fill="#bbbbbb", opacity=0.22, stroke=None)
+            _mark_chart(
+                alt.Chart(
+                    pd.DataFrame({"x": [_x0], "x2": [_x1], "y": [ylo], "y2": [yhi]})
+                ).mark_rect(fill="#bbbbbb", opacity=0.22, stroke=None)
+            )
             .encode(
                 x=alt.X("x:Q", scale=xscale),
                 x2="x2:Q",
@@ -392,8 +395,11 @@ def trajectory_chart(
     for off in (0.0, thick):
         c = off * nslab
         faces.append(
-            alt.Chart(_segment_df(-W * tang + c, W * tang + c))
-            .mark_line(color="#666666", strokeWidth=1.2, opacity=0.9)
+            _mark_chart(
+                alt.Chart(_segment_df(-W * tang + c, W * tang + c)).mark_line(
+                    color="#666666", strokeWidth=1.2, opacity=0.9
+                )
+            )
             .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
         )
     # internal layer boundaries (film-on-substrate stacks, e.g. mos2 on sapphire):
@@ -401,20 +407,29 @@ def trajectory_chart(
     for zb in data.get("layer_bounds", ()):
         c = float(zb) * nslab
         faces.append(
-            alt.Chart(_segment_df(-W * tang + c, W * tang + c))
-            .mark_line(color="#666666", strokeWidth=0.8, strokeDash=[4, 3], opacity=0.8)
+            _mark_chart(
+                alt.Chart(_segment_df(-W * tang + c, W * tang + c)).mark_line(
+                    color="#666666", strokeWidth=0.8, strokeDash=[4, 3], opacity=0.8
+                )
+            )
             .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
         )
 
     aL = 0.16 * (xhi - xlo)
     beam = (
-        alt.Chart(_segment_df((-aL, 0.0), (0.0, 0.0)))
-        .mark_line(color="red", strokeWidth=2.0)
+        _mark_chart(
+            alt.Chart(_segment_df((-aL, 0.0), (0.0, 0.0))).mark_line(
+                color="red", strokeWidth=2.0
+            )
+        )
         .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
     )
     det = (
-        alt.Chart(_segment_df((0.0, 0.0), (ndet[0] * aL, ndet[1] * aL)))
-        .mark_line(color="#119911", strokeWidth=2.0)
+        _mark_chart(
+            alt.Chart(_segment_df((0.0, 0.0), (ndet[0] * aL, ndet[1] * aL))).mark_line(
+                color="#119911", strokeWidth=2.0
+            )
+        )
         .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
     )
 

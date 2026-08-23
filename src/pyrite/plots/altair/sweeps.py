@@ -36,6 +36,7 @@ from ..mpl.sweeps import (
     _axis_label,
     _resolve_quantity,
 )
+from ._typing import _mark_chart
 
 # Tick-label format for numeric axes (d3-format): 3 significant digits, no
 # trailing zeros -- keeps a 25-tilt sweep (e.g. np.linspace(0.1, 85, 25),
@@ -117,7 +118,7 @@ def metric_vs_chart(
         color=alt.Color("hue:N", title=_AXIS_SPECS.get(hue, (hue,))[0]),
         tooltip=["hue:N", "x:Q", "metric:Q"],
     )
-    chart = base.mark_line(point=True, strokeWidth=1.8)
+    chart = _mark_chart(base.mark_line(point=True, strokeWidth=1.8))
     title = f"{metric_label} vs {_axis_label(eff_x)}  (best per point: {select})"
     return chart.properties(width=width, height=height, title=title).interactive()
 
@@ -179,8 +180,7 @@ def heatmap_chart(
         else alt.Scale(scheme=_scheme(cmap), domain=list(color_domain))  # type: ignore[arg-type]
     )
     chart = (
-        alt.Chart(df)
-        .mark_rect()
+        _mark_chart(alt.Chart(df).mark_rect())
         .encode(
             x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
@@ -284,8 +284,7 @@ def heatmap_select_chart(
         else alt.Scale(scheme=_scheme(cmap), domain=list(color_domain))  # type: ignore[arg-type]
     )
     chart = (
-        alt.Chart(df)
-        .mark_rect()
+        _mark_chart(alt.Chart(df).mark_rect())
         .encode(
             x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),

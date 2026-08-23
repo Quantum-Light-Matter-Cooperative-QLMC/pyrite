@@ -44,6 +44,7 @@ from ..mpl.detectors import (
     _thr_keV,
     _tpx_detected,
 )
+from ._typing import _mark_chart
 from .spectra import _scale as _axis_scale
 from .spectra import _tilt_records, _validate_band, _windowed_frame
 
@@ -259,8 +260,11 @@ def timepix_detected_chart(
         y_scale=_y_scale(df, "intensity", y_type, x_domain, y_domain),
     )
     thr = (
-        alt.Chart(pd.DataFrame({"E": [_thr_keV() * 1e3]}))
-        .mark_rule(color="gray", strokeDash=[4, 4])
+        _mark_chart(
+            alt.Chart(pd.DataFrame({"E": [_thr_keV() * 1e3]})).mark_rule(
+                color="gray", strokeDash=[4, 4]
+            )
+        )
         .encode(x="E:Q")
     )
     title = _title(recs, "Timepix3 detected (solid) vs incident (dotted)")
@@ -363,8 +367,11 @@ def eaglexo_detected_chart(
     layers = [
         incident,
         detected,
-        alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]}))
-        .mark_rule(color="gray", strokeDash=[6, 3])
+        _mark_chart(
+            alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]})).mark_rule(
+                color="gray", strokeDash=[6, 3]
+            )
+        )
         .encode(x="E:Q"),
     ]
     if show_qe:
@@ -374,8 +381,7 @@ def eaglexo_detected_chart(
         Eqe = np.geomspace(lo, hi, 400)
         qe_df = pd.DataFrame({"energy_eV": Eqe, "QE": eag.qe(Eqe, coating)})
         layers.append(
-            alt.Chart(qe_df)
-            .mark_line(color="gray", opacity=0.5)
+            _mark_chart(alt.Chart(qe_df).mark_line(color="gray", opacity=0.5))
             .encode(
                 x=alt.X("energy_eV:Q", scale=xsc),
                 y=alt.Y("QE:Q", title="QE", scale=alt.Scale(domain=[0, 1.05])),
@@ -482,13 +488,20 @@ def eaglexo_charge_chart(
         color=alt.Color("E0_keV:N", title="beam energy (keV)"),
         tooltip=["E0_keV:N", "energy_eV:Q", "charge_density:Q", "band:N"],
     )
-    line = base.transform_filter(alt.datum.band == "line").mark_line(strokeWidth=1.3)
-    brem = base.transform_filter(alt.datum.band == "brem").mark_line(
-        strokeWidth=0.8, strokeDash=[5, 3], opacity=0.85
+    line = _mark_chart(
+        base.transform_filter(alt.datum.band == "line").mark_line(strokeWidth=1.3)
+    )
+    brem = _mark_chart(
+        base.transform_filter(alt.datum.band == "brem").mark_line(
+            strokeWidth=0.8, strokeDash=[5, 3], opacity=0.85
+        )
     )
     sik = (
-        alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]}))
-        .mark_rule(color="gray", strokeDash=[6, 3])
+        _mark_chart(
+            alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]})).mark_rule(
+                color="gray", strokeDash=[6, 3]
+            )
+        )
         .encode(x="E:Q")
     )
     title = _title(recs, f"Eagle XO recorded charge density ({coating}, dashed = brem)")

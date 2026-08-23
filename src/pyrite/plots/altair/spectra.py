@@ -41,6 +41,7 @@ from ...results import records
 from ...results.store import _detected_background_wide
 from .._common import _best_azimuth, _case_title, _line_brem
 from ..mpl.spectra import _comparison_drop_message
+from ._typing import _mark_chart
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
 _TAIL_BUDGET_DIVISOR = 10
@@ -54,11 +55,11 @@ _COMPARE_HUE_FIELDS = {
     "tilt_azim_deg": "azimuth (deg)",
 }
 
-_TITLE_FONT_SIZE = 16
-_AXIS_LABEL_FONT_SIZE = 12
-_AXIS_TITLE_FONT_SIZE = 14
-_LEGEND_LABEL_FONT_SIZE = 12
-_LEGEND_TITLE_FONT_SIZE = 14
+_TITLE_FONT_SIZE = 18
+_AXIS_LABEL_FONT_SIZE = 14
+_AXIS_TITLE_FONT_SIZE = 16
+_LEGEND_LABEL_FONT_SIZE = 14
+_LEGEND_TITLE_FONT_SIZE = 16
 
 
 def _style_chart(chart):
@@ -793,7 +794,9 @@ def material_comparison_chart(
             scale=alt.Scale(type="log"),
         ),
     )
-    points_mark = base.mark_point(filled=True, size=110, stroke="black", strokeWidth=0.6).encode(
+    points_mark = _mark_chart(
+        base.mark_point(filled=True, size=110, stroke="black", strokeWidth=0.6)
+    ).encode(
         color=alt.Color(
             "quality:Q",
             title="line-definition quality",
@@ -809,7 +812,9 @@ def material_comparison_chart(
             alt.Tooltip("tilt_azim_deg:Q", title="phi (deg)"),
         ],
     )
-    labels_mark = base.mark_text(align="left", dx=7, fontSize=12).encode(text="label:N")
+    labels_mark = _mark_chart(base.mark_text(align="left", dx=7, fontSize=12)).encode(
+        text="label:N"
+    )
     chart = (points_mark + labels_mark).properties(width=width, height=height, title=title)
     if dropped:
         print(

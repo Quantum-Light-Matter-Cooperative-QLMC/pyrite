@@ -203,9 +203,9 @@ def test_spectrum_chart_builds_valid_spec():
     assert enc["color"]["field"] == "E0_keV"
     # total + brem layers
     assert len(spec["layer"]) == 2
-    assert spec["config"]["axis"] == {"labelFontSize": 12, "titleFontSize": 14}
-    assert spec["config"]["legend"] == {"labelFontSize": 12, "titleFontSize": 14}
-    assert spec["config"]["title"]["fontSize"] == 16
+    assert spec["config"]["axis"] == {"labelFontSize": 14, "titleFontSize": 16}
+    assert spec["config"]["legend"] == {"labelFontSize": 14, "titleFontSize": 16}
+    assert spec["config"]["title"]["fontSize"] == 18
 
 
 def test_spectrum_chart_compacts_components_within_coordinate_budget():
