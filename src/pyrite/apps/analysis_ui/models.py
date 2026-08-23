@@ -53,7 +53,20 @@ class AnalysisContext:
     def title_for_face(self, chart: Any) -> Any:
         if chart is None or self.selected_face != "blazed" or not hasattr(chart, "title"):
             return chart
-        return chart.properties(title=f"{chart.title} (blazed)")
+        title = chart.title
+        if isinstance(title, str):
+            return chart.properties(title=f"{title} (blazed)")
+        try:
+            import altair as alt
+
+            params = title.to_dict(validate=False)
+            text = params.get("text")
+            if isinstance(text, str):
+                params["text"] = f"{text} (blazed)"
+                return chart.properties(title=alt.TitleParams(**params))
+        except (AttributeError, TypeError, ValueError):
+            pass
+        return chart
 
 
 @dataclass(frozen=True)

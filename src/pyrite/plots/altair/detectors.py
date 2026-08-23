@@ -46,7 +46,14 @@ from ..mpl.detectors import (
 )
 from ._typing import _mark_chart
 from .spectra import _scale as _axis_scale
-from .spectra import _tilt_records, _validate_band, _windowed_frame
+from .spectra import (
+    _spectrum_axis,
+    _spectrum_legend,
+    _spectrum_title,
+    _tilt_records,
+    _validate_band,
+    _windowed_frame,
+)
 
 # incident-vs-detected long form (Timepix + Eagle photon density)
 _DET_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "kind", "band"]
@@ -201,9 +208,15 @@ def _detected_layers(
     detected-vs-incident frame. ``detail`` splits the line/brem bands so the two
     grids never join across their gap."""
     base = alt.Chart(df).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
-        y=alt.Y("intensity:Q", title="Phs/eV/s/nA", scale=y_scale),
-        color=alt.Color(f"{color_field}:N", title=color_title),
+        x=alt.X(
+            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
+        ),
+        y=alt.Y(
+            "intensity:Q", title="Phs/eV/s/nA", scale=y_scale, axis=_spectrum_axis()
+        ),
+        color=alt.Color(
+            f"{color_field}:N", title=color_title, legend=_spectrum_legend()
+        ),
         detail="band:N",
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "kind:N", "band:N"],
     )
@@ -270,7 +283,7 @@ def timepix_detected_chart(
     title = _title(recs, "Timepix3 detected (solid) vs incident (dotted)")
     return (
         alt.layer(incident, detected, thr)
-        .properties(width=width, height=height, title=title)
+        .properties(width=width, height=height, title=_spectrum_title(title))
         .interactive()
     )
 
@@ -384,7 +397,12 @@ def eaglexo_detected_chart(
             _mark_chart(alt.Chart(qe_df).mark_line(color="gray", opacity=0.5))
             .encode(
                 x=alt.X("energy_eV:Q", scale=xsc),
-                y=alt.Y("QE:Q", title="QE", scale=alt.Scale(domain=[0, 1.05])),
+                y=alt.Y(
+                    "QE:Q",
+                    title="QE",
+                    scale=alt.Scale(domain=[0, 1.05]),
+                    axis=_spectrum_axis(),
+                ),
             )
         )
     blur = ", energy-resolved" if resolve_energy else ""
@@ -393,7 +411,9 @@ def eaglexo_detected_chart(
     # x-only pan/zoom -- an interval bound to the x scale keeps the QE envelope's
     # independent y axis stable (full .interactive() fights the dual y resolve).
     pan = alt.selection_interval(bind="scales", encodings=["x"])
-    return chart.add_params(pan).properties(width=width, height=height, title=title)
+    return chart.add_params(pan).properties(
+        width=width, height=height, title=_spectrum_title(title)
+    )
 
 
 # ---- Eagle XO recorded-charge density ----------------------------------------
@@ -479,13 +499,15 @@ def eaglexo_charge_chart(
             "energy_eV:Q",
             title="Photon energy (eV)",
             scale=_detector_x_scale(x_type, x_domain),
+            axis=_spectrum_axis(),
         ),
         y=alt.Y(
             "charge_density:Q",
             title="charge density (e-/eV/s)",
             scale=_y_scale(df, "charge_density", y_type, x_domain, y_domain),
+            axis=_spectrum_axis(),
         ),
-        color=alt.Color("E0_keV:N", title="beam energy (keV)"),
+        color=alt.Color("E0_keV:N", title="beam energy (keV)", legend=_spectrum_legend()),
         tooltip=["E0_keV:N", "energy_eV:Q", "charge_density:Q", "band:N"],
     )
     line = _mark_chart(
@@ -506,7 +528,9 @@ def eaglexo_charge_chart(
     )
     title = _title(recs, f"Eagle XO recorded charge density ({coating}, dashed = brem)")
     return (
-        alt.layer(line, brem, sik).properties(width=width, height=height, title=title).interactive()
+        alt.layer(line, brem, sik)
+        .properties(width=width, height=height, title=_spectrum_title(title))
+        .interactive()
     )
 
 

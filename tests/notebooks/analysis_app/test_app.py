@@ -5,6 +5,10 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+import altair as alt
+
+from pyrite.apps.analysis_ui.models import AnalysisContext
+
 APP = Path(__file__).parents[3] / "src" / "pyrite" / "apps" / "analysis_app.py"
 
 
@@ -16,6 +20,27 @@ def _attribute_path(node: ast.AST) -> tuple[str, ...]:
     if isinstance(node, ast.Name):
         parts.append(node.id)
     return tuple(reversed(parts))
+
+
+def test_blazed_face_title_preserves_altair_typography() -> None:
+    context = AnalysisContext(
+        selected_material="hopg",
+        selected_face="blazed",
+        selected_profile=None,
+        checkpoint_stem=None,
+        settings=None,
+        checkpoint_results=None,
+        results=None,
+        cases=None,
+    )
+    chart = alt.Chart(alt.Data(values=[])).mark_line().properties(
+        title=alt.TitleParams(text="Spectrum", fontSize=18)
+    )
+
+    spec = context.title_for_face(chart).to_dict()
+
+    assert spec["title"]["text"] == "Spectrum (blazed)"
+    assert spec["title"]["fontSize"] == 18
 
 
 def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:

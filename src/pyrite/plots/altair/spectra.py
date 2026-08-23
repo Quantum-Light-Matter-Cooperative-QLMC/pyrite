@@ -62,6 +62,24 @@ _LEGEND_LABEL_FONT_SIZE = 14
 _LEGEND_TITLE_FONT_SIZE = 16
 
 
+def _spectrum_axis() -> alt.Axis:
+    return alt.Axis(
+        labelFontSize=_AXIS_LABEL_FONT_SIZE,
+        titleFontSize=_AXIS_TITLE_FONT_SIZE,
+    )
+
+
+def _spectrum_legend() -> alt.Legend:
+    return alt.Legend(
+        labelFontSize=_LEGEND_LABEL_FONT_SIZE,
+        titleFontSize=_LEGEND_TITLE_FONT_SIZE,
+    )
+
+
+def _spectrum_title(text: str) -> alt.TitleParams:
+    return alt.TitleParams(text=text, fontSize=_TITLE_FONT_SIZE)
+
+
 def _style_chart(chart):
     """Apply spectral typography at the top level of a composed chart."""
     return (
@@ -488,14 +506,23 @@ def spectrum_chart(
     base = _fold_components(
         alt.Chart(compact), include_brem, include_line, include_coherent
     ).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
-        y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
-        color=alt.Color("E0_keV:N", title="beam energy (keV)"),
+        x=alt.X(
+            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
+        ),
+        y=alt.Y(
+            "intensity:Q",
+            title="Intensity (Phs/eV/s/nA)",
+            scale=y_scale,
+            axis=_spectrum_axis(),
+        ),
+        color=alt.Color("E0_keV:N", title="beam energy (keV)", legend=_spectrum_legend()),
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
     layers = _component_layers(base, include_brem, include_line, include_coherent)
     return _style_chart(
-        alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+        alt.layer(*layers)
+        .properties(width=width, height=height, title=_spectrum_title(title))
+        .interactive()
     )
 
 
@@ -631,14 +658,23 @@ def compare_spectrum_chart(
     base = _fold_components(
         alt.Chart(compact), include_brem, include_line, include_coherent
     ).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
-        y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
-        color=alt.Color(f"{hue}:N", title=hue_title),
+        x=alt.X(
+            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
+        ),
+        y=alt.Y(
+            "intensity:Q",
+            title="Intensity (Phs/eV/s/nA)",
+            scale=y_scale,
+            axis=_spectrum_axis(),
+        ),
+        color=alt.Color(f"{hue}:N", title=hue_title, legend=_spectrum_legend()),
         tooltip=[f"{hue}:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
     layers = _component_layers(base, include_brem, include_line, include_coherent)
     return _style_chart(
-        alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+        alt.layer(*layers)
+        .properties(width=width, height=height, title=_spectrum_title(title))
+        .interactive()
     )
 
 
@@ -727,15 +763,22 @@ def multi_case_spectrum_chart(
     base = _fold_components(
         alt.Chart(compact), include_brem, include_line, include_coherent
     ).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
-        y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
-        color=alt.Color("label:N", title="case"),
+        x=alt.X(
+            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
+        ),
+        y=alt.Y(
+            "intensity:Q",
+            title="Intensity (Phs/eV/s/nA)",
+            scale=y_scale,
+            axis=_spectrum_axis(),
+        ),
+        color=alt.Color("label:N", title="case", legend=_spectrum_legend()),
         tooltip=["label:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
     layers = _component_layers(base, include_brem, include_line, include_coherent)
     return _style_chart(
         alt.layer(*layers)
-        .properties(width=width, height=height, title="Case comparison")
+        .properties(width=width, height=height, title=_spectrum_title("Case comparison"))
         .interactive()
     )
 
@@ -787,11 +830,16 @@ def material_comparison_chart(
     title = f"Cross-material comparison — {selection_title} ({energy_scope}{quality_scope})"
 
     base = alt.Chart(df).encode(
-        x=alt.X("line_keV:Q", title="dominant coherent line energy (keV)"),
+        x=alt.X(
+            "line_keV:Q",
+            title="dominant coherent line energy (keV)",
+            axis=_spectrum_axis(),
+        ),
         y=alt.Y(
             "line_flux:Q",
             title="integrated line flux at best geometry (Phs/s)",
             scale=alt.Scale(type="log"),
+            axis=_spectrum_axis(),
         ),
     )
     points_mark = _mark_chart(
@@ -801,6 +849,7 @@ def material_comparison_chart(
             "quality:Q",
             title="line-definition quality",
             scale=alt.Scale(scheme="viridis", domain=[0.0, 1.0]),
+            legend=_spectrum_legend(),
         ),
         tooltip=[
             alt.Tooltip("label:N", title="material"),
@@ -812,10 +861,14 @@ def material_comparison_chart(
             alt.Tooltip("tilt_azim_deg:Q", title="phi (deg)"),
         ],
     )
-    labels_mark = _mark_chart(base.mark_text(align="left", dx=7, fontSize=12)).encode(
+    labels_mark = _mark_chart(
+        base.mark_text(align="left", dx=7, fontSize=_AXIS_LABEL_FONT_SIZE)
+    ).encode(
         text="label:N"
     )
-    chart = (points_mark + labels_mark).properties(width=width, height=height, title=title)
+    chart = (points_mark + labels_mark).properties(
+        width=width, height=height, title=_spectrum_title(title)
+    )
     if dropped:
         print(
             f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "

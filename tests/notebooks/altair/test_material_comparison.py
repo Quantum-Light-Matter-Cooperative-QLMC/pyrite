@@ -83,9 +83,11 @@ def test_material_comparison_chart_prints_exact_drop_reason(capsys):
 
 def test_material_comparison_chart_title_matches_selection_and_scope():
     chart = material_comparison_chart([_point("Valid")], [], select="peak", beam_energy_keV=60.0)
-    assert chart.to_dict()["title"] == (
+    title = chart.to_dict()["title"]
+    assert title["text"] == (
         "Cross-material comparison — highest peak flux (60 keV beam energy, line quality >= 0.5)"
     )
+    assert title["fontSize"] == 18
 
 
 def test_material_comparison_chart_is_point_and_text_layers():

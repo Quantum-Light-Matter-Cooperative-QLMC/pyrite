@@ -9,10 +9,11 @@ checkpoint), keeping the data small enough to stay under Vega-Lite's default
 from types import SimpleNamespace
 
 import altair as alt
+import marimo as mo
 import numpy as np
 import pytest
 
-from pyrite.apps._design import apply_altair_theme
+from pyrite.apps._design import apply_altair_theme, static_altair_chart
 from pyrite.plots.altair.spectra import spectrum_chart, spectrum_frame
 
 
@@ -214,6 +215,23 @@ def test_spectrum_chart_builds_valid_spec():
     assert themed_spec["config"]["legend"]["labelFontSize"] == 14
     assert themed_spec["config"]["legend"]["titleFontSize"] == 16
     assert themed_spec["config"]["title"]["fontSize"] == 18
+
+
+def test_spectrum_typography_survives_marimo_vegafusion_compilation():
+    chart = apply_altair_theme(spectrum_chart(_store(), _settings()), "light")
+
+    with alt.data_transformers.enable("vegafusion"):
+        rendered = static_altair_chart(mo, chart)
+
+    spec = rendered._spec
+    titled_axes = [axis for axis in spec["axes"] if axis.get("title")]
+    assert titled_axes
+    assert all(axis["labelFontSize"] == 14 for axis in titled_axes)
+    assert all(axis["titleFontSize"] == 16 for axis in titled_axes)
+    assert spec["legends"]
+    assert all(legend["labelFontSize"] == 14 for legend in spec["legends"])
+    assert all(legend["titleFontSize"] == 16 for legend in spec["legends"])
+    assert spec["title"]["fontSize"] == 18
 
 
 def test_spectrum_chart_compacts_components_within_coordinate_budget():
