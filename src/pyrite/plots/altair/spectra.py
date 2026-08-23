@@ -54,6 +54,27 @@ _COMPARE_HUE_FIELDS = {
     "tilt_azim_deg": "azimuth (deg)",
 }
 
+_TITLE_FONT_SIZE = 16
+_AXIS_LABEL_FONT_SIZE = 12
+_AXIS_TITLE_FONT_SIZE = 14
+_LEGEND_LABEL_FONT_SIZE = 12
+_LEGEND_TITLE_FONT_SIZE = 14
+
+
+def _style_chart(chart):
+    """Apply spectral typography at the top level of a composed chart."""
+    return (
+        chart.configure_axis(
+            labelFontSize=_AXIS_LABEL_FONT_SIZE,
+            titleFontSize=_AXIS_TITLE_FONT_SIZE,
+        )
+        .configure_legend(
+            labelFontSize=_LEGEND_LABEL_FONT_SIZE,
+            titleFontSize=_LEGEND_TITLE_FONT_SIZE,
+        )
+        .configure_title(fontSize=_TITLE_FONT_SIZE)
+    )
+
 
 def _tilt_records(results, tilt_deg=None):
     """Records for ONE polar tilt: the one nearest ``tilt_deg`` (default: the
@@ -472,7 +493,9 @@ def spectrum_chart(
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
     layers = _component_layers(base, include_brem, include_line, include_coherent)
-    return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+    return _style_chart(
+        alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+    )
 
 
 def _component_layers(base, include_brem, include_line=False, include_coherent=False):
@@ -613,7 +636,9 @@ def compare_spectrum_chart(
         tooltip=[f"{hue}:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
     layers = _component_layers(base, include_brem, include_line, include_coherent)
-    return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+    return _style_chart(
+        alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+    )
 
 
 def _multi_case_frame(
@@ -707,7 +732,7 @@ def multi_case_spectrum_chart(
         tooltip=["label:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
     layers = _component_layers(base, include_brem, include_line, include_coherent)
-    return (
+    return _style_chart(
         alt.layer(*layers)
         .properties(width=width, height=height, title="Case comparison")
         .interactive()
@@ -784,11 +809,11 @@ def material_comparison_chart(
             alt.Tooltip("tilt_azim_deg:Q", title="phi (deg)"),
         ],
     )
-    labels_mark = base.mark_text(align="left", dx=7, fontSize=10).encode(text="label:N")
+    labels_mark = base.mark_text(align="left", dx=7, fontSize=12).encode(text="label:N")
     chart = (points_mark + labels_mark).properties(width=width, height=height, title=title)
     if dropped:
         print(
             f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "
             f"{_comparison_drop_message(dropped)}"
         )
-    return chart.interactive()
+    return _style_chart(chart.interactive())

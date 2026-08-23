@@ -2,6 +2,7 @@ import inspect
 from pathlib import Path
 
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 
 matplotlib.use("Agg")
@@ -12,6 +13,7 @@ from pyrite.plots import (
     plot_material_comparison,
     select_material_comparison,
 )
+from pyrite.plots.mpl.spectra import _style_axis
 
 
 def _record(name, E0_keV, line_eV, peak, tilt_deg=0.0, tilt_azim_deg=0.0):
@@ -32,6 +34,24 @@ def _record(name, E0_keV, line_eV, peak, tilt_deg=0.0, tilt_azim_deg=0.0):
     }
 
 
+def test_spectral_axis_style_increases_legend_typography():
+    fig, ax = plt.subplots()
+    ax.set_title("Spectrum")
+    ax.set_xlabel("Energy")
+    ax.set_ylabel("Intensity")
+    ax.plot([0.0, 1.0], label="line")
+    legend = ax.legend(title="component")
+
+    _style_axis(ax)
+
+    assert ax.title.get_fontsize() == 16
+    assert ax.xaxis.label.get_fontsize() == 14
+    assert ax.yaxis.label.get_fontsize() == 14
+    assert legend.get_texts()[0].get_fontsize() == 12
+    assert legend.get_title().get_fontsize() == 14
+    plt.close(fig)
+
+
 def test_material_comparison_compares_low_energy_lines_without_a_floor():
     low = _record("Test", 30.0, 80.0, peak=100.0)
     high = _record("Test", 60.0, 200.0, peak=10.0)
@@ -46,6 +66,10 @@ def test_material_comparison_compares_low_energy_lines_without_a_floor():
         fig.axes[0].get_title() == "Cross-material comparison — highest peak flux "
         "(all beam energies, line quality >= 0.5)"
     )
+    assert fig.axes[0].title.get_fontsize() == 16
+    assert fig.axes[0].xaxis.label.get_fontsize() == 14
+    assert fig.axes[0].yaxis.label.get_fontsize() == 14
+    assert fig.axes[1].yaxis.label.get_fontsize() == 14
 
 
 def test_material_comparison_filters_to_one_beam_energy_and_labels_geometry():

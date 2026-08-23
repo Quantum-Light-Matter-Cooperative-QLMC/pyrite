@@ -36,6 +36,24 @@ _COMPARISON_DROP_REASONS = {
     "nonfinite_ratio": "local line-to-bremsstrahlung ratio is undefined or non-finite",
 }
 
+_TITLE_FONT_SIZE = 16
+_AXIS_LABEL_FONT_SIZE = 14
+_TICK_LABEL_FONT_SIZE = 12
+_LEGEND_FONT_SIZE = 12
+_LEGEND_TITLE_FONT_SIZE = 14
+
+
+def _style_axis(ax):
+    """Apply readable typography to one completed spectral axis."""
+    ax.title.set_fontsize(_TITLE_FONT_SIZE)
+    ax.xaxis.label.set_size(_AXIS_LABEL_FONT_SIZE)
+    ax.yaxis.label.set_size(_AXIS_LABEL_FONT_SIZE)
+    ax.tick_params(labelsize=_TICK_LABEL_FONT_SIZE)
+    legend = ax.get_legend()
+    if legend is not None:
+        plt.setp(legend.get_texts(), fontsize=_LEGEND_FONT_SIZE)
+        legend.get_title().set_fontsize(_LEGEND_TITLE_FONT_SIZE)
+
 
 # ---- intrinsic spectra -------------------------------------------------------
 def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=False):
@@ -53,28 +71,28 @@ def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=Fal
             y * r["scale"],
             color=c,
             ls="-",
-            lw=1.1,
+            lw=1.4,
             label=rf"$\phi={az:.1f}\degree$",
         )
         if include_brem:
-            ax.plot(r["E_grid"] / 1e3, brem_det * r["scale"], color=c, ls="--", lw=0.7)
+            ax.plot(r["E_grid"] / 1e3, brem_det * r["scale"], color=c, ls="--", lw=1.0)
     case = group[0]["case"]
     ax.set_title(
         _case_title(case, "", e0_keV=case["E0_keV"], tilt_fmt="g"),
-        fontsize=11,
+        fontsize=_TITLE_FONT_SIZE,
     )
-    ax.set_xlabel("Photon energy (keV)", fontsize=10)
-    ax.set_ylabel("Intensity (Phs/eV/s/nA)", fontsize=10)
+    ax.set_xlabel("Photon energy (keV)", fontsize=_AXIS_LABEL_FONT_SIZE)
+    ax.set_ylabel("Intensity (Phs/eV/s/nA)", fontsize=_AXIS_LABEL_FONT_SIZE)
     ax.set_ylim(bottom=0)
     ax.margins(x=0)
     ax.grid(alpha=0.3)
-    ax.legend(title=("dashed: brem" if include_brem else None), fontsize=8)
+    ax.legend(title=("dashed: brem" if include_brem else None), fontsize=_LEGEND_FONT_SIZE)
+    _style_axis(ax)
 
 
 def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=True):
     """Render ONE polar tilt onto ``fig`` (cleared first): every beam energy
-    overlaid, INTRINSIC spectra (the detector view is the separate Eagle XO
-    browser, kind='eaglexo'). Single axis -> fits the screen without scrolling."""
+    overlaid."""
     fig.clear()
     ax = fig.subplots(1, 1)
     energies = sorted({r["case"]["E0_keV"] for r in trecs})
@@ -89,21 +107,22 @@ def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=Tr
             lbl = rf"{E0:g} keV ($\phi={az:0.1f}\degree$)"
             line_det, brem_det = _line_brem(r, settings, convolve=False)
             y = (line_det + brem_det) if include_brem else line_det
-            ax.plot(r["E_grid"], y * r["scale"], color=c, lw=1.3, label=lbl)
+            ax.plot(r["E_grid"], y * r["scale"], color=c, lw=1.4, label=lbl)
             if include_brem:
-                ax.plot(r["E_grid"], brem_det * r["scale"], color=c, ls="--", lw=0.6)
+                ax.plot(r["E_grid"], brem_det * r["scale"], color=c, ls="--", lw=1.0)
     case = trecs[0]["case"]
     tag = "best azimuth/energy" if collapse_azimuth else "all azimuths"
     ax.set_title(
         _case_title(case, f"intrinsic ({tag})"),
-        fontsize=12,
+        fontsize=_TITLE_FONT_SIZE,
     )
     ax.set_xlabel("Photon energy (eV)")
     ax.set_ylabel("Intensity (Phs/eV/s/nA)")
     ax.set_ylim(bottom=0)
     ax.margins(x=0)
     ax.grid(alpha=0.3)
-    ax.legend(title=("dashed: brem" if include_brem else None), fontsize=9)
+    ax.legend(title=("dashed: brem" if include_brem else None), fontsize=_LEGEND_FONT_SIZE)
+    _style_axis(ax)
     fig.tight_layout()
 
 
@@ -165,7 +184,7 @@ def _draw_full_spectrum(
     case = trecs[0]["case"]
     ax.set_title(
         _case_title(case, "full measured range, intrinsic (dashed = brem)"),
-        fontsize=12,
+        fontsize=_TITLE_FONT_SIZE,
     )
     if logy and ymax > 0:
         ax.set_yscale("log")
@@ -184,7 +203,8 @@ def _draw_full_spectrum(
     else:
         ax.margins(x=0)
     ax.grid(alpha=0.3, which="both")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=_LEGEND_FONT_SIZE)
+    _style_axis(ax)
     fig.tight_layout()
 
 
@@ -230,6 +250,7 @@ def plot_peak_vs_tilt(results, settings):
     ax.set_title("Peak spectral flux vs polar tilt (best azimuth per point)")
     ax.grid(alpha=0.3)
     ax.legend(title="beam energy")
+    _style_axis(ax)
     fig.tight_layout()
     return fig
 
@@ -279,15 +300,16 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
         rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} $\mu$m, "
         rf"$E_0$={case['E0_keV']:g} keV, $\theta_\mathrm{{tilt}}$="
         rf"{case['tilt_deg']:.1f}$\degree$ — crystal-mosaic broadening",
-        fontsize=12,
+        fontsize=_TITLE_FONT_SIZE,
     )
     ax.set_xlabel("Photon energy (eV)")
     ax.set_ylabel("Phs/eV/s/nA")
     ax.grid(alpha=0.3)
     ax.legend(
-        fontsize=8,
+        fontsize=_LEGEND_FONT_SIZE,
         title=(rf"$\psi$(v,g)={np.degrees(psi):.1f}$\degree$" if psi is not None else None),
     )
+    _style_axis(ax)
     return fig
 
 
@@ -347,17 +369,17 @@ def plot_best_spectra(
             "\n"
             rf"$\theta$={c['tilt_deg']:g}$\degree$ $\phi$={c['tilt_azim_deg']:g}$\degree$  "
             rf"q={m['line_quality']:.2f}, {m['line_eV']:.0f}eV",
-            fontsize=7.5,
+            fontsize=10,
         )
-        ax.tick_params(labelsize=6)
+        ax.tick_params(labelsize=8)
         ax.set_ylim(bottom=0)
         ax.margins(x=0)
         ax.grid(alpha=0.3)
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].axis("off")
-    fig.supxlabel("Photon energy (keV)", fontsize=9)
-    fig.supylabel("Intensity (Phs/eV/s/nA)", fontsize=9)
-    fig.suptitle(f"Top {n} geometries by {select} (dashed = brem)", fontsize=12)
+    fig.supxlabel("Photon energy (keV)", fontsize=12)
+    fig.supylabel("Intensity (Phs/eV/s/nA)", fontsize=12)
+    fig.suptitle(f"Top {n} geometries by {select} (dashed = brem)", fontsize=_TITLE_FONT_SIZE)
     return fig
 
 
@@ -551,7 +573,9 @@ def draw_material_comparison(
     ax.grid(alpha=0.3, which="both")
     ax.margins(x=0.12)
     cb = fig.colorbar(sc, ax=ax)
-    cb.set_label("line-definition quality")
+    cb.set_label("line-definition quality", fontsize=_AXIS_LABEL_FONT_SIZE)
+    cb.ax.tick_params(labelsize=_TICK_LABEL_FONT_SIZE)
+    _style_axis(ax)
     fig.tight_layout()
     _separate_annotation_boxes(fig, annotations)
     if dropped:
