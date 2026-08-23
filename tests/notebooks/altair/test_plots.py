@@ -12,6 +12,7 @@ import altair as alt
 import numpy as np
 import pytest
 
+from pyrite.apps._design import apply_altair_theme
 from pyrite.plots.altair.spectra import spectrum_chart, spectrum_frame
 
 
@@ -206,6 +207,13 @@ def test_spectrum_chart_builds_valid_spec():
     assert spec["config"]["axis"] == {"labelFontSize": 14, "titleFontSize": 16}
     assert spec["config"]["legend"] == {"labelFontSize": 14, "titleFontSize": 16}
     assert spec["config"]["title"]["fontSize"] == 18
+
+    themed_spec = apply_altair_theme(chart, "light").to_dict()
+    assert themed_spec["config"]["axis"]["labelFontSize"] == 14
+    assert themed_spec["config"]["axis"]["titleFontSize"] == 16
+    assert themed_spec["config"]["legend"]["labelFontSize"] == 14
+    assert themed_spec["config"]["legend"]["titleFontSize"] == 16
+    assert themed_spec["config"]["title"]["fontSize"] == 18
 
 
 def test_spectrum_chart_compacts_components_within_coordinate_budget():

@@ -67,12 +67,20 @@ def test_altair_light_theme_overrides_axis_and_embedded_title_colors() -> None:
         .mark_line()
         .encode(x="energy:Q", y="photons:Q")
         .properties(title=alt.TitleParams(text="Spectrum", color="#FFFFFF"))
+        .configure_axis(labelFontSize=14, titleFontSize=16)
+        .configure_legend(labelFontSize=14, titleFontSize=16)
+        .configure_title(fontSize=18)
     )
 
     spec = _design.apply_altair_theme(chart, "light").to_dict()
     light = _design.THEMES["light"]
     assert spec["config"]["axis"]["labelColor"] == light["text"]
     assert spec["config"]["axis"]["titleColor"] == light["text"]
+    assert spec["config"]["axis"]["labelFontSize"] == 14
+    assert spec["config"]["axis"]["titleFontSize"] == 16
+    assert spec["config"]["legend"]["labelFontSize"] == 14
+    assert spec["config"]["legend"]["titleFontSize"] == 16
+    assert spec["config"]["title"]["fontSize"] == 18
     assert spec["config"]["text"]["color"] == light["text"]
     assert spec["title"]["color"] == light["text"]
 

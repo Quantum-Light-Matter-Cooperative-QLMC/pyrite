@@ -363,36 +363,56 @@ def apply_altair_theme(chart, theme: str):
     marimo applies its own frontend Vega theme from the configured display
     theme. PyRITE's runtime switch is independent of that config, so these
     explicit chart settings keep labels, legends, and titles synchronized with
-    the selected PyRITE appearance. Explicit chart titles are rewritten too,
-    because a title-level color beats ``configure_title`` in Vega-Lite.
+    the selected PyRITE appearance. Existing chart typography is retained while
+    theme colors are merged into each config section. Explicit chart titles are
+    rewritten too, because a title-level color beats ``configure_title`` in
+    Vega-Lite.
     """
     if chart is None:
         return None
     mode = theme if theme in THEMES else "light"
     palette = THEMES[mode]
+
+    try:
+        raw_config = chart.to_dict(validate=False).get("config", {})
+        config = raw_config if isinstance(raw_config, dict) else {}
+    except (TypeError, ValueError):
+        config = {}
+
+    def config_section(name: str) -> dict:
+        section = config.get(name, {})
+        return dict(section) if isinstance(section, dict) else {}
+
+    axis_config = config_section("axis") | {
+        "labelColor": palette["text"],
+        "titleColor": palette["text"],
+        "gridColor": palette["rule"],
+        "domainColor": palette["muted"],
+        "tickColor": palette["muted"],
+    }
+    legend_config = config_section("legend") | {
+        "labelColor": palette["text"],
+        "titleColor": palette["text"],
+    }
+    header_config = config_section("header") | {
+        "labelColor": palette["text"],
+        "titleColor": palette["text"],
+    }
+    title_config = config_section("title") | {
+        "color": palette["text"],
+        "subtitleColor": palette["muted"],
+    }
+    text_config = config_section("text") | {"color": palette["text"]}
+    view_config = config_section("view") | {"stroke": palette["rule"]}
+
     chart = (
         chart.configure(background=palette["surface"])
-        .configure_axis(
-            labelColor=palette["text"],
-            titleColor=palette["text"],
-            gridColor=palette["rule"],
-            domainColor=palette["muted"],
-            tickColor=palette["muted"],
-        )
-        .configure_legend(
-            labelColor=palette["text"],
-            titleColor=palette["text"],
-        )
-        .configure_header(
-            labelColor=palette["text"],
-            titleColor=palette["text"],
-        )
-        .configure_title(
-            color=palette["text"],
-            subtitleColor=palette["muted"],
-        )
-        .configure_text(color=palette["text"])
-        .configure_view(stroke=palette["rule"])
+        .configure_axis(**axis_config)
+        .configure_legend(**legend_config)
+        .configure_header(**header_config)
+        .configure_title(**title_config)
+        .configure_text(**text_config)
+        .configure_view(**view_config)
     )
 
     # ``configure_title`` does not override a color embedded directly in a
