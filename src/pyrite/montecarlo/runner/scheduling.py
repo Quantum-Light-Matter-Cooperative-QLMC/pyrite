@@ -152,7 +152,46 @@ def run_cases(
     transport_only=False,
 ):
     """
-    Run typed cases or compatibility mappings through run_case in input order.
+    Run typed cases or compatibility mappings through ``run_case``.
+
+    Parameters
+    ----------
+    cases
+        Sized sequence of :class:`~pyrite.montecarlo.Case` objects or
+        compatibility mappings. Returned slots retain input order.
+    max_workers
+        Worker count. ``None`` selects a resource-aware count; zero forces
+        serial execution.
+    progress
+        Display a tqdm progress bar when available.
+    callback
+        Optional ``callback(index, case, output)`` invoked in the driver process.
+    should_stop
+        Optional zero-argument predicate. Once true, no new cases are started.
+    engine
+        ``"auto"``, ``"gpu"``, or ``"cpu"`` scheduling branch.
+    keep_results
+        Retain outputs in the returned list. Set false for callback-owned
+        streaming to bound memory.
+    on_timing
+        Optional callback receiving one timing-metrics mapping per case.
+    on_activity
+        Optional callback receiving driver phase-transition mappings.
+    transport_only
+        Run transport without spectrum calculation; output slots are ``None``.
+
+    Returns
+    -------
+    list
+        One output mapping or ``None`` per input slot. Never-started and
+        deliberately unretained outputs remain ``None``.
+
+    Raises
+    ------
+    ValueError
+        If ``engine`` is not a supported value.
+    BackendUnavailableError
+        If ``engine="gpu"`` is requested without an accelerator.
 
     GPU present, CPU transport (Ne at or below
     transport.CUDA_TRANSPORT_MIN_ELECTRONS, or a grooved run): the transport is

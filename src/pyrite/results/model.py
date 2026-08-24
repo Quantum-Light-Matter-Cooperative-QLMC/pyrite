@@ -30,7 +30,21 @@ def _positive_integer(name: str, value: object) -> int:
 
 @dataclass(frozen=True)
 class PixelRayMap:
-    """Shared pixel geometry for factorized downstream photon scoring."""
+    """Store shared pixel geometry for factorized photon scoring.
+
+    Parameters
+    ----------
+    tile_index
+        Integer array ``(ny, nx)`` mapping every pixel to an angular tile.
+    solid_angle_sr
+        Positive per-pixel solid angle in sr with shape ``(ny, nx)``.
+    path_length_mm
+        Non-negative filter path lengths with shape ``(ny, nx, n_filter)``.
+
+    Notes
+    -----
+    Inputs are converted to read-only NumPy arrays.
+    """
 
     tile_index: np.ndarray
     solid_angle_sr: np.ndarray
@@ -59,7 +73,19 @@ class PixelRayMap:
 
 @dataclass(frozen=True)
 class SpectralFactors:
-    """Tile spectra and filter coefficients without an eager pixel-energy cube."""
+    """Store tile spectra and filters without an eager pixel-energy cube.
+
+    Parameters
+    ----------
+    energy_eV
+        One-dimensional photon-energy coordinate in eV.
+    intrinsic_by_tile
+        Intrinsic density with shape ``(n_tile, n_energy)`` in photons per
+        incident electron per eV per sr.
+    mu_by_filter_inv_mm
+        Linear attenuation coefficients with shape ``(n_filter, n_energy)`` in
+        inverse mm.
+    """
 
     energy_eV: np.ndarray
     intrinsic_by_tile: np.ndarray
@@ -88,7 +114,19 @@ class SpectralFactors:
 
 @dataclass(frozen=True)
 class SpatialResult:
-    """Lazy, factorized pixel result for a physical planar detector."""
+    """Provide lazy spatial scoring from factorized planar-detector data.
+
+    Parameters
+    ----------
+    ray_map
+        Shared pixel solid angles, angular-tile indices, and filter path lengths.
+    line, background
+        Intrinsic line and continuum spectral factors.
+    detector
+        Physical detector used for geometry and optional measured response.
+    coherent_line
+        Optional coherent line factors, available for coherent calculations.
+    """
 
     ray_map: PixelRayMap
     line: SpectralFactors
@@ -188,7 +226,29 @@ class SpatialResult:
         measured: bool = False,
         fwhm_eV: float | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Materialize selected accepted-flux spectra [photons/electron/eV]."""
+        """Materialize selected accepted-flux spectra.
+
+        Parameters
+        ----------
+        pixels
+            Iterable of ``(row, column)`` pixel coordinates. Mutually exclusive
+            with ``region``.
+        region
+            ``(row_slice, column_slice)`` selection. Mutually exclusive with
+            ``pixels``.
+        component
+            ``"line"``, ``"background"``, or ``"coherent"``.
+        measured
+            Apply the detector response after geometric scoring.
+        fwhm_eV
+            Optional response-resolution override in eV.
+
+        Returns
+        -------
+        energy_eV, spectra
+            Photon-energy coordinate and an ``(n_pixel, n_energy)`` array in
+            photons per incident electron per eV.
+        """
         factor = self._factor(component)
         coordinates = self._coordinates(pixels=pixels, region=region)
         spectra = self._materialize(factor, coordinates)
@@ -214,7 +274,26 @@ class SpatialResult:
         fwhm_eV: float | None = None,
         pixel_chunk: int = 1024,
     ) -> np.ndarray:
-        """Integrate a true or measured energy window in bounded pixel chunks."""
+        """Integrate an energy window into a detector image.
+
+        Parameters
+        ----------
+        energy_range_eV
+            Finite increasing ``(low, high)`` bounds in eV, inclusive.
+        component
+            ``"line"``, ``"background"``, or ``"coherent"``.
+        measured
+            Apply detector response before integration.
+        fwhm_eV
+            Optional response-resolution override in eV.
+        pixel_chunk
+            Positive maximum pixels materialized per working chunk.
+
+        Returns
+        -------
+        numpy.ndarray
+            ``(ny, nx)`` accepted photons per incident electron.
+        """
         chunk = _positive_integer("pixel_chunk", pixel_chunk)
         factor = self._factor(component)
         low, high = map(float, energy_range_eV)
@@ -250,7 +329,20 @@ class SpatialResult:
         return image.reshape(ny, nx)
 
     def average_density(self, component: str, *, pixel_chunk: int = 1024) -> np.ndarray:
-        """Return the solid-angle-weighted detector-average density [per sr]."""
+        """Return the solid-angle-weighted detector-average density.
+
+        Parameters
+        ----------
+        component
+            ``"line"``, ``"background"``, or ``"coherent"``.
+        pixel_chunk
+            Positive maximum pixels materialized per working chunk.
+
+        Returns
+        -------
+        numpy.ndarray
+            Spectrum in photons per incident electron per eV per sr.
+        """
         chunk = _positive_integer("pixel_chunk", pixel_chunk)
         factor = self._factor(component)
         ny, nx = self.ray_map.tile_index.shape
@@ -273,6 +365,23 @@ class Result:
     observation averages. Selected ``spatial`` spectra are accepted per-pixel
     flux, with pixel solid angle included. ``energy_eV`` and
     ``background_energy_eV`` are the respective photon-energy coordinates.
+
+    Parameters
+    ----------
+    energy_eV, background_energy_eV
+        One-dimensional line and background photon-energy coordinates in eV.
+    spectrum, background
+        Line and continuum densities in photons per incident electron per eV
+        per sr.
+    case
+        Fully resolved transport input that produced the arrays.
+    provenance
+        Immutable-view metadata describing scene, numerics, identity, backend,
+        and dependency versions.
+    coherent_spectrum
+        Optional coherent line density on ``energy_eV``.
+    spatial
+        Optional factorized planar-detector result.
     """
 
     energy_eV: np.ndarray

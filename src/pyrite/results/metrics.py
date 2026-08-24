@@ -98,34 +98,17 @@ def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
 
 def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"):
     """Scalar metrics for one record, used by the heatmaps. Two flux quantities
-    are deliberately distinct -- see the note below on which integrates what:
+    are deliberately distinct:
 
-      peak_flux     : max(spec) * scale * current   [Phs/eV/s]. The tallest point
-                      of the coherent (line) spectral DENSITY, in absolute
-                      detected-rate-per-eV units. No peak finding -- just the max.
-      coherent_flux : trapz(spec) over the WHOLE line grid * scale * current
-                      [Phs/s]. ALL coherent flux (every line in the window), with
-                      no peak finding -- the robust, always-well-defined total.
-      line_flux     : trapz(spec) over ONLY the +-n_fwhm/2 window around the
-                      single dominant found line * scale * current [Phs/s]. This
-                      is one line, not the whole coherent spectrum, so it is only
-                      meaningful where line_quality is high.
-      line_eV       : energy of that dominant found line [eV] (see line_index).
-      fwhm_eV       : spectral FWHM of that line [eV] (peak_widths at half height).
-      line_frac     : line_flux / trapz(spec + brem) over the line grid -- the
-                      dominant line's share of the total (lines + brem) flux.
-      total_flux    : trapz(spec + brem) over the line grid * scale * current
-                      [Phs/s]. (brem here is the line-grid brem, not the wide
-                      grid -- this is the total IN the line window, not to E0.)
-      coherent_brem_ratio : trapz(spec) / trapz(brem) over the line grid -- ALL
-                      coherent (CXR) flux relative to the incoherent brem beneath
-                      it (a ratio, so scale/current cancel). NaN if there's no brem.
-      line_brem_ratio : trapz(spec) / trapz(brem) over ONLY the dominant line's
-                      local peak window. Unlike coherent_brem_ratio, this compares
-                      one line against its local brem, not all coherent flux over
-                      the full line grid. NaN if that window has no brem.
-      line_quality  : [0, 1] definition score of the dominant line (line_quality);
-                      the heatmaps gate the line-characterization maps on it.
+    * ``peak_flux`` is the tallest line-density sample in photons/eV/s.
+    * ``coherent_flux`` integrates every line over the complete line grid.
+    * ``line_flux`` integrates only the dominant peak over ``n_fwhm`` widths.
+    * ``line_eV`` and ``fwhm_eV`` locate and characterize that dominant peak.
+    * ``line_frac`` is the dominant line's share of line-plus-background flux.
+    * ``total_flux`` integrates line plus background over the line grid.
+    * ``coherent_brem_ratio`` compares all line flux to all local-grid background.
+    * ``line_brem_ratio`` compares the dominant peak to its local background.
+    * ``line_quality`` is the dominant-line definition score in ``[0, 1]``.
 
     The coherent-line quantities (peak_flux, coherent_flux, line_eV, fwhm_eV,
     and line_flux) are calculated from the LINE spectrum r['spec']. Brem enters
@@ -134,6 +117,25 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     peak_flux / coherent_flux / total_flux need no peak and stay valid
     everywhere; the line_index-based quantities are unreliable where
     line_quality is low (broad ramps, or many comparable peaks).
+
+    Parameters
+    ----------
+    r
+        Result record containing line/background arrays, grid, scale, and case.
+    settings
+        Read-time detector and current compatibility controls.
+    rel_prominence
+        Peak prominence relative to the spectrum maximum.
+    n_fwhm
+        Width of the dominant-line integration window in FWHM units.
+    metric
+        Peak-selection metric forwarded to :func:`line_index`.
+
+    Returns
+    -------
+    dict
+        Intrinsic and absolute flux metrics, line position/width/quality,
+        line-to-background ratios, and finite-footprint hit fraction.
     """
     E = np.asarray(r["E_grid"], dtype=float)
     spec = np.asarray(r["spec"], dtype=float)

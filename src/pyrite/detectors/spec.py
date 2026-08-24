@@ -41,6 +41,16 @@ class EnergyBins:
     and kinematically bounded. ``brem`` is coarse and wide because the smooth,
     cheap continuum must extend to the beam energy. ``line_by_energy`` selects
     a fine line grid per beam energy when one fixed line grid is insufficient.
+
+    Parameters
+    ----------
+    line
+        Optional shared one-dimensional line photon-energy grid in eV.
+    line_by_energy
+        Optional mapping from electron energy in keV to line grids in eV.
+        Mutually exclusive with ``line`` at catalog resolution.
+    brem
+        Optional one-dimensional bremsstrahlung photon-energy grid in eV.
     """
 
     line: np.ndarray | None = None
@@ -97,6 +107,19 @@ class Timepix3:
     ``thickness_um`` is the one formerly inert detector field with an existing
     physical consumer. The forward-model equations remain in
     :mod:`pyrite.detectors.timepix_response`.
+
+    Parameters
+    ----------
+    thickness_um
+        Active silicon thickness in micrometres; ``None`` uses hardware default.
+    bias_v
+        Sensor bias in volts; ``None`` uses hardware default.
+    dE_mc, dE_out
+        Monte Carlo input and recorded-output bin widths in eV.
+    n_mc
+        Simulated photons per coarse input energy.
+    seed
+        Response-matrix random seed.
     """
 
     thickness_um: float | None = None
@@ -123,7 +146,17 @@ class Timepix3:
 
 @dataclass(frozen=True)
 class EagleXO:
-    """Eagle XO response configuration; equations remain in its forward model."""
+    """Configure the Eagle XO response forward model.
+
+    Parameters
+    ----------
+    coating
+        Entrance coating, ``"BN"`` or ``"BEN"``.
+    resolve_energy
+        Apply photon-counting energy blur after quantum efficiency.
+    n_pix
+        Pixels in one photon cluster for the read-noise contribution.
+    """
 
     coating: str = "BN"
     resolve_energy: bool = False
@@ -143,7 +176,15 @@ class EagleXO:
 
 @dataclass(frozen=True)
 class LegacyEDS:
-    """Compatibility response for the historical EDS window and Gaussian blur."""
+    """Configure the historical EDS compatibility response.
+
+    Parameters
+    ----------
+    apply_qe
+        Apply the historical polymer/aluminium/silicon efficiency curve.
+    convolve
+        Apply a Gaussian energy blur; scoring then requires ``fwhm_eV``.
+    """
 
     apply_qe: bool = False
     convolve: bool = False
@@ -168,6 +209,19 @@ class Detector:
     Stored spectral arrays stay intrinsic. :meth:`score` applies the response
     only when results are read, so the same transport can be rescored. A
     ``None`` response is the identity apart from the acceptance ``scale``.
+
+    Parameters
+    ----------
+    observation_angle_deg
+        Polar observation angle from the beam axis in degrees.
+    polar_acceptance_deg
+        Optional full polar acceptance span in degrees.
+    solid_angle_sr
+        Optional accepted solid angle in sr.
+    energy_bins
+        Line and bremsstrahlung photon-energy grids.
+    response
+        Optional object implementing read-time ``score``.
     """
 
     observation_angle_deg: float = 90.0
@@ -208,7 +262,24 @@ class Detector:
         fwhm_eV: float | None = None,
         scale: float = 1.0,
     ) -> np.ndarray:
-        """Return this detector's scored density without mutating stored data."""
+        """Score an intrinsic density without mutating stored data.
+
+        Parameters
+        ----------
+        energy_eV
+            Photon-energy coordinate in eV.
+        intrinsic_density
+            Spectral density on ``energy_eV``.
+        fwhm_eV
+            Optional detector-resolution override in eV.
+        scale
+            Multiplicative acceptance or rate scale.
+
+        Returns
+        -------
+        numpy.ndarray
+            Scored density in the input density's scaled units.
+        """
         if self.response is None:
             return np.asarray(intrinsic_density) * scale
         return self.response.score(

@@ -123,7 +123,20 @@ def _grouped_error_lines(
 
 
 class MaterialConfigError(ValueError):
-    """One or more path-qualified material catalog errors."""
+    """Report one or more path-qualified material-catalog errors.
+
+    Parameters
+    ----------
+    errors
+        Individual validation messages, normally prefixed by catalog paths.
+    profile
+        Optional selected profile used to produce profile-specific repair hints.
+
+    Attributes
+    ----------
+    errors
+        Immutable tuple of the original ungrouped messages.
+    """
 
     def __init__(self, errors: Sequence[str], *, profile: str | None = None):
         self.errors = tuple(errors)
@@ -135,7 +148,21 @@ class MaterialConfigError(ValueError):
 
 @dataclass(frozen=True)
 class CrystalInfo:
-    """CIF-derived crystallographic data in cxr-mc units."""
+    """Store CIF-derived crystallographic data in PyRITE units.
+
+    Parameters
+    ----------
+    lattice
+        Lattice-system metadata and cell lengths in angstroms/angles in degrees.
+    basis
+        Expanded ``(element, fractional_xyz)`` unit-cell sites.
+    V_cell
+        Unit-cell volume in cubic angstroms.
+    composition
+        ``(element, number_density)`` pairs in atoms per cubic angstrom.
+    mosaic_fwhm_deg
+        Optional configured c-axis mosaic FWHM in degrees.
+    """
 
     lattice: Mapping[str, str | float]
     basis: tuple[tuple[str, np.ndarray], ...]
@@ -146,7 +173,37 @@ class CrystalInfo:
 
 @dataclass(frozen=True)
 class CrystalSpec:
-    """One configured crystal and its CIF-derived structure."""
+    """Describe one configured crystal and its CIF-derived structure.
+
+    Parameters
+    ----------
+    key
+        Stable catalog key.
+    cif
+        Resolved path to the packaged phase-specific CIF.
+    validation_id
+        Validation-ledger identifier for the crystal structure.
+    full_name, phase
+        Optional display name and phase label.
+    cod_id, mp_id
+        Optional Crystallography Open Database and Materials Project identifiers.
+    B_ang2
+        Isotropic Debye--Waller ``B`` factor in square angstroms.
+    beam_uvw
+        Optional default crystal direction parallel to the incident beam.
+    E_grid
+        Optional legacy photon-energy grid in eV.
+    hkl_families
+        Pinned representative Miller-index families.
+    hkl_reason
+        Optional provenance for the pinned reflection selection.
+    layers_per_cell
+        Optional layer-count conversion for thickness grids.
+    info
+        Parsed crystallographic lattice, basis, composition, and volume.
+    surface_hkl
+        Optional Miller indices of the surface normal.
+    """
 
     key: str
     cif: Path
@@ -197,7 +254,15 @@ class CrystalSpec:
 
 @dataclass(frozen=True)
 class MediumSpec:
-    """An amorphous medium represented by element number densities."""
+    """Describe an amorphous medium by elemental number density.
+
+    Parameters
+    ----------
+    key
+        Stable catalog key.
+    composition
+        ``(element, number_density)`` pairs in atoms per cubic angstrom.
+    """
 
     key: str
     composition: tuple[tuple[str, float], ...]
@@ -205,7 +270,28 @@ class MediumSpec:
 
 @dataclass(frozen=True)
 class ScanSpec:
-    """Resolved, read-only one-dimensional scan grids."""
+    """Store resolved, read-only one-dimensional scan grids.
+
+    Parameters
+    ----------
+    thickness_ang
+        Film-thickness grid in angstroms.
+    energy_keV
+        Electron kinetic-energy grid in keV.
+    tilt_deg, tilt_azim_deg
+        Target polar and azimuthal tilt grids in degrees.
+    E_grid_line
+        Shared line photon-energy grid in eV, or ``None`` when energy-specific
+        grids are used.
+    E_grid_line_by_energy
+        Optional mapping from electron energy in keV to line grids in eV.
+    E_grid_brem
+        Bremsstrahlung photon-energy grid in eV.
+    thickness_layers
+        Optional film-thickness grid in crystal layers.
+    n_electrons, n_electrons_brem
+        Optional macro-electron count grids overriding fidelity defaults.
+    """
 
     thickness_ang: np.ndarray
     energy_keV: np.ndarray
@@ -224,7 +310,19 @@ class ScanSpec:
 
 @dataclass(frozen=True)
 class LayerSpec:
-    """One fixed substrate-side layer in beam-entrance order."""
+    """Describe one fixed substrate-side layer.
+
+    Parameters
+    ----------
+    material
+        Catalog crystal or medium key.
+    thickness_ang
+        Positive layer thickness in angstroms.
+    beam_uvw
+        Optional crystal direction aligned with the incident beam.
+    azimuth_deg
+        In-plane crystal rotation in degrees relative to the film.
+    """
 
     material: str
     thickness_ang: float
@@ -234,14 +332,38 @@ class LayerSpec:
 
 @dataclass(frozen=True)
 class MaterialValidationSpec:
-    """Independent validation state attached to one material."""
+    """Store independent validation state attached to one material.
+
+    Parameters
+    ----------
+    crystal_database_match
+        ``"verified"``, ``"unverified"``, or ``None`` when not applicable.
+    """
 
     crystal_database_match: Literal["verified", "unverified"] | None = None
 
 
 @dataclass(frozen=True)
 class MaterialSpec:
-    """A runnable scan target."""
+    """Describe one runnable catalog scan target.
+
+    Parameters
+    ----------
+    key, label
+        Stable machine key and human-readable display label.
+    profile
+        Profile from which this resolved material inherited scan defaults.
+    crystal_key
+        Entrance-film crystal key.
+    scan
+        Resolved scan and photon-energy grids.
+    substrate
+        Optional legacy substrate material key.
+    stack
+        Film-excluded substrate-side layers in beam-entrance order.
+    validation
+        Independent material-validation state.
+    """
 
     key: str
     label: str
@@ -262,7 +384,37 @@ class MaterialSpec:
 
 @dataclass(frozen=True)
 class MaterialCatalog:
-    """Deeply immutable crystal, medium, and material registries."""
+    """Expose deeply immutable material and profile registries.
+
+    Parameters
+    ----------
+    schema_version
+        Parsed catalog schema version.
+    crystals, media, materials
+        Keyed immutable registries of crystal, amorphous medium, and runnable
+        material specifications.
+    material_keys
+        Runnable material keys in source declaration order.
+    profile_names, profile_memberships
+        Profile names and optional explicit material membership lists.
+    profile_beams, profile_detectors, profile_emissions
+        Resolved per-profile beam, scalar-detector, and emission overrides.
+    profile_transport_numerics
+        Per-profile result-affecting scalar numerical controls.
+    profile_filters, profile_physical_detectors
+        Declarative finite-filter and planar-detector profile data.
+    profile_energy_grid_refs, resolved_energy_grid_refs
+        Explicit artifact references and verified references used by this load.
+    beams, beam_keys
+        Named beam definitions and their source declaration order.
+    detectors, detector_labels, detector_keys
+        Named scalar detectors, display labels, and source declaration order.
+
+    Notes
+    -----
+    Instances are produced by :func:`load_material_catalog`; callers should not
+    mutate nested arrays or mappings.
+    """
 
     schema_version: int
     crystals: Mapping[str, CrystalSpec]
@@ -1716,7 +1868,25 @@ def load_material_catalog(
     *,
     profile: str = "standard",
 ) -> MaterialCatalog:
-    """Load, validate, and deeply freeze a schema-version-1 material catalog."""
+    """Load, validate, and deeply freeze a material catalog.
+
+    Parameters
+    ----------
+    path
+        TOML catalog path. ``None`` loads the packaged ``materials.toml``.
+    profile
+        Profile whose inherited scan grids and artifact references are resolved.
+
+    Returns
+    -------
+    MaterialCatalog
+        Validated immutable schema-version-1 catalog.
+
+    Raises
+    ------
+    MaterialConfigError
+        If the file cannot be read, parsed, or validated for ``profile``.
+    """
     source = Path(DATA_DIR) / "materials.toml" if path is None else Path(path)
     # Cache key includes the file's mtime/size so rewriting the same path
     # (tests do this) is never served a stale catalog.

@@ -72,6 +72,25 @@ class Settings:
     ``beam_current_na`` is a compatibility fallback for pre-pulse checkpoints.
     Cases carrying ``bunch_charge_pc`` / ``rep_rate_hz`` derive their current
     from those BeamSpec fields instead.
+
+    Parameters
+    ----------
+    beam_current_na
+        Fallback average current in nA for legacy checkpoints.
+    apply_detector_qe
+        Apply the historical polymer-window EDS efficiency during analysis.
+    convolve_with_det
+        Convolve read-time spectra with the stored detector FWHM.
+    brem_source
+        ``"mc"``, ``"external"``, or ``"none"`` background selection.
+    n_electrons, n_electrons_brem
+        Default line and continuum macro-electron counts.
+    straggling
+        Enable stochastic transport energy-loss straggling.
+    energy_model, max_dE_frac
+        Flight integration rule and optional fractional-loss substep cap.
+    emission
+        ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
 
     beam_current_na: float = DEFAULT_BEAM_CURRENT_NA

@@ -18,7 +18,19 @@ PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 @dataclass(frozen=True)
 class Convergence:
-    """Result-affecting convergence and truncation controls."""
+    """Control numerical convergence and truncation of line calculations.
+
+    Parameters
+    ----------
+    n_families
+        Number of dominant reflection families selected automatically.
+    max_reflections
+        Optional cap on individual reflections after family expansion.
+    mosaic_nodes
+        Number of quadrature nodes used for mosaic averaging.
+    mosaic_route
+        Mosaic integration strategy, ``"analytic"`` or ``"mc"``.
+    """
 
     n_families: int = 4
     max_reflections: int | None = None
@@ -40,7 +52,31 @@ class Convergence:
 
 @dataclass(frozen=True)
 class Numerics:
-    """Sampling, transport, convergence, and execution controls."""
+    """Configure simulation sampling, transport, and execution.
+
+    Parameters
+    ----------
+    n_electrons
+        Macro-electron count for line transport.
+    n_electrons_brem
+        Macro-electron count for bremsstrahlung transport.
+    spec_chunk, brem_chunk
+        Optional spectrum-kernel chunk sizes; ``None`` lets runtime choose.
+    transport_core
+        ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
+    backend
+        Requested array backend. An explicit value must match the backend
+        selected when PyRITE was imported.
+    straggling
+        Enable stochastic per-flight energy-loss straggling.
+    energy_model
+        ``"frozen"`` left-endpoint energy or ``"midpoint"`` integration.
+    max_dE_frac
+        Maximum predicted fractional mean loss per row. Zero disables
+        substepping; a positive value requires ``energy_model="midpoint"``.
+    convergence
+        Reflection and mosaic convergence controls.
+    """
 
     n_electrons: int = 450
     n_electrons_brem: int = 100

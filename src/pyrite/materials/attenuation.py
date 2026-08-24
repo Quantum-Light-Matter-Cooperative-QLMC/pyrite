@@ -28,6 +28,26 @@ def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> 
     keys are intentionally rejected because their film/stack composition is
     not a single homogeneous filter medium.
 
+    Parameters
+    ----------
+    material
+        Catalog crystal/media key or explicit homogeneous medium.
+    energy_eV
+        Non-empty one-dimensional array of finite positive photon energies in eV.
+
+    Returns
+    -------
+    numpy.ndarray
+        Read-only attenuation coefficients in inverse mm, shaped like
+        ``energy_eV``.
+
+    Raises
+    ------
+    TypeError
+        If the energy grid or material has an incompatible type.
+    ValueError
+        If energies, composition, or catalog key are invalid.
+
     Validation: positioned-filter-attenuation
     """
     try:

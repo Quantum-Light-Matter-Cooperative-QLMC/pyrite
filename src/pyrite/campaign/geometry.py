@@ -245,6 +245,12 @@ class Footprint:
     finite; ``footprint=None`` is the legacy infinite slab. Holding both
     dimensions on one object makes the historical "both or neither" pairing rule
     unrepresentable rather than checked.
+
+    Parameters
+    ----------
+    width_mm, height_mm
+        Full transverse dimensions in mm. Each may be a positive scalar or a
+        sequence expanded by campaign case construction.
     """
 
     width_mm: ScalarOrSeq
@@ -275,6 +281,12 @@ class BlazedGrooves:
     type constraint. A finite footprint IS compatible and is the default: the
     sub-micron groove phase and the mm-scale footprint are independent in
     transport. See docs/validation/geometry/blazed-groove-geometry.md.
+
+    Parameters
+    ----------
+    spacing_ang
+        Positive groove period in angstroms. The supported geometry fixes the
+        groove orientation and derives facet angles from the target tilt.
     """
 
     spacing_ang: float
@@ -293,6 +305,17 @@ class Layer:
 
     ``thickness_ang`` is ``ScalarOrSeq`` only for the film (``Stack.layers[0]``);
     every layer beneath it is fixed, which :class:`Stack` enforces.
+
+    Parameters
+    ----------
+    material
+        Catalog material or medium key.
+    thickness_ang
+        Layer thickness in angstroms. Only the entrance film may use a sequence.
+    beam_uvw
+        Optional three-index crystal direction aligned with the incident beam.
+    azimuth_deg
+        In-plane crystal rotation in degrees relative to the entrance film.
     """
 
     material: str
@@ -482,7 +505,27 @@ class _TargetGeometry:
 
 @dataclass(frozen=True)
 class Slab(_TargetGeometry):
-    """A single crystal slab, optionally bounded and optionally grooved."""
+    """Describe a single crystal slab, optionally bounded or grooved.
+
+    Parameters
+    ----------
+    material
+        Catalog material key for the radiator.
+    thickness_ang
+        Positive thickness in angstroms; a sequence is expanded by campaign
+        builders.
+    tilt_deg, tilt_azim_deg
+        Polar and azimuthal crystal tilt angles in degrees. Scalars or sequences.
+    footprint
+        Finite full width and height. ``None`` selects a laterally infinite slab.
+    entrance_face
+        Optional supported blazed-groove geometry.
+    allow_normal_incidence
+        Permit normally incident geometry that is otherwise rejected as a
+        likely configuration error.
+    mosaic
+        Apply the catalog crystal's mosaic spread when one is defined.
+    """
 
     material: str
     thickness_ang: ScalarOrSeq = 2e4
@@ -522,6 +565,20 @@ class Stack(_TargetGeometry):
     ``layers[0]`` is the film: it carries the swept thickness and is the material
     whose crystal params drive the case. Every layer beneath it is fixed, so a
     stack has no grooved entrance face -- that is a slab-only feature.
+
+    Parameters
+    ----------
+    layers
+        Film-first sequence containing at least two :class:`Layer` objects.
+        Only the first layer may have multiple thickness values.
+    tilt_deg, tilt_azim_deg
+        Polar and azimuthal stack tilt angles in degrees. Scalars or sequences.
+    footprint
+        Finite full width and height. ``None`` selects infinite lateral extent.
+    allow_normal_incidence
+        Permit normally incident geometry.
+    mosaic
+        Apply the entrance crystal's catalog mosaic spread when available.
     """
 
     layers: tuple[Layer, ...]

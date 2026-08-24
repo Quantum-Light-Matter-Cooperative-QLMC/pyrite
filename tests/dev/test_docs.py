@@ -55,6 +55,7 @@ def test_changed_warning_fingerprint_emits_unsuppressed_failure(
     warning_baseline_module, monkeypatch, tmp_path: Path
 ) -> None:
     baseline = warning_baseline_module.AutodocWarningBaseline(tmp_path / "src")
+    baseline.filter(_record(tmp_path / "src" / "pyrite" / "example.py"))
     app = SimpleNamespace()
     warning_baseline_module._BASELINES[id(app)] = baseline
     calls = []

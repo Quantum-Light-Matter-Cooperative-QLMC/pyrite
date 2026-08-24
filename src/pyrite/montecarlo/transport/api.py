@@ -229,6 +229,7 @@ def simulate_trajectories(
           lockstep, per-electron, grooved, and CUDA cores all implement the
           midpoint schema; unsupported CUDA-LUT/straggling combinations fail
           closed separately.
+
     See docs/validation/beam-transport/transport-midpoint-stopping.md.
     Validation: transport-midpoint-stopping
 
@@ -284,16 +285,67 @@ def simulate_trajectories(
     two copies transiently) and stay device-resident for as long as the
     caller keeps the dict.
 
-    Returns dict of per-segment arrays (schema, including E_start_keV/
-    t_start_ang canonical aliases and the energy_model="midpoint" additions:
-    see docs/physics/beam-transport/transport-outputs.md), incident
-    phase-space diagnostics (one row per sampled electron, including missed
-    entries: initial_r_ang, initial_v_hat, initial_E_keV, initial_t0_ang),
-    and non-radiating groove-gap "vacuum_*" arrays. Also returns the scalar
-    diagnostics n_backscattered, n_transmitted, n_side_exited, n_missed,
-    n_cutoff_stopped, n_step_limited, n_stopped (compatibility alias of
-    n_cutoff_stopped), and n_layers. Incomplete histories raise RuntimeError
-    rather than returning these arrays/counts.
+    Parameters
+    ----------
+    E0_keV, Ne, thickness_ang
+        Incident kinetic energy in keV, macro-electron count, and slab thickness
+        in angstroms.
+    element, n_atoms_per_ang3
+        Elemental target symbol and number density. Superseded by ``composition``.
+    E_cut_keV
+        Electron kinetic-energy termination threshold in keV.
+    seed, max_steps
+        Random seed and maximum transport steps per electron.
+    elastic_model
+        ``"mott"`` tabulated scattering or analytic ``"sr"`` scattering.
+    beam_dir
+        Mean incident direction in the slab frame; defaults to ``+z``.
+    composition
+        Compound ``(element, number_density)`` pairs in atoms per cubic angstrom.
+    layers
+        Optional contiguous film-first ``(z_top, z_bottom, composition)`` stack.
+    beam_fwhm_mm, beam_fwhm_y_mm
+        Gaussian entrance-spot FWHM values in mm.
+    bunch_length_fs, long_shape, long_offsets_fs, longitudinal_distribution
+        Longitudinal bunch sampling controls and resolved policy.
+    transverse_distribution
+        Resolved Courant--Snyder entrance phase-space policy.
+    energy_spread_frac
+        RMS fractional incident-energy spread.
+    crystal_width_mm, crystal_height_mm
+        Paired full transverse prism dimensions in mm.
+    tilt_polar_rad, tilt_azim_rad
+        Target tilt used to project the finite entrance beam.
+    groove
+        Optional supported blazed-groove specification.
+    E_cut_by_electrons
+        Optional alternate cutoff assignment by electron group.
+    transport_core
+        ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
+    per_electron_config, transport_lut_config
+        Per-electron batching and transport lookup-table controls.
+    keep_segments_on_device
+        Return core segment arrays as CuPy arrays from CUDA transport.
+    collect_diagnostics
+        Collect fixed-size transport-error percentile summaries.
+    energy_model, max_dE_frac
+        Flight-energy integration rule and optional fractional-loss substep cap.
+    straggling
+        Enable stochastic Urban per-flight energy loss.
+
+    Returns
+    -------
+    dict
+        Per-segment arrays, incident phase-space diagnostics, non-radiating
+        ``vacuum_*`` arrays, and scalar termination/count diagnostics. The
+        complete schema is documented in ``transport-outputs.md``.
+
+    Raises
+    ------
+    RuntimeError
+        If any electron history remains incomplete.
+    ValueError
+        If physical inputs or mutually exclusive model controls are invalid.
 
     Validation: electron-transport, energy-loss-straggling, finite-beam-size,
     finite-transverse-crystal, grazing-beam-projection, multilayer-stack

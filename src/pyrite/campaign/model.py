@@ -27,7 +27,41 @@ _INDEX = re.compile(r"\[(\d+)\]")
 
 
 class Beam(BeamSpec):
-    """Public name for the frozen electron-beam phase-space object."""
+    """Describe the electron beam at the crystal entrance plane.
+
+    Parameters
+    ----------
+    energy_keV
+        Central kinetic energy in keV. A scalar creates one scene; campaign
+        builders may expand a sequence.
+    transverse_fwhm_x_mm, transverse_fwhm_y_mm
+        Gaussian entrance-spot FWHM values in mm. Set both to ``None`` for a
+        point source. Mutually exclusive with ``transverse``.
+    bunch_length_fs
+        RMS bunch duration in fs. ``None`` selects a point bunch.
+    long_shape
+        Sampling law for ``bunch_length_fs``.
+    long_offsets_fs
+        Explicit per-electron arrival offsets in fs, replacing random sampling.
+    longitudinal
+        Declarative longitudinal-distribution policy. Mutually exclusive with
+        the legacy flat longitudinal fields.
+    transverse
+        Declarative Courant--Snyder transverse-distribution policy.
+    rep_rate_hz
+        Pulse repetition rate in Hz used for flux normalization.
+    bunch_charge_pc
+        Charge per bunch in pC used for flux normalization.
+    divergence_mrad
+        Deprecated input placeholder. Divergence is derived from
+        ``transverse`` and the case energy; supplying a value is rejected.
+    energy_spread_frac
+        RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
+
+    Notes
+    -----
+    Sampling counts and execution controls belong to :class:`Numerics`.
+    """
 
 
 def _one_float(name: str, value: Any) -> float:
@@ -66,7 +100,17 @@ def _scalar_target(target: Target) -> Target:
 
 @dataclass(frozen=True)
 class Analysis:
-    """Presentation and compatibility scaling controls."""
+    """Control presentation-time scaling of stored spectra.
+
+    Parameters
+    ----------
+    beam_current_na
+        Average beam current in nA used to convert per-electron yields to rates.
+    apply_detector_qe
+        Apply detector quantum efficiency during analysis.
+    convolve_with_det
+        Convolve spectra with detector energy resolution.
+    """
 
     beam_current_na: float = 5.0
     apply_detector_qe: bool = False
@@ -75,7 +119,34 @@ class Analysis:
 
 @dataclass(frozen=True)
 class Scene:
-    """One fully resolved physical configuration."""
+    """Collect one fully resolved physical simulation configuration.
+
+    Parameters
+    ----------
+    beam
+        Scalar electron-beam description. Express varying energies with
+        :class:`Sweep`.
+    target
+        Scalar :class:`~pyrite.Slab` or :class:`~pyrite.Stack` target.
+    detector
+        Scalar observation model or physical planar detector.
+    filters
+        Ordered filter plates between the source and a planar detector.
+    pixel_scorer
+        Optional request for factorized spatial scoring on a detector grid.
+    emission
+        ``"incoherent"``, ``"coherent"``, or ``"both"``.
+    brem_source
+        ``"mc"``, ``"external"``, or ``"none"``. The high-level API returns
+        zeros for the latter two because it accepts no external spectrum.
+
+    Raises
+    ------
+    TypeError
+        If components have incompatible public API types.
+    ValueError
+        If geometry, scoring, or policy values are inconsistent.
+    """
 
     beam: BeamSpec
     target: Target
@@ -197,7 +268,24 @@ def _axis_label(path: str, value: Any) -> str:
 
 @dataclass(frozen=True)
 class Sweep:
-    """A base scene plus ordered axes addressed by dotted field paths."""
+    """Define a Cartesian product over fields of a scalar base scene.
+
+    Parameters
+    ----------
+    base
+        Scalar scene copied for each product point.
+    axes
+        Ordered mapping from dotted dataclass paths to non-empty replacement
+        sequences. Indexed segments address sequence elements, for example
+        ``"target.layers[1].thickness_ang"``.
+
+    Raises
+    ------
+    TypeError
+        If ``base`` or the axis collections have invalid types.
+    ValueError
+        If an axis is empty or a path cannot be resolved and replaced.
+    """
 
     base: Scene
     axes: Mapping[str, Sequence[Any]] = field(default_factory=dict)
@@ -224,7 +312,14 @@ class Sweep:
         object.__setattr__(self, "axes", normalized)
 
     def expand(self) -> tuple[tuple[str, Scene], ...]:
-        """Return mechanically labeled scenes in Cartesian-product order."""
+        """Return labeled scenes in Cartesian-product order.
+
+        Returns
+        -------
+        tuple of tuple
+            ``(label, scene)`` pairs in axis insertion order. With no axes, the
+            base scene is returned with an empty label.
+        """
         if not self.axes:
             return (("", self.base),)
         paths = tuple(self.axes)
@@ -244,7 +339,18 @@ class Sweep:
         return tuple(expanded)
 
     def cases(self, numerics: Numerics | None = None) -> list[Any]:
-        """Lower this sweep through the same case seam as :func:`pyrite.simulate`."""
+        """Lower every expanded scene without executing or persisting it.
+
+        Parameters
+        ----------
+        numerics
+            Sampling and convergence controls. Defaults to :class:`Numerics`.
+
+        Returns
+        -------
+        list of pyrite.montecarlo.Case
+            Cases in the same order as :meth:`expand`.
+        """
         from ..api import build_sweep_cases
 
         return build_sweep_cases(self, numerics)

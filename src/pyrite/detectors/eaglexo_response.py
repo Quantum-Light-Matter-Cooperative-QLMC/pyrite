@@ -282,12 +282,15 @@ class EagleResponse:
 
     Parameters
     ----------
-    E_grid_eV : the energy grid the spectra live on [eV] (need not be uniform
-        for the bare QE multiply; uniform is required only for resolve_energy).
-    coating : "BN" (default) or "BEN".
-    resolve_energy : default False (the ``solid_angle x QE`` view). True applies
-        the Fano + read-noise photon-counting line shape (needs a uniform grid).
-    n_pix : pixels per photon cluster for the energy-resolution term.
+    E_grid_eV
+        One-dimensional spectrum grid in eV. It need not be uniform for quantum
+        efficiency alone; ``resolve_energy=True`` requires uniform spacing.
+    coating
+        ``"BN"`` (default) or ``"BEN"`` entrance coating.
+    resolve_energy
+        Apply the Fano plus read-noise photon-counting line shape.
+    n_pix
+        Pixels per photon cluster for the energy-resolution term.
 
     Validation: detector-eaglexo
     """
@@ -303,7 +306,18 @@ class EagleResponse:
         """Detected spectral density on the SAME grid and in the SAME flux units
         as the input (e.g. Phs/eV/s/nA): ``spec * QE(E)``, optionally blurred by
         the photon-counting energy resolution. NaN/inf samples (a bad-geometry
-        case) are treated as zero flux rather than poisoning the result."""
+        case) are treated as zero flux rather than poisoning the result.
+
+        Parameters
+        ----------
+        spec
+            Incident photon spectral density on the response grid.
+
+        Returns
+        -------
+        numpy.ndarray
+            Detected photon density on the same grid and in the same flux units.
+        """
         spec = prep_spectrum(spec, self.E, "eaglexo_response")
         det = spec * self.qe
         if self.resolve_energy:
@@ -356,9 +370,24 @@ _RESPONSE_CACHE = {}
 
 
 def get_response(E_grid_eV, *, coating="BN", resolve_energy=False, n_pix=4):
-    """Cached :class:`EagleResponse` for a grid + settings: built once per unique
-    signature and reused. Prefer this over constructing EagleResponse directly
-    when looping over many spectra so each gets a response matching ITS grid."""
+    """Return a cached :class:`EagleResponse` matching a grid and settings.
+
+    Parameters
+    ----------
+    E_grid_eV
+        One-dimensional photon-energy grid in eV.
+    coating
+        ``"BN"`` or ``"BEN"`` entrance coating.
+    resolve_energy
+        Apply photon-counting energy resolution.
+    n_pix
+        Pixels per photon cluster for the resolution term.
+
+    Returns
+    -------
+    EagleResponse
+        Shared response instance for the exact grid and settings signature.
+    """
     E = np.asarray(E_grid_eV, dtype=float)
     key = grid_key(E) + (coating.upper(), bool(resolve_energy), int(n_pix))
     resp = _RESPONSE_CACHE.get(key)

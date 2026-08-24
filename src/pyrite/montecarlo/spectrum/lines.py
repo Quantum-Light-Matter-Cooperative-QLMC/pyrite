@@ -811,10 +811,12 @@ def mc_spectrum(
     relative phase decorrelates over the segment midpoints, so cross-g
     coherence is negligible -- bounded under `cross-reflection-coherence`).
 
-    Per segment and reflection (Zhai SI Eqs. 5-7, nonrelativistic):
-      omega_res = beta v_hat.g / (1 - beta v_hat.n)         [Eq. 10 resonance]
-      d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |A|^2 t_L^2
-                      sinc^2[(1 - beta v.n)(omega-omega_res) t_L / 2] T_abs
+    Per segment and reflection (Zhai SI Eqs. 5-7, nonrelativistic)::
+
+      omega_res = beta*v_hat.g / (1 - beta*v_hat.n)
+      d2N/dE/dOmega = alpha*omega/(4*pi^2*hbar*c) * abs(A)^2 * t_L^2
+                      * sinc^2[(1-beta*v.n)*(omega-omega_res)*t_L/2] * T_abs
+
     with A = A_PXR + A_CBS per polarization (Feranchuk Eqs. 13/14 evaluated
     at omega_res with the segment's velocity vector), t_L = L_seg/beta, and
     T_abs the Beer-Lambert escape factor from the segment midpoint.
@@ -877,8 +879,8 @@ def mc_spectrum(
     escape hatch for a future asymmetric reflection (g not parallel to n).
 
     sinc_cutoff: None (default) evaluates every segment's lineshape over the
-    FULL grid (exact). A number C truncates each lineshape at |P t_L| > C,
-    i.e. |E - E_res| > C/a_width -- segments are processed in resonance-
+    FULL grid (exact). A number C truncates each lineshape at
+    ``abs(P*t_L) > C``, i.e. ``abs(E-E_res) > C/a_width`` -- segments are processed in resonance-
     sorted blocks against only the relevant grid window, which is several
     times faster on wide grids. Tail loss is ~1/(pi C) of each line's
     integral (0.3% at C = 100); peak heights are unaffected. Requires a
@@ -1029,6 +1031,62 @@ def mc_spectrum(
 
     coherent is mutually exclusive with components (the PXR/CBS split is
     ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
+
+    Parameters
+    ----------
+    segments
+        Transport output mapping from :func:`simulate_trajectories`.
+    E_grid_eV
+        One-dimensional line photon-energy grid in eV.
+    crystal, hkl_list
+        Catalog crystal key and reciprocal reflections to sum.
+    theta_obs_rad
+        Polar observation angle in radians, used when ``n_hat`` is absent.
+    B_ang2
+        Required isotropic Debye--Waller ``B`` factor in square angstroms.
+    use_henke
+        Include anomalous energy-dependent atomic form factors.
+    absorber_element, composition
+        Elemental or compound self-absorption description.
+    chunk
+        Maximum transport segments processed per spectrum chunk.
+    n_hat
+        Optional three-component observation direction in the sample frame.
+    beam_uvw, surface_hkl, azimuth_rad, recip_miscut_rad
+        Crystal-orientation controls. Direct-axis and surface-normal controls
+        are mutually exclusive.
+    sinc_cutoff
+        Optional dimensionless finite-time tail cutoff; ``None`` is exact.
+    components
+        Return separate PXR and CBS diagonal contributions with the total.
+    layers
+        Optional film-first absorber stack.
+    mosaic_fwhm_rad, mosaic_nodes
+        Mosaic rocking-curve FWHM and quadrature nodes per tilt axis.
+    groove
+        Optional supported blazed-groove escape geometry.
+    coherent
+        Sum segment fields coherently instead of segment intensities.
+    electron_limit
+        Optional leading macro-electron count used for normalization.
+    E_cut_keV
+        Optional post-transport electron-energy cutoff in keV.
+    longitudinal_rms_fs
+        Resolved Gaussian RMS bunch duration for analytic coherent averaging.
+
+    Returns
+    -------
+    numpy.ndarray or tuple of numpy.ndarray
+        Per-electron density in photons per eV per sr. With ``components=True``,
+        returns total, PXR-diagonal, and CBS-diagonal arrays; the latter two do
+        not include their interference term.
+
+    Raises
+    ------
+    ValueError
+        If required physical inputs or mutually exclusive controls are invalid.
+    NotImplementedError
+        For coherent propagation through layered absorbers.
 
     Validation: coherent-emission, coherent-segment-midpoint-time,
     finite-footprint-longitudinal-decoherence
@@ -2651,6 +2709,30 @@ def mc_spectrum_solid_angle(
     parallelism the groove geometry assumes (each tile would need its own
     working-facet family), so a multi-direction grid with groove set raises
     ValueError rather than silently mixing per-tile escape paths.
+
+    Parameters
+    ----------
+    segments, E_grid_eV, crystal, hkl_list
+        Inputs forwarded to :func:`mc_spectrum`.
+    n_hats
+        Observation directions with shape ``(n_direction, 3)``.
+    weights
+        Matching solid-angle quadrature weights in sr.
+    groove
+        Optional blazed-groove geometry; supported only for one direction.
+    **kwargs
+        Additional keyword arguments forwarded to :func:`mc_spectrum`.
+
+    Returns
+    -------
+    numpy.ndarray
+        Solid-angle-integrated line spectrum in photons per incident electron
+        per eV.
+
+    Raises
+    ------
+    ValueError
+        If direction/weight shapes differ or grooves are combined with tiling.
 
     Validation: blazed-groove-geometry
     """

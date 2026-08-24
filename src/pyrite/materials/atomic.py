@@ -62,14 +62,24 @@ Z_TABLE = _ElementZTable()
 
 # ---- f0(g): non-resonant, energy-independent --------------------------------
 def cromer_mann_f0(element, g):
-    """
-    Energy-independent atomic form factor f0(g) (Waasmaier-Kirfel via xraydb;
-    name kept for API compatibility with the old Cromer-Mann implementation).
+    """Return the energy-independent atomic form factor ``f0(g)``.
 
-    element : str element symbol (e.g. 'C')
-    g       : float or array, reciprocal lattice vector magnitude [1/Angstrom]
-              (g = 2*pi/d_hkl; NOT 1/d).
-    Returns f0 in electron units (f0(0) = Z), shaped like g.
+    Uses Waasmaier--Kirfel through xraydb; the historical function name is
+    retained for API compatibility with the old Cromer--Mann implementation.
+
+    Parameters
+    ----------
+    element
+        Element symbol, for example ``"C"``.
+    g
+        Scalar or array reciprocal-vector magnitude in inverse angstroms,
+        using ``g = 2*pi/d`` rather than ``1/d``.
+
+    Returns
+    -------
+    numpy.ndarray
+        Form factor in electron units, shaped like ``g``. ``f0(0) = Z``.
+
     """
     g_arr = np.asarray(g, dtype=float)
     s = (g_arr / (4.0 * np.pi)).ravel()
@@ -95,17 +105,36 @@ _HENKE_MEMO_MAX = 256
 
 
 def henke_dispersion(element, E_eV, on_out_of_range="nan"):
-    """
+    """Return energy-dependent anomalous dispersion corrections.
+
+    Parameters
+    ----------
+    element
+        Element symbol.
+    E_eV
+        Scalar or array photon energies in eV.
+    on_out_of_range
+        ``"nan"`` preserves shape and fills unsupported energies with NaN;
+        ``"raise"`` raises :class:`ValueError`.
+
+    Returns
+    -------
+    f_prime, f_double_prime
+        Read-only arrays shaped like ``E_eV`` containing the real and positive
+        imaginary anomalous corrections in electron units.
+
+    Raises
+    ------
+    KeyError
+        If ``element`` is unknown.
+    ValueError
+        If strict mode encounters energy outside the Chantler table.
+
+    Notes
+    -----
     Energy-dependent dispersion corrections (Chantler/FFAST via xraydb; name kept
     for API compatibility with the old Henke/CXRO implementation).
 
-    Returns (f_prime, f_double_prime) as arrays shaped like E_eV, where f' and f''
-    are the anomalous corrections directly (xraydb.f1_chantler / f2_chantler).
-
-    on_out_of_range :
-        "nan"   -> energies outside the tabulated range return NaN (default),
-                   keeping array length/alignment; downstream code tolerates NaN.
-        "raise" -> raise ValueError (the old strict behavior).
     """
     if element not in Z_TABLE:
         raise KeyError(f"Unknown element symbol '{element}'.")
@@ -162,8 +191,21 @@ def atomic_form_factor(element, g, E_eV, on_out_of_range="nan"):
     Chantler/FFAST tables through xraydb. This assumes the repository's
     structure-factor phase and passive-medium sign convention.
 
-    g    : reciprocal lattice vector magnitude [1/Angstrom] (= 2*pi/d_hkl)
-    E_eV : photon energy [eV]
+    Parameters
+    ----------
+    element
+        Element symbol.
+    g
+        Reciprocal-vector magnitude in inverse angstroms, ``2*pi/d``.
+    E_eV
+        Photon energy in eV. ``g`` and ``E_eV`` must broadcast together.
+    on_out_of_range
+        ``"nan"`` for aligned NaN results or ``"raise"`` for strict bounds.
+
+    Returns
+    -------
+    numpy.ndarray
+        Complex form factor in electron units on the broadcast input shape.
 
     Out-of-range energies return NaN (shape preserved) by default, so the result
     stays index-aligned with E_eV. Pass on_out_of_range="raise" for strict mode.

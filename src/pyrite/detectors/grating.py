@@ -99,22 +99,26 @@ def groove_spacing_angstrom(groove_density_per_mm):
 class Grating:
     """A reflection grating in a fixed mount.
 
-    groove_density_per_mm : ruling density (e.g. 1200 lines/mm).
-    alpha_rad : incidence angle from the grating NORMAL (grazing => near pi/2).
-    order : diffraction order m (1 typical; 0 is specular).
-    coating : reflective coating element symbol, one of `_COATING_DENSITY_G_CM3`
-        (default "Au"). Confirmed for the McPherson 251MX's four gratings
-        (120/300/1200/2400 g/mm all gold-coated per McPherson's own product
-        materials, see docs/research/instrumentation/grazing-grating.md "Hardware targets"); the exact
-        groove *profile* (laminar vs blazed) feeding a future groove-efficiency
-        model is still McPherson-family-typical, not 251MX-confirmed.
-    groove_efficiency : placeholder scalar diffraction efficiency in [0, 1],
-        NOT a real groove-profile efficiency model (that needs a scalar or
-        rigorous-coupled-wave (RCWA) treatment, out of scope here -- see
-        docs/research/instrumentation/grazing-grating.md "What is NOT modelled yet"). Default 1.0
-        (i.e. no groove-efficiency penalty applied) is itself the placeholder.
-        ### FILL IN once a groove-profile model or measured efficiency curve
-        lands.
+    Parameters
+    ----------
+    groove_density_per_mm
+        Ruling density in lines per mm.
+    alpha_rad
+        Incidence angle from the grating normal in radians; grazing incidence is
+        near ``pi/2``.
+    order
+        Integer diffraction order; one is typical and zero is specular.
+    coating
+        Reflective coating element symbol supported by the internal density
+        table. The default is gold.
+    groove_efficiency
+        Placeholder scalar diffraction efficiency in ``[0, 1]``. This is not a
+        groove-profile or rigorous coupled-wave model.
+
+    Notes
+    -----
+    The McPherson 251MX gratings are documented as gold-coated, but their exact
+    groove profiles are not encoded. See the grazing-grating research note.
     """
 
     groove_density_per_mm: float
@@ -135,7 +139,7 @@ class Grating:
     def diffraction_angle_rad(self, E_eV):
         """Diffraction angle beta [rad] from the grating normal for energy E_eV
         (array-safe). sin beta = m lambda/d - sin alpha; energies that would need
-        |sin beta| > 1 (no propagating order) return NaN."""
+        ``abs(sin(beta)) > 1`` (no propagating order) return NaN."""
         lam = wavelength_angstrom(E_eV)
         s = self.order * lam / self.d_angstrom - np.sin(self.alpha_rad)
         s = np.where(np.abs(s) <= 1.0, s, np.nan)
@@ -148,37 +152,30 @@ class Grating:
         return self.order / (self.d_angstrom * np.cos(beta))
 
     def reflectivity(self, E_eV):
-        """Grazing-incidence Fresnel reflectivity R(E) of the coating (bare-film;
-        groove-profile diffraction efficiency is NOT included, see `throughput`).
+        """Return bare-coating grazing-incidence Fresnel reflectivity.
 
-        Complex refractive index n = 1 - delta - i*beta of `coating`
-        (`crystallography.optical_constants`, Henke/Chantler f1 = Z+f', f2). At
-        the incidence grazing angle theta = `grazing_angle_rad` (measured from
-        the surface; theta, delta, beta all << 1), the vacuum/medium Fresnel
-        amplitude reflectivity r = (k_z1 - k_z2)/(k_z1 + k_z2), with
-        k_z1 = k0 sin(theta) ~ k0 theta and
-        k_z2 = k0 sqrt(n^2 - cos^2 theta) ~ k0 sqrt(theta^2 - 2 delta - 2i beta)
-        (using n^2 - 1 ~ -2 delta - 2i beta and cos^2 theta ~ 1 - theta^2 for
-        theta << 1 rad), reduces to the standard small-angle form:
+        Parameters
+        ----------
+        E_eV
+            Scalar or array photon energy in eV.
 
-            r(theta) = (theta - sqrt(theta^2 - 2 delta - 2i beta))
-                       / (theta + sqrt(theta^2 - 2 delta - 2i beta))
-            R(theta) = |r(theta)|^2
+        Returns
+        -------
+        numpy.ndarray
+            Dimensionless intensity reflectivity shaped like ``E_eV``.
 
-        Source: Als-Nielsen & McMorrow, "Elements of Modern X-ray Physics" 2nd
-        ed., Ch. 3 (refraction and reflection at an interface); equivalently
-        Attwood & Sakdinawat, "X-Rays and Extreme Ultraviolet Radiation" 2nd
-        ed., Ch. 3. ASSUMES grazing incidence, where the s- and p-polarization
-        reflectivities coincide to good approximation (the polarization factor
-        -> cos(2 theta) -> 1 as theta -> 0), so R is treated here as
-        polarization-independent -- standard practice for grazing-incidence
-        SXR optics, stated explicitly since it is an approximation.
+        Notes
+        -----
+        The coating uses ``n = 1 - delta - 1j*beta`` and the small-angle
+        vacuum/medium Fresnel amplitude
+        ``r = (theta - sqrt(theta**2 - 2*delta - 2j*beta)) /``
+        ``(theta + sqrt(theta**2 - 2*delta - 2j*beta))``. The returned value is
+        ``abs(r)**2``. Groove-profile efficiency is excluded; see
+        :meth:`throughput`.
 
-        Limiting cases (beta -> 0 idealization, theta_c = sqrt(2 delta)):
-          - theta << theta_c: the sqrt argument is negative, so r is a pure
-            phase, |r| = 1 -> total external reflection, R -> 1.
-          - theta >> theta_c: R -> (theta_c / (2 theta))^4 (Als-Nielsen &
-            McMorrow's steep power-law falloff above the critical angle).
+        The approximation treats s and p polarization equally at grazing
+        incidence. With vanishing absorption, reflectivity tends to one below
+        the critical angle and falls with the fourth power above it.
 
         Validation: grazing-reflectivity
         """
@@ -222,6 +219,28 @@ def disperse_spectrum(
     intensity is a throughput-weighted (still flux-conserving, now w.r.t. the
     *weighted* input) profile rather than a purely geometric one. This only
     rescales the input spectrum; the Jacobian math itself is untouched.
+
+    Parameters
+    ----------
+    E_grid_eV
+        One-dimensional photon-energy coordinate in eV.
+    spec
+        Spectral density per eV on ``E_grid_eV``.
+    grating
+        Reflection-grating geometry and throughput model.
+    distance_mm
+        Grating-to-detector distance in mm.
+    beta_ref_rad
+        Detector-normal diffraction direction in radians. ``None`` centres the
+        propagating band on its mean angle.
+    weight_by_throughput
+        Multiply by grating reflectivity and groove efficiency before remapping.
+
+    Returns
+    -------
+    position_mm, intensity_per_mm
+        Propagating detector positions and flux density per mm. Their integral
+        equals the input integral after any requested throughput weighting.
     """
     E = np.asarray(E_grid_eV, float)
     spec = np.asarray(spec, float)
@@ -267,8 +286,12 @@ ALEXS_SENSORS: dict[str, AlexsSensor] = {
 class SimpleCCD:
     """A geometry-only CCD pixel grid along the grating's dispersion axis.
 
-    n_pix : number of pixels along the dispersion direction.
-    pixel_mm : pixel pitch along the dispersion direction [mm].
+    Parameters
+    ----------
+    n_pix
+        Number of pixels along the dispersion direction.
+    pixel_mm
+        Pixel pitch along the dispersion direction in mm.
 
     Deliberately crude (phased-plan step 3, docs/research/instrumentation/grazing-grating.md): a fixed
     array of equal-width bins with no QE, charge-sharing, or energy-resolution
@@ -369,6 +392,30 @@ def detected_image(
 
     Returns ``(pixel_centers_mm, counts_per_pixel)``, both length ``ccd.n_pix`` --
     same contract as `bin_to_pixels`.
+
+    Parameters
+    ----------
+    E_grid_eV
+        Photon-energy coordinate in eV.
+    spec
+        Input spectral density per eV.
+    grating
+        Reflection-grating geometry and throughput model.
+    ccd
+        One-dimensional detector pixel grid.
+    distance_mm
+        Grating-to-detector distance in mm.
+    weight_by_throughput
+        Apply grating throughput before spatial remapping.
+    beta_ref_rad
+        Optional detector-normal diffraction direction in radians.
+    center_mm
+        Optional detector-grid centre in mm.
+
+    Returns
+    -------
+    pixel_centers_mm, counts_per_pixel
+        Arrays of length ``ccd.n_pix``. Counts use the integral units of ``spec``.
     """
     x, inten = disperse_spectrum(
         E_grid_eV,

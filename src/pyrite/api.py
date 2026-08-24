@@ -221,6 +221,41 @@ def simulate(
     same per-sr units. Selected spatial spectra include pixel solid angle and
     are accepted flux per incident electron per eV. Detector response remains
     an explicit read-time operation.
+
+    Parameters
+    ----------
+    beam
+        Scalar :class:`~pyrite.Beam` description.
+    target
+        Scalar :class:`~pyrite.Slab` or :class:`~pyrite.Stack`.
+    detector
+        Scalar detector model or physical :class:`~pyrite.PlanarDetector`.
+    numerics
+        Sampling and execution controls. ``None`` uses :class:`~pyrite.Numerics`.
+    emission
+        ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
+    brem_source
+        ``"mc"``, ``"external"``, or ``"none"`` background policy.
+    filters
+        Ordered filter plates; valid only with a physical planar detector.
+    pixel_scorer
+        Optional factorized spatial-scoring request for a pixelated detector.
+
+    Returns
+    -------
+    Result
+        In-memory spectra, resolved case, provenance, and optional spatial data.
+
+    Raises
+    ------
+    TypeError
+        If components or numerics have incompatible types.
+    ValueError
+        If scene geometry or requested backend is inconsistent.
+
+    Notes
+    -----
+    This function performs no checkpoint I/O.
     """
     resolved_numerics = Numerics() if numerics is None else numerics
     if not isinstance(resolved_numerics, Numerics):

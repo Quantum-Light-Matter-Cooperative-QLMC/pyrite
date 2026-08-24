@@ -55,6 +55,16 @@ class PlanarPose:
     detector side. Local ``+x`` is ``x_axis`` and local ``+y`` is
     ``normal cross x_axis``. The source must therefore lie in a plane object's
     negative-local-z half-space; scene validation enforces that relationship.
+
+    Parameters
+    ----------
+    center_mm
+        Plane-centre ``(x, y, z)`` coordinates in mm from the target reference.
+    normal
+        Local ``+z`` direction. It is normalized during construction.
+    x_axis
+        Local ``+x`` direction, orthogonal to ``normal``. It is normalized
+        during construction.
     """
 
     center_mm: tuple[float, float, float]
@@ -101,6 +111,22 @@ class PlanarPose:
         ``-z`` face. At zero roll, local ``+x`` increases polar angle and local
         ``+y`` increases azimuth. Positive roll rotates ``+x`` toward ``+y``
         about local ``+z``.
+
+        Parameters
+        ----------
+        distance_mm
+            Positive source-to-plane distance in mm before transverse offset.
+        polar_deg, azimuth_deg
+            Spherical observation direction in degrees.
+        roll_deg
+            Clockwise local-axis rotation in degrees about ``+z``.
+        offset_mm
+            Local ``(x, y)`` centre offset in mm.
+
+        Returns
+        -------
+        PlanarPose
+            Normalized pose in the target-centred lab frame.
         """
         distance = _positive_real("distance_mm", distance_mm)
         for name, value in (
@@ -146,6 +172,13 @@ class PixelGrid:
     Shape is ``(ny, nx)`` and pitch is ``(pitch_y_mm, pitch_x_mm)``. Array
     indices are ``[row_y, column_x]``; index zero lies on the negative local
     y/x side.
+
+    Parameters
+    ----------
+    shape
+        Positive ``(ny, nx)`` pixel counts.
+    pitch_mm
+        Positive ``(pitch_y, pitch_x)`` values in mm.
     """
 
     shape: tuple[int, int]
@@ -180,7 +213,21 @@ class PixelGrid:
 
 @dataclass(frozen=True)
 class FilterPlate:
-    """Finite rectangular material plate downstream of photon emission."""
+    """Represent a finite rectangular attenuating plate.
+
+    Parameters
+    ----------
+    material
+        Catalog crystal/media key or an explicit immutable medium composition.
+    thickness_mm
+        Positive full thickness along the pose normal in mm.
+    size_mm
+        Positive full ``(width_x, height_y)`` in mm.
+    pose
+        Plate-centre position and local axes.
+    name
+        Optional non-empty identifier, unique among filters in one scene.
+    """
 
     material: str | MediumSpec
     thickness_mm: float
@@ -213,7 +260,13 @@ class FilterPlate:
             raise ValueError("FilterPlate.name must be a non-empty string or None")
 
     def corners_mm(self) -> np.ndarray:
-        """Return the eight finite-box corners in lab coordinates."""
+        """Return the eight finite-box corners in lab coordinates.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array with shape ``(8, 3)`` and units mm.
+        """
         center = np.asarray(self.pose.center_mm)
         x_axis = np.asarray(self.pose.x_axis)
         y_axis = np.asarray(self.pose.y_axis)
@@ -234,7 +287,27 @@ class FilterPlate:
 
 @dataclass(frozen=True)
 class PlanarDetector:
-    """Physical planar detector, distinct from a detector-response model."""
+    """Describe physical planar detector geometry and optional response.
+
+    Parameters
+    ----------
+    pose
+        Detector-centre position and local axes; local ``+z`` points downstream.
+    size_mm
+        Full ``(width_x, height_y)`` in mm. Required without ``pixels`` and,
+        when both are given, must match the pixel-grid active size.
+    pixels
+        Optional physical pixel grid used for spatial scoring.
+    energy_bins
+        Intrinsic line and background photon-energy grids.
+    response
+        Optional read-time detector response implementing ``score``.
+
+    Notes
+    -----
+    Geometry changes source observation and accepted solid angle. ``response``
+    changes only read-time scoring.
+    """
 
     pose: PlanarPose
     size_mm: tuple[float, float] | None = None
@@ -338,7 +411,14 @@ class PlanarDetector:
 
 @dataclass(frozen=True)
 class PixelScorer:
-    """Request factorized spatial output on a physical detector pixel grid."""
+    """Request factorized spatial output on a planar detector grid.
+
+    Parameters
+    ----------
+    angular_shape
+        Positive ``(n_polar, n_azimuth)`` count of source-direction tiles. Each
+        count must not exceed the corresponding detector pixel count.
+    """
 
     angular_shape: tuple[int, int] = (1, 1)
 

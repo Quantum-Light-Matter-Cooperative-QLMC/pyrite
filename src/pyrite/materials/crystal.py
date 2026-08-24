@@ -135,10 +135,21 @@ def _reciprocal_basis(lattice):
 
 
 def reciprocal_g_vector(hkl, lattice):
-    """
-    Reciprocal lattice vector g = h b1 + k b2 + l b3 for any crystal system.
-    Returns (g_vec [1/Angstrom, 3-vector], g_mag [1/Angstrom]).
-    Convention: |g| = 2*pi/d_hkl, matching the rest of the module.
+    """Return a reciprocal-lattice vector for any crystal system.
+
+    Parameters
+    ----------
+    hkl
+        Three Miller indices.
+    lattice
+        Lattice mapping containing cell lengths in angstroms and angles in
+        degrees.
+
+    Returns
+    -------
+    g_vec, g_mag
+        Three-vector and scalar magnitude in inverse angstroms. The convention
+        is ``|g| = 2*pi/d_hkl``.
     """
     g_vec = np.asarray(hkl, dtype=float) @ _reciprocal_basis(lattice)
     return g_vec, np.linalg.norm(g_vec)
@@ -209,10 +220,30 @@ def _basis_F(basis, g, photon_E_eV, use_henke):
 
 
 def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
-    """
-    S(g) = sum_i F_i(g) exp(i g . R_i) exp(-W_i), Eq. (3).
-    Returns complex S(g) and |g| [1/Angstrom].
-    F_i is f0 (non-resonant) unless use_henke, then f0+f' (+ i f'').
+    """Return the crystal structure factor and reciprocal magnitude.
+
+    Implements ``S(g) = sum_i F_i(g) exp(i*g.R_i) exp(-W_i)`` from Eq. (3).
+    ``F_i`` is non-resonant ``f0`` unless ``use_henke`` enables anomalous
+    corrections.
+
+    Parameters
+    ----------
+    crystal
+        Catalog crystal key.
+    hkl
+        Three Miller indices.
+    photon_E_eV
+        Photon energy in eV.
+    B_ang2
+        Isotropic Debye--Waller ``B`` factor in square angstroms.
+    use_henke
+        Include anomalous energy-dependent corrections.
+
+    Returns
+    -------
+    structure_factor, g_mag
+        Complex structure factor in electron units and reciprocal magnitude in
+        inverse angstroms.
 
     Validation: structure-factor
     """
@@ -245,6 +276,22 @@ def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     Assumes the kinematic, independent-atom susceptibility convention used by
     Feranchuk--Spence (2000). An extinct reflection has ``S(g) -> 0`` and hence
     ``chi_g -> 0``; at high photon energy, ``chi_g`` falls as ``lambda**2``.
+
+    Parameters
+    ----------
+    crystal, hkl
+        Catalog crystal key and three Miller indices.
+    photon_E_eV
+        Scalar or array photon energy in eV.
+    B_ang2
+        Isotropic Debye--Waller ``B`` factor in square angstroms.
+    use_henke
+        Include anomalous energy-dependent form-factor corrections.
+
+    Returns
+    -------
+    complex or numpy.ndarray
+        Dimensionless complex polarizability on the photon-energy shape.
 
     Validation: pxr-amplitude
     """
@@ -335,12 +382,28 @@ def refractive_index(crystal, photon_E_eV, use_henke=True):
 
 
 def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
-    """
-    Crystal-potential Fourier component (CBS coupling), Eq. (4), folded with
-    the 1/V of Eq. (14) and one electron charge:
-        e U_g / V = 4 pi e^2 sum_i exp(i g Ri) (Z_i - F_i)/g^2 exp(-W) / V
-    with e^2 = alpha hbar c = 14.3996 eV*Angstrom (Gaussian). Returned in eV;
-    divide by m_e c^2 to get the dimensionless e U_g / (m V) of Eq. (14).
+    """Return the crystal-potential Fourier component for CBS coupling.
+
+    Implements Eq. (4), folded with the inverse-volume factor of Eq. (14) and
+    one electron charge: ``e*U_g/V = 4*pi*e**2*sum_i(exp(i*g*R_i) *``
+    ``(Z_i-F_i)/g**2 * exp(-W))/V``. The result is in eV; divide by
+    ``m_e*c**2`` for the dimensionless Eq. (14) coupling.
+
+    Parameters
+    ----------
+    crystal, hkl
+        Catalog crystal key and three Miller indices.
+    photon_E_eV
+        Scalar or array photon energy in eV.
+    B_ang2
+        Isotropic Debye--Waller ``B`` factor in square angstroms.
+    use_henke
+        Include anomalous form-factor corrections.
+
+    Returns
+    -------
+    complex or numpy.ndarray
+        Crystal-potential Fourier component in eV.
 
     Validation: cbs-amplitude
     """
@@ -377,6 +440,21 @@ def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
     out-of-domain bins. The ``errstate`` guard only suppresses the associated
     divide-by-zero and invalid-value warnings; the derivation above applies to
     positive energies inside the tabulated range.
+
+    Parameters
+    ----------
+    element
+        Element symbol.
+    photon_E_eV
+        Scalar or array photon energy in eV.
+    number_density_per_ang3
+        Element number density in atoms per cubic angstrom.
+
+    Returns
+    -------
+    numpy.ndarray
+        Beer--Lambert intensity attenuation length in angstroms, shaped like
+        ``photon_E_eV``.
 
     Validation: absorption-length
     """
@@ -469,14 +547,14 @@ def dominant_reflections(
 ):
     """
     Automatically select the strongest reflection FAMILIES of a crystal,
-    Zhai-style (their Table 5 keeps the four planes of largest ``|chi_g|`` per
+    Zhai-style (their Table 5 keeps the four planes of largest ``abs(chi_g)`` per
     crystal; everything weaker contributes < ~30%).
 
-    Enumerates all reciprocal vectors with |g| <= g_max_invang, ranks by
-        metric = |S(g)| e^{-W} / g^2
-    which is proportional to ``|chi_g|`` evaluated at each reflection's OWN line
+    Enumerates reciprocal vectors with ``abs(g) <= g_max_invang`` and ranks by
+    ``abs(S(g))*exp(-W)/g**2``, which is proportional to ``abs(chi_g)`` at each
+    reflection's own line
     energy (omega_res scales with g, and chi ~ S/omega^2). Symmetry-
-    equivalent members are grouped by identical (|g|, metric) -- no explicit
+    equivalent members are grouped by identical reciprocal magnitudes and metrics -- no explicit
     space-group code needed -- and ALL members of the top n_families are
     returned as a sorted list of (h, k, l) tuples (including Friedel mates).
     Set ``representatives_only`` to return one deterministic member per ranked
@@ -485,6 +563,28 @@ def dominant_reflections(
     NOTE: this ranks by the crystal STRUCTURE only. Texture constraints are
     yours to impose -- e.g. HOPG must be restricted to (00l) by hand, since
     its in-plane reflections are incoherent across fiber-textured grains.
+
+    Parameters
+    ----------
+    crystal
+        Catalog crystal key.
+    n_families
+        Maximum number of ranked symmetry families.
+    E_ref_eV
+        Reference photon energy in eV for anomalous form factors.
+    B_ang2
+        Isotropic Debye--Waller ``B`` factor in square angstroms.
+    use_henke
+        Include anomalous form-factor corrections.
+    g_max_invang
+        Maximum reciprocal-vector magnitude in inverse angstroms.
+    representatives_only
+        Return one deterministic member per family instead of all mates.
+
+    Returns
+    -------
+    list of tuple
+        Miller-index triples ordered by decreasing family strength.
     """
     info = CRYSTALS[crystal]
     B = _reciprocal_basis(info["lattice"])

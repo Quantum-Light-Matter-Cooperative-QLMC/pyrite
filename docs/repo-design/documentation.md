@@ -174,11 +174,14 @@ External link checking requires network access and is therefore not part of the 
 
 ## Warning policy
 
-The checked autodoc warning baseline covers inherited source-docstring parser debt only.
+The checked autodoc warning baseline is intentionally empty: source docstrings
+must render without parser warnings. The fingerprint mechanism remains so any
+new source-docstring warning fails the build for review.
 
-Warnings produced by maintained prose under `docs/` are never baselined. Any change to the inherited warning fingerprint fails the build for review.
+Warnings produced by maintained prose under `docs/` are never baselined. Any
+change to the zero-warning source-docstring fingerprint fails the build.
 
-To inspect the inherited autodoc warning debt, run the same build with:
+To inspect a source-docstring warning that changed the fingerprint, run the same build with:
 
 ```bash
 CXR_DOCS_SHOW_AUTODOC_WARNINGS=1

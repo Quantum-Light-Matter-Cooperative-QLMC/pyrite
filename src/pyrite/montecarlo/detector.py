@@ -28,6 +28,22 @@ def detector_efficiency(E_eV, polymer_nm=300.0, al_nm=40.0, grid_open=0.78):
     Moxtek AP3.3-class window -- the actual Oxford UltimMax window is
     proprietary, so treat the parameters as tunable. Carries the C, N, O
     edge structure (e.g. the deep notch just above the O-K edge at 532 eV).
+
+    Parameters
+    ----------
+    E_eV
+        Photon energy in eV.
+    polymer_nm
+        Polyimide window thickness in nm.
+    al_nm
+        Aluminium light-blocking coating thickness in nm.
+    grid_open
+        Support-grid open-area fraction.
+
+    Returns
+    -------
+    numpy.ndarray
+        Dimensionless efficiency shaped like ``E_eV``.
     """
     E = np.asarray(E_eV, dtype=float)
     # polyimide C22 H10 N2 O5: formula units per Ang^3 at rho = 1.42 g/cm^3
@@ -162,6 +178,20 @@ def convolve_detector(E_grid_eV, spec, fwhm_eV):
     distorts the lineshape). Edges are zero-padded: counts blurred past the
     grid ends are lost, consistent with a detector band edge. Requires a
     uniform energy grid.
+
+    Parameters
+    ----------
+    E_grid_eV
+        Uniform photon-energy coordinate in eV.
+    spec
+        Spectral samples on ``E_grid_eV``.
+    fwhm_eV
+        Positive Gaussian full width at half maximum in eV.
+
+    Returns
+    -------
+    numpy.ndarray
+        Convolved spectrum with the same shape and units as ``spec``.
     """
     from scipy.ndimage import gaussian_filter1d
 

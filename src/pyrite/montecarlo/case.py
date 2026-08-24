@@ -100,6 +100,51 @@ class Case(Mapping[str, Any]):
     compositions use atoms/angstrom^3, and detector acceptance uses steradian.
     Optional divergence-only fields retain an internal absence sentinel so
     :meth:`to_dict` exactly reproduces the historical mapping payload.
+
+    Parameters
+    ----------
+    name, crystal
+        Human-readable case name and catalog crystal key.
+    composition
+        ``(element, number_density)`` pairs in atoms per cubic angstrom.
+    hkl_list, B_ang2
+        Reflections and isotropic Debye--Waller ``B`` in square angstroms.
+    E0_keV, thickness_ang
+        Incident energy in keV and film thickness in angstroms.
+    crystal_width_mm, crystal_height_mm
+        Paired full transverse dimensions in mm, or both ``None``.
+    beam_fwhm_mm, beam_fwhm_y_mm
+        Entrance-beam Gaussian FWHM values in mm.
+    E_grid, E_grid_line, E_grid_brem
+        Compatibility, line, and continuum photon-energy grids in eV.
+    theta_obs_rad, dtheta_obs_rad, domega_sr
+        Observation direction, full polar acceptance, and solid angle.
+    tilt_deg, tilt_azim_deg, azimuth_rad, recip_miscut_rad
+        Target and crystal-orientation controls in suffix-named units.
+    beam_uvw, surface_hkl
+        Optional direct-axis or reciprocal-surface orientation.
+    mosaic_fwhm_rad, mosaic_mc_fwhm_rad, mosaic_mc_nodes
+        Analytic and quadrature mosaic controls.
+    abs_layers, layer_radiators
+        Optional film-first absorber and coherent-radiator payloads.
+    brem_file
+        Optional external bremsstrahlung spectrum path.
+    Ne, Ne_brem, seed
+        Line/background macro-electron counts and random seed.
+    spec_chunk, brem_chunk
+        Optional spectrum-kernel chunk sizes.
+    bunch_charge_pc, rep_rate_hz
+        Optional source-normalization values.
+    energy_spread_frac, long_shape, bunch_length_fs, long_offsets_fs
+        Legacy beam energy and longitudinal-distribution fields.
+    longitudinal_distribution, transverse_distribution
+        Resolved declarative phase-space policies.
+    groove_spacing_ang
+        Optional blazed-groove period in angstroms.
+    coherent_emission, straggling, energy_model, max_dE_frac
+        Result-affecting opt-in transport and radiation policies.
+    E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
+        Legacy/manual cutoff, truncation, and grid controls.
     """
 
     # Producer-required fields. Their declaration order need not match the
@@ -205,7 +250,14 @@ class Case(Mapping[str, Any]):
                 raise ValueError("max_dE_frac requires energy_model='midpoint'")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the exact legacy mapping shape and insertion order."""
+        """Return the exact legacy mapping shape and insertion order.
+
+        Returns
+        -------
+        dict
+            Present fields in canonical order. Internal absence sentinels are
+            omitted while explicit ``None`` values are retained.
+        """
         payload: dict[str, Any] = {}
         for key in _CASE_KEY_ORDER:
             value = getattr(self, key)

@@ -19,8 +19,20 @@ from ..sweep import fmt_thickness
 
 # ---- record selection --------------------------------------------------------
 def records(results, names=None):
-    """Flat list of every record in ``results`` (optionally restricted to
-    ``names``)."""
+    """Flatten records from a nested checkpoint store.
+
+    Parameters
+    ----------
+    results
+        ``{configuration_name: {electron_energy: record}}`` mapping.
+    names
+        Optional configuration names to include, in requested order.
+
+    Returns
+    -------
+    list
+        Record mappings in configuration and nested energy insertion order.
+    """
     keys = list(results) if names is None else [n for n in names if n in results]
     return [results[n][E0] for n in keys for E0 in results[n]]
 
@@ -43,6 +55,18 @@ def filter_results(results, cases):
         res = filter_results(results, cases)
         plot_by_energy(res, settings, collapse_azimuth=True)
         plot_heatmaps(res, settings)
+
+    Parameters
+    ----------
+    results
+        Nested checkpoint result store.
+    cases
+        Cases whose exact ``name`` values define the retained configurations.
+
+    Returns
+    -------
+    dict
+        New nested store containing matching configuration names.
     """
     names = {c["name"] for c in cases}
     return {n: results[n] for n in results if n in names}
@@ -101,6 +125,19 @@ def select_results(results, **constraints):
         plot_metric_vs(res, settings, x="thickness_ang", hue="tilt_deg")
 
     Call :func:`sweep_values` first to see which values are available to ask for.
+
+    Parameters
+    ----------
+    results
+        Nested checkpoint result store.
+    **constraints
+        Case field predicates. A scalar tests equality, a collection tests
+        membership, and a callable receives the stored field value.
+
+    Returns
+    -------
+    dict
+        New nested store containing records that satisfy every constraint.
     """
 
     def _match(val, spec):
@@ -360,7 +397,18 @@ def best_azimuth(recs):
     (material, thickness, polar tilt, energy) and, within each group, keep only
     the one whose spectrum has the largest peak ``max(spectrum)``. Returns the
     selected records, sorted by (polar tilt, energy). A no-op shape-wise when
-    azimuth is not swept (each group already has one member)."""
+    azimuth is not swept (each group already has one member).
+
+    Parameters
+    ----------
+    recs
+        Iterable of result records carrying ``case`` and ``spec`` fields.
+
+    Returns
+    -------
+    list
+        Peak-maximizing record per material/thickness/polar-tilt/energy group.
+    """
     groups = {}
     for r in recs:
         c = r["case"]

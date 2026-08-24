@@ -316,10 +316,17 @@ class TimepixResponse:
 
     Parameters
     ----------
-    E_grid_eV : the fine, uniform energy grid the spectra live on [eV].
-    dE_mc, dE_out : coarse input / output bin widths [eV].
-    n_mc, seed : Monte-Carlo photons per input energy, and RNG seed.
-    thickness_um, bias_v : override the module hardware defaults.
+    E_grid_eV
+        Fine, uniform photon-energy grid in eV.
+    dE_mc, dE_out
+        Coarse response-input and recorded-output bin widths in eV.
+    n_mc
+        Monte Carlo photons per coarse input energy.
+    seed
+        Response-matrix random seed.
+    thickness_um, bias_v
+        Optional silicon thickness in micrometres and bias in volts; ``None``
+        uses module hardware defaults.
     """
 
     def __init__(
@@ -385,7 +392,18 @@ class TimepixResponse:
         into photons per coarse-input bin; R @ that is detected photons per
         coarse-OUTPUT bin (R already carries absorption + counting efficiency);
         dividing by dE_out makes it a density again; interp lifts it back onto
-        the fine grid. Total detected photons are conserved through the chain."""
+        the fine grid. Total detected photons are conserved through the chain.
+
+        Parameters
+        ----------
+        spec
+            Incident photon spectral density on the response grid.
+
+        Returns
+        -------
+        numpy.ndarray
+            Detected density on the same fine grid and in the same flux units.
+        """
         spec = _si_sensor.prep_spectrum(spec, self.E, "timepix_response")
         n_in = np.bincount(
             self.idx_in, weights=spec * self.dE_fine, minlength=self.n_in
@@ -417,12 +435,29 @@ def get_response(
     thickness_um=None,
     bias_v=None,
 ):
-    """
-    Cached TimepixResponse for a given energy grid + settings: built once per
+    """Return a cached Timepix response for a grid and hardware settings.
+
+    Built once per
     unique (grid, hardware, MC) signature and reused thereafter. Prefer this over
     constructing TimepixResponse directly when looping over many spectra -- every
     spectrum gets a response matching ITS grid, instead of one shared matrix that
     only fits the first grid encountered.
+
+    Parameters
+    ----------
+    E_grid_eV
+        Fine, uniform photon-energy grid in eV.
+    dE_mc, dE_out
+        Coarse input and output bin widths in eV.
+    n_mc, seed
+        Simulated photons per input energy and random seed.
+    thickness_um, bias_v
+        Optional silicon thickness in micrometres and bias in volts.
+
+    Returns
+    -------
+    TimepixResponse
+        Shared response instance for the exact grid and settings signature.
     """
     E = np.asarray(E_grid_eV, dtype=float)
     thick = SENSOR_THICKNESS_UM if thickness_um is None else thickness_um

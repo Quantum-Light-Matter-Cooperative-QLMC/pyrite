@@ -84,7 +84,21 @@ def summary_table(recs, settings):
     brem / total count rates [counts/s] at the case's bunch charge and
     repetition rate, alongside intrinsic per-nA values. Old checkpoints fall
     back to ``settings.beam_current_na``. Returns a DataFrame with a 2-level
-    column index (empty if ``recs`` is empty)."""
+    column index (empty if ``recs`` is empty).
+
+    Parameters
+    ----------
+    recs
+        Iterable of result records.
+    settings
+        Read-time detector and legacy current controls.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per record. Non-empty results use a two-level column index with
+        geometry under ``"config"``; empty input returns an empty frame.
+    """
     rows = []
     for r in sorted(
         recs,

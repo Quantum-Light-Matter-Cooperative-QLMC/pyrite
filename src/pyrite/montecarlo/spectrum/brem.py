@@ -211,6 +211,41 @@ def mc_brem_spectrum(
     Limiting case: ``groove=None`` retains the original flat/prism path
     bit-for-bit; vanishing groove depth tends to the flat entrance-face path.
 
+    Parameters
+    ----------
+    segments
+        Transport output mapping from :func:`simulate_trajectories`.
+    E_grid_eV
+        One-dimensional continuum photon-energy grid in eV.
+    element, n_atoms_per_ang3
+        Elemental target symbol and number density, superseded by ``composition``.
+    theta_obs_rad
+        Polar observation angle in radians when ``n_hat`` is absent.
+    n_hat
+        Optional three-component observation direction in the sample frame.
+    chunk
+        Maximum transport segments processed per reduction chunk.
+    composition
+        Compound ``(element, number_density)`` pairs in atoms per cubic angstrom.
+    layers
+        Optional film-first absorber stack.
+    groove
+        Optional supported blazed-groove escape geometry.
+    electron_limit
+        Optional leading macro-electron count used for normalization.
+    E_cut_keV
+        Optional post-transport electron-energy cutoff in keV.
+
+    Returns
+    -------
+    numpy.ndarray
+        Continuum density in photons per incident electron per eV per sr.
+
+    Raises
+    ------
+    ValueError
+        If composition or requested escape geometry is inconsistent.
+
     Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry
     """
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)

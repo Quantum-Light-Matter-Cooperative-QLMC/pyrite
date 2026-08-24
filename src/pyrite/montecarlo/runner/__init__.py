@@ -471,8 +471,22 @@ def run_case(
     transport and spectrum execute in one process; an allocation failure falls
     back to downloaded segments without changing the result.
 
-    Returns line and bremsstrahlung arrays on their energy grids, backscatter
-    and hit fractions, segment count, crystal key, and incident energy.
+    Parameters
+    ----------
+    case
+        Validated typed case; a mapping remains accepted for compatibility.
+    record_timing
+        Include internal transport and spectrum timing metrics.
+    keep_segments_on_device
+        Keep CUDA transport segments on-device for same-process spectra.
+    transport_core
+        ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
+
+    Returns
+    -------
+    dict
+        Line and bremsstrahlung arrays and grids, transport fractions, segment
+        count, resolved crystal, incident energy, and optional timing metrics.
     """
     return _spectrum_case(
         case,
