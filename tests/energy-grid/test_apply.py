@@ -16,7 +16,7 @@ def test_apply_rewrites_only_owned_blocks_and_reparses():
     new_text, skipped = apply.apply_bounds(BASE_TOML, COMBINED, provenance_mod=_NoManual())
     assert skipped == []
     assert "stop = 2700.0, num = 897" in new_text
-    assert 'label = "HOPG"' in new_text  # untouched line preserved
+    assert 'display_name = "HOPG"' in new_text  # untouched line preserved
     tomllib.loads(new_text)  # still valid TOML
 
 
@@ -50,10 +50,10 @@ line_by_energy = [
 ]
 
 [materials.hfs2]
-label = "HfS2"
+display_name = "HfS2"
 
 [materials.hopg]
-label = "HOPG"
+display_name = "HOPG"
 """
 
 COMBINED_NO_GRID = {
@@ -74,8 +74,8 @@ def test_apply_inserts_new_line_and_brem_blocks_when_absent():
     assert "stop = 2800.0, num = 930" in new_text
     assert "[energy_grids.hfs2]" in new_text
     assert "stop = 140000.0, step = 25.0" in new_text
-    assert 'label = "HfS2"' in new_text  # untouched line preserved
-    assert 'label = "HOPG"' in new_text  # neighboring section untouched
+    assert 'display_name = "HfS2"' in new_text  # untouched line preserved
+    assert 'display_name = "HOPG"' in new_text  # neighboring section untouched
     tomllib.loads(new_text)  # still valid TOML
 
 

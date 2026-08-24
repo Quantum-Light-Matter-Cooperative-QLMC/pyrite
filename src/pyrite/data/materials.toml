@@ -705,6 +705,7 @@ line_by_energy = [
 cif = "cifs/diamond.cif"
 validation_id = "diamond-cif-migration"
 full_name = "Diamond"
+formula = "C"
 cod_id = 9008564
 B_ang2 = 0.21
 beam_uvw = [4, 0, 0]
@@ -714,6 +715,7 @@ E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
 cif = "cifs/silicon.cif"
 validation_id = "silicon-cif-migration"
 full_name = "Silicon"
+formula = "Si"
 cod_id = 9011998
 B_ang2 = 0.46
 beam_uvw = [4, 4, 0]
@@ -723,6 +725,7 @@ E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
 cif = "cifs/lif.cif"
 validation_id = "lif-cif-migration"
 full_name = "Lithium Fluoride"
+formula = "LiF"
 cod_id = 1010990
 B_ang2 = 0.5
 beam_uvw = [1, 0, 0]
@@ -731,6 +734,7 @@ beam_uvw = [1, 0, 0]
 cif = "cifs/sapphire.cif"
 validation_id = "sapphire-corundum-structure"
 full_name = "Aluminium Oxide"
+formula = "Al2O3"
 cod_id = 9008081
 B_ang2 = 0.25
 beam_uvw = [0, 0, 1]
@@ -740,6 +744,7 @@ E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
 cif = "cifs/v2o5.cif"
 validation_id = "v2o5-010-structure"
 full_name = "Vanadium Pentoxide"
+formula = "V2O5"
 cod_id = 2020756
 B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
@@ -751,6 +756,7 @@ hkl_reason = "Use standard-Pmmn (001), equivalent to the historical V2O5(010) la
 cif = "cifs/hopg.cif"
 validation_id = "hopg-cif-migration"
 full_name = "Highly Oriented Pyrolytic Graphite"
+formula = "C"
 phase = "2H"
 cod_id = 9011577
 B_ang2 = 0.8
@@ -764,6 +770,7 @@ hkl_reason = "HOPG is fiber-textured, so only the basal (00l) c-axis reflections
 cif = "cifs/hbn.cif"
 validation_id = "hbn-structure"
 full_name = "Hexagonal Boron Nitride"
+formula = "BN"
 phase = "2H"
 cod_id = 9008997
 B_ang2 = 3.45
@@ -776,6 +783,7 @@ hkl_reason = "Layered h-BN is scanned with the c-axis normal; keep the basal (00
 cif = "cifs/mose2.cif"
 validation_id = "mose2-cif-migration"
 full_name = "Molybdenum Diselenide"
+formula = "MoSe2"
 phase = "2H"
 mp_id = "mp-1634"
 B_ang2 = 0.6
@@ -786,6 +794,7 @@ E_grid = { arange = { start = 350.0, stop = 1750.0, step = 3.0 } }
 cif = "cifs/wse2.cif"
 validation_id = "wse2-cif-migration"
 full_name = "Tungsten Diselenide"
+formula = "WSe2"
 phase = "2H"
 cod_id = 9012193
 mp_id = "mp-1821"
@@ -797,6 +806,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/mote2.cif"
 validation_id = "mote2-bulk-structure"
 full_name = "Molybdenum Ditelluride"
+formula = "MoTe2"
 phase = "2H"
 cod_id = 2310465
 B_ang2 = 0.6
@@ -807,6 +817,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/mote2_product.cif"
 validation_id = "mote2-product-structure"
 full_name = "Molybdenum Ditelluride"
+formula = "MoTe2"
 phase = "1T'"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
@@ -817,6 +828,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/tis2.cif"
 validation_id = "tis2-003-structure"
 full_name = "Titanium Disulfide"
+formula = "TiS2"
 phase = "1T"
 cod_id = 1537865
 B_ang2 = 0.6
@@ -829,6 +841,7 @@ hkl_reason = "Pin the requested 1T-TiS2(003) symmetric-cut reflection so the rec
 cif = "cifs/tise2.cif"
 validation_id = "tise2-001-structure"
 full_name = "Titanium Diselenide"
+formula = "TiSe2"
 phase = "1T"
 cod_id = 1537860
 B_ang2 = 0.6
@@ -841,6 +854,7 @@ hkl_reason = "Pin the basal 1T-TiSe2(001) symmetric cut so the reciprocal vector
 cif = "cifs/black_phosphorus.cif"
 validation_id = "black-phosphorus-020-structure"
 full_name = "Black Phosphorus"
+formula = "P"
 cod_id = 9012486
 B_ang2 = 0.6
 beam_uvw = [0, 1, 0]
@@ -852,6 +866,7 @@ hkl_reason = "Pin the allowed black-phosphorus (020) symmetric cut so the recipr
 cif = "cifs/4h_sic.cif"
 validation_id = "4h-sic-0004-structure"
 full_name = "Silicon Carbide"
+formula = "SiC"
 phase = "4H"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
@@ -863,6 +878,7 @@ hkl_reason = "Pin the basal 4H-SiC (0004) symmetric cut so the reciprocal vector
 cif = "cifs/6h_sic.cif"
 validation_id = "6h-sic-0006-structure"
 full_name = "Silicon Carbide"
+formula = "SiC"
 phase = "6H"
 cod_id = 9010158
 B_ang2 = 0.6
@@ -875,6 +891,7 @@ hkl_reason = "Pin the basal 6H-SiC (0006) symmetric cut so the reciprocal vector
 cif = "cifs/ptse2.cif"
 validation_id = "ptse2-cif-migration"
 full_name = "Platinum Diselenide"
+formula = "PtSe2"
 phase = "1T"
 cod_id = 1539198
 B_ang2 = 0.6
@@ -885,6 +902,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/pts2.cif"
 validation_id = "pts2-p3m1-structure"
 full_name = "Platinum Disulfide"
+formula = "PtS2"
 phase = "1T"
 cod_id = 1537200
 mp_id = "mp-762"
@@ -898,6 +916,7 @@ hkl_reason = "Pin the allowed basal 1T-PtS2(001) symmetric cut parallel to the c
 cif = "cifs/pds2.cif"
 validation_id = "pds2-pbca-structure"
 full_name = "Palladium Disulfide"
+formula = "PdS2"
 cod_id = 2310589
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
@@ -909,6 +928,7 @@ hkl_reason = "Ambient Pbca PdS2 cleaves on (001), but odd 00l are extinct; pin t
 cif = "cifs/pdte2.cif"
 validation_id = "pdte2-p3m1-structure"
 full_name = "Palladium Ditelluride"
+formula = "PdTe2"
 phase = "1T"
 cod_id = 2004955
 # 113(2) K Pell et al. refinement: multiplicity-weighted common basal
@@ -923,6 +943,8 @@ hkl_reason = "Pin the allowed basal 1T-PdTe2(001) symmetric cut parallel to the 
 cif = "cifs/ptbi2.cif"
 validation_id = "ptbi2-p31m-structure"
 full_name = "Platinum Dibismuthide"
+formula = "PtBi2"
+phase = "beta"
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
@@ -933,6 +955,7 @@ hkl_reason = "Pin the allowed basal trigonal beta-PtBi2(001) symmetric cut paral
 cif = "cifs/ptte2.cif"
 validation_id = "ptte2-p3m1-structure"
 full_name = "Platinum Ditelluride"
+formula = "PtTe2"
 phase = "1T"
 cod_id = 1537197
 B_ang2 = 0.6
@@ -945,6 +968,7 @@ hkl_reason = "Pin the allowed basal 1T-PtTe2(001) symmetric cut parallel to the 
 cif = "cifs/pdse2.cif"
 validation_id = "pdse2-pbca-structure"
 full_name = "Palladium Diselenide"
+formula = "PdSe2"
 cod_id = 4310736
 mp_id = "mp-2418"
 B_ang2 = 0.6
@@ -955,6 +979,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/hfs2.cif"
 validation_id = "hfs2-structure"
 full_name = "Hafnium Disulfide"
+formula = "HfS2"
 phase = "1T"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
@@ -964,6 +989,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/hfse2.cif"
 validation_id = "hfse2-cif-migration"
 full_name = "Hafnium Diselenide"
+formula = "HfSe2"
 phase = "1T"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
@@ -973,6 +999,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/zrse2.cif"
 validation_id = "zrse2-cif-migration"
 full_name = "Zirconium Diselenide"
+formula = "ZrSe2"
 phase = "1T"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
@@ -982,6 +1009,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/ws2.cif"
 validation_id = "ws2-cif-migration"
 full_name = "Tungsten Disulfide"
+formula = "WS2"
 phase = "2H"
 cod_id = 9012191
 B_ang2 = 0.6
@@ -992,6 +1020,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/mos2.cif"
 validation_id = "mos2-cif-migration"
 full_name = "Molybdenum Disulfide"
+formula = "MoS2"
 phase = "2H"
 cod_id = 9007660
 B_ang2 = 0.6
@@ -1003,6 +1032,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/nbs2.cif"
 validation_id = "nbs2-2ha-structure"
 full_name = "Niobium Disulfide"
+formula = "NbS2"
 phase = "2H"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
@@ -1012,6 +1042,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/nbse2.cif"
 validation_id = "nbse2-2ha-structure"
 full_name = "Niobium Diselenide"
+formula = "NbSe2"
 phase = "2H"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
@@ -1021,6 +1052,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/hfte2.cif"
 validation_id = "hfte2-001-structure"
 full_name = "Hafnium Ditelluride"
+formula = "HfTe2"
 phase = "1T"
 mp_id = "mp-32887"
 B_ang2 = 0.6
@@ -1033,6 +1065,7 @@ hkl_reason = "Use the basal (001) symmetric cut of 1T-HfTe2 so the reciprocal ve
 cif = "cifs/nbte2.cif"
 validation_id = "nbte2-c2m-structure"
 full_name = "Niobium Ditelluride"
+formula = "NbTe2"
 phase = "1T'"
 cod_id = 2310357
 B_ang2 = 0.6
@@ -1045,6 +1078,7 @@ hkl_reason = "In the preserved Brown/COD 2310357 C2/m setting, distorted NbTe2 c
 cif = "cifs/tite2.cif"
 validation_id = "tite2-p3m1-structure"
 full_name = "Titanium Ditelluride"
+formula = "TiTe2"
 phase = "1T"
 cod_id = 1008063
 B_ang2 = 0.6
@@ -1057,6 +1091,7 @@ hkl_reason = "Pin the allowed basal 1T-TiTe2(001) symmetric cut parallel to the 
 cif = "cifs/vse2.cif"
 validation_id = "vse2-p3m1-structure"
 full_name = "Vanadium Diselenide"
+formula = "VSe2"
 phase = "1T"
 cod_id = 2107137
 B_ang2 = 0.6
@@ -1069,6 +1104,7 @@ hkl_reason = "Pin the allowed basal ambient 1T-VSe2(001) symmetric cut parallel 
 cif = "cifs/vte2.cif"
 validation_id = "vte2-c2m-structure"
 full_name = "Vanadium Ditelluride"
+formula = "VTe2"
 phase = "1T'"
 cod_id = 1535594
 B_ang2 = 0.6
@@ -1081,6 +1117,7 @@ hkl_reason = "In the preserved COD 1535594 C2/m setting, ambient distorted VTe2 
 cif = "cifs/gep.cif"
 validation_id = "gep-c2m-structure"
 full_name = "Germanium Phosphide"
+formula = "GeP"
 cod_id = 1562070
 B_ang2 = 0.35
 surface_hkl = [1, 0, -1]
@@ -1092,6 +1129,7 @@ hkl_reason = "In the preserved COD 1562070 C2/m setting, layered GeP cleaves on 
 cif = "cifs/ges.cif"
 validation_id = "ges-pnma-structure"
 full_name = "Germanium Sulfide"
+formula = "GeS"
 cod_id = 8104282
 B_ang2 = 1.07
 surface_hkl = [1, 0, 0]
@@ -1103,6 +1141,7 @@ hkl_reason = "In standard Pnma GeS the long a axis is the layer normal and (100)
 cif = "cifs/gese.cif"
 validation_id = "gese-pnma-structure"
 full_name = "Germanium Selenide"
+formula = "GeSe"
 cod_id = 4003515
 B_ang2 = 1.10
 surface_hkl = [1, 0, 0]
@@ -1114,6 +1153,8 @@ hkl_reason = "In the COD 4003515 standard-Pnma setting, GeSe cleaves on (100); o
 cif = "cifs/gese2.cif"
 validation_id = "gese2-beta-p21c-structure"
 full_name = "Germanium Diselenide"
+formula = "GeSe2"
+phase = "beta"
 mp_id = "mp-540625"
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
@@ -1125,6 +1166,7 @@ hkl_reason = "Layered beta-GeSe2 in the transformed standard P21/c:b1 setting cl
 cif = "cifs/res2.cif"
 validation_id = "res2-mp572758-structure"
 full_name = "Rhenium Disulfide"
+formula = "ReS2"
 phase = "1T'"
 mp_id = "mp-572758"
 B_ang2 = 0.6
@@ -1137,6 +1179,7 @@ hkl_reason = "The license-clean MP mp-572758 distorted-1T ReS2 fallback carries 
 cif = "cifs/rese2.cif"
 validation_id = "rese2-cod1539529-structure"
 full_name = "Rhenium Diselenide"
+formula = "ReSe2"
 phase = "1T'"
 cod_id = 1539529
 B_ang2 = 0.6
@@ -1149,6 +1192,7 @@ hkl_reason = "Pin the allowed basal distorted-1T ReSe2(001) harmonic from provis
 cif = "cifs/2h_tas2.cif"
 validation_id = "2h-tas2-p63mmc-structure"
 full_name = "Tantalum Disulfide"
+formula = "TaS2"
 phase = "2H"
 cod_id = 9007815
 # 295 K Meetsma et al. refinement: multiplicity-weighted common basal
@@ -1163,6 +1207,7 @@ hkl_reason = "Room-temperature 2H-TaS2 cleaves on (001), but P63/mmc stacking ex
 cif = "cifs/2h_tase2.cif"
 validation_id = "2h-tase2-p63mmc-structure"
 full_name = "Tantalum Diselenide"
+formula = "TaSe2"
 phase = "2H"
 cod_id = 2310532
 B_ang2 = 0.6
@@ -1175,6 +1220,7 @@ hkl_reason = "Room-temperature 2H-TaSe2 cleaves on (001), but P63/mmc stacking e
 cif = "cifs/tate2.cif"
 validation_id = "tate2-c2m-structure"
 full_name = "Tantalum Ditelluride"
+formula = "TaTe2"
 phase = "1T'"
 cod_id = 2310358
 B_ang2 = 0.6
@@ -1187,6 +1233,8 @@ hkl_reason = "In the preserved ambient Brown/COD 2310358 C2/m setting, distorted
 cif = "cifs/fete.cif"
 validation_id = "fete-p4nmm-idealized-structure"
 full_name = "Iron Telluride"
+formula = "FeTe"
+phase = "beta"
 cod_id = 4102703
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
@@ -1198,6 +1246,7 @@ hkl_reason = "Idealized stoichiometric beta-FeTe uses the fully occupied PbO-typ
 cif = "cifs/fes2.cif"
 validation_id = "fes2-pyrite-structure"
 full_name = "Iron Pyrite"
+formula = "FeS2"
 mp_id = "mp-226"
 B_ang2 = 0.6
 beam_uvw = [2, 0, 0]
@@ -1207,6 +1256,7 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/wte2.cif"
 validation_id = "wte2-td-pnm21-structure"
 full_name = "Tungsten Ditelluride"
+formula = "WTe2"
 phase = "Td"
 cod_id = 2310355
 B_ang2 = 0.6
@@ -1219,6 +1269,7 @@ hkl_reason = "Ambient Td-WTe2 in the preserved Brown/COD 2310355 Pnm21 axis sett
 cif = "cifs/zrte3.cif"
 validation_id = "zrte3-p21m-structure"
 full_name = "Zirconium Tritelluride"
+formula = "ZrTe3"
 cod_id = 1559502
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
@@ -1230,6 +1281,7 @@ hkl_reason = "Room-temperature parent-phase ZrTe3 cleaves on (001); the explicit
 cif = "cifs/zrte5.cif"
 validation_id = "zrte5-cmcm-structure"
 full_name = "Zirconium Pentatelluride"
+formula = "ZrTe5"
 B_ang2 = 0.6
 surface_hkl = [0, 1, 0]
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
@@ -1240,184 +1292,142 @@ hkl_reason = "Room-temperature Cmcm ZrTe5 layers lie in the a-c plane and cleave
 composition = { Si = 0.02205, O = 0.04410 }
 
 [materials.hopg]
-label = "HOPG"
+display_name = "HOPG"
 
 [materials.hbn]
-label = "h-BN"
+display_name = "h-BN"
 
 [materials.diamond]
-label = "diamond"
+display_name = "Diamond"
 
 [materials.silicon]
-label = "silicon"
+display_name = "Silicon"
 
 [materials.mose2]
-label = "MoSe2"
 
 [materials.mose2.validation]
 crystal_database_match = "unverified"
 
 [materials.wse2]
-label = "WSe2"
 
 [materials.nbs2]
-label = "NbS2"
 
 [materials.nbs2.validation]
 crystal_database_match = "unverified"
 
 [materials.nbse2]
-label = "NbSe2"
 
 [materials.nbse2.validation]
 crystal_database_match = "unverified"
 
 [materials.mote2]
-label = "MoTe2"
 
 [materials.mote2_product]
-label = "MoTe2 (product)"
 substrate = "sapphire"
 
 [materials.ptse2]
-label = "PtSe2"
 
 [materials.pts2]
-label = "PtS2"
 
 [materials.pds2]
-label = "PdS2"
 
 [materials.pdte2]
-label = "1T-PdTe2 (001)"
 
 [materials.ptbi2]
-label = "beta-PtBi2 (001)"
 
 [materials.ptbi2.validation]
 crystal_database_match = "unverified"
 
 [materials.ptte2]
-label = "1T-PtTe2 (001)"
 
 [materials.pdse2]
-label = "PdSe2"
 
 [materials.hfs2]
-label = "HfS2"
 
 [materials.hfs2.validation]
 crystal_database_match = "unverified"
 
 [materials.hfte2]
-label = "1T-HfTe2 (001)"
 
 [materials.nbte2]
-label = "NbTe2"
 
 [materials.tite2]
-label = "1T-TiTe2 (001)"
 
 [materials.vse2]
-label = "1T-VSe2 (001)"
 
 [materials.vte2]
-label = "1T''-VTe2"
 
 [materials.gep]
-label = "GeP"
 
 [materials.ges]
-label = "GeS"
 
 [materials.gese]
-label = "GeSe"
 
 [materials.gese2]
-label = "beta-GeSe2"
 
 [materials.res2]
-label = "1T-ReS2 (001)"
 
 [materials.res2.validation]
 crystal_database_match = "unverified"
 
 [materials.rese2]
-label = "1T-ReSe2 (001)"
 
 [materials.2h_tas2]
-label = "2H-TaS2 (002)"
 
 [materials.2h_tase2]
-label = "2H-TaSe2 (002)"
 
 [materials.tate2]
-label = "TaTe2 (001)"
 
 [materials.fete]
-label = "beta-FeTe (001)"
 
 [materials.fes2]
-label = "FeS2 (pyrite)"
 
 [materials.fes2.validation]
 crystal_database_match = "unverified"
 
 [materials.wte2]
-label = "Td-WTe2 (002)"
 
 [materials.zrte3]
-label = "ZrTe3 (001)"
 
 [materials.zrte5]
-label = "ZrTe5 (020)"
 
 [materials.zrte5.validation]
 crystal_database_match = "unverified"
 
 [materials.hfse2]
-label = "HfSe2"
 
 [materials.hfse2.validation]
 crystal_database_match = "unverified"
 
 [materials.zrse2]
-label = "ZrSe2"
 
 [materials.zrse2.validation]
 crystal_database_match = "unverified"
 
 [materials.v2o5]
-label = "V2O5 (010)"
 
 [materials.tis2]
-label = "1T-TiS2 (003)"
 
 [materials.tise2]
-label = "1T-TiSe2 (001)"
 
 [materials.black_phosphorus]
-label = "BP (020)"
+display_name = "Black Phosphorus"
 
 [materials.4h_sic]
-label = "4H-SiC (0004)"
 
 [materials.6h_sic]
-label = "6H-SiC (0006)"
 
 [materials.ws2]
-label = "WS2"
 
 [materials.mos2]
-label = "MoS2"
 
 [materials.mos2-on-sapphire]
-label = "MoS2 on sapphire"
+display_name = "MoS2 on sapphire"
 crystal = "mos2"
 substrate = "sapphire"
 
 [materials.mos2-on-sio2-si]
-label = "MoS2 on SiO2/Si"
+display_name = "MoS2 on SiO2/Si"
 crystal = "mos2"
 stack = [
     { material = "sio2", thickness_ang = 2850.0 },
@@ -1425,7 +1435,7 @@ stack = [
 ]
 
 [materials.sapphire]
-label = "sapphire"
+display_name = "Sapphire"
 
 [beams.default]
 rep_rate_hz = 5000.0

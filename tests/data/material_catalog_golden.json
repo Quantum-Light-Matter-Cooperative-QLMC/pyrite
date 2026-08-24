@@ -243,6 +243,9 @@
       ],
       "config": {
         "B_ang2": 0.21,
+        "formula": "C",
+        "full_name": "Diamond",
+        "phase": null,
         "beam_uvw": [
           4,
           0,
@@ -460,6 +463,9 @@
       ],
       "config": {
         "B_ang2": 0.46,
+        "formula": "Si",
+        "full_name": "Silicon",
+        "phase": null,
         "beam_uvw": [
           4,
           4,
@@ -681,6 +687,9 @@
       ],
       "config": {
         "B_ang2": 0.5,
+        "formula": "LiF",
+        "full_name": "Lithium Fluoride",
+        "phase": null,
         "beam_uvw": [
           1,
           0,
@@ -1043,6 +1052,9 @@
       ],
       "config": {
         "B_ang2": 0.25,
+        "formula": "Al2O3",
+        "full_name": "Aluminium Oxide",
+        "phase": null,
         "beam_uvw": [
           0,
           0,
@@ -1272,6 +1284,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "V2O5",
+        "full_name": "Vanadium Pentoxide",
+        "phase": null,
         "beam_uvw": [
           0,
           0,
@@ -1388,6 +1403,9 @@
       ],
       "config": {
         "B_ang2": 0.8,
+        "formula": "C",
+        "full_name": "Highly Oriented Pyrolytic Graphite",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -1518,6 +1536,9 @@
       ],
       "config": {
         "B_ang2": 3.45,
+        "formula": "BN",
+        "full_name": "Hexagonal Boron Nitride",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -1684,6 +1705,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "MoSe2",
+        "full_name": "Molybdenum Diselenide",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -1829,6 +1853,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "WSe2",
+        "full_name": "Tungsten Diselenide",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -2004,6 +2031,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "MoTe2",
+        "full_name": "Molybdenum Ditelluride",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -2129,6 +2159,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "MoTe2",
+        "full_name": "Molybdenum Ditelluride",
+        "phase": "1T'",
         "beam_uvw": [
           0,
           0,
@@ -2230,6 +2263,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "TiS2",
+        "full_name": "Titanium Disulfide",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -2362,6 +2398,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "TiSe2",
+        "full_name": "Titanium Diselenide",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -2530,6 +2569,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "P",
+        "full_name": "Black Phosphorus",
+        "phase": null,
         "beam_uvw": [
           0,
           1,
@@ -2692,6 +2734,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "SiC",
+        "full_name": "Silicon Carbide",
+        "phase": "4H",
         "beam_uvw": [
           0,
           0,
@@ -2866,6 +2911,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "SiC",
+        "full_name": "Silicon Carbide",
+        "phase": "6H",
         "beam_uvw": [
           0,
           0,
@@ -2968,6 +3016,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "PtSe2",
+        "full_name": "Platinum Diselenide",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -3089,6 +3140,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "PtS2",
+        "full_name": "Platinum Disulfide",
+        "phase": "1T",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -3293,6 +3347,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "PdS2",
+        "full_name": "Palladium Disulfide",
+        "phase": null,
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -3435,6 +3492,9 @@
       ],
       "config": {
         "B_ang2": 0.61,
+        "formula": "PdTe2",
+        "full_name": "Palladium Ditelluride",
+        "phase": "1T",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -3605,6 +3665,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "PtBi2",
+        "full_name": "Platinum Dibismuthide",
+        "phase": "beta",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -3707,6 +3770,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "PtTe2",
+        "full_name": "Platinum Ditelluride",
+        "phase": "1T",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -3901,6 +3967,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "PdSe2",
+        "full_name": "Palladium Diselenide",
+        "phase": null,
         "beam_uvw": [
           0,
           0,
@@ -4002,6 +4071,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "HfS2",
+        "full_name": "Hafnium Disulfide",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -4123,6 +4195,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "HfSe2",
+        "full_name": "Hafnium Diselenide",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -4244,6 +4319,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "ZrSe2",
+        "full_name": "Zirconium Diselenide",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -4389,6 +4467,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "WS2",
+        "full_name": "Tungsten Disulfide",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -4514,6 +4595,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "MoS2",
+        "full_name": "Molybdenum Disulfide",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -4659,6 +4743,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "NbS2",
+        "full_name": "Niobium Disulfide",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -4834,6 +4921,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "NbSe2",
+        "full_name": "Niobium Diselenide",
+        "phase": "2H",
         "beam_uvw": [
           0,
           0,
@@ -4985,6 +5075,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "HfTe2",
+        "full_name": "Hafnium Ditelluride",
+        "phase": "1T",
         "beam_uvw": [
           0,
           0,
@@ -5227,6 +5320,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "NbTe2",
+        "full_name": "Niobium Ditelluride",
+        "phase": "1T'",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -5349,6 +5445,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "TiTe2",
+        "full_name": "Titanium Ditelluride",
+        "phase": "1T",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -5481,6 +5580,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "VSe2",
+        "full_name": "Vanadium Diselenide",
+        "phase": "1T",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -5733,6 +5835,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "VTe2",
+        "full_name": "Vanadium Ditelluride",
+        "phase": "1T'",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -6023,6 +6128,9 @@
       ],
       "config": {
         "B_ang2": 0.35,
+        "formula": "GeP",
+        "full_name": "Germanium Phosphide",
+        "phase": null,
         "beam_uvw": null,
         "surface_hkl": [
           1,
@@ -6175,6 +6283,9 @@
       ],
       "config": {
         "B_ang2": 1.07,
+        "formula": "GeS",
+        "full_name": "Germanium Sulfide",
+        "phase": null,
         "beam_uvw": null,
         "surface_hkl": [
           1,
@@ -6337,6 +6448,9 @@
       ],
       "config": {
         "B_ang2": 1.1,
+        "formula": "GeSe",
+        "full_name": "Germanium Selenide",
+        "phase": null,
         "beam_uvw": null,
         "surface_hkl": [
           1,
@@ -6839,6 +6953,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "GeSe2",
+        "full_name": "Germanium Diselenide",
+        "phase": "beta",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -7119,6 +7236,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "ReS2",
+        "full_name": "Rhenium Disulfide",
+        "phase": "1T'",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -7303,6 +7423,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "ReSe2",
+        "full_name": "Rhenium Diselenide",
+        "phase": "1T'",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -7439,6 +7562,9 @@
       ],
       "config": {
         "B_ang2": 0.53,
+        "formula": "TaS2",
+        "full_name": "Tantalum Disulfide",
+        "phase": "2H",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -7625,6 +7751,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "TaSe2",
+        "full_name": "Tantalum Diselenide",
+        "phase": "2H",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -7867,6 +7996,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "TaTe2",
+        "full_name": "Tantalum Ditelluride",
+        "phase": "1T'",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -7997,6 +8129,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "FeTe",
+        "full_name": "Iron Telluride",
+        "phase": "beta",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -8211,6 +8346,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "FeS2",
+        "full_name": "Iron Pyrite",
+        "phase": null,
         "beam_uvw": [
           2,
           0,
@@ -8434,6 +8572,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "WTe2",
+        "full_name": "Tungsten Ditelluride",
+        "phase": "Td",
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -8576,6 +8717,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "ZrTe3",
+        "full_name": "Zirconium Tritelluride",
+        "phase": null,
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -8866,6 +9010,9 @@
       ],
       "config": {
         "B_ang2": 0.6,
+        "formula": "ZrTe5",
+        "full_name": "Zirconium Pentatelluride",
+        "phase": null,
         "beam_uvw": null,
         "surface_hkl": [
           0,
@@ -8943,7 +9090,19 @@
   },
   "materials": {
     "hopg": {
-      "label": "HOPG",
+      "label": "HOPG [001]",
+      "identity": {
+        "formula": "C",
+        "phase": "2H",
+        "full_name": "Highly Oriented Pyrolytic Graphite",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": "HOPG"
+      },
       "profile": "standard",
       "crystal_key": "hopg",
       "substrate": null,
@@ -9039,7 +9198,19 @@
       }
     },
     "hbn": {
-      "label": "h-BN",
+      "label": "h-BN [001]",
+      "identity": {
+        "formula": "BN",
+        "phase": "2H",
+        "full_name": "Hexagonal Boron Nitride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": "h-BN"
+      },
       "profile": "standard",
       "crystal_key": "hbn",
       "substrate": null,
@@ -9135,7 +9306,19 @@
       }
     },
     "diamond": {
-      "label": "diamond",
+      "label": "Diamond [100]",
+      "identity": {
+        "formula": "C",
+        "phase": null,
+        "full_name": "Diamond",
+        "cut": [
+          1,
+          0,
+          0
+        ],
+        "cut_frame": "direction",
+        "display_name": "Diamond"
+      },
       "profile": "standard",
       "crystal_key": "diamond",
       "substrate": null,
@@ -9231,7 +9414,19 @@
       }
     },
     "silicon": {
-      "label": "silicon",
+      "label": "Silicon [110]",
+      "identity": {
+        "formula": "Si",
+        "phase": null,
+        "full_name": "Silicon",
+        "cut": [
+          1,
+          1,
+          0
+        ],
+        "cut_frame": "direction",
+        "display_name": "Silicon"
+      },
       "profile": "standard",
       "crystal_key": "silicon",
       "substrate": null,
@@ -9327,7 +9522,19 @@
       }
     },
     "mose2": {
-      "label": "MoSe2",
+      "label": "2H-MoSe2 [001]",
+      "identity": {
+        "formula": "MoSe2",
+        "phase": "2H",
+        "full_name": "Molybdenum Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "mose2",
       "substrate": null,
@@ -9426,7 +9633,19 @@
       }
     },
     "wse2": {
-      "label": "WSe2",
+      "label": "2H-WSe2 [001]",
+      "identity": {
+        "formula": "WSe2",
+        "phase": "2H",
+        "full_name": "Tungsten Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "wse2",
       "substrate": null,
@@ -9522,7 +9741,19 @@
       }
     },
     "nbs2": {
-      "label": "NbS2",
+      "label": "2H-NbS2 [001]",
+      "identity": {
+        "formula": "NbS2",
+        "phase": "2H",
+        "full_name": "Niobium Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "nbs2",
       "substrate": null,
@@ -9621,7 +9852,19 @@
       }
     },
     "nbse2": {
-      "label": "NbSe2",
+      "label": "2H-NbSe2 [001]",
+      "identity": {
+        "formula": "NbSe2",
+        "phase": "2H",
+        "full_name": "Niobium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "nbse2",
       "substrate": null,
@@ -9720,7 +9963,19 @@
       }
     },
     "mote2": {
-      "label": "MoTe2",
+      "label": "2H-MoTe2 [001]",
+      "identity": {
+        "formula": "MoTe2",
+        "phase": "2H",
+        "full_name": "Molybdenum Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "mote2",
       "substrate": null,
@@ -9816,7 +10071,19 @@
       }
     },
     "mote2_product": {
-      "label": "MoTe2 (product)",
+      "label": "1T'-MoTe2 [001]",
+      "identity": {
+        "formula": "MoTe2",
+        "phase": "1T'",
+        "full_name": "Molybdenum Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "mote2_product",
       "substrate": "sapphire",
@@ -9912,7 +10179,19 @@
       }
     },
     "ptse2": {
-      "label": "PtSe2",
+      "label": "1T-PtSe2 [001]",
+      "identity": {
+        "formula": "PtSe2",
+        "phase": "1T",
+        "full_name": "Platinum Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "ptse2",
       "substrate": null,
@@ -10008,7 +10287,19 @@
       }
     },
     "pts2": {
-      "label": "PtS2",
+      "label": "1T-PtS2 (001)",
+      "identity": {
+        "formula": "PtS2",
+        "phase": "1T",
+        "full_name": "Platinum Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "pts2",
       "substrate": null,
@@ -10104,7 +10395,19 @@
       }
     },
     "pds2": {
-      "label": "PdS2",
+      "label": "PdS2 (001)",
+      "identity": {
+        "formula": "PdS2",
+        "phase": null,
+        "full_name": "Palladium Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "pds2",
       "substrate": null,
@@ -10201,6 +10504,18 @@
     },
     "pdte2": {
       "label": "1T-PdTe2 (001)",
+      "identity": {
+        "formula": "PdTe2",
+        "phase": "1T",
+        "full_name": "Palladium Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "pdte2",
       "substrate": null,
@@ -10297,6 +10612,18 @@
     },
     "ptbi2": {
       "label": "beta-PtBi2 (001)",
+      "identity": {
+        "formula": "PtBi2",
+        "phase": "beta",
+        "full_name": "Platinum Dibismuthide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "ptbi2",
       "substrate": null,
@@ -10396,6 +10723,18 @@
     },
     "ptte2": {
       "label": "1T-PtTe2 (001)",
+      "identity": {
+        "formula": "PtTe2",
+        "phase": "1T",
+        "full_name": "Platinum Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "ptte2",
       "substrate": null,
@@ -10491,7 +10830,19 @@
       }
     },
     "pdse2": {
-      "label": "PdSe2",
+      "label": "PdSe2 [001]",
+      "identity": {
+        "formula": "PdSe2",
+        "phase": null,
+        "full_name": "Palladium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "pdse2",
       "substrate": null,
@@ -10587,7 +10938,19 @@
       }
     },
     "hfs2": {
-      "label": "HfS2",
+      "label": "1T-HfS2 [001]",
+      "identity": {
+        "formula": "HfS2",
+        "phase": "1T",
+        "full_name": "Hafnium Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "hfs2",
       "substrate": null,
@@ -10686,7 +11049,19 @@
       }
     },
     "hfte2": {
-      "label": "1T-HfTe2 (001)",
+      "label": "1T-HfTe2 [001]",
+      "identity": {
+        "formula": "HfTe2",
+        "phase": "1T",
+        "full_name": "Hafnium Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "hfte2",
       "substrate": null,
@@ -10782,7 +11157,19 @@
       }
     },
     "nbte2": {
-      "label": "NbTe2",
+      "label": "1T'-NbTe2 (001)",
+      "identity": {
+        "formula": "NbTe2",
+        "phase": "1T'",
+        "full_name": "Niobium Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "nbte2",
       "substrate": null,
@@ -10879,6 +11266,18 @@
     },
     "tite2": {
       "label": "1T-TiTe2 (001)",
+      "identity": {
+        "formula": "TiTe2",
+        "phase": "1T",
+        "full_name": "Titanium Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "tite2",
       "substrate": null,
@@ -10975,6 +11374,18 @@
     },
     "vse2": {
       "label": "1T-VSe2 (001)",
+      "identity": {
+        "formula": "VSe2",
+        "phase": "1T",
+        "full_name": "Vanadium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "vse2",
       "substrate": null,
@@ -11070,7 +11481,19 @@
       }
     },
     "vte2": {
-      "label": "1T''-VTe2",
+      "label": "1T'-VTe2 (001)",
+      "identity": {
+        "formula": "VTe2",
+        "phase": "1T'",
+        "full_name": "Vanadium Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "vte2",
       "substrate": null,
@@ -11166,7 +11589,19 @@
       }
     },
     "gep": {
-      "label": "GeP",
+      "label": "GeP (1 0 -1)",
+      "identity": {
+        "formula": "GeP",
+        "phase": null,
+        "full_name": "Germanium Phosphide",
+        "cut": [
+          1,
+          0,
+          -1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "gep",
       "substrate": null,
@@ -11262,7 +11697,19 @@
       }
     },
     "ges": {
-      "label": "GeS",
+      "label": "GeS (100)",
+      "identity": {
+        "formula": "GeS",
+        "phase": null,
+        "full_name": "Germanium Sulfide",
+        "cut": [
+          1,
+          0,
+          0
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "ges",
       "substrate": null,
@@ -11358,7 +11805,19 @@
       }
     },
     "gese": {
-      "label": "GeSe",
+      "label": "GeSe (100)",
+      "identity": {
+        "formula": "GeSe",
+        "phase": null,
+        "full_name": "Germanium Selenide",
+        "cut": [
+          1,
+          0,
+          0
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "gese",
       "substrate": null,
@@ -11454,7 +11913,19 @@
       }
     },
     "gese2": {
-      "label": "beta-GeSe2",
+      "label": "beta-GeSe2 (001)",
+      "identity": {
+        "formula": "GeSe2",
+        "phase": "beta",
+        "full_name": "Germanium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "gese2",
       "substrate": null,
@@ -11550,7 +12021,19 @@
       }
     },
     "res2": {
-      "label": "1T-ReS2 (001)",
+      "label": "1T'-ReS2 (001)",
+      "identity": {
+        "formula": "ReS2",
+        "phase": "1T'",
+        "full_name": "Rhenium Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "res2",
       "substrate": null,
@@ -11649,7 +12132,19 @@
       }
     },
     "rese2": {
-      "label": "1T-ReSe2 (001)",
+      "label": "1T'-ReSe2 (001)",
+      "identity": {
+        "formula": "ReSe2",
+        "phase": "1T'",
+        "full_name": "Rhenium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "rese2",
       "substrate": null,
@@ -11745,7 +12240,19 @@
       }
     },
     "2h_tas2": {
-      "label": "2H-TaS2 (002)",
+      "label": "2H-TaS2 (001)",
+      "identity": {
+        "formula": "TaS2",
+        "phase": "2H",
+        "full_name": "Tantalum Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "2h_tas2",
       "substrate": null,
@@ -11841,7 +12348,19 @@
       }
     },
     "2h_tase2": {
-      "label": "2H-TaSe2 (002)",
+      "label": "2H-TaSe2 (001)",
+      "identity": {
+        "formula": "TaSe2",
+        "phase": "2H",
+        "full_name": "Tantalum Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "2h_tase2",
       "substrate": null,
@@ -11937,7 +12456,19 @@
       }
     },
     "tate2": {
-      "label": "TaTe2 (001)",
+      "label": "1T'-TaTe2 (001)",
+      "identity": {
+        "formula": "TaTe2",
+        "phase": "1T'",
+        "full_name": "Tantalum Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "tate2",
       "substrate": null,
@@ -12034,6 +12565,18 @@
     },
     "fete": {
       "label": "beta-FeTe (001)",
+      "identity": {
+        "formula": "FeTe",
+        "phase": "beta",
+        "full_name": "Iron Telluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "fete",
       "substrate": null,
@@ -12129,7 +12672,19 @@
       }
     },
     "fes2": {
-      "label": "FeS2 (pyrite)",
+      "label": "FeS2 [100]",
+      "identity": {
+        "formula": "FeS2",
+        "phase": null,
+        "full_name": "Iron Pyrite",
+        "cut": [
+          1,
+          0,
+          0
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "fes2",
       "substrate": null,
@@ -12228,7 +12783,19 @@
       }
     },
     "wte2": {
-      "label": "Td-WTe2 (002)",
+      "label": "Td-WTe2 (001)",
+      "identity": {
+        "formula": "WTe2",
+        "phase": "Td",
+        "full_name": "Tungsten Ditelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "wte2",
       "substrate": null,
@@ -12325,6 +12892,18 @@
     },
     "zrte3": {
       "label": "ZrTe3 (001)",
+      "identity": {
+        "formula": "ZrTe3",
+        "phase": null,
+        "full_name": "Zirconium Tritelluride",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "zrte3",
       "substrate": null,
@@ -12420,7 +12999,19 @@
       }
     },
     "zrte5": {
-      "label": "ZrTe5 (020)",
+      "label": "ZrTe5 (010)",
+      "identity": {
+        "formula": "ZrTe5",
+        "phase": null,
+        "full_name": "Zirconium Pentatelluride",
+        "cut": [
+          0,
+          1,
+          0
+        ],
+        "cut_frame": "plane",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "zrte5",
       "substrate": null,
@@ -12519,7 +13110,19 @@
       }
     },
     "hfse2": {
-      "label": "HfSe2",
+      "label": "1T-HfSe2 [001]",
+      "identity": {
+        "formula": "HfSe2",
+        "phase": "1T",
+        "full_name": "Hafnium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "hfse2",
       "substrate": null,
@@ -12618,7 +13221,19 @@
       }
     },
     "zrse2": {
-      "label": "ZrSe2",
+      "label": "1T-ZrSe2 [001]",
+      "identity": {
+        "formula": "ZrSe2",
+        "phase": "1T",
+        "full_name": "Zirconium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "zrse2",
       "substrate": null,
@@ -12717,7 +13332,19 @@
       }
     },
     "v2o5": {
-      "label": "V2O5 (010)",
+      "label": "V2O5 [001]",
+      "identity": {
+        "formula": "V2O5",
+        "phase": null,
+        "full_name": "Vanadium Pentoxide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "v2o5",
       "substrate": null,
@@ -12813,7 +13440,19 @@
       }
     },
     "tis2": {
-      "label": "1T-TiS2 (003)",
+      "label": "1T-TiS2 [001]",
+      "identity": {
+        "formula": "TiS2",
+        "phase": "1T",
+        "full_name": "Titanium Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "tis2",
       "substrate": null,
@@ -12909,7 +13548,19 @@
       }
     },
     "tise2": {
-      "label": "1T-TiSe2 (001)",
+      "label": "1T-TiSe2 [001]",
+      "identity": {
+        "formula": "TiSe2",
+        "phase": "1T",
+        "full_name": "Titanium Diselenide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "tise2",
       "substrate": null,
@@ -13005,7 +13656,19 @@
       }
     },
     "black_phosphorus": {
-      "label": "BP (020)",
+      "label": "Black Phosphorus [010]",
+      "identity": {
+        "formula": "P",
+        "phase": null,
+        "full_name": "Black Phosphorus",
+        "cut": [
+          0,
+          1,
+          0
+        ],
+        "cut_frame": "direction",
+        "display_name": "Black Phosphorus"
+      },
       "profile": "standard",
       "crystal_key": "black_phosphorus",
       "substrate": null,
@@ -13101,7 +13764,19 @@
       }
     },
     "4h_sic": {
-      "label": "4H-SiC (0004)",
+      "label": "4H-SiC [001]",
+      "identity": {
+        "formula": "SiC",
+        "phase": "4H",
+        "full_name": "Silicon Carbide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "4h_sic",
       "substrate": null,
@@ -13197,7 +13872,19 @@
       }
     },
     "6h_sic": {
-      "label": "6H-SiC (0006)",
+      "label": "6H-SiC [001]",
+      "identity": {
+        "formula": "SiC",
+        "phase": "6H",
+        "full_name": "Silicon Carbide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "6h_sic",
       "substrate": null,
@@ -13293,7 +13980,19 @@
       }
     },
     "ws2": {
-      "label": "WS2",
+      "label": "2H-WS2 [001]",
+      "identity": {
+        "formula": "WS2",
+        "phase": "2H",
+        "full_name": "Tungsten Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "ws2",
       "substrate": null,
@@ -13389,7 +14088,19 @@
       }
     },
     "mos2": {
-      "label": "MoS2",
+      "label": "2H-MoS2 [001]",
+      "identity": {
+        "formula": "MoS2",
+        "phase": "2H",
+        "full_name": "Molybdenum Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": null
+      },
       "profile": "standard",
       "crystal_key": "mos2",
       "substrate": null,
@@ -13485,7 +14196,19 @@
       }
     },
     "mos2-on-sapphire": {
-      "label": "MoS2 on sapphire",
+      "label": "MoS2 on sapphire [001]",
+      "identity": {
+        "formula": "MoS2",
+        "phase": "2H",
+        "full_name": "Molybdenum Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": "MoS2 on sapphire"
+      },
       "profile": "standard",
       "crystal_key": "mos2",
       "substrate": "sapphire",
@@ -13581,7 +14304,19 @@
       }
     },
     "mos2-on-sio2-si": {
-      "label": "MoS2 on SiO2/Si",
+      "label": "MoS2 on SiO2/Si [001]",
+      "identity": {
+        "formula": "MoS2",
+        "phase": "2H",
+        "full_name": "Molybdenum Disulfide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": "MoS2 on SiO2/Si"
+      },
       "profile": "standard",
       "crystal_key": "mos2",
       "substrate": null,
@@ -13690,7 +14425,19 @@
       }
     },
     "sapphire": {
-      "label": "sapphire",
+      "label": "Sapphire [001]",
+      "identity": {
+        "formula": "Al2O3",
+        "phase": null,
+        "full_name": "Aluminium Oxide",
+        "cut": [
+          0,
+          0,
+          1
+        ],
+        "cut_frame": "direction",
+        "display_name": "Sapphire"
+      },
       "profile": "standard",
       "crystal_key": "sapphire",
       "substrate": null,

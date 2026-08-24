@@ -32,6 +32,7 @@ E_grid_brem = 0.0
 [crystals.{crystal}]
 cif = "cifs/{crystal}.cif"
 validation_id = "test-fixture"
+formula = "MoS2"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
 layers_per_cell = 2
@@ -58,7 +59,7 @@ def _catalog_with_per_beam_line_grids(*, entries: str = PER_BEAM_ENTRIES) -> str
     base = _minimal_catalog(
         material_rows="""
 [materials.sample]
-label = "sample"
+display_name = "sample"
 crystal = "mos2"
 """
     ).replace(_NO_FLAT_LINE_GRID, "")
@@ -305,7 +306,7 @@ def _catalog_with_default_store_only(*, entries: str = PER_BEAM_ENTRIES) -> str:
     base = _minimal_catalog(
         material_rows="""
 [materials.sample]
-label = "sample"
+display_name = "sample"
 crystal = "mos2"
 """
     ).replace(_NO_FLAT_LINE_GRID, "")
@@ -345,11 +346,11 @@ def test_material_config_error_groups_identical_messages_across_materials(tmp_pa
     text = _minimal_catalog(
         material_rows="""
 [materials.sample_a]
-label = "sample_a"
+display_name = "sample_a"
 crystal = "mos2"
 
 [materials.sample_b]
-label = "sample_b"
+display_name = "sample_b"
 crystal = "mos2"
 """
     ).replace(_NO_FLAT_LINE_GRID, "")
@@ -373,11 +374,11 @@ def test_named_profile_scan_defaults_apply_only_to_members(tmp_path):
     text = _minimal_catalog(
         material_rows="""
 [materials.sample_a]
-label = "sample_a"
+display_name = "sample_a"
 crystal = "mos2"
 
 [materials.sample_b]
-label = "sample_b"
+display_name = "sample_b"
 crystal = "mos2"
 
 [profiles.narrowed]
@@ -409,7 +410,7 @@ def _catalog_with_two_profiles(tmp_path: Path) -> Path:
     text = _minimal_catalog(
         material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 
 [profiles.narrowed]
@@ -496,7 +497,7 @@ def test_material_validation_metadata_is_typed_and_validated(tmp_path):
     text = _minimal_catalog(
         material_rows="""
 [materials.sample]
-label = "sample"
+display_name = "sample"
 crystal = "mos2"
 [materials.sample.validation]
 crystal_database_match = "unverified"
@@ -520,7 +521,7 @@ def _catalog_with_standard_beam(beam_block: str) -> str:
         _minimal_catalog(
             material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """
         )
@@ -603,7 +604,7 @@ def _named_beam_catalog(*, beam_ref: str, beams_block: str) -> str:
         _minimal_catalog(
             material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """,
             profile_extra=f'beam = "{beam_ref}"',
@@ -660,7 +661,7 @@ def test_named_detector_reference_resolves_to_same_value_as_inline_block(tmp_pat
 
     material_rows = """
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """
     ref_text = _minimal_catalog(
@@ -705,7 +706,7 @@ def test_named_detector_unknown_reference_errors_with_profile_path(tmp_path):
     text = _minimal_catalog(
         material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """,
         profile_extra='detector = "missing"',
@@ -828,7 +829,7 @@ def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_pa
             _minimal_catalog(
                 material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """
             ),
@@ -851,7 +852,7 @@ def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):
         _minimal_catalog(
             material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """
         )
@@ -871,7 +872,7 @@ def test_profile_filter_and_physical_detector_blocks_decode_without_run_wiring(t
         _minimal_catalog(
             material_rows="""
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """
         )
@@ -962,7 +963,102 @@ def test_bundled_crystal_validation_ids_are_ledgered():
     assert not missing, f"catalog validation IDs missing from ledger: {missing}"
 
 
-_ALLOWED_PHASES = frozenset({"1T", "1T'", "2H", "3R", "4H", "6H", "Td"})
+_ALLOWED_PHASES = frozenset({"1T", "1T'", "2H", "3R", "4H", "6H", "Td", "beta"})
+
+
+def test_reduce_indices_collapses_unreduced_slab_normals():
+    from pyrite.materials._identity import reduce_indices
+
+    assert reduce_indices((0, 0, 2)) == (0, 0, 1)
+    assert reduce_indices((4, 4, 0)) == (1, 1, 0)
+    assert reduce_indices((4, 0, 0)) == (1, 0, 0)
+    assert reduce_indices((0, 2, 0)) == (0, 1, 0)
+    assert reduce_indices((1, 0, -1)) == (1, 0, -1)
+    assert reduce_indices((2, 0, -2)) == (1, 0, -1)
+    # an all-zero normal has no primitive representative to reduce to
+    assert reduce_indices((0, 0, 0)) == (0, 0, 0)
+
+
+def test_format_indices_uses_the_bracket_convention_for_each_frame():
+    from pyrite.materials._identity import format_indices
+
+    assert format_indices((0, 0, 1), "plane") == "(001)"
+    assert format_indices((0, 0, 1), "direction") == "[001]"
+    # multi-digit or negative components would be ambiguous concatenated
+    assert format_indices((1, 0, -1), "plane") == "(1 0 -1)"
+    assert format_indices((12, 0, 1), "direction") == "[12 0 1]"
+
+
+def test_every_bundled_material_label_is_derived_from_its_crystal():
+    """No hand-authored label can drift from the record it describes."""
+    from pyrite.materials import CATALOG
+    from pyrite.materials._identity import MaterialIdentity
+
+    for key in CATALOG.material_keys:
+        spec = CATALOG.material(key)
+        crystal = CATALOG.crystal(spec.crystal_key)
+        expected = MaterialIdentity(
+            formula=crystal.formula,
+            phase=crystal.phase,
+            full_name=crystal.full_name,
+            cut=crystal.cut,
+            cut_frame=crystal.cut_frame,
+            display_name=spec.identity.display_name,
+        )
+        assert spec.label == expected.label, key
+
+
+def test_every_bundled_material_label_agrees_with_its_crystal_phase_and_cut():
+    from pyrite.materials import CATALOG
+    from pyrite.materials._identity import format_indices, reduce_indices
+
+    for key in CATALOG.material_keys:
+        spec = CATALOG.material(key)
+        crystal = CATALOG.crystal(spec.crystal_key)
+
+        # the cut is the declared slab normal, reduced -- never a pinned reflection
+        declared = crystal.surface_hkl if crystal.surface_hkl is not None else crystal.beam_uvw
+        assert spec.cut is not None and declared is not None, key
+        assert spec.cut_frame == ("plane" if crystal.surface_hkl is not None else "direction"), key
+        assert format_indices(declared, spec.cut_frame) in spec.label, key
+
+        # a declared phase is always shown, unless a display_name replaces the name
+        if crystal.phase is not None and spec.identity.display_name is None:
+            assert spec.label.startswith(f"{crystal.phase}-"), key
+
+        # no label may quote a pinned reflection family pointing along a
+        # different axis than the cut (orders along the cut axis reduce to it)
+        for family in crystal.hkl_families:
+            if reduce_indices(family) != tuple(spec.cut):
+                assert format_indices(family, spec.cut_frame) not in spec.label, key
+
+
+def test_bundled_material_labels_are_unique_and_ascii():
+    from pyrite.materials import CATALOG
+
+    labels = [CATALOG.material(key).label for key in CATALOG.material_keys]
+    assert len(set(labels)) == len(labels), "material labels must be distinguishable"
+    assert all(label.isascii() for label in labels)
+
+
+def test_case_names_do_not_track_the_display_label():
+    """Case names key persisted checkpoint records, so a relabel must not rename them."""
+    from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+
+    sweep = Sweep(
+        material="mose2",
+        thickness_ang=1.0e4,
+        beam=BeamSpec(energy_keV=30.0),
+        tilt_deg=45.0,
+        tilt_azim_deg=180.0,
+        crystal_width_mm=None,
+        crystal_height_mm=None,
+    )
+    name = build_cases(sweep)[0]["name"]
+    assert name.startswith("mose2 ")
+    from pyrite.materials import CATALOG
+
+    assert CATALOG.material("mose2").label not in name
 
 
 def test_every_bundled_crystal_has_a_full_name():
@@ -1194,7 +1290,7 @@ def test_scan_angles_stay_in_physical_domains(tmp_path, field, value):
 
     material_rows = f"""
 [materials.mos2]
-label = "MoS2"
+display_name = "MoS2"
 
 [profiles.standard.overrides.mos2]
 {field} = {value}
@@ -1213,7 +1309,7 @@ def test_grid_descriptors_profile_overrides_and_layer_count_conversion(tmp_path)
         _minimal_catalog(
             material_rows="""
 [materials.sample]
-label = "sample"
+display_name = "sample"
 crystal = "mos2"
 stack = [{ material = "sio2", thickness_ang = 2850.0, azimuth_deg = 12.0 }]
 
@@ -1243,7 +1339,7 @@ def test_catalog_scalar_and_logspace_energy_grids_reach_runner_exactly(tmp_path,
     text = _minimal_catalog(
         material_rows="""
 [materials.sample]
-label = "sample"
+display_name = "sample"
 crystal = "mos2"
 """,
     )
@@ -1285,7 +1381,7 @@ def test_pinned_hkls_add_negatives_and_require_positive_representatives(tmp_path
     valid = _minimal_catalog(
         material_rows="""
 [materials.mos2]
-label = "MoS2"
+display_name = "MoS2"
 """,
     ).replace(
         "layers_per_cell = 2",
@@ -1316,12 +1412,14 @@ tilt_deg = nan
 [crystals.bad]
 cif = "../secrets.cif"
 validation_id = ""
+formula = "MoS2"
 B_ang2 = -1.0
 beam_uvw = [0, 0, 0]
 hkl_families = [[0, 0, 0]]
 [media.bad]
 composition = { Xe = -1.0 }
 [materials.bad]
+display_name = ""
 crystal = "missing"
 substrate = "missing"
 stack = [{ material = "missing", thickness_ang = -2.0 }]
@@ -1339,7 +1437,7 @@ stack = [{ material = "missing", thickness_ang = -2.0 }]
         "crystals.bad.cif",
         "crystals.bad.beam_uvw",
         "media.bad.composition.Xe",
-        "materials.bad.label",
+        "materials.bad.display_name",
         "materials.bad.crystal",
         "materials.bad.stack[0].material",
     ):
@@ -1351,7 +1449,7 @@ def test_crystal_requires_exactly_one_orientation(tmp_path):
 
     material = """
 [materials.mos2]
-label = "MoS2"
+display_name = "MoS2"
 """
     neither = _minimal_catalog(material_rows=material).replace("beam_uvw = [0, 0, 2]\n", "")
     with pytest.raises(
@@ -1374,7 +1472,7 @@ def test_crystal_accepts_reciprocal_surface_orientation(tmp_path):
     text = _minimal_catalog(
         material_rows="""
 [materials.mos2]
-label = "MoS2"
+display_name = "MoS2"
 """,
     ).replace("beam_uvw = [0, 0, 2]", "surface_hkl = [2, 0, -1]")
     spec = load_material_catalog(_write_catalog(tmp_path, text)).crystal("mos2")
@@ -1398,7 +1496,7 @@ def test_runnable_crystal_must_use_supported_transport_elements(tmp_path):
         crystal="lif",
         material_rows="""
 [materials.lif]
-label = "LiF"
+display_name = "LiF"
 """,
     )
     with pytest.raises(MaterialConfigError, match="unsupported transport elements.*F.*Li"):
@@ -1412,7 +1510,7 @@ def test_missing_mott_tables_warn_without_rejecting_catalog(tmp_path, caplog):
         crystal="ws2",
         material_rows="""
 [materials.ws2]
-label = "WS2"
+display_name = "WS2"
 """,
     )
     catalog = load_material_catalog(_write_catalog(tmp_path, text))
@@ -1475,6 +1573,9 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         )
         config = expected["config"]
         assert actual.B_ang2 == config["B_ang2"]
+        assert actual.formula == config["formula"]
+        assert actual.full_name == config["full_name"]
+        assert actual.phase == config["phase"]
         beam_uvw = list(actual.beam_uvw) if actual.beam_uvw is not None else None
         surface_hkl = list(actual.surface_hkl) if actual.surface_hkl is not None else None
         assert beam_uvw == config["beam_uvw"]
@@ -1499,6 +1600,13 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
     for key, expected in golden["materials"].items():
         actual = CATALOG.material(key)
         assert actual.label == expected["label"]
+        identity_golden = expected["identity"]
+        assert actual.formula == identity_golden["formula"]
+        assert actual.phase == identity_golden["phase"]
+        assert actual.full_name == identity_golden["full_name"]
+        assert (list(actual.cut) if actual.cut is not None else None) == identity_golden["cut"]
+        assert actual.cut_frame == identity_golden["cut_frame"]
+        assert actual.identity.display_name == identity_golden["display_name"]
         assert actual.profile == expected["profile"]
         assert actual.crystal_key == expected["crystal_key"]
         assert actual.substrate == expected["substrate"]
@@ -1579,7 +1687,7 @@ def test_resolved_stack_inherits_surface_and_direct_override_clears_it(tmp_path)
     text = _minimal_catalog(
         material_rows="""
 [materials.sample]
-label = "sample"
+display_name = "sample"
 crystal = "mos2"
 stack = [
   { material = "mos2", thickness_ang = 10.0 },

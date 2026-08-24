@@ -448,11 +448,15 @@ class _TargetGeometry:
         self,
         cp: dict[str, Any],
         *,
-        label: str,
+        name_stem: str,
         beam_uvw,
         n_families: int = 4,
     ) -> tuple[LoweredTarget, ...]:
         """Expand the target into its geometry product, in build_cases order.
+
+        ``name_stem`` leads every generated case name. It is the stable catalog
+        key, not the display label: case names are persisted as checkpoint record
+        keys, so editing a label must not rename stored cases.
 
         ``cp`` is the FILM's resolved :func:`crystal_params` and ``beam_uvw`` its
         resolved orientation. Both are passed in rather than looked up: they need
@@ -478,7 +482,7 @@ class _TargetGeometry:
         for thickness, tilt, azim, (width, height) in product(
             _seq(self._film_thickness()), tilts, azimuths, self._footprints()
         ):
-            name = f"{label} {fmt_thickness(thickness)} pol={tilt:g} az={azim:g}"
+            name = f"{name_stem} {fmt_thickness(thickness)} pol={tilt:g} az={azim:g}"
             abs_layers = None
             if below is not None:
                 name = f"{name} on {'+'.join(lay.material for lay in below)}"

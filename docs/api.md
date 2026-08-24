@@ -111,12 +111,20 @@ lowering or compatibility seams.
 `CRYSTALS`, `MATERIALS`, and `MATERIAL_LABELS` are compatibility projections,
 not independent registries and not part of the supported API.
 
+Each `MaterialSpec` carries a `MaterialIdentity` — `formula`, `phase`,
+`full_name`, `cut`, `cut_frame` — and its `label` is derived from those fields
+rather than authored, so a display string cannot drift from the record it
+describes. The cut is the crystal's declared slab normal, reduced to its
+primitive representative; it is unrelated to the pinned `hkl_families`
+reflections.
+
 ```{eval-rst}
 .. autosummary::
    :toctree: _autosummary
 
    pyrite.materials.MaterialCatalog
    pyrite.materials.MaterialConfigError
+   pyrite.materials.MaterialIdentity
    pyrite.materials.CrystalInfo
    pyrite.materials.CrystalSpec
    pyrite.materials.MediumSpec

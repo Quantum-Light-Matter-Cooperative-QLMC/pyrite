@@ -17,17 +17,17 @@ from pyrite.campaign.geometry import (
     Stack,
     crystal_params,
 )
-from pyrite.campaign.sweep import MATERIAL_LABELS, BeamSpec, Sweep, build_cases
+from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.detectors import Detector
 from pyrite.materials import LayerSpec
 
 MATERIAL = "mose2"
-LABEL = MATERIAL_LABELS[MATERIAL]
+LABEL = MATERIAL
 
 
 def _lower(target, material=MATERIAL, n_families=4):
     cp = crystal_params(material, n_families)
-    return target.lower(cp, label=MATERIAL_LABELS[material], beam_uvw=cp["beam_uvw"])
+    return target.lower(cp, name_stem=material, beam_uvw=cp["beam_uvw"])
 
 
 def _geometry_of(case):

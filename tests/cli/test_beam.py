@@ -432,6 +432,7 @@ E_grid_brem = 0.0
 [crystals.mos2]
 cif = "cifs/mos2.cif"
 validation_id = "test-fixture"
+formula = "MoS2"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
 layers_per_cell = 2
@@ -441,7 +442,7 @@ E_grid = { values = [100.0, 200.0] }
 composition = { Si = 0.02205, O = 0.04410 }
 
 [materials.mos2]
-label = "mos2"
+display_name = "mos2"
 crystal = "mos2"
 """
 

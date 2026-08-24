@@ -8,7 +8,6 @@ from click.testing import CliRunner
 
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
-from pyrite.materials import CATALOG
 from pyrite.runs import blaze
 
 MATERIAL = "hopg"  # std tilt_deg grid [5,15,30,45,60,75,85] is groove-legal
@@ -171,7 +170,8 @@ def test_flat_build_cases_name_unchanged():
         crystal_height_mm=None,
     )
     cases = build_cases(sweep)
-    label = CATALOG.materials[MATERIAL].label
-    expected_name = f"{label} {fmt_thickness(1.0e4)} pol=45 az=180"
+    # case names key persisted checkpoint records, so they use the stable
+    # catalog key rather than the display label
+    expected_name = f"{MATERIAL} {fmt_thickness(1.0e4)} pol=45 az=180"
     assert cases[0]["name"] == expected_name
     assert "groove=" not in cases[0]["name"]

@@ -637,8 +637,12 @@ def build_cases(
             beam_case["bunch_length_fs"] = float(b.bunch_length_fs)
         if b.long_offsets_fs is not None:
             beam_case["long_offsets_fs"] = tuple(float(x) for x in b.long_offsets_fs)
+    # Case names are persisted: they key the results dict and feed `_case_key`,
+    # which `pyrite checkpoint gc` compares against. So they are built from the
+    # stable catalog key, never from the display label -- a label is display
+    # metadata and editing one must not invalidate stored checkpoints.
     material_spec = CATALOG.materials.get(target.material)
-    label = material_spec.label if material_spec is not None else target.material
+    name_stem = material_spec.key if material_spec is not None else target.material
     # crystal mosaicity (analytic, optional): None unless the run enables it AND the
     # crystal has a mosaic_fwhm_deg (or the Sweep overrides it). None -> perfect
     # crystal, so store_result adds no mosaic term (exact no-op).
@@ -683,7 +687,9 @@ def build_cases(
     # lower() is the whole geometry product -- so nothing below branches on
     # geometry, it only spreads what the target produced.
     target.validate_against(sweep.detector)
-    geometries = target.lower(cp, label=label, beam_uvw=beam_uvw, n_families=sweep.n_families)
+    geometries = target.lower(
+        cp, name_stem=name_stem, beam_uvw=beam_uvw, n_families=sweep.n_families
+    )
 
     cases = []
     for i_c, geometry in enumerate(geometries):

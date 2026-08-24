@@ -334,10 +334,10 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
     ]
     assert [case["seed"] for case in cases] == [1, 1001, 2001, 3001]
     assert [case["name"] for case in cases] == [
-        "MoSe2 10nm pol=1 az=-1",
-        "MoSe2 10nm pol=1 az=-1.5",
-        "MoSe2 10nm pol=1.5 az=-1",
-        "MoSe2 10nm pol=1.5 az=-1.5",
+        "mose2 10nm pol=1 az=-1",
+        "mose2 10nm pol=1 az=-1.5",
+        "mose2 10nm pol=1.5 az=-1",
+        "mose2 10nm pol=1.5 az=-1.5",
     ]
     for case in cases:
         assert np.deg2rad(case["tilt_deg"]) == pytest.approx(
@@ -513,7 +513,7 @@ def test_build_cases_preserves_legacy_name_for_explicit_none_footprint():
         )
     )[0]
 
-    assert case["name"] == "MoSe2 10nm pol=5 az=0"
+    assert case["name"] == "mose2 10nm pol=5 az=0"
     assert case["crystal_width_mm"] is None
     assert case["crystal_height_mm"] is None
 
@@ -530,7 +530,7 @@ def test_build_cases_defaults_to_finite_footprint_and_beam_spot():
     assert case["crystal_width_mm"] == 5.0
     assert case["crystal_height_mm"] == 5.0
     assert case["beam_fwhm_mm"] == 1.0
-    assert case["name"] == "MoSe2 10nm pol=5 az=0 footprint=5x5mm"
+    assert case["name"] == "mose2 10nm pol=5 az=0 footprint=5x5mm"
 
 
 def test_build_cases_carries_pulse_source_fields_from_beam():
@@ -582,14 +582,14 @@ def test_brem_grid_upper_limit_tracks_case_beam_energy():
 
 
 def test_mote2_registered():
-    assert MATERIAL_LABELS["mote2"] == "MoTe2"
+    assert MATERIAL_LABELS["mote2"] == "2H-MoTe2 [001]"
 
     assert "mote2" in MATERIALS
 
 
 @pytest.mark.parametrize(
     ("material", "label", "chalcogen"),
-    [("nbs2", "NbS2", "S"), ("nbse2", "NbSe2", "Se")],
+    [("nbs2", "2H-NbS2 [001]", "S"), ("nbse2", "2H-NbSe2 [001]", "Se")],
 )
 def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcogen):
     assert MATERIAL_LABELS[material] == label
@@ -637,19 +637,19 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
 @pytest.mark.parametrize(
     ("material", "label", "beam_uvw", "hkl_list", "ratio"),
     [
-        ("v2o5", "V2O5 (010)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"V": 1, "O": 2.5}),
-        ("tis2", "1T-TiS2 (003)", (0, 0, 1), [(0, 0, 3), (0, 0, -3)], {"Ti": 1, "S": 2}),
-        ("hfte2", "1T-HfTe2 (001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Hf": 1, "Te": 2}),
-        ("tise2", "1T-TiSe2 (001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Ti": 1, "Se": 2}),
+        ("v2o5", "V2O5 [001]", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"V": 1, "O": 2.5}),
+        ("tis2", "1T-TiS2 [001]", (0, 0, 1), [(0, 0, 3), (0, 0, -3)], {"Ti": 1, "S": 2}),
+        ("hfte2", "1T-HfTe2 [001]", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Hf": 1, "Te": 2}),
+        ("tise2", "1T-TiSe2 [001]", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Ti": 1, "Se": 2}),
         (
             "black_phosphorus",
-            "BP (020)",
+            "Black Phosphorus [010]",
             (0, 1, 0),
             [(0, 2, 0), (0, -2, 0)],
             {"P": 1},
         ),
-        ("4h_sic", "4H-SiC (0004)", (0, 0, 1), [(0, 0, 4), (0, 0, -4)], {"Si": 1, "C": 1}),
-        ("6h_sic", "6H-SiC (0006)", (0, 0, 1), [(0, 0, 6), (0, 0, -6)], {"Si": 1, "C": 1}),
+        ("4h_sic", "4H-SiC [001]", (0, 0, 1), [(0, 0, 4), (0, 0, -4)], {"Si": 1, "C": 1}),
+        ("6h_sic", "6H-SiC [001]", (0, 0, 1), [(0, 0, 6), (0, 0, -6)], {"Si": 1, "C": 1}),
     ],
 )
 def test_oriented_materials_are_registered_as_symmetric_cuts(

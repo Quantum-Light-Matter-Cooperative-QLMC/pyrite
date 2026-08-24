@@ -216,6 +216,39 @@ def _unknown_profile(document, profile_name):
     raise ValueError(message)
 
 
+def _format_cut(identity):
+    """Render an identity payload's cut, or ``None`` when it declares none."""
+    from ...materials._identity import format_indices
+
+    cut = identity["cut"]
+    frame = identity["cut_frame"]
+    if cut is None or frame is None:
+        return None
+    return format_indices((cut[0], cut[1], cut[2]), frame)
+
+
+def _identity_payload(material):
+    """Structured display identity, or ``None`` for a material the catalog cannot resolve.
+
+    An edited working catalog can name a material that the loaded (packaged)
+    catalog does not carry; identity is reporting metadata, so a miss degrades
+    to ``None`` rather than failing the range inspection the command exists for.
+    """
+    from ...materials import CATALOG
+
+    spec = CATALOG.materials.get(material)
+    if spec is None:
+        return None
+    return {
+        "label": spec.label,
+        "formula": spec.formula,
+        "phase": spec.phase,
+        "full_name": spec.full_name,
+        "cut": list(spec.cut) if spec.cut is not None else None,
+        "cut_frame": spec.cut_frame,
+    }
+
+
 def _payload(document, material, profile_name):
     if material not in _catalog_io.material_rows(document):
         _unknown_material(document, material)
@@ -225,6 +258,7 @@ def _payload(document, material, profile_name):
     return {
         "material": material,
         "profile": profile_name,
+        "identity": _identity_payload(material),
         "ranges": [
             {
                 "name": label,
@@ -251,6 +285,17 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
         emit_json_result(cli_json.JsonResult(schema, payload))
         return 0
     emit_result(f"{material}: profile {profile_name}")
+    identity = payload["identity"]
+    if identity is not None:
+        emit_result(f"  label: {identity['label']}")
+        emit_result(f"  formula: {identity['formula']}")
+        if identity["phase"] is not None:
+            emit_result(f"  phase: {identity['phase']}")
+        if identity["full_name"] is not None:
+            emit_result(f"  name: {identity['full_name']}")
+        cut = _format_cut(identity)
+        if cut is not None:
+            emit_result(f"  cut: {cut}")
     for row in payload["ranges"]:
         emit_result(f"  {row['name']}: [{_catalog_io.display(row['values'])}] ({row['source']})")
     return 0

@@ -105,7 +105,7 @@ TATE2_SITES = {
             493.8911406412,
             {"Re": 8, "S": 16},
             RES2_SITES,
-            "1T-ReS2 (001)",
+            "1T'-ReS2 (001)",
         ),
         (
             "rese2",
@@ -113,7 +113,7 @@ TATE2_SITES = {
             248.194,
             {"Re": 4, "Se": 8},
             RESE2_SITES,
-            "1T-ReSe2 (001)",
+            "1T'-ReSe2 (001)",
         ),
         (
             "2h_tas2",
@@ -121,7 +121,7 @@ TATE2_SITES = {
             115.057,
             {"Ta": 2, "S": 4},
             TAS2_SITES,
-            "2H-TaS2 (002)",
+            "2H-TaS2 (001)",
         ),
         (
             "2h_tase2",
@@ -129,7 +129,7 @@ TATE2_SITES = {
             129.498,
             {"Ta": 2, "Se": 4},
             TASE2_SITES,
-            "2H-TaSe2 (002)",
+            "2H-TaSe2 (001)",
         ),
         (
             "tate2",
@@ -137,7 +137,7 @@ TATE2_SITES = {
             473.779,
             {"Ta": 6, "Te": 12},
             TATE2_SITES,
-            "TaTe2 (001)",
+            "1T'-TaTe2 (001)",
         ),
     ],
 )

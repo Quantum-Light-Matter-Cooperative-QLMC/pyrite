@@ -36,6 +36,7 @@ from ._catalog_decode import (
     _table,
 )
 from ._cif import load_crystal_from_cif
+from ._identity import CutFrame, MaterialIdentity, reduce_indices
 from ._transport_data import TRANSPORT_ELEMENTS
 
 logger = logging.getLogger(__name__)
@@ -183,6 +184,8 @@ class CrystalSpec:
         Resolved path to the packaged phase-specific CIF.
     validation_id
         Validation-ledger identifier for the crystal structure.
+    formula
+        Chemical formula in ASCII, e.g. ``"MoS2"``.
     full_name, phase
         Optional display name and phase label.
     cod_id, mp_id
@@ -208,6 +211,7 @@ class CrystalSpec:
     key: str
     cif: Path
     validation_id: str
+    formula: str
     full_name: str | None
     phase: str | None
     cod_id: int | None
@@ -225,6 +229,29 @@ class CrystalSpec:
     def hkl_list(self) -> tuple[tuple[int, int, int], ...]:
         """Pinned representatives expanded to both reciprocal directions."""
         return tuple(hkl for family in self.hkl_families for hkl in (family, _negative(family)))
+
+    @property
+    def cut_frame(self) -> CutFrame | None:
+        """Which space the declared slab normal lives in, or ``None`` if unset.
+
+        ``beam_uvw`` and ``surface_hkl`` are mutually exclusive spellings of the
+        same axis, so at most one of them decides this.
+        """
+        if self.surface_hkl is not None:
+            return "plane"
+        if self.beam_uvw is not None:
+            return "direction"
+        return None
+
+    @property
+    def cut(self) -> tuple[int, int, int] | None:
+        """Declared slab normal reduced to its primitive representative.
+
+        This is the crystal cut, and it is deliberately unrelated to
+        :attr:`hkl_families`, which pins diffracting reflections.
+        """
+        indices = self.surface_hkl if self.surface_hkl is not None else self.beam_uvw
+        return reduce_indices(indices) if indices is not None else None
 
     @property
     def lattice(self) -> Mapping[str, str | float]:
@@ -349,8 +376,11 @@ class MaterialSpec:
 
     Parameters
     ----------
-    key, label
-        Stable machine key and human-readable display label.
+    key
+        Stable machine key.
+    identity
+        Structured display identity — formula, phase, cut — from which
+        :attr:`label` is derived rather than authored.
     profile
         Profile from which this resolved material inherited scan defaults.
     crystal_key
@@ -366,7 +396,7 @@ class MaterialSpec:
     """
 
     key: str
-    label: str
+    identity: MaterialIdentity
     #: Name of the ``[profiles.*]`` campaign row this material resolved its
     #: scan defaults from (plus that profile's per-material override, if any).
     profile: str
@@ -380,6 +410,36 @@ class MaterialSpec:
     def crystal(self) -> str:
         """Compatibility spelling for the film crystal key."""
         return self.crystal_key
+
+    @property
+    def label(self) -> str:
+        """Display label derived from :attr:`identity`."""
+        return self.identity.label
+
+    @property
+    def formula(self) -> str:
+        """ASCII chemical formula of the entrance-film crystal."""
+        return self.identity.formula
+
+    @property
+    def phase(self) -> str | None:
+        """Polytype or structural phase, or ``None`` when the crystal declares none."""
+        return self.identity.phase
+
+    @property
+    def full_name(self) -> str | None:
+        """English name of the entrance-film crystal."""
+        return self.identity.full_name
+
+    @property
+    def cut(self) -> tuple[int, int, int] | None:
+        """Reduced slab-normal indices, or ``None`` when no orientation is declared."""
+        return self.identity.cut
+
+    @property
+    def cut_frame(self) -> CutFrame | None:
+        """Which space :attr:`cut` lives in; ``None`` exactly when :attr:`cut` is."""
+        return self.identity.cut_frame
 
 
 @dataclass(frozen=True)
@@ -648,6 +708,10 @@ def _parse_info(
 
 
 _MP_ID_RE = re.compile(r"^mp-\d+$")
+#: ASCII chemical formula: element symbols with optional integer counts, e.g.
+#: ``C``, ``MoS2``, ``Al2O3``. Subscripts stay ASCII so labels survive terminals,
+#: CSV exports, and filenames unchanged.
+_FORMULA_RE = re.compile(r"^(?:[A-Z][a-z]?\d*)+$")
 
 
 def _optional_text(value: object, path: str, errors: _Errors) -> str | None:
@@ -668,6 +732,7 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
     allowed = {
         "cif",
         "validation_id",
+        "formula",
         "full_name",
         "phase",
         "cod_id",
@@ -681,7 +746,7 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
         "hkl_reason",
         "layers_per_cell",
     }
-    required = {"cif", "validation_id", "B_ang2"}
+    required = {"cif", "validation_id", "formula", "B_ang2"}
     for key, value in table.items():
         path = f"crystals.{key}"
         row = _table(value, path, errors)
@@ -695,6 +760,12 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
         if not isinstance(validation_id, str) or not validation_id.strip():
             errors.add(f"{path}.validation_id", "must be a nonempty string")
             validation_id = ""
+        formula = row.get("formula")
+        if not isinstance(formula, str) or not formula.strip():
+            errors.add(f"{path}.formula", "must be a nonempty string")
+            formula = ""
+        elif not _FORMULA_RE.match(formula):
+            errors.add(f"{path}.formula", "must be an ASCII chemical formula")
         full_name = _optional_text(row.get("full_name"), f"{path}.full_name", errors)
         phase = _optional_text(row.get("phase"), f"{path}.phase", errors)
         cod_id = row.get("cod_id")
@@ -765,11 +836,17 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
             else:
                 layers = layers_raw
         info = _parse_info(key, cif, mosaic, f"{path}.cif", errors) if cif else None
-        if cif is not None and info is not None and (beam is not None or surface is not None):
+        if (
+            cif is not None
+            and info is not None
+            and formula
+            and (beam is not None or surface is not None)
+        ):
             out[key] = CrystalSpec(
                 key=key,
                 cif=cif,
                 validation_id=str(validation_id),
+                formula=str(formula).strip(),
                 full_name=full_name,
                 phase=phase,
                 cod_id=cod_id if isinstance(cod_id, int) and not isinstance(cod_id, bool) else None,
@@ -1665,17 +1742,14 @@ def _parse_materials(
         else None
     )
 
-    allowed = {"label", "crystal", "substrate", "stack", "validation"}
+    allowed = {"display_name", "crystal", "substrate", "stack", "validation"}
     for key, value in table.items():
         path = f"materials.{key}"
         row = _table(value, path, errors)
         if row is None:
             continue
         errors.keys(row, path, allowed)
-        label = row.get("label")
-        if not isinstance(label, str) or not label.strip():
-            errors.add(f"{path}.label", "must be a nonempty string")
-            label = ""
+        display_name = _optional_text(row.get("display_name"), f"{path}.display_name", errors)
         crystal_key = row.get("crystal", key)
         if not isinstance(crystal_key, str) or crystal_key not in crystals:
             errors.add(f"{path}.crystal", "must reference a crystal")
@@ -1771,10 +1845,18 @@ def _parse_materials(
                             Literal["verified", "unverified"], crystal_database_match
                         )
                     )
-        if label and crystal_key and scan is not None:
+        if crystal_key and scan is not None:
+            crystal = crystals[str(crystal_key)]
             out[key] = MaterialSpec(
                 key,
-                label,
+                MaterialIdentity(
+                    formula=crystal.formula,
+                    phase=crystal.phase,
+                    full_name=crystal.full_name,
+                    cut=crystal.cut,
+                    cut_frame=crystal.cut_frame,
+                    display_name=display_name,
+                ),
                 resolving_profile_name,
                 crystal_key,
                 scan,

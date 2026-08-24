@@ -38,7 +38,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("S", (0.107, 0.388, 0.925)),
                 ("S", (0.393, 0.612, 0.425)),
             },
-            "PdS2",
+            "PdS2 (001)",
         ),
         (
             "pdte2",
@@ -92,7 +92,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("S", (1 / 3, 2 / 3, 0.227)),
                 ("S", (2 / 3, 1 / 3, 0.773)),
             },
-            "PtS2",
+            "1T-PtS2 (001)",
         ),
     ],
 )

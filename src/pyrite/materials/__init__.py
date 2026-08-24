@@ -4,6 +4,7 @@ The package-level surface intentionally contains only scan-selection convenience
 Import atomic, crystal, or attenuation details from their owning submodules.
 """
 
+from ._identity import MaterialIdentity
 from .catalog import (
     CrystalInfo,
     CrystalSpec,
@@ -49,6 +50,7 @@ __all__ = [
     "CrystalInfo",
     "CrystalSpec",
     "MediumSpec",
+    "MaterialIdentity",
     "MaterialSpec",
     "MaterialValidationSpec",
     "ScanSpec",

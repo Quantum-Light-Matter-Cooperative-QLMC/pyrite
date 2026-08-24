@@ -88,6 +88,9 @@ def _serialize_crystal(spec) -> dict:
         "composition": [[element, density] for element, density in spec.composition],
         "config": {
             "B_ang2": spec.B_ang2,
+            "formula": spec.formula,
+            "full_name": spec.full_name,
+            "phase": spec.phase,
             "beam_uvw": list(spec.beam_uvw) if spec.beam_uvw is not None else None,
             "surface_hkl": list(spec.surface_hkl) if spec.surface_hkl is not None else None,
             "E_grid": _fingerprint(spec.E_grid) if spec.E_grid is not None else None,
@@ -122,6 +125,14 @@ def _serialize_scan(scan) -> dict:
 def _serialize_material(spec) -> dict:
     return {
         "label": spec.label,
+        "identity": {
+            "formula": spec.formula,
+            "phase": spec.phase,
+            "full_name": spec.full_name,
+            "cut": list(spec.cut) if spec.cut is not None else None,
+            "cut_frame": spec.cut_frame,
+            "display_name": spec.identity.display_name,
+        },
         "profile": spec.profile,
         "crystal_key": spec.crystal_key,
         "substrate": spec.substrate,

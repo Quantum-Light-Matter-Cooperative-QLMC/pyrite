@@ -17,7 +17,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
             (19.390, 3.642, 9.375, 90.0, 134.58, 90.0),
             471.557,
             {"Nb": 6, "Te": 12},
-            "NbTe2",
+            "1T'-NbTe2 (001)",
         ),
         (
             "tite2",
@@ -38,7 +38,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
             (18.984, 3.5947, 9.069, 90.0, 134.62, 90.0),
             440.510,
             {"V": 6, "Te": 12},
-            "1T''-VTe2",
+            "1T'-VTe2 (001)",
         ),
     ],
 )

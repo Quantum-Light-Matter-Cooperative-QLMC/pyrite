@@ -102,7 +102,7 @@ FETE_SITES = {
             309.004,
             {"W": 4, "Te": 8},
             _wte2_sites(),
-            "Td-WTe2 (002)",
+            "Td-WTe2 (001)",
         ),
         (
             "zrte3",
@@ -118,7 +118,7 @@ FETE_SITES = {
             795.20,
             {"Zr": 4, "Te": 20},
             _zrte5_sites(),
-            "ZrTe5 (020)",
+            "ZrTe5 (010)",
         ),
     ],
 )

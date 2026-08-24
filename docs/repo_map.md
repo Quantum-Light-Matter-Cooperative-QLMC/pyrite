@@ -194,7 +194,8 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 ### `materials/` (package)
 Material domain package. Narrow top-level API expose immutable
 `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`,
-`CrystalSpec`, `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`),
+`CrystalSpec`, `MediumSpec`, `MaterialIdentity`, `MaterialSpec`,
+`MaterialValidationSpec`, `ScanSpec`, `LayerSpec`),
 `load_material_catalog`, compatibility projections (`CRYSTALS`, `MATERIALS`,
 `MATERIAL_LABELS`). Implementation helpers stay in submodules below.
 
@@ -206,8 +207,20 @@ immutable typed records. `material_keys` preserve TOML declaration order.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`,
   `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`,
   `load_material_catalog`.
-- Deps: `materials._cif`, `materials._transport_data`, `materials._catalog_decode`,
-  `DATA_DIR`.
+- Deps: `materials._cif`, `materials._identity`, `materials._transport_data`,
+  `materials._catalog_decode`, `DATA_DIR`.
+
+### `materials/_identity.py`
+Display identity for a material — chemical formula, crystal phase, crystal cut —
+and the label derived from them. Labels are never authored in
+`data/materials.toml`; `[materials.*]` may only override the *name* segment via
+`display_name`, and the cut is always appended, so a label cannot contradict its
+crystal record. The cut is the declared slab normal reduced to its primitive
+representative, rendered `(hkl)` when the crystal declares `surface_hkl` and
+`[uvw]` when it declares `beam_uvw` — the two are mutually exclusive spellings of
+the same axis, and nothing is converted between them.
+- Public: `MaterialIdentity`, `reduce_indices`, `format_indices`; `CutFrame` alias.
+- Deps: none (leaf).
 
 ### `materials/_catalog_decode.py`
 Primitive decoders for schema-version-1 catalog grids and descriptors:
@@ -363,7 +376,10 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
 - Public: `BeamSpec` (incident phase space and pulse properties), `Sweep`
   (dataclass of simulation knobs), `beam_replace`, `LayerSpec` (one stack layer:
   material, thickness, orientation), `build_cases`, `geometry_table`,
-  `pm` (±hkl expansion); `MATERIAL_LABELS` registry. Re-exports the
+  `pm` (±hkl expansion); `MATERIAL_LABELS` registry. Case names are built from
+  the stable catalog key, never the display label: they key persisted checkpoint
+  records and feed `checkpoints/checkpoint_cleanup._case_key`, so relabelling a
+  material must not rename stored cases. Re-exports the
   `campaign/geometry.py` surface, so `pyrite.campaign.sweep` stays the stable
   import path for `crystal_params`, `fmt_thickness`, `stack_layers` and friends.
 - `Sweep.target` is the canonical geometry spelling and the only geometry state

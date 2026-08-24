@@ -262,6 +262,7 @@ E_grid_brem = 100.0
 [crystals.mos2]
 cif = "cifs/mos2.cif"
 validation_id = "mos2-cif-migration"
+formula = "MoS2"
 B_ang2 = 0.6
 surface_hkl = [1, 0, 0]
 E_grid = { arange = { start = 800.0, stop = 3500.0, step = 5.0 } }
@@ -270,7 +271,7 @@ hkl_reason = "test surface-parallel reflection"
 [media.sio2]
 composition = { Si = 0.02205, O = 0.04410 }
 [materials.sample]
-label = "surface sample"
+display_name = "surface sample"
 crystal = "mos2"
 """
     path = tmp_path / "materials.toml"

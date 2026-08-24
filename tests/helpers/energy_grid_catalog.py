@@ -15,7 +15,7 @@ line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 136500.0, step = 25.0 } }
 
 [materials.hopg]
-label = "HOPG"
+display_name = "HOPG"
 """
 
 COMBINED = {
