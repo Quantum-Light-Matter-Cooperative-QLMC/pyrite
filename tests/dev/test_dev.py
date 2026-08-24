@@ -119,6 +119,13 @@ def test_docs_parser_exposes_offline_and_linkcheck_modes(dev_module) -> None:
     assert online.linkcheck is True
 
 
+def test_perf_parser_delegates_remaining_arguments(dev_module) -> None:
+    args = dev_module.build_parser().parse_args(["perf", "standard", "--perf-interval", "2"])
+
+    assert args.func is dev_module.cmd_perf
+    assert args.command_args == ["standard", "--perf-interval", "2"]
+
+
 @pytest.mark.parametrize("command", ["performance", "energy-grid"])
 def test_relocated_click_help_is_forwarded(dev_module, command: str, capsys) -> None:
     dev_module.main([command, "--help"])

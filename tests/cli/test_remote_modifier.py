@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands import scan
+from pyrite.cli.commands.scan import performance_command
 from pyrite.remote import cli as remote_cli
 from pyrite.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
@@ -97,9 +98,12 @@ def test_cpu_profile_flags_require_remote_and_reach_the_job(monkeypatch):
     seen = {}
     monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.update(vars(args)))
 
-    local_cpu = invoke(scan.command, ["standard", "--cpu"])
-    local_cpu_only = invoke(scan.command, ["standard", "--cpu-only"])
-    remote = invoke(scan.command, ["standard", "-m", "hopg", "--remote=box-a", "--cpu", "--detach"])
+    local_cpu = invoke(performance_command, ["standard", "--cpu"])
+    local_cpu_only = invoke(performance_command, ["standard", "--cpu-only"])
+    remote = invoke(
+        performance_command,
+        ["standard", "-m", "hopg", "--remote=box-a", "--cpu", "--detach"],
+    )
 
     assert local_cpu.exit_code == 2
     assert "--cpu/--cpu-only require -R/--remote" in local_cpu.stderr
@@ -114,10 +118,17 @@ def test_cpu_profile_flags_require_remote_and_reach_the_job(monkeypatch):
 
 
 def test_cpu_profile_flag_conflicts_are_rejected_before_submission():
-    both = invoke(scan.command, ["standard", "--remote=box-a", "--cpu", "--cpu-only"])
-    with_nsys = invoke(scan.command, ["standard", "--remote=box-a", "--cpu-only", "--nsys"])
+    both = invoke(
+        performance_command,
+        ["standard", "--remote=box-a", "--cpu", "--cpu-only"],
+    )
+    with_nsys = invoke(
+        performance_command,
+        ["standard", "--remote=box-a", "--cpu-only", "--nsys"],
+    )
     with_chunk = invoke(
-        scan.command, ["standard", "--remote=box-a", "--cpu-only", "--spec-chunk", "8"]
+        performance_command,
+        ["standard", "--remote=box-a", "--cpu-only", "--spec-chunk", "8"],
     )
 
     assert both.exit_code == 2

@@ -20,8 +20,8 @@ legacy config stores, then the built-in default. `PYRITE_PROFILE` and
 `PYRITE_REMOTE_HOST` are the canonical environment tiers; their `CXR_*`
 aliases remain supported.
 `pyrite run PROFILE --remote` runs the profile membership; `-m MATERIAL`
-narrows it to one material and `-p/--perf` enables performance telemetry
-for that same profile.
+narrows it to one material. Compute-performance measurement is isolated
+behind `pyrite-dev perf PROFILE`; it accepts the same selectors.
 
 Checkpoint operations use the grouped `pyrite checkpoint ...` paths. Legacy
 top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,
@@ -119,28 +119,6 @@ Options:
                                   [default: checkpoints]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
-  -p, --perf                      Sample CPU pressure, RAM/swap, GPU clocks/VRAM,
-                                  process-tree, phase timing, queue, case, worker, and
-                                  chunk metrics for PROFILE's resolved membership into
-                                  performance-profiles/PROFILE/<material>.ndjson
-                                  (cxr.performance.v1). Combine with -m to profile a
-                                  single member. Runs without shared-cache reads or
-                                  writes unless --recompute is explicit.
-  -i, --perf-interval SECONDS     Performance-telemetry sampling interval; requires
-                                  -p/--perf.  [default: 5.0]
-  --spec-chunk N                  Pin line-spectrum segments per GPU chunk; requires
-                                  -p/--perf.
-  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk; requires
-                                  -p/--perf.
-  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX trace of
-                                  the run (writes a .nsys-rep next to the perf log);
-                                  defaults to the profile's full membership (-m narrows
-                                  to one member). Requires -p/--perf.
-  -c, --cpu                       After the primary run, capture one bounded serial CPU
-                                  cProfile pass; implies --perf. Requires -R/--remote.
-  --cpu-only                      Capture only the bounded serial CPU cProfile pass;
-                                  starts no primary GPU/Nsight scan and implies --perf.
-                                  Requires -R/--remote.
   --no-cache                      Neither read nor write the shared per-case checkpoint
                                   cache: an ephemeral run that recomputes every case and
                                   stores nothing shared.
@@ -312,7 +290,7 @@ Options:
 ## `pyrite app validation`
 
 ```text
-Usage: pyrite app validation [OPTIONS] COMMAND [ARGS]...
+Usage: pyrite app validation [OPTIONS] [COMMAND] [ARGS]...
 
   Launch the interactive validation application, or export cached figures.
 
@@ -1298,11 +1276,11 @@ Commands:
 ## `pyrite profile numerics reset`
 
 ```text
-Usage: pyrite profile numerics reset [OPTIONS] NAME [[line-electrons|bremsstrahlung-
+Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlung-
                                      electrons|reflection-families|maximum-
                                      reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
-                                     energy-loss]]...
+                                     energy-loss]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 

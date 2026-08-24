@@ -22,6 +22,7 @@ import click
 
 from pyrite._dev import build_parser
 from pyrite.cli import command as pyrite_command
+from pyrite.cli.commands.scan import performance_command as perf_command
 from pyrite.devtools.cli_commands import energy_grid_command, performance_command
 from pyrite.devtools.cli_reference import _walk as _click_walk
 from pyrite.devtools.doc_blocks import FencedBlock
@@ -33,6 +34,7 @@ _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 # argparse. Their argparse subparser is declared ``add_help=False`` with a
 # ``REMAINDER`` positional for exactly this reason.
 _CLICK_DELEGATES: dict[tuple[str, ...], click.Command] = {
+    ("pyrite-dev", "perf"): perf_command,
     ("pyrite-dev", "performance"): performance_command,
     ("pyrite-dev", "energy-grid"): energy_grid_command,
 }

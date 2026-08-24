@@ -35,7 +35,7 @@ accept all historical pickle encodings.
 | default | yes | yes | yes |
 | `--recompute` | no | yes | yes |
 | `--no-cache` | no | no | yes |
-| `-p/--perf` without explicit cache flag | no | no | yes |
+| `pyrite-dev perf` without explicit cache flag | no | no | yes |
 
 `--no-cache` and `--recompute` are mutually exclusive. Explicit
 `--recompute` overrides the performance default, including Nsight re-exec.

@@ -486,7 +486,7 @@ SLURM allocation so the pipeline arm gets every core it asks for). Both arms run
 the same `pyrite run` invocation and differ only in `PYRITE_MC_TRANSPORT_CORE`: unset
 (so `auto` resolves to the CUDA core, serial in the driver, segments resident)
 against `lockstep` (the historical `gpu-pipeline` arm, 16 transport workers).
-Fresh checkpoint directory per arm — `--perf` already bypasses the shared cache,
+Fresh checkpoint directory per arm — `pyrite-dev perf` already bypasses the shared cache,
 but a resumed arm would otherwise measure nothing. One warm-up rep per arm, then
 three interleaved reps.
 
@@ -636,7 +636,7 @@ in this round moves a spectrum.
 3. **`-c/--cpu` and `--cpu-only` on `pyrite run -R/--remote`.** The CPU-profiling
    phase existed only on `pyrite remote run`, which is deprecated and hidden with
    removal at 0.3.0, so the feature would have disappeared silently. Both flags
-   require `-R`, imply `--perf`, and forward to the same job machinery;
+   live only on `pyrite-dev perf`, require `-R`, and forward to the same job machinery;
    validation stays in `start_command`, unduplicated.
 
 ### Is the gated line prologue still worth anything? (`_USE_JIT_LINE_PROLOGUE`)

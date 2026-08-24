@@ -164,10 +164,11 @@ until at least one new unit of work supplies a finite rate. Cost-weighted work
 is preferred when available; parallel-material process seconds are folded back
 to approximate wall time using the submitted parallelism.
 
-Use `--perf` to enable resource sampling for the selected profile:
+Use the developer performance command to enable resource sampling for the
+selected profile:
 
 ```bash
-pyrite run sub_100keV --remote --perf
+pyrite-dev perf sub_100keV --remote
 ```
 
 Each five-second NDJSON sample records host and process-tree CPU/RAM, CPU
@@ -178,7 +179,7 @@ case, in-flight work, progress, worker topology, electron counts, grid widths,
 adaptive spectrum/brem chunk sizes, and child-process max/mean RSS. Rolling
 counters include CPU transport, spectrum, GPU feed-wait, checkpoint time, GPU
 OOM retries, and CuPy pool used/reserved/peak memory. These phase counters are
-enabled by `--perf`; `PYRITE_MC_TIMING` is not required. Logs go to
+enabled by `pyrite-dev perf`; `PYRITE_MC_TIMING` is not required. Logs go to
 `performance-profiles/NAME/<material>.ndjson`; remote logs appear beside case
 progress in attached status. Fetch every remote job matching the catalog profile name
 with:

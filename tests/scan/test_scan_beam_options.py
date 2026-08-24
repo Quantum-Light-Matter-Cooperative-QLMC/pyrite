@@ -5,6 +5,7 @@ import os
 import pytest
 from click.testing import CliRunner
 
+from pyrite.cli.commands.scan import performance_command
 from pyrite.runs import scan
 
 
@@ -36,46 +37,28 @@ def test_run_help_keeps_beam_overrides_profile_owned():
     assert "--beam-" not in result.output
 
 
-def test_run_internal_performance_profile_selects_same_catalog_profile(monkeypatch):
-    captured = {}
-
-    def capture(args):
-        captured["identity"] = scan._resolved_run(args, "hopg")[2]
-
-    monkeypatch.setattr(scan, "run", capture)
-    result = CliRunner().invoke(
-        scan.command,
-        [
-            "sub_100keV",
-            "-m",
-            "hopg",
-            "--performance-profile",
-            "sub_100keV",
-        ],
-        catch_exceptions=False,
-    )
-
-    assert result.exit_code == 0, result.output
-    assert captured["identity"]["catalog_profile"] == "sub_100keV"
-
-
-def test_run_internal_performance_profile_rejects_profile_mismatch():
-    result = CliRunner().invoke(
-        scan.command,
-        [
-            "sub_100keV",
-            "-m",
-            "hopg",
-            "--performance-profile",
-            "standard",
-        ],
-    )
+@pytest.mark.parametrize(
+    "option",
+    (
+        "--perf",
+        "--performance-profile",
+        "--performance-dir",
+        "--perf-interval",
+        "--spec-chunk",
+        "--brem-chunk",
+        "--nsys",
+        "--cpu",
+        "--cpu-only",
+    ),
+)
+def test_run_rejects_performance_options(option):
+    result = CliRunner().invoke(scan.command, ["sub_100keV", option])
 
     assert result.exit_code == 2
-    assert "must name the same catalog profile" in result.output
+    assert f"No such option '{option}'" in result.output
 
 
-def test_run_perf_flag_defaults_to_full_profile_membership(monkeypatch):
+def test_perf_defaults_to_full_profile_membership(monkeypatch):
     captured = {}
 
     def capture(args):
@@ -84,8 +67,8 @@ def test_run_perf_flag_defaults_to_full_profile_membership(monkeypatch):
 
     monkeypatch.setattr(scan, "run", capture)
     result = CliRunner().invoke(
-        scan.command,
-        ["sub_100keV", "-p"],
+        performance_command,
+        ["sub_100keV"],
         catch_exceptions=False,
     )
 
@@ -94,7 +77,7 @@ def test_run_perf_flag_defaults_to_full_profile_membership(monkeypatch):
     assert captured["material"] is None
 
 
-def test_run_perf_flag_with_material_profiles_single_member(monkeypatch):
+def test_perf_with_material_profiles_single_member(monkeypatch):
     captured = {}
 
     def capture(args):
@@ -103,8 +86,8 @@ def test_run_perf_flag_with_material_profiles_single_member(monkeypatch):
 
     monkeypatch.setattr(scan, "run", capture)
     result = CliRunner().invoke(
-        scan.command,
-        ["sub_100keV", "-m", "hopg", "-p"],
+        performance_command,
+        ["sub_100keV", "-m", "hopg"],
         catch_exceptions=False,
     )
 
@@ -113,29 +96,7 @@ def test_run_perf_flag_with_material_profiles_single_member(monkeypatch):
     assert captured["material"] == "hopg"
 
 
-def test_run_perf_interval_requires_perf_flag():
-    result = CliRunner().invoke(scan.command, ["sub_100keV", "-i", "10"])
-
-    assert result.exit_code == 2
-    assert "--perf-interval requires -p/--perf" in result.output
-
-
-@pytest.mark.parametrize("option", ("--spec-chunk", "--brem-chunk"))
-def test_run_chunk_pins_require_perf(option):
-    result = CliRunner().invoke(scan.command, ["sub_100keV", option, "128"])
-
-    assert result.exit_code == 2
-    assert "--spec-chunk/--brem-chunk require -p/--perf" in result.output
-
-
-def test_run_nsys_requires_perf():
-    result = CliRunner().invoke(scan.command, ["sub_100keV", "-m", "hopg", "--nsys"])
-
-    assert result.exit_code == 2
-    assert "--nsys requires -p/--perf" in result.output
-
-
-def test_run_nsys_defaults_to_full_profile_membership(monkeypatch):
+def test_perf_nsys_defaults_to_full_profile_membership(monkeypatch):
     captured = {}
 
     def fake_reexec(**kwargs):
@@ -147,8 +108,8 @@ def test_run_nsys_defaults_to_full_profile_membership(monkeypatch):
     monkeypatch.setattr(scan, "_reexec_under_nsys", fake_reexec)
     monkeypatch.setattr(scan, "run", fail_run)
     result = CliRunner().invoke(
-        scan.command,
-        ["sub_100keV", "-p", "--nsys"],
+        performance_command,
+        ["sub_100keV", "--nsys"],
         catch_exceptions=False,
     )
 
@@ -157,7 +118,7 @@ def test_run_nsys_defaults_to_full_profile_membership(monkeypatch):
     assert captured["performance_profile"] == "sub_100keV"
 
 
-def test_run_chunk_pins_exported_before_runtime_import(monkeypatch):
+def test_perf_chunk_pins_exported_before_runtime_import(monkeypatch):
     seen = {}
 
     def capture(args):
@@ -168,8 +129,8 @@ def test_run_chunk_pins_exported_before_runtime_import(monkeypatch):
     monkeypatch.delenv("PYRITE_MC_SPEC_CHUNK", raising=False)
     monkeypatch.delenv("PYRITE_MC_BREM_CHUNK", raising=False)
     result = CliRunner().invoke(
-        scan.command,
-        ["sub_100keV", "-p", "--spec-chunk", "128", "--brem-chunk", "64"],
+        performance_command,
+        ["sub_100keV", "--spec-chunk", "128", "--brem-chunk", "64"],
         catch_exceptions=False,
     )
 
@@ -178,7 +139,7 @@ def test_run_chunk_pins_exported_before_runtime_import(monkeypatch):
     assert seen["brem"] == "64"
 
 
-def test_run_nsys_reexecs_instead_of_running_in_process(monkeypatch):
+def test_perf_nsys_reexecs_instead_of_running_in_process(monkeypatch):
     captured = {}
 
     def fake_reexec(**kwargs):
@@ -190,8 +151,8 @@ def test_run_nsys_reexecs_instead_of_running_in_process(monkeypatch):
     monkeypatch.setattr(scan, "_reexec_under_nsys", fake_reexec)
     monkeypatch.setattr(scan, "run", fail_run)
     result = CliRunner().invoke(
-        scan.command,
-        ["sub_100keV", "-m", "hopg", "-p", "--nsys"],
+        performance_command,
+        ["sub_100keV", "-m", "hopg", "--nsys"],
         catch_exceptions=False,
     )
 
@@ -216,9 +177,9 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
 
     assert argv[0] == "nsys" and argv[1] == "profile"
     assert "--output=performance-profiles/sub_100keV/hopg" in argv
-    assert "-m" in argv and "pyrite._entry.scan" in argv
+    assert "-m" in argv and "pyrite._dev" in argv and "perf" in argv
     assert "--nsys" not in argv  # child must not recurse
-    assert "--performance-profile" in argv and "sub_100keV" in argv
+    assert "--performance-profile" not in argv and "sub_100keV" in argv
     assert "--perf-interval" in argv and "2" in argv
     assert "--max-minutes" in argv and "1.5" in argv
     # isolated, always-uncached checkpoint dir so the trace covers real work

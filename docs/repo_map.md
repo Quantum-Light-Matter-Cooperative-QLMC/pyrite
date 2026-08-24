@@ -118,6 +118,10 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   local runs reject them. Local output is canonical
   `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
   directory. Box shim: `python -m pyrite._entry.scan`.
+- **`pyrite-dev perf [PROFILE] [-m MATERIAL] [-R[=TARGET]]`** → the same run
+  machinery with compute-performance telemetry enabled and shared-cache access
+  disabled by default. Telemetry interval, GPU chunk pins, Nsight capture, and
+  remote CPU profiling are developer-only options on this command.
 - **`pyrite material energy-grid derive [-R[=TARGET]]`** →
   `energy_grid._command` → local
   derivation or the existing sliced SSH/SLURM grid job. Remote derivation waits

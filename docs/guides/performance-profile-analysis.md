@@ -1,6 +1,6 @@
 # Performance-profile analysis playbook
 
-Use this guide after collecting `pyrite run PROFILE --remote --perf` logs.
+Use this guide after collecting `pyrite-dev perf PROFILE --remote` logs.
 Goal: identify throughput constraint from measured phase and resource behavior,
 then test one change at a time. High CPU or GPU utilization is supporting
 evidence, not optimization target; compute-weighted throughput is target.
@@ -48,7 +48,7 @@ The performance-profile name selects an existing catalog profile; it is not an
 arbitrary experiment label. Pulled remote logs retain job separation:
 
 ```bash
-pyrite run sub_100keV --remote --perf --detach
+pyrite-dev perf sub_100keV --remote --detach
 pyrite remote performance pull sub_100keV
 ```
 
@@ -71,7 +71,7 @@ SECONDS` when collection did not use the default five-second interval.
 ### Repeat one uncached remote workload
 
 Run three comparable MoS2 sessions with one-second telemetry and a fixed
-six-worker allocation. Submissions go through `pyrite run PROFILE -R/--remote`;
+six-worker allocation. Submissions go through `pyrite-dev perf PROFILE -R/--remote`;
 `pyrite remote run` still resolves but is deprecated and hidden (removal in 0.3.0,
 see the [CLI deprecation reference](../repo-design/cli/cli-deprecations.md)). The supported form has no
 repetition flag — submit once per repetition, waiting for each to finish, since
@@ -79,8 +79,7 @@ one live job per named profile is allowed. `--perf-reps`, `--chunk-minutes`, and
 `--parallel-materials` exist only on the deprecated command:
 
 ```bash
-pyrite run mos2_heavy -m mos2 --remote \
-  -p \
+pyrite-dev perf mos2_heavy -m mos2 --remote \
   -i 1 \
   --workers 6 \
   --detach
@@ -89,8 +88,8 @@ pyrite remote performance pull mos2_heavy
 pyrite-dev performance analyze mos2_heavy --sample-period 1
 ```
 
-`-p/--perf` runs without shared-cache reads or writes, so every repetition is
-uncached and existing production checkpoints stay untouched; profiling
+`pyrite-dev perf` runs without shared-cache reads or writes, so every
+repetition is uncached and existing production checkpoints stay untouched; profiling
 checkpoints are not automatically pulled. `PROFILE` must name a catalog profile
 (`pyrite profile list`) — it is not a free-form experiment label.
 
@@ -98,8 +97,7 @@ After the baseline completes, test a smaller line-spectrum chunk while keeping
 every other option fixed:
 
 ```bash
-pyrite run mos2_heavy -m mos2 --remote \
-  -p \
+pyrite-dev perf mos2_heavy -m mos2 --remote \
   -i 1 \
   --workers 6 \
   --spec-chunk 20000 \
@@ -118,8 +116,7 @@ capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and native
 CPU samples for one full uncached session:
 
 ```bash
-pyrite run mos2_heavy -m mos2 --remote \
-  -p \
+pyrite-dev perf mos2_heavy -m mos2 --remote \
   -i 1 \
   --workers 6 \
   --spec-chunk 20000 \
@@ -185,12 +182,12 @@ Nsight attributes device work; it will not tell you which Python function owns a
 host-side range. For that, add a bounded single-process `cProfile` pass:
 
 ```bash
-pyrite run mos2_heavy -m mos2 --remote -c --detach     # primary run, then CPU pass
-pyrite run mos2_heavy -m mos2 --remote --cpu-only --detach  # CPU pass only
+pyrite-dev perf mos2_heavy -m mos2 --remote -c --detach  # primary run, then CPU pass
+pyrite-dev perf mos2_heavy -m mos2 --remote --cpu-only --detach  # CPU pass only
 ```
 
-Both flags require `-R/--remote` (heavy profiling stays off the workstation),
-imply `-p/--perf`, and force an unchunked session. `--cpu` runs the primary
+Both flags require `-R/--remote` (heavy profiling stays off the workstation)
+and force an unchunked session. `--cpu` runs the primary
 phase first and the CPU pass after it; `--cpu-only` starts no GPU or Nsight
 phase at all. `--cpu` and `--cpu-only` are mutually exclusive, and `--cpu-only`
 rejects `--nsys` and the GPU chunk pins, which have nothing to act on. The pass

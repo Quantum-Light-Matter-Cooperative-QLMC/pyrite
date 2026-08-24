@@ -1,5 +1,6 @@
-"""Click wiring for ``pyrite run``."""
+"""Click wiring shared by ``pyrite run`` and ``pyrite-dev perf``."""
 
+import copy
 import re
 from pathlib import Path
 
@@ -235,7 +236,7 @@ def _performance_profile(ctx, param, value):
 @click.pass_context
 @_cli_core.fidelity_option()
 @_cli_core.output_option
-def command(
+def _command(
     ctx,
     catalog_profile,
     material,
@@ -502,3 +503,109 @@ def command(
         no_progress=no_progress,
         **({"progress_phase": progress_phase} if progress_phase is not None else {}),
     )
+
+
+_PERF_PARAMETER_NAMES = frozenset(
+    {
+        "perf",
+        "performance_profile",
+        "performance_dir",
+        "performance_interval",
+        "spec_chunk",
+        "brem_chunk",
+        "nsys",
+        "cpu",
+        "cpu_only",
+    }
+)
+_PRESET_PARAMETER_NAMES = frozenset(
+    {"preset", "ne", "ne_brem", "ne_supp", "tmd_azimuth", "refresh"}
+)
+
+
+def _derived_command(name, *, excluded, implied, help):
+    """Build a public command view over the shared run implementation."""
+    params = []
+    for parameter in _command.params:
+        if parameter.name in excluded:
+            continue
+        cloned = copy.copy(parameter)
+        if name == "perf" and isinstance(cloned, click.Option):
+            if cloned.name == "performance_dir":
+                cloned.hidden = False
+                cloned.help = "Write local telemetry below DIR."
+            elif cloned.name == "performance_interval":
+                cloned.help = "Performance-telemetry sampling interval."
+            elif cloned.name == "spec_chunk":
+                cloned.help = "Pin line-spectrum segments per GPU chunk."
+            elif cloned.name == "brem_chunk":
+                cloned.help = "Pin bremsstrahlung segments per GPU chunk."
+            elif cloned.name == "nsys":
+                cloned.help = (
+                    "Capture one uncached Nsight Systems CUDA/NVTX trace of the run "
+                    "(writes a .nsys-rep next to the perf log)."
+                )
+            elif cloned.name == "cpu":
+                cloned.help = (
+                    "After the primary run, capture one bounded serial CPU cProfile "
+                    "pass; requires -R/--remote."
+                )
+            elif cloned.name == "cpu_only":
+                cloned.help = (
+                    "Capture only the bounded serial CPU cProfile pass; starts no "
+                    "primary GPU/Nsight scan and requires -R/--remote."
+                )
+        params.append(cloned)
+
+    command_callback = _command.callback
+    assert command_callback is not None
+
+    def callback(**kwargs):
+        return command_callback(**implied, **kwargs)
+
+    return click.Command(
+        name,
+        params=params,
+        callback=callback,
+        help=help,
+        context_settings={"help_option_names": ["-h", "--help"]},
+    )
+
+
+command = _derived_command(
+    "run",
+    excluded=_PERF_PARAMETER_NAMES,
+    implied={
+        "perf": False,
+        "performance_profile": None,
+        "performance_dir": None,
+        "performance_interval": 5.0,
+        "spec_chunk": None,
+        "brem_chunk": None,
+        "nsys": False,
+        "cpu": False,
+        "cpu_only": False,
+    },
+    help=_command.help,
+)
+
+performance_command = _derived_command(
+    "perf",
+    excluded={"perf", "performance_profile", *_PRESET_PARAMETER_NAMES},
+    implied={
+        "perf": True,
+        "performance_profile": None,
+        "preset": None,
+        "ne": 20_000,
+        "ne_brem": 200,
+        "ne_supp": 200,
+        "tmd_azimuth": 0.0,
+        "refresh": False,
+    },
+    help=(
+        "Measure a catalog profile's MC sweeps and write performance telemetry.\n\n"
+        "PROFILE defaults to the current configured profile. Use -m/--material "
+        "to measure one member; otherwise the full resolved membership is measured. "
+        "Runs omit shared-cache reads and writes unless --recompute is explicit."
+    ),
+)

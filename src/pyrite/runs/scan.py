@@ -206,7 +206,7 @@ def _nsys_reexec_command(
     no_cache=False,
     recompute=False,
 ):
-    """Build the ``nsys profile ... python -m pyrite._entry.scan`` argv and the
+    """Build the ``nsys profile ... python -m pyrite._dev perf`` argv and the
     trace-output stem for a local ``--nsys`` capture.
 
     Pure (no side effects) so the argv/trace contract is unit-testable. The
@@ -226,12 +226,12 @@ def _nsys_reexec_command(
     child = [
         sys.executable,
         "-m",
-        "pyrite._entry.scan",
+        "pyrite._dev",
+        "perf",
         catalog_profile,
     ]
     if material is not None:
         child += ["-m", material]
-    child += ["--performance-profile", performance_profile]
     if performance_dir is not None:
         child += ["--performance-dir", str(performance_dir)]
     if performance_interval != 5.0:

@@ -22,6 +22,7 @@ Commands:
     test-suite run one stable core/CLI/app/packaging/integration test suite
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
+    perf       measure MC sweeps with compute-performance telemetry
     performance list, analyze, or delete compute-performance artifacts
     energy-grid maintain derived detector energy-grid artifacts
     sync-skills mirror .agents/skills into .claude/skills
@@ -560,6 +561,16 @@ def cmd_performance(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_perf(args: argparse.Namespace) -> None:
+    from pyrite.cli.commands.scan import performance_command
+
+    _run_relocated_click(
+        performance_command,
+        args.command_args,
+        prog_name="pyrite-dev perf",
+    )
+
+
 def cmd_energy_grid(args: argparse.Namespace) -> None:
     from pyrite.devtools.cli_commands import energy_grid_command
 
@@ -648,6 +659,13 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     )
     performance.add_argument("command_args", nargs=argparse.REMAINDER)
     performance.set_defaults(func=cmd_performance)
+    perf = sub.add_parser(
+        "perf",
+        add_help=False,
+        help="measure MC sweeps with compute-performance telemetry",
+    )
+    perf.add_argument("command_args", nargs=argparse.REMAINDER)
+    perf.set_defaults(func=cmd_perf)
     energy_grid = sub.add_parser(
         "energy-grid",
         add_help=False,
@@ -675,9 +693,13 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> None:
     raw_args = list(sys.argv[1:] if argv is None else argv)
-    if raw_args and raw_args[0] in {"performance", "energy-grid"}:
+    if raw_args and raw_args[0] in {"perf", "performance", "energy-grid"}:
         command = raw_args[0]
-        func = cmd_performance if command == "performance" else cmd_energy_grid
+        func = {
+            "perf": cmd_perf,
+            "performance": cmd_performance,
+            "energy-grid": cmd_energy_grid,
+        }[command]
         func(argparse.Namespace(command=command, command_args=raw_args[1:]))
         return
     if raw_args and raw_args[0] in {"test", "verify"}:

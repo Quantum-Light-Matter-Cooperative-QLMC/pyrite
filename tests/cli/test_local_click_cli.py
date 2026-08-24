@@ -8,12 +8,14 @@ import pytest
 from pyrite.apps import analyze, check, export, viewer
 from pyrite.checkpoints import _checkpoint_io, archive, slim
 from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.cli.commands.scan import performance_command
 from pyrite.runs import blaze, scan
 from pyrite.validation import check_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [
     scan.command,
+    performance_command,
     blaze.command,
     analyze.command,
     viewer.command,
@@ -83,9 +85,6 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
     [
         (["--no-cache"], (False, False)),
         (["--recompute"], (False, True)),
-        (["-p"], (False, False)),
-        (["-p", "--no-cache"], (False, False)),
-        (["-p", "--recompute"], (False, True)),
     ],
 )
 def test_run_cache_flag_precedence(monkeypatch, extra, expected):
@@ -103,6 +102,21 @@ def test_run_cache_flags_are_mutually_exclusive(monkeypatch):
     )
     assert result.exit_code == 2
     assert "--no-cache and --recompute are mutually exclusive" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        ([], (False, False)),
+        (["--no-cache"], (False, False)),
+        (["--recompute"], (False, True)),
+    ],
+)
+def test_perf_cache_flag_precedence(monkeypatch, extra, expected):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(performance_command, ["standard", "-m", "hopg", *extra])
+    assert_clean_result(result)
+    assert (seen["cache_read"], seen["cache_write"]) == expected
 
 
 def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
