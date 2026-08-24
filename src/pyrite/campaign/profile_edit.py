@@ -302,32 +302,6 @@ def detector_table(profile):
     return detector
 
 
-def apply_detector_updates(document, target, updates):
-    """Apply legacy inline geometry flags, detaching a named reference.
-
-    Detachment copies the named object's current geometry first, so changing one
-    scalar preserves the other resolved values. The CLI warns before calling
-    this compatibility path.
-    """
-    if not updates:
-        return
-    current = target.get("detector")
-    if isinstance(current, str):
-        named = detector_rows(document).get(current)
-        if not isinstance(named, dict):
-            unknown_detector(document, current)
-        detector = tomlkit.table()
-        active = {key for key, _label, _unit in ACTIVE_DETECTOR_FIELDS}
-        for key, value in named.items():
-            if key in active:
-                detector[key] = value
-        target["detector"] = detector
-    else:
-        detector = detector_table(target)
-    for key, value in updates.items():
-        detector[key] = value
-
-
 def unknown_beam(document, name):
     known = beam_rows(document)
     suggestions = difflib.get_close_matches(name, known, n=3, cutoff=0.5)
@@ -497,7 +471,6 @@ def create_profile(
     updates,
     beam_name,
     detector_name,
-    detector_updates,
     transport_updates,
     materials,
 ):
@@ -523,8 +496,6 @@ def create_profile(
         target["beam"] = beam_name
     if detector_name is not None:
         target["detector"] = detector_name
-    else:
-        apply_detector_updates(document, target, detector_updates)
     _apply_transport_updates(target, transport_updates)
     if materials is not None:
         target["materials"] = validate_materials(document, csv_materials(materials))
@@ -538,7 +509,6 @@ def set_profile(
     updates,
     beam_name,
     detector_name,
-    detector_updates,
     transport_updates,
     materials,
     all_materials,
@@ -554,25 +524,12 @@ def set_profile(
         validate_materials(document, csv_materials(materials)) if materials is not None else None
     )
     overwriting = [label for label in updates if catalog_key(label) in target]
-    existing_detector = target.get("detector", {})
-    detector_labels = [
-        label for key, label, _unit in ACTIVE_DETECTOR_FIELDS if key in detector_updates
-    ]
-    overwriting.extend(
-        label
-        for key, label, _unit in ACTIVE_DETECTOR_FIELDS
-        if key in detector_updates
-        and isinstance(existing_detector, dict)
-        and key in existing_detector
-    )
     for label, values in updates.items():
         target[catalog_key(label)] = values_item(values)
     if beam_name is not None:
         target["beam"] = beam_name
     if detector_name is not None:
         target["detector"] = detector_name
-    else:
-        apply_detector_updates(document, target, detector_updates)
     _apply_transport_updates(target, transport_updates)
     if material_keys is not None:
         target["materials"] = material_keys
@@ -580,7 +537,7 @@ def set_profile(
         target.pop("materials", None)
     if emission is not None:
         target["emission"] = emission
-    return overwriting, detector_labels
+    return overwriting
 
 
 def rename_profile(document, name, new_name):

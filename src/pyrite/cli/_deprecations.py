@@ -302,20 +302,12 @@ def _flag(
     return DeprecatedFlag(command, flag, replacement, since, _window(since), note)
 
 
-# The nine inline beam-distribution flags that once sat on `profile create` and
-# `profile set` are gone rather than deprecated (issue #54): beam phase space is
-# set only through `pyrite beam create`/`set` and attached with `--beam NAME`, so
-# the old spellings are plain "no such option" usage errors with no registry row.
-# The detector family below is the surviving half of that pair and still warns.
-
-_DETECTOR_FLAG_NAMES: tuple[str, ...] = (
-    "--observation-angle",
-    "--polar-acceptance",
-    "--solid-angle",
-)
-_DETECTOR_FLAG_NOTE = (
-    "Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`."
-)
+# The nine inline beam-distribution flags and the three inline detector-geometry
+# flags that once sat on `profile create` and `profile set` are gone rather than
+# deprecated (issues #54, #62): beam phase space and detector geometry are set
+# only through `pyrite beam create`/`set` and `pyrite detector create`/`set`,
+# attached with `--beam NAME` / `--detector NAME`, so the old spellings are plain
+# "no such option" usage errors with no registry row.
 
 #: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
@@ -323,16 +315,6 @@ _DETECTOR_FLAG_NOTE = (
 DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     entry.key: entry
     for entry in (
-        *(
-            _flag(
-                command,
-                flag,
-                f"pyrite detector create/set {flag}",
-                note=_DETECTOR_FLAG_NOTE,
-            )
-            for command in ("profile create", "profile set")
-            for flag in _DETECTOR_FLAG_NAMES
-        ),
         # D5: one canonical name per quantity. The singular spellings were
         # already canonical on `material set`, `sweep set`, and `profile *`;
         # these are the stragglers that kept the plural.
@@ -437,16 +419,6 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("detector show", "--json", "--output json"),
     )
 }
-
-
-#: Keys in `DEPRECATED_FLAGS` with no live `RetiredOption` -- the command body
-#: calls `warn_flag` itself instead. Mirrors `SELF_WARNING`, one level down
-#: (flags rather than whole command paths).
-SELF_WARNING_FLAGS: frozenset[tuple[str, str]] = frozenset(
-    (command, flag)
-    for command in ("profile create", "profile set")
-    for flag in _DETECTOR_FLAG_NAMES
-)
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

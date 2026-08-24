@@ -160,9 +160,12 @@ Detector geometry uses the same named-object pattern shown above. Use
 objects and `pyrite profile set <profile> --detector NAME` to attach one.
 Rename updates every reference; delete names and refuses surviving referents.
 The name and label never enter checkpoint identity, but resolved geometry does.
-Legacy inline `[profiles.<name>.detector]` tables and the three equivalent
-profile flags remain readable during their deprecation window. Response models
-and detector energy bins are runtime objects and are not serialized here.
+The older inline `[profiles.<name>.detector]` table still decodes and means
+exactly the same thing, but nothing writes it any more. The three
+`pyrite profile create` / `pyrite profile set` flags that used to write that
+block have been removed; `--detector NAME` is the only way `pyrite profile`
+touches detector geometry. Response models and detector energy bins are
+runtime objects and are not serialized here.
 Named and inline geometry nevertheless preserve the catalog's existing default
 `Timepix3` response; this named-object workflow does not make that response
 configurable.

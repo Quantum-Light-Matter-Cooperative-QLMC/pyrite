@@ -136,9 +136,6 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite material simulate` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile create` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
-| `pyrite profile create` | `--observation-angle` | `pyrite detector create/set --observation-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
-| `pyrite profile create` | `--polar-acceptance` | `pyrite detector create/set --polar-acceptance` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
-| `pyrite profile create` | `--solid-angle` | `pyrite detector create/set --solid-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
 | `pyrite profile delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile energy-grid defaults` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile energy-grid defaults` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
@@ -150,9 +147,6 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite profile numerics show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile remove` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite profile set` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
-| `pyrite profile set` | `--observation-angle` | `pyrite detector create/set --observation-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
-| `pyrite profile set` | `--polar-acceptance` | `pyrite detector create/set --polar-acceptance` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
-| `pyrite profile set` | `--solid-angle` | `pyrite detector create/set --solid-angle` | 0.1.0 | 0.3.0 | Attach a named detector instead: `pyrite profile set NAME --detector DETECTOR_NAME`. |
 | `pyrite profile show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `pyrite-dev energy-grid add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `pyrite-dev energy-grid rm` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |

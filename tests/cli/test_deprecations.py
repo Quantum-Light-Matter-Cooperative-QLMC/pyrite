@@ -10,7 +10,6 @@ from pyrite.cli import command
 from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,
     DEPRECATIONS,
-    SELF_WARNING_FLAGS,
     SUPPORT_WINDOW_MINORS,
     RetiredOption,
     _window,
@@ -123,8 +122,7 @@ def test_retired_flag_registry_matches_live_command_tree() -> None:
                 assert key not in live, f"duplicate retired flag: {key!r}"
                 live[key] = param
 
-    assert SELF_WARNING_FLAGS <= DEPRECATED_FLAGS.keys()
-    assert live.keys() == DEPRECATED_FLAGS.keys() - SELF_WARNING_FLAGS
+    assert live.keys() == DEPRECATED_FLAGS.keys()
     for key, param in live.items():
         assert param.replacement == DEPRECATED_FLAGS[key].replacement
 

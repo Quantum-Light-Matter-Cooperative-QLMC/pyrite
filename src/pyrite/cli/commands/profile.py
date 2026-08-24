@@ -30,13 +30,7 @@ from pyrite.cli._core import (
     flatten_option_values,
     output_option,
 )
-from pyrite.cli._deprecations import DeprecatingGroup, canonical_option, warn_flag
-from pyrite.cli.commands._detector_shared import (
-    collect_detector_updates as _collect_detector_updates,
-)
-from pyrite.cli.commands._detector_shared import (
-    detector_cli_options as _detector_cli_options,
-)
+from pyrite.cli._deprecations import DeprecatingGroup, canonical_option
 from pyrite.cli.commands._filter_shared import (
     filter_cli_options,
     filter_row,
@@ -293,19 +287,6 @@ def _emit_show(payload):
 
 def _detector_table(profile):
     return _profile_edit.detector_table(profile)
-
-
-_DETECTOR_FLAG_PARAMS = {
-    "observation_angle_deg": "--observation-angle",
-    "polar_acceptance_deg": "--polar-acceptance",
-    "solid_angle_sr": "--solid-angle",
-}
-
-
-def _warn_inline_detector_flags(ctx, **detector_flag_values):
-    for param_name, flag in _DETECTOR_FLAG_PARAMS.items():
-        if detector_flag_values.get(param_name) is not None:
-            warn_flag(ctx, flag, f"pyrite detector create/set {flag}")
 
 
 class _ProfileGroup(LazyGroup):
@@ -748,9 +729,8 @@ def show_command(name, json_output):
     "detector_name",
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
-    help="Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+    help="Attach a named [detectors.NAME] reference; create it with 'pyrite detector create'.",
 )
-@_detector_cli_options
 @canonical_option(
     "--material",
     "materials",
@@ -760,9 +740,7 @@ def show_command(name, json_output):
     help="Set explicit initial membership (comma-separated material keys).",
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-@click.pass_context
 def create_command(
-    ctx,
     name,
     source,
     thickness,
@@ -774,9 +752,6 @@ def create_command(
     straggling,
     energy_model,
     max_de_frac,
-    observation_angle_deg,
-    polar_acceptance_deg,
-    solid_angle_sr,
     materials,
     beam_name,
     detector_name,
@@ -784,26 +759,14 @@ def create_command(
 ):
     """Create a new profile, cloning defaults from --from (standard).
 
-    Range options replace individual cloned grids; detector options replace
-    individual cloned fields. Material membership is cloned and ``--material``
-    replaces it. Per-material overrides are not cloned. Beam phase space is set
-    only through a named object: build it with ``pyrite beam create`` and attach
-    it here with --beam NAME.
+    Range options replace individual cloned grids. Material membership is cloned
+    and ``--material`` replaces it. Per-material overrides are not cloned. Beam
+    phase space and detector geometry are set only through named objects: build
+    them with ``pyrite beam create`` / ``pyrite detector create`` and attach them
+    here with --beam NAME / --detector NAME.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    detector_updates = _collect_detector_updates(
-        observation_angle_deg, polar_acceptance_deg, solid_angle_sr
-    )
-    if detector_name is not None and detector_updates:
-        raise click.UsageError("--detector replaces inline detector flags; pass only one")
-    if detector_updates:
-        _warn_inline_detector_flags(
-            ctx,
-            observation_angle_deg=observation_angle_deg,
-            polar_acceptance_deg=polar_acceptance_deg,
-            solid_angle_sr=solid_angle_sr,
-        )
     transport_updates = {
         key: value
         for key, value in (
@@ -823,7 +786,6 @@ def create_command(
             updates=updates,
             beam_name=beam_name,
             detector_name=detector_name,
-            detector_updates=detector_updates,
             transport_updates=transport_updates,
             materials=materials,
         )
@@ -849,9 +811,8 @@ def create_command(
     "detector_name",
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
-    help="Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+    help="Attach a named [detectors.NAME] reference; create it with 'pyrite detector create'.",
 )
-@_detector_cli_options
 @canonical_option(
     "--material",
     "materials",
@@ -872,9 +833,7 @@ def create_command(
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-@click.pass_context
 def set_command(
-    ctx,
     name,
     thickness,
     energy,
@@ -885,9 +844,6 @@ def set_command(
     straggling,
     energy_model,
     max_de_frac,
-    observation_angle_deg,
-    polar_acceptance_deg,
-    solid_angle_sr,
     materials,
     beam_name,
     detector_name,
@@ -896,30 +852,18 @@ def set_command(
     yes,
     dry_run,
 ):
-    """Replace range grids, the beam reference, detector scalars, or emission.
+    """Replace range grids, the beam reference, the detector reference, or emission.
 
     NAME must already exist (create it with ``pyrite profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
-    unless --yes is given; --dry-run never prompts. Detector scalars and
-    emission replace supplied fields; unlike range grids, they are not accepted
-    by add/remove -- except emission, which add/remove also accept via
-    --coherent/--incoherent for incremental switching. Beam phase space is set
-    only through a named object: edit it with ``pyrite beam set``, or attach a
-    different one here with --beam NAME.
+    unless --yes is given; --dry-run never prompts. Emission replaces the
+    supplied field; unlike range grids, it is not accepted by add/remove --
+    except via --coherent/--incoherent for incremental switching. Beam phase
+    space and detector geometry are set only through named objects: edit them
+    with ``pyrite beam set`` / ``pyrite detector set``, or attach different ones
+    here with --beam NAME / --detector NAME.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    detector_updates = _collect_detector_updates(
-        observation_angle_deg, polar_acceptance_deg, solid_angle_sr
-    )
-    if detector_name is not None and detector_updates:
-        raise click.UsageError("--detector replaces inline detector flags; pass only one")
-    if detector_updates:
-        _warn_inline_detector_flags(
-            ctx,
-            observation_angle_deg=observation_angle_deg,
-            polar_acceptance_deg=polar_acceptance_deg,
-            solid_angle_sr=solid_angle_sr,
-        )
     transport_updates = {
         key: value
         for key, value in (
@@ -935,7 +879,6 @@ def set_command(
         not updates
         and beam_name is None
         and detector_name is None
-        and not detector_updates
         and not transport_updates
         and materials is None
         and not all_materials
@@ -946,13 +889,12 @@ def set_command(
         )
     try:
         original, document = _catalog_io.catalog_text()
-        overwriting, detector_labels = _profile_edit.set_profile(
+        overwriting = _profile_edit.set_profile(
             document,
             name,
             updates=updates,
             beam_name=beam_name,
             detector_name=detector_name,
-            detector_updates=detector_updates,
             transport_updates=transport_updates,
             materials=materials,
             all_materials=all_materials,
@@ -964,13 +906,12 @@ def set_command(
         overwriting
         or beam_name is not None
         or detector_name is not None
-        or detector_updates
         or transport_updates
         or materials is not None
         or all_materials
         or emission is not None
     ):
-        action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
+        action_fields = list(dict.fromkeys(overwriting))
         if beam_name is not None:
             action_fields.append("beam")
         if detector_name is not None:

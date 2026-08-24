@@ -87,6 +87,26 @@ INTENTIONAL_P0_CORRECTIONS = [
             "Human presentation sanitizes controls and machine framing uses versioned base64 fields."
         ),
     },
+    {
+        "id": "profile-inline-beam-flags-removed",
+        "paths": ["profile create", "profile set"],
+        "contract": (
+            "Beam phase space is set only through `pyrite beam create/set` and attached with "
+            "`--beam NAME`; the nine inline beam-distribution flags are removed from `profile "
+            "create`/`profile set` rather than deprecated, so they are plain 'no such option' "
+            "usage errors."
+        ),
+    },
+    {
+        "id": "profile-inline-detector-flags-removed",
+        "paths": ["profile create", "profile set"],
+        "contract": (
+            "Detector geometry is set only through `pyrite detector create/set` and attached with "
+            "`--detector NAME`; the three inline detector-geometry flags are removed from `profile "
+            "create`/`profile set` rather than deprecated, so they are plain 'no such option' "
+            "usage errors."
+        ),
+    },
 ]
 
 

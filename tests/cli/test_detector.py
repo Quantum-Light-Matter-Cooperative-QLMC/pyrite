@@ -107,6 +107,24 @@ def test_create_set_and_dry_run(tmp_path, monkeypatch):
     assert "solid_angle_sr = 0.02" in path.read_text()
 
 
+def test_scalar_options_validate_domains(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    bad_acceptance = invoke(
+        detector.command,
+        ["set", "eds", "--polar-acceptance", "0"],
+    )
+    bad_solid_angle = invoke(
+        detector.command,
+        ["create", "bad", "--solid-angle", "13"],
+    )
+
+    assert bad_acceptance.exit_code == 2
+    assert "0<x<=180" in bad_acceptance.stderr
+    assert bad_solid_angle.exit_code == 2
+    assert "12.566" in bad_solid_angle.stderr
+
+
 def test_create_and_set_validate_names_fields_and_overwrites(tmp_path, monkeypatch):
     path = _catalog(tmp_path, monkeypatch)
     original = path.read_text()

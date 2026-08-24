@@ -82,7 +82,7 @@ def test_frozen_click_contract_records_current_tree():
     # slice 6 adds the artifact-store commands (`energy-grid verify`/`gc`).
     # Named detector tooling adds the visible group plus six verbs.
     assert len(list(_help_cases(_FROZEN["root"]))) < 170
-    assert len(_FROZEN["intentional_p0_corrections"]) == 11
+    assert len(_FROZEN["intentional_p0_corrections"]) == 12
 
 
 def test_every_yes_option_has_short_spelling():

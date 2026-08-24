@@ -758,9 +758,13 @@ hashes, so beam names never reach `parameter_sha256`. See
 Canonical `pyrite detector list|show|create|set|rename|delete` Click layer over
 top-level `[detectors.NAME]` geometry objects. Profiles attach one through
 `detector = "NAME"`; rename updates every referent and delete refuses while a
-reference survives. Names and display-only labels are removed during catalog
-resolution, so identity depends only on the resolved geometry. Detector
-responses and energy bins remain runtime objects outside this TOML schema.
+reference survives. This is the only CLI surface that writes detector geometry
+fields: `pyrite profile`'s inline detector flags were removed (issue #62),
+leaving `cli/commands/_detector_shared.py` to share option parsing,
+validation, and TOML writing between `create` and `set` alone. Names and
+display-only labels are removed during catalog resolution, so identity
+depends only on the resolved geometry. Detector responses and energy bins
+remain runtime objects outside this TOML schema.
 
 ### `cli/commands/job.py`
 Canonical `pyrite job list|status|logs|attach|stop` Click layer. Reuses the remote

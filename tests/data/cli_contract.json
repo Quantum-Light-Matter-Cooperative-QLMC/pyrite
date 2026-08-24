@@ -83,6 +83,14 @@
         "profile create",
         "profile set"
       ]
+    },
+    {
+      "contract": "Detector geometry is set only through `pyrite detector create/set` and attached with `--detector NAME`; the three inline detector-geometry flags are removed from `profile create`/`profile set` rather than deprecated, so they are plain 'no such option' usage errors.",
+      "id": "profile-inline-detector-flags-removed",
+      "paths": [
+        "profile create",
+        "profile set"
+      ]
     }
   ],
   "root": {
@@ -329,7 +337,7 @@
             "required": false
           }
         ],
-        "help": "Usage: pyrite run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes component data\n  beneath <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use a tiny smoke-test grid and write the\n                                  <material>_quick/ component directory.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write component checkpoints in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  -c, --cpu                       After the primary run, capture one bounded\n                                  serial CPU cProfile pass; implies --perf.\n                                  Requires -R/--remote.\n  --cpu-only                      Capture only the bounded serial CPU cProfile\n                                  pass; starts no primary GPU/Nsight scan and\n                                  implies --perf. Requires -R/--remote.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai\n                                  requires -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: pyrite run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes component data\n  beneath <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use a tiny smoke-test grid and write the\n                                  <material>_quick/ component directory.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write component checkpoints in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai\n                                  requires -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
@@ -754,7 +762,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite app validation [OPTIONS] COMMAND [ARGS]...\n\n  Launch the interactive validation application, or export cached figures.\n\nOptions:\n  --watch     Pass marimo's --watch.\n  --edit      Use `marimo edit` instead of `marimo run`.\n  --acp       Start local Claude and Codex ACP bridges.\n  --tunnel    Use fixed port for SSH tunneling.\n  -h, --help  Show this message and exit.\n\nCommands:\n  export  Write cached validation figures; never starts marimo.\n  launch  Launch the interactive validation application.\n",
+            "help": "Usage: pyrite app validation [OPTIONS] [COMMAND] [ARGS]...\n\n  Launch the interactive validation application, or export cached figures.\n\nOptions:\n  --watch     Pass marimo's --watch.\n  --edit      Use `marimo edit` instead of `marimo run`.\n  --acp       Start local Claude and Codex ACP bridges.\n  --tunnel    Use fixed port for SSH tunneling.\n  -h, --help  Show this message and exit.\n\nCommands:\n  export  Write cached validation figures; never starts marimo.\n  launch  Launch the interactive validation application.\n",
             "hidden": false,
             "path": "app validation",
             "subcommands": [
@@ -5191,7 +5199,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all catalog materials.\n  Membership uses ``set|add|remove --material``; ``set --all-materials``\n  restores implicit membership. Per-material range overrides and derived energy\n  grids are managed by ``pyrite material``.\n\n  Examples:\n    pyrite profile list\n    pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)\n    pyrite profile create sub_100keV --energy 30:100:10\n    pyrite profile set sub_100keV --observation-angle 119\n    pyrite profile add sub_100keV --energy 75\n    pyrite profile set sub_100keV --material hopg,mose2\n    pyrite profile rename sub_100keV sub100\n    pyrite profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add          Incrementally add values to profile grids,...\n  create       Create a new profile, cloning defaults...\n  delete       Delete a profile; irreversible.\n  list         List catalog profiles with membership,...\n  remove       Remove values from an existing profile's...\n  rename       Rename profile NAME to NEW_NAME.\n  set          Replace range grids, beam fields, detector...\n  show         Show one profile's ranges, beam, detector,...\n  energy-grid  Manage profile-scoped energy-grid derivation inputs.\n",
+        "help": "Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all catalog materials.\n  Membership uses ``set|add|remove --material``; ``set --all-materials``\n  restores implicit membership. Per-material range overrides and derived energy\n  grids are managed by ``pyrite material``.\n\n  Examples:\n    pyrite profile list\n    pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)\n    pyrite profile create sub_100keV --energy 30:100:10\n    pyrite profile set sub_100keV --observation-angle 119\n    pyrite profile add sub_100keV --energy 75\n    pyrite profile set sub_100keV --material hopg,mose2\n    pyrite profile rename sub_100keV sub100\n    pyrite profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add          Incrementally add values to profile grids,...\n  create       Create a new profile, cloning defaults...\n  delete       Delete a profile; irreversible.\n  filter       Manage finite FilterPlate objects on a...\n  list         List catalog profiles with membership,...\n  numerics     Inspect and edit result-affecting...\n  remove       Remove values from an existing profile's...\n  rename       Rename profile NAME to NEW_NAME.\n  set          Replace range grids, the beam reference,...\n  show         Show one profile's ranges, beam, detector,...\n  energy-grid  Manage profile-scoped energy-grid derivation inputs.\n",
         "hidden": false,
         "path": "profile",
         "subcommands": [
@@ -5477,7 +5485,7 @@
               },
               {
                 "dest": "beam_name",
-                "help": "Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+                "help": "Attach a named [beams.NAME] reference; create it with 'pyrite beam create'.",
                 "option_strings": [
                   "--beam"
                 ],
@@ -5485,33 +5493,9 @@
               },
               {
                 "dest": "detector_name",
-                "help": "Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+                "help": "Attach a named [detectors.NAME] reference; create it with 'pyrite detector create'.",
                 "option_strings": [
                   "--detector"
-                ],
-                "required": false
-              },
-              {
-                "dest": "observation_angle_deg",
-                "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
-                "option_strings": [
-                  "--observation-angle"
-                ],
-                "required": false
-              },
-              {
-                "dest": "polar_acceptance_deg",
-                "help": "Full detector polar acceptance span in degrees; scalar replacement.",
-                "option_strings": [
-                  "--polar-acceptance"
-                ],
-                "required": false
-              },
-              {
-                "dest": "solid_angle_sr",
-                "help": "Detector solid angle in sr; scalar replacement.",
-                "option_strings": [
-                  "--solid-angle"
                 ],
                 "required": false
               },
@@ -5540,7 +5524,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite profile create [OPTIONS] NAME\n\n  Create a new profile, cloning defaults from --from (standard).\n\n  Range options replace individual cloned grids; beam and detector options\n  replace individual cloned fields. Material membership is cloned and\n  ``--material`` replaces it. Per-material overrides are not cloned. --beam NAME\n  attaches a named [beams.NAME] reference and is mutually exclusive with the\n  inline beam flags, which are deprecated in its favor.\n\nOptions:\n  --from SOURCE                   Clone ranges, beam, detector, and material\n                                  membership from SOURCE; defaults to standard.\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model (frozen or midpoint).\n  --max-de-frac FRACTION          Cap one transport row's fractional mean energy\n                                  loss; requires midpoint.  [x>=0.0]\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference;\n                                  replaces the inline beam flags.\n  --detector NAME                 Attach a named [detectors.NAME] reference;\n                                  replaces inline geometry flags.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --material KEY,...              Set explicit initial membership (comma-\n                                  separated material keys).\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite profile create [OPTIONS] NAME\n\n  Create a new profile, cloning defaults from --from (standard).\n\n  Range options replace individual cloned grids. Material membership is cloned\n  and ``--material`` replaces it. Per-material overrides are not cloned. Beam\n  phase space and detector geometry are set only through named objects: build\n  them with ``pyrite beam create`` / ``pyrite detector create`` and attach them\n  here with --beam NAME / --detector NAME.\n\nOptions:\n  --from SOURCE                   Clone ranges, beam, detector, and material\n                                  membership from SOURCE; defaults to standard.\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model (frozen or midpoint).\n  --max-de-frac FRACTION          Cap one transport row's fractional mean energy\n                                  loss; requires midpoint.  [x>=0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference; create\n                                  it with 'pyrite beam create'.\n  --detector NAME                 Attach a named [detectors.NAME] reference;\n                                  create it with 'pyrite detector create'.\n  --material KEY,...              Set explicit initial membership (comma-\n                                  separated material keys).\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile create",
             "subcommands": []
@@ -5592,6 +5576,260 @@
             "hidden": false,
             "path": "profile delete",
             "subcommands": []
+          },
+          {
+            "actions": [],
+            "help": "Usage: pyrite profile filter [OPTIONS] COMMAND [ARGS]...\n\n  Manage finite FilterPlate objects on a profile.\n\n  ``add`` validates its plate through the public ``FilterPlate`` dataclass.\n  Supply ``--detector-distance-mm`` (and optionally ``--shape`` or ``--pitch-\n  mm``) to create or replace the profile's physical pixel detector. Filters need\n  that detector when running ``pyrite material simulate``.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add   Add one finite filter plate to PROFILE.\n  list  List PROFILE's finite filter plates.\n  rm    Remove one filter by its name or one-based list index.\n  show  Show one PROFILE filter by its name or one-based list index.\n",
+            "hidden": false,
+            "path": "profile filter",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "profile_name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "offset_mm",
+                    "help": "Local x/y offset in mm.",
+                    "option_strings": [
+                      "--offset-mm"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "roll_deg",
+                    "help": "Local-roll angle in degrees.",
+                    "option_strings": [
+                      "--roll-deg"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "azimuth_deg",
+                    "help": "Observation azimuth in degrees.",
+                    "option_strings": [
+                      "--azimuth-deg"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "polar_deg",
+                    "help": "Observation polar angle in degrees [0, 180].",
+                    "option_strings": [
+                      "--polar-deg"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "distance_mm",
+                    "help": "Source-to-plate distance in mm.",
+                    "option_strings": [
+                      "--distance-mm"
+                    ],
+                    "required": true
+                  },
+                  {
+                    "dest": "size_mm",
+                    "help": "Plate width and height in mm.",
+                    "option_strings": [
+                      "--size-mm"
+                    ],
+                    "required": true
+                  },
+                  {
+                    "dest": "thickness_mm",
+                    "help": "Plate thickness in mm.",
+                    "option_strings": [
+                      "--thickness-mm"
+                    ],
+                    "required": true
+                  },
+                  {
+                    "dest": "material",
+                    "help": "Catalog crystal or medium key.",
+                    "option_strings": [
+                      "--material"
+                    ],
+                    "required": true
+                  },
+                  {
+                    "dest": "name",
+                    "help": "Optional display name; must be unique within the profile.",
+                    "option_strings": [
+                      "--name"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_pitch_mm",
+                    "help": "Physical-detector pixel pitch (y, x) in mm.",
+                    "option_strings": [
+                      "--pitch-mm"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_shape",
+                    "help": "Physical-detector pixel shape; defaults to a Timepix3 chip.",
+                    "option_strings": [
+                      "--shape"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_offset_mm",
+                    "help": "Physical-detector local x/y offset in mm.",
+                    "option_strings": [
+                      "--detector-offset-mm"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_roll_deg",
+                    "help": "Physical-detector local roll in degrees.",
+                    "option_strings": [
+                      "--detector-roll-deg"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_azimuth_deg",
+                    "help": "Physical-detector azimuth in degrees.",
+                    "option_strings": [
+                      "--detector-azimuth-deg"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_polar_deg",
+                    "help": "Physical-detector polar angle in degrees [0, 180].",
+                    "option_strings": [
+                      "--detector-polar-deg"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detector_distance_mm",
+                    "help": "Source-to-physical-detector distance in mm.",
+                    "option_strings": [
+                      "--detector-distance-mm"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print proposed TOML diff; write nothing.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile filter add [OPTIONS] PROFILE_NAME\n\n  Add one finite filter plate to PROFILE.\n\nOptions:\n  --offset-mm X Y               Local x/y offset in mm.  [default: 0.0, 0.0]\n  --roll-deg FLOAT              Local-roll angle in degrees.  [default: 0.0]\n  --azimuth-deg FLOAT           Observation azimuth in degrees.  [default: 0.0]\n  --polar-deg FLOAT             Observation polar angle in degrees [0, 180].\n                                [default: 90.0]\n  --distance-mm MM              Source-to-plate distance in mm.  [x>0.0;\n                                required]\n  --size-mm WIDTH HEIGHT        Plate width and height in mm.  [required]\n  --thickness-mm MM             Plate thickness in mm.  [x>0.0; required]\n  --material KEY                Catalog crystal or medium key.  [required]\n  --name TEXT                   Optional display name; must be unique within the\n                                profile.\n  --pitch-mm Y X                Physical-detector pixel pitch (y, x) in mm.\n  --shape ROWS COLS             Physical-detector pixel shape; defaults to a\n                                Timepix3 chip.\n  --detector-offset-mm X Y      Physical-detector local x/y offset in mm.\n                                [default: 0.0, 0.0]\n  --detector-roll-deg FLOAT     Physical-detector local roll in degrees.\n                                [default: 0.0]\n  --detector-azimuth-deg FLOAT  Physical-detector azimuth in degrees.  [default:\n                                0.0]\n  --detector-polar-deg FLOAT    Physical-detector polar angle in degrees [0,\n                                180].  [default: 90.0]\n  --detector-distance-mm MM     Source-to-physical-detector distance in mm.\n                                [x>0.0]\n  --dry-run                     Print proposed TOML diff; write nothing.\n  -h, --help                    Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile filter add",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "profile_name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "json_output",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--json"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile filter list [OPTIONS] PROFILE_NAME\n\n  List PROFILE's finite filter plates.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile filter list",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "profile_name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "identifier",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print proposed TOML diff; write nothing.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile filter rm [OPTIONS] PROFILE_NAME IDENTIFIER\n\n  Remove one filter by its name or one-based list index.\n\nOptions:\n  --dry-run   Print proposed TOML diff; write nothing.\n  -h, --help  Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile filter rm",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "profile_name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "identifier",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "json_output",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--json"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile filter show [OPTIONS] PROFILE_NAME IDENTIFIER\n\n  Show one PROFILE filter by its name or one-based list index.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile filter show",
+                "subcommands": []
+              }
+            ]
           },
           {
             "actions": [
@@ -5764,6 +6002,194 @@
                 "help": "Usage: pyrite profile members set [OPTIONS] NAME [MATERIALS]...\n\n  Replace NAME's explicit membership with MATERIAL keys.\n\nOptions:\n  -y, --yes   Skip the 'standard' confirmation prompt.\n  --dry-run   Print proposed TOML diff; write nothing.\n  -h, --help  Show this message and exit.\n",
                 "hidden": false,
                 "path": "profile members set",
+                "subcommands": []
+              }
+            ]
+          },
+          {
+            "actions": [],
+            "help": "Usage: pyrite profile numerics [OPTIONS] COMMAND [ARGS]...\n\n  Inspect and edit result-affecting calculation controls.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  reset  Reset selected FIELDs, or every explicit numeric when none are named.\n  set    Set one or more explicit result-affecting controls on PROFILE.\n  show   Show explicit and effective PROFILE numerics with value sources.\n",
+            "hidden": false,
+            "path": "profile numerics",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "fields",
+                    "help": null,
+                    "option_strings": [],
+                    "required": false
+                  },
+                  {
+                    "dest": "yes",
+                    "help": "Skip the 'standard' confirmation prompt.",
+                    "option_strings": [
+                      "-y",
+                      "--yes"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print proposed TOML diff; write nothing.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile numerics reset [OPTIONS] NAME [line-\n                                     electrons|bremsstrahlung-\n                                     electrons|reflection-families|maximum-\n                                     reflections|mosaic-nodes|mosaic-\n                                     route|straggling|energy-model|maximum-\n                                     fractional-energy-loss]...\n\n  Reset selected FIELDs, or every explicit numeric when none are named.\n\nOptions:\n  -y, --yes   Skip the 'standard' confirmation prompt.\n  --dry-run   Print proposed TOML diff; write nothing.\n  -h, --help  Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile numerics reset",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "line_electrons",
+                    "help": "Line-spectrum samples.",
+                    "option_strings": [
+                      "--line-electrons"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "bremsstrahlung_electrons",
+                    "help": "Bremsstrahlung samples.",
+                    "option_strings": [
+                      "--bremsstrahlung-electrons"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "reflection_families",
+                    "help": "Ranked reflection families to resolve.",
+                    "option_strings": [
+                      "--reflection-families"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "maximum_reflections",
+                    "help": "Cap resolved reflections after family expansion.",
+                    "option_strings": [
+                      "--maximum-reflections"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "mosaic_nodes",
+                    "help": "Gauss-Hermite nodes per mosaic tilt axis.",
+                    "option_strings": [
+                      "--mosaic-nodes"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "mosaic_route",
+                    "help": "Mosaic broadening route.",
+                    "option_strings": [
+                      "--mosaic-route"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "straggling",
+                    "help": "Enable or disable Urban energy-loss straggling.",
+                    "option_strings": [
+                      "--straggling",
+                      "--no-straggling"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "energy_model",
+                    "help": "Transport clock model.",
+                    "option_strings": [
+                      "--energy-model"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "maximum_fractional_energy_loss",
+                    "help": "Cap one row's fractional mean energy loss; positive values require midpoint.",
+                    "option_strings": [
+                      "--maximum-fractional-energy-loss"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "yes",
+                    "help": "Skip the 'standard' confirmation prompt.",
+                    "option_strings": [
+                      "-y",
+                      "--yes"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Print proposed TOML diff; write nothing.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile numerics set [OPTIONS] NAME\n\n  Set one or more explicit result-affecting controls on PROFILE.\n\nOptions:\n  --line-electrons N              Line-spectrum samples.  [x>=1]\n  --bremsstrahlung-electrons N    Bremsstrahlung samples.  [x>=1]\n  --reflection-families N         Ranked reflection families to resolve.  [x>=1]\n  --maximum-reflections N         Cap resolved reflections after family\n                                  expansion.  [x>=1]\n  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.\n                                  [x>=1]\n  --mosaic-route [analytic|mc]    Mosaic broadening route.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model.\n  --maximum-fractional-energy-loss FRACTION\n                                  Cap one row's fractional mean energy loss;\n                                  positive values require midpoint.  [x>=0.0]\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile numerics set",
+                "subcommands": []
+              },
+              {
+                "actions": [
+                  {
+                    "dest": "name",
+                    "help": null,
+                    "option_strings": [],
+                    "required": true
+                  },
+                  {
+                    "dest": "fidelity",
+                    "help": "Resolve profile values against this fidelity preset.",
+                    "option_strings": [
+                      "--fidelity"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "json_output",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
+                    "option_strings": [
+                      "--json"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: pyrite profile numerics show [OPTIONS] NAME\n\n  Show explicit and effective PROFILE numerics with value sources.\n\nOptions:\n  --fidelity [full|survey]        Resolve profile values against this fidelity\n                                  preset.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "hidden": false,
+                "path": "profile numerics show",
                 "subcommands": []
               }
             ]
@@ -6021,7 +6447,7 @@
               },
               {
                 "dest": "beam_name",
-                "help": "Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+                "help": "Attach a named [beams.NAME] reference; create it with 'pyrite beam create'.",
                 "option_strings": [
                   "--beam"
                 ],
@@ -6029,33 +6455,9 @@
               },
               {
                 "dest": "detector_name",
-                "help": "Attach a named [detectors.NAME] reference; replaces inline geometry flags.",
+                "help": "Attach a named [detectors.NAME] reference; create it with 'pyrite detector create'.",
                 "option_strings": [
                   "--detector"
-                ],
-                "required": false
-              },
-              {
-                "dest": "observation_angle_deg",
-                "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
-                "option_strings": [
-                  "--observation-angle"
-                ],
-                "required": false
-              },
-              {
-                "dest": "polar_acceptance_deg",
-                "help": "Full detector polar acceptance span in degrees; scalar replacement.",
-                "option_strings": [
-                  "--polar-acceptance"
-                ],
-                "required": false
-              },
-              {
-                "dest": "solid_angle_sr",
-                "help": "Detector solid angle in sr; scalar replacement.",
-                "option_strings": [
-                  "--solid-angle"
                 ],
                 "required": false
               },
@@ -6109,7 +6511,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite profile set [OPTIONS] NAME\n\n  Replace range grids, beam fields, detector scalars, or emission.\n\n  NAME must already exist (create it with ``pyrite profile create``); unknown\n  names error with suggestions. Editing 'standard' prompts for confirmation\n  unless --yes is given; --dry-run never prompts. Detector scalars and emission\n  replace supplied fields; unlike range grids, they are not accepted by\n  add/remove -- except emission, which add/remove also accept via\n  --coherent/--incoherent for incremental switching. --beam NAME attaches a\n  named [beams.NAME] reference and is mutually exclusive with the inline beam\n  flags, which are deprecated in its favor.\n\nOptions:\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model (frozen or midpoint).\n  --max-de-frac FRACTION          Cap one transport row's fractional mean energy\n                                  loss; requires midpoint.  [x>=0.0]\n  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad;\n                                  replaces the spot FWHM.  [x>0.0]\n  --twiss-beta M                  Courant-Snyder beta in m. Requires\n                                  --emittance.  [x>0.0]\n  --twiss-alpha A                 Courant-Snyder alpha; negative diverges.\n                                  Requires --emittance.\n  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.\n                                  [x>0.0]\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference;\n                                  replaces the inline beam flags.\n  --detector NAME                 Attach a named [detectors.NAME] reference;\n                                  replaces inline geometry flags.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --material KEY,...              Replace explicit membership with comma-\n                                  separated material keys.\n  --all-materials                 Restore implicit membership in every catalog\n                                  material.\n  --emission [incoherent|coherent|both]\n                                  Replace the emission policy\n                                  (incoherent/coherent/both).\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite profile set [OPTIONS] NAME\n\n  Replace range grids, the beam reference, the detector reference, or emission.\n\n  NAME must already exist (create it with ``pyrite profile create``); unknown\n  names error with suggestions. Editing 'standard' prompts for confirmation\n  unless --yes is given; --dry-run never prompts. Emission replaces the supplied\n  field; unlike range grids, it is not accepted by add/remove -- except via\n  --coherent/--incoherent for incremental switching. Beam phase space and\n  detector geometry are set only through named objects: edit them with ``pyrite\n  beam set`` / ``pyrite detector set``, or attach different ones here with\n  --beam NAME / --detector NAME.\n\nOptions:\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges; repeat to\n                                  combine.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges; repeat to combine.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --straggling / --no-straggling  Enable or disable Urban energy-loss\n                                  straggling.\n  --energy-model [frozen|midpoint]\n                                  Transport clock model (frozen or midpoint).\n  --max-de-frac FRACTION          Cap one transport row's fractional mean energy\n                                  loss; requires midpoint.  [x>=0.0]\n  --beam NAME                     Attach a named [beams.NAME] reference; create\n                                  it with 'pyrite beam create'.\n  --detector NAME                 Attach a named [detectors.NAME] reference;\n                                  create it with 'pyrite detector create'.\n  --material KEY,...              Replace explicit membership with comma-\n                                  separated material keys.\n  --all-materials                 Restore implicit membership in every catalog\n                                  material.\n  --emission [incoherent|coherent|both]\n                                  Replace the emission policy\n                                  (incoherent/coherent/both).\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile set",
             "subcommands": []
@@ -6262,7 +6664,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite material [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, validate, edit, and blaze individual materials.\n\n  Profile membership remains under ``pyrite profile members``. ``validate``\n  checks the complete catalog; ``blaze`` writes a face-specific checkpoint.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set          Set or reset MATERIAL overrides without...\n  show         Show MATERIAL's effective ranges and...\n  blaze        Run a grooved-crystal sweep and write a checkpoint.\n  energy-grid  Derive and inspect detector energy-grid inputs.\n  validate     Validate a material catalog without starting simulation.\n",
+        "help": "Usage: pyrite material [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, validate, edit, and blaze individual materials.\n\n  Profile membership remains under ``pyrite profile members``. ``validate``\n  checks the complete catalog; ``blaze`` writes a face-specific checkpoint.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set          Set or reset MATERIAL overrides without...\n  show         Show MATERIAL's effective ranges and...\n  simulate     Simulate one material/profile scene on its...\n  blaze        Run a grooved-crystal sweep and write a checkpoint.\n  energy-grid  Derive and inspect detector energy-grid inputs.\n  validate     Validate a material catalog without starting simulation.\n",
         "hidden": false,
         "path": "material",
         "subcommands": [
@@ -6382,6 +6784,53 @@
             "help": "Usage: pyrite material show [OPTIONS] MATERIAL\n\n  Show MATERIAL's effective ranges and inherited/overridden sources.\n\nOptions:\n  --profile TEXT                  Resolve defaults and overrides under profile\n                                  NAME.  [default: standard]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "material show",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "material",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "profile_name",
+                "help": "Resolve one scene from profile NAME.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
+                "dest": "output_format",
+                "help": "Output format; json is the stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_output_format___json",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              },
+              {
+                "dest": "output_file",
+                "help": "Write full factorized spatial arrays as a new compressed .npz file.",
+                "option_strings": [
+                  "--output-file"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: pyrite material simulate [OPTIONS] MATERIAL\n\n  Simulate one material/profile scene on its physical detector.\n\n  This is intentionally filesystem-free except for an explicit --output-file: it\n  calls the public single-scene API and does not create a sweep or checkpoint.\n\nOptions:\n  --profile TEXT                  Resolve one scene from profile NAME.\n                                  [default: standard]\n  -o, --output [table|json|wide]  Output format; json is the stable automation\n                                  contract.  [default: table]\n  --output-file FILE              Write full factorized spatial arrays as a new\n                                  compressed .npz file.\n  -h, --help                      Show this message and exit.\n",
+            "hidden": false,
+            "path": "material simulate",
             "subcommands": []
           },
           {

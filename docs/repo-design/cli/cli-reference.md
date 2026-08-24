@@ -1070,10 +1070,11 @@ Usage: pyrite profile create [OPTIONS] NAME
 
   Create a new profile, cloning defaults from --from (standard).
 
-  Range options replace individual cloned grids; detector options replace individual
-  cloned fields. Material membership is cloned and ``--material`` replaces it. Per-
-  material overrides are not cloned. Beam phase space is set only through a named
-  object: build it with ``pyrite beam create`` and attach it here with --beam NAME.
+  Range options replace individual cloned grids. Material membership is cloned and
+  ``--material`` replaces it. Per-material overrides are not cloned. Beam phase space
+  and detector geometry are set only through named objects: build them with ``pyrite
+  beam create`` / ``pyrite detector create`` and attach them here with --beam NAME /
+  --detector NAME.
 
 Options:
   --from SOURCE                   Clone ranges, beam, detector, and material membership
@@ -1104,14 +1105,8 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named [detectors.NAME] reference; replaces
-                                  inline geometry flags.
-  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
-                                  replacement.  [0.0<=x<=180.0]
-  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
-                                  replacement.  [0.0<x<=180.0]
-  --solid-angle SR                Detector solid angle in sr; scalar replacement.
-                                  [0.0<x<=12.566370614359172]
+  --detector NAME                 Attach a named [detectors.NAME] reference; create it
+                                  with 'pyrite detector create'.
   --material KEY,...              Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -1379,15 +1374,15 @@ Options:
 ```text
 Usage: pyrite profile set [OPTIONS] NAME
 
-  Replace range grids, the beam reference, detector scalars, or emission.
+  Replace range grids, the beam reference, the detector reference, or emission.
 
   NAME must already exist (create it with ``pyrite profile create``); unknown names
   error with suggestions. Editing 'standard' prompts for confirmation unless --yes is
-  given; --dry-run never prompts. Detector scalars and emission replace supplied fields;
-  unlike range grids, they are not accepted by add/remove -- except emission, which
-  add/remove also accept via --coherent/--incoherent for incremental switching. Beam
-  phase space is set only through a named object: edit it with ``pyrite beam set``, or
-  attach a different one here with --beam NAME.
+  given; --dry-run never prompts. Emission replaces the supplied field; unlike range
+  grids, it is not accepted by add/remove -- except via --coherent/--incoherent for
+  incremental switching. Beam phase space and detector geometry are set only through
+  named objects: edit them with ``pyrite beam set`` / ``pyrite detector set``, or attach
+  different ones here with --beam NAME / --detector NAME.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1416,14 +1411,8 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named [detectors.NAME] reference; replaces
-                                  inline geometry flags.
-  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
-                                  replacement.  [0.0<=x<=180.0]
-  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
-                                  replacement.  [0.0<x<=180.0]
-  --solid-angle SR                Detector solid angle in sr; scalar replacement.
-                                  [0.0<x<=12.566370614359172]
+  --detector NAME                 Attach a named [detectors.NAME] reference; create it
+                                  with 'pyrite detector create'.
   --material KEY,...              Replace explicit membership with comma-separated
                                   material keys.
   --all-materials                 Restore implicit membership in every catalog material.
