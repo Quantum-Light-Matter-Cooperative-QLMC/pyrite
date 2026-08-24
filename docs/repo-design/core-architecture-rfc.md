@@ -186,7 +186,7 @@ target = pr.Slab("hopg", thickness_ang=20_000.0, tilt_deg=30.0)
 detector = pr.Detector(observation_angle_deg=90.0)
 
 result = pr.simulate(beam, target, detector, numerics=pr.Numerics(n_electrons=450))
-result.spectrum  # intrinsic photons per electron per eV per sr
+result.spectrum  # response-free source photons per electron per eV per sr
 result.provenance  # resolved scene, identity digest, backend, versions
 ```
 
@@ -474,7 +474,7 @@ detector = pr.Detector(
     polar_acceptance_deg=...,
     solid_angle_sr=...,
     energy_bins=pr.arange_eV(100.0, 5000.0, 3.0),
-    response=pr.Timepix3(),  # or None for the intrinsic spectrum
+    response=pr.Timepix3(),  # or None for the response-free source spectrum
 )
 ```
 

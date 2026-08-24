@@ -313,7 +313,7 @@ class Sweep:
     mosaic_fwhm_deg: float | None = None
     # how the mosaic broadening (when mosaic=True) is applied:
     #   "analytic" (default) -> the cheap energy-shift Gaussian added in quadrature
-    #       at detector convolution (results.store_result); the intrinsic spectrum is
+    #       at detector convolution (results.store_result); the response-free source spectrum is
     #       untouched, so one record re-broadens to any grade (plot_mosaic_comparison).
     #   "mc"                  -> the EXACT per-orientation average INSIDE mc_spectrum
     #       (broadens PXR+CBS, captures the amplitude variation + asymmetric lineshape

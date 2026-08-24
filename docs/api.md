@@ -39,10 +39,15 @@ result.spectrum
 result.provenance["identity_digest"]
 ```
 
-`Result.spectrum` and `Result.background` are intrinsic photon-density arrays
-per incident electron per eV per sr. Their coordinates are `energy_eV` and
-`background_energy_eV`. `Result.provenance` records the resolved scene,
-numerics, content identity, backend/device, and library versions. Coherent or
+For a scalar `Detector`, `Result.spectrum` and `Result.background` are
+response-free source photon-density arrays per incident electron per eV per sr:
+they exclude acceptance scaling, source current, quantum efficiency, and
+measured-energy redistribution. For a `PlanarDetector`, the scalar arrays are
+instead filter-attenuated, solid-angle-weighted observation averages in the same
+per-sr units; they still exclude the configured detector response. Their
+coordinates are `energy_eV` and `background_energy_eV`. `Result.provenance`
+records the resolved scene, numerics, content identity, backend/device, and
+library versions. Coherent or
 `both` emission also exposes `coherent_spectrum`; coherent-only simulation
 selects that array as `spectrum`. The high-level API does not currently accept
 an external background array, so both `none` and `external` return a zero

@@ -299,7 +299,7 @@ class PlanarDetector:
     pixels
         Optional physical pixel grid used for spatial scoring.
     energy_bins
-        Intrinsic line and background photon-energy grids.
+        True-energy grids for the line and background source spectra.
     response
         Optional read-time detector response implementing ``score``.
 

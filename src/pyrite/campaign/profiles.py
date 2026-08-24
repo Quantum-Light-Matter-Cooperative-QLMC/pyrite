@@ -425,7 +425,7 @@ def _identity_v1(
     sweep_payload["E_grid_line_by_energy"] = energy_bins["line_by_energy"]
     sweep_payload["E_grid_brem"] = energy_bins["brem"]
     sweep_payload["e_grid_eV"] = None
-    # Response is applied only to intrinsic arrays at read time. It must not
+    # Response is applied only to response-free source arrays at read time. It must not
     # fork transport/checkpoint identity, which is deliberately reusable by
     # several response models and is the future multi-detector seam.
     detector_payload.pop("response", None)

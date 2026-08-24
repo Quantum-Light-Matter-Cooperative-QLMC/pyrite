@@ -83,7 +83,7 @@ def default_settings(fidelity: str = "full"):
         beam_current_na=5.0,
         n_electrons=300,  # transport electrons per line spectrum
         n_electrons_brem=150,  # transport electrons per background
-        # OFF: the intrinsic spectra stay intrinsic (no legacy SDD polymer-window
+        # OFF: source spectra stay response-free (no legacy SDD polymer-window
         # QE). The Timepix3 / Eagle XO views apply their own QE downstream.
         apply_detector_qe=False,
         convolve_with_det=False,

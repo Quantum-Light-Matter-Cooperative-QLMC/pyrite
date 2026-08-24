@@ -262,8 +262,8 @@ than an isolated maximum that disappears after a fraction of a degree of
 misalignment. When no neighboring points exist, label robustness as unknown rather
 than good.
 
-Only at this level should the app invite the user to inspect the full intrinsic and
-detector-convolved spectra.
+Only at this level should the app invite the user to inspect the full response-free
+source and detector-convolved spectra.
 
 ## 6. Plain-language guide to candidate sampling methods
 

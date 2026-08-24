@@ -206,7 +206,7 @@ class LegacyEDS:
 class Detector:
     """One detector's acceptance, photon-energy binnings, and response.
 
-    Stored spectral arrays stay intrinsic. :meth:`score` applies the response
+    Stored source arrays remain response-free. :meth:`score` applies the response
     only when results are read, so the same transport can be rescored. A
     ``None`` response is the identity apart from the acceptance ``scale``.
 
@@ -262,14 +262,14 @@ class Detector:
         fwhm_eV: float | None = None,
         scale: float = 1.0,
     ) -> np.ndarray:
-        """Score an intrinsic density without mutating stored data.
+        """Score a response-free source density without mutating stored data.
 
         Parameters
         ----------
         energy_eV
             Photon-energy coordinate in eV.
         intrinsic_density
-            Spectral density on ``energy_eV``.
+            Response-free source density on ``energy_eV``.
         fwhm_eV
             Optional detector-resolution override in eV.
         scale

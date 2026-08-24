@@ -14,9 +14,9 @@ A_jQ_j\,
 E_{\rm tot}=\sum_jE_j,
 $$
 
-with $t_{{\rm abs},j}=t^{(0)}_j+t_{0,e}$ (intrinsic segment time plus electron
+with $t_{{\rm abs},j}=t^{(0)}_j+t_{0,e}$ (offset-free segment time plus electron
 $e$'s longitudinal bunch offset) and $\mathbf r_j=\mathbf
-r_j^{(0)}+\Delta\mathbf r_{\perp,e}$ (intrinsic position plus electron $e$'s
+r_j^{(0)}+\Delta\mathbf r_{\perp,e}$ (offset-free position plus electron $e$'s
 transverse entry offset). $t_{0,e}$ and $\Delta\mathbf r_{\perp,e}$ are
 sampled once per electron and held constant over that electron's whole
 trajectory (`montecarlo/transport/kinematics.py::_sample_bunch_offsets`, the
@@ -51,7 +51,7 @@ $$
 +\underbrace{\bigl[\omega t_{0,e}-\mathbf q_\perp\cdot\Delta\mathbf r_{\perp,e}\bigr]}_{\equiv\varphi_e,\text{ depends only on }e}.
 $$
 
-Define electron $e$'s **intrinsic** coherent sum $S_e\equiv\sum_{j\in
+Define electron $e$'s **offset-free** coherent sum $S_e\equiv\sum_{j\in
 e}a_j\exp\{i[\omega t^{(0)}_j-\mathbf q\cdot\mathbf r_j^{(0)}]\}$ — no $t_0$,
 no $\Delta\mathbf r_\perp$, pure geometric/position phase. Because $e^{i\varphi_e}$
 is common to every $j\in e$,

@@ -198,7 +198,7 @@ beta = p / (1 + T/mc^2) = p / gamma
 *`1/β_i²` vs `1/p_i²`: since `p = γβ`, `1/p_i² = 1/(γ_i² β_i²)`. In the
 non-relativistic limit `γ_i → 1` the two coincide, so the code reduces to the
 standard Koch–Motz NR 3BN. The code deliberately uses relativistic momenta
-`p`/`β` as a mildly-relativistic extension of an intrinsically NR Born formula;
+`p`/`β` as a mildly-relativistic extension of a non-relativistic Born formula;
 the docstring flags this as an approximation ("Adequate for Z≲30 and T≲100 keV;
 swap in Seltzer–Berger tables for better accuracy"). This is a documented
 modeling choice, not an error, and is self-consistent (`p_i`, `β_i`, `p_f`,

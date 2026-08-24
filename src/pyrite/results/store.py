@@ -96,7 +96,7 @@ class Settings:
     beam_current_na: float = DEFAULT_BEAM_CURRENT_NA
     # Legacy EDS/SDD polymer-window QE. The detector is now the Timepix3 quad or
     # the Eagle XO (each carries its OWN QE in its forward model), so this is OFF
-    # by default -- the "intrinsic" spectra are then genuinely what leaves the
+    # by default -- the response-free spectra then represent what leaves the
     # sample, not silently filtered by an unused SDD window. Leave False unless
     # you specifically want the old polymer-window SDD lens.
     apply_detector_qe: bool = False
@@ -194,7 +194,7 @@ def detected_background(r, settings, convolve=None):
     """Bremsstrahlung background in DETECTED units (Phs/eV/s/nA) on r['E_grid'],
     honoring the brem source + QE flags in ``settings``. ``convolve`` overrides
     settings.convolve_with_det when given (True/False) -- lets a caller draw the
-    intrinsic and detector-convolved background side by side."""
+    response-free source and detector-convolved background side by side."""
     do_conv = getattr(settings, "convolve_with_det", False) if convolve is None else convolve
     E = r["E_grid"]
     if settings.brem_source == "none":

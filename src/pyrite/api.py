@@ -215,12 +215,12 @@ def simulate(
 ) -> Result:
     """Simulate one scene without reading or writing a checkpoint.
 
-    A scalar :class:`Detector` returns intrinsic photon densities per incident
-    electron per eV per sr. With a :class:`PlanarDetector`, the scalar arrays
-    are filter-attenuated, solid-angle-weighted observation averages in the
-    same per-sr units. Selected spatial spectra include pixel solid angle and
-    are accepted flux per incident electron per eV. Detector response remains
-    an explicit read-time operation.
+    A scalar :class:`Detector` returns response-free source photon densities
+    per incident electron per eV per sr. With a :class:`PlanarDetector`, the
+    scalar arrays are filter-attenuated, solid-angle-weighted observation
+    averages in the same per-sr units. Selected spatial spectra include pixel
+    solid angle and are accepted flux per incident electron per eV. Detector
+    response remains an explicit read-time operation.
 
     Parameters
     ----------

@@ -21,11 +21,13 @@ _EFF_CACHE = {}
 
 
 def _mode(settings):
-    return "EDS-convolved" if getattr(settings, "convolve_with_det", False) else "intrinsic"
+    return (
+        "EDS-convolved" if getattr(settings, "convolve_with_det", False) else "response-free source"
+    )
 
 
 def _peak_line(r):
-    """Intrinsic line-spectrum peak of one record -- the azimuth-selection key
+    """Response-free source line peak of one record -- the azimuth-selection key
     (strongest line wins)."""
     return float(np.max(r["spec"]))
 
@@ -114,7 +116,7 @@ def _line_brem(r, settings, convolve=None):
     """Detected line and brem densities (per eV, before the unit scale) for one
     record, honoring the QE / brem-source flags. ``convolve`` overrides
     settings.convolve_with_det when given (True/False), so a caller can draw the
-    intrinsic (convolve=False) and detector-convolved (convolve=True) spectra
+    response-free source (convolve=False) and detector-convolved (convolve=True) spectra
     side by side."""
     do_conv = getattr(settings, "convolve_with_det", False) if convolve is None else convolve
     detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=do_conv))

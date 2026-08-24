@@ -307,8 +307,8 @@ tolerates coarse binning that would destroy a line.
 
 **Line observables depend on bin width.** A peak height read off a histogram is
 not a bin-width-independent quantity when the bin is comparable to or wider than
-the intrinsic linewidth. Comparisons of peak height are only meaningful at
-matched grids.
+the unbroadened source-model linewidth. Comparisons of peak height are only
+meaningful at matched grids.
 
 **Peak-pick is unstable near a bin edge.** When a resonance falls close to a
 boundary, a small parameter change can move the argmax by one bin and the

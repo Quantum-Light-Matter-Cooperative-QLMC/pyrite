@@ -23,8 +23,9 @@ T_p(E) = \exp\!\left[-\sum_j \mu_j(E)\ell_{pj}\right],
 F_p(E) = I_{q(p)}(E)\,\Delta\Omega_p\,T_p(E).
 $$
 
-Here (I_{q(p)}) is the intrinsic tile spectrum in photons per electron per
-electronvolt per steradian and (Delta\Omega_p) is the pixel solid angle.
+Here (I_{q(p)}) is the pre-filter source density for one angular tile in photons
+per electron per electronvolt per steradian and (Delta\Omega_p) is the pixel solid
+angle.
 The exponential is the Bouguer--Beer law. Elemental attenuation coefficients
 come from the Henke/Chantler imaginary scattering factors through the already
 ledgered `absorption-length` implementation. The primary tabulation source is
@@ -165,7 +166,7 @@ $\mu_j\ell_{pj}$ is dimensionless.
   derived angstrom-to-millimetre conversion.
 - `primary_transmission` contracts the filter index as
   $\sum_j\ell_{pj}\mu_j(E)$ and applies one negative exponential. The
-  materialized pixel result multiplies the intrinsic tile spectrum, pixel
+  materialized pixel result multiplies the pre-filter tile density, pixel
   solid angle, and this transmission once each.
 - A source-level numeric calculation used SciPy physical constants and
   `xraydb.f2_chantler` directly, without either attenuation implementation

@@ -379,7 +379,7 @@ Physical widths, convolved in this order:
 1. **Occupation (dominant for electrons):** Lorentzian with
    $\Gamma = \hbar \beta c\, (L_i^{-1} + L_f^{-1})$ from the collisional
    lifetimes of both states; $L \sim 1$ µm gives $\Gamma \sim 0.2$ eV on
-   eV-to-tens-of-eV transitions — percent-level intrinsic widths.
+   eV-to-tens-of-eV transitions — percent-level lifetime widths.
 2. **Doppler-geometric:** the $\theta$-dependence of $\hbar\omega$ across the
    detector solid angle and beam divergence (reuse the existing
    detector-solid-angle machinery; this usually dominates the *observed*

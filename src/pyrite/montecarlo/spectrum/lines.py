@@ -1309,7 +1309,7 @@ def mc_spectrum(
     #
     # Fresh-context result: per (row, energy), Total = (1-F)*Grouped +
     # F*Flat, where Flat = |sum_e S_e|^2 is TODAY'S coherent reduction but
-    # fed the electron's INTRINSIC (offset-free) position/time -- so it
+    # fed the electron's offset-free position/time -- so it
     # needs no new reduction code, only feeding ``d_all_geom``/``seg_r_geom``
     # in place of ``d_all``/``seg_r`` at the handful of points that build a
     # row's phase -- and Grouped = sum_e|S_e|^2 groups the SAME segments by

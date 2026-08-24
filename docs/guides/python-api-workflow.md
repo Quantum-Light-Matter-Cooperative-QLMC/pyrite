@@ -40,15 +40,18 @@ profile catalog.
 ## Interpret the result
 
 `Result.energy_eV` and `Result.background_energy_eV` are the photon-energy
-coordinates for `spectrum` and `background`. Both arrays are intrinsic photon
-density per incident electron per eV per sr. They have not been multiplied by
-detector acceptance or source current.
+coordinates for `spectrum` and `background`. With a scalar `Detector`, both
+arrays are response-free source photon density per incident electron per eV per
+sr. They exclude acceptance scaling, source current, quantum efficiency, and
+measured-energy redistribution. With a `PlanarDetector`, the scalar arrays are
+filter-attenuated, solid-angle-weighted observation averages; see the
+spatial-scoring boundary below.
 
 ```python
 line_energy_eV = result.energy_eV
-intrinsic_line = result.spectrum
+source_line = result.spectrum
 continuum_energy_eV = result.background_energy_eV
-intrinsic_continuum = result.background
+source_continuum = result.background
 
 digest = result.provenance["identity_digest"]
 backend = result.provenance["backend"]
@@ -124,15 +127,16 @@ secondary photons. A `PlanarDetector` without `PixelGrid` supports one centre
 ray and scalar output; partial-coverage scoring requires `PixelScorer` and a
 physical grid.
 
-`provenance["identity_digest"]` remains the intrinsic source-case digest.
+`provenance["identity_digest"]` remains the source-case digest.
 Physical observations additionally carry `observation_identity_digest`, which
 includes ordered geometry, resolved compositions, angular partition, response,
 and hashes of the coefficient arrays. Plate display names are not identity.
 
 ## Apply detector response explicitly
 
-Simulation output remains intrinsic even when the scene's detector has a
-response model. Apply read-time response with `Detector.score`:
+Simulation output remains free of the configured detector response even when the
+scene's detector has a response model. Apply that response at read time with
+`Detector.score`:
 
 ```python
 from pyrite.detectors import Timepix3

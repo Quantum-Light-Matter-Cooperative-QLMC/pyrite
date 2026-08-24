@@ -149,9 +149,9 @@ def test_plot_chunk_empty_results(capsys):
 def test_stream_chunk_prints_summary_table(capsys):
     stream_chunk(_store(), None, default_settings())
     # summary_table prints the QE/units caption line before the dataframe.
-    assert "per-nA columns are intrinsic" in capsys.readouterr().out
+    assert "per-nA columns are current-normalized" in capsys.readouterr().out
 
 
 def test_stream_chunk_without_azimuth_collapse(capsys):
     stream_chunk(_store(), None, default_settings(), collapse_azimuth=False)
-    assert "per-nA columns are intrinsic" in capsys.readouterr().out
+    assert "per-nA columns are current-normalized" in capsys.readouterr().out

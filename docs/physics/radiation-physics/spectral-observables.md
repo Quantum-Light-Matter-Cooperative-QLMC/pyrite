@@ -78,7 +78,7 @@ plus an analytic aperture width. Consequently:
 
 - do not multiply the result by the solid angle again;
 - drop the analytic aperture-broadening term from the detector convolution, but
-  keep the intrinsic energy-resolution term;
+  keep the configured detector energy-resolution term;
 - a one-direction grid reproduces `spec * Omega` exactly, which is the regression
   anchor;
 - the blazed-groove escape is only compatible with a single direction, since

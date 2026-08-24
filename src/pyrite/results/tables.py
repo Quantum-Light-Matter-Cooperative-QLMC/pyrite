@@ -82,7 +82,7 @@ def summary_table(recs, settings):
     own columns under a 'config' super-header; the rest are the line peak, the
     EDS-convolved peak height, peak-over-background, and the integrated line /
     brem / total count rates [counts/s] at the case's bunch charge and
-    repetition rate, alongside intrinsic per-nA values. Old checkpoints fall
+    repetition rate, alongside current-normalized per-nA values. Old checkpoints fall
     back to ``settings.beam_current_na``. Returns a DataFrame with a 2-level
     column index (empty if ``recs`` is empty).
 
@@ -168,7 +168,7 @@ def show_summary(recs, settings):
         return
     print(
         ("window-QE applied, " if settings.apply_detector_qe else "unity QE, ")
-        + "per-nA columns are intrinsic; rate columns use each case's "
+        + "per-nA columns are current-normalized; rate columns use each case's "
         "bunch charge x repetition rate  |  "
         "peak/bg = EDS-convolved peak height / background at the peak"
     )

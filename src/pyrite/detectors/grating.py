@@ -147,7 +147,7 @@ class Grating:
 
     def angular_dispersion_rad_per_angstrom(self, E_eV):
         """d(beta)/d(lambda) = m / (d cos beta) [rad/Angstrom]; the grating's
-        intrinsic dispersion before any detector geometry."""
+        grating-only dispersion before any detector geometry."""
         beta = self.diffraction_angle_rad(E_eV)
         return self.order / (self.d_angstrom * np.cos(beta))
 

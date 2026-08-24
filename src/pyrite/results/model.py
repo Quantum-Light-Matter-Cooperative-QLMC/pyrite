@@ -80,8 +80,9 @@ class SpectralFactors:
     energy_eV
         One-dimensional photon-energy coordinate in eV.
     intrinsic_by_tile
-        Intrinsic density with shape ``(n_tile, n_energy)`` in photons per
-        incident electron per eV per sr.
+        Pre-filter source density with shape ``(n_tile, n_energy)`` in photons
+        per incident electron per eV per sr. Pixel solid angle, filter
+        transmission, and detector response have not been applied.
     mu_by_filter_inv_mm
         Linear attenuation coefficients with shape ``(n_filter, n_energy)`` in
         inverse mm.
@@ -121,7 +122,7 @@ class SpatialResult:
     ray_map
         Shared pixel solid angles, angular-tile indices, and filter path lengths.
     line, background
-        Intrinsic line and continuum spectral factors.
+        Pre-filter line and continuum source factors.
     detector
         Physical detector used for geometry and optional measured response.
     coherent_line
@@ -360,7 +361,8 @@ class Result:
     """Scalar spectral arrays, optional spatial factors, and provenance.
 
     ``spectrum`` and ``background`` are photon densities per incident electron
-    per eV per sr. For scalar-detector simulations they are intrinsic. For a
+    per eV per sr. For scalar-detector simulations they are response-free source
+    densities without acceptance or current scaling. For a
     physical planar detector they are filter-attenuated, solid-angle-weighted
     observation averages. Selected ``spatial`` spectra are accepted per-pixel
     flux, with pixel solid angle included. ``energy_eV`` and

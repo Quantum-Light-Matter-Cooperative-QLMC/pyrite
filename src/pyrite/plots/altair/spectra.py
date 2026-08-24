@@ -1,6 +1,6 @@
 """Altair spectra
 
-Altair / Vega-Lite renderer for the intrinsic CXR spectra -- a fast, interactive
+Altair / Vega-Lite renderer for response-free CXR source spectra -- a fast, interactive
 alternative to the matplotlib :mod:`pyrite.plots.mpl.spectra` figures. The headline
 motivation for the jupyter -> marimo migration is that the matplotlib spectra are
 sluggish over the fine energy grids; Vega-Lite renders them in the browser and
@@ -409,7 +409,7 @@ def spectrum_frame(
 ):
     """Tidy long-form spectrum table for ``recs`` (already restricted to one polar
     tilt): one row per (beam energy, energy-grid point, component). Mirrors the
-    intrinsic per-energy view of :func:`pyrite.plots.mpl.spectra._draw_by_energy`.
+    response-free per-energy source view of :func:`pyrite.plots.mpl.spectra._draw_by_energy`.
 
     Whenever ``include_brem`` and a wide continuum (``brem_wide`` /
     ``E_grid_brem``) are available, the ``brem``/``total`` traces extend past
@@ -465,7 +465,7 @@ def spectrum_chart(
     width=720,
     height=360,
 ):
-    """Interactive Altair line chart of the intrinsic spectra at ONE polar tilt.
+    """Interactive Altair line chart of the response-free source spectra at ONE polar tilt.
 
     Both ``band`` values now draw the wide bremsstrahlung continuum past the
     line grid's cutoff whenever it's stored (see :func:`spectrum_frame`);
@@ -494,7 +494,7 @@ def spectrum_chart(
     if df.empty:
         return None
 
-    title = _case_title(recs[0]["case"], "intrinsic", latex=False)
+    title = _case_title(recs[0]["case"], "response-free source", latex=False)
     x_scale = _scale(x_type, x_domain)
     y_scale = (
         _log_y_scale(_windowed_frame(df, x_domain))

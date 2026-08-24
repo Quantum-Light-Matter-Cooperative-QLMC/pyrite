@@ -152,7 +152,7 @@ def browse_plotly(
     counterpart to :func:`browse` for the spectral views; the matplotlib ``browse``
     stays the path for static / nbconvert-PDF export (no client-side JS there).
 
-    ``kind``: ``"by_energy"`` (intrinsic lines + brem, linear axes) or ``"full"``
+    ``kind``: ``"by_energy"`` (response-free source lines + brem, linear axes) or ``"full"``
     (sharp lines on the wide brem out to the beam energy, log-log; needs records
     run with a separate ``E_grid_brem``). Beam energy -> colour matches every other
     figure. Needs ``plotly`` installed. Returns the figure (Jupyter renders it; call
@@ -272,8 +272,8 @@ def browse_plotly(
         c = tilt_case0[ti]
         head = f"{c['name'].split()[0]}, {c['thickness_ang'] / 1e4:.1f} µm, tilt={c['tilt_deg']:g}°"
         if kind == "by_energy":
-            return f"{head} — intrinsic ({tag})"
-        return f"{head} — full measured range, intrinsic (dashed = brem)"
+            return f"{head} — response-free source ({tag})"
+        return f"{head} — full measured range, response-free source (dashed = brem)"
 
     steps = [
         dict(
@@ -311,7 +311,7 @@ def browse_plotly(
 
 
 def _draw_chunk(fig, trecs, settings):
-    """Render ONE polar tilt's best-geometry INTRINSIC spectra onto ``fig``
+    """Render ONE polar tilt's best-geometry response-free source spectra onto ``fig``
     (cleared first): LEFT total (coherent + brem), RIGHT brem-subtracted CXR only.
     The detector view is the separate Eagle XO browser (kind='eaglexo').
 
@@ -337,13 +337,13 @@ def _draw_chunk(fig, trecs, settings):
         lbl = rf"{E0:g} keV ($\phi={az:g}\degree$"
         lbl += rf", {r['case']['thickness_ang'] / 1e4:g} $\mu$m)" if multi_t else ")"
         E = r["E_grid"] / 1e3
-        line_raw, brem_raw = _line_brem(r, settings, convolve=False)  # intrinsic
+        line_raw, brem_raw = _line_brem(r, settings, convolve=False)  # response-free source
         ax_tot.plot(E, (line_raw + brem_raw) * r["scale"], color=c, lw=1.2, label=lbl)
         ax_tot.plot(E, brem_raw * r["scale"], color=c, ls="--", lw=0.6)
         ax_cxr.plot(E, line_raw * r["scale"], color=c, lw=1.2, label=lbl)
     case = best[0]["case"]
     fig.suptitle(
-        _case_title(case, "best azimuth per energy (intrinsic)", tilt_fmt="g"),
+        _case_title(case, "best azimuth per energy (response-free source)", tilt_fmt="g"),
         fontsize=13,
     )
     for ax, title, leg in (
@@ -361,7 +361,7 @@ def _draw_chunk(fig, trecs, settings):
 
 
 def plot_chunk(results, settings):
-    """The best-azimuth intrinsic spectra (total | CXR-only), ONE figure per polar
+    """The best-azimuth response-free source spectra (total | CXR-only), ONE figure per polar
     tilt. For click-through use ``browse(results, settings, kind="chunk")``."""
     return _per_tilt_figs(records(results), settings, _draw_chunk, (11.0, 4.8))
 

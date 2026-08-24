@@ -115,6 +115,6 @@ def show_top(results, settings, top_n=15, select="quality_peak", **kw):
         return
     print(
         f"top {len(df)} geometries by '{select}'  (rates use each case's pulse current; "
-        f"peak = intrinsic coherent line density; quality in [0,1])"
+        f"peak = response-free coherent source density; quality in [0,1])"
     )
     display(df)

@@ -75,7 +75,7 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   `Convergence`, `Analysis`, `Result`, and `simulate`.
 - **`pyrite.simulate(beam, target, detector, ...)`** → `api:simulate`: lower one
   scalar scene to the typed `Case`, run it without checkpoint I/O, and return
-  intrinsic arrays plus resolved provenance in `Result`.
+  response-free source arrays plus resolved provenance in `Result`.
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign
   defaults and material membership through `set|add|remove`; an absent
   membership key means all catalog materials.
@@ -607,7 +607,7 @@ submodule DAG (leaf → driver):
   `detectors`/`trajectories` internals) — physics identical, only renderer
   differ. Intentionally **NOT** re-exported from package (frozen export
   guard) — import from submodule. Per-module guard tests: `tests/notebooks/altair/test_*.py`.
-  - `spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`,
+  - `spectra` — response-free source spectra: `spectrum_chart`, `spectrum_frame`,
     `compare_spectrum_chart` (overlay one line per E0/tilt/azimuth, for
     Energy/Polar-angle/Azimuthal comparison notebook tabs). Deps: `_common`,
     `results`.
@@ -644,7 +644,7 @@ electron-transport navigator. Deps: `detectors.spec`, `materials`.
 Detector configuration, read-time scoring, and detector-adjacent forward
 models. `spec.py` owns `Detector`, its fine-line/wide-bremsstrahlung
 `EnergyBins`, the `Timepix3`/`EagleXO`/`LegacyEDS` response adapters, and the
-deprecated `DetectorSpec` spelling. Stored arrays remain intrinsic; plots and
+deprecated `DetectorSpec` spelling. Stored arrays remain response-free; plots and
 result tables call `Detector.score`. Deps: `materials.crystal`, `montecarlo`
 (legacy analytic response only), `DATA_DIR`.
 

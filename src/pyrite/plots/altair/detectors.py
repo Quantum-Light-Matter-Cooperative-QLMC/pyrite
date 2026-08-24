@@ -63,7 +63,7 @@ _CHARGE_COLUMNS = ["energy_eV", "charge_density", "E0_keV", "azimuth_deg", "band
 
 def _collapsed(recs, *, collapse_azimuth):
     """Group ``recs`` by beam energy, optionally collapsing each group to its
-    best (max intrinsic line) azimuth -- the per-energy record selection shared by
+    best (maximum response-free source line) azimuth -- the per-energy record selection shared by
     every detector draw. Yields ``(E0_keV, [records])`` in ascending energy."""
     energies = sorted({r["case"]["E0_keV"] for r in recs})
     for E0 in energies:

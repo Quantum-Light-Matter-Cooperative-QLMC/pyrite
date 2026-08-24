@@ -1,6 +1,6 @@
 """spectra
 
-Intrinsic-spectrum figures: by-energy, full-range, peak-vs-tilt, mosaic, comparisons.
+Response-free source-spectrum figures: by-energy, full-range, peak-vs-tilt, mosaic, comparisons.
 """
 
 import matplotlib.pyplot as plt
@@ -55,7 +55,7 @@ def _style_axis(ax):
         legend.get_title().set_fontsize(_LEGEND_TITLE_FONT_SIZE)
 
 
-# ---- intrinsic spectra -------------------------------------------------------
+# ---- response-free source spectra --------------------------------------------
 def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=False):
     """One panel at fixed (energy, polar tilt): one curve per azimuth, or just
     the best azimuth if ``collapse_azimuth``."""
@@ -113,7 +113,7 @@ def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=Tr
     case = trecs[0]["case"]
     tag = "best azimuth/energy" if collapse_azimuth else "all azimuths"
     ax.set_title(
-        _case_title(case, f"intrinsic ({tag})"),
+        _case_title(case, f"response-free source ({tag})"),
         fontsize=_TITLE_FONT_SIZE,
     )
     ax.set_xlabel("Photon energy (eV)")
@@ -128,7 +128,7 @@ def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=Tr
 
 def plot_by_energy(results, settings, include_brem=True, collapse_azimuth=True):
     """One figure PER POLAR TILT, every beam energy overlaid (best azimuth when
-    ``collapse_azimuth``); INTRINSIC spectra (detector view = the Eagle XO
+    ``collapse_azimuth``); RESPONSE-FREE SOURCE spectra (detector view = the Eagle XO
     browser). For click-through use ``browse(results, settings, kind="by_energy")``."""
     return _per_tilt_figs(
         records(results),
@@ -144,7 +144,7 @@ def _draw_full_spectrum(
     fig, trecs, settings, collapse_azimuth=True, logy=True, logx=True, floor_frac=1e-3
 ):
     """Render ONE polar tilt of the full measured-range view onto ``fig``: sharp
-    lines + wide brem out to the beam energy, log-log, INTRINSIC (single axis; the
+    lines + wide brem out to the beam energy, log-log, RESPONSE-FREE SOURCE (single axis; the
     detector view is the Eagle XO browser).
 
     Broad-spectrum view: the y-floor is set from the brem CONTINUUM (its ~1st
@@ -183,7 +183,7 @@ def _draw_full_spectrum(
             ybrem_lo = min(ybrem_lo, float(np.percentile(bpos, 1)))
     case = trecs[0]["case"]
     ax.set_title(
-        _case_title(case, "full measured range, intrinsic (dashed = brem)"),
+        _case_title(case, "full measured range, response-free source (dashed = brem)"),
         fontsize=_TITLE_FONT_SIZE,
     )
     if logy and ymax > 0:
@@ -260,7 +260,7 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
     """Detector-convolved line spectrum of ONE record ``r`` overlaid for several
     crystal mosaic grades -- WITHOUT re-running transport. The analytic mosaic model
     (montecarlo.mosaic_fwhm_eV) only changes the convolution FWHM and leaves the
-    intrinsic spectrum fixed, so each grade is just a re-convolution of the same
+    response-free source spectrum fixed, so each grade is just a re-convolution of the same
     ``r["spec"]``. ``grades_deg`` entries are mosaic rocking-curve FWHM in degrees;
     None = perfect crystal (no mosaic term). Handy for HOPG: ZYA 0.4 / ZYB 0.8 /
     ZYH 3.5 deg. The record can come from a mosaic=False run -- the broadening is
@@ -325,7 +325,7 @@ def plot_best_spectra(
     line_metric="sharpness",
 ):
     """The top-``top_n`` geometries across the WHOLE sweep, ranked by
-    results.selection_score(``select``) -- one intrinsic spectrum panel each,
+    results.selection_score(``select``) -- one response-free source spectrum panel each,
     titled with the geometry, the score components, and the line quality. The
     answer to "thousands of cases, which few do I look at": instead of paging
     every polar tilt, see the best dozen at a glance. ``select`` defaults to

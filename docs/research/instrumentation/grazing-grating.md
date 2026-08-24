@@ -8,7 +8,7 @@ PXR+CBS spectrum as energy-vs-counts at a fixed take-off angle (EDS/Timepix),
 resulting *spatial* image on a position-sensitive detector (Raptor Eagle XO CCD,
 or an "Alex"-type detector from Ultrafast Innovations). The grating's dispersion
 gives spectral resolution set by geometry and pixel size rather than by the
-detector's intrinsic energy resolution — potentially far better than the ~130 eV
+detector's native energy resolution — potentially far better than the ~130 eV
 EDS line width that dominates the soft-X-ray band today.
 
 ---

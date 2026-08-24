@@ -134,7 +134,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     Returns
     -------
     dict
-        Intrinsic and absolute flux metrics, line position/width/quality,
+        Current-normalized source-yield and absolute flux metrics, line position/width/quality,
         line-to-background ratios, and finite-footprint hit fraction.
     """
     E = np.asarray(r["E_grid"], dtype=float)
@@ -162,7 +162,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     brem_int = float(np.trapezoid(brem, E))
     total_int = coh_int + brem_int
     return {
-        # Per-nA values are intrinsic to the MC yield. Existing absolute rates
+        # Per-nA values are normalized MC yields. Existing absolute rates
         # use case-derived pulsed-source current: photons/s at its rep rate.
         "peak_flux_per_na": smax * sc,
         "coherent_flux_per_na": coh_int * sc,

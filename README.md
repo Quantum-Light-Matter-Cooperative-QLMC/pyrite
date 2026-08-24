@@ -134,8 +134,9 @@ result = pr.simulate(
 print(result.provenance["identity_digest"])
 ```
 
-`simulate` returns intrinsic arrays and provenance without reading or writing a
-checkpoint. See the [Python API workflow](docs/guides/python-api-workflow.md)
+`simulate` returns in-memory arrays before configured detector response, plus
+provenance, without reading or writing a checkpoint. See the
+[Python API workflow](docs/guides/python-api-workflow.md)
 for scenes, sweeps, detector scoring, and persistence boundaries; use
 `pyrite run` when resumability, profiles, remote execution, or analysis apps
 matter.
@@ -173,7 +174,8 @@ Active checkpoints use `checkpoints/<stem>/{line,brem}.pkl`. The suffix is a
 historical layout token: new artifacts contain `pyrite.result` HDF5 version 1,
 while legacy plain, gzip, and zstd pickles remain readable. See the
 [result schema](docs/repo-design/storage/result-schema.md).
-Stored spectra are intrinsic unless a detector view applies downstream response.
+Stored source spectra exclude downstream detector response unless a detector view
+applies it explicitly.
 Timepix3 and Eagle XO geometry/QE are instrument-specific; never transfer
 counts or solid angle between setups. See
 [detector solid angle](docs/physics/detectors/detector-solid-angle.md).

@@ -35,9 +35,9 @@ kinematically bounded; the bremsstrahlung bins are coarse and wide because the
 smooth, cheap continuum must extend to the beam energy. Catalog resolution
 attaches both bins to the detector before case construction.
 
-Stored spectral arrays remain intrinsic. `Detector.score()` applies acceptance
+Stored source arrays remain response-free. `Detector.score()` applies acceptance
 scaling and, when configured, one of `Timepix3`, `EagleXO`, or the compatibility
-`LegacyEDS` adapter. `response=None` returns the scaled intrinsic density. This
+`LegacyEDS` adapter. `response=None` returns the scaled source density. This
 single read path keeps response choices out of transport identity and permits
 the same transport result to be rescored without rewriting its checkpoint.
 Detector-model modules still contain experiment-specific placeholders;
@@ -76,13 +76,13 @@ Implementation owners are `pyrite.detectors.spec`,
 
 The campaign currently carries exactly one detector. A later multi-detector
 run can reuse one electron-transport pass only when each detector receives the
-intrinsic line and bremsstrahlung densities on its own `EnergyBins`, plus the
-acceptance inputs needed to lower that detector to a case. Response adapters
-remain read-time consumers and do not require another transport pass.
+response-free line and bremsstrahlung source densities on its own `EnergyBins`,
+plus the acceptance inputs needed to lower that detector to a case. Response
+adapters remain read-time consumers and do not require another transport pass.
 
-The one-detector record layout is intentionally unchanged: intrinsic `spec`
+The one-detector record layout is intentionally unchanged: response-free source `spec`
 and `brem` arrays, their grids, and scalar `fwhm`/`scale` remain top-level.
 Supporting multiple detectors therefore requires a new versioned layout that
-groups grids, intrinsic arrays, `fwhm`, and `scale` by stable detector identity,
-with an explicit compatibility projection back to today's top-level record.
-This task does not introduce that container or change checkpoint identity.
+groups grids, response-free source arrays, `fwhm`, and `scale` by stable detector
+identity, with an explicit compatibility projection back to today's top-level
+record. This task does not introduce that container or change checkpoint identity.

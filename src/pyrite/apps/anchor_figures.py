@@ -111,7 +111,7 @@ class SupplementaryCoherentStudy:
 
     The study holds the reported thicknesses, photon-energy window, and four
     per-spectrum conditions (beam energy, polar tilt, and azimuth — ``None``
-    when Zhai does not report it).  Its cached spectra contain intrinsic
+    when Zhai does not report it).  Its cached spectra contain response-free source
     coherent emission only; the figure builders apply the Fig. 1c detector
     response when converting them to the displayed observable.
     """
@@ -522,7 +522,7 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
     """Run the MC transport + PXR/CBS spectrum for each beam energy (1 mm bulk),
     plus the 29 nm film at the top energy. SLOW (CPU minutes for ne~500).
 
-    Returns a dict keyed by beam energy [keV], each with the intrinsic line
+    Returns a dict keyed by beam energy [keV], each with the response-free source line
     spectrum, detector-convolved line + brem, peak energy, FWHM, and the
     per-electron integrated line flux into dOmega; plus a "film" entry.
     """
@@ -807,7 +807,7 @@ def model_coherent_spectra(
     *,
     exploratory_azimuth_deg: float | None = None,
 ) -> dict[SupplementaryCondition, np.ndarray]:
-    """Simulate intrinsic coherent PXR+CBS spectra for one requested thickness.
+    """Simulate response-free coherent PXR+CBS source spectra for one requested thickness.
 
     Electron transport uses the material's compound composition and the sample
     geometry at each reported condition (beam energy, polar tilt, azimuth).
@@ -1143,7 +1143,7 @@ def figure_background_validation(validation: dict, anchor: ZhaiAnchor, model: di
 def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = None):
     """Fig 1c analog vs theory in three vertically stacked stages.
 
-    The stages are intrinsic PXR+CBS, detector-convolved PXR+CBS without the
+    The stages are response-free source PXR+CBS, detector-convolved PXR+CBS without the
     incoherent bremsstrahlung background, and the detector-convolved total.
     Eq.(10) line energies are vertical markers; the 29 nm film is overlaid on
     both detector views, and digitized measurements (when present) on the total.
@@ -1198,7 +1198,7 @@ def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = Non
                 alpha=0.8,
                 label=f"{E0:g} keV (measured)",
             )
-    ax_i.set_title("Intrinsic PXR+CBS (1 mm HOPG)\ndotted = Eq.(10) line energy")
+    ax_i.set_title("Response-free source PXR+CBS (1 mm HOPG)\ndotted = Eq.(10) line energy")
     ax_line.set_title("EDS-convolved PXR+CBS only (no incoherent brem)")
     ax_total.set_title("EDS-convolved total: PXR+CBS + brem (dashed)")
     for ax in (ax_i, ax_line, ax_total):
@@ -1292,13 +1292,13 @@ def _supplementary_detected_spectrum(
     """Return one supplementary spectrum in Fig. 1c detected flux units.
 
     Applies the soft-X-ray window efficiency ``detector_efficiency`` to the
-    intrinsic spectrum first, then convolves with the same quadrature
+    response-free source spectrum first, then convolves with the same quadrature
     EDS-plus-aperture FWHM as ``model_spectra``: Zhai SI Eqs. (14) and (16),
-    at the spectrum's intrinsic peak and the condition's reported beam
+    at the source spectrum's pre-response peak and the condition's reported beam
     energy (photons are lost in the detector window before the sensor
     electronics blur the surviving counts in energy).  It assumes the
     Fig. 1c collection aperture (0.066 sr) and 1 nA electron rate.  In the
-    zero-FWHM, unit-efficiency limit the returned spectrum is the intrinsic
+    zero-FWHM, unit-efficiency limit the returned spectrum is the response-free source
     density scaled by those two factors.
 
     Caveat: Zhai's SI (S3/S4) never states whether their experimental

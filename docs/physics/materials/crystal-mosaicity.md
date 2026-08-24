@@ -30,8 +30,9 @@ FWHM_mosaic = E · |tan ψ| · η
 
 added **in quadrature** with the energy-dispersive spectrometer (EDS) resolution and
 detector-aperture widths and applied through the same Gaussian convolution path.
-The **intrinsic** spectrum is untouched — mosaicity enters only the detector-convolution
-FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
+The **unbroadened source** spectrum is untouched — mosaicity enters only the
+detector-convolution FWHM, so a record computed with `mosaic=False` can be
+re-broadened at plot time.
 
 **Where it lives.**
 
@@ -70,7 +71,7 @@ FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
 
 ### Scoping result (completed before implementing the exact route)
 
-The retired scoping study measured the intrinsic multiple-scattering Doppler
+The retired scoping study measured the pre-convolution multiple-scattering Doppler
 width vs the analytic mosaic broadening for HOPG, thin → bulk. The finding: for the
 real HOPG grades the line is genuinely **mosaic-broad** — ZYH (3.5°) gives 25–72 eV vs
 a ~5–30 eV Doppler width (1–15× across thin→bulk), and ZYB (0.8°) is comparable
@@ -115,12 +116,12 @@ The **moments converge fast.** Integrated yield, mean energy and the second-mome
 are converged by `mosaic_nodes ~ 5` (nodes 5 vs 9 agree to a few × 10⁻⁶ on the HOPG ZYH
 line integral). For a width-vs-rocking-curve comparison this is enough.
 
-The **detailed lineshape converges slowly when the mosaic spread ≫ the intrinsic line
-width.** Each node contributes a shifted copy of the (narrow) intrinsic line; for HOPG
+The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroadened
+source-line width.** Each node contributes a shifted copy of the narrow base line; for HOPG
 (00l) the energy shift is essentially 1-D in the in-plane tilt, so a handful of nodes
 gives a handful of discrete copies and the summed line is *lumpy* until the node spacing
-in energy drops below the intrinsic core width. A smooth broad lineshape needs
-`mosaic_nodes` scaling with (mosaic width / intrinsic width): HOPG ZYH (3.5°) on a thin
+in energy drops below the unbroadened core width. A smooth broad lineshape needs
+`mosaic_nodes` scaling with (mosaic width / unbroadened source width): HOPG ZYH (3.5°) on a thin
 film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13.
 Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so
 the broad-lineshape regime is genuinely expensive. The `Convergence` default
