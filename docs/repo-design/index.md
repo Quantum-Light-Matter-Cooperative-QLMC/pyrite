@@ -32,6 +32,7 @@ compute/coherent-streaming-rawkernel.md
 compute/compute-performance-optimization.md
 compute/gpu-transport-rawkernel.md
 compute/jit-spectrum-kernel-walkthrough.md
+compute/transport-jit-kernel-walkthrough.md
 ```
 
 ```{toctree}
