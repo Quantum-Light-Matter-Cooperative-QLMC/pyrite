@@ -143,9 +143,8 @@ def test_staged_segments_slice_by_layer_identically():
 
 
 def test_a_case_stages_once_and_every_kernel_reads_that_copy(monkeypatch):
-    """The point of the change: three kernels, one upload. A case that also
-    wants the coherent spectrum runs two line kernels and the brem kernel, and
-    all three must be handed the SAME staged dict."""
+    """Four kernels, one upload: two line totals, characteristic, and brem all
+    receive the same staged segment dictionary."""
     import pyrite.montecarlo.runner as runner
 
     stages = []
@@ -166,6 +165,11 @@ def test_a_case_stages_once_and_every_kernel_reads_that_copy(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_brem_wide_from_segments",
+        lambda segs, *a, **k: (seen.append(segs), np.zeros_like(E_GRID))[1],
+    )
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
         lambda segs, *a, **k: (seen.append(segs), np.zeros_like(E_GRID))[1],
     )
 
@@ -191,7 +195,7 @@ def test_a_case_stages_once_and_every_kernel_reads_that_copy(monkeypatch):
     )
 
     assert len(stages) == 1
-    assert len(seen) == 3
+    assert len(seen) == 4
     assert all(got is stages[0] for got in seen)
 
 
@@ -203,6 +207,11 @@ def test_a_case_reports_its_segment_counts_from_the_host_set(monkeypatch):
 
     monkeypatch.setattr(runner, "_lines_for_segments", lambda *a, **k: np.zeros_like(E_GRID))
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *a, **k: np.zeros_like(E_GRID),
+    )
 
     segments = _segments(count=6)
     out = runner._spectrum_case_impl(

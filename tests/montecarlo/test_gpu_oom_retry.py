@@ -202,6 +202,11 @@ def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
         "_brem_wide_from_segments",
         lambda *_args, **_kwargs: np.array([3.0, 4.0]),
     )
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *_args, **_kwargs: np.zeros(2),
+    )
     segments = {
         "n_backscattered": 0,
         "n_missed": 0,
@@ -222,6 +227,7 @@ def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
     assert entered == [
         "cxr.spectrum_case:heavy case",
         "cxr.lines",
+        "cxr.characteristic",
         "cxr.brem",
         "cxr.interpolate",
     ]

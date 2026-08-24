@@ -31,7 +31,14 @@ def _line_spectrum(energy_keV, *, energy_spread_frac=None):
         n_electrons_brem=5,
     )
     out = run_case(build_cases(sweep)[0])
-    return np.asarray(out["E_grid"], dtype=float), np.asarray(out["spec"], dtype=float)
+    # This regression is specifically about the PXR resonance derivative. The
+    # new atomic characteristic component is beam-energy stationary over this
+    # step and can dominate the combined peak, so remove its auditable array.
+    pxr = np.asarray(out["spec"], dtype=float) - np.asarray(
+        out["spec_characteristic"],
+        dtype=float,
+    )
+    return np.asarray(out["E_grid"], dtype=float), pxr
 
 
 def test_simulated_line_moves_by_the_predicted_sensitivity():

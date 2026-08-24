@@ -352,17 +352,30 @@ def test_merge_dataset_line_overwrites_spec_and_reinterps_brem():
     np.testing.assert_allclose(r["brem"], np.interp(r["E_grid"], r["E_grid_brem"], r["brem_wide"]))
 
 
-def test_project_dataset_line_carries_spec_coherent():
-    """`spec_coherent` lives on the line grid, so a --line-only pull must ship it;
-    dropping it silently degrades a coherent checkpoint to incoherent-only."""
+def test_project_dataset_line_carries_line_companions():
+    """Coherent and characteristic components live on the line grid, so a
+    --line-only pull must ship both audit arrays with the combined spectrum."""
     from pyrite.results import project_dataset
 
-    rec = {"case": {}, "spec": [1.0], "E_grid": [1.0], "spec_coherent": [2.0], "brem": [3.0]}
+    rec = {
+        "case": {},
+        "spec": [1.0],
+        "E_grid": [1.0],
+        "spec_coherent": [2.0],
+        "spec_characteristic": [0.25],
+        "brem": [3.0],
+    }
     line = project_dataset({"n": {30.0: rec}}, "line")["n"][30.0]
-    assert set(line) == {"case", "spec", "E_grid", "spec_coherent"}
+    assert set(line) == {
+        "case",
+        "spec",
+        "E_grid",
+        "spec_coherent",
+        "spec_characteristic",
+    }
 
 
-def test_merge_dataset_line_drops_stale_local_spec_coherent():
+def test_merge_dataset_line_drops_stale_local_line_companions():
     """An incoherent line payload replaces `spec`/`E_grid` but brings no coherent
     companion; keeping the local one would pair a stale (here wrong-length) array
     with the incoming grid."""
@@ -377,12 +390,14 @@ def test_merge_dataset_line_drops_stale_local_spec_coherent():
                 "spec": np.zeros(3),
                 "E_grid": np.arange(3.0),
                 "spec_coherent": np.ones(3),
+                "spec_characteristic": np.full(3, 0.25),
             }
         }
     }
     incoming = {"n": {30.0: {"case": {}, "spec": np.full(5, 5.0), "E_grid": np.arange(5.0)}}}
     merge_dataset(local, incoming, "line")
     assert "spec_coherent" not in local["n"][30.0]
+    assert "spec_characteristic" not in local["n"][30.0]
 
 
 def test_merge_dataset_line_overwrites_spec_coherent_when_incoming_has_one():
@@ -397,6 +412,7 @@ def test_merge_dataset_line_overwrites_spec_coherent_when_incoming_has_one():
                 "spec": np.zeros(3),
                 "E_grid": np.arange(3.0),
                 "spec_coherent": np.ones(3),
+                "spec_characteristic": np.full(3, 0.25),
             }
         }
     }
@@ -407,11 +423,13 @@ def test_merge_dataset_line_overwrites_spec_coherent_when_incoming_has_one():
                 "spec": np.full(3, 5.0),
                 "E_grid": np.arange(3.0),
                 "spec_coherent": np.full(3, 7.0),
+                "spec_characteristic": np.full(3, 0.5),
             }
         }
     }
     merge_dataset(local, incoming, "line")
     np.testing.assert_array_equal(local["n"][30.0]["spec_coherent"], np.full(3, 7.0))
+    np.testing.assert_array_equal(local["n"][30.0]["spec_characteristic"], np.full(3, 0.5))
 
 
 def test_merge_dataset_skips_unmatched_unless_force():

@@ -29,6 +29,7 @@ from ..spectrum import (
     _segments_in_layer,
     _segments_on_device,
     mc_brem_spectrum,
+    mc_characteristic_spectrum,
     mc_spectrum,
 )
 from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
@@ -405,9 +406,12 @@ def run_case_directions(
     result = {
         key: value
         for key, value in first.items()
-        if key not in {"spec", "spec_coherent", "brem", "brem_wide"}
+        if key not in {"spec", "spec_coherent", "spec_characteristic", "brem", "brem_wide"}
     }
     result["spec_by_direction"] = np.stack([np.asarray(output["spec"]) for output in outputs])
+    result["spec_characteristic_by_direction"] = np.stack(
+        [np.asarray(output["spec_characteristic"]) for output in outputs]
+    )
     result["brem_by_direction"] = np.stack([np.asarray(output["brem"]) for output in outputs])
     result["brem_wide_by_direction"] = np.stack(
         [np.asarray(output["brem_wide"]) for output in outputs]
@@ -643,6 +647,59 @@ def _brem_wide_from_segments(
     return brem_wide
 
 
+def _characteristic_from_segments(
+    segs,
+    E_brem,
+    case,
+    n_hat,
+    abs_layers,
+    groove=None,
+    Ne=None,
+):
+    """Characteristic lines on the wide bremsstrahlung energy grid.
+
+    Every material layer emits from its own EEDL subshell cross sections and
+    xraydb relaxation data; photons self-absorb through the complete stack.
+    The estimator uses the bremsstrahlung electron population because those
+    tracks continue to the lower, background cutoff and therefore retain the
+    low-energy ionization path that a line-only 5 keV cutoff would discard.
+    """
+    characteristic_chunk = _admit_chunk(
+        case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(E_brem.size),
+        E_brem.size,
+    )
+    n_lay = int(segs.get("n_layers", 1))
+    if n_lay == 1:
+        return mc_characteristic_spectrum(
+            segs,
+            E_brem,
+            composition=case["composition"],
+            n_hat=n_hat,
+            chunk=characteristic_chunk,
+            layers=abs_layers,
+            groove=groove,
+            electron_limit=Ne,
+            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+        )
+    characteristic = np.zeros(E_brem.shape, dtype=float)
+    for layer_index in range(n_lay):
+        layer_segments = _segments_in_layer(segs, layer_index)
+        if layer_segments["L_ang"].size == 0:
+            continue
+        characteristic = characteristic + mc_characteristic_spectrum(
+            layer_segments,
+            E_brem,
+            composition=abs_layers[layer_index][2],
+            n_hat=n_hat,
+            chunk=characteristic_chunk,
+            layers=abs_layers,
+            groove=groove,
+            electron_limit=Ne,
+            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+        )
+    return characteristic
+
+
 def _brem_for_case(case, E_brem):
     """Regenerate a case's bremsstrahlung background on ``E_brem`` from scratch:
     build the tilted geometry, transport ``Ne_brem`` electrons through the stack
@@ -803,46 +860,28 @@ def _lines_for_segments(
     return spec
 
 
-def _transport_lines_for_case(case):
-    """Re-run a case's LINE transport from scratch: tilted geometry + optional
-    groove, then transport ``Ne`` electrons at ``seed`` (the line seed, NOT
-    ``seed + 1``). Returns ``(segs, n_hat, abs_layers, groove)`` -- the shared
-    front half of :func:`_lines_for_case` / :func:`_line_pair_for_case` so a
-    reline reproduces the EXACT live-sweep transport (multilayer, mosaic, groove
-    and all) before the line kernel(s) run on the SAME segments."""
-    abs_layers = case.get("abs_layers")
-    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
-    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
-    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
-    groove = None
-    if case.get("groove_spacing_ang") is not None:
-        groove = blazed_groove_spec(
-            case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
-        )
+def _transport_lines_for_case(case, E_grid=None):
+    """Re-run the exact live transport population used by all line emitters.
 
-    Ne = case["Ne"]
-    # Lines-only re-transport: every electron is a line electron, so the whole
-    # ensemble gets the LINE cutoff. Must match _transport_for_case's
-    # E_cut_lines_keV or reline stops reproducing live-sweep transport.
-    E_cut = case.get("E_cut_lines_keV", 5.0)
-    E_cut_by_electrons = np.full(Ne, E_cut, dtype=np.float64)
-    segs = simulate_trajectories(
-        case["E0_keV"],
-        case["Ne"],
-        case["thickness_ang"],
-        E_cut_by_electrons=E_cut_by_electrons,
-        composition=case["composition"],
-        seed=case["seed"],
-        beam_dir=beam,
-        layers=abs_layers,
-        **_beam_kwargs(case),
-        crystal_width_mm=case.get("crystal_width_mm"),
-        crystal_height_mm=case.get("crystal_height_mm"),
-        tilt_polar_rad=tilt_polar_rad,
-        tilt_azim_rad=tilt_azim_rad,
-        groove=groove,
+    Characteristic radiation uses the lower-cutoff bremsstrahlung population,
+    while PXR/CBS uses the line population. Delegating to
+    :func:`_transport_case` preserves both electron counts, per-electron
+    cutoffs, the seed, geometry, and transport-core selection so ``reline``
+    cannot regenerate a different characteristic yield from a live run.
+    """
+    transport_case = case
+    if "E_grid" not in case and "E_grid_line" not in case:
+        if E_grid is None:
+            raise ValueError("E_grid is required when the case has no encoded line grid")
+        transport_case = {**case, "E_grid": E_grid}
+    transport = _transport_case(transport_case)
+    return (
+        transport["segs"],
+        transport["E_brem"],
+        transport["n_hat"],
+        case.get("abs_layers"),
+        transport.get("groove"),
     )
-    return segs, n_hat, abs_layers, groove
 
 
 def _lines_for_case(case, E_grid, *, coherent=None):
@@ -853,18 +892,41 @@ def _lines_for_case(case, E_grid, *, coherent=None):
     spectrum phases factored out so :func:`pyrite.runs.run.repair_line_spec`
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
-    segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
-    return _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=coherent)
+    segs, E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
+    segs = _segments_on_device(segs)
+    cxr = _lines_for_segments(
+        segs,
+        E_grid,
+        case,
+        n_hat,
+        abs_layers,
+        groove,
+        coherent=coherent,
+        Ne=case["Ne"],
+    )
+    characteristic_wide = _characteristic_from_segments(
+        segs,
+        E_brem,
+        case,
+        n_hat,
+        abs_layers,
+        groove=groove,
+        Ne=case["Ne_brem"],
+    )
+    characteristic = np.interp(E_grid, E_brem, characteristic_wide)
+    return cxr + characteristic
 
 
-def _line_pair_for_case(case, E_grid, *, want_coherent):
+def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
     """Reline mirror of the runner's one-transport / dual-kernel invariant: one
     re-transport of ``case`` yields the incoherent ``spec`` and (when
     ``want_coherent``) a ``spec_coherent`` from the SAME segments, so a
     ``pyrite reline`` that moves a ``coherent``/``both`` checkpoint onto a new grid
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
-    Returns ``(spec, spec_coherent_or_None)``."""
-    segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
+    Returns ``(spec, spec_coherent_or_None)``. With
+    ``return_characteristic=True``, append the separately auditable
+    characteristic component as a third item."""
+    segs, E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
     segs = _segments_on_device(segs)
@@ -896,6 +958,21 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
         if want_coherent
         else None
     )
+    characteristic_wide = _characteristic_from_segments(
+        segs,
+        E_brem,
+        case,
+        n_hat,
+        abs_layers,
+        groove=groove,
+        Ne=case["Ne_brem"],
+    )
+    characteristic = np.interp(E_grid, E_brem, characteristic_wide)
+    spec = spec + characteristic
+    if spec_coherent is not None:
+        spec_coherent = spec_coherent + characteristic
+    if return_characteristic:
+        return spec, spec_coherent, characteristic
     return spec, spec_coherent
 
 
@@ -1069,6 +1146,29 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         except _RESOURCE_POLICY.gpu_oom as error:
             raise _SpectrumPhaseOOM("line", error) from error
 
+    # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
+    # lower-cutoff bremsstrahlung electron population. Atomic relaxation is
+    # incoherent, so the same characteristic component is added to both the
+    # default PXR/CBS spectrum and its optional coherent companion. Preserve the
+    # component separately in the result for validation and plotting audits.
+    with _nsys_range("cxr.characteristic"):
+        try:
+            spec_characteristic_wide = _characteristic_from_segments(
+                segs_dev,
+                E_brem,
+                case,
+                n_hat,
+                abs_layers,
+                groove=tp.get("groove"),
+                Ne=Ne_brem,
+            )
+        except _GPU_OOM as error:
+            raise _SpectrumPhaseOOM("brem", error) from error
+    spec_characteristic = np.interp(E_grid, E_brem, spec_characteristic_wide)
+    spec = spec + spec_characteristic
+    if spec_coherent is not None:
+        spec_coherent = spec_coherent + spec_characteristic
+
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed
     # over layers (a single layer is exactly the old single-material brem).
@@ -1114,6 +1214,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     out = dict(
         E_grid=E_grid,
         spec=spec,
+        spec_characteristic=spec_characteristic,
         brem=brem,
         E_grid_brem=E_brem,
         brem_wide=brem_wide,

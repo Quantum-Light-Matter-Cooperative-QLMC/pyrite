@@ -142,6 +142,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** —
 - **Notes:** independent numpy reimplementation matches term-by-term to machine precision (rel diff ~1e-16) at k=100 eV/10 keV/49.9 keV; 0-eV clamp + k≥T cutoff reproduced. Notes: code uses `1/p_i²` (relativistic `p=γβ`) vs textbook NR `1/β_i²` (coincide as γ→1, documented mildly-relativistic extension); Elwert `1/β_f` pole cancels Born log so cross-section is **finite** approaching the tip, →0 only at hard cutoff k≥T (ledger "→0 at tip" phrasing describes bare Born, not Born+Elwert). Benign 0-eV divide clamped; [write-up](radiation-physics/brem-spectrum.md)
 
+## `characteristic-radiation`
+
+- **Claim:** electron-impact characteristic x rays from EEDL shell-ionization cross sections and xraydb direct-vacancy relaxation, evaluated as an isotropic, self-absorbed track-length estimator and added once to both incoherent and coherent PXR/CBS totals
+- **Code:** `montecarlo/spectrum/characteristic.py::load_characteristic_cross_sections`, `::mc_characteristic_spectrum`; integration in `montecarlo/runner/__init__.py::_characteristic_from_segments`
+- **Source:** 2025 Livermore Evaluated Electron Data Library, NDS-IAEA-226, ENDF-6 File 23 MT 534--572; Elam, Ravel & Sieber, *Radiation Physics and Chemistry* **63**, 121--128 (2002), through xraydb
+- **Status:** filtered
+- **Checks:** ENDF implicit-exponent parsing, declared TAB1 length/interpolation validation, barns-to-cm² conversion, packaged SHA-256; carbon K-shell table value; units; zero factors; unattenuated one-line reduction $nL\sigma\omega I/(4\pi N_e\Delta E)$; segment-subdivision invariance; Beer--Lambert path reuse; emitting-layer/passive-absorber separation; identical one-time addition to incoherent and coherent totals; checkpoint/reline component persistence; model-marker identity fork
+- **Anchor:** `tests/montecarlo/test_characteristic.py`; `tests/scan/test_run.py`; `tests/checkpoint/test_slim.py`; `tests/materials/test_profiles.py`
+- **Notes:** EEDL is linearly interpolated only inside each shell's tabulated incident-energy range. xraydb supplies line energies, fluorescence yields, and conditional intensities, but not a complete Auger/Coster--Kronig cascade; unresolved radiative shells therefore emit zero with a warning. The default 1 keV bremsstrahlung transport cutoff leaves sub-keV electron path unmodeled. Lines outside the requested line grid are omitted and detector broadening remains downstream. Implementation-context review completed 2026-08-24; independent fresh-context re-derivation and human sign-off remain pending. [validation write-up](radiation-physics/characteristic-radiation.md)
+
 ## `external-brem-subtraction`
 
 - **Claim:** weighted scale-only sideband fit and subtraction of external detected background

@@ -80,7 +80,7 @@ def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identit
 
 
 _CAS_PAYLOAD_KEYS = frozenset({"E_grid", "spec", "brem", "eta"})
-_CAS_OPTIONAL_PAYLOAD_KEYS = frozenset({"E_grid_brem", "brem_wide", "hit_frac", "spec_coherent"})
+_CAS_OPTIONAL_PAYLOAD_KEYS = frozenset({"E_grid_brem", "brem_wide", "hit_frac", "spec_coherent", "spec_characteristic"})
 
 
 def _cas_payload_from_record(record):

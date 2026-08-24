@@ -15,6 +15,16 @@ from .brem import (
     load_external_brem,
     mc_brem_spectrum,
 )
+from .characteristic import (
+    CHARACTERISTIC_DATA_DIR,
+    CHARACTERISTIC_EEDL_FILENAME,
+    CHARACTERISTIC_EEDL_SHA256,
+    CHARACTERISTIC_MODEL,
+    CHARACTERISTIC_XRAYDB_VERSION,
+    CharacteristicCrossSectionTable,
+    load_characteristic_cross_sections,
+    mc_characteristic_spectrum,
+)
 from .diagnostics import (
     DEFAULT_BREM_QUADRATURE_WARN,
     DEFAULT_RESONANCE_DRIFT_WARN,
@@ -64,6 +74,7 @@ for _function in (
     cxr_endpoint_resonance_drift,
     load_external_brem,
     mc_brem_spectrum,
+    mc_characteristic_spectrum,
     mc_spectrum,
     mc_spectrum_solid_angle,
     subdivide_flights,

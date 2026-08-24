@@ -156,6 +156,7 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
             "E_grid": np.array([5_000.0, 6_000.0]),
             "E_grid_brem": np.array([5_000.0, 6_000.0]),
             "spec_by_direction": np.ones((n_tile, 2)),
+            "spec_characteristic_by_direction": np.full((n_tile, 2), 0.25),
             "brem_wide_by_direction": np.full((n_tile, 2), 0.5),
         }
 
@@ -173,6 +174,7 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     )
 
     assert result.spatial is not None
+    np.testing.assert_allclose(result.characteristic_spectrum, 0.25 * result.spectrum)
     paths = result.spatial.ray_map.path_length_mm[..., 0]
     assert np.any(paths == 0.0)
     assert np.any(paths > 0.0)

@@ -78,6 +78,14 @@ FROZEN_EXPORTS = frozenset(
         "_polarization_pair",
         "_observation_direction",
         "_escape_length",
+        "CHARACTERISTIC_DATA_DIR",
+        "CHARACTERISTIC_EEDL_FILENAME",
+        "CHARACTERISTIC_EEDL_SHA256",
+        "CHARACTERISTIC_MODEL",
+        "CHARACTERISTIC_XRAYDB_VERSION",
+        "CharacteristicCrossSectionTable",
+        "load_characteristic_cross_sections",
+        "mc_characteristic_spectrum",
         "mc_spectrum",
         "mc_spectrum_solid_angle",
         "R_E_CM2",
@@ -118,6 +126,7 @@ def test_public_names_resolve_to_subpackage():
     # the re-exported callables must come from the new submodules, not a leftover
     # top-level montecarlo.py
     assert mc.mc_spectrum.__module__ == "pyrite.montecarlo.spectrum"
+    assert mc.mc_characteristic_spectrum.__module__ == "pyrite.montecarlo.spectrum"
     assert mc.simulate_trajectories.__module__ == "pyrite.montecarlo.transport"
     assert mc.run_cases.__module__ == "pyrite.montecarlo.runner"
 

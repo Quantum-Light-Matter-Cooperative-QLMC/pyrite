@@ -113,6 +113,7 @@ def test_run_case_directions_transports_once_and_stacks_direction_outputs(monkey
             "E_grid": np.array([1.0, 2.0]),
             "E_grid_brem": np.array([1.0, 2.0, 3.0]),
             "spec": np.array([value, value + 1.0]),
+            "spec_characteristic": np.array([0.25, 0.5]),
             "brem": np.array([value + 2.0, value + 3.0]),
             "brem_wide": np.array([value + 2.0, value + 3.0, value + 4.0]),
         }
@@ -124,6 +125,10 @@ def test_run_case_directions_transports_once_and_stacks_direction_outputs(monkey
 
     assert calls == {"transport": 1, "spectrum": 2}
     np.testing.assert_array_equal(output["spec_by_direction"], [[1.0, 2.0], [-1.0, 0.0]])
+    np.testing.assert_array_equal(
+        output["spec_characteristic_by_direction"],
+        [[0.25, 0.5], [0.25, 0.5]],
+    )
     assert output["brem_wide_by_direction"].shape == (2, 3)
 
 
@@ -140,6 +145,10 @@ def test_one_direction_runner_matches_scalar_runner_bit_for_bit() -> None:
     directional = runner.run_case_directions(case, direction[None, :])
 
     np.testing.assert_array_equal(directional["spec_by_direction"][0], scalar["spec"])
+    np.testing.assert_array_equal(
+        directional["spec_characteristic_by_direction"][0],
+        scalar["spec_characteristic"],
+    )
     np.testing.assert_array_equal(directional["brem_wide_by_direction"][0], scalar["brem_wide"])
 
 
@@ -263,6 +272,11 @@ def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
     monkeypatch.setattr(
         runner,
         "_lines_for_segments",
+        lambda *_args, **_kwargs: np.zeros_like(grid),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
         lambda *_args, **_kwargs: np.zeros_like(grid),
     )
 
@@ -1984,7 +1998,11 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
     monkeypatch.setattr(
         run.runner,
         "_line_pair_for_case",
-        lambda case, E_grid, *, want_coherent: (np.full(E_grid.shape, 5.0), None),
+        lambda case, E_grid, *, want_coherent, return_characteristic: (
+            np.full(E_grid.shape, 5.0),
+            None,
+            np.full(E_grid.shape, 1.0),
+        ),
     )
     results = {"mos2@30": {30.0: _line_record()}}
     r = results["mos2@30"][30.0]
@@ -1992,6 +2010,7 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
     n = run.repair_line_spec(results, material="mos2", line_ne=999, from_config=False)
     assert n == 1
     assert np.all(r["spec"] == 5.0)
+    assert np.all(r["spec_characteristic"] == 1.0)
     assert r["case"]["Ne"] == 999
     np.testing.assert_array_equal(r["brem_wide"], brem_wide0)  # brem untouched
     np.testing.assert_allclose(r["brem"], np.interp(r["E_grid"], r["E_grid_brem"], r["brem_wide"]))
@@ -2006,9 +2025,13 @@ def test_repair_line_spec_refreshes_both_spec_and_spec_coherent(monkeypatch):
 
     from pyrite.runs import run
 
-    def fake_pair(case, E_grid, *, want_coherent):
+    def fake_pair(case, E_grid, *, want_coherent, return_characteristic):
         spec = np.full(E_grid.shape, 5.0)
-        return spec, (np.full(E_grid.shape, 9.0) if want_coherent else None)
+        return (
+            spec,
+            (np.full(E_grid.shape, 9.0) if want_coherent else None),
+            np.full(E_grid.shape, 1.0),
+        )
 
     monkeypatch.setattr(run.runner, "_line_pair_for_case", fake_pair)
 
@@ -2033,7 +2056,11 @@ def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
     monkeypatch.setattr(
         run.runner,
         "_line_pair_for_case",
-        lambda _case, grid, *, want_coherent: (np.ones(np.asarray(grid).shape), None),
+        lambda _case, grid, *, want_coherent, return_characteristic: (
+            np.ones(np.asarray(grid).shape),
+            None,
+            np.ones(np.asarray(grid).shape),
+        ),
     )
     results = {"mos2@30": {30.0: _line_record()}}
     record = results["mos2@30"][30.0]
@@ -2063,7 +2090,11 @@ def test_repair_line_spec_skips_at_target(monkeypatch):
     monkeypatch.setattr(
         run.runner,
         "_line_pair_for_case",
-        lambda case, E_grid, *, want_coherent: (np.full(E_grid.shape, 5.0), None),
+        lambda case, E_grid, *, want_coherent, return_characteristic: (
+            np.full(E_grid.shape, 5.0),
+            None,
+            np.full(E_grid.shape, 1.0),
+        ),
     )
     results = {"mos2@30": {30.0: _line_record(ne=200)}}
     # same Ne, same grid, finite spec -> nothing to redo
@@ -2079,7 +2110,11 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
     monkeypatch.setattr(
         run.runner,
         "_line_pair_for_case",
-        lambda case, E_grid, *, want_coherent: (np.full(E_grid.shape, 5.0), None),
+        lambda case, E_grid, *, want_coherent, return_characteristic: (
+            np.full(E_grid.shape, 5.0),
+            None,
+            np.full(E_grid.shape, 1.0),
+        ),
     )
     results = {"mos2@30": {30.0: _line_record(ne=200)}}  # 1 stale record (line_ne bump)
     n = run.repair_line_spec(
