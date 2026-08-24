@@ -12,9 +12,10 @@ Every key below is spelled the same wherever the beam is written. Beams are now
 named catalog objects — a top-level `[beams.NAME]` table attached by
 `beam = "NAME"` on a profile and managed with `pyrite beam ...` — rather than an
 inline `[profiles.NAME.beam]` sub-table written by `pyrite profile` flags. The
-inline spelling still decodes and still means exactly this, and the nine
-`pyrite profile` beam flags still work while warning; nothing about the physics,
-the units, or the mutual exclusions changed with the move. Because a reference
+inline spelling still decodes and still means exactly this, but the nine
+`pyrite profile` beam flags that wrote it are gone -- `pyrite beam create` /
+`pyrite beam set` are the only CLI surface for these keys. Nothing about the
+physics, the units, or the mutual exclusions changed with the move. Because a reference
 resolves to values before hashing, converting an inline block to a named beam
 leaves `parameter_sha256` bit-for-bit. See
 [sweep profiles guide](../../guides/sweep-profiles.md) under "Named beams".

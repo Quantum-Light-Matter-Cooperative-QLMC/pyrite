@@ -75,6 +75,14 @@
         "remote jobs",
         "remote status"
       ]
+    },
+    {
+      "contract": "Beam phase space is set only through `pyrite beam create/set` and attached with `--beam NAME`; the nine inline beam-distribution flags are removed from `profile create`/`profile set` rather than deprecated, so they are plain 'no such option' usage errors.",
+      "id": "profile-inline-beam-flags-removed",
+      "paths": [
+        "profile create",
+        "profile set"
+      ]
     }
   ],
   "root": {
@@ -5468,78 +5476,6 @@
                 "required": false
               },
               {
-                "dest": "normalized_emittance_mm_mrad",
-                "help": "Normalized transverse emittance in mm*mrad; replaces the spot FWHM.",
-                "option_strings": [
-                  "--emittance"
-                ],
-                "required": false
-              },
-              {
-                "dest": "beta_twiss_m",
-                "help": "Courant-Snyder beta in m. Requires --emittance.",
-                "option_strings": [
-                  "--twiss-beta"
-                ],
-                "required": false
-              },
-              {
-                "dest": "alpha_twiss",
-                "help": "Courant-Snyder alpha; negative diverges. Requires --emittance.",
-                "option_strings": [
-                  "--twiss-alpha"
-                ],
-                "required": false
-              },
-              {
-                "dest": "energy_spread_frac",
-                "help": "RMS relative energy spread, (E - <E>) / <E>.",
-                "option_strings": [
-                  "--energy-spread"
-                ],
-                "required": false
-              },
-              {
-                "dest": "transverse_fwhm_mm",
-                "help": "Circular Gaussian transverse FWHM in mm.",
-                "option_strings": [
-                  "--transverse-fwhm-mm"
-                ],
-                "required": false
-              },
-              {
-                "dest": "rep_rate_hz",
-                "help": "Bunch repetition rate in Hz.",
-                "option_strings": [
-                  "--rep-rate-hz"
-                ],
-                "required": false
-              },
-              {
-                "dest": "bunch_charge_pc",
-                "help": "Physical charge per bunch in pC.",
-                "option_strings": [
-                  "--bunch-charge-pc"
-                ],
-                "required": false
-              },
-              {
-                "dest": "longitudinal_kind",
-                "help": "Replace the complete declarative longitudinal policy.",
-                "option_strings": [
-                  "--longitudinal"
-                ],
-                "required": false
-              },
-              {
-                "dest": "envelope_rms_fs",
-                "help": "RMS duration for gaussian or microtrain longitudinal policy.",
-                "option_strings": [
-                  "--envelope-rms-fs"
-                ],
-                "required": false
-              },
-              {
                 "dest": "beam_name",
                 "help": "Attach a named [beams.NAME] reference; replaces the inline beam flags.",
                 "option_strings": [
@@ -6080,78 +6016,6 @@
                 "help": "Cap one transport row's fractional mean energy loss; requires midpoint.",
                 "option_strings": [
                   "--max-de-frac"
-                ],
-                "required": false
-              },
-              {
-                "dest": "normalized_emittance_mm_mrad",
-                "help": "Normalized transverse emittance in mm*mrad; replaces the spot FWHM.",
-                "option_strings": [
-                  "--emittance"
-                ],
-                "required": false
-              },
-              {
-                "dest": "beta_twiss_m",
-                "help": "Courant-Snyder beta in m. Requires --emittance.",
-                "option_strings": [
-                  "--twiss-beta"
-                ],
-                "required": false
-              },
-              {
-                "dest": "alpha_twiss",
-                "help": "Courant-Snyder alpha; negative diverges. Requires --emittance.",
-                "option_strings": [
-                  "--twiss-alpha"
-                ],
-                "required": false
-              },
-              {
-                "dest": "energy_spread_frac",
-                "help": "RMS relative energy spread, (E - <E>) / <E>.",
-                "option_strings": [
-                  "--energy-spread"
-                ],
-                "required": false
-              },
-              {
-                "dest": "transverse_fwhm_mm",
-                "help": "Circular Gaussian transverse FWHM in mm.",
-                "option_strings": [
-                  "--transverse-fwhm-mm"
-                ],
-                "required": false
-              },
-              {
-                "dest": "rep_rate_hz",
-                "help": "Bunch repetition rate in Hz.",
-                "option_strings": [
-                  "--rep-rate-hz"
-                ],
-                "required": false
-              },
-              {
-                "dest": "bunch_charge_pc",
-                "help": "Physical charge per bunch in pC.",
-                "option_strings": [
-                  "--bunch-charge-pc"
-                ],
-                "required": false
-              },
-              {
-                "dest": "longitudinal_kind",
-                "help": "Replace the complete declarative longitudinal policy.",
-                "option_strings": [
-                  "--longitudinal"
-                ],
-                "required": false
-              },
-              {
-                "dest": "envelope_rms_fs",
-                "help": "RMS duration for gaussian or microtrain longitudinal policy.",
-                "option_strings": [
-                  "--envelope-rms-fs"
                 ],
                 "required": false
               },

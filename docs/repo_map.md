@@ -729,9 +729,10 @@ preserves the former private import surface for existing internal callers.
 Canonical `pyrite beam list|show|create|set|rename|delete` Click layer over
 top-level `[beams.NAME]` catalog tables, attached to a profile by
 `beam = "NAME"`. `rename` cascades to every referencing profile and `delete` is
-blocked while a reference survives. Option parsing, validation, and TOML writing
-are shared with `pyrite profile`'s retired inline beam flags via
-`cli/commands/_beam_shared.py`, so both surfaces validate identically. The
+blocked while a reference survives. This is the only CLI surface that writes
+beam distribution fields: `pyrite profile`'s inline beam flags were removed
+(issue #54), leaving `cli/commands/_beam_shared.py` to share option
+parsing, validation, and TOML writing between `create` and `set` alone. The
 reference resolves to values in `materials/catalog.py` before `profiles.py`
 hashes, so beam names never reach `parameter_sha256`. See
 [sweep profiles](guides/sweep-profiles.md) and

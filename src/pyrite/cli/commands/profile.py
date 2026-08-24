@@ -31,12 +31,6 @@ from pyrite.cli._core import (
     output_option,
 )
 from pyrite.cli._deprecations import DeprecatingGroup, canonical_option, warn_flag
-from pyrite.cli.commands._beam_shared import (
-    beam_cli_options as _beam_cli_options,
-)
-from pyrite.cli.commands._beam_shared import (
-    collect_beam_updates as _collect_beam_updates,
-)
 from pyrite.cli.commands._detector_shared import (
     collect_detector_updates as _collect_detector_updates,
 )
@@ -299,31 +293,6 @@ def _emit_show(payload):
 
 def _detector_table(profile):
     return _profile_edit.detector_table(profile)
-
-
-#: The nine inline beam-distribution flags (`_beam_cli_options`), keyed by
-#: their `_collect_beam_updates` parameter name -> CLI spelling. Registered in
-#: `cli/_deprecations.DEPRECATED_FLAGS` under `SELF_WARNING_FLAGS`: the whole
-#: family moved to ``pyrite beam``, so there is no same-command canonical flag to
-#: merge into via `RetiredOption` -- this module warns manually instead
-#: (decision 6, `agentdocs/tasks/feature/named-beam-objects`).
-_BEAM_FLAG_PARAMS = {
-    "transverse_fwhm_mm": "--transverse-fwhm-mm",
-    "rep_rate_hz": "--rep-rate-hz",
-    "bunch_charge_pc": "--bunch-charge-pc",
-    "longitudinal_kind": "--longitudinal",
-    "envelope_rms_fs": "--envelope-rms-fs",
-    "normalized_emittance_mm_mrad": "--emittance",
-    "beta_twiss_m": "--twiss-beta",
-    "alpha_twiss": "--twiss-alpha",
-    "energy_spread_frac": "--energy-spread",
-}
-
-
-def _warn_inline_beam_flags(ctx, **beam_flag_values):
-    for param_name, flag in _BEAM_FLAG_PARAMS.items():
-        if beam_flag_values.get(param_name) is not None:
-            warn_flag(ctx, flag, f"pyrite beam create/set {flag}")
 
 
 _DETECTOR_FLAG_PARAMS = {
@@ -767,13 +736,12 @@ def show_command(name, json_output):
 @_range_cli_options
 @_ne_cli_options
 @_transport_cli_options
-@_beam_cli_options
 @click.option(
     "--beam",
     "beam_name",
     metavar="NAME",
     shell_complete=_cli_completion.complete_beam,
-    help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+    help="Attach a named [beams.NAME] reference; create it with 'pyrite beam create'.",
 )
 @click.option(
     "--detector",
@@ -806,15 +774,6 @@ def create_command(
     straggling,
     energy_model,
     max_de_frac,
-    transverse_fwhm_mm,
-    rep_rate_hz,
-    bunch_charge_pc,
-    longitudinal_kind,
-    envelope_rms_fs,
-    normalized_emittance_mm_mrad,
-    beta_twiss_m,
-    alpha_twiss,
-    energy_spread_frac,
     observation_angle_deg,
     polar_acceptance_deg,
     solid_angle_sr,
@@ -825,40 +784,14 @@ def create_command(
 ):
     """Create a new profile, cloning defaults from --from (standard).
 
-    Range options replace individual cloned grids; beam and detector options
-    replace individual cloned fields. Material membership is cloned and
-    ``--material`` replaces it. Per-material overrides are not cloned. --beam
-    NAME attaches a named [beams.NAME] reference and is mutually exclusive with
-    the inline beam flags, which are deprecated in its favor.
+    Range options replace individual cloned grids; detector options replace
+    individual cloned fields. Material membership is cloned and ``--material``
+    replaces it. Per-material overrides are not cloned. Beam phase space is set
+    only through a named object: build it with ``pyrite beam create`` and attach
+    it here with --beam NAME.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    beam_updates = _collect_beam_updates(
-        transverse_fwhm_mm,
-        rep_rate_hz,
-        bunch_charge_pc,
-        longitudinal_kind,
-        envelope_rms_fs,
-        normalized_emittance_mm_mrad,
-        beta_twiss_m,
-        alpha_twiss,
-        energy_spread_frac,
-    )
-    if beam_name is not None and beam_updates:
-        raise click.UsageError("--beam replaces the inline beam flags; pass only one")
-    if beam_updates:
-        _warn_inline_beam_flags(
-            ctx,
-            transverse_fwhm_mm=transverse_fwhm_mm,
-            rep_rate_hz=rep_rate_hz,
-            bunch_charge_pc=bunch_charge_pc,
-            longitudinal_kind=longitudinal_kind,
-            envelope_rms_fs=envelope_rms_fs,
-            normalized_emittance_mm_mrad=normalized_emittance_mm_mrad,
-            beta_twiss_m=beta_twiss_m,
-            alpha_twiss=alpha_twiss,
-            energy_spread_frac=energy_spread_frac,
-        )
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
@@ -889,7 +822,6 @@ def create_command(
             source_name,
             updates=updates,
             beam_name=beam_name,
-            beam_updates=beam_updates,
             detector_name=detector_name,
             detector_updates=detector_updates,
             transport_updates=transport_updates,
@@ -905,13 +837,12 @@ def create_command(
 @_range_cli_options
 @_ne_cli_options
 @_transport_cli_options
-@_beam_cli_options
 @click.option(
     "--beam",
     "beam_name",
     metavar="NAME",
     shell_complete=_cli_completion.complete_beam,
-    help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+    help="Attach a named [beams.NAME] reference; create it with 'pyrite beam create'.",
 )
 @click.option(
     "--detector",
@@ -954,15 +885,6 @@ def set_command(
     straggling,
     energy_model,
     max_de_frac,
-    transverse_fwhm_mm,
-    rep_rate_hz,
-    bunch_charge_pc,
-    longitudinal_kind,
-    envelope_rms_fs,
-    normalized_emittance_mm_mrad,
-    beta_twiss_m,
-    alpha_twiss,
-    energy_spread_frac,
     observation_angle_deg,
     polar_acceptance_deg,
     solid_angle_sr,
@@ -974,44 +896,18 @@ def set_command(
     yes,
     dry_run,
 ):
-    """Replace range grids, beam fields, detector scalars, or emission.
+    """Replace range grids, the beam reference, detector scalars, or emission.
 
     NAME must already exist (create it with ``pyrite profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
     unless --yes is given; --dry-run never prompts. Detector scalars and
     emission replace supplied fields; unlike range grids, they are not accepted
     by add/remove -- except emission, which add/remove also accept via
-    --coherent/--incoherent for incremental switching. --beam NAME attaches a
-    named [beams.NAME] reference and is mutually exclusive with the inline beam
-    flags, which are deprecated in its favor.
+    --coherent/--incoherent for incremental switching. Beam phase space is set
+    only through a named object: edit it with ``pyrite beam set``, or attach a
+    different one here with --beam NAME.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    beam_updates = _collect_beam_updates(
-        transverse_fwhm_mm,
-        rep_rate_hz,
-        bunch_charge_pc,
-        longitudinal_kind,
-        envelope_rms_fs,
-        normalized_emittance_mm_mrad,
-        beta_twiss_m,
-        alpha_twiss,
-        energy_spread_frac,
-    )
-    if beam_name is not None and beam_updates:
-        raise click.UsageError("--beam replaces the inline beam flags; pass only one")
-    if beam_updates:
-        _warn_inline_beam_flags(
-            ctx,
-            transverse_fwhm_mm=transverse_fwhm_mm,
-            rep_rate_hz=rep_rate_hz,
-            bunch_charge_pc=bunch_charge_pc,
-            longitudinal_kind=longitudinal_kind,
-            envelope_rms_fs=envelope_rms_fs,
-            normalized_emittance_mm_mrad=normalized_emittance_mm_mrad,
-            beta_twiss_m=beta_twiss_m,
-            alpha_twiss=alpha_twiss,
-            energy_spread_frac=energy_spread_frac,
-        )
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
@@ -1037,7 +933,6 @@ def set_command(
         raise click.UsageError("--material and --all-materials are mutually exclusive")
     if (
         not updates
-        and not beam_updates
         and beam_name is None
         and detector_name is None
         and not detector_updates
@@ -1056,7 +951,6 @@ def set_command(
             name,
             updates=updates,
             beam_name=beam_name,
-            beam_updates=beam_updates,
             detector_name=detector_name,
             detector_updates=detector_updates,
             transport_updates=transport_updates,
@@ -1068,7 +962,6 @@ def set_command(
         raise CLIError(str(exc)) from None
     if (
         overwriting
-        or beam_updates
         or beam_name is not None
         or detector_name is not None
         or detector_updates
@@ -1078,7 +971,7 @@ def set_command(
         or emission is not None
     ):
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
-        if beam_updates or beam_name is not None:
+        if beam_name is not None:
             action_fields.append("beam")
         if detector_name is not None:
             action_fields.append("detector")

@@ -62,6 +62,27 @@ rep_rate_hz = 500.0
 """
 )
 
+_INLINE_BEAM_CATALOG = (
+    _CATALOG
+    + """
+[profiles.inline]
+materials = ["hopg"]
+thickness_ang = { values = [500.0] }
+energy_keV = { values = [40.0] }
+tilt_deg = { values = [10.0] }
+tilt_azim_deg = { values = [45.0] }
+
+[profiles.inline.beam]
+transverse_fwhm_mm = 0.1
+rep_rate_hz = 5000.0
+bunch_charge_pc = 1.0
+
+[profiles.inline.beam.longitudinal]
+kind = "microtrain"
+envelope_rms_fs = 200.0
+"""
+)
+
 _DETECTOR_CATALOG = (
     _CATALOG
     + """
@@ -284,72 +305,23 @@ shape = [4, 5]
     assert "--detector-roll-deg require --detector-distance-mm" in pose_invalid.stderr
 
 
-def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
+def test_show_renders_hand_authored_inline_beam_block(tmp_path, monkeypatch):
+    """`profile` no longer writes `[profiles.NAME.beam]` (issue #54), but the
+    block is still a valid hand-authored catalog shape, so `show` must keep
+    resolving it."""
+    _catalog(tmp_path, monkeypatch, _INLINE_BEAM_CATALOG)
 
-    created = invoke(
-        profile.command,
-        [
-            "create",
-            "microtrain",
-            "--material",
-            "hopg",
-            "--transverse-fwhm-mm",
-            "0.1",
-            "--rep-rate-hz",
-            "5000",
-            "--bunch-charge-pc",
-            "1",
-            "--longitudinal",
-            "microtrain",
-            "--envelope-rms-fs",
-            "200",
-        ],
-    )
-    assert_clean_result(
-        created,
-        stdout="created profile microtrain\n",
-        stderr="".join(
-            flag_message("profile create", flag, replacement) + "\n"
-            for flag, replacement in (
-                ("--transverse-fwhm-mm", "pyrite beam create/set --transverse-fwhm-mm"),
-                ("--rep-rate-hz", "pyrite beam create/set --rep-rate-hz"),
-                ("--bunch-charge-pc", "pyrite beam create/set --bunch-charge-pc"),
-                ("--longitudinal", "pyrite beam create/set --longitudinal"),
-                ("--envelope-rms-fs", "pyrite beam create/set --envelope-rms-fs"),
-            )
-        ),
-    )
+    shown = invoke(profile.command, ["show", "inline", "-o", "json"])
 
-    shown = invoke(profile.command, ["show", "microtrain", "-o", "json"])
     assert_clean_result(shown)
-    beam = json.loads(shown.stdout)["payload"]["beam"]
-    assert beam == {
+    payload = json.loads(shown.stdout)["payload"]
+    assert payload["beam_ref"] is None
+    assert payload["beam"] == {
         "transverse_fwhm_mm": 0.1,
         "rep_rate_hz": 5000.0,
         "bunch_charge_pc": 1.0,
         "longitudinal": {"kind": "microtrain", "envelope_rms_fs": 200.0},
     }
-
-    changed = invoke(
-        profile.command,
-        ["set", "microtrain", "--longitudinal", "compressed", "--bunch-charge-pc", "1"],
-    )
-    assert_clean_result(
-        changed,
-        stdout="updated profile microtrain\n",
-        stderr="".join(
-            flag_message("profile set", flag, replacement) + "\n"
-            for flag, replacement in (
-                ("--bunch-charge-pc", "pyrite beam create/set --bunch-charge-pc"),
-                ("--longitudinal", "pyrite beam create/set --longitudinal"),
-            )
-        ),
-    )
-    text = catalog.read_text()
-    section = text.split("[profiles.microtrain.beam.longitudinal]", 1)[1].split("\n[", 1)[0]
-    assert 'kind = "compressed"' in section
-    assert "envelope_rms_fs" not in section
 
 
 def test_add_does_not_merge_longitudinal_policy(tmp_path, monkeypatch):
@@ -1419,112 +1391,6 @@ def test_dry_run_writes_nothing_and_never_prompts(tmp_path, monkeypatch):
     assert catalog.read_text() == original
 
 
-def test_create_writes_transverse_twiss_block(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
-
-    result = invoke(
-        profile.command,
-        [
-            "create",
-            "twiss",
-            "--emittance",
-            "1.0",
-            "--twiss-beta",
-            "0.5",
-            "--twiss-alpha",
-            "-0.8",
-            "--energy-spread",
-            "0.002",
-        ],
-    )
-
-    assert_clean_result(
-        result,
-        stdout="created profile twiss\n",
-        stderr="".join(
-            flag_message("profile create", flag, replacement) + "\n"
-            for flag, replacement in (
-                ("--emittance", "pyrite beam create/set --emittance"),
-                ("--twiss-beta", "pyrite beam create/set --twiss-beta"),
-                ("--twiss-alpha", "pyrite beam create/set --twiss-alpha"),
-                ("--energy-spread", "pyrite beam create/set --energy-spread"),
-            )
-        ),
-    )
-    text = catalog.read_text().replace(" ", "")
-    assert "[profiles.twiss.beam.transverse]" in text
-    assert "normalized_emittance_x_mm_mrad=1.0" in text
-    assert "beta_twiss_x_m=0.5" in text
-    # A diverging beam past its waist is legitimate input, not a bad magnitude.
-    assert "alpha_twiss_x=-0.8" in text
-    assert "energy_spread_frac=0.002" in text
-
-
-def test_create_rejects_emittance_together_with_spot_fwhm(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch)
-
-    result = invoke(
-        profile.command,
-        [
-            "create",
-            "clash",
-            "--emittance",
-            "1.0",
-            "--twiss-beta",
-            "0.5",
-            "--transverse-fwhm-mm",
-            "1.0",
-        ],
-    )
-
-    assert result.exit_code == 2
-    assert "--emittance replaces --transverse-fwhm-mm" in result.output
-
-
-def test_create_requires_beta_alongside_emittance(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch)
-
-    result = invoke(profile.command, ["create", "partial", "--emittance", "1.0"])
-
-    assert result.exit_code == 2
-    assert "--emittance requires --twiss-beta" in result.output
-
-
-def test_create_rejects_twiss_without_emittance(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch)
-
-    result = invoke(profile.command, ["create", "orphan", "--twiss-alpha", "-0.5"])
-
-    assert result.exit_code == 2
-    assert "--twiss-beta and --twiss-alpha require --emittance" in result.output
-
-
-def test_set_transverse_retires_the_legacy_spot(tmp_path, monkeypatch):
-    """The two spellings are mutually exclusive at decode, so writing one
-    must remove the other or the edit leaves an unloadable profile."""
-    catalog = _catalog(tmp_path, monkeypatch)
-    invoke(profile.command, ["create", "spot", "--transverse-fwhm-mm", "2.0"])
-    assert "transverse_fwhm_mm" in catalog.read_text()
-
-    result = invoke(
-        profile.command,
-        ["set", "spot", "--emittance", "1.0", "--twiss-beta", "0.5"],
-    )
-
-    assert_clean_result(
-        result,
-        stderr="".join(
-            flag_message("profile set", flag, replacement) + "\n"
-            for flag, replacement in (
-                ("--emittance", "pyrite beam create/set --emittance"),
-                ("--twiss-beta", "pyrite beam create/set --twiss-beta"),
-            )
-        ),
-    )
-    section = catalog.read_text().split("[profiles.spot.beam]", 1)[1]
-    assert "transverse_fwhm_mm" not in section.split("\n[profiles.spot.beam.transverse]", 1)[0]
-
-
 def test_set_attaches_named_beam_by_reference(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
 
@@ -1581,37 +1447,32 @@ def test_create_unknown_beam_errors(tmp_path, monkeypatch):
     assert "unknown beam: bogus" in result.stderr
 
 
-def test_set_beam_and_inline_flag_are_mutually_exclusive(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
-
-    result = invoke(
-        profile.command,
-        ["set", "sub_100keV", "--beam", "rf_gun_200fs", "--rep-rate-hz", "100"],
+def test_inline_beam_flags_are_gone_from_create_and_set(tmp_path, monkeypatch):
+    """Issue #54: beam phase space is set only through `pyrite beam`. The nine
+    inline spellings are removed outright rather than deprecated, so Click
+    rejects them as unknown options and nothing reaches the catalog."""
+    catalog = _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+    original = catalog.read_text()
+    retired = (
+        ("--transverse-fwhm-mm", "0.1"),
+        ("--rep-rate-hz", "5000"),
+        ("--bunch-charge-pc", "1"),
+        ("--longitudinal", "microtrain"),
+        ("--envelope-rms-fs", "200"),
+        ("--emittance", "1.0"),
+        ("--twiss-beta", "0.5"),
+        ("--twiss-alpha", "-0.8"),
+        ("--energy-spread", "0.002"),
     )
 
-    assert result.exit_code == 2
-    assert "--beam replaces the inline beam flags; pass only one" in result.stderr
+    for flag, value in retired:
+        created = invoke(profile.command, ["create", "newprof", "--material", "hopg", flag, value])
+        updated = invoke(profile.command, ["set", "sub_100keV", flag, value])
+        for result in (created, updated):
+            assert result.exit_code == 2
+            assert f"No such option '{flag}'" in result.stderr
 
-
-def test_create_beam_and_inline_flag_are_mutually_exclusive(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
-
-    result = invoke(
-        profile.command,
-        [
-            "create",
-            "newprof",
-            "--material",
-            "hopg",
-            "--beam",
-            "rf_gun_200fs",
-            "--rep-rate-hz",
-            "100",
-        ],
-    )
-
-    assert result.exit_code == 2
-    assert "--beam replaces the inline beam flags; pass only one" in result.stderr
+    assert catalog.read_text() == original
 
 
 def test_set_and_create_attach_named_detector_and_show_resolved_geometry(tmp_path, monkeypatch):
@@ -1666,16 +1527,6 @@ def test_named_detector_unknown_conflict_and_inline_edit_compatibility(tmp_path,
     assert "[profiles.attached.detector]" in text
     assert "observation_angle_deg = 100.0" in text
     assert "polar_acceptance_deg = 16.6" in text
-
-
-def test_set_inline_flag_onto_named_reference_errors(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
-
-    result = invoke(profile.command, ["set", "attached", "--rep-rate-hz", "100"])
-
-    assert result.exit_code == 1
-    assert "profile attached has beam = 'rf_gun_200fs' (a named reference)" in result.stderr
-    assert "pyrite beam set rf_gun_200fs" in result.stderr
 
 
 def test_remove_beam_detaches_named_reference(tmp_path, monkeypatch):

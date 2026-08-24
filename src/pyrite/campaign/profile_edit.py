@@ -348,41 +348,6 @@ def unknown_detector(document, name):
     raise ValueError(message)
 
 
-def apply_beam_updates(name, target, updates):
-    """Apply inline beam fields without detaching a named beam reference."""
-    if not updates:
-        return
-    existing = target.get("beam")
-    if isinstance(existing, str):
-        raise ValueError(
-            f"profile {name} has beam = {existing!r} (a named reference); "
-            f"edit it with 'pyrite beam set {existing} ...', or replace the "
-            "reference with --beam NAME"
-        )
-    if existing is None:
-        existing = tomlkit.table()
-        target["beam"] = existing
-    elif not isinstance(existing, dict):
-        raise ValueError("profile beam must be a table or named reference")
-    for key, value in updates.items():
-        if key in ("longitudinal", "transverse"):
-            policy = tomlkit.table()
-            for policy_key, policy_value in value.items():
-                policy[policy_key] = policy_value
-            existing[key] = policy
-        else:
-            existing[key] = value
-    if "transverse" in updates:
-        for legacy in (
-            "transverse_fwhm_mm",
-            "transverse_fwhm_x_mm",
-            "transverse_fwhm_y_mm",
-        ):
-            existing.pop(legacy, None)
-    elif "transverse_fwhm_mm" in updates:
-        existing.pop("transverse", None)
-
-
 def merge_values(document, name, updates, *, add):
     """Mutate range values for ``profile add`` and ``profile remove``."""
     target = existing_profile(document, name)
@@ -531,7 +496,6 @@ def create_profile(
     *,
     updates,
     beam_name,
-    beam_updates,
     detector_name,
     detector_updates,
     transport_updates,
@@ -557,8 +521,6 @@ def create_profile(
         target[catalog_key(label)] = values_item(values)
     if beam_name is not None:
         target["beam"] = beam_name
-    else:
-        apply_beam_updates(name, target, beam_updates)
     if detector_name is not None:
         target["detector"] = detector_name
     else:
@@ -575,7 +537,6 @@ def set_profile(
     *,
     updates,
     beam_name,
-    beam_updates,
     detector_name,
     detector_updates,
     transport_updates,
@@ -608,8 +569,6 @@ def set_profile(
         target[catalog_key(label)] = values_item(values)
     if beam_name is not None:
         target["beam"] = beam_name
-    else:
-        apply_beam_updates(name, target, beam_updates)
     if detector_name is not None:
         target["detector"] = detector_name
     else:

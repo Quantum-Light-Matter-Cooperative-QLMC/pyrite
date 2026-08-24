@@ -1016,7 +1016,7 @@ Commands:
   numerics     Inspect and edit result-affecting...
   remove       Remove values from an existing profile's...
   rename       Rename profile NAME to NEW_NAME.
-  set          Replace range grids, beam fields, detector...
+  set          Replace range grids, the beam reference,...
   show         Show one profile's ranges, beam, detector,...
   energy-grid  Manage profile-scoped energy-grid derivation inputs.
 ```
@@ -1070,11 +1070,10 @@ Usage: pyrite profile create [OPTIONS] NAME
 
   Create a new profile, cloning defaults from --from (standard).
 
-  Range options replace individual cloned grids; beam and detector options replace
-  individual cloned fields. Material membership is cloned and ``--material`` replaces
-  it. Per-material overrides are not cloned. --beam NAME attaches a named [beams.NAME]
-  reference and is mutually exclusive with the inline beam flags, which are deprecated
-  in its favor.
+  Range options replace individual cloned grids; detector options replace individual
+  cloned fields. Material membership is cloned and ``--material`` replaces it. Per-
+  material overrides are not cloned. Beam phase space is set only through a named
+  object: build it with ``pyrite beam create`` and attach it here with --beam NAME.
 
 Options:
   --from SOURCE                   Clone ranges, beam, detector, and material membership
@@ -1103,22 +1102,8 @@ Options:
                                   Transport clock model (frozen or midpoint).
   --max-de-frac FRACTION          Cap one transport row's fractional mean energy loss;
                                   requires midpoint.  [x>=0.0]
-  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
-                                  the spot FWHM.  [x>0.0]
-  --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
-                                  [x>0.0]
-  --twiss-alpha A                 Courant-Snyder alpha; negative diverges. Requires
-                                  --emittance.
-  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
-  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
-  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
-  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
-  --longitudinal [gaussian|microtrain|compressed]
-                                  Replace the complete declarative longitudinal policy.
-  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
-                                  policy.  [x>0.0]
-  --beam NAME                     Attach a named [beams.NAME] reference; replaces the
-                                  inline beam flags.
+  --beam NAME                     Attach a named [beams.NAME] reference; create it with
+                                  'pyrite beam create'.
   --detector NAME                 Attach a named [detectors.NAME] reference; replaces
                                   inline geometry flags.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
@@ -1394,15 +1379,15 @@ Options:
 ```text
 Usage: pyrite profile set [OPTIONS] NAME
 
-  Replace range grids, beam fields, detector scalars, or emission.
+  Replace range grids, the beam reference, detector scalars, or emission.
 
   NAME must already exist (create it with ``pyrite profile create``); unknown names
   error with suggestions. Editing 'standard' prompts for confirmation unless --yes is
   given; --dry-run never prompts. Detector scalars and emission replace supplied fields;
   unlike range grids, they are not accepted by add/remove -- except emission, which
-  add/remove also accept via --coherent/--incoherent for incremental switching. --beam
-  NAME attaches a named [beams.NAME] reference and is mutually exclusive with the inline
-  beam flags, which are deprecated in its favor.
+  add/remove also accept via --coherent/--incoherent for incremental switching. Beam
+  phase space is set only through a named object: edit it with ``pyrite beam set``, or
+  attach a different one here with --beam NAME.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1429,22 +1414,8 @@ Options:
                                   Transport clock model (frozen or midpoint).
   --max-de-frac FRACTION          Cap one transport row's fractional mean energy loss;
                                   requires midpoint.  [x>=0.0]
-  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
-                                  the spot FWHM.  [x>0.0]
-  --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
-                                  [x>0.0]
-  --twiss-alpha A                 Courant-Snyder alpha; negative diverges. Requires
-                                  --emittance.
-  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
-  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
-  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
-  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
-  --longitudinal [gaussian|microtrain|compressed]
-                                  Replace the complete declarative longitudinal policy.
-  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
-                                  policy.  [x>0.0]
-  --beam NAME                     Attach a named [beams.NAME] reference; replaces the
-                                  inline beam flags.
+  --beam NAME                     Attach a named [beams.NAME] reference; create it with
+                                  'pyrite beam create'.
   --detector NAME                 Attach a named [detectors.NAME] reference; replaces
                                   inline geometry flags.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar

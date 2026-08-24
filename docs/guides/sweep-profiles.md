@@ -150,7 +150,10 @@ share checkpoints; renaming a beam moves nothing.
 
 The older inline `[profiles.<name>.beam]` table still decodes and means exactly
 the same thing, but nothing writes it any more and all bundled profiles have
-been converted. A profile carrying both spellings fails to load.
+been converted. A profile carrying both spellings fails to load. The nine
+`pyrite profile create` / `pyrite profile set` flags that used to write that
+block have been removed; `--beam NAME` is the only way `pyrite profile` touches
+beam phase space.
 
 Detector geometry uses the same named-object pattern shown above. Use
 `pyrite detector list|show|create|set|rename|delete` to manage these
@@ -171,9 +174,8 @@ A beam table -- named or inline -- decodes into `BeamSpec`. The nested
 policies; `docs/physics/beam-transport/beam-phase-space.md` is the reference for every key, its units,
 and the mutual exclusions between them. `pyrite beam create` / `pyrite beam set` write
 the same keys from `--emittance`, `--twiss-beta`, `--twiss-alpha`,
-`--energy-spread`, and the legacy `--transverse-fwhm-mm`. The nine equivalent
-`pyrite profile create` / `pyrite profile set` flags still work and still write an
-inline block, but each warns once naming `pyrite beam`.
+`--energy-spread`, and the legacy `--transverse-fwhm-mm`. They are the only CLI
+surface that writes them: `pyrite profile` has no inline beam flags.
 
 Both sub-tables join `parameter_sha256` only when they diverge from the inert
 defaults, so a profile that never sets them hashes exactly as it did before the

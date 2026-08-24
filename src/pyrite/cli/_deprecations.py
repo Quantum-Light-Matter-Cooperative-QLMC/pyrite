@@ -302,27 +302,12 @@ def _flag(
     return DeprecatedFlag(command, flag, replacement, since, _window(since), note)
 
 
-#: The nine ``pyrite profile create``/``pyrite profile set`` inline beam-distribution
-#: flags (decision 6, `agentdocs/tasks/feature/named-beam-objects`): the whole family
-#: moved to ``pyrite beam create``/``pyrite beam set``, so there is no differently
-#: named canonical flag on the *same* command to merge into the way D5's
-#: renamed spellings do. Each flag keeps its own name and stays fully
-#: functional through the support window; the command body warns manually
-#: (`profile.py`'s `_warn_inline_beam_flags`) rather than through a
-#: `RetiredOption`, so these keys are also listed in `SELF_WARNING_FLAGS`
-#: below.
-_BEAM_FLAG_NAMES: tuple[str, ...] = (
-    "--envelope-rms-fs",
-    "--longitudinal",
-    "--bunch-charge-pc",
-    "--rep-rate-hz",
-    "--transverse-fwhm-mm",
-    "--energy-spread",
-    "--twiss-alpha",
-    "--twiss-beta",
-    "--emittance",
-)
-_BEAM_FLAG_NOTE = "Attach a named beam instead: `pyrite profile set NAME --beam BEAM_NAME`."
+# The nine inline beam-distribution flags that once sat on `profile create` and
+# `profile set` are gone rather than deprecated (issue #54): beam phase space is
+# set only through `pyrite beam create`/`set` and attached with `--beam NAME`, so
+# the old spellings are plain "no such option" usage errors with no registry row.
+# The detector family below is the surviving half of that pair and still warns.
+
 _DETECTOR_FLAG_NAMES: tuple[str, ...] = (
     "--observation-angle",
     "--polar-acceptance",
@@ -338,11 +323,6 @@ _DETECTOR_FLAG_NOTE = (
 DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     entry.key: entry
     for entry in (
-        *(
-            _flag(command, flag, f"pyrite beam create/set {flag}", note=_BEAM_FLAG_NOTE)
-            for command in ("profile create", "profile set")
-            for flag in _BEAM_FLAG_NAMES
-        ),
         *(
             _flag(
                 command,
@@ -465,7 +445,7 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
 SELF_WARNING_FLAGS: frozenset[tuple[str, str]] = frozenset(
     (command, flag)
     for command in ("profile create", "profile set")
-    for flag in (*_BEAM_FLAG_NAMES, *_DETECTOR_FLAG_NAMES)
+    for flag in _DETECTOR_FLAG_NAMES
 )
 
 

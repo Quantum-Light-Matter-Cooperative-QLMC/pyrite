@@ -1,8 +1,9 @@
 """Beam distribution-field CLI options, validation, and TOML writers.
 
-Shared by ``pyrite profile``'s inline ``[profiles.NAME.beam]`` flags and
-``pyrite beam``'s named ``[beams.NAME]`` object verbs, so both surfaces validate
-identically.
+Backs ``pyrite beam``'s named ``[beams.NAME]`` object verbs, which are the only
+CLI surface that sets beam phase space: ``pyrite profile`` attaches a beam by
+name (``--beam NAME``) and never writes distribution fields itself (issue #54).
+``create`` and ``set`` share this module so the two verbs validate identically.
 """
 
 from __future__ import annotations
@@ -133,9 +134,9 @@ def collect_beam_updates(
 
 
 def write_beam_fields(table, updates):
-    """Write ``updates`` directly onto ``table``, a beam-shaped TOML table
-    (e.g. a ``[beams.NAME]`` row, or an already-created ``[profiles.NAME.beam]``
-    subtable)."""
+    """Write ``updates`` directly onto ``table``, a beam-shaped TOML table --
+    a ``[beams.NAME]`` row, or a hand-authored ``[profiles.NAME.beam]`` subtable
+    that still decodes."""
     if not updates:
         return
     for key, value in updates.items():
@@ -154,15 +155,3 @@ def write_beam_fields(table, updates):
             table.pop(legacy, None)
     elif "transverse_fwhm_mm" in updates:
         table.pop("transverse", None)
-
-
-def apply_beam_updates(profile, updates):
-    """Write ``updates`` onto ``profile``'s nested ``[profiles.NAME.beam]``
-    subtable, creating it if absent."""
-    if not updates:
-        return
-    beam = profile.get("beam")
-    if beam is None:
-        beam = tomlkit.table()
-        profile["beam"] = beam
-    write_beam_fields(beam, updates)

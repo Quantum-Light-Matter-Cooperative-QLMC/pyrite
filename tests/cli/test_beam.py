@@ -122,6 +122,136 @@ def test_create_writes_fields_and_label(tmp_path, monkeypatch):
     assert "bunch_charge_pc = 1.0" in text
 
 
+def test_create_and_set_round_trip_longitudinal_policy(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    created = invoke(
+        beam.command,
+        [
+            "create",
+            "microtrain",
+            "--transverse-fwhm-mm",
+            "0.1",
+            "--rep-rate-hz",
+            "5000",
+            "--bunch-charge-pc",
+            "1",
+            "--longitudinal",
+            "microtrain",
+            "--envelope-rms-fs",
+            "200",
+        ],
+    )
+    assert_clean_result(created, stdout="created beam microtrain\n")
+
+    shown = invoke(beam.command, ["show", "microtrain", "-o", "json"])
+    assert_clean_result(shown)
+    payload = json.loads(shown.stdout)["payload"]
+    assert payload["transverse_fwhm_mm"] == 0.1
+    assert payload["rep_rate_hz"] == 5000.0
+    assert payload["bunch_charge_pc"] == 1.0
+    assert payload["longitudinal"] == {"kind": "microtrain", "envelope_rms_fs": 200.0}
+
+    changed = invoke(beam.command, ["set", "microtrain", "-y", "--longitudinal", "compressed"])
+    assert_clean_result(changed, stdout="updated beam microtrain\n")
+
+    section = catalog.read_text().split("[beams.microtrain.longitudinal]", 1)[1].split("\n[", 1)[0]
+    assert 'kind = "compressed"' in section
+    # `compressed` derives its own duration, so the replaced policy must not
+    # carry the previous kind's envelope forward.
+    assert "envelope_rms_fs" not in section
+
+
+def test_longitudinal_policy_flag_pairing_errors(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    orphan = invoke(beam.command, ["create", "orphan", "--envelope-rms-fs", "200"])
+    assert orphan.exit_code == 2
+    assert "--envelope-rms-fs requires --longitudinal" in orphan.output
+
+    bare = invoke(beam.command, ["create", "bare", "--longitudinal", "gaussian"])
+    assert bare.exit_code == 2
+    assert "gaussian requires --envelope-rms-fs" in bare.output
+
+    derived = invoke(
+        beam.command,
+        ["create", "derived", "--longitudinal", "compressed", "--envelope-rms-fs", "200"],
+    )
+    assert derived.exit_code == 2
+    assert "compressed derives its duration; omit --envelope-rms-fs" in derived.output
+
+
+def test_create_writes_transverse_twiss_block(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        beam.command,
+        [
+            "create",
+            "twiss",
+            "--emittance",
+            "1.0",
+            "--twiss-beta",
+            "0.5",
+            "--twiss-alpha",
+            "-0.8",
+            "--energy-spread",
+            "0.002",
+        ],
+    )
+
+    assert_clean_result(result, stdout="created beam twiss\n")
+    text = catalog.read_text().replace(" ", "")
+    assert "[beams.twiss.transverse]" in text
+    assert "normalized_emittance_x_mm_mrad=1.0" in text
+    assert "beta_twiss_x_m=0.5" in text
+    # A diverging beam past its waist is legitimate input, not a bad magnitude.
+    assert "alpha_twiss_x=-0.8" in text
+    assert "energy_spread_frac=0.002" in text
+
+
+def test_emittance_and_twiss_pairing_errors(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    clash = invoke(
+        beam.command,
+        [
+            "create",
+            "clash",
+            "--emittance",
+            "1.0",
+            "--twiss-beta",
+            "0.5",
+            "--transverse-fwhm-mm",
+            "1.0",
+        ],
+    )
+    assert clash.exit_code == 2
+    assert "--emittance replaces --transverse-fwhm-mm" in clash.output
+
+    partial = invoke(beam.command, ["create", "partial", "--emittance", "1.0"])
+    assert partial.exit_code == 2
+    assert "--emittance requires --twiss-beta" in partial.output
+
+    orphan = invoke(beam.command, ["create", "orphan", "--twiss-alpha", "-0.5"])
+    assert orphan.exit_code == 2
+    assert "--twiss-beta and --twiss-alpha require --emittance" in orphan.output
+
+
+def test_set_transverse_retires_the_legacy_spot(tmp_path, monkeypatch):
+    """The two spellings are mutually exclusive at decode, so writing one
+    must remove the other or the edit leaves an unloadable beam."""
+    catalog = _catalog(tmp_path, monkeypatch)
+    invoke(beam.command, ["create", "spot", "--transverse-fwhm-mm", "2.0"])
+    assert "transverse_fwhm_mm" in catalog.read_text()
+
+    result = invoke(beam.command, ["set", "spot", "--emittance", "1.0", "--twiss-beta", "0.5"])
+
+    assert_clean_result(result, stdout="updated beam spot\n")
+    section = catalog.read_text().split("[beams.spot]", 1)[1]
+    assert "transverse_fwhm_mm" not in section.split("\n[beams.spot.transverse]", 1)[0]
+
+
 def test_create_existing_or_invalid_name_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
