@@ -1,99 +1,74 @@
 ---
 name: dispatch-task
-description: Use when post-triage work needs approved task setup verification, worker selection/handoff, or landed task-record/GitHub-issue retirement; excludes implementation and general git cleanup.
+description: Use when an approved GitHub issue needs a linked branch/worktree, worker selection/handoff, or post-merge issue/worktree retirement; excludes implementation.
 ---
 
 # Dispatch Task
 
-Coordinate one approved task. `triage` owns initial planning/publication;
-worker skills own implementation; `repo-cleanup` owns generic worktree/ref
-hygiene.
+Coordinate one approved GitHub issue. `triage` owns planning; worker skills own
+implementation; `repo-cleanup` owns generic git hygiene.
 
-## Inventory
+## Start an approved issue
 
-1. Invoke `todo-sync`. Read the issue (`gh issue view <n>`), the matching
-   `agentdocs/tasks/<branch-name>/README.md`,
-   worktree list, branch status, and relevant instructions.
-2. Invoke `repo-orientation` to confirm owners, dependencies, and tests.
-3. Stop on unrelated dirty state in the task worktree, missing/inaccessible
-   worktree, ambiguous
-   backlog ownership, or issue/task-doc divergence.
+1. Read the issue with `gh issue view <n> --json number,title,body,labels,state,url`
+   and confirm it is open, approved, and actionable. Inspect existing linked
+   branches with `gh issue develop --list <n>` and current worktrees/status.
+2. Reuse an existing clean linked branch/worktree when unambiguous. Otherwise
+   create one linked development branch from `main` with `gh issue develop`;
+   prefer `issue-<n>-<short-slug>` naming. Fetch it and attach a dedicated
+   worktree using the repository's normal worktree convention.
+3. Stop on overlapping dirty state in the target worktree, an already-active
+   conflicting branch, or a material decision missing from the issue. Unrelated
+   dirt in another worktree is not a blocker.
+4. Select the smallest worker capable of the approved scope:
 
-## Lifecycle
+| Skill | Assign |
+|---|---|
+| `implement-task-lite` | One mechanical, low-risk slice with explicit owner/check |
+| `implement-task` | Bounded cross-file checklist slice with known design |
+| `lead-task` | Ambiguous/cross-subsystem milestone, physics, performance, integration, or delegation |
 
-### Start approved task
+Add only domain skills that the slice actually needs. Do not force
+`repo-orientation`, Serena, or other setup tools when the issue/handoff already
+identifies owners and checks.
 
-1. Verify reviewed task doc, the issue's branch/task-doc pointer, branch, and
-   worktree.
-2. Create/reuse the approved worktree if missing; do not redesign the plan.
-3. Verify triage's setup commit (task doc + issue pointer) exists and
-   `main` and the task branch are pushed with upstream.
-4. Dispatch only after the task worktree is clean and remote setup is verified;
-   unrelated state in the `main` worktree is not a blocker.
+## Handoff
 
-Setup commit/push belongs to `triage`; do not grant worker push, issue, or
-delegation authority implicitly.
-
-### Retire landed task
-
-Only when explicitly asked:
-
-1. Verify branch landed and identify durable task content.
-2. Promote durable content to its owner (`README.md`, `docs/`, ADR, source
-   documentation, or tests); remove the task directory; close the issue
-   (`gh issue close <n> --comment "..."` pointing at the landing commit/PR).
-3. Commit and push authorized lifecycle changes.
-4. Hand physical worktree/ref removal to `repo-cleanup`; report its recovery
-   SHAs.
-
-## Select worker
-
-Risk and scope override model price/name.
-
-| Skill | Example tier | Assign |
-|---|---|---|
-| `implement-task-lite` | Haiku, Luna | Mechanical, specified owner, one small acceptance criterion |
-| `implement-task` | Sonnet, Terra | Coherent checklist slice, known design, bounded cross-file work |
-| `lead-task` | Opus, Sol, Fable, K3 | Whole milestone, ambiguity, physics, integration, or delegation |
-
-Do not split by CLI/UI/physics/performance/docs. Add matching domain skills to
-handoff: `cli-ui-ux`, `notebook-workflow`, `physics-review`,
-`physics-validation`, `performance`, `documentation-maintenance`,
-`remote-gpu-jobs`, `regression-testing`, or `scientific-library`.
-
-For an approved, self-contained execution slice, request Serena `one-shot`.
-Modes are fixed at MCP startup: when the worker gets its own Serena server,
-start it with `--add-mode one-shot`; when workers share a server, put the same
-autonomous-completion contract in the handoff and do not edit project defaults.
-The mode changes prompting only; it grants no extra authority or approvals.
-
-## Dispatch contract
-
-Send explicit values; never rely on child inheriting supervisor context.
+Send explicit context; do not rely on inherited supervisor state.
 
 ```text
 Worker skill:
-Task:
-Task doc (agentdocs/tasks/<branch-name>/README.md):
+Issue: #<n> <url>
 Worktree:
 Branch:
 Slice / non-goals:
 Done when:
 Required skills:
 Expected owners/tests:
-Serena execution: one-shot active | one-shot contract (shared server) | interactive
 Authority:
   commits: checkpoint | final | no
   push: yes | no
   issue-writer: yes | no
+  pr: yes | no
   delegate: yes | no
 Stop conditions:
 Report:
 ```
 
-Worker handoff from direct user invocation defaults to `commits: checkpoint`,
-`push: no`, `issue-writer: no`, `delegate: no`. A supervisor may pass only
-authority it already has. Use one writer per worktree; parallelize read-only
-investigation or isolated branches, never overlapping edits.
+Default direct-user authority: `commits: checkpoint`, `push: no`,
+`issue-writer: no`, `pr: no`, `delegate: no`. One writer per mutable worktree;
+parallel edits require isolated branches/worktrees. If worker dispatch is not
+available, return this filled handoff and target skill instead.
 
-If agent dispatch is unavailable, return exact handoff prompt and target skill.
+## After landing
+
+When explicitly asked to retire completed work:
+
+1. Verify the change landed on `main` and identify its PR/commit.
+2. Prefer a PR containing `Closes #<n>` so GitHub closes the issue on merge. If
+   the change landed without automatic closure, close the issue with a short
+   landing reference.
+3. Ensure durable decisions/documentation live in their owning artifacts. Do not
+   preserve disposable agent scratch merely for history.
+4. Hand safe worktree/local-ref removal to `repo-cleanup` and report recovery
+   SHAs.

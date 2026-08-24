@@ -1,35 +1,28 @@
 ---
 name: implement-task-lite
-description: Use when implementing one tightly bounded, low-risk PyRITE task slice with specified owners and acceptance checks, especially through Haiku- or Luna-tier workers.
+description: Use when implementing one tightly bounded, low-risk PyRITE issue slice with explicit owners and acceptance checks.
 ---
 
 # Implement Task Lite
 
-Execute only supplied slice. No architecture, broad refactor, TODO ownership,
-delegation, physics changes, or scope discovery.
+Execute only the assigned slice. No architecture work, broad refactor,
+delegation, physics changes, or backlog management.
 
-1. Confirm cwd, branch, worktree, status, and handoff fields. Read
-   `AGENTS.md`, supplied `agentdocs/tasks/<branch-name>/` task section, named
-   owners/tests, and required skills.
-   Activate Serena, read its manual, and inspect current config. If requested
-   `one-shot` is absent because the server is shared, follow this skill's
-   autonomous completion contract; do not alter project-wide modes.
-2. Treat main's `TODO.md` as authoritative; never edit or byte-compare the
-   disposable branch copy. If owner/path is not explicit, invoke
-   `repo-orientation` once; stop if still unclear.
-3. Follow `repo-orientation` for named symbols, impact, and affected tests.
-   Preserve unrelated changes.
-4. Make smallest complete change. Add focused regression test when behavior
-   changes. Do not widen cleanup.
-5. Run named/focused checks. Never run heavy sweep locally; use
-   `remote-gpu-jobs` only when handoff authorizes remote work.
-6. At each independently valid slice, if `commits` permits: inspect status and
-   scoped diff, stage explicit task paths only, commit. Never `git add .`.
-   Prefer one final commit for short work; never manufacture time-based commits.
-7. Update task doc only if handoff names it and no other writer owns it. Never
-   push unless `push: yes`.
-8. Report outcome, changed paths, checks, commit hashes, ahead count, and exact
+1. Confirm issue/handoff, cwd, branch, worktree, clean-enough status, and
+   authority. Read the named owner files/tests and any required domain skill.
+2. If ownership is not explicit, use `repo-orientation` once. Use Serena only
+   when symbol references/callers are needed; do not spend actions activating,
+   reading manuals, or inspecting tool config unless the tool actually fails.
+3. Make the smallest complete change. Add a focused regression test when
+   behavior changes; do not widen cleanup.
+4. Run the named/focused checks. Do not run heavy GPU sweeps locally.
+5. If `commits` permits, inspect the scoped diff, stage explicit task paths, and
+   commit one logical result. Never `git add .`; never commit known broken state.
+6. Do not edit the GitHub issue unless `issue-writer: yes`; if authorized, update
+   only the checklist/state materially changed by this slice. Do not push or
+   open a PR without the corresponding authority.
+7. Report changed paths, checks, commit hash(es), ahead count, and exact
    remainder/blocker.
 
-Stop on ambiguity, overlapping dirty files, failing unrelated prerequisites,
-required design choice, physics change, or scope exceeding one bounded slice.
+Stop on overlapping edits, a required design decision, physics/scope expansion,
+or failure of a prerequisite needed for the assigned slice.

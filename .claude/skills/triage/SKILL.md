@@ -1,61 +1,51 @@
 ---
 name: triage
-description: Use when /triage is invoked with optional task-description text or an open GitHub issue or user-marked backlog prose must become reviewable, tracked PyRITE agent task records, task branches/worktrees, and a canonical GitHub issue before dispatch.
+description: Use when new task prose or an existing GitHub issue must become a reviewable, canonical PyRITE issue plan before implementation or dispatch.
 ---
 
 # Triage
 
-Convert task prose into reviewable, tracked work. Judgment plus setup commit
-and branch push; stop before dispatch.
+GitHub Issues are the backlog and task-plan source of truth. Triage plans work;
+it does not implement it, create worktrees, or push branches.
 
 ## Input
 
-- `/triage`: select an open, unowned GitHub issue or `>user<` prose still in a
-  task doc.
-- `/triage <text>`: treat arguments as fresh untriaged prose. Process only that
-  text, not unrelated existing issues/markers. Split into multiple tasks only
-  when independently ownable; preserve all supplied intent.
+- `/triage <text>`: triage only the supplied task text.
+- `/triage #<n>` or an issue URL: refine that issue.
+- `/triage` with no target: choose an open, unassigned/unowned issue only when
+  selection is unambiguous; otherwise report the best candidates.
 
 ## Workflow
 
-1. Resolve input per above. Inspect branches, `git worktree list --porcelain`,
-   and statuses. Do not retouch tasks already owned by a branch.
-2. For each task, preserve full intent and read every linked design doc. Use
-   `repo-orientation` and Serena when implementation ownership needs
-   confirmation.
-3. For each task, derive `<branch-name>` (the full task branch name) and draft
-   `agentdocs/tasks/<branch-name>/README.md` (slashes nest, e.g.
-   `agentdocs/tasks/feature/oom-stage2/README.md`) with:
+1. For an existing target, read it with
+   `gh issue view <n> --json number,title,body,labels,assignees,state,url`. For
+   fresh text, draft the plan first and create the issue once. Preserve user
+   intent; split only when pieces are independently ownable and useful to track
+   separately.
+2. Inspect only enough repository context to make the plan executable. Use
+   `repo-orientation` when ownership or impact is unclear; use Serena only when
+   symbol-level navigation materially helps.
+3. Make the issue body concise and executable. Prefer these sections:
 
-   - problem and scope
-   - implementation path and likely owners
-   - stepwise checklist
-   - decisions/open questions
-   - delegation slices, required skills, and whether each reviewed slice is
-     self-contained enough for Serena `one-shot`
-   - acceptance checks
+   ```markdown
+   ## Goal
+   ## Scope
+   ## Plan
+   - [ ] ...
+   ## Acceptance
+   - [ ] ...
+   ## Decisions / constraints
+   ```
 
-4. For each task, open a new GitHub issue or update the existing one as the
-   canonical record: set relevant `area:*` labels and put the branch and
-   `agentdocs/tasks/<branch-name>/` pointers in the issue body
-   (`gh issue create`/`gh issue edit`).
-5. Commit the task-doc setup on `main` in one commit: stage explicit paths only
-   (each new `agentdocs/tasks/<branch-name>/`); never `git add .`. Preserve any
-   unrelated dirty state and use a `docs(tasks): triage <branch-name>`-style
-   message.
-6. Create each new local task branch/worktree from that setup commit so the
-   worker's branch contains its task record. Stop on name collision, ambiguous
-   intent, or missing design evidence; do not retouch a branch that already
-   owns work.
-7. Push `main` and each new task branch with upstream (`git push -u`). Verify
-   remote refs before presenting.
-8. Show task docs, the issue (created/updated, with link), commit, pushed
-   branches/worktrees, assumptions, and open decisions for user review. Address
-   feedback with a follow-up setup commit on `main` and issue edit, then
-   advance/recreate each still-unstarted task branch from the reviewed commit
-   and push it. Stop if implementation has begun; never rewrite a worker's
-   branch.
+   Omit empty sections. Put durable design decisions in their owning docs once
+   implemented, not in a second backlog file.
+4. Use existing `area:*`/type labels when clearly applicable. Use native issue
+   relations (`--blocked-by`, `--blocking`, parent/sub-issue) when they express
+   real dependencies; do not duplicate dependency state in prose.
+5. Create/update the issue with `gh issue create` or `gh issue edit`. Do not
+   create a branch or worktree yet.
+6. Report the issue number/link, key assumptions, unresolved material decisions,
+   and whether it is ready for dispatch.
 
-Do not label a slice `one-shot` while a material decision remains open. Do not
-implement or dispatch. After approval, `dispatch-task` owns worker launch,
-handoff, and eventual task-record retirement.
+`agentdocs/tasks/` is optional working scratch for complex implementation and
+is never canonical backlog state.

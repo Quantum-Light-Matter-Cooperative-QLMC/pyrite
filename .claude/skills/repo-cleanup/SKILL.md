@@ -1,54 +1,44 @@
 ---
 name: repo-cleanup
-description: "Use when PyRITE needs general git hygiene after task records are correct: safe branch rebases, stale tracking cleanup, and objectively merged worktree/ref removal; never edit GitHub issues or task docs."
+description: "Use when cleaning PyRITE git/worktree: requested safe rebases, stale tracking cleanup, and removal of objectively merged worktrees/refs; never edit GitHub issues."
 ---
-
 # Repo Cleanup
 
-Own git objects and worktrees only. `triage` creates task records;
-`dispatch-task` retires issues/task records before task-specific cleanup. Never
-edit those records. Never push except an explicitly requested, fully merged
-remote-branch deletion.
+Own git objects and worktrees only. Never edit issues or implementation plans.
+Never force-delete or force-push unless the user explicitly authorizes that
+exact operation.
 
 ## Inventory
 
-1. Fetch/prune, then inspect branches, worktrees, dirty/merge state,
+1. Fetch/prune, then inspect relevant branches/worktrees, dirty/merge state,
    ahead/behind counts, and merge bases against `main`.
-2. `gh issue list --state open` without editing. Active untracked branches
-   named by an open issue are triage candidates, never deletion candidates.
-3. Skip branches not behind main, dirty worktrees, active merge/rebase state,
-   open task records, or unclear ownership.
+2. For a deletion candidate, verify it is merged into `main`, its worktree is
+   clean, and no open PR targets it. If its name identifies an issue (for
+   example `issue-123-*`), check that issue; an open issue is a reason to skip.
+3. Skip unclear ownership, dirty worktrees, active merge/rebase state, or any
+   branch not objectively safe for the requested operation.
 
-## Rebase per branch
+## Rebase requested branches
 
-Fan out one cheap subagent per candidate. One agent per branch/worktree; explicit
-authority: preflight and rebase one branch, no push, force, or tests. Never
-switch branches in an existing checkout; use a fresh temporary worktree when a
-checkout is required.
+Do not fan out subagents by default. For each requested branch:
 
-1. Preflight with `git merge-tree --write-tree main <branch>`.
-2. Rebase only with no conflicts.
-3. Abort on any conflict; do not resolve it.
-4. Report branches already contained in main as retirement candidates.
-5. Remove temporary worktrees; report old/new heads or abort reason.
+1. Preflight conflict risk (`git merge-tree --write-tree main <branch>` when
+   appropriate).
+2. Rebase only when the target worktree is clean and ownership is clear.
+3. Abort on conflict unless conflict resolution was explicitly assigned; report
+   old/new head or abort reason.
+4. Never switch branches inside an unrelated existing checkout; use its own or a
+   temporary worktree.
 
-## Cleanup chores
+## Remove merged state
 
-Run after rebases. Delegate one named deletion target per cheap subagent. Record
-tip SHA first; never use force, wildcard/bulk deletion, or touch main.
-
-1. Prune stale worktree administration.
-2. Remove a worktree only when clean and its branch is merged or gone; never
-   use `--force`.
-3. Delete a fully merged local with `git branch -d` only after its worktree and
-   task/TODO records are gone.
+1. Record the branch tip SHA first.
+2. Remove a clean merged worktree without `--force`.
+3. Delete the fully merged local branch with `git branch -d`.
 4. Prune stale remote-tracking refs.
-5. Delete a fully merged remote only with explicit authority, after its local
-   counterpart is gone; never delete main/master.
+5. Delete a merged remote branch only with explicit authority and only after
+   local cleanup; never delete `main`/`master`.
 
-## After
-
-Do not run task test suites. Report per branch: rebased old→new,
-skipped/aborted reason, retirement candidate, removed worktree/ref with recovery
-SHA, backlog inconsistency, and upstream divergence requiring later explicit
-`--force-with-lease` authority.
+Do not run task test suites. Report each requested branch: action, old/new or
+recovery SHA, skipped reason, and any upstream divergence requiring separate
+`--force-with-lease` approval.

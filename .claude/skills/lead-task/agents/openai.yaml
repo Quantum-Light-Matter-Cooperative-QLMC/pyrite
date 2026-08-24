@@ -1,4 +1,4 @@
 interface:
   display_name: "Lead Task"
-  short_description: "Own and integrate a complex task milestone"
-  default_prompt: "Use $lead-task to lead this PyRITE task milestone."
+  short_description: "Lead and integrate a complex GitHub issue"
+  default_prompt: "Use $lead-task to lead this complex PyRITE issue milestone."

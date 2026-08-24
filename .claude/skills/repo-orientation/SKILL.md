@@ -1,25 +1,24 @@
 ---
 name: repo-orientation
-description: Use when locating code, choosing owners, assessing PyRITE structure, updating repository map, or planning surgical changes.
+description: Use when locating PyRITE code, choosing the smallest owner, tracing dependencies/tests, or updating the repository map.
 ---
 
 # Repo Orientation
 
-1. Read `docs/repo_map.md`.
-2. Use Serena for symbol-level search: definitions, references, callers/callees,
-   and dependencies.
-3. Use `rg` or direct reads for exact text, non-code, generated files, runtime
-   artifacts, branch context, and affected tests. `src/` is ~52k LOC; grep is
-   competitive for most questions.
+Use the cheapest navigation method that answers the question.
 
-Prefer `src/pyrite/` implementations, `tests/` fast CPU checks, `checks/`
-physics anchors, and thin marimo apps. Legacy
-`checks/cxr_analysis_feranchuk.ipynb` is not an app owner. Do not rewrite
-README/TODO/docs unless task targets them.
+1. Read `docs/repo_map.md` when package/ownership context is needed; skip it for
+   an already-known local owner.
+2. Use `rg`/direct reads for exact text, filenames, non-code, generated files,
+   branch context, and nearby tests. Use Serena when definition/reference/call
+   graph navigation is materially better.
+3. Prefer `src/pyrite/` implementations, `tests/` fast CPU checks, `checks/`
+   physics anchors, and thin marimo apps. Find an existing helper before adding
+   a new abstraction.
+4. Identify the smallest owning path, affected callers, and focused tests. Do
+   not broaden into unrelated README/docs/backlog edits.
+5. Regenerate with `pyrite-dev repo-map` only when packages, entry points,
+   ownership, or agent-tooling top-levels actually changed.
 
-Find smallest owner and existing helper before editing. Prefer focused test over
-broad refactor. Context7 is only for current external-library docs. Headroom
-shapes output; it is not a command or index. Do not use Tokensave or RTK.
-
-Regenerate repo inventory with `pyrite-dev repo-map` after packages, entry
-points, or agent-tooling top-levels change.
+Use Context7 only for current external-library documentation. Headroom is output
+shaping, not a repository index. Do not use Tokensave or RTK.

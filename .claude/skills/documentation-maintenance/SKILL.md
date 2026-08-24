@@ -1,45 +1,42 @@
 ---
 name: documentation-maintenance
-description: Use when changing README/docs/public docstrings/generated references/repository map, maintaining cross-links, or auditing stale docs/builds in PyRITE.
+description: Use when changing PyRITE README/docs/public docstrings/generated references/navigation or auditing documentation against implementation.
 ---
 
 # Documentation Maintenance
 
-Document behavior once at owning artifact:
+Document behavior once at its durable owner:
 
 | Change | Owner |
 |---|---|
 | Science, install, primary workflow | `README.md` |
-| User task or workflow | `docs/guides/` |
-| Current physical model or convention | `docs/physics/` |
-| Independent evidence or reproduction | `docs/validation/` |
-| Exploratory model or unimplemented proposal | `docs/research/` |
+| User task/workflow | `docs/guides/` |
+| Current physical model/convention | `docs/physics/` |
+| Independent evidence/reproduction | `docs/validation/` |
+| Exploratory/unimplemented proposal | `docs/research/` |
 | Current implementation/design reference | `docs/repo-design/` |
-| Durable architectural decision and rationale | `docs/adr/` |
-| CLI contract | Source help + generated `docs/repo-design/cli/cli-reference.md`; use `cli-ui-ux` |
+| Durable architecture decision | `docs/adr/` |
+| CLI contract | Source help + generated CLI reference; use `cli-ui-ux` |
 | Public API | Source docstring + `docs/api.md`; use `scientific-library` |
 | Ownership/entry point/dependency | `docs/repo_map.md`; use `repo-orientation` |
-| Physics claim | Derivation, validation record, ledger |
-| Backlog | `TODO.md`; agent work in `agentdocs/`; use `todo-sync` |
+| Backlog/task plan | GitHub Issues |
 
-Read `docs/repo_map.md` and `docs/repo-design/documentation.md`. Compare prose
-with source, tests, and runtime evidence. Add maintained pages to the nearest
-section index/toctree; do not use directory placement as a substitute for
-published navigation.
-Preserve units, assumptions, citations, validation state, and
-current-vs-proposed distinction. Prefer relative links and canonical detail.
-Keep task plans, handoffs, and reports out of `docs/`; place them under the
-owning `agentdocs/tasks/<branch-name>/`, or `agentdocs/plans/` only when they
-sequence multiple tasks. Promote durable outcomes to their owning artifact;
-use `docs/` only for durable project documentation.
+Read only the relevant owning docs plus source/tests/runtime evidence needed to
+verify them. Add maintained pages to the nearest index/toctree. Preserve units,
+assumptions, citations, validation state, and current-vs-proposed distinctions.
+Prefer relative links and one canonical explanation.
+
+Keep disposable agent plans/reports out of durable docs. Optional `agentdocs/`
+working notes are branch-local scratch; promote only durable outcomes.
 
 ## Verify touched artifacts
 
-- CLI: run `pyrite-dev cli-reference --write` and
-  `pyrite-dev cli-deprecations --write`, then their `--check` modes.
-- Ownership: `pyrite-dev repo-map`.
-- Docs/public API/navigation: `pyrite-dev docs` (clean, offline, warnings as
-  errors, generated validation views checked).
+Run only applicable checks:
+
+- CLI: `pyrite-dev cli-reference --write`, `pyrite-dev cli-deprecations --write`,
+  then their `--check` modes.
+- Ownership/topology: `pyrite-dev repo-map`.
+- Docs/public API/navigation: `pyrite-dev docs`.
 - Skills: `pyrite-dev sync-skills`, then `check-skills`.
 
-Inspect scoped diff; report checks and evidence gaps.
+Inspect the scoped diff and report checks/evidence gaps.

@@ -1,8 +1,7 @@
 ---
 name: repo-cleanup
-description: "Use for PyRITE git/worktree hygiene: requested safe rebases, stale tracking cleanup, and removal of objectively merged worktrees/refs; never edit GitHub issues."
+description: "Use when cleaning PyRITE git/worktree: requested safe rebases, stale tracking cleanup, and removal of objectively merged worktrees/refs; never edit GitHub issues."
 ---
-
 # Repo Cleanup
 
 Own git objects and worktrees only. Never edit issues or implementation plans.

@@ -1,49 +1,46 @@
 ---
 name: lead-task
-description: Use when a high-capability agent must own, decompose, implement, and integrate a complex PyRITE task milestone, including ambiguous or cross-subsystem work, physics, performance, or supervised delegation.
+description: Use when a high-capability agent must own, decompose, implement, and integrate a complex PyRITE GitHub issue milestone, including ambiguous, physics, performance, or delegated work.
 ---
 
 # Lead Task
 
-Own milestone outcome, not unlimited repository scope.
+Own the issue outcome, not unlimited repository scope.
 
 ## Establish control
 
-1. Read `AGENTS.md`; invoke `todo-sync` and `repo-orientation`. Confirm
-   `main:TODO.md`, task doc (`agentdocs/tasks/<branch-name>/README.md`), all
-   worktrees/branches, clean ownership, merge state, dependencies, and authority.
-   Activate Serena, read its manual, and inspect current config. If requested
-   `one-shot` is absent on a shared server, retain the handoff's autonomous
-   contract without changing project-wide modes.
-2. If authorized as TODO writer, preserve invariant and `>user<` text. New-task
-   setup requires task doc + synced TODO setup commit and upstream push before
-   implementation. Otherwise never edit TODO.
-3. Resolve goal, non-goals, decisions, acceptance evidence, owning paths,
-   dependency order, integration points, and risks. Record branch-specific
-   detail in the task doc, durable landed decisions in `docs/`.
-4. Follow `repo-orientation` for navigation and invoke every matching domain
-   skill. Require fresh-context `physics-validation` for changed physics; route
-   heavy compute through `remote-gpu-jobs`.
+1. Read the issue, handoff authority, branch/worktree state, dependencies, and
+   acceptance criteria. Check only worktrees/branches relevant to the milestone.
+2. Resolve goal, non-goals, decisions, owners, dependency order, integration
+   points, and risks. Use `repo-orientation` for cross-cutting ownership and
+   Serena when symbol-level navigation materially helps; do not perform tool
+   setup ceremony by default.
+3. Invoke only matching domain skills. Require fresh-context physics validation
+   for changed physics; route heavy compute through `remote-gpu-jobs`.
+4. If a long working plan is useful, keep it as disposable branch-local
+   `agentdocs/` scratch. The GitHub issue remains canonical; durable landed
+   decisions belong in docs/source/tests.
 
 ## Execute
 
-- Decompose into independently valid milestones. Delegate only with
-  `delegate: yes`, disjoint ownership, explicit worktree/branch, worker skill,
-  acceptance checks, authority, and report contract.
-- One writer owns TODO and each mutable worktree. Parallel workers use isolated
-  branches/worktrees; read-only investigation may share context.
-- Implement or integrate smallest owners. Verify before checkpoint.
-- If `commits` permits, commit every independently valid milestone and before
-  risky phases/handoffs: inspect status/scoped diff, stage explicit paths, run
-  focused checks, commit. Never `git add .`, commit broken state, rewrite other
-  workers' commits, or mix unrelated WIP.
-- Reconcile worker results from diffs/tests, not summaries alone. Resolve
-  integration conflicts deliberately. Push only with `push: yes`.
+- Decompose into independently verifiable milestones. Delegate only with
+  `delegate: yes`, disjoint ownership, an explicit worktree/branch, worker
+  skill, acceptance checks, authority, and report contract.
+- One writer per mutable worktree. Parallel workers edit isolated branches or
+  perform read-only investigation.
+- Implement/integrate the smallest owners and verify before checkpoints.
+- If `commits` permits, commit logical valid milestones: inspect scoped diff,
+  stage explicit paths, run focused checks, commit. Never `git add .`, commit
+  broken state, or rewrite another worker's commits.
+- Reconcile delegated results from diffs/tests, not summaries alone. Push only
+  with `push: yes`.
+- With `issue-writer: yes`, update issue checkboxes/decisions at meaningful
+  milestones only. With `pr: yes`, create/update the PR and use `Closes #<n>`
+  when merge should retire the issue.
 
 ## Close milestone
 
-Run focused, neighboring, runtime, then broader checks proportional to risk.
-Inspect the integrated diff and reconcile every delegated result from artifacts.
-Update task checklist, decisions, remainder, commits, and evidence. Report
-branch/worktree, ahead count, checks, risks, and next slice. Do not mark work
-landed or retire task state without confirmed integration and dispatch authority.
+Run focused, neighboring/runtime, then broader checks proportional to risk.
+Inspect the integrated diff and reconcile delegated artifacts. Report
+branch/worktree, ahead count, checks, risks, completed acceptance items, and the
+next remaining slice. Do not claim landing until integration is confirmed.
