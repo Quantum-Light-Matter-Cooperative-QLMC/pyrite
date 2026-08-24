@@ -633,9 +633,7 @@ def _(
         # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion.
         # Sits beside the survival chart now, not the 3D plot, so back to its
         # own 480 default width.
-        _cross_section_chart = apply_altair_theme(
-            trajectory_chart(_nc, Ne=40, width=420), _theme
-        )
+        _cross_section_chart = apply_altair_theme(trajectory_chart(_nc, Ne=40, width=420), _theme)
         _cross_section_block = _cross_section_chart
 
         _bottom_cols = [p for p in (_cross_section_block, _survival) if p is not None]

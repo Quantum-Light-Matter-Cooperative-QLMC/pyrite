@@ -110,9 +110,7 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
     convergence_values: dict[str, Any] = {
         key: values[key] for key in CONVERGENCE_KEYS if key in values
     }
-    transport_values: dict[str, Any] = {
-        key: values[key] for key in TRANSPORT_KEYS if key in values
-    }
+    transport_values: dict[str, Any] = {key: values[key] for key in TRANSPORT_KEYS if key in values}
     convergence = Convergence(**convergence_values)
     Numerics(
         **transport_values,

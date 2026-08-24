@@ -506,9 +506,7 @@ def spectrum_chart(
     base = _fold_components(
         alt.Chart(compact), include_brem, include_line, include_coherent
     ).encode(
-        x=alt.X(
-            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
-        ),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
             title="Intensity (Phs/eV/s/nA)",
@@ -658,9 +656,7 @@ def compare_spectrum_chart(
     base = _fold_components(
         alt.Chart(compact), include_brem, include_line, include_coherent
     ).encode(
-        x=alt.X(
-            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
-        ),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
             title="Intensity (Phs/eV/s/nA)",
@@ -763,9 +759,7 @@ def multi_case_spectrum_chart(
     base = _fold_components(
         alt.Chart(compact), include_brem, include_line, include_coherent
     ).encode(
-        x=alt.X(
-            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
-        ),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
             title="Intensity (Phs/eV/s/nA)",
@@ -863,9 +857,7 @@ def material_comparison_chart(
     )
     labels_mark = _mark_chart(
         base.mark_text(align="left", dx=7, fontSize=_AXIS_LABEL_FONT_SIZE)
-    ).encode(
-        text="label:N"
-    )
+    ).encode(text="label:N")
     chart = (points_mark + labels_mark).properties(
         width=width, height=height, title=_spectrum_title(title)
     )

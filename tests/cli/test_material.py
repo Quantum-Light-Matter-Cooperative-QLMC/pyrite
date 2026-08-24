@@ -270,7 +270,15 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
     monkeypatch.setattr(
         material,
         "_simulation_scene",
-        lambda *_args: ("beam", "target", "detector", ("filter",), "scorer", "numerics", "incoherent"),
+        lambda *_args: (
+            "beam",
+            "target",
+            "detector",
+            ("filter",),
+            "scorer",
+            "numerics",
+            "incoherent",
+        ),
     )
 
     import pyrite.api
@@ -380,7 +388,9 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
 def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypatch):
     document = _single_scene_catalog(tmp_path, monkeypatch, energies="[30.0, 40.0]")
 
-    with np.testing.assert_raises_regex(ValueError, "requires profile 'single' to resolve one value"):
+    with np.testing.assert_raises_regex(
+        ValueError, "requires profile 'single' to resolve one value"
+    ):
         material._simulation_scene(document, "hopg", "single")
 
 

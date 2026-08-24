@@ -229,7 +229,7 @@ class ThemeSelect(AnyWidget):
     export default { render };
     """
 
-    preference = traitlets.Enum(
-        values=("system", "light", "dark"), default_value="light"
-    ).tag(sync=True)
+    preference = traitlets.Enum(values=("system", "light", "dark"), default_value="light").tag(
+        sync=True
+    )
     resolved = traitlets.Enum(values=("light", "dark"), default_value="light").tag(sync=True)

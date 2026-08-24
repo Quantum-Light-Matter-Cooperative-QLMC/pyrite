@@ -792,9 +792,7 @@ def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
     ne = segments["Ne"]
     flat_segments = _decoh_segments(np.asarray(segments["r_mid"]))
     flat_segments.update(crystal_width_ang=200.0, crystal_height_ang=200.0)
-    flat_raw = (
-        mc_spectrum(flat_segments, _DECOH_E_GRID, coherent=True, **call_kwargs) * ne
-    )
+    flat_raw = mc_spectrum(flat_segments, _DECOH_E_GRID, coherent=True, **call_kwargs) * ne
     grouped_raw = 0.0
     for position in np.asarray(segments["r_mid"]):
         single = _decoh_segments(position)

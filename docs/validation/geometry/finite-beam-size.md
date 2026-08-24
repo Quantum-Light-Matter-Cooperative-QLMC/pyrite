@@ -144,12 +144,13 @@ snippet:
 
 ```python
 import numpy as np
+
 seed = 42
 rng_main = np.random.default_rng(seed)
 draws_main_before = rng_main.random(10)
 
 beam_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(2)[1])
-_ = beam_rng.normal(size=(50000, 2))   # heavy draw from the "beam" stream
+_ = beam_rng.normal(size=(50000, 2))  # heavy draw from the "beam" stream
 
 draws_main_after = rng_main.random(10)
 
@@ -181,7 +182,7 @@ and `beam_rng`.
 ```python
 seed = 999
 fwhm_mm = 2.5
-sigma_ang_expected = fwhm_mm * 1e7 / (2*np.sqrt(2*np.log(2)))   # 1.06165e7 Ang
+sigma_ang_expected = fwhm_mm * 1e7 / (2 * np.sqrt(2 * np.log(2)))  # 1.06165e7 Ang
 beam_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(2)[1])
 draws = beam_rng.normal(0.0, sigma_ang_expected, size=(100000, 2))
 # sampled std: 1.06522e7 (x), 1.06138e7 (y); rel err 0.34%, well within tolerance

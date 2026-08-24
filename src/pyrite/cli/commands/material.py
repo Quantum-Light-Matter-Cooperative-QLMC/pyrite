@@ -90,9 +90,7 @@ def _simulation_scene(document, material, profile_name):
         if (transverse := changes.get("transverse")) is not None:
             if not isinstance(transverse, Mapping):
                 raise TypeError("profile transverse policy must be a mapping")
-            changes["transverse"] = TransverseDistribution(
-                **cast(dict[str, Any], dict(transverse))
-            )
+            changes["transverse"] = TransverseDistribution(**cast(dict[str, Any], dict(transverse)))
             changes.setdefault("transverse_fwhm_x_mm", None)
             changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **changes)

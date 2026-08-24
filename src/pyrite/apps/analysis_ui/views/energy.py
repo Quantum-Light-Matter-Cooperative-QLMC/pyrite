@@ -157,7 +157,9 @@ def render_energy_comparison(
                 band="broad",
             ),
         ]
-        selected_charts = [themed_chart(chart, theme) for chart in selected_charts if chart is not None]
+        selected_charts = [
+            themed_chart(chart, theme) for chart in selected_charts if chart is not None
+        ]
         parts.append(
             mo.vstack([static_altair_chart(mo, chart) for chart in selected_charts])
             if selected_charts

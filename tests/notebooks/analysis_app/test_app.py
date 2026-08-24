@@ -33,8 +33,10 @@ def test_blazed_face_title_preserves_altair_typography() -> None:
         results=None,
         cases=None,
     )
-    chart = alt.Chart(alt.Data(values=[])).mark_line().properties(
-        title=alt.TitleParams(text="Spectrum", fontSize=18)
+    chart = (
+        alt.Chart(alt.Data(values=[]))
+        .mark_line()
+        .properties(title=alt.TitleParams(text="Spectrum", fontSize=18))
     )
 
     spec = context.title_for_face(chart).to_dict()

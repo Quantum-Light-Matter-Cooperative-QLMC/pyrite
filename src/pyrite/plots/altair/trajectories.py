@@ -130,18 +130,15 @@ def penetration_survival_chart(
         f"{case0['name'].split()[0]}, {case0['thickness_ang'] / 1e4:.1f} um, "
         f"theta_tilt={t:g} deg -- electron penetration / survival"
     )
-    chart = (
-        _mark_chart(alt.Chart(df).mark_line(strokeWidth=1.9))
-        .encode(
-            x=alt.X("depth:Q", title=x_title),
-            y=alt.Y(
-                "survival:Q",
-                title="surviving electrons (% of N0)",
-                scale=alt.Scale(domain=[0, 100]),
-            ),
-            color=alt.Color("energy:N", title="beam energy"),
-            tooltip=["energy:N", "depth:Q", "survival:Q"],
-        )
+    chart = _mark_chart(alt.Chart(df).mark_line(strokeWidth=1.9)).encode(
+        x=alt.X("depth:Q", title=x_title),
+        y=alt.Y(
+            "survival:Q",
+            title="surviving electrons (% of N0)",
+            scale=alt.Scale(domain=[0, 100]),
+        ),
+        color=alt.Color("energy:N", title="beam energy"),
+        tooltip=["energy:N", "depth:Q", "survival:Q"],
     )
     return (
         chart
@@ -271,13 +268,12 @@ def _groove_profile_layer(case, data, frame, xscale, yscale):
     cx = (xk * e1[0] + zk * e1[2]) / u
     cy = (xk * e2[0] + zk * e2[2]) / u
     df = pd.DataFrame({"x": cx, "y": cy, "i": np.arange(len(cx), dtype=float)})
-    return (
-        _mark_chart(alt.Chart(df).mark_line(color=_GROOVE, strokeWidth=1.4, opacity=0.95))
-        .encode(
-            x=alt.X("x:Q", scale=xscale),
-            y=alt.Y("y:Q", scale=yscale),
-            order=alt.Order("i:Q"),  # trace the profile in x-order, not y-sorted
-        )
+    return _mark_chart(
+        alt.Chart(df).mark_line(color=_GROOVE, strokeWidth=1.4, opacity=0.95)
+    ).encode(
+        x=alt.X("x:Q", scale=xscale),
+        y=alt.Y("y:Q", scale=yscale),
+        order=alt.Order("i:Q"),  # trace the profile in x-order, not y-sorted
     )
 
 
@@ -313,35 +309,29 @@ def trajectory_chart(
     # grouped ``mark_line``: a continuous ``color`` on a grouped line renders
     # nothing in Vega-Lite (see track_segments_frame). x2/y2 give each segment its
     # end point; energy still colours along the path.
-    tracks = (
-        _mark_chart(alt.Chart(seg_df).mark_rule(strokeWidth=0.9, opacity=0.85))
-        .encode(
-            x=alt.X("x:Q", scale=xscale, title=f"along beam ({data['ulab']})"),
-            y=alt.Y("y:Q", scale=yscale, title=f"transverse ({data['ulab']})"),
-            x2="x2:Q",
-            y2="y2:Q",
-            color=alt.Color(
-                "E:Q",
-                title="electron energy (keV)",
-                scale=alt.Scale(scheme="turbo", domain=[E_cut, E0]),  # type: ignore[arg-type]
-            ),
-        )
+    tracks = _mark_chart(alt.Chart(seg_df).mark_rule(strokeWidth=0.9, opacity=0.85)).encode(
+        x=alt.X("x:Q", scale=xscale, title=f"along beam ({data['ulab']})"),
+        y=alt.Y("y:Q", scale=yscale, title=f"transverse ({data['ulab']})"),
+        x2="x2:Q",
+        y2="y2:Q",
+        color=alt.Color(
+            "E:Q",
+            title="electron energy (keV)",
+            scale=alt.Scale(scheme="turbo", domain=[E_cut, E0]),  # type: ignore[arg-type]
+        ),
     )
-    vacuum = (
-        _mark_chart(
-            alt.Chart(vacuum_df).mark_rule(color="#8E9AAF", strokeWidth=0.8, opacity=0.35)
-        )
-        .encode(
-            x=alt.X("x:Q", scale=xscale),
-            y=alt.Y("y:Q", scale=yscale),
-            x2="x2:Q",
-            y2="y2:Q",
-            tooltip=[
-                alt.Tooltip("elec_id:Q", title="electron"),
-                alt.Tooltip("E:Q", title="energy (keV)", format=".3g"),
-                alt.Tooltip("t_fs:Q", title="start age (fs)", format=".3g"),
-            ],
-        )
+    vacuum = _mark_chart(
+        alt.Chart(vacuum_df).mark_rule(color="#8E9AAF", strokeWidth=0.8, opacity=0.35)
+    ).encode(
+        x=alt.X("x:Q", scale=xscale),
+        y=alt.Y("y:Q", scale=yscale),
+        x2="x2:Q",
+        y2="y2:Q",
+        tooltip=[
+            alt.Tooltip("elec_id:Q", title="electron"),
+            alt.Tooltip("E:Q", title="energy (keV)", format=".3g"),
+            alt.Tooltip("t_fs:Q", title="start age (fs)", format=".3g"),
+        ],
     )
 
     # crystal slab geometry: front face through origin along the slab tangent,
@@ -365,30 +355,24 @@ def trajectory_chart(
         _slab_band_df = pd.DataFrame(
             {"x": _xs, "y": np.minimum(_yf, _yb), "y2": np.maximum(_yf, _yb)}
         )
-        slab_shading = (
-            _mark_chart(
-                alt.Chart(_slab_band_df).mark_area(fill="#bbbbbb", opacity=0.22, stroke=None)
-            )
-            .encode(
-                x=alt.X("x:Q", scale=xscale),
-                y=alt.Y("y:Q", scale=yscale),
-                y2="y2:Q",
-            )
+        slab_shading = _mark_chart(
+            alt.Chart(_slab_band_df).mark_area(fill="#bbbbbb", opacity=0.22, stroke=None)
+        ).encode(
+            x=alt.X("x:Q", scale=xscale),
+            y=alt.Y("y:Q", scale=yscale),
+            y2="y2:Q",
         )
     else:
         _x0, _x1 = min(0.0, thick) / nslab[0], max(0.0, thick) / nslab[0]
-        slab_shading = (
-            _mark_chart(
-                alt.Chart(
-                    pd.DataFrame({"x": [_x0], "x2": [_x1], "y": [ylo], "y2": [yhi]})
-                ).mark_rect(fill="#bbbbbb", opacity=0.22, stroke=None)
+        slab_shading = _mark_chart(
+            alt.Chart(pd.DataFrame({"x": [_x0], "x2": [_x1], "y": [ylo], "y2": [yhi]})).mark_rect(
+                fill="#bbbbbb", opacity=0.22, stroke=None
             )
-            .encode(
-                x=alt.X("x:Q", scale=xscale),
-                x2="x2:Q",
-                y=alt.Y("y:Q", scale=yscale),
-                y2="y2:Q",
-            )
+        ).encode(
+            x=alt.X("x:Q", scale=xscale),
+            x2="x2:Q",
+            y=alt.Y("y:Q", scale=yscale),
+            y2="y2:Q",
         )
 
     faces = []
@@ -399,8 +383,7 @@ def trajectory_chart(
                 alt.Chart(_segment_df(-W * tang + c, W * tang + c)).mark_line(
                     color="#666666", strokeWidth=1.2, opacity=0.9
                 )
-            )
-            .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
+            ).encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
         )
     # internal layer boundaries (film-on-substrate stacks, e.g. mos2 on sapphire):
     # a dashed line at each interior interface, matching the matplotlib panel.
@@ -411,27 +394,18 @@ def trajectory_chart(
                 alt.Chart(_segment_df(-W * tang + c, W * tang + c)).mark_line(
                     color="#666666", strokeWidth=0.8, strokeDash=[4, 3], opacity=0.8
                 )
-            )
-            .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
+            ).encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
         )
 
     aL = 0.16 * (xhi - xlo)
-    beam = (
-        _mark_chart(
-            alt.Chart(_segment_df((-aL, 0.0), (0.0, 0.0))).mark_line(
-                color="red", strokeWidth=2.0
-            )
+    beam = _mark_chart(
+        alt.Chart(_segment_df((-aL, 0.0), (0.0, 0.0))).mark_line(color="red", strokeWidth=2.0)
+    ).encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
+    det = _mark_chart(
+        alt.Chart(_segment_df((0.0, 0.0), (ndet[0] * aL, ndet[1] * aL))).mark_line(
+            color="#119911", strokeWidth=2.0
         )
-        .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
-    )
-    det = (
-        _mark_chart(
-            alt.Chart(_segment_df((0.0, 0.0), (ndet[0] * aL, ndet[1] * aL))).mark_line(
-                color="#119911", strokeWidth=2.0
-            )
-        )
-        .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
-    )
+    ).encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
 
     title = (
         f"{case['name'].split()[0]}, {E0:g} keV, "

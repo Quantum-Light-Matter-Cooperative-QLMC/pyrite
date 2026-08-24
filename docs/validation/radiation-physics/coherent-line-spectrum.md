@@ -279,10 +279,10 @@ The ungrooved, unlayered, incoherent run takes the batched branch of
 per-hkl `_accumulate` fallback spelling the same thing inline):
 
 ```python
-pref   = alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs   # _line_weight_core
+pref = alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs  # _line_weight_core
 weight = pref * A2 * WM
 a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
-S = _sincsq_lineshape(a_width, E_grid, E_res)                   # sinc(a_width*(E-E_r)/pi)**2
+S = _sincsq_lineshape(a_width, E_grid, E_res)  # sinc(a_width*(E-E_r)/pi)**2
 spec += weight @ S
 ...
 return _to_cpu(spec / Ne)

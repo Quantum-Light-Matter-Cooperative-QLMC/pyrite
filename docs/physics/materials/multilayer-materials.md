@@ -124,7 +124,7 @@ is unchanged) — vdW films are conformal/parallel to the substrate.
 The former single-material escape
 
 ```python
-L_esc = z_mid/(-n_hat[2])  if n_hat[2]<0  else (thickness - z_mid)/n_hat[2]
+L_esc = z_mid / (-n_hat[2]) if n_hat[2] < 0 else (thickness - z_mid) / n_hat[2]
 T_abs = exp(-L_esc * mu(E))
 ```
 

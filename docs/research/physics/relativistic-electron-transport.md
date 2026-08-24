@@ -78,9 +78,7 @@ Add central fields to `Sweep`:
 
 ```python
 transport_backend: Literal["native", "geant4"] = "native"
-channeling_model: Literal[
-    "off", "quantum-planar", "experimental-axial"
-] = "off"
+channeling_model: Literal["off", "quantum-planar", "experimental-axial"] = "off"
 channeling_direction: tuple[int, int, int] | None = None
 crystal_temperature_K: float = 293.15
 ```
@@ -117,10 +115,7 @@ Preserve compatibility fields:
 
 ```python
 spec = radiation_components["pxr_cbs"] + radiation_components["channeling"]
-brem = (
-    radiation_components["bremsstrahlung"]
-    + radiation_components["atomic_relaxation"]
-)
+brem = radiation_components["bremsstrahlung"] + radiation_components["atomic_relaxation"]
 ```
 
 Old records without components retain their current interpretation. All new

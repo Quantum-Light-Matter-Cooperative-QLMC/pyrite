@@ -248,11 +248,11 @@ sharing the same docstring-cited contraction argument.
 each then compute, given `denom` and (for the refractive branch) `n_re`:
 
 ```python
-k_mag  = om if n_re_seg is None else om * n_re_seg      # (H)'s |k|
-k_dot_v = om * (1.0 - denom)                             # (E)
-k_dot_g = k_mag * n_dot_g                                 # (F), n_dot_g already n̂·g
-v_dot_kg = v_dot_g + k_dot_v                              # v·(k+g) = ω, trivially
-detuning = g2 + 2.0 * k_dot_g                             # (G)
+k_mag = om if n_re_seg is None else om * n_re_seg  # (H)'s |k|
+k_dot_v = om * (1.0 - denom)  # (E)
+k_dot_g = k_mag * n_dot_g  # (F), n_dot_g already n̂·g
+v_dot_kg = v_dot_g + k_dot_v  # v·(k+g) = ω, trivially
+detuning = g2 + 2.0 * k_dot_g  # (G)
 ```
 
 and the PXR amplitude (`lines.py` line ~1070, Feranchuk–Spence Eq. (13)):

@@ -166,7 +166,7 @@ sweep = pr.Sweep(
     },
 )
 
-expanded = sweep.expand()           # ordered (label, Scene) pairs
+expanded = sweep.expand()  # ordered (label, Scene) pairs
 cases = sweep.cases(pr.Numerics())  # typed Monte Carlo Case records
 ```
 

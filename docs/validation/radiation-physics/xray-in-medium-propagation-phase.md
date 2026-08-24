@@ -196,7 +196,7 @@ amplitude" statement in the ledger row without assuming it.
 the `delta_omega_grid` construction and its consumers):
 
 ```python
-delta_omega_grid = (1.0 - Re(n(E_grid))) * omega_grid   # = delta(E) * omega(E)
+delta_omega_grid = (1.0 - Re(n(E_grid))) * omega_grid  # = delta(E) * omega(E)
 ...
 arg = d[...] * omega_grid[...] - g_phase[...]
 if delta_omega_grid is not None:
@@ -260,7 +260,8 @@ which now accepts `v_dot_n`/`n_re_tab` and iterates the same
 
 ```python
 _use_jit_coherent_stream = (
-    coherent and _USE_JIT_COHERENT_STREAM
+    coherent
+    and _USE_JIT_COHERENT_STREAM
     and getattr(xp, "__name__", "") == "cupy"
     and np.dtype(REAL) == np.dtype(np.float32)
     and sinc_cutoff is None

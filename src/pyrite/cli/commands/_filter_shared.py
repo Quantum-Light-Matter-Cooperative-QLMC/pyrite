@@ -236,9 +236,7 @@ def physical_detector_row(**values):
     if values["detector_distance_mm"] is None:
         supplied = values.get("detector_options_explicit", ())
         if supplied:
-            raise ValueError(
-                f"{', '.join(supplied)} require --detector-distance-mm"
-            )
+            raise ValueError(f"{', '.join(supplied)} require --detector-distance-mm")
         return None
     row_values = {
         "distance_mm": values["detector_distance_mm"],

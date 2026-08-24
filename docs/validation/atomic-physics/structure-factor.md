@@ -165,11 +165,11 @@ derivation. Sign is negative (attenuation). ✓
 ### 2.2 `structure_factor`
 
 ```python
-_, g = reciprocal_g_vector(hkl, info["lattice"])   # g = 2π/d  (2π convention)
-dwf = debye_waller(g, B_ang2)                       # single scalar B for all atoms
+_, g = reciprocal_g_vector(hkl, info["lattice"])  # g = 2π/d  (2π convention)
+dwf = debye_waller(g, B_ang2)  # single scalar B for all atoms
 S = 0.0 + 0.0j
 for (_el, R), F in zip(info["basis"], _basis_F(...)):
-    phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))   # exp(2π i hkl·R)
+    phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))  # exp(2π i hkl·R)
     S += F * phase * dwf
 return S, g
 ```

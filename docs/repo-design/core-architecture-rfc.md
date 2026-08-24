@@ -186,8 +186,8 @@ target = pr.Slab("hopg", thickness_ang=20_000.0, tilt_deg=30.0)
 detector = pr.Detector(observation_angle_deg=90.0)
 
 result = pr.simulate(beam, target, detector, numerics=pr.Numerics(n_electrons=450))
-result.spectrum          # intrinsic photons per electron per eV per sr
-result.provenance        # resolved scene, identity digest, backend, versions
+result.spectrum  # intrinsic photons per electron per eV per sr
+result.provenance  # resolved scene, identity digest, backend, versions
 ```
 
 `pr.simulate` is a thin composition of the existing pieces: it builds one
@@ -311,8 +311,8 @@ by permanent conditionals in `build_cases`:
 
 ```python
 IDENTITY_MIGRATIONS = {
-    1: _identity_v1,   # divergence-only rule, reproduces every stored digest
-    2: _identity_v2,   # canonical full-payload digest
+    1: _identity_v1,  # divergence-only rule, reproduces every stored digest
+    2: _identity_v2,  # canonical full-payload digest
 }
 ```
 
@@ -413,11 +413,13 @@ target = pr.Stack(
     tilt_deg=30.0,
 )
 
-target = pr.Slab(material, thickness_ang=2e4, tilt_deg=30.0,
-                 footprint=pr.Footprint(width_mm=5.0, height_mm=5.0))
+target = pr.Slab(
+    material, thickness_ang=2e4, tilt_deg=30.0, footprint=pr.Footprint(width_mm=5.0, height_mm=5.0)
+)
 
-target = pr.Slab(material, thickness_ang=2e4, tilt_deg=30.0,
-                 entrance_face=pr.BlazedGrooves(spacing_ang=1e4))
+target = pr.Slab(
+    material, thickness_ang=2e4, tilt_deg=30.0, entrance_face=pr.BlazedGrooves(spacing_ang=1e4)
+)
 ```
 
 `Target` owns its own validity: the mutual exclusions and the groove
@@ -472,7 +474,7 @@ detector = pr.Detector(
     polar_acceptance_deg=...,
     solid_angle_sr=...,
     energy_bins=pr.arange_eV(100.0, 5000.0, 3.0),
-    response=pr.Timepix3(),          # or None for the intrinsic spectrum
+    response=pr.Timepix3(),  # or None for the intrinsic spectrum
 )
 ```
 

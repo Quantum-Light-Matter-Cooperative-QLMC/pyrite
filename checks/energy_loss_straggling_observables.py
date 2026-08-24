@@ -207,9 +207,7 @@ def _shape_distance(left: np.ndarray, right: np.ndarray) -> float:
     right_area = float(np.trapezoid(right, BREM_GRID_EV))
     if left_area <= 0.0 or right_area <= 0.0:
         return float("nan")
-    return float(
-        0.5 * np.trapezoid(np.abs(left / left_area - right / right_area), BREM_GRID_EV)
-    )
+    return float(0.5 * np.trapezoid(np.abs(left / left_area - right / right_area), BREM_GRID_EV))
 
 
 def _mean_sem(values: list[float]) -> dict[str, float | int | None]:
@@ -281,9 +279,7 @@ def run(*, quick: bool) -> dict:
             thick_segments = simulate_trajectories(thickness_ang=THICK_ANG, **common)
             thick[straggling].append(_terminal_observables(thick_segments))
 
-        shape_distances.append(
-            _shape_distance(spectra[False]["_brem"], spectra[True]["_brem"])
-        )
+        shape_distances.append(_shape_distance(spectra[False]["_brem"], spectra[True]["_brem"]))
 
     thin_summary = _paired_summary(thin[False], thin[True])
     thick_summary = _paired_summary(thick[False], thick[True])

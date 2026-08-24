@@ -208,15 +208,9 @@ def _detected_layers(
     detected-vs-incident frame. ``detail`` splits the line/brem bands so the two
     grids never join across their gap."""
     base = alt.Chart(df).encode(
-        x=alt.X(
-            "energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()
-        ),
-        y=alt.Y(
-            "intensity:Q", title="Phs/eV/s/nA", scale=y_scale, axis=_spectrum_axis()
-        ),
-        color=alt.Color(
-            f"{color_field}:N", title=color_title, legend=_spectrum_legend()
-        ),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
+        y=alt.Y("intensity:Q", title="Phs/eV/s/nA", scale=y_scale, axis=_spectrum_axis()),
+        color=alt.Color(f"{color_field}:N", title=color_title, legend=_spectrum_legend()),
         detail="band:N",
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "kind:N", "band:N"],
     )
@@ -272,14 +266,11 @@ def timepix_detected_chart(
         x_scale=_detector_x_scale(x_type, x_domain),
         y_scale=_y_scale(df, "intensity", y_type, x_domain, y_domain),
     )
-    thr = (
-        _mark_chart(
-            alt.Chart(pd.DataFrame({"E": [_thr_keV() * 1e3]})).mark_rule(
-                color="gray", strokeDash=[4, 4]
-            )
+    thr = _mark_chart(
+        alt.Chart(pd.DataFrame({"E": [_thr_keV() * 1e3]})).mark_rule(
+            color="gray", strokeDash=[4, 4]
         )
-        .encode(x="E:Q")
-    )
+    ).encode(x="E:Q")
     title = _title(recs, "Timepix3 detected (solid) vs incident (dotted)")
     return (
         alt.layer(incident, detected, thr)
@@ -384,8 +375,7 @@ def eaglexo_detected_chart(
             alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]})).mark_rule(
                 color="gray", strokeDash=[6, 3]
             )
-        )
-        .encode(x="E:Q"),
+        ).encode(x="E:Q"),
     ]
     if show_qe:
         E_all = df["energy_eV"].to_numpy()
@@ -394,8 +384,7 @@ def eaglexo_detected_chart(
         Eqe = np.geomspace(lo, hi, 400)
         qe_df = pd.DataFrame({"energy_eV": Eqe, "QE": eag.qe(Eqe, coating)})
         layers.append(
-            _mark_chart(alt.Chart(qe_df).mark_line(color="gray", opacity=0.5))
-            .encode(
+            _mark_chart(alt.Chart(qe_df).mark_line(color="gray", opacity=0.5)).encode(
                 x=alt.X("energy_eV:Q", scale=xsc),
                 y=alt.Y(
                     "QE:Q",
@@ -510,22 +499,15 @@ def eaglexo_charge_chart(
         color=alt.Color("E0_keV:N", title="beam energy (keV)", legend=_spectrum_legend()),
         tooltip=["E0_keV:N", "energy_eV:Q", "charge_density:Q", "band:N"],
     )
-    line = _mark_chart(
-        base.transform_filter(alt.datum.band == "line").mark_line(strokeWidth=1.3)
-    )
+    line = _mark_chart(base.transform_filter(alt.datum.band == "line").mark_line(strokeWidth=1.3))
     brem = _mark_chart(
         base.transform_filter(alt.datum.band == "brem").mark_line(
             strokeWidth=0.8, strokeDash=[5, 3], opacity=0.85
         )
     )
-    sik = (
-        _mark_chart(
-            alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]})).mark_rule(
-                color="gray", strokeDash=[6, 3]
-            )
-        )
-        .encode(x="E:Q")
-    )
+    sik = _mark_chart(
+        alt.Chart(pd.DataFrame({"E": [SI_K_EDGE_EV]})).mark_rule(color="gray", strokeDash=[6, 3])
+    ).encode(x="E:Q")
     title = _title(recs, f"Eagle XO recorded charge density ({coating}, dashed = brem)")
     return (
         alt.layer(line, brem, sik)
