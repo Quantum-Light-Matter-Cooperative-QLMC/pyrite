@@ -5,6 +5,7 @@ These are pure-string/logic checks (no ssh), so they run anywhere. The one
 exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
+import importlib
 import io
 import json
 import os
@@ -18,6 +19,7 @@ import pytest
 from pyrite import remote
 from pyrite.cli import dashboard as _dashboard
 from pyrite.cli.dashboard import poll as dashboard_poll
+from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
     cli,
     config,
@@ -28,6 +30,11 @@ from pyrite.remote import (  # noqa: F401
     transport,
     viewer,
 )
+from pyrite.remote import jobs as lifecycle_jobs
+from pyrite.remote import performance as lifecycle_performance
+from pyrite.remote import queue as lifecycle_queue
+
+lifecycle_pull = importlib.import_module("pyrite.remote.pull")
 
 
 def test_check_materials_accepts_crystal_keys():
@@ -648,7 +655,7 @@ def test_remote_performance_inventory_rejects_malformed_output(monkeypatch):
 
 def test_prune_remote_performance_previews_terminal_jobs(monkeypatch, capsys):
     inventory = [("job-1", "baseline", 2, 80), ("job-2", "keeper", 1, 40)]
-    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(lifecycle_performance, "remote_performance_inventory", lambda: inventory)
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
     monkeypatch.setattr(
@@ -667,7 +674,7 @@ def test_prune_remote_performance_previews_terminal_jobs(monkeypatch, capsys):
 
 def test_prune_remote_performance_blocks_live_or_incomplete_jobs(monkeypatch):
     inventory = [("job-1", "baseline", 2, 80)]
-    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(lifecycle_performance, "remote_performance_inventory", lambda: inventory)
     monkeypatch.setattr(state, "_live_jobs", lambda: [("job-1", False, ["hopg"])])
 
     with pytest.raises(SystemExit, match="live job"):
@@ -685,7 +692,7 @@ def test_prune_remote_performance_revalidates_and_deletes_exact_paths(monkeypatc
         ("job-2", "baseline", 1, 40),
         ("job-3", "keeper", 1, 20),
     ]
-    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(lifecycle_performance, "remote_performance_inventory", lambda: inventory)
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
     commands = []
@@ -707,7 +714,7 @@ def test_prune_remote_performance_blocks_changed_inventory(monkeypatch):
             [("job-1", "baseline", 3, 120)],
         ]
     )
-    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: next(inventories))
+    monkeypatch.setattr(lifecycle_performance, "remote_performance_inventory", lambda: next(inventories))
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
 
@@ -718,7 +725,7 @@ def test_prune_remote_performance_blocks_changed_inventory(monkeypatch):
 def test_prune_remote_performance_blocks_changed_job_state(monkeypatch):
     inventory = [("job-1", "baseline", 2, 80)]
     states = iter(["done [1/1]", "FAILED (exit 1)"])
-    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(lifecycle_performance, "remote_performance_inventory", lambda: inventory)
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_job_state", lambda _jobid: next(states))
 
@@ -846,7 +853,7 @@ def test_same_second_starters_use_unique_exclusive_job_directories(monkeypatch):
         SimpleNamespace(uuid4=lambda: SimpleNamespace(hex=next(suffixes))),
         raising=False,
     )
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         transport.subprocess,
@@ -1111,7 +1118,7 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     uploads = []
     submissions = []
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(
         transport.subprocess,
         "run",
@@ -1150,7 +1157,7 @@ def test_real_chunked_submission_carries_the_nice_flag(monkeypatch):
     command itself, so the courtesy flag has to survive that hop too."""
     uploads = []
     submissions = []
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(
         transport.subprocess, "run", lambda *args, **kwargs: uploads.append((args, kwargs))
     )
@@ -1168,7 +1175,7 @@ def test_real_chunked_submission_carries_the_nice_flag(monkeypatch):
 
 
 def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
@@ -1186,7 +1193,7 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
 
 
 def test_start_profile_submit_suggests_profile_pull_not_a_stem_wall(monkeypatch, capsys):
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
@@ -1199,7 +1206,7 @@ def test_start_profile_submit_suggests_profile_pull_not_a_stem_wall(monkeypatch,
 
 
 def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
@@ -1467,7 +1474,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
 
     monkeypatch.setattr(lifecycle, "resolve_profile_stem", resolve)
     monkeypatch.setattr(
-        lifecycle,
+        lifecycle_pull,
         "_remote_meta_json",
         lambda _stem: (
             1.0,
@@ -1646,7 +1653,7 @@ def test_retired_remote_run_commands_are_removed(retired, capsys):
 
 
 def _quiet_submission(monkeypatch):
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
@@ -1693,7 +1700,7 @@ def test_profile_jobdirs_parses_existing_dirs(monkeypatch):
 
 def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
     commands = []
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
     monkeypatch.setattr(
         transport.subprocess,
@@ -1713,7 +1720,7 @@ def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch
 def test_ambiguous_submit_failure_inspects_queued_state_and_keeps_reservations(monkeypatch):
     commands = []
     captures = []
-    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle_queue, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
     monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
 
@@ -3501,7 +3508,7 @@ def test_stop_materials_resolve_unique_live_jobs(monkeypatch):
         "_live_jobs",
         lambda: [("job1", False, ["hopg"]), ("job2", False, ["mose2", "wse2"])],
     )
-    monkeypatch.setattr(lifecycle, "_stop_jobids", lambda jobids: stopped.extend(jobids))
+    monkeypatch.setattr(lifecycle_jobs, "_stop_jobids", lambda jobids: stopped.extend(jobids))
 
     remote.stop_jobs(["wse2", "mose2"])
 
@@ -3515,7 +3522,7 @@ def test_stop_all_stops_every_live_job(monkeypatch):
         "_live_jobs",
         lambda: [("job1", False, ["hopg"]), ("job2", True, ["mose2"])],
     )
-    monkeypatch.setattr(lifecycle, "_stop_jobids", lambda jobids: stopped.extend(jobids))
+    monkeypatch.setattr(lifecycle_jobs, "_stop_jobids", lambda jobids: stopped.extend(jobids))
 
     remote.stop_jobs(all_jobs=True)
 
@@ -3575,7 +3582,7 @@ def test_stop_profile_matches_live_job_metadata(monkeypatch):
         "_job_profiles",
         lambda jobids: {"job1": "sub_100keV", "job2": "standard"},
     )
-    monkeypatch.setattr(lifecycle, "_stop_jobids", lambda jobids: stopped.extend(jobids))
+    monkeypatch.setattr(lifecycle_jobs, "_stop_jobids", lambda jobids: stopped.extend(jobids))
 
     remote.stop_jobs(profile="sub_100keV")
 
@@ -3817,7 +3824,7 @@ def test_profile_checkpoint_stems_discovers_previous_profile_identity(monkeypatc
         same_label_variant: {"catalog_profile": "standard", "variant": "hopg_hbn"},
     }
     monkeypatch.setattr(
-        lifecycle,
+        lifecycle_pull,
         "_remote_meta_json",
         lambda stem: ("raw", {"dataset_identity": identities[stem]}),
     )
@@ -3836,7 +3843,7 @@ def test_clear_profile_previews_partial_previous_identity_directory(monkeypatch,
     old = "hopg@hopg_hbn-111111111111"
     commands = []
     monkeypatch.setattr(
-        lifecycle,
+        lifecycle_cleanup,
         "_profile_checkpoint_stems",
         lambda *_args, **_kwargs: [old],
     )
@@ -3995,7 +4002,7 @@ def test_prune_remote_reserves_previous_profile_identity_for_reclamation(monkeyp
     commands = []
     monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [current])
     monkeypatch.setattr(
-        lifecycle,
+        lifecycle_cleanup,
         "_profile_checkpoint_stems",
         lambda *_args, **_kwargs: [current.stem, old],
     )
@@ -4022,7 +4029,7 @@ def test_prune_remote_obsolete_only_confirmation_reuses_exact_selection(monkeypa
     commands = []
     monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [current])
     monkeypatch.setattr(
-        lifecycle,
+        lifecycle_cleanup,
         "_profile_checkpoint_stems",
         lambda *_args, **_kwargs: discoveries.append(True) or [current.stem, old],
     )
@@ -4033,7 +4040,7 @@ def test_prune_remote_obsolete_only_confirmation_reuses_exact_selection(monkeypa
         "_ssh_capture",
         lambda command: commands.append(command) or "would delete obsolete profile checkpoint",
     )
-    monkeypatch.setattr(lifecycle._cli_core, "confirm_destructive", lambda *_args: True)
+    monkeypatch.setattr(lifecycle_cleanup._cli_core, "confirm_destructive", lambda *_args: True)
 
     lifecycle.prune_remote(catalog_profile="hopg_hbn")
 
@@ -4674,7 +4681,7 @@ def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_p
         resolved.append((material, profile, kwargs.get("hash_prefix")))
         return "hopg"
 
-    monkeypatch.setattr(lifecycle, "resolve_profile_stem", fake_resolve)
+    monkeypatch.setattr(lifecycle_pull, "resolve_profile_stem", fake_resolve)
     monkeypatch.setattr(transport, "sync_code", lambda: None)
     # resolves to bare "hopg" -- also triggers _resolve_survey_stems' listing;
     # empty means no sibling survey checkpoint to also pull.
