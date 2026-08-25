@@ -2,12 +2,20 @@
 
 import hashlib
 import json
+import pickle
 import tomllib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import numpy as np
 import pytest
+
+
+def test_public_schema_types_keep_catalog_pickle_identity():
+    from pyrite.materials import MaterialValidationSpec
+
+    assert MaterialValidationSpec.__module__ == "pyrite.materials.catalog"
+    assert pickle.loads(pickle.dumps(MaterialValidationSpec())) == MaterialValidationSpec()
 
 
 def _write_catalog(tmp_path: Path, text: str) -> Path:

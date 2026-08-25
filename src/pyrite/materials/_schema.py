@@ -641,3 +641,19 @@ class MaterialCatalog:
                 layer.azimuth_deg,
             )
         return tuple(physical)
+
+
+# Preserve the public pickle identity used before the schema split. These
+# classes remain compatibility exports of the public catalog module.
+for _catalog_type in (
+    MaterialConfigError,
+    CrystalInfo,
+    CrystalSpec,
+    MediumSpec,
+    ScanSpec,
+    LayerSpec,
+    MaterialValidationSpec,
+    MaterialSpec,
+    MaterialCatalog,
+):
+    _catalog_type.__module__ = "pyrite.materials.catalog"
