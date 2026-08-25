@@ -221,22 +221,44 @@ Material domain package. Narrow top-level API expose immutable
 `MATERIAL_LABELS`). Implementation helpers stay in submodules below.
 
 ### `materials/catalog.py`
-Schema-version-1 loader for packaged `data/materials.toml`. Resolve only
-phase-specific CIFs below packaged `data/cifs`, validate scan descriptors,
-transport support, pinned-reflection policy, stacks, then return deeply
-immutable typed records. `material_keys` preserve TOML declaration order.
+Thin schema-version-1 load/cache owner for packaged `data/materials.toml`.
+Owns `load_material_catalog`, the default `CATALOG` singleton, and compatibility
+exports for the frozen public record types. The exported types retain their
+historical `pyrite.materials.catalog` pickle identity even though their
+definitions live in `_schema.py`. `material_keys` preserve TOML declaration
+order.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`,
   `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`,
   `load_material_catalog`.
-- `[detectors.*]` and `[profiles.*.detector]` blocks resolve to validated
-  acceptance mappings, not built `Detector` objects — this module stays below
-  `detectors` — the same shape `physical_detector` already hands to `instrument`.
-  `campaign.config.catalog_detector` builds the detector. The copied range checks
-  are pinned to `Detector.__post_init__` by
-  `tests/materials/test_material_catalog.py::test_catalog_detector_bounds_match_the_detector_dataclass`.
-- Deps: `materials._cif`, `materials._identity`, `materials._transport_data`,
-  `materials._catalog_decode`, `_energy_grid_artifacts`, `DATA_DIR`. Imports no
-  driver package, so `materials` is a leaf component of the dependency DAG.
+- Deps: `materials._schema`, `materials._parse`, `DATA_DIR`. Imports no driver
+  package, so `materials` remains a leaf component of the dependency DAG.
+
+### `materials/_schema.py`
+Frozen catalog record types, schema constants, catalog accessors, and grouped
+validation-error formatting. `catalog.py` re-exports the public types and pins
+their historical pickle module identity.
+- Internal owner of: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`,
+  `CrystalSpec`, `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`,
+  `ScanSpec`, `LayerSpec`.
+- Deps: `materials._identity`, `materials._catalog_decode`, `_numerics`, NumPy.
+
+### `materials/_parse.py`
+Catalog validation and assembly for materials, crystals, media, profiles,
+stacks, scan descriptors, energy-grid artifacts, and transport support. Owns
+phase-specific CIF resolution below packaged `data/cifs` and pinned-reflection
+policy; delegates beam/detector blocks to `_beam_detector_parse.py`.
+- Deps: `materials._schema`, `materials._beam_detector_parse`,
+  `materials._catalog_decode`, `materials._cif`, `materials._identity`,
+  `materials._transport_data`, `_energy_grid_artifacts`, `_numerics`, `DATA_DIR`,
+  NumPy.
+
+### `materials/_beam_detector_parse.py`
+Beam, detector, filter, and physical-detector catalog parsing. Detector blocks
+resolve to validated acceptance mappings rather than built `Detector` objects,
+keeping `materials` below `detectors`; `campaign.config.catalog_detector`
+constructs the detector. Copied bounds are pinned to `Detector.__post_init__` by
+`tests/materials/test_material_catalog.py::test_catalog_detector_bounds_match_the_detector_dataclass`.
+- Deps: `materials._catalog_decode`; imports no driver or detector package.
 
 ### `materials/_identity.py`
 Display identity for a material — chemical formula, crystal phase, crystal cut —
@@ -253,8 +275,8 @@ the same axis, and nothing is converted between them.
 ### `materials/_catalog_decode.py`
 Primitive decoders for schema-version-1 catalog grids and descriptors:
 number/negative validation, immutable float64 grid construction,
-`values`/`arange`/`linspace`/`logspace` line-grid kinds. `catalog.py` orchestrate
-these, own record types and error aggregation.
+`values`/`arange`/`linspace`/`logspace` line-grid kinds. `_parse.py` orchestrates
+validation; `_schema.py` owns record types and error aggregation.
 - Internal: grid/descriptor decode helpers; `GridValue`, `LineGridByEnergy` aliases.
 - Deps: NumPy.
 
@@ -547,12 +569,22 @@ energy-grid artifact hash (or legacy marker), beside checkpoint metadata as
 artifact-GC roots.
 
 ### `runs/run.py`
-Checkpointed, resumable sweep driver plus cross-profile per-case CAS replay,
-thin `cases.json` manifests, legacy seeding, and component loaders/repair.
+Checkpointed, resumable sweep execution driver. Owns case execution and
+cross-profile per-case CAS replay; persistence, manifests, component loading,
+and repairs live in `checkpoints`. Compatibility re-exports preserve the former
+`pyrite.runs.run` helper imports.
 - Public: `run_sweep`, `load_checkpoint`, `checkpoint_path_for`,
   `cases_from_results`, `repair_brem_wide`, `repair_checkpoint`.
-- Deps: `_checkpoint_store`, `montecarlo` (`run_cases`), `results`
-  (`store_result`).
+- Deps: `checkpoints.persistence`, `checkpoints.recompute`,
+  `checkpoints._checkpoint_store`, `montecarlo` (`run_cases`), `results`.
+
+### `checkpoints/persistence.py`
+Checkpoint persistence owner: paths, load/save, component loaders, thin
+`cases.json` manifests, legacy seeding, and the default checkpoint directory.
+Keeps storage layout and serialization policy behind the checkpoint package.
+- Public compatibility surface is re-exported from `runs.run` where required.
+- Deps: `checkpoints._checkpoint_store`, `checkpoints._checkpoint_io`,
+  `paths`, `results`.
 
 ### `checkpoints/_checkpoint_store.py`
 Component storage adapter: active datasets live under
@@ -840,10 +872,15 @@ preview-by-default profile deletion (`rm`; the retired `prune` spelling stays a
 hidden alias). `profile analyze` remains a hidden warning alias. Revalidates selected file signatures before deletion.
 
 ### `checkpoints/recompute.py`
-Checkpoint recompute drivers for the brem and line datasets:
-`rebrem_checkpoints` and `reline_checkpoints`. Enumerates checkpoint stems,
-resolves per-material identity and fidelity defaults, and delegates per-record
-repair to `run`. Folded from the retired `rebrem.py`/`reline.py`.
+Checkpoint repair and recompute owner for both component datasets. Per-record
+`repair_brem_wide` / `repair_line_spec`, checkpoint-level `repair_checkpoint` /
+`reline_checkpoint`, and batch `rebrem_checkpoints` / `reline_checkpoints` share
+one progress callback. Enumerates checkpoint stems and resolves per-material
+identity and fidelity defaults. Folded from the retired `rebrem.py`/`reline.py`.
+- Deps: `checkpoints.persistence`, `checkpoints._checkpoint_store`,
+  `checkpoints.recompute_defaults`, `energy_grid.encoding`, `montecarlo`;
+  function-local `runs.scan` imports provide the progress record codec without
+  introducing an import-time cycle.
 
 ### `cli/commands/recompute.py`
 Click layer for `pyrite checkpoint recompute {brem,line}` (`brem_command`,
