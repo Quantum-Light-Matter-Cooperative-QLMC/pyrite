@@ -165,195 +165,40 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
     return best_t, best_face
 
 
-# ---- stochastic energy loss in transport (slice E) ----------------------------
-# Slice C built the Urban sampler and slice D addressed it per
-# `(electron, flight, substep)` without applying it. This block is the design
-# record for actually applying it inside `_transport_core_ungrooved`, i.e. for
-# the two questions the deterministic core answers by construction and a random
-# loss reopens: where the cutoff crossing is, and what `max_dE_frac` substepping
-# still guarantees. Both are gated behind `straggle_on`; with straggling off
-# every line below is unreachable and the deterministic code path is textually
-# unchanged.
+# ---- stochastic energy loss in transport ---------------------------------------
+# When `straggle_on` is set, the energy lost over a row is a draw from the Urban
+# compound-Poisson sampler in `straggling.py` rather than a known function of
+# distance. That reopens two questions the deterministic core answers by
+# construction -- where the cutoff crossing is, and what `max_dE_frac`
+# substepping still guarantees -- and the answers are derived in
+# `docs/repo-design/compute/straggled-transport-integration.md`. Read it before
+# changing anything below the `straggle_on` gate.
 #
-# Source: Geant4 PRM "Energy loss fluctuations" (Urban model) for the loss
-# itself -- see the derivation block above `_urban_levels_scalar`. Nothing here
-# adds physics to that model; it is the transport-side integration of it.
+# The invariants that derivation establishes, which the code here depends on:
 #
-# --- 1. The loss over a flight is a subordinator, not just a random number ----
+#   1. The crossing test is `dE >= E_start - E_cut` on the row's SAMPLED loss.
+#      The loss is a subordinator, so it is monotone in distance and that
+#      indicator is exact. Do not reintroduce a solve against `dE/ds`.
+#   2. The crossing location is `s_cut = s * Delta / dE`, the row's own realized
+#      average rate. It reduces algebraically to the deterministic
+#      `cutoff_distance` in the zero-fluctuation limit, and an overshoot
+#      (`dE >> Delta`) gives `s_cut -> 0` with `E_end = E_cut` exactly. Do not
+#      clamp the sampled loss: clamping breaks `<dE> = C s`.
+#   3. A geometry event at an exact tie beats the cutoff.
+#   4. The `max_dE_frac` cap is applied BEFORE the loss is sampled and the
+#      cutoff test AFTER it -- the reverse of the deterministic order. The cap
+#      is computed from the mean rate, never from a realized loss, because
+#      substep invariance holds only for a partition fixed independently of the
+#      increments.
+#   5. Under straggling `E_end = E_start - dE` for BOTH `energy_model` codes.
+#      `energy_model` still selects the clock's representative energy and the
+#      `seg_E_end`/`seg_t_end` schema, but no longer the energy update itself.
+#   6. No extra random numbers are drawn, so `straggle_dE_keV` stays
+#      reproducible offline from `(electron, flight, substep)`.
 #
-# Urban's loss over a step of length s at frozen energy is the compound Poisson
-# sum dE(s) = sum_i sum_{k=1}^{n_i(s)} E_{i,k} with n_i(s) ~ Poisson(s Sigma_i).
-# Read as a function of s it is a Levy process with non-negative jumps: a
-# subordinator. Two of its properties do all the work below.
-#
-#   (P1) MONOTONE. dE(s) is non-decreasing in s, so the electron's energy
-#        E(s) = E_start - dE(s) is non-increasing, exactly as in the
-#        deterministic model. Therefore
-#            inf{ s' <= s : E(s') <= E_cut }  exists  <=>  dE(s) >= E_start-E_cut.
-#        The *indicator* of "this row crosses the cutoff" is a function of the
-#        total loss over the row alone -- which is precisely what the sampler
-#        returns. Apart from an exact tie with a geometry event, the crossing
-#        decision is exact under this model. Geometry wins that tie by the
-#        transport's explicit row-end precedence convention.
-#   (P2) INFINITELY DIVISIBLE. For any partition s = sum_m s_m,
-#            sum_m CP(s_m Sigma) =_d CP(s Sigma),
-#        because sum_m Poisson(s_m Sigma_i) = Poisson(s Sigma_i) and the marks
-#        are i.i.d. from the same law. At frozen Sigma this is exact, not
-#        asymptotic. It is the substep invariance, derived in 3 below.
-#
-# --- 2. Cutoff crossing: exact indicator, fluid-interpolated location ---------
-#
-# Let Delta = E_start - E_cut > 0 (every alive electron satisfies this; a row
-# that reaches E_cut is killed) and let dE be the sampled loss over the row's
-# length s. By (P1) the row crosses iff dE >= Delta, and the crossing distance
-# is the position of the jump that carries the running sum past Delta. The
-# sampler returns the total, not the jump ladder, so the *location* needs a
-# rule. Equality at a simultaneous geometry event belongs to geometry; equality
-# without geometry belongs to the cutoff. The rule places a winning cutoff where
-# the loss, accrued at the
-# row's own REALIZED average rate dE/s, reaches Delta:
-#
-#       s_cut = s * Delta / dE,        E_end = E_cut,        cutoff_j = True.
-#
-# Why this rule:
-#   - It degenerates ALGEBRAICALLY, not merely in gate, to the deterministic
-#     solve. Put dE -> |dE/ds| s (the zero-fluctuation limit): the crossing
-#     condition becomes s > Delta/|dE/ds| = cutoff_distance and
-#     s_cut = s Delta / (|dE/ds| s) = Delta/|dE/ds| = cutoff_distance, which is
-#     the frozen-model line `cutoff_distance = (E_cut - E_j) / dEds` verbatim.
-#   - It is the same approximation the surrounding transport already makes.
-#     The deterministic core spreads a flight's loss uniformly along the flight
-#     even though the loss is physically a handful of discrete collisions; the
-#     clock (`s / beta`) and `seg_mid` are built on that fluid picture. Using
-#     the realized rate instead of the mean rate changes which number is spread,
-#     not the spreading.
-#   - It handles the overshoot case -- slice C decision 3: the sampler does not
-#     clamp dE to E, and with n_3 up to 1.15 per flight a single row can sample
-#     a loss far above Delta -- with no special case and no unphysical result:
-#     dE >> Delta gives s_cut -> 0, i.e. "the electron ran out of energy right
-#     at the start of this row". E_end is E_cut exactly, never negative, never
-#     below the cutoff.
-#   - It consumes no additional random numbers, so slice D's stream layout,
-#     its off-path bit-for-bit claim, and its offline reproducibility of
-#     `straggle_dE_keV` from `(electron, flight, substep)` all survive unchanged.
-#
-# What it costs: the crossing LOCATION is biased inside the crossing row. The
-# true first-passage distance is the position of the crossing jump, which given
-# one jump is uniform on [0, s]; the rule returns the deterministic fraction
-# Delta/dE of the row instead, so a large overshoot places the stop earlier than
-# the truth. The bias is bounded by one row length and applies only to the row
-# that terminates the track, so it perturbs the end of the range straggling
-# distribution by at most the final flight length -- which at E ~ E_cut is the
-# elastic mean free path at a few keV, Angstroms to tens of Angstroms.
-#
-# Alternatives considered and rejected:
-#   (a) Travel the full row, then stop if E_end <= E_cut. Rejected: it does not
-#       degenerate to the deterministic solve at all (in the zero-fluctuation
-#       limit it still overshoots by s - cutoff_distance), and it lengthens
-#       every terminated track by half a flight on average, which is a
-#       systematic range bias present even with the fluctuation switched off.
-#   (b) Draw the crossing position uniformly on [0, s]. Exact for a single-jump
-#       crossing, but wrong for a multi-jump one, wrong in the deterministic
-#       limit (it would randomize a stopping point that is not random), and it
-#       consumes a stream draw whose count depends on the outcome.
-#   (c) Clamp the sampled loss to Delta and keep the analytic cutoff distance.
-#       Rejected: clamping breaks <dE> = C s, the single property Urban was
-#       selected for (slice B point 4), and makes `n_cutoff_stopped` blind to
-#       the fluctuation it is supposed to reflect.
-#   (d) Sample the jump ladder (counts and uniform positions) to get the exact
-#       first passage. Correct, but it requires the sampler to return per-
-#       element counts and to draw n_i extra position variates -- i.e. changing
-#       slice C's sampler, which slice E does not own.
-#
-# `n_cutoff_stopped` bookkeeping: `cutoff_j` keeps its exact meaning ("this row
-# ended because the electron reached E_cut"), so the increment, the `died_j`
-# kill, and the geometry-flag clearing are unchanged; only the test that sets it
-# is redefined. By (P1) the flag fires on exactly the rows on which the true
-# first passage lies inside the row under the explicit tie convention, so the
-# count is exact within that convention, not approximate.
-#
-# The energy model: under straggling the loss over a row is the sampled dE and
-# E_end = E_start - dE for BOTH `energy_model` codes. The midpoint
-# predictor-corrector is a second-order quadrature of the deterministic ODE
-# dE/ds = f(E); with a random loss there is no ODE to quadrature and the
-# sampler's own mean is the left-endpoint one, C(E_start) s. `energy_model`
-# therefore still selects the clock's representative energy -- beta at the row's
-# realized midpoint (E_start + E_end)/2 versus at E_start -- and the
-# `seg_E_end`/`seg_t_end` schema, but no longer the energy update itself. The
-# residual left-endpoint bias this leaves in the mean is exactly the O(s^2) term
-# derived in 3 below, and `max_dE_frac` is the lever that controls it.
-#
-# --- 3. Substep invariance under a stochastic loss ----------------------------
-#
-# `substep-radiation-invariance` currently states an ALGEBRAIC invariance:
-# subdividing a flight leaves the deterministic result unchanged. That claim
-# does not survive a random loss and is re-derived here as a DISTRIBUTIONAL one.
-# (Docs are slices J/K; this block is the derivation for them to transcribe.)
-#
-# Setup: one physical flight of length s at start energy E, either taken whole
-# (N = 1 row) or split by `max_dE_frac` into N substeps of lengths s_1..s_N with
-# sum_m s_m = s, substep m starting at energy E^(m), E^(1) = E,
-# E^(m+1) = E^(m) - X_m, and X_m the loss sampled over s_m at E^(m).
-#
-# (i) At frozen energy the invariance is EXACT. If every substep used the same
-#     rates Sigma_i(E), then by (P2) sum_m X_m =_d X, the unsplit draw, for any
-#     partition and any N. Not a limit, not a tolerance: the same distribution.
-#     It is *distributional*, not pathwise -- each substep addresses its own
-#     `(flight, substep)` key, so the realized numbers differ; only the law is
-#     preserved. This is the strongest form the invariance can take and it is
-#     what slice B's infinite-divisibility argument buys.
-#
-# (ii) Once energy evolves, the next jump kernel depends on the previous random
-#     loss. Let nu_E(d epsilon) be the frozen-energy jump-intensity measure and
-#     C(E) = integral epsilon nu_E(d epsilon). For two short rows h_1, h_2,
-#
-#       <X_1 + X_2> - <X_frozen>
-#         = h_1 h_2 integral [C(E-epsilon) - C(E)] nu_E(d epsilon) + O(h^3)
-#         = h_1 h_2 [-C(E) C'(E) + R(E)] + O(h^3),
-#
-#       R(E) = integral [C(E-epsilon)-C(E)+epsilon C'(E)] nu_E(d epsilon).
-#
-#     Urban marks stay finite as h -> 0, so R(E) is generally nonzero at the
-#     same order as the deterministic linearization -C C'. For equal substeps,
-#     the generator coefficient is multiplied by s^2 (N-1)/(2N).
-#
-# (iii) The substeps are conditionally, not unconditionally, independent. For
-#     two rows,
-#
-#       Cov(X_1, X_2) = h_2 Cov(X_1, C(E-X_1)),
-#
-#     and the law of total variance also contributes
-#     E[h_2 V(E-X_1)] + Var(h_2 C(E-X_1)). Thus the evolving-energy variance is
-#     not sum_m s_m V(E^(m)) with cross terms discarded. `max_dE_frac` refines
-#     a state-dependent jump-process discretization; convergence cannot be
-#     reduced to deterministic stopping-power quadrature alone.
-#
-# (v) Measured (`tests/montecarlo/test_straggling_transport_integration.py`),
-#     graphite, E = 25 keV, s = 1e4 Ang (DeltaE/E = 0.09), 20000 repetitions:
-#       - frozen, N = 1 vs N = 32: mean shift -0.0014 +- 0.0150 keV on a mean
-#         of 2.243 keV, i.e. consistent with the exact invariance of (i);
-#       - drifting, N = 32: shift +0.086 +- 0.015 keV. The regression evaluates
-#         the full generator coefficient from the three Urban channels and
-#         resolves its finite-jump remainder beyond the -C C' linearization;
-#       - in transport, 600 electrons at 25 keV with `max_dE_frac` 0 vs 0.02:
-#         mean per-electron straggled loss 19.61 vs 19.70 keV, 0.5%.
-#
-# The step-length control itself stays DETERMINISTIC under straggling:
-# `max_dE_frac * E_j / (-dEds)` uses the mean rate, not the sampled loss. That
-# is deliberate. A substep grid chosen from the realized loss would be a random
-# partition, the partition and the increments would be dependent, and (P2) --
-# which holds for any FIXED partition -- would no longer apply. `max_dE_frac` is
-# a numerical control parameter and stays one.
-#
-# Ordering consequence: with straggling on the row's length must be settled
-# before the loss can be sampled over it, so the `max_dE_frac` cap is applied
-# BEFORE the sample and the cutoff test after it, the reverse of the
-# deterministic order (which can afford to solve the cutoff first because the
-# loss is a known function of distance). A substep cap that binds short of the
-# crossing simply emits its row and lets the next substep cross, which is the
-# same semantics, at finer resolution.
-
-
+# With `straggle_on` false every line behind the gate is unreachable and the
+# deterministic path is textually unchanged -- the bit-for-bit guarantee stated
+# at the top of `straggling.py`.
 @njit(cache=True)
 def _transport_core_ungrooved(
     Ne,
@@ -434,10 +279,11 @@ def _transport_core_ungrooved(
     ``(electron, flight, substep)``. It also redefines the cutoff crossing --
     exact indicator, fluid-interpolated location -- and reverses the order of the
     cutoff test and the ``max_dE_frac`` cap, since the row's length must be
-    settled before its loss can be sampled. See the module block comment
-    "stochastic energy loss in transport (slice E)" immediately above this
-    function for the derivation, the alternatives rejected, and the substep
-    invariance that survives. With ``straggle_on`` false none of it is reachable
+    settled before its loss can be sampled. See the "stochastic energy loss in
+    transport" block immediately above this function for the invariants, and
+    `docs/repo-design/compute/straggled-transport-integration.md`
+    for the derivation, the alternatives rejected, and the substep invariance
+    that survives. With ``straggle_on`` false none of it is reachable
     and the deterministic path is bit-for-bit what it was before straggling
     existed.
     """
@@ -552,13 +398,12 @@ def _transport_core_ungrooved(
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
             if straggle_on:
-                # Slice E. The loss over this row is a draw from the Urban
-                # compound-Poisson subordinator (slice C) rather than a known
-                # function of distance, so the row's length has to be settled
-                # first and the cutoff decided afterwards from the realized
-                # loss. See the "stochastic energy loss in transport (slice E)"
-                # block above this function for the derivation of both the
-                # crossing rule and the substep invariance; every branch here is
+                # The loss over this row is a draw from the Urban
+                # compound-Poisson subordinator rather than a known function of
+                # distance, so the row's length has to be settled first and the
+                # cutoff decided afterwards from the realized loss. See the
+                # "stochastic energy loss in transport" block above this
+                # function, invariants 1, 2 and 4; every branch here is
                 # unreachable with ``straggle_on`` false.
                 if energy_controlled:
                     # Deterministic step control on purpose: a substep grid
@@ -589,7 +434,7 @@ def _transport_core_ungrooved(
                     flight_key,
                     _SM64_ZERO,
                 )
-                # Diagnostic, unchanged from slice D: the SAMPLED loss, which on
+                # Diagnostic: the SAMPLED loss, which on
                 # a cutoff row exceeds the applied loss by exactly the overshoot
                 # the truncation discards.
                 stragg_dE[e] += stragg_loss
@@ -767,97 +612,23 @@ def _transport_core_ungrooved(
     return nseg, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
 
 
-# ---- porting the slice-E crossing rule to the remaining cores (slice F) -------
-# Slice E applied the Urban loss and redefined the cutoff crossing inside
-# `_transport_core_ungrooved`. The rule itself is core-agnostic -- it needs only
-# `E_start`, `E_cut`, the row's material path length, the sampled loss, and the
-# geometry-event flag -- so this slice ports it verbatim to the remaining cores
-# and changes only the bookkeeping each core's own geometry and flag
-# representation forces. NO physics decision from E is revisited here; see the
-# "stochastic energy loss in transport (slice E)" block above
-# `_transport_core_ungrooved` for the derivation of both the crossing rule and
-# the substep invariance. Three per-core questions had to be answered.
+# ---- the crossing rule in the remaining cores ----------------------------------
+# The rule above is core-agnostic: it needs only `E_start`, `E_cut`, the row's
+# MATERIAL-side path length, the sampled loss, and the geometry-event flag. The
+# cores below apply it unchanged and differ only in the bookkeeping their own
+# geometry and flag representation forces. Section 4 of
+# `docs/repo-design/compute/straggled-transport-integration.md` works through
+# all three cases; the two that are easy to break by accident:
 #
-# --- (1) LUT cores: the crossing no longer carries the LUT's own error --------
-#
-# The deterministic LUT cores solve the truncation distance on the INTERPOLATED
-# `dE/ds`, so their crossing point inherits the LUT's interpolation error. The
-# straggled crossing has no such solve: by (P1) the indicator is "does the row's
-# total sampled loss reach E_start - E_cut", and slice D already established
-# that the sampled loss on a LUT core is drawn from the EXACT per-element
-# stopping power (the LUT bakes one interpolated total per layer and carries no
-# per-element split, so `_urban_sample_compound_keV` is handed the exact tables
-# regardless of which core calls it). So under straggling the LUT core's
-# crossing is strictly MORE accurate than its own deterministic path.
-#
-# That is accepted, not reconciled. Reintroducing the LUT's interpolation error
-# into the crossing would mean deliberately degrading an exact quantity to match
-# an approximation whose only purpose is speed, and there is no LUT-consistent
-# loss to degrade it TO -- the loss is a draw, not a function of an interpolated
-# rate. What the LUT does keep is everything it exists to accelerate and
-# everything that is still deterministic:
-#   - the `max_dE_frac` step cap uses the LUT's `dE/ds` (E's ordering makes the
-#     cap a purely deterministic step control, evaluated before the draw), so
-#     the substep GRID a LUT run produces is the LUT's own, not the exact core's;
-#   - the clock uses the LUT's `inv_beta` at the representative energy the
-#     `energy_model` selects, exactly as the deterministic LUT path does;
-#   - the free-path rate, element selection and scattering angle are untouched.
-# The LUT therefore still governs step control, timing and geometry; only the
-# energy loss and the crossing come from the exact sampler, which is the same
-# split slice D already shipped for the diagnostic.
-#
-# --- (2) Per-electron and CUDA cores: `exit_code` instead of boolean flags ----
-#
-# Those cores return an `exit_code` enum per electron rather than accumulating
-# into shared counters. The re-expression is smaller than it looks: they still
-# carry the same local `cross_up_j`/`cross_dn_j`/`exit_top_j`/`exit_bot_j`/
-# `exit_side_j`/`cutoff_j` booleans through the row, and only DERIVE
-# `exit_code[i]` from them once at the end of the row. E's flag clearing on a
-# cutoff event therefore transcribes literally, and the derivation chain
-# (`EXIT_BACKSCATTERED` / `EXIT_TRANSMITTED` / `EXIT_SIDE` / `EXIT_CUTOFF_STOPPED`,
-# in that priority order) needs no change at all: clearing the geometry booleans
-# is exactly what makes the chain fall through to `EXIT_CUTOFF_STOPPED`.
-# `EXIT_STEP_LIMITED` is the loop's initial value, overwritten only by a real
-# exit, so a cutoff row that also cleared `limited_j` still classifies correctly.
-#
-# --- (3) Grooved core: the cutoff test runs on the MATERIAL-side length -------
-#
-# The grooved core is the one place a row can be cut short by leaving the
-# material entirely: a groove facet crossing into vacuum truncates the flight at
-# `s_surface` and the electron then travels a vacuum leg to its re-entry point.
-# Straggling must not see that vacuum leg, and it does not, because of where the
-# truncation already sits: `step_j` is truncated to `s_surface` in step 2b,
-# BEFORE the energy close, so the length handed to the sampler is the
-# material-side length by construction. Sampling over the untruncated collision
-# distance would attribute vacuum path length to material energy loss -- a
-# straightforward physics error, since vacuum has no stopping power -- and
-# sampling over the full material+vacuum path would do the same.
-#
-# The interaction with the crossing test is then a precedence question, and the
-# answer is forced by (P1) rather than chosen. The loss is non-decreasing along
-# the material path, so if the row's material-side loss reaches E_start - E_cut,
-# the first passage lies inside the MATERIAL part of the row, i.e. strictly
-# before the facet. The electron therefore stops in the material and never
-# reaches the vacuum: the crossing wins, `surface_first` is cleared alongside the
-# other geometry flags, and no vacuum segment is emitted. Conversely if the
-# material-side loss does not reach it, the electron leaves through the facet
-# with E_end = E_start - dE and the vacuum leg proceeds at that energy, losing
-# nothing. Both branches are exactly what the deterministic core does with
-# `cutoff_distance` compared against the already-facet-truncated `step_j`;
-# `surface_first` joins `geometry_event` for the tie-break for the same reason
-# it already does there, so a crossing landing exactly on the facet yields to
-# the facet. Nothing in the sampler or the crossing rule changes.
-#
-# One consequence worth recording for slice H: because the loss is sampled per
-# material row and a facet crossing splits what would otherwise be one flight
-# into a shorter material row plus a vacuum leg, a grooved geometry samples the
-# straggling stream at a different `(flight, substep)` cadence than a flat one.
-# That is not a bias -- the per-row means still sum to `C` times the total
-# material path -- but it does mean grooved and ungrooved runs at the same seed
-# address different straggling draws, exactly as they already address different
-# free-path draws.
-
-
+#   - LUT cores sample the loss from the EXACT per-element tables, not the LUT,
+#     so their straggled crossing carries no interpolation error. That is
+#     deliberate and is not to be "reconciled" by degrading it. The LUT still
+#     owns the step cap, the clock, the free-path rate and the geometry.
+#   - The grooved core must sample over the facet-truncated `step_j` from step
+#     2b, never the untruncated collision distance -- vacuum has no stopping
+#     power. Monotonicity then forces the precedence: a crossing lies strictly
+#     inside the material part of the row, so it wins and `surface_first` is
+#     cleared with the other geometry flags.
 @njit(cache=True)
 def _transport_core_ungrooved_lut(
     Ne,
@@ -918,17 +689,17 @@ def _transport_core_ungrooved_lut(
     exact core's energy-controlled substepping and optical-depth budget.
 
     ``L_Js``/``L_Zs``/``L_ks``/``L_coeffs``/``L_E_cross`` are the exact-core
-    per-element tables (slice D): the LUT bakes ``dE/ds`` as a single
+    per-element tables: the LUT bakes ``dE/ds`` as a single
     per-layer interpolant and carries no per-element split, but the Urban
     sampler needs one, so straggling re-derives its own per-element ``C_i``
     from these tables via :func:`_urban_sample_compound_keV` rather than the
     LUT's interpolated total. Unused when ``straggle_on`` is false.
 
-    ``straggle_on`` applies that sampled loss (slice F), using slice E's
-    crossing rule unchanged. The LUT keeps the ``max_dE_frac`` step cap and the
-    clock; the loss and the cutoff crossing come from the exact sampler, so the
-    straggled crossing does not carry the LUT's interpolation error. See part
-    (1) of the "porting the slice-E crossing rule" block above this function.
+    ``straggle_on`` applies that sampled loss with the crossing rule unchanged.
+    The LUT keeps the ``max_dE_frac`` step cap and the clock; the loss and the
+    cutoff crossing come from the exact sampler, so the straggled crossing does
+    not carry the LUT's interpolation error. See the "crossing rule in the
+    remaining cores" block above this function.
     With ``straggle_on`` false the deterministic path is bit-for-bit what it
     was before straggling existed.
     """
@@ -1020,12 +791,12 @@ def _transport_core_ungrooved_lut(
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
             if straggle_on:
-                # Slice F: slice E's crossing rule, ported unchanged. The cap
-                # runs before the draw and the cutoff test after it, and the cap
-                # uses the LUT's own interpolated rate while the loss and the
-                # crossing come from the exact per-element sampler -- see the
-                # "porting the slice-E crossing rule" block above this function,
-                # part (1). Unreachable with ``straggle_on`` false.
+                # The crossing rule, unchanged. The cap runs before the draw
+                # and the cutoff test after it, and the cap uses the LUT's own
+                # interpolated rate while the loss and the crossing come from
+                # the exact per-element sampler -- see the "crossing rule in the
+                # remaining cores" block above this function. Unreachable with
+                # ``straggle_on`` false.
                 if energy_controlled:
                     step_energy = max_dE_frac * E_j / (-dEds)
                     if step_energy < step_j:
@@ -1298,14 +1069,15 @@ def _transport_core_grooved(
     per-electron surface-event guard as the legacy implementation prevents
     pathological geometry from looping forever.
 
-    ``straggle_on`` applies the sampled Urban loss (slice F) using slice E's
-    crossing rule unchanged. The facet truncation in step 2b already reduces
-    ``step_j`` to the material-side length, so the sampler never sees the vacuum
-    leg, and a crossing beats a facet crossing because monotonicity puts the
-    first passage inside the material part of the row. See part (3) of the
-    "porting the slice-E crossing rule" block above
-    :func:`_transport_core_ungrooved_lut`. With ``straggle_on`` false the
-    deterministic path is bit-for-bit what it was before straggling existed.
+    ``straggle_on`` applies the sampled Urban loss with the crossing rule
+    unchanged. The facet truncation in step 2b already reduces ``step_j`` to the
+    material-side length, so the sampler never sees the vacuum leg, and a
+    crossing beats a facet crossing because monotonicity puts the first passage
+    inside the material part of the row. See the "crossing rule in the remaining
+    cores" block above :func:`_transport_core_ungrooved_lut`, and section 4.3 of
+    `docs/repo-design/compute/straggled-transport-integration.md`. With
+    ``straggle_on`` false the deterministic path is bit-for-bit what it was
+    before straggling existed.
     """
     EPS = 1e-6
     machine_eps = 2.220446049250313e-16
@@ -1464,15 +1236,15 @@ def _transport_core_grooved(
             geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
 
             if straggle_on:
-                # Slice F: slice E's crossing rule, ported unchanged. `step_j`
-                # has already been truncated at the groove facet in step 2b, so
+                # The crossing rule, unchanged. `step_j` has already been
+                # truncated at the groove facet in step 2b, so
                 # the length handed to the sampler is the MATERIAL-side length
                 # and the vacuum leg that may follow carries no loss. By the
                 # same monotonicity that makes the indicator exact, a crossing
                 # then lies strictly inside the material part of the row, so the
                 # electron stops in material and `surface_first` is cleared with
-                # the other geometry flags -- see part (3) of the "porting the
-                # slice-E crossing rule" block above
+                # the other geometry flags -- see the "crossing rule in the
+                # remaining cores" block above
                 # `_transport_core_ungrooved_lut`. Unreachable with
                 # ``straggle_on`` false.
                 if energy_controlled:
@@ -1870,12 +1642,12 @@ def _transport_core_ungrooved_perelectron(
     per-thread scalars here rather than the lockstep core's per-electron arrays,
     which is what the CUDA port needs.
 
-    ``straggle_on`` applies the sampled Urban loss (slice F) using slice E's
-    crossing rule unchanged; ``exit_code`` is still derived from the same local
-    geometry booleans, so the rule transcribes literally (part (2) of the
-    "porting the slice-E crossing rule" block above
-    :func:`_transport_core_ungrooved_lut`). With ``straggle_on`` false the
-    deterministic path is bit-for-bit what it was before straggling existed.
+    ``straggle_on`` applies the sampled Urban loss with the crossing rule
+    unchanged; ``exit_code`` is still derived from the same local geometry
+    booleans, so the rule transcribes literally -- see the "crossing rule in the
+    remaining cores" block above :func:`_transport_core_ungrooved_lut`. With
+    ``straggle_on`` false the deterministic path is bit-for-bit what it was
+    before straggling existed.
     """
     EPS = 1e-6
 
@@ -1986,11 +1758,11 @@ def _transport_core_ungrooved_perelectron(
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
             if straggle_on:
-                # Slice F: slice E's crossing rule, ported unchanged. This core
-                # derives ``exit_code[i]`` from the same local booleans the
-                # lockstep core uses, so E's flag clearing transcribes literally
-                # and the derivation chain below needs no change -- see part (2)
-                # of the "porting the slice-E crossing rule" block above
+                # The crossing rule, unchanged. This core derives
+                # ``exit_code[i]`` from the same local booleans the lockstep
+                # core uses, so the flag clearing transcribes literally and the
+                # derivation chain below needs no change -- see the "crossing
+                # rule in the remaining cores" block above
                 # `_transport_core_ungrooved_lut`. The straggling draw uses this
                 # electron's own stream key through the disjoint salted-rehash
                 # domain, so it draws no uniforms from `key`'s own counter
@@ -2259,16 +2031,16 @@ def _transport_core_ungrooved_perelectron_lut(
     ``L_Js``/``L_Zs``/``L_ks``/``L_coeffs``/``L_E_cross`` are the same padded
     ``(n_layers, max_elements)`` per-element tables
     :func:`_transport_core_ungrooved_perelectron` receives, threaded in here
-    only for straggling (slice D): the LUT carries no per-element split (see
+    only for straggling: the LUT carries no per-element split (see
     :func:`_transport_core_ungrooved_lut`). Unused when ``straggle_on`` is
     false.
 
-    ``straggle_on`` applies that sampled loss (slice F) using slice E's crossing
-    rule unchanged, combining both per-core adaptations: the LUT keeps the
-    ``max_dE_frac`` cap and the clock while the loss and the crossing come from
-    the exact sampler, and ``exit_code`` is still derived from the same local
-    geometry booleans. See parts (1) and (2) of the "porting the slice-E
-    crossing rule" block above :func:`_transport_core_ungrooved_lut`.
+    ``straggle_on`` applies that sampled loss with the crossing rule unchanged,
+    combining both per-core adaptations: the LUT keeps the ``max_dE_frac`` cap
+    and the clock while the loss and the crossing come from the exact sampler,
+    and ``exit_code`` is still derived from the same local geometry booleans.
+    See the "crossing rule in the remaining cores" block above
+    :func:`_transport_core_ungrooved_lut`.
     """
     EPS = 1e-6
 
@@ -2356,12 +2128,12 @@ def _transport_core_ungrooved_perelectron_lut(
             geometry_event = cross_up_j or cross_dn_j or exit_side_j
 
             if straggle_on:
-                # Slice F: slice E's crossing rule, ported unchanged. Combines
-                # the two per-core adaptations -- the LUT keeps the step cap and
-                # the clock while the loss and the crossing come from the exact
-                # sampler (part 1), and ``exit_code`` is still derived from these
-                # same local booleans (part 2). See the "porting the slice-E
-                # crossing rule" block above `_transport_core_ungrooved_lut`.
+                # The crossing rule, unchanged. Combines the two per-core
+                # adaptations -- the LUT keeps the step cap and the clock while
+                # the loss and the crossing come from the exact sampler, and
+                # ``exit_code`` is still derived from these same local booleans.
+                # See the "crossing rule in the remaining cores" block above
+                # `_transport_core_ungrooved_lut`.
                 # Unreachable with ``straggle_on`` false.
                 if energy_controlled:
                     step_energy = max_dE_frac * E_j / (-dEds)

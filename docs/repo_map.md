@@ -328,7 +328,12 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   (`"frozen"` default left-endpoint, `"midpoint"` predictor--corrector);
   `max_dE_frac` splits a physical flight into numerical substeps under
   `"midpoint"` and adds the `E_end_keV`/`t_end_ang`/`E_repr_keV` and
-  `flight_id`/`substep_id` row fields. Deps: `materials.attenuation`, `DATA_DIR`.
+  `flight_id`/`substep_id` row fields. How the Urban sampler is applied inside
+  the cores — the cutoff crossing rule under a random loss, what substepping
+  still guarantees, and the per-core bookkeeping — is derived in [straggled
+  transport integration](repo-design/compute/straggled-transport-integration.md);
+  `cores.py` carries only the resulting invariants at each site.
+  Deps: `materials.attenuation`, `DATA_DIR`.
 - `transport_jit_kernel` — the `cupyx.jit` port of
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
   run to completion, output slots addressed by electron index. Same arithmetic
