@@ -1,5 +1,5 @@
 import inspect
-from pathlib import Path
+from importlib import resources
 
 import numpy as np
 import pytest
@@ -157,11 +157,11 @@ def test_population_cutoff_clips_length_and_midpoint_but_not_start_state():
 
 def test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules():
     cpu_source = inspect.getsource(transport_module._transport_core_ungrooved_perelectron)
-    # transport_module.__file__ is the transport/ package's __init__.py; its
-    # parent is the transport/ package dir, and transport_jit_kernel.py is a
-    # sibling of that package (still directly under montecarlo/).
+    # Read the CUDA kernel module's source as text rather than importing it:
+    # it does a module-scope `import cupy`, so an ordinary import would fail
+    # outright on a CPU-only machine.
     cuda_source = (
-        Path(transport_module.__file__).parent.with_name("transport_jit_kernel.py").read_text()
+        resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
     )
     for source in (cpu_source, cuda_source):
         assert "cutoff_distance = (E_cut_e - E_j) / dEds" in source

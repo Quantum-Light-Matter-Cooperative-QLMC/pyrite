@@ -12,7 +12,7 @@ import argparse
 
 from tabulate import tabulate
 
-from pyrite.apps.anchor_figures import (
+from pyrite.validation.anchor_figures import (
     ZhaiAnchor,
     ZhaiCacheMiss,
     cached_model_spectra,

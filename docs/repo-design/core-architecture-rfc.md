@@ -437,7 +437,7 @@ target properties — they are quadrature choices and belong to
 that exist now — `abs_layers`, `layer_radiators`, `crystal_width_mm`,
 `crystal_height_mm`, `groove_spacing_ang` — so the
 {file}`src/pyrite/montecarlo/transport` package and its CUDA twin
-{file}`src/pyrite/montecarlo/transport_jit_kernel.py` keep their current
+{file}`src/pyrite/montecarlo/transport/_jit_kernel.py` keep their current
 branches, their current arithmetic, and their bit-for-bit guarantees. The
 change is a boundary reshape at the campaign layer only.
 

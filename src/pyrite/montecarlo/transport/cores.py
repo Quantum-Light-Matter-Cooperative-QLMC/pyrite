@@ -1616,7 +1616,7 @@ def _transport_core_ungrooved_perelectron(
     """Run electrons ``[e_start, e_start + e_count)`` to completion, independently.
 
     This is the executable specification of the CUDA transport kernel in
-    :mod:`transport_jit_kernel`: same arithmetic, same draw order, same output
+    :mod:`pyrite.montecarlo.transport._jit_kernel`: same arithmetic, same draw order, same output
     addressing, one CPU iteration per CUDA thread. Keeping the two in one
     algorithm lets the GPU port be checked bit-for-bit instead of statistically.
 

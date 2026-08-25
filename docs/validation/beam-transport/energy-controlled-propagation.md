@@ -3,7 +3,7 @@
 Ledger row: [`energy-controlled-propagation`](../ledger-transport-background.md#energy-controlled-propagation).
 Code: `montecarlo/transport/api.py::simulate_trajectories` (`max_dE_frac`);
 host cores in `montecarlo/transport/cores.py`; exact CUDA core in
-`montecarlo/transport_jit_kernel.py`.
+`montecarlo/transport/_jit_kernel.py`.
 Measurement: `checks/collision_statistics_refinement.py`.
 
 ## Claim
@@ -271,7 +271,7 @@ location of {math}`s^*` within it.
 
 **Comparison with the implementation** (the host cores in
 `montecarlo/transport/cores.py` and the CUDA core in
-`montecarlo/transport_jit_kernel.py` share this structure).
+`montecarlo/transport/_jit_kernel.py` share this structure).
 `tau_left[e] = -1.0` is
 the "no flight open" sentinel; a fresh draw `tau_left[e] = -np.log(rng.random())`
 fires only when `tau_left[e] < 0.0`, i.e. once per physical flight,

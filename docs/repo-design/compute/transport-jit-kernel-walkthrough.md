@@ -2,7 +2,7 @@
 
 This reference follows the arithmetic and control flow of the two CUDA
 transport kernels in
-[`transport_jit_kernel.py`](../../../src/pyrite/montecarlo/transport_jit_kernel.py):
+[`transport/_jit_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_kernel.py):
 
 - `_transport_kernel` evaluates elastic rates, stopping power, and optional
   Urban energy-loss straggling directly;

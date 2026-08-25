@@ -201,7 +201,7 @@ def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
 
 
 def _export(outdir="figures", ne=20_000, ne_brem=200, ne_supp=200):
-    af = importlib.import_module("pyrite.apps.anchor_figures")
+    af = importlib.import_module("pyrite.validation.anchor_figures")
 
     try:
         written = af.export_all_figures(

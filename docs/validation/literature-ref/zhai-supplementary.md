@@ -1,6 +1,6 @@
 # Validation status: Zhai supplementary coherent-emission studies
 
-**Scope.** `src/pyrite/apps/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
+**Scope.** `src/pyrite/validation/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
 WSe2/MoSe2/h-BN/HOPG reproductions rendered by the validation app's "Zhai
 supplementary" section and `pyrite app validation export`.
 

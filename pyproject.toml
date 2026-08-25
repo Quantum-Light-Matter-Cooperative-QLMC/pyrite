@@ -169,7 +169,7 @@ include = ["src"]
 
 [[tool.ty.overrides]]
 include = [
-    "src/pyrite/montecarlo/*_jit_kernel.py",
+    "src/pyrite/montecarlo/transport/_jit_kernel.py",
     "src/pyrite/montecarlo/runner/__init__.py",
     "src/pyrite/montecarlo/spectrum/*_jit_kernel.py",
 ]
@@ -181,7 +181,11 @@ allowed-unresolved-imports = ["cupy*", "cupy*.*"]
 unresolved-attribute = "ignore"
 
 [[tool.ty.overrides]]
-include = ["src/pyrite/apps/**/*.py"]
+include = [
+    "src/pyrite/apps/**/*.py",
+    "src/pyrite/validation/anchor_figures.py",
+    "src/pyrite/validation/feranchuk_spence.py",
+]
 
 [tool.ty.overrides.rules]
 invalid-argument-type = "ignore"

@@ -25,8 +25,9 @@ the import-linter contracts from `pyproject.toml`.
 - Runtime paths resolve through `pyrite.paths`: packaged read-only data stays
   package-relative; workspace artifacts use explicit path > `PYRITE_HOME` >
   `workspace.root` config > cwd; mutable user state uses Click's platform app
-  directory. Marimo apps, validation figure builders, and reference data ship
-  under `pyrite.apps`; standalone `checks/` scripts remain developer-only.
+  directory. Marimo apps ship under `pyrite.apps`; validation figure builders
+  and their reference data ship under `pyrite.validation`; standalone
+  `checks/` scripts remain developer-only.
 - Root domain implementations are grouped under `campaign/`, `checkpoints/`,
   `runs/`, `apps/`, `validation/`, `perf/`, and `remote/`. Former
   documented root module paths are compatibility re-exports only.
@@ -334,11 +335,13 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   transport integration](repo-design/compute/straggled-transport-integration.md);
   `cores.py` carries only the resulting invariants at each site.
   Deps: `materials.attenuation`, `DATA_DIR`.
-- `transport_jit_kernel` — the `cupyx.jit` port of
+- `transport._jit_kernel` — the `cupyx.jit` port of
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
   run to completion, output slots addressed by electron index. Same arithmetic
-  as the CPU core, so the two stay one algorithm.
-  See `docs/repo-design/compute/gpu-transport-rawkernel.md`. Deps: `pyrite._backend`, `transport`.
+  CPU core, so the two stay one algorithm. Kept out of `__init__.py`'s eager
+  imports — `api.py` and `batching.py` reach it only through deferred,
+  function-local imports — so its module-scope `cupy` import cannot break
+  CPU-only startup. See `docs/repo-design/compute/gpu-transport-rawkernel.md`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum/` — compatibility package for the former flat module. `lines.py`
@@ -877,7 +880,7 @@ launch/status/pull helpers. `pyrite check` is a hidden compatibility alias.
 ### `validation/_zhai.py`
 Canonical maintained Zhai detector geometry and cache-schema provenance shared
 by anchor figures, headless reproduction, validation-app export, and remote
-SLURM metadata. Heavy calculations remain in `src/pyrite/apps/anchor_figures.py`; app
+SLURM metadata. Heavy calculations remain in `src/pyrite/validation/anchor_figures.py`; app
 and export consumers are cache-only and direct misses to
 `pyrite run --preset zhai --remote`.
 - Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`,

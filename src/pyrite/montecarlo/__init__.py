@@ -18,7 +18,7 @@ following Zhai et al., Nat. Commun. 16, 11218 (2025), SI Sections S1-S5:
      across reciprocal vectors within a segment) with the finite-interaction-
      time factor |Q|^2 = t_L^2 sinc^2(P t_L), P = [w - v.(k+g)]/2, replacing
      the absorption-limited delta-function limit of Feranchuk Eq. (9).
-     Amplitudes are the same Eqs. (13)/(14) as src/pyrite/apps/feranchuk_spence.py, with
+     Amplitudes are the same Eqs. (13)/(14) as src/pyrite/validation/feranchuk_spence.py, with
      arbitrary segment velocity direction.
   3. Self-absorption (SI S5): Beer-Lambert along the observation direction
      from each segment midpoint (slab geometry).

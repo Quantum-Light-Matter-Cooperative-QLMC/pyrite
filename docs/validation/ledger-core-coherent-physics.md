@@ -9,7 +9,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Source:** Feranchuk–Spence 2000 Eq.(10),(12); Zhai 2025
 - **Status:** rederived
 - **Checks:** units; prefactor, squaring, summation order, per-electron normalization, and mosaic weighting reproduced term for term (absolute normalization to `6.7e-10` relative, whose entire budget is the repository's truncated fine-structure literal); incoherence structure confirmed by exact `1/N` subdivision falloff, bitwise reflection additivity, and invariance of the per-electron spectrum under electron replication; mosaic average is a unit-weight Gauss–Hermite intensity average collapsing to the perfect crystal as `η→0`
-- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (not a CI-green regression test on this row's normalization; it compares against `feranchuk_line_flux`, the `discrepancy` `closed-form-flux` row)
+- **Anchor:** `src/pyrite/validation/anchor_figures.py::single_segment_anchor` (not a CI-green regression test on this row's normalization; it compares against `feranchuk_line_flux`, the `discrepancy` `closed-form-flux` row)
 - **Notes:** interference is non-separable; highest priority; **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — simulated **intensities** at positive-θ grids differ from the old negative-θ (mirror) outputs by ~2× at peak; any intensity-dependent check of this row needs re-verification in fresh context. **2026-08-15**: fresh-context re-derivation matches with no divergent factor, sign, exponent, or unit. This row certifies how `\|A\|²` is *used*, not `A` itself (see `cbs-amplitude`). Integrated yield is exact but **line peak height is segmentation dependent**, so absolute peak comparisons against a paper inherit an implicit dependence on the transport's segment-length distribution. The prefactor is frozen at `ω_res` rather than the grid frequency — consistent with the existing narrow-line freezing of `χ_g`/`U_g`/`μ`, odd about line centre, cancels to first order on integration. `components=True` is **not** an additive split: `spec_pxr + spec_cbs` differs from `spec` by the interference term (+22% at the checked point), and the docstring says so only for the coherent path. Stands on the unresolved `line-energy-dispersion` harmonic sign, which fixes where each line sits, not how it is squared or summed. Human sign-off pending. [validation write-up](radiation-physics/coherent-line-spectrum.md)
 
 ## `coherent-emission`
@@ -165,11 +165,11 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `line-energy-dispersion`
 
 - **Claim:** `ω = v·g / (1 − v·n̂)` tunable line energy
-- **Code:** `montecarlo/geometry.py::tilted_geometry` / `src/pyrite/apps/anchor_figures.py::line_energy_eV`
+- **Code:** `montecarlo/geometry.py::tilted_geometry` / `src/pyrite/validation/anchor_figures.py::line_energy_eV`
 - **Source:** Zhai 2025 Eq.(10)
 - **Status:** discrepancy
 - **Checks:** units and positive Doppler denominator agree; zero-velocity, orthogonal-harmonic, reciprocal-vector reversal, and opposite-tilt limits checked; numerator sign cannot be certified because the spatial-Fourier/opposite-harmonic mapping from the documented `exp(+i g·R_j)` structure-factor phase is unspecified
-- **Anchor:** `src/pyrite/apps/anchor_figures.py::theory_line_energies` (same-convention regression only)
+- **Anchor:** `src/pyrite/validation/anchor_figures.py::theory_line_energies` (same-convention regression only)
 - **Notes:** unresolved reciprocal-harmonic/Fourier reconstruction sign mapping: the independent `exp(+i g·r)` derivation gives `−v·g/(1−v·n̂)` while production uses `+v·g/(1−v·n̂)`; [validation write-up](radiation-physics/line-energy-dispersion.md). **2026-07-11**: tilt convention flipped to Zhai's positive θ; the default beam-aligned line energy is even in opposite polar tilt, but that does not resolve the harmonic-sign discrepancy
 
 ## `longitudinal-target-timing`
@@ -185,21 +185,21 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `closed-form-flux`
 
 - **Claim:** Eq.(12) closed-form line flux (single-segment reference)
-- **Code:** `src/pyrite/apps/anchor_figures.py::feranchuk_line_flux`
+- **Code:** `src/pyrite/validation/anchor_figures.py::feranchuk_line_flux`
 - **Source:** Feranchuk 2000 Eq.(12)
 - **Status:** discrepancy
 - **Checks:** prefactor, `α`/`ℏc` bookkeeping, solid-angle and energy-bin conventions, return units, and the `1/(1−β cos θ_obs)` Jacobian all reproduce the independent derivation symbolically and to twelve digits, and are corroborated by the Monte Carlo at sub-percent (anchor ratio `0.99735` at 17.5 keV, `0.99673` at 25 keV). Escape length fails
-- **Anchor:** `src/pyrite/apps/anchor_figures.py::single_segment_anchor` (ratio≈1; **structurally blind to the defect** — it passes `L_abs_ang=1e12` against `L_seg_ang=290`, so the geometry factor cancels to first order)
-- **Notes:** reference, not pipeline. **2026-08-15 DISCREPANCY:** the escape length omits a geometric `\|cos θ_obs\|`. Code (`apps/feranchuk_spence.py::photons_per_electron`) computes `L_eff = L_abs[1 − exp(−t/L_abs)]`; the escape integral `∫₀ᵗ exp(−μ(t−z)/\|n_z\|) dz` gives `\|n_z\| L_abs [1 − exp(−t/(\|n_z\| L_abs))]`. `n_z` *is* computed in the function but is used only in the Jacobian, never in `L_eff`. At the anchor's `θ_obs=119°` this reaches `1/0.4848 = 2.06×` in the thick-target limit, growing monotonically with `t/L_abs`; the two agree only for `t≪L_abs`, which is the sole regime the anchor exercises. **Production `mc_spectrum` does NOT share the error** — it computes a real per-segment escape path; feeding it contiguous segments recovers `\|n_z\|=0.4848` to four digits. Since this expression is the yardstick the MC bulk results are compared against, a bulk-regime comparison against it overstates flux by up to 2.06×. Secondary: `absorption_length_ang("C", …)` is hardcoded while number density follows `anchor.crystal`, so any non-carbon override silently mixes carbon `f₂` with that crystal's density; neither `feranchuk_line_flux` nor `photons_per_electron` carries a `Validation:` marker; the equation actually lives in `apps/feranchuk_spence.py::photons_per_electron`, not the ledgered wrapper. `figure_enhancement` recomputes the same bare expression (ceiling 68.5 vs escape-weighted 33.5) — that is the separate `enhancement-bulk-film` row, but the defect is shared. [validation write-up](radiation-physics/closed-form-flux.md)
+- **Anchor:** `src/pyrite/validation/anchor_figures.py::single_segment_anchor` (ratio≈1; **structurally blind to the defect** — it passes `L_abs_ang=1e12` against `L_seg_ang=290`, so the geometry factor cancels to first order)
+- **Notes:** reference, not pipeline. **2026-08-15 DISCREPANCY:** the escape length omits a geometric `\|cos θ_obs\|`. Code (`validation/feranchuk_spence.py::photons_per_electron`) computes `L_eff = L_abs[1 − exp(−t/L_abs)]`; the escape integral `∫₀ᵗ exp(−μ(t−z)/\|n_z\|) dz` gives `\|n_z\| L_abs [1 − exp(−t/(\|n_z\| L_abs))]`. `n_z` *is* computed in the function but is used only in the Jacobian, never in `L_eff`. At the anchor's `θ_obs=119°` this reaches `1/0.4848 = 2.06×` in the thick-target limit, growing monotonically with `t/L_abs`; the two agree only for `t≪L_abs`, which is the sole regime the anchor exercises. **Production `mc_spectrum` does NOT share the error** — it computes a real per-segment escape path; feeding it contiguous segments recovers `\|n_z\|=0.4848` to four digits. Since this expression is the yardstick the MC bulk results are compared against, a bulk-regime comparison against it overstates flux by up to 2.06×. Secondary: `absorption_length_ang("C", …)` is hardcoded while number density follows `anchor.crystal`, so any non-carbon override silently mixes carbon `f₂` with that crystal's density; neither `feranchuk_line_flux` nor `photons_per_electron` carries a `Validation:` marker; the equation actually lives in `validation/feranchuk_spence.py::photons_per_electron`, not the ledgered wrapper. `figure_enhancement` recomputes the same bare expression (ceiling 68.5 vs escape-weighted 33.5) — that is the separate `enhancement-bulk-film` row, but the defect is shared. [validation write-up](radiation-physics/closed-form-flux.md)
 
 ## `enhancement-bulk-film`
 
 - **Claim:** bulk-vs-film line enhancement
-- **Code:** `src/pyrite/apps/anchor_figures.py::figure_enhancement`
+- **Code:** `src/pyrite/validation/anchor_figures.py::figure_enhancement`
 - **Source:** Zhai 2025
 - **Status:** unverified
 - **Checks:** —
-- **Anchor:** `src/pyrite/apps/anchor_figures.py::figure_enhancement`
+- **Anchor:** `src/pyrite/validation/anchor_figures.py::figure_enhancement`
 - **Notes:** **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — enhancement is an intensity ratio, so any prior number here was computed at the old negative-θ (mirror) grids; in the reproduced WSe₂ spot check the old negative tilt had roughly twice the positive-tilt peak (`I(+10°)/I(−10°)≈0.505`), but the enhancement itself still needs regeneration + fresh-context re-verification, not signed-off
 
 ## `zhai-material-screen-reconstruction`
@@ -215,7 +215,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `zhai-hbn-921-detected`
 
 - **Claim:** end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°)
-- **Code:** `src/pyrite/apps/anchor_figures.py::_supplementary_detected_spectrum` (+ `model_coherent_spectra`)
+- **Code:** `src/pyrite/validation/anchor_figures.py::_supplementary_detected_spectrum` (+ `model_coherent_spectra`)
 - **Source:** Zhai 2025 SI Fig. S5b
 - **Status:** discrepancy
 - **Checks:** —

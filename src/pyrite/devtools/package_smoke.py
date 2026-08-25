@@ -55,7 +55,9 @@ def _inspect_wheel(wheel: Path) -> None:
     assert "pyrite/apps/trace_app.py" in names
     assert "pyrite/apps/validation_app.py" in names
     assert "pyrite/apps/validation_defaults.json" in names
-    assert "pyrite/apps/reference_data/external_brem/v1/zhai_fig3b_25kev_1mm_brem.csv" in names
+    assert (
+        "pyrite/validation/reference_data/external_brem/v1/zhai_fig3b_25kev_1mm_brem.csv" in names
+    )
     assert "pyrite = pyrite.cli:main" in entry_points
     assert "pyrite-dev = pyrite._dev:main" in entry_points
     extras = {

@@ -123,7 +123,7 @@ coefficient. Consequently the exact difference is a single unresolved minus
 sign in the numerator; equivalence cannot be inferred merely because the
 reflection list may also contain `-hkl`.
 
-`src/pyrite/apps/anchor_figures.py::line_energy_eV` independently repeats the production
+`src/pyrite/validation/anchor_figures.py::line_energy_eV` independently repeats the production
 choice as
 
 $$

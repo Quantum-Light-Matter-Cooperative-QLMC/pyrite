@@ -51,7 +51,7 @@ by ``simulate_trajectories``'s ``straggling`` docstring paragraph:
    the cross-core claim: the same ``(seed, electron, flight, substep)`` given
    the same ``(E, s)`` inputs draws from the same stream and returns the same
    loss on lockstep, per-electron, and (by construction; see
-   ``transport_jit_kernel.py``, untestable on this machine without a CUDA
+   ``transport/_jit_kernel.py``, untestable on this machine without a CUDA
    device) CUDA cores, up to libm ulp for the last.
 """
 

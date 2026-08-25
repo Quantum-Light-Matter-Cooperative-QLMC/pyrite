@@ -1,12 +1,12 @@
 # Reference data for the validation figures
 
-Drop digitized literature curves here and `src/pyrite/apps/anchor_figures.py` overlays
+Drop digitized literature curves here and `src/pyrite/validation/anchor_figures.py` overlays
 them on the model figures automatically — turning the theory-anchored plots
 into true *model-vs-measured* comparisons with no code change.
 
 ## `zhai_fig1c.csv` — Zhai et al. Fig. 1c
 
-`src/pyrite/apps/anchor_figures.py:reference_curve()` looks for `zhai_fig1c.csv` in this
+`src/pyrite/validation/anchor_figures.py:reference_curve()` looks for `zhai_fig1c.csv` in this
 directory. If it is absent, the figure falls back to theory-only (the
 dispersion-relation line markers). If present, each series is overlaid on the
 EDS-convolved panel, scaled to the model peak for that beam energy (shape

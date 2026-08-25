@@ -18,7 +18,6 @@ def _():
 
     import marimo as mo
 
-    from pyrite.apps import anchor_figures as af
     from pyrite.apps import check as check_support
     from pyrite.apps._design import (
         configure_matplotlib_theme,
@@ -29,6 +28,7 @@ def _():
         theme_switch,
     )
     from pyrite.paths import workspace_root
+    from pyrite.validation import anchor_figures as af
 
     repo_dir = workspace_root()
     checks_dir = repo_dir / "checks"
@@ -388,7 +388,7 @@ def _(mo):
 
     Reproduces the HOPG spectra and bulk-versus-film comparison from Zhai et al.,
     *Nature Communications* **16**, 11218 (2025). If
-    `src/pyrite/apps/reference_data/zhai_fig1c.csv` is present, its digitized curves are
+    `src/pyrite/validation/reference_data/zhai_fig1c.csv` is present, its digitized curves are
     overlaid automatically. Use 20,000 line electrons and 200 bremsstrahlung
     electrons for publication-quality output. Results are cached locally by
     sample counts, experimental inputs, and implementation version.

@@ -16,7 +16,7 @@ _FIXTURES = (
     Path(__file__).resolve().parents[2]
     / "src"
     / "pyrite"
-    / "apps"
+    / "validation"
     / "reference_data"
     / "external_brem"
     / "v1"

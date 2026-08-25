@@ -778,7 +778,7 @@ def simulate_trajectories(
                     "to reach the CUDA exact per-electron core, or run off CUDA "
                     "with transport_core='per-electron' or 'lockstep'"
                 )
-            from ..transport_jit_kernel import make_cuda_transport_lut_core
+            from ._jit_kernel import make_cuda_transport_lut_core
 
             core, core_xp = make_cuda_transport_lut_core()
         else:
@@ -899,7 +899,7 @@ def simulate_trajectories(
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
         if transport_core == "cuda":
-            from ..transport_jit_kernel import make_cuda_transport_core
+            from ._jit_kernel import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()
         else:

@@ -17,17 +17,17 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 
-from pyrite.apps.feranchuk_spence import (
-    amplitudes_PXR_CBS,
-    delta_g,
-    flux_per_second,
-)
 from pyrite.materials.crystal import (
     CRYSTALS,
     Z_TABLE,
     absorption_length_ang,
     beta_from_Ee,
     chi_g,
+)
+from pyrite.validation.feranchuk_spence import (
+    amplitudes_PXR_CBS,
+    delta_g,
+    flux_per_second,
 )
 
 for el in ("Li", "F"):

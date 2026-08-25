@@ -14,7 +14,7 @@ import pytest
 @pytest.mark.parametrize(
     "module",
     [
-        "pyrite.montecarlo.transport_jit_kernel",
+        "pyrite.montecarlo.transport._jit_kernel",
         "pyrite.montecarlo.spectrum.brem_jit_kernel",
         "pyrite.montecarlo.spectrum.line_jit_kernel",
         "pyrite.montecarlo.spectrum.coherent_jit_kernel",

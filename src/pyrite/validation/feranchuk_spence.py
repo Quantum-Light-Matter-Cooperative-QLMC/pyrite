@@ -1,73 +1,37 @@
-"""
-
-feranchuk_spence.py  (checks/)
-
-
+"""The Feranchuk-Spence analytic amplitude core.
 
 Coherent X-ray radiation (PXR + coherent bremsstrahlung) from NONRELATIVISTIC
-
 electrons in a thin/absorption-limited crystal -- the Feranchuk-Spence ANALYTIC
-
-core, kept as a validation reference (the results pipeline is the Monte-Carlo in
-
-src/montecarlo.py). It builds on the general crystallography primitives in
-
-src/pyrite/materials/crystal.py (constants, CRYSTALS, structure factors, chi_g/U_g); run
-
-the checks/ scripts with src/ on sys.path so that import resolves.
-
-
+core, kept as a validation reference cited by `materials/crystal.py` and
+`montecarlo/__init__.py` (the results pipeline is the Monte-Carlo in
+`pyrite.montecarlo`). It builds on the general crystallography primitives in
+src/pyrite/materials/crystal.py (constants, CRYSTALS, structure factors, chi_g/U_g).
 
 Implements Feranchuk, Ulyanenkov, Harada & Spence, Phys. Rev. E 62, 4225 (2000):
-
   - Eq. (3):  chi_g  (non-resonant polarizability, real F(g))      [crystallography]
-
   - Eq. (4):  U_g    (crystal potential, CBS coupling, (Z-F)/g^2)  [crystallography]
-
   - Eq. (10): resonant frequencies omega_n(theta)
-
   - Eqs. (13)/(14): PXR and CBS amplitudes
-
   - Eq. (16): delta_g = A_PXR / A_CBS  (depends only on charge distribution)
-
   - Eq. (12)+(9): absolute photons/electron, absorption-limited
-
   - Eq. (18): CXR-to-bremsstrahlung-background ratio
 
-
-
 Conventions:
-
   theta_B  = angle between v0 and the PLANE NORMAL (Feranchuk-Spence Eq. 10),
-
              NOT the beam-to-plane Bragg angle. (theta_B^here = 90deg - theta_Bragg)
-
   Energies eV, lengths Angstrom, angles radians.
-
   hbar = c = 1 is used in the paper; we restore units at the boundaries.
 
-
-
 CAVEATS:
-
   * Eq. (3) is the NON-RESONANT (far-from-edge) approximation: F(g)=f0(g), drops
-
     f' and f''. Fine for carbon at 1-4 keV (K-edge 284 eV). For Si (K 1.84 keV),
-
     Ge (L 1.2-1.4 keV), Mo/Se (L 1.4-2.9 keV) with a line near an edge, use
-
     use_henke=True so chi_g and the delta_g ratio carry f'(omega).
-
   * Thin/absorption-limited regime (L_z <= L_abs), perturbative in U_g (Eq. 6).
-
     For bulk-stopping targets, set L_z = L_abs (escape-depth-limited; the
-
     saturated limit of Eq. 9). Slowing-down of the electron is NOT integrated.
-
   * Nonrelativistic isotropic-angular limit: the weak angular dependence of the
-
     polarization terms is neglected (paper, p.4). No sharp PXR lobes here.
-
 """
 
 import numpy as np

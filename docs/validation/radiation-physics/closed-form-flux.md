@@ -5,7 +5,7 @@
 - Claim: Feranchuk–Spence (2000) Eq. (12) closed-form line flux, used as the
   single-segment analytic reference against which the Monte Carlo pipeline is
   anchored.
-- Ledgered code: `src/pyrite/apps/anchor_figures.py::feranchuk_line_flux`.
+- Ledgered code: `src/pyrite/validation/anchor_figures.py::feranchuk_line_flux`.
 - Source: Feranchuk, Ulyanenkov, Harada, Spence, *Phys. Rev. E* **62**, 4225
   (2000), Eq. (12), with the Eq. (9) absorption-limited length and the
   Eq. (13)/(14) amplitudes.
@@ -212,7 +212,7 @@ The escape-length row is the failure. Everything else survives.
 The ledgered symbol is a thin wrapper. `anchor_figures.py::feranchuk_line_flux`
 resolves $\beta$, the Eq. (10) line energy, and an absorption length, then
 delegates the whole equation to
-`apps/feranchuk_spence.py::photons_per_electron`. The equation under test is
+`validation/feranchuk_spence.py::photons_per_electron`. The equation under test is
 therefore the last line of that function:
 
 ```text
@@ -380,7 +380,7 @@ existing anchor exercises.
    `photons_per_electron` carries a `Validation: closed-form-flux` back
    reference, so the code↔ledger tie is one-directional.
 3. **Ledger anchors the wrapper, not the equation.** The equation lives in
-   `apps/feranchuk_spence.py::photons_per_electron`;
+   `validation/feranchuk_spence.py::photons_per_electron`;
    `anchor_figures.py::feranchuk_line_flux` only chooses arguments.
 4. **Downstream reach of the escape-length error.**
    `anchor_figures.py::figure_enhancement` recomputes the same bare
@@ -403,7 +403,7 @@ existing anchor exercises.
   multiplicatively $1$. The anchor is structurally incapable of detecting the
   $\lvert\cos\theta_{\rm obs}\rvert$ omission.
 - **For the prefactor, the two legs are genuinely independent code.**
-  `montecarlo/spectrum/lines.py` does not import from `apps/feranchuk_spence.py`;
+  `montecarlo/spectrum/lines.py` does not import from `validation/feranchuk_spence.py`;
   the finite-segment lineshape, its normalisation, and the $\alpha$/$\hbar c$
   bookkeeping are written twice. What the two legs *do* share is the
   crystallographic layer — `materials/crystal.py` (`chi_g`, `U_g`, form

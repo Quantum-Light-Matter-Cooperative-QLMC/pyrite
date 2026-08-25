@@ -3,7 +3,7 @@
 Ledger row: [`transport-midpoint-stopping`](../physics-validation-ledger.md).
 Code: `montecarlo/transport/api.py::simulate_trajectories` (`energy_model`);
 host cores in `montecarlo/transport/cores.py`; exact CUDA core in
-`montecarlo/transport_jit_kernel.py`.
+`montecarlo/transport/_jit_kernel.py`.
 
 ## Claim
 

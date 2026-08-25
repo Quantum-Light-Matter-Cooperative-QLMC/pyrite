@@ -31,8 +31,8 @@ from dataclasses import dataclass
 import cupy as xp
 import numpy as np
 
-from ._cupy_jit import jit
-from .geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
+from .._cupy_jit import jit
+from ..geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
 
 F64_ZERO = np.float64(0.0)
 F64_HALF = np.float64(0.5)

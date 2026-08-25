@@ -7,7 +7,7 @@ DTSA-II” names simulation software, not one canonical NIST dataset or spectrum
 
 ## Versioned Zhai fixture
 
-`src/pyrite/apps/reference_data/external_brem/v1/` preserves Zhai et al. Figure 3b's
+`src/pyrite/validation/reference_data/external_brem/v1/` preserves Zhai et al. Figure 3b's
 25 keV, 1 mm HOPG, 0.066 sr condition. Numeric strings were copied without
 modification from authors' deposited DR-NTU dataset:
 

@@ -1,4 +1,4 @@
-"""Fast unit tests for src/pyrite/apps/anchor_figures.py (the P1 #2 validation figures).
+"""Fast unit tests for src/pyrite/validation/anchor_figures.py (the P1 #2 validation figures).
 
 The heavy MC figure run lives in checks/; here we test only the cheap, pure
 pieces -- theory anchors, the reference-CSV loader, series matching, the
@@ -16,9 +16,9 @@ import pytest
 
 matplotlib.use("Agg")  # headless; no display in CI
 
-from pyrite.apps import anchor_figures as af
 from pyrite.detectors import Detector, LegacyEDS
 from pyrite.montecarlo import convolve_detector, detector_efficiency
+from pyrite.validation import anchor_figures as af
 
 _APP_RESOURCES = Path(af.__file__).resolve().parent
 _CHECKS = Path(__file__).resolve().parents[2] / "checks"

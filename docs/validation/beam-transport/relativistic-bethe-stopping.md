@@ -4,7 +4,7 @@
 - **anchor**: `montecarlo/transport.py::_dEds_bs_compound_scalar`,
   `::_dEds_spliced_compound_scalar`, `::_dEds_spliced_packed_scalar`,
   `::_bs_joy_luo_crossover_keV`, `::spliced_stopping_keV_per_ang`,
-  `::build_transport_energy_lut`; `montecarlo/transport_jit_kernel.py::_dEds_packed`;
+  `::build_transport_energy_lut`; `montecarlo/transport/_jit_kernel.py::_dEds_packed`;
   `montecarlo/spectrum/lines.py::_spliced_stopping_magnitude_xp`
 - **source**: ICRU Report 37 (1984); Berger & Seltzer, NBSIR 82-2550 (1982);
   PDG *Atomic and Nuclear Properties* (mean excitation energies, Sternheimer
@@ -189,7 +189,7 @@ divergence.
 | $\delta$ handling | subtracted inside the bracket | `... + f_minus - delta` | identical (every call site passes `delta=0.0`; a documented, measured-bound approximation, out of scope for this claim's `Code:` list) |
 | crossover solve | bisection on $g(E)=0$, $(Z,J)$-only | `_bs_joy_luo_crossover_keV`: bisection from `lo=2J` to `hi=300`, 200 iterations | identical (bisection bracket choice differs from mine but both bracket the same root; see §5) |
 | splice routing | per-element, own crossover, additive | `_dEds_spliced_compound_scalar`/`_dEds_spliced_packed_scalar`: `if E_i < E_cross_arr[i]: joy_luo_total += ... else: bs_total += ...`, then `-7.85e-4/E_i*joy_luo_total - _BS_PREFACTOR/beta_sq*bs_total` | identical |
-| device/vector twins | same closed form, same routing | `transport_jit_kernel.py::_dEds_packed` (device, float64 constants), `spectrum/lines.py::_spliced_stopping_magnitude_xp` (host/device array twin) | identical construction of $\tau,\gamma,\beta^2,F^-$ and the same two-branch sum, checked by inspection |
+| device/vector twins | same closed form, same routing | `transport/_jit_kernel.py::_dEds_packed` (device, float64 constants), `spectrum/lines.py::_spliced_stopping_magnitude_xp` (host/device array twin) | identical construction of $\tau,\gamma,\beta^2,F^-$ and the same two-branch sum, checked by inspection |
 | `build_transport_energy_lut` | tabulate the closed form on a uniform energy grid, linear-interpolate at runtime | delegates to the same per-element/spliced kernels to fill `dEds`; no new physics, a numerical-method (grid+lerp) layer only | identical (nothing to re-derive beyond §2.1–2.5) |
 
 No divergent factor, sign, exponent, unit, or convention found in any listed

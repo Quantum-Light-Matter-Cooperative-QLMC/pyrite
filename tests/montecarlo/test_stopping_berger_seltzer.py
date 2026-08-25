@@ -426,8 +426,8 @@ def test_cutoff_solve_is_well_posed_across_the_crossover(transport_core):
 
 
 # ---- the CUDA twin ----------------------------------------------------------
-# transport_jit_kernel imports cupy at module scope, so without a GPU it cannot
-# even be imported, let alone run -- its own tests skip. The repository's
+# transport/_jit_kernel.py imports cupy at module scope, so without a GPU it
+# cannot even be imported, let alone run -- its own tests skip. The repository's
 # existing precedent for this (test_cuda_source_uses_cpu_reference_cutoff_and_
 # termination_rules) is to read the source as text; that check covers the cutoff
 # and termination control flow but says nothing about the stopping arithmetic.
@@ -436,14 +436,9 @@ def test_cutoff_solve_is_well_posed_across_the_crossover(transport_core):
 
 
 def _jit_kernel_source():
-    from pathlib import Path
+    from importlib import resources
 
-    from pyrite.montecarlo import transport
-
-    # transport.__file__ is the transport/ package's __init__.py; its parent is
-    # the transport/ package dir, and transport_jit_kernel.py is a sibling of
-    # that package (still directly under montecarlo/).
-    return Path(transport.__file__).parent.with_name("transport_jit_kernel.py").read_text()
+    return resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
 
 
 def test_cuda_stopping_constants_match_the_cpu_values():

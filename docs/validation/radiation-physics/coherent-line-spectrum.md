@@ -421,7 +421,7 @@ intensity average over a Gauss–Hermite quadrature whose weights sum to unity
 and which collapses to the perfect crystal as $\eta\to0$.
 
 Verdict: `rederived`. Not `anchored` — the ledgered anchor
-`src/pyrite/apps/anchor_figures.py::single_segment_anchor` compares
+`src/pyrite/validation/anchor_figures.py::single_segment_anchor` compares
 `mc_spectrum` against another implementation helper
 (`feranchuk_line_flux`, itself the `unverified` `closed-form-flux` row) and is
 not a CI-green regression test on this row's normalization. Not `signed-off`;
