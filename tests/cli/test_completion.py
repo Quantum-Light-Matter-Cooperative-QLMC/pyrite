@@ -283,7 +283,7 @@ def test_remote_checkpoint_completion_includes_positional_profiles():
 
 
 def test_line_grid_wires_safe_completion_but_not_stop_target():
-    from pyrite.energy_grid import command
+    from pyrite.cli.commands.energy_grid import command
 
     for name in ("derive", "submit", "apply"):
         assert (

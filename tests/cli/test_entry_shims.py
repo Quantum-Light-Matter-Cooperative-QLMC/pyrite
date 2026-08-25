@@ -10,11 +10,24 @@ from types import ModuleType
 import pytest
 
 
-def test_energy_grid_command_adapter_exports_domain_command():
-    adapter = importlib.import_module("pyrite.cli.commands.energy_grid")
-    implementation = importlib.import_module("pyrite.energy_grid")
+def test_energy_grid_command_lives_in_cli_and_not_in_the_domain_package():
+    """The command group moved out of ``energy_grid`` to break its cycle with ``cli``.
 
-    assert adapter.command is implementation.command
+    ``energy_grid`` must not grow a Click surface again: it is imported on the
+    Monte Carlo hot path, and re-exporting the group is what put the two
+    packages in an import cycle.
+    """
+    import click
+
+    from pyrite.cli import _COMMANDS
+
+    command = importlib.import_module("pyrite.cli.commands.energy_grid").command
+    domain = importlib.import_module("pyrite.energy_grid")
+
+    assert isinstance(command, click.Group)
+    assert _COMMANDS["energy-grid"] == "pyrite.cli.commands.energy_grid.command"
+    assert not hasattr(domain, "command")
+    assert not any(isinstance(value, click.Command) for value in vars(domain).values())
 
 
 def test_cli_module_entry_point_delegates_to_main(monkeypatch):

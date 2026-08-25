@@ -7,10 +7,10 @@ import pytest
 
 from pyrite.apps import analyze, check, export, viewer
 from pyrite.checkpoints import _checkpoint_io, archive, slim
+from pyrite.cli.commands import check_config
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands.scan import performance_command
 from pyrite.runs import blaze, scan
-from pyrite.validation import check_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [

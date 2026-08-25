@@ -1,26 +1,14 @@
-"""Photon-energy-grid derivation, encoding, and the ``pyrite energy-grid`` group.
+"""Photon-energy-grid derivation, encoding, and artifact application.
 
-The package init stays lightweight: derivation submodules
+The package stays lightweight and Click-free: derivation submodules
 (``apply``/``bounds``/``defaults``/``derive``/``golden``/``job``/``provenance``)
 and the case-grid ``encoding`` helpers import without pulling Click or the remote
-layer, so the Monte Carlo hot path is unaffected. The heavy Click command group
-lives in :mod:`pyrite.energy_grid._command` and is exposed lazily as
-``command`` via ``__getattr__`` so ``pyrite`` startup and scan workers stay cheap.
+layer, so the Monte Carlo hot path is unaffected.
+
+The ``pyrite energy-grid`` command group lives in
+:mod:`pyrite.cli.commands.energy_grid` with every other CLI surface. It used to
+sit here as ``_command`` and be re-exported lazily, which put this package and
+``cli`` in an import cycle; nothing in this package reaches up to it now.
 """
 
 from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pyrite.energy_grid._command import command as command
-
-__all__ = ["command"]
-
-
-def __getattr__(name: str):
-    if name == "command":
-        from pyrite.energy_grid._command import command
-
-        return command
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

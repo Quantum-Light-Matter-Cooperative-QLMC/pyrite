@@ -1,3 +1,3 @@
-"""Compatibility re-export for :mod:`pyrite.validation.check_config`."""
+"""Compatibility re-export for :mod:`pyrite.cli.commands.check_config`."""
 
-from .validation.check_config import *  # noqa: F401,F403
+from .cli.commands.check_config import *  # noqa: F401,F403

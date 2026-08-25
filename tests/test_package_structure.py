@@ -15,7 +15,7 @@ _COMPAT_MODULES = {
     "blaze": "runs.blaze",
     "campaign_lock": "checkpoints.campaign_lock",
     "check": "apps.check",
-    "check_config": "validation.check_config",
+    "check_config": "cli.commands.check_config",
     "checkpoint_cleanup": "checkpoints.checkpoint_cleanup",
     "config": "campaign.config",
     "export": "apps.export",
@@ -89,7 +89,9 @@ def test_root_module_reexports(legacy_name: str, canonical_name: str) -> None:
 
     assert stable_exports
     assert all(getattr(legacy, name) is getattr(canonical, name) for name in stable_exports)
-    assert Path(canonical.__file__).parent.name == canonical_name.split(".")[0]
+    # The canonical module must live in the package its dotted path names, so a
+    # shim cannot quietly start pointing somewhere else in the tree.
+    assert Path(canonical.__file__).parent.name == canonical_name.rsplit(".", 2)[-2]
 
 
 def test_remote_facade_is_the_public_package() -> None:

@@ -5,12 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from pyrite import energy_grid
 from pyrite.cli import _core as _cli_core
 from pyrite.cli._deprecations import message
+from pyrite.cli.commands import energy_grid
 from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
 from pyrite.devtools.cli_commands import energy_grid_command as dev_energy_grid_command
-from pyrite.energy_grid import _command
 from pyrite.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -49,7 +48,7 @@ def _invoke_grid(argv, **kwargs):
         if argv[1] == "set":
             return invoke(dev_energy_grid_command, argv, **kwargs)
     if head == "regen-golden":
-        return invoke(_command.regen_golden_command, argv[1:], **kwargs)
+        return invoke(energy_grid.regen_golden_command, argv[1:], **kwargs)
     return invoke(energy_grid.command, argv, **kwargs)
 
 
@@ -114,7 +113,7 @@ def test_standalone_module_entry_points_remain_available(module):
 def test_click_status_delegates_with_detail(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        _command.remote,
+        energy_grid.remote,
         "job_status",
         lambda jobid=None, detail=0: seen.update(jobid=jobid, detail=detail),
     )
@@ -130,11 +129,11 @@ def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
 
     def status(args):
         seen.update(vars(args))
-        _command.emit_json_result(
-            _command.cli_json.JsonResult("cxr.remote.status", {"job": {"job_id": args.jobid}})
+        energy_grid.emit_json_result(
+            energy_grid.cli_json.JsonResult("cxr.remote.status", {"job": {"job_id": args.jobid}})
         )
 
-    monkeypatch.setattr(_command.remote, "_cli_status", status)
+    monkeypatch.setattr(energy_grid.remote, "_cli_status", status)
 
     result = _invoke_grid(["job", "status", "job7", "-o", "json"])
 
@@ -145,7 +144,7 @@ def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_follow_logs_propagates_remote_exit_status(monkeypatch, status):
-    monkeypatch.setattr(_command.remote, "tail_logs", lambda _jobid, _follow: status)
+    monkeypatch.setattr(energy_grid.remote, "tail_logs", lambda _jobid, _follow: status)
 
     result = _invoke_grid(["job", "logs", "--follow"])
 
@@ -278,10 +277,10 @@ def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
         lambda **kwargs: seen.update(kwargs, host=remote_config.remote_host()) or "job7",
     )
     monkeypatch.setattr(
-        _command.remote, "attach", lambda jobid: seen.update(attached=jobid) or True
+        energy_grid.remote, "attach", lambda jobid: seen.update(attached=jobid) or True
     )
-    monkeypatch.setattr(_command.remote, "_job_succeeded", lambda jobid: jobid == "job7")
-    monkeypatch.setattr(_command, "_pull_combined", lambda *, dest_dir: "bounds.json")
+    monkeypatch.setattr(energy_grid.remote, "_job_succeeded", lambda jobid: jobid == "job7")
+    monkeypatch.setattr(energy_grid, "_pull_combined", lambda *, dest_dir: "bounds.json")
     monkeypatch.setattr(
         energy_grid.apply, "add_file", lambda path, **kwargs: seen.update(path=path, **kwargs)
     )
@@ -325,7 +324,7 @@ def test_click_derive_remote_detach_skips_attach(monkeypatch):
     )
     monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs) or "job7")
     monkeypatch.setattr(
-        _command.remote,
+        energy_grid.remote,
         "attach",
         lambda _jobid: (_ for _ in ()).throw(AssertionError("must not attach")),
     )
@@ -369,8 +368,8 @@ def test_click_derive_remote_save_default_persists_locally(monkeypatch):
 
 def test_click_derive_remote_failed_job_exits_nonzero(monkeypatch):
     monkeypatch.setattr(energy_grid.job, "start", lambda **_kwargs: "job7")
-    monkeypatch.setattr(_command.remote, "attach", lambda _jobid: True)
-    monkeypatch.setattr(_command.remote, "_job_succeeded", lambda _jobid: False)
+    monkeypatch.setattr(energy_grid.remote, "attach", lambda _jobid: True)
+    monkeypatch.setattr(energy_grid.remote, "_job_succeeded", lambda _jobid: False)
 
     result = _invoke_grid(["derive", "--remote"])
 
@@ -416,7 +415,7 @@ def test_click_add_pull_stages_into_a_removed_temp_dir(monkeypatch, tmp_path):
         return str(local)
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(_command, "_pull_combined", fake_pull)
+    monkeypatch.setattr(energy_grid, "_pull_combined", fake_pull)
     monkeypatch.setattr(
         energy_grid.apply, "add_file", lambda path, **kw: seen.update(existed=Path(path).is_file())
     )
@@ -431,7 +430,7 @@ def test_click_add_pull_stages_into_a_removed_temp_dir(monkeypatch, tmp_path):
 
 def test_click_add_dispatches_with_pull_force_and_resolved_profile(monkeypatch):
     seen = {}
-    monkeypatch.setattr(_command, "_pull_combined", lambda *, dest_dir: "combined.json")
+    monkeypatch.setattr(energy_grid, "_pull_combined", lambda *, dest_dir: "combined.json")
     monkeypatch.setattr(
         energy_grid.apply, "add_file", lambda path, **kw: seen.update(path=path, **kw)
     )
@@ -639,7 +638,7 @@ def test_click_line_delete_is_hidden_warning_alias_for_rm(monkeypatch):
 
 def test_click_verify_reports_integrity_and_failures(monkeypatch):
     monkeypatch.setattr(
-        _command.artifact_gc,
+        energy_grid.artifact_gc,
         "verify_artifacts",
         lambda *args, **kwargs: SimpleNamespace(ok=True, inventory=("a",), roots=("a",), issues=()),
     )
@@ -648,7 +647,7 @@ def test_click_verify_reports_integrity_and_failures(monkeypatch):
 
     issue = SimpleNamespace(digest="d" * 64, source="catalog", message="is missing")
     monkeypatch.setattr(
-        _command.artifact_gc,
+        energy_grid.artifact_gc,
         "verify_artifacts",
         lambda *args, **kwargs: SimpleNamespace(
             ok=False, inventory=(), roots=("d" * 64,), issues=(issue,)
@@ -663,10 +662,10 @@ def test_click_verify_reports_integrity_and_failures(monkeypatch):
 def test_click_gc_previews_non_tty_and_yes_executes_exact_plan(monkeypatch):
     candidate = SimpleNamespace(path=Path("store/aa/artifact.json"), digest="a" * 64)
     plan = SimpleNamespace(candidates=(candidate,), retained=("b" * 64,))
-    monkeypatch.setattr(_command.artifact_gc, "plan_gc", lambda *args, **kwargs: plan)
+    monkeypatch.setattr(energy_grid.artifact_gc, "plan_gc", lambda *args, **kwargs: plan)
     executed = []
     monkeypatch.setattr(
-        _command.artifact_gc,
+        energy_grid.artifact_gc,
         "execute_gc",
         lambda selected: executed.append(selected) or (candidate.path,),
     )
@@ -757,11 +756,11 @@ def test_click_rm_expected_failure_uses_stderr(monkeypatch):
 
 def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     calls = []
-    monkeypatch.setattr(_command.remote.config, "HOST", "qlmc")
-    monkeypatch.setattr(_command.remote.config, "REMOTE_DIR", "/srv/pyrite data")
-    monkeypatch.setattr(_command.remote, "_run", lambda command: calls.append(command))
+    monkeypatch.setattr(energy_grid.remote.config, "HOST", "qlmc")
+    monkeypatch.setattr(energy_grid.remote.config, "REMOTE_DIR", "/srv/pyrite data")
+    monkeypatch.setattr(energy_grid.remote, "_run", lambda command: calls.append(command))
 
-    local = _command._pull_combined("bounds-result.json", dest_dir="/tmp/pull-dest")
+    local = energy_grid._pull_combined("bounds-result.json", dest_dir="/tmp/pull-dest")
 
     assert local == "/tmp/pull-dest/bounds-result.json"
     assert calls == [
@@ -778,8 +777,8 @@ def test_click_stop_requires_explicit_target():
 
 def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
     seen = {}
-    monkeypatch.setattr(_command.remote, "_latest_jobid", lambda: "job9")
-    monkeypatch.setattr(_command.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
+    monkeypatch.setattr(energy_grid.remote, "_latest_jobid", lambda: "job9")
+    monkeypatch.setattr(energy_grid.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
 
     preview = _invoke_grid(["job", "stop", "--latest"])
     confirmed = _invoke_grid(["job", "stop", "--latest", "-y"])
@@ -796,8 +795,8 @@ def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
 def test_click_stop_prompts_on_tty(monkeypatch):
     seen = {}
     monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
-    monkeypatch.setattr(_command.remote, "_latest_jobid", lambda: "job9")
-    monkeypatch.setattr(_command.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
+    monkeypatch.setattr(energy_grid.remote, "_latest_jobid", lambda: "job9")
+    monkeypatch.setattr(energy_grid.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
 
     declined = _invoke_grid(["job", "stop", "--latest"], input="n\n")
     accepted = _invoke_grid(["job", "stop", "--latest"], input="y\n")

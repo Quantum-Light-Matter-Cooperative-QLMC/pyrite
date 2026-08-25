@@ -84,7 +84,7 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   inspect effective ranges and edit per-profile material overrides. `pyrite material
   blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility
   aliases remain under `pyrite sweep`.
-- **`pyrite material validate [catalog]`** → `check_config:_run`: validate bundled
+- **`pyrite material validate [catalog]`** → `cli.commands.check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation;
   hidden alias: `pyrite check-config`.
 - **`pyrite checkpoint ...`** → `cli.commands.checkpoint:command`: grouped local checkpoint
@@ -518,10 +518,13 @@ compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
 `pyrite material` and `pyrite profile`).
 - `encoding.py` (was `_energy_grid.py`) is the hot-path leaf: `encode_energy_grid`
   / `decode_energy_grid`, imported by `sweep`, `run`, `montecarlo.runner`.
-- `_command.py` holds the 700-line Click group (eager `click`, `remote`, `cli`);
-  `__init__.py` is thin and exposes `command` lazily via `__getattr__` so
-  hot-path `energy_grid.encoding` imports stay Click-free. Monkeypatch seams for
-  `remote`/`cli_json`/`emit_json_result` live on `_command`, not the package.
+- The `pyrite energy-grid` Click group lives in `cli/commands/energy_grid.py`
+  with every other CLI surface — it used to sit here as `_command.py` and be
+  re-exported lazily, which put this package and `cli` in an import cycle. This
+  package is now Click-free and reaches up to nothing, so hot-path
+  `energy_grid.encoding` imports stay cheap by construction rather than by a
+  lazy `__getattr__`. Monkeypatch seams for `remote`/`cli_json`/
+  `emit_json_result` live on the command module.
 - The artifact store itself lives at `pyrite._energy_grid_artifacts` (below this
   package; see Core physics), because `materials.catalog` reads it too. `gc.py`
   resolves profile/campaign-lock reachability, out-of-band orphan ages, preview
@@ -746,12 +749,12 @@ path, `DeprecatingGroup(click.Group)` that warns once per invocation in
 - Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`,
   `invocation_path`, `SUPPORT_WINDOW_MINORS`.
 - Wired into `cli/_core.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`,
-  `cli/commands/sweep.py`, `energy_grid/_command.py`, `remote/cli.py`.
+  `cli/commands/sweep.py`, `cli/commands/energy_grid.py`, `remote/cli.py`.
 
 ### `cli/commands/`
 One module per `pyrite` subcommand group, holding only the Click layer.
 `scan`/`blaze` command wiring split out of the fused `scan.py`/`blaze.py`
-drivers; `energy_grid` registers the domain-owned implementation; `profile`
+drivers; `energy_grid` owns the whole `pyrite energy-grid` group; `profile`
 owns named campaign defaults and membership; `material` owns effective-range
 inspection and per-profile overrides; `beam` owns named `[beams.*]` objects;
 `sweep` is hidden compatibility aliases
@@ -876,10 +879,14 @@ and export consumers are cache-only and direct misses to
   `detector_metadata`.
 - Deps: `detectors.Detector`.
 
-### `validation/check_config.py`
-`pyrite material validate` implementation for the bundled material catalog or
-an explicit full catalog without importing GPU-heavy CLI modules.
-- Public: `add_subparser`, `main`.
+### `cli/commands/check_config.py`
+`pyrite material validate` (hidden alias `pyrite check-config`): load the
+bundled material catalog or an explicit full catalog and print a one-line
+summary. No simulation, network access, or GPU probe. Body and Click wiring are
+both here; the body used to live in `validation/`, which had to reach up into
+`cli._core` for its output helpers — the whole of the `validation` ↔ `cli`
+import cycle.
+- Public: `command`; internal `_run`.
 
 ### `remote/`
 Optional SSH/SLURM orchestration for configured lab box: sync, bounded and

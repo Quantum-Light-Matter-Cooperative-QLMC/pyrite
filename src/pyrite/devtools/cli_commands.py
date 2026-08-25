@@ -32,12 +32,12 @@ def performance_command() -> None:
     cls=LazyGroup,
     deprecation_prefix="pyrite-dev energy-grid",
     lazy_commands={
-        "add": "pyrite.energy_grid._command.add_command",
+        "add": "pyrite.cli.commands.energy_grid.add_command",
         "line": "pyrite.devtools.cli_commands.energy_grid_line_command",
         "brem": "pyrite.devtools.cli_commands.energy_grid_brem_command",
-        "rm": "pyrite.energy_grid._command.rm_command",
-        "verify": "pyrite.energy_grid._command.verify_command",
-        "gc": "pyrite.energy_grid._command.gc_command",
+        "rm": "pyrite.cli.commands.energy_grid.rm_command",
+        "verify": "pyrite.cli.commands.energy_grid.verify_command",
+        "gc": "pyrite.cli.commands.energy_grid.gc_command",
     },
     lazy_help={
         "add": "Add immutable derived-grid artifacts and repoint one profile.",
@@ -57,7 +57,7 @@ def energy_grid_command() -> None:
     "line",
     cls=LazyGroup,
     deprecation_prefix="pyrite-dev energy-grid line",
-    lazy_commands={"set": "pyrite.energy_grid._command.set_command"},
+    lazy_commands={"set": "pyrite.cli.commands.energy_grid.set_command"},
     lazy_help={"set": "Set one line-grid row by repointing an immutable artifact."},
     no_args_is_help=True,
 )
@@ -69,7 +69,7 @@ def energy_grid_line_command() -> None:
     "brem",
     cls=LazyGroup,
     deprecation_prefix="pyrite-dev energy-grid brem",
-    lazy_commands={"set": "pyrite.energy_grid._command.set_brem_command"},
+    lazy_commands={"set": "pyrite.cli.commands.energy_grid.set_brem_command"},
     lazy_help={"set": "Set a bremsstrahlung grid by repointing an immutable artifact."},
     no_args_is_help=True,
 )
