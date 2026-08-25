@@ -426,26 +426,27 @@ def test_cutoff_solve_is_well_posed_across_the_crossover(transport_core):
 
 
 # ---- the CUDA twin ----------------------------------------------------------
-# transport/_jit_kernel.py imports cupy at module scope, so without a GPU it
+# transport/_jit_device.py imports cupy at module scope, so without a GPU it
 # cannot even be imported, let alone run -- its own tests skip. The repository's
 # existing precedent for this (test_cuda_source_uses_cpu_reference_cutoff_and_
 # termination_rules) is to read the source as text; that check covers the cutoff
 # and termination control flow but says nothing about the stopping arithmetic.
 # These pin the part that changed. They are NOT a substitute for running the
-# kernel on a device.
+# kernel on a device. The stopping constants and `_dEds_packed` live in
+# `_jit_device.py`, beside the other device-side helpers the kernels call.
 
 
-def _jit_kernel_source():
+def _jit_device_source():
     from importlib import resources
 
-    return resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
+    return resources.files("pyrite.montecarlo.transport").joinpath("_jit_device.py").read_text()
 
 
 def test_cuda_stopping_constants_match_the_cpu_values():
     """A constant edited on one side only is the drift this path is exposed to."""
     import re
 
-    source = _jit_kernel_source()
+    source = _jit_device_source()
     declared = dict(re.findall(r"^(F64_\w+) = np\.float64\(([^)]+)\)", source, re.MULTILINE))
     assert float(declared["F64_MC2_KEV"]) == _MC2_KEV
     assert float(declared["F64_BS_PREFACTOR"]) == _BS_PREFACTOR
@@ -456,7 +457,7 @@ def test_cuda_stopping_constants_match_the_cpu_values():
 
 def test_cuda_stopping_keeps_the_per_element_splice():
     """The device loop must branch per element on its own crossover, not globally."""
-    source = _jit_kernel_source()
+    source = _jit_device_source()
     start = source.index("def _dEds_packed(")
     body = source[start : source.index("\n@", start)]
 

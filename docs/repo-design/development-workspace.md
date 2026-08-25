@@ -82,7 +82,8 @@ the same way. `--numba` must come before other forwarded arguments; it sets
 `geometry.py`, `groove.py`) run under the Python tracer instead of compiled,
 at roughly 2x wall clock. Read the resulting totals against the two
 compiled-code caveats documented next to `[tool.coverage.report]` in
-`pyproject.toml`: the CuPy kernel modules (`montecarlo/*_jit_kernel.py`)
+`pyproject.toml`: the CuPy kernel modules (`montecarlo/transport/_jit_*.py`,
+`montecarlo/spectrum/*_jit_kernel.py`)
 report 0% on any environment without the `nvidia` extra, and `@njit` bodies
 need `--numba` to be measured at all.
 

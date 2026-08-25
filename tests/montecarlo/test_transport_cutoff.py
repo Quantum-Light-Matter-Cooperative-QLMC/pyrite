@@ -157,11 +157,14 @@ def test_population_cutoff_clips_length_and_midpoint_but_not_start_state():
 
 def test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules():
     cpu_source = inspect.getsource(transport_module._transport_core_ungrooved_perelectron)
-    # Read the CUDA kernel module's source as text rather than importing it:
-    # it does a module-scope `import cupy`, so an ordinary import would fail
-    # outright on a CPU-only machine.
-    cuda_source = (
-        resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
+    # Read the CUDA kernel modules' source as text rather than importing them:
+    # they do a module-scope `import cupy`, so an ordinary import would fail
+    # outright on a CPU-only machine. The control flow lives in `_jit_kernel.py`
+    # and the exit codes it writes in `_jit_device.py`, so both are read.
+    transport_package = resources.files("pyrite.montecarlo.transport")
+    cuda_source = "\n".join(
+        transport_package.joinpath(name).read_text()
+        for name in ("_jit_device.py", "_jit_kernel.py")
     )
     for source in (cpu_source, cuda_source):
         assert "cutoff_distance = (E_cut_e - E_j) / dEds" in source

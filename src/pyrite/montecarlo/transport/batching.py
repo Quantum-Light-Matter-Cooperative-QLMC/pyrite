@@ -267,7 +267,7 @@ def _cuda_transport_available():
     if BACKEND.name != "cuda":
         return False
     try:
-        from ._jit_kernel import make_cuda_transport_core  # noqa: F401
+        from ._jit_launch import make_cuda_transport_core  # noqa: F401
     except Exception as error:  # pragma: no cover - needs a broken CuPy install
         logger.warning("CUDA transport kernel unavailable, using the CPU core: %s", error)
         return False

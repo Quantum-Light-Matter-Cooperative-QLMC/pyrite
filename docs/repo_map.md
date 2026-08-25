@@ -384,13 +384,16 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   transport integration](repo-design/compute/straggled-transport-integration.md);
   `cores.py` carries only the resulting invariants at each site.
   Deps: `materials.attenuation`, `DATA_DIR`.
-- `transport._jit_kernel` — the `cupyx.jit` port of
-  `transport._transport_core_ungrooved_perelectron`: one thread per electron,
-  run to completion, output slots addressed by electron index. Same arithmetic
-  CPU core, so the two stay one algorithm. Kept out of `__init__.py`'s eager
-  imports — `api.py` and `batching.py` reach it only through deferred,
-  function-local imports — so its module-scope `cupy` import cannot break
-  CPU-only startup. See `docs/repo-design/compute/gpu-transport-rawkernel.md`.
+- `transport._jit_device` / `transport._jit_kernel` / `transport._jit_launch` —
+  the `cupyx.jit` port of `transport._transport_core_ungrooved_perelectron`: one
+  thread per electron, run to completion, output slots addressed by electron
+  index. Same arithmetic as the CPU core, so the two stay one algorithm. Layered
+  device helpers and constants (`_jit_device`) → the two `__global__` kernels
+  (`_jit_kernel`) → host launchers and launch geometry (`_jit_launch`). All three
+  are kept out of `__init__.py`'s eager imports — `api.py` and `batching.py`
+  reach `_jit_launch` only through deferred, function-local imports — so their
+  module-scope `cupy` import cannot break CPU-only startup. See
+  `docs/repo-design/compute/gpu-transport-rawkernel.md`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum/` — compatibility package for the former flat module. `lines.py`

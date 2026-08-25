@@ -2,7 +2,11 @@
 
 This reference follows the arithmetic and control flow of the two CUDA
 transport kernels in
-[`transport/_jit_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_kernel.py):
+[`transport/_jit_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_kernel.py),
+whose device-side constants and helpers live in
+[`transport/_jit_device.py`](../../../src/pyrite/montecarlo/transport/_jit_device.py)
+and whose host launchers live in
+[`transport/_jit_launch.py`](../../../src/pyrite/montecarlo/transport/_jit_launch.py):
 
 - `_transport_kernel` evaluates elastic rates, stopping power, and optional
   Urban energy-loss straggling directly;

@@ -340,7 +340,7 @@ def test_launcher_signature_tracks_the_reference_core():
     import inspect
 
     from pyrite.montecarlo.transport import _transport_core_ungrooved_perelectron
-    from pyrite.montecarlo.transport._jit_kernel import run_transport_kernel
+    from pyrite.montecarlo.transport._jit_launch import run_transport_kernel
 
     reference = list(inspect.signature(_transport_core_ungrooved_perelectron.py_func).parameters)
     launcher = [
@@ -361,11 +361,11 @@ def test_cuda_core_is_deterministic():
 @requires_cuda
 @pytest.mark.parametrize("nthreads", [32, 128, 512])
 def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, monkeypatch):
-    from pyrite.montecarlo.transport import _jit_kernel as tjk
+    from pyrite.montecarlo.transport import _jit_launch as tjl
 
     base = _run(transport_core="cuda")
     monkeypatch.setattr(
-        tjk, "DEFAULT_TRANSPORT_KERNEL_CONFIG", tjk.TransportKernelConfig(nthreads=nthreads)
+        tjl, "DEFAULT_TRANSPORT_KERNEL_CONFIG", tjl.TransportKernelConfig(nthreads=nthreads)
     )
     assert _identical(base, _run(transport_core="cuda"))
 

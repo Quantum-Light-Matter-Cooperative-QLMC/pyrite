@@ -61,7 +61,7 @@ def test_cuda_lut_core_raises_rather_than_running_unstraggled():
     (the default LUT configuration) must raise ``NotImplementedError``.
 
     This runs without a CUDA device because the guard sits in
-    ``simulate_trajectories`` ahead of the ``transport._jit_kernel`` import, by
+    ``simulate_trajectories`` ahead of the ``transport._jit_launch`` import, by
     construction: the point of a fail-closed guard is that it fires before
     anything device-specific is reached. The message must name both escapes so
     a caller who hits it can act on it.

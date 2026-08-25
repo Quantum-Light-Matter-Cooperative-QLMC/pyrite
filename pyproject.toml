@@ -146,8 +146,9 @@ exclude_also = [
 ]
 # No `omit` for the compiled paths; read totals with the environment in mind
 # instead of hiding modules.
-#   - `montecarlo/*_jit_kernel.py` import `cupy` at module scope, so a CPU-only
-#     environment reports them 0% (never imported) and the project total drops
+#   - the CUDA kernel modules (`montecarlo/transport/_jit_*.py` and
+#     `montecarlo/spectrum/*_jit_kernel.py`) import `cupy` at module scope, so
+#     a CPU-only environment reports them 0% (never imported) and the total drops
 #     ~7 points. With the `nvidia` extra installed their host-side code is
 #     measured; `cupyx.jit` device bodies stay untraceable regardless.
 #   - `@njit` bodies (`montecarlo/transport.py`, `geometry.py`, `groove.py`)
@@ -169,7 +170,9 @@ include = ["src"]
 
 [[tool.ty.overrides]]
 include = [
+    "src/pyrite/montecarlo/transport/_jit_device.py",
     "src/pyrite/montecarlo/transport/_jit_kernel.py",
+    "src/pyrite/montecarlo/transport/_jit_launch.py",
     "src/pyrite/montecarlo/runner/__init__.py",
     "src/pyrite/montecarlo/spectrum/*_jit_kernel.py",
 ]
