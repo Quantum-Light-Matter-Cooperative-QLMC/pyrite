@@ -44,34 +44,40 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 ```text
 Components (a + b denotes a static import cycle):
   p0: _entry
-  p1: apps + campaign + checkpoints + cli + energy_grid + remote + runs
-  p2: detectors + instrument + montecarlo
-  p3: devtools
-  p4: materials
-  p5: perf
-  p6: plots
-  p7: results
-  p8: validation
+  p1: apps + checkpoints + cli + energy_grid + remote + runs
+  p2: campaign
+  p3: detectors + instrument + montecarlo
+  p4: devtools
+  p5: materials
+  p6: perf
+  p7: plots
+  p8: results
+  p9: validation
 Edges (importer -> imported):
   p0 -> p1
-  p0 -> p4
+  p0 -> p5
   p1 -> p2
-  p1 -> p4
+  p1 -> p3
   p1 -> p5
   p1 -> p6
   p1 -> p7
   p1 -> p8
-  p2 -> p4
-  p3 -> p1
-  p3 -> p6
-  p3 -> p7
-  p6 -> p2
-  p6 -> p4
-  p6 -> p7
-  p7 -> p2
-  p7 -> p4
-  p8 -> p2
-  p8 -> p4
+  p1 -> p9
+  p2 -> p3
+  p2 -> p5
+  p2 -> p8
+  p3 -> p5
+  p4 -> p1
+  p4 -> p2
+  p4 -> p7
+  p4 -> p8
+  p7 -> p3
+  p7 -> p5
+  p7 -> p8
+  p8 -> p3
+  p8 -> p5
+  p9 -> p3
+  p9 -> p5
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 

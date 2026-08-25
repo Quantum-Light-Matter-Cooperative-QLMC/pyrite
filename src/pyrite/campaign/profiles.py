@@ -16,6 +16,7 @@ import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -775,13 +776,10 @@ def _sidecar_identity(stem: str, root: str | os.PathLike[str]) -> dict[str, Any]
     ``None`` when no sidecar/identity is present. This is authoritative: it
     survives edits to the backing named profile after the run, which a live
     recompute against the *current* catalog would not (the digest would no
-    longer match). Same sidecar read already relied on by
-    :func:`archive._dataset_identity` and the remote lifecycle. Local import of
-    ``_checkpoint_store`` mirrors the deferred-import pattern used elsewhere in
-    this module."""
-    from ..checkpoints import _checkpoint_store
-
-    manifest = _checkpoint_store.manifest_path(stem, root)
+    longer match). The sidecar layout is a storage contract shared with the
+    checkpoint and remote owners; resolving its path directly keeps campaign
+    identity parsing below those drivers."""
+    manifest = Path(root) / stem / "meta.json"
     if not manifest.is_file():
         return None
     try:
