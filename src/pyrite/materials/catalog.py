@@ -15,12 +15,11 @@ from types import MappingProxyType
 from typing import cast
 
 from .. import DATA_DIR
+from ._beam_detector_parse import _parse_beams, _parse_detectors
 from ._catalog_decode import LineGridByEnergy, _Errors, _grid
 from ._parse import (
     _load_profile_artifacts,
-    _parse_beams,
     _parse_crystals,
-    _parse_detectors,
     _parse_energy_grids,
     _parse_materials,
     _parse_media,
