@@ -43,12 +43,15 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 ```text
 Components (a + b denotes a static import cycle):
   p0: _entry
-  p1: apps + campaign + checkpoints + cli + detectors + energy_grid + instrument + materials + montecarlo + plots + remote + results + runs + validation
+  p1: apps + campaign + checkpoints + cli + detectors + energy_grid + instrument + montecarlo + plots + remote + results + runs + validation
   p2: devtools
-  p3: perf
+  p3: materials
+  p4: perf
 Edges (importer -> imported):
   p0 -> p1
+  p0 -> p3
   p1 -> p3
+  p1 -> p4
   p2 -> p1
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
@@ -199,6 +202,15 @@ out of the `montecarlo` import cycle. Importing it runs the accelerator probe,
 so cheap-import callers (CLI, catalog parsing) reach for it inside the function
 that needs a device. Deps: `_compat`.
 
+### `_energy_grid_artifacts.py`
+Immutable, content-addressed energy-grid artifact store: canonical
+`cxr.energy-grid-artifact.v1` identity bytes, SHA-256 naming, sharded storage,
+atomic dedup publication, and corruption checks. Imports nothing first-party.
+Read by `materials.catalog` when resolving `[profiles.*.energy_grid_refs]` at
+catalog-load time and written by `energy_grid.apply` / collected by
+`energy_grid.gc`, so it sits below both rather than inside `energy_grid/`.
+Deps: none (leaf; stdlib only).
+
 ### `materials/` (package)
 Material domain package. Narrow top-level API expose immutable
 `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`,
@@ -215,8 +227,15 @@ immutable typed records. `material_keys` preserve TOML declaration order.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`,
   `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`,
   `load_material_catalog`.
+- `[detectors.*]` and `[profiles.*.detector]` blocks resolve to validated
+  acceptance mappings, not built `Detector` objects — this module stays below
+  `detectors` — the same shape `physical_detector` already hands to `instrument`.
+  `campaign.config.catalog_detector` builds the detector. The copied range checks
+  are pinned to `Detector.__post_init__` by
+  `tests/materials/test_material_catalog.py::test_catalog_detector_bounds_match_the_detector_dataclass`.
 - Deps: `materials._cif`, `materials._identity`, `materials._transport_data`,
-  `materials._catalog_decode`, `DATA_DIR`.
+  `materials._catalog_decode`, `_energy_grid_artifacts`, `DATA_DIR`. Imports no
+  driver package, so `materials` is a leaf component of the dependency DAG.
 
 ### `materials/_identity.py`
 Display identity for a material — chemical formula, crystal phase, crystal cut —
@@ -450,7 +469,10 @@ emittance, bunch charge, Gaussian-equivalent peak current, and average current.
 Default settings/sweep builders shared by CLI and both notebooks; per-material
 scan grids project from immutable `materials.CATALOG`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
-  `trajectory_sweep`; `MATERIALS` ordered tuple.
+  `trajectory_sweep`, `catalog_detector`; `MATERIALS` ordered tuple.
+  `catalog_detector` applies the catalog's acceptance mapping onto
+  `DEFAULT_CATALOG_DETECTOR` (Timepix3 at 90 deg); the default response lives
+  here rather than in the catalog.
   The catalog speaks the flat geometry vocabulary, so both builders project
   their scan grid through `target_from_flat` and hand `Sweep` a built `target`.
   Catalog energy-grid artifacts resolve into the built detector's `EnergyBins`
@@ -500,10 +522,10 @@ compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
   `__init__.py` is thin and exposes `command` lazily via `__getattr__` so
   hot-path `energy_grid.encoding` imports stay Click-free. Monkeypatch seams for
   `remote`/`cli_json`/`emit_json_result` live on `_command`, not the package.
-- `artifacts.py` freezes canonical `cxr.energy-grid-artifact.v1` identity bytes,
-  SHA-256 naming, sharded storage, atomic dedup publication, and corruption
-  checks. `gc.py` resolves profile/campaign-lock reachability, out-of-band orphan
-  ages, preview revalidation, and deletion.
+- The artifact store itself lives at `pyrite._energy_grid_artifacts` (below this
+  package; see Core physics), because `materials.catalog` reads it too. `gc.py`
+  resolves profile/campaign-lock reachability, out-of-band orphan ages, preview
+  revalidation, and deletion.
 - Also: `derive`, `bounds`, `apply`, `defaults`, `provenance`, `golden`, `job`.
 
 ### `checkpoints/campaign_lock.py`

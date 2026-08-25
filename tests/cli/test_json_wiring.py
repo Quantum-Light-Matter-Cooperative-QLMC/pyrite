@@ -186,7 +186,7 @@ E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
 
 
 def test_line_grid_show_json_resolves_selected_profile_artifact(monkeypatch, tmp_path):
-    from pyrite.energy_grid import artifacts
+    from pyrite import _energy_grid_artifacts as artifacts
 
     identity = artifacts.artifact_identity(
         "hopg",

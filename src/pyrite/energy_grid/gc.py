@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 
+from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.checkpoints import campaign_lock
-from pyrite.energy_grid import artifacts
 
 DEFAULT_GRACE = timedelta(days=14)
 """Default retention period for newly unreachable artifacts."""

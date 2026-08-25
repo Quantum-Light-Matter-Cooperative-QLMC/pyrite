@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import functools
 import logging
+import math
 import re
 import tomllib
 import warnings
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
@@ -22,9 +23,8 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
+from .._energy_grid_artifacts import ArtifactError, load_artifact
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS, validate_profile_numerics
-from ..detectors.spec import Detector, Timepix3
-from ..energy_grid import artifacts as _grid_artifacts
 from ._catalog_decode import (
     LineGridByEnergy,
     _direction,
@@ -491,10 +491,12 @@ class MaterialCatalog:
     #: keyed by profile; profiles with no beam block are absent. Energy is NOT
     #: here -- it stays the per-material ``ScanSpec.energy_keV`` scan grid.
     profile_beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
-    #: Explicit profile detector blocks. Missing selected-profile blocks inherit
-    #: ``standard``; missing standard falls back to a fully-defined Timepix3
-    #: detector at 90 deg (:data:`_DEFAULT_PROFILE_DETECTOR`).
-    profile_detectors: Mapping[str, Detector] = MappingProxyType({})
+    #: Explicit profile detector blocks, as validated acceptance fields rather
+    #: than built detectors -- ``campaign.config`` applies them onto its default
+    #: response. Missing selected-profile blocks inherit ``standard``; missing
+    #: standard falls back to :data:`_DEFAULT_PROFILE_DETECTOR_SPEC`, which
+    #: leaves every default in place (Timepix3 at 90 deg).
+    profile_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit ``profiles.NAME.emission`` overrides ("incoherent"/"coherent"/
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
@@ -521,9 +523,9 @@ class MaterialCatalog:
     beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Every ``[beams.*]`` name defined by the source TOML.
     beam_keys: tuple[str, ...] = ()
-    #: Named ``[detectors.*]`` geometry objects, keyed by detector name. Labels
+    #: Named ``[detectors.*]`` acceptance specs, keyed by detector name. Labels
     #: are stored separately so display metadata cannot enter simulation state.
-    detectors: Mapping[str, Detector] = MappingProxyType({})
+    detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     detector_labels: Mapping[str, str] = MappingProxyType({})
     #: Every ``[detectors.*]`` name defined by the source TOML.
     detector_keys: tuple[str, ...] = ()
@@ -544,10 +546,14 @@ class MaterialCatalog:
         """Explicit result-affecting transport numerics for ``name``."""
         return self.profile_transport_numerics.get(name)
 
-    def profile_detector(self, name: str) -> Detector:
-        """Resolved detector for ``name`` with standard then legacy fallback."""
+    def profile_detector(self, name: str) -> Mapping[str, object]:
+        """Resolved acceptance fields for ``name``, standard then legacy fallback.
+
+        An empty mapping means "every detector default stands". Build the
+        detector with :func:`config.catalog_detector`.
+        """
         return self.profile_detectors.get(
-            name, self.profile_detectors.get("standard", _DEFAULT_PROFILE_DETECTOR)
+            name, self.profile_detectors.get("standard", _DEFAULT_PROFILE_DETECTOR_SPEC)
         )
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
@@ -1074,10 +1080,28 @@ _BEAM_KEYS = _BEAM_POSITIVE_KEYS | {
     "transverse",
 }
 _DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
-#: Fully-defined default profile detector: Timepix3 response at 90 deg, per
-#: issue #52. Profiles/blocks that omit a detector, or override only angle/
-#: acceptance/solid-angle fields, still resolve to this response.
-_DEFAULT_PROFILE_DETECTOR = Detector(response=Timepix3())
+#: Accepted range per acceptance field, as ``(minimum, maximum, strictly_positive)``.
+#: These mirror ``detectors.spec.Detector.__post_init__`` exactly, including its
+#: message wording, so a catalog block and a hand-built ``Detector`` reject the
+#: same values. ``campaign.config`` applies a parsed block onto the default
+#: detector and would raise there too; the duplication buys a catalog-path error
+#: at load time instead of a bare exception mid-sweep.
+_DETECTOR_FIELD_BOUNDS: tuple[tuple[str, float, float, bool], ...] = (
+    ("observation_angle_deg", 0.0, 180.0, False),
+    ("polar_acceptance_deg", 0.0, 180.0, True),
+    ("solid_angle_sr", 0.0, 4.0 * math.pi, True),
+)
+#: Upper-bound wording for the two strictly positive fields, quoted from
+#: ``Detector.__post_init__`` so the two paths report a ceiling identically.
+_DETECTOR_UPPER_BOUND_MESSAGES = {
+    "polar_acceptance_deg": (
+        "polar_acceptance_deg is a full polar span and must be <= 180 degrees"
+    ),
+    "solid_angle_sr": "solid_angle_sr must be <= 4*pi sr",
+}
+#: A profile that omits a detector, or overrides only acceptance fields, resolves
+#: to the driver's default response (Timepix3 at 90 deg, per issue #52).
+_DEFAULT_PROFILE_DETECTOR_SPEC: Mapping[str, object] = MappingProxyType({})
 _DEPRECATED_DETECTOR_KEYS = frozenset(
     {
         "response_model",
@@ -1318,8 +1342,19 @@ def _parse_beams(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]
     return out
 
 
-def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector | None:
-    """Validate one portable ``[profiles.NAME.detector]`` block."""
+def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
+    """Validate one portable ``[profiles.NAME.detector]`` block.
+
+    Returns the validated acceptance fields, not a built ``Detector``: this
+    module owns configuration parsing and stays below the detector forward
+    models, so a driver -- ``campaign.config`` -- applies the result onto the
+    default detector. This is the same shape ``_parse_physical_detector``
+    already hands to ``instrument``.
+
+    Fields are checked in ``Detector.__post_init__`` order and the first failure
+    wins, so a block that was rejected before is rejected here with the same
+    message.
+    """
     table = _table(raw, path, errors)
     if table is None:
         return None
@@ -1330,12 +1365,34 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Detector
             DeprecationWarning,
             stacklevel=3,
         )
-    known = {key: value for key, value in table.items() if key in _DETECTOR_KEYS}
-    try:
-        return replace(_DEFAULT_PROFILE_DETECTOR, **cast("dict[str, Any]", known))
-    except (TypeError, ValueError) as exc:
-        errors.add(path, str(exc))
-        return None
+    spec: dict[str, object] = {}
+    for key, minimum, maximum, strictly_positive in _DETECTOR_FIELD_BOUNDS:
+        if key not in table:
+            continue
+        raw_value = table[key]
+        if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
+            errors.add(path, f"{key} must be a real number")
+            return None
+        value = float(raw_value)
+        if not math.isfinite(value):
+            errors.add(path, f"{key} must be finite")
+            return None
+        # A strictly positive field is range-checked against its own upper bound
+        # only after the shared ">= 0" test, matching _positive_optional().
+        upper = maximum if not strictly_positive else None
+        if value < minimum or (upper is not None and value > upper):
+            bound = "" if upper is None else f" and <= {upper:g}"
+            errors.add(path, f"{key} must be >= {minimum:g}{bound}")
+            return None
+        if strictly_positive:
+            if value == 0.0:
+                errors.add(path, f"{key} must be positive")
+                return None
+            if value > maximum:
+                errors.add(path, _DETECTOR_UPPER_BOUND_MESSAGES[key])
+                return None
+        spec[key] = value
+    return MappingProxyType(spec)
 
 
 def _pair(
@@ -1442,17 +1499,19 @@ def _parse_physical_detector(
     return MappingProxyType(cleaned)
 
 
-def _parse_detectors(raw: object, errors: _Errors) -> tuple[dict[str, Detector], dict[str, str]]:
+def _parse_detectors(
+    raw: object, errors: _Errors
+) -> tuple[dict[str, Mapping[str, object]], dict[str, str]]:
     """Parse named ``[detectors.NAME]`` geometry objects.
 
     Named objects use the same decoder as legacy inline profile detector
     blocks. ``label`` is display-only and is never part of the resolved
-    :class:`Detector` value.
+    acceptance spec.
     """
     table = _table(raw, "detectors", errors)
     if table is None:
         return {}, {}
-    detectors: dict[str, Detector] = {}
+    detectors: dict[str, Mapping[str, object]] = {}
     labels: dict[str, str] = {}
     for key, value in table.items():
         path = f"detectors.{key}"
@@ -1693,8 +1752,8 @@ def _load_profile_artifacts(
     for material, digest in all_refs.get(profile_name, {}).items():
         path = f"profiles.{profile_name}.energy_grid_refs.{material}"
         try:
-            stored = _grid_artifacts.load_artifact(store_root, digest)
-        except _grid_artifacts.ArtifactError as exc:
+            stored = load_artifact(store_root, digest)
+        except ArtifactError as exc:
             errors.add(path, str(exc))
             continue
         identity = stored.identity
@@ -2061,7 +2120,7 @@ def _load_material_catalog_cached(
             profile_beams[name] = MappingProxyType(dict(cast("Mapping[str, object]", beam_value)))
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
-    profile_detectors: dict[str, Detector] = {}
+    profile_detectors: dict[str, Mapping[str, object]] = {}
     for name, row in profiles.items():
         detector_value = row.get("detector")
         if isinstance(detector_value, str):
@@ -2070,8 +2129,10 @@ def _load_material_catalog_cached(
                 errors.add(f"profiles.{name}.detector", f"unknown detector {detector_value!r}")
                 continue
             profile_detectors[name] = named_detector
-        elif isinstance(detector_value, Detector):
-            profile_detectors[name] = detector_value
+        elif isinstance(detector_value, Mapping):
+            # _parse_profiles already replaced an inline block with its validated
+            # spec; anything else with a detector key was rejected there.
+            profile_detectors[name] = cast("Mapping[str, object]", detector_value)
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
     profile_emissions = {

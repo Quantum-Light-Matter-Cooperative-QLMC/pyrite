@@ -5,8 +5,9 @@ from datetime import timedelta
 
 import pytest
 
+from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.checkpoints import campaign_lock
-from pyrite.energy_grid import artifacts, gc
+from pyrite.energy_grid import gc
 
 
 def _identity(material: str, stop: float = 100.0) -> dict:

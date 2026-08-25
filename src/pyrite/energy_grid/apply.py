@@ -27,7 +27,7 @@ from typing import cast
 
 import tomlkit
 
-from pyrite.energy_grid import artifacts
+from pyrite import _energy_grid_artifacts as artifacts
 from pyrite.energy_grid import provenance as _provenance
 from pyrite.energy_grid.bounds import line_start_eV as _line_start_eV
 from pyrite.energy_grid.bounds import spacing_num

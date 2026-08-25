@@ -27,7 +27,7 @@ from typing import Any
 import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS
-from ..detectors import Detector, EnergyBins
+from ..detectors import Detector, EnergyBins, Timepix3
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
 from ..results import Settings
@@ -90,6 +90,24 @@ def default_settings(fidelity: str = "full"):
         brem_source="mc",  # "mc" | "external" | "none"
     )
     return get_fidelity_preset(fidelity).apply_settings(settings)
+
+
+#: The detector every profile starts from: a Timepix3 response at 90 deg, per
+#: issue #52. ``materials.catalog`` validates the acceptance fields of a
+#: ``[profiles.NAME.detector]`` block but does not build the detector -- it sits
+#: below ``detectors`` in the package graph -- so the default response and the
+#: construction both live here, on the driver side.
+DEFAULT_CATALOG_DETECTOR = Detector(response=Timepix3())
+
+
+def catalog_detector(catalog_profile: str = "standard") -> Detector:
+    """Build the detector a catalog profile resolves to.
+
+    ``Catalog.profile_detector`` returns validated acceptance fields; an empty
+    mapping means every default stands.
+    """
+    spec = _catalog(catalog_profile).profile_detector(catalog_profile)
+    return replace(DEFAULT_CATALOG_DETECTOR, **dict(spec))
 
 
 def _catalog(catalog_profile: str = "standard"):
@@ -173,7 +191,7 @@ def material_sweep(
             beam_changes.setdefault("transverse_fwhm_x_mm", None)
             beam_changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **beam_changes)
-    catalog_detector = _catalog(catalog_profile).profile_detector(catalog_profile)
+    resolved_catalog_detector = catalog_detector(catalog_profile)
     legacy_detector = {
         "observation_angle_deg": theta_obs_deg,
         "polar_acceptance_deg": overrides.pop("dtheta_obs_deg", None),
@@ -189,7 +207,7 @@ def material_sweep(
                 "conflicting detector= and legacy detector override(s): " + ", ".join(conflicts)
             )
     resolved_detector = (
-        detector if detector is not None else replace(catalog_detector, **supplied_legacy)
+        detector if detector is not None else replace(resolved_catalog_detector, **supplied_legacy)
     )
     current_bins = resolved_detector.energy_bins
     missing = object()

@@ -215,6 +215,26 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+# `materials` is the bottom of the physics core: it must not reach sideways into
+# its own consumers either. Without this the three edges out of `catalog.py` and
+# `attenuation.py` put `materials` inside the repository's one big import cycle
+# and no contract noticed, because these three packages are absent from the
+# forbidden list above -- they are peers of `materials`, not drivers.
+[[tool.importlinter.contracts]]
+id = "materials-imports-no-peer-domain"
+name = "Materials imports no peer domain package"
+type = "forbidden"
+source_modules = [
+    "pyrite.materials",
+]
+forbidden_modules = [
+    "pyrite.detectors",
+    "pyrite.energy_grid",
+    "pyrite.instrument",
+    "pyrite.montecarlo",
+]
+allow_indirect_imports = true
+
 [[tool.importlinter.contracts]]
 id = "material-leaves-stay-independent"
 name = "Material leaves do not import higher material modules"

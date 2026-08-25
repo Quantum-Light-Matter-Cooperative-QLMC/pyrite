@@ -463,7 +463,7 @@ def test_click_apply_alias_adds_artifact_without_touching_legacy_payload(tmp_pat
     import json as _json
     import tomllib
 
-    from pyrite.energy_grid import artifacts
+    from pyrite import _energy_grid_artifacts as artifacts
     from tests.helpers.energy_grid_catalog import BASE_TOML, COMBINED
 
     toml_path = tmp_path / "materials.toml"

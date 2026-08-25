@@ -210,7 +210,7 @@ def _catalog_with_artifact_ref(digest: str) -> str:
 
 
 def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
-    from pyrite.energy_grid import artifacts
+    from pyrite import _energy_grid_artifacts as artifacts
     from pyrite.materials import load_material_catalog
 
     identity = artifacts.artifact_identity(
@@ -238,7 +238,7 @@ def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
 
 
 def test_profile_artifact_ref_matches_equivalent_legacy_resolution(tmp_path):
-    from pyrite.energy_grid import artifacts
+    from pyrite import _energy_grid_artifacts as artifacts
     from pyrite.materials import load_material_catalog
 
     legacy_text = (
@@ -277,7 +277,7 @@ def test_profile_artifact_ref_matches_equivalent_legacy_resolution(tmp_path):
 
 
 def test_profile_artifact_ref_rejects_missing_or_wrong_material(tmp_path):
-    from pyrite.energy_grid import artifacts
+    from pyrite import _energy_grid_artifacts as artifacts
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     missing = "a" * 64
@@ -685,11 +685,18 @@ crystal = "mos2"
     inline_catalog = load_material_catalog(_write_catalog(tmp_path / "inline", inline_text))
 
     assert ref_catalog.profile_detector("standard") == inline_catalog.profile_detector("standard")
-    expected = Detector(119.0, 16.6, 0.066, response=Timepix3())
-    assert ref_catalog.profile_detector("standard") == expected
+    # The catalog resolves acceptance fields; config builds the detector.
+    expected_spec = {
+        "observation_angle_deg": 119.0,
+        "polar_acceptance_deg": 16.6,
+        "solid_angle_sr": 0.066,
+    }
+    assert dict(ref_catalog.profile_detector("standard")) == expected_spec
     assert ref_catalog.detector_keys == ("eds",)
-    assert ref_catalog.detectors["eds"] == expected
+    assert dict(ref_catalog.detectors["eds"]) == expected_spec
     assert ref_catalog.detector_labels["eds"] == "SEM EDS"
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
+    assert config.catalog_detector("standard") == Detector(119.0, 16.6, 0.066, response=Timepix3())
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
     ref_sweep = config.material_sweep("mos2")
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inline_catalog)
@@ -803,11 +810,11 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     path = _write_catalog(tmp_path, text)
     catalog = load_material_catalog(path, profile="narrowed")
 
-    assert catalog.profile_detector("standard") == Detector(91.0, 12.0, 0.05, response=Timepix3())
-    selected = Detector(119.0, 16.6, 0.066, response=Timepix3())
-    assert catalog.profile_detector("narrowed") == selected
-
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
+    assert config.catalog_detector("standard") == Detector(91.0, 12.0, 0.05, response=Timepix3())
+    selected = Detector(119.0, 16.6, 0.066, response=Timepix3())
+    assert config.catalog_detector("narrowed") == selected
+
     profiled = config.material_sweep("mos2", catalog_profile="narrowed")
     explicit = config.material_sweep(
         "mos2",
@@ -818,7 +825,8 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     assert replace(explicit.detector, energy_bins=EnergyBins()) == Detector(100.0, 8.0, 0.01)
 
 
-def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path):
+def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path, monkeypatch):
+    from pyrite.campaign import config
     from pyrite.detectors import Detector
     from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
@@ -835,14 +843,18 @@ crystal = "mos2"
             ),
         )
     )
-    assert fallback.profile_detector("standard") == Detector(response=Timepix3())
+    assert dict(fallback.profile_detector("standard")) == {}
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": fallback)
+    assert config.catalog_detector("standard") == Detector(response=Timepix3())
 
     text = (
         _catalog_with_two_profiles(tmp_path).read_text()
         + "\n[profiles.standard.detector]\nobservation_angle_deg = 91.0\n"
     )
     inherited = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
-    assert inherited.profile_detector("narrowed") == Detector(91.0, response=Timepix3())
+    assert dict(inherited.profile_detector("narrowed")) == {"observation_angle_deg": 91.0}
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inherited)
+    assert config.catalog_detector("narrowed") == Detector(91.0, response=Timepix3())
 
 
 def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):
@@ -863,6 +875,49 @@ crystal = "mos2"
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, text))
     assert "profiles.standard.detector" in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("observation_angle_deg", 181.0),
+        ("observation_angle_deg", -1.0),
+        ("polar_acceptance_deg", 0.0),
+        ("polar_acceptance_deg", 181.0),
+        ("polar_acceptance_deg", -2.0),
+        ("solid_angle_sr", 0.0),
+        ("solid_angle_sr", 13.0),
+        ("solid_angle_sr", -0.5),
+    ],
+)
+def test_catalog_detector_bounds_match_the_detector_dataclass(tmp_path, field, value):
+    """The catalog no longer builds a Detector, so its ranges are a copy.
+
+    Hold the copy to the original: every value the dataclass rejects must be
+    rejected at catalog-load time with the same message, on the block's path.
+    """
+    from pyrite.detectors import Detector
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    with pytest.raises((TypeError, ValueError)) as dataclass_error:
+        Detector(**{field: value})
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+display_name = "mos2"
+crystal = "mos2"
+"""
+        )
+        + f"\n[profiles.standard.detector]\n{field} = {value!r}\n"
+    )
+    with pytest.raises(MaterialConfigError) as catalog_error:
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+    message = str(catalog_error.value)
+    assert "profiles.standard.detector" in message
+    assert str(dataclass_error.value) in message
 
 
 def test_profile_filter_and_physical_detector_blocks_decode_without_run_wiring(tmp_path):
