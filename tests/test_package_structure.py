@@ -99,3 +99,20 @@ def test_remote_facade_is_the_public_package() -> None:
 
     assert Path(remote.__file__).name == "__init__.py"
     assert import_module("pyrite.remote.lifecycle") is remote.lifecycle
+
+
+def test_source_modules_stay_near_the_1200_line_budget() -> None:
+    """Keep issue #64's module-size acceptance criterion enforceable."""
+    package_root = Path(pyrite.__file__).parent
+    exempt = {
+        Path("montecarlo/spectrum/lines.py"),  # issue #65
+        Path("montecarlo/transport/cores.py"),  # issue #66
+    }
+    oversized = {
+        path.relative_to(package_root): len(path.read_text().splitlines())
+        for path in package_root.rglob("*.py")
+        if path.relative_to(package_root) not in exempt
+        and len(path.read_text().splitlines()) > 1_250
+    }
+
+    assert oversized == {}
