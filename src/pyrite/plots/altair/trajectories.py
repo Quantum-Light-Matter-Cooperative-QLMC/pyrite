@@ -35,16 +35,18 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-from ..mpl.sweeps import _value_label
-from ..mpl.trajectories import (
+from .._common import (
     _beam_detector_basis,
     _case_of,
     _groove_spec,
+    groove_profile_knots,
+)
+from .._frames import (
     _square_frame,
     _trajectory_cases,
     _trajectory_data,
     _trajectory_frame,
-    groove_profile_knots,
+    survival_frame,
 )
 from ._typing import _mark_chart
 
@@ -62,37 +64,10 @@ _GROOVE_MAX_PERIODS = 400
 
 
 # ---- penetration / survival --------------------------------------------------
-def _max_depth_per_electron(data):
-    """Deepest point each electron reaches (max over its segment depths), with the
-    tiny negative excursions of backscattered electrons clipped to 0 -- the same
-    reduction :func:`pyrite.plots.plot_penetration_survival` does."""
-    max_depth = np.full(data["Ne"], -np.inf)
-    np.maximum.at(max_depth, data["elec_id"], data["z_u"])
-    return np.clip(max_depth[np.isfinite(max_depth)], 0.0, None)
-
-
-def survival_frame(data_by_energy, *, n_bins=80, depth_frac=True):
-    """Tidy long-form survival table from ``{E0_keV: _trajectory_data dict}``: one
-    row per (beam energy, depth sample), ``survival`` = % of incident electrons
-    reaching at least that depth. ``depth`` is depth/thickness when ``depth_frac``
-    else absolute (display units). Mirrors the curve behind
-    :func:`pyrite.plots.plot_penetration_survival`. Columns:
-    ``depth, survival, energy`` (``energy`` is the ``"30 keV"``-style label)."""
-    rows = []
-    for E0 in sorted(data_by_energy):
-        d = data_by_energy[E0]
-        depths = _max_depth_per_electron(d)
-        thick = d["thick"]
-        x = depths / thick if depth_frac else depths
-        zmax = 1.0 if depth_frac else float(thick)
-        zs = np.linspace(0.0, zmax, n_bins)
-        surv = 100.0 * np.array([float((x >= z).mean()) if x.size else 0.0 for z in zs])
-        label = _value_label("E0_keV", E0)
-        for z, s in zip(zs, surv, strict=False):
-            rows.append({"depth": float(z), "survival": float(s), "energy": label})
-    return pd.DataFrame(rows, columns=["depth", "survival", "energy"])
-
-
+# _max_depth_per_electron / survival_frame now live in pyrite.plots._frames,
+# shared verbatim with pyrite.plots.mpl.trajectories.plot_penetration_survival;
+# re-imported above for the existing ``from pyrite.plots.altair.trajectories
+# import survival_frame`` call sites (tests, this module's own use below).
 def penetration_survival_chart(
     cases_or_results,
     *,
@@ -242,7 +217,7 @@ def _groove_profile_layer(case, data, frame, xscale, yscale):
 
     The 2D cross-section is drawn in the BEAM-DETECTOR plane (the same basis
     ``_trajectory_data`` projects tracks into via
-    :func:`~pyrite.plots.mpl.trajectories._beam_detector_basis`), NOT a raw sample
+    :func:`~pyrite.plots._common._beam_detector_basis`), NOT a raw sample
     x/z slice, so the sawtooth surface is projected through that basis too: a
     sample-frame surface point ``(x, 0, groove_profile_z(x))`` maps to chart
     coordinates ``(P.e1, P.e2) / u``. This keeps the profile riding the entrance

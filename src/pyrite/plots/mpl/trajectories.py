@@ -8,13 +8,20 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ...montecarlo import (
-    simulate_trajectories,
-    tilted_geometry,
+from .._common import (
+    _beam_detector_basis,
+    _beam_phase_space,  # noqa: F401 -- re-exported via the flat compat shim
+    _case_of,
+    _groove_spec,  # noqa: F401 -- re-exported via the flat compat shim
+    groove_profile_knots,  # noqa: F401 -- re-exported via the flat compat shim
+    groove_profile_z,  # noqa: F401 -- re-exported via the flat compat shim
 )
-from ...montecarlo.groove import surface_depth_ang
-from ...results import (
-    records,
+from .._frames import (
+    _square_frame,
+    _trajectory_cases,
+    _trajectory_data,
+    _trajectory_frame,
+    survival_frame,
 )
 from .._style import (
     energy_color,
@@ -27,83 +34,7 @@ from .._style import (
 # and the energy colorbar (so the nbconvert PDF export still works). The segment
 # colour is the electron's kinetic energy along the track (turbo); ds.max keeps it
 # crisp under the line-width antialiasing (ds.mean would blend track edges low).
-C_ANG_PER_FS = 2997.924580  # speed of light [Ang/fs]: age sum(L/beta)[Ang] -> fs
 _TRAJ_CMAP = "turbo"
-
-
-def _case_of(rec_or_case):
-    """Accept either a results record (carries 'case') or a raw case dict."""
-    return rec_or_case.get("case", rec_or_case)
-
-
-def _groove_spec(case):
-    """Blazed :class:`~pyrite.montecarlo.groove.GrooveSpec` for a case carrying a
-    ``groove_spacing_ang`` knob, or ``None`` when it is absent.
-
-    Mirrors ``montecarlo.runner._transport_case``'s spec construction exactly
-    (``blazed_groove_spec(spacing, theta_obs_rad, tilt_polar_rad,
-    tilt_azim_rad)``) so the penetration figures transport electrons through the
-    SAME relief facets the spectrum runner does -- no new physics, no new
-    convention. ``blazed_groove_spec`` validates the restricted geometry
-    (theta_obs = 90 deg, tilt_azim = 180 deg, 0 < tilt_polar < 90 deg) and
-    raises ``ValueError`` otherwise; callers that build cases via
-    ``sweep.build_cases`` never hit that because it rejects the same geometries
-    up front."""
-    spacing = case.get("groove_spacing_ang")
-    if spacing is None:
-        return None
-    from ...montecarlo import blazed_groove_spec
-
-    return blazed_groove_spec(
-        spacing,
-        case["theta_obs_rad"],
-        np.deg2rad(case.get("tilt_deg", 0.0)),
-        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
-    )
-
-
-def groove_profile_z(x_ang, spec):
-    """Sawtooth surface depth [Ang] into the slab at sample-frame lateral position
-    ``x_ang`` [Ang].
-
-    Apexes (``z = 0``) sit at ``x = k * spacing``; the valley floor is at the
-    groove depth ``spec.depth_ang``. This is the SAME closed-form profile the
-    ``_z_surf`` helper in ``tests/montecarlo/test_groove.py`` evaluates (single geometric
-    source: :mod:`pyrite.montecarlo.groove`), reused here only to DRAW the
-    surface -- it introduces no new physics. numpy ufuncs only, so array input
-    works elementwise."""
-    return surface_depth_ang(x_ang, spec)
-
-
-def groove_profile_knots(x_lo_ang, x_hi_ang, spec, *, max_periods=200):
-    """Minimal sample-frame sawtooth vertices ``(x_ang, z_ang)`` covering
-    ``[x_lo_ang, x_hi_ang]``: two knots per period (apex at ``z = 0``, valley
-    floor at ``z = depth``), so a corrugated surface needs only ~2 vertices per
-    groove instead of a dense sweep.
-
-    Returns ``None`` when the requested span exceeds ``max_periods`` grooves --
-    the caller then falls back to the flat entrance face (drawing thousands of
-    teeth is neither legible nor cheap). ``x`` is returned strictly increasing so
-    the vertices trace the profile directly as a polyline."""
-    lam = spec.spacing_ang
-    k0 = int(np.floor(x_lo_ang / lam))
-    k1 = int(np.ceil(x_hi_ang / lam))
-    if k1 - k0 > max_periods:
-        return None
-    x_valley = spec.depth_ang * np.tan(spec.tilt_polar_rad)
-    xs = np.empty(2 * (k1 - k0 + 1))
-    ks = np.arange(k0, k1 + 1)
-    xs[0::2] = ks * lam  # apexes (z = 0)
-    xs[1::2] = ks * lam + x_valley  # valley floors (z = depth)
-    zs = groove_profile_z(xs, spec)
-    return xs, zs
-
-
-def _trajectory_cases(cases_or_results):
-    """Flatten a build_cases list OR a results store into a list of case dicts."""
-    if isinstance(cases_or_results, dict):
-        return [r["case"] for r in records(cases_or_results)]
-    return [_case_of(c) for c in cases_or_results]
 
 
 def _turbo_hex(n=256):
@@ -113,224 +44,6 @@ def _turbo_hex(n=256):
 
     cmap = colormaps[_TRAJ_CMAP]
     return [to_hex(cmap(i / (n - 1))) for i in range(n)]
-
-
-def _beam_detector_basis(beam, n_hat):
-    """Orthonormal 2D basis of the BEAM-DETECTOR plane: e1 = beam (-> +x, into the
-    slab); e2 = the in-plane part of the detector direction (-> +y, "up"). Working
-    in this plane (rather than a fixed x-z slice) keeps the beam horizontal AND the
-    detector arrow pointing the right way for ANY polar/azimuthal tilt."""
-    e1 = np.asarray(beam, float)
-    e1 = e1 / np.linalg.norm(e1)
-    nh = np.asarray(n_hat, float)
-    nh = nh / np.linalg.norm(nh)
-    perp = nh - np.dot(nh, e1) * e1
-    if np.linalg.norm(perp) < 1e-9:  # detector ~parallel to beam: any in-plane up
-        for ref in (np.array([0.0, 0.0, 1.0]), np.array([0.0, 1.0, 0.0])):
-            perp = ref - np.dot(ref, e1) * e1
-            if np.linalg.norm(perp) > 1e-9:
-                break
-    return e1, perp / np.linalg.norm(perp)
-
-
-def _beam_phase_space(case):
-    """The case's own beam phase space, for the transport behind a plot.
-
-    A trajectory plot that draws a point source for a beam the run treated as
-    having finite emittance, bunch length or energy spread is a picture of a
-    different beam than the one that made the spectrum. These keys are absent
-    unless a profile deliberately set them, so every case built before the beam
-    block existed still transports as the legacy point bunch, bit-for-bit.
-
-    The Gaussian spot (``beam_fwhm_mm``) is deliberately NOT included: it stays
-    under the caller's control, because the 2D cross-section wants a point
-    source and the 3D view supplies its own display width.
-    """
-    return dict(
-        bunch_length_fs=case.get("bunch_length_fs"),
-        long_shape=case.get("long_shape", "gaussian"),
-        long_offsets_fs=case.get("long_offsets_fs"),
-        longitudinal_distribution=case.get("longitudinal_distribution"),
-        transverse_distribution=case.get("transverse_distribution"),
-        energy_spread_frac=case.get("energy_spread_frac"),
-    )
-
-
-def _trajectory_data(
-    case,
-    Ne,
-    seed,
-    *,
-    beam_fwhm_mm=None,
-    crystal_width_mm=None,
-    crystal_height_mm=None,
-) -> dict[str, Any]:
-    """Simulate one case and project the cascade into the beam-detector plane.
-    Returns both the projected 2D tracks and true 3D segment endpoints in sample
-    coordinates, all in the same display units, plus per-segment energy/age/depth,
-    slab + detector directions, and back/through fractions.
-
-    ``beam_fwhm_mm`` (and, for a finite footprint, ``crystal_width_mm`` /
-    ``crystal_height_mm``) are forwarded to :func:`simulate_trajectories`, which
-    draws each electron's entry point from the Gaussian spot and projects it onto
-    the tilted entrance face (grazing-incidence ``1/cos`` stretch). All default
-    ``None`` -- the legacy point source entering at the origin, bit-for-bit -- so
-    the 2D cross-section callers are unchanged. With a finite crystal footprint,
-    entries landing off the crystal are dropped by transport (``n_missed``) and
-    never appear as tracks.
-
-    The case's own beam phase space (Twiss policy, bunch, energy spread) rides
-    along via :func:`_beam_phase_space`, so a plot shows the beam the run used
-    rather than a point source standing in for it. A case that sets none of
-    those keys transports exactly as before.
-
-    Multilayer/stacked materials (``case["abs_layers"]`` set -- film-on-substrate,
-    e.g. mos2-on-sapphire) are transported through the FULL stack via
-    ``layers=abs_layers``, matching the spectrum runner (`montecarlo.runner`);
-    without this the electron cascade (and hence the trajectory/penetration
-    plots) only ever saw the top film layer, silently dropping the substrate's
-    backscatter contribution and reporting only the film's thickness."""
-    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
-    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
-    phase_space = _beam_phase_space(case)
-    if phase_space["transverse_distribution"] is not None:
-        # A Twiss policy fixes the spot size as well as the divergence, so the
-        # display FWHM would be a second, contradictory answer for <x^2>.
-        beam_fwhm_mm = None
-    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
-    n_hat = -n_hat
-    abs_layers = case.get("abs_layers")
-    total_thickness_ang = (
-        float(abs_layers[-1][1]) if abs_layers is not None else case["thickness_ang"]
-    )
-    segs = simulate_trajectories(
-        case["E0_keV"],
-        Ne,
-        total_thickness_ang,
-        composition=case["composition"],
-        seed=seed,
-        beam_dir=beam,
-        layers=abs_layers,
-        beam_fwhm_mm=beam_fwhm_mm,
-        crystal_width_mm=crystal_width_mm,
-        crystal_height_mm=crystal_height_mm,
-        tilt_polar_rad=tilt_polar_rad,
-        tilt_azim_rad=tilt_azim_rad,
-        **phase_space,
-        # Blazed grooves (when the case carries the knob): electrons enter on the
-        # relief facets, so the drawn tracks start at z in [0, groove depth) --
-        # groove=None (the default for every ungrooved case) is bit-for-bit the
-        # legacy flat-face entry.
-        groove=_groove_spec(case),
-    )
-    e1, e2 = _beam_detector_basis(beam, n_hat)
-    L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
-    start = r - 0.5 * L[:, None] * v
-    u, ulab = (1e4, r"$\mu$m") if total_thickness_ang >= 1e4 else (10.0, "nm")
-
-    # Continuous per-electron tracks (not a loose segment cloud): order segments by
-    # (electron, age) so each electron's segment START points form a polyline --
-    # consecutive starts share an endpoint, so they trace the real zig-zag path --
-    # then break with NaN between electrons. This is what makes the tracks read as
-    # paths (the old per-segment LineCollection got faint at the cool, slow tail).
-    order = np.lexsort((segs["t_ang"], segs["elec_id"]))
-    sx = (start @ e1)[order] / u
-    sy = (start @ e2)[order] / u
-    sE = segs["E_keV"][order]
-    brk = np.flatnonzero(np.diff(segs["elec_id"][order]) != 0) + 1
-    px = np.insert(sx, brk, np.nan)
-    py = np.insert(sy, brk, np.nan)
-    pE = np.insert(sE, brk, np.nan)
-
-    z = np.array([0.0, 0.0, 1.0])  # slab normal in the sample frame
-    ndet = np.array([n_hat @ e1, n_hat @ e2])
-    ndet = ndet / np.linalg.norm(ndet)
-    nslab = np.array([z @ e1, z @ e2])
-    nn = np.linalg.norm(nslab)
-    nslab = nslab / nn if nn > 1e-9 else np.array([1.0, 0.0])
-    return dict(
-        px=px,
-        py=py,
-        pE=pE,
-        pts=np.column_stack([px, py]),  # for the shared-frame extent
-        E=segs["E_keV"],
-        t_fs=segs["t_ang"] / C_ANG_PER_FS,
-        z_u=(r[:, 2] + 0.5 * L * v[:, 2])
-        / u,  # depth of segment ENDPOINT; transmitted electrons reach thick exactly
-        elec_id=segs["elec_id"],  # emitting electron index, per segment
-        L=segs["L_ang"],
-        initial_r_ang=np.asarray(segs["initial_r_ang"], dtype=float),
-        initial_v_hat=np.asarray(segs["initial_v_hat"], dtype=float),
-        initial_E_keV=np.asarray(segs["initial_E_keV"], dtype=float),
-        initial_t0_ang=np.asarray(segs["initial_t0_ang"], dtype=float),
-        start_xyz=start / u,
-        end_xyz=(r + 0.5 * L[:, None] * v) / u,
-        # Groove-gap flights remain diagnostic-only: they do not radiate and
-        # therefore must never be appended to E/start_xyz/end_xyz.
-        vacuum_start_xyz=np.asarray(segs.get("vacuum_start_ang", np.empty((0, 3))), dtype=float)
-        / u,
-        vacuum_end_xyz=np.asarray(segs.get("vacuum_end_ang", np.empty((0, 3))), dtype=float) / u,
-        vacuum_E=np.asarray(segs.get("vacuum_E_keV", np.empty(0)), dtype=float),
-        vacuum_t_fs=np.asarray(segs.get("vacuum_t_ang", np.empty(0)), dtype=float) / C_ANG_PER_FS,
-        vacuum_elec_id=np.asarray(
-            segs.get("vacuum_elec_id", np.empty(0, dtype=np.int64)), dtype=np.int64
-        ),
-        beam=np.asarray(beam, dtype=float),
-        detector=np.asarray(n_hat, dtype=float),
-        ndet=ndet,
-        nslab=nslab,
-        u=u,
-        ulab=ulab,
-        thick=total_thickness_ang / u,
-        # internal layer boundaries (display units), excluding the final z_bot
-        # (== thick, already the slab's back face) -- empty for a single slab.
-        layer_bounds=(
-            [float(z_bot) / u for (_, z_bot, _) in abs_layers[:-1]]
-            if abs_layers is not None
-            else []
-        ),
-        eta=100.0 * segs["n_backscattered"] / segs["Ne"],
-        thru=100.0 * segs["n_transmitted"] / segs["Ne"],
-        Ne=segs["Ne"],
-    )
-
-
-def _trajectory_frame(pts_list, pct=99.0, pad=0.12, beam_frac=0.16):
-    """ONE shared (xlo, xhi, ylo, yhi) for a set of panels, from the robust
-    (1st/99th-percentile) extent of all their track vertices, expanded to include
-    the origin and padded. Sharing it across tilts is what makes only the slab
-    rotate frame-to-frame (the old per-panel autoscale was the "scaling is
-    inconsistent" complaint). Symmetric in y (beam axis centred); the left margin
-    always clears the beam arrow + label."""
-    pts = np.concatenate([np.asarray(s).reshape(-1, 2) for s in pts_list], axis=0)
-    pts = pts[np.isfinite(pts).all(axis=1)]
-    xlo = min(0.0, float(np.percentile(pts[:, 0], 100 - pct)))
-    xhi = max(0.0, float(np.percentile(pts[:, 0], pct)))
-    ymax = float(np.percentile(np.abs(pts[:, 1]), pct))
-    sx = max(xhi - xlo, 1e-6)
-    xlo -= pad * sx
-    xhi += pad * sx
-    yhi = max(ymax * (1.0 + pad), 1e-6)
-    aL = beam_frac * (xhi - xlo)
-    xlo = min(xlo, -1.5 * aL)  # room for the beam arrow + label
-    return (float(xlo), float(xhi), float(-yhi), float(yhi))
-
-
-def _square_frame(frame):
-    """Expand the shorter side of a (xlo, xhi, ylo, yhi) frame symmetrically so it
-    is SQUARE -- no data is cropped, the extra room becomes centred margin. With
-    set_aspect("equal") this lets square subplot boxes hold the tracks without the
-    skinny-strip letterboxing the wide native frame produced (the trajectory-grid
-    sizing fix)."""
-    xlo, xhi, ylo, yhi = frame
-    w, h = xhi - xlo, yhi - ylo
-    if w > h:
-        pad = 0.5 * (w - h)
-        ylo, yhi = ylo - pad, yhi + pad
-    elif h > w:
-        pad = 0.5 * (h - w)
-        xlo, xhi = xlo - pad, xhi + pad
-    return (float(xlo), float(xhi), float(ylo), float(yhi))
 
 
 def _draw_incident_bundle(ax, data, length):
@@ -727,25 +440,29 @@ def plot_penetration_survival(
     t = min(tilts, key=lambda x: abs(x - want))
     energies = sorted({c["E0_keV"] for c in cases})
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    xmax = 1.0
+    # Same data_by_energy -> tidy-table split as
+    # :func:`pyrite.plots.altair.trajectories.penetration_survival_chart`: build
+    # one _trajectory_data per beam energy at this tilt, then reduce every energy's
+    # cascade to a survival curve in ONE shared frame builder
+    # (:func:`pyrite.plots._frames.survival_frame`) so the matplotlib and Altair
+    # curves are computed identically.
+    data_by_energy = {}
     for E0 in energies:
         c = next((c for c in cases if c["E0_keV"] == E0 and c["tilt_deg"] == t), None)
-        if c is None:
+        if c is not None:
+            data_by_energy[E0] = _trajectory_data(c, Ne, seed)
+    xmax = 1.0 if depth_frac else max((float(d["thick"]) for d in data_by_energy.values()), default=1.0)
+    df = survival_frame(data_by_energy, n_bins=n_bins, depth_frac=depth_frac)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for E0 in energies:
+        if E0 not in data_by_energy:
             continue
-        d = _trajectory_data(c, Ne, seed)
-        # deepest point each electron reaches (max over its segment depths), then
-        # clip the tiny negative excursions of backscattered electrons that exit
-        # just above the entrance face.
-        max_depth = np.full(d["Ne"], -np.inf)  # type: ignore[reportCallIssue]
-        np.maximum.at(max_depth, d["elec_id"], d["z_u"])  # type: ignore[reportArgumentType]
-        max_depth = np.clip(max_depth[np.isfinite(max_depth)], 0.0, None)
-        thick = d["thick"]
-        x = max_depth / thick if depth_frac else max_depth
-        xmax = 1.0 if depth_frac else max(xmax, float(thick))
-        zs = np.linspace(0.0, 1.0 if depth_frac else float(thick), n_bins)
-        surv = 100.0 * np.array([float((x >= z).mean()) for z in zs])
-        ax.plot(zs, surv, "-", color=energy_color(E0, energies), lw=1.9, label=f"{E0:g} keV")
+        label = f"{E0:g} keV"
+        sub = df[df["energy"] == label]
+        ax.plot(
+            sub["depth"], sub["survival"], "-", color=energy_color(E0, energies), lw=1.9, label=label
+        )
     case0 = next(c for c in cases if c["tilt_deg"] == t)
     ulab = r"$\mu$m" if case0["thickness_ang"] >= 1e4 else "nm"
     xlab = "depth / thickness" if depth_frac else f"penetration depth ({ulab})"

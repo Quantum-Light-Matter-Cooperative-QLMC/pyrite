@@ -17,11 +17,11 @@ from .._common import (
     _case_title,
     _line_brem,
     _peak_line,
-    _per_tilt_figs,
 )
 from .._style import (
     energy_color,
 )
+from ._common import _per_tilt_figs
 from .detectors import (
     _draw_eaglexo_charge,
     _draw_eaglexo_detected,

@@ -255,6 +255,16 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+[[tool.importlinter.contracts]]
+id = "plots-backends-stay-independent"
+name = "Plot backends (mpl, altair, plotly) do not import each other"
+type = "independence"
+modules = [
+    "pyrite.plots.mpl",
+    "pyrite.plots.altair",
+    "pyrite.plots.plotly",
+]
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100

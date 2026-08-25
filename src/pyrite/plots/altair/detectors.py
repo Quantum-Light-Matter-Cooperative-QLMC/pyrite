@@ -35,9 +35,10 @@ from altair.utils.schemapi import UndefinedType
 from ...detectors import Detector, Timepix3
 from ...detectors import eaglexo_response as eag
 from ...results import beam_current_na
-from .._common import _best_azimuth, _case_title
-from ..mpl.detectors import (
+from .._common import (
     SI_K_EDGE_EV,
+    _best_azimuth,
+    _case_title,
     _eag_detected,
     _eag_wide_brem,
     _eag_wide_charge,

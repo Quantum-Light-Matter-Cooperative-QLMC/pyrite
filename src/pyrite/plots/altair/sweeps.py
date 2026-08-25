@@ -4,7 +4,7 @@ Altair / Vega-Lite renderers for the parametric-sweep figures -- the interactive
 counterparts of the matplotlib :mod:`pyrite.plots.mpl.sweeps` heatmaps and metric
 scans. Same contract as :mod:`pyrite.plots.altair.spectra`: these reuse the exact
 per-record metric prep (``results.line_metrics`` + ``results.selection_score``)
-and the shared axis/metric registries from :mod:`pyrite.plots.mpl.sweeps`, so the
+and the shared axis/metric registries from :mod:`pyrite.plots._frames`, so the
 numbers are identical -- only the renderer differs. Not re-exported from
 ``pyrite.plots`` (frozen export-set guard); import from the submodule:
 
@@ -23,18 +23,16 @@ import altair as alt
 from ...results import records_for_cases
 from .._common import _metrics_map
 from .._frames import (
-    _effective_x,
-    heatmap_frame,
-    metric_vs_frame,
-    pick_hue,
-    scan_mode,
-)
-from ..mpl.sweeps import (
     _AXIS_SPECS,
     _HEATMAP_QUANTITIES,
     _METRIC_LABELS,
     _axis_label,
+    _effective_x,
     _resolve_quantity,
+    heatmap_frame,
+    metric_vs_frame,
+    pick_hue,
+    scan_mode,
 )
 from ._typing import _mark_chart
 

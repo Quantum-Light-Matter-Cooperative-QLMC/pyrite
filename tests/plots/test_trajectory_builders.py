@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pytest
 
 from pyrite.plots.mpl.trajectories import (
@@ -84,6 +85,32 @@ def test_plot_penetration_survival_one_line_per_energy():
     fig = plot_penetration_survival(cases, Ne=_NE, seed=0, n_bins=10)
     assert fig is not None
     assert len(fig.axes[0].lines) == 2
+
+
+def test_plot_penetration_survival_renders_expected_survival_values(monkeypatch):
+    case = {
+        "name": "hopg survival",
+        "E0_keV": 20.0,
+        "tilt_deg": 10.0,
+        "thickness_ang": 1.0e4,
+    }
+    data = {
+        "Ne": 3,
+        "elec_id": np.array([0, 0, 1, 2]),
+        "z_u": np.array([0.2, 0.5, 0.1, 0.8]),
+        "thick": 1.0,
+    }
+    monkeypatch.setattr(
+        "pyrite.plots.mpl.trajectories._trajectory_data",
+        lambda *_args, **_kwargs: data,
+    )
+
+    fig = plot_penetration_survival([case], Ne=_NE, seed=0, n_bins=3)
+
+    assert fig is not None
+    line = fig.axes[0].lines[0]
+    np.testing.assert_allclose(line.get_xdata(), [0.0, 0.5, 1.0])
+    np.testing.assert_allclose(line.get_ydata(), [100.0, 200.0 / 3.0, 0.0])
 
 
 def test_plot_penetration_survival_absolute_depth_axis():

@@ -1,10 +1,10 @@
 """Browser-native 3D electron-penetration rendering with Plotly.
 
-The transport and coordinate preparation remain owned by
-:mod:`pyrite.plots.mpl.trajectories`; this module only builds an interactive view of
-the true sample-frame segment endpoints.  It is intentionally imported directly
-rather than re-exported from :mod:`pyrite.plots`, whose legacy export set is
-frozen.
+The transport and coordinate preparation live in the renderer-neutral
+:mod:`pyrite.plots._common` and :mod:`pyrite.plots._frames` modules; this module
+only builds an interactive view of the true sample-frame segment endpoints. It
+is intentionally imported directly rather than re-exported from
+:mod:`pyrite.plots`, whose legacy export set is frozen.
 """
 
 from __future__ import annotations
@@ -13,12 +13,12 @@ import numpy as np
 import plotly.graph_objects as go
 
 from ...montecarlo.geometry import project_beam_entry, sample_to_lab_R
-from ..mpl.trajectories import (
+from .._common import (
     _case_of,
     _groove_spec,
-    _trajectory_data,
     groove_profile_knots,
 )
+from .._frames import _trajectory_data
 
 _CRYSTAL = "#B9D9EB"
 _CRYSTAL_EDGE = "#EDF6F9"

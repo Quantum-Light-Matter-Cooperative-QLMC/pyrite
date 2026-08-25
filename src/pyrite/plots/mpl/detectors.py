@@ -6,7 +6,6 @@ Timepix3 and Eagle XO detector-view figures (efficiency, detected, charge).
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ...detectors import Detector, EagleXO, Timepix3
 from ...detectors import eaglexo_response as eag
 from ...detectors import timepix_response as tpx
 from ...results import (
@@ -16,20 +15,22 @@ from ...results import (
 )
 from .._common import (
     _EFF_CACHE,
+    SI_K_EDGE_EV,
     _best_azimuth,
     _case_title,
+    _eag_detected,
+    _eag_wide_brem,
+    _eag_wide_charge,
     _peak_line,
-    _per_tilt_figs,
+    _thr_keV,
+    _tpx_detected,
 )
 from .._style import energy_color
+from ._common import _per_tilt_figs
 from .sweeps import plot_heatmaps
 
 
 # ---- Timepix3 detector view --------------------------------------------------
-def _thr_keV():
-    return tpx.THRESHOLD_E * tpx.W_EHP_EV / 1e3
-
-
 def plot_timepix_efficiency(thickness_um=300.0, bias_v=100.0, n_mc=80000, seed=0):
     """Detection efficiency (absorption x counting turn-on) and energy
     resolution / charge-loss bias vs photon energy for the Si quad."""
@@ -91,21 +92,6 @@ def plot_timepix_efficiency(thickness_um=300.0, bias_v=100.0, n_mc=80000, seed=0
     axR2.tick_params(axis="y", colors="g")  # axR2.set_ylim(bottom=0)
     fig.tight_layout()
     return fig
-
-
-def _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed):
-    """Incident and Timepix3-detected (line + brem) [Phs/eV/s/nA] on r['E_grid'];
-    the per-grid response is cached by tpx.get_response."""
-    incident = (r["spec"] + r["brem"]) * r["scale"]
-    detector = Detector(
-        response=Timepix3(
-            n_mc=n_mc,
-            seed=seed,
-            thickness_um=thickness_um,
-            bias_v=bias_v,
-        )
-    )
-    return incident, detector.score(r["E_grid"], r["spec"] + r["brem"], scale=r["scale"])
 
 
 def _draw_timepix_detected(
@@ -257,9 +243,6 @@ def plot_timepix_poisson(
 
 
 # ---- Eagle XO detector view --------------------------------------------------
-SI_K_EDGE_EV = 1839.0  # silicon K absorption edge -> the QE notch the lines cross
-
-
 def _domega_of(r):
     """The solid angle [sr] actually baked into a record (scale = domega * PER_NA),
     so plot annotations report the geometry the sweep was run with -- not a value
@@ -320,34 +303,6 @@ def plot_eaglexo_efficiency(sensor="4240", distance_m=None, coating="BN"):
         fontsize=13,
     )
     return fig
-
-
-def _eag_detected(r, settings, coating="BN", resolve_energy=False):
-    """Incident and Eagle-detected (line + brem) [Phs/eV/s/nA] on r['E_grid'];
-    the per-grid response is cached by eag.get_response."""
-    incident = (r["spec"] + r["brem"]) * r["scale"]
-    detector = Detector(response=EagleXO(coating=coating, resolve_energy=resolve_energy))
-    return incident, detector.score(r["E_grid"], r["spec"] + r["brem"], scale=r["scale"])
-
-
-def _eag_wide_brem(r, coating="BN"):
-    """Wide-grid Eagle XO incident and detected brem [Phs/eV/s/nA]."""
-    E = np.asarray(r["E_grid_brem"], dtype=float)
-    incident = np.asarray(r["brem_wide"], dtype=float) * r["scale"]
-    detector = Detector(response=EagleXO(coating=coating))
-    detected = detector.score(E, r["brem_wide"], scale=r["scale"])
-    # EagleResponse sanitizes non-finite response-matrix inputs. This wide-grid
-    # diagnostic historically exposed missing input bins as NaN; retain that
-    # presentation contract after routing the actual response through Detector.
-    detected = np.where(np.isnan(incident), np.nan, detected)
-    return E, incident, detected
-
-
-def _eag_wide_charge(r, coating="BN", beam_current_na=1.0):
-    """Wide-grid Eagle XO charge density [e-/eV/s] from brem."""
-    E = np.asarray(r["E_grid_brem"], dtype=float)
-    incident = np.nan_to_num(np.asarray(r["brem_wide"], dtype=float) * r["scale"])
-    return E, incident * eag.qe(E, coating) * (E / eag.W_EHP_EV) * beam_current_na
 
 
 def _draw_eaglexo_detected(

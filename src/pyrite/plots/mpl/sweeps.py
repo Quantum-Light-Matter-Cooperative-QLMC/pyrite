@@ -10,10 +10,15 @@ from ...results import records_for_cases
 from .._common import _metrics_map
 from .._frames import (
     _AXIS_SPECS,
+    _EXTRA_QUANTITIES,  # noqa: F401  -- re-exported via plots.__init__ (frozen export set)
     _FLUX_GATED,  # noqa: F401  -- re-exported via plots.__init__ (frozen export set)
+    _HEATMAP_QUANTITIES,
+    _METRIC_LABELS,
     _axis_disp,
+    _axis_label,
     _effective_x,
     _ndistinct,
+    _resolve_quantity,
     _value_label,
     heatmap_frame,
     metric_vs_frame,
@@ -24,56 +29,6 @@ from .._style import (
     COLORS,
     energy_color,
 )
-
-# ---- parametric heatmaps + parameter scans -----------------------------------
-# (metric key, label + units, colormap)
-_HEATMAP_QUANTITIES = [
-    ("peak_flux", "peak spectral flux  (Phs/eV/s)", "viridis"),
-    ("coherent_flux", "integrated coherent flux, all lines  (Phs/s)", "viridis"),
-    ("line_flux", "integrated flux under the dominant line  (Phs/s)", "viridis"),
-    ("line_eV", "dominant coherent line energy  (eV)", "plasma"),
-    ("fwhm_eV", "dominant line FWHM  (eV)", "magma"),
-    ("line_frac", "dominant line / total spectral flux", "cividis"),
-    ("line_quality", "line-definition quality  (0-1)", "Greens"),
-    ("total_flux", "total integrated flux, lines+brem  (Phs/s)", "viridis"),
-]
-
-# Metrics that are NOT in the default heatmap set (so a plain plot_scan doesn't
-# grow an extra panel) but get a proper label + colormap when asked for by name,
-# e.g. plot_scan(..., quantities=["coherent_brem_ratio"]). coherent_brem_ratio is
-# ungated (not in _FLUX_GATED): it's the CXR/brem contrast, valid wherever brem>0.
-_EXTRA_QUANTITIES = {
-    "coherent_brem_ratio": (
-        "coherent / incoherent-brem flux ratio  (CXR / brem)",
-        "cividis",
-    ),
-    # finite-crystal footprint-hit fraction in [0, 1] (1 = every launched
-    # electron landed on the crystal). Ungated (not in _FLUX_GATED): a pure
-    # geometry diagnostic, valid regardless of line brightness.
-    "hit_frac": (
-        "electron footprint-hit fraction  (hits / launched)",
-        "magma",
-    ),
-}
-_METRIC_LABELS = {key: label for key, label, _ in _HEATMAP_QUANTITIES}
-_METRIC_LABELS.update({k: lbl for k, (lbl, _) in _EXTRA_QUANTITIES.items()})
-
-
-def _resolve_quantity(q):
-    """Normalize a quantity spec to a ``(key, label, cmap)`` triple: pass triples
-    through, look bare metric keys up in the default + extra registries (cmap
-    falls back to viridis for an unknown key)."""
-    if not isinstance(q, str):
-        return tuple(q)
-    if q in _EXTRA_QUANTITIES:
-        lbl, cmap = _EXTRA_QUANTITIES[q]
-        return (q, lbl, cmap)
-    return (q, _METRIC_LABELS.get(q, q), "viridis")
-
-
-def _axis_label(key):
-    spec = _AXIS_SPECS.get(key)
-    return key if spec is None else f"{spec[0]} ({spec[2]})"
 
 
 def _cell_edges(disp_vals):

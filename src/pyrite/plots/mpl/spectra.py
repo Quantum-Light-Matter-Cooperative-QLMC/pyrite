@@ -19,22 +19,18 @@ from ...results import (
 from .._common import (
     _best_azimuth,
     _case_title,
+    _comparison_drop_message,
     _line_brem,
     _metrics_map,
-    _per_tilt_figs,
 )
 from .._style import (
     COLORS,
     energy_color,
 )
+from ._common import _per_tilt_figs
 
 MATERIAL_COMPARISON_SUMMARY_VERSION = 1
 _COMPARISON_CASE_FIELDS = ("name", "E0_keV", "tilt_deg", "tilt_azim_deg")
-_COMPARISON_DROP_REASONS = {
-    "quality_floor": "no candidate line met the quality floor",
-    "beam_energy": "no checkpoint record exists at the selected beam energy",
-    "nonfinite_ratio": "local line-to-bremsstrahlung ratio is undefined or non-finite",
-}
 
 _TITLE_FONT_SIZE = 16
 _AXIS_LABEL_FONT_SIZE = 14
@@ -492,18 +488,6 @@ def material_comparison_point(
         min_line_quality,
     )
     return "dropped" if reason is not None else point
-
-
-def _comparison_drop_message(dropped):
-    """Format material labels grouped with their exact exclusion reasons."""
-    if not dropped:
-        return ""
-    if not hasattr(dropped, "items"):
-        return f"{', '.join(dropped)} -- no candidate line met the gate."
-    return "; ".join(
-        f"{label} -- {_COMPARISON_DROP_REASONS.get(reason, reason)}"
-        for label, reason in dropped.items()
-    )
 
 
 def draw_material_comparison(

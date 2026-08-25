@@ -39,8 +39,7 @@ import pandas as pd
 
 from ...results import records
 from ...results.store import _detected_background_wide
-from .._common import _best_azimuth, _case_title, _line_brem
-from ..mpl.spectra import _comparison_drop_message
+from .._common import _best_azimuth, _case_title, _comparison_drop_message, _line_brem
 from ._typing import _mark_chart
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
