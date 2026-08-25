@@ -32,3 +32,11 @@ def test_checked_in_dependency_region_is_current() -> None:
     root = Path(__file__).resolve().parents[2]
 
     assert repo_map.write_or_check(root=root, check=True)
+
+
+def test_checkpoints_do_not_import_run_drivers() -> None:
+    root = Path(__file__).resolve().parents[2]
+
+    _, dependencies = repo_map.package_dependencies(root / "src")
+
+    assert ("checkpoints", "runs") not in dependencies

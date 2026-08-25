@@ -124,6 +124,13 @@ def test_write_progress_record_omits_cost_fields_when_either_is_none(tmp_path):
     assert "total_cost" not in record
 
 
+def test_scan_keeps_progress_helper_compatibility_aliases():
+    from pyrite import _progress
+
+    assert scan._ProgressTimer is _progress._ProgressTimer
+    assert scan._write_progress_record is _progress._write_progress_record
+
+
 def test_write_progress_record_persists_remote_phase_identity(tmp_path):
     path = tmp_path / "hopg.cpu.json"
     scan._write_progress_record(

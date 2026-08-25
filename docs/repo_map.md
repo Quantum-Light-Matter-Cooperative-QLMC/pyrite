@@ -193,6 +193,13 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 
 ## Core physics
 
+### `_progress.py`
+Leaf progress-record codec and additive active-work timer shared by run and
+checkpoint drivers. Owns atomic compact-JSON replacement without importing a
+driver package.
+- Internal: `_ProgressTimer`, `_write_progress_record`.
+- Deps: none (stdlib only).
+
 ### `_backend.py`
 Portable array backend shared by every device-dispatching kernel: NumPy,
 CUDA/ROCm CuPy, and Intel dpnp/SYCL adapters behind a deterministic
@@ -615,7 +622,9 @@ catalog-profile resolution, and nsys re-exec. Click wiring is in
 `__getattr__` so the Monte Carlo hot path never imports Click.
 - Public: `main`, `run`, `command` (lazy), `validate_materials`,
   `validate_catalog_profile`, `resolve_profile_materials`.
-- Deps: `config`, `run`, `sweep`.
+- Compatibility: `_ProgressTimer` and `_write_progress_record` re-export the
+  neutral `pyrite._progress` implementations.
+- Deps: `_progress`, `config`, `run`, `sweep`.
 
 ### `runs/blaze.py`
 Headless blazed-crystal (sawtooth entrance face) sweep entry: `pyrite material blaze <material>
@@ -878,9 +887,8 @@ Checkpoint repair and recompute owner for both component datasets. Per-record
 one progress callback. Enumerates checkpoint stems and resolves per-material
 identity and fidelity defaults. Folded from the retired `rebrem.py`/`reline.py`.
 - Deps: `checkpoints.persistence`, `checkpoints._checkpoint_store`,
-  `checkpoints.recompute_defaults`, `energy_grid.encoding`, `montecarlo`;
-  function-local `runs.scan` imports provide the progress record codec without
-  introducing an import-time cycle.
+  `checkpoints.recompute_defaults`, `_progress`, `energy_grid.encoding`,
+  `montecarlo`; imports no run driver package.
 
 ### `cli/commands/recompute.py`
 Click layer for `pyrite checkpoint recompute {brem,line}` (`brem_command`,

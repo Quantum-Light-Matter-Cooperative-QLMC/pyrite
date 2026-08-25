@@ -14,7 +14,7 @@ resumes on re-invocation; ``redo_all`` forces a full recompute.
 
 ``progress_file`` (single material only) atomically maintains the same compact
 JSON progress record a remote sweep writes (see
-``scan._write_progress_record``), so the remote recompute queues feed the
+``pyrite._progress._write_progress_record``), so the remote recompute queues feed the
 ``pyrite job status``/``attach`` case-progress dashboard. ``max_minutes``
 bounds the whole run across the material list against one monotonic deadline;
 if any material stops short of complete the driver raises ``SystemExit(75)``
@@ -28,6 +28,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from .._progress import _ProgressTimer, _write_progress_record
 from ..energy_grid.encoding import decode_energy_grid
 from ..montecarlo import runner
 from . import _checkpoint_store
@@ -147,8 +148,6 @@ def rebrem_checkpoints(
                     resolved_step = profile_step
         kw = {}
         if progress_file is not None:
-            from ..runs.scan import _ProgressTimer, _write_progress_record
-
             latest = {"total_cases": 0, "cached_cases": 0, "completed_new_cases": 0}
             progress_timer = _ProgressTimer(progress_file)
 
@@ -276,8 +275,6 @@ def reline_checkpoints(
             resolved_ne = settings(context.fidelity).n_electrons
         kw = {}
         if progress_file is not None:
-            from ..runs.scan import _ProgressTimer, _write_progress_record
-
             latest = {"total_cases": 0, "cached_cases": 0, "completed_new_cases": 0}
             progress_timer = _ProgressTimer(progress_file)
 
