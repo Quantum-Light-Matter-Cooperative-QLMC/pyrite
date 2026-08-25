@@ -10,7 +10,8 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-from . import config, presentation
+from ..cli import dashboard as presentation
+from . import config
 
 _TRACE_ARG_LIMIT = 100
 _SYNC_EXCLUDED_DIRS = {

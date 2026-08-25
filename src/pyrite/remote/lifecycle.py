@@ -10,7 +10,8 @@ from pathlib import Path
 
 from ..checkpoints import archive
 from ..cli import _core as _cli_core
-from . import config, presentation, scripts, state, transport
+from ..cli import dashboard as presentation
+from . import config, scripts, state, transport
 
 
 def _refuse_if_busy(materials, quick):

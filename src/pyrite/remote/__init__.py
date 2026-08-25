@@ -73,7 +73,6 @@ Override the box via env: PYRITE_REMOTE_HOST / PYRITE_REMOTE_DIR / PYRITE_REMOTE
 # ---------------------------------------------------------------------------
 
 from .._compat import env_value
-from ..cli import dashboard as _presentation
 from . import (
     config,
     lifecycle,
@@ -213,6 +212,37 @@ _CLI_EXPORTS = frozenset(
     }
 )
 
+_PRESENTATION_EXPORTS = frozenset(
+    {
+        "_SHELL_TOKEN_RE",
+        "_STATE_COLORS",
+        "_TQDM_FRAME_RE",
+        "_active_work_label",
+        "_aggregate_progress",
+        "_overall_progress_line",
+        "_clean_recent_log",
+        "_color_enabled",
+        "_format_case_progress",
+        "_format_fields",
+        "_format_job_status",
+        "_format_material_roster",
+        "_format_now_testing",
+        "_format_table",
+        "_legacy_progress",
+        "_marked_sections",
+        "_material_label",
+        "_metadata_fields",
+        "_metadata_value",
+        "_mode_summary",
+        "_paint",
+        "_parse_progress_records",
+        "_progress_group",
+        "_progress_track",
+        "_scheduler_fields",
+        "_style_states",
+    }
+)
+
 
 def __getattr__(name):
     """Resolve the retired CLI facade without importing Click from ``remote``."""
@@ -220,32 +250,8 @@ def __getattr__(name):
         from ..cli.commands import remote as remote_cli
 
         return remote_cli if name == "cli" else getattr(remote_cli, name)
-    raise AttributeError(name)
+    if name == "presentation" or name in _PRESENTATION_EXPORTS:
+        from ..cli import dashboard
 
-# --- from presentation ------------------------------------------------
-_SHELL_TOKEN_RE = _presentation._SHELL_TOKEN_RE
-_STATE_COLORS = _presentation._STATE_COLORS
-_TQDM_FRAME_RE = _presentation._TQDM_FRAME_RE
-_active_work_label = _presentation._active_work_label
-_aggregate_progress = _presentation._aggregate_progress
-_overall_progress_line = _presentation._overall_progress_line
-_clean_recent_log = _presentation._clean_recent_log
-_color_enabled = _presentation._color_enabled
-_format_case_progress = _presentation._format_case_progress
-_format_fields = _presentation._format_fields
-_format_job_status = _presentation._format_job_status
-_format_material_roster = _presentation._format_material_roster
-_format_now_testing = _presentation._format_now_testing
-_format_table = _presentation._format_table
-_legacy_progress = _presentation._legacy_progress
-_marked_sections = _presentation._marked_sections
-_material_label = _presentation._material_label
-_metadata_fields = _presentation._metadata_fields
-_metadata_value = _presentation._metadata_value
-_mode_summary = _presentation._mode_summary
-_paint = _presentation._paint
-_parse_progress_records = _presentation._parse_progress_records
-_progress_group = _presentation._progress_group
-_progress_track = _presentation._progress_track
-_scheduler_fields = _presentation._scheduler_fields
-_style_states = _presentation._style_states
+        return dashboard if name == "presentation" else getattr(dashboard, name)
+    raise AttributeError(name)

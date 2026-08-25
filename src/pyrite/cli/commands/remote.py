@@ -7,9 +7,10 @@ from contextlib import redirect_stderr, redirect_stdout
 
 import click
 
-from ...remote import config, lifecycle, presentation, scripts, state, transport, viewer
+from ...remote import config, lifecycle, scripts, state, transport, viewer
 from .. import _completion as _cli_completion
 from .. import _deprecations
+from .. import dashboard as presentation
 from .. import json as cli_json
 from .._core import (
     FINITE_FLOAT,

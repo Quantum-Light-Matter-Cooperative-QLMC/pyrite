@@ -6,9 +6,10 @@ import time
 
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
+from ..cli import dashboard as presentation
 from ..cli.dashboard import _KeyListener, _render_frame
 from ..cli.json import job_kind
-from . import config, lifecycle, presentation, scripts, state, transport
+from . import config, lifecycle, scripts, state, transport
 
 
 def _jobs_remote_command():
