@@ -47,7 +47,7 @@ MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
         _entry("pyrite.blaze", "pyrite.runs.blaze"),
         _entry("pyrite.campaign_lock", "pyrite.checkpoints.campaign_lock"),
         _entry("pyrite.check", "pyrite.apps.check"),
-        _entry("pyrite.check_config", "pyrite.validation.check_config"),
+        _entry("pyrite.check_config", "pyrite.cli.commands.check_config"),
         _entry(
             "pyrite.checkpoint_cleanup",
             "pyrite.checkpoints.checkpoint_cleanup",

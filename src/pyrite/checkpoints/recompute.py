@@ -28,8 +28,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from .._progress import _ProgressTimer, _write_progress_record
 from .._energy_grid_encoding import decode_energy_grid
+from .._progress import _ProgressTimer, _write_progress_record
 from ..montecarlo import runner
 from . import _checkpoint_store
 from .persistence import (

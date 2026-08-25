@@ -18,8 +18,8 @@ from typing import Any
 
 import numpy as np
 
-from ..._compat import env_value, set_canonical_env
 from ..._backend import BACKEND
+from ..._compat import env_value, set_canonical_env
 from ..._energy_grid_encoding import decode_energy_grid
 from .. import spectrum as _spectrum_mod
 from ..case import Case

@@ -314,12 +314,12 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, na
     ],
 )
 def test_recompute_json_marks_low_level_exception_failed(monkeypatch, command, low_level):
-    from pyrite.runs import run
+    from pyrite.checkpoints import recompute
 
     def fail(*_args, **_kwargs):
         raise OSError("checkpoint failed")
 
-    monkeypatch.setattr(run, low_level, fail)
+    monkeypatch.setattr(recompute, low_level, fail)
 
     document = _document(
         invoke(command, ["hopg", "--profile", "standard", "-o", "json"]), exit_code=1

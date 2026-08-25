@@ -75,12 +75,12 @@ runpy.run_module("pyrite._entry.scan", run_name="__main__")
 
 
 def test_transitive_module_not_found_is_not_reported_as_bad_catalog(monkeypatch) -> None:
-    from pyrite.materials import catalog
+    from pyrite.materials import _parse, catalog
 
     def missing_transitive_dependency(*args, **kwargs):
         raise ModuleNotFoundError("No module named 'spglib'", name="spglib")
 
-    monkeypatch.setattr(catalog, "load_crystal_from_cif", missing_transitive_dependency)
+    monkeypatch.setattr(_parse, "load_crystal_from_cif", missing_transitive_dependency)
     catalog.load_material_catalog.cache_clear()
 
     with pytest.raises(ModuleNotFoundError, match="spglib"):
