@@ -109,18 +109,17 @@ def _performance_profile_name(ctx, param, value):
     return value
 
 
-def _selected_materials(args, attribute):
+def _selected_materials(remote_command, all_, explicit):
     """Resolve explicit material arguments or standard-profile membership."""
-    explicit = getattr(args, attribute)
-    if args.all:
+    if all_:
         if explicit:
-            raise SystemExit(f"{args.remote_command} --all does not take material names")
+            raise click.UsageError(f"{remote_command} --all does not take material names")
         from ...runs.scan import resolve_profile_materials
 
         return resolve_profile_materials("standard")
     if explicit:
         return explicit if isinstance(explicit, list) else [explicit]
-    raise SystemExit(f"{args.remote_command} needs material name(s), or use --all")
+    raise click.UsageError(f"{remote_command} needs material name(s), or use --all")
 
 
 def _profile_default_materials(catalog_profile):
@@ -141,33 +140,45 @@ def _profile_selected_materials(catalog_profile, materials):
     return validate_catalog_profile(catalog_profile, materials, intersect=False)
 
 
-def _start_selected(args):
+def _start_selected(materials, catalog_profile):
     """Validate the profile-owned material selection prepared by ``remote run``."""
     from ...runs.scan import validate_catalog_profile
 
-    materials = list(getattr(args, "materials", None) or [])
-    catalog_profile = getattr(args, "catalog_profile", "standard")
-    return validate_catalog_profile(catalog_profile, materials, intersect=False), None
+    return validate_catalog_profile(catalog_profile, list(materials or []), intersect=False), None
 
 
-def _cli_rebrem(args):
+def _cli_rebrem(
+    *,
+    material,
+    all_,
+    fidelity,
+    ne_brem,
+    start,
+    stop,
+    step,
+    redo_all,
+    no_sync,
+    dry_run,
+    chunk_minutes,
+    detach,
+):
     """Submit a brem-only checkpoint recompute, follow it, pull what completed."""
-    materials = _selected_materials(args, "material")
+    materials = _selected_materials("rebrem", all_, material)
     jobid = lifecycle.start_rebrem_queue(
         materials,
-        fidelity=getattr(args, "fidelity", "full"),
-        ne_brem=args.ne_brem,
-        brem_start_eV=getattr(args, "start", None),
-        brem_stop_eV=getattr(args, "stop", None),
-        brem_step_eV=args.step,
-        redo_all=args.redo_all,
-        no_sync=args.no_sync,
-        dry_run=args.dry_run,
-        chunk_minutes=args.chunk_minutes,
+        fidelity=fidelity,
+        ne_brem=ne_brem,
+        brem_start_eV=start,
+        brem_stop_eV=stop,
+        brem_step_eV=step,
+        redo_all=redo_all,
+        no_sync=no_sync,
+        dry_run=dry_run,
+        chunk_minutes=chunk_minutes,
     )
-    if args.dry_run:
+    if dry_run:
         return
-    if getattr(args, "detach", False):
+    if detach:
         return
     if not viewer.attach(jobid):
         emit_diagnostic(
@@ -184,24 +195,38 @@ def _cli_rebrem(args):
     lifecycle.pull(completed, dataset="brem")
 
 
-def _cli_reline(args):
+def _cli_reline(
+    *,
+    material,
+    all_,
+    fidelity,
+    line_ne,
+    start,
+    stop,
+    line_step,
+    redo_all,
+    no_sync,
+    dry_run,
+    chunk_minutes,
+    detach,
+):
     """Submit a line-only checkpoint recompute, follow it, pull what completed."""
-    materials = _selected_materials(args, "material")
+    materials = _selected_materials("reline", all_, material)
     jobid = lifecycle.start_reline_queue(
         materials,
-        fidelity=getattr(args, "fidelity", "full"),
-        line_ne=args.line_ne,
-        line_start_eV=getattr(args, "start", None),
-        line_stop_eV=getattr(args, "stop", None),
-        line_step_eV=args.line_step,
-        redo_all=args.redo_all,
-        no_sync=args.no_sync,
-        dry_run=args.dry_run,
-        chunk_minutes=args.chunk_minutes,
+        fidelity=fidelity,
+        line_ne=line_ne,
+        line_start_eV=start,
+        line_stop_eV=stop,
+        line_step_eV=line_step,
+        redo_all=redo_all,
+        no_sync=no_sync,
+        dry_run=dry_run,
+        chunk_minutes=chunk_minutes,
     )
-    if args.dry_run:
+    if dry_run:
         return
-    if getattr(args, "detach", False):
+    if detach:
         return
     if not viewer.attach(jobid):
         emit_diagnostic(
@@ -217,24 +242,52 @@ def _cli_reline(args):
     lifecycle.pull(completed, dataset="line")
 
 
-def _cli_pull(args):
-    dataset = "brem" if args.brem_only else ("line" if args.line_only else None)
+def _cli_pull(
+    *,
+    remote_command,
+    material,
+    all_,
+    full,
+    drop_wide_brem,
+    downcast,
+    level9,
+    no_sync,
+    brem_only,
+    line_only,
+    force,
+    hash_prefix,
+):
+    dataset = "brem" if brem_only else ("line" if line_only else None)
     lifecycle.pull(
-        _selected_materials(args, "material"),
-        grid=(not args.full) and dataset is None,
-        drop_wide_brem=args.drop_wide_brem,
-        downcast=args.downcast,
-        level9=args.level9,
-        no_sync=args.no_sync,
+        _selected_materials(remote_command, all_, material),
+        grid=(not full) and dataset is None,
+        drop_wide_brem=drop_wide_brem,
+        downcast=downcast,
+        level9=level9,
+        no_sync=no_sync,
         dataset=dataset,
-        force=args.force,
-        hash_prefix=getattr(args, "hash_prefix", None),
+        force=force,
+        hash_prefix=hash_prefix,
     )
 
 
-def _cli_pull_json(args):
-    materials = _selected_materials(args, "material")
-    dataset = "brem" if args.brem_only else ("line" if args.line_only else None)
+def _cli_pull_json(
+    *,
+    remote_command,
+    material,
+    all_,
+    full,
+    drop_wide_brem,
+    downcast,
+    level9,
+    no_sync,
+    brem_only,
+    line_only,
+    force,
+    hash_prefix,
+):
+    materials = _selected_materials(remote_command, all_, material)
+    dataset = "brem" if brem_only else ("line" if line_only else None)
     started = time.monotonic()
     summary = {}
     caught = None
@@ -242,15 +295,15 @@ def _cli_pull_json(args):
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
             lifecycle.pull(
                 materials,
-                grid=(not args.full) and dataset is None,
-                drop_wide_brem=args.drop_wide_brem,
-                downcast=args.downcast,
-                level9=args.level9,
-                no_sync=args.no_sync,
+                grid=(not full) and dataset is None,
+                drop_wide_brem=drop_wide_brem,
+                downcast=downcast,
+                level9=level9,
+                no_sync=no_sync,
                 dataset=dataset,
-                force=args.force,
+                force=force,
                 summary=summary,
-                hash_prefix=getattr(args, "hash_prefix", None),
+                hash_prefix=hash_prefix,
             )
     except (Exception, SystemExit) as exc:
         caught = exc
@@ -273,62 +326,86 @@ def _cli_pull_json(args):
     emit_json_result(result)
 
 
-def _cli_start(args):
-    materials, high_energy_min_kev = _start_selected(args)
-    if getattr(args, "nsys", False) and len(materials) != 1:
+def _cli_start(
+    *,
+    materials,
+    catalog_profile,
+    quick,
+    fidelity,
+    workers,
+    parallel_materials,
+    chunk_minutes,
+    no_sync,
+    dry_run,
+    headless,
+    no_pull,
+    grid,
+    drop_wide_brem,
+    downcast,
+    level9,
+    performance_profile,
+    performance_repetitions,
+    performance_interval,
+    spec_chunk,
+    brem_chunk,
+    nsys,
+    cpu,
+    cpu_only,
+    no_cache,
+    recompute,
+):
+    materials, high_energy_min_kev = _start_selected(materials, catalog_profile)
+    if nsys and len(materials) != 1:
         raise click.UsageError("--nsys requires exactly one material")
     jobid = lifecycle.start_queue(
         materials,
-        quick=args.quick,
-        fidelity=getattr(args, "fidelity", "full"),
-        workers=args.workers,
-        parallel_materials=args.parallel_materials,
-        chunk_minutes=args.chunk_minutes,
-        no_sync=args.no_sync,
-        dry_run=args.dry_run,
+        quick=quick,
+        fidelity=fidelity,
+        workers=workers,
+        parallel_materials=parallel_materials,
+        chunk_minutes=chunk_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
         high_energy_min_kev=high_energy_min_kev,
-        catalog_profile=getattr(args, "catalog_profile", "standard"),
-        performance_profile=getattr(args, "performance_profile", None),
-        performance_repetitions=getattr(args, "performance_repetitions", 1),
-        performance_interval=getattr(args, "performance_interval", 5.0),
-        spec_chunk=getattr(args, "spec_chunk", None),
-        brem_chunk=getattr(args, "brem_chunk", None),
-        nsys=getattr(args, "nsys", False),
-        cpu=getattr(args, "cpu", False),
-        cpu_only=getattr(args, "cpu_only", False),
-        no_cache=getattr(args, "no_cache", False),
-        recompute=getattr(args, "recompute", False),
+        catalog_profile=catalog_profile,
+        performance_profile=performance_profile,
+        performance_repetitions=performance_repetitions,
+        performance_interval=performance_interval,
+        spec_chunk=spec_chunk,
+        brem_chunk=brem_chunk,
+        nsys=nsys,
+        cpu=cpu,
+        cpu_only=cpu_only,
+        no_cache=no_cache,
+        recompute=recompute,
     )
-    if args.dry_run:
+    if dry_run:
         return
-    if args.headless:
-        if getattr(args, "performance_profile", None) is not None:
+    if headless:
+        if performance_profile is not None:
             emit_result(
                 "performance artifacts remain remote; pull after completion with: "
-                f"pyrite remote performance pull {args.performance_profile}"
+                f"pyrite remote performance pull {performance_profile}"
             )
         return
     if not viewer.attach(jobid):
         emit_diagnostic("run is still active or its viewer disconnected; skipping automatic pull")
         return
-    if getattr(args, "performance_profile", None) is not None and not args.no_pull:
+    if performance_profile is not None and not no_pull:
         succeeded = state._job_succeeded(jobid)
-        if succeeded or getattr(args, "cpu", False):
+        if succeeded or cpu:
             if not succeeded:
                 emit_diagnostic("CPU phase failed; pulling retained primary performance artifacts")
-            lifecycle.pull_performance_profile(args.performance_profile)
+            lifecycle.pull_performance_profile(performance_profile)
         else:
             emit_diagnostic(
                 "performance run did not complete successfully; "
                 "skipping automatic performance-artifact pull"
             )
     profiling_only = (
-        getattr(args, "performance_repetitions", 1) > 1
-        or getattr(args, "nsys", False)
-        or getattr(args, "cpu", False)
-        or getattr(args, "cpu_only", False)
+        performance_repetitions > 1 or nsys or cpu or cpu_only
     )
-    if args.no_pull or profiling_only:
+    if no_pull or profiling_only:
         if profiling_only:
             emit_diagnostic(
                 "performance profiling used isolated job-local checkpoints; "
@@ -341,12 +418,10 @@ def _cli_start(args):
             "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
         )
         return
-    fidelity = getattr(args, "fidelity", "full")
-    catalog_profile = getattr(args, "catalog_profile", "standard")
-    if args.quick or (fidelity == "full" and catalog_profile == "standard"):
+    if quick or (fidelity == "full" and catalog_profile == "standard"):
         stems = scripts._stems(
             completed,
-            args.quick,
+            quick,
             fidelity,
             high_energy_min_kev=high_energy_min_kev,
             catalog_profile=catalog_profile,
@@ -361,10 +436,10 @@ def _cli_start(args):
         ]
     lifecycle.pull(
         stems,
-        grid=args.grid,
-        drop_wide_brem=args.drop_wide_brem,
-        downcast=args.downcast,
-        level9=getattr(args, "level9", False),
+        grid=grid,
+        drop_wide_brem=drop_wide_brem,
+        downcast=downcast,
+        level9=level9,
         no_sync=True,
     )
     for stem in stems:
@@ -375,33 +450,32 @@ def _cli_start(args):
         )
 
 
-def _cli_jobs(args):
-    if not args.json_output:
-        kind = getattr(args, "kind", None)
+def _cli_jobs(*, json_output, kind=None):
+    if not json_output:
         if kind is None:
             viewer.list_jobs()
         else:
             viewer.list_jobs(kind)
         return
     try:
-        result = cli_json.remote_jobs(viewer.jobs_raw(), kind=getattr(args, "kind", None))
+        result = cli_json.remote_jobs(viewer.jobs_raw(), kind=kind)
     except (Exception, SystemExit) as exc:
         result = cli_json.failure("cxr.remote.jobs", {"jobs": []}, str(exc))
     emit_json_result(result)
 
 
-def _cli_status(args):
-    if getattr(args, "attach", False):
+def _cli_status(*, jobid, verbose, attach, json_output):
+    if attach:
         # Continuous, reconnecting monitor: the same acquisition/render path as
         # the one-shot snapshot, repainted in place until the job is terminal or
         # the viewer is interrupted (viewer-only disconnect; job keeps running).
-        viewer.attach(args.jobid, args.verbose)
+        viewer.attach(jobid, verbose)
         return
-    if not args.json_output:
-        viewer.job_status(args.jobid, args.verbose)
+    if not json_output:
+        viewer.job_status(jobid, verbose)
         return
     try:
-        sections, output = viewer.status_sections(args.jobid, max(args.verbose, 2))
+        sections, output = viewer.status_sections(jobid, max(verbose, 2))
         if not sections:
             raise RuntimeError(output.strip() or "remote status response was malformed")
         result = cli_json.remote_status(sections)
@@ -410,103 +484,113 @@ def _cli_status(args):
     emit_json_result(result)
 
 
-def _cli_logs(args):
-    return viewer.tail_logs(args.jobid, args.follow)
+def _cli_logs(*, jobid, follow):
+    return viewer.tail_logs(jobid, follow)
 
 
-def _cli_profile_pull(args):
-    return lifecycle.pull_performance_profile(args.profile)
+def _cli_profile_pull(*, profile):
+    return lifecycle.pull_performance_profile(profile)
 
 
-def _cli_performance_list(args):
-    del args
+def _cli_performance_list():
     return lifecycle.list_remote_performance()
 
 
-def _cli_performance_prune(args):
+def _cli_performance_prune(*, profiles, all_profiles, yes):
     return lifecycle.prune_remote_performance(
-        args.profiles,
-        all_profiles=args.all_profiles,
-        yes=args.yes,
+        profiles,
+        all_profiles=all_profiles,
+        yes=yes,
     )
 
 
-def _cli_stop(args):
-    lifecycle.stop_jobs(args.materials, args.all, yes=args.yes, profile=args.catalog_profile)
+def _cli_stop(*, materials, all_, yes, catalog_profile):
+    lifecycle.stop_jobs(materials, all_, yes=yes, profile=catalog_profile)
 
 
-def _cli_reap(args):
-    lifecycle.reap_reservations(min_age_minutes=args.min_age_minutes, yes=args.yes)
+def _cli_reap(*, min_age_minutes, yes):
+    lifecycle.reap_reservations(min_age_minutes=min_age_minutes, yes=yes)
 
 
-def _cli_clear(args):
-    if args.catalog_profile is not None:
-        if args.all_checkpoints or args.materials:
+def _cli_clear(*, materials, all_checkpoints, catalog_profile, yes):
+    if catalog_profile is not None:
+        if all_checkpoints or materials:
             raise click.UsageError("rm --profile takes no material arguments or --all")
-        membership = _profile_default_materials(args.catalog_profile)
+        membership = _profile_default_materials(catalog_profile)
         if membership is None:
             from ...materials import CATALOG
 
             membership = CATALOG.material_keys
         lifecycle.clear_remote(
             list(membership),
-            args.yes,
-            catalog_profile=args.catalog_profile,
+            yes,
+            catalog_profile=catalog_profile,
         )
         return
-    if args.all_checkpoints:
-        if args.materials:
+    if all_checkpoints:
+        if materials:
             raise click.UsageError("rm --all takes no material argument")
-        lifecycle.clear_all_remote(args.yes)
+        lifecycle.clear_all_remote(yes)
         return
-    if not args.materials:
+    if not materials:
         raise click.UsageError("rm needs material(s), --profile, or --all")
-    lifecycle.clear_remote(args.materials, args.yes)
+    lifecycle.clear_remote(materials, yes)
 
 
-def _cli_prune(args):
+def _cli_prune(*, all_profiles, catalog_profile, yes):
     lifecycle.prune_remote(
-        all_profiles=args.all_profiles,
-        catalog_profile=args.catalog_profile,
-        yes=args.yes,
+        all_profiles=all_profiles,
+        catalog_profile=catalog_profile,
+        yes=yes,
     )
 
 
-def _cli_prune_jobs(args):
+def _cli_prune_jobs(*, catalog_profile, all_jobs, yes):
     lifecycle.prune_job_dirs(
-        profile=args.catalog_profile,
-        all_jobs=args.all_jobs,
-        yes=args.yes,
+        profile=catalog_profile,
+        all_jobs=all_jobs,
+        yes=yes,
     )
 
 
-def _cli_sync(args):
+def _cli_sync():
     transport.sync_code()
 
 
-def _cli_check(args):
-    if args.follow and not args.detached:
+def _cli_check(
+    *,
+    follow,
+    detached,
+    pull,
+    ne,
+    ne_brem,
+    ne_supp,
+    tmd_azimuth,
+    refresh,
+    no_sync,
+):
+    if follow and not detached:
         raise click.UsageError("--follow requires --detached")
-    if args.pull:
+    if pull:
         lifecycle.pull_zhai_cache()
         return
-    if args.detached:
+    if detached:
         jobid = lifecycle.start_zhai_queue(
-            ne=args.ne,
-            ne_brem=args.ne_brem,
-            ne_supp=args.ne_supp,
-            tmd_azimuth=args.tmd_azimuth,
-            refresh=args.refresh,
-            no_sync=args.no_sync,
+            ne=ne,
+            ne_brem=ne_brem,
+            ne_supp=ne_supp,
+            tmd_azimuth=tmd_azimuth,
+            refresh=refresh,
+            no_sync=no_sync,
         )
-        if args.follow:
+        if follow:
             viewer.attach(jobid)
         return
     remote_check(
-        ne=args.ne,
-        ne_brem=args.ne_brem,
-        ne_supp=args.ne_supp,
-        tmd_azimuth=args.tmd_azimuth,
-        refresh=args.refresh,
-        no_sync=args.no_sync,
+        ne=ne,
+        ne_brem=ne_brem,
+        ne_supp=ne_supp,
+        tmd_azimuth=tmd_azimuth,
+        refresh=refresh,
+        no_sync=no_sync,
     )

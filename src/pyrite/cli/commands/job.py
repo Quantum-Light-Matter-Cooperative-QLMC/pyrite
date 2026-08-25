@@ -10,14 +10,10 @@ from .._core import confirm_destructive, emit_result, output_option
 from . import remote as remote_cli
 
 
-def _invoke(handler, **values):
-    """Run an existing remote handler through the shared Click exit contract."""
-    return remote_cli._invoke_click(handler, values)
-
-
 @click.group("job", no_args_is_help=True)
 def command() -> None:
     """List, inspect, follow, or stop asynchronous remote jobs."""
+    remote_cli._ensure_utf8_stdio()
 
 
 @command.command("list", help="List jobs with scheduler IDs, kinds, materials, and states.")
@@ -29,9 +25,8 @@ def command() -> None:
 )
 @output_option
 def list_command(kind: str | None, json_output: bool):
-    return _invoke(
+    return remote_cli._invoke_action(
         remote_cli._cli_jobs,
-        remote_command="list",
         kind=kind,
         json_output=json_output,
     )
@@ -52,9 +47,8 @@ def list_command(kind: str | None, json_output: bool):
 )
 @output_option
 def status_command(jobid: str | None, verbose: int, json_output: bool):
-    return _invoke(
+    return remote_cli._invoke_action(
         remote_cli._cli_status,
-        remote_command="status",
         jobid=jobid,
         verbose=verbose,
         attach=False,
@@ -71,9 +65,8 @@ def status_command(jobid: str | None, verbose: int, json_output: bool):
 )
 @click.option("-f", "--follow", is_flag=True, help="Stream until interrupted.")
 def logs_command(jobid: str | None, follow: bool):
-    return _invoke(
+    return remote_cli._invoke_action(
         remote_cli._cli_logs,
-        remote_command="logs",
         jobid=jobid,
         follow=follow,
     )

@@ -12,8 +12,8 @@ def test_run_remote_modifier_delegates_and_restores_explicit_target(monkeypatch)
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
 
-    def start(args):
-        seen.update(vars(args), host=remote_config.remote_host())
+    def start(**kwargs):
+        seen.update(kwargs, host=remote_config.remote_host())
 
     monkeypatch.setattr(remote_cli, "_cli_start", start)
 
@@ -36,7 +36,7 @@ def test_bare_remote_uses_configured_target_and_waits_by_default(monkeypatch):
     monkeypatch.setattr(
         remote_cli,
         "_cli_start",
-        lambda args: seen.update(vars(args), host=remote_config.remote_host()),
+        lambda **kwargs: seen.update(kwargs, host=remote_config.remote_host()),
     )
 
     result = invoke(scan.command, ["standard", "-m", "hopg", "--remote"])
@@ -49,7 +49,7 @@ def test_bare_remote_uses_configured_target_and_waits_by_default(monkeypatch):
 
 def test_remote_cache_modes_delegate_with_local_semantics(monkeypatch):
     seen = []
-    monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.append(vars(args)))
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.append(kwargs))
 
     no_cache = invoke(
         scan.command,
@@ -67,7 +67,7 @@ def test_remote_cache_modes_delegate_with_local_semantics(monkeypatch):
 
 
 def test_remote_cache_modes_are_mutually_exclusive_before_submission(monkeypatch):
-    def fail_submission(_args):
+    def fail_submission(**_kwargs):
         raise AssertionError("cache conflict must not submit")
 
     monkeypatch.setattr(remote_cli, "_cli_start", fail_submission)
@@ -96,7 +96,7 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
 
 def test_cpu_profile_flags_require_remote_and_reach_the_job(monkeypatch):
     seen = {}
-    monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.update(vars(args)))
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.update(kwargs))
 
     local_cpu = invoke(performance_command, ["standard", "--cpu"])
     local_cpu_only = invoke(performance_command, ["standard", "--cpu-only"])
@@ -141,7 +141,7 @@ def test_cpu_profile_flag_conflicts_are_rejected_before_submission():
 
 def test_explicit_remote_wait_delegates_without_detaching(monkeypatch):
     seen = {}
-    monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.update(vars(args)))
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.update(kwargs))
 
     result = invoke(scan.command, ["standard", "--remote", "--wait"])
 
@@ -244,7 +244,7 @@ def test_remote_optional_value_parses_around_profile(monkeypatch):
     monkeypatch.setattr(
         remote_cli,
         "_cli_start",
-        lambda args: seen.append((args.catalog_profile, remote_config.remote_host())),
+        lambda **kwargs: seen.append((kwargs["catalog_profile"], remote_config.remote_host())),
     )
 
     before = invoke(scan.command, ["--remote=box-a", "standard"])
@@ -261,7 +261,7 @@ def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch):
     monkeypatch.setattr(
         remote_cli,
         "_cli_rebrem",
-        lambda args: seen.update(vars(args), host=remote_config.remote_host()),
+        lambda **kwargs: seen.update(kwargs, host=remote_config.remote_host()),
     )
 
     result = invoke(
@@ -280,7 +280,7 @@ def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch):
 def test_recompute_bare_remote_waits_by_default(monkeypatch):
     seen = {}
     monkeypatch.setattr(remote_config, "HOST", "configured-box")
-    monkeypatch.setattr(remote_cli, "_cli_reline", lambda args: seen.update(vars(args)))
+    monkeypatch.setattr(remote_cli, "_cli_reline", lambda **kwargs: seen.update(kwargs))
 
     result = invoke(recompute_cli.line_command, ["hopg", "--remote", "--wait"])
 

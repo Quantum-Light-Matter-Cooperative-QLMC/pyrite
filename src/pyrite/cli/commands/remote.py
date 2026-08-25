@@ -15,7 +15,6 @@ from .._core import (
     emit_diagnostic,
     fidelity_option,
     hidden_alias,
-    invoke_legacy,
     output_option,
     run,
 )
@@ -48,16 +47,10 @@ from ._remote_actions import (
 )
 
 
-def _click_args(command_name, **values):
-    """Build handler namespace for Click orchestration callbacks."""
-    values["remote_command"] = command_name
-    return values
-
-
-def _invoke_click(handler, args):
-    """Translate legacy runtime exits and returned statuses to Click contract."""
+def _invoke_action(handler, **values):
+    """Invoke one explicitly-typed remote action under the Click exit contract."""
     _ensure_utf8_stdio()
-    status = invoke_legacy(handler, **args)
+    status = handler(**values)
     if isinstance(status, int) and not isinstance(status, bool) and status:
         raise click.exceptions.Exit(status)
     return status
@@ -153,23 +146,20 @@ def rebrem_command(
     _reject_all_with_values("rebrem", all_, materials)
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("rebrem --stop must be greater than --start")
-    return _invoke_click(
+    return _invoke_action(
         _cli_rebrem,
-        _click_args(
-            "rebrem",
-            material=materials,
-            all=all_,
-            fidelity=fidelity,
-            ne_brem=ne_brem,
-            start=start,
-            stop=stop,
-            step=step,
-            redo_all=redo_all,
-            chunk_minutes=chunk_minutes,
-            no_sync=no_sync,
-            dry_run=dry_run,
-            detach=detach,
-        ),
+        material=materials,
+        all_=all_,
+        fidelity=fidelity,
+        ne_brem=ne_brem,
+        start=start,
+        stop=stop,
+        step=step,
+        redo_all=redo_all,
+        chunk_minutes=chunk_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
+        detach=detach,
     )
 
 
@@ -208,23 +198,20 @@ def reline_command(
     _reject_all_with_values("reline", all_, materials)
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
-    return _invoke_click(
+    return _invoke_action(
         _cli_reline,
-        _click_args(
-            "reline",
-            material=materials,
-            all=all_,
-            fidelity=fidelity,
-            line_ne=line_ne,
-            start=start,
-            stop=stop,
-            line_step=line_step,
-            redo_all=redo_all,
-            chunk_minutes=chunk_minutes,
-            no_sync=no_sync,
-            dry_run=dry_run,
-            detach=detach,
-        ),
+        material=materials,
+        all_=all_,
+        fidelity=fidelity,
+        line_ne=line_ne,
+        start=start,
+        stop=stop,
+        line_step=line_step,
+        redo_all=redo_all,
+        chunk_minutes=chunk_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
+        detach=detach,
     )
 
 
@@ -482,38 +469,33 @@ def start_command(
         )
     if headless and no_pull:
         raise click.UsageError("--headless cannot be combined with --no-pull")
-    return _invoke_click(
+    return _invoke_action(
         _cli_start,
-        _click_args(
-            "run",
-            materials=materials,
-            all=False,
-            actually_all=False,
-            fidelity=fidelity,
-            catalog_profile=catalog_profile,
-            quick=quick,
-            workers=workers,
-            parallel_materials=parallel_materials,
-            chunk_minutes=chunk_minutes,
-            performance_profile=performance_profile,
-            performance_repetitions=performance_repetitions,
-            performance_interval=performance_interval,
-            spec_chunk=spec_chunk,
-            brem_chunk=brem_chunk,
-            nsys=nsys,
-            cpu=cpu,
-            cpu_only=cpu_only,
-            no_cache=no_cache,
-            recompute=recompute,
-            no_sync=no_sync,
-            dry_run=dry_run,
-            headless=headless,
-            no_pull=no_pull,
-            grid=grid,
-            drop_wide_brem=drop_wide_brem,
-            downcast=downcast,
-            level9=level9,
-        ),
+        materials=materials,
+        fidelity=fidelity,
+        catalog_profile=catalog_profile,
+        quick=quick,
+        workers=workers,
+        parallel_materials=parallel_materials,
+        chunk_minutes=chunk_minutes,
+        performance_profile=performance_profile,
+        performance_repetitions=performance_repetitions,
+        performance_interval=performance_interval,
+        spec_chunk=spec_chunk,
+        brem_chunk=brem_chunk,
+        nsys=nsys,
+        cpu=cpu,
+        cpu_only=cpu_only,
+        no_cache=no_cache,
+        recompute=recompute,
+        no_sync=no_sync,
+        dry_run=dry_run,
+        headless=headless,
+        no_pull=no_pull,
+        grid=grid,
+        drop_wide_brem=drop_wide_brem,
+        downcast=downcast,
+        level9=level9,
     )
 
 
@@ -524,7 +506,7 @@ command.add_command(start_command)
 @command.command("jobs", hidden=True, help="List jobs with SLURM IDs, materials, and last events.")
 @output_option
 def jobs_command(json_output):
-    return _invoke_click(_cli_jobs, _click_args("jobs", json_output=json_output))
+    return _invoke_action(_cli_jobs, json_output=json_output)
 
 
 @command.command(
@@ -561,9 +543,12 @@ def status_command(jobid, verbose, attach, json_output):
         raise click.UsageError(
             "--attach streams a live dashboard and cannot be combined with --output json"
         )
-    return _invoke_click(
+    return _invoke_action(
         _cli_status,
-        _click_args("status", jobid=jobid, verbose=verbose, attach=attach, json_output=json_output),
+        jobid=jobid,
+        verbose=verbose,
+        attach=attach,
+        json_output=json_output,
     )
 
 
@@ -576,7 +561,7 @@ def status_command(jobid, verbose, attach, json_output):
 )
 @click.option("-f", "--follow", is_flag=True, help="Stream live; Ctrl-C disconnects viewer.")
 def logs_command(jobid, follow):
-    return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
+    return _invoke_action(_cli_logs, jobid=jobid, follow=follow)
 
 
 @command.group(
@@ -602,10 +587,7 @@ def profile_command():
     metavar="PERFORMANCE_PROFILE",
 )
 def profile_pull_command(profile):
-    return _invoke_click(
-        _cli_profile_pull,
-        _click_args("profile pull", profile=profile),
-    )
+    return _invoke_action(_cli_profile_pull, profile=profile)
 
 
 @command.group(
@@ -619,7 +601,7 @@ def performance_command():
 
 @performance_command.command("list", help="List remote performance artifact directories.")
 def performance_list_command():
-    return _invoke_click(_cli_performance_list, _click_args("performance list"))
+    return _invoke_action(_cli_performance_list)
 
 
 @performance_command.command(
@@ -628,10 +610,7 @@ def performance_list_command():
 )
 @click.argument("profile", callback=_performance_profile_name, metavar="PERFORMANCE_PROFILE")
 def performance_pull_command(profile):
-    return _invoke_click(
-        _cli_profile_pull,
-        _click_args("performance pull", profile=profile),
-    )
+    return _invoke_action(_cli_profile_pull, profile=profile)
 
 
 @performance_command.command(
@@ -653,14 +632,11 @@ def performance_rm_command(profiles, all_profiles, yes):
         raise click.UsageError("remote performance rm --all does not take PROFILE names")
     if not all_profiles and not profiles:
         raise click.UsageError("remote performance rm needs PROFILE name(s), or use --all")
-    return _invoke_click(
+    return _invoke_action(
         _cli_performance_prune,
-        _click_args(
-            "performance rm",
-            profiles=list(profiles),
-            all_profiles=all_profiles,
-            yes=yes,
-        ),
+        profiles=list(profiles),
+        all_profiles=all_profiles,
+        yes=yes,
     )
 
 
@@ -686,11 +662,12 @@ def stop_command(materials, all_, catalog_profile, yes):
         raise click.UsageError("stop --profile does not take material names or --all")
     if not all_ and not materials and catalog_profile is None:
         raise click.UsageError("stop needs material name(s), --profile, or --all")
-    return _invoke_click(
+    return _invoke_action(
         _cli_stop,
-        _click_args(
-            "stop", materials=list(materials), all=all_, catalog_profile=catalog_profile, yes=yes
-        ),
+        materials=list(materials),
+        all_=all_,
+        catalog_profile=catalog_profile,
+        yes=yes,
     )
 
 
@@ -708,9 +685,10 @@ def stop_command(materials, all_, catalog_profile, yes):
 )
 @click.option("-y", "--yes", is_flag=True, help="Release reservations; otherwise preview.")
 def reap_command(min_age_minutes, yes):
-    return _invoke_click(
+    return _invoke_action(
         _cli_reap,
-        _click_args("reap", min_age_minutes=min_age_minutes, yes=yes),
+        min_age_minutes=min_age_minutes,
+        yes=yes,
     )
 
 
@@ -873,23 +851,20 @@ def pull_command(
         raise click.UsageError("--brem-only and --line-only are mutually exclusive")
     if hash_prefix is not None and sum("@" in m for m in materials) != 1:
         raise click.UsageError("--hash requires exactly one MATERIAL@PROFILE selector to pull")
-    return _invoke_click(
+    return _invoke_action(
         _cli_pull_json if json_output else _cli_pull,
-        _click_args(
-            "pull",
-            material=materials,
-            all=all_,
-            hash_prefix=hash_prefix,
-            full=full_,
-            drop_wide_brem=drop_wide_brem,
-            downcast=downcast,
-            level9=level9,
-            no_sync=no_sync,
-            brem_only=brem_only,
-            line_only=line_only,
-            force=force,
-            json_output=json_output,
-        ),
+        remote_command="pull",
+        material=materials,
+        all_=all_,
+        hash_prefix=hash_prefix,
+        full=full_,
+        drop_wide_brem=drop_wide_brem,
+        downcast=downcast,
+        level9=level9,
+        no_sync=no_sync,
+        brem_only=brem_only,
+        line_only=line_only,
+        force=force,
     )
 
 
@@ -918,15 +893,12 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes):
         raise click.UsageError("rm --profile takes no material arguments or --all")
     if not all_checkpoints and not materials and catalog_profile is None:
         raise click.UsageError("rm needs material(s), --profile, or --all")
-    return _invoke_click(
+    return _invoke_action(
         _cli_clear,
-        _click_args(
-            "clear",
-            materials=list(materials),
-            all_checkpoints=all_checkpoints,
-            catalog_profile=catalog_profile,
-            yes=yes,
-        ),
+        materials=list(materials),
+        all_checkpoints=all_checkpoints,
+        catalog_profile=catalog_profile,
+        yes=yes,
     )
 
 
@@ -956,14 +928,11 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes):
 def prune_command(all_profiles, catalog_profile, yes):
     if all_profiles and catalog_profile is not None:
         raise click.UsageError("prune --all cannot be combined with --profile")
-    return _invoke_click(
+    return _invoke_action(
         _cli_prune,
-        _click_args(
-            "prune",
-            all_profiles=all_profiles,
-            catalog_profile=catalog_profile,
-            yes=yes,
-        ),
+        all_profiles=all_profiles,
+        catalog_profile=catalog_profile,
+        yes=yes,
     )
 
 
@@ -1005,18 +974,16 @@ def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
     """
     if all_profiles and catalog_profile is not None:
         raise click.UsageError("gc --all cannot be combined with --profile")
-    _invoke_click(
+    _invoke_action(
         _cli_prune,
-        _click_args(
-            "gc",
-            all_profiles=all_profiles,
-            catalog_profile=catalog_profile,
-            yes=yes,
-        ),
+        all_profiles=all_profiles,
+        catalog_profile=catalog_profile,
+        yes=yes,
     )
-    return _invoke_click(
+    return _invoke_action(
         _cli_reap,
-        _click_args("gc", min_age_minutes=min_age_minutes, yes=yes),
+        min_age_minutes=min_age_minutes,
+        yes=yes,
     )
 
 
@@ -1040,20 +1007,17 @@ def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
 def prune_jobs_command(all_jobs, catalog_profile, yes):
     if all_jobs == (catalog_profile is not None):
         raise click.UsageError("prune-jobs needs exactly one of --profile NAME or --all")
-    return _invoke_click(
+    return _invoke_action(
         _cli_prune_jobs,
-        _click_args(
-            "prune-jobs",
-            all_jobs=all_jobs,
-            catalog_profile=catalog_profile,
-            yes=yes,
-        ),
+        all_jobs=all_jobs,
+        catalog_profile=catalog_profile,
+        yes=yes,
     )
 
 
 @command.command("sync", help="Push current code to remote box.")
 def sync_command():
-    return _invoke_click(_cli_sync, _click_args("sync"))
+    return _invoke_action(_cli_sync)
 
 
 @click.command(
@@ -1121,20 +1085,17 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
         else "pyrite run --preset zhai --remote" + (" --detach" if detached else "")
     )
     _deprecations.warn(path, replacement=replacement)
-    return _invoke_click(
+    return _invoke_action(
         _cli_check,
-        _click_args(
-            "check",
-            ne=ne,
-            ne_brem=ne_brem,
-            ne_supp=ne_supp,
-            tmd_azimuth=tmd_azimuth,
-            refresh=refresh,
-            no_sync=no_sync,
-            detached=detached,
-            follow=follow,
-            pull=pull,
-        ),
+        ne=ne,
+        ne_brem=ne_brem,
+        ne_supp=ne_supp,
+        tmd_azimuth=tmd_azimuth,
+        refresh=refresh,
+        no_sync=no_sync,
+        detached=detached,
+        follow=follow,
+        pull=pull,
     )
 
 

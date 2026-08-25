@@ -5373,22 +5373,20 @@ def test_cli_rebrem_pulls_brem_dataset(monkeypatch):
     monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: ["mos2"])
     captured = {}
     monkeypatch.setattr(lifecycle, "pull", lambda stems, **kw: captured.update(stems=stems, kw=kw))
-    args = type(
-        "A",
-        (),
-        dict(
-            material=["mos2"],
-            all=False,
-            ne_brem=None,
-            step=None,
-            redo_all=False,
-            no_sync=False,
-            dry_run=False,
-            chunk_minutes=10.0,
-            remote_command="rebrem",
-        ),
-    )()
-    cli._cli_rebrem(args)
+    cli._cli_rebrem(
+        material=["mos2"],
+        all_=False,
+        fidelity="full",
+        ne_brem=None,
+        start=None,
+        stop=None,
+        step=None,
+        redo_all=False,
+        no_sync=False,
+        dry_run=False,
+        chunk_minutes=10.0,
+        detach=False,
+    )
     assert captured["stems"] == ["mos2"]
     assert captured["kw"].get("dataset") == "brem"
 
