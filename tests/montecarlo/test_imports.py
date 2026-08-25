@@ -84,6 +84,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
 
         # CUDA-only implementation modules must remain unloaded on CPU.
         cuda_modules = {
+            "pyrite.montecarlo.transport._jit_kernel",
             "pyrite.montecarlo.spectrum.line_jit_kernel",
             "pyrite.montecarlo.spectrum.coherent_jit_kernel",
             "pyrite.montecarlo.spectrum.brem_jit_kernel",
