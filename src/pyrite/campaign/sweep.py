@@ -32,8 +32,8 @@ from typing import Any
 
 import numpy as np
 
+from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
 from ..detectors import Detector
-from ..energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from ..materials import CATALOG, LayerSpec
 from ..montecarlo.case import Case
 from ..montecarlo.transport import spliced_stopping_keV_per_ang

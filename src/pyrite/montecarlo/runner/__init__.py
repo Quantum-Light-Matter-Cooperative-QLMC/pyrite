@@ -25,7 +25,7 @@ from ..._backend import (
     BACKEND,
 )
 from ..._compat import env_value, set_canonical_env
-from ...energy_grid.encoding import decode_energy_grid
+from ..._energy_grid_encoding import decode_energy_grid
 from .. import spectrum as _spectrum_mod
 from ..case import Case
 from ..geometry import tilted_geometry

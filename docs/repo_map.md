@@ -44,16 +44,34 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 ```text
 Components (a + b denotes a static import cycle):
   p0: _entry
-  p1: apps + campaign + checkpoints + cli + detectors + energy_grid + instrument + montecarlo + plots + remote + results + runs + validation
-  p2: devtools
-  p3: materials
-  p4: perf
+  p1: apps + campaign + checkpoints + cli + energy_grid + remote + runs
+  p2: detectors + instrument + montecarlo
+  p3: devtools
+  p4: materials
+  p5: perf
+  p6: plots
+  p7: results
+  p8: validation
 Edges (importer -> imported):
   p0 -> p1
-  p0 -> p3
-  p1 -> p3
+  p0 -> p4
+  p1 -> p2
   p1 -> p4
-  p2 -> p1
+  p1 -> p5
+  p1 -> p6
+  p1 -> p7
+  p1 -> p8
+  p2 -> p4
+  p3 -> p1
+  p3 -> p6
+  p3 -> p7
+  p6 -> p2
+  p6 -> p4
+  p6 -> p7
+  p7 -> p2
+  p7 -> p4
+  p8 -> p2
+  p8 -> p4
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -549,18 +567,16 @@ owns validation and mutation semantics.
   lazy `runs.scan` import for manifest-backed membership groups.
 
 ### `energy_grid/` (package)
-Photon-energy-grid derivation, bounds analysis, catalog application, and the
-compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
-`_energy_grid.py` into one domain package; user inspection now nests under
-`pyrite material` and `pyrite profile`).
-- `encoding.py` (was `_energy_grid.py`) is the hot-path leaf: `encode_energy_grid`
-  / `decode_energy_grid`, imported by `sweep`, `run`, `montecarlo.runner`.
+Photon-energy-grid derivation, bounds analysis, and catalog application (user
+inspection nests under `pyrite material` and `pyrite profile`). The compact
+case-grid codec shared by campaign, checkpoints, and Monte Carlo lives below
+this driver package at `pyrite._energy_grid_encoding`; `encoding.py` is its
+public compatibility facade.
 - The `pyrite energy-grid` Click group lives in `cli/commands/energy_grid.py`
   with every other CLI surface — it used to sit here as `_command.py` and be
   re-exported lazily, which put this package and `cli` in an import cycle. This
-  package is now Click-free and reaches up to nothing, so hot-path
-  `energy_grid.encoding` imports stay cheap by construction rather than by a
-  lazy `__getattr__`. Monkeypatch seams for `remote`/`cli_json`/
+  package is now Click-free and reaches up to nothing. Monkeypatch seams for
+  `remote`/`cli_json`/
   `emit_json_result` live on the command module.
 - The artifact store itself lives at `pyrite._energy_grid_artifacts` (below this
   package; see Core physics), because `materials.catalog` reads it too. `gc.py`

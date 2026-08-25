@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 
 from .._progress import _ProgressTimer, _write_progress_record
-from ..energy_grid.encoding import decode_energy_grid
+from .._energy_grid_encoding import decode_energy_grid
 from ..montecarlo import runner
 from . import _checkpoint_store
 from .persistence import (

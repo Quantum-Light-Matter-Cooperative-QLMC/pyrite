@@ -8,7 +8,7 @@ from typing import Any
 
 from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._compat import env_value
-from ...energy_grid.encoding import decode_energy_grid
+from ..._energy_grid_encoding import decode_energy_grid
 from . import (
     _BREM_CHUNK,
     _GPU,
