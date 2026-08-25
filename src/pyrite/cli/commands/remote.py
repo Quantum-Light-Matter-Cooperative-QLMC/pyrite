@@ -48,19 +48,9 @@ from ._remote_actions import (
 )
 
 
-class _ClickParser:
-    """Parser-error compatibility for reused orchestration handlers."""
-
-    @staticmethod
-    def error(message):
-        raise click.UsageError(message)
-
-
 def _click_args(command_name, **values):
     """Build handler namespace for Click orchestration callbacks."""
     values["remote_command"] = command_name
-    values["_clear_parser"] = _ClickParser
-    values["_check_parser"] = _ClickParser
     return values
 
 

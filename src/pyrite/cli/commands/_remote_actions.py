@@ -442,7 +442,7 @@ def _cli_reap(args):
 def _cli_clear(args):
     if args.catalog_profile is not None:
         if args.all_checkpoints or args.materials:
-            args._clear_parser.error("rm --profile takes no material arguments or --all")
+            raise click.UsageError("rm --profile takes no material arguments or --all")
         membership = _profile_default_materials(args.catalog_profile)
         if membership is None:
             from ...materials import CATALOG
@@ -456,11 +456,11 @@ def _cli_clear(args):
         return
     if args.all_checkpoints:
         if args.materials:
-            args._clear_parser.error("rm --all takes no material argument")
+            raise click.UsageError("rm --all takes no material argument")
         lifecycle.clear_all_remote(args.yes)
         return
     if not args.materials:
-        args._clear_parser.error("rm needs material(s), --profile, or --all")
+        raise click.UsageError("rm needs material(s), --profile, or --all")
     lifecycle.clear_remote(args.materials, args.yes)
 
 
@@ -486,7 +486,7 @@ def _cli_sync(args):
 
 def _cli_check(args):
     if args.follow and not args.detached:
-        args._check_parser.error("--follow requires --detached")
+        raise click.UsageError("--follow requires --detached")
     if args.pull:
         lifecycle.pull_zhai_cache()
         return
