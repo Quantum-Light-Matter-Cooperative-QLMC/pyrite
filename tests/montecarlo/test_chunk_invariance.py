@@ -9,7 +9,7 @@ than bit-for-bit.  This gate lets the implementation retune or replace chunked
 work without silently perturbing results.
 
 The tolerance must track the backend's accumulation precision, which
-``montecarlo._backend.REAL`` selects at import: float64 on a CPU box (or under
+``pyrite._backend.REAL`` selects at import: float64 on a CPU box (or under
 ``PYRITE_FP64=1``), float32 on a GPU. Reordering an N-term sum perturbs it by
 roughly ``sqrt(N)*eps`` relative, so a fixed float64 rtol spuriously fails on
 any GPU machine -- the historical bug this parametrization fixes. Set
@@ -19,6 +19,7 @@ any GPU machine -- the historical bug this parametrization fixes. Set
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL
 from pyrite.materials.crystal import CRYSTALS
 from pyrite.montecarlo import (
     _brem_dsigma_dk,
@@ -27,7 +28,6 @@ from pyrite.montecarlo import (
     simulate_trajectories,
     spectrum,
 )
-from pyrite.montecarlo._backend import REAL
 from pyrite.montecarlo.runner import _env_chunk
 
 xp = spectrum.xp

@@ -4,7 +4,7 @@ import warnings
 
 import psutil
 
-from .._backend import BackendResourceError
+from ..._backend import BackendResourceError
 from . import (
     _N_CPUS,
     _PIPELINE_PREFETCH_AHEAD,

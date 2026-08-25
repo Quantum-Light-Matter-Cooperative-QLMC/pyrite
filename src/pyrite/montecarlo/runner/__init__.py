@@ -20,13 +20,13 @@ from typing import Any
 import numpy as np
 import psutil
 
-from ..._compat import env_value, set_canonical_env
-from ...energy_grid.encoding import decode_energy_grid
-from .. import spectrum as _spectrum_mod
-from .._backend import (
+from ..._backend import (
     _GPU,
     BACKEND,
 )
+from ..._compat import env_value, set_canonical_env
+from ...energy_grid.encoding import decode_energy_grid
+from .. import spectrum as _spectrum_mod
 from ..case import Case
 from ..geometry import tilted_geometry
 from ..groove import blazed_groove_spec

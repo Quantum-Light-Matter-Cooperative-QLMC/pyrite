@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL
 from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
@@ -10,7 +11,6 @@ from pyrite.materials.crystal import (
     reciprocal_g_vector,
 )
 from pyrite.montecarlo import mc_spectrum
-from pyrite.montecarlo._backend import REAL
 from pyrite.montecarlo.transport import C_ANG_PER_FS
 
 E_GRID = np.arange(700.0, 1500.0)

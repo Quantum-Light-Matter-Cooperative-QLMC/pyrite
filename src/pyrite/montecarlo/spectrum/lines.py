@@ -10,6 +10,7 @@ available.
 
 import numpy as np
 
+from ..._backend import REAL, _to_cpu, xp
 from ...materials.attenuation import (
     _mu_total_inv_ang,
     _normalize_composition,
@@ -25,7 +26,6 @@ from ...materials.crystal import (
     reciprocal_g_vector,
     refractive_index,
 )
-from .._backend import REAL, _to_cpu, xp
 from ..geometry import _mosaic_quadrature, _orientation_R, first_prism_exit
 from ..groove import _THETA_TOL, escape_distance_ang
 from ..transport import (

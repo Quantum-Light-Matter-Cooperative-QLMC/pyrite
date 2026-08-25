@@ -2,9 +2,9 @@
 
 import numpy as np
 
+from ..._backend import _GPU, BACKEND
 from ..._compat import env_value
 from .. import spectrum as _spectrum_mod
-from .._backend import _GPU, BACKEND
 from .._resources import admitted_chunk, resolve_resource_policy
 
 

@@ -10,8 +10,8 @@ spectra as host ones, and a case stages exactly once however many kernels run.
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL, _to_cpu
 from pyrite.montecarlo import mc_brem_spectrum, mc_spectrum
-from pyrite.montecarlo._backend import REAL, _to_cpu
 from pyrite.montecarlo.spectrum import (
     _SEG_ARRAYS,
     _segments_in_layer,
@@ -234,7 +234,7 @@ def test_a_case_reports_its_segment_counts_from_the_host_set(monkeypatch):
 try:  # pragma: no cover - depends on the machine, not the branch
     import cupy
 
-    from pyrite.montecarlo._backend import xp as _xp
+    from pyrite._backend import xp as _xp
 
     # A device is not enough. This test hands CuPy arrays to `_segments_on_device`,
     # which stages through the SESSION's `xp` -- and `tests/conftest.py` pins the

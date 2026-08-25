@@ -32,9 +32,9 @@ import warnings
 
 import numpy as np
 
+from ..._backend import _to_cpu
 from ...materials.attenuation import _normalize_composition
 from ...materials.crystal import HBARC_EV_ANG
-from .._backend import _to_cpu
 from ..transport import (
     TRANSPORT_ELEMENTS,
     _percentile_summary,

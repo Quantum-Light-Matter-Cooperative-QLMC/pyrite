@@ -73,7 +73,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         # The import should now finish using the CPU backend.
         importlib.import_module("pyrite.campaign.config")
 
-        from pyrite.montecarlo import _backend
+        from pyrite import _backend
         from pyrite.montecarlo import runner
         from pyrite.montecarlo import spectrum
         from pyrite.montecarlo import transport
@@ -177,7 +177,7 @@ def test_config_import_does_not_require_cupy() -> None:
         # and pytest discovery.
         import pyrite.campaign.config
 
-        from pyrite.montecarlo._backend import BACKEND
+        from pyrite._backend import BACKEND
 
         assert BACKEND.name not in {"cuda", "rocm"}
 

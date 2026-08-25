@@ -5,8 +5,9 @@ import types
 import numpy as np
 import pytest
 
+from pyrite import _backend
 from pyrite._compat import env_value
-from pyrite.montecarlo import _backend, runner
+from pyrite.montecarlo import runner
 from pyrite.montecarlo._resources import GIB, admitted_chunk, resolve_resource_policy
 
 
@@ -453,7 +454,7 @@ def test_intel_machine_selects_sycl_backend() -> None:
         import sys
 
         import pyrite.campaign.config
-        from pyrite.montecarlo._backend import BACKEND
+        from pyrite._backend import BACKEND
 
         assert BACKEND.name == "sycl", (
             f"Expected SYCL backend, got {BACKEND.name!r}. "

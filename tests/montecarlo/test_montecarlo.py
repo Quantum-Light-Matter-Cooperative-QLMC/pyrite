@@ -616,8 +616,8 @@ def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):
 
 
 def test_run_cases_engine_gpu_errors_when_accelerator_unavailable(monkeypatch):
+    from pyrite._backend import BackendUnavailableError
     from pyrite.montecarlo import runner
-    from pyrite.montecarlo._backend import BackendUnavailableError
 
     monkeypatch.setattr(runner, "_GPU", False)
 

@@ -189,6 +189,16 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 
 ## Core physics
 
+### `_backend.py`
+Portable array backend shared by every device-dispatching kernel: NumPy,
+CUDA/ROCm CuPy, and Intel dpnp/SYCL adapters behind a deterministic
+`PYRITE_MC_BACKEND` selection. Exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`,
+`is_device_array`. Lives at the package root, not under `montecarlo/`, because
+`materials.attenuation` dispatches on it too — that is what keeps `materials`
+out of the `montecarlo` import cycle. Importing it runs the accelerator probe,
+so cheap-import callers (CLI, catalog parsing) reach for it inside the function
+that needs a device. Deps: `_compat`.
+
 ### `materials/` (package)
 Material domain package. Narrow top-level API expose immutable
 `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`,
@@ -283,13 +293,10 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
 - `case` — frozen, validating `Case` input schema. `build_cases` returns it;
   `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily
   accepts either representation.
-- `_backend` — portable NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL backend
-  adapters; deterministic `PYRITE_MC_BACKEND` selection
-  exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`.
 - `_resources` — execution resource-policy resolution and backend-neutral
   pre-allocation chunk admission. Small devices default conservative.
 - `materials.attenuation` — `_normalize_composition`, `_mu_total_inv_ang`, `_layer_dz`,
-  `_stack_tau` (composition + cross-stack self-absorption). Deps: `_backend`,
+  `_stack_tau` (composition + cross-stack self-absorption). Deps: `pyrite._backend`,
   `materials.crystal`.
 - `transport/` — compatibility package for the former transport monolith;
   `__init__.py` re-exports its complete pre-split surface. `api.py` owns
@@ -307,7 +314,7 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
   run to completion, output slots addressed by electron index. Same arithmetic
   as the CPU core, so the two stay one algorithm.
-  See `docs/repo-design/compute/gpu-transport-rawkernel.md`. Deps: `_backend`, `transport`.
+  See `docs/repo-design/compute/gpu-transport-rawkernel.md`. Deps: `pyrite._backend`, `transport`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum/` — compatibility package for the former flat module. `lines.py`
@@ -318,7 +325,7 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   host-only radiation error estimators `cxr_endpoint_resonance_drift` and
   `brem_endpoint_quadrature_error` plus `subdivide_flights`, none of which sit
   on a default call path. Line, brem, and coherent CUDA kernels are
-  colocated in this package and remain lazy on CPU. Deps: `_backend`,
+  colocated in this package and remain lazy on CPU. Deps: `pyrite._backend`,
   `materials.attenuation`, `transport`, `geometry`, `materials.crystal`.
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
   `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
@@ -331,7 +338,7 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   owns accelerator OOM tags, release cadence, and pool limits. `_spectrum_case`
   always stores incoherent `spec` and, when requested, `spec_coherent` from the
   same transport; `_line_pair_for_case` mirrors this for `pyrite reline`. Deps:
-  `_backend`, `transport`, `geometry`, `spectrum`.
+  `pyrite._backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
 ## Campaign, checkpoints & run drivers

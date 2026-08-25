@@ -1,8 +1,16 @@
-"""Portable array-backend selection for Monte Carlo spectrum kernels.
+"""Portable array-backend selection for every device-dispatching kernel.
 
 Selection is controlled by ``PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl``.
 Automatic selection probes CUDA/ROCm CuPy, then Intel SYCL through dpnp, and
 finally NumPy. Explicit accelerator requests fail instead of changing device.
+
+This sits at the package root rather than under ``montecarlo`` because the
+physics core dispatches on it too: ``materials.attenuation`` returns absorption
+on the same device as its input. Nothing here is Monte Carlo specific, and
+keeping it below the domain packages is what lets ``materials`` stay out of the
+``montecarlo`` import cycle. Importing this module runs the accelerator probe,
+so callers that must stay cheap at import time reach for it inside the function
+that needs a device.
 """
 
 from __future__ import annotations
@@ -16,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from .._compat import env_value
+from ._compat import env_value
 
 logger = logging.getLogger(__name__)
 

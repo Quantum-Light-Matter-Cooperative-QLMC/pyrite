@@ -111,8 +111,12 @@ def _mu_total_inv_ang(comp, E_eV):
     on-device factors), a numpy array otherwise (detector_efficiency, whose
     output is multiplied into the host-side spectra in the notebook). Keying off
     the input device -- not the global _GPU flag -- keeps the CPU post-processing
-    path numpy even when a GPU is present."""
-    from ..montecarlo._backend import REAL, _to_cpu, is_device_array, xp
+    path numpy even when a GPU is present.
+
+    The backend import stays function-local for import cost, not for cycles:
+    importing pyrite._backend runs the accelerator probe, and the catalog and
+    CLI paths that pull in this module must not pay for it."""
+    from .._backend import REAL, _to_cpu, is_device_array, xp
 
     E_cpu = _to_cpu(E_eV)
     mu = 0.0

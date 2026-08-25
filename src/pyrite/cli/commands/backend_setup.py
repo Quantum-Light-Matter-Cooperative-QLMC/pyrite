@@ -4,7 +4,7 @@ Detection is OS-tooling only (``nvidia-smi``, ``rocm-smi``/``rocminfo``,
 ``clinfo``/``sycl-ls``/``lspci``, device nodes) and never assumes a vendor
 Python package (``cupy``, ``dpnp``/``dpctl``) is installed -- those extras are
 what this command is meant to help a user *decide* to install, so requiring
-them first would defeat the point. See ``montecarlo._backend.select_backend``
+them first would defeat the point. See ``pyrite._backend.select_backend``
 for the runtime-side counterpart this command does not touch.
 """
 

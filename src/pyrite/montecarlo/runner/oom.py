@@ -1,6 +1,6 @@
 """Accelerator OOM tagging, pool release cadence, and pool limits."""
 
-from .._backend import _GPU, BACKEND
+from ..._backend import _GPU, BACKEND
 from . import (
     _FREE_EVERY,
     _FREE_WATERMARK_MB,

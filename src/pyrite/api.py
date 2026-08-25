@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from . import __version__
+from ._backend import BACKEND
 from .campaign.model import (
     BremSource,
     EmissionMode,
@@ -32,7 +33,6 @@ from .instrument.geometry import (
 from .materials import CATALOG, MediumSpec
 from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
-from .montecarlo._backend import BACKEND
 from .montecarlo.geometry import directions_to_sample_frame
 from .montecarlo.runner import run_case_directions
 from .montecarlo.transport import STOPPING_MODEL

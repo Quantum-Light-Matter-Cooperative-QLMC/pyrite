@@ -347,7 +347,7 @@ def test_stopping_mirrors_agree():
     drifting; ``campaign.sweep`` and ``spectrum.diagnostics`` need no such pin
     because they now delegate outright.
     """
-    from pyrite.montecarlo._backend import REAL
+    from pyrite._backend import REAL
     from pyrite.montecarlo.spectrum import lines
 
     composition = [("C", 0.1136), ("Si", 0.05)]

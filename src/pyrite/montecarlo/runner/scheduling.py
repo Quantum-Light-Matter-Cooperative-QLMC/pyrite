@@ -6,9 +6,9 @@ from contextlib import nullcontext
 from time import perf_counter
 from typing import Any
 
+from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._compat import env_value
 from ...energy_grid.encoding import decode_energy_grid
-from .._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from . import (
     _BREM_CHUNK,
     _GPU,

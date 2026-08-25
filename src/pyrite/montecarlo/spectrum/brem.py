@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from ..._backend import REAL, _to_cpu, xp
 from ...materials.attenuation import (
     _layer_dz,
     _layer_path_length,
@@ -9,7 +10,6 @@ from ...materials.attenuation import (
     _normalize_composition,
 )
 from ...materials.crystal import ALPHA_FS
-from .._backend import REAL, _to_cpu, xp
 from ..groove import escape_distance_ang
 from ..transport import TRANSPORT_ELEMENTS
 from .lines import (

@@ -2,7 +2,7 @@
 P3 #3 -- CLI/remote output noise.
 
 Regression coverage for silencing:
-  - the GPU/CPU backend-probe banner (montecarlo._backend), previously
+  - the GPU/CPU backend-probe banner (pyrite._backend), previously
     `print()`ed at import time on every `pyrite` invocation.
   - the "no Mott transport table for 'X'" notice (montecarlo.transport),
     previously `print()`ed the first time an element without a NIST table

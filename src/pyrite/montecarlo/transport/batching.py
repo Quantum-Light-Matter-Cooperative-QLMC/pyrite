@@ -262,7 +262,7 @@ def _cuda_transport_available():
     import and a failed import will not start succeeding.
     """
 
-    from .._backend import BACKEND
+    from ..._backend import BACKEND
 
     if BACKEND.name != "cuda":
         return False

@@ -698,7 +698,7 @@ def test_coherent_decoherence_blend_matches_reference_formula_on_device(route, m
 
     Validation: coherent-inter-electron-decoherence
     """
-    from pyrite.montecarlo._backend import REAL, xp
+    from pyrite._backend import REAL, xp
     from pyrite.montecarlo.spectrum import mc_spectrum
 
     assert getattr(xp, "__name__", "") == "cupy"

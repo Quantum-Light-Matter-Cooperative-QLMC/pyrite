@@ -3,9 +3,9 @@ import importlib
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL
 from pyrite.materials.attenuation import _mu_total_inv_ang
 from pyrite.montecarlo import _to_cpu
-from pyrite.montecarlo._backend import REAL
 from pyrite.montecarlo.groove import (
     blazed_groove_spec,
     entry_points,

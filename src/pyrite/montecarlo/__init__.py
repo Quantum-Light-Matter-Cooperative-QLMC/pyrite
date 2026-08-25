@@ -40,7 +40,7 @@ Lengths in Angstrom, energies in eV (electron energies in keV where noted).
 This module was split from a single montecarlo.py into a package; every public
 and internal name remains importable as ``from pyrite.montecarlo import X`` for
 backward compatibility. The submodules are:
-  _backend  -- GPU/CPU array backend (xp, cp, REAL, _to_cpu, _GPU)
+  pyrite._backend -- GPU/CPU array backend (xp, cp, REAL, _to_cpu, _GPU)
   pyrite.materials.attenuation -- composition normalization + X-ray self-absorption
   transport -- electron transport, scattering, stopping power
   geometry  -- tilted-sample / detector / orientation rotations
@@ -49,6 +49,7 @@ backward compatibility. The submodules are:
   runner    -- per-case driver and the pipelined run_cases sweep
 """
 
+from .._backend import _GPU, REAL, _to_cpu, cp, xp
 from ..materials.attenuation import (
     _layer_dz,
     _layer_path_length,
@@ -56,7 +57,6 @@ from ..materials.attenuation import (
     _normalize_composition,
     _stack_tau,
 )
-from ._backend import _GPU, REAL, _to_cpu, cp, xp
 from .case import Case
 from .detector import (
     aperture_fwhm_eV,
