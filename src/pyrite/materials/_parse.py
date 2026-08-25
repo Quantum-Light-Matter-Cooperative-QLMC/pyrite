@@ -1,0 +1,1382 @@
+"""Parsing and validation for schema-version-1 material catalogs."""
+
+from __future__ import annotations
+
+import logging
+import math
+import re
+import warnings
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from types import MappingProxyType
+from typing import Any, Literal, cast
+
+import numpy as np
+
+from .. import DATA_DIR
+from .._energy_grid_artifacts import ArtifactError, load_artifact
+from .._numerics import validate_profile_numerics
+from ._catalog_decode import (
+    LineGridByEnergy,
+    _direction,
+    _energy_grid_rows,
+    _Errors,
+    _grid,
+    _number,
+    _readonly,
+    _table,
+)
+from ._cif import load_crystal_from_cif
+from ._identity import MaterialIdentity
+from ._schema import (
+    _EMISSION_VALUES,
+    _PROFILE_SCALAR_NUMERICS_KEYS,
+    _SCAN_KEYS,
+    CrystalInfo,
+    CrystalSpec,
+    LayerSpec,
+    MaterialConfigError,
+    MaterialSpec,
+    MaterialValidationSpec,
+    MediumSpec,
+    ScanSpec,
+)
+from ._transport_data import TRANSPORT_ELEMENTS
+
+logger = logging.getLogger(__name__)
+
+
+def _cif_path(value: object, path: str, errors: _Errors) -> Path | None:
+    if not isinstance(value, str) or not value:
+        errors.add(path, "must be a nonempty relative path")
+        return None
+    candidate = (DATA_DIR / value).resolve()
+    cif_root = (DATA_DIR / "cifs").resolve()
+    if not candidate.is_relative_to(cif_root):
+        errors.add(path, "must stay inside packaged data/cifs")
+        return None
+    if not candidate.is_file():
+        errors.add(path, f"file does not exist ({value})")
+        return None
+    return candidate
+
+
+def _parse_info(
+    key: str, cif: Path, mosaic: float | None, path: str, errors: _Errors
+) -> CrystalInfo | None:
+    try:
+        raw = load_crystal_from_cif(cif, mosaic_fwhm_deg=mosaic)
+        lattice_raw = cast(Mapping[str, str | float], raw["lattice"])
+        lattice = MappingProxyType(dict(lattice_raw))
+        basis_items = []
+        for element, position in cast(Sequence[tuple[str, object]], raw["basis"]):
+            pos = _readonly(position)
+            basis_items.append((str(element), pos))
+        basis = tuple(basis_items)
+        volume = float(cast(int | float, raw["V_cell"]))
+        counts = Counter(element for element, _ in basis)
+        composition = tuple((element, count / volume) for element, count in counts.items())
+        return CrystalInfo(lattice, basis, volume, composition, mosaic)
+    except ModuleNotFoundError as exc:
+        if exc.name == "crystals":
+            raise MaterialConfigError(
+                (
+                    "required dependency 'crystals' is not installed; "
+                    "install the project environment with `uv sync`",
+                )
+            ) from None
+        raise
+    except Exception as exc:  # external CIF parser normalizes several exception types
+        errors.add(path, f"could not load crystal {key!r} ({exc})")
+        return None
+
+
+_MP_ID_RE = re.compile(r"^mp-\d+$")
+#: ASCII chemical formula: element symbols with optional integer counts, e.g.
+#: ``C``, ``MoS2``, ``Al2O3``. Subscripts stay ASCII so labels survive terminals,
+#: CSV exports, and filenames unchanged.
+_FORMULA_RE = re.compile(r"^(?:[A-Z][a-z]?\d*)+$")
+
+
+def _optional_text(value: object, path: str, errors: _Errors) -> str | None:
+    """Validate an optional metadata string: absent is fine, present must be nonempty."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        errors.add(path, "must be a nonempty string")
+        return None
+    return value.strip()
+
+
+def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
+    table = _table(raw, "crystals", errors)
+    if table is None:
+        return {}
+    out: dict[str, CrystalSpec] = {}
+    allowed = {
+        "cif",
+        "validation_id",
+        "formula",
+        "full_name",
+        "phase",
+        "cod_id",
+        "mp_id",
+        "B_ang2",
+        "beam_uvw",
+        "surface_hkl",
+        "mosaic_fwhm_deg",
+        "E_grid",
+        "hkl_families",
+        "hkl_reason",
+        "layers_per_cell",
+    }
+    required = {"cif", "validation_id", "formula", "B_ang2"}
+    for key, value in table.items():
+        path = f"crystals.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        errors.keys(row, path, allowed)
+        for name in sorted(required - set(row)):
+            errors.add(f"{path}.{name}", "missing required key")
+        cif = _cif_path(row.get("cif"), f"{path}.cif", errors)
+        validation_id = row.get("validation_id")
+        if not isinstance(validation_id, str) or not validation_id.strip():
+            errors.add(f"{path}.validation_id", "must be a nonempty string")
+            validation_id = ""
+        formula = row.get("formula")
+        if not isinstance(formula, str) or not formula.strip():
+            errors.add(f"{path}.formula", "must be a nonempty string")
+            formula = ""
+        elif not _FORMULA_RE.match(formula):
+            errors.add(f"{path}.formula", "must be an ASCII chemical formula")
+        full_name = _optional_text(row.get("full_name"), f"{path}.full_name", errors)
+        phase = _optional_text(row.get("phase"), f"{path}.phase", errors)
+        cod_id = row.get("cod_id")
+        if cod_id is not None and (
+            not isinstance(cod_id, int) or isinstance(cod_id, bool) or cod_id <= 0
+        ):
+            errors.add(f"{path}.cod_id", "must be a positive integer")
+            cod_id = None
+        mp_id = row.get("mp_id")
+        if mp_id is not None and (not isinstance(mp_id, str) or not _MP_ID_RE.match(mp_id)):
+            errors.add(f"{path}.mp_id", "must match 'mp-<digits>'")
+            mp_id = None
+        B = _number(row.get("B_ang2"))
+        if B is None or B < 0:
+            errors.add(f"{path}.B_ang2", "must be finite and nonnegative")
+            B = 0.0
+        has_beam = "beam_uvw" in row
+        has_surface = "surface_hkl" in row
+        if has_beam == has_surface:
+            errors.add(path, "requires exactly one of beam_uvw or surface_hkl")
+        beam = _direction(row["beam_uvw"], f"{path}.beam_uvw", errors) if has_beam else None
+        surface = (
+            _direction(row["surface_hkl"], f"{path}.surface_hkl", errors) if has_surface else None
+        )
+        mosaic_raw = row.get("mosaic_fwhm_deg")
+        mosaic = None
+        if mosaic_raw is not None:
+            mosaic_value = _number(mosaic_raw)
+            if mosaic_value is None or mosaic_value <= 0:
+                errors.add(f"{path}.mosaic_fwhm_deg", "must be finite and positive")
+            else:
+                mosaic = mosaic_value
+        e_grid = None
+        if "E_grid" in row:
+            e_grid = _grid(row["E_grid"], f"{path}.E_grid", errors)
+            if e_grid is not None and np.any(e_grid <= 0):
+                errors.add(f"{path}.E_grid", "values must be positive")
+                e_grid = None
+        families: list[tuple[int, int, int]] = []
+        hkl_raw = row.get("hkl_families")
+        reason_raw = row.get("hkl_reason")
+        if hkl_raw is not None:
+            if not isinstance(hkl_raw, list) or not hkl_raw:
+                errors.add(f"{path}.hkl_families", "must be a nonempty array")
+            else:
+                for index, item in enumerate(hkl_raw):
+                    hkl = _direction(item, f"{path}.hkl_families[{index}]", errors)
+                    if hkl is not None:
+                        first = next(component for component in hkl if component)
+                        if first < 0:
+                            errors.add(
+                                f"{path}.hkl_families[{index}]",
+                                "must use the positive representative",
+                            )
+                        elif hkl in families:
+                            errors.add(f"{path}.hkl_families[{index}]", "duplicate family")
+                        else:
+                            families.append(hkl)
+            if not isinstance(reason_raw, str) or not reason_raw.strip():
+                errors.add(f"{path}.hkl_reason", "is required when hkl_families is pinned")
+        elif reason_raw is not None:
+            errors.add(f"{path}.hkl_reason", "requires hkl_families")
+        layers_raw = row.get("layers_per_cell")
+        layers = None
+        if layers_raw is not None:
+            if not isinstance(layers_raw, int) or isinstance(layers_raw, bool) or layers_raw <= 0:
+                errors.add(f"{path}.layers_per_cell", "must be a positive integer")
+            else:
+                layers = layers_raw
+        info = _parse_info(key, cif, mosaic, f"{path}.cif", errors) if cif else None
+        if (
+            cif is not None
+            and info is not None
+            and formula
+            and (beam is not None or surface is not None)
+        ):
+            out[key] = CrystalSpec(
+                key=key,
+                cif=cif,
+                validation_id=str(validation_id),
+                formula=str(formula).strip(),
+                full_name=full_name,
+                phase=phase,
+                cod_id=cod_id if isinstance(cod_id, int) and not isinstance(cod_id, bool) else None,
+                mp_id=mp_id if isinstance(mp_id, str) else None,
+                B_ang2=B,
+                beam_uvw=beam,
+                surface_hkl=surface,
+                E_grid=e_grid,
+                hkl_families=tuple(families),
+                hkl_reason=reason_raw.strip() if isinstance(reason_raw, str) else None,
+                layers_per_cell=layers,
+                info=info,
+            )
+    return out
+
+
+def _parse_media(raw: object, errors: _Errors) -> dict[str, MediumSpec]:
+    table = _table(raw, "media", errors)
+    if table is None:
+        return {}
+    out: dict[str, MediumSpec] = {}
+    for key, value in table.items():
+        path = f"media.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        errors.keys(row, path, {"composition"})
+        comp_raw = _table(row.get("composition"), f"{path}.composition", errors)
+        composition: list[tuple[str, float]] = []
+        if comp_raw is not None:
+            if not comp_raw:
+                errors.add(f"{path}.composition", "must be nonempty")
+            for element, density in comp_raw.items():
+                density_value = _number(density)
+                if density_value is None or density_value <= 0:
+                    errors.add(f"{path}.composition.{element}", "must be finite and positive")
+                else:
+                    composition.append((element, density_value))
+        if composition:
+            out[key] = MediumSpec(key, tuple(composition))
+    return out
+
+
+def _validate_angle_grid(name: str, grid: np.ndarray, path: str, errors: _Errors) -> bool:
+    if name == "tilt_deg" and (np.any(grid < 0) or np.any(grid >= 90)):
+        errors.add(path, "values must satisfy 0 <= tilt_deg < 90")
+        return False
+    if name == "tilt_azim_deg" and (np.any(grid < 0) or np.any(grid > 360)):
+        errors.add(path, "values must satisfy 0 <= tilt_azim_deg <= 360")
+        return False
+    return True
+
+
+def _scan(
+    values: Mapping[str, object],
+    path: str,
+    crystal: CrystalSpec | None,
+    errors: _Errors,
+    *,
+    line_grid_store: LineGridByEnergy | None = None,
+) -> ScanSpec | None:
+    has_ang = "thickness_ang" in values
+    has_layers = "thickness_layers" in values
+    if has_ang == has_layers:
+        errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
+    has_line = "E_grid_line" in values
+    grids: dict[str, np.ndarray | None] = {}
+    for key in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
+        if key not in values:
+            errors.add(f"{path}.{key}", "missing required key")
+            grids[key] = None
+        else:
+            grids[key] = _grid(values[key], f"{path}.{key}", errors)
+    if has_line:
+        grids["E_grid_line"] = _grid(values["E_grid_line"], f"{path}.E_grid_line", errors)
+    else:
+        grids["E_grid_line"] = None
+    line_grids = None
+    if not has_line:
+        energy_grid = grids.get("energy_keV")
+        if energy_grid is not None:
+            # dict preserves energy_keV's declared order (e.g. 30,40,...,300),
+            # not set-hash order: the golden snapshot and E_grid_line_by_energy
+            # consumers rely on that ordering.
+            configured = list(dict.fromkeys(float(value) for value in energy_grid))
+            available = set(line_grid_store) if line_grid_store else set()
+            missing = sorted(set(configured) - available)
+            if missing:
+                errors.add(
+                    path,
+                    "requires E_grid_line, or an energy_grids store entry covering "
+                    f"beam energies {missing}",
+                )
+            elif line_grid_store:
+                line_grids = MappingProxyType(
+                    {energy: line_grid_store[energy] for energy in configured}
+                )
+    thickness = None
+    layer_grid = None
+    if has_ang:
+        thickness = _grid(values["thickness_ang"], f"{path}.thickness_ang", errors)
+    elif has_layers:
+        layer_grid = _grid(values["thickness_layers"], f"{path}.thickness_layers", errors)
+        if layer_grid is not None:
+            if np.any(layer_grid <= 0) or np.any(layer_grid != np.floor(layer_grid)):
+                errors.add(f"{path}.thickness_layers", "values must be positive integers")
+            elif crystal is None or crystal.layers_per_cell is None:
+                errors.add(
+                    f"{path}.thickness_layers",
+                    "requires the referenced crystal to define layers_per_cell",
+                )
+            else:
+                c_ang = float(crystal.lattice["c"])
+                thickness = _readonly(layer_grid * c_ang / crystal.layers_per_cell)
+    if thickness is not None and np.any(thickness <= 0):
+        errors.add(f"{path}.thickness_ang", "values must be positive")
+        thickness = None
+    for key in ("energy_keV", "E_grid_line"):
+        grid = grids.get(key)
+        if grid is not None and np.any(grid <= 0):
+            errors.add(f"{path}.{key}", "values must be positive")
+            grids[key] = None
+    brem = grids.get("E_grid_brem")
+    if brem is not None and np.any(brem < 0):
+        errors.add(f"{path}.E_grid_brem", "values must be nonnegative")
+        grids["E_grid_brem"] = None
+    for key in ("tilt_deg", "tilt_azim_deg"):
+        grid = grids.get(key)
+        if grid is not None and not _validate_angle_grid(key, grid, f"{path}.{key}", errors):
+            grids[key] = None
+    electron_grids: dict[str, np.ndarray | None] = {}
+    for key in ("n_electrons", "n_electrons_brem"):
+        grid = None
+        if key in values:
+            grid = _grid(values[key], f"{path}.{key}", errors)
+            if grid is not None and (np.any(grid <= 0) or np.any(grid != np.floor(grid))):
+                errors.add(f"{path}.{key}", "values must be positive integers")
+                grid = None
+        electron_grids[key] = grid
+    ordinary_required = ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem")
+    line_valid = grids["E_grid_line"] is not None or line_grids is not None
+    if (
+        thickness is None
+        or any(grids.get(key) is None for key in ordinary_required)
+        or not line_valid
+    ):
+        return None
+    energy_keV = grids["energy_keV"]
+    tilt_deg = grids["tilt_deg"]
+    tilt_azim_deg = grids["tilt_azim_deg"]
+    E_grid_brem = grids["E_grid_brem"]
+    assert energy_keV is not None
+    assert tilt_deg is not None
+    assert tilt_azim_deg is not None
+    assert E_grid_brem is not None
+    return ScanSpec(
+        thickness_ang=thickness,
+        thickness_layers=layer_grid,
+        energy_keV=energy_keV,
+        tilt_deg=tilt_deg,
+        tilt_azim_deg=tilt_azim_deg,
+        E_grid_line=grids["E_grid_line"],
+        E_grid_line_by_energy=line_grids,
+        E_grid_brem=E_grid_brem,
+        n_electrons=electron_grids["n_electrons"],
+        n_electrons_brem=electron_grids["n_electrons_brem"],
+    )
+
+
+_OVERRIDABLE_KEYS = frozenset(_SCAN_KEYS)
+
+
+def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
+    """Structurally validate ``[profiles.NAME.overrides.MATERIAL]`` tables.
+
+    Only well-formedness is checked here (decodable grids, mutual exclusion
+    of thickness alternatives). Full semantic validation -- merged against
+    the profile's own defaults, including line-grid energy coverage against
+    the shared ``[energy_grids.*]`` store -- happens per material in
+    ``_parse_materials`` via ``_scan``.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return
+    for material_key, value in table.items():
+        material_path = f"{path}.{material_key}"
+        row = _table(value, material_path, errors)
+        if row is None:
+            continue
+        errors.keys(row, material_path, set(_OVERRIDABLE_KEYS))
+        if "thickness_ang" in row and "thickness_layers" in row:
+            errors.add(material_path, "cannot set both thickness_ang and thickness_layers")
+        for name in _OVERRIDABLE_KEYS:
+            if name not in row:
+                continue
+            grid = _grid(row[name], f"{material_path}.{name}", errors)
+            if grid is not None:
+                _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
+
+
+# Beam *distribution* fields settable in a ``[profiles.NAME.beam]`` block. These
+# mirror the non-energy fields of ``sweep.BeamSpec`` (energy stays the per-material
+# ``ScanSpec.energy_keV`` scan grid -- decision 2); the isotropic aliases
+# ``transverse_fwhm_mm`` / ``beam_fwhm_mm`` route onto BOTH transverse planes via
+# ``sweep.beam_replace`` when the block is applied in ``config.material_sweep``.
+# Kept as local literals here to avoid a ``materials -> sweep`` import cycle.
+_BEAM_POSITIVE_KEYS = frozenset(
+    {
+        "transverse_fwhm_x_mm",
+        "transverse_fwhm_y_mm",
+        "transverse_fwhm_mm",
+        "beam_fwhm_mm",
+        "bunch_length_fs",
+        "rep_rate_hz",
+        "bunch_charge_pc",
+        "divergence_mrad",
+        "energy_spread_frac",
+    }
+)
+_BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
+_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {
+    "long_shape",
+    "long_offsets_fs",
+    "longitudinal",
+    "transverse",
+}
+_DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
+#: Accepted range per acceptance field, as ``(minimum, maximum, strictly_positive)``.
+#: These mirror ``detectors.spec.Detector.__post_init__`` exactly, including its
+#: message wording, so a catalog block and a hand-built ``Detector`` reject the
+#: same values. ``campaign.config`` applies a parsed block onto the default
+#: detector and would raise there too; the duplication buys a catalog-path error
+#: at load time instead of a bare exception mid-sweep.
+_DETECTOR_FIELD_BOUNDS: tuple[tuple[str, float, float, bool], ...] = (
+    ("observation_angle_deg", 0.0, 180.0, False),
+    ("polar_acceptance_deg", 0.0, 180.0, True),
+    ("solid_angle_sr", 0.0, 4.0 * math.pi, True),
+)
+#: Upper-bound wording for the two strictly positive fields, quoted from
+#: ``Detector.__post_init__`` so the two paths report a ceiling identically.
+_DETECTOR_UPPER_BOUND_MESSAGES = {
+    "polar_acceptance_deg": (
+        "polar_acceptance_deg is a full polar span and must be <= 180 degrees"
+    ),
+    "solid_angle_sr": "solid_angle_sr must be <= 4*pi sr",
+}
+#: A profile that omits a detector, or overrides only acceptance fields, resolves
+#: to the driver's default response (Timepix3 at 90 deg, per issue #52).
+_DEPRECATED_DETECTOR_KEYS = frozenset(
+    {
+        "response_model",
+        "qe_curve",
+        "pixel_pitch_um",
+        "sensor_thickness_um",
+        "distance_mm",
+        "threshold_eV",
+    }
+)
+_FILTER_KEYS = frozenset(
+    {
+        "name",
+        "material",
+        "thickness_mm",
+        "size_mm",
+        "distance_mm",
+        "polar_deg",
+        "azimuth_deg",
+        "roll_deg",
+        "offset_mm",
+    }
+)
+_PHYSICAL_DETECTOR_KEYS = frozenset(
+    {"distance_mm", "polar_deg", "azimuth_deg", "roll_deg", "offset_mm", "shape", "pitch_mm"}
+)
+_LONGITUDINAL_KINDS = frozenset({"gaussian", "microtrain", "compressed"})
+_LONGITUDINAL_KEYS = frozenset(
+    {
+        "kind",
+        "envelope_rms_fs",
+        "retained_coherence",
+        "target_reflection",
+        "spacing_periods",
+        "modulation_depth",
+        "timing_jitter_fs",
+    }
+)
+
+# alpha_twiss is legitimately negative -- a diverging beam past its waist -- so
+# the Twiss keys split into positive-magnitude and signed sets. Putting them all
+# in a positive-only set would reject valid profiles.
+_TRANSVERSE_POSITIVE_KEYS = frozenset(
+    {
+        "normalized_emittance_x_mm_mrad",
+        "beta_twiss_x_m",
+        "normalized_emittance_y_mm_mrad",
+        "beta_twiss_y_m",
+    }
+)
+_TRANSVERSE_SIGNED_KEYS = frozenset({"alpha_twiss_x", "alpha_twiss_y"})
+_TRANSVERSE_KEYS = _TRANSVERSE_POSITIVE_KEYS | _TRANSVERSE_SIGNED_KEYS
+_TRANSVERSE_REQUIRED_KEYS = ("normalized_emittance_x_mm_mrad", "beta_twiss_x_m")
+
+
+def _parse_longitudinal_policy(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
+    """Validate one declarative longitudinal distribution policy."""
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_LONGITUDINAL_KEYS))
+    kind = table.get("kind")
+    if not isinstance(kind, str) or kind not in _LONGITUDINAL_KINDS:
+        errors.add(f"{path}.kind", f"must be one of {sorted(_LONGITUDINAL_KINDS)}")
+        return None
+
+    out: dict[str, object] = {"kind": kind}
+    envelope = table.get("envelope_rms_fs")
+    if kind in {"gaussian", "microtrain"}:
+        number = _number(envelope)
+        if number is None or number <= 0:
+            errors.add(f"{path}.envelope_rms_fs", "must be a finite positive number")
+        else:
+            out["envelope_rms_fs"] = number
+    elif envelope is not None:
+        errors.add(f"{path}.envelope_rms_fs", "must be omitted for compressed")
+
+    eta = table.get("retained_coherence", 0.9)
+    eta_number = _number(eta)
+    if eta_number is None or not 0 < eta_number <= 1:
+        errors.add(f"{path}.retained_coherence", "must satisfy 0 < eta <= 1")
+    elif "retained_coherence" in table:
+        out["retained_coherence"] = eta_number
+
+    spacing = table.get("spacing_periods", 1)
+    if type(spacing) is not int or spacing < 1:
+        errors.add(f"{path}.spacing_periods", "must be a positive integer")
+    elif "spacing_periods" in table:
+        out["spacing_periods"] = spacing
+
+    modulation = table.get("modulation_depth", 1.0)
+    modulation_number = _number(modulation)
+    if modulation_number is None or not 0 <= modulation_number <= 1:
+        errors.add(f"{path}.modulation_depth", "must satisfy 0 <= depth <= 1")
+    elif "modulation_depth" in table:
+        out["modulation_depth"] = modulation_number
+
+    jitter = table.get("timing_jitter_fs", 0.0)
+    jitter_number = _number(jitter)
+    if jitter_number is None or jitter_number < 0:
+        errors.add(f"{path}.timing_jitter_fs", "must be finite and non-negative")
+    elif "timing_jitter_fs" in table:
+        out["timing_jitter_fs"] = jitter_number
+
+    reflection = table.get("target_reflection")
+    if reflection is not None:
+        valid = (
+            isinstance(reflection, list)
+            and len(reflection) == 3
+            and all(type(item) is int for item in reflection)
+            and any(reflection)
+        )
+        if not valid:
+            errors.add(f"{path}.target_reflection", "must be a nonzero integer triple")
+        else:
+            out["target_reflection"] = tuple(reflection)
+
+    targeted = (
+        reflection is not None
+        or eta_number != 0.9
+        or spacing != 1
+        or modulation_number != 1.0
+        or jitter_number != 0.0
+    )
+    if kind == "gaussian" and targeted:
+        errors.add(path, "gaussian does not accept target-line or modulation controls")
+    return out
+
+
+def _parse_transverse_policy(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
+    """Validate one declarative transverse Courant-Snyder policy.
+
+    The x-plane emittance and beta are required; the y-plane keys are optional
+    and mirror x when omitted. ``alpha_twiss_*`` is signed and only has to be
+    finite -- see :data:`_TRANSVERSE_SIGNED_KEYS`.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_TRANSVERSE_KEYS))
+    out: dict[str, object] = {}
+    for key, value in table.items():
+        number = _number(value)
+        if key in _TRANSVERSE_SIGNED_KEYS:
+            if number is None:
+                errors.add(f"{path}.{key}", "must be a finite number")
+            else:
+                out[key] = number
+        elif key in _TRANSVERSE_POSITIVE_KEYS:
+            if number is None or number <= 0:
+                errors.add(f"{path}.{key}", "must be a finite positive number")
+            else:
+                out[key] = number
+    missing = [key for key in _TRANSVERSE_REQUIRED_KEYS if key not in out]
+    if missing:
+        errors.add(path, f"missing required {', '.join(missing)}")
+        return None
+    return out
+
+
+def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
+    """Structurally validate a ``[profiles.NAME.beam]`` distribution block.
+
+    Distribution fields only (transverse size, bunch length/shape/offsets,
+    rep-rate, charge, reserved divergence/spread) -- ``energy_keV`` is NOT
+    accepted (it stays the per-material scan grid, decision 2). Positive
+    magnitudes must be finite and ``> 0``; ``long_shape`` is one of
+    :data:`_BEAM_LONG_SHAPES`; ``long_offsets_fs`` is an array of finite numbers
+    (any sign) coerced to a tuple. Returns the cleaned mapping, or ``None`` when
+    the block is empty or fully rejected.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_BEAM_KEYS))
+    out: dict[str, object] = {}
+    for key, value in table.items():
+        if key == "long_shape":
+            if not isinstance(value, str) or value not in _BEAM_LONG_SHAPES:
+                errors.add(f"{path}.long_shape", f"must be one of {sorted(_BEAM_LONG_SHAPES)}")
+            else:
+                out[key] = value
+        elif key == "long_offsets_fs":
+            offsets = [_number(item) for item in value] if isinstance(value, list) else None
+            if not offsets or any(item is None for item in offsets):
+                errors.add(f"{path}.long_offsets_fs", "must be a non-empty array of finite numbers")
+            else:
+                out[key] = tuple(offsets)
+        elif key == "longitudinal":
+            policy = _parse_longitudinal_policy(value, f"{path}.longitudinal", errors)
+            if policy is not None:
+                out[key] = MappingProxyType(policy)
+        elif key == "transverse":
+            transverse = _parse_transverse_policy(value, f"{path}.transverse", errors)
+            if transverse is not None:
+                out[key] = MappingProxyType(transverse)
+        elif key in _BEAM_POSITIVE_KEYS:
+            number = _number(value)
+            if number is None or number <= 0:
+                errors.add(f"{path}.{key}", "must be a finite positive number")
+            else:
+                out[key] = number
+    return out or None
+
+
+def _parse_beams(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
+    """Parse ``[beams.NAME]`` named beam objects.
+
+    Same distribution fields as an inline ``[profiles.NAME.beam]`` block, plus
+    an optional ``label``, validated with the identical field parser
+    (:func:`_parse_profile_beam`) so a named beam and its equivalent inline
+    block decode to bit-identical payloads. ``label`` is display-only metadata
+    and never joins the resolved payload a profile reference produces (decision
+    3: only field *values* may affect ``parameter_sha256``, never the beam's
+    name or label).
+    """
+    table = _table(raw, "beams", errors)
+    if table is None:
+        return {}
+    out: dict[str, Mapping[str, object]] = {}
+    for key, value in table.items():
+        path = f"beams.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        label = row.get("label")
+        if label is not None and (not isinstance(label, str) or not label.strip()):
+            errors.add(f"{path}.label", "must be a nonempty string")
+            label = None
+        fields = {k: v for k, v in row.items() if k != "label"}
+        beam = _parse_profile_beam(fields, path, errors)
+        if beam is None:
+            errors.add(path, "must define at least one beam field")
+            continue
+        if label is not None:
+            beam = {**beam, "label": label}
+        out[key] = MappingProxyType(beam)
+    return out
+
+
+def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
+    """Validate one portable ``[profiles.NAME.detector]`` block.
+
+    Returns the validated acceptance fields, not a built ``Detector``: this
+    module owns configuration parsing and stays below the detector forward
+    models, so a driver -- ``campaign.config`` -- applies the result onto the
+    default detector. This is the same shape ``_parse_physical_detector``
+    already hands to ``instrument``.
+
+    Fields are checked in ``Detector.__post_init__`` order and the first failure
+    wins, so a block that was rejected before is rejected here with the same
+    message.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS))
+    for key in sorted(table.keys() & _DEPRECATED_DETECTOR_KEYS):
+        warnings.warn(
+            f"{path}.{key} is deprecated and ignored; configure a Detector response object",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    spec: dict[str, object] = {}
+    for key, minimum, maximum, strictly_positive in _DETECTOR_FIELD_BOUNDS:
+        if key not in table:
+            continue
+        raw_value = table[key]
+        if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
+            errors.add(path, f"{key} must be a real number")
+            return None
+        value = float(raw_value)
+        if not math.isfinite(value):
+            errors.add(path, f"{key} must be finite")
+            return None
+        # A strictly positive field is range-checked against its own upper bound
+        # only after the shared ">= 0" test, matching _positive_optional().
+        upper = maximum if not strictly_positive else None
+        if value < minimum or (upper is not None and value > upper):
+            bound = "" if upper is None else f" and <= {upper:g}"
+            errors.add(path, f"{key} must be >= {minimum:g}{bound}")
+            return None
+        if strictly_positive:
+            if value == 0.0:
+                errors.add(path, f"{key} must be positive")
+                return None
+            if value > maximum:
+                errors.add(path, _DETECTOR_UPPER_BOUND_MESSAGES[key])
+                return None
+        spec[key] = value
+    return MappingProxyType(spec)
+
+
+def _pair(
+    raw: object, path: str, errors: _Errors, *, integer: bool = False
+) -> tuple[int | float, int | float] | None:
+    if not isinstance(raw, list) or len(raw) != 2:
+        errors.add(path, "must be a two-item array")
+        return None
+    if integer:
+        if any(type(item) is not int or item <= 0 for item in raw):
+            errors.add(path, "must contain two positive integers")
+            return None
+        return cast(tuple[int, int], (raw[0], raw[1]))
+    first = _number(raw[0])
+    second = _number(raw[1])
+    if first is None or second is None:
+        errors.add(path, "must contain two finite numbers")
+        return None
+    return first, second
+
+
+def _parse_filter_rows(
+    raw: object, path: str, errors: _Errors
+) -> tuple[Mapping[str, object], ...] | None:
+    if not isinstance(raw, list):
+        errors.add(path, "must be an array of tables")
+        return None
+    rows: list[Mapping[str, object]] = []
+    for index, item in enumerate(raw):
+        row_path = f"{path}[{index}]"
+        row = _table(item, row_path, errors)
+        if row is None:
+            continue
+        errors.keys(row, row_path, set(_FILTER_KEYS))
+        material = row.get("material")
+        if not isinstance(material, str) or not material:
+            errors.add(f"{row_path}.material", "must be a nonempty catalog key")
+        name = row.get("name")
+        if name is not None and (not isinstance(name, str) or not name.strip()):
+            errors.add(f"{row_path}.name", "must be a nonempty string")
+        cleaned: dict[str, object] = {key: row[key] for key in ("name", "material") if key in row}
+        for key in ("thickness_mm", "distance_mm"):
+            value = _number(row.get(key))
+            if value is None or value <= 0:
+                errors.add(f"{row_path}.{key}", "must be a finite positive number")
+            else:
+                cleaned[key] = value
+        size = _pair(row.get("size_mm"), f"{row_path}.size_mm", errors)
+        if size is not None:
+            if any(float(item) <= 0 for item in size):
+                errors.add(f"{row_path}.size_mm", "must contain positive numbers")
+            else:
+                cleaned["size_mm"] = size
+        for key, default in (("polar_deg", 90.0), ("azimuth_deg", 0.0), ("roll_deg", 0.0)):
+            value = _number(row.get(key, default))
+            if value is None or key == "polar_deg" and not 0 <= value <= 180:
+                errors.add(
+                    f"{row_path}.{key}",
+                    "must be finite" if key != "polar_deg" else "must be between 0 and 180",
+                )
+            else:
+                cleaned[key] = value
+        offset = _pair(row.get("offset_mm", [0.0, 0.0]), f"{row_path}.offset_mm", errors)
+        if offset is not None:
+            cleaned["offset_mm"] = offset
+        rows.append(MappingProxyType(cleaned))
+    return tuple(rows)
+
+
+def _parse_physical_detector(
+    raw: object, path: str, errors: _Errors
+) -> Mapping[str, object] | None:
+    row = _table(raw, path, errors)
+    if row is None:
+        return None
+    errors.keys(row, path, set(_PHYSICAL_DETECTOR_KEYS))
+    cleaned: dict[str, object] = {}
+    distance = _number(row.get("distance_mm"))
+    if distance is None or distance <= 0:
+        errors.add(f"{path}.distance_mm", "must be a finite positive number")
+    else:
+        cleaned["distance_mm"] = distance
+    for key, default in (("polar_deg", 90.0), ("azimuth_deg", 0.0), ("roll_deg", 0.0)):
+        value = _number(row.get(key, default))
+        if value is None or key == "polar_deg" and not 0 <= value <= 180:
+            errors.add(
+                f"{path}.{key}",
+                "must be finite" if key != "polar_deg" else "must be between 0 and 180",
+            )
+        else:
+            cleaned[key] = value
+    offset = _pair(row.get("offset_mm", [0.0, 0.0]), f"{path}.offset_mm", errors)
+    if offset is not None:
+        cleaned["offset_mm"] = offset
+    shape = _pair(row.get("shape", [256, 256]), f"{path}.shape", errors, integer=True)
+    if shape is not None:
+        cleaned["shape"] = shape
+    pitch = _pair(row.get("pitch_mm", [0.055, 0.055]), f"{path}.pitch_mm", errors)
+    if pitch is not None:
+        if any(float(item) <= 0 for item in pitch):
+            errors.add(f"{path}.pitch_mm", "must contain positive numbers")
+        else:
+            cleaned["pitch_mm"] = pitch
+    return MappingProxyType(cleaned)
+
+
+def _parse_detectors(
+    raw: object, errors: _Errors
+) -> tuple[dict[str, Mapping[str, object]], dict[str, str]]:
+    """Parse named ``[detectors.NAME]`` geometry objects.
+
+    Named objects use the same decoder as legacy inline profile detector
+    blocks. ``label`` is display-only and is never part of the resolved
+    acceptance spec.
+    """
+    table = _table(raw, "detectors", errors)
+    if table is None:
+        return {}, {}
+    detectors: dict[str, Mapping[str, object]] = {}
+    labels: dict[str, str] = {}
+    for key, value in table.items():
+        path = f"detectors.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        label = row.get("label")
+        if label is not None:
+            if not isinstance(label, str) or not label.strip():
+                errors.add(f"{path}.label", "must be a nonempty string")
+            else:
+                labels[key] = label
+        fields = {name: item for name, item in row.items() if name != "label"}
+        if not fields:
+            errors.add(path, "must define at least one detector geometry field")
+            continue
+        detector = _parse_profile_detector(fields, path, errors)
+        if detector is not None:
+            detectors[key] = detector
+    return detectors, labels
+
+
+def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
+    """Parse ``[profiles.*]`` campaign rows.
+
+    Schema inversion (docs/adr/0005-energy-grid-schema-decisions.md decision 2):
+    a profile carries scan defaults plus an optional ``materials`` list
+    (absent means all catalog materials) and an optional ``overrides`` table
+    keyed by material, holding per-material deltas on the same scan keys.
+    """
+    table = _table(raw, "profiles", errors)
+    if table is None:
+        return {}
+    out = {}
+    for key, value in table.items():
+        path = f"profiles.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        errors.keys(
+            row,
+            path,
+            set(_SCAN_KEYS)
+            | {
+                "materials",
+                "overrides",
+                "beam",
+                "detector",
+                "filters",
+                "physical_detector",
+                "emission",
+                *_PROFILE_SCALAR_NUMERICS_KEYS,
+                "energy_grid_refs",
+            },
+        )
+        has_ang = "thickness_ang" in row
+        has_layers = "thickness_layers" in row
+        if has_ang == has_layers:
+            errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
+        for name in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
+            if name not in row:
+                errors.add(f"{path}.{name}", "missing required key")
+        for name in _SCAN_KEYS:
+            if name in row:
+                grid = _grid(row[name], f"{path}.{name}", errors)
+                if grid is not None:
+                    _validate_angle_grid(name, grid, f"{path}.{name}", errors)
+        materials_list = row.get("materials")
+        if materials_list is not None and (
+            not isinstance(materials_list, list)
+            or not all(isinstance(item, str) and item for item in materials_list)
+        ):
+            errors.add(f"{path}.materials", "must be an array of nonempty material keys")
+        elif isinstance(materials_list, list) and len(set(materials_list)) != len(materials_list):
+            errors.add(f"{path}.materials", "must not contain duplicate material keys")
+        emission = row.get("emission")
+        if emission is not None and emission not in _EMISSION_VALUES:
+            errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
+        scalar_numerics = {name: row[name] for name in _PROFILE_SCALAR_NUMERICS_KEYS if name in row}
+        try:
+            validate_profile_numerics(scalar_numerics)
+        except ValueError as exc:
+            message = str(exc)
+            field = message.split(maxsplit=1)[0]
+            detail = message.removeprefix(field).strip()
+            errors.add(f"{path}.{field}", detail)
+        if "overrides" in row:
+            _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
+        refs = row.get("energy_grid_refs")
+        if refs is not None:
+            refs_table = _table(refs, f"{path}.energy_grid_refs", errors)
+            if refs_table is not None:
+                for material_key, digest in refs_table.items():
+                    if not isinstance(material_key, str) or not material_key:
+                        errors.add(
+                            f"{path}.energy_grid_refs", "material keys must be nonempty strings"
+                        )
+                    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                        errors.add(
+                            f"{path}.energy_grid_refs.{material_key}",
+                            "must be a 64-character lowercase SHA-256 digest",
+                        )
+        row_out = dict(row)
+        if "beam" in row_out:
+            beam_raw = row_out["beam"]
+            if isinstance(beam_raw, str):
+                # A bare string is a ``[beams.NAME]`` reference (decision 4);
+                # TOML's own duplicate-key rule already rejects a profile
+                # spelling both `beam = "NAME"` and an inline `[profiles.NAME.
+                # beam]` table under the same key, so no extra check is needed
+                # here. Resolved against `beams` once that table is parsed --
+                # see `_load_material_catalog_cached`.
+                if not beam_raw:
+                    errors.add(f"{path}.beam", "must be a nonempty beam name")
+                    del row_out["beam"]
+            else:
+                beam = _parse_profile_beam(beam_raw, f"{path}.beam", errors)
+                if beam is not None:
+                    row_out["beam"] = beam
+                else:
+                    del row_out["beam"]
+        if "detector" in row_out:
+            detector_raw = row_out["detector"]
+            if isinstance(detector_raw, str):
+                if not detector_raw:
+                    errors.add(f"{path}.detector", "must be a nonempty detector name")
+                    del row_out["detector"]
+            else:
+                detector = _parse_profile_detector(detector_raw, f"{path}.detector", errors)
+                if detector is not None:
+                    row_out["detector"] = detector
+                else:
+                    del row_out["detector"]
+        if "filters" in row_out:
+            filters = _parse_filter_rows(row_out["filters"], f"{path}.filters", errors)
+            if filters is not None:
+                row_out["filters"] = filters
+            else:
+                del row_out["filters"]
+        if "physical_detector" in row_out:
+            physical_detector = _parse_physical_detector(
+                row_out["physical_detector"], f"{path}.physical_detector", errors
+            )
+            if physical_detector is not None:
+                row_out["physical_detector"] = physical_detector
+            else:
+                del row_out["physical_detector"]
+        out[key] = row_out
+    return out
+
+
+def _parse_layer(
+    value: object,
+    path: str,
+    crystals: Mapping[str, CrystalSpec],
+    media: Mapping[str, MediumSpec],
+    errors: _Errors,
+) -> LayerSpec | None:
+    row = _table(value, path, errors)
+    if row is None:
+        return None
+    errors.keys(row, path, {"material", "thickness_ang", "beam_uvw", "azimuth_deg"})
+    material = row.get("material")
+    if not isinstance(material, str) or material not in crystals and material not in media:
+        errors.add(f"{path}.material", "must reference a crystal or medium")
+        material = ""
+    thickness = _number(row.get("thickness_ang"))
+    if thickness is None or thickness <= 0:
+        errors.add(f"{path}.thickness_ang", "must be finite and positive")
+        thickness = 0.0
+    beam = None
+    if "beam_uvw" in row:
+        beam = _direction(row["beam_uvw"], f"{path}.beam_uvw", errors)
+    azimuth = _number(row.get("azimuth_deg", 0.0))
+    if azimuth is None:
+        errors.add(f"{path}.azimuth_deg", "must be finite")
+        azimuth = 0.0
+    if material and thickness > 0:
+        return LayerSpec(material, thickness, beam, azimuth)
+    return None
+
+
+def _material_elements(
+    material: MaterialSpec,
+    crystals: Mapping[str, CrystalSpec],
+    media: Mapping[str, MediumSpec],
+) -> set[str]:
+    elements = {element for element, _ in crystals[material.crystal_key].composition}
+    refs = ([material.substrate] if material.substrate else []) + [
+        layer.material for layer in material.stack
+    ]
+    for ref in refs:
+        if ref in crystals:
+            elements.update(element for element, _ in crystals[ref].composition)
+        elif ref in media:
+            elements.update(element for element, _ in media[ref].composition)
+    return elements
+
+
+def _artifact_line_grids(identity: Mapping[str, object]) -> LineGridByEnergy:
+    """Decode a verified v1 artifact's normalized line rows exactly."""
+    rows = cast("list[Mapping[str, Any]]", identity["line_rows"])
+    decoded: dict[float, np.ndarray] = {}
+    for row in rows:
+        energy = float(row["energy_keV"])
+        grid = np.linspace(
+            float(row["start_eV"]),
+            float(row["stop_eV"]),
+            int(row["num"]),
+            endpoint=True,
+        )
+        decoded[energy] = _readonly(grid)
+    return MappingProxyType(decoded)
+
+
+def _load_profile_artifacts(
+    source: Path,
+    profiles: Mapping[str, Mapping[str, object]],
+    profile_name: str,
+    errors: _Errors,
+) -> tuple[dict[str, tuple[str, Mapping[str, object]]], dict[str, Mapping[str, str]]]:
+    """Load and verify explicit refs; leave legacy fallback entirely read-only."""
+    all_refs: dict[str, Mapping[str, str]] = {}
+    for name, row in profiles.items():
+        raw_refs = row.get("energy_grid_refs")
+        if isinstance(raw_refs, Mapping):
+            refs = {
+                str(material): str(digest)
+                for material, digest in raw_refs.items()
+                if isinstance(material, str)
+                and isinstance(digest, str)
+                and re.fullmatch(r"[0-9a-f]{64}", digest) is not None
+            }
+            all_refs[name] = MappingProxyType(refs)
+
+    selected: dict[str, tuple[str, Mapping[str, object]]] = {}
+    store_root = source.parent / "energy-grid-artifacts"
+    for material, digest in all_refs.get(profile_name, {}).items():
+        path = f"profiles.{profile_name}.energy_grid_refs.{material}"
+        try:
+            stored = load_artifact(store_root, digest)
+        except ArtifactError as exc:
+            errors.add(path, str(exc))
+            continue
+        identity = stored.identity
+        if identity.get("material") != material:
+            errors.add(
+                path,
+                f"artifact material {identity.get('material')!r} does not match ref key",
+            )
+            continue
+        selected[material] = (digest, identity)
+    return selected, all_refs
+
+
+def _parse_materials(
+    raw: object,
+    crystals: Mapping[str, CrystalSpec],
+    media: Mapping[str, MediumSpec],
+    energy_grids: Mapping[str, LineGridByEnergy],
+    errors: _Errors,
+    profiles: Mapping[str, Mapping[str, object]],
+    profile_artifacts: Mapping[str, tuple[str, Mapping[str, object]]],
+    resolved_artifact_refs: dict[str, str],
+    profile_name: str = "standard",
+) -> dict[str, MaterialSpec]:
+    table = _table(raw, "materials", errors)
+    if table is None:
+        return {}
+    out: dict[str, MaterialSpec] = {}
+
+    selected_profile = profiles.get(profile_name)
+    if not isinstance(selected_profile, Mapping):
+        errors.add(
+            f"profiles.{profile_name}",
+            "must be defined; materials resolve scan defaults from it",
+        )
+        selected_profile = {}
+
+    standard_profile = profiles.get("standard")
+    if not isinstance(standard_profile, Mapping):
+        standard_profile = selected_profile
+    membership_raw = selected_profile.get("materials")
+    selected_members = (
+        {item for item in membership_raw if isinstance(item, str)}
+        if isinstance(membership_raw, list)
+        else None
+    )
+
+    allowed = {"display_name", "crystal", "substrate", "stack", "validation"}
+    for key, value in table.items():
+        path = f"materials.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        errors.keys(row, path, allowed)
+        display_name = _optional_text(row.get("display_name"), f"{path}.display_name", errors)
+        crystal_key = row.get("crystal", key)
+        if not isinstance(crystal_key, str) or crystal_key not in crystals:
+            errors.add(f"{path}.crystal", "must reference a crystal")
+            crystal_key = ""
+
+        resolves_selected = selected_members is None or key in selected_members
+        resolving_profile_name = profile_name if resolves_selected else "standard"
+        resolving_profile = selected_profile if resolves_selected else standard_profile
+        overrides_raw = resolving_profile.get("overrides")
+        overrides = overrides_raw if isinstance(overrides_raw, Mapping) else {}
+        override_raw = overrides.get(key)
+        override: Mapping[str, object] = (
+            cast(Mapping[str, object], override_raw) if isinstance(override_raw, Mapping) else {}
+        )
+        values = {name: resolving_profile[name] for name in _SCAN_KEYS if name in resolving_profile}
+        if "thickness_ang" in override or "thickness_layers" in override:
+            values.pop("thickness_ang", None)
+            values.pop("thickness_layers", None)
+        values.update({name: override[name] for name in _SCAN_KEYS if name in override})
+
+        artifact = profile_artifacts.get(key) if resolves_selected else None
+        artifact_line_grids = None
+        if artifact is not None:
+            digest, identity = artifact
+            artifact_energies = cast("list[float]", identity["beam_energies_keV"])
+            values["energy_keV"] = {"values": list(artifact_energies)}
+            brem = cast("Mapping[str, float]", identity["brem_grid"])
+            values["E_grid_brem"] = {
+                "arange": {
+                    "start": float(brem["start_eV"]),
+                    "stop": float(brem["stop_eV"]),
+                    "step": float(brem["step_eV"]),
+                }
+            }
+            values.pop("E_grid_line", None)
+            artifact_line_grids = _artifact_line_grids(identity)
+            resolved_artifact_refs[key] = digest
+
+        scan = _scan(
+            values,
+            f"{path}.scan",
+            crystals.get(str(crystal_key)),
+            errors,
+            line_grid_store=(
+                artifact_line_grids
+                if artifact_line_grids is not None
+                else energy_grids.get(
+                    key,
+                    energy_grids.get(
+                        resolving_profile_name,
+                        energy_grids.get("standard"),
+                    ),
+                )
+            ),
+        )
+        substrate = row.get("substrate")
+        if substrate is not None and (
+            not isinstance(substrate, str) or substrate not in crystals and substrate not in media
+        ):
+            errors.add(f"{path}.substrate", "must reference a crystal or medium")
+            substrate = None
+        stack_raw = row.get("stack", [])
+        layers: list[LayerSpec] = []
+        if "stack" in row:
+            if not isinstance(stack_raw, list) or not stack_raw:
+                errors.add(f"{path}.stack", "must be a nonempty array of layers")
+            else:
+                for index, item in enumerate(stack_raw):
+                    layer = _parse_layer(item, f"{path}.stack[{index}]", crystals, media, errors)
+                    if layer is not None:
+                        layers.append(layer)
+        if substrate is not None and "stack" in row:
+            errors.add(path, "cannot define both substrate and stack")
+        validation = MaterialValidationSpec()
+        validation_raw = row.get("validation")
+        if validation_raw is not None:
+            validation_row = _table(validation_raw, f"{path}.validation", errors)
+            if validation_row is not None:
+                errors.keys(
+                    validation_row,
+                    f"{path}.validation",
+                    {"crystal_database_match"},
+                )
+                crystal_database_match = validation_row.get("crystal_database_match")
+                if crystal_database_match not in {"verified", "unverified"}:
+                    errors.add(
+                        f"{path}.validation.crystal_database_match",
+                        "must be 'verified' or 'unverified'",
+                    )
+                else:
+                    validation = MaterialValidationSpec(
+                        crystal_database_match=cast(
+                            Literal["verified", "unverified"], crystal_database_match
+                        )
+                    )
+        if crystal_key and scan is not None:
+            crystal = crystals[str(crystal_key)]
+            out[key] = MaterialSpec(
+                key,
+                MaterialIdentity(
+                    formula=crystal.formula,
+                    phase=crystal.phase,
+                    full_name=crystal.full_name,
+                    cut=crystal.cut,
+                    cut_frame=crystal.cut_frame,
+                    display_name=display_name,
+                ),
+                resolving_profile_name,
+                crystal_key,
+                scan,
+                substrate,
+                tuple(layers),
+                validation,
+            )
+
+    for profile_key, profile_row in profiles.items():
+        materials_list = profile_row.get("materials")
+        if isinstance(materials_list, list):
+            for material_key in materials_list:
+                if isinstance(material_key, str) and material_key not in table:
+                    errors.add(
+                        f"profiles.{profile_key}.materials", f"unknown material {material_key!r}"
+                    )
+        profile_overrides = profile_row.get("overrides")
+        if isinstance(profile_overrides, Mapping):
+            for material_key in profile_overrides:
+                if material_key not in table:
+                    errors.add(
+                        f"profiles.{profile_key}.overrides.{material_key}", "unknown material"
+                    )
+        profile_refs = profile_row.get("energy_grid_refs")
+        if isinstance(profile_refs, Mapping):
+            for material_key in profile_refs:
+                if material_key not in table:
+                    errors.add(
+                        f"profiles.{profile_key}.energy_grid_refs.{material_key}",
+                        "unknown material",
+                    )
+    for material_key in energy_grids:
+        if material_key not in table and material_key not in profiles:
+            errors.add(f"energy_grids.{material_key}", "unknown material")
+    for key, material in out.items():
+        unsupported = sorted(
+            _material_elements(material, crystals, media) - set(TRANSPORT_ELEMENTS)
+        )
+        if unsupported:
+            errors.add(
+                f"materials.{key}",
+                f"runnable composition has unsupported transport elements {unsupported}",
+            )
+    return out
+
+
+def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEnergy]:
+    """Parse the shared per-material derived-grid store: ``[energy_grids.*]``.
+
+    Decision 3 (docs/adr/0005-energy-grid-schema-decisions.md): line-grid bounds
+    live here, keyed by material, independent of any profile -- so profile
+    edits can never delete expensive Monte-Carlo-derived bounds; only an
+    explicit ``pyrite energy-grid line delete`` can. Absent entirely means no
+    material has a store entry (materials must then set ``E_grid_line``).
+    """
+    table = _table(raw, "energy_grids", errors)
+    if table is None:
+        return {}
+    out: dict[str, LineGridByEnergy] = {}
+    for material_key, value in table.items():
+        path = f"energy_grids.{material_key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        errors.keys(row, path, {"line_by_energy"})
+        if "line_by_energy" not in row:
+            errors.add(f"{path}.line_by_energy", "missing required key")
+            continue
+        rows = _energy_grid_rows(row["line_by_energy"], f"{path}.line_by_energy", errors)
+        if rows is not None:
+            out[material_key] = rows
+    return out
+
+
+def _warn_missing_mott(materials: Mapping[str, MaterialSpec], crystals, media) -> None:
+    elements = set()
+    for material in materials.values():
+        elements.update(_material_elements(material, crystals, media))
+    mott_dir = DATA_DIR / "mott_transport_cross_sections"
+    for element in sorted(elements):
+        path = mott_dir / f"DisplayCalcTCSTableFor{element}.csv"
+        if not path.exists():
+            logger.warning(
+                "material catalog: no Mott transport table for %s; transport will use the analytic fallback",
+                element,
+            )
