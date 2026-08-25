@@ -52,6 +52,7 @@ def _inspect_wheel(wheel: Path) -> None:
     assert "pyrite/__init__.py" in names
     assert "pyrite/data/materials.toml" in names
     assert "pyrite/apps/analysis_app.py" in names
+    assert "pyrite/apps/_design.css" in names
     assert "pyrite/apps/trace_app.py" in names
     assert "pyrite/apps/validation_app.py" in names
     assert "pyrite/apps/validation_defaults.json" in names

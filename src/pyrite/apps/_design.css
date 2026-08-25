@@ -1,0 +1,252 @@
+<style>
+  html[data-pyrite-theme="dark"],
+  body[data-theme="dark"] {
+    --pyrite-bg: ${DARK_BG};
+    --pyrite-surface: ${DARK_SURFACE};
+    --pyrite-text: ${DARK_TEXT};
+    --pyrite-muted: ${DARK_MUTED};
+    --pyrite-subtle: ${DARK_SUBTLE};
+    --pyrite-rule: ${DARK_RULE};
+    --pyrite-focus: ${DARK_FOCUS};
+    --pyrite-compute: ${DARK_COMPUTE};
+    --pyrite-failure: ${DARK_FAILURE};
+    --pyrite-done: ${DARK_DONE};
+    --background: ${DARK_BG};
+    --foreground: ${DARK_TEXT};
+    --muted: ${DARK_SURFACE};
+    --muted-foreground: ${DARK_MUTED};
+    --popover: ${DARK_SURFACE};
+    --popover-foreground: ${DARK_TEXT};
+    --card: ${DARK_SURFACE};
+    --card-foreground: ${DARK_TEXT};
+    --border: ${DARK_RULE};
+    --input: ${DARK_SURFACE};
+    --primary: ${DARK_FOCUS};
+    --primary-foreground: ${DARK_BG};
+    --secondary: ${DARK_SURFACE};
+    --secondary-foreground: ${DARK_TEXT};
+    --accent: ${DARK_RULE};
+    --accent-foreground: ${DARK_TEXT};
+    --ring: ${DARK_FOCUS};
+    color-scheme: dark;
+  }
+  html[data-pyrite-theme="light"],
+  body[data-theme="light"] {
+    --pyrite-bg: ${LIGHT_BG};
+    --pyrite-surface: ${LIGHT_SURFACE};
+    --pyrite-text: ${LIGHT_TEXT};
+    --pyrite-muted: ${LIGHT_MUTED};
+    --pyrite-subtle: ${LIGHT_SUBTLE};
+    --pyrite-rule: ${LIGHT_RULE};
+    --pyrite-focus: ${LIGHT_FOCUS};
+    --pyrite-compute: ${LIGHT_COMPUTE};
+    --pyrite-failure: ${LIGHT_FAILURE};
+    --pyrite-done: ${LIGHT_DONE};
+    --background: ${LIGHT_BG};
+    --foreground: ${LIGHT_TEXT};
+    --muted: #EEF3F5;
+    --muted-foreground: ${LIGHT_MUTED};
+    --popover: ${LIGHT_SURFACE};
+    --popover-foreground: ${LIGHT_TEXT};
+    --card: ${LIGHT_SURFACE};
+    --card-foreground: ${LIGHT_TEXT};
+    --border: ${LIGHT_RULE};
+    --input: ${LIGHT_SURFACE};
+    --primary: ${LIGHT_FOCUS};
+    --primary-foreground: #FFFFFF;
+    --secondary: #E8EFF2;
+    --secondary-foreground: ${LIGHT_TEXT};
+    --accent: #E3EEF1;
+    --accent-foreground: ${LIGHT_TEXT};
+    --ring: ${LIGHT_FOCUS};
+    color-scheme: light;
+  }
+  .pyrite-shell {
+    color: var(--pyrite-text);
+    font-family: ${TYPOGRAPHY_BODY};
+    max-width: 100%;
+  }
+  body:has(.pyrite-shell) {
+    background: var(--pyrite-bg, ${DARK_BG});
+    color: var(--pyrite-text, ${DARK_TEXT});
+  }
+  body:has(.pyrite-shell) :is(button, input, select, [tabindex]):focus-visible {
+    outline: ${FOCUS_WIDTH} solid var(--pyrite-focus, ${DARK_FOCUS});
+    outline-offset: ${FOCUS_OFFSET};
+  }
+  body:has(.pyrite-shell) :is(button, select, input:not([type="hidden"])) {
+    min-height: 44px;
+  }
+  .pyrite-theme-select {
+    display: inline-flex; align-items: center; gap: .55rem;
+    color: var(--pyrite-muted); font: 600 .7rem/1.2 ${TYPOGRAPHY_DATA};
+    letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+  }
+  .pyrite-theme-select__control {
+    min-height: 36px !important; padding: .25rem 1.8rem .25rem .55rem;
+    border: 1px solid var(--pyrite-rule); border-radius: ${BORDERS_RADIUS};
+    background: var(--pyrite-surface); color: var(--pyrite-text);
+    font: 500 .78rem/1.2 ${TYPOGRAPHY_DATA}; letter-spacing: 0;
+    text-transform: none;
+  }
+  /* Legacy/non-shadow Marimo surfaces and native-select fallbacks. Current
+     Marimo custom elements are synchronized inside their open shadow roots by
+     ThemeSelect because document styles cannot cross the shadow boundary. */
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-content"],
+    [data-slot="dropdown-menu-content"],
+    [data-radix-select-content],
+    [role="listbox"],
+    [role="menu"],
+    [data-radix-popper-content-wrapper] > [data-side]
+  ) {
+    background: ${LIGHT_SURFACE} !important;
+    background-color: ${LIGHT_SURFACE} !important;
+    color: ${LIGHT_TEXT} !important;
+    border-color: ${LIGHT_RULE} !important;
+    color-scheme: light !important;
+  }
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-viewport"],
+    [data-radix-select-viewport]
+  ) {
+    background: ${LIGHT_SURFACE} !important;
+    color: ${LIGHT_TEXT} !important;
+  }
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-item"],
+    [data-radix-select-item],
+    [role="option"],
+    [role="menuitem"]
+  ) {
+    background: transparent !important;
+    color: ${LIGHT_TEXT} !important;
+  }
+  html[data-pyrite-theme="light"] :is(
+    [data-slot="select-item"],
+    [data-radix-select-item],
+    [role="option"],
+    [role="menuitem"]
+  ):is(:hover, :focus, [data-highlighted], [data-state="checked"]) {
+    background: #E3EEF1 !important;
+    color: ${LIGHT_TEXT} !important;
+  }
+  html[data-pyrite-theme="light"] :is(
+    button[role="combobox"],
+    button[aria-haspopup="listbox"]
+  ) {
+    background: ${LIGHT_SURFACE} !important;
+    color: ${LIGHT_TEXT} !important;
+    border-color: ${LIGHT_RULE} !important;
+  }
+  /* Compatibility with marimo releases that style selects through utility
+     classes instead of data-slot attributes, plus native <select> fallbacks. */
+  html[data-pyrite-theme="light"] :is(.bg-popover, .bg-background) {
+    background-color: ${LIGHT_SURFACE} !important;
+  }
+  html[data-pyrite-theme="light"] :is(.text-popover-foreground, .text-foreground) {
+    color: ${LIGHT_TEXT} !important;
+  }
+  html[data-pyrite-theme="light"] select,
+  html[data-pyrite-theme="light"] select option,
+  html[data-pyrite-theme="light"] select optgroup {
+    background-color: ${LIGHT_SURFACE} !important;
+    color: ${LIGHT_TEXT} !important;
+    color-scheme: light !important;
+  }
+  /* Legacy/non-shadow tab fallback; ThemeSelect owns current shadow roots. */
+  html[data-pyrite-theme="light"] :is([role="tablist"], .bg-muted) {
+    background-color: ${LIGHT_SURFACE} !important;
+  }
+  html[data-pyrite-theme="light"] :is([role="tab"], .text-muted-foreground) {
+    color: ${LIGHT_MUTED} !important;
+  }
+  html[data-pyrite-theme="light"] [role="tab"][data-state="active"] {
+    background-color: ${LIGHT_BG} !important;
+    color: ${LIGHT_TEXT} !important;
+  }
+  html[data-pyrite-theme="light"] [role="tabpanel"] {
+    color: ${LIGHT_TEXT} !important;
+  }
+  .pyrite-title { max-width: ${WIDTHS_PROSE}; margin: 0 0 1.25rem; }
+  .pyrite-title__eyebrow {
+    color: var(--pyrite-focus); font: 600 .75rem/1.2 ${TYPOGRAPHY_DATA};
+    letter-spacing: .14em;
+  }
+  .pyrite-title h1 {
+    font-family: ${TYPOGRAPHY_DISPLAY};
+    font-size: clamp(2rem, 4vw, 3.4rem); line-height: .98; margin: .35rem 0 .7rem;
+  }
+  .pyrite-title p { color: var(--pyrite-subtle); line-height: 1.55; margin: 0; }
+  .pyrite-rail {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem 1.4rem;
+    border-block: ${BORDERS_WIDTH} solid var(--pyrite-rule);
+    margin: .6rem 0 .9rem; padding: .5rem 0;
+  }
+  .pyrite-rail__item {
+    display: flex; align-items: baseline; gap: .5rem; min-width: 0;
+    border-left: 2px solid var(--pyrite-focus); padding-left: .6rem;
+  }
+  .pyrite-rail dt {
+    color: var(--pyrite-muted); font: 600 .64rem/1.2 ${TYPOGRAPHY_DATA};
+    letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+  }
+  .pyrite-rail dd {
+    color: var(--pyrite-text); font: 500 .85rem/1.2 ${TYPOGRAPHY_DATA};
+    margin: 0; white-space: nowrap;
+  }
+  .pyrite-badge {
+    border: 1px solid currentColor; border-radius: 999px; display: inline-block;
+    font: 600 .72rem/1 ${TYPOGRAPHY_DATA}; padding: .38rem .62rem;
+  }
+  .pyrite-badge--failed { color: var(--pyrite-failure); }
+  .pyrite-badge--running, .pyrite-badge--interpret { color: var(--pyrite-compute); }
+  .pyrite-badge--ready, .pyrite-badge--cached, .pyrite-badge--passed { color: var(--pyrite-focus); }
+  .pyrite-grid { display: grid; gap: .28rem; align-items: end; }
+  .pyrite-grid__corner, .pyrite-grid__col, .pyrite-grid__row {
+    color: var(--pyrite-muted); font: 600 .62rem/1.1 ${TYPOGRAPHY_DATA};
+    letter-spacing: .04em; white-space: nowrap;
+  }
+  .pyrite-grid__col { text-align: center; align-self: end; }
+  .pyrite-grid__row { text-align: right; align-self: center; padding-right: .3rem; }
+  .pyrite-grid__cell {
+    position: relative; aspect-ratio: 1 / 1; width: 100%; min-width: 12px;
+    border-radius: 2px; background: var(--pyrite-surface);
+    box-shadow: inset 0 0 0 1px var(--pyrite-rule); overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pyrite-grid__marker {
+    display: flex; flex-direction: column-reverse; border-radius: 1px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pyrite-text) 25%, transparent);
+  }
+  .pyrite-grid__seg { width: 100%; }
+  .pyrite-grid__seg--cached { background: var(--pyrite-focus); }
+  .pyrite-grid__seg--done { background: var(--pyrite-done); }
+  .pyrite-grid__seg--running { background: var(--pyrite-compute); }
+  .pyrite-grid__seg--excluded { background: var(--pyrite-failure); }
+  .pyrite-grid__legend {
+    display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .6rem;
+    color: var(--pyrite-muted); font: 500 .68rem/1.2 ${TYPOGRAPHY_DATA};
+  }
+  .pyrite-grid__legend span { display: inline-flex; align-items: center; gap: .35rem; }
+  .pyrite-grid__swatch {
+    width: .72rem; height: .72rem; border-radius: 2px;
+    box-shadow: inset 0 0 0 1px var(--pyrite-rule);
+  }
+  .pyrite-group { border-left: 2px solid var(--pyrite-rule); padding: .35rem 0 .35rem 1rem; }
+  .pyrite-group__label {
+    color: var(--pyrite-muted); font: 600 .72rem/1.2 ${TYPOGRAPHY_DATA};
+    letter-spacing: .08em; margin-bottom: .65rem; text-transform: uppercase;
+  }
+  @media (max-width: ${WIDTHS_BREAKPOINT}) {
+    .pyrite-title h1 { font-size: 2rem; }
+    .pyrite-theme-select__label { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body:has(.pyrite-shell) *,
+    body:has(.pyrite-shell) *::before,
+    body:has(.pyrite-shell) *::after {
+      animation-duration: .01ms !important; transition-duration: .01ms !important;
+    }
+  }
+</style>

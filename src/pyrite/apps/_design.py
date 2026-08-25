@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from html import escape
+from importlib.resources import files
+from string import Template
 
 THEMES = {
     "dark": {
@@ -67,260 +69,39 @@ def notebook_css() -> str:
     """Return shared light/dark CSS; the resolved mode lives on body[data-theme]."""
     dark = THEMES["dark"]
     light = THEMES["light"]
-    return f"""
-<style>
-  html[data-pyrite-theme="dark"],
-  body[data-theme="dark"] {{
-    --pyrite-bg: {dark["bg"]};
-    --pyrite-surface: {dark["surface"]};
-    --pyrite-text: {dark["text"]};
-    --pyrite-muted: {dark["muted"]};
-    --pyrite-subtle: {dark["subtle"]};
-    --pyrite-rule: {dark["rule"]};
-    --pyrite-focus: {dark["focus"]};
-    --pyrite-compute: {dark["compute"]};
-    --pyrite-failure: {dark["failure"]};
-    --pyrite-done: {dark["done"]};
-    --background: {dark["bg"]};
-    --foreground: {dark["text"]};
-    --muted: {dark["surface"]};
-    --muted-foreground: {dark["muted"]};
-    --popover: {dark["surface"]};
-    --popover-foreground: {dark["text"]};
-    --card: {dark["surface"]};
-    --card-foreground: {dark["text"]};
-    --border: {dark["rule"]};
-    --input: {dark["surface"]};
-    --primary: {dark["focus"]};
-    --primary-foreground: {dark["bg"]};
-    --secondary: {dark["surface"]};
-    --secondary-foreground: {dark["text"]};
-    --accent: {dark["rule"]};
-    --accent-foreground: {dark["text"]};
-    --ring: {dark["focus"]};
-    color-scheme: dark;
-  }}
-  html[data-pyrite-theme="light"],
-  body[data-theme="light"] {{
-    --pyrite-bg: {light["bg"]};
-    --pyrite-surface: {light["surface"]};
-    --pyrite-text: {light["text"]};
-    --pyrite-muted: {light["muted"]};
-    --pyrite-subtle: {light["subtle"]};
-    --pyrite-rule: {light["rule"]};
-    --pyrite-focus: {light["focus"]};
-    --pyrite-compute: {light["compute"]};
-    --pyrite-failure: {light["failure"]};
-    --pyrite-done: {light["done"]};
-    --background: {light["bg"]};
-    --foreground: {light["text"]};
-    --muted: #EEF3F5;
-    --muted-foreground: {light["muted"]};
-    --popover: {light["surface"]};
-    --popover-foreground: {light["text"]};
-    --card: {light["surface"]};
-    --card-foreground: {light["text"]};
-    --border: {light["rule"]};
-    --input: {light["surface"]};
-    --primary: {light["focus"]};
-    --primary-foreground: #FFFFFF;
-    --secondary: #E8EFF2;
-    --secondary-foreground: {light["text"]};
-    --accent: #E3EEF1;
-    --accent-foreground: {light["text"]};
-    --ring: {light["focus"]};
-    color-scheme: light;
-  }}
-  .pyrite-shell {{
-    color: var(--pyrite-text);
-    font-family: {TYPOGRAPHY["body"]};
-    max-width: 100%;
-  }}
-  body:has(.pyrite-shell) {{
-    background: var(--pyrite-bg, {dark["bg"]});
-    color: var(--pyrite-text, {dark["text"]});
-  }}
-  body:has(.pyrite-shell) :is(button, input, select, [tabindex]):focus-visible {{
-    outline: {FOCUS["width"]} solid var(--pyrite-focus, {dark["focus"]});
-    outline-offset: {FOCUS["offset"]};
-  }}
-  body:has(.pyrite-shell) :is(button, select, input:not([type="hidden"])) {{
-    min-height: 44px;
-  }}
-  .pyrite-theme-select {{
-    display: inline-flex; align-items: center; gap: .55rem;
-    color: var(--pyrite-muted); font: 600 .7rem/1.2 {TYPOGRAPHY["data"]};
-    letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
-  }}
-  .pyrite-theme-select__control {{
-    min-height: 36px !important; padding: .25rem 1.8rem .25rem .55rem;
-    border: 1px solid var(--pyrite-rule); border-radius: {BORDERS["radius"]};
-    background: var(--pyrite-surface); color: var(--pyrite-text);
-    font: 500 .78rem/1.2 {TYPOGRAPHY["data"]}; letter-spacing: 0;
-    text-transform: none;
-  }}
-  /* Legacy/non-shadow Marimo surfaces and native-select fallbacks. Current
-     Marimo custom elements are synchronized inside their open shadow roots by
-     ThemeSelect because document styles cannot cross the shadow boundary. */
-  html[data-pyrite-theme="light"] :is(
-    [data-slot="select-content"],
-    [data-slot="dropdown-menu-content"],
-    [data-radix-select-content],
-    [role="listbox"],
-    [role="menu"],
-    [data-radix-popper-content-wrapper] > [data-side]
-  ) {{
-    background: {light["surface"]} !important;
-    background-color: {light["surface"]} !important;
-    color: {light["text"]} !important;
-    border-color: {light["rule"]} !important;
-    color-scheme: light !important;
-  }}
-  html[data-pyrite-theme="light"] :is(
-    [data-slot="select-viewport"],
-    [data-radix-select-viewport]
-  ) {{
-    background: {light["surface"]} !important;
-    color: {light["text"]} !important;
-  }}
-  html[data-pyrite-theme="light"] :is(
-    [data-slot="select-item"],
-    [data-radix-select-item],
-    [role="option"],
-    [role="menuitem"]
-  ) {{
-    background: transparent !important;
-    color: {light["text"]} !important;
-  }}
-  html[data-pyrite-theme="light"] :is(
-    [data-slot="select-item"],
-    [data-radix-select-item],
-    [role="option"],
-    [role="menuitem"]
-  ):is(:hover, :focus, [data-highlighted], [data-state="checked"]) {{
-    background: #E3EEF1 !important;
-    color: {light["text"]} !important;
-  }}
-  html[data-pyrite-theme="light"] :is(
-    button[role="combobox"],
-    button[aria-haspopup="listbox"]
-  ) {{
-    background: {light["surface"]} !important;
-    color: {light["text"]} !important;
-    border-color: {light["rule"]} !important;
-  }}
-  /* Compatibility with marimo releases that style selects through utility
-     classes instead of data-slot attributes, plus native <select> fallbacks. */
-  html[data-pyrite-theme="light"] :is(.bg-popover, .bg-background) {{
-    background-color: {light["surface"]} !important;
-  }}
-  html[data-pyrite-theme="light"] :is(.text-popover-foreground, .text-foreground) {{
-    color: {light["text"]} !important;
-  }}
-  html[data-pyrite-theme="light"] select,
-  html[data-pyrite-theme="light"] select option,
-  html[data-pyrite-theme="light"] select optgroup {{
-    background-color: {light["surface"]} !important;
-    color: {light["text"]} !important;
-    color-scheme: light !important;
-  }}
-  /* Legacy/non-shadow tab fallback; ThemeSelect owns current shadow roots. */
-  html[data-pyrite-theme="light"] :is([role="tablist"], .bg-muted) {{
-    background-color: {light["surface"]} !important;
-  }}
-  html[data-pyrite-theme="light"] :is([role="tab"], .text-muted-foreground) {{
-    color: {light["muted"]} !important;
-  }}
-  html[data-pyrite-theme="light"] [role="tab"][data-state="active"] {{
-    background-color: {light["bg"]} !important;
-    color: {light["text"]} !important;
-  }}
-  html[data-pyrite-theme="light"] [role="tabpanel"] {{
-    color: {light["text"]} !important;
-  }}
-  .pyrite-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
-  .pyrite-title__eyebrow {{
-    color: var(--pyrite-focus); font: 600 .75rem/1.2 {TYPOGRAPHY["data"]};
-    letter-spacing: .14em;
-  }}
-  .pyrite-title h1 {{
-    font-family: {TYPOGRAPHY["display"]};
-    font-size: clamp(2rem, 4vw, 3.4rem); line-height: .98; margin: .35rem 0 .7rem;
-  }}
-  .pyrite-title p {{ color: var(--pyrite-subtle); line-height: 1.55; margin: 0; }}
-  .pyrite-rail {{
-    display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem 1.4rem;
-    border-block: {BORDERS["width"]} solid var(--pyrite-rule);
-    margin: .6rem 0 .9rem; padding: .5rem 0;
-  }}
-  .pyrite-rail__item {{
-    display: flex; align-items: baseline; gap: .5rem; min-width: 0;
-    border-left: 2px solid var(--pyrite-focus); padding-left: .6rem;
-  }}
-  .pyrite-rail dt {{
-    color: var(--pyrite-muted); font: 600 .64rem/1.2 {TYPOGRAPHY["data"]};
-    letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
-  }}
-  .pyrite-rail dd {{
-    color: var(--pyrite-text); font: 500 .85rem/1.2 {TYPOGRAPHY["data"]};
-    margin: 0; white-space: nowrap;
-  }}
-  .pyrite-badge {{
-    border: 1px solid currentColor; border-radius: 999px; display: inline-block;
-    font: 600 .72rem/1 {TYPOGRAPHY["data"]}; padding: .38rem .62rem;
-  }}
-  .pyrite-badge--failed {{ color: var(--pyrite-failure); }}
-  .pyrite-badge--running, .pyrite-badge--interpret {{ color: var(--pyrite-compute); }}
-  .pyrite-badge--ready, .pyrite-badge--cached, .pyrite-badge--passed {{ color: var(--pyrite-focus); }}
-  .pyrite-grid {{ display: grid; gap: .28rem; align-items: end; }}
-  .pyrite-grid__corner, .pyrite-grid__col, .pyrite-grid__row {{
-    color: var(--pyrite-muted); font: 600 .62rem/1.1 {TYPOGRAPHY["data"]};
-    letter-spacing: .04em; white-space: nowrap;
-  }}
-  .pyrite-grid__col {{ text-align: center; align-self: end; }}
-  .pyrite-grid__row {{ text-align: right; align-self: center; padding-right: .3rem; }}
-  .pyrite-grid__cell {{
-    position: relative; aspect-ratio: 1 / 1; width: 100%; min-width: 12px;
-    border-radius: 2px; background: var(--pyrite-surface);
-    box-shadow: inset 0 0 0 1px var(--pyrite-rule); overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
-  }}
-  .pyrite-grid__marker {{
-    display: flex; flex-direction: column-reverse; border-radius: 1px;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pyrite-text) 25%, transparent);
-  }}
-  .pyrite-grid__seg {{ width: 100%; }}
-  .pyrite-grid__seg--cached {{ background: var(--pyrite-focus); }}
-  .pyrite-grid__seg--done {{ background: var(--pyrite-done); }}
-  .pyrite-grid__seg--running {{ background: var(--pyrite-compute); }}
-  .pyrite-grid__seg--excluded {{ background: var(--pyrite-failure); }}
-  .pyrite-grid__legend {{
-    display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .6rem;
-    color: var(--pyrite-muted); font: 500 .68rem/1.2 {TYPOGRAPHY["data"]};
-  }}
-  .pyrite-grid__legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
-  .pyrite-grid__swatch {{
-    width: .72rem; height: .72rem; border-radius: 2px;
-    box-shadow: inset 0 0 0 1px var(--pyrite-rule);
-  }}
-  .pyrite-group {{ border-left: 2px solid var(--pyrite-rule); padding: .35rem 0 .35rem 1rem; }}
-  .pyrite-group__label {{
-    color: var(--pyrite-muted); font: 600 .72rem/1.2 {TYPOGRAPHY["data"]};
-    letter-spacing: .08em; margin-bottom: .65rem; text-transform: uppercase;
-  }}
-  @media (max-width: {WIDTHS["breakpoint"]}) {{
-    .pyrite-title h1 {{ font-size: 2rem; }}
-    .pyrite-theme-select__label {{ display: none; }}
-  }}
-  @media (prefers-reduced-motion: reduce) {{
-    body:has(.pyrite-shell) *,
-    body:has(.pyrite-shell) *::before,
-    body:has(.pyrite-shell) *::after {{
-      animation-duration: .01ms !important; transition-duration: .01ms !important;
-    }}
-  }}
-</style>
-""".strip()
+    tokens = {
+        "BORDERS_RADIUS": BORDERS["radius"],
+        "BORDERS_WIDTH": BORDERS["width"],
+        "FOCUS_OFFSET": FOCUS["offset"],
+        "FOCUS_WIDTH": FOCUS["width"],
+        "TYPOGRAPHY_BODY": TYPOGRAPHY["body"],
+        "TYPOGRAPHY_DATA": TYPOGRAPHY["data"],
+        "TYPOGRAPHY_DISPLAY": TYPOGRAPHY["display"],
+        "WIDTHS_BREAKPOINT": WIDTHS["breakpoint"],
+        "WIDTHS_PROSE": WIDTHS["prose"],
+        "DARK_BG": dark["bg"],
+        "DARK_COMPUTE": dark["compute"],
+        "DARK_DONE": dark["done"],
+        "DARK_FAILURE": dark["failure"],
+        "DARK_FOCUS": dark["focus"],
+        "DARK_MUTED": dark["muted"],
+        "DARK_RULE": dark["rule"],
+        "DARK_SUBTLE": dark["subtle"],
+        "DARK_SURFACE": dark["surface"],
+        "DARK_TEXT": dark["text"],
+        "LIGHT_BG": light["bg"],
+        "LIGHT_COMPUTE": light["compute"],
+        "LIGHT_DONE": light["done"],
+        "LIGHT_FAILURE": light["failure"],
+        "LIGHT_FOCUS": light["focus"],
+        "LIGHT_MUTED": light["muted"],
+        "LIGHT_RULE": light["rule"],
+        "LIGHT_SUBTLE": light["subtle"],
+        "LIGHT_SURFACE": light["surface"],
+        "LIGHT_TEXT": light["text"],
+    }
+    template = files("pyrite.apps").joinpath("_design.css").read_text()
+    return Template(template).substitute(tokens).strip()
 
 
 def style_sheet(mo):
@@ -620,7 +401,9 @@ def context_rail(mo, values: Mapping[str, object] | Iterable[tuple[str, object]]
 
 def status_badge(mo, state: str):
     kind = STATUS_KINDS.get(state, "skipped")
-    return mo.Html(f'<span class="pyrite-shell pyrite-badge pyrite-badge--{kind}">{escape(state)}</span>')
+    return mo.Html(
+        f'<span class="pyrite-shell pyrite-badge pyrite-badge--{kind}">{escape(state)}</span>'
+    )
 
 
 def control_group(mo, label: str, controls):

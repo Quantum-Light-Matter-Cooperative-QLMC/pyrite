@@ -1,6 +1,8 @@
 """Stable contracts for shared notebook presentation primitives."""
 
 import tomllib
+from hashlib import sha256
+from importlib.resources import files
 from pathlib import Path
 
 import altair as alt
@@ -38,6 +40,19 @@ def test_design_tokens_are_complete_and_export_safe() -> None:
     assert "body:has(.pyrite-shell) *::before" in css
     assert "prefers-reduced-motion" in css
     assert "https://" not in css and "http://" not in css
+
+
+def test_notebook_css_resource_preserves_pre_extraction_rendering() -> None:
+    template = files("pyrite.apps").joinpath("_design.css").read_text()
+    css = _design.notebook_css()
+
+    assert "${DARK_BG}" in template
+    assert "${LIGHT_TEXT}" in template
+    assert "${" not in css
+    assert len(css.splitlines()) == 252
+    assert sha256(css.encode()).hexdigest() == (
+        "88705675fefcf6a02d00f9039716f63325a7384cc7cc2c08c4977211820f0e49"
+    )
 
 
 def test_marimo_starts_in_pyrite_default_light_theme() -> None:
