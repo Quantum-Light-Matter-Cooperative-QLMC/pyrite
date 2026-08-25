@@ -94,7 +94,7 @@ def _gpu_pipeline_workers(max_workers, n):
                 f"requested {max_workers} GPU-pipeline transport workers, "
                 f"host RAM admits {cap} once their in-flight segment payloads "
                 f"are charged too ({slots} slots at {_PIPELINE_WORKER_MEM_MB} "
-                "MiB each); raise CXR_MC_PIPELINE_WORKER_MEM_MB only if the "
+                "MiB each); raise PYRITE_MC_PIPELINE_WORKER_MEM_MB only if the "
                 "measured per-worker RSS is smaller than that budget",
                 RuntimeWarning,
                 stacklevel=2,
@@ -130,7 +130,7 @@ def _cpu_pool_workers(max_workers, n):
     The memory cap binds BOTH branches: even an explicit request is clamped to
     min(MemAvailable, 0.85*MemTotal) // _WORKER_MEM_MB, so a pinned count can't
     re-create the OOM. To deliberately run tighter than the measured budget,
-    raise CXR_MC_WORKER_MEM_MB -- that's the knob for "my workload is smaller
+    raise PYRITE_MC_WORKER_MEM_MB -- that's the knob for "my workload is smaller
     than the default assumes", not a bigger --max-workers.
 
     Returns the worker count to use, >= 1.

@@ -841,7 +841,7 @@ def test_coherent_decoherence_device_suite():
     """
     env = dict(os.environ)
     env["PYRITE_TEST_BACKEND"] = "cuda"
-    env.pop("CXR_TEST_BACKEND", None)
+    env.pop("PYRITE_TEST_BACKEND", None)
     completed = subprocess.run(  # noqa: S603
         # No -q here: pyproject's addopts already carries one, and -qq drops
         # the summary line this asserts on.

@@ -1,4 +1,4 @@
-"""``cxr analyze`` -- launches src/pyrite/apps/analysis_app.py via marimo run/edit with
+"""``pyrite analyze`` -- launches src/pyrite/apps/analysis_app.py via marimo run/edit with
 a chosen initial material. The initial-material resolution has to be a pure,
 unit-testable helper (:func:`analyze.initial_material`) because marimo apps
 can't be driven live in this environment; these tests exercise that helper and
@@ -18,9 +18,9 @@ from pyrite.materials import CATALOG
 @pytest.fixture(autouse=True)
 def _no_env_leak(monkeypatch):
     # keep the env-var fallback transport from polluting the pure-precedence
-    # tests below (CXR_ANALYZE_INITIAL sits between cli-arg and persisted-default
+    # tests below (PYRITE_ANALYZE_INITIAL sits between cli-arg and persisted-default
     # in precedence, so an ambient value would silently win over "persisted").
-    monkeypatch.delenv("CXR_ANALYZE_INITIAL", raising=False)
+    monkeypatch.delenv("PYRITE_ANALYZE_INITIAL", raising=False)
 
 
 # --- initial_material precedence ---------------------------------------
@@ -160,7 +160,7 @@ def test_profile_menu_lists_standard_and_sidecar_resolved_variant(tmp_path):
 
 def test_material_and_profile_menu_browse_new_at_stem(tmp_path):
     """A named-profile checkpoint written under the @-stem scheme
-    (`<material>@<catalog_profile>-<digest>`) is browsable in `cxr app
+    (`<material>@<catalog_profile>-<digest>`) is browsable in `pyrite app
     analysis`: material_menu marks the material available and profile_menu
     lists the variant labeled by its catalog_profile. Sidecar-driven, so it
     behaves identically to the legacy `--` path -- this guards the milestone's
@@ -329,7 +329,7 @@ def test_select_initial_material_works_with_material_menu_ordering(tmp_path):
 
 
 def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):
-    monkeypatch.setenv("CXR_ANALYZE_INITIAL", "diamond")
+    monkeypatch.setenv("PYRITE_ANALYZE_INITIAL", "diamond")
     assert analyze.initial_material({}, "hopg") == "diamond"  # env beats persisted
     assert analyze.initial_material({"material": "wse2"}, "hopg") == "wse2"  # cli beats env
 
@@ -338,7 +338,7 @@ def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):
 
 
 def test_default_material_round_trip(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     assert analyze.get_default_material() is None  # never written yet
     analyze.set_default_material("mose2")
     assert analyze.get_default_material() == "mose2"
@@ -350,7 +350,7 @@ def test_default_material_missing_file_returns_none(tmp_path, monkeypatch):
 
 
 def test_default_material_empty_file_returns_none(tmp_path, monkeypatch):
-    f = tmp_path / ".cxr-analyze-default"
+    f = tmp_path / ".pyrite-analyze-default"
     f.write_text("   \n")
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", f)
     assert analyze.get_default_material() is None
@@ -364,7 +364,7 @@ def _invoke(argv=()):
 
 
 def test_default_flag_without_material_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     result = _invoke(["-d"])
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -372,7 +372,7 @@ def test_default_flag_without_material_errors(tmp_path, monkeypatch):
 
 
 def test_unknown_material_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     result = _invoke(["not-a-real-material"])
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -380,7 +380,7 @@ def test_unknown_material_errors(tmp_path, monkeypatch):
 
 
 def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze,
@@ -395,7 +395,7 @@ def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
 
 
 def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     analyze.set_default_material("hbn")
     launched = {}
     monkeypatch.setattr(
@@ -410,7 +410,7 @@ def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
 
 
 def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze,
@@ -426,7 +426,7 @@ def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
 
 
 def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     monkeypatch.setattr(analyze, "_launch", lambda material, **kw: None)
     result = _invoke(["wse2"])
     assert result.exit_code == 0
@@ -490,7 +490,7 @@ def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(mon
 
 
 def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)
@@ -519,7 +519,7 @@ def test_command_no_token_omitted_by_default():
 
 
 def test_no_token_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)

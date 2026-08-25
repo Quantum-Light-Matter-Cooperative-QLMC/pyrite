@@ -301,7 +301,7 @@ the CUDA core when the process has a CUDA device, the run is ungrooved, and
 count is the transport's own, `max(Ne, Ne_brem)` — one transport serves both
 populations. Every explicit `transport_core=` is honored verbatim, so a caller
 that names a core gets that core or an error, never a substitution;
-`CXR_MC_TRANSPORT_CORE` pins the choice for a whole process, which is how a run
+`PYRITE_MC_TRANSPORT_CORE` pins the choice for a whole process, which is how a run
 reproduces a pre-threshold result or bisects a host/device difference.
 
 **Why 1000.** The measured crossover is `Ne ≈ 500–1000` for both a light and a
@@ -319,7 +319,7 @@ process is already driving. `run_cases` therefore keeps such a run in the driver
 process, serially, and every worker process is kept off the device in
 `_worker_init` — the pin covers both pools and every call site inside a worker.
 `_worker_init` redirects only `auto` and `cuda`; it used to overwrite the
-variable unconditionally, which made `CXR_MC_TRANSPORT_CORE=per-electron` a no-op
+variable unconditionally, which made `PYRITE_MC_TRANSPORT_CORE=per-electron` a no-op
 in any pooled run.
 The switch is all-or-nothing across a run's cases, since a mixed run would
 strand its CPU-core cases in the driver with nothing overlapping them; sweeps

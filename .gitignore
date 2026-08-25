@@ -253,8 +253,8 @@ jobs/
 # Local session logs (full conversation transcripts written by the /compress skill)
 /CC-Session-Logs/*
 
-# cxr analyze persisted default material
-.cxr-analyze-default
+# pyrite analyze persisted default material
+.pyrite-analyze-default
 
 # Ephemeral tool / assistant scratch output. Tracked agent plans and task
 # records live in agentdocs/; use scratch/ or /tmp for disposable notes.

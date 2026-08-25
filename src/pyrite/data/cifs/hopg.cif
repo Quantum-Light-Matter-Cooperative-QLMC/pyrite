@@ -1,5 +1,5 @@
 data_hopg
-# Phase identity: cxr-mc crystal catalog entry [hopg].
+# Phase identity: PyRITE crystal catalog entry [hopg].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # AB-stacked (Bernal) highly-oriented pyrolytic graphite, 4 atoms per cell.
@@ -27,4 +27,3 @@ C1 C 0.0 0.0 0.0 1.0
 C2 C 0.3333333333333333 0.6666666666666667 0.0 1.0
 C3 C 0.0 0.0 0.5 1.0
 C4 C 0.6666666666666667 0.3333333333333333 0.5 1.0
-

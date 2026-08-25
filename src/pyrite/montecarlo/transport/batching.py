@@ -283,13 +283,13 @@ def resolve_transport_core(requested, Ne, groove=None):
     explicit value is returned unchanged so a caller that names a core still gets
     that core or an error, never a silent substitution.
 
-    ``CXR_MC_TRANSPORT_CORE`` overrides the *requested* value for the whole
+    ``PYRITE_MC_TRANSPORT_CORE`` overrides the *requested* value for the whole
     process, which is how a run pins the historical CPU core (``=lockstep``)
     without touching call sites -- reproducing a pre-existing result, or
     bisecting a device/host difference.
     """
 
-    pinned = env_value("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    pinned = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
     if pinned:
         if pinned not in TRANSPORT_CORES:
             raise ValueError(

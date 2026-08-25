@@ -55,7 +55,6 @@ Then locally: run ``pyrite app analysis <material>`` or ``pyrite app analysis ex
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
 Override the box via env: PYRITE_REMOTE_HOST / PYRITE_REMOTE_DIR / PYRITE_REMOTE_UV.
-The corresponding CXR_* spellings remain compatibility aliases.
 """
 
 # ---------------------------------------------------------------------------
@@ -88,7 +87,7 @@ from . import (
 # --- from config ------------------------------------------------------
 # Compatibility snapshot only; subsystem calls resolve the effective host
 # dynamically through ``config.remote_host()``.
-HOST = env_value("CXR_REMOTE_HOST", "qlmc")
+HOST = env_value("PYRITE_REMOTE_HOST", "qlmc")
 REMOTE_DIR = config.REMOTE_DIR
 REMOTE_UV = config.REMOTE_UV
 SLURM_PARTITION = config.SLURM_PARTITION

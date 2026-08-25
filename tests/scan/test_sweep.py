@@ -783,7 +783,7 @@ def test_mote2_product_material_grid_matches_few_layer_sapphire():
 
 def test_named_stack_registered():
     # a registry key can name a full STACK: film crystal + substrate-side layers,
-    # runnable via `cxr run standard -m <key>` like any single material
+    # runnable via `pyrite run standard -m <key>` like any single material
     assert "mos2-on-sio2-si" in MATERIALS
     sweep = material_sweep("mos2-on-sio2-si")
     assert sweep.target.material == "mos2"
@@ -819,7 +819,7 @@ def test_trajectory_sweep_accepts_explicit_penetration_thickness():
 
 def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     # the checkpoint must be named for the REGISTRY key, not the film crystal --
-    # otherwise `cxr run standard -m mos2-on-sio2-si` would clobber/resume plain mos2.pkl
+    # otherwise `pyrite run standard -m mos2-on-sio2-si` would clobber/resume plain mos2.pkl
     # (run_sweep's default derives the name from cases[0]["crystal"]).
     import argparse
 

@@ -3,7 +3,7 @@ data_vte2
 # Provenance: Bronsema, Bus & Wiegers, J. Solid State Chem. 53, 415--421
 # (1984), COD 1535594 (CC0). The source sample is V1.04Te2; because its minor
 # interstitial V site is not part of the supplied coordinate packet and partial
-# occupancies are rejected by cxr-mc, this model explicitly idealizes the fully
+# occupancies are rejected by PyRITE, this model explicitly idealizes the fully
 # occupied primary sites to stoichiometric VTe2. It is not the high-T trigonal phase.
 # The P1 basis expands the reported 2a, 4i, and 4j sites in the source setting.
 # Limiting checks: V=abc sin(beta), 6V+12Te, and finite basal (001) coupling.

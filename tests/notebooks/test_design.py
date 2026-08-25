@@ -34,8 +34,8 @@ def test_design_tokens_are_complete_and_export_safe() -> None:
     css = _design.notebook_css()
     assert "focus-visible" in css
     assert "min-height: 44px" in css
-    assert "body:has(.cxr-shell)" in css
-    assert "body:has(.cxr-shell) *::before" in css
+    assert "body:has(.pyrite-shell)" in css
+    assert "body:has(.pyrite-shell) *::before" in css
     assert "prefers-reduced-motion" in css
     assert "https://" not in css and "http://" not in css
 
@@ -138,9 +138,9 @@ def test_scan_grid_renders_export_safe_state_matrix() -> None:
     html = _design.scan_grid(_FakeMo, energies, rows).text
 
     # structure: a cell per (row, energy) plus the state + legend vocabulary
-    assert html.count("cxr-grid__cell") == 4
+    assert html.count("pyrite-grid__cell") == 4
     for state in ("cached", "excluded", "running"):
-        assert f"cxr-grid__seg--{state}" in html
+        assert f"pyrite-grid__seg--{state}" in html
     assert "Penetration-excluded" in html and "Remaining" in html
     # cost sizing: the unit-weight cell fills the marker, the light cell shrinks
     assert "width:100%" in html

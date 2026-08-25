@@ -7,8 +7,7 @@ The block is an opt-in-overridable safety default for GPU-less/underprovisioned
 WSL hosts. A box with a real accelerator declares itself a local compute node by
 setting ``PYRITE_LOCAL_SWEEP_OK`` truthy -- ambient in the hook's environment (e.g.
 `.claude/settings.local.json` env) or inline on the command
-(``PYRITE_LOCAL_SWEEP_OK=1 pyrite run ...``). ``CXR_LOCAL_SWEEP_OK`` remains a
-compatibility alias. Default stays a hard block so shared
+(``PYRITE_LOCAL_SWEEP_OK=1 pyrite run ...``). Default stays a hard block so shared
 contributors on unfit hosts remain protected.
 """
 
@@ -39,7 +38,7 @@ SHELL_SEPARATORS = set(";&|()")
 
 # Truthy override values; everything else (including unset) keeps the block.
 _FALSEY = {"", "0", "false", "no", "off"}
-_OVERRIDE_VARS = ("PYRITE_LOCAL_SWEEP_OK", "CXR_LOCAL_SWEEP_OK")
+_OVERRIDE_VARS = ("PYRITE_LOCAL_SWEEP_OK",)
 _OVERRIDE_ASSIGN_RE = re.compile(
     rf"^(?P<name>{'|'.join(map(re.escape, _OVERRIDE_VARS))})=(?P<value>.*)$"
 )
@@ -69,7 +68,7 @@ def _segment_has_local_run(tokens: list[str]) -> bool:
         return False
 
     for i, tok in enumerate(tokens):
-        if os.path.basename(tok) not in {"pyrite", "cxr"}:
+        if os.path.basename(tok) != "pyrite":
             continue
         trailing = tokens[i + 1 :]
         for nxt in trailing:

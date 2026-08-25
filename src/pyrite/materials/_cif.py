@@ -27,7 +27,7 @@ def crystals_crystal_to_crystal_info(
 
     Source: ``Crystal.lattice_parameters``, ``Atom.coords_fractional``, and
     ``Crystal.volume`` from crystals 1.7. The adapter is structural only, so
-    cxr-mc remains the source of X-ray scattering physics. It assumes each
+    PyRITE remains the source of X-ray scattering physics. It assumes each
     expanded site is fully occupied and rejects partial occupancy instead of
     silently treating it as a whole atom. In the P1 limiting case, sites are
     copied one-for-one; for higher symmetry, ``Crystal.from_cif`` expands the
@@ -50,7 +50,7 @@ def crystals_crystal_to_crystal_info(
         occupancy = float(getattr(atom, "occupancy", 1.0))
         if not np.isclose(occupancy, 1.0, rtol=0.0, atol=1e-12):
             raise ValueError(
-                f"cxr-mc CIF imports require full occupancy; found {occupancy:g} for {atom.element}"
+                f"PyRITE CIF imports require full occupancy; found {occupancy:g} for {atom.element}"
             )
         coords = np.mod(np.asarray(atom.coords_fractional, dtype=float), 1.0)
         basis.append((str(atom.element), coords))
@@ -71,7 +71,7 @@ def load_crystal_from_cif(
 
     ``Crystal.from_cif`` performs the CIF symmetry expansion. The canonical
     adapter then retains the expanded fractional basis, cell parameters, and
-    volume while cxr-mc retains ownership of X-ray scattering physics.
+    volume while PyRITE retains ownership of X-ray scattering physics.
 
     Validation: crystals-cif-adapter
     """

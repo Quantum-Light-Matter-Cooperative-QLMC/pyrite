@@ -57,7 +57,7 @@ def fit_external_background(
     ordinary least squares through the origin.
 
     ``fit_mask`` must exclude coherent and characteristic peaks.  This
-    scale-only sideband fit is cxr-mc's documented analysis method; Zhai et al.
+    scale-only sideband fit is PyRITE's documented analysis method; Zhai et al.
     state that DTSA-II plus a numerical PIXE method was used, but do not publish
     enough algorithmic detail to claim an exact reconstruction.
 
@@ -136,7 +136,7 @@ def compare_external_background(
     *,
     comparison_mask: ArrayLike | None = None,
 ) -> BackgroundComparison:
-    """Compare cxr-mc and external backgrounds without rescaling either one."""
+    """Compare PyRITE and external backgrounds without rescaling either one."""
     energy = np.asarray(energy_eV, dtype=float)
     model = np.asarray(model_intensity, dtype=float)
     if energy.ndim != 1 or model.shape != energy.shape:

@@ -1,4 +1,4 @@
-"""Tool-owned source/note store for cxr energy-grid bounds (NOT the catalog).
+"""Tool-owned source/note store for pyrite energy-grid bounds (NOT the catalog).
 
 materials.toml holds pure grid values; this sidecar records who set each grid and
 why. New artifact-backed records are keyed profile -> material -> channel ->
@@ -117,7 +117,7 @@ def set_brem(material, source, note=None, *, profile: str | None = None):
 
 
 def _emit(data: dict) -> str:
-    lines = ["# managed by cxr energy-grid; do not hand-edit", ""]
+    lines = ["# managed by pyrite energy-grid; do not hand-edit", ""]
 
     def block(header, rec):
         lines.append(f"[{header}]")

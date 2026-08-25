@@ -229,21 +229,6 @@ def test_remove_managed_installation_and_preserve_other_content(tmp_path):
     assert not _script_path(tmp_path, "zsh").exists()
 
 
-def test_remove_recognizes_legacy_two_line_installation(tmp_path):
-    rc_file = tmp_path / ".bashrc"
-    rc_file.write_text(
-        'export KEEP=1\n# cxr shell completion\neval "$(_CXR_COMPLETE=bash_source cxr)"\n'
-    )
-
-    result = invoke(
-        root_command,
-        ["config", "completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
-    )
-
-    assert_clean_result(result)
-    assert rc_file.read_text() == "export KEEP=1\n"
-
-
 def test_remove_is_idempotent_and_dry_run_preserves_file(tmp_path):
     rc_file = tmp_path / ".bashrc"
     install = ["config", "completion", "install", "--shell", "bash", "--rc-file", str(rc_file)]
@@ -269,7 +254,7 @@ def test_remove_is_idempotent_and_dry_run_preserves_file(tmp_path):
 
 def test_remove_does_not_delete_unmanaged_completion_line(tmp_path):
     rc_file = tmp_path / ".bashrc"
-    line = 'eval "$(_CXR_COMPLETE=bash_source cxr)"\n'
+    line = 'eval "$(_OTHER_COMPLETE=bash_source other)"\n'
     rc_file.write_text(line)
 
     result = invoke(

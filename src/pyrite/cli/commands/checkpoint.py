@@ -79,7 +79,7 @@ def command() -> None:
 
 
 def main(argv=None):
-    return run(command, argv, prog_name="cxr-checkpoint")
+    return run(command, argv, prog_name="pyrite-checkpoint")
 
 
 if __name__ == "__main__":

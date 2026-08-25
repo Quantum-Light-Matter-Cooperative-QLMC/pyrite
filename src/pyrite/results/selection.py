@@ -238,7 +238,7 @@ BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 def project_dataset(results, dataset):
     """Return a NEW results store carrying only ``dataset``'s record arrays
     (plus ``case``) per record -- the wire payload for a dataset-partial pull
-    (``cxr slim --brem-only/--line-only``). ``dataset`` is ``"line"`` (keeps
+    (``pyrite slim --brem-only/--line-only``). ``dataset`` is ``"line"`` (keeps
     :data:`LINE_RECORD_KEYS`) or ``"brem"`` (:data:`BREM_RECORD_KEYS`).
     Delegates to :func:`slim_results`' ``fields`` allow-list so the drop logic
     lives in one place; ``case`` is always kept."""
@@ -353,7 +353,7 @@ def slim_results(
 
     Round-trips through ``pickle`` and ``run.load_checkpoint`` unchanged. For the
     on-disk wrapper that reports the size saved, see ``run.slim_checkpoint`` /
-    ``cxr slim``.
+    ``pyrite slim``.
     """
     if grid is not None:
         if isinstance(grid, tuple):

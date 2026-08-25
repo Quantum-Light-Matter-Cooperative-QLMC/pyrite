@@ -1,5 +1,5 @@
 data_v2o5
-# Phase identity: cxr-mc crystal catalog entry [v2o5].
+# Phase identity: PyRITE crystal catalog entry [v2o5].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Alpha-V2O5, ambient orthorhombic standard Pmmn (two formula units per cell).
@@ -40,4 +40,3 @@ O7 O 0.0689 0.75 0.997 1.0
 O8 O 0.4311 0.75 0.997 1.0
 O9 O 0.25 0.25 0.001 1.0
 O10 O 0.75 0.75 0.999 1.0
-

@@ -71,16 +71,16 @@ def notebook_css() -> str:
 <style>
   html[data-pyrite-theme="dark"],
   body[data-theme="dark"] {{
-    --cxr-bg: {dark["bg"]};
-    --cxr-surface: {dark["surface"]};
-    --cxr-text: {dark["text"]};
-    --cxr-muted: {dark["muted"]};
-    --cxr-subtle: {dark["subtle"]};
-    --cxr-rule: {dark["rule"]};
-    --cxr-focus: {dark["focus"]};
-    --cxr-compute: {dark["compute"]};
-    --cxr-failure: {dark["failure"]};
-    --cxr-done: {dark["done"]};
+    --pyrite-bg: {dark["bg"]};
+    --pyrite-surface: {dark["surface"]};
+    --pyrite-text: {dark["text"]};
+    --pyrite-muted: {dark["muted"]};
+    --pyrite-subtle: {dark["subtle"]};
+    --pyrite-rule: {dark["rule"]};
+    --pyrite-focus: {dark["focus"]};
+    --pyrite-compute: {dark["compute"]};
+    --pyrite-failure: {dark["failure"]};
+    --pyrite-done: {dark["done"]};
     --background: {dark["bg"]};
     --foreground: {dark["text"]};
     --muted: {dark["surface"]};
@@ -102,16 +102,16 @@ def notebook_css() -> str:
   }}
   html[data-pyrite-theme="light"],
   body[data-theme="light"] {{
-    --cxr-bg: {light["bg"]};
-    --cxr-surface: {light["surface"]};
-    --cxr-text: {light["text"]};
-    --cxr-muted: {light["muted"]};
-    --cxr-subtle: {light["subtle"]};
-    --cxr-rule: {light["rule"]};
-    --cxr-focus: {light["focus"]};
-    --cxr-compute: {light["compute"]};
-    --cxr-failure: {light["failure"]};
-    --cxr-done: {light["done"]};
+    --pyrite-bg: {light["bg"]};
+    --pyrite-surface: {light["surface"]};
+    --pyrite-text: {light["text"]};
+    --pyrite-muted: {light["muted"]};
+    --pyrite-subtle: {light["subtle"]};
+    --pyrite-rule: {light["rule"]};
+    --pyrite-focus: {light["focus"]};
+    --pyrite-compute: {light["compute"]};
+    --pyrite-failure: {light["failure"]};
+    --pyrite-done: {light["done"]};
     --background: {light["bg"]};
     --foreground: {light["text"]};
     --muted: #EEF3F5;
@@ -131,31 +131,31 @@ def notebook_css() -> str:
     --ring: {light["focus"]};
     color-scheme: light;
   }}
-  .cxr-shell {{
-    color: var(--cxr-text);
+  .pyrite-shell {{
+    color: var(--pyrite-text);
     font-family: {TYPOGRAPHY["body"]};
     max-width: 100%;
   }}
-  body:has(.cxr-shell) {{
-    background: var(--cxr-bg, {dark["bg"]});
-    color: var(--cxr-text, {dark["text"]});
+  body:has(.pyrite-shell) {{
+    background: var(--pyrite-bg, {dark["bg"]});
+    color: var(--pyrite-text, {dark["text"]});
   }}
-  body:has(.cxr-shell) :is(button, input, select, [tabindex]):focus-visible {{
-    outline: {FOCUS["width"]} solid var(--cxr-focus, {dark["focus"]});
+  body:has(.pyrite-shell) :is(button, input, select, [tabindex]):focus-visible {{
+    outline: {FOCUS["width"]} solid var(--pyrite-focus, {dark["focus"]});
     outline-offset: {FOCUS["offset"]};
   }}
-  body:has(.cxr-shell) :is(button, select, input:not([type="hidden"])) {{
+  body:has(.pyrite-shell) :is(button, select, input:not([type="hidden"])) {{
     min-height: 44px;
   }}
-  .cxr-theme-select {{
+  .pyrite-theme-select {{
     display: inline-flex; align-items: center; gap: .55rem;
-    color: var(--cxr-muted); font: 600 .7rem/1.2 {TYPOGRAPHY["data"]};
+    color: var(--pyrite-muted); font: 600 .7rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
   }}
-  .cxr-theme-select__control {{
+  .pyrite-theme-select__control {{
     min-height: 36px !important; padding: .25rem 1.8rem .25rem .55rem;
-    border: 1px solid var(--cxr-rule); border-radius: {BORDERS["radius"]};
-    background: var(--cxr-surface); color: var(--cxr-text);
+    border: 1px solid var(--pyrite-rule); border-radius: {BORDERS["radius"]};
+    background: var(--pyrite-surface); color: var(--pyrite-text);
     font: 500 .78rem/1.2 {TYPOGRAPHY["data"]}; letter-spacing: 0;
     text-transform: none;
   }}
@@ -238,84 +238,84 @@ def notebook_css() -> str:
   html[data-pyrite-theme="light"] [role="tabpanel"] {{
     color: {light["text"]} !important;
   }}
-  .cxr-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
-  .cxr-title__eyebrow {{
-    color: var(--cxr-focus); font: 600 .75rem/1.2 {TYPOGRAPHY["data"]};
+  .pyrite-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
+  .pyrite-title__eyebrow {{
+    color: var(--pyrite-focus); font: 600 .75rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .14em;
   }}
-  .cxr-title h1 {{
+  .pyrite-title h1 {{
     font-family: {TYPOGRAPHY["display"]};
     font-size: clamp(2rem, 4vw, 3.4rem); line-height: .98; margin: .35rem 0 .7rem;
   }}
-  .cxr-title p {{ color: var(--cxr-subtle); line-height: 1.55; margin: 0; }}
-  .cxr-rail {{
+  .pyrite-title p {{ color: var(--pyrite-subtle); line-height: 1.55; margin: 0; }}
+  .pyrite-rail {{
     display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem 1.4rem;
-    border-block: {BORDERS["width"]} solid var(--cxr-rule);
+    border-block: {BORDERS["width"]} solid var(--pyrite-rule);
     margin: .6rem 0 .9rem; padding: .5rem 0;
   }}
-  .cxr-rail__item {{
+  .pyrite-rail__item {{
     display: flex; align-items: baseline; gap: .5rem; min-width: 0;
-    border-left: 2px solid var(--cxr-focus); padding-left: .6rem;
+    border-left: 2px solid var(--pyrite-focus); padding-left: .6rem;
   }}
-  .cxr-rail dt {{
-    color: var(--cxr-muted); font: 600 .64rem/1.2 {TYPOGRAPHY["data"]};
+  .pyrite-rail dt {{
+    color: var(--pyrite-muted); font: 600 .64rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
   }}
-  .cxr-rail dd {{
-    color: var(--cxr-text); font: 500 .85rem/1.2 {TYPOGRAPHY["data"]};
+  .pyrite-rail dd {{
+    color: var(--pyrite-text); font: 500 .85rem/1.2 {TYPOGRAPHY["data"]};
     margin: 0; white-space: nowrap;
   }}
-  .cxr-badge {{
+  .pyrite-badge {{
     border: 1px solid currentColor; border-radius: 999px; display: inline-block;
     font: 600 .72rem/1 {TYPOGRAPHY["data"]}; padding: .38rem .62rem;
   }}
-  .cxr-badge--failed {{ color: var(--cxr-failure); }}
-  .cxr-badge--running, .cxr-badge--interpret {{ color: var(--cxr-compute); }}
-  .cxr-badge--ready, .cxr-badge--cached, .cxr-badge--passed {{ color: var(--cxr-focus); }}
-  .cxr-grid {{ display: grid; gap: .28rem; align-items: end; }}
-  .cxr-grid__corner, .cxr-grid__col, .cxr-grid__row {{
-    color: var(--cxr-muted); font: 600 .62rem/1.1 {TYPOGRAPHY["data"]};
+  .pyrite-badge--failed {{ color: var(--pyrite-failure); }}
+  .pyrite-badge--running, .pyrite-badge--interpret {{ color: var(--pyrite-compute); }}
+  .pyrite-badge--ready, .pyrite-badge--cached, .pyrite-badge--passed {{ color: var(--pyrite-focus); }}
+  .pyrite-grid {{ display: grid; gap: .28rem; align-items: end; }}
+  .pyrite-grid__corner, .pyrite-grid__col, .pyrite-grid__row {{
+    color: var(--pyrite-muted); font: 600 .62rem/1.1 {TYPOGRAPHY["data"]};
     letter-spacing: .04em; white-space: nowrap;
   }}
-  .cxr-grid__col {{ text-align: center; align-self: end; }}
-  .cxr-grid__row {{ text-align: right; align-self: center; padding-right: .3rem; }}
-  .cxr-grid__cell {{
+  .pyrite-grid__col {{ text-align: center; align-self: end; }}
+  .pyrite-grid__row {{ text-align: right; align-self: center; padding-right: .3rem; }}
+  .pyrite-grid__cell {{
     position: relative; aspect-ratio: 1 / 1; width: 100%; min-width: 12px;
-    border-radius: 2px; background: var(--cxr-surface);
-    box-shadow: inset 0 0 0 1px var(--cxr-rule); overflow: hidden;
+    border-radius: 2px; background: var(--pyrite-surface);
+    box-shadow: inset 0 0 0 1px var(--pyrite-rule); overflow: hidden;
     display: flex; align-items: center; justify-content: center;
   }}
-  .cxr-grid__marker {{
+  .pyrite-grid__marker {{
     display: flex; flex-direction: column-reverse; border-radius: 1px;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cxr-text) 25%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pyrite-text) 25%, transparent);
   }}
-  .cxr-grid__seg {{ width: 100%; }}
-  .cxr-grid__seg--cached {{ background: var(--cxr-focus); }}
-  .cxr-grid__seg--done {{ background: var(--cxr-done); }}
-  .cxr-grid__seg--running {{ background: var(--cxr-compute); }}
-  .cxr-grid__seg--excluded {{ background: var(--cxr-failure); }}
-  .cxr-grid__legend {{
+  .pyrite-grid__seg {{ width: 100%; }}
+  .pyrite-grid__seg--cached {{ background: var(--pyrite-focus); }}
+  .pyrite-grid__seg--done {{ background: var(--pyrite-done); }}
+  .pyrite-grid__seg--running {{ background: var(--pyrite-compute); }}
+  .pyrite-grid__seg--excluded {{ background: var(--pyrite-failure); }}
+  .pyrite-grid__legend {{
     display: flex; flex-wrap: wrap; gap: .8rem; margin-top: .6rem;
-    color: var(--cxr-muted); font: 500 .68rem/1.2 {TYPOGRAPHY["data"]};
+    color: var(--pyrite-muted); font: 500 .68rem/1.2 {TYPOGRAPHY["data"]};
   }}
-  .cxr-grid__legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
-  .cxr-grid__swatch {{
+  .pyrite-grid__legend span {{ display: inline-flex; align-items: center; gap: .35rem; }}
+  .pyrite-grid__swatch {{
     width: .72rem; height: .72rem; border-radius: 2px;
-    box-shadow: inset 0 0 0 1px var(--cxr-rule);
+    box-shadow: inset 0 0 0 1px var(--pyrite-rule);
   }}
-  .cxr-group {{ border-left: 2px solid var(--cxr-rule); padding: .35rem 0 .35rem 1rem; }}
-  .cxr-group__label {{
-    color: var(--cxr-muted); font: 600 .72rem/1.2 {TYPOGRAPHY["data"]};
+  .pyrite-group {{ border-left: 2px solid var(--pyrite-rule); padding: .35rem 0 .35rem 1rem; }}
+  .pyrite-group__label {{
+    color: var(--pyrite-muted); font: 600 .72rem/1.2 {TYPOGRAPHY["data"]};
     letter-spacing: .08em; margin-bottom: .65rem; text-transform: uppercase;
   }}
   @media (max-width: {WIDTHS["breakpoint"]}) {{
-    .cxr-title h1 {{ font-size: 2rem; }}
-    .cxr-theme-select__label {{ display: none; }}
+    .pyrite-title h1 {{ font-size: 2rem; }}
+    .pyrite-theme-select__label {{ display: none; }}
   }}
   @media (prefers-reduced-motion: reduce) {{
-    body:has(.cxr-shell) *,
-    body:has(.cxr-shell) *::before,
-    body:has(.cxr-shell) *::after {{
+    body:has(.pyrite-shell) *,
+    body:has(.pyrite-shell) *::before,
+    body:has(.pyrite-shell) *::after {{
       animation-duration: .01ms !important; transition-duration: .01ms !important;
     }}
   }}
@@ -602,8 +602,8 @@ def apply_plotly_theme(fig, theme: str):
 
 def page_title(mo, title: str, intro: str, *, eyebrow: str = "PyRITE"):
     return mo.Html(
-        '<header class="cxr-shell cxr-title">'
-        f'<div class="cxr-title__eyebrow">{escape(eyebrow)}</div>'
+        '<header class="pyrite-shell pyrite-title">'
+        f'<div class="pyrite-title__eyebrow">{escape(eyebrow)}</div>'
         f"<h1>{escape(title)}</h1><p>{escape(intro)}</p></header>"
     )
 
@@ -611,22 +611,22 @@ def page_title(mo, title: str, intro: str, *, eyebrow: str = "PyRITE"):
 def context_rail(mo, values: Mapping[str, object] | Iterable[tuple[str, object]]):
     items = values.items() if isinstance(values, Mapping) else values
     body = "".join(
-        '<div class="cxr-rail__item">'
+        '<div class="pyrite-rail__item">'
         f"<dt>{escape(str(label))}</dt><dd>{escape(_display(value))}</dd></div>"
         for label, value in items
     )
-    return mo.Html(f'<dl class="cxr-shell cxr-rail">{body}</dl>')
+    return mo.Html(f'<dl class="pyrite-shell pyrite-rail">{body}</dl>')
 
 
 def status_badge(mo, state: str):
     kind = STATUS_KINDS.get(state, "skipped")
-    return mo.Html(f'<span class="cxr-shell cxr-badge cxr-badge--{kind}">{escape(state)}</span>')
+    return mo.Html(f'<span class="pyrite-shell pyrite-badge pyrite-badge--{kind}">{escape(state)}</span>')
 
 
 def control_group(mo, label: str, controls):
     return mo.vstack(
-        [mo.Html(f'<div class="cxr-shell cxr-group__label">{escape(label)}</div>'), controls]
-    ).style({"border-left": "2px solid var(--cxr-rule)", "padding-left": "1rem"})
+        [mo.Html(f'<div class="pyrite-shell pyrite-group__label">{escape(label)}</div>'), controls]
+    ).style({"border-left": "2px solid var(--pyrite-rule)", "padding-left": "1rem"})
 
 
 def directional_state(mo, title: str, detail: str, action: str, *, kind: str = "info"):
@@ -637,14 +637,14 @@ def directional_state(mo, title: str, detail: str, action: str, *, kind: str = "
 
 
 #: Cell fill segments, drawn bottom-to-top, mapped to the palette in CSS
-#: (``.cxr-grid__seg--<state>``). Order is the reading order of the stack.
+#: (``.pyrite-grid__seg--<state>``). Order is the reading order of the stack.
 SCAN_GRID_STATES = ("done", "cached", "running", "excluded")
 _SCAN_GRID_LEGEND = {
-    "done": ("This session", "var(--cxr-done)"),
-    "cached": ("Cached", "var(--cxr-focus)"),
-    "running": ("Running", "var(--cxr-compute)"),
-    "excluded": ("Penetration-excluded", "var(--cxr-failure)"),
-    "remaining": ("Remaining", "var(--cxr-surface)"),
+    "done": ("This session", "var(--pyrite-done)"),
+    "cached": ("Cached", "var(--pyrite-focus)"),
+    "running": ("Running", "var(--pyrite-compute)"),
+    "excluded": ("Penetration-excluded", "var(--pyrite-failure)"),
+    "remaining": ("Remaining", "var(--pyrite-surface)"),
 }
 
 
@@ -656,20 +656,20 @@ def _scan_cell(cell: Mapping[str, float] | None, max_weight: float) -> str:
     ``sqrt(weight / max_weight)`` so the heavy high-energy corner reads as heavy,
     with a floor so light cells stay legible."""
     if cell is None:
-        return '<div class="cxr-grid__cell" style="opacity:.28"></div>'
+        return '<div class="pyrite-grid__cell" style="opacity:.28"></div>'
     weight = float(cell.get("weight", 0.0))
     side = 100.0 if max_weight <= 0 else max(34.0, 100.0 * (weight / max_weight) ** 0.5)
     total = sum(max(0.0, float(cell.get(state, 0.0))) for state in SCAN_GRID_STATES)
     segments = "".join(
-        f'<div class="cxr-grid__seg cxr-grid__seg--{state}" '
+        f'<div class="pyrite-grid__seg pyrite-grid__seg--{state}" '
         f'style="height:{100.0 * max(0.0, float(cell.get(state, 0.0))):.4g}%"></div>'
         for state in SCAN_GRID_STATES
     )
     done = min(1.0, total)
     title = escape(f"{done:.0%} done, {weight / max_weight:.0%} of the peak per-cell cost")
     return (
-        f'<div class="cxr-grid__cell" title="{title}">'
-        f'<div class="cxr-grid__marker" style="width:{side:.4g}%;height:{side:.4g}%">'
+        f'<div class="pyrite-grid__cell" title="{title}">'
+        f'<div class="pyrite-grid__marker" style="width:{side:.4g}%;height:{side:.4g}%">'
         f"{segments}</div></div>"
     )
 
@@ -692,25 +692,25 @@ def scan_grid(mo, energies, rows, *, max_weight=None, states=SCAN_GRID_STATES):
             default=0.0,
         )
     columns = f"minmax(5ch, max-content) repeat({len(energies)}, minmax(12px, 1fr))"
-    header = '<div class="cxr-grid__corner">tilt \\ keV</div>' + "".join(
-        f'<div class="cxr-grid__col">{escape(_display(energy))}</div>' for energy in energies
+    header = '<div class="pyrite-grid__corner">tilt \\ keV</div>' + "".join(
+        f'<div class="pyrite-grid__col">{escape(_display(energy))}</div>' for energy in energies
     )
     body = "".join(
-        f'<div class="cxr-grid__row">{escape(str(row["label"]))}</div>'
+        f'<div class="pyrite-grid__row">{escape(str(row["label"]))}</div>'
         + "".join(_scan_cell(cell, max_weight) for cell in row["cells"])
         for row in rows
     )
     legend = "".join(
-        f'<span><i class="cxr-grid__swatch" style="background:{_SCAN_GRID_LEGEND[state][1]}"></i>'
+        f'<span><i class="pyrite-grid__swatch" style="background:{_SCAN_GRID_LEGEND[state][1]}"></i>'
         f"{escape(_SCAN_GRID_LEGEND[state][0])}</span>"
         for state in (*states, "remaining")
         if state in _SCAN_GRID_LEGEND
     )
     return mo.Html(
-        f'<div class="cxr-shell cxr-grid" style="grid-template-columns:{columns}" '
+        f'<div class="pyrite-shell pyrite-grid" style="grid-template-columns:{columns}" '
         f'role="img" aria-label="Scan progress matrix, tilt by beam energy, '
         f'cell size by compute cost">{header}{body}</div>'
-        f'<div class="cxr-shell cxr-grid__legend">{legend}</div>'
+        f'<div class="pyrite-shell pyrite-grid__legend">{legend}</div>'
     )
 
 

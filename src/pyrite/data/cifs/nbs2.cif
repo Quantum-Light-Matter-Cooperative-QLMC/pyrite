@@ -1,5 +1,5 @@
 data_nbs2
-# Phase identity: cxr-mc crystal catalog entry [nbs2].
+# Phase identity: PyRITE crystal catalog entry [nbs2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Metallic 2H-a NbS2, P6_3/mmc: Nb occupies aligned 2b columns and S occupies
@@ -30,4 +30,3 @@ S2 S 0.3333333333333333 0.6666666666666667 0.387 1.0
 Nb2 Nb 0.0 0.0 0.75 1.0
 S3 S 0.6666666666666667 0.3333333333333333 0.613 1.0
 S4 S 0.6666666666666667 0.3333333333333333 0.887 1.0
-

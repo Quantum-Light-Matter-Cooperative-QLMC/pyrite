@@ -50,8 +50,6 @@ import yaml
 from pyrite.apps._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 from pyrite.paths import workspace_root
 
-from ._compat import warn_legacy_command
-
 ROOT = workspace_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
@@ -488,7 +486,7 @@ def cmd_docs(args: argparse.Namespace) -> None:
         builder,
         str(docs_dir),
         str(docs_dir / "_build" / builder),
-        extra_env={"PYRITE_MC_BACKEND": "cpu", "CXR_MC_BACKEND": "cpu"},
+        extra_env={"PYRITE_MC_BACKEND": "cpu"},
     )
 
 
@@ -712,12 +710,6 @@ def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> Non
         return
     args = build_parser(prog_name).parse_args(raw_args)
     args.func(args)
-
-
-def legacy_main(argv: list[str] | None = None) -> None:
-    """Run the retained ``cxr-dev`` compatibility executable."""
-    warn_legacy_command("cxr-dev", "pyrite-dev")
-    main(argv, prog_name="cxr-dev")
 
 
 if __name__ == "__main__":

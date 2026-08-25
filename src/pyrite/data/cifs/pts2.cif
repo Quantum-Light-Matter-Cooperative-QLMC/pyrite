@@ -1,5 +1,5 @@
 data_pts2
-# Phase identity: cxr-mc crystal catalog entry [pts2].
+# Phase identity: PyRITE crystal catalog entry [pts2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Layered 1T-PtS2 (P-3m1): Furuseth, Selte & Kjekshus, Acta Chem. Scand. 19,

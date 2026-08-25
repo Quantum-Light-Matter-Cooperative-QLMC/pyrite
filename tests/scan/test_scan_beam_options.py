@@ -1,4 +1,4 @@
-"""Regression tests for profile-owned ``cxr run`` beam configuration."""
+"""Regression tests for profile-owned ``pyrite run`` beam configuration."""
 
 import os
 

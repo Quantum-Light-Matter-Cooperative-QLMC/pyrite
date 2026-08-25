@@ -68,7 +68,7 @@ def test_remote_host_rejects_ssh_option_and_shell_syntax_before_subprocess(monke
         lambda *_args, **_kwargs: pytest.fail("invalid host must not reach ssh"),
     )
 
-    with pytest.raises(SystemExit, match="CXR_REMOTE_HOST"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_HOST"):
         transport._ssh_capture(":")
 
 
@@ -76,7 +76,7 @@ def test_non_nvidia_remote_vendor_fails_before_script_generation(monkeypatch):
     monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "amd")
 
     with pytest.raises(ValueError, match="do not yet support amd"):
-        scripts._slurm_batch_script("job1", "echo ok", job_name="cxr-test")
+        scripts._slurm_batch_script("job1", "echo ok", job_name="pyrite-test")
 
 
 def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
@@ -88,7 +88,7 @@ def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
         lambda *_args, **_kwargs: pytest.fail("invalid host must not reach scp"),
     )
 
-    with pytest.raises(SystemExit, match="CXR_REMOTE_HOST"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_HOST"):
         transport.sync_code()
 
 
@@ -140,7 +140,7 @@ def test_ssh_download_streams_bytes_and_removes_partial_failure(monkeypatch, tmp
 def test_remote_dir_rejects_nonabsolute_and_control_values(monkeypatch, value):
     monkeypatch.setattr(config, "REMOTE_DIR", value)
 
-    with pytest.raises(SystemExit, match="CXR_REMOTE_DIR"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_DIR"):
         remote._queue_script("j", ["hopg"], quick=False, workers=None)
 
 
@@ -257,7 +257,7 @@ def test_every_remote_bash_command_family_quotes_hostile_remote_dir(monkeypatch,
 def test_every_generated_bash_payload_rejects_remote_uv_program_text(monkeypatch, build):
     monkeypatch.setattr(config, "REMOTE_UV", "uv; SENTINEL_REMOTE_UV #")
 
-    with pytest.raises(SystemExit, match="CXR_REMOTE_UV"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_UV"):
         build()
 
 
@@ -266,16 +266,16 @@ def test_sbatch_rejects_remote_dir_unsupported_by_directives(monkeypatch, value)
     monkeypatch.setattr(config, "REMOTE_DIR", value)
 
     with pytest.raises(SystemExit, match="SBATCH"):
-        remote._slurm_batch_script("j", ":", job_name="cxr-j")
+        remote._slurm_batch_script("j", ":", job_name="pyrite-j")
 
 
 def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
     monkeypatch.setattr(config, "HOST", "qlmc")
-    path = "/srv/cxr data/$(touch SENTINEL)"
+    path = "/srv/pyrite data/$(touch SENTINEL)"
 
     rendered = config.scp_remote_path(path)
 
-    assert rendered == "qlmc:'/srv/cxr data/$(touch SENTINEL)'"
+    assert rendered == "qlmc:'/srv/pyrite data/$(touch SENTINEL)'"
 
 
 def test_queue_script_has_per_material_scan_calls():
@@ -804,9 +804,9 @@ def test_queue_script_warns_and_continues_after_a_material_fails():
 
 
 def test_slurm_batch_script_requests_the_lab_gpu_profile():
-    script = remote._slurm_batch_script("j", "echo payload", job_name="cxr-j")
+    script = remote._slurm_batch_script("j", "echo payload", job_name="pyrite-j")
 
-    assert "#SBATCH --job-name=cxr-j" in script
+    assert "#SBATCH --job-name=pyrite-j" in script
     assert "#SBATCH --partition=gpu" in script
     assert "#SBATCH --nodes=1" in script
     assert "#SBATCH --ntasks-per-node=1" in script
@@ -888,7 +888,7 @@ def test_checkpoint_reservation_rejects_a_second_stager_for_the_same_stem(monkey
 
 def test_slurm_batch_script_releases_its_checkpoint_reservations():
     script = remote._slurm_batch_script(
-        "j", "echo payload", job_name="cxr-j", reservation_stems=["hopg"]
+        "j", "echo payload", job_name="pyrite-j", reservation_stems=["hopg"]
     )
 
     assert "release_reservations" in script
@@ -2084,7 +2084,7 @@ def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys
                     "JOB": "j",
                     "META": "job: j\nmaterials: hopg\nworkers: None\nslurm_job_id: 48291",
                     "STATE": "running hopg",
-                    "SQUEUE": "job_id=48291|state=RUNNING|name=cxr-j|partition=gpu|"
+                    "SQUEUE": "job_id=48291|state=RUNNING|name=pyrite-j|partition=gpu|"
                     "elapsed=1:02|left=UNLIMITED|nodes=1|reason=None",
                 }
             )
@@ -4374,7 +4374,7 @@ def test_clear_listing_snippet_exits_zero_when_quick_pkl_missing(monkeypatch, tm
 
 # ---- run --quick --grid must be rejected at parse time --------------------------
 def test_run_rejects_quick_plus_grid_before_any_work(monkeypatch):
-    """--quick checkpoints aren't grid-filterable (cxr slim rejects _quick stems),
+    """--quick checkpoints aren't grid-filterable (pyrite slim rejects _quick stems),
     so run --quick --grid must fail up front -- not run the whole sweep and then
     traceback on the trailing pull."""
     monkeypatch.setattr(

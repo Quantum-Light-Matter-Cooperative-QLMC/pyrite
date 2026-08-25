@@ -545,7 +545,7 @@ def _(
         # Render button: prerender a smooth, looping fixed-camera video of the
         # SAME reveal sequence the old client-side animation played, offscreen
         # via kaleido + ffmpeg (see pyrite.plots.plotly.render). Cached
-        # under ~/.cache/cxr-mc/viewer-renders keyed on every parameter the
+        # under ~/.cache/pyrite/viewer-renders keyed on every parameter the
         # render depends on, so an unchanged parameter set short-circuits to
         # the existing file instead of re-rendering.
         _render_controls = mo.hstack(
@@ -602,7 +602,7 @@ def _(
                 f"cached per parameter set afterwards).*"
             )
 
-        # Cache lives under ~/.cache/cxr-mc/viewer-renders, easy to forget
+        # Cache lives under ~/.cache/pyrite/viewer-renders, easy to forget
         # about; a download button lets the user pull a render straight to
         # their own filesystem without knowing that path.
         _save_row = mo.hstack(

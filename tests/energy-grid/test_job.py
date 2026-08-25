@@ -260,7 +260,7 @@ def test_slice_payload_quotes_hostile_remote_dir(monkeypatch):
 def test_slice_payload_rejects_remote_uv_program_text(monkeypatch):
     monkeypatch.setattr(job.remote.config, "REMOTE_UV", "uv; SENTINEL_LINE_GRID #")
 
-    with pytest.raises(SystemExit, match="CXR_REMOTE_UV"):
+    with pytest.raises(SystemExit, match="PYRITE_REMOTE_UV"):
         job._slice_payload(
             "j",
             slice_minutes=10.0,

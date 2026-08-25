@@ -1,4 +1,4 @@
-"""``cxr app analysis`` -- launch the marimo analysis app (``src/pyrite/apps/analysis_app.py``)
+"""``pyrite app analysis`` -- launch the marimo analysis app (``src/pyrite/apps/analysis_app.py``)
 with a chosen initial material.
 
 Marimo apps in this environment can't be driven live (no browser/kernel access;
@@ -15,17 +15,17 @@ else ``"hopg"``.
 Two transports carry the resolved material into the marimo subprocess, since we
 can't verify in this environment whether ``mo.cli_args()`` reaches ``marimo edit``
 (only confirmed for ``marimo run``): ``-- --material <X>`` app args (marimo's own
-mechanism) AND a ``CXR_ANALYZE_INITIAL`` environment variable set on the
+mechanism) AND a ``PYRITE_ANALYZE_INITIAL`` environment variable set on the
 subprocess, as a belt-and-suspenders fallback. :func:`initial_material` checks
 both.
 
-    cxr app analysis                    # persisted default (fallback hopg)
-    cxr app analysis wse2               # transient: this run only, doesn't persist
-    cxr app analysis -d wse2            # persist wse2 as the new default, and launch it
-    cxr app analysis --watch            # add marimo's --watch (combinable with either)
-    cxr app analysis --smoke            # execute the app once without a browser
-    cxr app analysis --edit             # `marimo edit` instead of `marimo run`
-    cxr app analysis --no-token         # pass marimo's --no-token (disable auth token)
+    pyrite app analysis                    # persisted default (fallback hopg)
+    pyrite app analysis wse2               # transient: this run only, doesn't persist
+    pyrite app analysis -d wse2            # persist wse2 as the new default, and launch it
+    pyrite app analysis --watch            # add marimo's --watch (combinable with either)
+    pyrite app analysis --smoke            # execute the app once without a browser
+    pyrite app analysis --edit             # `marimo edit` instead of `marimo run`
+    pyrite app analysis --no-token         # pass marimo's --no-token (disable auth token)
 """
 
 import gzip
@@ -47,15 +47,13 @@ from ..checkpoints import _checkpoint_store
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
 from ..cli._deprecations import canonical_option
-from ..paths import app_dir, atomic_write_text, legacy_state_dir, state_dir
+from ..paths import app_dir, atomic_write_text, state_dir
 from ._acp import running_acp
 
 NOTEBOOK = str(app_dir() / "analysis_app.py")
 TUNNEL_PORT = 2718
 
 _DEFAULT_FILE = state_dir() / "analysis-default"
-_CANONICAL_DEFAULT_FILE = _DEFAULT_FILE
-_LEGACY_DEFAULT_FILE = legacy_state_dir() / "analysis-default"
 
 
 class MaterialMenuRow(TypedDict):
@@ -123,9 +121,9 @@ def select_initial_material(requested: str | None, menu: tuple[MaterialMenuRow, 
 def checkpoint_stem(material: str, face: str) -> str:
     """Checkpoint stem for a material's face variant.
 
-    ``material`` itself for the flat (``cxr run``) face; ``f"{material}_blazed"``
+    ``material`` itself for the flat (``pyrite run``) face; ``f"{material}_blazed"``
     for the blazed (sawtooth entrance-face) checkpoint written by
-    ``cxr material blaze``.
+    ``pyrite material blaze``.
     Passing this stem to :func:`~pyrite.runs.run.load_checkpoint` loads the matching
     ``.pkl`` -- no change to ``load_checkpoint`` / ``checkpoint_path_for`` needed.
     """
@@ -356,10 +354,7 @@ def apply_emission(results, emission):
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
     try:
-        path = _DEFAULT_FILE
-        if path == _CANONICAL_DEFAULT_FILE and not path.exists():
-            path = _LEGACY_DEFAULT_FILE
-        text = path.read_text().strip()
+        text = _DEFAULT_FILE.read_text().strip()
     except FileNotFoundError:
         return None
     return text or None
@@ -374,14 +369,14 @@ def initial_material(cli_args, persisted_default):
     """Resolve the dropdown's initial value. Pure function -- called both from
     the notebook cell (with ``mo.cli_args()``) and directly from tests.
 
-    Precedence: cli-arg material -> ``CXR_ANALYZE_INITIAL`` env var (fallback
+    Precedence: cli-arg material -> ``PYRITE_ANALYZE_INITIAL`` env var (fallback
     transport, in case ``mo.cli_args()`` doesn't reach ``marimo edit``) ->
     ``persisted_default`` -> ``"hopg"``.
     """
     cli_material = cli_args.get("material")
     if cli_material:
         return str(cli_material)
-    env_material = env_value("CXR_ANALYZE_INITIAL")
+    env_material = env_value("PYRITE_ANALYZE_INITIAL")
     if env_material:
         return env_material
     if persisted_default:
@@ -450,7 +445,7 @@ def _launch(
 
 def _cli(args):
     if args.default and args.material is None:
-        raise SystemExit("cxr app analysis -d/--save-default: no material given to persist")
+        raise SystemExit("pyrite app analysis -d/--save-default: no material given to persist")
 
     if args.default:
         set_default_material(args.material)
@@ -513,7 +508,7 @@ def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token
 
 
 def main(argv=None):
-    return _cli_core.run(command, argv, prog_name="cxr-analyze")
+    return _cli_core.run(command, argv, prog_name="pyrite-analyze")
 
 
 if __name__ == "__main__":

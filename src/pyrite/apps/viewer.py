@@ -1,4 +1,4 @@
-"""``cxr app viewer`` -- launch the marimo 3D visualization app (``src/pyrite/apps/trace_app.py``)
+"""``pyrite app viewer`` -- launch the marimo 3D visualization app (``src/pyrite/apps/trace_app.py``)
 with a chosen initial material.
 
 Marimo apps in this environment can't be driven live (no browser/kernel access;
@@ -15,17 +15,17 @@ else ``"hopg"``.
 Two transports carry the resolved material into the marimo subprocess, since we
 can't verify in this environment whether ``mo.cli_args()`` reaches ``marimo edit``
 (only confirmed for ``marimo run``): ``-- --material <X>`` app args (marimo's own
-mechanism) AND a ``CXR_VIEWER_INITIAL`` environment variable set on the
+mechanism) AND a ``PYRITE_VIEWER_INITIAL`` environment variable set on the
 subprocess, as a belt-and-suspenders fallback. :func:`initial_material` checks
 both.
 
-    cxr app viewer                    # persisted default (fallback hopg)
-    cxr app viewer wse2               # transient: this run only, doesn't persist
-    cxr app viewer -d wse2            # persist wse2 as the new default, and launch it
-    cxr app viewer --watch            # add marimo's --watch (combinable with either)
-    cxr app viewer --smoke            # execute the app once without a browser
-    cxr app viewer --edit             # `marimo edit` instead of `marimo run`
-    cxr app viewer --no-token         # pass marimo's --no-token (disable auth token)
+    pyrite app viewer                    # persisted default (fallback hopg)
+    pyrite app viewer wse2               # transient: this run only, doesn't persist
+    pyrite app viewer -d wse2            # persist wse2 as the new default, and launch it
+    pyrite app viewer --watch            # add marimo's --watch (combinable with either)
+    pyrite app viewer --smoke            # execute the app once without a browser
+    pyrite app viewer --edit             # `marimo edit` instead of `marimo run`
+    pyrite app viewer --no-token         # pass marimo's --no-token (disable auth token)
 """
 
 import os
@@ -40,24 +40,19 @@ from .._compat import env_value
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
 from ..cli._deprecations import canonical_option
-from ..paths import app_dir, atomic_write_text, legacy_state_dir, state_dir
+from ..paths import app_dir, atomic_write_text, state_dir
 from ._acp import running_acp
 
 NOTEBOOK = str(app_dir() / "trace_app.py")
 TUNNEL_PORT = 2719
 
 _DEFAULT_FILE = state_dir() / "viewer-default"
-_CANONICAL_DEFAULT_FILE = _DEFAULT_FILE
-_LEGACY_DEFAULT_FILE = legacy_state_dir() / "viewer-default"
 
 
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
     try:
-        path = _DEFAULT_FILE
-        if path == _CANONICAL_DEFAULT_FILE and not path.exists():
-            path = _LEGACY_DEFAULT_FILE
-        text = path.read_text().strip()
+        text = _DEFAULT_FILE.read_text().strip()
     except FileNotFoundError:
         return None
     return text or None
@@ -72,14 +67,14 @@ def initial_material(cli_args, persisted_default):
     """Resolve the dropdown's initial value. Pure function -- called both from
     the notebook cell (with ``mo.cli_args()``) and directly from tests.
 
-    Precedence: cli-arg material -> ``CXR_VIEWER_INITIAL`` env var (fallback
+    Precedence: cli-arg material -> ``PYRITE_VIEWER_INITIAL`` env var (fallback
     transport, in case ``mo.cli_args()`` doesn't reach ``marimo edit``) ->
     ``persisted_default`` -> ``"hopg"``.
     """
     cli_material = cli_args.get("material")
     if cli_material:
         return str(cli_material)
-    env_material = env_value("CXR_VIEWER_INITIAL")
+    env_material = env_value("PYRITE_VIEWER_INITIAL")
     if env_material:
         return env_material
     if persisted_default:
@@ -157,7 +152,7 @@ def _launch(
 
 def _cli(args):
     if args.default and args.material is None:
-        raise SystemExit("cxr app viewer -d/--save-default: no material given to persist")
+        raise SystemExit("pyrite app viewer -d/--save-default: no material given to persist")
 
     if args.default:
         set_default_material(args.material)
@@ -233,7 +228,7 @@ def export_command(material, stem):
 
 
 def main(argv=None):
-    return _cli_core.run(command, argv, prog_name="cxr-viewer")
+    return _cli_core.run(command, argv, prog_name="pyrite-viewer")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""CLI checks for ``cxr setup``: OS-level GPU detection and .env writes."""
+"""CLI checks for ``pyrite setup``: OS-level GPU detection and .env writes."""
 
 from __future__ import annotations
 
@@ -155,7 +155,7 @@ def test_read_existing_backend_missing_file_returns_none(tmp_path):
 
 def test_read_existing_backend_ignores_comments_and_unrelated_keys(tmp_path):
     env = tmp_path / ".env"
-    env.write_text("# comment\nMP_API_KEY_ENV=abc\nCXR_MC_BACKEND=cuda\n")
+    env.write_text("# comment\nMP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cuda\n")
     assert backend_setup.read_existing_backend(env) == "cuda"
 
 
@@ -186,7 +186,7 @@ def test_write_backend_overwrites_existing_key_in_place(tmp_path):
     assert env.read_text() == "MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cpu\nOTHER=1\n"
 
 
-# ---- `cxr setup` CLI integration ----
+# ---- `pyrite setup` CLI integration ----
 
 
 def _isolate_env(monkeypatch, tmp_path) -> Path:
@@ -283,20 +283,20 @@ def test_setup_interactive_prompt_decline_defaults_to_cpu(monkeypatch, tmp_path)
 
 def test_setup_already_set_is_a_no_op(monkeypatch, tmp_path, capsys):
     env_path = _isolate_env(monkeypatch, tmp_path)
-    env_path.write_text("CXR_MC_BACKEND=cuda\n")
+    env_path.write_text("PYRITE_MC_BACKEND=cuda\n")
     calls: list[bool] = []
     monkeypatch.setattr(backend_setup, "detect_all", lambda: calls.append(True) or [])
 
     assert cli.main(["setup"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=cuda\n"
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=cuda\n"
     assert calls == []
     assert "already set" in capsys.readouterr().out
 
 
 def test_setup_force_reruns_detection_and_overwrites(monkeypatch, tmp_path):
     env_path = _isolate_env(monkeypatch, tmp_path)
-    env_path.write_text("CXR_MC_BACKEND=cuda\n")
+    env_path.write_text("PYRITE_MC_BACKEND=cuda\n")
     monkeypatch.setattr(backend_setup, "_interactive", lambda: False)
     monkeypatch.setattr(backend_setup, "detect_all", lambda: [])
 

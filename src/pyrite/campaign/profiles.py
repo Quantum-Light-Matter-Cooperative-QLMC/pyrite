@@ -355,7 +355,7 @@ def _jsonable(value: Any) -> Any:
         # A non-object dtype's `.tolist()` is already a plain nested list of
         # int/float/bool -- never a dataclass or Mapping -- so re-walking each
         # element through `_jsonable` is pure overhead. That walk dominated
-        # `cxr prune`/`cxr checkpoint gc` runtime (minutes) once an
+        # `pyrite prune`/`pyrite checkpoint gc` runtime (minutes) once an
         # energy-grid case field fell back to its full uncompressed array.
         if value.dtype != object:
             return value.tolist()

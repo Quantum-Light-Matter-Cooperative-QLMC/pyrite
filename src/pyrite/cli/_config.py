@@ -11,16 +11,14 @@ from pathlib import Path
 import tomlkit
 from tomlkit.exceptions import ParseError
 
-from .._compat import canonical_env_name, env_value
-from ..paths import legacy_state_dir, state_dir
+from .._compat import env_value
+from ..paths import state_dir
 
 CONFIG_PATH = state_dir() / "config.toml"
-LEGACY_CONFIG_PATH = legacy_state_dir() / "config.toml"
-
 _SETTINGS = {
-    "profile.current": ("CXR_PROFILE", "standard"),
-    "remote.target": ("CXR_REMOTE_HOST", "qlmc"),
-    "workspace.root": ("CXR_HOME", "."),
+    "profile.current": ("PYRITE_PROFILE", "standard"),
+    "remote.target": ("PYRITE_REMOTE_HOST", "qlmc"),
+    "workspace.root": ("PYRITE_HOME", "."),
 }
 
 
@@ -40,7 +38,7 @@ def keys() -> tuple[str, ...]:
 
 
 def _store_path_for_read() -> Path:
-    return CONFIG_PATH if CONFIG_PATH.exists() else LEGACY_CONFIG_PATH
+    return CONFIG_PATH
 
 
 def _read_store() -> dict[str, object]:
@@ -73,7 +71,7 @@ def _stored_value(key: str, store: dict[str, object]) -> str | None:
 
 
 def resolve(key: str, per_call: str | None = None) -> ResolvedValue:
-    """Resolve per-call > PyRITE env > CXR env > stores > built-in."""
+    """Resolve per-call > PyRITE env > config store > built-in."""
     try:
         env_name, default = _SETTINGS[key]
     except KeyError as exc:
@@ -83,19 +81,11 @@ def resolve(key: str, per_call: str | None = None) -> ResolvedValue:
     environment = env_value(env_name)
     if environment is not None:
         if not environment:
-            raise ConfigError(
-                f"{canonical_env_name(env_name)}/{env_name} must be a non-empty string"
-            )
-        source = (
-            canonical_env_name(env_name)
-            if os.environ.get(canonical_env_name(env_name)) is not None
-            else env_name
-        )
-        return ResolvedValue(environment, source)
+            raise ConfigError(f"{env_name} must be a non-empty string")
+        return ResolvedValue(environment, env_name)
     stored = _stored_value(key, _read_store())
     if stored is not None:
-        source = "config store" if CONFIG_PATH.exists() else "legacy config store"
-        return ResolvedValue(stored, source)
+        return ResolvedValue(stored, "config store")
     return ResolvedValue(default, "built-in default")
 
 

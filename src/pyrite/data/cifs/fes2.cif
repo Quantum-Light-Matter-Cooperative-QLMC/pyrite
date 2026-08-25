@@ -1,5 +1,5 @@
 data_fes2
-# Phase identity: cxr-mc crystal catalog entry [fes2].
+# Phase identity: PyRITE crystal catalog entry [fes2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Cubic pyrite FeS2, Pa-3 (#205, origin choice 2): Fe occupies 4a at

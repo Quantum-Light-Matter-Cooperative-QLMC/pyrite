@@ -48,7 +48,7 @@ def test_dump_is_byte_stable_across_paths_and_write_times(tmp_path):
 
 
 def test_dump_stream_frames_the_container_and_leaves_stream_open(tmp_path):
-    """`cxr slim -o -` is a wire format, not a stored artifact: it frames the
+    """`pyrite slim -o -` is a wire format, not a stored artifact: it frames the
     same container in zstd so redundant HDF5 metadata is not sent raw. It must
     not close the caller's stdout, and load() must take the frame back."""
     path = tmp_path / "hopg.pkl"
@@ -143,7 +143,7 @@ def test_stored_arrays_carry_no_filters_and_wire_arrays_carry_shuffle(tmp_path):
 
 
 def test_dump_load_roundtrips_empty_containers(tmp_path):
-    """`cxr slim` trims records down to empty mappings and arrays; an empty set
+    """`pyrite slim` trims records down to empty mappings and arrays; an empty set
     of names has no inferable element type, so it needs an explicit one."""
     path = tmp_path / "empty.pkl"
     payload = {"n": {30.0: {"case": {}, "hkl_list": [], "tags": (), "spec": np.zeros(0)}}}

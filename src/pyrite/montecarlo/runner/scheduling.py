@@ -231,14 +231,14 @@ def run_cases(
         runs everything serially in this process (debugging / safe fallback).
         On the full-case CPU pool (no GPU, or engine="cpu") both auto and
         pinned counts are additionally clamped by host RAM -- see
-        _cpu_pool_workers; per-worker budget via CXR_MC_WORKER_MEM_MB.
+        _cpu_pool_workers; per-worker budget via PYRITE_MC_WORKER_MEM_MB.
     progress: tqdm bar over completed cases.
     callback: callable(i, case, out) invoked in THIS process as each case
         finishes; stream/checkpoint/plot without waiting for the batch.
         Exceptions propagate and abort the run.
     on_timing: optional callback(dict) invoked after each case with transport,
         spectrum, GPU feed-wait, retry, and CuPy-pool metrics. Enables phase
-        timing without requiring CXR_MC_TIMING or printing its stderr report.
+        timing without requiring PYRITE_MC_TIMING or printing its stderr report.
     on_activity: optional callback(dict) invoked at driver phase transitions
         with phase, case index, and in-flight work counts.
     should_stop: optional callable() -> bool, checked before each new case
@@ -270,7 +270,7 @@ def run_cases(
     def _maybe_bar(iterable):
         if not progress:
             return iterable
-        if env_value("CXR_LOCAL_DASHBOARD") == "1":
+        if env_value("PYRITE_LOCAL_DASHBOARD") == "1":
             return iterable
         try:
             from tqdm.auto import tqdm
@@ -296,7 +296,7 @@ def run_cases(
         try:
             case_runtime_plan(cases[0])
         except BackendResourceError as error:
-            if engine != "auto" or env_value("CXR_MC_BACKEND", "auto").lower() != "auto":
+            if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
                 raise
             _admit_cpu_fallback()
             fallback_reason = f"device_budget_infeasible: {error}"
@@ -497,7 +497,7 @@ def run_cases(
                         else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
                     )  # accelerator, THIS process only
                 except _GPU_OOM as error:
-                    if engine != "auto" or env_value("CXR_MC_BACKEND", "auto").lower() != "auto":
+                    if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
                         raise
                     _admit_cpu_fallback()
                     reason = f"accelerator_oom_retries_exhausted: {error}"

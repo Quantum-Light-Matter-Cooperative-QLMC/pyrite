@@ -178,7 +178,7 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
         "uv run pyrite run standard -m hopg",
         "UV_CACHE_DIR=/tmp/cache uv run pyrite run standard -m hopg",
         "git status && uv run pyrite run standard -m hopg",
-        "(uv run cxr run standard -m hopg)",
+        "(uv run pyrite run standard -m hopg)",
     ],
 )
 def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None:
@@ -207,14 +207,14 @@ def test_sweep_guard_allows_safe_commands(sweep_guard_module, command: str) -> N
     "command",
     [
         "PYRITE_LOCAL_SWEEP_OK=1 uv run pyrite run standard -m hopg",
-        "CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
+        "PYRITE_LOCAL_SWEEP_OK=1 uv run pyrite run standard -m hopg",
         "env PYRITE_LOCAL_SWEEP_OK=true uv run pyrite run standard -m hopg",
     ],
 )
 def test_sweep_guard_inline_override_opts_out_a_detected_run(
     sweep_guard_module, monkeypatch, command: str
 ) -> None:
-    monkeypatch.delenv("CXR_LOCAL_SWEEP_OK", raising=False)
+    monkeypatch.delenv("PYRITE_LOCAL_SWEEP_OK", raising=False)
     # Still detected as a local run -- the detector is unchanged ...
     assert sweep_guard_module._local_scan(command)
     # ... but the inline opt-in suppresses the block.
@@ -231,7 +231,7 @@ def test_sweep_guard_ambient_override_opts_out(sweep_guard_module, monkeypatch) 
 def test_sweep_guard_falsey_override_still_blocks(
     sweep_guard_module, monkeypatch, value: str
 ) -> None:
-    monkeypatch.delenv("CXR_LOCAL_SWEEP_OK", raising=False)
+    monkeypatch.delenv("PYRITE_LOCAL_SWEEP_OK", raising=False)
     command = f"PYRITE_LOCAL_SWEEP_OK={value} uv run pyrite run standard -m hopg"
     assert sweep_guard_module._local_scan(command)
     assert not sweep_guard_module._override_active(command)

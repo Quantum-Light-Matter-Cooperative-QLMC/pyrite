@@ -23,7 +23,7 @@ from tests.helpers.cli import invoke
 
 def _resolve_command_path(root: click.Group, path: str) -> click.Command:
     current: click.Command = root
-    ctx = click.Context(root, info_name="cxr")
+    ctx = click.Context(root, info_name="pyrite")
 
     for part in path.split():
         assert isinstance(current, click.Group)
@@ -85,7 +85,7 @@ def _hidden_path_is_covered(
 
 
 def test_every_hidden_command_is_covered_by_deprecations() -> None:
-    root_ctx = click.Context(command, info_name="cxr")
+    root_ctx = click.Context(command, info_name="pyrite")
 
     for path, child, child_ctx in _walk_commands(command, root_ctx):
         is_root_lazy_hidden = len(path) == 1 and path[0] in getattr(command, "lazy_hidden", ())
@@ -99,7 +99,7 @@ def test_every_hidden_command_is_covered_by_deprecations() -> None:
 
 
 def test_retired_flag_registry_matches_live_command_tree() -> None:
-    root_ctx = click.Context(command, info_name="cxr")
+    root_ctx = click.Context(command, info_name="pyrite")
     live: dict[tuple[str, str], RetiredOption] = {}
 
     trees = [

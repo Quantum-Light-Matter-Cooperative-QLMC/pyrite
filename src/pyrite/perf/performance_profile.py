@@ -207,7 +207,7 @@ class PerformanceLogger:
         self.sample("start")
         self._thread = threading.Thread(
             target=self._run,
-            name=f"cxr-performance-{self.material}",
+            name=f"pyrite-performance-{self.material}",
             daemon=True,
         )
         self._thread.start()

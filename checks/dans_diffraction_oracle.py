@@ -3,7 +3,7 @@
 The check builds P1 ``Dans_Diffraction`` crystals from the internal pyrite
 structures, then compares lattice parameters, ``|g|``, and ``|F_hkl|^2`` for a
 small material/reflection set. Non-resonant factors compare identical
-Waasmaier--Kirfel tables tightly. Dispersive factors compare cxr-mc's
+Waasmaier--Kirfel tables tightly. Dispersive factors compare PyRITE's
 Chantler/FFAST data with independent Henke/CXRO data over 1--8 keV.
 
 Run with the pinned optional dependency:

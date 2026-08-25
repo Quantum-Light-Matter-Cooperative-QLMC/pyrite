@@ -1,4 +1,4 @@
-"""``cxr export`` targets the marimo analysis app, not the retired Jupyter
+"""``pyrite export`` targets the marimo analysis app, not the retired Jupyter
 notebook (analysis.ipynb was replaced by src/pyrite/apps/analysis_app.py in the
 marimo migration -- exporting must follow, via ``marimo export html``)."""
 
@@ -11,7 +11,7 @@ from pyrite.apps import export
 
 def test_export_targets_existing_notebook():
     # the export source must exist in the repo (run from the repo root,
-    # which is the documented contract for `cxr export`)
+    # which is the documented contract for `pyrite export`)
     assert Path(export.NOTEBOOK).exists()
 
 

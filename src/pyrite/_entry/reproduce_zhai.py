@@ -3,8 +3,8 @@ shim over src/pyrite/apps/anchor_figures.py::reproduce_all.
 
 The remote box invokes ``python -m pyrite._entry.reproduce_zhai`` inside its
 uv-synced checkout. Populates checkpoints/zhai_reproduction/ for every cache the
-validation app's Zhai sections hit -- no figures, no display -- so a later ``cxr
-remote pull --preset zhai`` (or plain local ``cxr check``) sees an instant cache hit.
+validation app's Zhai sections hit -- no figures, no display -- so a later ``pyrite
+remote pull --preset zhai`` (or plain local ``pyrite check``) sees an instant cache hit.
 
 Run (defaults match the app's own UI defaults, so the pulled cache is guaranteed
 to hit locally):

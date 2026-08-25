@@ -1,5 +1,5 @@
 data_black_phosphorus
-# Phase identity: cxr-mc crystal catalog entry [black_phosphorus].
+# Phase identity: PyRITE crystal catalog entry [black_phosphorus].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Ambient black phosphorus is orthorhombic Cmce (No. 64; the modern alternate

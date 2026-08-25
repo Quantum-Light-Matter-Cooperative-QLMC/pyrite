@@ -1,10 +1,10 @@
-"""Central registry and warning format for deprecated ``cxr`` spellings.
+"""Central registry and warning format for deprecated ``pyrite`` spellings.
 
 ADR-0002 (`docs/adr/0002-cli-surface-redesign.md`) asks every renamed or retired command to
 (a) keep working for a published support window, (b) warn on stderr naming its
 replacement, and (c) appear in `docs/repo-design/cli/cli-deprecations.md` with a removal
 target. This module owns (a) and (b); that document is generated
-from `DEPRECATIONS` by ``cxr-dev cli-deprecations``.
+from `DEPRECATIONS` by ``pyrite-dev cli-deprecations``.
 
 The support window is two minor releases: a spelling deprecated in 0.1.0 is
 removed in 0.3.0. `tests/test_cli_deprecations.py` holds the registry to the
@@ -44,7 +44,7 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
     return Deprecation(path, replacement, since, _window(since), note)
 
 
-#: Keyed by full command path as the user types it, minus the ``cxr`` prefix.
+#: Keyed by full command path as the user types it, minus the ``pyrite`` prefix.
 DEPRECATIONS: dict[str, Deprecation] = {
     entry.path: entry
     for entry in (
@@ -204,8 +204,8 @@ PENDING_WARNING_META_KEY = "pyrite_pending_deprecation"
 def invocation_path(ctx: click.Context) -> str:
     """Registry key for *ctx*: its command chain minus the program root.
 
-    Keys are stored without the ``cxr`` prefix, and the root's ``info_name``
-    varies by entry point (``cxr``, ``cxr-remote``, or the callback name under
+    Keys are stored without the ``pyrite`` prefix, and the root's ``info_name``
+    varies by entry point (``pyrite``, ``pyrite-remote``, or the callback name under
     ``CliRunner``), so the root is dropped rather than matched. A group that can
     itself be a program root carries the prefix it would lose via
     ``deprecation_prefix``.

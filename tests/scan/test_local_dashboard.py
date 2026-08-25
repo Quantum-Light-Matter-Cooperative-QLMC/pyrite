@@ -73,10 +73,10 @@ def test_partial_section_rendering_no_slurm_no_gpu(monkeypatch):
 
 
 def test_non_tty_falls_back_to_tqdm(monkeypatch):
-    monkeypatch.delenv("CXR_LOCAL_DASHBOARD", raising=False)
+    monkeypatch.delenv("PYRITE_LOCAL_DASHBOARD", raising=False)
 
     # Just checking that _maybe_bar returns the iterable (or tqdm wrapped)
-    # when CXR_LOCAL_DASHBOARD is not set.
+    # when PYRITE_LOCAL_DASHBOARD is not set.
     # Because we patched runner.py to do this.
     pass
 

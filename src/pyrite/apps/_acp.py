@@ -8,12 +8,10 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from ..paths import atomic_write_text, legacy_state_dir, state_dir, workspace_root
+from ..paths import atomic_write_text, state_dir, workspace_root
 
 ROOT = workspace_root()
 ACP_STATE_PATH = state_dir() / "acp-servers.json"
-_CANONICAL_ACP_STATE_PATH = ACP_STATE_PATH
-_LEGACY_ACP_STATE_PATH = legacy_state_dir() / "acp-servers.json"
 ACP_SERVERS = {
     "claude": ("@agentclientprotocol/claude-agent-acp", 3017),
     "codex": ("@agentclientprotocol/codex-acp", 3021),
@@ -61,8 +59,6 @@ def terminate_process_tree(pid: int) -> None:
 def start_acp_servers() -> list[subprocess.Popen[bytes]]:
     """Start both ACP bridges and save their process IDs for ``acp-down``."""
     read_path = ACP_STATE_PATH
-    if read_path == _CANONICAL_ACP_STATE_PATH and not read_path.exists():
-        read_path = _LEGACY_ACP_STATE_PATH
     if read_path.exists():
         raise RuntimeError(f"ACP state already exists at {read_path}; run acp-down first.")
 
@@ -81,8 +77,6 @@ def start_acp_servers() -> list[subprocess.Popen[bytes]]:
 def stop_acp_servers() -> None:
     """Stop bridges recorded by ``acp-up`` and clear their local state."""
     read_path = ACP_STATE_PATH
-    if read_path == _CANONICAL_ACP_STATE_PATH and not read_path.exists():
-        read_path = _LEGACY_ACP_STATE_PATH
     if not read_path.exists():
         print("No ACP bridge state found.")
         return

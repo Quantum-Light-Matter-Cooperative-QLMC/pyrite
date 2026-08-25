@@ -1,5 +1,5 @@
 """Tests for the local checkpoint shelf (checkpoint lifecycle, component 2):
-cxr archive / restore / archives / union. Pure local file ops on a temp
+pyrite archive / restore / archives / union. Pure local file ops on a temp
 checkpoints/ tree -- no ssh, CPU-only, fast."""
 
 import json
@@ -146,7 +146,7 @@ def test_archive_and_restore_prints_use_forward_slashes(tmp_path, capsys):
 
 
 def test_default_root_is_repo_anchored():
-    """cxr archive must hit the same checkpoints/ dir no matter the cwd, and it
+    """pyrite archive must hit the same checkpoints/ dir no matter the cwd, and it
     must be the exact dir run.load_checkpoint reads from (repo-root anchored)."""
     import os
 

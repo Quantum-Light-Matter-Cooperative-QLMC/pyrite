@@ -21,7 +21,7 @@ from pyrite.plots.plotly.trajectories import (
     trajectory_volume_figure_from_data,
 )
 
-from ...paths import cache_dir, legacy_cache_dir
+from ...paths import cache_dir
 
 _RENDER_SALT = "v2"  # bump on any change to the cache-key inputs or render format
 
@@ -160,11 +160,7 @@ def render_cache_dir():
 
 def cached_render_path(key, suffix=".mp4"):
     """Path a render for ``key`` should live at under :func:`render_cache_dir`."""
-    canonical = render_cache_dir() / f"{key}{suffix}"
-    if canonical.exists():
-        return canonical
-    legacy = legacy_cache_dir() / "viewer-renders" / f"{key}{suffix}"
-    return legacy if legacy.exists() else canonical
+    return render_cache_dir() / f"{key}{suffix}"
 
 
 def prune_render_cache(keep=20):

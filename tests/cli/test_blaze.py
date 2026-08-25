@@ -1,4 +1,4 @@
-"""`cxr material blaze` blazed-crystal sweep driver: arg parsing, energy/spacing
+"""`pyrite material blaze` blazed-crystal sweep driver: arg parsing, energy/spacing
 pairing, forced groove geometry, checkpoint naming, and the `build_cases`
 groove-tag guard (see
 docs/validation/geometry/blazed-groove-geometry.md)."""

@@ -89,7 +89,7 @@ def _ensure_utf8_stdio():
     printing that text raises UnicodeEncodeError, so `status`/`jobs`/`logs`/
     `attach` would crash on the glyphs. Force UTF-8 with replacement so they
     never do. Scoped to remote subcommands (called from their CLI wrappers, not
-    at import time) so it doesn't change stdio encoding for unrelated ``cxr``
+    at import time) so it doesn't change stdio encoding for unrelated ``pyrite``
     commands."""
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
@@ -564,8 +564,7 @@ def _reject_all_with_values(command_name, all_, values):
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
         "Host, remote directory, and executable come from PYRITE_REMOTE_HOST, "
-        "PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV (legacy CXR_* aliases remain "
-        "supported). Command-line options take precedence over workflow defaults "
+        "PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV. Command-line options take precedence over workflow defaults "
         "where offered.\n\n"
         "\b\n"
         "Examples:\n"
@@ -1633,7 +1632,7 @@ hidden_alias(performance_command, performance_rm_command, "prune")
 
 
 def main(argv=None):
-    return run(command, argv, prog_name="cxr-remote")
+    return run(command, argv, prog_name="pyrite-remote")
 
 
 if __name__ == "__main__":

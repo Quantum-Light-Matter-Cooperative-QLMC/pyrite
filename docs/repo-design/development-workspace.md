@@ -2,8 +2,7 @@
 
 The repository has one uv project and one publishable distribution. The root
 project owns the `pyrite-xray` distribution, `src/pyrite/`, packaged data,
-`pyrite`, `pyrite-dev`, and the test suite. The installed `cxr` and `cxr-dev`
-executables are compatibility aliases through their documented removal window.
+`pyrite`, `pyrite-dev`, and the test suite.
 Contributor tools are dependency groups in the root `pyproject.toml`; there is
 no uv workspace split or separate test-tools package.
 

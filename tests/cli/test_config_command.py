@@ -8,10 +8,10 @@ from tests.helpers.cli import assert_clean_result, invoke
 
 
 def _isolated_store(monkeypatch, tmp_path):
-    path = tmp_path / "cxr" / "config.toml"
+    path = tmp_path / "pyrite" / "config.toml"
     monkeypatch.setattr(_config, "CONFIG_PATH", path)
-    monkeypatch.delenv("CXR_PROFILE", raising=False)
-    monkeypatch.delenv("CXR_REMOTE_HOST", raising=False)
+    monkeypatch.delenv("PYRITE_PROFILE", raising=False)
+    monkeypatch.delenv("PYRITE_REMOTE_HOST", raising=False)
     monkeypatch.setattr(remote_config, "HOST", None)
     return path
 
@@ -55,11 +55,11 @@ def test_shared_precedence_is_call_environment_store_default(monkeypatch, tmp_pa
     _config.set_stored("profile.current", "sub_100keV")
 
     assert _config.resolve("profile.current").value == "sub_100keV"
-    monkeypatch.setenv("CXR_PROFILE", "standard")
+    monkeypatch.setenv("PYRITE_PROFILE", "standard")
     assert _config.resolve("profile.current").value == "standard"
     assert _config.resolve("profile.current", "sub_100keV").value == "sub_100keV"
 
-    monkeypatch.delenv("CXR_PROFILE")
+    monkeypatch.delenv("PYRITE_PROFILE")
     _config.CONFIG_PATH.unlink()
     resolved = _config.resolve("profile.current")
     assert (resolved.value, resolved.source) == ("standard", "built-in default")

@@ -11,9 +11,9 @@ from .._compat import env_value
 # module global. Normal resolution is dynamic so environment and store changes
 # made before an invocation are observed.
 HOST: str | None = None
-REMOTE_DIR = env_value("CXR_REMOTE_DIR", "/home/aamador/dev/pyrite")
-REMOTE_UV = env_value("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
-REMOTE_GPU_VENDOR = env_value("CXR_REMOTE_GPU_VENDOR", "nvidia")
+REMOTE_DIR = env_value("PYRITE_REMOTE_DIR", "/home/aamador/dev/pyrite")
+REMOTE_UV = env_value("PYRITE_REMOTE_UV", "/home/aamador/.local/bin/uv")
+REMOTE_GPU_VENDOR = env_value("PYRITE_REMOTE_GPU_VENDOR", "nvidia")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
@@ -22,7 +22,7 @@ SLURM_TIME = "UNLIMITED"
 # processes time-slice the card while the runner's own CPU-pool/GPU pipeline
 # already overlaps the two phases -- contention for no throughput win, plus
 # VRAM-pool oversubscription. Opt in via parallel_materials; the queue script
-# exports CXR_MC_GPU_SHARE so co-tenant pool caps sum to CXR_MC_GPU_POOL_FRAC.
+# exports PYRITE_MC_GPU_SHARE so co-tenant pool caps sum to PYRITE_MC_GPU_POOL_FRAC.
 DEFAULT_PARALLEL_MATERIALS = 1
 MAX_PARALLEL_MATERIALS = 4
 # repo root = three levels up from src/pyrite/remote/config.py. The package facade orchestrates
@@ -89,7 +89,7 @@ def remote_host() -> str:
         resolved = cli_config.resolve("remote.target", HOST)
         return validate_remote_target(resolved.value)
     except (ValueError, cli_config.ConfigError) as exc:
-        raise SystemExit(f"invalid CXR_REMOTE_HOST: {exc}") from exc
+        raise SystemExit(f"invalid PYRITE_REMOTE_HOST: {exc}") from exc
 
 
 @contextmanager
@@ -112,12 +112,12 @@ def remote_dir() -> str:
     """Return validated absolute POSIX checkout path."""
     value = REMOTE_DIR
     if not isinstance(value, str):
-        raise SystemExit(f"invalid CXR_REMOTE_DIR={value!r}: expected absolute POSIX path")
-    _reject_controls("CXR_REMOTE_DIR", value)
+        raise SystemExit(f"invalid PYRITE_REMOTE_DIR={value!r}: expected absolute POSIX path")
+    _reject_controls("PYRITE_REMOTE_DIR", value)
     if not value or not PurePosixPath(value).is_absolute():
         raise SystemExit(
-            f"invalid CXR_REMOTE_DIR={value!r}: expected absolute POSIX path "
-            "(for example /home/user/dev/cxr-mc)"
+            f"invalid PYRITE_REMOTE_DIR={value!r}: expected absolute POSIX path "
+            "(for example /home/user/dev/pyrite)"
         )
     return value
 
@@ -127,14 +127,14 @@ def remote_uv() -> str:
     value = REMOTE_UV
     if not isinstance(value, str):
         raise SystemExit(
-            f"invalid CXR_REMOTE_UV={value!r}: expected executable name or absolute POSIX path"
+            f"invalid PYRITE_REMOTE_UV={value!r}: expected executable name or absolute POSIX path"
         )
-    _reject_controls("CXR_REMOTE_UV", value)
+    _reject_controls("PYRITE_REMOTE_UV", value)
     if not value or (
         _ABS_EXECUTABLE_RE.fullmatch(value) is None and _EXECUTABLE_RE.fullmatch(value) is None
     ):
         raise SystemExit(
-            f"invalid CXR_REMOTE_UV={value!r}: expected executable name such as 'uv' "
+            f"invalid PYRITE_REMOTE_UV={value!r}: expected executable name such as 'uv' "
             "or absolute POSIX path, not shell program text"
         )
     return value
@@ -146,7 +146,7 @@ def remote_gpu_vendor() -> str:
     value = str(REMOTE_GPU_VENDOR).strip().lower()
     if value not in {"nvidia", "amd", "intel"}:
         raise SystemExit(
-            f"invalid CXR_REMOTE_GPU_VENDOR={REMOTE_GPU_VENDOR!r}: expected nvidia, amd, or intel"
+            f"invalid PYRITE_REMOTE_GPU_VENDOR={REMOTE_GPU_VENDOR!r}: expected nvidia, amd, or intel"
         )
     return value
 
@@ -193,7 +193,7 @@ def sbatch_remote_path(*parts: str) -> str:
     value = remote_path(*parts)
     if any(char.isspace() for char in value) or "#" in value:
         raise SystemExit(
-            f"invalid CXR_REMOTE_DIR={REMOTE_DIR!r}: SLURM output paths cannot contain "
+            f"invalid PYRITE_REMOTE_DIR={REMOTE_DIR!r}: SLURM output paths cannot contain "
             "whitespace or '#'; choose a checkout path safe for #SBATCH directives"
         )
     return value

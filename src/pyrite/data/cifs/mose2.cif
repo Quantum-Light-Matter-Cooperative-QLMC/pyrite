@@ -1,5 +1,5 @@
 data_mose2
-# Phase identity: cxr-mc crystal catalog entry [mose2].
+# Phase identity: PyRITE crystal catalog entry [mose2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # 2H-MoSe2 (P6_3/mmc): Bronsema, Z. Anorg. Allg. Chem. 540/541, 15--17

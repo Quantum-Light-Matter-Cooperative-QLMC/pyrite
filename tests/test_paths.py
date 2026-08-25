@@ -5,7 +5,6 @@ from pyrite.cli import _config
 from pyrite.paths import (
     cache_dir,
     data_dir,
-    legacy_state_dir,
     state_dir,
     user_data_dir,
     workspace_root,
@@ -24,7 +23,7 @@ def test_workspace_root_precedence(monkeypatch, tmp_path):
     explicit = tmp_path / "explicit"
     monkeypatch.setattr(_config, "CONFIG_PATH", config_path)
     _config.set_stored("workspace.root", str(stored))
-    monkeypatch.setenv("CXR_HOME", str(environment))
+    monkeypatch.setenv("PYRITE_HOME", str(environment))
 
     assert workspace_root() == environment.resolve()
     assert workspace_root(explicit) == explicit.resolve()
@@ -36,7 +35,7 @@ def test_workspace_root_uses_store_then_cwd(monkeypatch, tmp_path):
     cwd = tmp_path / "cwd"
     cwd.mkdir()
     monkeypatch.setattr(_config, "CONFIG_PATH", config_path)
-    monkeypatch.delenv("CXR_HOME", raising=False)
+    monkeypatch.delenv("PYRITE_HOME", raising=False)
     _config.set_stored("workspace.root", str(stored))
 
     assert workspace_root() == stored.resolve()
@@ -49,7 +48,6 @@ def test_workspace_root_uses_store_then_cwd(monkeypatch, tmp_path):
 def test_state_dir_matches_config_store_parent():
     assert state_dir() == _config.CONFIG_PATH.parent
     assert state_dir().name == "pyrite"
-    assert legacy_state_dir().name == "cxr-mc"
 
 
 def test_platform_cache_and_data_use_pyrite(monkeypatch, tmp_path):

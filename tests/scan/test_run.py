@@ -1794,7 +1794,7 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 
 
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
-    """`cxr checkpoint recompute brem` refuses no-selection and materials+--all;
+    """`pyrite checkpoint recompute brem` refuses no-selection and materials+--all;
     accepts either alone."""
     from pyrite.checkpoints import recompute
     from pyrite.cli.commands.recompute import brem_command
@@ -1823,7 +1823,7 @@ def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
 
 
 def test_reline_cli_requires_materials_xor_all(monkeypatch):
-    """`cxr checkpoint recompute line` preserves brem's exclusive
+    """`pyrite checkpoint recompute line` preserves brem's exclusive
     material-selection contract."""
     from pyrite.checkpoints import recompute
     from pyrite.cli.commands.recompute import line_command

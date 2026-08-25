@@ -46,7 +46,7 @@ def _validated(key: str, value: str) -> str:
 def command() -> None:
     """Set and inspect environment-scoped CLI defaults.
 
-    Values resolve in one order everywhere: per-call flag, CXR_* environment,
+    Values resolve in one order everywhere: per-call flag, PYRITE_* environment,
     config store, then built-in default.
     """
 

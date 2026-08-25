@@ -1123,7 +1123,7 @@ def remove_command(
 def rename_command(name, new_name, dry_run):
     """Rename profile NAME to NEW_NAME.
 
-    'standard' cannot be renamed: profile-name defaults throughout cxr-mc
+    'standard' cannot be renamed: profile-name defaults throughout PyRITE
     assume it exists. NEW_NAME must not already exist. Migrates the profile's
     ``[energy_grids.NAME]`` fallback bucket (if any) to ``NEW_NAME`` alongside it.
     """

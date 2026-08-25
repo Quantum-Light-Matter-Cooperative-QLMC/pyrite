@@ -104,7 +104,7 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
                 str(docs),
                 str(docs / "_build" / builder),
             ),
-            {"extra_env": {"PYRITE_MC_BACKEND": "cpu", "CXR_MC_BACKEND": "cpu"}},
+            {"extra_env": {"PYRITE_MC_BACKEND": "cpu"}},
         ),
     ]
 
@@ -262,11 +262,11 @@ def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -
     monkeypatch.setattr(smoke, "main", lambda args: calls.append(args) or 0)
 
     args = dev_module.build_parser().parse_args(
-        ["smoke", "--material", "hopg", "--output-dir", "/tmp/cxr-mc-smoke"]
+        ["smoke", "--material", "hopg", "--output-dir", "/tmp/pyrite-smoke"]
     )
     args.func(args)
 
-    assert calls == [["--material", "hopg", "--output-dir", "/tmp/cxr-mc-smoke"]]
+    assert calls == [["--material", "hopg", "--output-dir", "/tmp/pyrite-smoke"]]
 
 
 def test_package_smoke_uses_importable_devtool(dev_module, monkeypatch) -> None:
@@ -324,7 +324,7 @@ def test_repo_map_check_reports_stale_document(dev_module, monkeypatch, capsys) 
 def test_cli_doc_commands_use_canonical_targets(
     dev_module, monkeypatch, command: str, module_name: str, target_name: str
 ) -> None:
-    module = __import__(f"cxr_mc.devtools.{module_name}", fromlist=["main"])
+    module = __import__(f"pyrite.devtools.{module_name}", fromlist=["main"])
     calls = []
     monkeypatch.setattr(module, "main", lambda args: calls.append(args) or 0)
 

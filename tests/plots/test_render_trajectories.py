@@ -64,16 +64,6 @@ def test_cached_render_path_uses_cache_dir_and_key(tmp_path, monkeypatch):
     assert path == render_cache_dir() / f"{key}.gif"
 
 
-def test_cached_render_path_reads_legacy_cache_on_miss(tmp_path, monkeypatch):
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-    key = _key()
-    legacy = tmp_path / "cxr-mc" / "viewer-renders" / f"{key}.gif"
-    legacy.parent.mkdir(parents=True)
-    legacy.write_bytes(b"legacy")
-
-    assert cached_render_path(key, suffix=".gif") == legacy
-
-
 def test_prune_render_cache_keeps_newest_files(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
     cache_dir = render_cache_dir()

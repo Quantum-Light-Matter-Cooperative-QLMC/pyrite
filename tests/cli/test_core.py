@@ -151,10 +151,10 @@ def test_run_maps_usage_runtime_resumable_and_interrupts(capsys):
         if mode == "interrupt":
             raise click.Abort()
 
-    assert _cli_core.run(command, ["--bad"], prog_name="cxr") == 2
-    assert _cli_core.run(command, ["--mode", "runtime"], prog_name="cxr") == 1
-    assert _cli_core.run(command, ["--mode", "resume"], prog_name="cxr") == 75
-    assert _cli_core.run(command, ["--mode", "interrupt"], prog_name="cxr") == 130
+    assert _cli_core.run(command, ["--bad"], prog_name="pyrite") == 2
+    assert _cli_core.run(command, ["--mode", "runtime"], prog_name="pyrite") == 1
+    assert _cli_core.run(command, ["--mode", "resume"], prog_name="pyrite") == 75
+    assert _cli_core.run(command, ["--mode", "interrupt"], prog_name="pyrite") == 130
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "No such option '--bad'." in captured.err

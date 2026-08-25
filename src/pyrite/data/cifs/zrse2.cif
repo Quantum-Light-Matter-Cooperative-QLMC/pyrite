@@ -1,5 +1,5 @@
 data_zrse2
-# Phase identity: cxr-mc crystal catalog entry [zrse2].
+# Phase identity: PyRITE crystal catalog entry [zrse2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Provenance: no additional source citation is recorded with this TOML entry.
 _symmetry_space_group_name_H-M 'P 1'

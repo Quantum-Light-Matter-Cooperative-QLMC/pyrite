@@ -1,4 +1,4 @@
-"""Package-layout and compatibility guards."""
+"""Package-layout and public-surface guards."""
 
 from importlib import import_module, util
 from importlib.metadata import distribution
@@ -36,13 +36,13 @@ _COMPAT_MODULES = {
 }
 
 
-def test_distribution_identity_exposes_canonical_and_compatibility_namespaces() -> None:
+def test_distribution_identity_exposes_only_canonical_namespace() -> None:
     installed = distribution("pyrite-xray")
 
     assert installed.metadata["Name"] == "pyrite-xray"
     assert installed.version == pyrite.__version__
     assert util.find_spec("pyrite") is not None
-    assert util.find_spec("cxr_mc") is not None
+    assert util.find_spec("cxr_mc") is None
     assert util.find_spec("pyrite_xray") is None
 
 

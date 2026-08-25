@@ -181,7 +181,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
         @staticmethod
         def export_all_figures(*_args, **_kwargs):
             raise FileNotFoundError(
-                "Zhai cache missing; populate it with `cxr run --preset zhai --remote`"
+                "Zhai cache missing; populate it with `pyrite run --preset zhai --remote`"
             )
 
     monkeypatch.setitem(sys.modules, "pyrite.apps.anchor_figures", _FakeAF())
@@ -190,7 +190,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
 
     assert result.exit_code == 1
     assert "Error: Zhai cache missing" in result.output
-    assert "cxr run --preset zhai --remote" in result.output
+    assert "pyrite run --preset zhai --remote" in result.output
     assert result.exception is not None
 
 

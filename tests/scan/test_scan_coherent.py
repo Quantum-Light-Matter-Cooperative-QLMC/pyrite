@@ -1,4 +1,4 @@
-"""Regression tests for the profile-owned emission policy on ``cxr run``.
+"""Regression tests for the profile-owned emission policy on ``pyrite run``.
 
 The former ``--coherent/--incoherent`` CLI flags are gone: emission
 (``incoherent``/``coherent``/``both``) is resolved from the profile onto
@@ -16,7 +16,7 @@ from pyrite.runs import scan
 
 
 def _resolved_run(monkeypatch, argv, emission=None):
-    """Invoke ``cxr run`` and capture ``_resolved_run``'s output. When
+    """Invoke ``pyrite run`` and capture ``_resolved_run``'s output. When
     ``emission`` is given, wrap ``default_settings`` so the resolved profile
     reports that emission mode -- the profile-owned path that replaces the
     removed CLI flags."""
@@ -137,7 +137,7 @@ def test_help_no_longer_lists_coherent_incoherent():
 
 
 def test_catalog_profile_emission_key_reaches_resolved_settings(monkeypatch):
-    """End-to-end wiring check for ``CATALOG.profile_emission`` (set via ``cxr
+    """End-to-end wiring check for ``CATALOG.profile_emission`` (set via ``pyrite
     profile set/add/remove --emission/--coherent/--incoherent``), as opposed to
     the other tests in this module which inject the emission by monkeypatching
     ``default_settings`` directly and never exercise the catalog lookup in

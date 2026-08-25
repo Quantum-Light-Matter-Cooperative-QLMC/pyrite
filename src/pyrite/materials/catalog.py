@@ -1909,7 +1909,7 @@ def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEne
     Decision 3 (docs/adr/0005-energy-grid-schema-decisions.md): line-grid bounds
     live here, keyed by material, independent of any profile -- so profile
     edits can never delete expensive Monte-Carlo-derived bounds; only an
-    explicit ``cxr energy-grid line delete`` can. Absent entirely means no
+    explicit ``pyrite energy-grid line delete`` can. Absent entirely means no
     material has a store entry (materials must then set ``E_grid_line``).
     """
     table = _table(raw, "energy_grids", errors)

@@ -531,10 +531,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
 
 
 def test_identity_from_stem_resolves_non_standard_catalog_profile():
-    """Regression: ``cxr remote pull --profile`` died here -- a variant stem
+    """Regression: ``pyrite remote pull --profile`` died here -- a variant stem
     names only material/fidelity/digest, and identity_from_stem used to
     recompute the digest under "standard" only, so a sub_100keV checkpoint
-    could never match (remote `cxr slim --grid` SystemExit, 21/21 failed)."""
+    could never match (remote `pyrite slim --grid` SystemExit, 21/21 failed)."""
     stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     identity = identity_from_stem(stem)
 

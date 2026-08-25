@@ -176,9 +176,9 @@ def test_remote_lookup_timeout_stays_interactive():
 def test_checkpoint_group_completion_does_not_import_gpu_backend():
     """Completion stays usable when the selected accelerator package is absent."""
     environment = os.environ | {
-        "CXR_MC_BACKEND": "cuda",
-        "_CXR_COMPLETE": "bash_complete",
-        "COMP_WORDS": "cxr checkpoint ",
+        "PYRITE_MC_BACKEND": "cuda",
+        "_PYRITE_COMPLETE": "bash_complete",
+        "COMP_WORDS": "pyrite checkpoint ",
         "COMP_CWORD": "2",
     }
     code = """
@@ -192,8 +192,8 @@ def block_cupy(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 
 builtins.__import__ = block_cupy
-from pyrite.cli import legacy_main
-legacy_main()
+from pyrite.cli import main
+main()
 """
     completed = subprocess.run(
         [sys.executable, "-c", code],

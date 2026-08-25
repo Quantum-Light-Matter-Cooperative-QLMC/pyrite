@@ -476,7 +476,7 @@ host's by a few ulp on a chaotic trajectory. It is ledgered as
 seeds, first-step agreement at `rtol=1e-12`, bitwise repeat-run determinism, and
 invariance to batch size, launch geometry, and capacity replay. Any pinned
 spectrum taken above the threshold on a CUDA box has to be regenerated;
-`CXR_MC_TRANSPORT_CORE=lockstep` restores the old core process-wide.
+`PYRITE_MC_TRANSPORT_CORE=lockstep` restores the old core process-wide.
 
 ### Verification: whole-sweep A/B on qlmc (2026-08-08)
 
@@ -527,7 +527,7 @@ run-to-run bitwise reproducible, and serial-lockstep matches pipeline-lockstep
 exactly, so the engine does not enter the result.
 
 That control also caught a defect in the pin: `_worker_init` overwrote
-`CXR_MC_TRANSPORT_CORE` unconditionally, so a worker pool silently ran lockstep
+`PYRITE_MC_TRANSPORT_CORE` unconditionally, so a worker pool silently ran lockstep
 even when the run was pinned to `per-electron` — the pin was a no-op for every
 pooled run. It now redirects only `auto` and `cuda`, which are the values that
 would open a second CUDA context; a deliberate CPU core is honored.

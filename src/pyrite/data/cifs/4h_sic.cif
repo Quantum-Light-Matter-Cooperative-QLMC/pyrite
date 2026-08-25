@@ -1,4 +1,4 @@
-# Phase identity: cxr-mc crystal catalog entry [4h_sic].
+# Phase identity: PyRITE crystal catalog entry [4h_sic].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions: ambient hexagonal 4H-SiC.
 # The basal slab normal is c, so the pinned (0004) reciprocal vector is parallel to it.

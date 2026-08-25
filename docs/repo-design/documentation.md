@@ -184,7 +184,7 @@ change to the zero-warning source-docstring fingerprint fails the build.
 To inspect a source-docstring warning that changed the fingerprint, run the same build with:
 
 ```bash
-CXR_DOCS_SHOW_AUTODOC_WARNINGS=1
+PYRITE_DOCS_SHOW_AUTODOC_WARNINGS=1
 ```
 
 The build intentionally fails while printing every baseline record.

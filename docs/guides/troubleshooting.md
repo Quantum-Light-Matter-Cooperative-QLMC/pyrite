@@ -3,8 +3,8 @@
 ## A command uses the wrong profile, host, or workspace
 
 Run `pyrite config list`; it reports the winning source for every value. A
-command option beats `PYRITE_*`, which beats legacy `CXR_*`, the persistent
-store, and the built-in default. Remove or change the higher-precedence value.
+command option beats `PYRITE_*`, the persistent store, and the built-in default.
+Remove or change the higher-precedence value.
 
 ## The catalog does not load
 
@@ -36,7 +36,7 @@ checkpoints without identity are provenance-incomplete.
 
 ## Analysis cannot find output
 
-Confirm the effective `workspace.root`, any `PYRITE_HOME`/`CXR_HOME`, and any
+Confirm the effective `workspace.root`, any `PYRITE_HOME`, and any
 `--checkpoint-dir` used for the run. Inspect that same active checkpoint root
 or the analysis app's dataset selector. Analysis needs component checkpoint
 data; exported HTML alone is not an input dataset.

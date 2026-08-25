@@ -53,7 +53,7 @@ def test_explicit_fp64_incompatible_backend_errors(monkeypatch):
     backend.vendor = "intel"
     backend.device = _backend.DeviceInfo("sycl", "intel", "Arc", 4 * GIB, False)
     monkeypatch.setattr(_backend, "_load_sycl", lambda: backend)
-    monkeypatch.setenv("CXR_FP64", "1")
+    monkeypatch.setenv("PYRITE_FP64", "1")
 
     with pytest.raises(_backend.BackendUnavailableError, match="lacks fp64"):
         _backend.select_backend("sycl")
@@ -234,7 +234,7 @@ def _fake_sycl_modules(*, devices=None, get_devices=None, sycl_device=None):
 
 
 def test_sycl_backend_selects_env_pinned_device(monkeypatch):
-    monkeypatch.setenv("CXR_MC_SYCL_DEVICE", "level_zero:0")
+    monkeypatch.setenv("PYRITE_MC_SYCL_DEVICE", "level_zero:0")
     fake_dpctl, fake_dpnp, calls = _fake_sycl_modules(
         sycl_device=lambda selector: types.SimpleNamespace(
             name=selector, global_mem_size=0, max_compute_units=0, has_aspect_fp64=False
@@ -248,7 +248,7 @@ def test_sycl_backend_selects_env_pinned_device(monkeypatch):
 
 
 def test_sycl_backend_falls_back_when_no_level_zero_device(monkeypatch):
-    monkeypatch.delenv("CXR_MC_SYCL_DEVICE", raising=False)
+    monkeypatch.delenv("PYRITE_MC_SYCL_DEVICE", raising=False)
     device = types.SimpleNamespace(
         name="opencl device",
         global_mem_size=0,
@@ -264,7 +264,7 @@ def test_sycl_backend_falls_back_when_no_level_zero_device(monkeypatch):
 
 
 def test_sycl_backend_raises_when_no_device_found(monkeypatch):
-    monkeypatch.delenv("CXR_MC_SYCL_DEVICE", raising=False)
+    monkeypatch.delenv("PYRITE_MC_SYCL_DEVICE", raising=False)
     fake_dpctl, fake_dpnp, _ = _fake_sycl_modules(devices=[])
 
     with pytest.raises(_backend.BackendUnavailableError, match="no usable SYCL GPU"):
@@ -272,7 +272,7 @@ def test_sycl_backend_raises_when_no_device_found(monkeypatch):
 
 
 def test_sycl_backend_wraps_unexpected_queue_errors(monkeypatch):
-    monkeypatch.delenv("CXR_MC_SYCL_DEVICE", raising=False)
+    monkeypatch.delenv("PYRITE_MC_SYCL_DEVICE", raising=False)
     device = types.SimpleNamespace(
         name="broken",
         global_mem_size=0,
@@ -292,7 +292,7 @@ def test_sycl_backend_wraps_unexpected_queue_errors(monkeypatch):
 
 
 def test_sycl_backend_synchronize_waits_on_queue(monkeypatch):
-    monkeypatch.delenv("CXR_MC_SYCL_DEVICE", raising=False)
+    monkeypatch.delenv("PYRITE_MC_SYCL_DEVICE", raising=False)
     device = types.SimpleNamespace(
         name="wait-device",
         global_mem_size=0,
@@ -372,7 +372,7 @@ def test_select_backend_auto_falls_back_when_fp64_unsupported(monkeypatch):
     fake.name = "cuda"
     fake.device = _backend.DeviceInfo("cuda", "nvidia", "fake", None, False)
     monkeypatch.setattr(_backend, "_load_cupy", lambda expected=None: fake)
-    monkeypatch.setenv("CXR_FP64", "1")
+    monkeypatch.setenv("PYRITE_FP64", "1")
 
     result = _backend.select_backend("auto")
 
@@ -444,7 +444,7 @@ pytestmark = [
 
 
 @pytest.mark.skipif(
-    env_value("CXR_RUN_INTEL_SYCL_TESTS") != "1",
+    env_value("PYRITE_RUN_INTEL_SYCL_TESTS") != "1",
     reason="set PYRITE_RUN_INTEL_SYCL_TESTS=1 to run Intel SYCL hardware tests",
 )
 def test_intel_machine_selects_sycl_backend() -> None:
@@ -474,7 +474,6 @@ def test_intel_machine_selects_sycl_backend() -> None:
     # auto-selection probe against the machine's hardware.
     env = os.environ.copy()
     env.pop("PYRITE_MC_BACKEND", None)
-    env.pop("CXR_MC_BACKEND", None)
 
     result = subprocess.run(
         [sys.executable, "-c", script],

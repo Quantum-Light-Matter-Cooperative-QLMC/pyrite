@@ -47,7 +47,7 @@ def test_warning_baseline_filters_only_source_docutils(
     )
     assert len(baseline.fingerprints) == 2
 
-    monkeypatch.setenv("CXR_DOCS_SHOW_AUTODOC_WARNINGS", "1")
+    monkeypatch.setenv("PYRITE_DOCS_SHOW_AUTODOC_WARNINGS", "1")
     assert baseline.filter(_record(source_root / "pyrite" / "visible.py")) is True
 
 

@@ -4,7 +4,7 @@ Job verbs (``status``/``attach``/``logs``/``stop``) delegate to ``pyrite.remote`
 for output byte-identical to ``pyrite remote``; ``derive``/``apply``/
 ``line set``/``brem set``/``defaults``/``show``/``regen-golden`` call the package
 modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
-``cxr`` startup stays cheap.
+``pyrite`` startup stays cheap.
 """
 
 from __future__ import annotations
@@ -566,7 +566,7 @@ for _legacy_job_child in (status_command, attach_command, logs_command, stop_com
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help=("Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard."),
+    help=("Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard."),
 )
 @click.option(
     "--regen-golden",
@@ -644,7 +644,7 @@ apply_command = hidden_alias(command, add_command, "apply")
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+    help="Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
 def set_command(material, energy, stop, num, start, note, catalog_profile):
     """Set one line-grid row by repointing an immutable artifact."""
@@ -683,7 +683,7 @@ def set_command(material, energy, stop, num, start, note, catalog_profile):
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help=("Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard."),
+    help=("Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard."),
 )
 @output_option
 def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
@@ -841,7 +841,7 @@ def gc_command(checkpoint_dir, prune_all, yes):
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+    help="Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
 def set_brem_command(material, stop, step, note, catalog_profile):
     """Set a bremsstrahlung grid by repointing an immutable artifact."""
@@ -1026,7 +1026,7 @@ def _show(json_output, material, catalog_profile, *, band=None):
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+    help="Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
 def show_command(json_output, material, catalog_profile):
     """Show line and bremsstrahlung grids together."""
@@ -1041,7 +1041,7 @@ def show_command(json_output, material, catalog_profile):
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+    help="Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
 def line_show_command(json_output, material, catalog_profile):
     """Show coherent line-energy grids."""
@@ -1056,7 +1056,7 @@ def line_show_command(json_output, material, catalog_profile):
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+    help="Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
 def brem_show_command(json_output, material, catalog_profile):
     """Show bremsstrahlung energy grids."""

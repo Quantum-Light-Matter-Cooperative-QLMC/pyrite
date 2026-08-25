@@ -36,9 +36,6 @@ resolved backend to *be* a CUDA device, because it is the only backend with a
 `cupyx.jit` transport kernel. A ROCm or SYCL backend runs its spectrum kernels
 on the device and its transport on the CPU.
 
-Both variables also accept their legacy `CXR_*` spellings. The canonical
-`PYRITE_*` name wins when both are set, with a warning on `stderr`.
-
 ### Backend resolution
 
 `auto` probes in a fixed order — CuPy for CUDA or ROCm, then Intel SYCL through

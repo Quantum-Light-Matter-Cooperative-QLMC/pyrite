@@ -180,7 +180,7 @@ parameter.
 Elements without a NIST transport table (tungsten among them) fall back to
 {eq}`eq-elastic-screening-joy` for the angular draw while keeping the Browning
 total. The miss is cached per element per process and logged once at `DEBUG`
-(`CXR_MC_DEBUG=1` to see it). A worker pool re-logs once per worker, since each
+(`PYRITE_MC_DEBUG=1` to see it). A worker pool re-logs once per worker, since each
 worker holds its own cache.
 
 ## Compounds and layers

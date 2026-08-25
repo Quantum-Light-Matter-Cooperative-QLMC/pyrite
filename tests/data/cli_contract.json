@@ -362,7 +362,7 @@
             "required": false
           }
         ],
-        "help": "Usage: pyrite setup [OPTIONS]\n\n  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  PYRITE_MC_BACKEND or its CXR_MC_BACKEND alias is already set in .env, unless\n  --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value\n              in .env.\n  -h, --help  Show this message and exit.\n",
+        "help": "Usage: pyrite setup [OPTIONS]\n\n  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  PYRITE_MC_BACKEND is already set in .env, unless --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value\n              in .env.\n  -h, --help  Show this message and exit.\n",
         "hidden": true,
         "path": "setup",
         "subcommands": []
@@ -1659,7 +1659,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite completion remove [OPTIONS]\n\n  Remove pyrite tab-completion setup and its generated script.\n\n  Idempotent: exact pyrite and retained cxr-managed blocks are removed. With no\n  --shell, detects from $SHELL.\n\nOptions:\n  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.\n  --rc-file FILE           Rc/config file to edit. Defaults to the shell's\n                           standard location.\n  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data\n                           directory.\n  --dry-run                Print what would change without writing.\n  -h, --help               Show this message and exit.\n",
+            "help": "Usage: pyrite completion remove [OPTIONS]\n\n  Remove pyrite tab-completion setup and its generated script.\n\n  Idempotent: exact PyRITE-managed blocks are removed. With no --shell, detects\n  from $SHELL.\n\nOptions:\n  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.\n  --rc-file FILE           Rc/config file to edit. Defaults to the shell's\n                           standard location.\n  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data\n                           directory.\n  --dry-run                Print what would change without writing.\n  -h, --help               Show this message and exit.\n",
             "hidden": false,
             "path": "completion remove",
             "subcommands": []
@@ -1668,7 +1668,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite config [OPTIONS] COMMAND [ARGS]...\n\n  Set and inspect environment-scoped CLI defaults.\n\n  Values resolve in one order everywhere: per-call flag, CXR_* environment,\n  config store, then built-in default.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  get         Print the effective value for KEY.\n  list        List effective values and the winning...\n  set         Persist VALUE for KEY.\n  setup       Detect GPU hardware and persist the selected backend.\n  completion  Manage PyRITE shell tab-completion.\n",
+        "help": "Usage: pyrite config [OPTIONS] COMMAND [ARGS]...\n\n  Set and inspect environment-scoped CLI defaults.\n\n  Values resolve in one order everywhere: per-call flag, PYRITE_* environment,\n  config store, then built-in default.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  get         Print the effective value for KEY.\n  list        List effective values and the winning...\n  set         Persist VALUE for KEY.\n  setup       Detect GPU hardware and persist the selected backend.\n  completion  Manage PyRITE shell tab-completion.\n",
         "hidden": false,
         "path": "config",
         "subcommands": [
@@ -1733,7 +1733,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite config setup [OPTIONS]\n\n  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  PYRITE_MC_BACKEND or its CXR_MC_BACKEND alias is already set in .env, unless\n  --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value\n              in .env.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: pyrite config setup [OPTIONS]\n\n  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  PYRITE_MC_BACKEND is already set in .env, unless --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value\n              in .env.\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
             "path": "config setup",
             "subcommands": []
@@ -1819,7 +1819,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite config completion remove [OPTIONS]\n\n  Remove pyrite tab-completion setup and its generated script.\n\n  Idempotent: exact pyrite and retained cxr-managed blocks are removed. With no\n  --shell, detects from $SHELL.\n\nOptions:\n  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.\n  --rc-file FILE           Rc/config file to edit. Defaults to the shell's\n                           standard location.\n  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data\n                           directory.\n  --dry-run                Print what would change without writing.\n  -h, --help               Show this message and exit.\n",
+                "help": "Usage: pyrite config completion remove [OPTIONS]\n\n  Remove pyrite tab-completion setup and its generated script.\n\n  Idempotent: exact PyRITE-managed blocks are removed. With no --shell, detects\n  from $SHELL.\n\nOptions:\n  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.\n  --rc-file FILE           Rc/config file to edit. Defaults to the shell's\n                           standard location.\n  --completion-file FILE   Generated script path. Defaults to PyRITE's user-data\n                           directory.\n  --dry-run                Print what would change without writing.\n  -h, --help               Show this message and exit.\n",
                 "hidden": false,
                 "path": "config completion remove",
                 "subcommands": []
@@ -2520,7 +2520,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: pyrite remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from PYRITE_REMOTE_HOST,\n  PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV (legacy CXR_* aliases remain\n  supported). Command-line options take precedence over workflow defaults where\n  offered.\n\n  Examples:\n    pyrite run sub_100keV --remote --dry-run\n    pyrite run compute_test_300keV --remote -p\n    pyrite run standard -m hopg --remote\n    pyrite job status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rm           Delete remote checkpoints; preview unless --yes.\n  sync         Push current code to remote box.\n",
+        "help": "Usage: pyrite remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from PYRITE_REMOTE_HOST,\n  PYRITE_REMOTE_DIR, and PYRITE_REMOTE_UV. Command-line options take precedence\n  over workflow defaults where offered.\n\n  Examples:\n    pyrite run sub_100keV --remote --dry-run\n    pyrite run compute_test_300keV --remote -p\n    pyrite run standard -m hopg --remote\n    pyrite job status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rm           Delete remote checkpoints; preview unless --yes.\n  sync         Push current code to remote box.\n",
         "hidden": false,
         "path": "remote",
         "subcommands": [
@@ -3927,7 +3927,7 @@
               },
               {
                 "dest": "catalog_profile",
-                "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "help": "Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                 "option_strings": [
                   "--profile"
                 ],
@@ -3950,7 +3950,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid add [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid add [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > PYRITE_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid add",
             "subcommands": []
@@ -3997,7 +3997,7 @@
               },
               {
                 "dest": "catalog_profile",
-                "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "help": "Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                 "option_strings": [
                   "--profile"
                 ],
@@ -4020,7 +4020,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid apply [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid apply [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    pyrite-dev energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > PYRITE_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
             "hidden": true,
             "path": "energy-grid apply",
             "subcommands": []
@@ -4079,14 +4079,14 @@
                   },
                   {
                     "dest": "catalog_profile",
-                    "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "help": "Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                     "option_strings": [
                       "--profile"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite energy-grid brem set [OPTIONS] MATERIAL\n\n  Set a bremsstrahlung grid by repointing an immutable artifact.\n\nOptions:\n  --stop EV       Bremsstrahlung grid upper bound in eV.  [required]\n  --step EV       Grid spacing in eV; preserve current value if omitted.\n  --note TEXT     Provenance note stored with manual override.\n  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config\n                  store > standard.\n  -h, --help      Show this message and exit.\n",
+                "help": "Usage: pyrite energy-grid brem set [OPTIONS] MATERIAL\n\n  Set a bremsstrahlung grid by repointing an immutable artifact.\n\nOptions:\n  --stop EV       Bremsstrahlung grid upper bound in eV.  [required]\n  --step EV       Grid spacing in eV; preserve current value if omitted.\n  --note TEXT     Provenance note stored with manual override.\n  --profile NAME  Repoint profile NAME; precedence: flag > PYRITE_PROFILE >\n                  config store > standard.\n  -h, --help      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid brem set",
                 "subcommands": []
@@ -4118,14 +4118,14 @@
                   },
                   {
                     "dest": "catalog_profile",
-                    "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "help": "Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                     "option_strings": [
                       "--profile"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: pyrite energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid brem show",
                 "subcommands": []
@@ -4588,7 +4588,7 @@
                   },
                   {
                     "dest": "catalog_profile",
-                    "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "help": "Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                     "option_strings": [
                       "--profile"
                     ],
@@ -4612,7 +4612,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite energy-grid line delete [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite-dev energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: pyrite energy-grid line delete [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite-dev energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": true,
                 "path": "energy-grid line delete",
                 "subcommands": []
@@ -4667,14 +4667,14 @@
                   },
                   {
                     "dest": "catalog_profile",
-                    "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "help": "Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                     "option_strings": [
                       "--profile"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite energy-grid line set [OPTIONS] MATERIAL\n\n  Set one line-grid row by repointing an immutable artifact.\n\nOptions:\n  --energy KEV    Beam energy in keV.  [required]\n  --stop EV       Line-grid upper bound in eV.  [required]\n  --num N         Grid point count; preserve current value if omitted.\n  --start EV      Line-grid lower bound in eV; preserve current value if\n                  omitted.\n  --note TEXT     Provenance note stored with manual override.\n  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config\n                  store > standard.\n  -h, --help      Show this message and exit.\n",
+                "help": "Usage: pyrite energy-grid line set [OPTIONS] MATERIAL\n\n  Set one line-grid row by repointing an immutable artifact.\n\nOptions:\n  --energy KEV    Beam energy in keV.  [required]\n  --stop EV       Line-grid upper bound in eV.  [required]\n  --num N         Grid point count; preserve current value if omitted.\n  --start EV      Line-grid lower bound in eV; preserve current value if\n                  omitted.\n  --note TEXT     Provenance note stored with manual override.\n  --profile NAME  Repoint profile NAME; precedence: flag > PYRITE_PROFILE >\n                  config store > standard.\n  -h, --help      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line set",
                 "subcommands": []
@@ -4706,14 +4706,14 @@
                   },
                   {
                     "dest": "catalog_profile",
-                    "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "help": "Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                     "option_strings": [
                       "--profile"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: pyrite energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line show",
                 "subcommands": []
@@ -4794,7 +4794,7 @@
               },
               {
                 "dest": "catalog_profile",
-                "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "help": "Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                 "option_strings": [
                   "--profile"
                 ],
@@ -4818,7 +4818,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid rm [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite-dev energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid rm [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    pyrite-dev energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid rm",
             "subcommands": []
@@ -4850,14 +4850,14 @@
               },
               {
                 "dest": "catalog_profile",
-                "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "help": "Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                 "option_strings": [
                   "--profile"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: pyrite energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: pyrite energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid show",
             "subcommands": []
@@ -6357,7 +6357,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: pyrite profile rename [OPTIONS] NAME NEW_NAME\n\n  Rename profile NAME to NEW_NAME.\n\n  'standard' cannot be renamed: profile-name defaults throughout cxr-mc assume\n  it exists. NEW_NAME must not already exist. Migrates the profile's\n  ``[energy_grids.NAME]`` fallback bucket (if any) to ``NEW_NAME`` alongside it.\n\nOptions:\n  --dry-run   Print proposed TOML diff; write nothing.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: pyrite profile rename [OPTIONS] NAME NEW_NAME\n\n  Rename profile NAME to NEW_NAME.\n\n  'standard' cannot be renamed: profile-name defaults throughout PyRITE assume\n  it exists. NEW_NAME must not already exist. Migrates the profile's\n  ``[energy_grids.NAME]`` fallback bucket (if any) to ``NEW_NAME`` alongside it.\n\nOptions:\n  --dry-run   Print proposed TOML diff; write nothing.\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
             "path": "profile rename",
             "subcommands": []
@@ -7130,14 +7130,14 @@
                   },
                   {
                     "dest": "catalog_profile",
-                    "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "help": "Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                     "option_strings": [
                       "--profile"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: pyrite material energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: pyrite material energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "material energy-grid show",
                 "subcommands": []
@@ -7175,14 +7175,14 @@
                       },
                       {
                         "dest": "catalog_profile",
-                        "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                        "help": "Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                         "option_strings": [
                           "--profile"
                         ],
                         "required": false
                       }
                     ],
-                    "help": "Usage: pyrite material energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                    "help": "Usage: pyrite material energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                     "hidden": false,
                     "path": "material energy-grid line show",
                     "subcommands": []
@@ -7222,14 +7222,14 @@
                       },
                       {
                         "dest": "catalog_profile",
-                        "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                        "help": "Resolve profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
                         "option_strings": [
                           "--profile"
                         ],
                         "required": false
                       }
                     ],
-                    "help": "Usage: pyrite material energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
+                    "help": "Usage: pyrite material energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  PYRITE_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                     "hidden": false,
                     "path": "material energy-grid brem show",
                     "subcommands": []

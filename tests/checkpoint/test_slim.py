@@ -116,7 +116,7 @@ def test_slim_checkpoint_default_out_path(tmp_path):
 def test_slim_checkpoint_pipe_mode_writes_artifact_to_stdout_and_report_to_stderr(
     tmp_path, capsysbinary
 ):
-    """`cxr slim -o -` is what `cxr remote pull` streams: stdout must be the
+    """`pyrite slim -o -` is what `pyrite remote pull` streams: stdout must be the
     artifact and nothing else, with every report on stderr. Piped bytes are
     zstd-framed rather than byte-identical to a file dump -- the frame is what
     keeps redundant HDF5 metadata off the wire -- so equality is on content."""
@@ -146,7 +146,7 @@ def test_slim_checkpoint_pipe_mode_writes_artifact_to_stdout_and_report_to_stder
 
 def test_slim_checkpoint_max_compresslevel_is_lossless_and_no_larger(tmp_path):
     """No trimming flag + a raised --compresslevel is a pure recompress: same
-    content, same or smaller bytes than the default -- what `cxr remote pull
+    content, same or smaller bytes than the default -- what `pyrite remote pull
     --level9` relies on."""
     res = _results()
     src = tmp_path / "hopg.pkl"
@@ -220,8 +220,8 @@ def test_grid_accepts_survey_profile_selector_and_variant_stem():
 def test_grid_from_stem_resolves_catalog_profile_variant():
     """A profile-variant stem (materials.toml [profiles.*]) yields the
     3-tuple grid selector, and slim_results filters on that profile's grid --
-    this is the path `cxr remote pull --profile` exercises on the box via
-    `cxr slim --grid`."""
+    this is the path `pyrite remote pull --profile` exercises on the box via
+    `pyrite slim --grid`."""
     from pyrite.campaign.profiles import named_profile_stem
     from pyrite.checkpoints.slim import _grid_from_stem
 

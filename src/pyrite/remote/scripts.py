@@ -599,7 +599,7 @@ def _rebrem_chunked_queue_script(
     """One SLURM slice of a self-resubmitting brem-only recompute chain.
 
     Mirror of ``_reline_chunked_queue_script`` for ``pyrite rebrem``: each slice
-    resumes from checkpoint, does about ``chunk_minutes`` of work via ``cxr
+    resumes from checkpoint, does about ``chunk_minutes`` of work via ``pyrite
     rebrem --max-minutes``, and either terminates the chain (all materials
     completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave

@@ -1,17 +1,17 @@
-"""``cxr app validation`` -- launch the marimo validation app (``src/pyrite/apps/validation_app.py``),
+"""``pyrite app validation`` -- launch the marimo validation app (``src/pyrite/apps/validation_app.py``),
 or render its figures in batch from cache.
 
-Unlike ``cxr app analysis``, this command takes no material argument -- the
+Unlike ``pyrite app analysis``, this command takes no material argument -- the
 validation app reproduces fixed literature figures (e.g. Zhai et al.) rather
 than sweeping a chosen material, so there's no initial-material selection to
 resolve or persist.
 
-    cxr app validation             # `marimo run` the validation app
-    cxr app validation --watch     # add marimo's --watch
-    cxr app validation --edit      # `marimo edit` instead of `marimo run`
-    cxr app validation export      # skip marimo; render the full Zhai figure
+    pyrite app validation             # `marimo run` the validation app
+    pyrite app validation --watch     # add marimo's --watch
+    pyrite app validation --edit      # `marimo edit` instead of `marimo run`
+    pyrite app validation export      # skip marimo; render the full Zhai figure
                                     # set from checkpoints/zhai_reproduction/
-                                    # (see `cxr run --preset zhai --remote`) to figures/
+                                    # (see `pyrite run --preset zhai --remote`) to figures/
 """
 
 import importlib
@@ -26,15 +26,13 @@ from pathlib import Path
 import click
 
 from ..cli import _core as _cli_core
-from ..paths import app_dir, atomic_write_text, legacy_state_dir, state_dir
+from ..paths import app_dir, atomic_write_text, state_dir
 from ..remote.config import remote_host
 from ._acp import running_acp
 
 NOTEBOOK = str(app_dir() / "validation_app.py")
 TUNNEL_PORT = 2718
 DEFAULTS_PATH = state_dir() / "validation-defaults.json"
-_CANONICAL_DEFAULTS_PATH = DEFAULTS_PATH
-_LEGACY_DEFAULTS_PATH = legacy_state_dir() / "validation-defaults.json"
 _PACKAGED_DEFAULTS_PATH = app_dir() / "validation_defaults.json"
 
 
@@ -42,9 +40,7 @@ def load_default_azimuth(path=DEFAULTS_PATH):
     """Load the user override or packaged exploratory TMD azimuth default."""
     resolved = Path(path)
     if resolved == DEFAULTS_PATH and not resolved.is_file():
-        resolved = (
-            _LEGACY_DEFAULTS_PATH if _LEGACY_DEFAULTS_PATH.is_file() else _PACKAGED_DEFAULTS_PATH
-        )
+        resolved = _PACKAGED_DEFAULTS_PATH
     data = json.loads(resolved.read_text(encoding="utf-8"))
     value = float(data["tmd_exploratory_azimuth_deg"])
     if not 0.0 <= value <= 180.0:
@@ -289,7 +285,7 @@ def command(watch, edit, acp, tunnel, export_, outdir, ne, ne_brem, ne_supp):
 
 
 def main(argv=None):
-    return _cli_core.run(command, argv, prog_name="cxr-check")
+    return _cli_core.run(command, argv, prog_name="pyrite-check")
 
 
 if __name__ == "__main__":

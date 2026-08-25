@@ -77,7 +77,7 @@ def _fake_cases():
 
 
 def _run_scan(monkeypatch, tmp_path, *, ref):
-    """Drive one completed ``cxr run`` with a stubbed sweep and profile ref."""
+    """Drive one completed ``pyrite run`` with a stubbed sweep and profile ref."""
     captured = {}
 
     def _run_sweep(*args, **kwargs):

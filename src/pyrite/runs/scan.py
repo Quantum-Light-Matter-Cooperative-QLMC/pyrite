@@ -211,7 +211,7 @@ def _nsys_reexec_command(
 
     Pure (no side effects) so the argv/trace contract is unit-testable. The
     child re-runs this same command WITHOUT ``--nsys`` (so it cannot recurse)
-    under CXR_MC_NSYS=1, mirroring the remote job script's nsys launcher
+    under PYRITE_MC_NSYS=1, mirroring the remote job script's nsys launcher
     (:mod:`pyrite.remote.scripts`). It points the child at an isolated,
     always-uncached checkpoint dir so the trace covers real GPU work rather
     than a fast checkpoint resume. ``material`` is optional: when omitted the
@@ -267,13 +267,13 @@ def _nsys_reexec_command(
 def _reexec_under_nsys(**kwargs):
     """Replace this process with the :func:`_nsys_reexec_command` launcher so
     Nsight Systems captures one uncached CUDA/NVTX trace of the run. Sets
-    CXR_MC_NSYS=1 so the runner emits NVTX ranges in the child. Does not
+    PYRITE_MC_NSYS=1 so the runner emits NVTX ranges in the child. Does not
     return on success (``os.execvp``)."""
     if shutil.which("nsys") is None:
         raise click.UsageError("--nsys requested but the nsys executable is not on PATH")
     argv, trace_base = _nsys_reexec_command(**kwargs)
     trace_base.parent.mkdir(parents=True, exist_ok=True)
-    set_canonical_env("CXR_MC_NSYS", "1")
+    set_canonical_env("PYRITE_MC_NSYS", "1")
     os.execvp(argv[0], argv)
 
 
@@ -342,7 +342,7 @@ def validate_catalog_profile(
 def resolve_profile_materials(catalog_profile: str, material: str | None = None) -> list[str]:
     """Resolve one run selection from a profile and optional material override.
 
-    Shared boundary contract for local and remote ``cxr run``: ``-m``
+    Shared boundary contract for local and remote ``pyrite run``: ``-m``
     selects one profile member; omitting it selects the profile's explicit
     ``materials`` membership. A custom profile without an explicit membership
     selects the full catalog; every shipped profile is explicit.
@@ -382,7 +382,7 @@ def run(args):
 
     if use_dashboard:
         args._job_records = job_records
-        set_canonical_env("CXR_LOCAL_DASHBOARD", "1")
+        set_canonical_env("PYRITE_LOCAL_DASHBOARD", "1")
         detail = getattr(args, "verbose", 0)
         t = threading.Thread(
             target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True
@@ -512,7 +512,7 @@ def _resolved_run(args, material):
     catalog_profile = _effective_catalog_profile(args)
     settings = default_settings() if fidelity == "full" else default_settings(fidelity)
     # Emission (incoherent/coherent/both) is PROFILE-owned -- there is no CLI
-    # override flag. A catalog_profile emission key (set via `cxr profile
+    # override flag. A catalog_profile emission key (set via `pyrite profile
     # set/add/remove --emission/--coherent/--incoherent`) overrides the
     # fidelity preset's emission; absent means the fidelity's own emission
     # stands. The resolved settings.emission drives the dataset_identity
@@ -563,7 +563,7 @@ def _resolved_run(args, material):
         overrides["beam_uvw"] = tuple(args.beam_uvw)
     # The beam itself (spot, bunch, rep rate, charge, phase space) is
     # profile-owned: there is no per-run override path. Set it once on a catalog
-    # profile with `cxr profile create/edit`, so every run that names the profile
+    # profile with `pyrite profile create/edit`, so every run that names the profile
     # gets the same beam and the same dataset identity.
     # See tests/scan/test_scan_beam_options.py.
     sweep = (
@@ -1153,7 +1153,7 @@ def __getattr__(name):
 def main(argv=None):
     from ..cli.commands.scan import command
 
-    return _cli_core.run(command, argv, prog_name="cxr run")
+    return _cli_core.run(command, argv, prog_name="pyrite run")
 
 
 if __name__ == "__main__":

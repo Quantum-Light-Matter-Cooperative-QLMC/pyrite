@@ -1,4 +1,4 @@
-"""Tool-owned persistent defaults for `cxr energy-grid` (NOT the material catalog).
+"""Tool-owned persistent defaults for `pyrite energy-grid` (NOT the material catalog).
 
 Stored at src/pyrite/data/line_grid_defaults.toml so local/remote derive read a single
 source of standing defaults that `--set-default` / `defaults --set` update. Empty
@@ -40,7 +40,7 @@ def _emit(values: dict) -> str:
             return f'"{v}"'
         return repr(v)
 
-    lines = ["# managed by `cxr energy-grid defaults --set`; edit via CLI, not by hand", ""]
+    lines = ["# managed by `pyrite energy-grid defaults --set`; edit via CLI, not by hand", ""]
     for key in ("tilts", "azimuths", "thickness_ang", "energies", "materials"):
         items = ", ".join(scalar(x) for x in values[key])
         lines.append(f"{key} = [{items}]")

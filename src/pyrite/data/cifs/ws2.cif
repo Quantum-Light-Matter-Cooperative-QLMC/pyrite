@@ -1,5 +1,5 @@
 data_ws2
-# Phase identity: cxr-mc crystal catalog entry [ws2].
+# Phase identity: PyRITE crystal catalog entry [ws2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # 2H-WS2 / 2H-MoS2 (P6_3/mmc), isostructural with MoSe2/WSe2: metal on 2c
@@ -27,4 +27,3 @@ S2 S 0.6666666666666667 0.3333333333333333 0.121 1.0
 W2 W 0.6666666666666667 0.3333333333333333 0.75 1.0
 S3 S 0.3333333333333333 0.6666666666666667 0.879 1.0
 S4 S 0.3333333333333333 0.6666666666666667 0.621 1.0
-

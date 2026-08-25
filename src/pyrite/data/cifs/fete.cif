@@ -4,7 +4,7 @@ data_fete
 # doi:10.1021/ja104004t; COD 4102703 (CC0):
 # https://www.crystallography.net/cod/4102703.cif
 # IMPORTANT IDEALIZATION: the experimental parent is Fe1.095Te at 250(2) K.
-# cxr-mc supports only fully occupied sites, so the source's 0.095-occupied
+# PyRITE supports only fully occupied sites, so the source's 0.095-occupied
 # interstitial Fe 2c orbit at (0.25,0.25,0.7811) is intentionally omitted.
 # The retained fully occupied framework Fe 2b and Te 2c sites are expanded in P1.
 # The catalog B_ang2=0.6 A^2 is a modeling placeholder, not source-derived.

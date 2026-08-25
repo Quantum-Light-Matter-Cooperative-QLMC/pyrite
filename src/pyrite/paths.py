@@ -22,7 +22,7 @@ def app_dir() -> Path:
 
 
 def workspace_root(explicit: str | PathLike[str] | None = None) -> Path:
-    """Resolve explicit > ``PYRITE_HOME``/``CXR_HOME`` > stores > cwd."""
+    """Resolve explicit > ``PYRITE_HOME`` > config store > cwd."""
     from .cli._config import resolve
 
     value = resolve("workspace.root", None if explicit is None else str(explicit)).value
@@ -34,29 +34,14 @@ def state_dir() -> Path:
     return Path(click.get_app_dir("pyrite"))
 
 
-def legacy_state_dir() -> Path:
-    """Return the retained cxr-mc mutable-state directory."""
-    return Path(click.get_app_dir("cxr-mc"))
-
-
 def state_path_for_read(name: str) -> Path:
-    """Resolve one state file canonical-first, then through the legacy store."""
-    canonical = state_dir() / name
-    if canonical.exists():
-        return canonical
-    legacy = legacy_state_dir() / name
-    return legacy if legacy.exists() else canonical
+    """Return one path in the canonical mutable-state directory."""
+    return state_dir() / name
 
 
 def cache_dir() -> Path:
     """Return the canonical platform-specific user cache directory."""
     return Path(user_cache_path("pyrite", appauthor=False))
-
-
-def legacy_cache_dir() -> Path:
-    """Reproduce the exact pre-PyRITE cache-root algorithm."""
-    base = os.environ.get("XDG_CACHE_HOME")
-    return (Path(base) if base else Path.home() / ".cache") / "cxr-mc"
 
 
 def user_data_dir() -> Path:

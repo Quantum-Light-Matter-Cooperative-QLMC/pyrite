@@ -1,6 +1,6 @@
 """Portable array-backend selection for Monte Carlo spectrum kernels.
 
-Selection is controlled by ``CXR_MC_BACKEND=auto|cpu|cuda|rocm|sycl``.
+Selection is controlled by ``PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl``.
 Automatic selection probes CUDA/ROCm CuPy, then Intel SYCL through dpnp, and
 finally NumPy. Explicit accelerator requests fail instead of changing device.
 """
@@ -102,7 +102,7 @@ class CuPyBackend(ArrayBackend):
         self.vendor = "amd" if is_hip else "nvidia"
         if expected is not None and self.name != expected:
             raise BackendUnavailableError(
-                f"CXR_MC_BACKEND={expected} requested, but installed CuPy targets {self.name}; "
+                f"PYRITE_MC_BACKEND={expected} requested, but installed CuPy targets {self.name}; "
                 f"install pyrite-xray[{('amd' if expected == 'rocm' else 'nvidia')}] "
                 "in a clean environment"
             )
@@ -195,7 +195,7 @@ class SyclBackend(ArrayBackend):
     vendor = "intel"
 
     def __init__(self, dpnp: ModuleType, dpctl: ModuleType):
-        selector = env_value("CXR_MC_SYCL_DEVICE")
+        selector = env_value("PYRITE_MC_SYCL_DEVICE")
         try:
             if selector:
                 devices = [dpctl.SyclDevice(selector)]
@@ -276,10 +276,10 @@ def _load_sycl() -> SyclBackend:
 def select_backend(requested: str | None = None) -> ArrayBackend:
     """Resolve requested backend; ``auto`` alone may fall back to NumPy."""
 
-    requested = (requested or env_value("CXR_MC_BACKEND", "auto")).strip().lower()
+    requested = (requested or env_value("PYRITE_MC_BACKEND", "auto")).strip().lower()
     if requested not in _VALID_BACKENDS:
         raise BackendUnavailableError(
-            f"CXR_MC_BACKEND must be one of {', '.join(_VALID_BACKENDS)}; got {requested!r}"
+            f"PYRITE_MC_BACKEND must be one of {', '.join(_VALID_BACKENDS)}; got {requested!r}"
         )
     if requested == "cpu":
         return NumPyBackend()
@@ -299,13 +299,13 @@ def select_backend(requested: str | None = None) -> ArrayBackend:
                 logger.debug("accelerator probe skipped: %s", error)
         if backend is None:
             return NumPyBackend(fallback_reason="accelerator_unavailable: " + "; ".join(failures))
-    if env_value("CXR_FP64") == "1" and not backend.device.supports_fp64:
+    if env_value("PYRITE_FP64") == "1" and not backend.device.supports_fp64:
         if requested == "auto":
-            logger.warning("%s lacks fp64; CXR_FP64=1 selects CPU NumPy", backend.device.name)
+            logger.warning("%s lacks fp64; PYRITE_FP64=1 selects CPU NumPy", backend.device.name)
             return NumPyBackend(fallback_reason=f"unsupported_fp64: {backend.device.name}")
         raise BackendUnavailableError(
-            f"CXR_MC_BACKEND={backend.name} device {backend.device.name!r} lacks fp64; "
-            "unset CXR_FP64 or select CXR_MC_BACKEND=cpu"
+            f"PYRITE_MC_BACKEND={backend.name} device {backend.device.name!r} lacks fp64; "
+            "unset PYRITE_FP64 or select PYRITE_MC_BACKEND=cpu"
         )
     return backend
 
@@ -314,7 +314,7 @@ BACKEND = select_backend()
 xp = BACKEND.xp
 cp: ModuleType | None = BACKEND.cp if isinstance(BACKEND, CuPyBackend) else None
 _GPU = BACKEND.name != "cpu"
-REAL = xp.float32 if (_GPU and env_value("CXR_FP64") != "1") else xp.float64
+REAL = xp.float32 if (_GPU and env_value("PYRITE_FP64") != "1") else xp.float64
 
 
 def _to_cpu(value: Any) -> np.ndarray:

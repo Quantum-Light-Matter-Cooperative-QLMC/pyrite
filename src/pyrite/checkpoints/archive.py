@@ -1,23 +1,23 @@
-"""``cxr archive`` / ``restore`` / ``archives`` / ``union`` -- a durable local
+"""``pyrite archive`` / ``restore`` / ``archives`` / ``union`` -- a durable local
 shelf for checkpoints (checkpoint lifecycle, component 2).
 
 The GPU box is scratch compute; the laptop is the durable store. A grid-filtered
 pull lands in the ACTIVE slot ``checkpoints/<stem>.pkl`` (exactly what
-``cxr app analysis`` loads). These commands add a two-tier model on top of that:
+``pyrite app analysis`` loads). These commands add a two-tier model on top of that:
 
     checkpoints/<stem>.pkl            active slot (viz loads this)
     checkpoints/archive/<label>.pkl   long-term shelf (named snapshots you keep)
 
-    cxr archive hopg                  # -> archive/hopg-20260704.pkl
-    cxr archive hopg good-thickness   # -> archive/good-thickness.pkl
-    cxr restore hopg-20260704         # -> checkpoints/hopg.pkl (stem inferred)
-    cxr restore good-thickness --as hopg
-    cxr archives                      # list the shelf
-    cxr union hopg good-thickness     # merge archive/good-thickness.pkl into
+    pyrite archive hopg                  # -> archive/hopg-20260704.pkl
+    pyrite archive hopg good-thickness   # -> archive/good-thickness.pkl
+    pyrite restore hopg-20260704         # -> checkpoints/hopg.pkl (stem inferred)
+    pyrite restore good-thickness --as hopg
+    pyrite archives                      # list the shelf
+    pyrite union hopg good-thickness     # merge archive/good-thickness.pkl into
                                        # checkpoints/hopg.pkl (TODO P2 #8)
 
 All operations are pure local file copies (atomic temp+replace), so this lives on
-the ``cxr`` console script next to ``slim`` -- library-side and unit-testable --
+the ``pyrite`` console script next to ``slim`` -- library-side and unit-testable --
 not in ``pyrite.remote``. The shelf stores whatever the active slot holds at the
 time, typically the grid-filtered view.
 """
@@ -240,7 +240,7 @@ def union_checkpoint(
     into mos2 would silently pollute a checkpoint with another crystal's records.
 
     By default archives the live checkpoint FIRST (via :func:`archive_checkpoint`,
-    same default label), so the union is undoable via ``cxr restore``; pass
+    same default label), so the union is undoable via ``pyrite restore``; pass
     ``pre_archive=False`` to skip it. ``force`` is forwarded to that pre-archive
     step's overwrite guard. The source archive is left intact by default; pass
     ``delete_archive=True`` to remove it once the union has landed. Returns the
@@ -436,7 +436,7 @@ def union_command(stem, label, no_archive, delete_archive, force):
     )
 
 
-@click.group("cxr-archive")
+@click.group("pyrite-archive")
 def standalone_command():
     """Manage local checkpoint archive shelf."""
 
@@ -446,7 +446,7 @@ for _command in (archive_command, restore_command, archives_command, union_comma
 
 
 def main(argv=None):
-    return _cli_core.run(standalone_command, argv, prog_name="cxr-archive")
+    return _cli_core.run(standalone_command, argv, prog_name="pyrite-archive")
 
 
 if __name__ == "__main__":

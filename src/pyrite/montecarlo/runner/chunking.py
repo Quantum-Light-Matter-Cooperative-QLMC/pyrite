@@ -22,12 +22,12 @@ def _env_chunk(name, default):
 
 
 # Segments per spectrum matmul. 0 (the default) = size adaptively per call from
-# the energy-grid width via _adaptive_chunk; a positive CXR_MC_SPEC_CHUNK /
-# CXR_MC_BREM_CHUNK env value pins a fixed chunk (A1 sweep-accel spike), and an
+# the energy-grid width via _adaptive_chunk; a positive PYRITE_MC_SPEC_CHUNK /
+# PYRITE_MC_BREM_CHUNK env value pins a fixed chunk (A1 sweep-accel spike), and an
 # explicit per-case spec_chunk/brem_chunk still wins over both.
 _RESOURCE_POLICY = resolve_resource_policy(BACKEND)
-_SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 0)
-_BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 0)
+_SPEC_CHUNK = _env_chunk("PYRITE_MC_SPEC_CHUNK", 0)
+_BREM_CHUNK = _env_chunk("PYRITE_MC_BREM_CHUNK", 0)
 # Transient-memory budget [MB] for one spectrum matmul. The chunk loops in
 # mc_spectrum / mc_brem_spectrum hold ~3 float64 (chunk, nbins) arrays at peak
 # (x, S = sinc(x)**2, and sinc's internal temporary), so transient bytes
@@ -38,7 +38,7 @@ _POLICY_DEVICE_MB = (
     if _RESOURCE_POLICY.device_budget_bytes is not None
     else 1920
 )
-_SPEC_BUDGET_MB = _env_chunk("CXR_MC_SPEC_BUDGET_MB", min(1920, _POLICY_DEVICE_MB))
+_SPEC_BUDGET_MB = _env_chunk("PYRITE_MC_SPEC_BUDGET_MB", min(1920, _POLICY_DEVICE_MB))
 
 
 def _adaptive_chunk(nbins):

@@ -20,4 +20,4 @@ sign-off.
 | `cxr_analysis_feranchuk.ipynb`, `cxr_analysis_feranchuk.md` | `coherent-line-spectrum`, `closed-form-flux` | Legacy paired notebook retained for historical Feranchuk analysis; keep output-free. |
 
 Run commands are documented in each check. Heavy Monte Carlo or GPU work must
-use `cxr remote`; do not launch it locally from this directory.
+use `pyrite remote`; do not launch it locally from this directory.

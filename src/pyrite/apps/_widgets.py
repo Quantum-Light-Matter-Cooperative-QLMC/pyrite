@@ -15,9 +15,9 @@ class MaterialSelect(AnyWidget):
       label.appendChild(labelText);
       const select = document.createElement("select");
       select.setAttribute("aria-label", model.get("label"));
-      select.style.backgroundColor = "var(--cxr-surface, #FFFFFF)";
-      select.style.color = "var(--cxr-text, #172832)";
-      select.style.borderColor = "var(--cxr-rule, #C6D2D8)";
+      select.style.backgroundColor = "var(--pyrite-surface, #FFFFFF)";
+      select.style.color = "var(--pyrite-text, #172832)";
+      select.style.borderColor = "var(--pyrite-rule, #C6D2D8)";
       select.style.colorScheme = "light dark";
       for (const row of model.get("options")) {
         const option = document.createElement("option");
@@ -108,18 +108,18 @@ class ThemeSelect(AnyWidget):
       const media = window.matchMedia("(prefers-color-scheme: dark)");
 
       const wrapper = document.createElement("label");
-      wrapper.className = "cxr-theme-select";
+      wrapper.className = "pyrite-theme-select";
 
       const caption = document.createElement("span");
       caption.textContent = "Appearance";
-      caption.className = "cxr-theme-select__label";
+      caption.className = "pyrite-theme-select__label";
 
       const select = document.createElement("select");
-      select.className = "cxr-theme-select__control";
+      select.className = "pyrite-theme-select__control";
       select.setAttribute("aria-label", "Appearance");
-      select.style.backgroundColor = "var(--cxr-surface, #FFFFFF)";
-      select.style.color = "var(--cxr-text, #172832)";
-      select.style.border = "1px solid var(--cxr-rule, #C6D2D8)";
+      select.style.backgroundColor = "var(--pyrite-surface, #FFFFFF)";
+      select.style.color = "var(--pyrite-text, #172832)";
+      select.style.border = "1px solid var(--pyrite-rule, #C6D2D8)";
       select.style.borderRadius = "3px";
       select.style.padding = ".25rem 1.8rem .25rem .55rem";
       for (const [value, label] of [
@@ -152,7 +152,7 @@ class ThemeSelect(AnyWidget):
           document.body.dataset.theme = resolved;
           document.body.dataset.pyriteTheme = resolved;
         }
-        wrapper.style.color = "var(--cxr-muted, #526B76)";
+        wrapper.style.color = "var(--pyrite-muted, #526B76)";
         syncMarimoShadowThemes(resolved);
         window.requestAnimationFrame(() => syncMarimoShadowThemes(resolved));
 

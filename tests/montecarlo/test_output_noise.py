@@ -3,13 +3,13 @@ P3 #3 -- CLI/remote output noise.
 
 Regression coverage for silencing:
   - the GPU/CPU backend-probe banner (montecarlo._backend), previously
-    `print()`ed at import time on every `cxr` invocation.
+    `print()`ed at import time on every `pyrite` invocation.
   - the "no Mott transport table for 'X'" notice (montecarlo.transport),
     previously `print()`ed the first time an element without a NIST table
     was requested.
 
 Both are now module-level `logging.getLogger(__name__).debug(...)` calls,
-silent unless the caller opts in (CXR_MC_DEBUG=1 or their own logging
+silent unless the caller opts in (PYRITE_MC_DEBUG=1 or their own logging
 config), so a plain import / CLI run stays quiet.
 """
 
@@ -23,7 +23,7 @@ from pyrite.montecarlo import transport
 
 
 def test_cli_help_has_no_gpu_banner():
-    """A plain `cxr --help` must not print the GPU/CPU backend-probe banner."""
+    """A plain `pyrite --help` must not print the GPU/CPU backend-probe banner."""
     result = subprocess.run(
         [sys.executable, "-m", "pyrite.cli", "--help"],
         capture_output=True,

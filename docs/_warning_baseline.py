@@ -64,7 +64,7 @@ class AutodocWarningBaseline(logging.Filter):
         self.fingerprints.append(
             f"{source_name}::{record.levelname}::docutils.{subtype}::{message}"
         )
-        return os.environ.get("CXR_DOCS_SHOW_AUTODOC_WARNINGS") == "1"
+        return os.environ.get("PYRITE_DOCS_SHOW_AUTODOC_WARNINGS") == "1"
 
     def digest(self) -> str:
         payload = "\n".join(sorted(self.fingerprints)).encode()

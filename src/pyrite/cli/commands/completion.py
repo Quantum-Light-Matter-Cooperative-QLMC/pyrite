@@ -24,13 +24,10 @@ _SHELL_SOURCE_MODE = {"bash": "bash_source", "zsh": "zsh_source", "fish": "fish_
 SHELL_CHOICE = click.Choice(tuple(_SHELL_SOURCE_MODE), case_sensitive=True)
 _MANAGED_START = "# >>> pyrite shell completion >>>"
 _MANAGED_END = "# <<< pyrite shell completion <<<"
-_CXR_MANAGED_START = "# >>> cxr shell completion >>>"
-_CXR_MANAGED_END = "# <<< cxr shell completion <<<"
-_LEGACY_COMMENT = "# cxr shell completion"
 
 
 def _completion_line(shell: str, prog_name: str = PROG_NAME) -> str:
-    """Return the retained dynamic-source line used by older installations."""
+    """Return the dynamic-source line used by older PyRITE installations."""
     mode = _SHELL_SOURCE_MODE[shell]
     complete_var = f"_{prog_name.upper()}_COMPLETE"
     if shell == "fish":
@@ -146,7 +143,7 @@ def _managed_block(shell: str, completion_file: Path) -> str:
 def _without_managed_completion(
     existing: str, shell: str, completion_file: Path
 ) -> tuple[str, bool]:
-    """Remove exact current or legacy managed blocks for one shell."""
+    """Remove exact current managed blocks for one shell."""
     lines = existing.splitlines(keepends=True)
     kept: list[str] = []
     removed = False
@@ -154,14 +151,7 @@ def _without_managed_completion(
     while index < len(lines):
         current = lines[index].strip()
         dynamic_line = _completion_line(shell)
-        legacy_blocks = {
-            (_MANAGED_START, _MANAGED_END, dynamic_line),
-            (
-                _CXR_MANAGED_START,
-                _CXR_MANAGED_END,
-                _completion_line_from_line(dynamic_line, "cxr"),
-            ),
-        }
+        legacy_blocks = {(_MANAGED_START, _MANAGED_END, dynamic_line)}
         current_block = _managed_block(shell, completion_file).splitlines()
         if lines[index : index + len(current_block)] and [
             item.strip() for item in lines[index : index + len(current_block)]
@@ -178,25 +168,9 @@ def _without_managed_completion(
             removed = True
             index += 3
             continue
-        if (
-            current == _LEGACY_COMMENT
-            and index + 1 < len(lines)
-            and lines[index + 1].strip()
-            in {dynamic_line, _completion_line_from_line(dynamic_line, "cxr")}
-        ):
-            removed = True
-            index += 2
-            continue
         kept.append(lines[index])
         index += 1
     return "".join(kept), removed
-
-
-def _completion_line_from_line(line: str, prog_name: str) -> str:
-    """Translate a generated canonical line to one retained program spelling."""
-    return line.replace("_PYRITE_COMPLETE", f"_{prog_name.upper()}_COMPLETE").replace(
-        " pyrite", f" {prog_name}"
-    )
 
 
 def _target_options(function):
@@ -299,7 +273,7 @@ def install_command(
     "remove",
     help=(
         "Remove pyrite tab-completion setup and its generated script.\n\n"
-        "Idempotent: exact pyrite and retained cxr-managed blocks are removed. "
+        "Idempotent: exact PyRITE-managed blocks are removed. "
         "With no --shell, detects from $SHELL."
     ),
 )
@@ -310,7 +284,7 @@ def remove_command(
     completion_file: Path | None,
     dry_run: bool,
 ) -> None:
-    """Remove cxr-managed tab-completion setup from a shell rc/config file."""
+    """Remove PyRITE-managed tab-completion setup from a shell rc/config file."""
     shell, target = _resolve_target(shell, rc_file)
     script_path = completion_file or _completion_file(shell)
     try:
@@ -362,7 +336,7 @@ def command() -> None:
 
 
 def main(argv=None):
-    return run(command, argv, prog_name="cxr-completion")
+    return run(command, argv, prog_name="pyrite-completion")
 
 
 if __name__ == "__main__":

@@ -271,8 +271,8 @@ n_electrons = {values = [20000]}
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
-  # 40/60 keV: provisional interpolated bounds, pending `cxr energy-grid derive --remote`
-  # rerun (issue: add-40-60kev-energies) -- replace stop/num via `cxr energy-grid apply` once derived values land.
+  # 40/60 keV: provisional interpolated bounds, pending `pyrite energy-grid derive --remote`
+  # rerun (issue: add-40-60kev-energies) -- replace stop/num via `pyrite energy-grid apply` once derived values land.
   { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2800.0, num = 931, endpoint = true } }, source = "derived" },
   { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3000.0, num = 998, endpoint = true } }, source = "derived" },
   { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 4200.0, num = 1398, endpoint = true } }, source = "derived" },
@@ -1240,7 +1240,7 @@ B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 0, 1]]
-hkl_reason = "Idealized stoichiometric beta-FeTe uses the fully occupied PbO-type framework from experimental Fe1.095Te COD 4102703; the 9.5%-occupied interstitial Fe orbit is intentionally omitted because cxr-mc supports only fully occupied sites. Pin the finite basal (001) harmonic parallel to its cleavage surface."
+hkl_reason = "Idealized stoichiometric beta-FeTe uses the fully occupied PbO-type framework from experimental Fe1.095Te COD 4102703; the 9.5%-occupied interstitial Fe orbit is intentionally omitted because PyRITE supports only fully occupied sites. Pin the finite basal (001) harmonic parallel to its cleavage surface."
 
 [crystals.fes2]
 cif = "cifs/fes2.cif"

@@ -1,5 +1,5 @@
 data_tis2
-# Phase identity: cxr-mc crystal catalog entry [tis2].
+# Phase identity: PyRITE crystal catalog entry [tis2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # 1T (CdI2-type, P-3m1) metal dichalcogenides: heavy metal on Wyckoff 1a (0,0,0)
@@ -31,4 +31,3 @@ _atom_site_occupancy
 Ti1 Ti 0.0 0.0 0.0 1.0
 S1 S 0.3333333333333333 0.6666666666666667 0.2493 1.0
 S2 S 0.6666666666666667 0.3333333333333333 0.7507 1.0
-

@@ -10,7 +10,7 @@ work without silently perturbing results.
 
 The tolerance must track the backend's accumulation precision, which
 ``montecarlo._backend.REAL`` selects at import: float64 on a CPU box (or under
-``CXR_FP64=1``), float32 on a GPU. Reordering an N-term sum perturbs it by
+``PYRITE_FP64=1``), float32 on a GPU. Reordering an N-term sum perturbs it by
 roughly ``sqrt(N)*eps`` relative, so a fixed float64 rtol spuriously fails on
 any GPU machine -- the historical bug this parametrization fixes. Set
 ``CUDA_VISIBLE_DEVICES=""`` to exercise the strict float64 path anywhere.
@@ -168,16 +168,16 @@ def test_brem_dsigma_gpu_scalar_z_preserves_real_precision():
 
 # ---- the env-var override that drives the A1 spike ---------------------------
 def test_env_chunk_parses_positive_override(monkeypatch):
-    monkeypatch.setenv("CXR_MC_SPEC_CHUNK", "250000")
-    assert _env_chunk("CXR_MC_SPEC_CHUNK", 40000) == 250000
+    monkeypatch.setenv("PYRITE_MC_SPEC_CHUNK", "250000")
+    assert _env_chunk("PYRITE_MC_SPEC_CHUNK", 40000) == 250000
 
 
 @pytest.mark.parametrize("bad", ["", "0", "-5", "12.5", "lots", "  "])
 def test_env_chunk_falls_back_on_bad_values(monkeypatch, bad):
-    monkeypatch.setenv("CXR_MC_SPEC_CHUNK", bad)
-    assert _env_chunk("CXR_MC_SPEC_CHUNK", 40000) == 40000
+    monkeypatch.setenv("PYRITE_MC_SPEC_CHUNK", bad)
+    assert _env_chunk("PYRITE_MC_SPEC_CHUNK", 40000) == 40000
 
 
 def test_env_chunk_falls_back_when_unset(monkeypatch):
-    monkeypatch.delenv("CXR_MC_SPEC_CHUNK", raising=False)
-    assert _env_chunk("CXR_MC_SPEC_CHUNK", 40000) == 40000
+    monkeypatch.delenv("PYRITE_MC_SPEC_CHUNK", raising=False)
+    assert _env_chunk("PYRITE_MC_SPEC_CHUNK", 40000) == 40000

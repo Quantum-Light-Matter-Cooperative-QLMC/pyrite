@@ -221,7 +221,7 @@ def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
     analytic screened-Rutherford screening for that element. The miss is cached
     in _NO_MOTT so we don't re-stat the filesystem every transport step
     (lru_cache doesn't cache the FileNotFoundError); logged once per element
-    per process at DEBUG (silent by default -- set CXR_MC_DEBUG=1 to see it;
+    per process at DEBUG (silent by default -- set PYRITE_MC_DEBUG=1 to see it;
     a ProcessPoolExecutor worker pool re-logs once per worker, since each
     worker gets its own _NO_MOTT cache)."""
     R = rng.random(E_keV.shape)

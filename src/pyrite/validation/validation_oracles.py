@@ -101,7 +101,7 @@ class DansOracleTolerances:
 
     Geometry limits cover roundoff in two implementations of the same lattice
     algebra. The non-resonant limit compares the same Waasmaier--Kirfel tables.
-    The dispersive limit is intentionally wider because cxr-mc uses
+    The dispersive limit is intentionally wider because PyRITE uses
     Chantler/FFAST while ``Dans_Diffraction`` uses independent Henke/CXRO data.
     """
 
@@ -297,7 +297,7 @@ def validate_dans_crystal(
     """Run thresholded lattice, reciprocal-geometry, and ``|F_hkl|²`` checks.
 
     ``use_henke=False`` compares non-resonant Waasmaier--Kirfel factors.
-    ``use_henke=True`` compares cxr-mc's Chantler/FFAST corrections with
+    ``use_henke=True`` compares PyRITE's Chantler/FFAST corrections with
     ``Dans_Diffraction``'s independent Henke/CXRO corrections. Consequently the
     two modes use different structure-factor tolerances.
 

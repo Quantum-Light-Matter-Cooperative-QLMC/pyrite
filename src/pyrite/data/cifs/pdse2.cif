@@ -1,5 +1,5 @@
 data_pdse2
-# Phase identity: cxr-mc crystal catalog entry [pdse2].
+# Phase identity: PyRITE crystal catalog entry [pdse2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Ambient orthorhombic Pbca PdSe2: Soulard et al., Inorg. Chem. 43,

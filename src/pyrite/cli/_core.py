@@ -385,7 +385,7 @@ AZIMUTH_CSV_TEXT = _CSV(
     "azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, preserve_text=True
 )
 
-# Range-capable variants for direct catalog writes (``sweep set``, ``cxr
+# Range-capable variants for direct catalog writes (``sweep set``, ``pyrite
 # profile``): additionally accept ``start:stop:step`` tokens (stop-inclusive
 # bound), mixable with plain CSV values. The ``_TEXT`` relay variants stay
 # colon-free because they forward argv to legacy argparse handlers.

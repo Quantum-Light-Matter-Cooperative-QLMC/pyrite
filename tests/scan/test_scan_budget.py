@@ -1,4 +1,4 @@
-"""``cxr run --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
+"""``pyrite run --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
 
 import json
 
@@ -77,7 +77,7 @@ def test_scan_budget_writes_paused_progress_state(monkeypatch, tmp_path):
 def test_scan_progress_records_compute_cost_when_progress_file_given(monkeypatch, tmp_path):
     """item 6: _run_material wires sweep.case_cost through run_sweep's on_cost
         callback into the remote progress JSON's done_cost/total_cost fields, so
-    `cxr remote status --attach` can render a compute-weighted bar (presentation.py's
+    `pyrite remote status --attach` can render a compute-weighted bar (presentation.py's
         _overall_progress_line(..., use_cost=True))."""
 
     def _fake_run_sweep(*args, **kwargs):

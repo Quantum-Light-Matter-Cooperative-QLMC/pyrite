@@ -704,7 +704,7 @@ def test_cpu_pool_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
 
 
 def test_cpu_pool_workers_pin_is_clamped_by_memory(monkeypatch):
-    """An explicit pin cannot re-create the OOM; raise CXR_MC_WORKER_MEM_MB to
+    """An explicit pin cannot re-create the OOM; raise PYRITE_MC_WORKER_MEM_MB to
     deliberately run tighter than the measured per-worker budget."""
     runner = _patch_host(monkeypatch)
     assert runner._cpu_pool_workers(24, 980) == 7

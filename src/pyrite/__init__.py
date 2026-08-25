@@ -16,7 +16,7 @@ from typing import Any
 from ._compat import env_value
 from .paths import data_dir
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 # Packaged data (materials.toml, cifs/, mott_transport_cross_sections/,
 # eaglexo_qe.csv, legacy atomic_scattering_factors/). Resolved relative to this
@@ -24,7 +24,7 @@ __version__ = "0.2.0"
 DATA_DIR = data_dir()
 
 # Package logger. Library convention: attach a NullHandler so a plain `import
-# pyrite` (and every `cxr` CLI invocation, incl. each ProcessPoolExecutor
+# pyrite` (and every `pyrite` CLI invocation, incl. each ProcessPoolExecutor
 # worker in montecarlo.runner) stays silent -- submodules log routine
 # noise (GPU/CPU backend probe, per-element Mott-table fallback) at DEBUG,
 # which propagates nowhere by default. Set PYRITE_MC_DEBUG=1 to see it: this
@@ -32,7 +32,7 @@ DATA_DIR = data_dir()
 # without touching the caller's root logging config.
 logger = logging.getLogger("pyrite")
 logger.addHandler(logging.NullHandler())
-if env_value("CXR_MC_DEBUG"):
+if env_value("PYRITE_MC_DEBUG"):
     _handler = logging.StreamHandler()
     _handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
     logger.addHandler(_handler)

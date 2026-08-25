@@ -39,15 +39,15 @@ from ..spectrum import (
 from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
-# see docs/repo-design/compute/compute-performance-optimization.md). With CXR_MC_TIMING set (to
+# see docs/repo-design/compute/compute-performance-optimization.md). With PYRITE_MC_TIMING set (to
 # anything but "" / "0"), each phase records its own wall time onto the dict it
 # returns under a private "_t_*" key, and run_cases accumulates those (plus the
 # GPU-idle wait) and prints a per-phase summary + the pipeline verdict. The keys
 # are STRIPPED by _TimingAgg.collect before any result is stored/checkpointed, so
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
-_TIMING = env_value("CXR_MC_TIMING", "") not in ("", "0")
-_NSYS = env_value("CXR_MC_NSYS", "") not in ("", "0")
+_TIMING = env_value("PYRITE_MC_TIMING", "") not in ("", "0")
+_NSYS = env_value("PYRITE_MC_NSYS", "") not in ("", "0")
 
 
 def _cgroup_cpu_quota():
@@ -209,14 +209,14 @@ def _process_pool_kwargs():
 # otherwise bounded. It now is: _ensure_pool_limit caps the pool
 # (_GPU_POOL_FRAC) and _spectrum_case_retry catches the resulting OOM and frees
 # on demand, so the per-case free is no longer load-bearing. Default 8 amortizes
-# the sync/realloc across cases; drop to 1 (CXR_MC_FREE_EVERY=1) for the old
+# the sync/realloc across cases; drop to 1 (PYRITE_MC_FREE_EVERY=1) for the old
 # per-case cadence, or set a watermark below. Read once at import; the GPU free
 # path is driver-process only (workers run transport), so no locking.
-_FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", _RESOURCE_POLICY.release_every)
+_FREE_EVERY = _env_chunk("PYRITE_MC_FREE_EVERY", _RESOURCE_POLICY.release_every)
 # Per-worker host-RAM budget [MB] for the full-case CPU pool. Default is the
 # measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
 # worker held ~5.5 GB anon-rss at 200 keV (ne=500, 30000 eV grid), rounded up.
-_WORKER_MEM_MB = _env_chunk("CXR_MC_WORKER_MEM_MB", 6144)
+_WORKER_MEM_MB = _env_chunk("PYRITE_MC_WORKER_MEM_MB", 6144)
 # Per-worker host-RAM budget [MB] for the GPU-pipeline transport pool. These
 # workers run transport ONLY (the driver process owns all spectrum/GPU state),
 # so they are far smaller than the full-case CPU pool above: measured peak child
@@ -224,14 +224,14 @@ _WORKER_MEM_MB = _env_chunk("CXR_MC_WORKER_MEM_MB", 6144)
 # 1536 leaves ~50% headroom over the measured peak. Sharing _WORKER_MEM_MB
 # capped this pool at 2 workers on a 23.4 GB box and silently clamped explicit
 # --workers with it.
-_PIPELINE_WORKER_MEM_MB = _env_chunk("CXR_MC_PIPELINE_WORKER_MEM_MB", 1536)
+_PIPELINE_WORKER_MEM_MB = _env_chunk("PYRITE_MC_PIPELINE_WORKER_MEM_MB", 1536)
 # Cases the GPU pipeline keeps in flight BEYOND its worker count, so a worker
 # always has the next case queued. Each in-flight case is a host-resident
 # segment payload the DRIVER holds, so it is charged against host RAM exactly
 # like a worker -- see _gpu_pipeline_workers.
 _PIPELINE_PREFETCH_AHEAD = 2
 _FREE_WATERMARK_MB = _env_chunk(
-    "CXR_MC_FREE_WATERMARK_MB", 0
+    "PYRITE_MC_FREE_WATERMARK_MB", 0
 )  # ...or when reserved pool exceeds this; 0 = off
 _cases_since_free = 0  # GPU cases since the last free (module-global: single driver process)
 _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational watermark check
@@ -241,7 +241,7 @@ _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational wa
 # VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
 _GPU_POOL_FRAC = float(
     env_value(
-        "CXR_MC_GPU_POOL_FRAC",
+        "PYRITE_MC_GPU_POOL_FRAC",
         (
             str(_RESOURCE_POLICY.device_budget_bytes / BACKEND.device.total_memory_bytes)
             if _GPU
@@ -252,14 +252,14 @@ _GPU_POOL_FRAC = float(
     )
 )
 # Number of scan processes sharing this one GPU (the remote queue's
-# parallel_materials runs that many `cxr run` processes concurrently on the
+# parallel_materials runs that many `pyrite run` processes concurrently on the
 # single card, each its own CUDA context + pool). The queue script exports this;
 # the pool cap is divided by it so N concurrent processes cap at N*(FRAC/N) = FRAC
 # total instead of N*FRAC, which would oversubscribe VRAM and OOM. Default 1
 # (a lone process gets the full FRAC) -- today's behaviour bit-for-bit.
-_GPU_POOL_SHARE = max(1, _env_chunk("CXR_MC_GPU_SHARE", 1))
+_GPU_POOL_SHARE = max(1, _env_chunk("PYRITE_MC_GPU_SHARE", 1))
 # How many times a single GPU case may halve its chunk and retry on OOM.
-_GPU_OOM_RETRIES = _env_chunk("CXR_MC_GPU_OOM_RETRIES", _RESOURCE_POLICY.oom_retries)
+_GPU_OOM_RETRIES = _env_chunk("PYRITE_MC_GPU_OOM_RETRIES", _RESOURCE_POLICY.oom_retries)
 # Catchable OOM type, empty tuple on a CPU box so `except _GPU_OOM` never fires
 _GPU_OOM = BACKEND.oom_exceptions
 _pool_limit_set = False
@@ -303,7 +303,7 @@ def _ensure_pool_limit(*args, **kwargs):
 
 
 class _TimingAgg:
-    """Main-process accumulator for CXR_MC_TIMING phase profiling.
+    """Main-process accumulator for PYRITE_MC_TIMING phase profiling.
 
     Lives only in the driver process (never pickled). Per-case transport and
     spectrum deltas ride back on the phase dicts (workers -> main for transport);
@@ -396,7 +396,7 @@ def _report_timing(agg, mode, nw):
     wt = np.asarray(agg.wait, dtype=float)
     lines = [
         "",
-        f"[cxr-timing] mode={mode}  cases={max(tr.size, sp.size)}  workers={nw}",
+        f"[pyrite-timing] mode={mode}  cases={max(tr.size, sp.size)}  workers={nw}",
         f"  transport (worker compute) : {_fmt_ms(tr)}",
         f"  spectrum  (GPU/main proc)  : {_fmt_ms(sp)}",
     ]
@@ -983,7 +983,7 @@ def _lines_for_case(case, E_grid, *, coherent=None):
     ``spec``. ``coherent`` overrides the kernel coherence (``None`` = derive from
     ``case["coherent_emission"]``). The line half of run_case's transport +
     spectrum phases factored out so :func:`pyrite.runs.run.repair_line_spec`
-    (``cxr reline``) reuses the EXACT live-sweep line path rather than
+    (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
     segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
     return _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=coherent)
@@ -993,7 +993,7 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
     """Reline mirror of the runner's one-transport / dual-kernel invariant: one
     re-transport of ``case`` yields the incoherent ``spec`` and (when
     ``want_coherent``) a ``spec_coherent`` from the SAME segments, so a
-    ``cxr reline`` that moves a ``coherent``/``both`` checkpoint onto a new grid
+    ``pyrite reline`` that moves a ``coherent``/``both`` checkpoint onto a new grid
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
     Returns ``(spec, spec_coherent_or_None)``."""
     segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
@@ -1285,7 +1285,7 @@ def _worker_init(force_cpu=False):
     argument; it is process-local (spawn/fork copies the environment) and never
     touches the driver's own resolution.
 
-    Only "cuda" and "auto" are redirected. An inherited CXR_MC_TRANSPORT_CORE
+    Only "cuda" and "auto" are redirected. An inherited PYRITE_MC_TRANSPORT_CORE
     naming a CPU core is a deliberate choice that a worker can honor, and
     overwriting it made the pin a no-op for every pooled run: a sweep pinned to
     "per-electron" silently transported on lockstep instead, which a 2026-08-08
@@ -1298,9 +1298,9 @@ def _worker_init(force_cpu=False):
     the box. A no-op fork/spawn-local mutation: it never touches the driver
     process's globals. Harmless when _GPU is already False.
     """
-    inherited = env_value("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    inherited = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
     if inherited in ("", "auto", "cuda"):
-        set_canonical_env("CXR_MC_TRANSPORT_CORE", "lockstep")
+        set_canonical_env("PYRITE_MC_TRANSPORT_CORE", "lockstep")
     if force_cpu:
         global _GPU
 

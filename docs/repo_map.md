@@ -18,14 +18,12 @@ the import-linter contracts from `pyproject.toml`.
 ## Workspace ownership
 
 - Root `pyrite-xray`: sole publishable distribution and owner of `src/pyrite/`,
-  packaged data, `pyrite`, `pyrite-dev`, compatibility executables `cxr` and
-  `cxr-dev`, and the test suite. No `uv` workspace split; `uv run pyrite-dev
+  packaged data, `pyrite`, `pyrite-dev`, and the test suite. No `uv` workspace split; `uv run pyrite-dev
   ...` needs no `--package` flag.
 - Stable `pyrite-dev test-suite {core,cli,apps,packaging}` selectors partition all
   test modules; `integration` overlaps deliberately; `verify` remains full gate.
 - Runtime paths resolve through `pyrite.paths`: packaged read-only data stays
   package-relative; workspace artifacts use explicit path > `PYRITE_HOME` >
-  legacy `CXR_HOME` >
   `workspace.root` config > cwd; mutable user state uses Click's platform app
   directory. Marimo apps, validation figure builders, and reference data ship
   under `pyrite.apps`; standalone `checks/` scripts remain developer-only.
@@ -103,8 +101,8 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
 - **`pyrite config set|get|list|setup|completion`** → `cli.commands.config` +
   `cli._config`: persist and inspect the current profile and remote target,
   select the local compute backend, and manage shell completion. Values resolve through the
-  shared per-call > `PYRITE_*` environment > legacy `CXR_*` environment >
-  config store > built-in precedence chain. The user store is written
+  shared per-call > `PYRITE_*` environment > config store > built-in precedence
+  chain. The user store is written
   atomically under Click's platform config dir.
 - **`-o/--output table|json|wide`** → `cli._core.output_option`: shared output
   selector on JSON-capable non-interactive commands. `table` is the human
@@ -286,8 +284,7 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `to_dict()` reproduces the version-1 legacy mapping and `run_case` temporarily
   accepts either representation.
 - `_backend` — portable NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL backend
-  adapters; deterministic `PYRITE_MC_BACKEND` selection plus legacy `CXR_*`
-  compatibility
+  adapters; deterministic `PYRITE_MC_BACKEND` selection
   exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`.
 - `_resources` — execution resource-policy resolution and backend-neutral
   pre-allocation chunk admission. Small devices default conservative.

@@ -566,7 +566,7 @@ def start_queue(
     script = scripts._slurm_batch_script(
         jobid,
         payload,
-        job_name=f"cxr-{jobid}",
+        job_name=f"pyrite-{jobid}",
         reservation_stems=stems,
         time_limit=time_limit,
         cpus_per_task=cpus_per_task,
@@ -699,7 +699,7 @@ def start_zhai_queue(
     stems = [config.ZHAI_STEM]
     payload = scripts._zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
     script = scripts._slurm_batch_script(
-        jobid, payload, job_name=f"cxr-zhai-{jobid}", reservation_stems=stems
+        jobid, payload, job_name=f"pyrite-zhai-{jobid}", reservation_stems=stems
     )
     upload = scripts._write_job_script_command(
         jobdir, scripts._zhai_queue_metadata(jobid, ne, ne_brem, ne_supp)
@@ -951,7 +951,7 @@ def start_rebrem_queue(
     script = scripts._slurm_batch_script(
         jobid,
         payload,
-        job_name=f"cxr-rebrem-{jobid}",
+        job_name=f"pyrite-rebrem-{jobid}",
         reservation_stems=stems,
         time_limit=time_limit,
     )
@@ -1032,7 +1032,7 @@ def start_reline_queue(
     """Submit a line-only checkpoint recompute (``pyrite reline``) to SLURM.
 
     Reserves the same ``<material>.pkl`` stems as a sweep/rebrem. By default the
-    recompute is chunked: each ~chunk_minutes slice does bounded work via ``cxr
+    recompute is chunked: each ~chunk_minutes slice does bounded work via ``pyrite
     reline --max-minutes`` and self-resubmits with ``--nice=10000`` so the
     single-GPU box stays shareable at every slice boundary. Pass
     ``chunk_minutes=0`` for the original monolithic allocation. Returns the
@@ -1072,7 +1072,7 @@ def start_reline_queue(
     script = scripts._slurm_batch_script(
         jobid,
         payload,
-        job_name=f"cxr-reline-{jobid}",
+        job_name=f"pyrite-reline-{jobid}",
         reservation_stems=stems,
         time_limit=time_limit,
     )

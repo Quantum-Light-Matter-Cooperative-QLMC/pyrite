@@ -758,14 +758,14 @@ def test_click_rm_expected_failure_uses_stderr(monkeypatch):
 def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     calls = []
     monkeypatch.setattr(_command.remote.config, "HOST", "qlmc")
-    monkeypatch.setattr(_command.remote.config, "REMOTE_DIR", "/srv/cxr data")
+    monkeypatch.setattr(_command.remote.config, "REMOTE_DIR", "/srv/pyrite data")
     monkeypatch.setattr(_command.remote, "_run", lambda command: calls.append(command))
 
     local = _command._pull_combined("bounds-result.json", dest_dir="/tmp/pull-dest")
 
     assert local == "/tmp/pull-dest/bounds-result.json"
     assert calls == [
-        ["scp", "qlmc:'/srv/cxr data/bounds-result.json'", "/tmp/pull-dest/bounds-result.json"]
+        ["scp", "qlmc:'/srv/pyrite data/bounds-result.json'", "/tmp/pull-dest/bounds-result.json"]
     ]
 
 

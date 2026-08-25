@@ -73,7 +73,7 @@ def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identit
     ``(name, E0_keV)`` to its shared-store ``content_key`` (see
     :func:`pyrite.campaign.profiles.case_content_key`), plus label provenance
     (``catalog_profile``/``variant``/``parameter_sha256``). This is the reference
-    list a future GC / ``cxr clear`` walks to decide which shared blobs a profile
+    list a future GC / ``pyrite clear`` walks to decide which shared blobs a profile
     still needs. Atomic temp-file + ``os.replace`` mirrors :func:`_manifest_save`."""
     entries = []
     for case in cases:
@@ -214,7 +214,7 @@ def load_checkpoint(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     it avoids the unpickle entirely on the common path."""
     path = checkpoint_path_for(material, checkpoint_dir)
     if not _checkpoint_exists(path):
-        print(f"no checkpoint at {path} -- run `cxr run standard -m {material}` first")
+        print(f"no checkpoint at {path} -- run `pyrite run standard -m {material}` first")
         return {}
     return _load_checkpoint_cached(path, _checkpoint_signature(path))
 
@@ -848,7 +848,7 @@ def run_sweep(
             _save()  # persist reused cases into this profile's checkpoint + manifest
 
     # Thin per-profile pointer table: (name, E0_keV) -> content_key, plus label
-    # provenance. Enables a future GC / `cxr clear` to know which shared blobs a
+    # provenance. Enables a future GC / `pyrite clear` to know which shared blobs a
     # profile references. Written on any run that populates the store.
     if cache_write:
         _write_case_manifest(checkpoint_path, cases, _content_key, dataset_identity)
@@ -1035,7 +1035,7 @@ def repair_brem_wide(
     (``layers=abs_layers``, per-layer Z^2 sum, ``brem_chunk`` honored) rather
     than being silently rewritten as single-slab brem.
 
-    ne_brem / brem_step_eV : NEW brem parameters to recompute with (``cxr
+    ne_brem / brem_step_eV : NEW brem parameters to recompute with (``pyrite
         rebrem``). ``ne_brem`` overrides the electron count (noise goes down as
         1/sqrt(Ne_brem)); ``brem_step_eV`` rebuilds a uniform grid at that
         spacing from the record's existing low cutoff up to the sweep-convention
@@ -1056,7 +1056,7 @@ def repair_brem_wide(
     on_progress : optional callback ``on_progress(done, todo_total, skipped)``,
         fired once before the loop and after every repaired record -- same shape
         as run_sweep's ``on_progress(completed_new_cases, total, cached_cases)``,
-        so ``cxr rebrem --progress-file`` feeds the remote progress dashboard.
+        so ``pyrite rebrem --progress-file`` feeds the remote progress dashboard.
     max_seconds / status : chunked resubmission (mirror of ``repair_line_spec``).
         When ``max_seconds`` is not ``None`` a ``time.monotonic``-based deadline is
         checked BEFORE each record; on expiry the loop breaks with unprocessed
@@ -1171,7 +1171,7 @@ def repair_brem_wide(
         # Return this record's GPU scratch on the SAME A2 cadence the live sweep
         # uses in _spectrum_case. _brem_for_case runs the full transport+spectrum
         # path in-process, so without this the CuPy reserved pool grows and
-        # fragments record-over-record until a long `cxr rebrem` fills the card
+        # fragments record-over-record until a long `pyrite rebrem` fills the card
         # (Task 8). Guarded like the live path; skipped cases never reach here, so
         # resumability (deadline break, save_cb, skip-at-target) is untouched.
         if runner._GPU:
@@ -1197,7 +1197,7 @@ def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=
     :func:`repair_brem_wide`), and re-pickle it in place -- saving progress every
     ``save_every`` records (atomic temp+replace) so a crash/OOM is RESUMABLE: just
     call again and only_nonfinite picks up where it left off. Extra ``**kw``
-    (e.g. ``ne_brem=``, ``brem_step_eV=`` -- ``cxr rebrem``) pass through to
+    (e.g. ``ne_brem=``, ``brem_step_eV=`` -- ``pyrite rebrem``) pass through to
     :func:`repair_brem_wide`. ``max_seconds``/``status`` thread the
     chunked-resubmission deadline through. Returns the repaired ``results`` dict
     (also usable directly in the notebook)."""
@@ -1284,7 +1284,7 @@ def repair_line_spec(
     Target line grid per record (see :func:`_target_line_grid`): ``line_step_eV``
     (explicit uniform spacing), else ``from_config`` rebuilds it from
     ``material``'s current ``E_grid_line_by_energy`` at the record's E0 (edit
-    materials.toml, ``cxr reline`` re-runs lines on the new grid), else the
+    materials.toml, ``pyrite reline`` re-runs lines on the new grid), else the
     record's existing grid (pure ``line_ne`` bump). ``line_ne`` overrides
     ``case["Ne"]``.
 

@@ -16,20 +16,18 @@ Each context value resolves independently in this order:
 
 1. an option supplied for this command;
 2. a `PYRITE_*` environment variable;
-3. its legacy `CXR_*` environment variable;
-4. the persistent user config store;
-5. the built-in default.
+3. the persistent user config store;
+4. the built-in default.
 
 | key | environment | built-in |
 |---|---|---|
-| `profile.current` | `PYRITE_PROFILE`, `CXR_PROFILE` | `standard` |
-| `remote.target` | `PYRITE_REMOTE_HOST`, `CXR_REMOTE_HOST` | `qlmc` |
-| `workspace.root` | `PYRITE_HOME`, `CXR_HOME` | current directory |
+| `profile.current` | `PYRITE_PROFILE` | `standard` |
+| `remote.target` | `PYRITE_REMOTE_HOST` | `qlmc` |
+| `workspace.root` | `PYRITE_HOME` | current directory |
 
 `pyrite config list` shows both effective values and their sources. `config
 set` writes atomically to Click's platform-specific user configuration
-directory. A legacy store is read only when the current store does not exist;
-the next write targets the current store.
+directory.
 
 The workspace resolver uses an explicit command path first, then the effective
 `workspace.root`. Packaged catalog and CIF data remain package-relative and are

@@ -1,5 +1,5 @@
 data_hfte2
-# Phase identity: cxr-mc crystal catalog entry [hfte2].
+# Phase identity: PyRITE crystal catalog entry [hfte2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # 1T-HfTe2, CdI2-type P-3m1 (#164), from Materials Project mp-32887.
@@ -27,4 +27,3 @@ _atom_site_occupancy
 Hf1 Hf 0.0 0.0 0.0 1.0
 Te1 Te 0.33333333 0.66666667 0.228088 1.0
 Te2 Te 0.66666667 0.33333333 0.771912 1.0
-

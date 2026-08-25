@@ -197,7 +197,7 @@ def simulate_trajectories(
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
     and Ne > CUDA_TRANSPORT_MIN_ELECTRONS; the lockstep core otherwise (see
-    `resolve_transport_core`; pin with `CXR_MC_TRANSPORT_CORE`). "lockstep"
+    `resolve_transport_core`; pin with `PYRITE_MC_TRANSPORT_CORE`). "lockstep"
     -- the historical core, one shared Generator in step-major order,
     BIT-FOR-BIT unchanged. "per-electron" -- each electron on its own
     counter-addressed stream. "cuda" -- one CUDA thread per electron. The
@@ -279,7 +279,7 @@ def simulate_trajectories(
     and order -- only the payload's location moves). Requires
     transport_core="cuda"; every other returned array (incident phase-space
     diagnostics, groove-gap arrays) and every count stays NumPy. The caller's
-    spectrum backend must then also be CUDA (CXR_MC_BACKEND resolving to
+    spectrum backend must then also be CUDA (PYRITE_MC_BACKEND resolving to
     CUDA) -- NumPy kernels refuse the implicit host conversion rather than
     performing it silently. Segments are joined with one concatenate (holds
     two copies transiently) and stay device-resident for as long as the

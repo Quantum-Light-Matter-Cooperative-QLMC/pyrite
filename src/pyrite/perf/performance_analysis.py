@@ -399,7 +399,7 @@ def _classification(row: dict[str, Any]) -> tuple[str, str]:
         ):
             return (
                 "conservative worker admission / CPU transport supply",
-                "test lower CXR_MC_WORKER_MEM_MB (CXR_MC_PIPELINE_WORKER_MEM_MB on the "
+                "test lower PYRITE_MC_WORKER_MEM_MB (PYRITE_MC_PIPELINE_WORKER_MEM_MB on the "
                 "gpu-pipeline engine) or adjacent explicit worker counts",
             )
         return "CPU transport supply", "test adjacent higher worker counts within RAM headroom"

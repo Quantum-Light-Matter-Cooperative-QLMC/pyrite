@@ -415,7 +415,7 @@ def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):
     building `sweep`, so `material_sweep()` always resolved the standard
     profile's grid regardless of `--profile` -- the checkpoint identity/stem
     were correctly tagged `sub_100keV` while the simulated parameters (energy
-    grid, thickness, etc.) silently stayed standard's. Caught live: `cxr
+    grid, thickness, etc.) silently stayed standard's. Caught live: `pyrite
     remote profile runs still used standard-profile 250 keV cases."""
     import types
 

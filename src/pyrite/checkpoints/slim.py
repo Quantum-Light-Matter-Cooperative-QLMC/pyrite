@@ -1,4 +1,4 @@
-"""``cxr slim`` -- shrink a per-material checkpoint for transfer (TODO P2 #5).
+"""``pyrite slim`` -- shrink a per-material checkpoint for transfer (TODO P2 #5).
 
 The GPU box writes one pickle per material holding the full union of every swept
 config at full resolution (``results.store_result``); pulling it to the viz
@@ -8,9 +8,9 @@ downcasting the spectra to float32, and zstd-compressing the output (TODO P2 #8,
 see ``pyrite.checkpoints._checkpoint_io``) -- that still loads and plots exactly like the
 full one via ``run.load_checkpoint``.
 
-    cxr slim checkpoints/hopg.pkl --drop-wide-brem --downcast
-    cxr slim checkpoints/hopg.pkl -o hopg.slim.pkl --downcast
-    cxr slim checkpoints/hopg -o -            # stream to stdout (report on stderr)
+    pyrite slim checkpoints/hopg.pkl --drop-wide-brem --downcast
+    pyrite slim checkpoints/hopg.pkl -o hopg.slim.pkl --downcast
+    pyrite slim checkpoints/hopg -o -            # stream to stdout (report on stderr)
 
 Value-based config filtering (keep only some tilts/energies) is available
 programmatically via ``results.slim_results(..., tilt_deg=..., E0_keV=...)``.
@@ -87,7 +87,7 @@ def slim_checkpoint(in_path, out_path=None, **kwargs):
     stdout, so stdout is claimed here and every ordinary print in the slim path
     (this module's report, plus anything ``slim_results`` emits) is redirected
     to stderr for the whole call -- one stray print would otherwise corrupt the
-    byte stream a `cxr remote pull` is reading.
+    byte stream a `pyrite remote pull` is reading.
     """
     if out_path != "-":
         return _slim_checkpoint(in_path, out_path, **kwargs)
@@ -117,7 +117,7 @@ def _slim_checkpoint(
     instead of a file, with no temp. ``compresslevel`` is a zstd level forwarded to
     ``_checkpoint_io`` (``None`` = its default); with no other trimming flag it
     makes this call a pure lossless recompress (e.g. level 19 for a smaller
-    `cxr remote pull` transfer, independent of the level-3 default a live sweep
+    `pyrite remote pull` transfer, independent of the level-3 default a live sweep
     writes at). Extra keyword args are case-field constraints passed straight to
     ``slim_results``. Returns the slim results dict."""
     # validate the stem before loading: the load is the expensive step, and a bad
@@ -210,7 +210,7 @@ def _cli(args):
 def main(argv=None):
     from ..cli.commands.slim import command
 
-    return _cli_core.run(command, argv, prog_name="cxr-slim")
+    return _cli_core.run(command, argv, prog_name="pyrite-slim")
 
 
 def __getattr__(name: str):

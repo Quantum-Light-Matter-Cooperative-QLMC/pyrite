@@ -7,7 +7,6 @@ from collections.abc import Sequence
 import click
 
 from .. import __version__
-from .._compat import warn_legacy_command
 from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
@@ -117,15 +116,6 @@ def command() -> None:
 def main(argv: Sequence[str] | None = None):
     """Run canonical ``pyrite`` preserving exit-code and stream contracts."""
     result = run(command, argv, prog_name="pyrite")
-    if isinstance(result, int):
-        raise SystemExit(result)
-    return result
-
-
-def legacy_main(argv: Sequence[str] | None = None):
-    """Run the retained ``cxr`` compatibility executable."""
-    warn_legacy_command("cxr", "pyrite")
-    result = run(command, argv, prog_name="cxr")
     if isinstance(result, int):
         raise SystemExit(result)
     return result

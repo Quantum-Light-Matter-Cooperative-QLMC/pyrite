@@ -1,5 +1,5 @@
 data_sapphire
-# Phase identity: cxr-mc crystal catalog entry [sapphire].
+# Phase identity: PyRITE crystal catalog entry [sapphire].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Alpha-Al2O3 / sapphire, corundum R-3c in the conventional hexagonal cell
@@ -53,4 +53,3 @@ O15 O 0.02709333 0.36042667 0.91666667 1.0
 O16 O 0.02709333 0.66666667 0.41666667 1.0
 O17 O 0.33333333 0.36042667 0.41666667 1.0
 O18 O 0.63957333 0.97290667 0.41666667 1.0
-

@@ -1,4 +1,4 @@
-# managed by cxr energy-grid; do not hand-edit
+# managed by pyrite energy-grid; do not hand-edit
 
 [2h_tas2.brem]
 source = "derived job ? (2026-07-22)"

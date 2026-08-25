@@ -21,7 +21,6 @@ import click
 from .. import _core as _cli_core
 
 _ENV_KEY = "PYRITE_MC_BACKEND"
-_LEGACY_ENV_KEY = "CXR_MC_BACKEND"
 
 # Matches README.md's install table; printed as a follow-up instruction, never
 # run automatically (see agentdocs/tasks/feature/backend-autodetect/README.md decision 2).
@@ -134,31 +133,21 @@ def _interactive() -> bool:
 
 
 def read_existing_backend(env_path: Path) -> str | None:
-    """Return canonical then legacy backend value from ``env_path``."""
+    """Return the configured backend value from ``env_path``."""
     if not env_path.is_file():
         return None
-    values: dict[str, str] = {}
     for line in env_path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped.startswith("#") or "=" not in stripped:
             continue
         key, _, value = stripped.partition("=")
-        if key.strip() in {_ENV_KEY, _LEGACY_ENV_KEY}:
-            values[key.strip()] = value.strip()
-    canonical = values.get(_ENV_KEY)
-    legacy = values.get(_LEGACY_ENV_KEY)
-    if canonical is not None:
-        if legacy is not None and legacy != canonical:
-            click.echo(
-                f"warning: {_ENV_KEY} and {_LEGACY_ENV_KEY} differ; using {_ENV_KEY}",
-                err=True,
-            )
-        return canonical
-    return legacy
+        if key.strip() == _ENV_KEY:
+            return value.strip()
+    return None
 
 
 def write_backend(env_path: Path, backend: str) -> None:
-    """Write only ``PYRITE_MC_BACKEND``, migrating the legacy managed key."""
+    """Write ``PYRITE_MC_BACKEND`` without disturbing unrelated entries."""
     if not env_path.is_file():
         env_path.write_text(f"{_ENV_KEY}={backend}\n", encoding="utf-8")
         return
@@ -170,7 +159,7 @@ def write_backend(env_path: Path, backend: str) -> None:
         if stripped.startswith("#") or "=" not in stripped:
             continue
         key = stripped.partition("=")[0].strip()
-        if key in {_ENV_KEY, _LEGACY_ENV_KEY}:
+        if key == _ENV_KEY:
             managed_indexes.append(index)
 
     if managed_indexes:
@@ -206,7 +195,7 @@ def _print_extra_instructions(backend: str) -> None:
         "lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed "
         "first. Prompts interactively to opt into an accelerator; defaults to cpu if "
         "none is detected, declined, or the session is non-interactive. A no-op once "
-        "PYRITE_MC_BACKEND or its CXR_MC_BACKEND alias is already set in .env, unless --force is given."
+        "PYRITE_MC_BACKEND is already set in .env, unless --force is given."
     ),
 )
 @click.option(
