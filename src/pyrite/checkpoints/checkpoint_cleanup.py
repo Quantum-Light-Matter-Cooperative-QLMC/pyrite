@@ -128,7 +128,7 @@ def _partition(results: dict, target: _Target) -> tuple[dict, int]:
 
 def _write_target(target: _Target, root: Path, results: dict) -> None:
     """Atomically rewrite current storage form and refresh dataset identity."""
-    from ..runs.run import _checkpoint_save, _manifest_save
+    from .persistence import _checkpoint_save, _manifest_save
 
     component = _checkpoint_store.component_path(target.stem, "line", root)
     if component.is_file():

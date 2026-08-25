@@ -651,16 +651,17 @@ def test_shard_manifest_scans_accumulated_results_only_at_consolidation(tmp_path
     """Per-config shard publication must not rebuild the manifest from every
     accumulated record; one full scan at final consolidation is sufficient."""
     import pyrite.runs.run as run
+    from pyrite.checkpoints import persistence
 
     monkeypatch.setattr(run, "run_cases", stub_run_cases)
-    real_manifest_for = run._manifest_for
+    real_manifest_for = persistence._manifest_for
     scanned_record_counts = []
 
     def counted_manifest_for(results, dataset_identity=None):
         scanned_record_counts.append(sum(len(by_energy) for by_energy in results.values()))
         return real_manifest_for(results, dataset_identity)
 
-    monkeypatch.setattr(run, "_manifest_for", counted_manifest_for)
+    monkeypatch.setattr(persistence, "_manifest_for", counted_manifest_for)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -1758,7 +1759,7 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
         calls.append((path, kw))
         return {}
 
-    monkeypatch.setattr("pyrite.runs.run.repair_checkpoint", _spy)
+    monkeypatch.setattr("pyrite.checkpoints.recompute.repair_checkpoint", _spy)
     out = rebrem_checkpoints(checkpoint_dir=str(tmp_path), ne_brem=1000, brem_step_eV=25.0)
     assert sorted(out) == ["MoS2", "W_grooved"]
     assert all(kw["ne_brem"] == 1000 and kw["brem_step_eV"] == 25.0 for _, kw in calls)
@@ -1779,7 +1780,7 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         (tmp_path / f"{material}.pkl").write_bytes(b"")
     calls = []
     monkeypatch.setattr(
-        "pyrite.runs.run.repair_checkpoint",
+        "pyrite.checkpoints.recompute.repair_checkpoint",
         lambda path, **kwargs: calls.append((Path(path).name, kwargs)) or {},
     )
 
@@ -1908,7 +1909,7 @@ def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, 
     def _snoop_write(path):
         states.append(json.loads(Path(path).read_text()))
 
-    monkeypatch.setattr("pyrite.runs.run.repair_checkpoint", _spy)
+    monkeypatch.setattr("pyrite.checkpoints.recompute.repair_checkpoint", _spy)
     rebrem_checkpoints(
         materials=["hopg"], checkpoint_dir=str(tmp_path), ne_brem=1000, progress_file=str(progress)
     )
@@ -1934,7 +1935,7 @@ def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeyp
     def _boom(path, **kw):
         raise RuntimeError("kaput")
 
-    monkeypatch.setattr("pyrite.runs.run.repair_checkpoint", _boom)
+    monkeypatch.setattr("pyrite.checkpoints.recompute.repair_checkpoint", _boom)
     with pytest.raises(RuntimeError):
         rebrem_checkpoints(
             materials=["hopg"], checkpoint_dir=str(tmp_path), progress_file=str(progress)
@@ -2094,12 +2095,11 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
 
 
 def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
-    import pyrite.runs.run as run
     from pyrite.checkpoints import recompute as reline
 
     calls = []
     monkeypatch.setattr(
-        run,
+        reline,
         "reline_checkpoint",
         lambda path, material, **kw: calls.append((material, kw)) or {},
     )
@@ -2134,7 +2134,7 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         (tmp_path / f"{material}.pkl").write_bytes(b"")
     calls = []
     monkeypatch.setattr(
-        "pyrite.runs.run.reline_checkpoint",
+        "pyrite.checkpoints.recompute.reline_checkpoint",
         lambda path, material, **kwargs: calls.append((material, kwargs)) or {},
     )
 
@@ -2151,7 +2151,6 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(monkeypatch, tmp_path):
     import json
 
-    import pyrite.runs.run as run
     from pyrite.checkpoints import recompute as reline
 
     stem = "hopg@sub_100keV-deadbeef0000"
@@ -2171,7 +2170,7 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(mon
     )
     calls = []
     monkeypatch.setattr(
-        run,
+        reline,
         "reline_checkpoint",
         lambda path, material, **kwargs: calls.append((path, material, kwargs)) or {},
     )
@@ -2226,7 +2225,7 @@ def test_recompute_rejects_profile_mismatch(tmp_path):
 def test_recomputed_checkpoint_publishes_cas_before_component_and_manifest(monkeypatch, tmp_path):
     import json
 
-    import pyrite.runs.run as run
+    import pyrite.checkpoints.persistence as run
 
     checkpoint = tmp_path / "hopg@survey"
     checkpoint.mkdir()
