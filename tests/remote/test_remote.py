@@ -18,6 +18,7 @@ import pytest
 
 from pyrite import remote
 from pyrite.cli import dashboard as _dashboard
+from pyrite.cli.commands import _remote_actions
 from pyrite.cli.dashboard import poll as dashboard_poll
 from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
@@ -3861,7 +3862,9 @@ def test_clear_profile_previews_partial_previous_identity_directory(monkeypatch,
 
 def test_clear_profile_cli_uses_profile_membership(monkeypatch):
     calls = []
-    monkeypatch.setattr(cli, "_profile_default_materials", lambda profile: ("hopg", "hbn"))
+    monkeypatch.setattr(
+        _remote_actions, "_profile_default_materials", lambda profile: ("hopg", "hbn")
+    )
     monkeypatch.setattr(
         lifecycle,
         "clear_remote",
@@ -5133,7 +5136,7 @@ def test_check_cli_detached_follow_attaches(monkeypatch):
 
 def test_check_cli_foreground_calls_remote_check(monkeypatch):
     calls = []
-    monkeypatch.setattr(cli, "remote_check", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(_remote_actions, "remote_check", lambda **kw: calls.append(kw))
 
     remote.main(["check", "--ne", "11", "--refresh"])
 

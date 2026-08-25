@@ -7,6 +7,7 @@ import pytest
 
 from pyrite import remote
 from pyrite.cli._deprecations import message
+from pyrite.cli.commands import _remote_actions
 from pyrite.remote import lifecycle, viewer
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -264,7 +265,7 @@ def test_hidden_remote_aliases_remain_callable():
 
 @pytest.mark.parametrize("name", ["validate", "check"])
 def test_legacy_zhai_execution_aliases_warn_once(monkeypatch, name):
-    monkeypatch.setattr(remote.cli, "remote_check", lambda **_kwargs: None)
+    monkeypatch.setattr(_remote_actions, "remote_check", lambda **_kwargs: None)
 
     result = invoke(remote.command, [name])
 
