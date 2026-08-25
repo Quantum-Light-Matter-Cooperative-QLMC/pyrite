@@ -33,6 +33,25 @@ from pyrite import __version__
 # build diagnostic; importing the full API otherwise logs one warning per element.
 logging.getLogger("pyrite.materials.catalog").setLevel(logging.ERROR)
 
+# Catalog schema classes keep their historical public ``__module__`` for
+# pickle compatibility. During this documentation process only, point Sphinx's
+# source analyzer at the module that owns their definitions and annotated
+# dataclass fields. The public autosummary entries remain ``pyrite.materials.*``.
+from pyrite.materials import _schema as _materials_schema
+
+for _name in (
+    "MaterialConfigError",
+    "CrystalInfo",
+    "CrystalSpec",
+    "MediumSpec",
+    "ScanSpec",
+    "LayerSpec",
+    "MaterialValidationSpec",
+    "MaterialSpec",
+    "MaterialCatalog",
+):
+    getattr(_materials_schema, _name).__module__ = _materials_schema.__name__
+
 # -- Project -----------------------------------------------------------------
 project = "PyRITE"
 author = "Alex Amador"
