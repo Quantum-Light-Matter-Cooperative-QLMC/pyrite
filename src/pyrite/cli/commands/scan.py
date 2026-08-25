@@ -345,8 +345,8 @@ def _command(
                     "--preset zhai does not support normal-run option(s): "
                     + ", ".join(explicit_normal)
                 )
-            from ...remote import cli as remote_cli
             from ...remote import config as remote_config
+            from . import remote as remote_cli
 
             target = None if remote_target == "__configured__" else remote_target
             with remote_config.override_remote_host(target):
@@ -382,8 +382,8 @@ def _command(
             raise click.UsageError(
                 f"remote run does not support local-only option(s): {', '.join(explicit_local)}"
             )
-        from ...remote import cli as remote_cli
         from ...remote import config as remote_config
+        from . import remote as remote_cli
 
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):

@@ -295,8 +295,8 @@ def brem_command(
         dry_run=dry_run,
     ):
         _reject_remote_local_options(ctx, json_output)
-        from ...remote import cli as remote_cli
         from ...remote import config as remote_config
+        from . import remote as remote_cli
 
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):
@@ -534,8 +534,8 @@ def line_command(
         dry_run=dry_run,
     ):
         _reject_remote_local_options(ctx, json_output)
-        from ...remote import cli as remote_cli
         from ...remote import config as remote_config
+        from . import remote as remote_cli
 
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):

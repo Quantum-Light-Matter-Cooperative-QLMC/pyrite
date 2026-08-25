@@ -24,7 +24,7 @@ _COMMANDS = {
     "restore": "pyrite.checkpoints.archive.restore_command",
     "archives": "pyrite.checkpoints.archive.archives_command",
     "union": "pyrite.checkpoints.archive.union_command",
-    "remote": "pyrite.remote.command",
+    "remote": "pyrite.cli.commands.remote.command",
     "job": "pyrite.cli.commands.job.command",
     "energy-grid": "pyrite.cli.commands.energy_grid.command",
     "sweep": "pyrite.cli.commands.sweep.command",

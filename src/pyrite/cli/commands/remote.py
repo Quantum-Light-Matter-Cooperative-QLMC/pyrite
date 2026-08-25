@@ -7,10 +7,11 @@ from contextlib import redirect_stderr, redirect_stdout
 
 import click
 
-from ..cli import _completion as _cli_completion
-from ..cli import _deprecations
-from ..cli import json as cli_json
-from ..cli._core import (
+from ...remote import config, lifecycle, presentation, scripts, state, transport, viewer
+from .. import _completion as _cli_completion
+from .. import _deprecations
+from .. import json as cli_json
+from .._core import (
     FINITE_FLOAT,
     NONNEGATIVE_FLOAT,
     NONNEGATIVE_INT,
@@ -26,8 +27,7 @@ from ..cli._core import (
     output_option,
     run,
 )
-from ..cli._deprecations import DeprecatingGroup
-from . import config, lifecycle, presentation, scripts, state, transport, viewer
+from .._deprecations import DeprecatingGroup
 
 
 def remote_scan(material, quick=False, workers=None, fidelity="full"):
@@ -128,7 +128,7 @@ def _selected_materials(args, attribute):
     if args.all:
         if explicit:
             raise SystemExit(f"{args.remote_command} --all does not take material names")
-        from ..runs.scan import resolve_profile_materials
+        from ...runs.scan import resolve_profile_materials
 
         return resolve_profile_materials("standard")
     if explicit:
@@ -138,7 +138,7 @@ def _selected_materials(args, attribute):
 
 def _profile_default_materials(catalog_profile):
     """Resolve a profile's explicit membership or implicit full catalog."""
-    from ..runs.scan import resolve_profile_materials
+    from ...runs.scan import resolve_profile_materials
 
     return resolve_profile_materials(catalog_profile)
 
@@ -148,7 +148,7 @@ def _profile_selected_materials(catalog_profile, materials):
     if not materials:
         return _profile_default_materials(catalog_profile)
 
-    from ..runs.scan import validate_catalog_profile, validate_materials
+    from ...runs.scan import validate_catalog_profile, validate_materials
 
     validate_materials(materials)
     return validate_catalog_profile(catalog_profile, materials, intersect=False)
@@ -156,7 +156,7 @@ def _profile_selected_materials(catalog_profile, materials):
 
 def _start_selected(args):
     """Validate the profile-owned material selection prepared by ``remote run``."""
-    from ..runs.scan import validate_catalog_profile
+    from ...runs.scan import validate_catalog_profile
 
     materials = list(getattr(args, "materials", None) or [])
     catalog_profile = getattr(args, "catalog_profile", "standard")
@@ -458,7 +458,7 @@ def _cli_clear(args):
             args._clear_parser.error("rm --profile takes no material arguments or --all")
         membership = _profile_default_materials(args.catalog_profile)
         if membership is None:
-            from ..materials import CATALOG
+            from ...materials import CATALOG
 
             membership = CATALOG.material_keys
         lifecycle.clear_remote(
@@ -908,8 +908,8 @@ def start_command(
     downcast,
     level9,
 ):
-    from ..cli import _config as cli_config
-    from ..runs.scan import resolve_profile_materials
+    from ...runs.scan import resolve_profile_materials
+    from .. import _config as cli_config
 
     try:
         catalog_profile = cli_config.resolve("profile.current", catalog_profile).value
@@ -1326,7 +1326,7 @@ def pull_command(
             )
         return lifecycle.pull_zhai_cache()
     if catalog_profile is None:
-        from ..materials import CATALOG
+        from ...materials import CATALOG
 
         if materials and materials[0] in CATALOG.profile_names:
             catalog_profile = materials.pop(0)

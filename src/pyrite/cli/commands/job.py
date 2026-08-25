@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import click
 
-from ...remote import cli as remote_cli
 from ...remote import lifecycle, viewer
 from .. import _completion as _cli_completion
 from .._core import confirm_destructive, emit_result, output_option
+from . import remote as remote_cli
 
 
 def _invoke(handler, **values):

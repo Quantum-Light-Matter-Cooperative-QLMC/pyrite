@@ -75,7 +75,6 @@ Override the box via env: PYRITE_REMOTE_HOST / PYRITE_REMOTE_DIR / PYRITE_REMOTE
 from .._compat import env_value
 from ..cli import dashboard as _presentation
 from . import (
-    cli,
     config,
     lifecycle,
     scripts,
@@ -191,25 +190,37 @@ _attach_header = viewer._attach_header
 _live_status = viewer._live_status
 attach = viewer.attach
 
-# --- from cli ---------------------------------------------------------
-command = cli.command
-remote_scan = cli.remote_scan
-remote_check = cli.remote_check
-_ensure_utf8_stdio = cli._ensure_utf8_stdio
-_dispatch = cli._dispatch
-_selected_materials = cli._selected_materials
-_cli_rebrem = cli._cli_rebrem
-_cli_pull = cli._cli_pull
-_cli_start = cli._cli_start
-_cli_jobs = cli._cli_jobs
-_cli_status = cli._cli_status
-_cli_logs = cli._cli_logs
-_cli_stop = cli._cli_stop
-_cli_reap = cli._cli_reap
-_cli_clear = cli._cli_clear
-_cli_sync = cli._cli_sync
-_cli_check = cli._cli_check
-main = cli.main
+_CLI_EXPORTS = frozenset(
+    {
+        "command",
+        "remote_scan",
+        "remote_check",
+        "_ensure_utf8_stdio",
+        "_dispatch",
+        "_selected_materials",
+        "_cli_rebrem",
+        "_cli_pull",
+        "_cli_start",
+        "_cli_jobs",
+        "_cli_status",
+        "_cli_logs",
+        "_cli_stop",
+        "_cli_reap",
+        "_cli_clear",
+        "_cli_sync",
+        "_cli_check",
+        "main",
+    }
+)
+
+
+def __getattr__(name):
+    """Resolve the retired CLI facade without importing Click from ``remote``."""
+    if name == "cli" or name in _CLI_EXPORTS:
+        from ..cli.commands import remote as remote_cli
+
+        return remote_cli if name == "cli" else getattr(remote_cli, name)
+    raise AttributeError(name)
 
 # --- from presentation ------------------------------------------------
 _SHELL_TOKEN_RE = _presentation._SHELL_TOKEN_RE
