@@ -412,9 +412,9 @@ def test_preallocation_admission_caps_or_errors():
 
 
 def test_cpu_fallback_requires_host_ram_admission(monkeypatch):
-    monkeypatch.setattr(runner, "_TOTAL_MEM", 8_000)
-    monkeypatch.setattr(runner, "_available_mem_mb", lambda: 4_000)
-    monkeypatch.setattr(runner, "_WORKER_MEM_MB", 6_144)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "total_mem_mb", 8_000)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "available_mem_mb", lambda: 4_000)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "worker_mem_mb", 6_144)
 
     with pytest.raises(_backend.BackendResourceError, match="cannot admit CPU fallback"):
         runner._admit_cpu_fallback()
@@ -426,7 +426,7 @@ def test_cpu_spectrum_backend_updates_active_itemsize() -> None:
     from pyrite.montecarlo import runner
 
     with runner._cpu_spectrum_backend():
-        assert runner._GPU is False
+        assert runner._RESOURCE_POLICY.gpu is False
         assert runner._spectrum_mod.xp is np
         assert runner._spectrum_mod.REAL is np.float64
         assert runner._real_itemsize() == 8
@@ -490,8 +490,8 @@ def test_intel_machine_selects_sycl_backend() -> None:
 
 
 def test_nsys_helpers_are_noops_for_sycl(monkeypatch) -> None:
-    monkeypatch.setattr(runner, "_GPU", True)
-    monkeypatch.setattr(runner, "_NSYS", True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "nsys", True)
     monkeypatch.setattr(
         runner,
         "BACKEND",
@@ -518,7 +518,7 @@ def test_cpu_spectrum_backend_restores_backend() -> None:
     from pyrite.montecarlo import runner
 
     original = (
-        runner._GPU,
+        runner._RESOURCE_POLICY.gpu,
         runner._spectrum_mod.xp,
         runner._spectrum_mod.REAL,
     )
@@ -527,7 +527,7 @@ def test_cpu_spectrum_backend_restores_backend() -> None:
         pass
 
     assert (
-        runner._GPU,
+        runner._RESOURCE_POLICY.gpu,
         runner._spectrum_mod.xp,
         runner._spectrum_mod.REAL,
     ) == original

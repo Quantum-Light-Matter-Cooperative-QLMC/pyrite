@@ -20,6 +20,7 @@ from pyrite.montecarlo import (
     mc_spectrum,
     simulate_trajectories,
 )
+from pyrite.montecarlo.runner import scheduling
 
 
 def test_normalize_requires_material():
@@ -486,7 +487,7 @@ def test_finite_footprint_rejects_invalid_dimension_pairs(width_mm, height_mm):
 def test_run_cases_should_stop_halts_new_dispatch(monkeypatch):
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(scheduling, "run_case", lambda case: {"name": case["name"]})
     calls = {"n": 0}
 
     def stop_after_two():
@@ -510,7 +511,7 @@ def test_run_cases_should_stop_halts_new_dispatch(monkeypatch):
 def test_run_cases_should_stop_none_runs_everything(monkeypatch):
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(scheduling, "run_case", lambda case: {"name": case["name"]})
     cases = [{"name": f"c{i}"} for i in range(3)]
     results = runner.run_cases(cases, max_workers=0, progress=False, should_stop=None)
     assert all(r is not None for r in results)
@@ -518,7 +519,7 @@ def test_run_cases_should_stop_none_runs_everything(monkeypatch):
 
 # ---- engine= regime-split dispatch (2026-07-18 design) ----------------------
 # CI has no GPU (_GPU is False), so the dispatch tests below monkeypatch
-# runner._GPU to exercise all four branch combinations, and stand in a
+# runner._RESOURCE_POLICY.gpu to exercise all four branch combinations, and stand in a
 # same-process "pool" (real, already-finished concurrent.futures.Future
 # objects, so as_completed's normal machinery still works) for
 # ProcessPoolExecutor so no real subprocess/CUDA context is ever requested.
@@ -568,8 +569,8 @@ def test_run_cases_invalid_engine_raises():
 def test_run_cases_engine_auto_uses_cpu_pool_when_no_gpu(monkeypatch):
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "_GPU", False)
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    monkeypatch.setattr(scheduling, "run_case", lambda case: {"name": case["name"]})
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
     cases = [{"name": f"c{i}"} for i in range(3)]
@@ -583,9 +584,9 @@ def test_run_cases_engine_auto_uses_cpu_pool_when_no_gpu(monkeypatch):
 def test_run_cases_nsys_uses_spawn_processes(monkeypatch):
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "_GPU", False)
-    monkeypatch.setattr(runner, "_NSYS", True)
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "nsys", True)
+    monkeypatch.setattr(scheduling, "run_case", lambda case: {"name": case["name"]})
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
     cases = [{"name": f"c{i}"} for i in range(3)]
@@ -603,8 +604,8 @@ def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):
     # full-case CPU pool (not the GPU-pipeline branch, which submits
     # _transport_case/_spectrum_case instead and would blow up on these
     # name-only stub cases).
-    monkeypatch.setattr(runner, "_GPU", True)
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "run_case", lambda case: {"name": case["name"]})
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
     cases = [{"name": f"c{i}"} for i in range(3)]
@@ -619,7 +620,7 @@ def test_run_cases_engine_gpu_errors_when_accelerator_unavailable(monkeypatch):
     from pyrite._backend import BackendUnavailableError
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
 
     cases = [{"name": f"c{i}"} for i in range(3)]
     with pytest.raises(BackendUnavailableError, match="engine='gpu'"):
@@ -683,11 +684,11 @@ def _patch_host(
     """Fake a host for _cpu_pool_workers; defaults reproduce qlmc's shape."""
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "_N_CPUS", ncpus)
-    monkeypatch.setattr(runner, "_available_mem_mb", lambda: avail_mb)
-    monkeypatch.setattr(runner, "_TOTAL_MEM", total_mb)
-    monkeypatch.setattr(runner, "_WORKER_MEM_MB", budget_mb)
-    monkeypatch.setattr(runner, "_PIPELINE_WORKER_MEM_MB", pipeline_budget_mb)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "n_cpus", ncpus)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "available_mem_mb", lambda: avail_mb)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "total_mem_mb", total_mb)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "worker_mem_mb", budget_mb)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "pipeline_worker_mem_mb", pipeline_budget_mb)
     return runner
 
 
@@ -732,8 +733,8 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
     fall-through-returns-None failure, which ProcessPoolExecutor would
     silently accept as 'use all cores' -- worse than the bug being fixed."""
     runner = _patch_host(monkeypatch)
-    monkeypatch.setattr(runner, "_GPU", False)
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    monkeypatch.setattr(scheduling, "run_case", lambda case: {"name": case["name"]})
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
     cases = [{"name": f"c{i}"} for i in range(10)]
@@ -811,7 +812,7 @@ def test_gpu_pipeline_holds_worker_and_prefetch_payloads_inside_the_budget(monke
 def test_gpu_pipeline_prefetch_is_reclamped_when_memory_moved(monkeypatch):
     """Sizing and the driver loop read the budget at different moments."""
     runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
-    monkeypatch.setattr(runner, "_available_mem_mb", lambda: 6_000)  # 3 slots left
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "available_mem_mb", lambda: 6_000)  # 3 slots left
     assert runner._gpu_pipeline_prefetch(2, 980) == 1
 
 
@@ -826,13 +827,15 @@ def test_run_cases_pipeline_holds_no_more_than_the_budgeted_prefetch(monkeypatch
     Pinned to 6 workers against a 7-slot budget, so the two differ: the old
     hard-coded nw + 2 would put 8 payloads in the driver, the budget allows 1."""
     runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
-    monkeypatch.setattr(runner, "_gpu_pipeline_workers", lambda *_args: 6)
-    monkeypatch.setattr(runner, "_GPU", True)
-    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
-    monkeypatch.setattr(runner, "_process_pool_kwargs", lambda: {})
-    monkeypatch.setattr(runner, "_transport_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 6)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(scheduling, "_transport_case", lambda case: {"name": case["name"]})
     monkeypatch.setattr(
-        runner, "_spectrum_case_retry", lambda case, tp, **_kw: {"name": tp["name"]}
+        scheduling,
+        "_spectrum_case_retry",
+        lambda case, tp, **_kw: {"name": tp["name"]},
     )
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
@@ -916,18 +919,12 @@ def test_cgroup_cpu_quota_reads_v2_then_v1(monkeypatch, tmp_path):
 
 def _patch_cpu_chunk_policy(monkeypatch, *, budget_mb=1920, device_budget_bytes=None):
     """Pin chunk tests to the CPU/fp64 path, independent of test hardware."""
-    from types import SimpleNamespace
-
     from pyrite.montecarlo import runner
 
-    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
     monkeypatch.setattr(runner._spectrum_mod, "REAL", np.float64)
-    monkeypatch.setattr(runner, "_SPEC_BUDGET_MB", budget_mb)
-    monkeypatch.setattr(
-        runner,
-        "_RESOURCE_POLICY",
-        SimpleNamespace(device_budget_bytes=device_budget_bytes),
-    )
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "spec_budget_mb", budget_mb)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "device_budget_bytes", device_budget_bytes)
     return runner
 
 

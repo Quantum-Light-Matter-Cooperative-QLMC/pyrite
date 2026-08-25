@@ -1583,7 +1583,7 @@ def test_repair_brem_wide_frees_gpu_pool_per_record(monkeypatch):
     )
     # pretend a live GPU so the guarded inter-case cadence path executes, and
     # count how often the pool is released instead of touching CuPy.
-    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     freed = {"n": 0}
     monkeypatch.setattr(runner, "_maybe_free_pool", lambda: freed.__setitem__("n", freed["n"] + 1))
 
@@ -1593,7 +1593,7 @@ def test_repair_brem_wide_frees_gpu_pool_per_record(monkeypatch):
 
 
 def test_repair_brem_wide_skips_pool_free_off_gpu(monkeypatch):
-    """CPU-default path (runner._GPU False) must NOT touch the pool -- the free
+    """CPU-default path (runner._RESOURCE_POLICY.gpu False) must NOT touch the pool -- the free
     is guarded, so the byte-identical local repair never calls into CuPy."""
     Eb = np.arange(0.0, 500.0, 50.0)
     record = dict(
@@ -1610,7 +1610,7 @@ def test_repair_brem_wide_skips_pool_free_off_gpu(monkeypatch):
         "pyrite.montecarlo._brem_for_case",
         lambda c, E_brem: np.full(np.asarray(E_brem, float).shape, 0.002),
     )
-    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
 
     def _boom():
         raise AssertionError("pool free must not run off-GPU")

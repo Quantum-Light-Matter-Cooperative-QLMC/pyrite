@@ -16,6 +16,7 @@ import os
 import pytest
 
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner import scheduling
 from pyrite.montecarlo.transport import (
     CUDA_TRANSPORT_MIN_ELECTRONS,
     resolve_transport_core,
@@ -185,7 +186,7 @@ def test_a_run_moves_to_the_device_only_when_every_case_does(cuda):
 
 def test_runtime_plan_reports_a_serial_device_transport(cuda, monkeypatch):
     cuda(True)
-    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     plan = runner.runtime_plan([_case(), _case()], max_workers=8)
     assert plan["transport_core"] == "cuda"
     assert plan["engine"] == "serial"
@@ -194,12 +195,12 @@ def test_runtime_plan_reports_a_serial_device_transport(cuda, monkeypatch):
 
 def test_runtime_plan_keeps_the_pipeline_for_cpu_transport(cuda, monkeypatch):
     cuda(True)
-    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     # Pin the pool size instead of trusting live host RAM: _gpu_pipeline_workers
     # clamps by real available memory (see pool.py), which on a RAM-constrained
     # CI runner can cap below 2 and silently drop this to "serial" -- what's
     # under test is the engine-selection decision, not the memory admission.
-    monkeypatch.setattr(runner, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
     plan = runner.runtime_plan([_case(Ne=10), _case(Ne=10)], max_workers=8)
     assert plan["transport_core"] == "lockstep"
     assert plan["engine"] == "gpu-pipeline"
@@ -209,20 +210,20 @@ def test_device_transport_runs_in_this_process_with_resident_segments(cuda, monk
     # The pipeline would need a second CUDA context per worker and could not
     # return device arrays through a pickle anyway.
     cuda(True)
-    monkeypatch.setattr(runner, "_GPU", True)
-    monkeypatch.setattr(runner, "case_runtime_plan", lambda case: {})
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "case_runtime_plan", lambda case: {})
     calls = []
 
     def fake_run_case(case, record_timing=False, keep_segments_on_device=False, **kwargs):
         calls.append(keep_segments_on_device)
         return {"case": case}
 
-    monkeypatch.setattr(runner, "run_case", fake_run_case)
+    monkeypatch.setattr(scheduling, "run_case", fake_run_case)
 
     def no_pool(*args, **kwargs):  # pragma: no cover - a pass means it is unused
         raise AssertionError("device transport must not start a worker pool")
 
-    monkeypatch.setattr(runner, "_gpu_pipeline_workers", no_pool)
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", no_pool)
 
     out = runner.run_cases([_case(), _case()], max_workers=8, progress=False)
     assert calls == [True, True]
@@ -232,13 +233,13 @@ def test_device_transport_runs_in_this_process_with_resident_segments(cuda, monk
 def test_transport_only_device_run_does_not_ask_for_residency(cuda, monkeypatch):
     # Nothing consumes the segments, so keeping them on the card is pure cost.
     cuda(True)
-    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
     seen = []
 
     def fake_transport_case(case, record_timing=False, **kwargs):
         seen.append(kwargs.get("keep_segments_on_device", False))
         return {}
 
-    monkeypatch.setattr(runner, "_transport_case", fake_transport_case)
+    monkeypatch.setattr(scheduling, "_transport_case", fake_transport_case)
     runner.run_cases([_case()], max_workers=8, progress=False, transport_only=True)
     assert seen == [False]

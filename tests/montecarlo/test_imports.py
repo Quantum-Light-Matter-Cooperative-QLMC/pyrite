@@ -80,7 +80,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
 
         assert _backend._GPU is False
         assert spectrum.xp is np
-        assert runner._GPU is False
+        assert runner._RESOURCE_POLICY.gpu is False
 
         # CUDA-only implementation modules must remain unloaded on CPU.
         cuda_modules = {

@@ -5,6 +5,7 @@ import numpy as np
 
 from pyrite.energy_grid.encoding import encode_energy_grid
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.runner import scheduling
 from pyrite.perf import performance_profile
 
 
@@ -76,8 +77,12 @@ def test_performance_logger_writes_append_only_samples_and_latest(monkeypatch, t
 
 
 def test_runtime_plan_reports_effective_workers_and_chunks(monkeypatch):
-    monkeypatch.setattr(runner, "_GPU", False)
-    monkeypatch.setattr(runner, "_mem_worker_cap", lambda: 8)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    monkeypatch.setattr(
+        runner._RESOURCE_POLICY,
+        "available_mem_mb",
+        lambda: runner._RESOURCE_POLICY.worker_mem_mb * 8,
+    )
     cases = [
         {
             "E_grid": encode_energy_grid(np.arange(100.0, 200.0, 10.0)),
@@ -157,7 +162,7 @@ def test_run_cases_profile_callbacks_report_timing_and_activity(monkeypatch):
             "_t_spectrum": 3.0,
         }
 
-    monkeypatch.setattr(runner, "run_case", fake_run_case)
+    monkeypatch.setattr(scheduling, "run_case", fake_run_case)
     timings = []
     activities = []
 

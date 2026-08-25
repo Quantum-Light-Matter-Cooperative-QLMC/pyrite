@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import numpy as np
 
 import pyrite.montecarlo.runner as runner
+from pyrite.montecarlo.runner import scheduling
 
 
 class DummyOOM(Exception):
@@ -65,7 +66,7 @@ def test_generic_oom_preserves_legacy_dual_chunk_fallback(monkeypatch):
             raise DummyOOM
         return {"ok": True}
 
-    monkeypatch.setattr(runner, "_GPU_OOM", (DummyOOM,))
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", (DummyOOM,))
     monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
     case = {"spec_chunk": 30_000, "brem_chunk": 100_000}
 
@@ -139,11 +140,11 @@ def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
             raise runner._SpectrumPhaseOOM("line", DummyOOM())
         return {"name": tp["name"], "_t_spectrum": 0.2}
 
-    monkeypatch.setattr(runner, "_GPU", True)
-    monkeypatch.setattr(runner, "_gpu_pipeline_workers", lambda *_args: 2)
-    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
-    monkeypatch.setattr(runner, "_process_pool_kwargs", lambda: {})
-    monkeypatch.setattr(runner, "_transport_case", fake_transport)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
     monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
     cases = [

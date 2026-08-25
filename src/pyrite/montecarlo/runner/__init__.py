@@ -12,19 +12,14 @@ import os
 import sys
 from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
-from functools import wraps
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 import numpy as np
-import psutil
 
-from ..._backend import (
-    _GPU,
-    BACKEND,
-)
 from ..._compat import env_value, set_canonical_env
+from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid
 from .. import spectrum as _spectrum_mod
 from ..case import Case
@@ -47,7 +42,6 @@ from ..transport import TransportLUTConfig, resolve_transport_core, simulate_tra
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
 _TIMING = env_value("PYRITE_MC_TIMING", "") not in ("", "0")
-_NSYS = env_value("PYRITE_MC_NSYS", "") not in ("", "0")
 
 
 def _cgroup_cpu_quota():
@@ -103,70 +97,24 @@ def _usable_cpus():
     return min(known) if known else None
 
 
-_N_CPUS = _usable_cpus()
-_TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
-
-
-from . import chunking as _chunking
 from .chunking import (
-    _BREM_CHUNK,
     _RESOURCE_POLICY,
-    _SPEC_CHUNK,
+    _adaptive_chunk,
+    _admit_chunk,
 )
 from .chunking import (
-    _SPEC_BUDGET_MB as _SPEC_BUDGET_MB,
+    _env_chunk as _env_chunk,
+)
+from .chunking import (
+    _real_itemsize as _real_itemsize,
 )
 
-_CHUNKING_NAMES = ("_env_chunk", "_adaptive_chunk", "_admit_chunk", "_real_itemsize")
-_CHUNKING_ORIGINALS = {name: getattr(_chunking, name) for name in _CHUNKING_NAMES}
-
-
-def _sync_chunking_globals():
-    namespace = globals()
-    for name, value in namespace.items():
-        if name.startswith("__") or name in _CHUNKING_NAMES:
-            continue
-        setattr(_chunking, name, value)
-    for name in _CHUNKING_NAMES:
-        value = namespace.get(name)
-        wrapper = namespace.get(f"_{name}_wrapper")
-        setattr(_chunking, name, _CHUNKING_ORIGINALS[name] if value is wrapper else value)
-
-
-def __env_chunk_wrapper(*args, **kwargs):
-    _sync_chunking_globals()
-    return _CHUNKING_ORIGINALS["_env_chunk"](*args, **kwargs)
-
-
-def __adaptive_chunk_wrapper(*args, **kwargs):
-    _sync_chunking_globals()
-    return _CHUNKING_ORIGINALS["_adaptive_chunk"](*args, **kwargs)
-
-
-def __admit_chunk_wrapper(*args, **kwargs):
-    _sync_chunking_globals()
-    return _CHUNKING_ORIGINALS["_admit_chunk"](*args, **kwargs)
-
-
-def __real_itemsize_wrapper(*args, **kwargs):
-    _sync_chunking_globals()
-    return _CHUNKING_ORIGINALS["_real_itemsize"](*args, **kwargs)
-
-
-_env_chunk = wraps(_CHUNKING_ORIGINALS["_env_chunk"])(__env_chunk_wrapper)
-_adaptive_chunk = wraps(_CHUNKING_ORIGINALS["_adaptive_chunk"])(__adaptive_chunk_wrapper)
-_admit_chunk = wraps(_CHUNKING_ORIGINALS["_admit_chunk"])(__admit_chunk_wrapper)
-_real_itemsize = wraps(_CHUNKING_ORIGINALS["_real_itemsize"])(__real_itemsize_wrapper)
-
-for _function in (_env_chunk, _adaptive_chunk, _admit_chunk, _real_itemsize):
-    _function.__module__ = __name__
-
-del _function
+_RESOURCE_POLICY.n_cpus = _usable_cpus()
 
 
 def _nsys_range(message):
     """Return an NVTX range when the remote Nsight profiler is enabled."""
-    if not (_GPU and _NSYS and BACKEND.name == "cuda"):
+    if not (_RESOURCE_POLICY.gpu and _RESOURCE_POLICY.nsys and BACKEND.name == "cuda"):
         return nullcontext()
     from cupyx.profiler import time_range
 
@@ -179,7 +127,7 @@ def _nsys_push(message):
     A push/pop pair instead of :func:`_nsys_range` for bracketing a straight-
     line block deep in a hot loop without indenting it -- the block must have a
     single exit so the pop always runs. No-op off the profiled GPU path."""
-    if not (_GPU and _NSYS and BACKEND.name == "cuda"):
+    if not (_RESOURCE_POLICY.gpu and _RESOURCE_POLICY.nsys and BACKEND.name == "cuda"):
         return
     from cupy.cuda import nvtx
 
@@ -188,7 +136,7 @@ def _nsys_push(message):
 
 def _nsys_pop():
     """Close the range opened by the matching :func:`_nsys_push`."""
-    if not (_GPU and _NSYS and BACKEND.name == "cuda"):
+    if not (_RESOURCE_POLICY.gpu and _RESOURCE_POLICY.nsys and BACKEND.name == "cuda"):
         return
     from cupy.cuda import nvtx
 
@@ -197,109 +145,21 @@ def _nsys_pop():
 
 def _process_pool_kwargs():
     """Use exec-based workers under Nsight; forkserver can deadlock its injection."""
-    if not _NSYS:
+    if not _RESOURCE_POLICY.nsys:
         return {}
     import multiprocessing
 
     return {"mp_context": multiprocessing.get_context("spawn")}
 
 
-# Stretch the CuPy memory-pool free cadence. free_all_blocks() forces a device
-# sync + full realloc, so freeing every case is pure overhead once growth is
-# otherwise bounded. It now is: _ensure_pool_limit caps the pool
-# (_GPU_POOL_FRAC) and _spectrum_case_retry catches the resulting OOM and frees
-# on demand, so the per-case free is no longer load-bearing. Default 8 amortizes
-# the sync/realloc across cases; drop to 1 (PYRITE_MC_FREE_EVERY=1) for the old
-# per-case cadence, or set a watermark below. Read once at import; the GPU free
-# path is driver-process only (workers run transport), so no locking.
-_FREE_EVERY = _env_chunk("PYRITE_MC_FREE_EVERY", _RESOURCE_POLICY.release_every)
-# Per-worker host-RAM budget [MB] for the full-case CPU pool. Default is the
-# measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
-# worker held ~5.5 GB anon-rss at 200 keV (ne=500, 30000 eV grid), rounded up.
-_WORKER_MEM_MB = _env_chunk("PYRITE_MC_WORKER_MEM_MB", 6144)
-# Per-worker host-RAM budget [MB] for the GPU-pipeline transport pool. These
-# workers run transport ONLY (the driver process owns all spectrum/GPU state),
-# so they are far smaller than the full-case CPU pool above: measured peak child
-# RSS 552-1033 MB on a 24-core box (hopg_coherent, Ne=10000, 864 line bins).
-# 1536 leaves ~50% headroom over the measured peak. Sharing _WORKER_MEM_MB
-# capped this pool at 2 workers on a 23.4 GB box and silently clamped explicit
-# --workers with it.
-_PIPELINE_WORKER_MEM_MB = _env_chunk("PYRITE_MC_PIPELINE_WORKER_MEM_MB", 1536)
-# Cases the GPU pipeline keeps in flight BEYOND its worker count, so a worker
-# always has the next case queued. Each in-flight case is a host-resident
-# segment payload the DRIVER holds, so it is charged against host RAM exactly
-# like a worker -- see _gpu_pipeline_workers.
-_PIPELINE_PREFETCH_AHEAD = 2
-_FREE_WATERMARK_MB = _env_chunk(
-    "PYRITE_MC_FREE_WATERMARK_MB", 0
-)  # ...or when reserved pool exceeds this; 0 = off
-_cases_since_free = 0  # GPU cases since the last free (module-global: single driver process)
-_pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational watermark check
-
-# Cap the CuPy default pool so an over-budget alloc raises a *catchable*
-# OutOfMemoryError before the driver hard-OOMs the process. Fraction of total
-# VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
-_GPU_POOL_FRAC = float(
-    env_value(
-        "PYRITE_MC_GPU_POOL_FRAC",
-        (
-            str(_RESOURCE_POLICY.device_budget_bytes / BACKEND.device.total_memory_bytes)
-            if _GPU
-            and _RESOURCE_POLICY.device_budget_bytes is not None
-            and BACKEND.device.total_memory_bytes
-            else "0"
-        ),
-    )
+from .oom import (
+    _ensure_pool_limit as _ensure_pool_limit,
 )
-# Number of scan processes sharing this one GPU (the remote queue's
-# parallel_materials runs that many `pyrite run` processes concurrently on the
-# single card, each its own CUDA context + pool). The queue script exports this;
-# the pool cap is divided by it so N concurrent processes cap at N*(FRAC/N) = FRAC
-# total instead of N*FRAC, which would oversubscribe VRAM and OOM. Default 1
-# (a lone process gets the full FRAC) -- today's behaviour bit-for-bit.
-_GPU_POOL_SHARE = max(1, _env_chunk("PYRITE_MC_GPU_SHARE", 1))
-# How many times a single GPU case may halve its chunk and retry on OOM.
-_GPU_OOM_RETRIES = _env_chunk("PYRITE_MC_GPU_OOM_RETRIES", _RESOURCE_POLICY.oom_retries)
-# Catchable OOM type, empty tuple on a CPU box so `except _GPU_OOM` never fires
-_GPU_OOM = BACKEND.oom_exceptions
-_pool_limit_set = False
-
-
-from . import oom as _oom
-from .oom import _SpectrumPhaseOOM
-
-
-def _sync_oom_globals():
-    for name, value in globals().items():
-        if name.startswith("__") or name in {
-            "_should_free",
-            "_maybe_free_pool",
-            "_ensure_pool_limit",
-        }:
-            continue
-        setattr(_oom, name, value)
-
-
-def _should_free(*args, **kwargs):
-    _sync_oom_globals()
-    return _oom._should_free(*args, **kwargs)
-
-
-def _maybe_free_pool(*args, **kwargs):
-    global _cases_since_free, _pool_peak_bytes
-    _sync_oom_globals()
-    result = _oom._maybe_free_pool(*args, **kwargs)
-    _cases_since_free = _oom._cases_since_free
-    _pool_peak_bytes = _oom._pool_peak_bytes
-    return result
-
-
-def _ensure_pool_limit(*args, **kwargs):
-    global _pool_limit_set
-    _sync_oom_globals()
-    result = _oom._ensure_pool_limit(*args, **kwargs)
-    _pool_limit_set = _oom._pool_limit_set
-    return result
+from .oom import (
+    _maybe_free_pool,
+    _SpectrumPhaseOOM,
+)
+from .oom import _should_free as _should_free
 
 
 class _TimingAgg:
@@ -442,11 +302,19 @@ def _report_timing(agg, mode, nw):
         lines.append(f"  Gate-0 verdict             : {verdict}")
     else:
         lines.append("  (CPU-only mode: no GPU phase. Split sizes the Branch B / mode-2 payoff.)")
-    if _GPU and _pool_peak_bytes:
-        cadence = f"every {_FREE_EVERY} cases" if _FREE_EVERY > 1 else "per case"
-        wm = f", watermark {_FREE_WATERMARK_MB} MB" if _FREE_WATERMARK_MB > 0 else ""
+    if _RESOURCE_POLICY.gpu and _RESOURCE_POLICY.pool_peak_bytes:
+        cadence = (
+            f"every {_RESOURCE_POLICY.free_every} cases"
+            if _RESOURCE_POLICY.free_every > 1
+            else "per case"
+        )
+        wm = (
+            f", watermark {_RESOURCE_POLICY.free_watermark_mb} MB"
+            if _RESOURCE_POLICY.free_watermark_mb > 0
+            else ""
+        )
         lines.append(
-            f"  CuPy pool peak (reserved)  : {_pool_peak_bytes / (1 << 20):8.1f} MB"
+            f"  CuPy pool peak (reserved)  : {_RESOURCE_POLICY.pool_peak_bytes / (1 << 20):8.1f} MB"
             f"   (free {cadence}{wm})"  # A2 operational watermark: must stay bounded
         )
     lines.append("")
@@ -695,7 +563,7 @@ def _transport_case(
     if resident:
         try:
             segs_all = _transport(True)
-        except _GPU_OOM:
+        except _RESOURCE_POLICY.gpu_oom:
             # Residency holds the whole payload plus the join's second copy. The
             # streams are counter-addressed, so replaying the same seed with the
             # segments downloaded reproduces this run exactly -- the retry costs
@@ -739,7 +607,7 @@ def _brem_wide_from_segments(
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
     the SAME multilayer background as a live sweep."""
     brem_chunk = _admit_chunk(
-        case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(E_brem.size),
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(E_brem.size),
         E_brem.size,
     )
     n_lay = int(segs_b.get("n_layers", 1))
@@ -863,7 +731,7 @@ def _lines_for_segments(
         mosaic_nodes=case.get("mosaic_mc_nodes", 1),
     )
     spec_chunk = _admit_chunk(
-        case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size),
+        case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(E_grid.size),
         E_grid.size,
     )
     if coherent is None:
@@ -1034,7 +902,7 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
 def _effective_spec_chunk(case, tp):
     """Resolve one case's line-spectrum chunk without changing the case."""
     return _admit_chunk(
-        case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size),
+        case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(tp["E_grid"].size),
         tp["E_grid"].size,
     )
 
@@ -1042,20 +910,24 @@ def _effective_spec_chunk(case, tp):
 def _effective_brem_chunk(case, tp):
     """Resolve one case's bremsstrahlung chunk without changing the case."""
     return _admit_chunk(
-        case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size),
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size),
         tp["E_brem"].size,
     )
 
 
 def _halve_case_spec_chunk(case, tp):
     """Halve this case's effective line chunk in place; preserve brem tuning."""
-    spec_cur = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size)
+    spec_cur = (
+        case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(tp["E_grid"].size)
+    )
     case["spec_chunk"] = max(1000, spec_cur // 2)
 
 
 def _halve_case_brem_chunk(case, tp):
     """Halve this case's effective brem chunk in place; preserve line tuning."""
-    brem_cur = case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size)
+    brem_cur = (
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size)
+    )
     case["brem_chunk"] = max(1000, brem_cur // 2)
 
 
@@ -1068,7 +940,7 @@ def _halve_case_chunks(case, tp):
 def _spectrum_case_retry(
     case,
     tp,
-    max_retries=_GPU_OOM_RETRIES,
+    max_retries=_RESOURCE_POLICY.gpu_oom_retries,
     record_timing=False,
     spec_chunk_cap=None,
 ):
@@ -1116,7 +988,7 @@ def _spectrum_case_retry(
             else:
                 brem_retries += 1
                 _halve_case_brem_chunk(work, tp)
-        except _GPU_OOM:
+        except _RESOURCE_POLICY.gpu_oom:
             if attempt == max_retries:
                 raise
             BACKEND.release_memory()
@@ -1194,7 +1066,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     Ne=Ne_lines,
                     table_cache=line_table_cache,
                 )
-        except _GPU_OOM as error:
+        except _RESOURCE_POLICY.gpu_oom as error:
             raise _SpectrumPhaseOOM("line", error) from error
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
@@ -1213,13 +1085,13 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 groove=tp.get("groove"),
                 Ne=Ne_brem,
             )
-        except _GPU_OOM as error:
+        except _RESOURCE_POLICY.gpu_oom as error:
             raise _SpectrumPhaseOOM("brem", error) from error
     with _nsys_range("cxr.interpolate"):
         brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool
     # can't accumulate (and fragment) across a long sweep until it fills the card.
-    if _GPU:
+    if _RESOURCE_POLICY.gpu:
         _maybe_free_pool()
         if timed:
             stats = BACKEND.allocator_stats()
@@ -1292,19 +1164,17 @@ def _worker_init(force_cpu=False):
     qlmc A/B caught only because the two arms came out bit-identical.
 
     force_cpu: when True (the engine="cpu" full-case pool), rebind THIS
-    worker process's copy of runner._GPU and spectrum.xp/REAL to their CPU
+    worker process's copy of runner._RESOURCE_POLICY.gpu and spectrum.xp/REAL to their CPU
     equivalents, so _spectrum_case (via mc_spectrum/mc_brem_spectrum) takes
     the NumPy path even when cupy is importable and a real GPU is present on
     the box. A no-op fork/spawn-local mutation: it never touches the driver
-    process's globals. Harmless when _GPU is already False.
+    process's globals. Harmless when _RESOURCE_POLICY.gpu is already False.
     """
     inherited = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
     if inherited in ("", "auto", "cuda"):
         set_canonical_env("PYRITE_MC_TRANSPORT_CORE", "lockstep")
     if force_cpu:
-        global _GPU
-
-        _GPU = False
+        _RESOURCE_POLICY.gpu = False
         _spectrum_mod.xp = np
         _spectrum_mod.REAL = np.float64
     try:
@@ -1328,167 +1198,30 @@ def _worker_init(force_cpu=False):
 def _cpu_spectrum_backend():
     """Temporarily execute spectrum helpers with NumPy in the driver."""
 
-    global _GPU
-    previous = (_GPU, _spectrum_mod.xp, _spectrum_mod.REAL)
-    _GPU = False
+    previous = (_RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL)
+    _RESOURCE_POLICY.gpu = False
     _spectrum_mod.xp = np
     _spectrum_mod.REAL = np.float64
     try:
         yield
     finally:
-        _GPU, _spectrum_mod.xp, _spectrum_mod.REAL = previous
+        _RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL = previous
 
 
-from . import pool as _pool
+from .pool import _admit_cpu_fallback as _admit_cpu_fallback
+from .pool import _available_mem_mb as _available_mem_mb
+from .pool import _case_progress_label as _case_progress_label
+from .pool import _cpu_pool_workers as _cpu_pool_workers
+from .pool import _gpu_pipeline_prefetch as _gpu_pipeline_prefetch
+from .pool import _gpu_pipeline_workers as _gpu_pipeline_workers
+from .pool import _mem_worker_cap as _mem_worker_cap
+from .pool import _pipeline_slot_cap as _pipeline_slot_cap
+from .scheduling import _cuda_transport_run as _cuda_transport_run
+from .scheduling import case_runtime_plan as case_runtime_plan
+from .scheduling import run_cases as run_cases
+from .scheduling import runtime_plan as runtime_plan
 
-_POOL_NAMES = (
-    "_available_mem_mb",
-    "_mem_worker_cap",
-    "_admit_cpu_fallback",
-    "_pipeline_slot_cap",
-    "_gpu_pipeline_workers",
-    "_gpu_pipeline_prefetch",
-    "_cpu_pool_workers",
-    "_case_progress_label",
-)
-_POOL_ORIGINALS = {name: getattr(_pool, name) for name in _POOL_NAMES}
+for _exported in (case_runtime_plan, _cuda_transport_run, runtime_plan, run_cases):
+    _exported.__module__ = __name__
 
-
-def _sync_pool_globals():
-    namespace = globals()
-    for name, value in namespace.items():
-        if name.startswith("__") or name in _POOL_NAMES:
-            continue
-        setattr(_pool, name, value)
-    for name in _POOL_NAMES:
-        value = namespace.get(name)
-        wrapper = namespace.get(f"_{name}_wrapper")
-        setattr(_pool, name, _POOL_ORIGINALS[name] if value is wrapper else value)
-
-
-def __available_mem_mb_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_available_mem_mb"](*args, **kwargs)
-
-
-def __mem_worker_cap_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_mem_worker_cap"](*args, **kwargs)
-
-
-def __admit_cpu_fallback_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_admit_cpu_fallback"](*args, **kwargs)
-
-
-def __pipeline_slot_cap_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_pipeline_slot_cap"](*args, **kwargs)
-
-
-def __gpu_pipeline_workers_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_gpu_pipeline_workers"](*args, **kwargs)
-
-
-def __gpu_pipeline_prefetch_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_gpu_pipeline_prefetch"](*args, **kwargs)
-
-
-def __cpu_pool_workers_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_cpu_pool_workers"](*args, **kwargs)
-
-
-def __case_progress_label_wrapper(*args, **kwargs):
-    _sync_pool_globals()
-    return _POOL_ORIGINALS["_case_progress_label"](*args, **kwargs)
-
-
-_available_mem_mb = wraps(_POOL_ORIGINALS["_available_mem_mb"])(__available_mem_mb_wrapper)
-_mem_worker_cap = wraps(_POOL_ORIGINALS["_mem_worker_cap"])(__mem_worker_cap_wrapper)
-_admit_cpu_fallback = wraps(_POOL_ORIGINALS["_admit_cpu_fallback"])(__admit_cpu_fallback_wrapper)
-_pipeline_slot_cap = wraps(_POOL_ORIGINALS["_pipeline_slot_cap"])(__pipeline_slot_cap_wrapper)
-_gpu_pipeline_workers = wraps(_POOL_ORIGINALS["_gpu_pipeline_workers"])(
-    __gpu_pipeline_workers_wrapper
-)
-_gpu_pipeline_prefetch = wraps(_POOL_ORIGINALS["_gpu_pipeline_prefetch"])(
-    __gpu_pipeline_prefetch_wrapper
-)
-_cpu_pool_workers = wraps(_POOL_ORIGINALS["_cpu_pool_workers"])(__cpu_pool_workers_wrapper)
-_case_progress_label = wraps(_POOL_ORIGINALS["_case_progress_label"])(__case_progress_label_wrapper)
-
-for _function in (
-    _available_mem_mb,
-    _mem_worker_cap,
-    _admit_cpu_fallback,
-    _pipeline_slot_cap,
-    _gpu_pipeline_workers,
-    _gpu_pipeline_prefetch,
-    _cpu_pool_workers,
-    _case_progress_label,
-):
-    _function.__module__ = __name__
-
-del _function
-
-
-from . import scheduling as _scheduling
-
-_SCHEDULING_NAMES = ("case_runtime_plan", "_cuda_transport_run", "runtime_plan", "run_cases")
-_SCHEDULING_ORIGINALS = {name: getattr(_scheduling, name) for name in _SCHEDULING_NAMES}
-
-
-def _sync_scheduling_globals():
-    """Mirror compatibility-module overrides into the scheduling owner.
-
-    Existing callers and tests patch ``pyrite.montecarlo.runner`` internals.
-    Preserve that behavior while the implementation lives in ``scheduling``.
-    """
-    namespace = globals()
-    for name, value in namespace.items():
-        if name.startswith("__") or name in _SCHEDULING_NAMES:
-            continue
-        setattr(_scheduling, name, value)
-    for name in _SCHEDULING_NAMES:
-        value = namespace.get(name)
-        wrapper = namespace.get(f"_{name}_wrapper")
-        setattr(
-            _scheduling,
-            name,
-            _SCHEDULING_ORIGINALS[name] if value is wrapper else value,
-        )
-
-
-def _case_runtime_plan_wrapper(*args, **kwargs):
-    _sync_scheduling_globals()
-    return _SCHEDULING_ORIGINALS["case_runtime_plan"](*args, **kwargs)
-
-
-def __cuda_transport_run_wrapper(*args, **kwargs):
-    _sync_scheduling_globals()
-    return _SCHEDULING_ORIGINALS["_cuda_transport_run"](*args, **kwargs)
-
-
-def _runtime_plan_wrapper(*args, **kwargs):
-    _sync_scheduling_globals()
-    return _SCHEDULING_ORIGINALS["runtime_plan"](*args, **kwargs)
-
-
-def _run_cases_wrapper(*args, **kwargs):
-    _sync_scheduling_globals()
-    return _SCHEDULING_ORIGINALS["run_cases"](*args, **kwargs)
-
-
-case_runtime_plan = wraps(_SCHEDULING_ORIGINALS["case_runtime_plan"])(_case_runtime_plan_wrapper)
-_cuda_transport_run = wraps(_SCHEDULING_ORIGINALS["_cuda_transport_run"])(
-    __cuda_transport_run_wrapper
-)
-runtime_plan = wraps(_SCHEDULING_ORIGINALS["runtime_plan"])(_runtime_plan_wrapper)
-run_cases = wraps(_SCHEDULING_ORIGINALS["run_cases"])(_run_cases_wrapper)
-
-for _function in (case_runtime_plan, _cuda_transport_run, runtime_plan, run_cases):
-    _function.__module__ = __name__
-
-del _function
+del _exported

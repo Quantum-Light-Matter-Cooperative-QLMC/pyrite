@@ -2,22 +2,13 @@
 
 import warnings
 
-import psutil
-
 from ..._backend import BackendResourceError
-from . import (
-    _N_CPUS,
-    _PIPELINE_PREFETCH_AHEAD,
-    _PIPELINE_WORKER_MEM_MB,
-    _RESOURCE_POLICY,
-    _TOTAL_MEM,
-    _WORKER_MEM_MB,
-)
+from .chunking import _RESOURCE_POLICY
 
 
 def _available_mem_mb():
     """Return available system memory in MB"""
-    return psutil.virtual_memory().available // 1_000_000
+    return _RESOURCE_POLICY.available_mem_mb()
 
 
 def _mem_worker_cap(per_worker_mb=None):
@@ -30,7 +21,9 @@ def _mem_worker_cap(per_worker_mb=None):
     two pools pass different budgets: ``_WORKER_MEM_MB`` for full-case workers
     (transport + spectrum state), ``_PIPELINE_WORKER_MEM_MB`` for the much
     smaller transport-only pipeline workers. Default is ``_WORKER_MEM_MB``."""
-    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.9)) // (per_worker_mb or _WORKER_MEM_MB)
+    return min(_available_mem_mb(), int(_RESOURCE_POLICY.total_mem_mb * 0.9)) // (
+        per_worker_mb or _RESOURCE_POLICY.worker_mem_mb
+    )
 
 
 def _admit_cpu_fallback():
@@ -40,14 +33,14 @@ def _admit_cpu_fallback():
         _available_mem_mb(),
         max(
             0,
-            int(_TOTAL_MEM * _RESOURCE_POLICY.host_fraction)
+            int(_RESOURCE_POLICY.total_mem_mb * _RESOURCE_POLICY.host_fraction)
             - _RESOURCE_POLICY.host_reserve_bytes // 1_000_000,
         ),
     )
-    if budget < _WORKER_MEM_MB:
+    if budget < _RESOURCE_POLICY.worker_mem_mb:
         raise BackendResourceError(
             f"{_RESOURCE_POLICY.name} policy cannot admit CPU fallback: "
-            f"{budget} MiB budgeted, {_WORKER_MEM_MB} MiB required"
+            f"{budget} MiB budgeted, {_RESOURCE_POLICY.worker_mem_mb} MiB required"
         )
 
 
@@ -60,7 +53,7 @@ def _pipeline_slot_cap():
     the measured 552-1033 MB child RSS is dominated by the segments the worker
     just built, and the driver holds a copy of exactly those from the moment the
     future completes until the case's spectrum phase runs."""
-    return _mem_worker_cap(_PIPELINE_WORKER_MEM_MB)
+    return _mem_worker_cap(_RESOURCE_POLICY.pipeline_worker_mem_mb)
 
 
 def _gpu_pipeline_workers(max_workers, n):
@@ -83,9 +76,9 @@ def _gpu_pipeline_workers(max_workers, n):
     swap. Clamping an EXPLICIT request warns rather than doing it silently.
     Returns the worker count; the caller drops to serial below 2."""
     slots = _pipeline_slot_cap()
-    cap = max(0, (slots - _PIPELINE_PREFETCH_AHEAD) // 2)
+    cap = max(0, (slots - _RESOURCE_POLICY.pipeline_prefetch_ahead) // 2)
     if max_workers is None:
-        ncpu = _N_CPUS or 8
+        ncpu = _RESOURCE_POLICY.n_cpus or 8
         nw = max(2, min(n, ncpu // 2))
     else:
         nw = min(max_workers, n)
@@ -93,7 +86,8 @@ def _gpu_pipeline_workers(max_workers, n):
             warnings.warn(
                 f"requested {max_workers} GPU-pipeline transport workers, "
                 f"host RAM admits {cap} once their in-flight segment payloads "
-                f"are charged too ({slots} slots at {_PIPELINE_WORKER_MEM_MB} "
+                f"are charged too ({slots} slots at "
+                f"{_RESOURCE_POLICY.pipeline_worker_mem_mb} "
                 "MiB each); raise PYRITE_MC_PIPELINE_WORKER_MEM_MB only if the "
                 "measured per-worker RSS is smaller than that budget",
                 RuntimeWarning,
@@ -110,7 +104,14 @@ def _gpu_pipeline_prefetch(nw, n):
     the host budget, but the budget is re-read here because free memory moves
     between the two calls -- and an unbudgeted depth is half of the 2026-08-08
     swap incident."""
-    return max(1, min(nw + _PIPELINE_PREFETCH_AHEAD, max(1, _pipeline_slot_cap() - nw), n))
+    return max(
+        1,
+        min(
+            nw + _RESOURCE_POLICY.pipeline_prefetch_ahead,
+            max(1, _pipeline_slot_cap() - nw),
+            n,
+        ),
+    )
 
 
 def _cpu_pool_workers(max_workers, n):
@@ -135,8 +136,8 @@ def _cpu_pool_workers(max_workers, n):
 
     Returns the worker count to use, >= 1.
     """
-    if _N_CPUS is not None:
-        _max_allowed_workers = _N_CPUS * 3 // 4
+    if _RESOURCE_POLICY.n_cpus is not None:
+        _max_allowed_workers = _RESOURCE_POLICY.n_cpus * 3 // 4
     else:
         _max_allowed_workers = 6
 

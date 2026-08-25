@@ -1,16 +1,7 @@
 """Accelerator OOM tagging, pool release cadence, and pool limits."""
 
-from ..._backend import _GPU, BACKEND
-from . import (
-    _FREE_EVERY,
-    _FREE_WATERMARK_MB,
-    _GPU_POOL_FRAC,
-    _GPU_POOL_SHARE,
-)
-
-_cases_since_free = 0
-_pool_peak_bytes = 0
-_pool_limit_set = False
+from ..._backend import BACKEND
+from .chunking import _RESOURCE_POLICY
 
 
 class _SpectrumPhaseOOM(Exception):
@@ -44,15 +35,19 @@ def _maybe_free_pool():
     never trip -- ``total_bytes()`` is the footprint that actually grows. Default
     (1 / off) reproduces the original per-case free exactly. Driver-process only,
     so the module counter needs no lock."""
-    global _cases_since_free, _pool_peak_bytes
     stats = BACKEND.allocator_stats()
     reserved = int((stats["reserved_mib"] or 0) * (1 << 20))
-    if reserved > _pool_peak_bytes:
-        _pool_peak_bytes = reserved
-    _cases_since_free += 1
-    if _should_free(_cases_since_free, _FREE_EVERY, reserved, _FREE_WATERMARK_MB):
+    if reserved > _RESOURCE_POLICY.pool_peak_bytes:
+        _RESOURCE_POLICY.pool_peak_bytes = reserved
+    _RESOURCE_POLICY.cases_since_free += 1
+    if _should_free(
+        _RESOURCE_POLICY.cases_since_free,
+        _RESOURCE_POLICY.free_every,
+        reserved,
+        _RESOURCE_POLICY.free_watermark_mb,
+    ):
         BACKEND.release_memory()
-        _cases_since_free = 0
+        _RESOURCE_POLICY.cases_since_free = 0
 
 
 def _ensure_pool_limit():
@@ -64,8 +59,11 @@ def _ensure_pool_limit():
     OutOfMemoryError before the driver's own hard-OOM. The cap is divided by
     `_GPU_POOL_SHARE` so co-tenant scan processes on one GPU sum to _GPU_POOL_FRAC
     rather than oversubscribing it."""
-    global _pool_limit_set
-    if _pool_limit_set or not _GPU or _GPU_POOL_FRAC <= 0:
+    if (
+        _RESOURCE_POLICY.pool_limit_set
+        or not _RESOURCE_POLICY.gpu
+        or _RESOURCE_POLICY.gpu_pool_fraction <= 0
+    ):
         return
-    BACKEND.set_memory_limit(_GPU_POOL_FRAC / _GPU_POOL_SHARE)
-    _pool_limit_set = True
+    BACKEND.set_memory_limit(_RESOURCE_POLICY.gpu_pool_fraction / _RESOURCE_POLICY.gpu_pool_share)
+    _RESOURCE_POLICY.pool_limit_set = True

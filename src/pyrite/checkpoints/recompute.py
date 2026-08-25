@@ -535,7 +535,7 @@ def repair_brem_wide(
         # fragments record-over-record until a long `pyrite rebrem` fills the card
         # (Task 8). Guarded like the live path; skipped cases never reach here, so
         # resumability (deadline break, save_cb, skip-at-target) is untouched.
-        if runner._GPU:
+        if runner._RESOURCE_POLICY.gpu:
             runner._maybe_free_pool()
         done = k
         if on_progress is not None:

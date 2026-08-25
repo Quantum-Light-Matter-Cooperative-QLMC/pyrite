@@ -10,17 +10,8 @@ from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._compat import env_value
 from ..._energy_grid_encoding import decode_energy_grid
 from . import (
-    _BREM_CHUNK,
-    _GPU,
-    _GPU_OOM,
-    _GPU_POOL_FRAC,
-    _GPU_POOL_SHARE,
-    _PIPELINE_WORKER_MEM_MB,
     _RESOURCE_POLICY,
-    _SPEC_BUDGET_MB,
-    _SPEC_CHUNK,
     _TIMING,
-    _WORKER_MEM_MB,
     _adaptive_chunk,
     _admit_chunk,
     _admit_cpu_fallback,
@@ -47,7 +38,9 @@ def case_runtime_plan(case):
     brem_grid = decode_energy_grid(case.get("E_grid_brem", []))
     spec_chunk = (
         _admit_chunk(
-            case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(line_grid.size),
+            case.get("spec_chunk")
+            or _RESOURCE_POLICY.spec_chunk
+            or _adaptive_chunk(line_grid.size),
             line_grid.size,
         )
         if line_grid.size
@@ -55,7 +48,9 @@ def case_runtime_plan(case):
     )
     brem_chunk = (
         _admit_chunk(
-            case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(brem_grid.size),
+            case.get("brem_chunk")
+            or _RESOURCE_POLICY.brem_chunk
+            or _adaptive_chunk(brem_grid.size),
             brem_grid.size,
         )
         if brem_grid.size
@@ -86,7 +81,7 @@ def _cuda_transport_run(cases):
 def runtime_plan(cases, max_workers=None, engine="auto"):
     """Resolve execution topology and representative chunk sizing for profiling."""
     n = len(cases)
-    use_gpu = _GPU if engine == "auto" else engine == "gpu" and _GPU
+    use_gpu = _RESOURCE_POLICY.gpu if engine == "auto" else engine == "gpu" and _RESOURCE_POLICY.gpu
     cuda_transport = use_gpu and _cuda_transport_run(cases)
     if n == 0 or max_workers == 0:
         workers = 1
@@ -108,7 +103,9 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
         "requested_workers": max_workers,
         "effective_workers": workers,
         "worker_memory_budget_mib": (
-            _PIPELINE_WORKER_MEM_MB if resolved_engine == "gpu-pipeline" else _WORKER_MEM_MB
+            _RESOURCE_POLICY.pipeline_worker_mem_mb
+            if resolved_engine == "gpu-pipeline"
+            else _RESOURCE_POLICY.worker_mem_mb
         ),
         # Host-resident segment payloads the driver may hold at once. Budgeted
         # against the same per-slot figure as the workers, so a profile can show
@@ -132,9 +129,9 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
             if _RESOURCE_POLICY.device_reserve_bytes is not None
             else None
         ),
-        "gpu_pool_fraction": _GPU_POOL_FRAC,
-        "gpu_pool_share": _GPU_POOL_SHARE,
-        "spectrum_budget_mib": _SPEC_BUDGET_MB,
+        "gpu_pool_fraction": _RESOURCE_POLICY.gpu_pool_fraction,
+        "gpu_pool_share": _RESOURCE_POLICY.gpu_pool_share,
+        "spectrum_budget_mib": _RESOURCE_POLICY.spec_budget_mb,
         **case_runtime_plan(representative),
     }
 
@@ -258,8 +255,8 @@ def run_cases(
     """
     if engine not in ("auto", "gpu", "cpu"):
         raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")
-    use_gpu = _GPU if engine == "auto" else engine == "gpu"
-    if engine == "gpu" and not _GPU:
+    use_gpu = _RESOURCE_POLICY.gpu if engine == "auto" else engine == "gpu"
+    if engine == "gpu" and not _RESOURCE_POLICY.gpu:
         raise BackendUnavailableError(
             "run_cases(engine='gpu') requested but no supported accelerator is available; "
             "install pyrite-xray[nvidia], pyrite-xray[amd], or pyrite-xray[intel], or use engine='auto'"
@@ -342,7 +339,7 @@ def run_cases(
             )
 
     def _serial(keep_segments_on_device=False):
-        force_cpu = not use_gpu and _GPU
+        force_cpu = not use_gpu and _RESOURCE_POLICY.gpu
         with _cpu_spectrum_backend() if force_cpu else nullcontext():
             for i in _maybe_bar(range(n)):
                 if should_stop is not None and should_stop():
@@ -496,7 +493,7 @@ def run_cases(
                         if on_timing is not None
                         else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
                     )  # accelerator, THIS process only
-                except _GPU_OOM as error:
+                except _RESOURCE_POLICY.gpu_oom as error:
                     if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
                         raise
                     _admit_cpu_fallback()
@@ -543,7 +540,7 @@ def run_cases(
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=_worker_init,
-        initargs=(not use_gpu and _GPU,),
+        initargs=(not use_gpu and _RESOURCE_POLICY.gpu,),
         **_process_pool_kwargs(),
     ) as ex:
         futures = {
