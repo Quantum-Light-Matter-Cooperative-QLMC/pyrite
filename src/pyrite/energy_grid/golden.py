@@ -132,6 +132,7 @@ def _serialize_material(spec) -> dict:
             "cut": list(spec.cut) if spec.cut is not None else None,
             "cut_frame": spec.cut_frame,
             "display_name": spec.identity.display_name,
+            "hexagonal": spec.hexagonal,
         },
         "profile": spec.profile,
         "crystal_key": spec.crystal_key,

@@ -50,7 +50,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("Te", (1 / 3, 2 / 3, 0.26628)),
                 ("Te", (2 / 3, 1 / 3, 0.73372)),
             },
-            "1T-PdTe2 (001)",
+            "1T-PdTe2 (0001)",
         ),
         (
             "ptbi2",
@@ -68,7 +68,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("Bi", (0.0, 0.6111, 0.6147)),
                 ("Bi", (0.3889, 0.3889, 0.6147)),
             },
-            "beta-PtBi2 (001)",
+            "beta-PtBi2 (0001)",
         ),
         (
             "ptte2",
@@ -80,7 +80,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("Te", (1 / 3, 2 / 3, 0.254)),
                 ("Te", (2 / 3, 1 / 3, 0.746)),
             },
-            "1T-PtTe2 (001)",
+            "1T-PtTe2 (0001)",
         ),
         (
             "pts2",
@@ -92,7 +92,7 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("S", (1 / 3, 2 / 3, 0.227)),
                 ("S", (2 / 3, 1 / 3, 0.773)),
             },
-            "1T-PtS2 (001)",
+            "1T-PtS2 (0001)",
         ),
     ],
 )

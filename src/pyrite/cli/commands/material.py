@@ -224,7 +224,9 @@ def _format_cut(identity):
     frame = identity["cut_frame"]
     if cut is None or frame is None:
         return None
-    return format_indices((cut[0], cut[1], cut[2]), frame)
+    return format_indices(
+        (cut[0], cut[1], cut[2]), frame, hexagonal=bool(identity.get("hexagonal"))
+    )
 
 
 def _identity_payload(material):
@@ -246,6 +248,7 @@ def _identity_payload(material):
         "full_name": spec.full_name,
         "cut": list(spec.cut) if spec.cut is not None else None,
         "cut_frame": spec.cut_frame,
+        "hexagonal": spec.hexagonal,
     }
 
 

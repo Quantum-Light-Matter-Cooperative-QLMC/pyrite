@@ -295,8 +295,11 @@ and the label derived from them. Labels are never authored in
 crystal record. The cut is the declared slab normal reduced to its primitive
 representative, rendered `(hkl)` when the crystal declares `surface_hkl` and
 `[uvw]` when it declares `beam_uvw` — the two are mutually exclusive spellings of
-the same axis, and nothing is converted between them.
-- Public: `MaterialIdentity`, `reduce_indices`, `format_indices`; `CutFrame` alias.
+the same axis, and nothing is converted between them. Every packaged crystal
+declares `surface_hkl`, so every label reads `(hkl)`; a cell on hexagonal axes
+renders four Miller–Bravais indices instead — `(0001)`, not `(001)`.
+- Public: `MaterialIdentity`, `reduce_indices`, `format_indices`,
+  `bravais_indices`, `hexagonal_setting`; `CutFrame` alias.
 - Deps: none (leaf).
 
 ### `materials/_catalog_decode.py`

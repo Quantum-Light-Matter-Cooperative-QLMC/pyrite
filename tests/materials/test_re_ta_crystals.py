@@ -121,7 +121,7 @@ TATE2_SITES = {
             115.057,
             {"Ta": 2, "S": 4},
             TAS2_SITES,
-            "2H-TaS2 (001)",
+            "2H-TaS2 (0001)",
         ),
         (
             "2h_tase2",
@@ -129,7 +129,7 @@ TATE2_SITES = {
             129.498,
             {"Ta": 2, "Se": 4},
             TASE2_SITES,
-            "2H-TaSe2 (001)",
+            "2H-TaSe2 (0001)",
         ),
         (
             "tate2",

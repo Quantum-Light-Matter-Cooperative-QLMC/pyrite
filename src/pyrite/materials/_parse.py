@@ -435,6 +435,7 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
             if grid is not None:
                 _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
 
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -816,6 +817,7 @@ def _parse_materials(
                     cut=crystal.cut,
                     cut_frame=crystal.cut_frame,
                     display_name=display_name,
+                    hexagonal=crystal.hexagonal,
                 ),
                 resolving_profile_name,
                 crystal_key,

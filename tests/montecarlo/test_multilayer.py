@@ -260,11 +260,14 @@ def test_layer_radiator_orientation_overrides():
     assert rad is not None
     assert rad["crystal"] == "silicon"
     assert rad["beam_uvw"] == (1, 1, 1)
+    assert rad["surface_hkl"] is None
     assert rad["azimuth_rad"] == pytest.approx(np.pi / 6)
-    # sapphire keeps its hardcoded c-cut default when not overridden
+    # sapphire inherits its catalog c-cut when not overridden, in the catalog's
+    # own reciprocal spelling -- the override above clears it, it does not merge
     sap = layer_radiator(LayerSpec("sapphire", 5e6))
     assert sap is not None
-    assert sap["beam_uvw"] == (0, 0, 1)
+    assert sap["surface_hkl"] == (0, 0, 1)
+    assert sap["beam_uvw"] is None
     assert sap["azimuth_rad"] == 0.0
 
 

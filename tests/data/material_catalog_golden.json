@@ -246,12 +246,12 @@
         "formula": "C",
         "full_name": "Diamond",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           4,
           0,
           0
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1634
@@ -466,12 +466,12 @@
         "formula": "Si",
         "full_name": "Silicon",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           4,
           4,
           0
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1634
@@ -690,12 +690,12 @@
         "formula": "LiF",
         "full_name": "Lithium Fluoride",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           1,
           0,
           0
         ],
-        "surface_hkl": null,
         "E_grid": null,
         "hkl_list": [],
         "hkl_reason": null,
@@ -1055,12 +1055,12 @@
         "formula": "Al2O3",
         "full_name": "Aluminium Oxide",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1634
@@ -1287,12 +1287,12 @@
         "formula": "V2O5",
         "full_name": "Vanadium Pentoxide",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1317
@@ -1406,12 +1406,12 @@
         "formula": "C",
         "full_name": "Highly Oriented Pyrolytic Graphite",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1634
@@ -1539,12 +1539,12 @@
         "formula": "BN",
         "full_name": "Hexagonal Boron Nitride",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1634
@@ -1708,12 +1708,12 @@
         "formula": "MoSe2",
         "full_name": "Molybdenum Diselenide",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             467
@@ -1856,12 +1856,12 @@
         "formula": "WSe2",
         "full_name": "Tungsten Diselenide",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -2034,12 +2034,12 @@
         "formula": "MoTe2",
         "full_name": "Molybdenum Ditelluride",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -2162,12 +2162,12 @@
         "formula": "MoTe2",
         "full_name": "Molybdenum Ditelluride",
         "phase": "1T'",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -2266,12 +2266,12 @@
         "formula": "TiS2",
         "full_name": "Titanium Disulfide",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             2550
@@ -2401,12 +2401,12 @@
         "formula": "TiSe2",
         "full_name": "Titanium Diselenide",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -2572,12 +2572,12 @@
         "formula": "P",
         "full_name": "Black Phosphorus",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           1,
           0
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1150
@@ -2737,12 +2737,12 @@
         "formula": "SiC",
         "full_name": "Silicon Carbide",
         "phase": "4H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             984
@@ -2914,12 +2914,12 @@
         "formula": "SiC",
         "full_name": "Silicon Carbide",
         "phase": "6H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             984
@@ -3019,12 +3019,12 @@
         "formula": "PtSe2",
         "full_name": "Platinum Diselenide",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -3970,12 +3970,12 @@
         "formula": "PdSe2",
         "full_name": "Palladium Diselenide",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4074,12 +4074,12 @@
         "formula": "HfS2",
         "full_name": "Hafnium Disulfide",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4198,12 +4198,12 @@
         "formula": "HfSe2",
         "full_name": "Hafnium Diselenide",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4322,12 +4322,12 @@
         "formula": "ZrSe2",
         "full_name": "Zirconium Diselenide",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4470,12 +4470,12 @@
         "formula": "WS2",
         "full_name": "Tungsten Disulfide",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4598,12 +4598,12 @@
         "formula": "MoS2",
         "full_name": "Molybdenum Disulfide",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4746,12 +4746,12 @@
         "formula": "NbS2",
         "full_name": "Niobium Disulfide",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -4924,12 +4924,12 @@
         "formula": "NbSe2",
         "full_name": "Niobium Diselenide",
         "phase": "2H",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           2
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -5078,12 +5078,12 @@
         "formula": "HfTe2",
         "full_name": "Hafnium Ditelluride",
         "phase": "1T",
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           0,
           0,
           1
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1150
@@ -8349,12 +8349,12 @@
         "formula": "FeS2",
         "full_name": "Iron Pyrite",
         "phase": null,
-        "beam_uvw": [
+        "beam_uvw": null,
+        "surface_hkl": [
           2,
           0,
           0
         ],
-        "surface_hkl": null,
         "E_grid": {
           "shape": [
             1050
@@ -9090,7 +9090,7 @@
   },
   "materials": {
     "hopg": {
-      "label": "HOPG [001]",
+      "label": "HOPG (0001)",
       "identity": {
         "formula": "C",
         "phase": "2H",
@@ -9100,8 +9100,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": "HOPG"
+        "cut_frame": "plane",
+        "display_name": "HOPG",
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "hopg",
@@ -9198,7 +9199,7 @@
       }
     },
     "hbn": {
-      "label": "h-BN [001]",
+      "label": "h-BN (0001)",
       "identity": {
         "formula": "BN",
         "phase": "2H",
@@ -9208,8 +9209,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": "h-BN"
+        "cut_frame": "plane",
+        "display_name": "h-BN",
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "hbn",
@@ -9306,7 +9308,7 @@
       }
     },
     "diamond": {
-      "label": "Diamond [100]",
+      "label": "Diamond (100)",
       "identity": {
         "formula": "C",
         "phase": null,
@@ -9316,8 +9318,9 @@
           0,
           0
         ],
-        "cut_frame": "direction",
-        "display_name": "Diamond"
+        "cut_frame": "plane",
+        "display_name": "Diamond",
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "diamond",
@@ -9414,7 +9417,7 @@
       }
     },
     "silicon": {
-      "label": "Silicon [110]",
+      "label": "Silicon (110)",
       "identity": {
         "formula": "Si",
         "phase": null,
@@ -9424,8 +9427,9 @@
           1,
           0
         ],
-        "cut_frame": "direction",
-        "display_name": "Silicon"
+        "cut_frame": "plane",
+        "display_name": "Silicon",
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "silicon",
@@ -9522,7 +9526,7 @@
       }
     },
     "mose2": {
-      "label": "2H-MoSe2 [001]",
+      "label": "2H-MoSe2 (0001)",
       "identity": {
         "formula": "MoSe2",
         "phase": "2H",
@@ -9532,8 +9536,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "mose2",
@@ -9633,7 +9638,7 @@
       }
     },
     "wse2": {
-      "label": "2H-WSe2 [001]",
+      "label": "2H-WSe2 (0001)",
       "identity": {
         "formula": "WSe2",
         "phase": "2H",
@@ -9643,8 +9648,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "wse2",
@@ -9741,7 +9747,7 @@
       }
     },
     "nbs2": {
-      "label": "2H-NbS2 [001]",
+      "label": "2H-NbS2 (0001)",
       "identity": {
         "formula": "NbS2",
         "phase": "2H",
@@ -9751,8 +9757,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "nbs2",
@@ -9852,7 +9859,7 @@
       }
     },
     "nbse2": {
-      "label": "2H-NbSe2 [001]",
+      "label": "2H-NbSe2 (0001)",
       "identity": {
         "formula": "NbSe2",
         "phase": "2H",
@@ -9862,8 +9869,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "nbse2",
@@ -9963,7 +9971,7 @@
       }
     },
     "mote2": {
-      "label": "2H-MoTe2 [001]",
+      "label": "2H-MoTe2 (0001)",
       "identity": {
         "formula": "MoTe2",
         "phase": "2H",
@@ -9973,8 +9981,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "mote2",
@@ -10071,7 +10080,7 @@
       }
     },
     "mote2_product": {
-      "label": "1T'-MoTe2 [001]",
+      "label": "1T'-MoTe2 (0001)",
       "identity": {
         "formula": "MoTe2",
         "phase": "1T'",
@@ -10081,8 +10090,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "mote2_product",
@@ -10179,7 +10189,7 @@
       }
     },
     "ptse2": {
-      "label": "1T-PtSe2 [001]",
+      "label": "1T-PtSe2 (0001)",
       "identity": {
         "formula": "PtSe2",
         "phase": "1T",
@@ -10189,8 +10199,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "ptse2",
@@ -10287,7 +10298,7 @@
       }
     },
     "pts2": {
-      "label": "1T-PtS2 (001)",
+      "label": "1T-PtS2 (0001)",
       "identity": {
         "formula": "PtS2",
         "phase": "1T",
@@ -10298,7 +10309,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "pts2",
@@ -10406,7 +10418,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "pds2",
@@ -10503,7 +10516,7 @@
       }
     },
     "pdte2": {
-      "label": "1T-PdTe2 (001)",
+      "label": "1T-PdTe2 (0001)",
       "identity": {
         "formula": "PdTe2",
         "phase": "1T",
@@ -10514,7 +10527,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "pdte2",
@@ -10611,7 +10625,7 @@
       }
     },
     "ptbi2": {
-      "label": "beta-PtBi2 (001)",
+      "label": "beta-PtBi2 (0001)",
       "identity": {
         "formula": "PtBi2",
         "phase": "beta",
@@ -10622,7 +10636,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "ptbi2",
@@ -10722,7 +10737,7 @@
       }
     },
     "ptte2": {
-      "label": "1T-PtTe2 (001)",
+      "label": "1T-PtTe2 (0001)",
       "identity": {
         "formula": "PtTe2",
         "phase": "1T",
@@ -10733,7 +10748,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "ptte2",
@@ -10830,7 +10846,7 @@
       }
     },
     "pdse2": {
-      "label": "PdSe2 [001]",
+      "label": "PdSe2 (001)",
       "identity": {
         "formula": "PdSe2",
         "phase": null,
@@ -10840,8 +10856,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "pdse2",
@@ -10938,7 +10955,7 @@
       }
     },
     "hfs2": {
-      "label": "1T-HfS2 [001]",
+      "label": "1T-HfS2 (0001)",
       "identity": {
         "formula": "HfS2",
         "phase": "1T",
@@ -10948,8 +10965,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "hfs2",
@@ -11049,7 +11067,7 @@
       }
     },
     "hfte2": {
-      "label": "1T-HfTe2 [001]",
+      "label": "1T-HfTe2 (0001)",
       "identity": {
         "formula": "HfTe2",
         "phase": "1T",
@@ -11059,8 +11077,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "hfte2",
@@ -11168,7 +11187,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "nbte2",
@@ -11265,7 +11285,7 @@
       }
     },
     "tite2": {
-      "label": "1T-TiTe2 (001)",
+      "label": "1T-TiTe2 (0001)",
       "identity": {
         "formula": "TiTe2",
         "phase": "1T",
@@ -11276,7 +11296,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "tite2",
@@ -11373,7 +11394,7 @@
       }
     },
     "vse2": {
-      "label": "1T-VSe2 (001)",
+      "label": "1T-VSe2 (0001)",
       "identity": {
         "formula": "VSe2",
         "phase": "1T",
@@ -11384,7 +11405,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "vse2",
@@ -11492,7 +11514,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "vte2",
@@ -11600,7 +11623,8 @@
           -1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "gep",
@@ -11708,7 +11732,8 @@
           0
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "ges",
@@ -11816,7 +11841,8 @@
           0
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "gese",
@@ -11924,7 +11950,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "gese2",
@@ -12032,7 +12059,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "res2",
@@ -12143,7 +12171,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "rese2",
@@ -12240,7 +12269,7 @@
       }
     },
     "2h_tas2": {
-      "label": "2H-TaS2 (001)",
+      "label": "2H-TaS2 (0001)",
       "identity": {
         "formula": "TaS2",
         "phase": "2H",
@@ -12251,7 +12280,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "2h_tas2",
@@ -12348,7 +12378,7 @@
       }
     },
     "2h_tase2": {
-      "label": "2H-TaSe2 (001)",
+      "label": "2H-TaSe2 (0001)",
       "identity": {
         "formula": "TaSe2",
         "phase": "2H",
@@ -12359,7 +12389,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "2h_tase2",
@@ -12467,7 +12498,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "tate2",
@@ -12575,7 +12607,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "fete",
@@ -12672,7 +12705,7 @@
       }
     },
     "fes2": {
-      "label": "FeS2 [100]",
+      "label": "FeS2 (100)",
       "identity": {
         "formula": "FeS2",
         "phase": null,
@@ -12682,8 +12715,9 @@
           0,
           0
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "fes2",
@@ -12794,7 +12828,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "wte2",
@@ -12902,7 +12937,8 @@
           1
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "zrte3",
@@ -13010,7 +13046,8 @@
           0
         ],
         "cut_frame": "plane",
-        "display_name": null
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "zrte5",
@@ -13110,7 +13147,7 @@
       }
     },
     "hfse2": {
-      "label": "1T-HfSe2 [001]",
+      "label": "1T-HfSe2 (0001)",
       "identity": {
         "formula": "HfSe2",
         "phase": "1T",
@@ -13120,8 +13157,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "hfse2",
@@ -13221,7 +13259,7 @@
       }
     },
     "zrse2": {
-      "label": "1T-ZrSe2 [001]",
+      "label": "1T-ZrSe2 (0001)",
       "identity": {
         "formula": "ZrSe2",
         "phase": "1T",
@@ -13231,8 +13269,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "zrse2",
@@ -13332,7 +13371,7 @@
       }
     },
     "v2o5": {
-      "label": "V2O5 [001]",
+      "label": "V2O5 (001)",
       "identity": {
         "formula": "V2O5",
         "phase": null,
@@ -13342,8 +13381,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "v2o5",
@@ -13440,7 +13480,7 @@
       }
     },
     "tis2": {
-      "label": "1T-TiS2 [001]",
+      "label": "1T-TiS2 (0001)",
       "identity": {
         "formula": "TiS2",
         "phase": "1T",
@@ -13450,8 +13490,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "tis2",
@@ -13548,7 +13589,7 @@
       }
     },
     "tise2": {
-      "label": "1T-TiSe2 [001]",
+      "label": "1T-TiSe2 (0001)",
       "identity": {
         "formula": "TiSe2",
         "phase": "1T",
@@ -13558,8 +13599,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "tise2",
@@ -13656,7 +13698,7 @@
       }
     },
     "black_phosphorus": {
-      "label": "Black Phosphorus [010]",
+      "label": "Black Phosphorus (010)",
       "identity": {
         "formula": "P",
         "phase": null,
@@ -13666,8 +13708,9 @@
           1,
           0
         ],
-        "cut_frame": "direction",
-        "display_name": "Black Phosphorus"
+        "cut_frame": "plane",
+        "display_name": "Black Phosphorus",
+        "hexagonal": false
       },
       "profile": "standard",
       "crystal_key": "black_phosphorus",
@@ -13764,7 +13807,7 @@
       }
     },
     "4h_sic": {
-      "label": "4H-SiC [001]",
+      "label": "4H-SiC (0001)",
       "identity": {
         "formula": "SiC",
         "phase": "4H",
@@ -13774,8 +13817,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "4h_sic",
@@ -13872,7 +13916,7 @@
       }
     },
     "6h_sic": {
-      "label": "6H-SiC [001]",
+      "label": "6H-SiC (0001)",
       "identity": {
         "formula": "SiC",
         "phase": "6H",
@@ -13882,8 +13926,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "6h_sic",
@@ -13980,7 +14025,7 @@
       }
     },
     "ws2": {
-      "label": "2H-WS2 [001]",
+      "label": "2H-WS2 (0001)",
       "identity": {
         "formula": "WS2",
         "phase": "2H",
@@ -13990,8 +14035,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "ws2",
@@ -14088,7 +14134,7 @@
       }
     },
     "mos2": {
-      "label": "2H-MoS2 [001]",
+      "label": "2H-MoS2 (0001)",
       "identity": {
         "formula": "MoS2",
         "phase": "2H",
@@ -14098,8 +14144,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": null
+        "cut_frame": "plane",
+        "display_name": null,
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "mos2",
@@ -14196,7 +14243,7 @@
       }
     },
     "mos2-on-sapphire": {
-      "label": "MoS2 on sapphire [001]",
+      "label": "MoS2 on sapphire (0001)",
       "identity": {
         "formula": "MoS2",
         "phase": "2H",
@@ -14206,8 +14253,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": "MoS2 on sapphire"
+        "cut_frame": "plane",
+        "display_name": "MoS2 on sapphire",
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "mos2",
@@ -14304,7 +14352,7 @@
       }
     },
     "mos2-on-sio2-si": {
-      "label": "MoS2 on SiO2/Si [001]",
+      "label": "MoS2 on SiO2/Si (0001)",
       "identity": {
         "formula": "MoS2",
         "phase": "2H",
@@ -14314,8 +14362,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": "MoS2 on SiO2/Si"
+        "cut_frame": "plane",
+        "display_name": "MoS2 on SiO2/Si",
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "mos2",
@@ -14425,7 +14474,7 @@
       }
     },
     "sapphire": {
-      "label": "Sapphire [001]",
+      "label": "Sapphire (0001)",
       "identity": {
         "formula": "Al2O3",
         "phase": null,
@@ -14435,8 +14484,9 @@
           0,
           1
         ],
-        "cut_frame": "direction",
-        "display_name": "Sapphire"
+        "cut_frame": "plane",
+        "display_name": "Sapphire",
+        "hexagonal": true
       },
       "profile": "standard",
       "crystal_key": "sapphire",
@@ -14551,11 +14601,7 @@
               0.03762374182509983
             ]
           ],
-          "beam_uvw": [
-            0,
-            0,
-            2
-          ],
+          "beam_uvw": null,
           "azimuth_deg": 0.0
         },
         {
@@ -14585,11 +14631,7 @@
               0.049942993373787194
             ]
           ],
-          "beam_uvw": [
-            4,
-            4,
-            0
-          ],
+          "beam_uvw": null,
           "azimuth_deg": 0.0
         }
       ]

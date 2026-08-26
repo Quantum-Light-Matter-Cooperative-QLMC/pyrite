@@ -24,14 +24,14 @@ from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
             (3.777, 3.777, 6.498, 90.0, 90.0, 120.0),
             80.279,
             {"Ti": 1, "Te": 2},
-            "1T-TiTe2 (001)",
+            "1T-TiTe2 (0001)",
         ),
         (
             "vse2",
             (3.357, 3.357, 6.104, 90.0, 90.0, 120.0),
             59.573,
             {"V": 1, "Se": 2},
-            "1T-VSe2 (001)",
+            "1T-VSe2 (0001)",
         ),
         (
             "vte2",

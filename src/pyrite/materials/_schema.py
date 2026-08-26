@@ -13,7 +13,7 @@ import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS, TRANSPORT_KEYS
 from ._catalog_decode import LineGridByEnergy, _number
-from ._identity import CutFrame, MaterialIdentity, reduce_indices
+from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
 
 _SCAN_KEYS = (
     "thickness_ang",
@@ -233,6 +233,16 @@ class CrystalSpec:
         return reduce_indices(indices) if indices is not None else None
 
     @property
+    def hexagonal(self) -> bool:
+        """Whether the CIF-derived cell is given on hexagonal axes.
+
+        Notation only -- see :func:`._identity.hexagonal_setting`. No geometry
+        path consults this; the reciprocal normal is already exact in every
+        setting.
+        """
+        return hexagonal_setting(self.lattice)
+
+    @property
     def lattice(self) -> Mapping[str, str | float]:
         """CIF-derived lattice parameters."""
         return self.info.lattice
@@ -419,6 +429,11 @@ class MaterialSpec:
     def cut_frame(self) -> CutFrame | None:
         """Which space :attr:`cut` lives in; ``None`` exactly when :attr:`cut` is."""
         return self.identity.cut_frame
+
+    @property
+    def hexagonal(self) -> bool:
+        """Whether the entrance-film cell is given on hexagonal axes."""
+        return self.identity.hexagonal
 
 
 @dataclass(frozen=True)

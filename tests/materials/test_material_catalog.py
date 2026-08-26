@@ -1050,6 +1050,29 @@ def test_format_indices_uses_the_bracket_convention_for_each_frame():
     # multi-digit or negative components would be ambiguous concatenated
     assert format_indices((1, 0, -1), "plane") == "(1 0 -1)"
     assert format_indices((12, 0, 1), "direction") == "[12 0 1]"
+    # a hexagonal setting renders a plane in four Miller--Bravais indices
+    assert format_indices((0, 0, 2), "plane", hexagonal=True) == "(0001)"
+    assert format_indices((1, 1, 0), "plane", hexagonal=True) == "(1 1 -2 0)"
+    # the direction transform is rational, so a direction stays in three
+    assert format_indices((0, 0, 1), "direction", hexagonal=True) == "[001]"
+
+
+def test_hexagonal_setting_reads_the_cell_parameters_not_the_system_field():
+    from pyrite.materials import CATALOG
+    from pyrite.materials._identity import hexagonal_setting
+
+    hexagonal = {"a": 3.16, "b": 3.16, "c": 12.294, "alpha": 90.0, "beta": 90.0, "gamma": 120.0}
+    assert hexagonal_setting(hexagonal)
+    # CIF-derived gamma arrives a few ulps off 120
+    assert hexagonal_setting({**hexagonal, "gamma": 119.99999999999999})
+    assert not hexagonal_setting({**hexagonal, "gamma": 90.0})
+    assert not hexagonal_setting({**hexagonal, "b": 3.30})
+    assert not hexagonal_setting({**hexagonal, "alpha": 77.6})
+    assert not hexagonal_setting({})
+    # the stored "system" field is always "general" and must not be consulted
+    assert CATALOG.crystal("mos2").lattice["system"] == "general"
+    assert CATALOG.crystal("mos2").hexagonal
+    assert not CATALOG.crystal("silicon").hexagonal
 
 
 def test_every_bundled_material_label_is_derived_from_its_crystal():
@@ -1067,6 +1090,7 @@ def test_every_bundled_material_label_is_derived_from_its_crystal():
             cut=crystal.cut,
             cut_frame=crystal.cut_frame,
             display_name=spec.identity.display_name,
+            hexagonal=crystal.hexagonal,
         )
         assert spec.label == expected.label, key
 
@@ -1083,7 +1107,7 @@ def test_every_bundled_material_label_agrees_with_its_crystal_phase_and_cut():
         declared = crystal.surface_hkl if crystal.surface_hkl is not None else crystal.beam_uvw
         assert spec.cut is not None and declared is not None, key
         assert spec.cut_frame == ("plane" if crystal.surface_hkl is not None else "direction"), key
-        assert format_indices(declared, spec.cut_frame) in spec.label, key
+        assert format_indices(declared, spec.cut_frame, hexagonal=spec.hexagonal) in spec.label, key
 
         # a declared phase is always shown, unless a display_name replaces the name
         if crystal.phase is not None and spec.identity.display_name is None:
@@ -1093,7 +1117,48 @@ def test_every_bundled_material_label_agrees_with_its_crystal_phase_and_cut():
         # different axis than the cut (orders along the cut axis reduce to it)
         for family in crystal.hkl_families:
             if reduce_indices(family) != tuple(spec.cut):
-                assert format_indices(family, spec.cut_frame) not in spec.label, key
+                assert (
+                    format_indices(family, spec.cut_frame, hexagonal=spec.hexagonal)
+                    not in spec.label
+                ), key
+
+
+def test_every_bundled_crystal_declares_its_cut_as_a_plane():
+    """The packaged catalog spells every slab normal ``surface_hkl``.
+
+    ``g_hkl`` is the normal of the cut face by construction in any lattice; the
+    direct axis of the same indices coincides with it only under symmetry the
+    catalog does not assert. A crystal added with ``beam_uvw`` would still be
+    valid config -- the parser accepts either, and Sweep/Layer overrides use the
+    direct spelling -- but it would render ``[uvw]`` beside its neighbours'
+    ``(hkl)``, which is exactly the label drift ``_identity`` exists to prevent.
+    """
+    from pyrite.materials import CATALOG
+
+    direct = sorted(key for key, spec in CATALOG.crystals.items() if spec.beam_uvw is not None)
+    assert direct == [], (
+        f"crystals declaring beam_uvw: {direct}; "
+        "re-declare the cut as surface_hkl with the same indices"
+    )
+
+
+def test_hexagonal_cuts_render_four_index_miller_bravais():
+    """``(0001)``, not ``(001)``, wherever the cell is on hexagonal axes."""
+    from pyrite.materials import CATALOG
+    from pyrite.materials._identity import bravais_indices
+
+    hexagonal = [key for key in CATALOG.material_keys if CATALOG.material(key).hexagonal]
+    assert {"mos2", "hopg", "hbn", "sapphire", "4h_sic"} <= set(hexagonal)
+    for key in hexagonal:
+        spec = CATALOG.material(key)
+        assert spec.cut_frame == "plane", key
+        assert spec.label.endswith("(0001)"), key
+    # non-hexagonal settings keep three indices, including the low-symmetry
+    # cells where the plane normal genuinely differs from the direct axis
+    for key in ("silicon", "res2", "wte2", "gep"):
+        assert "(0001)" not in CATALOG.material(key).label, key
+    assert bravais_indices((1, 1, 0)) == (1, 1, -2, 0)
+    assert bravais_indices((0, 0, 1)) == (0, 0, 0, 1)
 
 
 def test_bundled_material_labels_are_unique_and_ascii():

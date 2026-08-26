@@ -148,7 +148,12 @@ and the parser rejects a row that gives both or neither:
 * `surface_hkl` — a reciprocal-lattice plane normal $(hkl)$ placed along $+z$.
 
 The two coincide for orthogonal one-axis cuts and differ for nonorthogonal
-cleavage planes, where the reciprocal form is the correct one. Both are followed
+cleavage planes, where the reciprocal form is the correct one. **Every packaged
+crystal declares `surface_hkl`**: a slab normal is the normal of the cut face,
+and $\mathbf g_{hkl}$ is that normal by construction in any lattice, whereas the
+direct axis coincides with it only under symmetry the catalog does not assert.
+`beam_uvw` remains valid config and is the spelling a `Sweep` or `LayerSpec`
+override uses. Both are followed
 by the configured right-handed azimuth about $+z$; the geometry is documented in
 [Coherent PXR and CBS radiation](../radiation-physics/coherent-radiation.md) and
 [Transport geometry](../geometry/transport-geometry.md).

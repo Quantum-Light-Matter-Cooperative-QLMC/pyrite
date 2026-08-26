@@ -582,14 +582,14 @@ def test_brem_grid_upper_limit_tracks_case_beam_energy():
 
 
 def test_mote2_registered():
-    assert MATERIAL_LABELS["mote2"] == "2H-MoTe2 [001]"
+    assert MATERIAL_LABELS["mote2"] == "2H-MoTe2 (0001)"
 
     assert "mote2" in MATERIALS
 
 
 @pytest.mark.parametrize(
     ("material", "label", "chalcogen"),
-    [("nbs2", "2H-NbS2 [001]", "S"), ("nbse2", "2H-NbSe2 [001]", "Se")],
+    [("nbs2", "2H-NbS2 (0001)", "S"), ("nbse2", "2H-NbSe2 (0001)", "Se")],
 )
 def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcogen):
     assert MATERIAL_LABELS[material] == label
@@ -614,7 +614,7 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
 
     params = crystal_params(material)
     composition = dict(params["composition"])
-    assert params["beam_uvw"] == (0, 0, 2)
+    assert params["surface_hkl"] == (0, 0, 2)
     assert params["hkl_list"]
     assert composition[chalcogen] == pytest.approx(2.0 * composition["Nb"])
 
@@ -635,25 +635,25 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
 
 
 @pytest.mark.parametrize(
-    ("material", "label", "beam_uvw", "hkl_list", "ratio"),
+    ("material", "label", "surface_hkl", "hkl_list", "ratio"),
     [
-        ("v2o5", "V2O5 [001]", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"V": 1, "O": 2.5}),
-        ("tis2", "1T-TiS2 [001]", (0, 0, 1), [(0, 0, 3), (0, 0, -3)], {"Ti": 1, "S": 2}),
-        ("hfte2", "1T-HfTe2 [001]", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Hf": 1, "Te": 2}),
-        ("tise2", "1T-TiSe2 [001]", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Ti": 1, "Se": 2}),
+        ("v2o5", "V2O5 (001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"V": 1, "O": 2.5}),
+        ("tis2", "1T-TiS2 (0001)", (0, 0, 1), [(0, 0, 3), (0, 0, -3)], {"Ti": 1, "S": 2}),
+        ("hfte2", "1T-HfTe2 (0001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Hf": 1, "Te": 2}),
+        ("tise2", "1T-TiSe2 (0001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Ti": 1, "Se": 2}),
         (
             "black_phosphorus",
-            "Black Phosphorus [010]",
+            "Black Phosphorus (010)",
             (0, 1, 0),
             [(0, 2, 0), (0, -2, 0)],
             {"P": 1},
         ),
-        ("4h_sic", "4H-SiC [001]", (0, 0, 1), [(0, 0, 4), (0, 0, -4)], {"Si": 1, "C": 1}),
-        ("6h_sic", "6H-SiC [001]", (0, 0, 1), [(0, 0, 6), (0, 0, -6)], {"Si": 1, "C": 1}),
+        ("4h_sic", "4H-SiC (0001)", (0, 0, 1), [(0, 0, 4), (0, 0, -4)], {"Si": 1, "C": 1}),
+        ("6h_sic", "6H-SiC (0001)", (0, 0, 1), [(0, 0, 6), (0, 0, -6)], {"Si": 1, "C": 1}),
     ],
 )
 def test_oriented_materials_are_registered_as_symmetric_cuts(
-    material, label, beam_uvw, hkl_list, ratio
+    material, label, surface_hkl, hkl_list, ratio
 ):
     assert MATERIAL_LABELS[material] == label
     assert material in MATERIALS
@@ -677,7 +677,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
 
     params = crystal_params(material, n_families=999)
     composition = dict(params["composition"])
-    assert params["beam_uvw"] == beam_uvw
+    assert params["surface_hkl"] == surface_hkl
     assert params["hkl_list"] == hkl_list
     assert CATALOG.crystal(material).hkl_reason
     for element, count in ratio.items():
@@ -696,7 +696,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
     assert case["crystal"] == material
-    assert case["beam_uvw"] == beam_uvw
+    assert case["surface_hkl"] == surface_hkl
     assert case["hkl_list"] == hkl_list
 
 
@@ -705,7 +705,7 @@ def test_material_registry_projects_scan_and_crystal_views():
     assert MATERIAL_LABELS == {key: material.label for key, material in CATALOG.materials.items()}
     assert CATALOG.material("mos2-on-sio2-si").crystal_key == "mos2"
     assert CATALOG.material("mos2-on-sio2-si").stack[0].material == "sio2"
-    assert CATALOG.crystal("mos2").beam_uvw == (0, 0, 2)
+    assert CATALOG.crystal("mos2").surface_hkl == (0, 0, 2)
     assert material_registry.LayerSpec is LayerSpec
 
 

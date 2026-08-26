@@ -84,8 +84,9 @@ stack = [
 - A layer referencing `[media.<key>]` is **amorphous**: it absorbs and produces
   bremsstrahlung but has no coherent radiator.
 - A layer referencing `[crystals.<key>]` receives that crystal's composition,
-  default zone axis, and reflection policy; an inline `beam_uvw` overrides the
-  layer orientation.
+  default cut (`surface_hkl` for every packaged crystal), and reflection policy;
+  an inline `beam_uvw` replaces the layer orientation, clearing the inherited
+  `surface_hkl` rather than merging with it.
 - A **single-layer** stack must reproduce today's result **bit-for-bit** (the regression
   anchor) — so the scalar `crystal`/`thickness_ang`/… path stays valid and is internally
   promoted to a one-layer stack.
