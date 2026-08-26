@@ -195,11 +195,18 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
     return cases
 
 
-def build_legacy_cases(old_sweep: Any, settings: Any) -> list[Case]:
-    """Internal scan/blaze bridge onto the public sweep lowering path."""
-    from .campaign.legacy import adapt_legacy_sweep
+def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
+    """Lower a configured `campaign.sweep.Sweep`/`Settings` pair to cases.
 
-    return build_sweep_cases(adapt_legacy_sweep(old_sweep, settings))
+    This is the production path `pyrite scan` and `pyrite material blaze` take,
+    not a compatibility shim: `runs.scan` and `runs.blaze` both default their
+    `build_cases` hook to it. The pair it accepts is the config-driven campaign
+    description assembled from `data/materials.toml`, which is why the lowering
+    lives behind one named function rather than in each runner.
+    """
+    from .campaign.legacy import adapt_configured_sweep
+
+    return build_sweep_cases(adapt_configured_sweep(old_sweep, settings))
 
 
 def simulate(
@@ -385,4 +392,4 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
     )
 
 
-__all__ = ["build_case", "build_legacy_cases", "build_sweep_cases", "simulate"]
+__all__ = ["build_case", "build_configured_cases", "build_sweep_cases", "simulate"]

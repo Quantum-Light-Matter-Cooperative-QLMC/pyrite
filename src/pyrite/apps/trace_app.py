@@ -15,7 +15,7 @@ def _():
     import marimo as mo
     import numpy as np
 
-    import pyrite as pr
+    from pyrite.api import build_configured_cases
     from pyrite.apps._design import (
         apply_altair_theme,
         apply_plotly_theme,
@@ -59,6 +59,7 @@ def _():
         MaterialSelect,
         apply_altair_theme,
         apply_plotly_theme,
+        build_configured_cases,
         cached_render_path,
         crystal_lattice_figure,
         default_settings,
@@ -68,7 +69,6 @@ def _():
         np,
         page_title,
         penetration_survival_chart,
-        pr,
         prune_render_cache,
         resolved_theme,
         render_cache_key,
@@ -359,6 +359,7 @@ def _(
     MATERIAL,
     apply_altair_theme,
     apply_plotly_theme,
+    build_configured_cases,
     cached_render_path,
     get_penetration_data,
     get_penetration_render_status,
@@ -375,7 +376,6 @@ def _(
     penetration_energy_source_ui,
     penetration_groove_ui,
     penetration_ne_ui,
-    pr,
     penetration_realistic_ui,
     penetration_regen_ui,
     penetration_render_button_ui,
@@ -437,14 +437,14 @@ def _(
 
         try:
             _sweep = _make_sweep(_groove_spacing)
-            _traj = pr.Sweep.from_legacy(_sweep, settings).cases()
+            _traj = build_configured_cases(_sweep, settings)
         except ValueError as _exc:
             # geometry/material rejects grooves (tilt=0, substrate/stack, ...):
             # fall back to the flat face and surface the reason.
             _groove_spacing = None
             _groove_note = mo.md(f"*Grooves not applied: {_exc}*")
             _sweep = _make_sweep(None)
-            _traj = pr.Sweep.from_legacy(_sweep, settings).cases()
+            _traj = build_configured_cases(_sweep, settings)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
         # The sweep has one selected energy and tilt; keep the nearest-case guard

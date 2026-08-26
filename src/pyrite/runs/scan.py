@@ -79,7 +79,7 @@ def _load_runtime() -> None:
     gate_cases_by_penetration = gate_cases_by_penetration or config_module.gate_cases_by_penetration
     material_sweep = material_sweep or config_module.material_sweep
     run_sweep = run_sweep or run_module.run_sweep
-    build_cases = build_cases or api_module.build_legacy_cases
+    build_cases = build_cases or api_module.build_configured_cases
     case_cost = case_cost or sweep_module.case_cost
 
 

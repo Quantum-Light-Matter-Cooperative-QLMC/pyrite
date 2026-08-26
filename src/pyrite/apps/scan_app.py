@@ -16,7 +16,7 @@ def _():
 
     import marimo as mo
 
-    import pyrite as pr
+    from pyrite.api import build_configured_cases
     from pyrite.apps._design import (
         context_rail,
         directional_state,
@@ -46,6 +46,7 @@ def _():
         COLLAPSE_AZIMUTH,
         CATALOG,
         Path,
+        build_configured_cases,
         case_cost,
         checkpoint_path_for,
         context_rail,
@@ -56,7 +57,6 @@ def _():
         geometry_table,
         material_sweep,
         mo,
-        pr,
         page_title,
         load_checkpoint,
         run_sweep,
@@ -110,6 +110,7 @@ def _(CATALOG, mo):
 def _(
     CATALOG,
     Path,
+    build_configured_cases,
     checkpoint_path_for,
     default_settings,
     format_penetration_watchdog_summary,
@@ -117,7 +118,6 @@ def _(
     load_checkpoint,
     material_sweep,
     material_ui,
-    pr,
     scan_grid_rows,
     sweep_cost_weights,
 ):
@@ -126,7 +126,7 @@ def _(
     settings = default_settings()
     sweep = material_sweep(MATERIAL)  # full parametric grid (data/materials.toml)
 
-    cases = pr.Sweep.from_legacy(sweep, settings).cases()
+    cases = build_configured_cases(sweep, settings)
     cases, dropped = gate_cases_by_penetration(cases)
     penetration_summary = format_penetration_watchdog_summary(dropped)
     checkpoint_path = Path(checkpoint_path_for(MATERIAL))

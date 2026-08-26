@@ -1,4 +1,14 @@
-"""D7 adapters between the legacy sweep/settings pair and public objects."""
+"""Adapters between the configured sweep/settings pair and the public objects.
+
+Permanent infrastructure, not a shim awaiting removal. `adapt_configured_sweep`
+is what `pyrite scan` and `pyrite material blaze` run through on every
+invocation, via `api.build_configured_cases`. The `*_from_legacy` helpers keep
+that name because their *input* is the older representation; nothing about the
+callers is legacy.
+
+The one retiring thing in this area is the public door,
+`Sweep.from_legacy()`, which is scheduled in `campaign.model`.
+"""
 
 from __future__ import annotations
 
@@ -86,8 +96,8 @@ def sweep_from_legacy(old_sweep: Any, settings: Any) -> Sweep:
     return Sweep(base=scene, axes=axes)
 
 
-def adapt_legacy_sweep(old_sweep: Any, settings: Any) -> Sweep:
-    """Internal bridge retaining the exact source expansion for D7 callers."""
+def adapt_configured_sweep(old_sweep: Any, settings: Any) -> Sweep:
+    """Convert the pair, retaining the exact source expansion for its callers."""
     converted = sweep_from_legacy(old_sweep, settings)
     object.__setattr__(converted, "_legacy_source", (old_sweep, settings))
     return converted
@@ -128,7 +138,7 @@ def analysis_from_legacy(settings: Any) -> Analysis:
 
 
 __all__ = [
-    "adapt_legacy_sweep",
+    "adapt_configured_sweep",
     "analysis_from_legacy",
     "numerics_from_legacy",
     "sweep_from_legacy",

@@ -22,6 +22,15 @@ from .sweep import BeamSpec
 EmissionMode = Literal["incoherent", "coherent", "both"]
 BremSource = Literal["mc", "external", "none"]
 
+#: Removal target for the public `Sweep.from_legacy()` bridge.
+#:
+#: The bridge previously cited "the D7 support window" with no end date, which
+#: is not a schedule. 0.3.0 is the first release that names a target, so the
+#: two-minor window runs to 0.5.0 -- the same clock the module re-export cohort
+#: restarted on for the same reason. `tests/test_deprecation_schedule.py` holds
+#: this constant to the shipping `__version__` alongside the three registries.
+FROM_LEGACY_REMOVE_IN = "0.5.0"
+
 _SEGMENT = re.compile(r"(?P<name>[A-Za-z_]\w*)(?P<indexes>(?:\[\d+\])*)\Z")
 _INDEX = re.compile(r"\[(\d+)\]")
 
@@ -358,14 +367,17 @@ class Sweep:
     @classmethod
     def from_legacy(cls, old_sweep: Any, settings: Any) -> Sweep:
         """Convert the D7 `campaign.sweep.Sweep`/`Settings` pair."""
-        from .legacy import adapt_legacy_sweep
+        from .legacy import adapt_configured_sweep
 
         warnings.warn(
-            "Sweep.from_legacy() is a compatibility bridge for the D7 support window",
+            f"Sweep.from_legacy() is deprecated and will be removed in "
+            f"{FROM_LEGACY_REMOVE_IN}; use pyrite.api.build_configured_cases("
+            f"old_sweep, settings) to lower the pair to cases, or build a Sweep "
+            f"directly from a Scene",
             DeprecationWarning,
             stacklevel=2,
         )
-        return adapt_legacy_sweep(old_sweep, settings)
+        return adapt_configured_sweep(old_sweep, settings)
 
 
 __all__ = ["Analysis", "Beam", "Convergence", "Numerics", "Scene", "Sweep"]
