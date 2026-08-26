@@ -530,23 +530,23 @@ def _component_layers(base, include_brem, include_line=False, include_coherent=F
     ``coherent`` overlays the checkpoint's ``spec_coherent`` line for a
     ``both``-emission view, dashed so it stays visually distinct from ``total``
     while sharing its hue color."""
-    layers = [base.transform_filter(alt.datum.component == "total").mark_line(strokeWidth=1.4)]
+    layers = [base.transform_filter(alt.datum.component == "total").mark_line(strokeWidth=2.2)]
     if include_brem:
         layers.append(
             base.transform_filter(alt.datum.component == "brem").mark_line(
-                strokeWidth=0.7, strokeDash=[4, 3], opacity=0.7
+                strokeWidth=1.1, strokeDash=[4, 3], opacity=0.7
             )
         )
     if include_line:
         layers.append(
             base.transform_filter(alt.datum.component == "line").mark_line(
-                strokeWidth=1.0, strokeDash=[1, 1], opacity=0.85
+                strokeWidth=1.6, strokeDash=[1, 1], opacity=0.85
             )
         )
     if include_coherent:
         layers.append(
             base.transform_filter(alt.datum.component == "coherent").mark_line(
-                strokeWidth=1.4, strokeDash=[6, 2]
+                strokeWidth=2.2, strokeDash=[6, 2]
             )
         )
     return layers

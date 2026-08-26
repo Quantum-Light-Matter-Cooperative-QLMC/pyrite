@@ -5,7 +5,7 @@
 
 import marimo
 
-__generated_with = "0.23.16"
+__generated_with = "0.24.0"
 app = marimo.App(width="full")
 
 with app.setup:
@@ -84,9 +84,9 @@ def _():
             [
                 page_title(
                     mo,
-                    "Coherent X-ray radiation analysis",
+                    "Spectral Analysis",
                     "Explore spectra, optimize geometry, inspect instrument response, and compare materials.",
-                    eyebrow="Electron transport and radiation from crystalline materials",
+                    eyebrow="PyRITE - a Python toolkit for Radiation from Interaction and Transport of Electrons",
                 ),
                 theme_ui,
             ],
@@ -112,7 +112,7 @@ def _():
 @app.cell
 def _(theme_ui):
     app_theme = resolved_theme(theme_ui)
-    configure_matplotlib_theme(app_theme)
+    _ = configure_matplotlib_theme(app_theme)
     return (app_theme,)
 
 
@@ -595,7 +595,13 @@ def _(
 
 
 @app.cell
-def _(app_theme, context, detector_controls, detector_results, detector_values):
+def _(
+    app_theme,
+    context,
+    detector_controls,
+    detector_results,
+    detector_values,
+):
     _axes = resolve_axis_pair(detector_values["axes"], include_y_domain=True)
 
     def detector_tab():
