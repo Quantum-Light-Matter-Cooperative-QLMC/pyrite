@@ -33,7 +33,7 @@ _COMMANDS = {
     "beam": "pyrite.cli.commands.beam.command",
     "detector": "pyrite.cli.commands.detector.command",
     "prune": "pyrite.cli.commands.cleanup.gc_command",
-    "check": "pyrite.check.command",
+    "check": "pyrite.apps.check.command",
     "check-config": "pyrite.cli.commands.check_config.command",
 }
 

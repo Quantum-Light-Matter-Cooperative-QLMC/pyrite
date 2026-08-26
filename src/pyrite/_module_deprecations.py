@@ -3,11 +3,18 @@
 These modules remain behavior-preserving re-exports through the support window.
 The registry gives each path an explicit canonical replacement and removal
 target; ``tests/test_module_deprecations.py`` holds it to the live package tree
-in both directions.
+in both directions and to the shipping ``__version__``.
+
+Each shim's module body calls `warn_module_deprecation`, so the removal target
+below is a promise that was actually announced to importers rather than a
+private note. The paths were carved out in 0.2.0 but stayed silent until 0.3.0,
+so 0.3.0 is the release the two-minor window counts from -- an import path that
+never warned has not spent its window (issue #68).
 """
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 SUPPORT_WINDOW_MINORS = 2
@@ -32,7 +39,7 @@ def _entry(
     module: str,
     replacement: str,
     *,
-    since: str = "0.2.0",
+    since: str = "0.3.0",
 ) -> ModuleDeprecation:
     return ModuleDeprecation(module, replacement, since, _window(since))
 
@@ -109,3 +116,27 @@ MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
         _entry("pyrite.viewer", "pyrite.apps.viewer"),
     )
 }
+
+
+def warn_module_deprecation(module: str) -> None:
+    """Announce *module* as a compatibility path and name its replacement.
+
+    Called from the shim's own module body rather than from a ``__getattr__``,
+    because ``import pyrite.slim`` binds a submodule through the import system
+    and never reaches the parent package's attribute hook -- a lazy warning
+    would stay silent for exactly the import the deprecation is about.
+
+    Module bodies execute once per interpreter, so this fires exactly once per
+    path with no separate guard; a caller that deliberately evicts the module
+    from ``sys.modules`` and re-imports it is warned again, which is correct.
+    """
+    entry = MODULE_DEPRECATIONS.get(module)
+    if entry is None:
+        return
+
+    warnings.warn(
+        f"{entry.module} is deprecated and will be removed in {entry.remove_in}; "
+        f"import {entry.replacement} instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )

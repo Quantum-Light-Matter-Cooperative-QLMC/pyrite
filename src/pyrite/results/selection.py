@@ -14,7 +14,7 @@ flux), collapsing hundreds of azimuth runs to one row/curve each.
 
 import numpy as np
 
-from ..sweep import fmt_thickness
+from ..campaign.sweep import fmt_thickness
 
 
 # ---- record selection --------------------------------------------------------
@@ -310,8 +310,8 @@ def _grid_names(material, fidelity="full", catalog_profile="standard"):
     module-level ``config`` import here would close an import cycle. Deferring it
     to call time breaks the cycle.
     """
-    from ..config import default_settings, material_sweep
-    from ..sweep import build_cases
+    from ..campaign.config import default_settings, material_sweep
+    from ..campaign.sweep import build_cases
 
     settings = default_settings(fidelity)
     sweep = material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)

@@ -169,7 +169,7 @@ def validation_launch_command(
 def _launch_validation(
     ctx: click.Context, *, watch: bool, edit: bool, acp: bool, tunnel: bool
 ) -> None:
-    check = _load("pyrite.check.command")
+    check = _load("pyrite.apps.check.command")
     ctx.invoke(
         check,
         watch=watch,
@@ -194,7 +194,7 @@ def validation_export_command(
     ctx: click.Context, outdir: str, ne: int, ne_brem: int, ne_supp: int
 ) -> None:
     """Delegate cached-figure export to existing validation orchestration."""
-    check = _load("pyrite.check.command")
+    check = _load("pyrite.apps.check.command")
     ctx.invoke(
         check,
         watch=False,

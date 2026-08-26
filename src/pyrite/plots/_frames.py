@@ -17,12 +17,12 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from ..campaign.sweep import fmt_thickness
 from ..montecarlo import (
     simulate_trajectories,
     tilted_geometry,
 )
 from ..results import records, records_for_cases, selection_score
-from ..sweep import fmt_thickness
 from ._common import (
     _beam_detector_basis,
     _beam_phase_space,

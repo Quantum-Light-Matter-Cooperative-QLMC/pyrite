@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from pyrite.config import default_settings
+from pyrite.campaign.config import default_settings
 from pyrite.plots.mpl.interactive import (
     browse,
     browse_plotly,
