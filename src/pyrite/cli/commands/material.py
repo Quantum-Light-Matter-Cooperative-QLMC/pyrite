@@ -28,7 +28,6 @@ from pyrite.cli._core import (
     flatten_option_values,
     output_option,
 )
-from pyrite.cli._deprecations import RetiredOption
 from pyrite.cli.commands._filter_shared import filter_from_row, physical_detector_from_row
 
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
@@ -428,14 +427,6 @@ def command():
     show_default=True,
     is_eager=True,
     help="Output format; json is the stable automation contract.",
-)
-@click.option(
-    "--json",
-    cls=RetiredOption,
-    dest="output_format",
-    replacement="--output json",
-    is_flag=True,
-    flag_value="json",
 )
 @click.option(
     "--output-file",

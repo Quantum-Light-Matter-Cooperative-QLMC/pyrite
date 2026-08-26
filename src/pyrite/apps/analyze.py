@@ -482,7 +482,6 @@ def _cli(args):
     "--save-default",
     "persist_default",
     is_flag=True,
-    retired=["--default"],
     help="Persist MATERIAL as default for future no-argument runs.",
 )
 @click.option("--watch", is_flag=True, help="Reload app when source files change.")

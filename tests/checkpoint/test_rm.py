@@ -138,17 +138,3 @@ def test_rm_requires_exactly_one_selector(tmp_path):
     assert conflicting.exit_code == 2
     assert "exactly one" in missing.stderr
     assert "exactly one" in conflicting.stderr
-
-
-def test_hidden_checkpoint_clear_alias_warns_and_still_previews(tmp_path):
-    _dataset(tmp_path, "hopg", "hopg", ["a" * 64])
-
-    result = invoke(
-        root_command,
-        ["checkpoint", "clear", "hopg", "--checkpoint-dir", str(tmp_path)],
-    )
-
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "use 'pyrite checkpoint rm'" in result.stderr
-    assert "would delete local checkpoint datasets:" in result.stdout

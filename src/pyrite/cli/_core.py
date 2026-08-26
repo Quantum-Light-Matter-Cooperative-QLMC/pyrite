@@ -15,7 +15,7 @@ from typing import Any
 
 import click
 
-from pyrite.cli._deprecations import DeprecatingGroup, RetiredOption
+from pyrite.cli._deprecations import DeprecatingGroup
 
 _COLOR_MODE: ContextVar[str] = ContextVar("cxr_cli_color_mode", default="auto")
 
@@ -428,15 +428,7 @@ def _json_selected(_ctx, _param, value: str) -> bool:
 
 
 def output_option(function):
-    """Add canonical human/machine output selection plus retired ``--json``."""
-    function = click.option(
-        "--json",
-        cls=RetiredOption,
-        dest="json_output",
-        replacement="--output json",
-        is_flag=True,
-        flag_value=True,
-    )(function)
+    """Add the canonical human/machine output selector."""
     return click.option(
         "-o",
         "--output",

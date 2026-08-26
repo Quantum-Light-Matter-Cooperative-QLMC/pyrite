@@ -21,11 +21,11 @@ def test_energy_grid_command_lives_in_cli_and_not_in_the_domain_package():
 
     from pyrite.cli import _COMMANDS
 
-    command = importlib.import_module("pyrite.cli.commands.energy_grid").command
+    module = importlib.import_module("pyrite.cli.commands.energy_grid")
     domain = importlib.import_module("pyrite.energy_grid")
 
-    assert isinstance(command, click.Group)
-    assert _COMMANDS["energy-grid"] == "pyrite.cli.commands.energy_grid.command"
+    assert isinstance(module.add_command, click.Command)
+    assert "energy-grid" not in _COMMANDS
     assert not hasattr(domain, "command")
     assert not any(isinstance(value, click.Command) for value in vars(domain).values())
 

@@ -104,7 +104,6 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     multiple=True,
     default=None,
     metavar="A",
-    retired=["--angles"],
     help="Polar tilt values in degrees.",
 )
 @click.option(

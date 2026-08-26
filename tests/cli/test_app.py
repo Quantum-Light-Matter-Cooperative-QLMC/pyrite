@@ -86,7 +86,8 @@ def test_validation_leaf_and_export_dispatch_without_cross_mode_flags(monkeypatc
     assert calls[1] == ("export", ("out",), {"ne": 11, "ne_brem": 200, "ne_supp": 200})
 
 
-def test_implicit_app_launch_warns_and_still_dispatches(monkeypatch):
+def test_implicit_app_launch_retired_in_favour_of_the_explicit_leaf(monkeypatch):
+    """The bare group launched the app through 0.2.x; 0.3.0 requires `launch`."""
     launched = {}
     monkeypatch.setattr(
         analyze,
@@ -94,9 +95,9 @@ def test_implicit_app_launch_warns_and_still_dispatches(monkeypatch):
         lambda material, **kwargs: launched.update(material=material, **kwargs),
     )
 
-    result = CliRunner().invoke(cli.command, ["app", "analysis", "mose2"])
+    implicit = CliRunner().invoke(cli.command, ["app", "analysis", "mose2"])
+    explicit = CliRunner().invoke(cli.command, ["app", "analysis", "launch", "mose2"])
 
-    assert result.exit_code == 0
+    assert implicit.exit_code == 2
+    assert explicit.exit_code == 0
     assert launched["material"] == "mose2"
-    assert "'pyrite app analysis' is deprecated" in result.stderr
-    assert "use 'pyrite app analysis launch'" in result.stderr

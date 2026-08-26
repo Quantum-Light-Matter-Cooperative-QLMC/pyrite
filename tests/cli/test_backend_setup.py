@@ -200,7 +200,7 @@ def test_setup_no_env_non_interactive_defaults_to_cpu(monkeypatch, tmp_path, cap
     monkeypatch.setattr(backend_setup, "_interactive", lambda: False)
     monkeypatch.setattr(backend_setup, "detect_all", lambda: [])
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
     assert "PYRITE_MC_BACKEND=cpu" in capsys.readouterr().out
@@ -211,7 +211,7 @@ def test_setup_no_gpu_prints_no_install_instructions(monkeypatch, tmp_path, caps
     monkeypatch.setattr(backend_setup, "_interactive", lambda: False)
     monkeypatch.setattr(backend_setup, "detect_all", lambda: [])
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert "uv sync" not in capsys.readouterr().out
 
@@ -227,7 +227,7 @@ def test_setup_detected_gpu_non_interactive_defaults_to_cpu_with_stderr_hint(
         lambda: [backend_setup.DetectionResult("nvidia", "cuda", "nvidia-smi on PATH")],
     )
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
     captured = capsys.readouterr()
@@ -244,7 +244,7 @@ def test_setup_yes_flag_accepts_top_detected_backend_without_prompt(monkeypatch,
         lambda: [backend_setup.DetectionResult("nvidia", "cuda", "nvidia-smi on PATH")],
     )
 
-    assert cli.main(["setup", "-y"]) is None
+    assert cli.main(["config", "setup", "-y"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cuda\n"
     assert "uv sync --extra nvidia" in capsys.readouterr().out
@@ -260,7 +260,7 @@ def test_setup_interactive_prompt_accept_writes_detected_backend(monkeypatch, tm
     )
     monkeypatch.setattr(backend_setup.click, "confirm", lambda *args, **kwargs: True)
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=rocm\n"
     assert "CUPY_INSTALL_USE_HIP=1 uv sync --extra amd" in capsys.readouterr().out
@@ -276,7 +276,7 @@ def test_setup_interactive_prompt_decline_defaults_to_cpu(monkeypatch, tmp_path)
     )
     monkeypatch.setattr(backend_setup.click, "confirm", lambda *args, **kwargs: False)
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
 
@@ -287,7 +287,7 @@ def test_setup_already_set_is_a_no_op(monkeypatch, tmp_path, capsys):
     calls: list[bool] = []
     monkeypatch.setattr(backend_setup, "detect_all", lambda: calls.append(True) or [])
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cuda\n"
     assert calls == []
@@ -300,7 +300,7 @@ def test_setup_force_reruns_detection_and_overwrites(monkeypatch, tmp_path):
     monkeypatch.setattr(backend_setup, "_interactive", lambda: False)
     monkeypatch.setattr(backend_setup, "detect_all", lambda: [])
 
-    assert cli.main(["setup", "--force"]) is None
+    assert cli.main(["config", "setup", "--force"]) is None
 
     assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
 
@@ -311,7 +311,7 @@ def test_setup_preserves_unrelated_env_content(monkeypatch, tmp_path):
     monkeypatch.setattr(backend_setup, "_interactive", lambda: False)
     monkeypatch.setattr(backend_setup, "detect_all", lambda: [])
 
-    assert cli.main(["setup"]) is None
+    assert cli.main(["config", "setup"]) is None
 
     assert env_path.read_text() == "MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cpu\n"
 

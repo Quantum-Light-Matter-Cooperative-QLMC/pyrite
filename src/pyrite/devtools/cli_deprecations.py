@@ -13,6 +13,16 @@ from pathlib import Path
 from pyrite import __version__
 from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, SUPPORT_WINDOW_MINORS
 
+_EMPTY_COMMANDS = (
+    "No command spelling is currently deprecated. Every spelling the CLI accepts "
+    "is canonical; anything else exits as an unknown command."
+)
+
+_EMPTY_OPTIONS = (
+    "No option spelling is currently deprecated. Every option the CLI accepts is "
+    "canonical; anything else exits as a usage error."
+)
+
 
 def build_deprecations() -> str:
     lines = [
@@ -33,33 +43,43 @@ def build_deprecations() -> str:
         "",
         "## Commands",
         "",
-        "| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |",
-        "| --- | --- | --- | --- | --- |",
     ]
-    for path in sorted(DEPRECATIONS):
-        entry = DEPRECATIONS[path]
-        lines.append(
-            f"| `pyrite {entry.path}` | `{entry.replacement}` | {entry.deprecated_in} "
-            f"| {entry.remove_in} | {entry.note} |"
+    if DEPRECATIONS:
+        lines.extend(
+            (
+                "| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |",
+                "| --- | --- | --- | --- | --- |",
+            )
         )
-    lines.extend(
-        (
-            "",
-            "## Options",
-            "",
-            "| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |",
-            "| --- | --- | --- | --- | --- | --- |",
+        for path in sorted(DEPRECATIONS):
+            entry = DEPRECATIONS[path]
+            lines.append(
+                f"| `pyrite {entry.path}` | `{entry.replacement}` | {entry.deprecated_in} "
+                f"| {entry.remove_in} | {entry.note} |"
+            )
+    else:
+        lines.append(_EMPTY_COMMANDS)
+    lines.extend(("", "## Options", ""))
+    if DEPRECATED_FLAGS:
+        lines.extend(
+            (
+                "| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |",
+                "| --- | --- | --- | --- | --- | --- |",
+            )
         )
-    )
-    for key in sorted(DEPRECATED_FLAGS):
-        entry = DEPRECATED_FLAGS[key]
-        command = (
-            entry.command if entry.command.startswith("pyrite-dev ") else f"pyrite {entry.command}"
-        )
-        lines.append(
-            f"| `{command}` | `{entry.flag}` | `{entry.replacement}` "
-            f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
-        )
+        for key in sorted(DEPRECATED_FLAGS):
+            entry = DEPRECATED_FLAGS[key]
+            command = (
+                entry.command
+                if entry.command.startswith("pyrite-dev ")
+                else f"pyrite {entry.command}"
+            )
+            lines.append(
+                f"| `{command}` | `{entry.flag}` | `{entry.replacement}` "
+                f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
+            )
+    else:
+        lines.append(_EMPTY_OPTIONS)
     lines.append("")
     return "\n".join(lines)
 

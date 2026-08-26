@@ -10,7 +10,7 @@ from pyrite import DATA_DIR, cli
 
 
 def test_check_config_validates_bundled_catalog_without_running_simulation(capsys) -> None:
-    assert cli.main(["check-config"]) is None
+    assert cli.main(["material", "validate"]) is None
 
     output = capsys.readouterr().out
     assert "valid material catalog" in output
@@ -20,7 +20,7 @@ def test_check_config_validates_bundled_catalog_without_running_simulation(capsy
 def test_check_config_accepts_an_explicit_full_catalog(capsys) -> None:
     catalog_path = DATA_DIR / "materials.toml"
 
-    assert cli.main(["check-config", str(catalog_path)]) is None
+    assert cli.main(["material", "validate", str(catalog_path)]) is None
 
     assert str(catalog_path) in capsys.readouterr().out
 
@@ -32,7 +32,7 @@ def test_check_config_reports_custom_catalog_errors_as_clean_cli_errors(
     invalid.write_text('materials = ["hopg"]\n')
 
     with pytest.raises(SystemExit) as exc:
-        cli.main(["check-config", str(invalid)])
+        cli.main(["material", "validate", str(invalid)])
 
     assert exc.value.code == 1
     stderr = capsys.readouterr().err
@@ -59,7 +59,7 @@ def redirected_open(path, *args, **kwargs):
 
 Path.open = redirected_open
 from pyrite import cli
-cli.main(["check-config"])
+cli.main(["material", "validate"])
 """
 
     result = subprocess.run(

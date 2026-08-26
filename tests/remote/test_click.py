@@ -6,36 +6,22 @@ import click
 import pytest
 
 from pyrite import remote
-from pyrite.cli._deprecations import message
 from pyrite.cli.commands import _remote_actions
 from pyrite.remote import lifecycle, viewer
 from tests.helpers.cli import assert_clean_result, invoke
 
 REMOTE_COMMANDS = (
-    "run",
-    "rebrem",
-    "reline",
-    "jobs",
-    "status",
-    "logs",
-    "stop",
     "gc",
-    "reap",
     "pull",
-    "profile",
     "performance",
     "rm",
-    "clear",
-    "prune",
     "prune-jobs",
     "sync",
-    "validate",
-    "check",
 )
 
 
 def assert_legacy_run_result(result, *, stderr=""):
-    assert_clean_result(result, stderr=f"{message('remote run')}\n{stderr}")
+    assert_clean_result(result, stderr=stderr)
 
 
 def test_remote_exports_click_group():
@@ -80,17 +66,6 @@ def test_remote_performance_commands_dispatch(monkeypatch):
     ]
 
 
-def test_legacy_remote_profile_pull_warns_once(monkeypatch):
-    monkeypatch.setattr(lifecycle, "pull_performance_profile", lambda _profile: None)
-
-    result = invoke(remote.command, ["profile", "pull", "baseline"])
-
-    assert result.exit_code == 0
-    assert result.stdout == ""
-    assert result.stderr.count("is deprecated") == 1
-    assert "pyrite remote performance pull" in result.stderr
-
-
 def test_run_click_defaults_and_zero_meanings(monkeypatch):
     calls = []
     monkeypatch.setattr(
@@ -100,7 +75,7 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
     )
 
     result = invoke(
-        remote.command, ["run", "standard", "-m", "hopg", "--workers", "0", "--headless"]
+        remote.start_command, ["standard", "-m", "hopg", "--workers", "0", "--headless"]
     )
 
     assert_legacy_run_result(result)
@@ -153,7 +128,7 @@ def test_run_cpu_incompatible_inputs_fail_before_submission(monkeypatch, flags, 
         lambda *_args, **_kwargs: pytest.fail("invalid CPU flags must not submit"),
     )
 
-    result = invoke(remote.command, ["run", "standard", "-m", "hopg", *flags])
+    result = invoke(remote.start_command, ["standard", "-m", "hopg", *flags])
 
     assert result.exit_code == 2
     assert message in result.stderr
@@ -172,8 +147,8 @@ def test_run_cpu_flags_imply_performance_and_monolithic_dispatch(monkeypatch, fl
     )
 
     result = invoke(
-        remote.command,
-        ["run", "standard", "-m", "hopg", flag, "--headless"],
+        remote.start_command,
+        ["standard", "-m", "hopg", flag, "--headless"],
     )
 
     assert_legacy_run_result(result)
@@ -194,7 +169,7 @@ def test_combined_cpu_failure_pulls_retained_primary_performance_artifacts(monke
         lambda profile: pulled.append(profile),
     )
 
-    result = invoke(remote.command, ["run", "standard", "-m", "hopg", "--cpu"])
+    result = invoke(remote.start_command, ["standard", "-m", "hopg", "--cpu"])
 
     assert_legacy_run_result(
         result,
@@ -227,9 +202,8 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
     )
 
     result = invoke(
-        remote.command,
+        remote.start_command,
         [
-            "run",
             "standard",
             "-m",
             "hopg",
@@ -251,47 +225,34 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
     assert pulled[0][1]["level9"] is True
 
 
-def test_hidden_remote_aliases_remain_callable():
-    assert_clean_result(invoke(remote.command, ["check", "--help"]))
-
-    root_help = invoke(remote.command, ["--help"])
-    command_lines = {
-        line.split()[0]
-        for line in root_help.stdout.splitlines()
-        if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
-    }
-    assert command_lines.isdisjoint({"run", "validate", "scan", "submit", "start", "check"})
-
-
-@pytest.mark.parametrize("name", ["validate", "check"])
-def test_legacy_zhai_execution_aliases_warn_once(monkeypatch, name):
+def test_zhai_execution_dispatches_without_a_deprecation_diagnostic(monkeypatch):
     monkeypatch.setattr(_remote_actions, "remote_check", lambda **_kwargs: None)
 
-    result = invoke(remote.command, [name])
+    result = invoke(remote.check_command, [])
 
     assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "pyrite run --preset zhai --remote" in result.stderr
+    assert "is deprecated" not in result.stderr
 
 
-def test_legacy_zhai_pull_alias_warns_with_retrieval_replacement(monkeypatch):
-    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: None)
+def test_zhai_pull_dispatches_to_the_cache_retrieval_path(monkeypatch):
+    pulled = []
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: pulled.append("pull"))
 
-    result = invoke(remote.command, ["validate", "--pull"])
+    result = invoke(remote.check_command, ["--pull"])
 
     assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "pyrite remote pull --preset zhai" in result.stderr
+    assert pulled == ["pull"]
 
 
-def test_legacy_zhai_detached_follow_warning_preserves_no_pull(monkeypatch):
+def test_zhai_detached_follow_submits_and_attaches(monkeypatch):
+    attached = []
     monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **_kwargs: "job")
-    monkeypatch.setattr(viewer, "attach", lambda _jobid: None)
+    monkeypatch.setattr(viewer, "attach", lambda jobid: attached.append(jobid))
 
-    result = invoke(remote.command, ["validate", "--detached", "--follow"])
+    result = invoke(remote.check_command, ["--detached", "--follow"])
 
     assert result.exit_code == 0
-    assert "pyrite run --preset zhai --remote --detach" in result.stderr
+    assert attached == ["job"]
 
 
 def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
@@ -311,22 +272,25 @@ def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "argv, option",
+    "target, argv, option",
     [
-        (["run", "standard", "-m", "hopg", "--workers", "-1"], "--workers"),
-        (["run", "standard", "-m", "hopg", "--chunk-minutes", "-1"], "--chunk-minutes"),
-        (["rebrem", "hopg", "--ne-brem", "0"], "--ne-brem"),
-        (["rebrem", "hopg", "--step", "nan"], "--step"),
-        (["reline", "hopg", "--line-ne", "0"], "--line-ne"),
-        (["reline", "hopg", "--line-step", "inf"], "--line-step"),
-        (["reap", "--min-age-minutes", "-0.1"], "--min-age-minutes"),
-        (["check", "--ne", "0"], "--ne"),
-        (["check", "--tmd-azimuth", "nan"], "--tmd-azimuth"),
-        (["check", "--tmd-azimuth", "-inf"], "--tmd-azimuth"),
+        ("start_command", ["standard", "-m", "hopg", "--workers", "-1"], "--workers"),
+        (
+            "start_command",
+            ["standard", "-m", "hopg", "--chunk-minutes", "-1"],
+            "--chunk-minutes",
+        ),
+        ("rebrem_command", ["hopg", "--ne-brem", "0"], "--ne-brem"),
+        ("rebrem_command", ["hopg", "--step", "nan"], "--step"),
+        ("reline_command", ["hopg", "--line-ne", "0"], "--line-ne"),
+        ("reline_command", ["hopg", "--line-step", "inf"], "--line-step"),
+        ("check_command", ["--ne", "0"], "--ne"),
+        ("check_command", ["--tmd-azimuth", "nan"], "--tmd-azimuth"),
+        ("check_command", ["--tmd-azimuth", "-inf"], "--tmd-azimuth"),
     ],
 )
-def test_remote_numeric_domains_fail_at_click_boundary(argv, option):
-    result = invoke(remote.command, argv)
+def test_remote_numeric_domains_fail_at_click_boundary(target, argv, option):
+    result = invoke(getattr(remote, target), argv)
 
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -337,13 +301,9 @@ def test_remote_numeric_domains_fail_at_click_boundary(argv, option):
 @pytest.mark.parametrize(
     "argv, message",
     [
-        (["run", "standard", "-m", "hopg", "--quick", "--grid"], "drop --grid"),
         (["pull", "hopg", "--brem-only", "--line-only"], "mutually exclusive"),
-        (["stop"], "needs material"),
-        (["clear"], "needs material"),
-        (["prune", "--all", "--profile", "sub_100keV"], "cannot be combined"),
-        (["check", "--follow"], "requires --detached"),
-        (["check", "--pull", "--detached"], "mutually exclusive"),
+        (["rm"], "needs material"),
+        (["gc", "--all", "--profile", "sub_100keV"], "cannot be combined"),
     ],
 )
 def test_remote_incompatible_click_inputs_are_usage_errors(argv, message):
@@ -376,49 +336,7 @@ def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
     ]
 
 
-def test_hidden_remote_prune_alias_warns_and_reclaims_records_only(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "prune_remote",
-        lambda **kwargs: calls.append(("prune", kwargs)),
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "reap_reservations",
-        lambda **kwargs: pytest.fail("retired `prune` must not reap reservations"),
-    )
-
-    result = invoke(remote.command, ["prune"])
-
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "pyrite remote gc" in result.stderr
-    assert calls == [("prune", {"all_profiles": False, "catalog_profile": None, "yes": False})]
-
-
-def test_hidden_remote_reap_alias_warns_and_releases_locks_only(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "reap_reservations",
-        lambda **kwargs: calls.append(("reap", kwargs)),
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "prune_remote",
-        lambda **kwargs: pytest.fail("retired `reap` must not prune records"),
-    )
-
-    result = invoke(remote.command, ["reap"])
-
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "pyrite remote gc" in result.stderr
-    assert calls == [("reap", {"min_age_minutes": 5.0, "yes": False})]
-
-
-@pytest.mark.parametrize("command_name", ["run", "rebrem", "reline"])
+@pytest.mark.parametrize("command_name", ["start", "rebrem", "reline"])
 def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     calls = []
     monkeypatch.setattr(
@@ -438,12 +356,10 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     )
     monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
 
-    argv = [command_name, "hopg", "--fidelity", "survey", "--no-sync"]
     if command_name in ("rebrem", "reline"):
-        argv.append("--dry-run")
+        argv = ["hopg", "--fidelity", "survey", "--no-sync", "--dry-run"]
     else:
         argv = [
-            command_name,
             "standard",
             "-m",
             "hopg",
@@ -453,17 +369,9 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
             "--headless",
         ]
 
-    result = invoke(remote.command, argv)
+    result = invoke(getattr(remote, f"{command_name}_command"), argv)
 
-    if command_name == "run":
-        assert_legacy_run_result(result)
-    else:
-        assert result.exit_code == 0
-        assert result.stderr.count("is deprecated") == 1
-        assert (
-            f"pyrite checkpoint recompute {'brem' if command_name == 'rebrem' else 'line'} --remote"
-            in result.stderr
-        )
+    assert_clean_result(result)
     assert calls[0]["fidelity"] == "survey"
 
 
@@ -487,10 +395,9 @@ def test_remote_recompute_detach_skips_viewer_and_pull(monkeypatch, command_name
         lambda *_args, **_kwargs: pytest.fail("detached recompute must not pull"),
     )
 
-    result = invoke(remote.command, [command_name, "hopg", "--detach"])
+    result = invoke(getattr(remote, f"{command_name}_command"), ["hopg", "--detach"])
 
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
+    assert_clean_result(result)
 
 
 def test_run_profile_and_material_dispatch(monkeypatch):
@@ -512,8 +419,8 @@ def test_run_profile_and_material_dispatch(monkeypatch):
     )
 
     result = invoke(
-        remote.command,
-        ["run", "sub_100keV", "-m", "hopg", "--headless"],
+        remote.start_command,
+        ["sub_100keV", "-m", "hopg", "--headless"],
     )
 
     assert_legacy_run_result(result)
@@ -538,7 +445,7 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
+    result = invoke(remote.start_command, ["sub_100keV", "--headless"])
 
     assert_legacy_run_result(result)
     assert calls[0][0] == ["hopg", "mose2"]
@@ -563,7 +470,7 @@ def test_run_profile_without_membership_uses_catalog_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
+    result = invoke(remote.start_command, ["sub_100keV", "--headless"])
 
     assert_legacy_run_result(result)
     assert calls[0][0] == ["mose2", "hopg"]
@@ -615,75 +522,6 @@ def test_partial_pull_all_forwards_full_material_list(monkeypatch, tmp_path, fla
     assert seen["materials"] == ["hopg", "hbn", "mos2"]
     assert seen["kwargs"]["dataset"] == dataset
     assert seen["kwargs"]["grid"] is False
-
-
-@pytest.mark.parametrize("status", [1, 130])
-def test_logs_click_propagates_follow_status(monkeypatch, status):
-    monkeypatch.setattr(viewer, "tail_logs", lambda _jobid, _follow: status)
-
-    result = invoke(remote.command, ["logs", "--follow"])
-
-    assert_clean_result(
-        result,
-        exit_code=status,
-        stderr=message("remote logs") + "\n",
-    )
-
-
-def test_remote_click_preserves_resumable_exit(monkeypatch):
-    monkeypatch.setattr(viewer, "list_jobs", lambda: (_ for _ in ()).throw(SystemExit(75)))
-
-    result = invoke(remote.command, ["jobs"])
-
-    assert_clean_result(
-        result,
-        exit_code=75,
-        stderr=message("remote jobs") + "\n",
-    )
-
-
-def test_stop_previews_by_default_and_yes_executes(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "stop_jobs",
-        lambda materials, all_jobs, *, yes, profile: calls.append(
-            (materials, all_jobs, yes, profile)
-        ),
-    )
-
-    preview = invoke(remote.command, ["stop", "hopg"])
-    confirmed = invoke(remote.command, ["stop", "hopg", "--yes"])
-
-    assert_clean_result(preview, stderr=message("remote stop") + "\n")
-    assert_clean_result(confirmed, stderr=message("remote stop") + "\n")
-    assert calls == [(["hopg"], False, False, None), (["hopg"], False, True, None)]
-
-
-def test_stop_profile_dispatches_and_rejects_combinations(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "stop_jobs",
-        lambda materials, all_jobs, *, yes, profile: calls.append(
-            (materials, all_jobs, yes, profile)
-        ),
-    )
-
-    ok = invoke(remote.command, ["stop", "--profile", "sub_100keV", "--yes"])
-    assert_clean_result(ok, stderr=message("remote stop") + "\n")
-    assert calls == [([], False, True, "sub_100keV")]
-
-    with_materials = invoke(remote.command, ["stop", "hopg", "--profile", "sub_100keV"])
-    assert with_materials.exit_code == 2
-    assert "--profile does not take material names or --all" in with_materials.stderr
-
-    with_all = invoke(remote.command, ["stop", "--all", "--profile", "sub_100keV"])
-    assert with_all.exit_code == 2
-
-    bare = invoke(remote.command, ["stop"])
-    assert bare.exit_code == 2
-    assert "--profile" in bare.stderr
 
 
 def test_clear_implicit_profile_uses_catalog_materials(monkeypatch):

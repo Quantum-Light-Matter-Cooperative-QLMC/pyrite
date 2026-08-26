@@ -15,8 +15,6 @@ _COMMANDS = {
     "merge": "pyrite.checkpoints.archive.union_command",
     "gc": "pyrite.cli.commands.cleanup.gc_command",
     "rm": "pyrite.cli.commands.cleanup.rm_command",
-    "prune": "pyrite.cli.commands.cleanup.gc_command",
-    "clear": "pyrite.cli.commands.cleanup.rm_command",
 }
 
 _COMMAND_HELP = {
@@ -28,8 +26,6 @@ _COMMAND_HELP = {
     "merge": "Merge a shelved checkpoint into active slot.",
     "gc": "Reclaim records obsolete under current scan profiles.",
     "rm": "Delete local datasets and newly unreachable shared cases.",
-    "prune": "Retired spelling of `gc`.",
-    "clear": "Retired spelling of `rm`.",
 }
 
 _RECOMPUTE_COMMANDS = {
@@ -59,14 +55,10 @@ def recompute_command() -> None:
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
-    lazy_hidden={"prune", "clear"},
     no_args_is_help=True,
 )
 def command() -> None:
     """Inspect, transform, recompute, archive, and reclaim local checkpoints.
-
-    Existing top-level paths such as ``pyrite slim`` and ``pyrite archive`` remain
-    compatibility aliases.
 
     \b
     Examples:

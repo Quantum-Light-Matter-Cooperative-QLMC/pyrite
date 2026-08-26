@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from .._core import CLIError, DeprecatingGroup, confirm_destructive, emit_result, hidden_alias
+from .._core import CLIError, confirm_destructive, emit_result
 
 _PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
@@ -74,12 +74,7 @@ def analyze(name: str, performance_dir: Path, sample_period: float) -> int:
     return 0
 
 
-@click.group("performance", cls=DeprecatingGroup, no_args_is_help=True)
-def command():
-    """List, analyze, or delete local compute-performance artifacts."""
-
-
-@command.command("list")
+@click.command("list")
 @click.argument("profiles", nargs=-1, callback=_profile_names)
 @click.option(
     "--performance-dir",
@@ -104,7 +99,7 @@ def list_command(profiles, performance_dir):
     return 0
 
 
-@command.command("analyze")
+@click.command("analyze")
 @click.argument("name", callback=_profile_name)
 @click.option(
     "--performance-dir",
@@ -126,7 +121,7 @@ def analyze_command(name, performance_dir, sample_period):
     return analyze(name, performance_dir, sample_period)
 
 
-@command.command("rm")
+@click.command("rm")
 @click.argument("profiles", nargs=-1, callback=_profile_names)
 @click.option("--all", "all_profiles", is_flag=True, help="Select every local profile.")
 @click.option("-y", "--yes", is_flag=True, help="Delete exact previewed profile directories.")
@@ -169,5 +164,3 @@ def rm_command(profiles, all_profiles, yes, performance_dir):
     emit_result(f"deleted {len(selected)} local performance profile(s)")
     return 0
 
-
-hidden_alias(command, rm_command, "prune")

@@ -1,6 +1,6 @@
 """Independent regeneration of tests/data/material_catalog_golden.json.
 
-`pyrite energy-grid regen-golden` rebuilds the serialized catalog snapshot the
+`pyrite-dev regen-golden` rebuilds the serialized catalog snapshot the
 material-catalog golden test asserts against. It re-loads materials.toml from
 disk via ``load_material_catalog`` (NOT the process-global ``CATALOG`` singleton)
 so the regenerated golden always reflects on-disk state after a
@@ -32,7 +32,7 @@ GOLDEN_PATH = (
 )
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
 _SOURCE_CHECKOUT_ERROR = (
-    "error: `pyrite energy-grid regen-golden` is source-checkout-only; installed wheels "
+    "error: `pyrite-dev regen-golden` is source-checkout-only; installed wheels "
     "do not contain tests/data/material_catalog_golden.json. Run it from an editable "
     "PyRITE source checkout."
 )

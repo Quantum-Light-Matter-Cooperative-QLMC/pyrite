@@ -9,7 +9,7 @@ import numpy as np
 
 from pyrite import cli
 from pyrite.cli import _catalog_io
-from pyrite.cli.commands import material, sweep
+from pyrite.cli.commands import material
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -159,60 +159,6 @@ def test_unknown_names_report_actionable_errors(tmp_path, monkeypatch):
     assert "unknown profile: missing" in unknown_profile.stderr
 
 
-def test_hidden_sweep_paths_warn_and_delegate(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
-
-    shown = invoke(sweep.command, ["show", "hopg", "-o", "json"])
-    changed = invoke(
-        sweep.command,
-        ["set", "hopg", "--profile", "survey", "--azimuth", "100"],
-    )
-
-    assert shown.exit_code == 0
-    assert json.loads(shown.stdout)["schema"] == "cxr.sweep.show"
-    assert "use 'pyrite material show hopg'" in shown.stderr
-    assert changed.exit_code == 0
-    assert "use 'pyrite material set hopg --profile survey'" in changed.stderr
-    assert "tilt_azim_deg = {values = [100.0]}" in catalog.read_text()
-
-
-def test_hidden_sweep_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
-
-    result = invoke(
-        sweep.command,
-        [
-            "set",
-            "mose2",
-            "--profile",
-            "survey",
-            "--energy",
-            "40",
-            "--energy",
-            "50:70:20",
-        ],
-    )
-
-    assert result.exit_code == 0
-    assert "use 'pyrite material set mose2 --profile survey'" in result.stderr
-    assert "energy_keV = {values = [40.0, 50.0, 70.0]}" in catalog.read_text()
-
-
-def test_hidden_sweep_show_without_material_preserves_overview(tmp_path, monkeypatch):
-    _catalog(tmp_path, monkeypatch)
-
-    result = invoke(sweep.command, ["show", "-o", "json"])
-
-    assert result.exit_code == 0
-    document = json.loads(result.stdout)
-    assert document["schema"] == "cxr.sweep.show"
-    assert [row["name"] for row in document["payload"]["profiles"]] == [
-        "standard",
-        "survey",
-    ]
-    assert "use 'pyrite profile list'" in result.stderr
-
-
 def test_root_and_group_help_expose_new_ownership_only():
     root = invoke(cli.command, ["--help"])
     profile_help = invoke(cli.command, ["profile", "--help"])
@@ -224,7 +170,7 @@ def test_root_and_group_help_expose_new_ownership_only():
     assert "\n  catalog " not in root.stdout
     assert "\n  sweep " not in root.stdout
     assert_clean_result(profile_help)
-    assert "members" in profile_help.stdout
+    assert "\n  members " not in profile_help.stdout
     assert "add-material" not in profile_help.stdout
     assert "remove-material" not in profile_help.stdout
     assert_clean_result(material_help)

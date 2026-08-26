@@ -37,11 +37,6 @@ from pyrite.cli.commands._filter_shared import (
     physical_detector_row,
 )
 from pyrite.cli.commands._profile_members import (
-    add_material_command,
-    members_command,
-    remove_material_command,
-)
-from pyrite.cli.commands._profile_members import (
     add_membership as _add_membership,
 )
 from pyrite.cli.commands._profile_members import (
@@ -290,7 +285,6 @@ class _ProfileGroup(LazyGroup):
     lazy_commands={"energy-grid": "pyrite.cli.commands.energy_grid_surface.profile_command"},
     lazy_help={"energy-grid": "Manage profile-scoped energy-grid derivation inputs."},
     no_args_is_help=True,
-    deprecation_prefix="profile",
 )
 def command():
     """Manage catalog scan profiles (named campaign defaults).
@@ -597,30 +591,6 @@ def filter_rm_command(profile_name, identifier, dry_run):
     )
 
 
-@command.command("analyze", hidden=True)
-@click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.option(
-    "--performance-dir",
-    type=click.Path(path_type=Path, file_okay=False),
-    default=Path("performance-profiles"),
-    show_default=True,
-    help="Directory containing NAME's local or pulled NDJSON logs.",
-)
-@click.option(
-    "--sample-period",
-    type=click.FloatRange(min=0, min_open=True),
-    default=5.0,
-    show_default=True,
-    metavar="SECONDS",
-    help="Expected sampling period; intervals over twice this value are gaps.",
-)
-def analyze_command(name, performance_dir, sample_period):
-    """Deprecated compatibility alias for ``performance analyze``."""
-    from pyrite.cli.commands.performance import analyze
-
-    return analyze(name, performance_dir, sample_period)
-
-
 @command.command("list")
 @output_option
 def list_command(json_output):
@@ -717,7 +687,6 @@ def show_command(name, json_output):
     "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    retired=["--materials"],
     help="Set explicit initial membership (comma-separated material keys).",
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -799,7 +768,6 @@ def create_command(
     "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    retired=["--materials"],
     help="Replace explicit membership with comma-separated material keys.",
 )
 @click.option(
@@ -927,7 +895,6 @@ def _apply_emission_remove(name, target, coherent, incoherent):
     "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    retired=["--materials"],
     help="Add comma-separated material keys to explicit membership.",
 )
 @click.option(
@@ -1008,7 +975,6 @@ def add_command(
     "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    retired=["--materials"],
     help="Remove comma-separated material keys from explicit membership.",
 )
 @click.option("--coherent", is_flag=True, help="Remove coherent emission from the mode set.")
@@ -1176,7 +1142,3 @@ def delete_command(name, yes, dry_run, json_output):
     emit_result(f"deleted profile {name}")
     return 0
 
-
-command.add_command(members_command)
-command.add_command(add_material_command)
-command.add_command(remove_material_command)

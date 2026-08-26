@@ -11,6 +11,8 @@ from pyrite.cli import command as root_command
 from pyrite.cli.commands import job as job_cli
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
+from pyrite.energy_grid import apply as _energy_grid_apply  # noqa: F401 - binds the submodule
+from pyrite.energy_grid import defaults as _energy_grid_defaults  # noqa: F401 - binds it
 from pyrite.remote import lifecycle, viewer
 from pyrite.runs import blaze, scan
 from tests.helpers.cli import invoke
@@ -54,7 +56,8 @@ def test_remote_jobs_human_output_accepts_six_field_transport(monkeypatch):
     assert result.stderr == ""
 
 
-def test_output_selector_keeps_json_alias_compatible_and_hidden(monkeypatch):
+def test_output_selector_is_the_only_machine_output_door(monkeypatch):
+    """`--json` retired at 0.3.0; `-o/--output` carries the contract alone."""
     monkeypatch.setattr(
         viewer,
         "jobs_raw",
@@ -66,27 +69,12 @@ def test_output_selector_keeps_json_alias_compatible_and_hidden(monkeypatch):
     wide = invoke(root_command, ["job", "list", "-o", "wide"])
     help_result = invoke(root_command, ["job", "list", "--help"])
 
-    assert canonical.exit_code == retired.exit_code == wide.exit_code == 0
-    assert canonical.stdout == retired.stdout
+    assert canonical.exit_code == wide.exit_code == 0
     assert canonical.stderr == wide.stderr == ""
-    assert "warning: '--json' is deprecated" in retired.stderr
-    assert "use '--output json'" in retired.stderr
+    assert retired.exit_code == 2
+    assert "No such option" in retired.stderr
     assert "-o, --output [table|json|wide]" in help_result.stdout
     assert "--json" not in help_result.stdout
-
-
-@pytest.mark.parametrize(
-    "argv",
-    [
-        ["job", "list", "-o", "json", "--json"],
-        ["job", "list", "--json", "--output", "json"],
-    ],
-)
-def test_output_selector_conflicts_with_retired_json(argv):
-    result = invoke(root_command, argv)
-
-    assert result.exit_code == 2
-    assert "--json is the retired spelling of --output json; pass one, not both" in result.stderr
 
 
 def test_remote_status_json_fetches_full_detail(monkeypatch):
@@ -154,7 +142,7 @@ def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
 
     assert document["schema"] == "cxr.energy-grid.defaults"
     assert document["payload"]["source"] == "persisted"
-    result = invoke(profile_command, ["defaults", "--set", "-o", "json"])
+    result = invoke(profile_command, ["defaults", "--save-default", "-o", "json"])
     assert result.exit_code == 2
     assert result.stdout == ""
 

@@ -192,6 +192,10 @@ attach = viewer.attach
 _CLI_EXPORTS = frozenset(
     {
         "command",
+        "start_command",
+        "check_command",
+        "rebrem_command",
+        "reline_command",
         "remote_scan",
         "remote_check",
         "_ensure_utf8_stdio",

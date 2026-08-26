@@ -8,6 +8,7 @@ from ...remote import lifecycle, viewer
 from .. import _completion as _cli_completion
 from .._core import confirm_destructive, emit_result, output_option
 from . import remote as remote_cli
+from ._remote_actions import _cli_jobs, _cli_logs, _cli_status
 
 
 @click.group("job", no_args_is_help=True)
@@ -26,7 +27,7 @@ def command() -> None:
 @output_option
 def list_command(kind: str | None, json_output: bool):
     return remote_cli._invoke_action(
-        remote_cli._cli_jobs,
+        _cli_jobs,
         kind=kind,
         json_output=json_output,
     )
@@ -48,7 +49,7 @@ def list_command(kind: str | None, json_output: bool):
 @output_option
 def status_command(jobid: str | None, verbose: int, json_output: bool):
     return remote_cli._invoke_action(
-        remote_cli._cli_status,
+        _cli_status,
         jobid=jobid,
         verbose=verbose,
         attach=False,
@@ -66,7 +67,7 @@ def status_command(jobid: str | None, verbose: int, json_output: bool):
 @click.option("-f", "--follow", is_flag=True, help="Stream until interrupted.")
 def logs_command(jobid: str | None, follow: bool):
     return remote_cli._invoke_action(
-        remote_cli._cli_logs,
+        _cli_logs,
         jobid=jobid,
         follow=follow,
     )

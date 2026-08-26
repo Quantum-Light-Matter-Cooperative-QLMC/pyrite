@@ -21,18 +21,17 @@ default. `PYRITE_PROFILE` and `PYRITE_REMOTE_HOST` are the environment tiers.
 narrows it to one material. Compute-performance measurement is isolated
 behind `pyrite-dev perf PROFILE`; it accepts the same selectors.
 
-Checkpoint operations use the grouped `pyrite checkpoint ...` paths. Legacy
+Checkpoint operations use the grouped `pyrite checkpoint ...` paths. The
 top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,
-and `union` paths remain callable compatibility aliases but are hidden
-from root help.
+and `union` spellings were removed at 0.3.0 and now exit as unknown
+commands.
 
 Validation uses `pyrite app validation` and `pyrite material validate`; the
-Zhai reproduction uses `pyrite run --preset zhai --remote`. Legacy `check`,
-`check-config`, `remote validate`, and `remote check` paths remain hidden
-compatibility aliases. Remote runs use `pyrite run --remote`; retired
-`remote run`, `scan`, `submit`, and `start` paths are hidden or absent.
-Energy-grid job lifecycle uses the top-level `pyrite job ...` paths; former
-`pyrite energy-grid` job paths remain hidden aliases.
+Zhai reproduction uses `pyrite run --preset zhai --remote`. Remote runs use
+`pyrite run --remote`. The `check`, `check-config`, `remote run`,
+`remote validate`, and `remote check` spellings were removed at 0.3.0.
+Energy-grid job lifecycle uses the top-level `pyrite job ...` paths; the
+former `pyrite energy-grid` job paths were removed at the same time.
 User grid derivation and inspection live below `pyrite material energy-grid`;
 profile derivation defaults live below `pyrite profile energy-grid`.
 Artifact mutation and verification use `pyrite-dev energy-grid`.
@@ -167,7 +166,7 @@ Commands:
 ## `pyrite app analysis`
 
 ```text
-Usage: pyrite app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
+Usage: pyrite app analysis [OPTIONS] COMMAND [ARGS]...
 
   Launch the interactive analysis application with marimo run or edit.
 
@@ -175,14 +174,7 @@ Usage: pyrite app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
   later no-argument launches.
 
 Options:
-  -d, --save-default  Persist MATERIAL as default for future no-argument runs.
-  --watch             Reload app when source files change.
-  --smoke             Execute app once headlessly and exit.
-  --edit              Use `marimo edit` instead of `marimo run`.
-  --acp               Start local Claude and Codex ACP bridges.
-  --tunnel            Bind fixed port for SSH tunneling.
-  --no-token          Disable marimo auth token.
-  -h, --help          Show this message and exit.
+  -h, --help  Show this message and exit.
 
 Commands:
   export  Render the analysis application to static HTML.
@@ -226,7 +218,7 @@ Options:
 ## `pyrite app viewer`
 
 ```text
-Usage: pyrite app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
+Usage: pyrite app viewer [OPTIONS] COMMAND [ARGS]...
 
   Launch the interactive 3D viewer with marimo run or edit.
 
@@ -236,14 +228,7 @@ Usage: pyrite app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
   later no-argument launches.
 
 Options:
-  -d, --save-default  Persist MATERIAL as default for future no-argument runs.
-  --watch             Reload app when source files change.
-  --smoke             Execute app once headlessly and exit.
-  --edit              Use `marimo edit` instead of `marimo run`.
-  --acp               Start local Claude and Codex ACP bridges.
-  --tunnel            Bind fixed port for SSH tunneling.
-  --no-token          Disable marimo auth token.
-  -h, --help          Show this message and exit.
+  -h, --help  Show this message and exit.
 
 Commands:
   export  Render the viewer as static HTML without starting marimo.
@@ -288,15 +273,11 @@ Options:
 ## `pyrite app validation`
 
 ```text
-Usage: pyrite app validation [OPTIONS] [COMMAND] [ARGS]...
+Usage: pyrite app validation [OPTIONS] COMMAND [ARGS]...
 
   Launch the interactive validation application, or export cached figures.
 
 Options:
-  --watch     Pass marimo's --watch.
-  --edit      Use `marimo edit` instead of `marimo run`.
-  --acp       Start local Claude and Codex ACP bridges.
-  --tunnel    Use fixed port for SSH tunneling.
   -h, --help  Show this message and exit.
 
 Commands:
@@ -340,9 +321,6 @@ Options:
 Usage: pyrite checkpoint [OPTIONS] COMMAND [ARGS]...
 
   Inspect, transform, recompute, archive, and reclaim local checkpoints.
-
-  Existing top-level paths such as ``pyrite slim`` and ``pyrite archive`` remain
-  compatibility aliases.
 
   Examples:
     pyrite checkpoint list

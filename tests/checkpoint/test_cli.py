@@ -24,8 +24,6 @@ def test_checkpoint_group_exposes_resource_oriented_tree():
         "merge",
         "gc",
         "rm",
-        "prune",
-        "clear",
     ]
 
 
@@ -60,13 +58,16 @@ def test_checkpoint_gc_dispatches_existing_handler(monkeypatch):
     assert seen == {"all_profiles": False, "catalog_profile": "sub_100keV", "yes": True}
 
 
-def test_hidden_top_level_checkpoint_alias_warns_once(monkeypatch):
+def test_canonical_recompute_line_dispatches_without_a_diagnostic(monkeypatch):
+    """`pyrite reline` retired at 0.3.0; the grouped path is the only door."""
     seen = {}
     monkeypatch.setattr(recompute_cli, "_line_cli", lambda args: seen.update(vars(args)))
 
-    result = invoke(root_command, ["reline", "hopg"])
+    result = invoke(root_command, ["checkpoint", "recompute", "line", "hopg"])
+    retired = invoke(root_command, ["reline", "hopg"])
 
     assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "use 'pyrite checkpoint recompute line'" in result.stderr
+    assert "is deprecated" not in result.stderr
     assert seen["material"] == ["hopg"]
+    assert retired.exit_code == 2
+    assert "No such command" in retired.stderr

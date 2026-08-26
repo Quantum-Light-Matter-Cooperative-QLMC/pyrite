@@ -7,9 +7,14 @@ target. This module owns (a) and (b); that document is generated
 from `DEPRECATIONS` by ``pyrite-dev cli-deprecations``.
 
 The support window is two minor releases: a spelling deprecated in 0.1.0 is
-removed in 0.3.0. `tests/cli/test_deprecations.py` holds the registry to the
+removed in 0.3.0. `tests/cli/test_deprecations.py` holds the registries to the
 live command tree in both directions, so a new hidden alias cannot land
-without a row and a row cannot outlive the alias it describes.
+without a row and a row cannot outlive the alias it describes, and
+`tests/test_deprecation_schedule.py` holds every row to the shipping
+`__version__` so a removal target cannot pass unnoticed again.
+
+Both registries are empty at 0.3.0: the 0.1.0 cohort reached its target and was
+removed. What remains here is the substrate, not leftovers.
 """
 
 from __future__ import annotations
@@ -45,134 +50,22 @@ def _entry(path: str, replacement: str, *, since: str = "0.1.0", note: str = "")
 
 
 #: Keyed by full command path as the user types it, minus the ``pyrite`` prefix.
-DEPRECATIONS: dict[str, Deprecation] = {
-    entry.path: entry
-    for entry in (
-        # Flat checkpoint verbs, retired into the `checkpoint` noun.
-        _entry("slim", "pyrite checkpoint slim"),
-        _entry("rebrem", "pyrite checkpoint recompute brem"),
-        _entry("reline", "pyrite checkpoint recompute line"),
-        _entry("archive", "pyrite checkpoint archive"),
-        _entry("restore", "pyrite checkpoint restore"),
-        _entry("archives", "pyrite checkpoint list"),
-        _entry("union", "pyrite checkpoint merge"),
-        _entry("prune", "pyrite checkpoint gc"),
-        # D4 verb collapse: `prune` (reclaim obsolete) became `gc`; `clear`
-        # (delete an explicit target) became `rm`.
-        _entry("checkpoint prune", "pyrite checkpoint gc"),
-        _entry("checkpoint clear", "pyrite checkpoint rm"),
-        # Change 7: configuration helpers remain user workflows but move below
-        # the retained `config` noun. Derived-artifact maintenance leaves the
-        # user CLI for `pyrite-dev`.
-        _entry("setup", "pyrite config setup"),
-        _entry("completion install", "pyrite config completion install"),
-        _entry("completion remove", "pyrite config completion remove"),
-        _entry("performance analyze", "pyrite-dev performance analyze"),
-        _entry("performance list", "pyrite-dev performance list"),
-        _entry("performance rm", "pyrite-dev performance rm"),
-        _entry("performance prune", "pyrite-dev performance rm"),
-        # Retired scan-range group. Each leaf has its own canonical spelling,
-        # so the rows sit on the leaves rather than on the `sweep` group.
-        _entry(
-            "sweep show",
-            "pyrite material show",
-            note="With no MATERIAL argument, use `pyrite profile list`.",
-        ),
-        _entry(
-            "sweep set",
-            "pyrite material set",
-            note="The warning names the material and profile actually given.",
-        ),
-        # Config/validation spellings.
-        _entry("check", "pyrite material validate"),
-        _entry("check-config", "pyrite profile show"),
-        # D1: app actions are explicit leaves; implicit group launch remains a
-        # compatibility callback through the removal window.
-        _entry("app analysis", "pyrite app analysis launch"),
-        _entry("app viewer", "pyrite app viewer launch"),
-        _entry("app validation", "pyrite app validation launch"),
-        # Flat energy-grid job verbs, retired into the `job` subgroup.
-        _entry("energy-grid attach", "pyrite job attach"),
-        _entry("energy-grid logs", "pyrite job logs"),
-        _entry("energy-grid status", "pyrite job status"),
-        _entry("energy-grid stop", "pyrite job stop"),
-        _entry("energy-grid job attach", "pyrite job attach"),
-        _entry("energy-grid job logs", "pyrite job logs"),
-        _entry("energy-grid job status", "pyrite job status"),
-        _entry("energy-grid job stop", "pyrite job stop"),
-        _entry(
-            "energy-grid derive",
-            "pyrite material energy-grid derive",
-        ),
-        _entry("energy-grid show", "pyrite material energy-grid show"),
-        _entry("energy-grid line show", "pyrite material energy-grid line show"),
-        _entry("energy-grid brem show", "pyrite material energy-grid brem show"),
-        _entry("energy-grid defaults", "pyrite profile energy-grid defaults"),
-        _entry("energy-grid add", "pyrite-dev energy-grid add"),
-        _entry("energy-grid line set", "pyrite-dev energy-grid line set"),
-        _entry("energy-grid brem set", "pyrite-dev energy-grid brem set"),
-        _entry("energy-grid rm", "pyrite-dev energy-grid rm"),
-        _entry("energy-grid verify", "pyrite-dev energy-grid verify"),
-        _entry("energy-grid gc", "pyrite-dev energy-grid gc"),
-        _entry("energy-grid regen-golden", "pyrite-dev regen-golden"),
-        _entry(
-            "energy-grid submit",
-            "pyrite material energy-grid derive --remote --detach",
-        ),
-        _entry(
-            "energy-grid apply",
-            "pyrite-dev energy-grid add",
-            note="The replacement creates an immutable artifact and repoints the resolved profile.",
-        ),
-        _entry(
-            "energy-grid line delete",
-            "pyrite-dev energy-grid rm",
-            note="The replacement repoints a profile; gc later reclaims unreachable bytes.",
-        ),
-        # Profile membership and performance spellings.
-        _entry("profile add-material", "pyrite profile add NAME --material MATERIAL,..."),
-        _entry("profile remove-material", "pyrite profile remove NAME --material MATERIAL,..."),
-        _entry("profile analyze", "pyrite-dev performance analyze NAME"),
-        # `profile members` stays reachable; `set/add/remove --material` is
-        # canonical, and each membership verb maps to a different one.
-        _entry("profile members set", "pyrite profile set NAME --material MATERIAL,..."),
-        _entry("profile members add", "pyrite profile add NAME --material MATERIAL,..."),
-        _entry("profile members remove", "pyrite profile remove NAME --material MATERIAL,..."),
-        _entry("profile members reset", "pyrite profile set NAME --all-materials"),
-        # Remote namespace: `profile` here meant the performance profile. The row
-        # sits on the leaf so the warning names a runnable command, not a group.
-        _entry("remote profile pull", "pyrite remote performance pull"),
-        _entry("remote run", "pyrite run --remote"),
-        _entry("remote validate", "pyrite run --preset zhai --remote"),
-        _entry("remote check", "pyrite run --preset zhai --remote"),
-        _entry("remote rebrem", "pyrite checkpoint recompute brem --remote"),
-        _entry("remote reline", "pyrite checkpoint recompute line --remote"),
-        _entry("remote jobs", "pyrite job list"),
-        _entry("remote status", "pyrite job status"),
-        _entry("remote logs", "pyrite job logs"),
-        _entry("remote stop", "pyrite job stop"),
-        # D4 verb collapse in the remote namespace. `gc` runs both halves the
-        # retired `prune` (obsolete records) and `reap` (orphaned reservations)
-        # spellings ran separately, so both rows point at it.
-        _entry("remote clear", "pyrite remote rm"),
-        _entry("remote prune", "pyrite remote gc"),
-        _entry(
-            "remote reap",
-            "pyrite remote gc",
-            note="`gc` also drops obsolete records; use `--min-age-minutes` as before.",
-        ),
-        _entry("remote performance prune", "pyrite remote performance rm"),
-    )
-}
+#:
+#: Empty as of 0.3.0. Every row carried `deprecated_in="0.1.0"`, and a two-minor
+#: window closes at 0.3.0, so the 68 command spellings and the aliases behind
+#: them were removed together rather than drifting past their own schedule
+#: (issue #68). The machinery below -- `DeprecatingGroup`, `RetiredOption`,
+#: `canonical_option`, `hidden_alias` -- is deliberately retained: ADR-0002
+#: requires it for the next rename, and `tests/cli/test_deprecations.py`
+#: still exercises it against a locally declared command.
+DEPRECATIONS: dict[str, Deprecation] = {}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
 #: command computes it and calls `warn(path, replacement=...)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
-#: with the registry's generic replacement.
-SELF_WARNING: frozenset[str] = frozenset(
-    {"remote validate", "remote check", "sweep show", "sweep set"}
-)
+#: with the registry's generic replacement. Empty while `DEPRECATIONS` is.
+SELF_WARNING: frozenset[str] = frozenset()
 
 
 def message(path: str, *, replacement: str | None = None) -> str:
@@ -312,113 +205,12 @@ def _flag(
 #: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
 #: it does for `DEPRECATIONS`.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
-    entry.key: entry
-    for entry in (
-        # D5: one canonical name per quantity. The singular spellings were
-        # already canonical on `material set`, `sweep set`, and `profile *`;
-        # these are the stragglers that kept the plural.
-        *(
-            _flag(command, retired, replacement)
-            for command in ("energy-grid derive", "material energy-grid derive")
-            for retired, replacement in (
-                ("--energies", "--energy"),
-                ("--tilts", "--polar"),
-                ("--azimuths", "--azimuth"),
-                ("--materials", "--material"),
-            )
-        ),
-        _flag("energy-grid submit", "--energies", "--energy"),
-        _flag("energy-grid submit", "--tilts", "--polar"),
-        _flag("energy-grid submit", "--azimuths", "--azimuth"),
-        _flag("energy-grid submit", "--materials", "--material"),
-        *(
-            _flag(command, "--tilts", "--polar")
-            for command in ("energy-grid defaults", "profile energy-grid defaults")
-        ),
-        *(
-            _flag(command, "--azimuths", "--azimuth")
-            for command in ("energy-grid defaults", "profile energy-grid defaults")
-        ),
-        *(
-            _flag(command, "--materials", "--material")
-            for command in ("energy-grid add", "pyrite-dev energy-grid add")
-        ),
-        _flag("energy-grid apply", "--materials", "--material"),
-        _flag("material blaze", "--angles", "--polar"),
-        _flag("profile create", "--materials", "--material"),
-        _flag("profile set", "--materials", "--material"),
-        _flag("profile add", "--materials", "--material"),
-        _flag("profile remove", "--materials", "--material"),
-        # D5 persist-as-default: one `--save-default` everywhere.
-        *(
-            _flag(command, "--set-default", "--save-default")
-            for command in ("energy-grid derive", "material energy-grid derive")
-        ),
-        _flag("energy-grid submit", "--set-default", "--save-default"),
-        *(
-            _flag(command, "--set", "--save-default")
-            for command in ("energy-grid defaults", "profile energy-grid defaults")
-        ),
-        _flag("app analysis", "--default", "--save-default"),
-        _flag("app viewer", "--default", "--save-default"),
-        _flag("app analysis launch", "--default", "--save-default"),
-        _flag("app viewer launch", "--default", "--save-default"),
-        # D5 output selection: JSON remains supported through the stable
-        # extensible output selector; the boolean spelling is retired.
-        _flag("run", "--json", "--output json"),
-        _flag("rebrem", "--json", "--output json"),
-        _flag("reline", "--json", "--output json"),
-        _flag("archives", "--json", "--output json"),
-        _flag("checkpoint list", "--json", "--output json"),
-        _flag("checkpoint recompute brem", "--json", "--output json"),
-        _flag("checkpoint recompute line", "--json", "--output json"),
-        _flag("remote jobs", "--json", "--output json"),
-        _flag("remote pull", "--json", "--output json"),
-        _flag("remote status", "--json", "--output json"),
-        _flag("job list", "--json", "--output json"),
-        _flag("job status", "--json", "--output json"),
-        *(
-            _flag(command, "--json", "--output json")
-            for command in ("energy-grid defaults", "profile energy-grid defaults")
-        ),
-        *(
-            _flag(command, "--json", "--output json")
-            for command in ("energy-grid show", "material energy-grid show")
-        ),
-        _flag("energy-grid status", "--json", "--output json"),
-        _flag("energy-grid job status", "--json", "--output json"),
-        *(
-            _flag(command, "--json", "--output json")
-            for command in ("energy-grid rm", "pyrite-dev energy-grid rm")
-        ),
-        _flag("energy-grid line delete", "--json", "--output json"),
-        *(
-            _flag(command, "--json", "--output json")
-            for command in ("energy-grid line show", "material energy-grid line show")
-        ),
-        *(
-            _flag(command, "--json", "--output json")
-            for command in ("energy-grid brem show", "material energy-grid brem show")
-        ),
-        _flag("sweep show", "--json", "--output json"),
-        _flag("profile delete", "--json", "--output json"),
-        _flag("profile list", "--json", "--output json"),
-        _flag("profile show", "--json", "--output json"),
-        _flag("profile numerics show", "--json", "--output json"),
-        _flag("profile filter list", "--json", "--output json"),
-        _flag("profile filter show", "--json", "--output json"),
-        _flag("material show", "--json", "--output json"),
-        _flag("material simulate", "--json", "--output json"),
-        _flag("material blaze", "--json", "--output json"),
-        _flag("beam delete", "--json", "--output json"),
-        _flag("beam list", "--json", "--output json"),
-        _flag("beam show", "--json", "--output json"),
-        _flag("detector delete", "--json", "--output json"),
-        _flag("detector list", "--json", "--output json"),
-        _flag("detector show", "--json", "--output json"),
-    )
-}
+#:
+#: Empty as of 0.3.0: the D5 spellings were deprecated in 0.1.0, and a
+#: two-minor window closes at 0.3.0. `RetiredOption` and `canonical_option`
+#: below stay -- they are the substrate ADR-0002 requires for the next rename,
+#: not leftovers from this one.
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

@@ -4,7 +4,6 @@ import click
 
 from ...remote import config, lifecycle
 from .. import _completion as _cli_completion
-from .. import _deprecations
 from .._core import (
     FINITE_FLOAT,
     NONNEGATIVE_FLOAT,
@@ -14,7 +13,6 @@ from .._core import (
     CLIError,
     emit_diagnostic,
     fidelity_option,
-    hidden_alias,
     output_option,
     run,
 )
@@ -22,8 +20,6 @@ from .._deprecations import DeprecatingGroup
 from ._remote_actions import (
     _cli_check,
     _cli_clear,
-    _cli_jobs,
-    _cli_logs,
     _cli_performance_list,
     _cli_performance_prune,
     _cli_profile_pull,
@@ -35,8 +31,6 @@ from ._remote_actions import (
     _cli_rebrem,
     _cli_reline,
     _cli_start,
-    _cli_status,
-    _cli_stop,
     _cli_sync,
     _ensure_utf8_stdio,
     _performance_profile_name,
@@ -66,7 +60,6 @@ def _reject_all_with_values(command_name, all_, values):
 @click.group(
     "remote",
     cls=DeprecatingGroup,
-    deprecation_prefix="remote",
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
         "Host, remote directory, and executable come from PYRITE_REMOTE_HOST, "
@@ -116,9 +109,8 @@ def _recompute_options(function):
     )(function)
 
 
-@command.command(
+@click.command(
     "rebrem",
-    hidden=True,
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
@@ -163,9 +155,8 @@ def rebrem_command(
     )
 
 
-@command.command(
+@click.command(
     "reline",
-    hidden=True,
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
@@ -499,95 +490,6 @@ def start_command(
     )
 
 
-start_command.hidden = True
-command.add_command(start_command)
-
-
-@command.command("jobs", hidden=True, help="List jobs with SLURM IDs, materials, and last events.")
-@output_option
-def jobs_command(json_output):
-    return _invoke_action(_cli_jobs, json_output=json_output)
-
-
-@command.command(
-    "status",
-    hidden=True,
-    help=(
-        "Show one job; use -v for allocation and -vv for logs.\n\n"
-        "By default prints one snapshot and exits. Use -a/--attach to "
-        "continuously monitor the same dashboard, reconnecting until the job is "
-        "terminal; Ctrl-C detaches the viewer only and the job keeps running."
-    ),
-)
-@click.argument(
-    "jobid",
-    required=False,
-    metavar="[JOBID]",
-    shell_complete=_cli_completion.complete_job_id,
-)
-@click.option(
-    "-v",
-    "--verbose",
-    count=True,
-    help="Add allocation detail; repeat for case progress and recent logs.",
-)
-@click.option(
-    "-a",
-    "--attach",
-    is_flag=True,
-    help="Continuously monitor the dashboard until interrupted; Ctrl-C detaches viewer only.",
-)
-@output_option
-def status_command(jobid, verbose, attach, json_output):
-    if attach and json_output:
-        raise click.UsageError(
-            "--attach streams a live dashboard and cannot be combined with --output json"
-        )
-    return _invoke_action(
-        _cli_status,
-        jobid=jobid,
-        verbose=verbose,
-        attach=attach,
-        json_output=json_output,
-    )
-
-
-@command.command("logs", hidden=True, help="Show a job diagnostic log; defaults to latest.")
-@click.argument(
-    "jobid",
-    required=False,
-    metavar="[JOBID]",
-    shell_complete=_cli_completion.complete_job_id,
-)
-@click.option("-f", "--follow", is_flag=True, help="Stream live; Ctrl-C disconnects viewer.")
-def logs_command(jobid, follow):
-    return _invoke_action(_cli_logs, jobid=jobid, follow=follow)
-
-
-@command.group(
-    "profile",
-    cls=DeprecatingGroup,
-    help="Manage named compute-performance logs.",
-    hidden=True,
-)
-def profile_command():
-    pass
-
-
-@profile_command.command(
-    "pull",
-    help=(
-        "Fetch NDJSON logs and Nsight artifacts for PERFORMANCE_PROFILE from every "
-        "matching remote job into performance-profiles/PROFILE/<job>/."
-    ),
-)
-@click.argument(
-    "profile",
-    callback=_performance_profile_name,
-    metavar="PERFORMANCE_PROFILE",
-)
-def profile_pull_command(profile):
-    return _invoke_action(_cli_profile_pull, profile=profile)
 
 
 @command.group(
@@ -636,58 +538,6 @@ def performance_rm_command(profiles, all_profiles, yes):
         _cli_performance_prune,
         profiles=list(profiles),
         all_profiles=all_profiles,
-        yes=yes,
-    )
-
-
-@command.command(
-    "stop",
-    hidden=True,
-    help="cancel active SLURM job(s) by material, profile, or every live job.",
-)
-@click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
-@click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
-@click.option(
-    "--profile",
-    "catalog_profile",
-    default=None,
-    metavar="NAME",
-    help="Stop live job(s) submitted with this catalog profile.",
-)
-@click.option("-y", "--yes", is_flag=True, help="Cancel exact previewed jobs; otherwise preview.")
-def stop_command(materials, all_, catalog_profile, yes):
-    if all_ and materials:
-        raise click.UsageError("stop --all does not take material names")
-    if catalog_profile is not None and (materials or all_):
-        raise click.UsageError("stop --profile does not take material names or --all")
-    if not all_ and not materials and catalog_profile is None:
-        raise click.UsageError("stop needs material name(s), --profile, or --all")
-    return _invoke_action(
-        _cli_stop,
-        materials=list(materials),
-        all_=all_,
-        catalog_profile=catalog_profile,
-        yes=yes,
-    )
-
-
-@command.command(
-    "reap",
-    hidden=True,
-    help="Release orphaned checkpoint reservations; preview unless --yes.",
-)
-@click.option(
-    "--min-age-minutes",
-    type=NONNEGATIVE_FLOAT,
-    default=5.0,
-    show_default=True,
-    help="Only reap locks at least this old.",
-)
-@click.option("-y", "--yes", is_flag=True, help="Release reservations; otherwise preview.")
-def reap_command(min_age_minutes, yes):
-    return _invoke_action(
-        _cli_reap,
-        min_age_minutes=min_age_minutes,
         yes=yes,
     )
 
@@ -903,40 +753,6 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes):
 
 
 @command.command(
-    "prune",
-    hidden=True,
-    help=(
-        "Drop remote records obsolete under current scan profiles; preview "
-        "unless --yes. Defaults to profile=standard."
-    ),
-)
-@click.option(
-    "--all",
-    "all_profiles",
-    is_flag=True,
-    help="Prune current checkpoints for standard and every named catalog profile.",
-)
-@click.option(
-    "--profile",
-    "catalog_profile",
-    default=None,
-    metavar="NAME",
-    shell_complete=_cli_completion.complete_profile,
-    help="Prune current full and survey checkpoints for catalog profile NAME.",
-)
-@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed stale records.")
-def prune_command(all_profiles, catalog_profile, yes):
-    if all_profiles and catalog_profile is not None:
-        raise click.UsageError("prune --all cannot be combined with --profile")
-    return _invoke_action(
-        _cli_prune,
-        all_profiles=all_profiles,
-        catalog_profile=catalog_profile,
-        yes=yes,
-    )
-
-
-@command.command(
     "gc",
     help=(
         "Reclaim remote records obsolete under current scan profiles and release "
@@ -1022,7 +838,6 @@ def sync_command():
 
 @click.command(
     "validate",
-    hidden=True,
     help="Run Zhai reproduction remotely or pull existing caches.",
 )
 @click.option(
@@ -1078,13 +893,6 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
         raise click.UsageError("--follow requires --detached")
     if pull and detached:
         raise click.UsageError("--pull and --detached are mutually exclusive")
-    path = f"remote {ctx.info_name}"
-    replacement = (
-        "pyrite remote pull --preset zhai"
-        if pull
-        else "pyrite run --preset zhai --remote" + (" --detach" if detached else "")
-    )
-    _deprecations.warn(path, replacement=replacement)
     return _invoke_action(
         _cli_check,
         ne=ne,
@@ -1098,11 +906,6 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
         pull=pull,
     )
 
-
-command.add_command(check_command)
-hidden_alias(command, check_command, "check")
-hidden_alias(command, rm_command, "clear")
-hidden_alias(performance_command, performance_rm_command, "prune")
 
 
 def main(argv=None):

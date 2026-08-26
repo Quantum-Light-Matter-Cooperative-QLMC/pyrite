@@ -39,7 +39,6 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         (): ("Examples:", "pyrite run"),
         ("run",): ("minutes", "--preset"),
         ("remote",): ("PYRITE_REMOTE_HOST", "Examples:"),
-        ("remote", "run"): ("PROFILE selects", "-m, --material"),
         ("remote", "pull"): ("--preset", "grid-filtered"),
         ("material", "energy-grid"): ("detector energy-grid inputs", "Examples:"),
         ("material", "energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),

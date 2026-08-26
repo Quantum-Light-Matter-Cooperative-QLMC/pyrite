@@ -8,7 +8,6 @@ from importlib import import_module
 import click
 
 from .._core import LazyGroup
-from .._deprecations import warn_command
 
 _LEAVES = {
     "analysis": "pyrite.cli.commands.app.analysis_command",
@@ -32,60 +31,6 @@ class AppGroup(LazyGroup):
         loaded = _load(import_path)
         return loaded() if callable(loaded) and not isinstance(loaded, click.Command) else loaded
 
-    def resolve_command(
-        self, ctx: click.Context, args: list[str]
-    ) -> tuple[str | None, click.Command | None, list[str]]:
-        """Warn only for an implicit launch, not the canonical launch/export leaf."""
-        cmd_name, resolved, remaining = click.Group.resolve_command(self, ctx, args)
-        help_requested = any(arg in self.get_help_option_names(ctx) for arg in remaining)
-        explicit_leaf = (
-            isinstance(resolved, click.Group)
-            and bool(remaining)
-            and remaining[0] in resolved.commands
-        )
-        if cmd_name is not None and not help_requested and not explicit_leaf:
-            warn_command(ctx, cmd_name)
-        return cmd_name, resolved, remaining
-
-
-class LaunchLeafGroup(click.Group):
-    """Treat an unrecognised first token as the wrapped launch command's argv."""
-
-    def __init__(self, *args, launch: click.Command, **kwargs):
-        self.launch = launch
-        super().__init__(*args, params=[copy(param) for param in launch.params], **kwargs)
-
-    def get_params(self, ctx: click.Context) -> list[click.Parameter]:
-        """Keep wrapped launch parameters visible in help, but parse them downstream."""
-        return [param for param in super().get_params(ctx) if param not in self.params]
-
-    def format_usage(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        formatter.write_usage(ctx.command_path, "[OPTIONS] [MATERIAL] [COMMAND] [ARGS]...")
-
-    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        rows = [
-            record
-            for parameter in [*self.params, self.get_help_option(ctx)]
-            if parameter is not None and (record := parameter.get_help_record(ctx)) is not None
-        ]
-        if rows:
-            with formatter.section("Options"):
-                formatter.write_dl(rows)
-        self.format_commands(ctx, formatter)
-
-    def invoke(self, ctx: click.Context):
-        protected = ctx._protected_args
-        launches = (protected and protected[0] not in self.commands) or (
-            not protected and ctx.args and ctx.args[0].startswith("-")
-        )
-        if launches:
-            ctx.args = [*protected, *ctx.args]
-            ctx._protected_args = []
-            callback = self.callback
-            assert callback is not None
-            return ctx.invoke(callback)
-        return super().invoke(ctx)
-
 
 @click.command(cls=AppGroup, lazy_commands=_LEAVES, lazy_help=_HELP, no_args_is_help=True)
 def command() -> None:
@@ -103,20 +48,7 @@ def _launch_leaf(name: str, launch_path: str, export_path: str) -> click.Group:
     if not isinstance(launch, click.Command):
         raise TypeError(f"{launch_path!r} did not resolve to a Click command")
 
-    @click.pass_context
-    def dispatch(ctx: click.Context) -> None:
-        if ctx.invoked_subcommand is None:
-            launch.main(args=ctx.args, prog_name=ctx.command_path, standalone_mode=False)
-
-    leaf = LaunchLeafGroup(
-        name=name,
-        callback=dispatch,
-        launch=launch,
-        help=launch.help,
-        invoke_without_command=True,
-        no_args_is_help=False,
-        context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-    )
+    leaf = click.Group(name=name, help=launch.help, no_args_is_help=True)
     canonical_launch = copy(launch)
     canonical_launch.name = "launch"
     leaf.add_command(canonical_launch)
@@ -137,21 +69,11 @@ def viewer_command() -> click.Group:
 
 @click.group(
     "validation",
-    invoke_without_command=True,
-    no_args_is_help=False,
+    no_args_is_help=True,
     help="Launch the interactive validation application, or export cached figures.",
 )
-@click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
-@click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
-@click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
-@click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
-@click.pass_context
-def validation_command(
-    ctx: click.Context, watch: bool, edit: bool, acp: bool, tunnel: bool
-) -> None:
-    """Launch validation app when no nested command is selected."""
-    if ctx.invoked_subcommand is None:
-        _launch_validation(ctx, watch=watch, edit=edit, acp=acp, tunnel=tunnel)
+def validation_command() -> None:
+    """Launch or export cached validation figures."""
 
 
 @click.command("launch", help="Launch the interactive validation application.")

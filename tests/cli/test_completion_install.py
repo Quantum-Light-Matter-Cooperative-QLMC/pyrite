@@ -195,6 +195,7 @@ def test_project_only_venv_install_is_rejected(tmp_path, monkeypatch):
     result = invoke(
         root_command,
         [
+            "config",
             "completion",
             "install",
             "--shell",

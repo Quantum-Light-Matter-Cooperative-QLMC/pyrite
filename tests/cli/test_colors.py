@@ -14,7 +14,7 @@ def test_color_always_styles_help_and_human_result():
     runner = CliRunner()
 
     help_result = runner.invoke(cli.command, ["--color", "always", "--help"])
-    check_result = runner.invoke(cli.command, ["--color", "always", "check-config"])
+    check_result = runner.invoke(cli.command, ["--color", "always", "material", "validate"])
 
     assert help_result.exit_code == 0
     assert "\033[38;2;92;207;230mOptions\033[0m:" in help_result.stdout
@@ -42,7 +42,7 @@ def test_color_always_styles_usage_error_but_not_json(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--color", "always", "not-a-command"])
     error = capsys.readouterr()
-    machine = runner.invoke(cli.command, ["--color", "always", "archives", "-o", "json"])
+    machine = runner.invoke(cli.command, ["--color", "always", "checkpoint", "list", "-o", "json"])
 
     assert exc.value.code == 2
     assert "\033[38;2;240;113;120mError:\033[0m" in error.err

@@ -247,27 +247,23 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     from pyrite.remote import cli
 
-    command = cli.command.commands["run"]
+    command = cli.start_command
     assert _callback(command, "catalog_profile") is _cli_completion.complete_profile
     assert _callback(command, "material") is _cli_completion.complete_material
-    for name in ("rebrem", "reline"):
-        assert (
-            _callback(cli.command.commands[name], "material") is _cli_completion.complete_material
-        )
+    for name in ("rebrem_command", "reline_command"):
+        assert _callback(getattr(cli, name), "material") is _cli_completion.complete_material
     assert (
         _callback(cli.command.commands["pull"], "material")
         is _cli_completion.complete_remote_checkpoint_stem
     )
+    from pyrite.cli.commands.job import command as job_command
+
     for name in ("status", "logs"):
-        assert _callback(cli.command.commands[name], "jobid") is _cli_completion.complete_job_id
-    values = _parameter(cli.command.commands["run"], "parallel_materials").shell_complete(None, "")
+        assert _callback(job_command.commands[name], "jobid") is _cli_completion.complete_job_id
+    values = _parameter(command, "parallel_materials").shell_complete(None, "")
     assert _values(values) == ["1", "2", "3", "4"]
 
-    assert _callback(cli.command.commands["stop"], "materials") is None
-    assert _callback(cli.command.commands["clear"], "materials") is None
-    assert all(
-        param._custom_shell_complete is None for param in cli.command.commands["reap"].params
-    )
+    assert _callback(cli.command.commands["rm"], "materials") is None
 
 
 def test_remote_checkpoint_completion_includes_variant_stems():
@@ -282,36 +278,27 @@ def test_remote_checkpoint_completion_includes_positional_profiles():
     assert values == ["standard"]
 
 
-def test_line_grid_wires_safe_completion_but_not_stop_target():
-    from pyrite.cli.commands.energy_grid import command
+def test_line_grid_wires_safe_completion_on_its_canonical_owners():
+    from pyrite.cli.commands import energy_grid
 
-    for name in ("derive", "submit", "apply"):
+    for name in ("derive_command", "add_command"):
         assert (
-            _callback(command.commands[name], "materials") is _cli_completion.complete_material_csv
+            _callback(getattr(energy_grid, name), "materials")
+            is _cli_completion.complete_material_csv
         )
-    for name in ("show",):
-        assert _callback(command.commands[name], "material") is _cli_completion.complete_material
-    for band in ("line", "brem"):
-        for name in ("set", "show"):
-            assert (
-                _callback(command.commands[band].commands[name], "material")
-                is _cli_completion.complete_material
-            )
-    job = command.commands["job"]
-    for name in ("attach", "status", "logs"):
-        assert _callback(job.commands[name], "jobid") is _cli_completion.complete_job_id
-    assert _callback(job.commands["stop"], "jobid") is None
+    for name in ("show_command", "line_show_command", "brem_show_command"):
+        assert _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
+    for name in ("set_command", "set_brem_command"):
+        assert _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
 
 
-def test_profile_members_and_material_commands_wire_catalog_completion():
+def test_profile_and_material_commands_wire_catalog_completion():
     from pyrite.cli.commands import material, profile
 
-    members = profile.command.commands["members"]
     for name in ("set", "add", "remove"):
-        member_command = members.commands[name]
+        member_command = profile.command.commands[name]
         assert _callback(member_command, "name") is _cli_completion.complete_profile
-        assert _callback(member_command, "materials") is _cli_completion.complete_material
-    assert _callback(members.commands["reset"], "name") is _cli_completion.complete_profile
+        assert _callback(member_command, "materials") is _cli_completion.complete_material_csv
 
     for name in ("show", "set"):
         material_command = material.command.commands[name]

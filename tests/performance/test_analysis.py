@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from pyrite.cli.commands import performance, profile
+from pyrite.devtools.cli_commands import performance_command
 from pyrite.perf import performance_analysis
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -223,28 +223,6 @@ def test_analyze_rejects_schema_mismatch_without_creating_analysis(tmp_path):
     assert not (source.parents[1] / "analysis").exists()
 
 
-def test_profile_analyze_cli(tmp_path):
-    _write_profile(
-        tmp_path,
-        [_record(0, "start"), _record(5, "tick"), _record(10, "done")],
-    )
-
-    result = invoke(
-        profile.command,
-        [
-            "analyze",
-            "baseline",
-            "--performance-dir",
-            str(tmp_path / "performance-profiles"),
-        ],
-    )
-
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "pyrite-dev performance analyze NAME" in result.stderr
-    assert "analyzed 1 sessions (2 intervals)" in result.stdout
-
-
 def test_performance_analyze_cli(tmp_path):
     _write_profile(
         tmp_path,
@@ -252,7 +230,7 @@ def test_performance_analyze_cli(tmp_path):
     )
 
     result = invoke(
-        performance.command,
+        performance_command,
         [
             "analyze",
             "baseline",

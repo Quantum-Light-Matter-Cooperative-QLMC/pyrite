@@ -10,7 +10,6 @@ from pyrite.cli._core import LazyGroup
 @click.group(
     "performance",
     cls=LazyGroup,
-    deprecation_prefix="pyrite-dev performance",
     lazy_commands={
         "analyze": "pyrite.cli.commands.performance.analyze_command",
         "list": "pyrite.cli.commands.performance.list_command",
@@ -30,7 +29,6 @@ def performance_command() -> None:
 @click.group(
     "energy-grid",
     cls=LazyGroup,
-    deprecation_prefix="pyrite-dev energy-grid",
     lazy_commands={
         "add": "pyrite.cli.commands.energy_grid.add_command",
         "line": "pyrite.devtools.cli_commands.energy_grid_line_command",
@@ -56,7 +54,6 @@ def energy_grid_command() -> None:
 @click.group(
     "line",
     cls=LazyGroup,
-    deprecation_prefix="pyrite-dev energy-grid line",
     lazy_commands={"set": "pyrite.cli.commands.energy_grid.set_command"},
     lazy_help={"set": "Set one line-grid row by repointing an immutable artifact."},
     no_args_is_help=True,
@@ -68,7 +65,6 @@ def energy_grid_line_command() -> None:
 @click.group(
     "brem",
     cls=LazyGroup,
-    deprecation_prefix="pyrite-dev energy-grid brem",
     lazy_commands={"set": "pyrite.cli.commands.energy_grid.set_brem_command"},
     lazy_help={"set": "Set a bremsstrahlung grid by repointing an immutable artifact."},
     no_args_is_help=True,

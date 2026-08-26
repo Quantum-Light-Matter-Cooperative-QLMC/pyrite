@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pyrite.cli import command as root_command
 from pyrite.devtools.cli_commands import performance_command
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -74,18 +73,3 @@ def test_performance_rm_all_handles_empty_root(tmp_path):
     )
 
     assert_clean_result(result, stdout="(nothing to prune)\n")
-
-
-def test_hidden_performance_prune_alias_warns_and_still_previews(tmp_path):
-    root = tmp_path / "performance-profiles"
-    (root / "baseline").mkdir(parents=True)
-    (root / "baseline" / "gpu.ndjson").write_text("{}\n")
-
-    result = invoke(
-        root_command,
-        ["performance", "prune", "baseline", "--performance-dir", str(root)],
-    )
-
-    assert result.exit_code == 0
-    assert result.stderr.count("is deprecated") == 1
-    assert "use 'pyrite-dev performance rm'" in result.stderr

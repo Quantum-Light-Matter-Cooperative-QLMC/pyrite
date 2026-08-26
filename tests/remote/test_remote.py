@@ -17,8 +17,10 @@ from types import SimpleNamespace
 import pytest
 
 from pyrite import remote
+from pyrite.cli import _core as _cli_core
 from pyrite.cli import dashboard as _dashboard
 from pyrite.cli.commands import _remote_actions
+from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.dashboard import poll as dashboard_poll
 from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
@@ -34,6 +36,34 @@ from pyrite.remote import (  # noqa: F401
 from pyrite.remote import jobs as lifecycle_jobs
 from pyrite.remote import performance as lifecycle_performance
 from pyrite.remote import queue as lifecycle_queue
+
+
+def _remote_main(argv):
+    """Route `pyrite-remote` argv to the object that still owns each spelling.
+
+    `run`, `rebrem`, `reline`, `validate`, and `check` retired as *spellings* at
+    0.3.0, but the command objects behind them are still the implementation the
+    canonical `pyrite run --remote` / `pyrite checkpoint recompute ... --remote`
+    paths invoke. These tests are about that implementation, so they address it
+    directly instead of through a group entry that no longer mounts it.
+    """
+    head, *rest = argv
+    owners = {
+        "run": remote_cli.start_command,
+        "rebrem": remote_cli.rebrem_command,
+        "reline": remote_cli.reline_command,
+        "validate": remote_cli.check_command,
+        "check": remote_cli.check_command,
+    }
+    if head in owners:
+        return _cli_core.run(owners[head], rest, prog_name=f"pyrite-remote {head}")
+    if head in ("status", "logs"):
+        # These moved wholesale to the canonical `pyrite job` noun at 0.3.0.
+        from pyrite.cli.commands.job import command as job_command
+
+        return _cli_core.run(job_command, [head, *rest], prog_name="pyrite job")
+    return remote.main(argv)
+
 
 lifecycle_pull = importlib.import_module("pyrite.remote.pull")
 
@@ -715,7 +745,9 @@ def test_prune_remote_performance_blocks_changed_inventory(monkeypatch):
             [("job-1", "baseline", 3, 120)],
         ]
     )
-    monkeypatch.setattr(lifecycle_performance, "remote_performance_inventory", lambda: next(inventories))
+    monkeypatch.setattr(
+        lifecycle_performance, "remote_performance_inventory", lambda: next(inventories)
+    )
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
 
@@ -1097,7 +1129,7 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
         transport, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
     )
 
-    remote.main(
+    _remote_main(
         [
             "run",
             "standard",
@@ -1111,7 +1143,7 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
         ]
     )  # legal: monolithic
     assert (
-        remote.main(["run", "standard", "-m", "hopg", "--dry-run", "--parallel-materials", "3"])
+        _remote_main(["run", "standard", "-m", "hopg", "--dry-run", "--parallel-materials", "3"])
         == 2
     )  # illegal: chunked default
 
@@ -1220,14 +1252,14 @@ def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
 
 def test_run_profile_uses_shipped_membership_without_material_option(capsys):
     """A positional profile selects its explicit material membership."""
-    remote.main(["run", "sub_100keV", "--dry-run"])
+    _remote_main(["run", "sub_100keV", "--dry-run"])
 
     out = capsys.readouterr().out
     assert "hopg" in out and "zrte3" in out
 
 
 def test_run_perf_uses_positional_catalog_profile(capsys):
-    remote.main(["run", "sub_100keV", "--perf", "--dry-run"])
+    _remote_main(["run", "sub_100keV", "--perf", "--dry-run"])
 
     out = capsys.readouterr().out
     assert "hopg" in out and "zrte3" in out
@@ -1236,7 +1268,7 @@ def test_run_perf_uses_positional_catalog_profile(capsys):
 
 
 def test_run_rejects_retired_profile_option(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1251,7 +1283,7 @@ def test_run_rejects_retired_profile_option(capsys):
 
 
 def test_run_rejects_perf_reps_without_perf(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1268,7 +1300,7 @@ def test_run_rejects_perf_reps_without_perf(capsys):
 
 
 def test_run_perf_reps_default_to_monolithic_mode(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1284,7 +1316,7 @@ def test_run_perf_reps_default_to_monolithic_mode(capsys):
 
 
 def test_run_rejects_explicit_nonzero_chunk_for_perf_reps(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1302,7 +1334,7 @@ def test_run_rejects_explicit_nonzero_chunk_for_perf_reps(capsys):
 
 
 def test_run_nsys_implies_performance_profile(capsys):
-    result = remote.main(["run", "sub_100keV", "-m", "mos2", "--nsys", "--dry-run"])
+    result = _remote_main(["run", "sub_100keV", "-m", "mos2", "--nsys", "--dry-run"])
 
     assert result is None
     output = capsys.readouterr().out
@@ -1311,7 +1343,7 @@ def test_run_nsys_implies_performance_profile(capsys):
 
 
 def test_run_rejects_nsys_in_chunked_mode(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1329,7 +1361,7 @@ def test_run_rejects_nsys_in_chunked_mode(capsys):
 
 
 def test_run_rejects_nsys_with_multiple_repetitions(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1349,7 +1381,7 @@ def test_run_rejects_nsys_with_multiple_repetitions(capsys):
 
 
 def test_run_rejects_nsys_without_explicit_material(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1366,7 +1398,7 @@ def test_run_rejects_nsys_without_explicit_material(capsys):
 
 
 def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1399,7 +1431,7 @@ def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
 
 
 def test_run_nsys_reaches_monolithic_dry_run(capsys):
-    result = remote.main(
+    result = _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1438,7 +1470,7 @@ def test_run_defaults_to_attach_and_pull(monkeypatch):
         lifecycle, "pull", lambda stems, **kwargs: events.append(("pull", stems, kwargs))
     )
 
-    remote.main(["run", "standard", "-m", "hopg", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
 
     assert [event[0] for event in events] == ["run", "attach", "pull"]
     assert events[-1][2]["no_sync"] is True
@@ -1497,7 +1529,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
 
     monkeypatch.setattr(transport, "_ssh_download", download)
 
-    remote.main(["run", "sub_100keV", "--no-sync"])
+    _remote_main(["run", "sub_100keV", "--no-sync"])
 
     assert resolved == [("hopg", "sub_100keV", "full")]
     assert len(transfers) == 1
@@ -1511,7 +1543,7 @@ def test_run_cache_mode_reaches_each_box_side_scan_once(cache_flag, chunk_minute
     if chunk_minutes is not None:
         args.extend(["--chunk-minutes", chunk_minutes])
 
-    remote.main(args)
+    _remote_main(args)
 
     script = capsys.readouterr().out
     assert script.count(f" {cache_flag}") == 1
@@ -1524,14 +1556,14 @@ def test_run_headless_skips_attach_and_pull(monkeypatch):
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
     monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("must not pull"))
 
-    remote.main(["run", "standard", "-m", "hopg", "--headless", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--headless", "--no-sync"])
 
 
 def test_headless_performance_run_prints_canonical_pull_hint(monkeypatch, capsys):
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
 
-    remote.main(["run", "standard", "-m", "hopg", "--perf", "--headless", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--perf", "--headless", "--no-sync"])
 
     assert "pyrite remote performance pull standard" in capsys.readouterr().out
 
@@ -1542,7 +1574,7 @@ def test_run_no_pull_still_attaches(monkeypatch):
     monkeypatch.setattr(viewer, "attach", lambda jobid: attached.append(jobid) or True)
     monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("must not pull"))
 
-    remote.main(["run", "standard", "-m", "hopg", "--no-pull", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--no-pull", "--no-sync"])
 
     assert attached == ["j"]
 
@@ -1566,7 +1598,7 @@ def test_performance_no_pull_skips_all_artifact_pulls(monkeypatch):
         lambda *_args, **_kwargs: pytest.fail("--no-pull must not pull checkpoints"),
     )
 
-    remote.main(["run", "standard", "-m", "hopg", "--perf", "--no-pull", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--perf", "--no-pull", "--no-sync"])
 
 
 def test_successful_performance_run_auto_pulls_artifacts(monkeypatch):
@@ -1587,7 +1619,7 @@ def test_successful_performance_run_auto_pulls_artifacts(monkeypatch):
         lambda stems, **_kwargs: pulled.append(("checkpoint", stems)),
     )
 
-    remote.main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
 
     assert pulled == [("performance", "standard"), ("checkpoint", ["hopg"])]
 
@@ -1603,7 +1635,7 @@ def test_failed_performance_run_skips_artifact_pull(monkeypatch, capsys):
         lambda _profile: pytest.fail("failed job must not auto-pull performance artifacts"),
     )
 
-    remote.main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
 
     assert "did not complete successfully" in capsys.readouterr().err
 
@@ -1624,7 +1656,7 @@ def test_run_perf_reps_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
         lambda *_args, **_kwargs: pytest.fail("must not pull profiling checkpoints"),
     )
 
-    remote.main(
+    _remote_main(
         [
             "run",
             "sub_100keV",
@@ -1643,13 +1675,13 @@ def test_run_perf_reps_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
 
 
 def test_run_rejects_headless_with_no_pull(capsys):
-    assert remote.main(["run", "standard", "-m", "hopg", "--headless", "--no-pull"]) == 2
+    assert _remote_main(["run", "standard", "-m", "hopg", "--headless", "--no-pull"]) == 2
     assert "--headless cannot be combined with --no-pull" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("retired", ["scan", "submit", "start"])
 def test_retired_remote_run_commands_are_removed(retired, capsys):
-    assert remote.main([retired, "--help"]) == 2
+    assert _remote_main([retired, "--help"]) == 2
     assert f"No such command '{retired}'" in capsys.readouterr().err
 
 
@@ -2255,7 +2287,7 @@ def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
     calls = []
     monkeypatch.setattr(viewer, "job_status", lambda jobid, detail: calls.append((jobid, detail)))
 
-    remote.main(["status", "j", "-vv"])
+    _remote_main(["status", "j", "-vv"])
 
     assert calls == [("j", 2)]
 
@@ -2364,25 +2396,28 @@ def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
     assert "CHAIN STALLED" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("attach_flag", ["-a", "--attach"])
-def test_status_attach_cli_repeats_verbose_for_the_live_report(monkeypatch, attach_flag):
+def test_job_attach_repeats_verbose_for_the_live_report(monkeypatch):
+    """`remote status -a` retired at 0.3.0; `pyrite job attach` is the door."""
+    from pyrite.cli import _core as core
+    from pyrite.cli.commands.job import command as job_command
+
     calls = []
     monkeypatch.setattr(viewer, "attach", lambda jobid, detail: calls.append((jobid, detail)))
 
-    remote.main(["status", "j", "-vv", attach_flag])
+    core.run(job_command, ["attach", "j", "-vv"], prog_name="pyrite job")
 
     assert calls == [("j", 2)]
 
 
 def test_remote_attach_command_is_absent(capsys):
-    assert remote.main(["attach"]) == 2
+    assert _remote_main(["attach"]) == 2
     assert "No such command 'attach'" in capsys.readouterr().err
 
 
 def test_status_attach_rejects_json(monkeypatch):
     monkeypatch.setattr(viewer, "attach", lambda *_args: pytest.fail("must reject before attach"))
 
-    assert remote.main(["status", "--attach", "-o", "json"]) == 2
+    assert _remote_main(["status", "--attach", "-o", "json"]) == 2
 
 
 def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tmp_path):
@@ -3445,14 +3480,6 @@ def test_stop_jobid_rejects_legacy_job_without_scheduler_id(monkeypatch):
         remote._stop_jobid("j")
 
 
-def test_stop_help_describes_slurm_cancellation(capsys):
-    assert remote.main(["stop", "--help"]) == 0
-
-    help_text = capsys.readouterr().out
-    assert "cancel active SLURM job" in help_text
-    assert "SIGTERM" not in help_text
-
-
 def test_follow_logs_use_stdin_closed_ssh(monkeypatch):
     runs = []
     monkeypatch.setattr(
@@ -3494,7 +3521,7 @@ def test_follow_logs_maps_interrupt_to_130_and_stderr(monkeypatch, capsys):
 def test_follow_logs_status_propagates_through_remote_cli(monkeypatch, status):
     monkeypatch.setattr(viewer, "tail_logs", lambda _jobid, _follow: status)
 
-    assert remote.main(["logs", "--follow"]) == status
+    assert _remote_main(["logs", "--follow"]) == status
 
 
 def test_stems_quick_suffix():
@@ -3539,36 +3566,6 @@ def test_stop_rejects_bad_material_before_live_job_lookup(monkeypatch):
 
     with pytest.raises(SystemExit):
         remote.stop_jobs(["bad;material"])
-
-
-def test_stop_cli_accepts_materials(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "stop_jobs",
-        lambda materials, all_jobs, *, yes, profile: calls.append(
-            (materials, all_jobs, yes, profile)
-        ),
-    )
-
-    remote.main(["stop", "hopg", "mose2", "--yes"])
-
-    assert calls == [(["hopg", "mose2"], False, True, None)]
-
-
-def test_stop_cli_accepts_all(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "stop_jobs",
-        lambda materials, all_jobs, *, yes, profile: calls.append(
-            (materials, all_jobs, yes, profile)
-        ),
-    )
-
-    remote.main(["stop", "--all", "--yes"])
-
-    assert calls == [([], True, True, None)]
 
 
 def test_stop_profile_matches_live_job_metadata(monkeypatch):
@@ -3871,15 +3868,15 @@ def test_clear_profile_cli_uses_profile_membership(monkeypatch):
         lambda materials, yes, **kwargs: calls.append((materials, yes, kwargs)),
     )
 
-    remote.main(["clear", "--profile", "sub_100keV", "--yes"])
+    _remote_main(["rm", "--profile", "sub_100keV", "--yes"])
 
     assert calls == [(["hopg", "hbn"], True, {"catalog_profile": "sub_100keV"})]
 
 
 def test_clear_profile_rejects_materials_and_all(capsys):
-    assert remote.main(["clear", "hopg", "--profile", "sub_100keV"]) == 2
+    assert _remote_main(["rm", "hopg", "--profile", "sub_100keV"]) == 2
     assert "--profile takes no material" in capsys.readouterr().err
-    assert remote.main(["clear", "--all", "--profile", "sub_100keV"]) == 2
+    assert _remote_main(["rm", "--all", "--profile", "sub_100keV"]) == 2
     assert "--profile takes no material" in capsys.readouterr().err
 
 
@@ -4394,37 +4391,37 @@ def test_run_rejects_quick_plus_grid_before_any_work(monkeypatch):
     monkeypatch.setattr(
         lifecycle, "start_queue", lambda *a, **kw: pytest.fail("must reject before submitting")
     )
-    assert remote.main(["run", "standard", "-m", "hopg", "--quick", "--grid"]) == 2
+    assert _remote_main(["run", "standard", "-m", "hopg", "--quick", "--grid"]) == 2
 
 
 # ---- pull defaults to --grid; -f/--full opts into the plain whole-file pull -----
 def test_pull_defaults_to_grid(monkeypatch):
     calls = []
     monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
-    remote.main(["pull", "hopg"])
+    _remote_main(["pull", "hopg"])
     assert calls[0]["grid"] is True
 
 
 def test_pull_full_flag_disables_grid(monkeypatch):
     calls = []
     monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
-    remote.main(["pull", "hopg", "--full"])
+    _remote_main(["pull", "hopg", "--full"])
     assert calls[0]["grid"] is False
 
 
 def test_pull_short_full_flag(monkeypatch):
     calls = []
     monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
-    remote.main(["pull", "hopg", "-f"])
+    _remote_main(["pull", "hopg", "-f"])
     assert calls[0]["grid"] is False
 
 
 def test_pull_level9_flag_defaults_off_and_wires_through(monkeypatch):
     calls = []
     monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
-    remote.main(["pull", "hopg"])
+    _remote_main(["pull", "hopg"])
     assert calls[0]["level9"] is False
-    remote.main(["pull", "hopg", "--level9"])
+    _remote_main(["pull", "hopg", "--level9"])
     assert calls[1]["level9"] is True
 
 
@@ -4789,7 +4786,7 @@ def test_remote_run_uses_profile_membership(monkeypatch):
         lifecycle, "start_queue", lambda materials, *args, **kwargs: calls.append(materials)
     )
 
-    remote.main(["run", "sub_100keV", "--dry-run"])
+    _remote_main(["run", "sub_100keV", "--dry-run"])
 
     assert calls and "hopg" in calls[0] and "zrte3" in calls[0]
 
@@ -4806,7 +4803,7 @@ def test_remote_run_defers_parallel_materials_default_to_start_queue(monkeypatch
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
 
-    remote.main(["run", "standard", "-m", "hopg", "--dry-run", "--chunk-minutes", "0"])
+    _remote_main(["run", "standard", "-m", "hopg", "--dry-run", "--chunk-minutes", "0"])
 
     assert calls[0][1]["parallel_materials"] is None
     assert calls[0][1]["chunk_minutes"] == 0.0
@@ -4820,10 +4817,10 @@ def test_remote_run_accepts_parallel_materials_three_and_four(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
 
-    remote.main(
+    _remote_main(
         ["run", "sub_100keV", "--parallel-materials", "3", "--chunk-minutes", "0", "--dry-run"]
     )
-    remote.main(
+    _remote_main(
         ["run", "sub_100keV", "--parallel-materials", "4", "--chunk-minutes", "0", "--dry-run"]
     )
 
@@ -4836,7 +4833,7 @@ def test_remote_run_rejects_parallel_materials_above_four(monkeypatch):
     )
 
     assert (
-        remote.main(["run", "standard", "-m", "hopg", "--parallel-materials", "5", "--dry-run"])
+        _remote_main(["run", "standard", "-m", "hopg", "--parallel-materials", "5", "--dry-run"])
         == 2
     )
 
@@ -4855,7 +4852,7 @@ def test_remote_run_forwards_parallel_materials(monkeypatch):
     )
     monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
 
-    remote.main(
+    _remote_main(
         [
             "run",
             "standard",
@@ -4896,7 +4893,7 @@ def test_remote_run_preserves_hyphenated_catalog_material(monkeypatch):
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, materials: materials)
     monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: None)
 
-    remote.main(["run", "standard", "-m", "mos2-on-sio2-si", "--no-sync"])
+    _remote_main(["run", "standard", "-m", "mos2-on-sio2-si", "--no-sync"])
 
     assert calls == [["mos2-on-sio2-si"]]
 
@@ -4919,7 +4916,7 @@ def test_remote_run_rejects_unknown_profile_before_busy_or_sync(monkeypatch):
     )
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
-    assert remote.main(["run", "not_in_catalog"]) == 2
+    assert _remote_main(["run", "not_in_catalog"]) == 2
 
 
 def test_pull_rejects_unsafe_stem_before_sync_or_local_mutation(monkeypatch, tmp_path):
@@ -5109,7 +5106,7 @@ def test_check_cli_pull_flag_skips_run(monkeypatch):
         cli, "remote_check", lambda **kw: pytest.fail("--pull must not run the reproduction")
     )
 
-    remote.main(["check", "--pull"])
+    _remote_main(["check", "--pull"])
 
     assert calls == ["pull"]
 
@@ -5119,7 +5116,7 @@ def test_check_cli_detached_starts_queue(monkeypatch):
     monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **kw: calls.append(kw) or "jid")
     monkeypatch.setattr(viewer, "attach", lambda jobid: pytest.fail("no --follow: must not attach"))
 
-    remote.main(["check", "--detached", "--ne", "11"])
+    _remote_main(["check", "--detached", "--ne", "11"])
 
     assert calls[0]["ne"] == 11
 
@@ -5129,7 +5126,7 @@ def test_check_cli_detached_follow_attaches(monkeypatch):
     attached = []
     monkeypatch.setattr(viewer, "attach", attached.append)
 
-    remote.main(["check", "--detached", "--follow"])
+    _remote_main(["check", "--detached", "--follow"])
 
     assert attached == ["jid"]
 
@@ -5138,7 +5135,7 @@ def test_check_cli_foreground_calls_remote_check(monkeypatch):
     calls = []
     monkeypatch.setattr(_remote_actions, "remote_check", lambda **kw: calls.append(kw))
 
-    remote.main(["check", "--ne", "11", "--refresh"])
+    _remote_main(["check", "--ne", "11", "--refresh"])
 
     assert calls == [
         {
@@ -5155,7 +5152,7 @@ def test_check_cli_foreground_calls_remote_check(monkeypatch):
 def test_check_cli_rejects_follow_without_detached(monkeypatch, capsys):
     monkeypatch.setattr(cli, "remote_check", lambda **kw: pytest.fail("must reject before running"))
 
-    assert remote.main(["check", "--follow"]) == 2
+    assert _remote_main(["check", "--follow"]) == 2
 
     assert "--follow requires --detached" in capsys.readouterr().err
 
@@ -5166,7 +5163,7 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
         lifecycle, "pull_zhai_cache", lambda: pytest.fail("must reject before pulling")
     )
 
-    assert remote.main(["check", *args]) == 2
+    assert _remote_main(["check", *args]) == 2
 
     assert "--pull and --detached are mutually exclusive" in capsys.readouterr().err
 
@@ -5349,7 +5346,7 @@ def test_rebrem_cli_submits_attaches_and_pulls_completed(monkeypatch):
     monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: ["hopg"])
     monkeypatch.setattr(lifecycle, "pull", lambda stems, **kw: events.append(("pull", stems)))
 
-    remote.main(["rebrem", "hopg", "hbn", "--ne-brem", "1000", "--step", "25"])
+    _remote_main(["rebrem", "hopg", "hbn", "--ne-brem", "1000", "--step", "25"])
 
     assert events[0][0] == "start" and events[0][1] == ["hopg", "hbn"]
     assert events[0][2]["ne_brem"] == 1000 and events[0][2]["brem_step_eV"] == 25.0
@@ -5364,7 +5361,7 @@ def test_rebrem_cli_skips_pull_when_viewer_disconnects(monkeypatch):
         lifecycle, "pull", lambda *a, **kw: pytest.fail("must not pull after disconnect")
     )
 
-    remote.main(["rebrem", "hopg"])
+    _remote_main(["rebrem", "hopg"])
 
 
 def test_cli_rebrem_pulls_brem_dataset(monkeypatch):
@@ -5677,7 +5674,7 @@ def test_prune_jobs_cli_dispatch(monkeypatch):
     calls = []
     monkeypatch.setattr(lifecycle, "prune_job_dirs", lambda **kwargs: calls.append(kwargs))
 
-    remote.main(["prune-jobs", "--profile", "sub_100keV", "--yes"])
+    _remote_main(["prune-jobs", "--profile", "sub_100keV", "--yes"])
 
     assert calls == [{"profile": "sub_100keV", "all_jobs": False, "yes": True}]
 
@@ -5687,5 +5684,5 @@ def test_prune_jobs_cli_rejects_bad_selectors(monkeypatch):
         lifecycle, "prune_job_dirs", lambda **kwargs: pytest.fail("must not dispatch")
     )
 
-    assert remote.main(["prune-jobs"]) == 2
-    assert remote.main(["prune-jobs", "--all", "--profile", "sub_100keV"]) == 2
+    assert _remote_main(["prune-jobs"]) == 2
+    assert _remote_main(["prune-jobs", "--all", "--profile", "sub_100keV"]) == 2

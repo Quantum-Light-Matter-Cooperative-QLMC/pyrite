@@ -11,9 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import tempfile
-from copy import copy
 from pathlib import Path
-from types import SimpleNamespace
 
 import click
 
@@ -36,12 +34,11 @@ from pyrite.cli._core import (
     emit_diagnostic,
     emit_json_result,
     emit_result,
-    hidden_alias,
     invoke_legacy,
     output_option,
     remote_option,
 )
-from pyrite.cli._deprecations import DeprecatingGroup, canonical_option
+from pyrite.cli._deprecations import canonical_option
 from pyrite.energy_grid import apply, defaults, job
 from pyrite.energy_grid import gc as artifact_gc
 
@@ -110,7 +107,6 @@ def _derive_options(function):
         "--save-default",
         "set_default",
         is_flag=True,
-        retired=["--set-default"],
         help="Persist supplied geometry, energies, and materials as future defaults.",
     )(function)
     function = click.option(
@@ -124,7 +120,6 @@ def _derive_options(function):
         "azimuths",
         type=AZIMUTH_CSV_TEXT,
         metavar="DEG,...",
-        retired=["--azimuths"],
         help="Azimuths in degrees [0, 360]; comma-separated.",
     )(function)
     function = canonical_option(
@@ -132,7 +127,6 @@ def _derive_options(function):
         "tilts",
         type=TILT_CSV_TEXT,
         metavar="DEG,...",
-        retired=["--tilts"],
         help="Polar tilts in degrees [0, 90); comma-separated.",
     )(function)
     function = canonical_option(
@@ -140,58 +134,18 @@ def _derive_options(function):
         "energies",
         type=ENERGY_CSV_TEXT,
         metavar="KEV,...",
-        retired=["--energies"],
         help="Beam energies in keV; comma-separated and positive.",
     )(function)
     return canonical_option(
         "--material",
         "materials",
         metavar="KEY,...",
-        retired=["--materials"],
         help="Material keys; comma-separated. Omit to use persistent defaults.",
         shell_complete=_cli_completion.complete_material_csv,
     )(function)
 
 
-@click.group(
-    name="energy-grid",
-    cls=DeprecatingGroup,
-    no_args_is_help=False,
-    deprecation_prefix="energy-grid",
-)
-def command():
-    """Derive and manage per-material photon-energy grids.
-
-    ``derive`` measures both coherent-line and bremsstrahlung
-    upper bounds. ``defaults`` controls that diagnostic derivation only;
-    ``add`` stores validated bounds and repoints a profile. Physical scan
-    profile defaults belong to ``pyrite profile``; per-material range overrides
-    belong to ``pyrite material``.
-
-    Scan ``--fidelity full|survey`` is separate. It controls later simulation
-    cost and grid reduction; it never changes derivation or applied full bounds.
-
-    Command-line derivation values override persistent defaults for one run.
-
-    \b
-    Examples:
-      pyrite material energy-grid derive --material mose2,wse2 --energy 30,60 --profile survey
-      pyrite material energy-grid derive --material mose2 --remote --dry-run
-      pyrite material energy-grid show mose2
-    """
-
-
-@command.group("line", cls=DeprecatingGroup, no_args_is_help=True)
-def line_command():
-    """Inspect or manually set coherent line-energy grids."""
-
-
-@command.group("brem", cls=DeprecatingGroup, no_args_is_help=True)
-def brem_command():
-    """Inspect or manually set bremsstrahlung energy grids."""
-
-
-@command.command("derive")
+@click.command("derive")
 @_derive_options
 @click.option(
     "--brem-step",
@@ -399,155 +353,12 @@ def _derive_remote(
     return 0
 
 
-@command.command("submit")
-@_derive_options
-@click.option(
-    "--slice-minutes",
-    type=POSITIVE_FLOAT,
-    default=job.DEFAULT_SLICE_MINUTES,
-    show_default=True,
-    metavar="MINUTES",
-    help="Maximum duration of each self-resubmitting remote slice.",
-)
-@click.option("--no-sync", is_flag=True, help="Skip code upload before submission.")
-@click.option(
-    "--dry-run",
-    is_flag=True,
-    help="Print batch script and submission command; do not connect or submit.",
-)
-def submit_command(
-    materials,
-    energies,
-    tilts,
-    azimuths,
-    thickness,
-    set_default,
-    slice_minutes,
-    no_sync,
-    dry_run,
-):
-    """Submit remotely (deprecated: use ``derive --remote --detach``)."""
-    return _derive_remote(
-        materials=materials,
-        energies=energies,
-        tilts=tilts,
-        azimuths=azimuths,
-        thickness=thickness,
-        set_default=set_default,
-        brem_step=None,
-        slice_minutes=slice_minutes,
-        no_sync=no_sync,
-        dry_run=dry_run,
-        detach=True,
-        remote_target="__configured__",
-        persist_local=False,
-        catalog_profile="standard",
-    )
-
-
-submit_command.hidden = True
-
-
-@click.command("status")
-@click.argument(
-    "jobid",
-    required=False,
-    metavar="[JOBID]",
-    shell_complete=_cli_completion.complete_job_id,
-)
-@click.option(
-    "-v",
-    "--verbose",
-    count=True,
-    help="Add allocation detail; repeat for case progress and recent logs.",
-)
-@output_option
-def status_command(jobid, verbose, json_output):
-    """Show energy-grid job status. JOBID defaults to latest recorded job."""
-    if json_output:
-        return _invoke_callback(
-            remote._cli_status,
-            SimpleNamespace(jobid=jobid, verbose=verbose, json_output=True),
-        )
-    remote.job_status(jobid, detail=verbose)
-    return 0
-
-
-@click.command("attach")
-@click.argument(
-    "jobid",
-    required=False,
-    metavar="[JOBID]",
-    shell_complete=_cli_completion.complete_job_id,
-)
-def attach_command(jobid):
-    """Attach to energy-grid job progress. JOBID defaults to latest recorded job."""
-    remote.attach(jobid)
-    return 0
-
-
-@click.command("logs")
-@click.argument(
-    "jobid",
-    required=False,
-    metavar="[JOBID]",
-    shell_complete=_cli_completion.complete_job_id,
-)
-@click.option(
-    "-f",
-    "--follow",
-    is_flag=True,
-    help="Stream live; Ctrl-C disconnects viewer without stopping job.",
-)
-def logs_command(jobid, follow):
-    """Print or follow energy-grid job logs. JOBID defaults to latest recorded job."""
-    return _invoke_callback(remote.tail_logs, jobid, follow)
-
-
-@click.command("stop")
-@click.argument("jobid", required=False, metavar="[JOBID]")
-@click.option("--latest", is_flag=True, help="Target latest recorded job instead of JOBID.")
-@click.option("-y", "--yes", is_flag=True, help="Cancel exact previewed job; otherwise preview.")
-def stop_command(jobid, latest, yes):
-    """Preview or stop one energy-grid job."""
-    if jobid and latest:
-        raise click.UsageError("stop takes JOBID or --latest, not both")
-    if not jobid and not latest:
-        raise click.UsageError("stop needs JOBID, or use --latest")
-    resolved_jobid = jobid or remote._latest_jobid()
-    if not resolved_jobid:
-        raise CLIError("no jobs to stop")
-    emit_result(f"would cancel remote job: {resolved_jobid}")
-    if not confirm_destructive(yes, "Cancel this remote job?"):
-        return 0
-    remote._stop_jobid(resolved_jobid)
-    return 0
-
-
-@click.group("job", cls=DeprecatingGroup, no_args_is_help=True)
-def job_command():
-    """Inspect, follow, or stop remote energy-grid jobs."""
-
-
-for _job_child in (status_command, attach_command, logs_command, stop_command):
-    _job_alias = copy(_job_child)
-    _job_alias.hidden = True
-    job_command.add_command(_job_alias)
-command.add_command(job_command)
-
-for _legacy_job_child in (status_command, attach_command, logs_command, stop_command):
-    _alias = copy(_legacy_job_child)
-    _alias.hidden = True
-    command.add_command(_alias)
-
-
-@command.command("add")
+@click.command("add")
 @click.argument("json_path", required=False, metavar="JSON")
 @canonical_option(
     "--material",
     "materials",
     metavar="KEY,...",
-    retired=["--materials"],
     help="Apply only listed material keys.",
     shell_complete=_cli_completion.complete_material_csv,
 )
@@ -615,10 +426,7 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
     return 0
 
 
-apply_command = hidden_alias(command, add_command, "apply")
-
-
-@line_command.command("set")
+@click.command("set")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--energy", type=POSITIVE_FLOAT, required=True, metavar="KEV", help="Beam energy in keV."
@@ -665,7 +473,7 @@ def set_command(material, energy, stop, num, start, note, catalog_profile):
     return 0
 
 
-@command.command("rm")
+@click.command("rm")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--energy",
@@ -749,10 +557,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
     return 0
 
 
-delete_command = hidden_alias(line_command, rm_command, "delete")
-
-
-@command.command("verify")
+@click.command("verify")
 @click.option(
     "--checkpoint-dir",
     default="checkpoints",
@@ -777,7 +582,7 @@ def verify_command(checkpoint_dir):
     return 0
 
 
-@command.command("gc")
+@click.command("gc")
 @click.option(
     "--checkpoint-dir",
     default="checkpoints",
@@ -820,7 +625,7 @@ def gc_command(checkpoint_dir, prune_all, yes):
     return 0
 
 
-@brem_command.command("set")
+@click.command("set")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--stop",
@@ -860,13 +665,12 @@ def set_brem_command(material, stop, step, note, catalog_profile):
     return 0
 
 
-@command.command("defaults")
+@click.command("defaults")
 @output_option
 @canonical_option(
     "--save-default",
     "set_values",
     is_flag=True,
-    retired=["--set"],
     help="Persist supplied values; otherwise only show defaults.",
 )
 @click.option(
@@ -890,7 +694,6 @@ def set_brem_command(material, stop, step, note, catalog_profile):
     "tilts",
     type=TILT_CSV,
     metavar="DEG,...",
-    retired=["--tilts"],
     help="Persistent derivation polar tilts in degrees [0, 90).",
 )
 @canonical_option(
@@ -898,7 +701,6 @@ def set_brem_command(material, stop, step, note, catalog_profile):
     "azimuths",
     type=AZIMUTH_CSV,
     metavar="DEG,...",
-    retired=["--azimuths"],
     help="Persistent azimuths in degrees [0, 360].",
 )
 @click.option(
@@ -1018,7 +820,7 @@ def _show(json_output, material, catalog_profile, *, band=None):
     return 0
 
 
-@command.command("show")
+@click.command("show")
 @output_option
 @click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 @click.option(
@@ -1033,7 +835,7 @@ def show_command(json_output, material, catalog_profile):
     return _show(json_output, material, catalog_profile)
 
 
-@line_command.command("show")
+@click.command("show")
 @output_option
 @click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 @click.option(
@@ -1048,7 +850,7 @@ def line_show_command(json_output, material, catalog_profile):
     return _show(json_output, material, catalog_profile, band="line")
 
 
-@brem_command.command("show")
+@click.command("show")
 @output_option
 @click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 @click.option(
@@ -1063,17 +865,3 @@ def brem_show_command(json_output, material, catalog_profile):
     return _show(json_output, material, catalog_profile, band="brem")
 
 
-@command.command("regen-golden")
-@click.option(
-    "--check",
-    is_flag=True,
-    help="Check snapshot for drift; do not write (exit 1 when stale).",
-)
-def regen_golden_command(check):
-    """Regenerate or check material-catalog golden snapshot.
-
-    Requires source checkout because installed wheels do not contain test data.
-    """
-    from pyrite.energy_grid import golden
-
-    return _invoke_callback(golden.regen, check=check)

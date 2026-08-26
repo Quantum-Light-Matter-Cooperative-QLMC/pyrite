@@ -80,26 +80,3 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         "beam",
         "detector",
     }
-
-
-@pytest.mark.parametrize(
-    "alias",
-    (
-        "slim",
-        "rebrem",
-        "reline",
-        "archive",
-        "restore",
-        "archives",
-        "union",
-        "prune",
-        "check",
-        "check-config",
-    ),
-)
-def test_hidden_checkpoint_aliases_remain_callable(alias, capsys):
-    with pytest.raises(SystemExit) as exc:
-        cli.main([alias, "--help"])
-
-    assert exc.value.code == 0
-    assert capsys.readouterr().out.startswith(f"Usage: pyrite {alias} ")
