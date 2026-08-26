@@ -2,3 +2,6 @@
 *.zpln filter=nbstripout
 *.ipynb diff=ipynb
 * text=auto eol=lf
+
+# Upstream EEDL ships CRLF; its SHA-256 pin asserts the published bytes.
+src/pyrite/data/characteristic_cross_sections/EEDL.endf -text

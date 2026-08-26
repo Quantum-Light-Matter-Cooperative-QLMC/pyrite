@@ -47,7 +47,7 @@ escape geometry.
   outside the requested line grid do not contribute, so a study of a specific
   shell must include its xraydb line energy in the configured line range.
 - Packaged EEDL bytes are verified before first use against SHA-256
-  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`.
+  `ce37912435e0b8002f85878f98ccf7c5840cb168f1d46af3c9e915cd16c70ccc`.
   The resolved xraydb package version is included in the characteristic-model
   checkpoint marker.
 

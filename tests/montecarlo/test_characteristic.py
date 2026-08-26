@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 import numpy as np
 
 from pyrite.montecarlo.spectrum import characteristic
@@ -19,6 +21,22 @@ def _carbon_segments(lengths: list[float]) -> dict[str, object]:
         "Ne": 1,
         "thickness_ang": float(lengths_array.sum()),
     }
+
+
+def test_packaged_eedl_bytes_match_pinned_checksum():
+    """Guard the pin against line-ending renormalization.
+
+    Upstream EEDL ships 75-column CRLF records. The repository normalizes text
+    to LF (`.gitattributes`), which rewrites these bytes and breaks the pin
+    unless the file stays marked `-text`, so assert the shipped bytes directly
+    rather than only through the loader.
+    """
+    path = characteristic.CHARACTERISTIC_DATA_DIR / characteristic.CHARACTERISTIC_EEDL_FILENAME
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+
+    assert digest == characteristic.CHARACTERISTIC_EEDL_SHA256
+    with path.open("rb") as stream:
+        assert stream.readline().endswith(b"\r\n"), "CRLF lost to eol normalization"
 
 
 def test_packaged_carbon_eedl_values_and_relaxation_join():

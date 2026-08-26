@@ -56,7 +56,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
 
     assert case_content_key(case) == case_content_key(case.to_dict())
     assert case_content_key(case) == (
-        "36446119bd2697e798331ef0ce9ab5a3a4f9b1eeb61cbf7feaa86ff18be92c91"
+        "3e40f68286a582536d66b30c69e5b4e4a4cd1ab8cb4c147bf68a1301d5674581"
     )
 
 
@@ -67,7 +67,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "1fe105d83720541e57ec36a1c5d3e5e418629c361edcbbd330569e70a8dd1ca5"
+        "9f2b0f81fde05cb95c540814147f204bd304d69110925a8e28e61ed641e54790"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -339,7 +339,7 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "1fe105d83720541e57ec36a1c5d3e5e418629c361edcbbd330569e70a8dd1ca5"
+        "9f2b0f81fde05cb95c540814147f204bd304d69110925a8e28e61ed641e54790"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -353,42 +353,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "91b49d30f19265837799daa31b21b6b61717c11f4bb955b85a9bbd147c8cf560",
+            "e5510710ab22e1ee10b9e39cb72fd5d98cb0a5de1d3f1b2f0824a6fe71ad151b",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "f24af213636951d62acd613a242d5b8069014c6c6b4134e9e8f63d3bf22dfb95",
+            "cfb5dc6211616b3fe31b1f7348cfe21e142ffada847e1508cb85c280852bd60f",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "704bd8072af47bdd5c5227b2762cc45bff54e6397fb929fe8e0b3916217ab1a3",
+            "b279c5a2df740396637293d1a0dd11013735f5c8a6ea077be7176743710133c4",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "5acbe8170999e2dce9295ccb65c85fe78d8c4fb832a85aab370ba86b180e8aea",
+            "b5f4e3cce8b4fdda8a4f84cc68969c5c0e58fd5d2b25782a9f98d546e7d7405c",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "7793da4f29ae1f5054e465efffc0e37d41b69d0a4cbefa65b848a4d2478b9418",
+            "9424fa4f053a95e02530f52191b7cd2178d13eece544a308054b793292006074",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "cb55039b4cf8176265ff6ba8fe46e6aca34cea21bdd0fb7743bfa7619e8bc570",
+            "444dbd4ecfb85e809147acde8ef84a68be150a2dd7449eb29e2a5b9f4666cce2",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "a50867a89b421ad87a67267da55ea2e2498e863e0da140fe401c564fe0548050",
+            "df4de5f93dfa5c10ab281a60eeb8c09fe043cb397990f235ca837bf8c300daa0",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "eb7a0e9253597718e38871092a6aac55d2bbdfbb376846568d02ca95cde27495",
+            "7d737d0e85646ee1558f262dc99db970388e8dcfd0fbf3f6b15a36fb6da745bc",
         ),
     ],
 )
@@ -542,13 +542,13 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Berger--Seltzer stopping splice did, and again when every crystal cut
     # moved to the surface_hkl spelling) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "1fe105d83720541e57ec36a1c5d3e5e418629c361edcbbd330569e70a8dd1ca5"
+        "9f2b0f81fde05cb95c540814147f204bd304d69110925a8e28e61ed641e54790"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "a1172b8d440db875e9b52287c04c9687345ffa1b10ace9e8246edfa5945c72a7"
+        "2f769d9735dc6c38848e756ccd22c0d195aeb3726df761c3a70ba085794e9638"
     )
 
 
