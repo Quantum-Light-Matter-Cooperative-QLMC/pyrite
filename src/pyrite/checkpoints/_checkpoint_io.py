@@ -40,8 +40,12 @@ SCHEMA_VERSION = _result_v2.SCHEMA_VERSION
 READABLE_SCHEMA_VERSIONS = (1, SCHEMA_VERSION)
 IDENTITY_VERSION = 1
 
-# Retained as the public CLI compatibility range. It now selects the transfer
-# frame's zstd level; stored artifacts are never compressed.
+# Retained as the public CLI compatibility range, but only half of it still
+# does anything. `LEVEL_RANGE` is the accepted 1--22 interface, validated on
+# both entry points so a bad value is still an error wherever it arrives.
+# `MAX_LEVEL` is live: `remote.pull` passes it to `dump_stream` to squeeze the
+# transfer frame. `DEFAULT_LEVEL` reaches a stored artifact nowhere -- `dump`
+# writes unfiltered -- so on that path the level is vestigial.
 DEFAULT_LEVEL = 3
 MAX_LEVEL = 19
 LEVEL_RANGE = (1, 22)
@@ -107,10 +111,14 @@ def _read_container(h5: h5py.File) -> Any:
 def dump(obj: Any, path: str, *, compresslevel: int | None = None) -> None:
     """Encode ``obj`` as schema-version-2 HDF5 at ``path``.
 
-    Callers continue to own atomic write-then-rename behavior. ``compresslevel``
-    retains the historical 1--22 interface but no longer affects a stored
-    artifact, which is written unfiltered; it selects the frame level in
-    :func:`dump_stream`.
+    Callers continue to own atomic write-then-rename behavior.
+
+    ``compresslevel`` is vestigial here: it is range-checked so an out-of-range
+    value is still rejected on this path, and then discarded, because a stored
+    artifact is written unfiltered. The parameter is only load-bearing in
+    :func:`dump_stream`, where it sets the zstd level of the transfer frame --
+    that is the caller :mod:`pyrite.remote.pull` reaches with
+    :data:`MAX_LEVEL`. Do not read a level passed here as affecting the file.
     """
     _check_level(compresslevel)
     _write_container(obj, path, shuffle=False)

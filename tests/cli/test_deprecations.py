@@ -17,7 +17,7 @@ from pyrite.cli._deprecations import (
     message,
 )
 from pyrite.devtools.cli_commands import energy_grid_command, performance_command
-from scripts.generate_cli_deprecations import build_deprecations
+from pyrite.devtools.cli_deprecations import build_deprecations
 from tests.helpers.cli import invoke
 
 

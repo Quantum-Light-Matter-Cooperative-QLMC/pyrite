@@ -7,7 +7,7 @@ target. This module owns (a) and (b); that document is generated
 from `DEPRECATIONS` by ``pyrite-dev cli-deprecations``.
 
 The support window is two minor releases: a spelling deprecated in 0.1.0 is
-removed in 0.3.0. `tests/test_cli_deprecations.py` holds the registry to the
+removed in 0.3.0. `tests/cli/test_deprecations.py` holds the registry to the
 live command tree in both directions, so a new hidden alias cannot land
 without a row and a row cannot outlive the alias it describes.
 """
