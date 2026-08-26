@@ -24,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from ._compat import env_value
+from ._env import env_value
 
 logger = logging.getLogger(__name__)
 

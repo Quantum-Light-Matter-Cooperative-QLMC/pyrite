@@ -72,7 +72,7 @@ Override the box via env: PYRITE_REMOTE_HOST / PYRITE_REMOTE_DIR / PYRITE_REMOTE
 # ``remote.<name>`` at call time (as ``energy_grid/job.py`` does).
 # ---------------------------------------------------------------------------
 
-from .._compat import env_value
+from .._env import env_value
 from . import (
     config,
     lifecycle,

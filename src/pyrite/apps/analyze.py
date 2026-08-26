@@ -42,7 +42,7 @@ from typing import TypedDict
 
 import click
 
-from .._compat import env_value
+from .._env import env_value
 from ..checkpoints import _checkpoint_store
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core

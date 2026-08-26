@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from ..._compat import set_canonical_env
+from ..._env import set_canonical_env
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _config as _cli_config

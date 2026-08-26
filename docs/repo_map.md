@@ -228,7 +228,7 @@ CUDA/ROCm CuPy, and Intel dpnp/SYCL adapters behind a deterministic
 `materials.attenuation` dispatches on it too — that is what keeps `materials`
 out of the `montecarlo` import cycle. Importing it runs the accelerator probe,
 so cheap-import callers (CLI, catalog parsing) reach for it inside the function
-that needs a device. Deps: `_compat`.
+that needs a device. Deps: `_env`.
 
 ### `_energy_grid_artifacts.py`
 Immutable, content-addressed energy-grid artifact store: canonical

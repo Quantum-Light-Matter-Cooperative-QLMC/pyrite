@@ -36,7 +36,7 @@ from pathlib import Path
 
 import click
 
-from .._compat import env_value
+from .._env import env_value
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
 from ..cli._deprecations import canonical_option

@@ -7,7 +7,7 @@ from functools import cache
 
 import numpy as np
 
-from ..._compat import env_value
+from ..._env import env_value
 from .cores import (
     EXIT_BACKSCATTERED,
     EXIT_CUTOFF_STOPPED,

@@ -13,7 +13,7 @@ surface, and ``AGENTS.md`` for repository working conventions.
 import logging
 from typing import Any
 
-from ._compat import env_value
+from ._env import env_value
 from .paths import data_dir
 
 __version__ = "0.3.0"

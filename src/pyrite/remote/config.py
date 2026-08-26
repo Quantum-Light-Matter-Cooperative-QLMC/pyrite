@@ -5,7 +5,7 @@ import shlex
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
-from .._compat import env_value
+from .._env import env_value
 
 # Compatibility override for tests and callers that historically patched this
 # module global. Normal resolution is dynamic so environment and store changes

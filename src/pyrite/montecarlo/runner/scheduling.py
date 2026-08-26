@@ -7,8 +7,8 @@ from time import perf_counter
 from typing import Any
 
 from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
-from ..._compat import env_value
 from ..._energy_grid_encoding import decode_energy_grid
+from ..._env import env_value
 from . import (
     _RESOURCE_POLICY,
     _TIMING,

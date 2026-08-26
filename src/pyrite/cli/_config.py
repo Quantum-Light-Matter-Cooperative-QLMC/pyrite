@@ -11,7 +11,7 @@ from pathlib import Path
 import tomlkit
 from tomlkit.exceptions import ParseError
 
-from .._compat import env_value
+from .._env import env_value
 from ..paths import state_dir
 
 CONFIG_PATH = state_dir() / "config.toml"

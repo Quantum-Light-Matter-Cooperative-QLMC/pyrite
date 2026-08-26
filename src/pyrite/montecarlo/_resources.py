@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .._backend import ArrayBackend, BackendResourceError
-from .._compat import env_value
+from .._env import env_value
 
 GIB = 1 << 30
 _VALID_POLICIES = ("auto", "conservative", "balanced", "throughput")

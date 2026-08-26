@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from pyrite import _backend
-from pyrite._compat import env_value
+from pyrite._env import env_value
 from pyrite.montecarlo import runner
 from pyrite.montecarlo._resources import GIB, admitted_chunk, resolve_resource_policy
 

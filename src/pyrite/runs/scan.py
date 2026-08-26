@@ -40,7 +40,7 @@ from typing import Any
 
 import click
 
-from .._compat import set_canonical_env
+from .._env import set_canonical_env
 from .._progress import _ProgressTimer, _write_progress_record
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core

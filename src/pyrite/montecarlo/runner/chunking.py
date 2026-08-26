@@ -7,7 +7,7 @@ import numpy as np
 import psutil
 
 from ..._backend import _GPU, BACKEND
-from ..._compat import env_value
+from ..._env import env_value
 from .. import spectrum as _spectrum_mod
 from .._resources import admitted_chunk, resolve_resource_policy
 
