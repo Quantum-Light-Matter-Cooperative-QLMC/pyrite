@@ -736,7 +736,10 @@ submodule DAG (leaf → driver):
 - `plotly/` — Plotly-specific interactive and rendered trajectory views.
   `trajectories` builds 3D beam/crystal/track figures from shared
   `mpl.trajectories` geometry; `crystal_lattice` renders unit-cell figures;
-  `render` owns cached animation export over the Plotly trajectory builder.
+  `render` owns cached animation export over the Plotly trajectory builder;
+  `camera` turns azimuth/elevation/zoom or a named preset into a
+  `scene.camera` dict, so a viewer's chosen view reaches snapshots and renders
+  (marimo drops `scene.camera` relayout events, so a dragged one cannot).
 - Deps: `detectors`, `montecarlo`, `results`.
 
 ## Downstream instrument and detector forward models

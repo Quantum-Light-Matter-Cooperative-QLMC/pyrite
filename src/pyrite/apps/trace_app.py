@@ -42,6 +42,12 @@ def _():
         penetration_survival_chart,
         trajectory_chart,
     )
+    from pyrite.plots.plotly.camera import (
+        CAMERA_PRESETS,
+        DEFAULT_ANGLES,
+        data_aspect_ratio,
+        resolve_scene_camera,
+    )
     from pyrite.plots.plotly.crystal_lattice import crystal_lattice_figure
     from pyrite.plots.plotly.render import (
         cached_render_path,
@@ -50,18 +56,23 @@ def _():
         render_reveal_animation,
     )
     from pyrite.plots.plotly.trajectories import (
+        VOLUME_CAMERA_ANGLES,
         trajectory_volume_data,
         trajectory_volume_figure_from_data,
     )
 
     return (
+        CAMERA_PRESETS,
         CATALOG,
+        DEFAULT_ANGLES,
         MaterialSelect,
+        VOLUME_CAMERA_ANGLES,
         apply_altair_theme,
         apply_plotly_theme,
         build_configured_cases,
         cached_render_path,
         crystal_lattice_figure,
+        data_aspect_ratio,
         default_settings,
         fmt_thickness,
         initial_state_metrics,
@@ -70,6 +81,7 @@ def _():
         page_title,
         penetration_survival_chart,
         prune_render_cache,
+        resolve_scene_camera,
         resolved_theme,
         render_cache_key,
         render_reveal_animation,
@@ -105,6 +117,38 @@ def _(mo, page_title, style_sheet, theme_switch):
         ]
     )
     return (theme_ui,)
+
+
+@app.cell
+def _(CAMERA_PRESETS, mo):
+    # Both 3D tabs expose the SAME camera control set. An explicit camera is
+    # what makes a snapshot match what you see: marimo's plotly component drops
+    # `scene.camera` relayout events, so a camera you drag to never reaches
+    # Python -- neither the modebar PNG (which re-renders from the spec marimo
+    # sent) nor the offscreen video render can see it. These controls put the
+    # view back in the figure spec, where both paths read it.
+    _VIEW_OPTIONS = ["default", *CAMERA_PRESETS, "custom"]
+
+    def camera_controls(default_angles):
+        """`(view, orbit axis, azimuth, elevation, zoom)` controls seeded from a figure's view."""
+        _azimuth, _elevation, _distance = default_angles
+        return (
+            mo.ui.dropdown(_VIEW_OPTIONS, value="default", label="view"),
+            # Azimuth orbits ABOUT this axis, so z alone can never bring the
+            # camera over the z pole; x or y re-poles the sphere to sweep there.
+            mo.ui.dropdown(["z", "x", "y"], value="z", label="orbit axis"),
+            mo.ui.slider(-180, 180, value=round(_azimuth), step=1, label="azimuth"),
+            mo.ui.slider(-89, 89, value=round(_elevation), step=1, label="elevation"),
+            mo.ui.slider(0.5, 3.0, value=1.0, step=0.05, label="zoom"),
+        )
+
+    def dim_unless(element, active):
+        """Grey out a control that currently has no effect, keeping its value visible."""
+        if active:
+            return element
+        return element.style({"opacity": "0.4", "pointer-events": "none"})
+
+    return camera_controls, dim_unless
 
 
 @app.cell
@@ -355,12 +399,60 @@ def _(mo):
 
 
 @app.cell
+def _(VOLUME_CAMERA_ANGLES, camera_controls):
+    # Seeded from the volume figure's own hand-tuned eye, so "default" is the
+    # long-standing view, exactly. Named `_camera_` throughout to keep these
+    # apart from the crystal TILT azimuth the transport sweep reads.
+    (
+        penetration_camera_view_ui,
+        penetration_camera_orbit_ui,
+        penetration_camera_azim_ui,
+        penetration_camera_elev_ui,
+        penetration_camera_zoom_ui,
+    ) = camera_controls(VOLUME_CAMERA_ANGLES)
+    return (
+        penetration_camera_azim_ui,
+        penetration_camera_elev_ui,
+        penetration_camera_orbit_ui,
+        penetration_camera_view_ui,
+        penetration_camera_zoom_ui,
+    )
+
+
+@app.cell
+def _(
+    VOLUME_CAMERA_ANGLES,
+    penetration_camera_azim_ui,
+    penetration_camera_elev_ui,
+    penetration_camera_orbit_ui,
+    penetration_camera_view_ui,
+    penetration_camera_zoom_ui,
+    resolve_scene_camera,
+):
+    # ONE camera dict for both consumers: the lazy tab body (live figure +
+    # cache-key lookup) and the eager render cell (the render itself). If they
+    # disagreed, the tab would look for a cache entry the render never wrote.
+    penetration_camera = resolve_scene_camera(
+        penetration_camera_view_ui.value,
+        penetration_camera_azim_ui.value,
+        penetration_camera_elev_ui.value,
+        penetration_camera_zoom_ui.value,
+        default_angles=VOLUME_CAMERA_ANGLES,
+        orbit_axis=penetration_camera_orbit_ui.value,
+    )
+    # This scene stays perspective, so the eye distance the zoom rides on is
+    # read as written -- no aspect-ratio workaround needed here.
+    return (penetration_camera,)
+
+
+@app.cell
 def _(
     MATERIAL,
     apply_altair_theme,
     apply_plotly_theme,
     build_configured_cases,
     cached_render_path,
+    dim_unless,
     get_penetration_data,
     get_penetration_render_status,
     get_penetration_survival,
@@ -370,6 +462,12 @@ def _(
     penetration_azim_deg,
     penetration_azim_ui,
     penetration_beam_fwhm_ui,
+    penetration_camera,
+    penetration_camera_azim_ui,
+    penetration_camera_elev_ui,
+    penetration_camera_orbit_ui,
+    penetration_camera_view_ui,
+    penetration_camera_zoom_ui,
     penetration_energy_grid_ui,
     penetration_energy_keV,
     penetration_energy_manual_ui,
@@ -517,6 +615,9 @@ def _(
         if _volume is not None:
             apply_plotly_theme(_volume, _theme)
             _volume.update_layout(width=900)
+            # Explicit camera, so the modebar PNG and the offscreen render
+            # below both frame the scene the way this tab shows it.
+            _volume.update_scenes(camera=penetration_camera)
 
         _beam_metrics = initial_state_metrics(
             _data["initial_r_ang"],
@@ -548,6 +649,20 @@ def _(
         # under ~/.cache/pyrite/viewer-renders keyed on every parameter the
         # render depends on, so an unchanged parameter set short-circuits to
         # the existing file instead of re-rendering.
+        _custom_view = penetration_camera_view_ui.value == "custom"
+        _camera_controls = mo.hstack(
+            [
+                penetration_camera_view_ui,
+                dim_unless(penetration_camera_orbit_ui, _custom_view),
+                dim_unless(penetration_camera_azim_ui, _custom_view),
+                dim_unless(penetration_camera_elev_ui, _custom_view),
+                penetration_camera_zoom_ui,
+            ],
+            justify="start",
+            align="center",
+            gap=1.5,
+            wrap=True,
+        )
         _render_controls = mo.hstack(
             [penetration_render_frames_ui, penetration_render_button_ui],
             justify="start",
@@ -565,7 +680,7 @@ def _(
             _beam_fwhm,
             _n_frames,
             12,
-            None,
+            penetration_camera,
         )
         _render_path = cached_render_path(_render_key, ".mp4")
         # This lazy tab body CANNOT run the render itself: marimo resets
@@ -752,7 +867,14 @@ def _(
             ),
             *(
                 p
-                for p in (_volume, _render_controls, _render_block, _save_row, _bottom_row)
+                for p in (
+                    _volume,
+                    _camera_controls,
+                    _render_controls,
+                    _render_block,
+                    _save_row,
+                    _bottom_row,
+                )
                 if p is not None
             ),
         ]
@@ -762,7 +884,7 @@ def _(
 
 
 @app.cell
-def _(mo):
+def _(DEFAULT_ANGLES, camera_controls, mo):
     # A few unit cells in each direction (a x b x c) gives enough of the stack
     # to read layering without the scene turning to soup.
     crystal_na_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells a")
@@ -783,7 +905,19 @@ def _(mo):
     # edges toward a vanishing point, so columns of atoms only line up on a
     # zone axis without it.
     crystal_ortho_ui = mo.ui.switch(value=True, label="orthographic camera")
+    # crystal_lattice_figure ships no camera of its own, so the controls seed
+    # from Plotly's default eye -- "default" reproduces the untouched view.
+    (
+        crystal_view_ui,
+        crystal_orbit_ui,
+        crystal_azim_ui,
+        crystal_elev_ui,
+        crystal_zoom_ui,
+    ) = camera_controls(DEFAULT_ANGLES)
     return (
+        crystal_azim_ui,
+        crystal_elev_ui,
+        crystal_orbit_ui,
         crystal_axes_ui,
         crystal_bonds_ui,
         crystal_grid_ui,
@@ -794,26 +928,37 @@ def _(mo):
         crystal_ortho_ui,
         crystal_reciprocal_show_ui,
         crystal_reciprocal_ui,
+        crystal_view_ui,
+        crystal_zoom_ui,
     )
 
 
 @app.cell
 def _(
     CATALOG,
+    DEFAULT_ANGLES,
     MATERIAL,
     apply_plotly_theme,
+    crystal_azim_ui,
     crystal_axes_ui,
     crystal_bonds_ui,
+    crystal_elev_ui,
     crystal_grid_ui,
     crystal_lattice_figure,
     crystal_layers_ui,
     crystal_na_ui,
     crystal_nb_ui,
     crystal_nc_ui,
+    crystal_orbit_ui,
     crystal_ortho_ui,
     crystal_reciprocal_show_ui,
     crystal_reciprocal_ui,
+    crystal_view_ui,
+    crystal_zoom_ui,
+    data_aspect_ratio,
+    dim_unless,
     mo,
+    resolve_scene_camera,
     resolved_theme,
     theme_ui,
 ):
@@ -857,23 +1002,35 @@ def _(
         # the structure, not anything on the axis walls: that is the ``cell``
         # trace crystal_lattice_figure adds first.
         _fig.update_traces(visible=crystal_grid_ui.value, selector={"name": "cell"})
+        # One explicit camera carries both the viewpoint and the projection.
         # Orthographic drops the perspective parallax so parallel lattice
-        # directions stay parallel at every depth; it is a layout property, so
-        # it survives the user orbiting the scene.
-        _fig.update_scenes(
-            camera={
-                "projection": {
-                    "type": "orthographic" if crystal_ortho_ui.value else "perspective"
-                }
-            }
+        # directions stay parallel at every depth; because the camera lives in
+        # the figure spec, the modebar's "Download plot as png" gets this exact
+        # view instead of falling back to the default one.
+        _camera = resolve_scene_camera(
+            crystal_view_ui.value,
+            crystal_azim_ui.value,
+            crystal_elev_ui.value,
+            crystal_zoom_ui.value,
+            default_angles=DEFAULT_ANGLES,
+            orbit_axis=crystal_orbit_ui.value,
+            orthographic=crystal_ortho_ui.value,
         )
-        # Arrow count only means something while the arrows are drawn; dim it
-        # rather than hide it so its value stays visible (as beam FWHM does).
-        _reciprocal_count = (
-            crystal_reciprocal_ui
-            if crystal_reciprocal_show_ui.value
-            else crystal_reciprocal_ui.style({"opacity": "0.4", "pointer-events": "none"})
-        )
+        _fig.update_scenes(camera=_camera)
+        if crystal_ortho_ui.value:
+            # An orthographic projection box is fixed, so the camera distance
+            # the zoom rides on does nothing here. Plotly zooms an ortho scene
+            # by scaling the aspect ratio instead (that is what its own scroll
+            # handler does), and any aspectmode but "manual" would recompute
+            # the ratio and throw this away.
+            _fig.update_scenes(
+                aspectmode="manual",
+                aspectratio=data_aspect_ratio(_fig, crystal_zoom_ui.value),
+            )
+        # Angles only bite under the "custom" view; the arrow count only while
+        # the arrows are drawn. Dim rather than hide, so values stay visible.
+        _custom_view = crystal_view_ui.value == "custom"
+        _reciprocal_count = dim_unless(crystal_reciprocal_ui, crystal_reciprocal_show_ui.value)
         _controls = mo.hstack(
             [
                 crystal_na_ui,
@@ -891,7 +1048,19 @@ def _(
             gap=1.5,
             wrap=True,
         )
-        return mo.vstack([_md, _controls, _fig])
+        _camera_row = mo.hstack(
+            [
+                crystal_view_ui,
+                dim_unless(crystal_orbit_ui, _custom_view),
+                dim_unless(crystal_azim_ui, _custom_view),
+                dim_unless(crystal_elev_ui, _custom_view),
+                crystal_zoom_ui,
+            ],
+            justify="start",
+            gap=1.5,
+            wrap=True,
+        )
+        return mo.vstack([_md, _controls, _camera_row, _fig])
 
     return (crystal_tab,)
 
@@ -922,6 +1091,7 @@ def _(
     cached_render_path,
     get_penetration_data,
     mo,
+    penetration_camera,
     penetration_render_button_ui,
     penetration_render_frames_ui,
     prune_render_cache,
@@ -957,7 +1127,7 @@ def _(
         _data_key[8],
         _n_frames,
         12,
-        None,
+        penetration_camera,
     )
     _render_path = cached_render_path(_render_key, ".mp4")
     if not _render_path.exists():
@@ -982,7 +1152,7 @@ def _(
                     beam_fwhm_mm=_data_key[8],
                     n_frames=_n_frames,
                     fps=12,
-                    camera=None,
+                    camera=penetration_camera,
                     progress_cb=_render_progress_cb,
                 )
             prune_render_cache()

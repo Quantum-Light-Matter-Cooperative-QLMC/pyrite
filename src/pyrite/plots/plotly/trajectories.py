@@ -19,6 +19,7 @@ from .._common import (
     groove_profile_knots,
 )
 from .._frames import _trajectory_data
+from .camera import eye_angles
 
 _CRYSTAL = "#B9D9EB"
 _CRYSTAL_EDGE = "#EDF6F9"
@@ -47,6 +48,11 @@ _IDENTITY_R = np.eye(3)
 # eye norm is 1.25*sqrt(3) ~= 2.17, for scale.
 _CAMERA_EYE_DIRECTION = np.array([-0.8, 1.5, -0.4])
 _CAMERA_EYE = tuple((_CAMERA_EYE_DIRECTION / np.linalg.norm(_CAMERA_EYE_DIRECTION) * 1.25).tolist())
+
+# The same eye as (azimuth_deg, elevation_deg, distance), published so a viewer's
+# camera controls can seed themselves from THIS scene's hand-tuned view and
+# reproduce it exactly rather than to slider resolution.
+VOLUME_CAMERA_ANGLES = eye_angles(_CAMERA_EYE)
 
 
 def _case_R(case):

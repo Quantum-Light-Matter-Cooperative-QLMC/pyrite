@@ -20,7 +20,7 @@ def test_crystal_view_hides_reciprocal_vectors_until_switched_on() -> None:
     source = APP.read_text()
 
     assert '1, 8, value=1, step=1, label="reciprocal vectors"' in source
-    assert 'crystal_reciprocal_show_ui = mo.ui.switch(value=False' in source
+    assert "crystal_reciprocal_show_ui = mo.ui.switch(value=False" in source
     # Count still drives the overlay, but only while the switch is on; off
     # collapses to zero vectors, which drops the cone trace entirely.
     assert "crystal_reciprocal_ui.value if crystal_reciprocal_show_ui.value else 0" in source
@@ -29,8 +29,8 @@ def test_crystal_view_hides_reciprocal_vectors_until_switched_on() -> None:
 def test_crystal_view_toggles_cell_gridlines_and_axes_independently() -> None:
     source = APP.read_text()
 
-    assert 'crystal_grid_ui = mo.ui.switch(value=True' in source
-    assert 'crystal_axes_ui = mo.ui.switch(value=True' in source
+    assert "crystal_grid_ui = mo.ui.switch(value=True" in source
+    assert "crystal_axes_ui = mo.ui.switch(value=True" in source
     # One switch owns the WHOLE axis frame (walls, wall rules, ticks, labels,
     # titles), which is what axis-level ``visible`` takes down.
     assert "_fig.update_scenes(" in source
@@ -38,18 +38,58 @@ def test_crystal_view_toggles_cell_gridlines_and_axes_independently() -> None:
         assert f'{axis}={{"visible": crystal_axes_ui.value}}' in source
     # The gridlines switch owns the per-cell edge trace running through the
     # structure -- the depth cue -- not anything on the axis walls.
-    assert (
-        '_fig.update_traces(visible=crystal_grid_ui.value, selector={"name": "cell"})' in source
-    )
+    assert '_fig.update_traces(visible=crystal_grid_ui.value, selector={"name": "cell"})' in source
 
 
 def test_crystal_view_defaults_to_an_orthographic_camera() -> None:
     source = APP.read_text()
 
-    assert 'crystal_ortho_ui = mo.ui.switch(value=True' in source
-    # Orthographic removes the perspective parallax; the switch falls back to
-    # plotly's default projection rather than leaving the key unset.
-    assert '"orthographic" if crystal_ortho_ui.value else "perspective"' in source
+    assert "crystal_ortho_ui = mo.ui.switch(value=True" in source
+    # Projection rides on the one resolved camera (plots.plotly.camera owns the
+    # orthographic/perspective mapping), not a separate scene update.
+    assert "orthographic=crystal_ortho_ui.value" in source
+    assert "_fig.update_scenes(camera=_camera)" in source
+
+
+def test_both_3d_tabs_drive_an_explicit_camera() -> None:
+    source = APP.read_text()
+
+    assert "from pyrite.plots.plotly.camera import (" in source
+    for name in ("CAMERA_PRESETS,", "DEFAULT_ANGLES,", "resolve_scene_camera,"):
+        assert name in source
+    # A dragged camera never reaches Python (marimo drops scene.camera relayout
+    # events), so each tab resolves its own explicit one instead.
+    assert "camera_controls(DEFAULT_ANGLES)" in source
+    assert "camera_controls(VOLUME_CAMERA_ANGLES)" in source
+    assert "_volume.update_scenes(camera=penetration_camera)" in source
+    # Azimuth orbits ABOUT one axis, so both tabs expose which axis that is --
+    # a z-only orbit can never bring the camera over the z pole.
+    assert 'mo.ui.dropdown(["z", "x", "y"], value="z", label="orbit axis")' in source
+    assert "orbit_axis=crystal_orbit_ui.value" in source
+    assert "orbit_axis=penetration_camera_orbit_ui.value" in source
+
+
+def test_orthographic_crystal_view_zooms_through_the_aspect_ratio() -> None:
+    source = APP.read_text()
+
+    # Camera distance cannot zoom an orthographic scene (fixed projection box),
+    # so the ortho branch scales the aspect ratio the way plotly's own scroll
+    # handler does -- and only "manual" keeps the ratio it is handed.
+    assert "if crystal_ortho_ui.value:" in source
+    assert 'aspectmode="manual"' in source
+    assert "aspectratio=data_aspect_ratio(_fig, crystal_zoom_ui.value)" in source
+
+
+def test_render_path_uses_the_same_camera_the_trace_tab_shows() -> None:
+    source = APP.read_text()
+
+    # The camera is resolved ONCE, upstream of both the lazy tab body (which
+    # looks up the cache entry) and the eager cell (which writes it); a
+    # mismatch would leave the tab hunting for a file the render never wrote.
+    assert source.count("penetration_camera = resolve_scene_camera(") == 1
+    assert source.count("        penetration_camera,") == 2  # both cache keys
+    assert "camera=penetration_camera," in source
+    assert "camera=None," not in source
 
 
 def test_penetration_view_uses_static_volume_figure_as_primary_track_plot() -> None:
