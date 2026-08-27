@@ -16,11 +16,40 @@ def test_penetration_controls_read_the_active_material_scan() -> None:
     assert "_scan = CATALOG.material(MATERIAL).scan" in source
 
 
-def test_crystal_view_defaults_to_one_ranked_reciprocal_vector() -> None:
+def test_crystal_view_hides_reciprocal_vectors_until_switched_on() -> None:
     source = APP.read_text()
 
     assert '1, 8, value=1, step=1, label="reciprocal vectors"' in source
-    assert "n_reciprocal_vectors=crystal_reciprocal_ui.value" in source
+    assert 'crystal_reciprocal_show_ui = mo.ui.switch(value=False' in source
+    # Count still drives the overlay, but only while the switch is on; off
+    # collapses to zero vectors, which drops the cone trace entirely.
+    assert "crystal_reciprocal_ui.value if crystal_reciprocal_show_ui.value else 0" in source
+
+
+def test_crystal_view_toggles_cell_gridlines_and_axes_independently() -> None:
+    source = APP.read_text()
+
+    assert 'crystal_grid_ui = mo.ui.switch(value=True' in source
+    assert 'crystal_axes_ui = mo.ui.switch(value=True' in source
+    # One switch owns the WHOLE axis frame (walls, wall rules, ticks, labels,
+    # titles), which is what axis-level ``visible`` takes down.
+    assert "_fig.update_scenes(" in source
+    for axis in ("xaxis", "yaxis", "zaxis"):
+        assert f'{axis}={{"visible": crystal_axes_ui.value}}' in source
+    # The gridlines switch owns the per-cell edge trace running through the
+    # structure -- the depth cue -- not anything on the axis walls.
+    assert (
+        '_fig.update_traces(visible=crystal_grid_ui.value, selector={"name": "cell"})' in source
+    )
+
+
+def test_crystal_view_defaults_to_an_orthographic_camera() -> None:
+    source = APP.read_text()
+
+    assert 'crystal_ortho_ui = mo.ui.switch(value=True' in source
+    # Orthographic removes the perspective parallax; the switch falls back to
+    # plotly's default projection rather than leaving the key unset.
+    assert '"orthographic" if crystal_ortho_ui.value else "perspective"' in source
 
 
 def test_penetration_view_uses_static_volume_figure_as_primary_track_plot() -> None:

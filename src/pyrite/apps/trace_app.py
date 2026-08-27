@@ -770,13 +770,29 @@ def _(mo):
     crystal_nc_ui = mo.ui.slider(1, 3, value=2, step=1, label="cells c")
     crystal_bonds_ui = mo.ui.switch(value=True, label="show bonds")
     crystal_layers_ui = mo.ui.switch(value=False, label="color by layer")
+    # Arrows are off by default: they dominate the scene and only matter when
+    # reading diffraction families, so the structure view starts uncluttered.
+    crystal_reciprocal_show_ui = mo.ui.switch(value=False, label="show reciprocal vectors")
     crystal_reciprocal_ui = mo.ui.slider(1, 8, value=1, step=1, label="reciprocal vectors")
+    # Two independent scene toggles: the gridlines are the tiled unit-cell
+    # edges running THROUGH the structure (the depth cue), the axes are the
+    # whole surrounding frame.
+    crystal_grid_ui = mo.ui.switch(value=True, label="show gridlines")
+    crystal_axes_ui = mo.ui.switch(value=True, label="show axes")
+    # Orthographic by default: perspective foreshortening bends parallel cell
+    # edges toward a vanishing point, so columns of atoms only line up on a
+    # zone axis without it.
+    crystal_ortho_ui = mo.ui.switch(value=True, label="orthographic camera")
     return (
+        crystal_axes_ui,
         crystal_bonds_ui,
+        crystal_grid_ui,
         crystal_layers_ui,
         crystal_na_ui,
         crystal_nb_ui,
         crystal_nc_ui,
+        crystal_ortho_ui,
+        crystal_reciprocal_show_ui,
         crystal_reciprocal_ui,
     )
 
@@ -786,12 +802,16 @@ def _(
     CATALOG,
     MATERIAL,
     apply_plotly_theme,
+    crystal_axes_ui,
     crystal_bonds_ui,
+    crystal_grid_ui,
     crystal_lattice_figure,
     crystal_layers_ui,
     crystal_na_ui,
     crystal_nb_ui,
     crystal_nc_ui,
+    crystal_ortho_ui,
+    crystal_reciprocal_show_ui,
     crystal_reciprocal_ui,
     mo,
     resolved_theme,
@@ -804,8 +824,9 @@ def _(
             "### Crystal structure\n"
             "Ball-and-stick view of the selected material's unit cell tiled over "
             "a few cells. Spheres are element-colored (sized by covalent radius); "
-            "arrows show strongest reciprocal-lattice families in descending "
-            "strength. Adjust cell tiling, bonds, coloring, and arrow count below."
+            "switch on reciprocal vectors to overlay the strongest "
+            "reciprocal-lattice families as arrows in descending strength. "
+            "Adjust cell tiling, bonds, coloring, arrows, axes, and camera below."
         )
         if MATERIAL is None:
             return mo.vstack([_md, mo.md("_Select a material to view its lattice._")])
@@ -818,10 +839,41 @@ def _(
             label=_material.label,
             show_bonds=crystal_bonds_ui.value,
             color_by="layer" if crystal_layers_ui.value else "element",
-            n_reciprocal_vectors=crystal_reciprocal_ui.value,
+            n_reciprocal_vectors=(
+                crystal_reciprocal_ui.value if crystal_reciprocal_show_ui.value else 0
+            ),
         )
         apply_plotly_theme(_fig, _theme)
         _fig.update_layout(height=680)
+        # Both applied after the theme, which owns axis colors but not
+        # visibility. One switch takes the entire axis frame down -- walls,
+        # wall rules, ticks, labels, and titles -- via axis-level ``visible``.
+        _fig.update_scenes(
+            xaxis={"visible": crystal_axes_ui.value},
+            yaxis={"visible": crystal_axes_ui.value},
+            zaxis={"visible": crystal_axes_ui.value},
+        )
+        # The gridlines that read as depth are the per-cell edges drawn through
+        # the structure, not anything on the axis walls: that is the ``cell``
+        # trace crystal_lattice_figure adds first.
+        _fig.update_traces(visible=crystal_grid_ui.value, selector={"name": "cell"})
+        # Orthographic drops the perspective parallax so parallel lattice
+        # directions stay parallel at every depth; it is a layout property, so
+        # it survives the user orbiting the scene.
+        _fig.update_scenes(
+            camera={
+                "projection": {
+                    "type": "orthographic" if crystal_ortho_ui.value else "perspective"
+                }
+            }
+        )
+        # Arrow count only means something while the arrows are drawn; dim it
+        # rather than hide it so its value stays visible (as beam FWHM does).
+        _reciprocal_count = (
+            crystal_reciprocal_ui
+            if crystal_reciprocal_show_ui.value
+            else crystal_reciprocal_ui.style({"opacity": "0.4", "pointer-events": "none"})
+        )
         _controls = mo.hstack(
             [
                 crystal_na_ui,
@@ -829,7 +881,11 @@ def _(
                 crystal_nc_ui,
                 crystal_bonds_ui,
                 crystal_layers_ui,
-                crystal_reciprocal_ui,
+                crystal_reciprocal_show_ui,
+                _reciprocal_count,
+                crystal_grid_ui,
+                crystal_axes_ui,
+                crystal_ortho_ui,
             ],
             justify="start",
             gap=1.5,
