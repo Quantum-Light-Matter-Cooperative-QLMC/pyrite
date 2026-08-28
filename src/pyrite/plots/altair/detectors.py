@@ -5,10 +5,13 @@ XO) -- the interactive counterparts of the matplotlib
 :mod:`pyrite.plots.mpl.detectors` figures. Same contract as
 :mod:`pyrite.plots.altair.spectra`: these reuse the exact per-record detector
 data prep (``detectors._tpx_detected`` / ``detectors._eag_detected`` and the
-Eagle response's ``charge_density``), so the physics and units are identical --
-only the renderer differs. The matplotlib ``detectors`` module is left untouched,
-and these names are intentionally NOT re-exported from ``pyrite.plots`` (that
-package has a frozen export-set guard); import them from the submodule:
+Eagle response's ``charge_density``), so the physics is identical -- only the
+renderer and the reported beam-current unit differ (the photon-density charts
+report Phs/s/eV/uA, where the matplotlib path reports the stored per-nA values;
+the recorded-charge density carries no per-current unit and is unaffected). The
+matplotlib ``detectors`` module is left untouched, and these names are
+intentionally NOT re-exported from ``pyrite.plots`` (that package has a frozen
+export-set guard); import them from the submodule:
 
     from pyrite.plots.altair.detectors import eaglexo_detected_chart
 
@@ -58,6 +61,10 @@ from .spectra import (
 
 # incident-vs-detected long form (Timepix + Eagle photon density)
 _DET_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "kind", "band"]
+# Records carry per-nA flux; these charts report per-uA, matching
+# :mod:`pyrite.plots.altair.spectra`. Display convention only.
+_NA_PER_UA = 1000.0
+_INTENSITY_TITLE = "Phs/s/eV/uA"
 # Eagle recorded-charge density long form
 _CHARGE_COLUMNS = ["energy_eV", "charge_density", "E0_keV", "azimuth_deg", "band"]
 
@@ -150,7 +157,7 @@ def timepix_detected_frame(
 ):
     """Tidy long-form incident-vs-Timepix3-detected table for ``recs`` (already
     restricted to one polar tilt): one row per (beam energy, grid point, kind),
-    ``kind`` in ``{"incident", "detected"}``, both already scaled to Phs/eV/s/nA.
+    ``kind`` in ``{"incident", "detected"}``, both already scaled to Phs/s/eV/uA.
     Mirrors :func:`pyrite.plots.mpl.detectors._draw_timepix_detected`. ``band`` is
     ``"line"`` (fine line grid) or ``"broad"`` (the wide brem grid with the
     coherent contribution interpolated onto it).  The broad view applies one
@@ -184,7 +191,7 @@ def timepix_detected_frame(
                         pd.DataFrame(
                             {
                                 "energy_eV": Ex,
-                                "intensity": np.asarray(y, dtype=float),
+                                "intensity": np.asarray(y, dtype=float) * _NA_PER_UA,
                                 "E0_keV": float(E0),
                                 "azimuth_deg": az,
                                 "kind": kind,
@@ -210,7 +217,7 @@ def _detected_layers(
     grids never join across their gap."""
     base = alt.Chart(df).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
-        y=alt.Y("intensity:Q", title="Phs/eV/s/nA", scale=y_scale, axis=_spectrum_axis()),
+        y=alt.Y("intensity:Q", title=_INTENSITY_TITLE, scale=y_scale, axis=_spectrum_axis()),
         color=alt.Color(f"{color_field}:N", title=color_title, legend=_spectrum_legend()),
         detail="band:N",
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "kind:N", "band:N"],
@@ -292,9 +299,9 @@ def eaglexo_detected_frame(
 ):
     """Tidy long-form incident-vs-Eagle-XO-detected table for ``recs`` (one polar
     tilt): one row per (beam energy, grid point, kind, band). ``kind`` in
-    ``{"incident", "detected"}``; ``band`` is ``"line"`` (fine line grid) or
-    ``"brem"`` (the wide brem grid, present only when the sweep stored
-    ``brem_wide``). Mirrors :func:`pyrite.plots.mpl.detectors._draw_eaglexo_detected`,
+    ``{"incident", "detected"}``, both scaled to Phs/s/eV/uA; ``band`` is
+    ``"line"`` (fine line grid) or ``"brem"`` (the wide brem grid, present only
+    when the sweep stored ``brem_wide``). Mirrors :func:`pyrite.plots.mpl.detectors._draw_eaglexo_detected`,
     including the thin-sensor QE roll-off on the wide brem. Columns:
     ``energy_eV, intensity, E0_keV, azimuth_deg, kind, band``."""
     _validate_band(band)
@@ -314,7 +321,7 @@ def eaglexo_detected_frame(
                         pd.DataFrame(
                             {
                                 "energy_eV": Ex,
-                                "intensity": np.asarray(y, dtype=float),
+                                "intensity": np.asarray(y, dtype=float) * _NA_PER_UA,
                                 "E0_keV": float(E0),
                                 "azimuth_deg": az,
                                 "kind": kind,

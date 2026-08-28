@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from pyrite.apps._design import apply_altair_theme, static_altair_chart
-from pyrite.plots.altair.spectra import spectrum_chart, spectrum_frame
+from pyrite.plots.altair.spectra import _NA_PER_UA, spectrum_chart, spectrum_frame
 
 
 def _settings():
@@ -138,7 +138,8 @@ def test_spectrum_frame_peak_preserving_decimation_keeps_line_peak():
 
     total = df[df.component == "total"]
     assert len(total) <= 40
-    assert np.isclose(total["intensity"].max(), rec["spec"].max() * rec["scale"])
+    # frames report per-uA: the stored per-nA scale times _NA_PER_UA
+    assert np.isclose(total["intensity"].max(), rec["spec"].max() * rec["scale"] * _NA_PER_UA)
 
 
 def test_spectrum_frame_brem_toggle_preserves_total_sampling_budget():

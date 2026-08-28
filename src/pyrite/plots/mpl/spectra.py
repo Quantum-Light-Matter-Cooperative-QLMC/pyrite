@@ -38,6 +38,9 @@ _TICK_LABEL_FONT_SIZE = 12
 _LEGEND_FONT_SIZE = 12
 _LEGEND_TITLE_FONT_SIZE = 14
 
+# nA per uA -- see `plot_best_spectra`, the one figure here reported per-uA.
+_NA_PER_UA = 1000.0
+
 
 def _style_axis(ax):
     """Apply readable typography to one completed spectral axis."""
@@ -352,14 +355,18 @@ def plot_best_spectra(
         line_det, brem_det = _line_brem(r, settings, convolve=False)
         E = r["E_grid"] / 1e3
         col = energy_color(c["E0_keV"], all_E)
+        # Records store per-nA flux; these panels report per-uA (see the axis
+        # label below), matching the Altair spectra the analysis app pairs them
+        # with. Display convention only -- the records are untouched.
+        scale = r["scale"] * _NA_PER_UA
         ax.plot(
             E,
-            (line_det + brem_det if include_brem else line_det) * r["scale"],
+            (line_det + brem_det if include_brem else line_det) * scale,
             color=col,
             lw=1.1,
         )
         if include_brem:
-            ax.plot(E, brem_det * r["scale"], color=col, ls="--", lw=0.5)
+            ax.plot(E, brem_det * scale, color=col, ls="--", lw=0.5)
         ax.set_title(
             rf"#{k + 1} {c['name'].split()[0]} {c['E0_keV']:g}keV"
             "\n"
@@ -374,7 +381,7 @@ def plot_best_spectra(
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].axis("off")
     fig.supxlabel("Photon energy (keV)", fontsize=12)
-    fig.supylabel("Intensity (Phs/eV/s/nA)", fontsize=12)
+    fig.supylabel("Intensity (Phs/s/eV/uA)", fontsize=12)
     fig.suptitle(f"Top {n} geometries by {select} (dashed = brem)", fontsize=_TITLE_FONT_SIZE)
     return fig
 

@@ -8,10 +8,11 @@ pans/zooms interactively at a fraction of the redraw cost.
 
 Non-destructive: this module reuses the exact per-record data prep
 (:func:`pyrite.plots._common._line_brem`) that the matplotlib path uses, so the
-physics and units are identical -- only the renderer differs. The matplotlib
-``plots/`` package is left untouched, and these names are intentionally NOT
-re-exported from ``pyrite.plots`` (that package has a frozen export-set guard);
-import them from the submodule:
+physics is identical -- only the renderer and the reported beam-current unit
+differ (these charts report Phs/s/eV/uA; the matplotlib path reports the stored
+per-nA values). The matplotlib ``plots/`` package is left untouched, and these
+names are intentionally NOT re-exported from ``pyrite.plots`` (that package has
+a frozen export-set guard); import them from the submodule:
 
     from pyrite.plots.altair.spectra import (
         spectrum_chart,
@@ -44,6 +45,13 @@ from ._typing import _mark_chart
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
 _TAIL_BUDGET_DIVISOR = 10
+
+# ``r["scale"]`` carries per-nA units (see results.store: `scale=... * PER_NA`);
+# these charts report per-uA instead, so every intensity column folds in the
+# 1000 nA/uA factor. Purely a display convention -- the stored records and the
+# matplotlib renderers are untouched.
+_NA_PER_UA = 1000.0
+_INTENSITY_TITLE = "Intensity (Phs/s/eV/uA)"
 
 # Case fields a `compare_spectrum_chart` caller may color by, and the axis/legend
 # metadata for each -- readable title + unit suffix used both in the legend and
@@ -199,6 +207,7 @@ def _scale(scale_type, domain=None):
 
 def _record_frame(r, settings, *, include_brem, include_line=False, include_coherent=False, meta):
     E = np.asarray(r["E_grid"], dtype=float)
+    scale = r["scale"] * _NA_PER_UA
     line_det, brem_det = _line_brem(r, settings, convolve=False)
     line_det = np.asarray(line_det, dtype=float)
     brem_det = np.asarray(brem_det, dtype=float)
@@ -233,8 +242,8 @@ def _record_frame(r, settings, *, include_brem, include_line=False, include_cohe
         pd.DataFrame(
             {
                 "energy_eV": total_E,
-                "intensity": total * r["scale"],
-                "_line_intensity": line_basis * r["scale"],
+                "intensity": total * scale,
+                "_line_intensity": line_basis * scale,
                 "_line_grid": line_grid,
                 **meta,
                 "component": "total",
@@ -246,8 +255,8 @@ def _record_frame(r, settings, *, include_brem, include_line=False, include_cohe
             pd.DataFrame(
                 {
                     "energy_eV": brem_E,
-                    "intensity": brem * r["scale"],
-                    "_line_intensity": line_basis * r["scale"],
+                    "intensity": brem * scale,
+                    "_line_intensity": line_basis * scale,
                     "_line_grid": line_grid,
                     **meta,
                     "component": "brem",
@@ -259,8 +268,8 @@ def _record_frame(r, settings, *, include_brem, include_line=False, include_cohe
             pd.DataFrame(
                 {
                     "energy_eV": total_E,
-                    "intensity": line_basis * r["scale"],
-                    "_line_intensity": line_basis * r["scale"],
+                    "intensity": line_basis * scale,
+                    "_line_intensity": line_basis * scale,
                     "_line_grid": line_grid,
                     **meta,
                     "component": "line",
@@ -283,8 +292,8 @@ def _record_frame(r, settings, *, include_brem, include_line=False, include_cohe
             pd.DataFrame(
                 {
                     "energy_eV": total_E,
-                    "intensity": coherent_basis * r["scale"],
-                    "_line_intensity": coherent_basis * r["scale"],
+                    "intensity": coherent_basis * scale,
+                    "_line_intensity": coherent_basis * scale,
                     "_line_grid": line_grid,
                     **meta,
                     "component": "coherent",
@@ -508,7 +517,7 @@ def spectrum_chart(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
-            title="Intensity (Phs/eV/s/nA)",
+            title=_INTENSITY_TITLE,
             scale=y_scale,
             axis=_spectrum_axis(),
         ),
@@ -658,7 +667,7 @@ def compare_spectrum_chart(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
-            title="Intensity (Phs/eV/s/nA)",
+            title=_INTENSITY_TITLE,
             scale=y_scale,
             axis=_spectrum_axis(),
         ),
@@ -761,7 +770,7 @@ def multi_case_spectrum_chart(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale, axis=_spectrum_axis()),
         y=alt.Y(
             "intensity:Q",
-            title="Intensity (Phs/eV/s/nA)",
+            title=_INTENSITY_TITLE,
             scale=y_scale,
             axis=_spectrum_axis(),
         ),

@@ -14,6 +14,7 @@ import numpy as np
 
 from pyrite.detectors import Timepix3
 from pyrite.plots.altair.detectors import (
+    _NA_PER_UA,
     eaglexo_charge_chart,
     eaglexo_charge_frame,
     eaglexo_detected_chart,
@@ -98,7 +99,7 @@ def test_timepix_frame_uses_one_response_across_line_grid_boundary(monkeypatch):
     assert df["energy_eV"].max() == 30000.0
     incident = df.loc[df["kind"] == "incident"]
     assert incident["energy_eV"].is_monotonic_increasing
-    np.testing.assert_allclose(incident["intensity"], 2.0)
+    np.testing.assert_allclose(incident["intensity"], 2.0 * _NA_PER_UA)
     assert len(calls) == 1
     np.testing.assert_allclose(calls[0], incident["energy_eV"])
 
