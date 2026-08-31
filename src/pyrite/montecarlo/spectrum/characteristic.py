@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 from importlib.metadata import version as package_version
@@ -12,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 import xraydb
+from endf_parserpy import EndfFile
 
 from ... import DATA_DIR
 from ...materials.atomic import Z_TABLE
@@ -34,9 +36,11 @@ from .lines import (
 CHARACTERISTIC_DATA_DIR = DATA_DIR / "characteristic_cross_sections"
 CHARACTERISTIC_EEDL_FILENAME = "EEDL.endf"
 CHARACTERISTIC_EEDL_SHA256 = "f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c"
+CHARACTERISTIC_ENDF_PARSERPY_VERSION = package_version("endf-parserpy")
 CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 CHARACTERISTIC_MODEL = (
     f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
+    f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
     f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-v1"
 )
 _MIN_RELAXATION_CUTOFF_EV = 50.0
@@ -111,15 +115,13 @@ class CharacteristicCrossSectionTable:
 
 
 @dataclass(frozen=True, slots=True)
-class _EEDLSectionIndex:
-    """Cached records for EEDL subshell-ionization sections."""
+class _EEDLSubshellTable:
+    """One validated EEDL MF=23 subshell-ionization TAB1 table."""
 
-    sections_by_atomic_number: dict[
-        int,
-        dict[int, tuple[tuple[int, str], ...]],
-    ]
-    saw_eedl_subshell: bool
-    saw_eadl_relaxation: bool
+    shell_designator: int
+    binding_energy_eV: float
+    projectile_energy_eV: np.ndarray
+    cross_section_cm2: np.ndarray
 
 
 def _readonly(array: object) -> np.ndarray:
@@ -139,209 +141,65 @@ def _require_finite(value: object, name: str, *, positive: bool = False) -> floa
     return number
 
 
-def _parse_endf_float(field: str, name: str) -> float:
-    """Parse an eleven-column ENDF-6 real field, including implicit exponents."""
-    text = field.strip()
-    if not text:
-        return 0.0
-    normalized = text.replace("D", "E").replace("d", "e")
-    if "e" not in normalized.lower():
-        match = re.fullmatch(r"([+-]?(?:\d+(?:\.\d*)?|\.\d+))([+-]\d+)", normalized)
-        if match is not None:
-            normalized = f"{match.group(1)}e{match.group(2)}"
-    try:
-        value = float(normalized)
-    except ValueError as exc:
-        raise ValueError(f"{name}: invalid ENDF-6 real field {field!r}") from exc
-    if not np.isfinite(value):
-        raise ValueError(f"{name}: ENDF-6 value must be finite")
-    return value
-
-
-def _parse_endf_int(field: str, name: str) -> int:
-    text = field.strip()
-    if not text:
-        return 0
-    try:
-        return int(text)
-    except ValueError:
-        value = _parse_endf_float(field, name)
-        integer = int(round(value))
-        if value != integer:
-            raise ValueError(f"{name}: expected an ENDF-6 integer, got {field!r}") from None
-        return integer
-
-
-def _endf_fields(line: str) -> tuple[str, ...]:
-    data = line[:66].ljust(66)
-    return tuple(data[start : start + 11] for start in range(0, 66, 11))
-
-
-def _endf_record_id(line: str) -> tuple[int, int, int] | None:
-    if len(line) < 75:
-        return None
-    try:
-        return int(line[66:70]), int(line[70:72]), int(line[72:75])
-    except ValueError:
-        return None
-
-
-@cache
-def _index_eedl_sections(
-    path: Path,
-    file_size: int,
-    modified_time_ns: int,
-) -> _EEDLSectionIndex:
-    """Scan one ENDF-6 file and cache every EEDL subshell section.
-
-    ``file_size`` and ``modified_time_ns`` are cache-key sentinels supplied by
-    :func:`_read_eedl_sections`; they prevent an explicit data file that was
-    replaced in place from reusing a stale index.
-    """
-    del file_size, modified_time_ns
-    sections_by_atomic_number: dict[
-        int,
-        dict[int, tuple[tuple[int, str], ...]],
-    ] = {}
-    current_key: tuple[int, int, int] | None = None
-    current_records: list[tuple[int, str]] = []
-    saw_eedl_subshell = False
-    saw_eadl_relaxation = False
-
-    def finish_section() -> None:
-        if current_key is None or not current_records:
-            return
-        _mat, mf, mt = current_key
-        assert mf == 23 and 534 <= mt <= 572
-        head_line_number, head_line = current_records[0]
-        za = _parse_endf_float(
-            _endf_fields(head_line)[0],
-            f"{path}:{head_line_number}: ZA",
-        )
-        section_atomic_number = int(round(za / 1000.0))
-        if not 1 <= section_atomic_number <= 100:
-            raise ValueError(
-                f"{path}:{head_line_number}: invalid EEDL atomic number derived from ZA={za:g}"
-            )
-        element_sections = sections_by_atomic_number.setdefault(section_atomic_number, {})
-        if mt in element_sections:
-            raise ValueError(
-                f"{path}: duplicate EEDL MF=23/MT={mt} section for Z={section_atomic_number}"
-            )
-        element_sections[mt] = tuple(current_records)
-
-    with path.open("r", encoding="ascii", errors="strict", newline=None) as stream:
-        for line_number, raw_line in enumerate(stream, start=1):
-            line = raw_line.rstrip("\r\n")
-            record_id = _endf_record_id(line)
-            if record_id is None:
-                continue
-            _mat, mf, mt = record_id
-            saw_eedl_subshell = saw_eedl_subshell or (mf == 23 and 534 <= mt <= 572)
-            saw_eadl_relaxation = saw_eadl_relaxation or (mf == 28 and mt == 533)
-            if record_id != current_key:
-                finish_section()
-                current_key = record_id
-                current_records = [(line_number, line)] if mf == 23 and 534 <= mt <= 572 else []
-            elif current_records:
-                current_records.append((line_number, line))
-    finish_section()
-
-    return _EEDLSectionIndex(
-        sections_by_atomic_number=sections_by_atomic_number,
-        saw_eedl_subshell=saw_eedl_subshell,
-        saw_eadl_relaxation=saw_eadl_relaxation,
-    )
-
-
-def _read_eedl_sections(
-    path: Path,
-    atomic_number: int,
-    element: str,
-) -> dict[int, list[tuple[int, str]]]:
-    """Collect the target element's EEDL MF=23 subshell TAB1 sections."""
-    resolved_path = path.resolve()
-    stat = resolved_path.stat()
-    index = _index_eedl_sections(
-        resolved_path,
-        stat.st_size,
-        stat.st_mtime_ns,
-    )
-    sections = index.sections_by_atomic_number.get(atomic_number)
-
-    if sections:
-        return {mt: list(records) for mt, records in sections.items()}
-    if index.saw_eadl_relaxation and not index.saw_eedl_subshell:
-        raise ValueError(
-            f"{path}: contains EADL MF=28/MT=533 atomic-relaxation data, not "
-            "electron-impact ionization cross sections; provide the companion EEDL "
-            "electro-atomic file with MF=23/MT=534-572"
-        )
-    raise ValueError(
-        f"{path}: no electroionization subshell sections for {element} (Z={atomic_number}); "
-        "expected EEDL MF=23/MT=534-572"
-    )
-
-
-def _parse_eedl_subshell(
+def _section_vector(
+    section: Mapping[str, object],
+    field: str,
     path: Path,
     mt: int,
-    records: list[tuple[int, str]],
-) -> tuple[int, float, np.ndarray, np.ndarray]:
-    """Parse one ENDF-6 File-23 TAB1 subshell cross-section section."""
-    if len(records) < 4:
-        raise ValueError(f"{path}: EEDL MF=23/MT={mt} section is truncated")
-    header_line_number, header_line = records[1]
-    header = _endf_fields(header_line)
-    binding = _parse_endf_float(
-        header[0],
-        f"{path}:{header_line_number}: EPE binding energy",
-    )
-    if binding <= 0.0:
-        raise ValueError(f"{path}:{header_line_number}: EPE binding energy must be positive")
-    nr = _parse_endf_int(header[4], f"{path}:{header_line_number}: NR")
-    npairs = _parse_endf_int(header[5], f"{path}:{header_line_number}: NP")
-    if nr <= 0 or npairs < 3:
-        raise ValueError(f"{path}:{header_line_number}: EEDL TAB1 needs NR>0 and NP>=3")
-
-    payload: list[tuple[str, int]] = []
-    for line_number, line in records[2:]:
-        payload.extend((field, line_number) for field in _endf_fields(line) if field.strip())
-    expected_fields = 2 * nr + 2 * npairs
-    if len(payload) != expected_fields:
+) -> np.ndarray:
+    """Copy one endf-parserpy section vector into a finite float array."""
+    try:
+        values = np.asarray(section[field], dtype=float)
+    except KeyError as exc:
+        raise ValueError(f"{path}: EEDL MF=23/MT={mt} is missing {field}") from exc
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{path}: EEDL MF=23/MT={mt} has invalid {field} values") from exc
+    if values.ndim != 1 or not np.all(np.isfinite(values)):
         raise ValueError(
-            f"{path}: EEDL MF=23/MT={mt} TAB1 declares {expected_fields} payload "
-            f"fields but contains {len(payload)}"
+            f"{path}: EEDL MF=23/MT={mt} {field} must be a finite one-dimensional array"
         )
-    interpolation = payload[: 2 * nr]
-    breakpoints = [
-        _parse_endf_int(field, f"{path}:{line_number}: NBT")
-        for field, line_number in interpolation[0::2]
-    ]
-    laws = [
-        _parse_endf_int(field, f"{path}:{line_number}: INT")
-        for field, line_number in interpolation[1::2]
-    ]
-    if breakpoints[-1] != npairs or any(
-        later <= earlier for earlier, later in zip(breakpoints[:-1], breakpoints[1:], strict=True)
+    return values
+
+
+def _extract_eedl_subshell(
+    path: Path,
+    mt: int,
+    section: Mapping[str, object],
+) -> _EEDLSubshellTable:
+    """Validate one MF=23 section already decoded by endf-parserpy."""
+    try:
+        binding = _require_finite(
+            section["EPE"],
+            f"{path}: EEDL MF=23/MT={mt} EPE binding energy",
+            positive=True,
+        )
+    except KeyError as exc:
+        raise ValueError(f"{path}: EEDL MF=23/MT={mt} is missing EPE") from exc
+
+    projectile = _section_vector(section, "Eint", path, mt)
+    cross_section_barn = _section_vector(section, "sigma", path, mt)
+    breakpoints_float = _section_vector(section, "NBT", path, mt)
+    laws_float = _section_vector(section, "INT", path, mt)
+    if projectile.size != cross_section_barn.size or projectile.size < 3:
+        raise ValueError(
+            f"{path}: EEDL MF=23/MT={mt} must contain at least three paired "
+            "Eint/sigma samples"
+        )
+    if breakpoints_float.size == 0 or breakpoints_float.size != laws_float.size:
+        raise ValueError(f"{path}: EEDL MF=23/MT={mt} has invalid NBT/INT arrays")
+    breakpoints = np.rint(breakpoints_float).astype(int)
+    laws = np.rint(laws_float).astype(int)
+    if not np.array_equal(breakpoints_float, breakpoints) or not np.array_equal(
+        laws_float, laws
     ):
+        raise ValueError(f"{path}: EEDL MF=23/MT={mt} NBT/INT values must be integers")
+    if breakpoints[-1] != projectile.size or np.any(np.diff(breakpoints) <= 0):
         raise ValueError(f"{path}: invalid EEDL MF=23/MT={mt} interpolation breakpoints")
-    if any(law != 2 for law in laws):
+    if np.any(laws != 2):
         raise ValueError(
             f"{path}: only ENDF interpolation law 2 (lin-lin) is supported for EEDL "
-            f"cross sections; MF=23/MT={mt} declares {laws}"
+            f"cross sections; MF=23/MT={mt} declares {laws.tolist()}"
         )
-
-    table_fields = payload[2 * nr :]
-    table_values = np.asarray(
-        [
-            _parse_endf_float(field, f"{path}:{line_number}: TAB1 value")
-            for field, line_number in table_fields
-        ],
-        dtype=float,
-    )
-    projectile = table_values[0::2]
-    cross_section_barn = table_values[1::2]
     if np.any(projectile <= 0.0) or np.any(np.diff(projectile) <= 0.0):
         raise ValueError(
             f"{path}: EEDL MF=23/MT={mt} projectile energies must be positive and "
@@ -353,20 +211,89 @@ def _parse_eedl_subshell(
         raise ValueError(f"{path}: EEDL MF=23/MT={mt} cross section is nonzero at/below EPE")
     if np.count_nonzero(cross_section_barn > 0.0) < 2:
         raise ValueError(f"{path}: EEDL MF=23/MT={mt} needs at least two positive samples")
-    return mt - 533, binding, projectile, cross_section_barn * 1.0e-24
+
+    return _EEDLSubshellTable(
+        shell_designator=mt - 533,
+        binding_energy_eV=binding,
+        projectile_energy_eV=_readonly(projectile),
+        cross_section_cm2=_readonly(cross_section_barn * 1.0e-24),
+    )
+
+
+@cache
+def _load_eedl_subshell_tables(
+    path: Path,
+    file_size: int,
+    modified_time_ns: int,
+    atomic_number: int,
+    element: str,
+) -> tuple[_EEDLSubshellTable, ...]:
+    """Use endf-parserpy to load one element's EEDL subshell sections.
+
+    ``file_size`` and ``modified_time_ns`` are cache-key sentinels. They ensure
+    that replacing an explicitly supplied EEDL file in place invalidates the
+    cached parsed tables.
+    """
+    del file_size, modified_time_ns
+    saw_eedl_subshell = False
+    saw_eadl_relaxation = False
+    matching_materials: list[tuple[int, tuple[int, ...], object]] = []
+
+    with EndfFile(path, on_error="raise") as tape:
+        for position in range(len(tape)):
+            material = tape[position]
+            section_ids = tuple(material.sections())
+            subshell_mts = tuple(
+                sorted(mt for mf, mt in section_ids if mf == 23 and 534 <= mt <= 572)
+            )
+            saw_eedl_subshell = saw_eedl_subshell or bool(subshell_mts)
+            saw_eadl_relaxation = saw_eadl_relaxation or (28, 533) in section_ids
+            section_atomic_number = round(float(material.za) / 1000.0)
+            if section_atomic_number == atomic_number and subshell_mts:
+                matching_materials.append((int(material.mat), subshell_mts, material))
+
+        if len(matching_materials) > 1:
+            mats = [mat for mat, _mts, _material in matching_materials]
+            raise ValueError(
+                f"{path}: multiple EEDL materials contain MF=23 subshell data "
+                f"for {element} (Z={atomic_number}): MAT={mats}"
+            )
+        if matching_materials:
+            _mat, subshell_mts, material = matching_materials[0]
+            return tuple(
+                _extract_eedl_subshell(path, mt, material[23, mt]) for mt in subshell_mts
+            )
+
+    if saw_eadl_relaxation and not saw_eedl_subshell:
+        raise ValueError(
+            f"{path}: contains EADL MF=28/MT=533 atomic-relaxation data, not "
+            "electron-impact ionization cross sections; provide the companion EEDL "
+            "electro-atomic file with MF=23/MT=534-572"
+        )
+    raise ValueError(
+        f"{path}: no electroionization subshell sections for {element} (Z={atomic_number}); "
+        "expected EEDL MF=23/MT=534-572"
+    )
 
 
 def _parse_characteristic_file(
     path: Path,
     element: str,
 ) -> CharacteristicCrossSectionTable:
-    """Parse EEDL ionization tables and join them to xraydb relaxation data."""
+    """Load EEDL ionization tables and join them to xraydb relaxation data."""
     try:
         atomic_number = Z_TABLE[element]
     except KeyError as exc:
         raise ValueError(f"unknown element {element!r}") from exc
-    sections = _read_eedl_sections(path, atomic_number, element)
-    parsed_shells = [_parse_eedl_subshell(path, mt, sections[mt]) for mt in sorted(sections)]
+    resolved_path = path.resolve()
+    stat = resolved_path.stat()
+    parsed_shells = _load_eedl_subshell_tables(
+        resolved_path,
+        stat.st_size,
+        stat.st_mtime_ns,
+        atomic_number,
+        element,
+    )
     ionization_shell_labels: list[str] = []
     binding_energies: list[float] = []
     fluorescence_yields: list[float] = []
@@ -374,12 +301,14 @@ def _parse_characteristic_file(
     cross_section_tables: list[np.ndarray] = []
     line_records: list[tuple[int, str, float, float]] = []
     unresolved_radiative_shells: list[str] = []
-    for shell_designator, binding, projectile, cross_section_cm2 in parsed_shells:
-        shell = _SHELL_LABELS.get(shell_designator)
+    for subshell in parsed_shells:
+        shell = _SHELL_LABELS.get(subshell.shell_designator)
+        binding = subshell.binding_energy_eV
         if shell is None:
             if binding > _MIN_RELAXATION_CUTOFF_EV:
                 raise ValueError(
-                    f"{path}: unsupported ENDF subshell designator {shell_designator} "
+                    f"{path}: unsupported ENDF subshell designator "
+                    f"{subshell.shell_designator} "
                     f"above the {_MIN_RELAXATION_CUTOFF_EV:g} eV model cutoff"
                 )
             continue
@@ -398,8 +327,8 @@ def _parse_characteristic_file(
         ionization_shell_labels.append(shell)
         binding_energies.append(binding)
         fluorescence_yields.append(fluorescence_yield)
-        projectile_grids.append(projectile)
-        cross_section_tables.append(cross_section_cm2)
+        projectile_grids.append(subshell.projectile_energy_eV)
+        cross_section_tables.append(subshell.cross_section_cm2)
         lines = xraydb.xray_lines(element, initial_level=shell)
         if not lines and fluorescence_yield > 0.0 and binding > _MIN_RELAXATION_CUTOFF_EV:
             unresolved_radiative_shells.append(shell)
@@ -505,7 +434,8 @@ def load_characteristic_cross_sections(
 
     ``data_dir`` may name a monolithic ENDF-6 EEDL file or a directory that
     contains ``EEDL.endf``. EEDL MF=23/MT=534--572 supplies incident-energy
-    grids, binding energies, and electroionization cross sections in barns.
+    grids, binding energies, and electroionization cross sections in barns;
+    these sections are decoded and validated by endf-parserpy.
     Fluorescence yields, line energies, and conditional line intensities come
     from xraydb. EADL MF=28 relaxation files and legacy NIST
     ``ELEMENT_Xchar.txt`` line-emission exports are intentionally not treated
@@ -763,6 +693,7 @@ __all__ = [
     "CHARACTERISTIC_DATA_DIR",
     "CHARACTERISTIC_EEDL_FILENAME",
     "CHARACTERISTIC_EEDL_SHA256",
+    "CHARACTERISTIC_ENDF_PARSERPY_VERSION",
     "CHARACTERISTIC_MODEL",
     "CHARACTERISTIC_XRAYDB_VERSION",
     "CharacteristicCrossSectionTable",

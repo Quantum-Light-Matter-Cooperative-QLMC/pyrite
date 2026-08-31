@@ -913,6 +913,27 @@ wheels = [
 ]
 
 [[package]]
+name = "endf-parserpy"
+version = "0.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "lark" },
+    { name = "platformdirs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/15/c5485b0af4affbb0959ffe19122998a82fa66fa352d919d37c3e2aa98dd9/endf_parserpy-0.17.0.tar.gz", hash = "sha256:9b59e1524ac0051e3fe77c8967345379af8cb03e6e8e4b4d95461a86d53eb133", size = 243794, upload-time = "2026-05-18T10:28:51.52Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/10/a3f26fe5ccc4ccf4ba48e504e26fc10e2d4f06a90463ccead1d8921cad2d/endf_parserpy-0.17.0-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:c06c62f9351f92b11778505aee793ba281d6a41b04a776ed0f38ae244921ef5f", size = 12644708, upload-time = "2026-05-18T10:28:11.167Z" },
+    { url = "https://files.pythonhosted.org/packages/84/0a/2ea566a5708df5f8a04e710f28d8dee6b8b7b7fd4ee47031a19c42f6dc3f/endf_parserpy-0.17.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:7c29e1b84964b3453cf6e4f886b56cd0567341fe6a092e672e4c13239d6c0c31", size = 12616438, upload-time = "2026-05-18T10:28:13.843Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/9c/7f8a13063be4cf0d4202077cc9e97d0b5421b9e8025dcc48a2e13af8e529/endf_parserpy-0.17.0-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:2903f3f5f41b95018a9445ad880a4153bd21e19b308fded6fd286889915a6467", size = 11846764, upload-time = "2026-05-18T10:28:15.948Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/95/6eada27cf965fc2db1d0c58bfdd2556ad227cba4e124e9730335075b8afb/endf_parserpy-0.17.0-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:23065425c5a5ab0a752426b67cec4dbb33576f55ac6afb8e0d724b6cacafb362", size = 13974595, upload-time = "2026-05-18T10:28:18.383Z" },
+    { url = "https://files.pythonhosted.org/packages/62/77/960c445051d752aa75e1f58ee4ffc1ad10d1ba0deb9089560edaed6ade06/endf_parserpy-0.17.0-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:b7714b15c3ffdb5b1660701e3bb0005c7a11058fd9c50a193dbb8be1cb5b093f", size = 12013721, upload-time = "2026-05-18T10:28:21.121Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/9d/e5f354073d2333cb575b251d62923c38212b3aea706bb2a4ad6f61e6ee69/endf_parserpy-0.17.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:610a873085ba1e146feb112b1f2510c4d43896ff0285abf6ba549e22f148d0fc", size = 14149859, upload-time = "2026-05-18T10:28:23.581Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/9f/993cda7a126245c2bd98bded96e36326dc9cbd5ce8e7f1c398775b15b8cf/endf_parserpy-0.17.0-cp314-cp314-win32.whl", hash = "sha256:b9cec413f78f0cd8b7c62b0cfdc7912b1707e62dfe9649d3e7a9491524a42c37", size = 5830916, upload-time = "2026-05-18T10:28:26.606Z" },
+    { url = "https://files.pythonhosted.org/packages/6f/f2/e7bb098efbb95bf7df414087000dc2b06f8565233e34312eda559ce0e591/endf_parserpy-0.17.0-cp314-cp314-win_amd64.whl", hash = "sha256:23d98191eb8ac429ce377872b002f3f8f387f112e8be331ec347c96387ca03b0", size = 6099582, upload-time = "2026-05-18T10:28:28.131Z" },
+    { url = "https://files.pythonhosted.org/packages/73/c4/494b38b5d0ec69a730708c908a017dcbc87a9307e54defc22720685b3b77/endf_parserpy-0.17.0-cp314-cp314-win_arm64.whl", hash = "sha256:fea304e7578e0097c73a17005c508080d83f9275c1ef94123502946c8a7d43f9", size = 6723790, upload-time = "2026-05-18T10:28:29.845Z" },
+]
+
+[[package]]
 name = "execnet"
 version = "2.1.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1574,6 +1595,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/07/18/43a5f24608d8c313dd189cf838c8e68d75b115567c6279de7796197cfb6a/kiwisolver-1.5.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:e7a116ae737f0000343218c4edf5bd45893bfeaff0993c0b215d7124c9f77646", size = 2394403, upload-time = "2026-03-09T13:15:31.517Z" },
     { url = "https://files.pythonhosted.org/packages/3b/b5/98222136d839b8afabcaa943b09bd05888c2d36355b7e448550211d1fca4/kiwisolver-1.5.0-cp314-cp314t-win_amd64.whl", hash = "sha256:1dd9b0b119a350976a6d781e7278ec7aca0b201e1a9e2d23d9804afecb6ca681", size = 79687, upload-time = "2026-03-09T13:15:33.204Z" },
     { url = "https://files.pythonhosted.org/packages/99/a2/ca7dc962848040befed12732dff6acae7fb3c4f6fc4272b3f6c9a30b8713/kiwisolver-1.5.0-cp314-cp314t-win_arm64.whl", hash = "sha256:58f812017cd2985c21fbffb4864d59174d4903dd66fa23815e74bbc7a0e2dd57", size = 70032, upload-time = "2026-03-09T13:15:34.411Z" },
+]
+
+[[package]]
+name = "lark"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/34/28fff3ab31ccff1fd4f6c7c7b0ceb2b6968d8ea4950663eadcb5720591a0/lark-1.3.1.tar.gz", hash = "sha256:b426a7a6d6d53189d318f2b6236ab5d6429eaf09259f1ca33eb716eed10d2905", size = 382732, upload-time = "2025-10-27T18:25:56.653Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/3d/14ce75ef66813643812f3093ab17e46d3a206942ce7376d31ec2d36229e7/lark-1.3.1-py3-none-any.whl", hash = "sha256:c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12", size = 113151, upload-time = "2025-10-27T18:25:54.882Z" },
 ]
 
 [[package]]
@@ -3077,6 +3107,7 @@ source = { editable = "." }
 dependencies = [
     { name = "click" },
     { name = "crystals" },
+    { name = "endf-parserpy" },
     { name = "h5py" },
     { name = "numba" },
     { name = "numpy" },
@@ -3169,6 +3200,7 @@ requires-dist = [
     { name = "cupy-cuda13x", extras = ["ctk"], marker = "extra == 'nvidia'", specifier = ">=14.1.1" },
     { name = "dpctl", marker = "extra == 'intel'", specifier = ">=0.22.1" },
     { name = "dpnp", marker = "extra == 'intel'", specifier = ">=0.20.0" },
+    { name = "endf-parserpy", specifier = ">=0.17.0" },
     { name = "h5py", specifier = ">=3.16.0" },
     { name = "mp-api", marker = "extra == 'external-db'", specifier = ">=0.46" },
     { name = "numba", specifier = ">=0.66.0" },
