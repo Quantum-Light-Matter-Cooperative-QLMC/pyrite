@@ -25,7 +25,11 @@ from pyrite.campaign.profiles import (
 from pyrite.campaign.sweep import build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import Detector, EnergyBins, Timepix3
-from pyrite.montecarlo.spectrum import CHARACTERISTIC_MODEL, CHARACTERISTIC_XRAYDB_VERSION
+from pyrite.montecarlo.spectrum import (
+    BREMSSTRAHLUNG_MODEL,
+    CHARACTERISTIC_MODEL,
+    CHARACTERISTIC_XRAYDB_VERSION,
+)
 
 
 def _cases_by_key(material, catalog_profile):
@@ -56,7 +60,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
 
     assert case_content_key(case) == case_content_key(case.to_dict())
     assert case_content_key(case) == (
-        "3e40f68286a582536d66b30c69e5b4e4a4cd1ab8cb4c147bf68a1301d5674581"
+        "3a261d1a903cd792cd62b5cacaac632114444619f6793dd1e2de622972c126f4"
     )
 
 
@@ -67,7 +71,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "9f2b0f81fde05cb95c540814147f204bd304d69110925a8e28e61ed641e54790"
+        "aa8dc2a138eddefc582d59a379c6b36781fce3f5a04102ad07d7883444ce7c5e"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -334,12 +338,28 @@ def test_case_content_key_separates_characteristic_models():
     assert pre_characteristic != current
 
 
+def test_bremsstrahlung_model_marker_orphans_bethe_heitler_era_digests():
+    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+
+    assert identity["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
+    assert "mf23-527-mf26-527" in BREMSSTRAHLUNG_MODEL
+
+
+def test_case_content_key_separates_bremsstrahlung_models():
+    case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
+    current = case_content_key(case)
+    with mock.patch.object(profiles, "BREMSSTRAHLUNG_MODEL", "bethe-heitler-only"):
+        bethe_heitler_era = case_content_key(case)
+
+    assert bethe_heitler_era != current
+
+
 def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "9f2b0f81fde05cb95c540814147f204bd304d69110925a8e28e61ed641e54790"
+        "aa8dc2a138eddefc582d59a379c6b36781fce3f5a04102ad07d7883444ce7c5e"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -353,42 +373,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "e5510710ab22e1ee10b9e39cb72fd5d98cb0a5de1d3f1b2f0824a6fe71ad151b",
+            "2bb4dc4188f1f4deb11393d3e65b2fe77c27f7384582f60137e6c39094752202",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "cfb5dc6211616b3fe31b1f7348cfe21e142ffada847e1508cb85c280852bd60f",
+            "04251f0e97aaf9129de1a8d1d9357a6edcad1b049937950da96e3368f918b4fb",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "b279c5a2df740396637293d1a0dd11013735f5c8a6ea077be7176743710133c4",
+            "029f9a366411abfd5cd731c54bb76001be7b595e4aa6c76e7763626cd9c9af11",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "b5f4e3cce8b4fdda8a4f84cc68969c5c0e58fd5d2b25782a9f98d546e7d7405c",
+            "fb3873c4d610531d2d226f32e7610e56bed3b541b58f11d8e8009f109e96f2ce",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "9424fa4f053a95e02530f52191b7cd2178d13eece544a308054b793292006074",
+            "645044e91fecebb60ad9b854643c5b900903d7d01af2ca924421e7f7f4089aa7",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "444dbd4ecfb85e809147acde8ef84a68be150a2dd7449eb29e2a5b9f4666cce2",
+            "07ffe5ece678dbcdb3ccd1ca83673deb488155581db53e8535b33823bb69f7c5",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "df4de5f93dfa5c10ab281a60eeb8c09fe043cb397990f235ca837bf8c300daa0",
+            "604b8b396cd265dcd34f5dd83c9e35a9347e49961b35c8565cc92e724d92b204",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "7d737d0e85646ee1558f262dc99db970388e8dcfd0fbf3f6b15a36fb6da745bc",
+            "5640619d787057a361a2604824cbc2ebb2a5dc0459113abdb4165e1d6e2519e1",
         ),
     ],
 )
@@ -401,7 +421,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     once when the in-medium line kinematics became unconditional, which
     deliberately orphaned every vacuum-era checkpoint stem; they must stay
     bit-for-bit from here. They were re-minted again when unconditional EEDL
-    characteristic radiation was introduced."""
+        characteristic radiation was introduced, and again for the EEDL
+        bremsstrahlung generation marker."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
     assert identity["parameter_sha256"] == digest
@@ -542,13 +563,13 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Berger--Seltzer stopping splice did, and again when every crystal cut
     # moved to the surface_hkl spelling) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "9f2b0f81fde05cb95c540814147f204bd304d69110925a8e28e61ed641e54790"
+        "aa8dc2a138eddefc582d59a379c6b36781fce3f5a04102ad07d7883444ce7c5e"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "2f769d9735dc6c38848e756ccd22c0d195aeb3726df761c3a70ba085794e9638"
+        "4eeb4714f5138439add13ec4ef754eb4c231b9277fb2ae4f0008cc3559859f0c"
     )
 
 

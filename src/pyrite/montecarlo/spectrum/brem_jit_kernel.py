@@ -1,8 +1,9 @@
-"""CUDA JIT reduction for the bremsstrahlung spectrum.
+"""CUDA JIT reductions for analytic and staged-EEDL bremsstrahlung.
 
 One CUDA block owns one or more photon-energy bins. Threads stride over
-transport segments, evaluate Bethe-Heitler + Elwert and Beer-Lambert
-attenuation directly, then reduce the segment sum in shared memory.
+transport segments, evaluate either staged EEDL interpolation or
+Bethe-Heitler + Elwert and Beer-Lambert attenuation directly, then reduce the
+segment sum in shared memory.
 
 The kernel consumes per-segment absorber path lengths for each layer rather
 than a dense (segment, energy) attenuation matrix, so peak scratch memory is
@@ -22,6 +23,7 @@ F32_1E_M3 = np.float32(1.0e-3)
 F32_1E_M6 = np.float32(1.0e-6)
 F32_1E_M8 = np.float32(1.0e-8)
 F32_1E_M30 = np.float32(1.0e-30)
+F32_1E3 = np.float32(1.0e3)
 F32_TWO = np.float32(2.0)
 F32_16_OVER_3 = np.float32(16.0 / 3.0)
 F32_MC2_KEV = np.float32(510.99895)
@@ -89,6 +91,93 @@ def _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
         tau += path_flat[line * n_layers + layer] * mu_flat[layer * n_E + k]
         layer += U32_ONE
     return tau
+
+
+@jit.rawkernel(device=True)
+def _eedl_or_bh_weighted_scalar(
+    T_i,
+    k_eV,
+    k_index,
+    p_i,
+    bethe_heitler_prefactor,
+    eedl_weight,
+    lower_panel,
+    panel_fraction,
+    available,
+    panel_probability,
+    n_E,
+    Z,
+):
+    """Weighted EEDL cell, with Bethe--Heitler for uncovered segments."""
+    if available > F32_ZERO:
+        if k_eV <= F32_ZERO or k_eV > T_i * F32_1E3:
+            return F32_ZERO
+        lower_offset = lower_panel * n_E + k_index
+        upper_offset = lower_offset + n_E
+        lower_pdf = panel_probability[lower_offset]
+        upper_pdf = panel_probability[upper_offset]
+        mixed_pdf = lower_pdf + panel_fraction * (upper_pdf - lower_pdf)
+        return eedl_weight * mixed_pdf
+    return _dsigma_weighted_scalar(T_i, k_eV, Z, p_i, bethe_heitler_prefactor)
+
+
+@jit.rawkernel()
+def _eedl_kernel_1e(
+    T,
+    p_i_arr,
+    bethe_heitler_prefactor,
+    eedl_weight,
+    lower_panel,
+    panel_fraction,
+    available,
+    path_flat,
+    mu_flat,
+    E_grid,
+    panel_probability,
+    spec,
+    Z,
+    n_seg,
+    n_E,
+    n_layers,
+):
+    """Fuse EEDL interpolation, fallback, attenuation, and segment reduction."""
+    k = jit.blockIdx.x
+    tid = jit.threadIdx.x
+    nthreads = jit.blockDim.x
+    photon_eV = E_grid[k]
+    acc = F32_ZERO
+
+    line = tid
+    while line < n_seg:
+        weighted = _eedl_or_bh_weighted_scalar(
+            T[line],
+            photon_eV,
+            k,
+            p_i_arr[line],
+            bethe_heitler_prefactor[line],
+            eedl_weight[line],
+            lower_panel[line],
+            panel_fraction[line],
+            available[line],
+            panel_probability,
+            n_E,
+            Z,
+        )
+        tau = _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
+        acc += weighted * xp.exp(-tau)
+        line += nthreads
+
+    shared = jit.shared_memory(xp.float32, None)
+    shared[tid] = acc
+    jit.syncthreads()
+    stride = nthreads // U32_TWO
+    while stride > U32_ZERO:
+        if tid < stride:
+            shared[tid] += shared[tid + stride]
+        jit.syncthreads()
+        stride //= U32_TWO
+    if tid == U32_ZERO:
+        spec[k] += shared[U32_ZERO]
 
 
 @jit.rawkernel()
@@ -401,5 +490,68 @@ def run_brem_reduction_kernel(
             np.uint32(n_layers),
         ),
         shared_mem=shared_bytes,
+    )
+    return out
+
+
+def run_eedl_brem_reduction_kernel(
+    T_keV,
+    p_i,
+    bethe_heitler_prefactor,
+    eedl_weight,
+    lower_panel,
+    panel_fraction,
+    available,
+    path_flat,
+    mu_flat,
+    E_grid,
+    panel_probability,
+    *,
+    Z,
+    n_layers,
+    out=None,
+    config=DEFAULT_BREM_KERNEL_CONFIG,
+):
+    """Accumulate staged EEDL bremsstrahlung without dense segment-grid arrays.
+
+    ``panel_probability`` is the C-order ``(n_panel, n_E)`` probability table
+    already evaluated on ``E_grid``. The per-segment arrays contain the two
+    adjacent-panel selector, interpolation weight, and
+    ``density * length * sigma / normalization``. Rows with ``available == 0``
+    evaluate the retained Bethe--Heitler expression from the supplied fallback
+    prefactor. All arrays must be contiguous float32 CuPy arrays except
+    ``lower_panel``, which is uint32.
+    """
+    nthreads = int(config.nthreads)
+    if nthreads not in (32, 64, 128, 256, 512, 1024):
+        raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
+    n_E = int(E_grid.size)
+    if out is None:
+        out = xp.zeros(n_E, dtype=xp.float32)
+    if n_E == 0 or T_keV.size == 0:
+        return out
+
+    _eedl_kernel_1e(
+        (n_E,),
+        (nthreads,),
+        (
+            T_keV,
+            p_i,
+            bethe_heitler_prefactor,
+            eedl_weight,
+            lower_panel,
+            panel_fraction,
+            available,
+            path_flat,
+            mu_flat,
+            E_grid,
+            panel_probability,
+            out,
+            np.float32(Z),
+            np.uint32(T_keV.size),
+            np.uint32(n_E),
+            np.uint32(n_layers),
+        ),
+        shared_mem=nthreads * np.dtype(np.float32).itemsize,
     )
     return out

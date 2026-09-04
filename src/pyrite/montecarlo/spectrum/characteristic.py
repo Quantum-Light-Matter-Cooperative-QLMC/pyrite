@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from functools import cache
 from importlib.metadata import version as package_version
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import xraydb
@@ -237,7 +238,7 @@ def _load_eedl_subshell_tables(
     del file_size, modified_time_ns
     saw_eedl_subshell = False
     saw_eadl_relaxation = False
-    matching_materials: list[tuple[int, tuple[int, ...], object]] = []
+    matching_materials: list[tuple[int, tuple[int, ...], Any]] = []
 
     with EndfFile(path, on_error="raise") as tape:
         for position in range(len(tape)):

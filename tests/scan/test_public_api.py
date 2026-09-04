@@ -8,7 +8,12 @@ from pyrite.campaign.sweep import Sweep as LegacySweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import run_case
-from pyrite.montecarlo.spectrum import CHARACTERISTIC_MODEL, CHARACTERISTIC_XRAYDB_VERSION
+from pyrite.montecarlo.spectrum import (
+    BREM_ENDF_PARSERPY_VERSION,
+    BREMSSTRAHLUNG_MODEL,
+    CHARACTERISTIC_MODEL,
+    CHARACTERISTIC_XRAYDB_VERSION,
+)
 from pyrite.montecarlo.transport import STOPPING_MODEL
 
 
@@ -70,7 +75,9 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     # not just of the digest that separates the two models' checkpoints.
     assert result.provenance["stopping_model"] == STOPPING_MODEL
     assert result.provenance["characteristic_model"] == CHARACTERISTIC_MODEL
+    assert result.provenance["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
     assert result.provenance["versions"]["xraydb"] == CHARACTERISTIC_XRAYDB_VERSION
+    assert result.provenance["versions"]["endf-parserpy"] == BREM_ENDF_PARSERPY_VERSION
 
 
 def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:

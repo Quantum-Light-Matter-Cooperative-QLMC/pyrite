@@ -845,13 +845,20 @@ def test_brem_groove_gain_matches_beer_lambert_escape():
     composition = [("C", 0.1136)]
     n_hat = np.array([np.cos(TP), 0.0, -np.sin(TP)])
 
-    flat = mc_brem_spectrum(segments, grid, composition=composition, n_hat=n_hat)
+    flat = mc_brem_spectrum(
+        segments,
+        grid,
+        composition=composition,
+        n_hat=n_hat,
+        cross_section_model="bethe-heitler",
+    )
     grooved = mc_brem_spectrum(
         segments,
         grid,
         composition=composition,
         n_hat=n_hat,
         groove=SPEC,
+        cross_section_model="bethe-heitler",
     )
     expected = _independent_brem_with_escape(
         segments,

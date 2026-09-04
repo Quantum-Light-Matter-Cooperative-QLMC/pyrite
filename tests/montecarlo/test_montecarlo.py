@@ -956,3 +956,10 @@ def test_adaptive_chunk_cpu_path_does_not_apply_device_admission(monkeypatch):
 def test_adaptive_chunk_honors_budget_override(monkeypatch):
     runner = _patch_cpu_chunk_policy(monkeypatch, budget_mb=480)
     assert runner._adaptive_chunk(2000) == 10_000
+
+
+def test_adaptive_chunk_accounts_for_eedl_brem_intermediates(monkeypatch):
+    runner = _patch_cpu_chunk_policy(monkeypatch)
+
+    assert runner._adaptive_chunk(2000, intermediates=8) == 15_000
+    assert runner._admit_chunk(40_000, 2000, intermediates=8) == 40_000

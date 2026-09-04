@@ -29,6 +29,8 @@ from . import (
     _transport_case,
     _worker_init,
     run_case,
+    _EEDL_BREM_DENSE_INTERMEDIATES,
+    _is_gpu_oom,
 )
 
 
@@ -50,8 +52,9 @@ def case_runtime_plan(case):
         _admit_chunk(
             case.get("brem_chunk")
             or _RESOURCE_POLICY.brem_chunk
-            or _adaptive_chunk(brem_grid.size),
+            or _adaptive_chunk(brem_grid.size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
             brem_grid.size,
+            intermediates=_EEDL_BREM_DENSE_INTERMEDIATES,
         )
         if brem_grid.size
         else None
@@ -493,7 +496,9 @@ def run_cases(
                         if on_timing is not None
                         else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
                     )  # accelerator, THIS process only
-                except _RESOURCE_POLICY.gpu_oom as error:
+                except Exception as error:
+                    if not _is_gpu_oom(error):
+                        raise
                     if engine != "auto" or env_value("PYRITE_MC_BACKEND", "auto").lower() != "auto":
                         raise
                     _admit_cpu_fallback()

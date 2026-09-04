@@ -31,7 +31,7 @@ from .._numerics import (
 )
 from ..detectors import EnergyBins
 from ..montecarlo.case import Case
-from ..montecarlo.spectrum import CHARACTERISTIC_MODEL
+from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from .sweep import (
@@ -543,6 +543,9 @@ def _identity_v1(
     # line arrays, so the exact EEDL/xraydb model generation must separate
     # checkpoints from pre-characteristic and future database generations.
     resolved["characteristic_model"] = CHARACTERISTIC_MODEL
+    # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
+    # instead of the historical analytic Bethe--Heitler approximation.
+    resolved["bremsstrahlung_model"] = BREMSSTRAHLUNG_MODEL
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,
@@ -618,8 +621,8 @@ def case_content_key(case: Case | Mapping[str, Any]) -> str:
     case whose seed differs simply gets a distinct key and recomputes; the store
     never serves a mismatched-seed result.
 
-    The stopping and characteristic-radiation models join the payload as
-    constants alongside the case. They are not case fields -- both are
+    The stopping, characteristic-radiation, and bremsstrahlung models join the
+    payload as constants alongside the case. They are not case fields -- all are
     unconditional -- but they determine the stored arrays, and without them a
     blob from an earlier physics/data generation could be served silently.
     """
@@ -627,6 +630,7 @@ def case_content_key(case: Case | Mapping[str, Any]) -> str:
         "schema": CASE_CONTENT_KEY_SCHEMA,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
+        "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
         "case": _jsonable(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),

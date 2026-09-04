@@ -749,3 +749,31 @@ CPU-bound at `ncpu // 2`. `runtime_plan` now reports
 `transport_prefetch_depth` so a profile shows the whole host footprint before the
 run starts. Unverified on hardware: the numbers above are the model's, and the
 MoSe2 pipeline arm is the workload that would confirm them.
+
+## EEDL bremsstrahlung memory repair (2026-09-03)
+
+Replacing the analytic bremsstrahlung model with EEDL added a larger portable
+working set: incident-panel interpolation constructed several dense
+`(segment, energy)` arrays, native panels were repeatedly evaluated and staged
+inside segment chunks, and the generic chunk estimate still budgeted only three
+dense intermediates. A CuPy allocation may also fail asynchronously and report
+`cudaErrorMemoryAllocation` at the next device synchronization, which bypassed
+the existing `OutOfMemoryError` retry path.
+
+The repair separates setup from reduction. Native EEDL panels are evaluated on
+the output grid and staged once per element; panel brackets, interpolation
+fractions, cross-section/normalization weights, and coverage are stored once as
+one-dimensional segment arrays. The portable path reuses those arrays and sizes
+chunks for eight dense EEDL intermediates. The float32 CUDA path uses one block
+per output energy and reduces over segments in a fused kernel, including
+per-segment Bethe--Heitler fallback and layer attenuation, so it does not create
+a dense segment-by-energy cross-section scratch array. Delayed CUDA/ROCm runtime
+allocation failures are classified by runtime status and enter the existing
+phase-specific retry; unrelated runtime failures remain hard errors.
+
+This is a structural memory-complexity result, not a timing claim. CPU numerical
+tests, staging-count tests, chunk-admission tests, and allocation-classification
+tests pass locally. A CUDA-gated independent NumPy equivalence test is committed,
+but no CUDA device was available in the editing environment, so GPU compilation,
+numerical execution, peak-memory measurement, and throughput measurement remain
+release gates.

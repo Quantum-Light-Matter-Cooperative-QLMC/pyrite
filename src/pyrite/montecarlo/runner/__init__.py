@@ -99,6 +99,7 @@ def _usable_cpus():
 
 
 from .chunking import (
+    _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
     _adaptive_chunk,
     _admit_chunk,
@@ -162,6 +163,11 @@ from .oom import (
 )
 from .oom import _should_free as _should_free
 
+def _is_gpu_oom(error):
+    return (
+        isinstance(error, _RESOURCE_POLICY.gpu_oom)
+        or BACKEND.is_oom_error(error)
+    )
 
 class _TimingAgg:
     """Main-process accumulator for PYRITE_MC_TIMING phase profiling.
@@ -611,8 +617,9 @@ def _brem_wide_from_segments(
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
     the SAME multilayer background as a live sweep."""
     brem_chunk = _admit_chunk(
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(E_brem.size),
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(E_brem.size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
         E_brem.size,
+        intermediates=_EEDL_BREM_DENSE_INTERMEDIATES,
     )
     n_lay = int(segs_b.get("n_layers", 1))
 
@@ -665,7 +672,7 @@ def _characteristic_from_segments(
     low-energy ionization path that a line-only 5 keV cutoff would discard.
     """
     characteristic_chunk = _admit_chunk(
-        case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(E_brem.size),
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(E_brem.size),
         E_brem.size,
     )
     n_lay = int(segs.get("n_layers", 1))
@@ -987,8 +994,9 @@ def _effective_spec_chunk(case, tp):
 def _effective_brem_chunk(case, tp):
     """Resolve one case's bremsstrahlung chunk without changing the case."""
     return _admit_chunk(
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size),
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
         tp["E_brem"].size,
+        intermediates=_EEDL_BREM_DENSE_INTERMEDIATES,
     )
 
 
@@ -1003,7 +1011,7 @@ def _halve_case_spec_chunk(case, tp):
 def _halve_case_brem_chunk(case, tp):
     """Halve this case's effective brem chunk in place; preserve line tuning."""
     brem_cur = (
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size)
+        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES)
     )
     case["brem_chunk"] = max(1000, brem_cur // 2)
 
@@ -1065,7 +1073,9 @@ def _spectrum_case_retry(
             else:
                 brem_retries += 1
                 _halve_case_brem_chunk(work, tp)
-        except _RESOURCE_POLICY.gpu_oom:
+        except Exception as error:
+            if not _is_gpu_oom(error):
+                raise
             if attempt == max_retries:
                 raise
             BACKEND.release_memory()
@@ -1143,7 +1153,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                     Ne=Ne_lines,
                     table_cache=line_table_cache,
                 )
-        except _RESOURCE_POLICY.gpu_oom as error:
+        except Exception as error:
+            if not _is_gpu_oom(error):
+                raise
             raise _SpectrumPhaseOOM("line", error) from error
 
     # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
@@ -1162,7 +1174,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 groove=tp.get("groove"),
                 Ne=Ne_brem,
             )
-        except _GPU_OOM as error:
+        except Exception as error:
+            if not _is_gpu_oom(error):
+                raise
             raise _SpectrumPhaseOOM("brem", error) from error
     spec_characteristic = np.interp(E_grid, E_brem, spec_characteristic_wide)
     spec = spec + spec_characteristic
@@ -1185,7 +1199,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 groove=tp.get("groove"),
                 Ne=Ne_brem,
             )
-        except _RESOURCE_POLICY.gpu_oom as error:
+        except Exception as error:
+            if not _is_gpu_oom(error):
+                raise
             raise _SpectrumPhaseOOM("brem", error) from error
     with _nsys_range("cxr.interpolate"):
         brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)

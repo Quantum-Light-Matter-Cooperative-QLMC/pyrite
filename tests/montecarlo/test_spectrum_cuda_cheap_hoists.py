@@ -125,6 +125,99 @@ def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers):
     np.testing.assert_allclose(cp.asnumpy(got_compat), got_host, rtol=2e-6, atol=1e-15)
 
 
+def test_eedl_brem_raw_kernel_matches_staged_numpy_reference():
+    from pyrite.montecarlo.spectrum.brem_jit_kernel import (
+        BremKernelConfig,
+        run_eedl_brem_reduction_kernel,
+    )
+
+    T = np.array([12.0, 31.0, 78.0, 20.0], dtype=np.float32)
+    L = np.array([45.0, 130.0, 750.0, 300.0], dtype=np.float32)
+    E = np.array([80.0, 250.0, 900.0, 15_000.0, 40_000.0], dtype=np.float32)
+    paths = np.array([[20.0], [50.0], [80.0], [100.0]], dtype=np.float32)
+    mu = np.array([[3e-4, 2e-4, 9e-5, 3e-5, 5e-6]], dtype=np.float32)
+    panel_pdf = np.array(
+        [
+            [3.0e-3, 1.8e-3, 7.0e-4, 1.0e-5, 0.0],
+            [2.7e-3, 1.6e-3, 8.0e-4, 2.0e-5, 4.0e-6],
+            [2.3e-3, 1.4e-3, 9.0e-4, 3.0e-5, 8.0e-6],
+        ],
+        dtype=np.float32,
+    )
+    lower = np.array([0, 0, 1, 0], dtype=np.uint32)
+    fraction = np.array([0.1, 0.7, 0.4, 0.5], dtype=np.float32)
+    available = np.array([1.0, 1.0, 1.0, 0.0], dtype=np.float32)
+    differential_scale = np.array([2.0e-23, 2.5e-23, 3.0e-23, 0.0], dtype=np.float32)
+    density = 5.0e22
+    Z = 14.0
+
+    T_d = cp.asarray(T)
+    L_d = cp.asarray(L)
+    mc2 = cp.float32(510.99895)
+    p_i = cp.sqrt(T_d * (T_d + cp.float32(2.0) * mc2)) / mc2
+    beta_i = p_i / (cp.float32(1.0) + T_d / mc2)
+    zi = cp.float32(2.0 * np.pi * 7.2973525693e-3 * Z)
+    den_i = cp.float32(1.0) - cp.exp(-zi / beta_i)
+    bh_prefactor = (
+        cp.float32(density)
+        * L_d
+        * cp.float32(1.0e-8)
+        * cp.float32(16.0 / 3.0)
+        * cp.float32(7.2973525693e-3)
+        * cp.float32(7.9407877e-26)
+        * cp.float32(Z * Z)
+        * beta_i
+        * den_i
+        / (p_i * p_i)
+    )
+    eedl_weight = cp.float32(density) * L_d * cp.float32(1.0e-8) * cp.asarray(
+        differential_scale
+    )
+
+    got = run_eedl_brem_reduction_kernel(
+        T_d,
+        cp.ascontiguousarray(p_i),
+        cp.ascontiguousarray(bh_prefactor),
+        cp.ascontiguousarray(eedl_weight),
+        cp.asarray(lower),
+        cp.asarray(fraction),
+        cp.asarray(available),
+        cp.asarray(paths).reshape(-1),
+        cp.asarray(mu).reshape(-1),
+        cp.asarray(E),
+        cp.asarray(panel_pdf).reshape(-1),
+        Z=Z,
+        n_layers=1,
+        config=BremKernelConfig(nthreads=32, energies_per_block=1),
+    )
+    cp.cuda.Stream.null.synchronize()
+
+    expected = np.zeros(E.size, dtype=np.float64)
+    for line in range(3):
+        for energy_index, photon_eV in enumerate(E):
+            if photon_eV <= 0.0 or photon_eV > T[line] * 1.0e3:
+                continue
+            panel = int(lower[line])
+            probability = panel_pdf[panel, energy_index] + fraction[line] * (
+                panel_pdf[panel + 1, energy_index] - panel_pdf[panel, energy_index]
+            )
+            weight = density * L[line] * 1.0e-8 * differential_scale[line]
+            expected[energy_index] += (
+                weight * probability * np.exp(-paths[line, 0] * mu[0, energy_index])
+            )
+    expected += _old_weighted_brem_reference(
+        T[3:],
+        L[3:],
+        paths[3:],
+        mu,
+        E,
+        Z=Z,
+        density_cm3=density,
+    )
+
+    np.testing.assert_allclose(cp.asnumpy(got), expected, rtol=3e-5, atol=1e-15)
+
+
 def test_coherent_field_reducer_uses_segment_only_aw_and_phase():
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,

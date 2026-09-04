@@ -429,8 +429,12 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum/` — compatibility package for the former flat module. `lines/`
   owns `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
-  average) and `mc_spectrum_solid_angle`; `brem.py` owns
-  `mc_brem_spectrum` and `load_external_brem`; `characteristic.py` parses the
+  average) and `mc_spectrum_solid_angle`; `brem.py` parses the packaged EEDL
+  MF=23/527 totals and MF=26/527 photon spectra for the default
+  `mc_brem_spectrum`, retains Bethe--Heitler as an optional/fallback backend,
+  stages EEDL panels once per element/grid, and owns `load_external_brem`;
+  `brem_jit_kernel.py` owns the fused CUDA EEDL/Bethe--Heitler reduction;
+  `characteristic.py` parses the
   packaged ENDF-6 EEDL File-23 tables, joins xraydb direct-vacancy relaxation,
   and owns `mc_characteristic_spectrum`; `coherent.py` groups the CUDA-only
   coherent-kernel surface; `diagnostics.py` owns the opt-in,
@@ -468,8 +472,10 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
 - `runner/` — compatibility package for the former flat module. `__init__.py`
   owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py`
   owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum
-  chunk admission; `pool.py` owns host-memory and worker-pool sizing; `oom.py`
-  owns accelerator OOM tags, release cadence, and pool limits. `_spectrum_case`
+  chunk admission, including the larger portable EEDL working-set budget;
+  `pool.py` owns host-memory and worker-pool sizing; `oom.py` owns accelerator
+  OOM tags, release cadence, and pool limits. The backend classifier also
+  recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case`
   always stores incoherent `spec` and, when requested, `spec_coherent` from the
   same transport, adds the shared characteristic component to both, and keeps
   it separately as `spec_characteristic`; `_line_pair_for_case` mirrors this
@@ -608,6 +614,9 @@ nothing else would stop the CAS serving a Joy--Luo-era blob for a case that now
 transports differently. The unconditional EEDL/xraydb characteristic model
 likewise hashes a constant `characteristic_model` marker into both identities,
 preventing reuse of pre-characteristic results.
+The default EEDL bremsstrahlung continuum likewise hashes a constant
+`bremsstrahlung_model` marker into both identities, separating it from spectra
+computed under the retired default Bethe--Heitler backend.
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
   `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.

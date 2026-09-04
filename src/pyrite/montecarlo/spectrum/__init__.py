@@ -7,11 +7,21 @@ their owning radiation path.
 """
 
 from .brem import (
+    BREM_ENDF_PARSERPY_VERSION,
+    BREMSSTRAHLUNG_DATA_DIR,
+    BREMSSTRAHLUNG_EEDL_FILENAME,
+    BREMSSTRAHLUNG_EEDL_SHA256,
+    BREMSSTRAHLUNG_MODEL,
     R_E_CM2,
+    BremsstrahlungCrossSectionTable,
+    EEDLBremsstrahlungDataUnavailable,
     _BREM_MC2_KEV,
     _USE_JIT_BREM_REDUCTION,
     _brem_dsigma_dk,
     _brem_dsigma_dk_core,
+    _bremsstrahlung_dsigma_dk,
+    _eedl_brem_dsigma_dk,
+    load_bremsstrahlung_cross_sections,
     load_external_brem,
     mc_brem_spectrum,
 )

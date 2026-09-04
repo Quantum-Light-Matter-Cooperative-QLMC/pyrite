@@ -35,7 +35,11 @@ from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
 from .montecarlo.geometry import directions_to_sample_frame
 from .montecarlo.runner import run_case_directions
-from .montecarlo.spectrum import CHARACTERISTIC_MODEL
+from .montecarlo.spectrum import (
+    BREM_ENDF_PARSERPY_VERSION,
+    BREMSSTRAHLUNG_MODEL,
+    CHARACTERISTIC_MODEL,
+)
 from .montecarlo.transport import STOPPING_MODEL
 from .results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
 
@@ -305,12 +309,14 @@ def simulate(
             "identity_digest": case_content_key(case),
             "stopping_model": STOPPING_MODEL,
             "characteristic_model": CHARACTERISTIC_MODEL,
+            "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {
                 "pyrite": __version__,
                 "numpy": np.__version__,
                 "xraydb": _package_version("xraydb"),
+                "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
             },
         },
         coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
@@ -395,12 +401,14 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
             "observation": observation,
             "stopping_model": STOPPING_MODEL,
             "characteristic_model": CHARACTERISTIC_MODEL,
+            "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {
                 "pyrite": __version__,
                 "numpy": np.__version__,
                 "xraydb": _package_version("xraydb"),
+                "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
             },
         },
         coherent_spectrum=coherent_average,

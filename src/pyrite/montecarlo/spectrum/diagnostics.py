@@ -36,12 +36,11 @@ from ..._backend import _to_cpu
 from ...materials.attenuation import _normalize_composition
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport import (
-    TRANSPORT_ELEMENTS,
     _percentile_summary,
     beta_from_keV,
     spliced_stopping_keV_per_ang,
 )
-from .brem import _brem_dsigma_dk
+from .brem import BremsstrahlungModel, _bremsstrahlung_dsigma_dk
 from .lines import _SEG_ARRAYS, _observation_direction
 
 # Measured calibration defaults; see the validation doc named above. Drift is
@@ -340,6 +339,7 @@ def brem_endpoint_quadrature_error(
     layers=None,
     warn_threshold=None,
     chunk=8192,
+    cross_section_model: BremsstrahlungModel = "eedl",
 ):
     """Per-flight bremsstrahlung left-endpoint versus midpoint quadrature error.
 
@@ -347,7 +347,8 @@ def brem_endpoint_quadrature_error(
     ``n * dsigma/dk(T_start) * L`` -- a left-endpoint rectangle rule in the
     electron energy. This estimator re-evaluates the same Bethe-Heitler/Elwert
     integrand at the flight's midpoint energy and reports, per flight, the
-    grid-integrated relative yield difference and the worst per-bin relative
+    configured cross-section model at the flight's midpoint energy and reports,
+    per flight, the grid-integrated relative yield difference and the worst per-bin relative
     difference (bins below 1e-6 of the flight's peak bin excluded: the escape
     factor and ``n * L`` cancel in every ratio). Flights contribute per their
     own layer's composition.
@@ -393,11 +394,24 @@ def brem_endpoint_quadrature_error(
             ys = np.zeros((int(mask.sum()), E_grid.size), dtype=float)
             ym = np.zeros((int(mask.sum()), E_grid.size), dtype=float)
             for element_i, n_i in layer_comp:
-                Z = TRANSPORT_ELEMENTS[element_i]["Z"]
                 # _to_cpu keeps the estimator host-only even when the global
                 # backend has xp on a device.
-                ys += n_i * _to_cpu(_brem_dsigma_dk(Z, T_start[mask], E_grid))
-                ym += n_i * _to_cpu(_brem_dsigma_dk(Z, T_mid[mask], E_grid))
+                ys += n_i * _to_cpu(
+                    _bremsstrahlung_dsigma_dk(
+                        element_i,
+                        T_start[mask],
+                        E_grid,
+                        cross_section_model=cross_section_model,
+                    )
+                )
+                ym += n_i * _to_cpu(
+                    _bremsstrahlung_dsigma_dk(
+                        element_i,
+                        T_mid[mask],
+                        E_grid,
+                        cross_section_model=cross_section_model,
+                    )
+                )
             y_start[mask] = ys
             y_mid[mask] = ym
         diff = np.abs(y_start - y_mid)
