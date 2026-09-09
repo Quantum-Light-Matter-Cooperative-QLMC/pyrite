@@ -78,10 +78,18 @@ def test_performance_logger_writes_append_only_samples_and_latest(monkeypatch, t
 
 def test_runtime_plan_reports_effective_workers_and_chunks(monkeypatch):
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    # The pool cap is min(MemAvailable, 0.9 * MemTotal) // worker_mem_mb, so
+    # pinning only MemAvailable leaves the cap riding on the HOST's total RAM:
+    # this asserts a 3-worker pool, which a 32 GB box gives and a 7 GB CI runner
+    # collapses to one worker, i.e. "serial". Pin both ends of the budget so the
+    # test states the memory environment it assumes.
     monkeypatch.setattr(
         runner._RESOURCE_POLICY,
         "available_mem_mb",
         lambda: runner._RESOURCE_POLICY.worker_mem_mb * 8,
+    )
+    monkeypatch.setattr(
+        runner._RESOURCE_POLICY, "total_mem_mb", runner._RESOURCE_POLICY.worker_mem_mb * 8
     )
     cases = [
         {
