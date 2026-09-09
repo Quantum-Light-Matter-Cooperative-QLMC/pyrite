@@ -2183,13 +2183,14 @@ class _LineBatch:
 
     def flush(self):
         """Reduce every queued line into ``spec`` and reset the queue."""
-        # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy imports:
-        # runner imports this module, so a top-level import would be circular.
-        from ..runner import _nsys_pop, _nsys_push
-        from .line_jit_kernel import DEFAULT_SPECTRUM_KERNEL_CONFIG, run_reduction_kernel
-
         if self.n_lines == 0:
             return
+
+        # Reached only on the CuPy JIT path, which is the only one that builds a
+        # _LineBatch at all. NVTX sub-ranges are a no-op off the profiled GPU
+        # path; runner imports this module, so both imports stay lazy.
+        from ..runner import _nsys_pop, _nsys_push
+        from .line_jit_kernel import DEFAULT_SPECTRUM_KERNEL_CONFIG, run_reduction_kernel
 
         if len(self.E_r) == 1:
             E_r_batch = self.E_r[0]
