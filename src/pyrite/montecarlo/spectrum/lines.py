@@ -823,6 +823,1144 @@ class SpectrumRequest:
     _table_cache: Any = None
     longitudinal_rms_fs: Any = None
 
+@dataclass
+class _SpectrumSetup:
+    """Everything :func:`_prepare_spectrum` derives from a
+    :class:`SpectrumRequest`: resolved geometry, staged device arrays, the
+    energy tabulations, the flight-grouping decision, the coherent and
+    inter-electron decoherence precompute, and the three accumulation buffers.
+
+    This is the state ``mc_spectrum``'s inner closures used to capture. Passing
+    it explicitly is what makes the accumulation phases module-level functions a
+    test can drive directly.
+
+    Mutable, and deliberately so: ``spec`` / ``spec_pxr`` / ``spec_cbs`` are
+    accumulated into in place by whichever route runs, and ``L_esc_all`` is
+    filled in by the per-hkl route's stacking prologue.
+    """
+
+    request: SpectrumRequest
+    info: Any
+    abs_comp: Any
+    segments: Any
+    R_orient: Any
+    thickness: Any
+    Ne: Any
+    n_hat: Any
+    n_hat_d: Any
+    E_grid: Any
+    spec: Any
+    spec_pxr: Any
+    spec_cbs: Any
+    seg_r: Any
+    seg_elec_id: Any
+    line_electron: Any
+    v_all: Any
+    v_dot_n_all: Any
+    denom_all: Any
+    gamma_all: Any
+    t_L_all: Any
+    gid_all: Any
+    grouped: Any
+    E_tab: Any
+    E_tab_g: Any
+    log_mu_tab_g: Any
+    n_re_tab_g: Any
+    mosaic_quad: Any
+    finite_footprint: Any
+    cdtype: Any
+    omega_grid: Any
+    delta_omega_grid: Any
+    d_all: Any
+    seg_r_geom: Any
+    d_all_geom: Any
+    decoherence_active: Any
+    finite_footprint_now: Any
+    finite_footprint_F: Any
+    decoherence_A_pop: Any
+    xy0_pop: Any
+    L_esc_all: Any = None
+
+def _prepare_spectrum(request):
+    """Phase 1: validate the request and build every quantity that depends on
+    neither the reflection nor the crystallite orientation.
+
+    Covers argument compatibility, crystal lookup and orientation, cutoff
+    clipping, device staging of the segment arrays, the physical-flight
+    grouping decision, the edge-resolved chi/U/mu/n tabulation grid, the
+    segment-only kinematics both accumulation routes share, the coherent
+    propagation-phase precompute, and the inter-electron decoherence
+    population terms.
+
+    Returns the :class:`_SpectrumSetup` the accumulation phases consume.
+    """
+    segments = request.segments
+    E_grid_eV = request.E_grid_eV
+    crystal = request.crystal
+    theta_obs_rad = request.theta_obs_rad
+    B_ang2 = request.B_ang2
+    use_henke = request.use_henke
+    absorber_element = request.absorber_element
+    n_hat = request.n_hat
+    composition = request.composition
+    beam_uvw = request.beam_uvw
+    azimuth_rad = request.azimuth_rad
+    recip_miscut_rad = request.recip_miscut_rad
+    components = request.components
+    layers = request.layers
+    mosaic_fwhm_rad = request.mosaic_fwhm_rad
+    mosaic_nodes = request.mosaic_nodes
+    surface_hkl = request.surface_hkl
+    groove = request.groove
+    coherent = request.coherent
+    electron_limit = request.electron_limit
+    E_cut_keV = request.E_cut_keV
+    longitudinal_rms_fs = request.longitudinal_rms_fs
+
+    if coherent and components:
+        raise ValueError(
+            "coherent=True is incompatible with components=True: the PXR/CBS "
+            "split is ambiguous under coherence (the A_PXR*A_CBS cross term "
+            "survives). Request the coherent total, or components incoherently."
+        )
+    if B_ang2 is None:
+        raise ValueError(
+            "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
+            "pass the material's value (no silent default)."
+        )
+    if coherent and layers is not None:
+        raise NotImplementedError(
+            "the in-medium dispersion does not cover the coherent path through "
+            "a LAYERED absorber: the dispersive propagation phase needs a "
+            "per-layer delta accumulated along the escape path -- the real "
+            "partner of _stack_tau's per-layer mu -- which is not modelled. "
+            "Single-slab absorbers (with or without a groove or a finite "
+            "footprint) are supported."
+        )
+    # Precompute that only some routes bind. As a closure these names simply
+    # went unbound on the paths that never read them; as dataclass fields they
+    # need an explicit absent value. Nothing below reads one where the original
+    # would have raised UnboundLocalError.
+    cdtype = omega_grid = delta_omega_grid = d_all = None
+    seg_r_geom = d_all_geom = xy0_pop = None
+    finite_footprint_now = finite_footprint_F = decoherence_A_pop = None
+
+    info = CRYSTALS[crystal]
+    n_atoms = len(info["basis"]) / info["V_cell"]
+    abs_comp = _normalize_composition(absorber_element, n_atoms, composition)
+    segments = _clip_segments_to_cutoff(segments, E_cut_keV, abs_comp, layers)
+
+    # crystal orientation: rotation applied to all reciprocal vectors
+    R_orient = _orientation_R(
+        info["lattice"],
+        beam_uvw,
+        azimuth_rad,
+        recip_miscut_rad,
+        surface_hkl=surface_hkl,
+    )
+    thickness = segments["thickness_ang"]
+    if electron_limit is None:
+        Ne = segments["Ne"]
+    else:
+        Ne = electron_limit
+
+    n_hat = _observation_direction(theta_obs_rad, n_hat)
+    if groove is not None:
+        if layers is not None:
+            raise ValueError("groove escape is v1 single-slab only (no layers)")
+        _validate_groove_escape_direction(n_hat, groove)
+    E_grid = xp.asarray(E_grid_eV, dtype=REAL)
+    spec = xp.zeros(E_grid.size, dtype=REAL)
+    spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
+    spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
+
+    # Every per-row emission coefficient is evaluated at ONE energy along the
+    # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
+    # own representative energy, so the row becomes a midpoint evaluation of its
+    # emission integral rather than a left-endpoint one; the resulting t_L =
+    # L/beta(E_repr) is then exactly the transported flight duration
+    # ``t_end - t_start``, and ``t_ang + t_L/2`` exactly its midpoint age.
+    # Frozen rows carry no representative energy and stay bit-for-bit.
+    # Validation: substep-radiation-invariance
+    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    seg_E = xp.asarray(segments[E_field], dtype=REAL)
+    seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
+    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
+    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
+    seg_elec_id = xp.asarray(segments["elec_id"])
+    line_electron = seg_elec_id < Ne
+    beta_all = beta_from_keV(seg_E)  # speed/c per segment
+    v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
+
+    # Physical-flight grouping for the DEFAULT (incoherent) reduction. Numerical
+    # substeps of one flight are integration detail: summing |A_j Q_j|^2 over
+    # them treats each as an independent emitter and divides the line peak by
+    # the substep count (each row carries (t_L/N)^2 where the flight carries
+    # t_L^2), so a tighter energy tolerance would silently destroy the line.
+    # Rows of one flight therefore add COHERENTLY and only whole flights add
+    # incoherently. Groups are keyed by ``(electron_id, flight_id)`` VALUE, not
+    # by adjacency: the lockstep core emits step-major, so one flight's substeps
+    # are separated by every other electron's rows for that step.
+    # Validation: substep-radiation-invariance
+    gid_all = None
+    grouped = False
+    if not coherent and segments.get("flight_id") is not None and seg_E.size:
+        flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
+        electron_key = _to_cpu(xp.asarray(segments["elec_id"]))
+        order = np.lexsort((flight_key, electron_key))
+        new_group = np.empty(flight_key.size, dtype=bool)
+        new_group[0] = True
+        new_group[1:] = (flight_key[order][1:] != flight_key[order][:-1]) | (
+            electron_key[order][1:] != electron_key[order][:-1]
+        )
+        # All-singleton groups are the one-row-per-flight case, whose grouped
+        # reduction is algebraically the incoherent one; keep the proven path.
+        grouped = not bool(new_group.all())
+        if grouped:
+            gid_all = np.empty(flight_key.size, dtype=np.int64)
+            gid_all[order] = np.cumsum(new_group) - 1
+    if grouped and getattr(xp, "__name__", "") != "numpy":
+        raise ValueError(
+            "flight-grouped incoherent CXR is host-only: the segmented complex "
+            "reduction over numerical substeps has no device port yet. Run the "
+            "spectrum on the NumPy backend, or transport without max_dE_frac."
+        )
+    if grouped and layers is not None:
+        # Same unmodelled per-layer delta as the coherent path: the grouped
+        # reduction carries the dispersive propagation phase too.
+        raise NotImplementedError(
+            "the in-medium dispersion does not cover numerical substeps through "
+            "a LAYERED absorber: the intra-flight coherent sum needs the "
+            "per-layer dispersive propagation phase, which is not modelled."
+        )
+    if grouped and components:
+        raise ValueError(
+            "components=True is incompatible with numerical substeps: the "
+            "PXR/CBS split is ambiguous once a flight's substep fields add "
+            "coherently (the A_PXR*A_CBS cross term survives). Request the "
+            "total, or transport without max_dE_frac."
+        )
+
+    # chi_g / U_g are smooth in energy AWAY from absorption edges, so evaluate
+    # them on a tabulation grid and interpolate at the per-segment resonance
+    # energies ON THE GPU (step 3) -- a few ms over ~10^3 grid points instead of
+    # ~0.25 s/case over ~10^5 segments, and E_res stays on the device (no
+    # per-reflection GPU->CPU->GPU round-trip; that structure-factor CPU cost was
+    # what capped GPU utilisation on a fast card). The grid is a 1 eV mesh UNION
+    # the basis and absorber elements' native Henke energies, which densely
+    # sample the edges -- a plain uniform mesh mis-resolves the edge jumps (tens
+    # of % at e.g. the C K-edge). Window matches the keep mask below.
+    _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
+    _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
+    _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
+    E_tab = _line_tabulation_grid(info, abs_comp, _lo, _hi)
+    E_tab_g = xp.asarray(E_tab, dtype=REAL)
+    # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and
+    # interpolated linearly against log(E) before summing. This reproduces the
+    # pinned xraydb non-f1 Chantler rule; interpolating the compound total in
+    # either linear or log space does not. Explicit absorber elements contribute
+    # their native nodes to E_tab even when absent from the crystal basis.
+    # Applied only to single-slab/finite-footprint routes. Layered and grooved
+    # escape retain exact per-point mu. No per-segment host/device transfer is
+    # restored. Independently rederived with no physics divergence; human
+    # sign-off remains required.
+    # Validation: line-absorption-tabulation
+    log_mu_tab_g = xp.asarray(_elemental_log_mu_table(abs_comp, E_tab), dtype=REAL)
+
+    # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
+    # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
+    # its own edge structure, from the f1 cusp). The in-medium dispersion is
+    # unconditional, so this table is always built.
+    n_re_tab_g = xp.asarray(
+        np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
+    )
+
+    n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
+
+    # Segment-only kinematics shared by every reflection/orientation and by both
+    # the batched and compatibility paths. These used to be recomputed inside
+    # ``_accumulate`` for every g row.
+    v_dot_n_all = _matvec3(v_all, n_hat_d)
+    denom_all = 1.0 - v_dot_n_all
+    gamma_all = 1.0 / xp.sqrt(1.0 - beta_all * beta_all)
+    t_L_all = seg_L / beta_all
+
+    # coherent (phased) sum precompute: the per-segment retardation scalar
+    # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
+    # retardation) and photon wavenumber k_gamma(E) = E / hbar c [1/Ang].
+    # ``t_ang`` remains segment-start age; add half the constant-velocity flight
+    # time so it describes the same midpoint as ``r_mid``. This one d_all feeds
+    # both coherent reduction routes. Validation: coherent-segment-midpoint-time.
+    # Each reflection adds its spatial susceptibility phase -g.r_j inside
+    # _accumulate. All-zero t0_ang leaves the physical trajectory phase.
+    # Inert unless a complex per-row field is actually reduced, i.e. under
+    # coherent=True or the flight-grouped incoherent path.
+    if coherent or grouped:
+        cdtype = xp.result_type(REAL, 1j)
+        seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
+        seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
+        seg_t_mid = seg_t + 0.5 * t_L_all
+        d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
+        omega_grid = E_grid / HBARC_EV_ANG
+
+        # In-medium propagation phase. The observation-time phase is
+        # omega (t_j + n_med L_esc,j + L_vac,j), and the geometric total path
+        # L_esc + L_vac = R - n_hat.r_j to first order, so the vacuum
+        # ``omega d_j`` picks up exactly
+        #
+        #     omega (Re n(E) - 1) L_esc,j = - delta(E) omega(E) L_esc,j
+        #
+        # where L_esc,j is the SAME in-crystal escape distance the Beer-Lambert
+        # factor already runs over. That is not a coincidence: the escape leg
+        # contributes exp(i n omega L) = exp(i omega L) exp(-i delta omega L)
+        # exp(-beta omega L), and the last factor is sqrt(exp(-mu L)) = ``amp``.
+        # The dispersive phase is the real partner of an absorption the coherent
+        # path already carries; only the two together are one complex n.
+        #
+        # Note this is NOT ``k(E) n_hat.r_j``: that form would charge the medium
+        # for the whole flight to the detector. The two agree only when the
+        # photon exits along the face normal (where L_esc and n_hat.r differ by a
+        # segment-independent constant, i.e. a global phase).
+        #
+        # Tabulated on the OUTPUT grid: it is a propagation phase read across the
+        # whole spectrum, not a coupling frozen at the line energy.
+        # Validation: xray-in-medium-propagation-phase
+        delta_omega_grid = (
+            xp.asarray(
+                1.0 - np.asarray(refractive_index(crystal, E_grid_eV, use_henke).real),
+                dtype=REAL,
+            )
+            * omega_grid
+        )
+
+    # Empirical inter-electron decoherence for the coherent path. Today's
+    # coherent sum bakes each electron's SAMPLED longitudinal offset
+    # (``t0_ang``) and transverse entry offset (via ``seg_r``'s trajectory
+    # position) into the segment phase and squares once -- one Monte Carlo
+    # realization. For a squared coherent sum that is speckle, not shot
+    # noise: the spurious enhancement does not shrink with electron count
+    # (Rayleigh statistics), unlike ordinary incoherent MC noise.
+    #
+    # Fresh-context result: per (row, energy), Total = (1-F)*Grouped +
+    # F*Flat, where Flat = |sum_e S_e|^2 is TODAY'S coherent reduction but
+    # fed the electron's offset-free position/time -- so it
+    # needs no new reduction code, only feeding ``d_all_geom``/``seg_r_geom``
+    # in place of ``d_all``/``seg_r`` at the handful of points that build a
+    # row's phase -- and Grouped = sum_e|S_e|^2 groups the SAME segments by
+    # electron, squares each electron's own sum, then adds (new reduction,
+    # ``_coherent_electron_grouped_row`` below). F is the empirical
+    # characteristic function of the ACTUAL per-electron offsets transport
+    # already draws (``initial_t0_ang``/``initial_r_ang``, Ne-long
+    # population arrays, NOT the per-segment gathered/duplicated ones):
+    # F(row) = |mean_e exp(i*(omega*t0_e - q_perp(row).dr_perp,e))|^2. This
+    # needs no per-policy sigma-resolution logic (legacy gaussian/uniform
+    # bunch, long_offsets_fs, compressed, microtrain, and elliptical/
+    # Courant-Snyder transverse spots all fall out for free -- the only
+    # requirement is t0 sampled independently of the transverse offset,
+    # true here since they use independent RNG child streams), and it
+    # converges to the closed-form exp[-(omega sigma_z)^2-(q_perp
+    # sigma_perp)^2] via ordinary 1/sqrt(Ne) statistics rather than the
+    # non-converging speckle the naive sum shows.
+    #
+    # F must be applied PER ROW (reflection x mosaic orientation), before
+    # summing across rows: q_perp depends on g, which differs row to row,
+    # so a single scalar F(E) on the row-summed spectrum would be wrong
+    # whenever more than one row contributes to the same energy bin.
+    #
+    # Validation: coherent-inter-electron-decoherence
+    decoherence_active = False
+    if coherent:
+        seg_r_geom = seg_r
+        d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
+        t0_pop = xp.asarray(segments.get("initial_t0_ang", np.zeros(0)), dtype=REAL)[:Ne]
+        xy0_pop = xp.asarray(
+            np.asarray(segments.get("initial_r_ang", np.zeros((0, 3))))[:, :2], dtype=REAL
+        )[:Ne]
+        decoherence_active = bool(
+            (t0_pop.size and xp.any(t0_pop != 0.0)) or (xy0_pop.size and xp.any(xy0_pop != 0.0))
+        )
+        if longitudinal_rms_fs is not None:
+            longitudinal_rms_fs = float(longitudinal_rms_fs)
+            if not np.isfinite(longitudinal_rms_fs) or longitudinal_rms_fs <= 0.0:
+                raise ValueError("longitudinal_rms_fs must be finite and positive")
+        if decoherence_active:
+            finite_footprint_now = (
+                segments.get("crystal_width_ang") is not None
+                and segments.get("crystal_height_ang") is not None
+            )
+            if finite_footprint_now:
+                if longitudinal_rms_fs is None:
+                    raise ValueError(
+                        "coherent emission with a finite crystal footprint and "
+                        "nonzero bunch offsets requires longitudinal_rms_fs; "
+                        "only the fully longitudinally decohered limit is "
+                        "supported"
+                    )
+                sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
+                # Decide support in host float64 so a borderline duration does
+                # not run on float32 CUDA while the CPU rejects it.
+                omega_host = np.asarray(_to_cpu(omega_grid), dtype=float)
+                finite_footprint_F_host = np.exp(-((omega_host * sigma_z_ang) ** 2))
+                finite_footprint_F = xp.asarray(finite_footprint_F_host, dtype=REAL)
+                # Average only the independent longitudinal arrival time. Keep
+                # each electron at its sampled transverse position in BOTH the
+                # flat and grouped terms: its phase, hit/miss history, and
+                # finite-prism attenuation are coupled and must stay together.
+                # F_z then blends those terms exactly, conditional on this
+                # transverse/transport realization. The CUDA-JIT grouped
+                # reductions consume these same arrays.
+                d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
+            else:
+                seg_r_geom = seg_r.copy()
+                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
+                seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
+                d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
+                # A_e = t0_e - n_hat_perp . dr_perp,e does not depend on g (the
+                # reciprocal vector varies per row; n_hat is fixed for the whole
+                # call), so hoist it once here; B_e(row) = g_perp . dr_perp,e is
+                # cheap and stays inside the per-row helper below.
+                decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
+
+    # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
+    # today's single-orientation result bit-for-bit). Otherwise a list of
+    # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
+    # incoherently below (docs/physics/materials/crystal-mosaicity.md route 2).
+    mosaic_quad = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes)
+
+    # Finite transverse dimensions make the escape distance a nearest-face
+    # query rather than the plain slab path. It is g-independent either way,
+    # so both routes hoist it out of their per-reflection work.
+    finite_footprint = (
+        segments.get("crystal_width_ang") is not None
+        and segments.get("crystal_height_ang") is not None
+    )
+
+    return _SpectrumSetup(
+        request=request,
+        info=info,
+        abs_comp=abs_comp,
+        segments=segments,
+        R_orient=R_orient,
+        thickness=thickness,
+        Ne=Ne,
+        n_hat=n_hat,
+        n_hat_d=n_hat_d,
+        E_grid=E_grid,
+        spec=spec,
+        spec_pxr=spec_pxr,
+        spec_cbs=spec_cbs,
+        seg_r=seg_r,
+        seg_elec_id=seg_elec_id,
+        line_electron=line_electron,
+        v_all=v_all,
+        v_dot_n_all=v_dot_n_all,
+        denom_all=denom_all,
+        gamma_all=gamma_all,
+        t_L_all=t_L_all,
+        gid_all=gid_all,
+        grouped=grouped,
+        E_tab=E_tab,
+        E_tab_g=E_tab_g,
+        log_mu_tab_g=log_mu_tab_g,
+        n_re_tab_g=n_re_tab_g,
+        mosaic_quad=mosaic_quad,
+        finite_footprint=finite_footprint,
+        cdtype=cdtype,
+        omega_grid=omega_grid,
+        delta_omega_grid=delta_omega_grid,
+        d_all=d_all,
+        seg_r_geom=seg_r_geom,
+        d_all_geom=d_all_geom,
+        decoherence_active=decoherence_active,
+        finite_footprint_now=finite_footprint_now,
+        finite_footprint_F=finite_footprint_F,
+        decoherence_A_pop=decoherence_A_pop,
+        xy0_pop=xy0_pop,
+    )
+
+def _row_decoherence_factor(st, g_vec_d):
+    """Inter-electron factor for one row.
+
+    Infinite slabs use the empirical joint longitudinal/transverse
+    characteristic function. Finite footprints retain their coupled
+    sampled transverse fields and use only analytic Gaussian ``F_z``.
+    """
+    req = st.request
+    chunk = req.chunk
+    E_grid = st.E_grid
+    cdtype = st.cdtype
+    omega_grid = st.omega_grid
+    decoherence_active = st.decoherence_active
+    finite_footprint_now = st.finite_footprint_now
+    finite_footprint_F = st.finite_footprint_F
+    decoherence_A_pop = st.decoherence_A_pop
+    xy0_pop = st.xy0_pop
+
+    if not decoherence_active:
+        return None
+    if finite_footprint_now:
+        return finite_footprint_F
+    B_pop = xy0_pop @ g_vec_d[:2]
+    chi_sum = xp.zeros(E_grid.size, dtype=cdtype)
+    for j0 in range(0, decoherence_A_pop.size, chunk):
+        sl = slice(j0, min(j0 + chunk, decoherence_A_pop.size))
+        phase = omega_grid[None, :] * decoherence_A_pop[sl][:, None] - B_pop[sl][:, None]
+        chi_sum += xp.exp(1j * phase).sum(axis=0)
+    chi = chi_sum / decoherence_A_pop.size
+    return (chi.real**2 + chi.imag**2).astype(REAL)
+
+def _coherent_electron_grouped_row(
+    st, elec_id_sel, a_width_sel, E_r_sel, d_geom_sel, g_phase_sel, L_esc_sel, coefs_sel
+):
+    """sum_e |sum_{j in e} E_j|^2 for one row's kept, finite segments,
+    using the SAME group-then-reduce-then-square pattern as the
+    flight-grouped incoherent path (7b) above, keyed by electron
+    instead of flight. Every ``*_sel`` array is already restricted
+    to this row's kept, finite segments and shares one length;
+    ``coefs_sel``: per-polarization complex per-segment
+    coefficients (same restriction)."""
+    req = st.request
+    chunk = req.chunk
+    E_grid = st.E_grid
+    cdtype = st.cdtype
+    omega_grid = st.omega_grid
+    delta_omega_grid = st.delta_omega_grid
+
+    gid = _to_cpu(elec_id_sel)
+    perm = np.argsort(gid, kind="stable")
+    gid = gid[perm]
+    starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
+    bounds = np.append(starts, gid.size)
+    row_total = xp.zeros(E_grid.size, dtype=REAL)
+    perm_xp = xp.asarray(perm)
+    aw_p = a_width_sel[perm_xp]
+    Er_p = E_r_sel[perm_xp]
+    d_p = d_geom_sel[perm_xp]
+    gp_p = g_phase_sel[perm_xp]
+    Lesc_p = L_esc_sel[perm_xp]
+    coefs_p = [c[perm_xp] for c in coefs_sel]
+    for ka, kb in _flight_blocks(bounds, chunk):
+        rows = slice(bounds[ka], bounds[kb])
+        x = aw_p[rows][:, None] * (E_grid[None, :] - Er_p[rows][:, None]) / xp.pi
+        arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
+        arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
+        SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
+        offsets = bounds[ka:kb] - bounds[ka]
+        for c in coefs_p:
+            field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+            row_total += (xp.abs(field) ** 2).sum(axis=0)
+    return row_total
+
+def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
+    """sum_e |sum_{j in e} E_j|^2 for one row on the float32 CUDA-JIT
+    reduction kernel -- the device counterpart of
+    ``_coherent_electron_grouped_row`` above.
+
+    No new device code is needed: ``run_coherent_reduction_kernel``
+    already computes |sum of the lines it is handed|^2 and ACCUMULATES
+    (``spec[k] += wm * ...``), so calling it once per electron over that
+    electron's own lines, with ``mosaic_weight=1``, into one zeroed
+    buffer sums the per-electron squares exactly. The cost is Ne extra
+    launches per row (the segments themselves are still touched once in
+    total); the mosaic weight is applied outside, by the blend.
+
+    ``per_line_sel`` is the 8-tuple the kernel takes (E_r, a_width,
+    phase_slope, g_phase, and the two complex polarization coefficients
+    split into real/imag), already restricted to this row's kept lines
+    and sharing one length with ``elec_id_sel``/``L_esc_sel``."""
+    E_grid = st.E_grid
+    delta_omega_grid = st.delta_omega_grid
+
+    from .coherent_jit_kernel import (
+        DEFAULT_COHERENT_KERNEL_CONFIG,
+        run_coherent_reduction_kernel,
+    )
+
+    gid = _to_cpu(elec_id_sel)
+    if gid.size == 0:
+        return out
+    perm = np.argsort(gid, kind="stable")
+    gid = gid[perm]
+    starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
+    bounds = np.append(starts, gid.size)
+    perm_xp = xp.asarray(perm)
+    cols = [xp.ascontiguousarray(a[perm_xp], dtype=REAL) for a in per_line_sel]
+    L_p = xp.ascontiguousarray(L_esc_sel[perm_xp], dtype=REAL)
+    E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
+    dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
+    for b0, b1 in zip(bounds[:-1], bounds[1:], strict=True):
+        sl = slice(int(b0), int(b1))
+        run_coherent_reduction_kernel(
+            *(c[sl] for c in cols),
+            E_grid_c,  # ty: ignore[too-many-positional-arguments]
+            out=out,
+            mosaic_weight=1.0,
+            L_esc=L_p[sl],
+            delta_omega=dom_c,
+            config=DEFAULT_COHERENT_KERNEL_CONFIG,
+        )
+    return out
+
+def _accumulate_reflection_coherent(
+    st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_abs, L_esc, pol_A
+):
+    """Step 7c: coherent (phased) accumulation for one reflection and
+    crystallite orientation.
+
+    Builds the complex field per polarization within THIS row, squares it,
+    and adds ``|field|^2 * wm`` to ``spec``; reflections and mosaic
+    orientations stay incoherent. The un-squared finite-time factor
+    ``Q = t_L sinc(a_width (E - E_res) / pi)`` carries the amplitude scale
+    (its modulus-square is the incoherent ``t_L^2 sinc^2``), and the
+    emission-time/retardation phase is ``exp[i omega(E) d_j]`` with
+    ``d_j = t_abs,j - n_hat.r_j``.
+    """
+    req = st.request
+    chunk = req.chunk
+    sinc_cutoff = req.sinc_cutoff
+    E_grid = st.E_grid
+    spec = st.spec
+    seg_elec_id = st.seg_elec_id
+    cdtype = st.cdtype
+    omega_grid = st.omega_grid
+    delta_omega_grid = st.delta_omega_grid
+    seg_r_geom = st.seg_r_geom
+    d_all_geom = st.d_all_geom
+    decoherence_active = st.decoherence_active
+
+    amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
+    a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+    # Geometric-only (offset-free) phase: identical to d_all/seg_r
+    # when no decoherence-relevant offset is configured, so this is
+    # a no-op swap in that (default) case. See the
+    # coherent-inter-electron-decoherence block above.
+    d = d_all_geom[idx]
+    g_phase = _matvec3(seg_r_geom[idx], g_vec_d)
+    coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
+    good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+
+    if decoherence_active and sinc_cutoff is not None:
+        raise ValueError(
+            "coherent emission with a nonzero bunch_length_fs/"
+            "beam_fwhm_mm and sinc_cutoff together is not yet "
+            "supported (the electron-grouped decoherence floor "
+            "does not implement sinc_cutoff windowing)"
+        )
+
+    # GPU float32 fast path: reduce the two complex polarization fields
+    # directly in a raw kernel. This avoids materializing the dense
+    # complex SP[segment, energy] matrix and avoids both complex GEMVs.
+    # The exact CuPy path below remains the fallback for CPU/other
+    # backends, float64, and sinc_cutoff windowing. A nonzero
+    # bunch_length_fs/beam_fwhm_mm stays ON the kernel: the fused
+    # kernel squares whatever line set it is handed and ACCUMULATES,
+    # so the electron-grouped floor sum_e|S_e|^2 is just one call per
+    # electron into a zeroed buffer (``_coherent_jit_grouped_row``),
+    # and |sum_e S_e|^2 is the same single call this path already
+    # makes -- both on the geometric (offset-free) phase, blended by
+    # F(row, E) outside the kernel.
+    # The reduction kernel folds the vacuum phase as ``slope_j * E``, a
+    # single per-line scalar against the energy axis. The in-medium term
+    # is a SECOND (per-segment scalar) x (per-energy table) product, so
+    # it rides along as its own ``L_esc``/``delta_omega`` pair rather
+    # than being absorbed into that slope.
+    _use_jit_coherent_reduction = (
+        _USE_JIT_COHERENT_REDUCTION
+        and getattr(xp, "__name__", "") == "cupy"
+        and np.dtype(REAL) == np.dtype(np.float32)
+        and sinc_cutoff is None
+    )
+    if _use_jit_coherent_reduction:
+        from .coherent_jit_kernel import (
+            DEFAULT_COHERENT_KERNEL_CONFIG,
+            run_coherent_reduction_kernel,
+        )
+
+        sel = xp.flatnonzero(good)
+        if sel.size:
+            c_s, c_p = coefs
+            per_line_sel = (
+                xp.ascontiguousarray(E_r[sel], dtype=REAL),
+                xp.ascontiguousarray(a_width[sel], dtype=REAL),
+                xp.ascontiguousarray(d[sel] / HBARC_EV_ANG, dtype=REAL),
+                xp.ascontiguousarray(g_phase[sel], dtype=REAL),
+                xp.ascontiguousarray(c_s[sel].real, dtype=REAL),
+                xp.ascontiguousarray(c_s[sel].imag, dtype=REAL),
+                xp.ascontiguousarray(c_p[sel].real, dtype=REAL),
+                xp.ascontiguousarray(c_p[sel].imag, dtype=REAL),
+            )
+            L_esc_sel = xp.ascontiguousarray(L_esc[sel], dtype=REAL)
+            E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
+            dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
+            # Decoherence-inactive: unchanged single fused call
+            # straight into spec with the row's mosaic weight.
+            out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
+            run_coherent_reduction_kernel(
+                *per_line_sel,
+                E_grid_c,
+                out=out_flat,
+                mosaic_weight=1.0 if decoherence_active else wm,
+                L_esc=L_esc_sel,
+                delta_omega=dom_c,
+                config=DEFAULT_COHERENT_KERNEL_CONFIG,
+            )
+            if decoherence_active:
+                grouped_total = _coherent_jit_grouped_row(
+                    st,
+                    seg_elec_id[idx][sel],
+                    per_line_sel,
+                    L_esc_sel,
+                    xp.zeros(E_grid.size, dtype=REAL),
+                )
+                F_row = _row_decoherence_factor(st, g_vec_d)
+                spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm
+        return
+
+    fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
+    if sinc_cutoff is None:
+        for j0 in range(0, idx.size, chunk):
+            sl = slice(j0, min(j0 + chunk, idx.size))
+            m = good[sl]
+            if not m.any():
+                continue
+            x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
+            arg = d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]
+            arg = arg - L_esc[sl][m, None] * delta_omega_grid[None, :]
+            ph = xp.exp(1j * arg)
+            SP = xp.sinc(x).astype(cdtype) * ph
+            for c, f in zip(coefs, fields, strict=True):
+                f += c[sl][m] @ SP
+    else:
+        dE = E_grid[1] - E_grid[0]
+        order = xp.argsort(E_r)
+        blk = 8192
+        for j0 in range(0, order.size, blk):
+            sel = order[j0 : j0 + blk]
+            sel = sel[good[sel]]
+            if sel.size == 0:
+                continue
+            half = sinc_cutoff / a_width[sel]
+            lo = float(_to_cpu((E_r[sel] - half).min()))
+            hi = float(_to_cpu((E_r[sel] + half).max()))
+            i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
+            i1 = min(
+                int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
+                E_grid.size,
+            )
+            if i1 <= i0:
+                continue
+            x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
+            arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
+            arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
+            ph = xp.exp(1j * arg)
+            SP = xp.sinc(x).astype(cdtype) * ph
+            for c, f in zip(coefs, fields, strict=True):
+                f[i0:i1] += c[sel] @ SP
+    flat_total = sum(xp.abs(f) ** 2 for f in fields)
+    if decoherence_active:
+        sel_full = xp.flatnonzero(good)
+        grouped_total = _coherent_electron_grouped_row(
+            st,
+            seg_elec_id[idx][sel_full],
+            a_width[sel_full],
+            E_r[sel_full],
+            d[sel_full],
+            g_phase[sel_full],
+            L_esc[sel_full],
+            [c[sel_full] for c in coefs],
+        )
+        F_row = _row_decoherence_factor(st, g_vec_d)
+        spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm
+    else:
+        spec[:] += flat_total * wm
+    return
+
+def _accumulate_reflection(
+    st, g_vec_d, e_s, e_p, g2, n_dot_g, g_dot_es, g_dot_ep, chi_re, chi_im, u_re, u_im, wm
+):
+    """Add one reflection's contribution for crystallite reciprocal vector
+    ``g_vec_d``, scaled by the mosaic-quadrature weight ``wm``, into spec /
+    spec_pxr / spec_cbs in place. Every argument is a DEVICE array uploaded
+    once by the caller's stacking prologue (row views): the structure-factor
+    tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
+    the mosaic orientation -- while g and its sigma/pi polarization pair
+    (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
+    path."""
+    # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
+    # runner imports this module, so a top-level import would be circular.
+    from ..runner import _nsys_pop, _nsys_push
+
+    req = st.request
+    chunk = req.chunk
+    sinc_cutoff = req.sinc_cutoff
+    components = req.components
+    layers = req.layers
+    groove = req.groove
+    coherent = req.coherent
+    abs_comp = st.abs_comp
+    thickness = st.thickness
+    n_hat = st.n_hat
+    E_grid = st.E_grid
+    spec = st.spec
+    spec_pxr = st.spec_pxr
+    spec_cbs = st.spec_cbs
+    seg_r = st.seg_r
+    line_electron = st.line_electron
+    v_all = st.v_all
+    v_dot_n_all = st.v_dot_n_all
+    gamma_all = st.gamma_all
+    t_L_all = st.t_L_all
+    gid_all = st.gid_all
+    grouped = st.grouped
+    E_tab_g = st.E_tab_g
+    log_mu_tab_g = st.log_mu_tab_g
+    n_re_tab_g = st.n_re_tab_g
+    finite_footprint = st.finite_footprint
+    cdtype = st.cdtype
+    omega_grid = st.omega_grid
+    delta_omega_grid = st.delta_omega_grid
+    d_all = st.d_all
+    L_esc_all = st.L_esc_all
+
+
+    # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
+    #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
+    v_dot_g = _matvec3(v_all, g_vec_d)
+    denom, n_re_seg = _in_medium_kinematics(v_dot_n_all, v_dot_g, n_re_tab_g, E_tab_g)
+    omega_res = v_dot_g / denom
+    E_res = HBARC_EV_ANG * omega_res  # -> eV
+
+    # -- 2. drop segments whose line misses the spectral window -------------
+    # (pad by 20% so sinc tails that reach into the window still count)
+    pad = 0.2 * (E_grid[-1] - E_grid[0])
+    keep = (
+        line_electron
+        & (E_res > float(E_grid[0] - pad))
+        & (E_res > 10.0)
+        & (E_res < E_grid[-1] + pad)
+    )
+    if not keep.any():
+        return
+    idx = xp.flatnonzero(keep)
+
+    E_r = E_res[idx]  # line energy per kept segment [eV]
+    om = omega_res[idx]  # same in 1/Ang
+    v = v_all[idx]  # velocity vectors
+    t_L = t_L_all[idx]  # interaction time [Ang] (c=1)
+    dnm = denom[idx]
+    vdg = v_dot_g[idx]
+
+    # -- 3. couplings AT each segment's resonance energy --------------------
+    # All five tabulations share E_r and E_tab_g, so bracket once. U_g tables
+    # are pre-scaled by 1/m_e during construction.
+    _ix, _fr, _blw, _abv = _interp_index(E_r, E_tab_g)
+    _log_fr = _log_interp_fraction(E_r, E_tab_g, _ix)
+    chi_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_re)
+    chi_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_im)
+    u_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_re)
+    u_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_im)
+    mu_i = _interp_elemental_mu(_ix, _log_fr, _blw, _abv, log_mu_tab_g)
+    chi = chi_re_i + 1j * chi_im_i
+    eUg_over_m = u_re_i + 1j * u_im_i
+
+    # -- 4. photon kinematics per segment ------------------------------------
+    # k = omega*n, so detuning = g^2 + 2*omega*(n.g), k.g = omega*(n.g),
+    # and v.(k+g) = v.g + k.v. The g-only scalars are precomputed once.
+    # In medium k = n omega n_hat, so k.v = omega(1 - denom) still holds
+    # exactly (denom absorbed the n), while k.g takes one power of n and
+    # |k+g|^2 - k^2 = g^2 + 2 k.g keeps its form. k_mag = |k| is what the
+    # PXR numerator's k^2 needs; it is omega in vacuum.
+    k_mag = om if n_re_seg is None else om * n_re_seg[idx]
+    k_dot_v = om * (1.0 - dnm)
+    k_dot_g = k_mag * n_dot_g
+    v_dot_kg = vdg + k_dot_v
+    detuning = g2 + 2.0 * k_dot_g
+
+    # -- 5. Eq. (13) + relativistic Eq. (14) amplitudes, per segment ----------
+    # CBS braced product {a;b} = a.b - (a.v)(b.v) and 1/gamma prefactor
+    # (Zhai SI Eq. 6).
+    gamma = gamma_all[idx]
+    A2 = xp.zeros(idx.size, dtype=REAL)
+    A2_pxr = xp.zeros(idx.size, dtype=REAL)
+    A2_cbs = xp.zeros(idx.size, dtype=REAL)
+    pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
+    for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
+        v_dot_e = _matvec3(v, e_d)
+        if coherent or grouped:
+            # Complex amplitudes retained verbatim -- the phased-field paths
+            # (global-coherent and flight-grouped) keep the un-reassociated
+            # expression and their goldens are unaffected.
+            A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
+            braced_ge = g_dot_e - vdg * v_dot_e
+            braced_kg = k_dot_g - k_dot_v * vdg
+            A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
+            pol_A.append(A_PXR + A_CBS)  # keep phase: orthogonal pols still add incoherently
+            continue
+        # Incoherent |A|^2 in one fused real kernel (reassociated, NOT
+        # bit-for-bit; ledger + regen required -- see _line_amp_sq_core,
+        # Validation: line-amplitude-fusion).
+        a2, a2_pxr, a2_cbs = _line_amp_sq_core(
+            chi.real,
+            chi.imag,
+            eUg_over_m.real,
+            eUg_over_m.imag,
+            v_dot_kg,
+            g_dot_e,
+            k_mag,
+            v_dot_e,
+            vdg,
+            k_dot_g,
+            k_dot_v,
+            gamma,
+            detuning,
+        )
+        A2 += a2
+        A2_pxr += a2_pxr
+        A2_cbs += a2_cbs
+
+    # -- 6. Beer-Lambert escape factor from the segment midpoint -------------
+    # straight path along n_hat to whichever face the photon exits. With a
+    # LAYERED absorber (layers) the optical depth sums mu_i*dz_i across the
+    # film-on-substrate stack; otherwise it's the single-slab path. The
+    # geometric path is mosaic-independent; the optical depth uses E_r (the
+    # orientation-shifted line energy), so it is recomputed per orientation.
+    z_mid = seg_r[idx, 2]
+    if groove is not None:
+        # Blazed sawtooth entrance face: closed-form path to the working
+        # facet (grooves shorten, never lengthen, the flat-face path). Takes
+        # precedence over any finite footprint -- the mm-scale crystal extent
+        # only classifies launch hit/miss (hit_frac, set in transport); the
+        # groove escape treats the slab as laterally periodic. At depth z,
+        # the side-edge-affected strip is
+        # L_esc*cos(tp) = z*cot(tp) + O(groove spacing), capped by the
+        # crystal width. The guard above guarantees layers is None and
+        # n_hat[2] < 0 here.
+        # Validation: blazed-groove-geometry
+        L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
+        tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+    elif finite_footprint:
+        # the escape DISTANCE is g-independent, so it is computed once per
+        # case (L_esc_all, below the loop's stacking prologue) instead of per
+        # reflection/orientation; only the idx selection is per-g.
+        assert L_esc_all is not None  # set whenever finite_footprint and no groove
+        L_esc = L_esc_all[idx]
+        if layers is None:
+            tau = L_esc * mu_i
+        else:
+            tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
+    else:
+        if layers is None:
+            if n_hat[2] < 0:
+                L_esc = z_mid / (-n_hat[2])  # out the entrance face
+            else:
+                L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
+            tau = L_esc * mu_i
+        else:
+            tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
+    T_abs = xp.exp(-tau)
+
+    # -- 7b. flight-grouped incoherent accumulation ---------------------------
+    # The same complex per-row field the coherent path builds, but reduced
+    # per PHYSICAL FLIGHT: substeps of one flight add coherently, whole
+    # flights add incoherently. At frozen energy and clock this is an exact
+    # algebraic identity with the unsplit row (the substep sinc times the
+    # Dirichlet sum over substep offsets rebuilds the parent's
+    # ``t_L sinc(P t_L / pi)``), so refining the energy tolerance changes
+    # only the quadrature of the energy sweep along the flight -- which is
+    # the point -- and not the number of independent emitters.
+    if gid_all is not None:  # i.e. ``grouped``, narrowed for the gather below
+        amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
+        a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+        d = d_all[idx]
+        g_phase = _matvec3(seg_r[idx], g_vec_d)
+        coefs = [(amp * t_L) * A_e for A_e in pol_A]
+        good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+        sel = np.flatnonzero(good)
+        if sel.size == 0:
+            return
+        gid = gid_all[idx[sel]]
+        # Gather this flight's rows together; a stable sort leaves already
+        # grouped input (and each group's internal row order) untouched.
+        perm = np.argsort(gid, kind="stable")
+        sel = sel[perm]
+        gid = gid[perm]
+        starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
+        bounds = np.append(starts, sel.size)
+        for ka, kb in _flight_blocks(bounds, chunk):
+            rows = sel[bounds[ka] : bounds[kb]]
+            x = a_width[rows][:, None] * (E_grid[None, :] - E_r[rows][:, None]) / xp.pi
+            arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
+            arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
+            SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
+            # Blocks break only on flight boundaries, so no flight is split
+            # across two reductions and squared twice.
+            offsets = bounds[ka:kb] - bounds[ka]
+            for c in coefs:
+                field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
+                spec[:] += (xp.abs(field) ** 2).sum(axis=0) * wm
+        return
+
+    # -- 7c. coherent (phased) accumulation -----------------------------------
+    # Build the complex field per polarization within THIS reflection and
+    # orientation, square it, and add |field|^2 * wm to spec (reflections and
+    # mosaic orientations remain incoherent). The un-squared finite-time
+    # factor Q = t_L sinc(a_width(E-E_res)/pi) carries the amplitude scale
+    # (|Q|^2 = t_L^2 sinc^2); the emission-time/retardation phase is
+    # exp[i omega(E) d_j] with d_j = t_abs,j - n_hat.r_j.
+    if coherent:
+        _accumulate_reflection_coherent(
+            st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_abs, L_esc, pol_A
+        )
+        return
+
+    # -- 7. accumulate the finite-segment lineshape ---------------------------
+    # d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |A|^2 t_L^2
+    #                  * sinc^2[(1 - v.n)(omega - omega_res) t_L / 2] * T_abs
+    # weight = everything except the sinc^2 (times the mosaic weight wm);
+    # a_width converts (E - E_res) to the sinc argument: P t_L = a_width(E - E_res).
+    _nsys_push("cxr.lines.accum")
+    pref = ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
+    weight = pref * A2 * wm
+    targets = [(weight, spec)]
+    if components:
+        targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
+    a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+    good = xp.isfinite(weight) & (weight > 0)
+
+    if sinc_cutoff is None:
+        for j0 in range(0, idx.size, chunk):
+            sl = slice(j0, min(j0 + chunk, idx.size))
+            m = good[sl]
+            if not m.any():
+                continue
+            S = _sincsq_lineshape(a_width[sl][m, None], E_grid[None, :], E_r[sl][m, None])
+            for w, tgt in targets:
+                tgt += w[sl][m] @ S
+    else:
+        dE = E_grid[1] - E_grid[0]
+        order = xp.argsort(E_r)
+        blk = 8192
+        for j0 in range(0, order.size, blk):
+            sel = order[j0 : j0 + blk]
+            sel = sel[good[sel]]
+            if sel.size == 0:
+                continue
+            half = sinc_cutoff / a_width[sel]
+            lo = float(_to_cpu((E_r[sel] - half).min()))
+            hi = float(_to_cpu((E_r[sel] + half).max()))
+            i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
+            i1 = min(
+                int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
+                E_grid.size,
+            )
+            if i1 <= i0:
+                continue
+            S = _sincsq_lineshape(a_width[sel][:, None], E_grid[None, i0:i1], E_r[sel][:, None])
+            for w, tgt in targets:
+                tgt[i0:i1] += w[sel] @ S
+    _nsys_pop()
+
+def _accumulate_per_hkl(st):
+    """Phase 2, compatibility route: one :func:`_accumulate_reflection` pass
+    per (reflection, crystallite orientation) row.
+
+    Owns the layered and grooved absorbers, coherent runs that ask for
+    sinc_cutoff windowing, and the flight-grouped incoherent reduction --
+    everything the batched ``(n_seg, N_g)`` path does not cover. The stacking
+    prologue does every host->device transfer once per case rather than once
+    per row, and records the g-independent escape distance on the setup.
+    """
+    # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
+    # runner imports this module, so a top-level import would be circular.
+    from ..runner import _nsys_pop, _nsys_push
+
+    req = st.request
+    crystal = req.crystal
+    hkl_list = req.hkl_list
+    B_ang2 = req.B_ang2
+    use_henke = req.use_henke
+    groove = req.groove
+    info = st.info
+    segments = st.segments
+    R_orient = st.R_orient
+    n_hat = st.n_hat
+    n_hat_d = st.n_hat_d
+    E_tab = st.E_tab
+    mosaic_quad = st.mosaic_quad
+    finite_footprint = st.finite_footprint
+
+    # Stacking prologue: every host->device transfer this path needs is done
+    # ONCE per case here, not once per (reflection, orientation) inside the
+    # loop. Previously each pass re-uploaded the four chi/U tabulations plus
+    # g and its two polarization vectors -- ~90 xp.asarray calls per case,
+    # 15% of GPU-phase tottime on the 3060 Ti profile (hopg_coherent, 4
+    # reflections). The chi/U rows are keyed by REFLECTION (they do not
+    # depend on the mosaic orientation), the geometry rows by
+    # (reflection, orientation). U_g/m_e is now pre-scaled at table build and
+    # the fallback shares one interpolation bracket; these are algebraically
+    # identical with only float-rounding-level movement.
+    _nsys_push("cxr.lines.tab")
+    g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
+    cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
+    orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
+    for i_hkl, hkl in enumerate(hkl_list):
+        # reciprocal vector in the sample frame: construction frame by default
+        # ([001] along the slab normal), rotated if beam_uvw given
+        g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
+        if R_orient is not None:
+            g_vec = R_orient @ g_vec
+        chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
+        u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
+        # Store U_g/m_e in the table: the mass scaling is energy-independent.
+        cr_rows.append(chi_tab.real)
+        ci_rows.append(chi_tab.imag)
+        ur_rows.append(u_tab.real)
+        ui_rows.append(u_tab.imag)
+        for R_m, wm in orients:  # None -> perfect crystal, one orientation, weight 1
+            gd = g_vec if R_m is None else R_m @ g_vec
+            e_s, e_p = _polarization_pair(n_hat, gd)
+            g_rows.append(gd)
+            es_rows.append(e_s)
+            ep_rows.append(e_p)
+            wm_rows.append(wm)
+            hkl_of_row.append(i_hkl)
+    G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
+    ES = xp.asarray(np.array(es_rows), dtype=REAL)
+    EP = xp.asarray(np.array(ep_rows), dtype=REAL)
+    CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_hkl, N_tab)
+    CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
+    U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
+    U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
+    G2 = _rowdot3(G, G)
+    N_DOT_G = _matvec3(G, n_hat_d)
+    G_DOT_ES = _rowdot3(G, ES)
+    G_DOT_EP = _rowdot3(G, EP)
+    # g-independent escape distance: one pass per case, sliced per g inside
+    # _accumulate_reflection (only the finite-footprint, non-grooved branch
+    # reads it).
+    st.L_esc_all = (
+        _segment_escape_distance(segments, n_hat, xp=xp)
+        if finite_footprint and groove is None
+        else None
+    )
+    _nsys_pop()
+
+    for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
+        _accumulate_reflection(
+            st,
+            G[i_row],
+            ES[i_row],
+            EP[i_row],
+            G2[i_row],
+            N_DOT_G[i_row],
+            G_DOT_ES[i_row],
+            G_DOT_EP[i_row],
+            CHI_RE[i_hkl],
+            CHI_IM[i_hkl],
+            U_RE[i_hkl],
+            U_IM[i_hkl],
+            wm,
+        )
 
 def mc_spectrum(
     segments,
@@ -1169,834 +2307,65 @@ def mc_spectrum(
     )
     return _mc_spectrum(request)
 
-
 def _mc_spectrum(request):
-    """``mc_spectrum``'s body against a bound :class:`SpectrumRequest`."""
-    segments = request.segments
-    E_grid_eV = request.E_grid_eV
-    crystal = request.crystal
-    hkl_list = request.hkl_list
-    theta_obs_rad = request.theta_obs_rad
-    B_ang2 = request.B_ang2
-    use_henke = request.use_henke
-    absorber_element = request.absorber_element
-    chunk = request.chunk
-    n_hat = request.n_hat
-    composition = request.composition
-    beam_uvw = request.beam_uvw
-    azimuth_rad = request.azimuth_rad
-    recip_miscut_rad = request.recip_miscut_rad
-    sinc_cutoff = request.sinc_cutoff
-    components = request.components
-    layers = request.layers
-    mosaic_fwhm_rad = request.mosaic_fwhm_rad
-    mosaic_nodes = request.mosaic_nodes
-    surface_hkl = request.surface_hkl
-    groove = request.groove
-    coherent = request.coherent
-    electron_limit = request.electron_limit
-    E_cut_keV = request.E_cut_keV
-    _table_cache = request._table_cache
-    longitudinal_rms_fs = request.longitudinal_rms_fs
-
-    if coherent and components:
-        raise ValueError(
-            "coherent=True is incompatible with components=True: the PXR/CBS "
-            "split is ambiguous under coherence (the A_PXR*A_CBS cross term "
-            "survives). Request the coherent total, or components incoherently."
-        )
-    if B_ang2 is None:
-        raise ValueError(
-            "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
-            "pass the material's value (no silent default)."
-        )
-    if coherent and layers is not None:
-        raise NotImplementedError(
-            "the in-medium dispersion does not cover the coherent path through "
-            "a LAYERED absorber: the dispersive propagation phase needs a "
-            "per-layer delta accumulated along the escape path -- the real "
-            "partner of _stack_tau's per-layer mu -- which is not modelled. "
-            "Single-slab absorbers (with or without a groove or a finite "
-            "footprint) are supported."
-        )
-    info = CRYSTALS[crystal]
-    n_atoms = len(info["basis"]) / info["V_cell"]
-    abs_comp = _normalize_composition(absorber_element, n_atoms, composition)
-    segments = _clip_segments_to_cutoff(segments, E_cut_keV, abs_comp, layers)
-
-    # crystal orientation: rotation applied to all reciprocal vectors
-    R_orient = _orientation_R(
-        info["lattice"],
-        beam_uvw,
-        azimuth_rad,
-        recip_miscut_rad,
-        surface_hkl=surface_hkl,
-    )
-    thickness = segments["thickness_ang"]
-    if electron_limit is None:
-        Ne = segments["Ne"]
-    else:
-        Ne = electron_limit
-
-    n_hat = _observation_direction(theta_obs_rad, n_hat)
-    if groove is not None:
-        if layers is not None:
-            raise ValueError("groove escape is v1 single-slab only (no layers)")
-        _validate_groove_escape_direction(n_hat, groove)
-    E_grid = xp.asarray(E_grid_eV, dtype=REAL)
-    spec = xp.zeros(E_grid.size, dtype=REAL)
-    spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
-    spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
-
-    # Every per-row emission coefficient is evaluated at ONE energy along the
-    # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
-    # own representative energy, so the row becomes a midpoint evaluation of its
-    # emission integral rather than a left-endpoint one; the resulting t_L =
-    # L/beta(E_repr) is then exactly the transported flight duration
-    # ``t_end - t_start``, and ``t_ang + t_L/2`` exactly its midpoint age.
-    # Frozen rows carry no representative energy and stay bit-for-bit.
-    # Validation: substep-radiation-invariance
-    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    seg_E = xp.asarray(segments[E_field], dtype=REAL)
-    seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
-    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
-    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
-    seg_elec_id = xp.asarray(segments["elec_id"])
-    line_electron = seg_elec_id < Ne
-    beta_all = beta_from_keV(seg_E)  # speed/c per segment
-    v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
-
-    # Physical-flight grouping for the DEFAULT (incoherent) reduction. Numerical
-    # substeps of one flight are integration detail: summing |A_j Q_j|^2 over
-    # them treats each as an independent emitter and divides the line peak by
-    # the substep count (each row carries (t_L/N)^2 where the flight carries
-    # t_L^2), so a tighter energy tolerance would silently destroy the line.
-    # Rows of one flight therefore add COHERENTLY and only whole flights add
-    # incoherently. Groups are keyed by ``(electron_id, flight_id)`` VALUE, not
-    # by adjacency: the lockstep core emits step-major, so one flight's substeps
-    # are separated by every other electron's rows for that step.
-    # Validation: substep-radiation-invariance
-    gid_all = None
-    grouped = False
-    if not coherent and segments.get("flight_id") is not None and seg_E.size:
-        flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
-        electron_key = _to_cpu(xp.asarray(segments["elec_id"]))
-        order = np.lexsort((flight_key, electron_key))
-        new_group = np.empty(flight_key.size, dtype=bool)
-        new_group[0] = True
-        new_group[1:] = (flight_key[order][1:] != flight_key[order][:-1]) | (
-            electron_key[order][1:] != electron_key[order][:-1]
-        )
-        # All-singleton groups are the one-row-per-flight case, whose grouped
-        # reduction is algebraically the incoherent one; keep the proven path.
-        grouped = not bool(new_group.all())
-        if grouped:
-            gid_all = np.empty(flight_key.size, dtype=np.int64)
-            gid_all[order] = np.cumsum(new_group) - 1
-    if grouped and getattr(xp, "__name__", "") != "numpy":
-        raise ValueError(
-            "flight-grouped incoherent CXR is host-only: the segmented complex "
-            "reduction over numerical substeps has no device port yet. Run the "
-            "spectrum on the NumPy backend, or transport without max_dE_frac."
-        )
-    if grouped and layers is not None:
-        # Same unmodelled per-layer delta as the coherent path: the grouped
-        # reduction carries the dispersive propagation phase too.
-        raise NotImplementedError(
-            "the in-medium dispersion does not cover numerical substeps through "
-            "a LAYERED absorber: the intra-flight coherent sum needs the "
-            "per-layer dispersive propagation phase, which is not modelled."
-        )
-    if grouped and components:
-        raise ValueError(
-            "components=True is incompatible with numerical substeps: the "
-            "PXR/CBS split is ambiguous once a flight's substep fields add "
-            "coherently (the A_PXR*A_CBS cross term survives). Request the "
-            "total, or transport without max_dE_frac."
-        )
-
-    # chi_g / U_g are smooth in energy AWAY from absorption edges, so evaluate
-    # them on a tabulation grid and interpolate at the per-segment resonance
-    # energies ON THE GPU (step 3) -- a few ms over ~10^3 grid points instead of
-    # ~0.25 s/case over ~10^5 segments, and E_res stays on the device (no
-    # per-reflection GPU->CPU->GPU round-trip; that structure-factor CPU cost was
-    # what capped GPU utilisation on a fast card). The grid is a 1 eV mesh UNION
-    # the basis and absorber elements' native Henke energies, which densely
-    # sample the edges -- a plain uniform mesh mis-resolves the edge jumps (tens
-    # of % at e.g. the C K-edge). Window matches the keep mask below.
-    _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
-    _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
-    _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
-    E_tab = _line_tabulation_grid(info, abs_comp, _lo, _hi)
-    E_tab_g = xp.asarray(E_tab, dtype=REAL)
-    # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and
-    # interpolated linearly against log(E) before summing. This reproduces the
-    # pinned xraydb non-f1 Chantler rule; interpolating the compound total in
-    # either linear or log space does not. Explicit absorber elements contribute
-    # their native nodes to E_tab even when absent from the crystal basis.
-    # Applied only to single-slab/finite-footprint routes. Layered and grooved
-    # escape retain exact per-point mu. No per-segment host/device transfer is
-    # restored. Independently rederived with no physics divergence; human
-    # sign-off remains required.
-    # Validation: line-absorption-tabulation
-    log_mu_tab_g = xp.asarray(_elemental_log_mu_table(abs_comp, E_tab), dtype=REAL)
-
-    # Real part of the crystal's bulk refractive index n(E) = sqrt(1 + chi_0(E)),
-    # tabulated on the SAME edge-resolved grid as chi/U/mu (delta = 1 - Re n has
-    # its own edge structure, from the f1 cusp). The in-medium dispersion is
-    # unconditional, so this table is always built.
-    n_re_tab_g = xp.asarray(
-        np.asarray(refractive_index(crystal, E_tab, use_henke).real), dtype=REAL
-    )
-
-    n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
-
-    # Segment-only kinematics shared by every reflection/orientation and by both
-    # the batched and compatibility paths. These used to be recomputed inside
-    # ``_accumulate`` for every g row.
-    v_dot_n_all = _matvec3(v_all, n_hat_d)
-    denom_all = 1.0 - v_dot_n_all
-    gamma_all = 1.0 / xp.sqrt(1.0 - beta_all * beta_all)
-    t_L_all = seg_L / beta_all
-
-    # coherent (phased) sum precompute: the per-segment retardation scalar
-    # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
-    # retardation) and photon wavenumber k_gamma(E) = E / hbar c [1/Ang].
-    # ``t_ang`` remains segment-start age; add half the constant-velocity flight
-    # time so it describes the same midpoint as ``r_mid``. This one d_all feeds
-    # both coherent reduction routes. Validation: coherent-segment-midpoint-time.
-    # Each reflection adds its spatial susceptibility phase -g.r_j inside
-    # _accumulate. All-zero t0_ang leaves the physical trajectory phase.
-    # Inert unless a complex per-row field is actually reduced, i.e. under
-    # coherent=True or the flight-grouped incoherent path.
-    if coherent or grouped:
-        cdtype = xp.result_type(REAL, 1j)
-        seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
-        seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
-        seg_t_mid = seg_t + 0.5 * t_L_all
-        d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
-        omega_grid = E_grid / HBARC_EV_ANG
-
-        # In-medium propagation phase. The observation-time phase is
-        # omega (t_j + n_med L_esc,j + L_vac,j), and the geometric total path
-        # L_esc + L_vac = R - n_hat.r_j to first order, so the vacuum
-        # ``omega d_j`` picks up exactly
-        #
-        #     omega (Re n(E) - 1) L_esc,j = - delta(E) omega(E) L_esc,j
-        #
-        # where L_esc,j is the SAME in-crystal escape distance the Beer-Lambert
-        # factor already runs over. That is not a coincidence: the escape leg
-        # contributes exp(i n omega L) = exp(i omega L) exp(-i delta omega L)
-        # exp(-beta omega L), and the last factor is sqrt(exp(-mu L)) = ``amp``.
-        # The dispersive phase is the real partner of an absorption the coherent
-        # path already carries; only the two together are one complex n.
-        #
-        # Note this is NOT ``k(E) n_hat.r_j``: that form would charge the medium
-        # for the whole flight to the detector. The two agree only when the
-        # photon exits along the face normal (where L_esc and n_hat.r differ by a
-        # segment-independent constant, i.e. a global phase).
-        #
-        # Tabulated on the OUTPUT grid: it is a propagation phase read across the
-        # whole spectrum, not a coupling frozen at the line energy.
-        # Validation: xray-in-medium-propagation-phase
-        delta_omega_grid = (
-            xp.asarray(
-                1.0 - np.asarray(refractive_index(crystal, E_grid_eV, use_henke).real),
-                dtype=REAL,
-            )
-            * omega_grid
-        )
-
-    # Empirical inter-electron decoherence for the coherent path. Today's
-    # coherent sum bakes each electron's SAMPLED longitudinal offset
-    # (``t0_ang``) and transverse entry offset (via ``seg_r``'s trajectory
-    # position) into the segment phase and squares once -- one Monte Carlo
-    # realization. For a squared coherent sum that is speckle, not shot
-    # noise: the spurious enhancement does not shrink with electron count
-    # (Rayleigh statistics), unlike ordinary incoherent MC noise.
-    #
-    # Fresh-context result: per (row, energy), Total = (1-F)*Grouped +
-    # F*Flat, where Flat = |sum_e S_e|^2 is TODAY'S coherent reduction but
-    # fed the electron's offset-free position/time -- so it
-    # needs no new reduction code, only feeding ``d_all_geom``/``seg_r_geom``
-    # in place of ``d_all``/``seg_r`` at the handful of points that build a
-    # row's phase -- and Grouped = sum_e|S_e|^2 groups the SAME segments by
-    # electron, squares each electron's own sum, then adds (new reduction,
-    # ``_coherent_electron_grouped_row`` below). F is the empirical
-    # characteristic function of the ACTUAL per-electron offsets transport
-    # already draws (``initial_t0_ang``/``initial_r_ang``, Ne-long
-    # population arrays, NOT the per-segment gathered/duplicated ones):
-    # F(row) = |mean_e exp(i*(omega*t0_e - q_perp(row).dr_perp,e))|^2. This
-    # needs no per-policy sigma-resolution logic (legacy gaussian/uniform
-    # bunch, long_offsets_fs, compressed, microtrain, and elliptical/
-    # Courant-Snyder transverse spots all fall out for free -- the only
-    # requirement is t0 sampled independently of the transverse offset,
-    # true here since they use independent RNG child streams), and it
-    # converges to the closed-form exp[-(omega sigma_z)^2-(q_perp
-    # sigma_perp)^2] via ordinary 1/sqrt(Ne) statistics rather than the
-    # non-converging speckle the naive sum shows.
-    #
-    # F must be applied PER ROW (reflection x mosaic orientation), before
-    # summing across rows: q_perp depends on g, which differs row to row,
-    # so a single scalar F(E) on the row-summed spectrum would be wrong
-    # whenever more than one row contributes to the same energy bin.
-    #
-    # Validation: coherent-inter-electron-decoherence
-    decoherence_active = False
-    if coherent:
-        seg_r_geom = seg_r
-        d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
-        t0_pop = xp.asarray(segments.get("initial_t0_ang", np.zeros(0)), dtype=REAL)[:Ne]
-        xy0_pop = xp.asarray(
-            np.asarray(segments.get("initial_r_ang", np.zeros((0, 3))))[:, :2], dtype=REAL
-        )[:Ne]
-        decoherence_active = bool(
-            (t0_pop.size and xp.any(t0_pop != 0.0)) or (xy0_pop.size and xp.any(xy0_pop != 0.0))
-        )
-        if longitudinal_rms_fs is not None:
-            longitudinal_rms_fs = float(longitudinal_rms_fs)
-            if not np.isfinite(longitudinal_rms_fs) or longitudinal_rms_fs <= 0.0:
-                raise ValueError("longitudinal_rms_fs must be finite and positive")
-        if decoherence_active:
-            finite_footprint_now = (
-                segments.get("crystal_width_ang") is not None
-                and segments.get("crystal_height_ang") is not None
-            )
-            if finite_footprint_now:
-                if longitudinal_rms_fs is None:
-                    raise ValueError(
-                        "coherent emission with a finite crystal footprint and "
-                        "nonzero bunch offsets requires longitudinal_rms_fs; "
-                        "only the fully longitudinally decohered limit is "
-                        "supported"
-                    )
-                sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
-                # Decide support in host float64 so a borderline duration does
-                # not run on float32 CUDA while the CPU rejects it.
-                omega_host = np.asarray(_to_cpu(omega_grid), dtype=float)
-                finite_footprint_F_host = np.exp(-((omega_host * sigma_z_ang) ** 2))
-                finite_footprint_F = xp.asarray(finite_footprint_F_host, dtype=REAL)
-                # Average only the independent longitudinal arrival time. Keep
-                # each electron at its sampled transverse position in BOTH the
-                # flat and grouped terms: its phase, hit/miss history, and
-                # finite-prism attenuation are coupled and must stay together.
-                # F_z then blends those terms exactly, conditional on this
-                # transverse/transport realization. The CUDA-JIT grouped
-                # reductions consume these same arrays.
-                d_all_geom = seg_t_mid - _matvec3(seg_r, n_hat_d)
-            else:
-                seg_r_geom = seg_r.copy()
-                seg_elec_id_clamped = xp.clip(seg_elec_id, 0, max(Ne - 1, 0))
-                seg_r_geom[:, :2] = seg_r_geom[:, :2] - xy0_pop[seg_elec_id_clamped]
-                d_all_geom = seg_t_mid - _matvec3(seg_r_geom, n_hat_d)
-                # A_e = t0_e - n_hat_perp . dr_perp,e does not depend on g (the
-                # reciprocal vector varies per row; n_hat is fixed for the whole
-                # call), so hoist it once here; B_e(row) = g_perp . dr_perp,e is
-                # cheap and stays inside the per-row helper below.
-                decoherence_A_pop = t0_pop - xy0_pop @ n_hat_d[:2]
-
-        def _row_decoherence_factor(g_vec_d):
-            """Inter-electron factor for one row.
-
-            Infinite slabs use the empirical joint longitudinal/transverse
-            characteristic function. Finite footprints retain their coupled
-            sampled transverse fields and use only analytic Gaussian ``F_z``.
-            """
-            if not decoherence_active:
-                return None
-            if finite_footprint_now:
-                return finite_footprint_F
-            B_pop = xy0_pop @ g_vec_d[:2]
-            chi_sum = xp.zeros(E_grid.size, dtype=cdtype)
-            for j0 in range(0, decoherence_A_pop.size, chunk):
-                sl = slice(j0, min(j0 + chunk, decoherence_A_pop.size))
-                phase = omega_grid[None, :] * decoherence_A_pop[sl][:, None] - B_pop[sl][:, None]
-                chi_sum += xp.exp(1j * phase).sum(axis=0)
-            chi = chi_sum / decoherence_A_pop.size
-            return (chi.real**2 + chi.imag**2).astype(REAL)
-
-        def _coherent_electron_grouped_row(
-            elec_id_sel, a_width_sel, E_r_sel, d_geom_sel, g_phase_sel, L_esc_sel, coefs_sel
-        ):
-            """sum_e |sum_{j in e} E_j|^2 for one row's kept, finite segments,
-            using the SAME group-then-reduce-then-square pattern as the
-            flight-grouped incoherent path (7b) above, keyed by electron
-            instead of flight. Every ``*_sel`` array is already restricted
-            to this row's kept, finite segments and shares one length;
-            ``coefs_sel``: per-polarization complex per-segment
-            coefficients (same restriction)."""
-            gid = _to_cpu(elec_id_sel)
-            perm = np.argsort(gid, kind="stable")
-            gid = gid[perm]
-            starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
-            bounds = np.append(starts, gid.size)
-            row_total = xp.zeros(E_grid.size, dtype=REAL)
-            perm_xp = xp.asarray(perm)
-            aw_p = a_width_sel[perm_xp]
-            Er_p = E_r_sel[perm_xp]
-            d_p = d_geom_sel[perm_xp]
-            gp_p = g_phase_sel[perm_xp]
-            Lesc_p = L_esc_sel[perm_xp]
-            coefs_p = [c[perm_xp] for c in coefs_sel]
-            for ka, kb in _flight_blocks(bounds, chunk):
-                rows = slice(bounds[ka], bounds[kb])
-                x = aw_p[rows][:, None] * (E_grid[None, :] - Er_p[rows][:, None]) / xp.pi
-                arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
-                arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
-                SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
-                offsets = bounds[ka:kb] - bounds[ka]
-                for c in coefs_p:
-                    field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-                    row_total += (xp.abs(field) ** 2).sum(axis=0)
-            return row_total
-
-        def _coherent_jit_grouped_row(elec_id_sel, per_line_sel, L_esc_sel, out):
-            """sum_e |sum_{j in e} E_j|^2 for one row on the float32 CUDA-JIT
-            reduction kernel -- the device counterpart of
-            ``_coherent_electron_grouped_row`` above.
-
-            No new device code is needed: ``run_coherent_reduction_kernel``
-            already computes |sum of the lines it is handed|^2 and ACCUMULATES
-            (``spec[k] += wm * ...``), so calling it once per electron over that
-            electron's own lines, with ``mosaic_weight=1``, into one zeroed
-            buffer sums the per-electron squares exactly. The cost is Ne extra
-            launches per row (the segments themselves are still touched once in
-            total); the mosaic weight is applied outside, by the blend.
-
-            ``per_line_sel`` is the 8-tuple the kernel takes (E_r, a_width,
-            phase_slope, g_phase, and the two complex polarization coefficients
-            split into real/imag), already restricted to this row's kept lines
-            and sharing one length with ``elec_id_sel``/``L_esc_sel``."""
-            from .coherent_jit_kernel import (
-                DEFAULT_COHERENT_KERNEL_CONFIG,
-                run_coherent_reduction_kernel,
-            )
-
-            gid = _to_cpu(elec_id_sel)
-            if gid.size == 0:
-                return out
-            perm = np.argsort(gid, kind="stable")
-            gid = gid[perm]
-            starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
-            bounds = np.append(starts, gid.size)
-            perm_xp = xp.asarray(perm)
-            cols = [xp.ascontiguousarray(a[perm_xp], dtype=REAL) for a in per_line_sel]
-            L_p = xp.ascontiguousarray(L_esc_sel[perm_xp], dtype=REAL)
-            E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
-            dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
-            for b0, b1 in zip(bounds[:-1], bounds[1:], strict=True):
-                sl = slice(int(b0), int(b1))
-                run_coherent_reduction_kernel(
-                    *(c[sl] for c in cols),
-                    E_grid_c,  # ty: ignore[too-many-positional-arguments]
-                    out=out,
-                    mosaic_weight=1.0,
-                    L_esc=L_p[sl],
-                    delta_omega=dom_c,
-                    config=DEFAULT_COHERENT_KERNEL_CONFIG,
-                )
-            return out
-
-    # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
-    # today's single-orientation result bit-for-bit). Otherwise a list of
-    # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
-    # incoherently below (docs/physics/materials/crystal-mosaicity.md route 2).
-    mosaic_quad = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes)
-
-    # NVTX sub-ranges to split the coarse ``cxr.lines`` range into structure-
-    # factor tabulation vs per-reflection accumulation (no-op off the profiled
-    # GPU path). Lazy import: runner imports this module, so a top-level import
-    # would be circular.
+    """Run the spectrum phases for a bound request: prepare, accumulate on
+    whichever route the configuration selects, then reduce and normalise.
+    """
+    st = _prepare_spectrum(request)
+    # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
+    # runner imports this module, so a top-level import would be circular.
     from ..runner import _nsys_pop, _nsys_push
 
-    def _accumulate(
-        g_vec_d, e_s, e_p, g2, n_dot_g, g_dot_es, g_dot_ep, chi_re, chi_im, u_re, u_im, wm
-    ):
-        """Add one reflection's contribution for crystallite reciprocal vector
-        ``g_vec_d``, scaled by the mosaic-quadrature weight ``wm``, into spec /
-        spec_pxr / spec_cbs in place. Every argument is a DEVICE array uploaded
-        once by the caller's stacking prologue (row views): the structure-factor
-        tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
-        the mosaic orientation -- while g and its sigma/pi polarization pair
-        (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
-        path."""
-
-        # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
-        #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
-        v_dot_g = _matvec3(v_all, g_vec_d)
-        denom, n_re_seg = _in_medium_kinematics(v_dot_n_all, v_dot_g, n_re_tab_g, E_tab_g)
-        omega_res = v_dot_g / denom
-        E_res = HBARC_EV_ANG * omega_res  # -> eV
-
-        # -- 2. drop segments whose line misses the spectral window -------------
-        # (pad by 20% so sinc tails that reach into the window still count)
-        pad = 0.2 * (E_grid[-1] - E_grid[0])
-        keep = (
-            line_electron
-            & (E_res > float(E_grid[0] - pad))
-            & (E_res > 10.0)
-            & (E_res < E_grid[-1] + pad)
-        )
-        if not keep.any():
-            return
-        idx = xp.flatnonzero(keep)
-
-        E_r = E_res[idx]  # line energy per kept segment [eV]
-        om = omega_res[idx]  # same in 1/Ang
-        v = v_all[idx]  # velocity vectors
-        t_L = t_L_all[idx]  # interaction time [Ang] (c=1)
-        dnm = denom[idx]
-        vdg = v_dot_g[idx]
-
-        # -- 3. couplings AT each segment's resonance energy --------------------
-        # All five tabulations share E_r and E_tab_g, so bracket once. U_g tables
-        # are pre-scaled by 1/m_e during construction.
-        _ix, _fr, _blw, _abv = _interp_index(E_r, E_tab_g)
-        _log_fr = _log_interp_fraction(E_r, E_tab_g, _ix)
-        chi_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_re)
-        chi_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, chi_im)
-        u_re_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_re)
-        u_im_i = _interp_gather1d(_ix, _fr, _blw, _abv, u_im)
-        mu_i = _interp_elemental_mu(_ix, _log_fr, _blw, _abv, log_mu_tab_g)
-        chi = chi_re_i + 1j * chi_im_i
-        eUg_over_m = u_re_i + 1j * u_im_i
-
-        # -- 4. photon kinematics per segment ------------------------------------
-        # k = omega*n, so detuning = g^2 + 2*omega*(n.g), k.g = omega*(n.g),
-        # and v.(k+g) = v.g + k.v. The g-only scalars are precomputed once.
-        # In medium k = n omega n_hat, so k.v = omega(1 - denom) still holds
-        # exactly (denom absorbed the n), while k.g takes one power of n and
-        # |k+g|^2 - k^2 = g^2 + 2 k.g keeps its form. k_mag = |k| is what the
-        # PXR numerator's k^2 needs; it is omega in vacuum.
-        k_mag = om if n_re_seg is None else om * n_re_seg[idx]
-        k_dot_v = om * (1.0 - dnm)
-        k_dot_g = k_mag * n_dot_g
-        v_dot_kg = vdg + k_dot_v
-        detuning = g2 + 2.0 * k_dot_g
-
-        # -- 5. Eq. (13) + relativistic Eq. (14) amplitudes, per segment ----------
-        # CBS braced product {a;b} = a.b - (a.v)(b.v) and 1/gamma prefactor
-        # (Zhai SI Eq. 6).
-        gamma = gamma_all[idx]
-        A2 = xp.zeros(idx.size, dtype=REAL)
-        A2_pxr = xp.zeros(idx.size, dtype=REAL)
-        A2_cbs = xp.zeros(idx.size, dtype=REAL)
-        pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
-        for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
-            v_dot_e = _matvec3(v, e_d)
-            if coherent or grouped:
-                # Complex amplitudes retained verbatim -- the phased-field paths
-                # (global-coherent and flight-grouped) keep the un-reassociated
-                # expression and their goldens are unaffected.
-                A_PXR = chi / detuning * (v_dot_kg * g_dot_e - k_mag**2 * v_dot_e)
-                braced_ge = g_dot_e - vdg * v_dot_e
-                braced_kg = k_dot_g - k_dot_v * vdg
-                A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
-                pol_A.append(A_PXR + A_CBS)  # keep phase: orthogonal pols still add incoherently
-                continue
-            # Incoherent |A|^2 in one fused real kernel (reassociated, NOT
-            # bit-for-bit; ledger + regen required -- see _line_amp_sq_core,
-            # Validation: line-amplitude-fusion).
-            a2, a2_pxr, a2_cbs = _line_amp_sq_core(
-                chi.real,
-                chi.imag,
-                eUg_over_m.real,
-                eUg_over_m.imag,
-                v_dot_kg,
-                g_dot_e,
-                k_mag,
-                v_dot_e,
-                vdg,
-                k_dot_g,
-                k_dot_v,
-                gamma,
-                detuning,
-            )
-            A2 += a2
-            A2_pxr += a2_pxr
-            A2_cbs += a2_cbs
-
-        # -- 6. Beer-Lambert escape factor from the segment midpoint -------------
-        # straight path along n_hat to whichever face the photon exits. With a
-        # LAYERED absorber (layers) the optical depth sums mu_i*dz_i across the
-        # film-on-substrate stack; otherwise it's the single-slab path. The
-        # geometric path is mosaic-independent; the optical depth uses E_r (the
-        # orientation-shifted line energy), so it is recomputed per orientation.
-        z_mid = seg_r[idx, 2]
-        if groove is not None:
-            # Blazed sawtooth entrance face: closed-form path to the working
-            # facet (grooves shorten, never lengthen, the flat-face path). Takes
-            # precedence over any finite footprint -- the mm-scale crystal extent
-            # only classifies launch hit/miss (hit_frac, set in transport); the
-            # groove escape treats the slab as laterally periodic. At depth z,
-            # the side-edge-affected strip is
-            # L_esc*cos(tp) = z*cot(tp) + O(groove spacing), capped by the
-            # crystal width. The guard above guarantees layers is None and
-            # n_hat[2] < 0 here.
-            # Validation: blazed-groove-geometry
-            L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
-            tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
-        elif finite_footprint:
-            # the escape DISTANCE is g-independent, so it is computed once per
-            # case (L_esc_all, below the loop's stacking prologue) instead of per
-            # reflection/orientation; only the idx selection is per-g.
-            assert L_esc_all is not None  # set whenever finite_footprint and no groove
-            L_esc = L_esc_all[idx]
-            if layers is None:
-                tau = L_esc * mu_i
-            else:
-                tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
-        else:
-            if layers is None:
-                if n_hat[2] < 0:
-                    L_esc = z_mid / (-n_hat[2])  # out the entrance face
-                else:
-                    L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
-                tau = L_esc * mu_i
-            else:
-                tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
-        T_abs = xp.exp(-tau)
-
-        # -- 7b. flight-grouped incoherent accumulation ---------------------------
-        # The same complex per-row field the coherent path builds, but reduced
-        # per PHYSICAL FLIGHT: substeps of one flight add coherently, whole
-        # flights add incoherently. At frozen energy and clock this is an exact
-        # algebraic identity with the unsplit row (the substep sinc times the
-        # Dirichlet sum over substep offsets rebuilds the parent's
-        # ``t_L sinc(P t_L / pi)``), so refining the energy tolerance changes
-        # only the quadrature of the energy sweep along the flight -- which is
-        # the point -- and not the number of independent emitters.
-        if gid_all is not None:  # i.e. ``grouped``, narrowed for the gather below
-            amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
-            a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
-            d = d_all[idx]
-            g_phase = _matvec3(seg_r[idx], g_vec_d)
-            coefs = [(amp * t_L) * A_e for A_e in pol_A]
-            good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
-            sel = np.flatnonzero(good)
-            if sel.size == 0:
-                return
-            gid = gid_all[idx[sel]]
-            # Gather this flight's rows together; a stable sort leaves already
-            # grouped input (and each group's internal row order) untouched.
-            perm = np.argsort(gid, kind="stable")
-            sel = sel[perm]
-            gid = gid[perm]
-            starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
-            bounds = np.append(starts, sel.size)
-            for ka, kb in _flight_blocks(bounds, chunk):
-                rows = sel[bounds[ka] : bounds[kb]]
-                x = a_width[rows][:, None] * (E_grid[None, :] - E_r[rows][:, None]) / xp.pi
-                arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
-                arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
-                SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
-                # Blocks break only on flight boundaries, so no flight is split
-                # across two reductions and squared twice.
-                offsets = bounds[ka:kb] - bounds[ka]
-                for c in coefs:
-                    field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-                    spec[:] += (xp.abs(field) ** 2).sum(axis=0) * wm
-            return
-
-        # -- 7c. coherent (phased) accumulation -----------------------------------
-        # Build the complex field per polarization within THIS reflection and
-        # orientation, square it, and add |field|^2 * wm to spec (reflections and
-        # mosaic orientations remain incoherent). The un-squared finite-time
-        # factor Q = t_L sinc(a_width(E-E_res)/pi) carries the amplitude scale
-        # (|Q|^2 = t_L^2 sinc^2); the emission-time/retardation phase is
-        # exp[i omega(E) d_j] with d_j = t_abs,j - n_hat.r_j.
-        if coherent:
-            amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
-            a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
-            # Geometric-only (offset-free) phase: identical to d_all/seg_r
-            # when no decoherence-relevant offset is configured, so this is
-            # a no-op swap in that (default) case. See the
-            # coherent-inter-electron-decoherence block above.
-            d = d_all_geom[idx]
-            g_phase = _matvec3(seg_r_geom[idx], g_vec_d)
-            coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
-            good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
-
-            if decoherence_active and sinc_cutoff is not None:
-                raise ValueError(
-                    "coherent emission with a nonzero bunch_length_fs/"
-                    "beam_fwhm_mm and sinc_cutoff together is not yet "
-                    "supported (the electron-grouped decoherence floor "
-                    "does not implement sinc_cutoff windowing)"
-                )
-
-            # GPU float32 fast path: reduce the two complex polarization fields
-            # directly in a raw kernel. This avoids materializing the dense
-            # complex SP[segment, energy] matrix and avoids both complex GEMVs.
-            # The exact CuPy path below remains the fallback for CPU/other
-            # backends, float64, and sinc_cutoff windowing. A nonzero
-            # bunch_length_fs/beam_fwhm_mm stays ON the kernel: the fused
-            # kernel squares whatever line set it is handed and ACCUMULATES,
-            # so the electron-grouped floor sum_e|S_e|^2 is just one call per
-            # electron into a zeroed buffer (``_coherent_jit_grouped_row``),
-            # and |sum_e S_e|^2 is the same single call this path already
-            # makes -- both on the geometric (offset-free) phase, blended by
-            # F(row, E) outside the kernel.
-            # The reduction kernel folds the vacuum phase as ``slope_j * E``, a
-            # single per-line scalar against the energy axis. The in-medium term
-            # is a SECOND (per-segment scalar) x (per-energy table) product, so
-            # it rides along as its own ``L_esc``/``delta_omega`` pair rather
-            # than being absorbed into that slope.
-            _use_jit_coherent_reduction = (
-                _USE_JIT_COHERENT_REDUCTION
-                and getattr(xp, "__name__", "") == "cupy"
-                and np.dtype(REAL) == np.dtype(np.float32)
-                and sinc_cutoff is None
-            )
-            if _use_jit_coherent_reduction:
-                from .coherent_jit_kernel import (
-                    DEFAULT_COHERENT_KERNEL_CONFIG,
-                    run_coherent_reduction_kernel,
-                )
-
-                sel = xp.flatnonzero(good)
-                if sel.size:
-                    c_s, c_p = coefs
-                    per_line_sel = (
-                        xp.ascontiguousarray(E_r[sel], dtype=REAL),
-                        xp.ascontiguousarray(a_width[sel], dtype=REAL),
-                        xp.ascontiguousarray(d[sel] / HBARC_EV_ANG, dtype=REAL),
-                        xp.ascontiguousarray(g_phase[sel], dtype=REAL),
-                        xp.ascontiguousarray(c_s[sel].real, dtype=REAL),
-                        xp.ascontiguousarray(c_s[sel].imag, dtype=REAL),
-                        xp.ascontiguousarray(c_p[sel].real, dtype=REAL),
-                        xp.ascontiguousarray(c_p[sel].imag, dtype=REAL),
-                    )
-                    L_esc_sel = xp.ascontiguousarray(L_esc[sel], dtype=REAL)
-                    E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
-                    dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
-                    # Decoherence-inactive: unchanged single fused call
-                    # straight into spec with the row's mosaic weight.
-                    out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
-                    run_coherent_reduction_kernel(
-                        *per_line_sel,
-                        E_grid_c,
-                        out=out_flat,
-                        mosaic_weight=1.0 if decoherence_active else wm,
-                        L_esc=L_esc_sel,
-                        delta_omega=dom_c,
-                        config=DEFAULT_COHERENT_KERNEL_CONFIG,
-                    )
-                    if decoherence_active:
-                        grouped_total = _coherent_jit_grouped_row(
-                            seg_elec_id[idx][sel],
-                            per_line_sel,
-                            L_esc_sel,
-                            xp.zeros(E_grid.size, dtype=REAL),
-                        )
-                        F_row = _row_decoherence_factor(g_vec_d)
-                        spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm
-                return
-
-            fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
-            if sinc_cutoff is None:
-                for j0 in range(0, idx.size, chunk):
-                    sl = slice(j0, min(j0 + chunk, idx.size))
-                    m = good[sl]
-                    if not m.any():
-                        continue
-                    x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
-                    arg = d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]
-                    arg = arg - L_esc[sl][m, None] * delta_omega_grid[None, :]
-                    ph = xp.exp(1j * arg)
-                    SP = xp.sinc(x).astype(cdtype) * ph
-                    for c, f in zip(coefs, fields, strict=True):
-                        f += c[sl][m] @ SP
-            else:
-                dE = E_grid[1] - E_grid[0]
-                order = xp.argsort(E_r)
-                blk = 8192
-                for j0 in range(0, order.size, blk):
-                    sel = order[j0 : j0 + blk]
-                    sel = sel[good[sel]]
-                    if sel.size == 0:
-                        continue
-                    half = sinc_cutoff / a_width[sel]
-                    lo = float(_to_cpu((E_r[sel] - half).min()))
-                    hi = float(_to_cpu((E_r[sel] + half).max()))
-                    i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
-                    i1 = min(
-                        int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
-                        E_grid.size,
-                    )
-                    if i1 <= i0:
-                        continue
-                    x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
-                    arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
-                    arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
-                    ph = xp.exp(1j * arg)
-                    SP = xp.sinc(x).astype(cdtype) * ph
-                    for c, f in zip(coefs, fields, strict=True):
-                        f[i0:i1] += c[sel] @ SP
-            flat_total = sum(xp.abs(f) ** 2 for f in fields)
-            if decoherence_active:
-                sel_full = xp.flatnonzero(good)
-                grouped_total = _coherent_electron_grouped_row(
-                    seg_elec_id[idx][sel_full],
-                    a_width[sel_full],
-                    E_r[sel_full],
-                    d[sel_full],
-                    g_phase[sel_full],
-                    L_esc[sel_full],
-                    [c[sel_full] for c in coefs],
-                )
-                F_row = _row_decoherence_factor(g_vec_d)
-                spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm
-            else:
-                spec[:] += flat_total * wm
-            return
-
-        # -- 7. accumulate the finite-segment lineshape ---------------------------
-        # d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |A|^2 t_L^2
-        #                  * sinc^2[(1 - v.n)(omega - omega_res) t_L / 2] * T_abs
-        # weight = everything except the sinc^2 (times the mosaic weight wm);
-        # a_width converts (E - E_res) to the sinc argument: P t_L = a_width(E - E_res).
-        _nsys_push("cxr.lines.accum")
-        pref = ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
-        weight = pref * A2 * wm
-        targets = [(weight, spec)]
-        if components:
-            targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
-        a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
-        good = xp.isfinite(weight) & (weight > 0)
-
-        if sinc_cutoff is None:
-            for j0 in range(0, idx.size, chunk):
-                sl = slice(j0, min(j0 + chunk, idx.size))
-                m = good[sl]
-                if not m.any():
-                    continue
-                S = _sincsq_lineshape(a_width[sl][m, None], E_grid[None, :], E_r[sl][m, None])
-                for w, tgt in targets:
-                    tgt += w[sl][m] @ S
-        else:
-            dE = E_grid[1] - E_grid[0]
-            order = xp.argsort(E_r)
-            blk = 8192
-            for j0 in range(0, order.size, blk):
-                sel = order[j0 : j0 + blk]
-                sel = sel[good[sel]]
-                if sel.size == 0:
-                    continue
-                half = sinc_cutoff / a_width[sel]
-                lo = float(_to_cpu((E_r[sel] - half).min()))
-                hi = float(_to_cpu((E_r[sel] + half).max()))
-                i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
-                i1 = min(
-                    int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
-                    E_grid.size,
-                )
-                if i1 <= i0:
-                    continue
-                S = _sincsq_lineshape(a_width[sel][:, None], E_grid[None, i0:i1], E_r[sel][:, None])
-                for w, tgt in targets:
-                    tgt[i0:i1] += w[sel] @ S
-        _nsys_pop()
+    req = st.request
+    E_grid_eV = req.E_grid_eV
+    crystal = req.crystal
+    hkl_list = req.hkl_list
+    B_ang2 = req.B_ang2
+    use_henke = req.use_henke
+    chunk = req.chunk
+    beam_uvw = req.beam_uvw
+    azimuth_rad = req.azimuth_rad
+    recip_miscut_rad = req.recip_miscut_rad
+    sinc_cutoff = req.sinc_cutoff
+    components = req.components
+    layers = req.layers
+    mosaic_fwhm_rad = req.mosaic_fwhm_rad
+    mosaic_nodes = req.mosaic_nodes
+    surface_hkl = req.surface_hkl
+    groove = req.groove
+    coherent = req.coherent
+    _table_cache = req._table_cache
+    info = st.info
+    segments = st.segments
+    R_orient = st.R_orient
+    thickness = st.thickness
+    Ne = st.Ne
+    n_hat = st.n_hat
+    n_hat_d = st.n_hat_d
+    E_grid = st.E_grid
+    spec = st.spec
+    spec_pxr = st.spec_pxr
+    spec_cbs = st.spec_cbs
+    seg_r = st.seg_r
+    seg_elec_id = st.seg_elec_id
+    line_electron = st.line_electron
+    v_all = st.v_all
+    v_dot_n_all = st.v_dot_n_all
+    denom_all = st.denom_all
+    gamma_all = st.gamma_all
+    t_L_all = st.t_L_all
+    grouped = st.grouped
+    E_tab = st.E_tab
+    E_tab_g = st.E_tab_g
+    log_mu_tab_g = st.log_mu_tab_g
+    n_re_tab_g = st.n_re_tab_g
+    mosaic_quad = st.mosaic_quad
+    finite_footprint = st.finite_footprint
+    cdtype = st.cdtype
+    delta_omega_grid = st.delta_omega_grid
+    seg_r_geom = st.seg_r_geom
+    d_all_geom = st.d_all_geom
+    decoherence_active = st.decoherence_active
 
     # The batched path below runs the whole hkl set through steps 1-6 in one
     # vectorized (n_seg, N_g) pass. It covers the single-slab absorber (with or
@@ -2004,10 +2373,6 @@ def _mc_spectrum(request):
     # either way, so it hoists) for BOTH coherent and incoherent emission. The
     # layered / grooved absorbers, and coherent runs that ask for sinc_cutoff
     # windowing, stay on the proven per-hkl _accumulate loop, bit-for-bit.
-    finite_footprint = (
-        segments.get("crystal_width_ang") is not None
-        and segments.get("crystal_height_ang") is not None
-    )
     # The flight-grouped reduction lives on the per-hkl loop only: its segmented
     # complex sum has no batched or device counterpart yet (slice H owns those
     # ports), and correctness of the default incoherent yield outranks the
@@ -2018,76 +2383,7 @@ def _mc_spectrum(request):
         or layers is not None
         or grouped
     ):
-        # Stacking prologue: every host->device transfer this path needs is done
-        # ONCE per case here, not once per (reflection, orientation) inside the
-        # loop. Previously each pass re-uploaded the four chi/U tabulations plus
-        # g and its two polarization vectors -- ~90 xp.asarray calls per case,
-        # 15% of GPU-phase tottime on the 3060 Ti profile (hopg_coherent, 4
-        # reflections). The chi/U rows are keyed by REFLECTION (they do not
-        # depend on the mosaic orientation), the geometry rows by
-        # (reflection, orientation). U_g/m_e is now pre-scaled at table build and
-        # the fallback shares one interpolation bracket; these are algebraically
-        # identical with only float-rounding-level movement.
-        _nsys_push("cxr.lines.tab")
-        g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
-        cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
-        orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
-        for i_hkl, hkl in enumerate(hkl_list):
-            # reciprocal vector in the sample frame: construction frame by default
-            # ([001] along the slab normal), rotated if beam_uvw given
-            g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
-            if R_orient is not None:
-                g_vec = R_orient @ g_vec
-            chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
-            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke)) / M_E_EV
-            # Store U_g/m_e in the table: the mass scaling is energy-independent.
-            cr_rows.append(chi_tab.real)
-            ci_rows.append(chi_tab.imag)
-            ur_rows.append(u_tab.real)
-            ui_rows.append(u_tab.imag)
-            for R_m, wm in orients:  # None -> perfect crystal, one orientation, weight 1
-                gd = g_vec if R_m is None else R_m @ g_vec
-                e_s, e_p = _polarization_pair(n_hat, gd)
-                g_rows.append(gd)
-                es_rows.append(e_s)
-                ep_rows.append(e_p)
-                wm_rows.append(wm)
-                hkl_of_row.append(i_hkl)
-        G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
-        ES = xp.asarray(np.array(es_rows), dtype=REAL)
-        EP = xp.asarray(np.array(ep_rows), dtype=REAL)
-        CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_hkl, N_tab)
-        CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
-        U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
-        U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
-        G2 = _rowdot3(G, G)
-        N_DOT_G = _matvec3(G, n_hat_d)
-        G_DOT_ES = _rowdot3(G, ES)
-        G_DOT_EP = _rowdot3(G, EP)
-        # g-independent escape distance: one pass per case, sliced per g inside
-        # _accumulate (only the finite-footprint, non-grooved branch reads it).
-        L_esc_all = (
-            _segment_escape_distance(segments, n_hat, xp=xp)
-            if finite_footprint and groove is None
-            else None
-        )
-        _nsys_pop()
-
-        for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
-            _accumulate(
-                G[i_row],
-                ES[i_row],
-                EP[i_row],
-                G2[i_row],
-                N_DOT_G[i_row],
-                G_DOT_ES[i_row],
-                G_DOT_EP[i_row],
-                CHI_RE[i_hkl],
-                CHI_IM[i_hkl],
-                U_RE[i_hkl],
-                U_IM[i_hkl],
-                wm,
-            )
+        _accumulate_per_hkl(st)
     else:
         # ---- batched line accumulation (options A + B) -----------------------
         # Every reflection/orientation shares the segment geometry, so run the
@@ -2680,7 +2976,7 @@ def _mc_spectrum(request):
                         )
                         group0 = group1
                 # F PER ROW, before the incoherent row sum.
-                F_rows = xp.stack([_row_decoherence_factor(G[i_row]) for i_row in range(N_g)])
+                F_rows = xp.stack([_row_decoherence_factor(st, G[i_row]) for i_row in range(N_g)])
                 blended = (1.0 - F_rows) * grouped_mag2 + F_rows * flat_mag2
                 spec[:] += (WM.reshape(-1)[:, None] * blended).sum(axis=0)
             else:
@@ -2738,12 +3034,13 @@ def _mc_spectrum(request):
                     )
                     if decoherence_active:
                         grouped_total = _coherent_jit_grouped_row(
+                            st,
                             elec_id_i,
                             per_line_i,
                             L_i,
                             xp.zeros(E_grid.size, dtype=REAL),
                         )
-                        F_row = _row_decoherence_factor(G[i_row])
+                        F_row = _row_decoherence_factor(st, G[i_row])
                         spec[:] += ((1.0 - F_row) * grouped_total + F_row * out_flat) * wm_i
                     continue
                 f_s = xp.zeros(E_grid.size, dtype=cdtype)
@@ -2760,6 +3057,7 @@ def _mc_spectrum(request):
                 flat_total = xp.abs(f_s) ** 2 + xp.abs(f_p) ** 2
                 if decoherence_active:
                     grouped_total = _coherent_electron_grouped_row(
+                        st,
                         elec_id_i,
                         aw_i,
                         E_r_i,
@@ -2768,7 +3066,7 @@ def _mc_spectrum(request):
                         L_i,
                         [csr + 1j * csi, cpr + 1j * cpi],
                     )
-                    F_row = _row_decoherence_factor(G[i_row])
+                    F_row = _row_decoherence_factor(st, G[i_row])
                     spec[:] += ((1.0 - F_row) * grouped_total + F_row * flat_total) * wm_i
                 else:
                     spec[:] += flat_total * wm_i
@@ -2777,7 +3075,6 @@ def _mc_spectrum(request):
     if components:
         return _to_cpu(spec / Ne), _to_cpu(spec_pxr / Ne), _to_cpu(spec_cbs / Ne)
     return _to_cpu(spec / Ne)
-
 
 def mc_spectrum_solid_angle(
     segments,
