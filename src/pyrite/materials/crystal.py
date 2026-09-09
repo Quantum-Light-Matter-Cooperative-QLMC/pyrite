@@ -417,7 +417,13 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     ):
         phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
         acc += phase * (Z_TABLE[el] - F.real) / g**2 * dwf
-    return 4.0 * np.pi * E2_EV_ANG * acc / info["V_cell"]
+    result = 4.0 * np.pi * E2_EV_ANG * acc / info["V_cell"]
+    # Without anomalous corrections the CBS coupling is energy-independent,
+    # but callers still receive one value per requested energy so it can share
+    # the chi_g tabulation/interpolation path.
+    if np.ndim(photon_E_eV):
+        return np.broadcast_to(result, np.shape(photon_E_eV))
+    return result
 
 
 # ---- absorption length ------------------------------------------------------
