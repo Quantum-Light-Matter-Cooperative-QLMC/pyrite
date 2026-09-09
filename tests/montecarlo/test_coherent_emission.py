@@ -533,11 +533,13 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     incoherent `spec` and a `spec_coherent`, each matching a direct
     `mc_spectrum` on the SAME segments -- the single-transport / dual-kernel
     invariant."""
+    # Both accumulation routes tabulate reflections through `_kernels`, so that
+    # is the one place a `chi_g` counter sees every evaluation.
     import pyrite.montecarlo.runner as runner
-    from pyrite.montecarlo.spectrum import lines as line_spectrum
+    from pyrite.montecarlo.spectrum.lines import _kernels as line_kernels
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
-    real_chi_g = line_spectrum.chi_g
+    real_chi_g = line_kernels.chi_g
     chi_g_calls = 0
 
     def counted_chi_g(*args, **kwargs):
@@ -545,7 +547,7 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
         chi_g_calls += 1
         return real_chi_g(*args, **kwargs)
 
-    monkeypatch.setattr(line_spectrum, "chi_g", counted_chi_g)
+    monkeypatch.setattr(line_kernels, "chi_g", counted_chi_g)
     segs = _segments(2)
     tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
 
