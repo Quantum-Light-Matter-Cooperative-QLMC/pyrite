@@ -6,7 +6,7 @@ import datetime
 import sys
 from pathlib import Path
 
-from pyrite.apps import export
+from pyrite.cli.commands import export
 
 
 def test_export_targets_existing_notebook():

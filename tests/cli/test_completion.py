@@ -219,8 +219,8 @@ def _callback(command, name):
 
 
 def test_local_commands_wire_material_checkpoint_archive_and_choice_completion():
-    from pyrite.apps import analyze
     from pyrite.checkpoints import archive, slim
+    from pyrite.cli.commands import app_analysis as analyze
     from pyrite.cli.commands import recompute as recompute_cli
     from pyrite.runs import blaze, scan
 
@@ -287,9 +287,13 @@ def test_line_grid_wires_safe_completion_on_its_canonical_owners():
             is _cli_completion.complete_material_csv
         )
     for name in ("show_command", "line_show_command", "brem_show_command"):
-        assert _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
+        assert (
+            _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
+        )
     for name in ("set_command", "set_brem_command"):
-        assert _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
+        assert (
+            _callback(getattr(energy_grid, name), "material") is _cli_completion.complete_material
+        )
 
 
 def test_profile_and_material_commands_wire_catalog_completion():

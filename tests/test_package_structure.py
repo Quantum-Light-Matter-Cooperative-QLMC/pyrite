@@ -18,7 +18,7 @@ _COMPAT_MODULES = {
     "check_config": "cli.commands.check_config",
     "checkpoint_cleanup": "checkpoints.checkpoint_cleanup",
     "config": "campaign.config",
-    "export": "apps.export",
+    "export": "cli.commands.export",
     "longitudinal": "campaign.longitudinal",
     "performance_analysis": "perf.performance_analysis",
     "performance_profile": "perf.performance_profile",

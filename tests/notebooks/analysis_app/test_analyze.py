@@ -12,6 +12,7 @@ import pytest
 from click.testing import CliRunner
 
 from pyrite.apps import analyze
+from pyrite.cli.commands import app_analysis as analyze_cli
 from pyrite.materials import CATALOG
 
 
@@ -360,7 +361,7 @@ def test_default_material_empty_file_returns_none(tmp_path, monkeypatch):
 
 
 def _invoke(argv=()):
-    return CliRunner().invoke(analyze.command, list(argv), catch_exceptions=False)
+    return CliRunner().invoke(analyze_cli.command, list(argv), catch_exceptions=False)
 
 
 def test_default_flag_without_material_errors(tmp_path, monkeypatch):
@@ -383,7 +384,7 @@ def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
-        analyze,
+        analyze_cli,
         "_launch",
         lambda material, **kw: launched.update(material=material, **kw),
     )
@@ -399,7 +400,7 @@ def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
     analyze.set_default_material("hbn")
     launched = {}
     monkeypatch.setattr(
-        analyze,
+        analyze_cli,
         "_launch",
         lambda material, **kw: launched.update(material=material, **kw),
     )
@@ -413,7 +414,7 @@ def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
-        analyze,
+        analyze_cli,
         "_launch",
         lambda material, **kw: launched.update(material=material, **kw),
     )
@@ -427,7 +428,7 @@ def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
 
 def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
-    monkeypatch.setattr(analyze, "_launch", lambda material, **kw: None)
+    monkeypatch.setattr(analyze_cli, "_launch", lambda material, **kw: None)
     result = _invoke(["wse2"])
     assert result.exit_code == 0
     assert result.stderr == ""
@@ -438,12 +439,12 @@ def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
 
 
 def test_command_run_default():
-    cmd = analyze._command("hopg")
+    cmd = analyze_cli._command("hopg")
     assert cmd[0] == sys.executable
     assert cmd[1:4] == ["-m", "marimo", "run"]
     assert "--watch" not in cmd
     assert "--port" not in cmd
-    assert cmd[-4:] == [analyze.NOTEBOOK, "--", "--material", "hopg"]
+    assert cmd[-4:] == [analyze_cli.NOTEBOOK, "--", "--material", "hopg"]
 
 
 def test_headless_flag_is_not_supported():
@@ -456,11 +457,11 @@ def test_headless_flag_is_not_supported():
 def test_smoke_command_executes_analysis_app_to_a_temporary_html_file(tmp_path):
     output = tmp_path / "analysis.html"
 
-    cmd = analyze._smoke_command("hopg", output)
+    cmd = analyze_cli._smoke_command("hopg", output)
 
     assert cmd[:5] == [sys.executable, "-m", "marimo", "export", "html"]
     assert cmd[5:] == [
-        analyze.NOTEBOOK,
+        analyze_cli.NOTEBOOK,
         "--output",
         str(output),
         "--force",
@@ -471,17 +472,17 @@ def test_smoke_command_executes_analysis_app_to_a_temporary_html_file(tmp_path):
 
 
 def test_command_tunnel_uses_fixed_marimo_port():
-    command = analyze._command("hopg", tunnel=True)
-    assert command[3:7] == ["run", "--port", "2718", analyze.NOTEBOOK]
+    command = analyze_cli._command("hopg", tunnel=True)
+    assert command[3:7] == ["run", "--port", "2718", analyze_cli.NOTEBOOK]
 
 
 def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(monkeypatch, capsys):
     launched = []
     monkeypatch.setattr(
-        analyze.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+        analyze_cli.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
     )
 
-    analyze._launch("hopg", tunnel=True)
+    analyze_cli._launch("hopg", tunnel=True)
 
     output = capsys.readouterr().out
     assert "ssh -L 2718:127.0.0.1:2718 <your-pi-ssh-host>" in output
@@ -493,7 +494,7 @@ def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
-        analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)
+        analyze_cli, "_launch", lambda material, **kw: launched.update(material=material, **kw)
     )
     result = _invoke(["--tunnel"])
     assert result.exit_code == 0
@@ -502,19 +503,19 @@ def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
 
 
 def test_command_edit():
-    cmd = analyze._command("wse2", edit=True)
+    cmd = analyze_cli._command("wse2", edit=True)
     assert cmd[3] == "edit"
     assert "--watch" not in cmd
 
 
 def test_command_no_token_passes_marimo_flag():
-    command = analyze._command("hopg", no_token=True)
+    command = analyze_cli._command("hopg", no_token=True)
     assert "--no-token" in command
-    assert command.index("--no-token") < command.index(analyze.NOTEBOOK)
+    assert command.index("--no-token") < command.index(analyze_cli.NOTEBOOK)
 
 
 def test_command_no_token_omitted_by_default():
-    command = analyze._command("hopg")
+    command = analyze_cli._command("hopg")
     assert "--no-token" not in command
 
 
@@ -522,7 +523,7 @@ def test_no_token_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
-        analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)
+        analyze_cli, "_launch", lambda material, **kw: launched.update(material=material, **kw)
     )
     result = _invoke(["--no-token"])
     assert result.exit_code == 0
@@ -536,15 +537,15 @@ def test_no_token_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
 
 
 def test_command_watch_combines_with_run_and_edit():
-    run_cmd = analyze._command("hopg", watch=True)
+    run_cmd = analyze_cli._command("hopg", watch=True)
     assert run_cmd[3] == "run"
     assert run_cmd[4] == "--watch"
-    assert run_cmd[5] == analyze.NOTEBOOK
+    assert run_cmd[5] == analyze_cli.NOTEBOOK
 
-    edit_cmd = analyze._command("hopg", edit=True, watch=True)
+    edit_cmd = analyze_cli._command("hopg", edit=True, watch=True)
     assert edit_cmd[3] == "edit"
     assert edit_cmd[4] == "--watch"
-    assert edit_cmd[5] == analyze.NOTEBOOK
+    assert edit_cmd[5] == analyze_cli.NOTEBOOK
 
 
 # --- emission view selector (analysis-app) ------------------------------

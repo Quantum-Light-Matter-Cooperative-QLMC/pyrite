@@ -933,25 +933,56 @@ and remote command paths. Resolves preset settings and material photon grids;
 keeps a compatibility fallback for older branches.
 
 ### `apps/analyze.py`
-`pyrite app analysis launch` owner for `src/pyrite/apps/analysis_app.py`: persisted
-initial-material selection, smoke execution, edit/watch mode, ACP bridges,
-SSH-tunnel-friendly fixed-port launch.
+Notebook support for `src/pyrite/apps/analysis_app.py`: checkpoint loading,
+menu building, emission selection, and persisted initial-material state. Free
+of CLI imports so the notebook can load it on its own; the launcher lives in
+`cli/commands/app_analysis.py`.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
   `emission_menu`, `pick_spectrum`, `apply_emission`, `checkpoint_stem`,
-  `initial_material`, `get_default_material`, `set_default_material`, `command`,
-  `main`. `face_menu`/`checkpoint_stem` back the app's flat/blazed **Face**
-  dropdown (blazed loads `<material>_blazed/` from `pyrite material blaze`).
-  `emission_menu`/`apply_emission` back the app's **Emission** radio
-  (Incoherent/Coherent), gated per checkpoint on the stored `spec`/`spec_coherent`
-  and routing every spectrum read through the one `pick_spectrum`.
+  `analysis_checkpoint_manifest`, `load_analysis_checkpoint`, `cached_analysis`,
+  `profile_menu`, `comparison_stem`, `initial_material`, `get_default_material`,
+  `set_default_material`. `face_menu`/`checkpoint_stem` back the app's
+  flat/blazed **Face** dropdown (blazed loads `<material>_blazed/` from
+  `pyrite material blaze`). `emission_menu`/`apply_emission` back the app's
+  **Emission** radio (Incoherent/Coherent), gated per checkpoint on the stored
+  `spec`/`spec_coherent` and routing every spectrum read through the one
+  `pick_spectrum`.
+
+### `apps/viewer.py`
+Notebook support for `src/pyrite/apps/trace_app.py`: the pure initial-material
+precedence rule and its persisted default. Free of CLI imports; the launcher
+lives in `cli/commands/app_viewer.py`.
+- Public: `initial_material`, `get_default_material`, `set_default_material`.
 
 ### `apps/check.py`
-`pyrite app validation launch|export` owner for
-`src/pyrite/apps/validation_app.py`, plus optional remote Zhai-job
-launch/status/pull helpers. `pyrite check` is a hidden compatibility alias.
+Notebook support for `src/pyrite/apps/validation_app.py`: the persisted
+supplementary TMD azimuth plus optional remote Zhai-job launch/status/pull
+helpers driven from inside the notebook. Free of CLI imports; the launcher and
+cached-figure export live in `cli/commands/app_validation.py`.
 - Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`,
-  `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`,
-  `add_subparser`, `main`.
+  `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`.
+- Deps: `remote.config` (`remote_host`).
+
+### `cli/commands/app_analysis.py`
+`pyrite app analysis launch` owner for `src/pyrite/apps/analysis_app.py`:
+persisted initial-material selection, smoke execution, edit/watch mode, ACP
+bridges, SSH-tunnel-friendly fixed-port launch. Reads the resolution helpers
+from `apps/analyze.py`; that direction is what took `apps` out of the `cli`
+import cycle.
+- Public: `command`, `main`.
+
+### `cli/commands/app_viewer.py`
+`pyrite app viewer launch|export` owner for `src/pyrite/apps/trace_app.py`:
+material-argument handling, smoke execution, static-HTML export, ACP bridges,
+fixed-port tunnel launch.
+- Public: `command`, `export_command`, `main`.
+
+### `cli/commands/app_validation.py`
+`pyrite app validation launch|export` owner for
+`src/pyrite/apps/validation_app.py`. `pyrite check` is a hidden compatibility
+alias. `--export` skips marimo and renders cached figures through
+`validation.anchor_figures`.
+- Public: `command`, `main`.
 
 ### `validation/_zhai.py`
 Canonical maintained Zhai detector geometry and cache-schema provenance shared
@@ -1001,10 +1032,12 @@ and clear, remote validation jobs.
   through the owning submodule, so tests patch the owner (e.g.
   `transport._ssh_capture`), not the facade.
 
-### `apps/export.py`
+### `cli/commands/export.py`
 `pyrite app analysis export` subcommand — `marimo export html` of `src/pyrite/apps/analysis_app.py`
-→ `results/<stem>.html` (replace retired nbconvert-PDF path).
-- Public: `add_subparser`, `main`.
+→ `results/<stem>.html` (replaces the retired nbconvert-PDF path). Body and
+Click wiring are both here; the body used to live in `apps/export.py`, which
+reached back into `cli._core`.
+- Public: `command`, `main`.
 
 ### `checkpoints/slim.py`
 `pyrite checkpoint slim` subcommand — shrink checkpoint HDF5 for transfer (drop

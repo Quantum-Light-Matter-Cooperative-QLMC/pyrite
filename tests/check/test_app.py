@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from pyrite.apps import check
+from pyrite.cli.commands import app_validation as check_cli
 from tests.helpers.cli import invoke
 
 
@@ -89,31 +90,31 @@ def test_remote_zhai_status_parses_job_state(monkeypatch, report, expected):
 
 
 def test_command_uses_run_by_default():
-    cmd = check._command()
+    cmd = check_cli._command()
     assert cmd[1:4] == ["-m", "marimo", "run"]
-    assert check.NOTEBOOK in cmd
+    assert check_cli.NOTEBOOK in cmd
     assert "--watch" not in cmd
     assert "--port" not in cmd
 
 
 def test_command_edit_and_watch_flags():
-    cmd = check._command(edit=True, watch=True)
+    cmd = check_cli._command(edit=True, watch=True)
     assert "edit" in cmd and "run" not in cmd
     assert "--watch" in cmd
 
 
 def test_command_tunnel_uses_fixed_marimo_port():
-    command = check._command(tunnel=True)
-    assert command[3:7] == ["run", "--port", "2718", check.NOTEBOOK]
+    command = check_cli._command(tunnel=True)
+    assert command[3:7] == ["run", "--port", "2718", check_cli.NOTEBOOK]
 
 
 def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(monkeypatch, capsys):
     launched = []
     monkeypatch.setattr(
-        check.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+        check_cli.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
     )
 
-    check._launch(tunnel=True)
+    check_cli._launch(tunnel=True)
 
     output = capsys.readouterr().out
     assert "ssh -L 2718:127.0.0.1:2718 <your-pi-ssh-host>" in output
@@ -122,18 +123,18 @@ def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(mon
 
 
 def test_default_launch_keeps_stdout_unchanged(monkeypatch, capsys):
-    monkeypatch.setattr(check.subprocess, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(check_cli.subprocess, "run", lambda *args, **kwargs: None)
 
-    check._launch()
+    check_cli._launch()
 
     assert capsys.readouterr().out == ""
 
 
 def test_tunnel_flag_forwards_to_validation_launch(monkeypatch):
     calls = []
-    monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(check_cli, "_launch", lambda **kw: calls.append(kw))
 
-    check.main(["--tunnel"])
+    check_cli.main(["--tunnel"])
 
     assert calls == [{"edit": False, "watch": False, "tunnel": True}]
 
@@ -149,10 +150,10 @@ def test_export_cli_calls_export_all_figures_and_skips_marimo(monkeypatch, tmp_p
 
     monkeypatch.setitem(sys.modules, "pyrite.validation.anchor_figures", _FakeAF())
     monkeypatch.setattr(
-        check, "_launch", lambda **kw: pytest.fail("--export must not launch marimo")
+        check_cli, "_launch", lambda **kw: pytest.fail("--export must not launch marimo")
     )
 
-    check.main(["--export", "--outdir", str(tmp_path), "--ne", "11"])
+    check_cli.main(["--export", "--outdir", str(tmp_path), "--ne", "11"])
 
     assert calls == [(str(tmp_path), 11, 200, 200)]
 
@@ -168,10 +169,10 @@ def test_export_tunnel_cli_calls_export_all_figures_and_skips_marimo(monkeypatch
 
     monkeypatch.setitem(sys.modules, "pyrite.validation.anchor_figures", _FakeAF())
     monkeypatch.setattr(
-        check, "_launch", lambda **kw: pytest.fail("--export --tunnel must not launch marimo")
+        check_cli, "_launch", lambda **kw: pytest.fail("--export --tunnel must not launch marimo")
     )
 
-    check.main(["--export", "--tunnel", "--outdir", str(tmp_path), "--ne", "11"])
+    check_cli.main(["--export", "--tunnel", "--outdir", str(tmp_path), "--ne", "11"])
 
     assert calls == [(str(tmp_path), 11, 200, 200)]
 
@@ -186,7 +187,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
 
     monkeypatch.setitem(sys.modules, "pyrite.validation.anchor_figures", _FakeAF())
 
-    result = invoke(check.command, ["--export", "--outdir", str(tmp_path)])
+    result = invoke(check_cli.command, ["--export", "--outdir", str(tmp_path)])
 
     assert result.exit_code == 1
     assert "Error: Zhai cache missing" in result.output
@@ -196,18 +197,18 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
 
 def test_default_cli_launches_marimo_not_export(monkeypatch):
     calls = []
-    monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(check_cli, "_launch", lambda **kw: calls.append(kw))
 
-    check.main([])
+    check_cli.main([])
 
     assert calls == [{"edit": False, "watch": False}]
 
 
 def test_acp_flag_starts_validation_with_bridge_lifecycle(monkeypatch):
     calls = []
-    monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(check_cli, "_launch", lambda **kw: calls.append(kw))
 
-    check.main(["--acp"])
+    check_cli.main(["--acp"])
 
     assert calls == [{"edit": False, "watch": False, "acp": True}]
 
@@ -218,7 +219,7 @@ def test_launch_treats_keyboard_interrupt_as_normal_marimo_exit():
             sys.executable,
             "-c",
             (
-                "from pyrite.apps import check; "
+                "from pyrite.cli.commands import app_validation as check; "
                 "check.subprocess.run = lambda *args, **kwargs: "
                 "(_ for _ in ()).throw(KeyboardInterrupt()); "
                 "check._launch()"
@@ -236,7 +237,7 @@ def test_validation_app_initializes_its_default_supplementary_study():
     repo_dir = Path(__file__).resolve().parents[2]
 
     completed = subprocess.run(
-        [sys.executable, check.NOTEBOOK],
+        [sys.executable, check_cli.NOTEBOOK],
         cwd=repo_dir,
         capture_output=True,
         text=True,
@@ -248,13 +249,13 @@ def test_validation_app_initializes_its_default_supplementary_study():
 
 def test_validation_app_centers_the_supplementary_figure():
     repo_dir = Path(__file__).resolve().parents[2]
-    source = (repo_dir / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (repo_dir / check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "mo.center(figure)" in source
 
 
 def test_validation_app_never_falls_back_to_heavy_local_cache_population():
-    source = Path(check.NOTEBOOK).read_text(encoding="utf-8")
+    source = Path(check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "falls back locally" not in source.lower()
     assert "af.reproduce_all(" not in source
@@ -264,7 +265,7 @@ def test_validation_app_never_falls_back_to_heavy_local_cache_population():
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():
-    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
     for task in ("Anchors", "Reproductions", "Supplementary", "Provenance"):
         assert f'"{task}"' in source
@@ -291,7 +292,7 @@ def test_validation_app_declares_evidence_tasks_and_authorities():
 
 
 def test_validation_diagnostic_success_requires_interpretation():
-    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
     assert 'authority == "Diagnostic"' in source
     assert 'state = "Completed—interpret"' in source
@@ -300,7 +301,7 @@ def test_validation_diagnostic_success_requires_interpretation():
 
 
 def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparison():
-    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
     skip_branch = 'authority == "Optional oracle" and "result: skip"'
     assert skip_branch in source
@@ -309,7 +310,7 @@ def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparis
 
 
 def test_repository_default_save_names_mutated_setting_and_file():
-    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "Save user default" in source
     assert "tmd_exploratory_azimuth_deg" in source

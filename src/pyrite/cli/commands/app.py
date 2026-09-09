@@ -60,11 +60,19 @@ def _launch_leaf(name: str, launch_path: str, export_path: str) -> click.Group:
 
 
 def analysis_command() -> click.Group:
-    return _launch_leaf("analysis", "pyrite.apps.analyze.command", "pyrite.apps.export.command")
+    return _launch_leaf(
+        "analysis",
+        "pyrite.cli.commands.app_analysis.command",
+        "pyrite.cli.commands.export.command",
+    )
 
 
 def viewer_command() -> click.Group:
-    return _launch_leaf("viewer", "pyrite.apps.viewer.command", "pyrite.apps.viewer.export_command")
+    return _launch_leaf(
+        "viewer",
+        "pyrite.cli.commands.app_viewer.command",
+        "pyrite.cli.commands.app_viewer.export_command",
+    )
 
 
 @click.group(
@@ -91,7 +99,7 @@ def validation_launch_command(
 def _launch_validation(
     ctx: click.Context, *, watch: bool, edit: bool, acp: bool, tunnel: bool
 ) -> None:
-    check = _load("pyrite.apps.check.command")
+    check = _load("pyrite.cli.commands.app_validation.command")
     ctx.invoke(
         check,
         watch=watch,
@@ -116,7 +124,7 @@ def validation_export_command(
     ctx: click.Context, outdir: str, ne: int, ne_brem: int, ne_supp: int
 ) -> None:
     """Delegate cached-figure export to existing validation orchestration."""
-    check = _load("pyrite.apps.check.command")
+    check = _load("pyrite.cli.commands.app_validation.command")
     ctx.invoke(
         check,
         watch=False,

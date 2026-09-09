@@ -7,7 +7,9 @@ import importlib
 from click.testing import CliRunner
 
 from pyrite import cli
-from pyrite.apps import analyze, check, viewer
+from pyrite.cli.commands import app_analysis as analyze
+from pyrite.cli.commands import app_validation as check
+from pyrite.cli.commands import app_viewer as viewer
 
 
 def test_app_help_imports_only_the_group(monkeypatch):
@@ -38,7 +40,9 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
             launched.update(**kwargs),
         ),
     )
-    monkeypatch.setattr("pyrite.apps.export._export", lambda stem: launched.update(export=stem))
+    monkeypatch.setattr(
+        "pyrite.cli.commands.export._export", lambda stem: launched.update(export=stem)
+    )
 
     runner = CliRunner()
     launch = runner.invoke(cli.command, ["app", "analysis", "launch", "mose2"])

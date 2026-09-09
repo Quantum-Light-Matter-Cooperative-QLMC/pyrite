@@ -81,7 +81,7 @@ MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
             "pyrite.checkpoints.checkpoint_cleanup",
         ),
         _entry("pyrite.config", "pyrite.campaign.config"),
-        _entry("pyrite.export", "pyrite.apps.export"),
+        _entry("pyrite.export", "pyrite.cli.commands.export"),
         _entry("pyrite.longitudinal", "pyrite.campaign.longitudinal"),
         _entry(
             "pyrite.performance_analysis",
