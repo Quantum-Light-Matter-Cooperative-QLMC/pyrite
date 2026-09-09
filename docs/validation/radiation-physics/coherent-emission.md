@@ -219,7 +219,7 @@ $Q=t_L\operatorname{sinc}(Pt_L/\pi)$. The cutoff path changes only the
 evaluated energy slice. The field contains $\sqrt{T_{\rm abs}}$, and its
 self-term exactly reproduces the incoherent $T_{\rm abs}$ factor.
 
-Mosaic placement also matches: `_accumulate` receives the rotated
+Mosaic placement also matches: `_accumulate_reflection` receives the rotated
 $\mathbf g_m=R_m\mathbf g$; that same vector controls resonance, amplitude,
 polarization, and `g_phase`. Each orientation's complex field is squared
 before multiplication by its positive quadrature weight, so mosaic

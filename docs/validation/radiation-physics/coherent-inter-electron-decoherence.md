@@ -181,7 +181,7 @@ $\sum_e|S_e|^2$ is the same kernel called once per electron over that
 electron's own lines, with unit mosaic weight, into one zeroed buffer;
 $|\sum_eS_e|^2$ is the single call these paths already made. Both are fed the
 geometric (offset-free) phase, and $F$ multiplies outside the kernel. Three
-call sites share this shape: `_accumulate`'s per-(reflection, orientation)
+call sites share this shape: `_accumulate_reflection_coherent`'s per-(reflection, orientation)
 reduction, the batched path's per-row reduction fallback, and the batched
 streaming field kernel. The streaming path uses a segmented CUDA reduction:
 stable electron grouping is packed into whole-electron segment blocks, threads
@@ -220,7 +220,7 @@ throughput. CUDA tests cover the segmented kernel against an independent
 grouped-field reference for both one and two energies per block and assert one
 grouped launch for a two-electron one-block case.
 
-The two per-row routes (`_accumulate` and the
+The two per-row routes (`_accumulate_reflection_coherent` and the
 batched reduction fallback) pay $N_e$ launches *per row* rather than $N_e$
 total, which does not amortize: measured 0.76 s at $N_e=300$, $N_g=18$ against
 the streaming path's 0.25 s. Both remain correct and tested; they are only
