@@ -202,56 +202,14 @@ def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height
 @njit(cache=True)
 def _transport_core_ungrooved(
     Ne,
-    alive,
-    max_steps,
-    max_segments,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    clock,
     rng,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_Js,
-    L_Zs,
-    L_ks,
-    L_coeffs,
-    L_E_cross,
-    L_ncm3,
-    L_sr_rate_numer,
-    L_mott_numer,
-    L_mott_denom1,
-    L_mott_denom2,
-    L_sr_joy_numer,
-    L_top,
-    L_bot,
-    mott_has_table,
-    mott_start,
-    mott_len,
-    mott_logE_flat,
-    mott_logA_flat,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    straggle_on,
-    stream_keys_arr,
-    stragg_dE,
+    control,
+    geometry,
+    materials,
+    mott,
+    state,
+    segments,
+    straggling,
 ):
     """Compiled ungrooved transport core, with optional finite x/y footprint.
 
@@ -287,6 +245,49 @@ def _transport_core_ungrooved(
     and the deterministic path is bit-for-bit what it was before straggling
     existed.
     """
+    # Grouped argument tuples; the layout is the call-site contract shared with
+    # api.py (lockstep calls) and batching.py (per-electron drivers).
+    (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        L_Js,
+        L_Zs,
+        L_ks,
+        L_coeffs,
+        L_E_cross,
+        L_ncm3,
+        L_sr_rate_numer,
+        L_mott_numer,
+        L_mott_denom1,
+        L_mott_denom2,
+        L_sr_joy_numer,
+    ) = materials
+    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (straggle_on, stream_keys_arr, stragg_dE) = straggling
     EPS = 1e-6
     # ``tau_left`` is the current physical flight's unconsumed optical depth;
     # -1.0 marks "no flight open", which is the only place a collision is drawn.
@@ -632,54 +633,14 @@ def _transport_core_ungrooved(
 @njit(cache=True)
 def _transport_core_ungrooved_lut(
     Ne,
-    alive,
-    max_steps,
-    max_segments,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    clock,
     rng,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_nel,
-    L_top,
-    L_bot,
-    lut_E_min_keV,
-    lut_inv_dE_keV,
-    lut_n_energy,
-    lut_total_rate,
-    lut_dEds,
-    lut_inv_beta,
-    lut_cdf,
-    lut_alpha,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    L_Js,
-    L_Zs,
-    L_ks,
-    L_coeffs,
-    L_E_cross,
-    straggle_on,
-    stream_keys_arr,
-    stragg_dE,
+    control,
+    geometry,
+    lut,
+    materials,
+    state,
+    segments,
+    straggling,
 ):
     """Ungrooved lockstep CPU core using pretabulated energy-dependent physics.
 
@@ -703,6 +664,46 @@ def _transport_core_ungrooved_lut(
     With ``straggle_on`` false the deterministic path is bit-for-bit what it
     was before straggling existed.
     """
+    # Grouped argument tuples; see _transport_core_ungrooved. ``materials``
+    # carries only the exact per-element tables the straggling sampler reads.
+    (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        lut_E_min_keV,
+        lut_inv_dE_keV,
+        lut_n_energy,
+        lut_total_rate,
+        lut_dEds,
+        lut_inv_beta,
+        lut_cdf,
+        lut_alpha,
+    ) = lut
+    (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross) = materials
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (straggle_on, stream_keys_arr, stragg_dE) = straggling
     EPS = 1e-6
     tau_left = np.full(Ne, -1.0)
     flight_of = np.zeros(Ne, dtype=np.int64)
@@ -1000,66 +1001,15 @@ def _transport_core_ungrooved_lut(
 @njit(cache=True)
 def _transport_core_grooved(
     Ne,
-    alive,
-    max_steps,
-    max_segments,
-    max_vac,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    groove_spacing,
-    groove_depth,
-    groove_st,
-    groove_ct,
-    clock,
     rng,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_Js,
-    L_Zs,
-    L_ks,
-    L_coeffs,
-    L_E_cross,
-    L_ncm3,
-    L_sr_rate_numer,
-    L_mott_numer,
-    L_mott_denom1,
-    L_mott_denom2,
-    L_sr_joy_numer,
-    L_top,
-    L_bot,
-    mott_has_table,
-    mott_start,
-    mott_len,
-    mott_logE_flat,
-    mott_logA_flat,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    vac_start,
-    vac_end,
-    vac_E,
-    vac_t0,
-    vac_id,
-    straggle_on,
-    stream_keys_arr,
-    stragg_dE,
+    control,
+    geometry,
+    groove,
+    materials,
+    mott,
+    state,
+    segments,
+    straggling,
 ):
     """Compiled groove-aware scalar transport.
 
@@ -1079,6 +1029,61 @@ def _transport_core_grooved(
     ``straggle_on`` false the deterministic path is bit-for-bit what it was
     before straggling existed.
     """
+    # Grouped argument tuples; see _transport_core_ungrooved. ``groove`` bundles
+    # the sawtooth geometry, the vacuum-row capacity, and the vacuum output rows.
+    (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        groove_spacing,
+        groove_depth,
+        groove_st,
+        groove_ct,
+        max_vac,
+        vac_start,
+        vac_end,
+        vac_E,
+        vac_t0,
+        vac_id,
+    ) = groove
+    (
+        L_Js,
+        L_Zs,
+        L_ks,
+        L_coeffs,
+        L_E_cross,
+        L_ncm3,
+        L_sr_rate_numer,
+        L_mott_numer,
+        L_mott_denom1,
+        L_mott_denom2,
+        L_sr_joy_numer,
+    ) = materials
+    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (straggle_on, stream_keys_arr, stragg_dE) = straggling
     EPS = 1e-6
     machine_eps = 2.220446049250313e-16
     surface_eps = max(
@@ -1558,60 +1563,15 @@ def _searchsorted_right_scalar(bounds, x, n):
 
 @njit(cache=True)
 def _transport_core_ungrooved_perelectron(
-    e_start,
-    e_count,
-    cap,
-    stream_key,
-    alive,
-    max_steps,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    clock,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_Js,
-    L_Zs,
-    L_ks,
-    L_coeffs,
-    L_E_cross,
-    L_ncm3,
-    L_sr_rate_numer,
-    L_mott_numer,
-    L_mott_denom1,
-    L_mott_denom2,
-    L_sr_joy_numer,
-    L_nel,
-    L_top,
-    L_bot,
-    mott_has_table,
-    mott_start,
-    mott_len,
-    mott_logE_flat,
-    mott_logA_flat,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    seg_count,
-    exit_code,
-    straggle_on,
-    stragg_dE,
+    run,
+    control,
+    geometry,
+    materials,
+    mott,
+    state,
+    segments,
+    pe_out,
+    straggling,
 ):
     """Run electrons ``[e_start, e_start + e_count)`` to completion, independently.
 
@@ -1649,6 +1609,55 @@ def _transport_core_ungrooved_perelectron(
     ``straggle_on`` false the deterministic path is bit-for-bit what it was
     before straggling existed.
     """
+    # Grouped argument tuples; see _transport_core_ungrooved. ``run`` carries
+    # this batch's electron range, slot capacity, and counter-stream keys;
+    # ``max_segments`` (unused here) stays in ``control`` so every core shares
+    # one control layout. ``materials`` is the packed (n_layers, max_elements)
+    # layout. ``straggling`` has no separate key array: this core's own
+    # ``stream_key`` feeds the salted rehash.
+    (e_start, e_count, cap, stream_key) = run
+    (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        L_Js,
+        L_Zs,
+        L_ks,
+        L_coeffs,
+        L_E_cross,
+        L_ncm3,
+        L_sr_rate_numer,
+        L_mott_numer,
+        L_mott_denom1,
+        L_mott_denom2,
+        L_sr_joy_numer,
+    ) = materials
+    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (seg_count, exit_code) = pe_out
+    (straggle_on, stragg_dE) = straggling
     EPS = 1e-6
 
     for i in range(e_count):
@@ -1969,57 +1978,15 @@ def _transport_core_ungrooved_perelectron(
 
 @njit(cache=True)
 def _transport_core_ungrooved_perelectron_lut(
-    e_start,
-    e_count,
-    cap,
-    stream_key,
-    alive,
-    max_steps,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    clock,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_nel,
-    L_top,
-    L_bot,
-    lut_E_min_keV,
-    lut_inv_dE_keV,
-    lut_n_energy,
-    lut_total_rate,
-    lut_dEds,
-    lut_inv_beta,
-    lut_cdf,
-    lut_alpha,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    seg_count,
-    exit_code,
-    L_Js,
-    L_Zs,
-    L_ks,
-    L_coeffs,
-    L_E_cross,
-    straggle_on,
-    stragg_dE,
+    run,
+    control,
+    geometry,
+    lut,
+    materials,
+    state,
+    segments,
+    pe_out,
+    straggling,
 ):
     """Per-electron CPU reference for the CUDA LUT transport kernel.
 
@@ -2042,6 +2009,49 @@ def _transport_core_ungrooved_perelectron_lut(
     See the "crossing rule in the remaining cores" block above
     :func:`_transport_core_ungrooved_lut`.
     """
+    # Grouped argument tuples; see _transport_core_ungrooved_perelectron.
+    # ``materials`` carries only the exact per-element tables the straggling
+    # sampler reads.
+    (e_start, e_count, cap, stream_key) = run
+    (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        lut_E_min_keV,
+        lut_inv_dE_keV,
+        lut_n_energy,
+        lut_total_rate,
+        lut_dEds,
+        lut_inv_beta,
+        lut_cdf,
+        lut_alpha,
+    ) = lut
+    (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross) = materials
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (seg_count, exit_code) = pe_out
+    (straggle_on, stragg_dE) = straggling
     EPS = 1e-6
 
     for i in range(e_count):
