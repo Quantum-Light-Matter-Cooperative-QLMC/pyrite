@@ -247,9 +247,10 @@ The full returned schema and its normalization semantics are documented in
 [Transport outputs](transport-outputs.md).
 
 Segments are Monte Carlo histories, not detector events. The line and
-bremsstrahlung kernels consume them separately. Default spectra add segment and
-electron intensities incoherently; experimental coherent emission additionally
-uses segment midpoint times and bunch offsets.
+bremsstrahlung kernels consume them separately. Numerical substeps within one
+physical flight are phase-summed; default spectra then add physical-flight and
+electron intensities under a random-phase approximation. Experimental coherent
+emission additionally uses segment midpoint times and bunch offsets.
 
 `E_keV` and `t_ang` keep flight-start semantics under both propagation rules and
 are compatibility aliases of `E_start_keV` and `t_start_ang`; `elec_id` is a

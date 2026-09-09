@@ -283,6 +283,14 @@ The grouped reduction is host-only and non-batched. Substepped rows on a device
 backend, with `components=True`, or with refractive dispersion across `layers`
 raise rather than silently degrading to a row-incoherent sum.
 
+The subsequent intensity sum over distinct physical flights is an explicit
+random-phase/independent-emission approximation. An elastic collision changes
+the trajectory and phase but does not by itself destroy coherence; neglecting
+cross-flight terms requires those phases to average away through angular or
+energy spread, formation-length separation, or unresolved environmental recoil.
+The optional `coherent` policy instead retains phase across the complete
+single-electron trajectory.
+
 ## Mosaicity
 
 `mosaic_fwhm_rad` with `mosaic_nodes > 1` replaces the perfect crystal by an
@@ -297,7 +305,8 @@ double counts. See [Crystal mosaicity](../materials/crystal-mosaicity.md).
 
 ## Emission policies
 
-The default `incoherent` policy sums intensities over flights and electrons.
+The default `incoherent` policy sums intensities over flights and electrons
+under that random-phase approximation.
 `coherent` instead phase-sums segment fields using the emission midpoint position
 and time plus per-electron bunch timing, and `both` stores the two results side
 by side from a single electron transport. The cross-electron coherent path is

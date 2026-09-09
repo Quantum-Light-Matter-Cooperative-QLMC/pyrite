@@ -4,34 +4,11 @@ a **Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport o
 
 PyRITE predicts narrow, tunable X-ray lines from ~30–60 keV electrons in
 crystals, plus detector-visible flux. Active question: expected line flux and
-enhancement at θ_obs = 90° for a 2×2 Timepix3 quad or Raptor Eagle XO CCD.
+enhancement at $\theta_{\mathrm{obs}}=90^\circ$ for a 2×2 Timepix3 quad or
+Raptor Eagle XO CCD.
 
 Research code; absolute predictions remain bounded by
 [validation status](docs/validation/physics-validation-ledger.md) and instrument inputs.
-
-## Physics
-
-- **PXR:** virtual photons Bragg-diffract from lattice planes. Line energy
-  follows ω = **v·g** / (1 − **v·n̂**) and changes with beam/observation
-  geometry.
-- **CBS:** crystal periodic potential adds coherent bremsstrahlung peaks.
-- **Interference:** observed coherent line is `|A_PXR + A_CBS|²`; channels are
-  not separable.
-- **Background:** incoherent bremsstrahlung forms smooth continuum.
-
-Pipeline: Monte Carlo electron transport → segment-wise PXR+CBS and
-bremsstrahlung → layered self-absorption → instrument response. Default spectra
-add segments/electrons incoherently; a profile's `emission` policy
-(`incoherent`/`coherent`/`both`) opts into an experimental phased sum using
-trajectory and bunch timing, where `both` runs one electron transport and stores
-the incoherent and coherent spectra side by side for comparison. That path is
-[unverified](docs/physics/radiation-physics/coherent-emission.md) and must not support scientific claims
-until its phase convention and bunch-form-factor limits are independently
-validated.
-
-Core conventions: beam along +z; detector at φ = 0; positive sample tilt points
-toward detector. At θ_obs = 90°, zero tilt self-absorbs photons traveling along
-slab faces. See [tilt convention](docs/physics/geometry/tilt-convention.md) before geometry work.
 
 ## Install
 
@@ -45,9 +22,7 @@ uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
 
-`uv sync` installs the root distribution and contributor dependency groups.
-For a locked runtime-only installation use `uv sync --no-dev --locked`;
-focused contributor and CI commands are documented in
+Focused contributor and CI commands are documented in
 [development workspace guide](docs/repo-design/development-workspace.md).
 
 `uv run` exposes project commands only for that invocation; it does not make
@@ -62,38 +37,23 @@ pyrite config completion install
 exec "$SHELL"
 ```
 
-Contributors who want the persistent command to follow source edits may use
-`uv tool install --editable .`. Continue to use `uv run pyrite-dev ...` for
-locked development and verification. See the
-[shell-completion guide](docs/guides/shell-completion.md) for zsh setup,
+See the [shell-completion guide](docs/guides/shell-completion.md) for zsh setup,
 generated-file locations, removal, and troubleshooting.
 
-Base `pyrite-xray` is CPU-only. Install exactly one accelerator extra in a clean
-environment:
+Base `pyrite-xray` is CPU-only. Install exactly one GPU accelerator extra if applicable:
 
-| Hardware | Install                                      | Backend                |
-| ---------- | ---------------------------------------------- | ------------------------ |
-| NVIDIA   | `uv sync --extra nvidia`                     | CUDA CuPy              |
-| AMD      | `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd` | ROCm source-built CuPy |
-| Intel    | `uv sync --extra intel`                      | oneAPI`dpnp` + `dpctl` |
+| Hardware | Install                                      | Backend                 |
+| -------- | -------------------------------------------- | ----------------------- |
+| NVIDIA   | `uv sync --extra nvidia`                     | CUDA CuPy               |
+| AMD      | `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd` | ROCm source-built CuPy  |
+| Intel    | `uv sync --extra intel`                      | oneAPI `dpnp` + `dpctl` |
 
-Do not combine `nvidia` and `amd`: both provide the `cupy` import. AMD's current
-`amd-cupy` wheels only support CPython 3.10, below PyRITE's Python requirement,
-so the AMD extra uses upstream CuPy's ROCm source build. ROCm remains
-provisional until exercised on AMD hardware.
+ROCm functionality remains provisional until exercised on AMD hardware.
 
-Use `uv run ...`; bare system Python lacks locked dependencies.
-`PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. `auto`
-tries CuPy, then SYCL, then NumPy; explicit accelerator selection errors if
-unavailable. `PYRITE_FP64=1` requires fp64 and falls back to CPU only under
-automatic selection.
-
-`PYRITE_MC_RESOURCE_POLICY=auto|conservative|balanced|throughput` controls memory
-admission, retry count, release cadence, and host-worker admission. `auto`
-uses `conservative` below 8 GiB. Its device budget is
-`min(50% of VRAM, VRAM - 2 GiB)`, protecting small GPUs such as the 4 GiB Arc
-A370M. Expert chunk/pool environment overrides remain supported but cannot
-bypass pre-allocation admission.
+`PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend; explicit
+accelerator requests fail rather than silently falling back. See
+[execution and acceleration](docs/computation/execution-and-acceleration.md) for
+backend, precision, transport-core, and memory-policy controls.
 
 > **Distribution warning:** locked `crystals` 1.7.0 dependency is GPLv3. Review
 > licensing before distributing source, wheels, binaries, or containers that
@@ -134,81 +94,98 @@ result = pr.simulate(
 print(result.provenance["identity_digest"])
 ```
 
-`simulate` returns in-memory arrays before configured detector response, plus
-provenance, without reading or writing a checkpoint. See the
+For the scalar `Detector` shown here, `simulate` returns response-free source
+spectra in photons per incident electron per eV per sr, plus provenance, without
+reading or writing a checkpoint. Detector acceptance and response remain
+downstream. See the
 [Python API workflow](docs/guides/python-api-workflow.md)
 for scenes, sweeps, detector scoring, and persistence boundaries; use
 `pyrite run` when resumability, profiles, remote execution, or analysis apps
 matter.
 
-Main surfaces:
+See the generated [CLI reference](docs/repo-design/cli/cli-reference.md) for the
+complete command surface.
 
-- `pyrite`: ten visible user nouns — `run`, `app`, `checkpoint`, `config`,
-  `remote`, `job`, `profile`, `material`, `beam`, and `detector`. App launch/export lives
-  below `pyrite app`. See the generated
-  [CLI reference](docs/repo-design/cli/cli-reference.md).
-- `src/pyrite/apps/scan_app.py`: interactive sweep runner.
-- `src/pyrite/apps/analysis_app.py`: checkpoint analysis.
-- `src/pyrite/apps/trace_app.py`: trajectory/lattice viewer.
-- `src/pyrite/apps/validation_app.py`: literature-validation studies.
-- `src/pyrite/`: importable physics, results, plotting, and detector library.
+Full sweeps are usually heavy. Use
+[PyRITE's remote workflow](docs/guides/running-on-a-cluster.md) or the portable
+SLURM templates documented there.
 
-Full sweeps are heavy. Use [PyRITE's remote workflow](docs/guides/running-on-a-cluster.md) for lab
-GPU work or follow portable SLURM templates there.
+## Core physics
+
+Pipeline: sampled electron beam → single-scattering electron transport →
+segment-wise PXR+CBS and incoherent bremsstrahlung → photon escape → detector
+scoring.
+
+- **[Electron transport](docs/physics/beam-transport/electron-transport.md):**
+  independent piecewise-linear flights use explicit
+  elastic collisions and condensed energy loss. The default combines
+  Mott-calibrated Browning scattering with Joy--Luo/Berger--Seltzer stopping;
+  beamline space charge and knock-on electrons are not modeled.
+- **[Crystal source](docs/physics/materials/structure-factor.md):** phase-specific
+  structures, complex atomic form factors, Debye--Waller factors, selected
+  reflections, and optional mosaicity define the reciprocal-space coupling.
+- **[Coherent lines](docs/physics/radiation-physics/coherent-radiation.md):**
+  first-order kinematic Born PXR and CBS amplitudes interfere within each
+  transport row. A collision-free flight may be subdivided to resolve CSDA
+  energy and clock evolution; each row uses one representative velocity, and
+  the rows of a flight are summed as a field before squaring. Their in-medium
+  Bragg resonance is
+
+  $$
+  \omega = \frac{\mathbf v\cdot\mathbf g}
+  {1-\operatorname{Re}n(\omega)\,\hat{\mathbf n}\cdot\mathbf v}.
+  $$
+
+  Dynamical diffraction and electron channeling are not modeled.
+- **[Incoherent background](docs/physics/radiation-physics/bremsstrahlung.md):**
+  isotropic, unscreened Born Bethe--Heitler bremsstrahlung uses relativistic
+  momenta and an Elwert correction; characteristic radiation is not modeled.
+- **[Photon transport](docs/physics/radiation-physics/photon-escape-and-dispersion.md):**
+  straight-ray Beer--Lambert attenuation and bulk refractive dispersion are
+  passive; interface optics, photon scattering, and re-emission are omitted.
+- **[Detector treatment](docs/physics/detectors/detector-response.md):** source
+  spectra are evaluated in a fixed far-field direction; solid-angle acceptance,
+  aperture broadening, efficiency, and measured-energy redistribution are
+  downstream steps.
+
+By default, PyRITE neglects interference between distinct physical flights and
+incident electrons. This is a random-phase/independent-emission approximation,
+not an assertion that elastic scattering destroys coherence. The optional
+[`coherent`/`both` tracking policy](docs/physics/radiation-physics/coherent-emission.md)
+preserves phase across a single-electron trajectory and blends inter-electron
+terms using the sampled bunch form factor. It is independently rederived but
+not human-signed-off and retains documented open boundaries, so it is not yet
+suitable for scientific claims.
+
+See the [physics model index](docs/physics/index.md) for assumptions, model
+variants, conventions, and links to each implementation-level description.
+Core geometry conventions are documented in the
+[tilt convention](docs/physics/geometry/tilt-convention.md).
 
 ## Data and outputs
 
 [`src/pyrite/data/materials.toml`](src/pyrite/data/materials.toml) is immutable
 catalog source for crystals, media, scan profiles, materials, and stacks.
 Phase-specific CIFs live under `src/pyrite/data/cifs/`; production loading is
-offline. Validate edits with:
+offline. `uv run pyrite material validate` checks the bundled catalog.
 
-```bash
-uv run pyrite material validate
-```
-
-Golden catalog snapshot must be regenerated after catalog/schema changes; use
-`regen-golden` skill.
-
-Active checkpoints use `checkpoints/<stem>/{line,brem}.pkl`. The suffix is a
-historical layout token: new artifacts contain `pyrite.result` HDF5 version 1,
-while legacy plain, gzip, and zstd pickles remain readable. See the
-[result schema](docs/repo-design/storage/result-schema.md).
+Active checkpoints use `checkpoints/<stem>/{line,brem}.h5`
+plus a `checkpoints/<stem>/meta.json` manifest.
 Stored source spectra exclude downstream detector response unless a detector view
 applies it explicitly.
-Timepix3 and Eagle XO geometry/QE are instrument-specific; never transfer
-counts or solid angle between setups. See
-[detector solid angle](docs/physics/detectors/detector-solid-angle.md).
 
 ## Validation and provenance
 
-Analytic core is cross-checked against Feranchuk et al. and Zhai et al. Model
-claims, assumptions, and evidence live in:
+The analytic core is cross-checked against Feranchuk et al. and Zhai et al.
+Consult the [validation ledger](docs/validation/physics-validation-ledger.md) for
+claim-level status and the [validation method](docs/validation/methodology.md)
+before scientific use.
 
-- [validation ledger](docs/validation/physics-validation-ledger.md)
-- [validation method and records](docs/validation/methodology.md)
-- [coherent-emission model and validation boundary](docs/physics/radiation-physics/coherent-emission.md)
-- [crystal mosaicity](docs/physics/materials/crystal-mosaicity.md)
-- [atomic data sources](docs/physics/atomic-physics/atomic-data-sources.md)
-- [detector solid-angle treatment](docs/physics/detectors/detector-solid-angle.md)
+## Documentation
 
-Important open uncertainty: modeled mosaic broadening lacks measured HOPG
-line-width validation; Timepix3 hardware parameters still need final instrument
-values. Treat absolute detector predictions accordingly.
-
-Data sources: xraydb atomic scattering factors; NIST SRD 64 Mott transport
-cross sections with analytic fallback; bundled phase-specific CIFs; bundled
-Eagle XO QE plus computed Timepix Si response.
-
-## Repository guide
-
-- [published documentation](docs/index.md): guides, physics, validation,
-  research, repository design, ADRs, and API reference
-- [documentation authoring and maintenance](docs/repo-design/documentation.md)
-- [package ownership and dependency map](docs/repo_map.md)
+- [published documentation](docs/index.md)
+- [physics models](docs/physics/index.md)
 - [Python API](docs/api.md)
-- [backlog](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues)
-- [agent conventions](AGENTS.md)
 
 ## References
 

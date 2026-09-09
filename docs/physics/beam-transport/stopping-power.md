@@ -2,8 +2,17 @@
 
 Between elastic collisions PyRITE removes energy continuously rather than
 sampling individual inelastic events. This is the condensed-history
-(continuous-slowing-down) approximation: every inelastic channel is folded into a
-single mean energy-loss rate $dE/ds$, evaluated along the flight.
+(continuous-slowing-down) approximation: discrete excitation and ionization
+losses are replaced by their mean rate $dE/ds$, evaluated along the
+flight{cite:p}`nistestar,akkerman1978`.
+
+CSDA does not require many inelastic events between every pair of elastic
+collisions. The inelastic and elastic mean free paths are distinct,
+material- and energy-dependent scales{cite:p}`akkerman1978,shinotsuka2015`.
+The local scale-separation check is instead the fractional mean loss over an
+elastic free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves
+slowly compared with the explicitly sampled directional changes. Optional
+straggling restores fluctuations around that mean without changing it.
 
 ## Joy–Luo modified Bethe law
 

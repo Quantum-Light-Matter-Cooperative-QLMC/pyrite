@@ -62,6 +62,12 @@ the flight is subdivided into numerical substeps the same $\tau$ is consumed
 across them at each substep's hazard; see
 [Electron transport](electron-transport.md#physical-flights-and-numerical-substeps).
 
+This elastic mean free path is not the inelastic mean free path. The latter is
+derived from the material energy-loss function and can be comparable to, longer
+than, or shorter than the elastic scale depending on energy and composition;
+published calculations tabulate it independently alongside stopping and
+straggling{cite:p}`akkerman1978,shinotsuka2015`.
+
 The elastic hazard is evaluated at the flight-start energy under **both**
 propagation rules. `energy_model="midpoint"` controls stopping and the transport
 clock only, so a rising hazard along a lossy flight is not resolved by the
