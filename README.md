@@ -129,14 +129,9 @@ scoring.
   transport row. A collision-free flight may be subdivided to resolve CSDA
   energy and clock evolution; each row uses one representative velocity, and
   the rows of a flight are summed as a field before squaring. Their in-medium
-  Bragg resonance is
-
-  $$
-  \omega = \frac{\mathbf v\cdot\mathbf g}
-  {1-\operatorname{Re}n(\omega)\,\hat{\mathbf n}\cdot\mathbf v}.
-  $$
-
-  Dynamical diffraction and electron channeling are not modeled.
+  Bragg resonance is $\omega=(\mathbf v\cdot\mathbf g)/[1-
+  \operatorname{Re}n(\omega)\,\hat{\mathbf n}\cdot\mathbf v]$. Dynamical
+  diffraction and electron channeling are not modeled.
 - **[Incoherent background](docs/physics/radiation-physics/bremsstrahlung.md):**
   isotropic, unscreened Born Bethe--Heitler bremsstrahlung uses relativistic
   momenta and an Elwert correction; characteristic radiation is not modeled.
