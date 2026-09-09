@@ -402,9 +402,7 @@ def _cli_start(
                 "performance run did not complete successfully; "
                 "skipping automatic performance-artifact pull"
             )
-    profiling_only = (
-        performance_repetitions > 1 or nsys or cpu or cpu_only
-    )
+    profiling_only = performance_repetitions > 1 or nsys or cpu or cpu_only
     if no_pull or profiling_only:
         if profiling_only:
             emit_diagnostic(

@@ -272,9 +272,7 @@ def test_batched_route_supports_non_henke_form_factors():
 
     peak = float(max(batched.max(), per_hkl.max()))
     assert peak > 0.0
-    np.testing.assert_allclose(
-        batched, per_hkl, rtol=BATCH_RTOL, atol=BATCH_RTOL * 1e-2 * peak
-    )
+    np.testing.assert_allclose(batched, per_hkl, rtol=BATCH_RTOL, atol=BATCH_RTOL * 1e-2 * peak)
 
 
 def test_batched_block_masks_lines_outside_the_padded_window():

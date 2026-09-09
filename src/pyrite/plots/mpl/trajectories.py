@@ -451,7 +451,11 @@ def plot_penetration_survival(
         c = next((c for c in cases if c["E0_keV"] == E0 and c["tilt_deg"] == t), None)
         if c is not None:
             data_by_energy[E0] = _trajectory_data(c, Ne, seed)
-    xmax = 1.0 if depth_frac else max((float(d["thick"]) for d in data_by_energy.values()), default=1.0)
+    xmax = (
+        1.0
+        if depth_frac
+        else max((float(d["thick"]) for d in data_by_energy.values()), default=1.0)
+    )
     df = survival_frame(data_by_energy, n_bins=n_bins, depth_frac=depth_frac)
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -461,7 +465,12 @@ def plot_penetration_survival(
         label = f"{E0:g} keV"
         sub = df[df["energy"] == label]
         ax.plot(
-            sub["depth"], sub["survival"], "-", color=energy_color(E0, energies), lw=1.9, label=label
+            sub["depth"],
+            sub["survival"],
+            "-",
+            color=energy_color(E0, energies),
+            lw=1.9,
+            label=label,
         )
     case0 = next(c for c in cases if c["tilt_deg"] == t)
     ulab = r"$\mu$m" if case0["thickness_ang"] >= 1e4 else "nm"
