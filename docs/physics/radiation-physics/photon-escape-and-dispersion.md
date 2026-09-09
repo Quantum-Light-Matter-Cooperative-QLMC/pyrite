@@ -146,6 +146,31 @@ real partner of the amplitude factor $\sqrt{T_{\rm abs}}$ applied over that same
 path. This is refused for layered absorbers, whose per-layer $\delta$ is not
 modelled.
 
+That the phase runs over the *escape* path, and not some other length, is not a
+convention. The observation-time phase is
+$\omega\,(t_j + n\,L_{{\rm esc},j} + L_{\rm vac},j)$, and to first order the
+geometric total $L_{\rm esc}+L_{\rm vac}$ is $R-\hat{\mathbf n}\cdot\mathbf r_j$,
+so the vacuum term $\omega d_j$ (with $d_j=t_j-\hat{\mathbf n}\cdot\mathbf r_j$)
+picks up exactly the excess
+
+$$
+\omega\bigl(\operatorname{Re}n(E)-1\bigr)L_{{\rm esc},j}
+=-\delta(E)\,\omega(E)\,L_{{\rm esc},j}.
+$$
+
+Equivalently, the escape leg contributes
+$e^{\,i n \omega L}=e^{\,i\omega L}\,e^{-i\delta\omega L}\,e^{-\beta\omega L}$,
+whose last factor is $\sqrt{e^{-\mu L}}$ — the Beer–Lambert amplitude the
+coherent path already applies. Only the two together are one complex $n$.
+
+This is deliberately **not** $k(E)\,\hat{\mathbf n}\cdot\mathbf r_j$, which would
+charge the medium's index for the whole flight to the detector. The two agree
+only when the photon exits along the face normal, where $L_{\rm esc}$ and
+$\hat{\mathbf n}\cdot\mathbf r$ differ by a segment-independent constant — i.e. by
+a global phase. The term is tabulated on the **output** grid, because it is a
+propagation phase read across the whole spectrum rather than a coupling frozen
+at the line energy.
+
 ## Assumptions and limits
 
 - straight photon rays: no refraction at interfaces, no Fresnel reflection or
