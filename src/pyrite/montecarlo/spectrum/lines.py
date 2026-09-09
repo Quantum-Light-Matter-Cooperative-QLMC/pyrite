@@ -297,7 +297,7 @@ def _interp_gather2d(idx, frac, below, above, tables, gcol):
     """Per-column gather+blend for the shared ``_interp_index`` bracket against
     per-``g`` ``tables`` of shape ``(N_g, n)`` (``gcol == arange(N_g)``, hoisted
     once). Bit-for-bit the batched per-reflection ``xp.interp`` blend it replaces
-    (Validation: line-hkl-batch, unchanged debt)."""
+    (Validation: line-hkl-batch). This remains unchanged debt."""
     f0 = tables[gcol, idx - 1]
     y = f0 + frac * (tables[gcol, idx] - f0)
     y = xp.where(below, tables[gcol, 0], y)
@@ -2054,8 +2054,9 @@ def mc_spectrum(
     NotImplementedError
         For coherent propagation through layered absorbers.
 
-    Validation: coherent-emission, coherent-segment-midpoint-time,
-    finite-footprint-longitudinal-decoherence
+    Validation: coherent-emission, coherent-line-spectrum,
+    coherent-segment-midpoint-time, finite-footprint-longitudinal-decoherence,
+    transverse-bunch-form-factor
     """
     request = SpectrumRequest(
         segments=segments,

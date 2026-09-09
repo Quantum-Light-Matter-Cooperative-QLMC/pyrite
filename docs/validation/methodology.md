@@ -8,7 +8,7 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 
 ## The pieces
 
-- **The ledger** — [physics validation ledger](physics-validation-ledger.md) is the single source of truth: one record per atomic physics claim, keyed by a stable `id`, anchored on `file::symbol`. The unit of trust is the **equation, not the module**. The ledger is split into domain parts (`docs/validation/ledger-*.md`) listed by that index; edit the part that owns the claim, then regenerate the compact views with `pyrite-dev validation-ledger --write`.
+- **The ledger** — [physics validation ledger](physics-validation-ledger.md) is the single source of truth: one record per atomic physics claim, keyed by a stable `id`, anchored on `file::symbol`. The unit of trust is the **equation, not the module**. An anchor names the definition site, not a re-export; use its repository-relative path. The ledger is split into domain parts (`docs/validation/ledger-*.md`) listed by that index; edit the part that owns the claim, then regenerate the compact views with `pyrite-dev validation-ledger --write`.
 - **In-code back-reference** — every annotated physics function carries a one-line `Validation: <id>` marker in its docstring, tying code↔ledger both ways. A physics `def` with no marker is an unledgered claim — find them with:
   ```bash
   # physics symbols missing a Validation: back-reference

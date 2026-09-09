@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `multilayer-stack`
 
 - **Claim:** film-on-substrate transport + absorption
-- **Code:** `montecarlo/transport.py::simulate_trajectories` (`layers=`)
+- **Code:** `montecarlo/transport/api.py::simulate_trajectories` (`layers=`)
 - **Source:** `../physics/materials/multilayer-materials.md` §(3) option A (CASINO-style boundary-aware multilayer transport)
 - **Status:** rederived
 - **Checks:** units; limits (one-layer reduction, identical-sublayer invariance, substrate backscatter); signs/conventions (entrance-first ordering, outer-face-only termination); one-layer `layers=` vs `composition=` bit-for-bit on every segment array and counter; 16-seed subdivision-invariance matrix

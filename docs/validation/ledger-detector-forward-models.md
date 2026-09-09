@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `detector-eaglexo`
 
 - **Claim:** `solid_angle(Ω) × QE(E)` CCD operator
-- **Code:** `eaglexo_response.py::EagleResponse`
+- **Code:** `detectors/eaglexo_response.py::EagleResponse`
 - **Source:** `eaglexo_qe.csv`
 - **Status:** filtered
 - **Checks:** units, zero/far-field limits, exact rectangular solid angle, QE bounds/tail continuity, and single ownership of `Ω` checked
@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `detector-timepix`
 
 - **Claim:** Si charge model, diffusion, ~1.9 keV counting threshold
-- **Code:** `timepix_response.py::TimepixResponse`
+- **Code:** `detectors/timepix_response.py::TimepixResponse`
 - **Source:** Henke f2 (Si)
 - **Status:** blocked
 - **Checks:** —

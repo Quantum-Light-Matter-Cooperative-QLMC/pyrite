@@ -5,7 +5,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `grazing-reflectivity`
 
 - **Claim:** small-angle Fresnel reflectivity `R(θ) = \|r(θ)\|²`, `r(θ) = (θ − √(θ²−2δ−2iβ)) / (θ + √(θ²−2δ−2iβ))`, polarization-independent (grazing-incidence approximation)
-- **Code:** `grating.py::Grating.reflectivity`
+- **Code:** `detectors/grating.py::Grating.reflectivity`
 - **Source:** Als-Nielsen & McMorrow *Elements of Modern X-ray Physics* 2nd ed. Ch. 3; equiv. Attwood & Sakdinawat Ch. 3
 - **Status:** rederived
 - **Checks:** bounded in [0,1]; θ≪θc → R→1 (total external reflection); θ≫θc → R→(θc/2θ)⁴·(1+(β/δ)²) independently re-derived (Taylor expansion), test's 60° choice confirmed necessary (Au β/δ≈0.25 at 1500 eV, needs θ≳20° for <10% convergence to the β→0 idealization); monotonic decrease with grazing angle; independent Maxwell/Snell re-derivation matches code term-for-term
@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `alexs-qe-absorption`
 
 - **Claim:** Beer-Lambert absorption-efficiency QE, `QE(E) = peak·(1−exp(−t/L_abs(E)))`
-- **Code:** `grating.py::qe_absorption`
+- **Code:** `detectors/grating.py::qe_absorption`
 - **Source:** Beer-Lambert / Henke f2 (via `crystallography.absorption_length_ang`, same as `absorption-length`)
 - **Status:** rederived
 - **Checks:** units (dimensionless, [0,1]) confirmed; thin/thick limiting cases (QE→peak·t/L_abs and QE→peak) independently re-derived from exponential attenuation and numerically spot-checked (thin-limit linear approx vs exact: rel diff 2.2e-6 at E=900 eV); independent from-scratch re-derivation bitwise-matches the code across E=200-8000 eV
@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `alexs-charge-diffusion`
 
 - **Claim:** drift-diffusion charge-cloud spread, `σ² = 2(kT/q)·t·(t−min(L_abs(E),t))/v_dep`
-- **Code:** `grating.py::charge_cloud_sigma_um`
+- **Code:** `detectors/grating.py::charge_cloud_sigma_um`
 - **Source:** Einstein relation (D=μkT/q) + drift-diffusion, standard back-illuminated-CCD treatment (e.g. Janesick, *Scientific Charge-Coupled Devices*, SPIE 2001, Ch. 4 — generic-treatment pointer, not page-verified)
 - **Status:** rederived
 - **Checks:** independent re-derivation from D=μkT/q + uniform-field drift confirms mobility μ cancels exactly (verified numerically with μ=1350 vs 450 cm²/(V·s): both give identical σ), reproducing the code's formula term-for-term; units (V·µm²/V → µm) confirmed; soft-photon (σ→max) and hard-photon (σ→0) limits independently re-derived and match tests; single-carrier (non-ambipolar) drift-diffusion assumed, appropriate for single-photon e-h counts but not stated explicitly in the docstring
