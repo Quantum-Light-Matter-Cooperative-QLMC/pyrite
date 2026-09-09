@@ -99,6 +99,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
     )
 
     env = os.environ.copy()
+    env["PYRITE_MC_BACKEND"] = "cpu"
     env["PYTHONPATH"] = os.pathsep.join(path for path in sys.path if path)
 
     result = subprocess.run(
@@ -197,6 +198,7 @@ def test_config_import_does_not_require_cupy() -> None:
     )
 
     env = os.environ.copy()
+    env["PYRITE_MC_BACKEND"] = "cpu"
     env["PYTHONPATH"] = os.pathsep.join(path for path in sys.path if path)
 
     result = subprocess.run(
