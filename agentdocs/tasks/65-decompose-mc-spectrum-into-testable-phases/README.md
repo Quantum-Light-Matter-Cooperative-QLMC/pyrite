@@ -110,14 +110,38 @@ could not previously be its own function.
   to the `docs/physics/` pages that already own that material; every
   `Validation:` marker and the whole numpydoc contract stayed.
 
-## Not covered by the goldens
+## GPU verification
 
-The CUDA streaming and fused-reduction paths (`_LineBatch.flush`, the stream
-branch of `_batched_coherent_finalize`, `_batched_coherent_block`'s JIT branch)
-are unreachable on the NumPy backend, so no CPU golden touches them. They were
-moved verbatim, but `_LineBatch` is a genuine restructuring of `nonlocal`
-closure state and its lazy kernel import now happens per flush rather than once.
-Worth a GPU smoke run before merge.
+The CUDA streaming and fused-reduction paths are unreachable on the NumPy
+backend, so no CPU golden touches them. They were checked directly on the lab
+box (`qlmc`, RTX 5080, CuPy 14.2.0, `PYRITE_MC_BACKEND=cuda`, `REAL=float32`)
+by running the same 12-configuration matrix against two synced trees --
+`main@2aed7009` and this branch -- under `srun -p gpu`, importing each revision
+via `PYTHONPATH` with an asserted `pyrite.__file__`.
+
+**All 14 result arrays are bit-identical between the two revisions**, better
+than the few-ulp tolerance the issue allowed for. Paths covered:
+
+| Configuration | Branch reached |
+|---|---|
+| `jit_line_reduction` | `_LineBatch` queue + residual flush, `run_reduction_kernel` |
+| `one_flush_many_blocks` | `_LineBatch.flush`'s multi-block `xp.concatenate` (2 flushes, both concatenating) |
+| `many_flushes` | batch target reached repeatedly (4 flushes) |
+| `coherent_stream[_decoh,_mosaic]` | streaming prologue/field/grouped kernels, `finalize_coherent_fields` |
+| `coherent_jit_reduction[_decoh]` | `_batched_coherent_finalize`'s per-row JIT reducer, `_coherent_jit_grouped_row` |
+| `per_hkl_coherent_jit_groove[_decoh]` | `_accumulate_reflection_coherent`'s JIT branch |
+| `no_jit_*`, `batched_fallback_components` | plain-CuPy controls |
+
+Engagement was proven rather than assumed: each JIT variant differs from its
+non-JIT control in float32 (`1.8e-07` for the fused line kernel, `4.3e-05` for
+the streaming reduction), which cannot happen if the kernel silently fell back.
+
+One correction found while doing this: the first matrix's `multiflush` case was
+inert. `seg_block = 1_000_000 // N_g` made 16k segments a *single* segment block,
+so the queue got one `append` and `_JIT_LINE_BATCH_TARGET` never bound. Raising
+`N_g` to 192 with an 8-node mosaic quadrature shrinks `seg_block` to ~5.2k and
+produces the several appends the concatenate branch needs; the addendum run above
+is the one that actually covers it.
 
 `mc_spectrum(..., use_henke=False)` remains broken on `main` and here; see
 below.
