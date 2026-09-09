@@ -7,7 +7,7 @@ The "which material does the dropdown start on" logic is a pure helper in
 :mod:`pyrite.apps.analyze`, so the notebook and the tests can call it without
 importing any CLI machinery. Precedence for the initial material: an explicit
 CLI material always wins; else the persisted default
-(:func:`pyrite.apps.analyze.get_default_material`, written by ``-d/--save-default``);
+(:func:`pyrite._app_defaults.get_analysis_default`, written by ``-d/--save-default``);
 else ``"hopg"``.
 
 Two transports carry the resolved material into the marimo subprocess, since we
@@ -34,8 +34,8 @@ from pathlib import Path
 
 import click
 
-from ...apps._acp import running_acp
-from ...apps.analyze import get_default_material, set_default_material
+from ..._acp import running_acp
+from ..._app_defaults import get_analysis_default, set_analysis_default
 from ...paths import app_dir
 from .. import _completion as _cli_completion
 from .. import _core as _cli_core
@@ -109,9 +109,9 @@ def _cli(args):
         raise SystemExit("pyrite app analysis -d/--save-default: no material given to persist")
 
     if args.default:
-        set_default_material(args.material)
+        set_analysis_default(args.material)
 
-    material = args.material or get_default_material() or "hopg"
+    material = args.material or get_analysis_default() or "hopg"
     launch_args = {"edit": args.edit, "watch": args.watch}
     if args.smoke:
         launch_args["smoke"] = True

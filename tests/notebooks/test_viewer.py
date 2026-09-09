@@ -9,6 +9,7 @@ import sys
 import pytest
 from click.testing import CliRunner
 
+from pyrite import _app_defaults
 from pyrite.apps import viewer
 from pyrite.cli.commands import app_viewer as viewer_cli
 
@@ -47,21 +48,21 @@ def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):
 
 
 def test_default_material_round_trip(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     assert viewer.get_default_material() is None  # never written yet
     viewer.set_default_material("mose2")
     assert viewer.get_default_material() == "mose2"
 
 
 def test_default_material_missing_file_returns_none(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / "does-not-exist")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / "does-not-exist")
     assert viewer.get_default_material() is None
 
 
 def test_default_material_empty_file_returns_none(tmp_path, monkeypatch):
     f = tmp_path / ".pyrite-viewer-default"
     f.write_text("   \n")
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", f)
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", f)
     assert viewer.get_default_material() is None
 
 
@@ -73,7 +74,7 @@ def _invoke(argv=()):
 
 
 def test_default_flag_without_material_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     result = _invoke(["-d"])
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -81,7 +82,7 @@ def test_default_flag_without_material_errors(tmp_path, monkeypatch):
 
 
 def test_unknown_material_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     result = _invoke(["not-a-real-material"])
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -89,7 +90,7 @@ def test_unknown_material_errors(tmp_path, monkeypatch):
 
 
 def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     launched = {}
     monkeypatch.setattr(
         viewer_cli,
@@ -104,7 +105,7 @@ def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
 
 
 def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     viewer.set_default_material("hbn")
     launched = {}
     monkeypatch.setattr(
@@ -119,7 +120,7 @@ def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
 
 
 def test_acp_flag_starts_viewer_with_bridge_lifecycle(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     launched = {}
     monkeypatch.setattr(
         viewer_cli,
@@ -135,7 +136,7 @@ def test_acp_flag_starts_viewer_with_bridge_lifecycle(tmp_path, monkeypatch):
 
 
 def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     monkeypatch.setattr(viewer_cli, "_launch", lambda material, **kw: None)
     result = _invoke(["wse2"])
     assert result.exit_code == 0
@@ -199,7 +200,7 @@ def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(mon
 
 
 def test_tunnel_flag_forwards_to_viewer_launch(monkeypatch, tmp_path):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     launched = {}
     monkeypatch.setattr(
         viewer_cli, "_launch", lambda material, **kw: launched.update(material=material, **kw)
@@ -228,7 +229,7 @@ def test_command_no_token_omitted_by_default():
 
 
 def test_no_token_flag_forwards_to_viewer_launch(monkeypatch, tmp_path):
-    monkeypatch.setattr(viewer, "_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
+    monkeypatch.setattr(_app_defaults, "VIEWER_DEFAULT_FILE", tmp_path / ".pyrite-viewer-default")
     launched = {}
     monkeypatch.setattr(
         viewer_cli, "_launch", lambda material, **kw: launched.update(material=material, **kw)

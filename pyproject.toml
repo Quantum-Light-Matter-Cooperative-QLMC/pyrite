@@ -273,6 +273,28 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+# The marimo apps sit at the very top of the stack, so nothing may import them.
+# The launchers used to live beside the notebook helpers in `apps/`, which put a
+# `cli -> apps` edge under every path back into `apps` and held the package
+# inside the driver import cycle. The shared state those launchers still need
+# lives below both (`pyrite._acp`, `pyrite._app_defaults`); this contract keeps
+# it that way.
+[[tool.importlinter.contracts]]
+id = "nothing-imports-the-marimo-apps"
+name = "No package imports the marimo app package"
+type = "forbidden"
+source_modules = [
+    "pyrite.checkpoints",
+    "pyrite.cli",
+    "pyrite.remote",
+    "pyrite.runs",
+    "pyrite.validation",
+]
+forbidden_modules = [
+    "pyrite.apps",
+]
+allow_indirect_imports = true
+
 [[tool.importlinter.contracts]]
 id = "plots-backends-stay-independent"
 name = "Plot backends (mpl, altair, plotly) do not import each other"

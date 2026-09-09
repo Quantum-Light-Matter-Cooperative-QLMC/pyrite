@@ -1,4 +1,11 @@
-"""Optional local ACP bridge lifecycle for Marimo developer sessions."""
+"""Optional local ACP bridge lifecycle for Marimo developer sessions.
+
+Lives at the package root rather than under ``apps/`` because nothing in
+``apps/`` uses it: its callers are the app launchers
+(:mod:`pyrite.cli.commands.app_analysis` and friends) and ``pyrite-dev
+acp-up``/``acp-down``. Keeping it below both leaves ``cli`` free of ``apps``
+imports, so ``apps`` stays outside the driver import cycle.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +15,7 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from ..paths import atomic_write_text, state_dir, workspace_root
+from .paths import atomic_write_text, state_dir, workspace_root
 
 ROOT = workspace_root()
 ACP_STATE_PATH = state_dir() / "acp-servers.json"

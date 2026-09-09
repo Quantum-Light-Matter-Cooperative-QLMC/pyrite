@@ -21,11 +21,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
 
+from .._app_defaults import get_analysis_default, set_analysis_default
 from .._env import env_value
 from ..checkpoints import _checkpoint_store
-from ..paths import atomic_write_text, state_dir
-
-_DEFAULT_FILE = state_dir() / "analysis-default"
 
 
 class MaterialMenuRow(TypedDict):
@@ -325,16 +323,12 @@ def apply_emission(results, emission):
 
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
-    try:
-        text = _DEFAULT_FILE.read_text().strip()
-    except FileNotFoundError:
-        return None
-    return text or None
+    return get_analysis_default()
 
 
 def set_default_material(material):
     """Persist ``material`` as the default for future no-argument runs."""
-    atomic_write_text(_DEFAULT_FILE, material)
+    set_analysis_default(material)
 
 
 def initial_material(cli_args, persisted_default):

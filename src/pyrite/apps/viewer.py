@@ -9,27 +9,23 @@ calls it in a cell that runs before the dropdown cell.
 
 The launcher that resolves and transports the material into the marimo
 subprocess is :mod:`pyrite.cli.commands.app_viewer`; this module stays free of
-CLI imports so the notebook can load it on its own.
+CLI imports so the notebook can load it on its own. The persisted default the
+launcher and the notebook share lives lower still, in
+:mod:`pyrite._app_defaults`, so neither package has to import the other.
 """
 
+from .._app_defaults import get_viewer_default, set_viewer_default
 from .._env import env_value
-from ..paths import atomic_write_text, state_dir
-
-_DEFAULT_FILE = state_dir() / "viewer-default"
 
 
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
-    try:
-        text = _DEFAULT_FILE.read_text().strip()
-    except FileNotFoundError:
-        return None
-    return text or None
+    return get_viewer_default()
 
 
 def set_default_material(material):
     """Persist ``material`` as the default for future no-argument runs."""
-    atomic_write_text(_DEFAULT_FILE, material)
+    set_viewer_default(material)
 
 
 def initial_material(cli_args, persisted_default):
