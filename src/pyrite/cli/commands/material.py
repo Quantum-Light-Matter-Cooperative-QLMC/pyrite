@@ -60,10 +60,10 @@ def _simulation_scene(document, material, profile_name):
     from pyrite.campaign.longitudinal import LongitudinalDistribution
     from pyrite.campaign.model import Beam, Numerics
     from pyrite.campaign.sweep import beam_replace, target_from_flat
-    from pyrite.campaign.transverse import TransverseDistribution
     from pyrite.detectors import EnergyBins
     from pyrite.instrument import PixelScorer
     from pyrite.materials import load_material_catalog
+    from pyrite.montecarlo.transverse import TransverseDistribution
 
     _catalog_io.existing_profile(document, profile_name)
     catalog = load_material_catalog(_catalog_io._MATERIALS_TOML, profile=profile_name)

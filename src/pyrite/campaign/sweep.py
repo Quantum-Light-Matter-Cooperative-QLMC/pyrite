@@ -37,6 +37,7 @@ from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..montecarlo.case import Case
 from ..montecarlo.transport import spliced_stopping_keV_per_ang
+from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
 from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is the stable import path)
     BlazedGrooves,
     Footprint,
@@ -64,7 +65,6 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     target_replace,
 )
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
-from .transverse import TransverseDistribution, resolve_transverse_distribution
 
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
 

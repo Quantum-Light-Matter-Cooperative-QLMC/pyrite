@@ -115,7 +115,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `beam-phase-space-injection`
 
 - **Claim:** Courant–Snyder transverse injection: stored normalized emittance, geometric `ε_g = ε_n/(βγ)` per case, per-plane Gaussian draw `x = sqrt(ε_gβ_T)·u₁`, `x' = sqrt(ε_g/β_T)·(u₂ − α u₁)` at the crystal entrance face
-- **Code:** `campaign/transverse.py::resolve_transverse_distribution`; `::sample_transverse`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/geometry.py::beam_frame_basis`
+- **Code:** `montecarlo/transverse.py::resolve_transverse_distribution`; `::sample_transverse`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/geometry.py::beam_frame_basis`
 - **Source:** Courant & Snyder, *Ann. Phys.* **3**, 1–48 (1958); standard normalized-emittance convention
 - **Status:** rederived
 - **Checks:** units (`mm·mrad`→`mm·rad`, `m`→`mm/rad`); `βγ = sqrt(γ_rel²−1)`; `ε_g ∝ 1/βγ` at fixed `ε_n` across the swept energy axis; `α` signed, not a magnitude; correlation sign `⟨xx'⟩ = −α ε_g`; `y` mirrors `x` when unset; round trip through `beam_metrics.sampled_beam_metrics` at 30 and 3000 keV; charge/rep-rate inert on the draw (bit-for-bit); slopes referred to the beam axis by `beam_frame_basis`, exactly `I` on axis; `ε_n → 0` and an unset policy both recover the collimated run

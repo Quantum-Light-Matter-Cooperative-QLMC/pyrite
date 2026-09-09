@@ -45,24 +45,29 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps + checkpoints + cli + energy_grid + remote + runs + validation
-  p2: campaign + detectors + instrument + montecarlo + results
-  p3: devtools
-  p4: materials
-  p5: perf
-  p6: plots
+  p2: campaign + results
+  p3: detectors + instrument + montecarlo
+  p4: devtools
+  p5: materials
+  p6: perf
+  p7: plots
 Edges (importer -> imported):
   p0 -> p1
-  p0 -> p4
+  p0 -> p5
   p1 -> p2
-  p1 -> p4
+  p1 -> p3
   p1 -> p5
   p1 -> p6
-  p2 -> p4
-  p3 -> p1
-  p3 -> p2
-  p3 -> p6
-  p6 -> p2
-  p6 -> p4
+  p1 -> p7
+  p2 -> p3
+  p2 -> p5
+  p3 -> p5
+  p4 -> p1
+  p4 -> p2
+  p4 -> p7
+  p7 -> p2
+  p7 -> p3
+  p7 -> p5
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -402,6 +407,16 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
   `geometry`, `transport`, `materials.crystal`.
 - `montecarlo/groove.py` — blazed sawtooth entrance-face grooves (escape-path engineering): closed-form entry/escape, `Sweep.groove_spacing_ang` knob.
+- `montecarlo/transverse.py` — transverse phase-space policy on the input side of
+  `BeamSpec`: a Courant-Snyder triplet `(eps_n, beta, alpha)` per plane, resolved
+  per case (normalized emittance is the stored input, geometric is derived as
+  `eps_n / (beta*gamma)`) and sampled into per-electron offsets and slopes. The
+  `y` plane mirrors `x` unless set. Zero first-party imports, so it is the
+  destination `transport/api.py` samples from directly (`resolved_from_mapping`,
+  `sample_transverse`) rather than reaching up into `campaign` (issue #69). See
+  `docs/physics/beam-transport/beam-phase-space.md`. Public: `TransverseDistribution`,
+  `ResolvedTransversePlane`, `ResolvedTransverseDistribution`,
+  `resolve_transverse_distribution`, `sample_transverse`. Deps: NumPy, SciPy constants.
 - `runner/` — compatibility package for the former flat module. `__init__.py`
   owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py`
   owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum
@@ -497,17 +512,6 @@ resolved per case against the dominant basal reflection.
 - Public: `LongitudinalDistribution`, `ResolvedLongitudinalDistribution`,
   `resolve_longitudinal_distribution`.
 - Deps: `materials.crystal`, NumPy, SciPy constants.
-
-### `campaign/transverse.py`
-Transverse phase-space policy on the input side of `BeamSpec`: a Courant-Snyder
-triplet `(eps_n, beta, alpha)` per plane, resolved per case (normalized
-emittance is the stored input, geometric is derived as `eps_n / (beta*gamma)`)
-and sampled into per-electron offsets and slopes. The `y` plane mirrors `x`
-unless set. See `docs/physics/beam-transport/beam-phase-space.md`.
-- Public: `TransverseDistribution`, `ResolvedTransversePlane`,
-  `ResolvedTransverseDistribution`, `resolve_transverse_distribution`,
-  `sample_transverse`.
-- Deps: NumPy, SciPy constants.
 
 ### `campaign/beam_metrics.py`
 Pure diagnostics over sampled initial phase-space arrays: per-plane RMS size,
