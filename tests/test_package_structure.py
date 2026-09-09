@@ -29,7 +29,7 @@ _COMPAT_MODULES = {
     "scan": "runs.scan",
     "slim": "checkpoints.slim",
     "sweep": "campaign.sweep",
-    "transverse": "campaign.transverse",
+    "transverse": "montecarlo.transverse",
     "validation_background": "validation.validation_background",
     "validation_oracles": "validation.validation_oracles",
     "viewer": "apps.viewer",

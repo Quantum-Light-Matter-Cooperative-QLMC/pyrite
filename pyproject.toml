@@ -221,17 +221,6 @@ forbidden_modules = [
     "pyrite.validation",
 ]
 allow_indirect_imports = true
-# One edge, pinned rather than hidden. `transport.api` samples transverse phase
-# space through `resolved_from_mapping`/`sample_transverse`, which are used by
-# nothing else in the tree and live in a module with no first-party imports of
-# its own. The edge is not new: until 0.3.0 it went through the `pyrite.transverse`
-# compatibility re-export, and because this contract only counts direct imports,
-# that shim kept it out of this report entirely (issue #68). Repointing the
-# import at the canonical module surfaced it. Listing it here keeps the
-# violation greppable and keeps every *other* montecarlo -> campaign import
-# failing. Relocating `transverse` below `campaign` is the real fix and is a
-# separate architectural change.
-ignore_imports = ["pyrite.montecarlo.transport.api -> pyrite.campaign.transverse"]
 
 # `materials` is the bottom of the physics core: it must not reach sideways into
 # its own consumers either. Without this the three edges out of `catalog.py` and

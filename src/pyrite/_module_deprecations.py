@@ -104,7 +104,7 @@ MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
         _entry("pyrite.scan", "pyrite.runs.scan"),
         _entry("pyrite.slim", "pyrite.checkpoints.slim"),
         _entry("pyrite.sweep", "pyrite.campaign.sweep"),
-        _entry("pyrite.transverse", "pyrite.campaign.transverse"),
+        _entry("pyrite.transverse", "pyrite.montecarlo.transverse"),
         _entry(
             "pyrite.validation_background",
             "pyrite.validation.validation_background",

@@ -1,7 +1,7 @@
 # Courant–Snyder transverse beam injection
 
 **Validation id:** `beam-phase-space-injection`
-**Code:** `campaign/transverse.py::resolve_transverse_distribution`; `::sample_transverse`;
+**Code:** `montecarlo/transverse.py::resolve_transverse_distribution`; `::sample_transverse`;
 `montecarlo/transport.py::simulate_trajectories`;
 `montecarlo/geometry.py::beam_frame_basis`
 **Source:** Courant & Snyder, *Ann. Phys.* **3**, 1–48 (1958); standard
@@ -172,7 +172,7 @@ point source in position and direction — matches the claimed limiting case.
 
 ## 3. Diff against the implementation
 
-Read after the derivation above (`campaign/transverse.py` lines 101–219;
+Read after the derivation above (`montecarlo/transverse.py` lines 101–219;
 `montecarlo/geometry.py::beam_frame_basis` lines 523–545;
 `montecarlo/transport.py::simulate_trajectories` transverse-injection block,
 ~lines 1500–1570):

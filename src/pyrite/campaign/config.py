@@ -30,11 +30,11 @@ from .._numerics import CONVERGENCE_KEYS
 from ..detectors import Detector, EnergyBins, Timepix3
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
+from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
 from .profiles import get_fidelity_preset, resolve_numerics
 from .sweep import BeamSpec, Sweep, beam_replace, target_from_flat, target_replace
-from .transverse import TransverseDistribution
 
 # Override keys that address the beam (BeamSpec) rather than the Sweep itself,
 # so ``material_sweep(..., energy_keV=[30, 60])`` and the legacy scalar-spot

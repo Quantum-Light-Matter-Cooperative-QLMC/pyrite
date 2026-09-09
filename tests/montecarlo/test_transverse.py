@@ -13,13 +13,13 @@ import pytest
 
 from pyrite.campaign.beam_metrics import sampled_beam_metrics
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.campaign.transverse import (
+from pyrite.montecarlo.geometry import beam_frame_basis
+from pyrite.montecarlo.transport import simulate_trajectories
+from pyrite.montecarlo.transverse import (
     TransverseDistribution,
     resolve_transverse_distribution,
     sample_transverse,
 )
-from pyrite.montecarlo.geometry import beam_frame_basis
-from pyrite.montecarlo.transport import simulate_trajectories
 
 _POLICY = TransverseDistribution(
     normalized_emittance_x_mm_mrad=1.0,

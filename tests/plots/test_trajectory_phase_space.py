@@ -10,7 +10,7 @@ import pytest
 from matplotlib.collections import LineCollection
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.campaign.transverse import TransverseDistribution
+from pyrite.montecarlo.transverse import TransverseDistribution
 from pyrite.plots.mpl.trajectories import (
     _beam_phase_space,
     _draw_incident_bundle,

@@ -4,11 +4,11 @@ import logging
 
 import numpy as np
 
-from ...campaign.transverse import resolved_from_mapping, sample_transverse
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ...materials.attenuation import _normalize_composition
 from ..geometry import beam_frame_basis, project_beam_entry, validate_transverse_dimensions
 from ..groove import entry_points
+from ..transverse import resolved_from_mapping, sample_transverse
 from .batching import (
     DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     _flight_diagnostic_summary,
