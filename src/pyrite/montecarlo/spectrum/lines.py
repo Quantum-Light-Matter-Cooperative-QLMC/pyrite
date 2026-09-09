@@ -8,6 +8,9 @@ loader. The array-heavy inner loops run on the GPU backend (``xp``) when
 available.
 """
 
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 
 from ..._backend import REAL, _to_cpu, xp
@@ -776,6 +779,51 @@ def _flight_blocks(bounds, chunk):
         yield ka, n_groups
 
 
+@dataclass(frozen=True, eq=False)
+class SpectrumRequest:
+    """The 26 inputs of :func:`mc_spectrum`, bound into one value.
+
+    Grouping them is what lets the spectrum phases below be module-level
+    functions instead of closures over ``mc_spectrum``'s locals: a phase takes
+    the request (and the setup derived from it) rather than reaching into an
+    enclosing scope. :func:`mc_spectrum` keeps its historical keyword signature
+    and builds the request itself, so no caller sees this type.
+
+    Frozen because a phase must not be able to edit the inputs a later phase
+    reads. ``eq=False`` keeps the inherited identity ``__hash__``: several
+    fields (``segments``, ``hkl_list``, the energy grid) are unhashable
+    containers, and the batched path's ``_table_cache`` key is an explicit
+    tuple rather than a hash of this object.
+    """
+
+    segments: Any
+    E_grid_eV: Any
+    crystal: Any
+    hkl_list: Any
+    theta_obs_rad: Any = np.deg2rad(119.0)
+    B_ang2: Any = None
+    use_henke: Any = True
+    absorber_element: Any = "C"
+    chunk: Any = 40000
+    n_hat: Any = None
+    composition: Any = None
+    beam_uvw: Any = None
+    azimuth_rad: Any = 0.0
+    recip_miscut_rad: Any = None
+    sinc_cutoff: Any = None
+    components: Any = False
+    layers: Any = None
+    mosaic_fwhm_rad: Any = None
+    mosaic_nodes: Any = 1
+    surface_hkl: Any = None
+    groove: Any = None
+    coherent: Any = False
+    electron_limit: Any = None
+    E_cut_keV: Any = None
+    _table_cache: Any = None
+    longitudinal_rms_fs: Any = None
+
+
 def mc_spectrum(
     segments,
     E_grid_eV,
@@ -1091,6 +1139,66 @@ def mc_spectrum(
     Validation: coherent-emission, coherent-segment-midpoint-time,
     finite-footprint-longitudinal-decoherence
     """
+    request = SpectrumRequest(
+        segments=segments,
+        E_grid_eV=E_grid_eV,
+        crystal=crystal,
+        hkl_list=hkl_list,
+        theta_obs_rad=theta_obs_rad,
+        B_ang2=B_ang2,
+        use_henke=use_henke,
+        absorber_element=absorber_element,
+        chunk=chunk,
+        n_hat=n_hat,
+        composition=composition,
+        beam_uvw=beam_uvw,
+        azimuth_rad=azimuth_rad,
+        recip_miscut_rad=recip_miscut_rad,
+        sinc_cutoff=sinc_cutoff,
+        components=components,
+        layers=layers,
+        mosaic_fwhm_rad=mosaic_fwhm_rad,
+        mosaic_nodes=mosaic_nodes,
+        surface_hkl=surface_hkl,
+        groove=groove,
+        coherent=coherent,
+        electron_limit=electron_limit,
+        E_cut_keV=E_cut_keV,
+        _table_cache=_table_cache,
+        longitudinal_rms_fs=longitudinal_rms_fs,
+    )
+    return _mc_spectrum(request)
+
+
+def _mc_spectrum(request):
+    """``mc_spectrum``'s body against a bound :class:`SpectrumRequest`."""
+    segments = request.segments
+    E_grid_eV = request.E_grid_eV
+    crystal = request.crystal
+    hkl_list = request.hkl_list
+    theta_obs_rad = request.theta_obs_rad
+    B_ang2 = request.B_ang2
+    use_henke = request.use_henke
+    absorber_element = request.absorber_element
+    chunk = request.chunk
+    n_hat = request.n_hat
+    composition = request.composition
+    beam_uvw = request.beam_uvw
+    azimuth_rad = request.azimuth_rad
+    recip_miscut_rad = request.recip_miscut_rad
+    sinc_cutoff = request.sinc_cutoff
+    components = request.components
+    layers = request.layers
+    mosaic_fwhm_rad = request.mosaic_fwhm_rad
+    mosaic_nodes = request.mosaic_nodes
+    surface_hkl = request.surface_hkl
+    groove = request.groove
+    coherent = request.coherent
+    electron_limit = request.electron_limit
+    E_cut_keV = request.E_cut_keV
+    _table_cache = request._table_cache
+    longitudinal_rms_fs = request.longitudinal_rms_fs
+
     if coherent and components:
         raise ValueError(
             "coherent=True is incompatible with components=True: the PXR/CBS "
