@@ -27,4 +27,3 @@ def add_membership(document, name, requested):
 
 def remove_membership(document, name, requested):
     return _profile_edit.remove_membership(document, name, requested)
-

@@ -863,5 +863,3 @@ def line_show_command(json_output, material, catalog_profile):
 def brem_show_command(json_output, material, catalog_profile):
     """Show bremsstrahlung energy grids."""
     return _show(json_output, material, catalog_profile, band="brem")
-
-

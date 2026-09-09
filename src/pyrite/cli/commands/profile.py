@@ -1141,4 +1141,3 @@ def delete_command(name, yes, dry_run, json_output):
         return 0
     emit_result(f"deleted profile {name}")
     return 0
-

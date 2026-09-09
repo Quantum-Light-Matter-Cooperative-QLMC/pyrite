@@ -490,8 +490,6 @@ def start_command(
     )
 
 
-
-
 @command.group(
     "performance",
     cls=DeprecatingGroup,
@@ -905,7 +903,6 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
         follow=follow,
         pull=pull,
     )
-
 
 
 def main(argv=None):

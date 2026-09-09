@@ -54,7 +54,10 @@ def test_no_deprecated_command_spelling_is_past_its_removal_target() -> None:
 
 def test_no_deprecated_option_spelling_is_past_its_removal_target() -> None:
     overdue = _overdue(
-        {f"{command} {flag}": entry.remove_in for (command, flag), entry in DEPRECATED_FLAGS.items()}
+        {
+            f"{command} {flag}": entry.remove_in
+            for (command, flag), entry in DEPRECATED_FLAGS.items()
+        }
     )
 
     assert not overdue, (

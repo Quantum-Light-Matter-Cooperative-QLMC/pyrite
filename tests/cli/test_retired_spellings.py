@@ -200,9 +200,7 @@ def test_app_leaves_keep_the_path_but_lose_the_implicit_launch(path: str) -> Non
     assert explicit.exit_code == 0
 
 
-@pytest.mark.parametrize(
-    "path", (*_UNKNOWN_COMMANDS, *sorted(_SWALLOWED_BY_PROFILE_NAME_ALIAS))
-)
+@pytest.mark.parametrize("path", (*_UNKNOWN_COMMANDS, *sorted(_SWALLOWED_BY_PROFILE_NAME_ALIAS)))
 def test_no_retired_spelling_still_resolves_in_the_tree(path: str) -> None:
     current: click.Command = command
     ctx = click.Context(command, info_name="pyrite")

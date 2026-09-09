@@ -163,4 +163,3 @@ def rm_command(profiles, all_profiles, yes, performance_dir):
         pass
     emit_result(f"deleted {len(selected)} local performance profile(s)")
     return 0
-
