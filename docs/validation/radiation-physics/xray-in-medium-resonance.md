@@ -244,7 +244,7 @@ the identical 3-pass loop in float32 with the same initialization and update,
 sharing the same docstring-cited contraction argument.
 
 `_line_kin_core` (CPU batched path) and its equivalent inline block in
-`_accumulate` (CPU per-hkl path) and `_coherent_prologue_kernel` (CUDA)
+`_accumulate_reflection` (CPU per-hkl path) and `_coherent_prologue_kernel` (CUDA)
 each then compute, given `denom` and (for the refractive branch) `n_re`:
 
 ```python

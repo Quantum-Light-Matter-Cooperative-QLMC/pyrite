@@ -276,7 +276,7 @@ rungs are no-ops, so segments are not artificially subdivided.
 
 The ungrooved, unlayered, incoherent run takes the batched branch of
 `mc_spectrum`. Its accumulation reduces to (literal source, with the
-per-hkl `_accumulate` fallback spelling the same thing inline):
+per-hkl `_accumulate_reflection` fallback spelling the same thing inline):
 
 ```python
 pref = alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs  # _line_weight_core
