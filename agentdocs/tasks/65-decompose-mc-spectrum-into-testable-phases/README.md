@@ -61,6 +61,33 @@ The harness lives in the session scratchpad — it is a migration instrument, no
 a durable artifact. What survives it is the direct per-phase tests added under
 `tests/montecarlo/`.
 
+## Landed shape
+
+| Function | Lines | Role |
+|---|---|---|
+| `mc_spectrum` | 150 | public signature, docstring, request construction (20 executable) |
+| `_prepare_spectrum` | 364 | phase 1 |
+| `_needs_per_hkl_route` | 20 | route choice |
+| `_accumulate_per_hkl` | 101 | phase 2, compatibility route |
+| `_accumulate_reflection` (+ `_accumulate_reflection_coherent`) | 283 + 171 | one (reflection, orientation) row |
+| `_accumulate_batched` | 253 | phase 2, batched route |
+| `_batched_reflection_tables` / `_batched_tables` / `_batched_block` | 105 / 89 / 103 | batched sub-phases |
+| `_batched_coherent_block` / `_batched_incoherent_block` | 112 / 109 | per-block steps 5-7 |
+| `_batched_coherent_finalize` | 186 | coherent reduction |
+| `_finalize_spectrum` | 15 | phase 3 |
+| `_mc_spectrum` | 8 | prepare -> route -> finalise |
+
+Largest function in `lines.py` is now 364 lines, down from 1 894. The file grew
+from 2 760 to ~3 330 lines: the phase signatures, carrier dataclasses and
+unpacking prologues cost more lines than the block comments removed, which is
+the trade the issue asked for.
+
+Carrier types beyond the two the issue named: `_BatchedTables` and
+`_BatchedBlock` hand per-case and per-segment-block quantities between the
+batched sub-phases, and `_LineBatch` replaces a closure over `nonlocal`
+counters -- that state was the specific reason the batched incoherent step
+could not previously be its own function.
+
 ## Deviations from the issue plan (and why)
 
 - **`SpectrumRequest` is not hashed for `_table_cache`.** The issue anticipated
@@ -73,6 +100,27 @@ a durable artifact. What survives it is the direct per-phase tests added under
 - **No caller changes.** Keeping the public signature stable means
   `mc_spectrum_solid_angle`, the `*_jit_kernel` modules, and the four
   `montecarlo/runner/__init__.py` entry points need no edit at all.
+- **One optional-state seam.** Precompute that simply went unbound on routes
+  that never read it (the coherent and decoherence terms) now needs an explicit
+  `None` as a dataclass field. Nothing reads one where the closure would have
+  raised `UnboundLocalError`.
+- **The docstring moved too.** The issue scoped step 7 to the 287 lines of
+  *block comments*, but `mc_spectrum` cannot reach "under 150 lines" while
+  carrying a 287-line docstring. Its per-option physics narrative became links
+  to the `docs/physics/` pages that already own that material; every
+  `Validation:` marker and the whole numpydoc contract stayed.
+
+## Not covered by the goldens
+
+The CUDA streaming and fused-reduction paths (`_LineBatch.flush`, the stream
+branch of `_batched_coherent_finalize`, `_batched_coherent_block`'s JIT branch)
+are unreachable on the NumPy backend, so no CPU golden touches them. They were
+moved verbatim, but `_LineBatch` is a genuine restructuring of `nonlocal`
+closure state and its lazy kernel import now happens per flush rather than once.
+Worth a GPU smoke run before merge.
+
+`mc_spectrum(..., use_henke=False)` remains broken on `main` and here; see
+below.
 
 ## Known pre-existing defect (out of scope, not introduced here)
 
