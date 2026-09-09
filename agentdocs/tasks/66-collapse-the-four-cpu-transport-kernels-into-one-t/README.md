@@ -97,11 +97,11 @@ Axis 3 — ungrooved vs grooved (lockstep only):
   breaks on the real body: four module-level wrappers over one shared body.
 - One body text: runtime draws behind a small stream tuple so lockstep and
   counter-addressed modes share the row logic.
-- Straggling invariants (cores.py:168-201 and
-  docs/repo-design/compute/straggled-transport-integration.md) are preserved
-  verbatim in the merged body.
+- Straggling invariants from the pre-collapse cores and
+  `docs/repo-design/compute/straggled-transport-integration.md` are preserved in
+  the merged control flow and summarized on the factory docstring.
 
-## Handoff state (M2 and M5 done, paused before M4)
+## Final implementation state (M4-M6 done)
 
 Verified: all 20 goldens reproduce bit-for-bit, and the focused transport
 tests pass (165 passed, 21 CUDA-hardware skipped: test_groove,
@@ -156,10 +156,32 @@ M2 grouped-parameter refactor is applied everywhere:
   `_drive_per_electron_batches` implementation for capacity replay, compaction,
   exit-code accounting, and optional device joining. Focused tests and all 20
   goldens pass bit-for-bit after the hoist.
+- `cores.py`: `make_cpu_transport_core` owns one row/scheduler body closed over
+  `grooved`, `per_electron`, and `lut`. Five small adapters preserve every
+  existing API/CUDA-reference signature. Numba prunes unreachable tuple layouts
+  per specialization. The module is 774 formatted lines; kernels take 9-10
+  top-level parameters; the whitespace-normalized 25-line duplicate scan finds
+  0 repeated windows.
+- Exact CPU contract: all 20 seed-66 goldens reproduce bit-for-bit. The source
+  parity test now inspects the factory, where cutoff and termination rules live.
+  A no-JIT multilayer LUT regression also verifies dormant one-row straggling
+  placeholders are never indexed by the active material layer.
+- Cold isolated-cache first calls (Ne=300): lockstep 4.43s, lockstep LUT 2.52s,
+  grooved 3.77s, per-electron 2.44s, per-electron LUT 2.31s; total 15.47s versus
+  the 19.3s baseline. Every specialization is within 20% (four improve; the
+  largest increase is per-electron LUT at 2.7%).
+- Warm Ne=4000, seed=66 CPU medians over 3 measured repeats after one warm-up:
+  lockstep 0.111/0.203s, lockstep LUT 0.062/0.151s, grooved 0.093/0.166s,
+  per-electron 0.147/0.256s, per-electron LUT 0.091/0.200s for
+  frozen/no-straggle and midpoint/straggle respectively. All improve on the
+  recorded baseline pairs.
 
-Remaining: M4 (factory), M6 (full checks incl.
-`test-suite core`, `--numba`, `pyrite-dev verify`, duplicate-window scan
-139 -> <20, physics-ledger-auditor). See issue #66 acceptance for thresholds.
+Verification complete: `test-suite core` (1888 passed, 76 skipped), no-JIT
+Monte Carlo suite via `test --numba` (756 passed, 35 skipped), and
+`pyrite-dev verify` (3692 passed, 78 skipped) pass. `validation-ledger --check`
+passes; this checkout has no standalone `physics-ledger-auditor` command and no
+`Validation:` marker was removed. CUDA hardware parity remains unexecuted here;
+the hardware-only launcher/reference test is skipped on this CPU host.
 
 Verify commands:
     uv run python checks/transport_core_goldens.py check --dir .golden66
@@ -170,6 +192,6 @@ Verify commands:
 
 - [x] M0 baselines, M1 goldens
 - [x] M2 grouped parameter tuples on all 5 kernels; goldens hold
-- [ ] M4 factory generates all 4 (+5th) kernels; goldens hold
+- [x] M4 factory generates all 4 (+5th) kernels; goldens hold
 - [x] M5 batching.py per-electron driver hoist
-- [ ] M6 full checks: core suite, --numba, verify, perf, dup scan, ledger audit
+- [x] M6 full checks: core suite, --numba, verify, perf, dup scan, ledger audit
