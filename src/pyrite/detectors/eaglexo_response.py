@@ -95,6 +95,7 @@ from ._si_sensor import (
     poisson_core,
     prep_spectrum,
 )
+from .response import convolve_detector
 
 # ---- sensor variants (fixed, from the Eagle XO datasheet) --------------------
 # Active area and pixel pitch for the two CCD options; the active area (with the
@@ -321,8 +322,6 @@ class EagleResponse:
         spec = prep_spectrum(spec, self.E, "eaglexo_response")
         det = spec * self.qe
         if self.resolve_energy:
-            from ..montecarlo import convolve_detector
-
             fwhm = float(np.median(energy_fwhm_eV(self.E, self.n_pix)))
             det = convolve_detector(self.E, det, fwhm)  # ~const, sqrt(E)-weak
         return det

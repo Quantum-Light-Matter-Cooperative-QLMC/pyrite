@@ -11,6 +11,8 @@ from typing import Protocol
 
 import numpy as np
 
+from .response import convolve_detector, detector_efficiency
+
 
 def _number(name: str, value: object, *, minimum: float, maximum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, Real):
@@ -190,8 +192,6 @@ class LegacyEDS:
     convolve: bool = False
 
     def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
-        from ..montecarlo import convolve_detector, detector_efficiency
-
         scored = np.asarray(intrinsic_density)
         if self.apply_qe:
             scored = scored * detector_efficiency(energy_eV)

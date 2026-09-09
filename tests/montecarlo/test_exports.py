@@ -8,7 +8,13 @@ Importing the package runs the GPU/CPU backend probe and is otherwise cheap; it
 does NOT call mc_spectrum (GPU), so it stays in the fast suite.
 """
 
+import warnings
+
+import pytest
+
 import pyrite.montecarlo as mc
+from pyrite import detectors
+from pyrite._module_deprecations import PUBLIC_EXPORT_DEPRECATIONS
 
 # Every name imported from pyrite.montecarlo anywhere in src/, tests/ or checks/,
 # plus the backend/internal helpers re-exported for safety. Adding a name to the
@@ -98,7 +104,9 @@ FROZEN_EXPORTS = frozenset(
 
 
 def test_every_frozen_name_is_importable():
-    missing = sorted(n for n in FROZEN_EXPORTS if not hasattr(mc, n))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        missing = sorted(n for n in FROZEN_EXPORTS if not hasattr(mc, n))
     assert not missing, f"montecarlo package no longer exports: {missing}"
 
 
@@ -112,3 +120,12 @@ def test_public_names_resolve_to_subpackage():
     assert mc.mc_spectrum.__module__ == "pyrite.montecarlo.spectrum"
     assert mc.simulate_trajectories.__module__ == "pyrite.montecarlo.transport"
     assert mc.run_cases.__module__ == "pyrite.montecarlo.runner"
+
+
+def test_relocated_detector_response_exports_keep_the_legacy_montecarlo_surface():
+    for name in ("convolve_detector", "detector_efficiency"):
+        entry = PUBLIC_EXPORT_DEPRECATIONS[("pyrite.montecarlo", name)]
+        mc.__dict__.pop(name, None)
+        with pytest.warns(DeprecationWarning, match=entry.replacement):
+            assert getattr(mc, name) is getattr(detectors, name)
+        assert getattr(detectors, name).__module__ == "pyrite.detectors.response"

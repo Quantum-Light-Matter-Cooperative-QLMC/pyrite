@@ -16,8 +16,7 @@ import pytest
 
 matplotlib.use("Agg")  # headless; no display in CI
 
-from pyrite.detectors import Detector, LegacyEDS
-from pyrite.montecarlo import convolve_detector, detector_efficiency
+from pyrite.detectors import Detector, LegacyEDS, convolve_detector, detector_efficiency
 from pyrite.validation import anchor_figures as af
 
 _APP_RESOURCES = Path(af.__file__).resolve().parent

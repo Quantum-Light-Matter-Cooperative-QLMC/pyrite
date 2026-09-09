@@ -46,28 +46,39 @@ Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps + checkpoints + cli + energy_grid + remote + runs + validation
   p2: campaign + results
-  p3: detectors + instrument + montecarlo
+  p3: detectors
   p4: devtools
-  p5: materials
-  p6: perf
-  p7: plots
+  p5: instrument
+  p6: materials
+  p7: montecarlo
+  p8: perf
+  p9: plots
 Edges (importer -> imported):
   p0 -> p1
-  p0 -> p5
+  p0 -> p6
   p1 -> p2
   p1 -> p3
   p1 -> p5
   p1 -> p6
   p1 -> p7
+  p1 -> p8
+  p1 -> p9
   p2 -> p3
   p2 -> p5
-  p3 -> p5
+  p2 -> p6
+  p2 -> p7
+  p3 -> p6
   p4 -> p1
   p4 -> p2
-  p4 -> p7
-  p7 -> p2
-  p7 -> p3
+  p4 -> p9
+  p5 -> p3
+  p5 -> p6
   p7 -> p5
+  p7 -> p6
+  p9 -> p2
+  p9 -> p3
+  p9 -> p6
+  p9 -> p7
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 

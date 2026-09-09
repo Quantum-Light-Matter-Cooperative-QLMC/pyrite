@@ -30,6 +30,17 @@ class ModuleDeprecation:
     remove_in: str
 
 
+@dataclass(frozen=True)
+class PublicExportDeprecation:
+    """One deprecated package attribute and its canonical replacement."""
+
+    module: str
+    name: str
+    replacement: str
+    deprecated_in: str
+    remove_in: str
+
+
 def _window(deprecated_in: str, minors: int = SUPPORT_WINDOW_MINORS) -> str:
     major, minor, *_ = deprecated_in.split(".")
     return f"{major}.{int(minor) + minors}.0"
@@ -42,6 +53,16 @@ def _entry(
     since: str = "0.3.0",
 ) -> ModuleDeprecation:
     return ModuleDeprecation(module, replacement, since, _window(since))
+
+
+def _public_export_entry(
+    module: str,
+    name: str,
+    replacement: str,
+    *,
+    since: str = "0.3.0",
+) -> PublicExportDeprecation:
+    return PublicExportDeprecation(module, name, replacement, since, _window(since))
 
 
 #: Keyed by the full compatibility module path used in an import.
@@ -118,6 +139,24 @@ MODULE_DEPRECATIONS: dict[str, ModuleDeprecation] = {
 }
 
 
+#: Keyed by the compatibility package and exported attribute.
+PUBLIC_EXPORT_DEPRECATIONS: dict[tuple[str, str], PublicExportDeprecation] = {
+    (entry.module, entry.name): entry
+    for entry in (
+        _public_export_entry(
+            "pyrite.montecarlo",
+            "convolve_detector",
+            "pyrite.detectors.convolve_detector",
+        ),
+        _public_export_entry(
+            "pyrite.montecarlo",
+            "detector_efficiency",
+            "pyrite.detectors.detector_efficiency",
+        ),
+    )
+}
+
+
 def warn_module_deprecation(module: str) -> None:
     """Announce *module* as a compatibility path and name its replacement.
 
@@ -139,4 +178,17 @@ def warn_module_deprecation(module: str) -> None:
         f"import {entry.replacement} instead",
         DeprecationWarning,
         stacklevel=2,
+    )
+
+
+def warn_public_export_deprecation(module: str, name: str) -> None:
+    """Announce a relocated package attribute when its compatibility shim is used."""
+    entry = PUBLIC_EXPORT_DEPRECATIONS.get((module, name))
+    if entry is None:
+        return
+    warnings.warn(
+        f"{entry.module}.{entry.name} is deprecated and will be removed in {entry.remove_in}; "
+        f"import {entry.replacement} instead",
+        DeprecationWarning,
+        stacklevel=3,
     )

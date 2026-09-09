@@ -58,14 +58,7 @@ from ..materials.attenuation import (
     _stack_tau,
 )
 from .case import Case
-from .detector import (
-    aperture_fwhm_eV,
-    convolve_detector,
-    detector_efficiency,
-    eds_fwhm_eV,
-    mosaic_fwhm_eV,
-    mosaic_psi_rad,
-)
+from .detector import aperture_fwhm_eV, eds_fwhm_eV, mosaic_fwhm_eV, mosaic_psi_rad
 from .geometry import (
     X_MAX,
     X_MIN,
@@ -206,3 +199,20 @@ __all__ = [
     "_worker_init",
     "run_cases",
 ]
+
+
+_DEPRECATED_RESPONSE_EXPORTS = frozenset({"convolve_detector", "detector_efficiency"})
+
+
+def __getattr__(name: str):
+    """Resolve relocated detector response operators through their old API."""
+    if name not in _DEPRECATED_RESPONSE_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    from .._module_deprecations import warn_public_export_deprecation
+
+    value = getattr(import_module("pyrite.detectors.response"), name)
+    warn_public_export_deprecation(__name__, name)
+    globals()[name] = value
+    return value
