@@ -5,9 +5,11 @@ import sys
 
 import pytest
 
-from pyrite.apps import analyze, check, export, viewer
 from pyrite.checkpoints import _checkpoint_io, archive, slim
-from pyrite.cli.commands import check_config
+from pyrite.cli.commands import app_analysis as analyze
+from pyrite.cli.commands import app_validation as check
+from pyrite.cli.commands import app_viewer as viewer
+from pyrite.cli.commands import check_config, export
 from pyrite.cli.commands import recompute as recompute_cli
 from pyrite.cli.commands.scan import performance_command
 from pyrite.runs import blaze, scan
