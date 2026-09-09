@@ -9,8 +9,8 @@ from pyrite.montecarlo.groove import blazed_groove_spec
 from pyrite.montecarlo.spectrum import (
     _clip_segments_to_cutoff,
     mc_brem_spectrum,
-    mc_spectrum,
 )
+from pyrite.montecarlo.spectrum.lines import _prepare_spectrum
 from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
 
 CARBON = [("C", 0.1136)]
@@ -150,8 +150,10 @@ def test_population_cutoff_clips_length_and_midpoint_but_not_start_state():
     assert clipped["t_ang"][0] == 12.0
     assert clipped["t0_ang"][0] == 3.0
 
+    # The line path applies the cutoff in its preparation phase, before any
+    # segment array is staged; the brem path still does it inline.
     expected_call = "segments = _clip_segments_to_cutoff(segments, E_cut_keV"
-    assert expected_call in inspect.getsource(mc_spectrum)
+    assert expected_call in inspect.getsource(_prepare_spectrum)
     assert expected_call in inspect.getsource(mc_brem_spectrum)
 
 
