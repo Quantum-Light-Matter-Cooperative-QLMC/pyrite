@@ -5,7 +5,7 @@ Both CUDA coherent routes fold the vacuum phase into one per-line slope,
 ``-L_esc[j] * delta_omega[k]``, whose two factors live on different axes, so it
 rides along as its own pair of arrays rather than being absorbed into the slope.
 These tests pin the kernels to the same closed form the exact array path in
-``lines.py`` evaluates, and pin the vacuum branch to bit-for-bit identity with
+``lines`` evaluates, and pin the vacuum branch to bit-for-bit identity with
 the pre-existing kernels.
 
 See ledger ``xray-in-medium-propagation-phase``.
@@ -635,12 +635,13 @@ def _decoh_reference(**kwargs):
 
 def _decoh_route_kwargs(route, monkeypatch):
     """Select which of the three CUDA-JIT coherent fast paths runs."""
-    from pyrite.montecarlo.spectrum import lines
+    # `_policy` owns the dispatch switches and every route reads them there.
+    from pyrite.montecarlo.spectrum.lines import _policy
 
     if route == "stream":  # batched (n_seg, N_g) streaming field kernel
         return {}
     if route == "row-reduction":  # batched path's per-row raw reduction fallback
-        monkeypatch.setattr(lines, "_USE_JIT_COHERENT_STREAM", False)
+        monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
         return {}
     if route == "per-hkl":  # _accumulate's per-(reflection, orientation) reduction
         # The grooved escape branch is the only coherent route off the batched
@@ -724,7 +725,8 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
 
     Validation: coherent-inter-electron-decoherence
     """
-    from pyrite.montecarlo.spectrum import lines, mc_spectrum
+    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum.lines import _policy
 
     call_kwargs = {
         **_DECOH_KWARGS,
@@ -736,8 +738,8 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
     fast = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert calls[0] > 0, "the CUDA-JIT fast path was not taken"
 
-    monkeypatch.setattr(lines, "_USE_JIT_COHERENT_STREAM", False)
-    monkeypatch.setattr(lines, "_USE_JIT_COHERENT_REDUCTION", False)
+    monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
+    monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_REDUCTION", False)
     generic_calls = _count_kernel_calls(monkeypatch, route)
     generic = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert generic_calls[0] == 0

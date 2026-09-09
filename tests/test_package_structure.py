@@ -104,16 +104,13 @@ def test_remote_facade_is_the_public_package() -> None:
 def test_source_modules_stay_near_the_1200_line_budget() -> None:
     """Keep issue #64's module-size acceptance criterion enforceable."""
     package_root = Path(pyrite.__file__).parent
-    # `cores.py` was exempt for issue #66; that collapse landed and brought it
-    # to ~770 lines, so the exemption is gone and the budget now holds it.
-    exempt = {
-        Path("montecarlo/spectrum/lines.py"),  # issue #65 -- still 3,330 lines
-    }
+    # No exemptions left. `transport/cores.py` (issue #66) collapsed to ~770
+    # lines and `montecarlo/spectrum/lines.py` (issue #65) was split into the
+    # `lines/` package, so the budget now holds every module in the tree.
     oversized = {
         path.relative_to(package_root): len(path.read_text().splitlines())
         for path in package_root.rglob("*.py")
-        if path.relative_to(package_root) not in exempt
-        and len(path.read_text().splitlines()) > 1_250
+        if len(path.read_text().splitlines()) > 1_250
     }
 
     assert oversized == {}

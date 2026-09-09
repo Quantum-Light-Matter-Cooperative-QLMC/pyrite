@@ -224,7 +224,10 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
         with pytest.raises(ValueError, match="incompatible with numerical substeps"):
             mc_spectrum(rows, CXR_GRID_EV, components=True, **CXR_KWARGS)
     else:
-        import pyrite.montecarlo.spectrum.lines as lines
+        # The host-only guard reads `xp` in `_prepare_spectrum`, so the fake
+        # backend has to land on the submodule that owns it -- rebinding the
+        # `lines` package attribute would not reach the route.
+        from pyrite.montecarlo.spectrum.lines import _setup
 
         class _FakeCupy:
             __name__ = "cupy"
@@ -232,7 +235,7 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
             def __getattr__(self, name):
                 return getattr(np, name)
 
-        monkeypatch.setattr(lines, "xp", _FakeCupy())
+        monkeypatch.setattr(_setup, "xp", _FakeCupy())
         with pytest.raises(ValueError, match="host-only"):
             mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
 

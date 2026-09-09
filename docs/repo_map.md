@@ -426,7 +426,7 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `docs/repo-design/compute/gpu-transport-rawkernel.md`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
-- `spectrum/` — compatibility package for the former flat module. `lines.py`
+- `spectrum/` — compatibility package for the former flat module. `lines/`
   owns `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
   average) and `mc_spectrum_solid_angle`; `brem.py` owns
   `mc_brem_spectrum` and `load_external_brem`; `coherent.py` groups the
@@ -436,6 +436,18 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   on a default call path. Line, brem, and coherent CUDA kernels are
   colocated in this package and remain lazy on CPU. Deps: `pyrite._backend`,
   `materials.attenuation`, `transport`, `geometry`, `materials.crystal`.
+- `spectrum/lines/` — the line spectrum split by phase, bottom-up (issue #65).
+  `_policy` owns the five device-kernel dispatch switches; `_kernels` the leaf
+  array numerics (lineshape, interpolation, per-segment geometry, reflection
+  tabulation); `_setup` the `SpectrumRequest` record and the one-shot
+  `_prepare_spectrum`; `_per_hkl` the reference route that walks one reflection
+  at a time (layered stacks, grooved escape, flight-grouped coherence);
+  `_batched` the default route over stacked reflection tables; `_spectrum` the
+  public entry points, route dispatch, and finalization. `__init__.py`
+  re-exports the whole pre-split surface, so
+  `pyrite.montecarlo.spectrum.lines.<name>` still resolves — but those are
+  bindings, not seams: a test that *replaces* one patches the owning submodule
+  (`_policy` for the switches, `_kernels` for `chi_g`, `_setup` for `xp`).
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
   `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
   `geometry`, `transport`, `materials.crystal`.
