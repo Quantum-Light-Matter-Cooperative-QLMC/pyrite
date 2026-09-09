@@ -4,7 +4,6 @@ from importlib import resources
 import numpy as np
 import pytest
 
-from pyrite.montecarlo import transport as transport_module
 from pyrite.montecarlo.groove import blazed_groove_spec
 from pyrite.montecarlo.spectrum import (
     _clip_segments_to_cutoff,
@@ -158,7 +157,9 @@ def test_population_cutoff_clips_length_and_midpoint_but_not_start_state():
 
 
 def test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules():
-    cpu_source = inspect.getsource(transport_module._transport_core_ungrooved_perelectron)
+    from pyrite.montecarlo.transport.cores import make_cpu_transport_core
+
+    cpu_source = inspect.getsource(make_cpu_transport_core)
     # Read the CUDA kernel modules' source as text rather than importing them:
     # they do a module-scope `import cupy`, so an ordinary import would fail
     # outright on a CPU-only machine. The control flow lives in `_jit_kernel.py`
