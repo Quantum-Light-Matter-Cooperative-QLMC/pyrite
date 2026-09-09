@@ -1105,27 +1105,14 @@ def _prepare_spectrum(request):
         d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
         omega_grid = E_grid / HBARC_EV_ANG
 
-        # In-medium propagation phase. The observation-time phase is
-        # omega (t_j + n_med L_esc,j + L_vac,j), and the geometric total path
-        # L_esc + L_vac = R - n_hat.r_j to first order, so the vacuum
-        # ``omega d_j`` picks up exactly
-        #
-        #     omega (Re n(E) - 1) L_esc,j = - delta(E) omega(E) L_esc,j
-        #
-        # where L_esc,j is the SAME in-crystal escape distance the Beer-Lambert
-        # factor already runs over. That is not a coincidence: the escape leg
-        # contributes exp(i n omega L) = exp(i omega L) exp(-i delta omega L)
-        # exp(-beta omega L), and the last factor is sqrt(exp(-mu L)) = ``amp``.
-        # The dispersive phase is the real partner of an absorption the coherent
-        # path already carries; only the two together are one complex n.
-        #
-        # Note this is NOT ``k(E) n_hat.r_j``: that form would charge the medium
-        # for the whole flight to the detector. The two agree only when the
-        # photon exits along the face normal (where L_esc and n_hat.r differ by a
-        # segment-independent constant, i.e. a global phase).
-        #
-        # Tabulated on the OUTPUT grid: it is a propagation phase read across the
-        # whole spectrum, not a coupling frozen at the line energy.
+        # In-medium propagation phase: each segment's field picks up
+        # -delta(E) omega(E) L_esc,j over the SAME in-crystal escape path the
+        # Beer-Lambert factor runs over -- the real partner of that absorption.
+        # Deliberately NOT k(E) n_hat.r_j, which would charge the medium for the
+        # whole flight to the detector. Tabulated on the OUTPUT grid: it is a
+        # propagation phase read across the spectrum, not a coupling frozen at
+        # the line energy. Derivation:
+        # docs/physics/radiation-physics/photon-escape-and-dispersion.md
         # Validation: xray-in-medium-propagation-phase
         delta_omega_grid = (
             xp.asarray(
@@ -1135,39 +1122,20 @@ def _prepare_spectrum(request):
             * omega_grid
         )
 
-    # Empirical inter-electron decoherence for the coherent path. Today's
-    # coherent sum bakes each electron's SAMPLED longitudinal offset
-    # (``t0_ang``) and transverse entry offset (via ``seg_r``'s trajectory
-    # position) into the segment phase and squares once -- one Monte Carlo
-    # realization. For a squared coherent sum that is speckle, not shot
-    # noise: the spurious enhancement does not shrink with electron count
-    # (Rayleigh statistics), unlike ordinary incoherent MC noise.
-    #
-    # Fresh-context result: per (row, energy), Total = (1-F)*Grouped +
-    # F*Flat, where Flat = |sum_e S_e|^2 is TODAY'S coherent reduction but
-    # fed the electron's offset-free position/time -- so it
-    # needs no new reduction code, only feeding ``d_all_geom``/``seg_r_geom``
-    # in place of ``d_all``/``seg_r`` at the handful of points that build a
-    # row's phase -- and Grouped = sum_e|S_e|^2 groups the SAME segments by
-    # electron, squares each electron's own sum, then adds (new reduction,
-    # ``_coherent_electron_grouped_row`` below). F is the empirical
-    # characteristic function of the ACTUAL per-electron offsets transport
-    # already draws (``initial_t0_ang``/``initial_r_ang``, Ne-long
-    # population arrays, NOT the per-segment gathered/duplicated ones):
-    # F(row) = |mean_e exp(i*(omega*t0_e - q_perp(row).dr_perp,e))|^2. This
-    # needs no per-policy sigma-resolution logic (legacy gaussian/uniform
-    # bunch, long_offsets_fs, compressed, microtrain, and elliptical/
-    # Courant-Snyder transverse spots all fall out for free -- the only
-    # requirement is t0 sampled independently of the transverse offset,
-    # true here since they use independent RNG child streams), and it
-    # converges to the closed-form exp[-(omega sigma_z)^2-(q_perp
-    # sigma_perp)^2] via ordinary 1/sqrt(Ne) statistics rather than the
-    # non-converging speckle the naive sum shows.
+    # Empirical inter-electron decoherence for the coherent path. Squaring one
+    # realization of the sampled per-electron offsets is speckle, not shot
+    # noise: it does not shrink with electron count. Blend instead, per (row,
+    # energy), Total = (1-F)*Grouped + F*Flat, where Flat is today's reduction
+    # fed the electron's OFFSET-FREE position/time (hence the
+    # d_all_geom/seg_r_geom swap below, a strict no-op when no offset is
+    # configured), Grouped = sum_e |S_e|^2 groups the same segments by electron,
+    # and F is the empirical characteristic function of the offset population
+    # transport already drew. Derivation and the closed form it converges to:
+    # docs/physics/radiation-physics/coherent-emission.md
     #
     # F must be applied PER ROW (reflection x mosaic orientation), before
-    # summing across rows: q_perp depends on g, which differs row to row,
-    # so a single scalar F(E) on the row-summed spectrum would be wrong
-    # whenever more than one row contributes to the same energy bin.
+    # summing across rows: q_perp depends on g, so a single scalar F(E) on the
+    # row-summed spectrum would be wrong wherever two rows share an energy bin.
     #
     # Validation: coherent-inter-electron-decoherence
     decoherence_active = False
@@ -1997,232 +1965,44 @@ def mc_spectrum(
     longitudinal_rms_fs=None,
 ):
     """
-    Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
-    on E_grid_eV, summed incoherently over the trajectory segments and the
-    listed reflections (their resonances are spectrally separated and their
-    relative phase decorrelates over the segment midpoints, so cross-g
-    coherence is negligible -- bounded under `cross-reflection-coherence`).
-
+    Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
+    E_grid_eV, summed over the trajectory segments and the listed reflections.
     Per segment and reflection (Zhai SI Eqs. 5-7, nonrelativistic)::
 
       omega_res = beta*v_hat.g / (1 - beta*v_hat.n)
       d2N/dE/dOmega = alpha*omega/(4*pi^2*hbar*c) * abs(A)^2 * t_L^2
                       * sinc^2[(1-beta*v.n)*(omega-omega_res)*t_L/2] * T_abs
 
-    with A = A_PXR + A_CBS per polarization (Feranchuk Eqs. 13/14 evaluated
-    at omega_res with the segment's velocity vector), t_L = L_seg/beta, and
-    T_abs the Beer-Lambert escape factor from the segment midpoint.
-
-    The finite-time factor follows from integrating ``exp(i 2 P t)`` over a
-    centered segment duration ``t_L``, giving
-    ``t_L**2 sinc(P t_L / pi)**2`` under NumPy's normalized-sinc convention,
-    with ``P = (1 - beta v_hat.n)(omega - omega_res) / 2``. It assumes a
-    constant segment velocity and amplitude. Writing this factor as
-    ``|Q(P, t_L)|**2``, its exact normalized long-duration limit is
-    ``|Q|**2 / (pi t_L) -> delta(P)`` distributionally. At zero detuning the
-    unnormalized factor has value ``t_L**2``.
+    with A = A_PXR + A_CBS per polarization (Feranchuk Eqs. 13/14 at omega_res),
+    t_L = L_seg/beta, and T_abs the Beer-Lambert escape factor from the segment
+    midpoint. The finite-time sinc^2 is the centered integral of ``exp(i 2 P t)``
+    over ``t_L`` (normalized-sinc convention) under a constant segment velocity
+    and amplitude; at zero detuning it is ``t_L**2``.
 
     Validation: finite-time-lineshape
 
-    n_hat: detector direction in the SAMPLE frame; overrides theta_obs_rad
-    when given (use tilted_geometry() for a tilted sample).
-    composition: [(element, n_per_Ang3), ...] for compound self-absorption;
-    defaults to the single absorber_element at the crystal's total atom
-    density (exact for elemental crystals).
+    Physical model, documented once under ``docs/physics/``:
 
-    Validation: line-absorption-tabulation
+    - escape and self-absorption from the segment midpoint, and the in-medium
+      dispersion ``k = n(omega) omega`` that both the kinematics and the
+      coherent propagation phase run on -- real part only, bulk response, so
+      grazing geometry is out of scope: radiation-physics/photon-escape-and-dispersion.md
+    - crystal orientation (``beam_uvw`` a direct-lattice axis along +z,
+      ``surface_hkl`` a reciprocal plane normal, ``recip_miscut_rad`` tilting
+      only g) and the mosaic average: geometry/transport-geometry.md,
+      materials/crystal-mosaicity.md
+    - coherent field summation, its two coherence scales, and the bounded cross-g
+      terms dropped by keeping reflections and orientations incoherent:
+      radiation-physics/coherent-emission.md
 
-    layers: optional film-on-substrate absorber stack
-    [(z_top, z_bot, composition), ...] (top/entrance first). When given, the
-    escape attenuation is the piecewise mu_i*dz_i sum across the whole stack
-    rather than the single slab; the RADIATION still comes from crystal/hkl_list
-    (the film). None -> single slab (bit-for-bit unchanged).
+    Mutually exclusive: ``coherent`` with ``components``, ``beam_uvw`` with
+    ``surface_hkl``, the Monte-Carlo mosaic with analytic ``mosaic_fwhm_eV``;
+    ``coherent`` is refused for layered absorbers.
 
-    Validation: self-absorption
-
-    Finite transverse dimensions stored on ``segments`` attenuate each photon to
-    the first of the rectangular prism's six faces along the fixed far-field
-    ``n_hat``. When both dimensions are omitted, the original z-only slab
-    attenuation branch is retained unchanged.
-
-    Validation: finite-transverse-crystal
-
-    beam_uvw: CRYSTAL AXIS along the slab normal (+z). Default None keeps the
-    construction-frame convention, i.e. [001] (the c-axis for hexagonal
-    crystals, a cube edge for cubic ones). Passing e.g. (1, 1, 1) cuts the
-    slab perpendicular to the [111] direct-lattice direction: every g in
-    hkl_list is rotated by the MINIMAL rotation taking [uvw] -> +z, then by
-    azimuth_rad about +z (the in-plane setting of the crystal relative to
-    the detector azimuth -- it matters for individual family members).
-
-    surface_hkl: reciprocal-lattice PLANE NORMAL along the slab normal (+z).
-    This is mutually exclusive with beam_uvw and is the exact cleavage-plane
-    contract for nonorthogonal crystals. The reciprocal vector is rotated by
-    the minimal proper rotation, followed by azimuth_rad about +z.
-
-    Validation: surface-hkl-orientation
-
-    recip_miscut_rad: optional (polar_rad, azim_rad) crystal miscut -- an
-    EXTRA tilt applied only to the reciprocal vectors g, leaving the
-    transported slab normal/beam_dir (set by tilted_geometry() upstream,
-    outside this function) untouched. None (default) is a strict no-op: g
-    stays aligned with the slab normal, today's behavior bit-for-bit. See
-    :func:`geometry._orientation_R`. Not wired into any grid/study yet; the
-    escape hatch for a future asymmetric reflection (g not parallel to n).
-
-    sinc_cutoff: None (default) evaluates every segment's lineshape over the
-    FULL grid (exact). A number C truncates each lineshape at
-    ``abs(P*t_L) > C``, i.e. ``abs(E-E_res) > C/a_width`` -- segments are processed in resonance-
-    sorted blocks against only the relevant grid window, which is several
-    times faster on wide grids. Tail loss is ~1/(pi C) of each line's
-    integral (0.3% at C = 100); peak heights are unaffected. Requires a
-    UNIFORM E_grid.
-
-    mosaic_fwhm_rad / mosaic_nodes: the EXACT crystal-mosaicity route
-    (docs/physics/materials/crystal-mosaicity.md (2)). None / nodes<=1 (the default) is a perfect
-    crystal -- today's single-orientation result bit-for-bit. Otherwise the
-    spectrum is incoherently averaged over crystallite orientations drawn from a
-    Gaussian mosaic of rocking-curve FWHM ``mosaic_fwhm_rad`` [rad], via a 2-D
-    Gauss-Hermite product quadrature of ``mosaic_nodes`` nodes per tilt axis (so
-    K = mosaic_nodes**2 evaluations of the per-reflection block). Unlike the
-    analytic mosaic_fwhm_eV (energy-shift only, applied at detector convolution),
-    this broadens BOTH PXR and CBS, captures the amplitude/polarization variation
-    across the cone, and yields the correct (generally asymmetric) lineshape and
-    integrated yield. Do NOT also apply the analytic term to the result (double
-    count); build_cases handles that mutual exclusion.
-
-    Validation: mosaic-mc
-
-    groove: optional GrooveSpec (montecarlo.groove) cutting the beam-entrance
-    face into a blazed sawtooth relief profile instead of a flat face. The
-    working facet is perpendicular to n_hat and the relief facet is
-    perpendicular to the beam (zero shadowing by construction), so a photon's
-    straight-line escape path along n_hat is shortened to the nearest working
-    facet rather than running the full flat-face distance z_mid/(-n_hat[2])
-    (source: elementary ray-plane intersection on a periodic sawtooth --
-    montecarlo.groove.escape_distance_ang). This ONLY replaces the escape
-    DISTANCE fed into the existing straight-ray incoherent Beer-Lambert
-    attenuation (T_abs = exp(-mu*L_esc)); the radiation amplitudes (Eqs.
-    13/14) and resonance kinematics (Eq. 10) are unchanged -- grooving is
-    purely an absorption-path effect in this v1 model.
-
-    Assumptions: profile invariant along y; photons travel straight along
-    n_hat with no wave-optics diffraction off the groove edges (consistent
-    with the rest of mc_spectrum's incoherent transport). A finite crystal
-    footprint (crystal_width_ang/crystal_height_ang) is permitted and only
-    classifies launch hit/miss in transport (hit_frac); the groove escape here
-    ignores it and treats the sawtooth as laterally periodic. At emission depth
-    z, the side-edge-affected strip has width
-    ``L_esc*cos(tp) = z*cot(tp) + O(groove spacing)``; its fractional width is
-    ``min(z*cot(tp)/crystal_width + O(groove spacing/crystal_width), 1)``.
-
-    v1 exclusions (raise ValueError rather than silently mismodeling):
-    groove with layers (single-slab absorber only); groove with n_hat[2] >= 0
-    (escape must be back out the entrance face -- the relief geometry is defined
-    for that exit only). None (default) is a strict no-op: today's flat-face
-    result bit-for-bit.
-
-    The first working-facet crossing is also the complete material path:
-    ``n_hat`` is parallel to every relief facet and points outward through the
-    working facets, so an escaped coherent photon cannot intersect a later
-    material interval. This differs from a scattered electron, whose arbitrary
-    direction can leave one facet and re-enter through another. Source: exact
-    periodic ray-plane intersections; see
-    ``docs/validation/geometry/blazed-groove-geometry.md``.
-
-    Validation: blazed-groove-geometry
-
-    The line kinematics always run on the IN-MEDIUM photon dispersion: the bulk
-    crystal dielectric response gives ``k = n(omega) omega`` with
-    ``n = sqrt(1 + chi_0)`` (materials.crystal.refractive_index), which shifts
-    the resonance denominator to ``1 - Re n (v.n_hat)`` and carries the
-    corresponding ``n`` powers into ``k.g`` and the PXR numerator's ``k^2``.
-    Only the real part is applied: ``Im n`` is the same absorption already
-    carried by the Beer-Lambert ``mu(E)`` escape factor. Bulk response only --
-    interface/Fresnel refraction is not modelled, so grazing observation
-    geometry is out of scope. There is no vacuum-dispersion switch; ``k = omega``
-    is recovered only in the physical ``chi_0 -> 0`` (high-energy) limit.
-
-    With ``coherent=True`` the segment-to-segment propagation phase rides the
-    same dispersion relation: each segment's field picks up
-    ``-delta(E) omega(E) L_esc,j`` over its in-crystal escape path, the real
-    partner of the Beer-Lambert amplitude factor already applied over that same
-    path. Refused for LAYERED absorbers, whose per-layer delta is not modelled.
-
-    Validation: xray-in-medium-resonance, xray-in-medium-propagation-phase
-
-    coherent: opt-in coherent (phased) segment sum. None/False (default) is the
-    incoherent path above, bit-for-bit. When True the spectrum is
-    ``d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |sum_j A_j Q_j e^{i phi_j}|^2``
-    -- the SAME per-segment quantities (resonance omega, complex A = A_PXR+A_CBS
-    per polarization, the finite-time factor and the escape factor) accumulated
-    as a COMPLEX field per polarization and squared at the end, rather than
-    accumulating ``|A_j|^2 * |Q_j|^2`` incoherently. Concretely, per segment the
-    complex field is
-
-        E_j(omega) = sqrt(alpha*omega/(4 pi^2 hbar c) * T_abs_j)
-                     * A_j * Q_j(omega)
-                     * exp{i[omega t_abs,j - (omega n_hat + g).r_j]},
-
-    with the UN-squared finite-time factor ``Q_j = t_L sinc(P t_L / pi)`` (whose
-    modulus-square is the incoherent ``t_L^2 sinc^2``), the emission-time phase
-    ``omega t_abs,j`` (``t_abs = t_ang + L_ang/(2 beta) + t0_ang``: midpoint
-    transport age plus the per-electron bunch offset, in Ang with c=1) and the
-    far-field retardation ``omega n_hat.r_j``. Transport keeps ``t_ang`` as
-    segment-start age for compatibility; the midpoint correction pairs time
-    with the stored midpoint position under the same constant-velocity segment
-    assumption as the finite-time factor. The reciprocal-harmonic spatial phase
-    ``g.r_j`` follows the repository's structure-factor convention
-    ``S(g)=sum F exp(+i g.R)``, whose susceptibility harmonic is
-    ``chi_g exp(-i g.r)``. The coherent sum runs WITHIN each reflection and
-    orientation; reflections/orientations still add incoherently, i.e. the
-    cross-reflection terms of ``|sum_g F_g|^2`` are DROPPED. Two independent
-    mechanisms suppress them -- spectral separation (each reflection's sinc
-    line is narrow against the harmonic spacing, so the Cauchy-Schwarz bound
-    ``2 sqrt(S_g S_g')`` collapses wherever either line is strong) and
-    reciprocal-lattice decorrelation (the residual ``exp[-i(g-g').r_j]`` phase
-    random-walks to ~``1/sqrt(n_seg)`` over midpoints spread across thousands
-    of lattice spacings, which the diagonal ``|F_g|^2`` does not carry). Over
-    the catalog's basal-plane families the dropped term bounds below ~1.6% of
-    the integrated yield, and below ~1.4e-2 at the line centres of the forward
-    harmonics that carry it; a reflection set with near-degenerate resonances
-    at the observation angle is NOT covered.
-
-    Validation: cross-reflection-coherence
-
-    Two coherence scales fall
-    out of the one sum: intra-electron
-    (segments of a trajectory) and inter-electron / superradiant (the spread of
-    ``t0_ang`` across the bunch, whose ``|<e^{i omega t0}>|^2`` is the Gaussian
-    bunch form factor ``exp[-(omega sigma_z)^2]``).
-
-    Limiting cases: coherent=False recovers the incoherent path bit-for-bit; a
-    single segment / single electron has only the self-term and is identical to
-    incoherent. A bunch much longer than the wavelength (or independently
-    scrambled per-electron ``t0``) removes inter-electron cross terms but
-    preserves each electron's intra-trajectory field,
-    ``sum_e |sum_{j in e} E_j|^2``; it equals the per-segment incoherent path
-    only when each electron contributes one segment or its internal segment
-    phases also decohere. A bunch much shorter than the wavelength phases every
-    emitter together into the ``|sum A_j|^2`` N^2-scaling limit.
-    ``bunch_length_fs=None`` (all ``t0_ang=0``) is the documented degenerate
-    pure-geometry (position-phase) limit, still physics.
-
-    ``longitudinal_rms_fs`` supplies the resolved RMS duration of a Gaussian
-    bunch. For a finite crystal footprint, the transverse launch offset also
-    changes escape attenuation, so the combined longitudinal/transverse
-    phase-only form factor does not apply. Longitudinal arrival time remains
-    independent of that geometry, however. Conditional on each sampled
-    transverse trajectory, its exact Gaussian average is
-    ``(1-F_z)*sum_e|S_e|^2 + F_z*|sum_e S_e|^2`` with
-    ``F_z=exp[-(omega*c*sigma_t)^2]``. Here each ``S_e`` retains its actual
-    transverse phase and finite-prism attenuation. Thus short bunches retain
-    inter-electron enhancement, while long bunches reduce continuously to the
-    grouped floor. An additional ensemble average over transverse bunch
-    realizations remains outside this conditional result.
-
-    coherent is mutually exclusive with components (the PXR/CBS split is
-    ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
+    Validation: line-absorption-tabulation, self-absorption,
+    finite-transverse-crystal, blazed-groove-geometry, xray-in-medium-resonance,
+    xray-in-medium-propagation-phase, surface-hkl-orientation, mosaic-mc,
+    cross-reflection-coherence
 
     Parameters
     ----------
@@ -2232,37 +2012,31 @@ def mc_spectrum(
         One-dimensional line photon-energy grid in eV.
     crystal, hkl_list
         Catalog crystal key and reciprocal reflections to sum.
-    theta_obs_rad
-        Polar observation angle in radians, used when ``n_hat`` is absent.
-    B_ang2
-        Required isotropic Debye--Waller ``B`` factor in square angstroms.
-    use_henke
-        Include anomalous energy-dependent atomic form factors.
+    theta_obs_rad, n_hat
+        Polar observation angle [rad], or a sample-frame direction overriding it.
+    B_ang2, use_henke
+        Required isotropic Debye--Waller ``B`` factor in square angstroms, and
+        whether to include anomalous energy-dependent atomic form factors.
     absorber_element, composition
         Elemental or compound self-absorption description.
     chunk
         Maximum transport segments processed per spectrum chunk.
-    n_hat
-        Optional three-component observation direction in the sample frame.
     beam_uvw, surface_hkl, azimuth_rad, recip_miscut_rad
-        Crystal-orientation controls. Direct-axis and surface-normal controls
-        are mutually exclusive.
+        Crystal-orientation controls.
     sinc_cutoff
         Optional dimensionless finite-time tail cutoff; ``None`` is exact.
     components
         Return separate PXR and CBS diagonal contributions with the total.
-    layers
-        Optional film-first absorber stack.
     mosaic_fwhm_rad, mosaic_nodes
         Mosaic rocking-curve FWHM and quadrature nodes per tilt axis.
-    groove
-        Optional supported blazed-groove escape geometry.
+    layers, groove
+        Optional film-first absorber stack, and optional blazed-groove escape
+        geometry for the beam-entrance face.
     coherent
         Sum segment fields coherently instead of segment intensities.
-    electron_limit
-        Optional leading macro-electron count used for normalization.
-    E_cut_keV
-        Optional post-transport electron-energy cutoff in keV.
+    electron_limit, E_cut_keV
+        Optional leading macro-electron count used for normalization, and
+        optional post-transport electron-energy cutoff in keV.
     longitudinal_rms_fs
         Resolved Gaussian RMS bunch duration for analytic coherent averaging.
 
@@ -2270,8 +2044,8 @@ def mc_spectrum(
     -------
     numpy.ndarray or tuple of numpy.ndarray
         Per-electron density in photons per eV per sr. With ``components=True``,
-        returns total, PXR-diagonal, and CBS-diagonal arrays; the latter two do
-        not include their interference term.
+        total, PXR-diagonal and CBS-diagonal arrays; the latter two exclude
+        their interference term.
 
     Raises
     ------
