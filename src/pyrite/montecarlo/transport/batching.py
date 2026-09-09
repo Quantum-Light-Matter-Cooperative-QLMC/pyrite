@@ -336,6 +336,121 @@ def _batch_electrons(e, cap, Ne, config):
     return n
 
 
+def _drive_per_electron_batches(
+    core,
+    core_args,
+    xp,
+    Ne,
+    max_segments,
+    energy_model_code,
+    d_keys,
+    d_pos,
+    d_dirs,
+    d_E,
+    d_clock,
+    d_stragg,
+    straggling_args,
+    out_bufs,
+    to_host,
+    config,
+    keep_on_device,
+):
+    """Run capacity-replayed batches for either exact or LUT transport."""
+    from ..runner import _nsys_pop, _nsys_push
+
+    midpoint = energy_model_code == 1
+    batches = []
+    cap = max(1, int(config.seg_capacity))
+    seen_max = 0
+    nseg = 0
+    n_back = n_trans = n_side = n_cutoff = n_step_limited = 0
+    e = 0
+    while e < Ne:
+        m = _batch_electrons(e, cap, Ne, config)
+        sl = slice(e, e + m)
+        # The core mutates these arrays in place. Counter-addressed streams make
+        # restoring this snapshot sufficient for an exact capacity replay.
+        snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
+
+        while True:
+            _nsys_push("cxr.transport.scratch")
+            scratch = _alloc_scratch(xp, m, cap, midpoint)
+            seg_count = xp.zeros(m, dtype=xp.int64)
+            exit_code = xp.zeros(m, dtype=xp.int8)
+            _nsys_pop()
+            _nsys_push("cxr.transport.launch")
+            core(
+                (e, m, cap, d_keys),
+                *core_args,
+                scratch,
+                (seg_count, exit_code),
+                straggling_args,
+            )
+            _nsys_pop()
+
+            # CUDA launches asynchronously; this scalar read is the device sync.
+            _nsys_push("cxr.transport.capsync")
+            needed = int(seg_count.max())
+            _nsys_pop()
+            seen_max = max(seen_max, needed)
+            if needed <= cap:
+                break
+            cap = _capacity_for(seen_max, config)
+            d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
+            m = _batch_electrons(e, cap, Ne, config)
+            sl = slice(e, e + m)
+            snap = tuple(a[:m] for a in snap)
+
+        total = int(seg_count.sum())
+        if nseg + total > max_segments:
+            raise RuntimeError("segment buffer exhausted")
+        _nsys_push("cxr.transport.compact")
+        keep = xp.arange(cap)[None, :] < seg_count[:, None]
+        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch[:7]
+        slots = (
+            s_dir.reshape(m, cap, 3),
+            s_mid.reshape(m, cap, 3),
+            s_len.reshape(m, cap),
+            s_E.reshape(m, cap),
+            s_t0.reshape(m, cap),
+            s_id.reshape(m, cap),
+            s_lay.reshape(m, cap),
+        )
+        if midpoint:
+            slots += tuple(a.reshape(m, cap) for a in scratch[7:])
+        if keep_on_device:
+            batches.append(tuple(a[keep] for a in slots))
+        else:
+            dst = slice(nseg, nseg + total)
+            for buf, a in zip(out_bufs, slots, strict=True):
+                buf[dst] = to_host(a[keep])
+        nseg += total
+        _nsys_pop()
+
+        _nsys_push("cxr.transport.exitcodes")
+        n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
+        n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
+        n_side += int((exit_code == EXIT_SIDE).sum())
+        n_cutoff += int((exit_code == EXIT_CUTOFF_STOPPED).sum())
+        n_step_limited += int((exit_code == EXIT_STEP_LIMITED).sum())
+        _nsys_pop()
+        e += m
+        if seen_max > 0:
+            cap = _capacity_for(seen_max, config)
+
+    joined = None
+    if keep_on_device:
+        _nsys_push("cxr.transport.join")
+        empty = _alloc_scratch(xp, 0, 1, midpoint)
+        joined = tuple(
+            xp.concatenate([b[i] for b in batches]) if batches else empty[i]
+            for i in range(len(out_bufs))
+        )
+        _nsys_pop()
+
+    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
+
+
 def _run_per_electron_transport_lut(
     core,
     xp,
@@ -442,103 +557,29 @@ def _run_per_electron_transport_lut(
     state = (d_alive, d_clock, d_pos, d_dirs, d_E, d_E_cut)
     straggling_args = (straggle_on, d_stragg)
 
-    midpoint = energy_model_code == 1
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
-    if midpoint:
+    if energy_model_code == 1:
         out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep)
-    batches = []
-
-    cap = max(1, int(config.seg_capacity))
-    seen_max = 0
-    nseg = 0
-    n_back = n_trans = n_side = n_cutoff = n_step_limited = 0
-    e = 0
-    while e < Ne:
-        m = _batch_electrons(e, cap, Ne, config)
-        sl = slice(e, e + m)
-        snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
-
-        while True:
-            _nsys_push("cxr.transport.scratch")
-            scratch = _alloc_scratch(xp, m, cap, midpoint)
-            seg_count = xp.zeros(m, dtype=xp.int64)
-            exit_code = xp.zeros(m, dtype=xp.int8)
-            _nsys_pop()
-            _nsys_push("cxr.transport.launch")
-            core(
-                (e, m, cap, d_keys),
-                control,
-                geometry,
-                lut_args,
-                d_stragg_layers,
-                state,
-                scratch,
-                (seg_count, exit_code),
-                straggling_args,
-            )
-            _nsys_pop()
-
-            _nsys_push("cxr.transport.capsync")
-            needed = int(seg_count.max())
-            _nsys_pop()
-            seen_max = max(seen_max, needed)
-            if needed <= cap:
-                break
-            cap = _capacity_for(seen_max, config)
-            d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
-            m = _batch_electrons(e, cap, Ne, config)
-            sl = slice(e, e + m)
-            snap = tuple(a[:m] for a in snap)
-
-        total = int(seg_count.sum())
-        if nseg + total > max_segments:
-            raise RuntimeError("segment buffer exhausted")
-        _nsys_push("cxr.transport.compact")
-        keep = xp.arange(cap)[None, :] < seg_count[:, None]
-        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch[:7]
-        slots = (
-            s_dir.reshape(m, cap, 3),
-            s_mid.reshape(m, cap, 3),
-            s_len.reshape(m, cap),
-            s_E.reshape(m, cap),
-            s_t0.reshape(m, cap),
-            s_id.reshape(m, cap),
-            s_lay.reshape(m, cap),
-        )
-        if midpoint:
-            slots += tuple(a.reshape(m, cap) for a in scratch[7:])
-        if keep_on_device:
-            batches.append(tuple(a[keep] for a in slots))
-        else:
-            dst = slice(nseg, nseg + total)
-            for buf, a in zip(out_bufs, slots, strict=True):
-                buf[dst] = to_host(a[keep])
-        nseg += total
-        _nsys_pop()
-
-        _nsys_push("cxr.transport.exitcodes")
-        n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
-        n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
-        n_side += int((exit_code == EXIT_SIDE).sum())
-        n_cutoff += int((exit_code == EXIT_CUTOFF_STOPPED).sum())
-        n_step_limited += int((exit_code == EXIT_STEP_LIMITED).sum())
-        _nsys_pop()
-        e += m
-
-        if seen_max > 0:
-            cap = _capacity_for(seen_max, config)
-
-    joined = None
-    if keep_on_device:
-        _nsys_push("cxr.transport.join")
-        empty = _alloc_scratch(xp, 0, 1, midpoint)
-        joined = tuple(
-            xp.concatenate([b[i] for b in batches]) if batches else empty[i]
-            for i in range(len(out_bufs))
-        )
-        _nsys_pop()
-
-    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
+    core_args = (control, geometry, lut_args, d_stragg_layers, state)
+    return _drive_per_electron_batches(
+        core,
+        core_args,
+        xp,
+        Ne,
+        max_segments,
+        energy_model_code,
+        d_keys,
+        d_pos,
+        d_dirs,
+        d_E,
+        d_clock,
+        d_stragg,
+        straggling_args,
+        out_bufs,
+        to_host,
+        config,
+        keep_on_device,
+    )
 
 
 def _run_per_electron_transport(
@@ -661,120 +702,29 @@ def _run_per_electron_transport(
     state = (d_alive, d_clock, d_pos, d_dirs, d_E, d_E_cut)
     straggling_args = (straggle_on, d_stragg)
 
-    midpoint = energy_model_code == 1
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
-    if midpoint:
+    if energy_model_code == 1:
         out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep)
-    batches = []
-
-    cap = max(1, int(config.seg_capacity))
-    seen_max = 0
-    nseg = 0
-    n_back = n_trans = n_side = n_cutoff = n_step_limited = 0
-    e = 0
-    while e < Ne:
-        m = _batch_electrons(e, cap, Ne, config)
-        sl = slice(e, e + m)
-        # The core advances position/direction/energy/clock in place, so a
-        # capacity replay has to start from the same state it did.
-        snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
-
-        while True:
-            _nsys_push("cxr.transport.scratch")
-            scratch = _alloc_scratch(xp, m, cap, midpoint)
-            seg_count = xp.zeros(m, dtype=xp.int64)
-            exit_code = xp.zeros(m, dtype=xp.int8)
-            _nsys_pop()
-            _nsys_push("cxr.transport.launch")
-            core(
-                (e, m, cap, d_keys),
-                control,
-                geometry,
-                d_materials,
-                d_mott,
-                state,
-                scratch,
-                (seg_count, exit_code),
-                straggling_args,
-            )
-            _nsys_pop()
-            # Split from the launch above because on CUDA the launch returns
-            # immediately: this read is where the batch's kernel time actually
-            # lands, so `launch` is host-side dispatch cost and `capsync` is the
-            # device.
-            _nsys_push("cxr.transport.capsync")
-            needed = int(seg_count.max())
-            _nsys_pop()
-            seen_max = max(seen_max, needed)
-            if needed <= cap:
-                break
-            # Replay: the streams are counter-addressed, so the retry reproduces
-            # the discarded run exactly rather than resampling it. `needed` is the
-            # true count, not a truncated one, so one replay always suffices; the
-            # headroom is for the batches after this one.
-            cap = _capacity_for(seen_max, config)
-            d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
-            m = _batch_electrons(e, cap, Ne, config)
-            sl = slice(e, e + m)
-            snap = tuple(a[:m] for a in snap)
-
-        total = int(seg_count.sum())
-        if nseg + total > max_segments:
-            raise RuntimeError("segment buffer exhausted")
-        _nsys_push("cxr.transport.compact")
-        keep = xp.arange(cap)[None, :] < seg_count[:, None]
-        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch[:7]
-        slots = (
-            s_dir.reshape(m, cap, 3),
-            s_mid.reshape(m, cap, 3),
-            s_len.reshape(m, cap),
-            s_E.reshape(m, cap),
-            s_t0.reshape(m, cap),
-            s_id.reshape(m, cap),
-            s_lay.reshape(m, cap),
-        )
-        if midpoint:
-            slots += tuple(a.reshape(m, cap) for a in scratch[7:])
-        if keep_on_device:
-            # No preallocation here: `max_segments` is Ne*max_steps rows, a bound
-            # no run comes near and no device would hold. The batch list is the
-            # buffer, and the join below sizes the output from what actually ran.
-            batches.append(tuple(a[keep] for a in slots))
-        else:
-            dst = slice(nseg, nseg + total)
-            for buf, a in zip(out_bufs, slots, strict=True):
-                buf[dst] = to_host(a[keep])
-        nseg += total
-        _nsys_pop()
-
-        _nsys_push("cxr.transport.exitcodes")
-        n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
-        n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
-        n_side += int((exit_code == EXIT_SIDE).sum())
-        n_cutoff += int((exit_code == EXIT_CUTOFF_STOPPED).sum())
-        n_step_limited += int((exit_code == EXIT_STEP_LIMITED).sum())
-        _nsys_pop()
-        e += m
-
-        # Re-size from what electrons actually needed rather than from the guess,
-        # in both directions: a tighter `cap` buys a proportionally larger batch
-        # out of the same byte budget.
-        if seen_max > 0:
-            cap = _capacity_for(seen_max, config)
-
-    joined = None
-    if keep_on_device:
-        _nsys_push("cxr.transport.join")
-        # An empty run has no batch to take shapes and dtypes from; borrow them
-        # from a zero-length scratch, which is where they came from anyway.
-        empty = _alloc_scratch(xp, 0, 1, midpoint)
-        joined = tuple(
-            xp.concatenate([b[i] for b in batches]) if batches else empty[i]
-            for i in range(len(out_bufs))
-        )
-        _nsys_pop()
-
-    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined, to_host(d_stragg)
+    core_args = (control, geometry, d_materials, d_mott, state)
+    return _drive_per_electron_batches(
+        core,
+        core_args,
+        xp,
+        Ne,
+        max_segments,
+        energy_model_code,
+        d_keys,
+        d_pos,
+        d_dirs,
+        d_E,
+        d_clock,
+        d_stragg,
+        straggling_args,
+        out_bufs,
+        to_host,
+        config,
+        keep_on_device,
+    )
 
 
 def _alloc_scratch(xp, m, cap, midpoint=False):

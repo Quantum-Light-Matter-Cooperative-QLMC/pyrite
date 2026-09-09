@@ -101,7 +101,7 @@ Axis 3 — ungrooved vs grooved (lockstep only):
   docs/repo-design/compute/straggled-transport-integration.md) are preserved
   verbatim in the merged body.
 
-## Handoff state (M2 done, paused before M4)
+## Handoff state (M2 and M5 done, paused before M4)
 
 Verified: all 20 goldens reproduce bit-for-bit, and the focused transport
 tests pass (165 passed, 21 CUDA-hardware skipped: test_groove,
@@ -151,8 +151,13 @@ M2 grouped-parameter refactor is applied everywhere:
   core dispatch; LUT geometry swaps in `transport_lut.n_el`.
 - `tests/montecarlo/test_groove.py`: direct `_transport_core_grooved` call
   regrouped.
+- `batching.py`: exact and LUT entry points retain their distinct upload/table
+  preparation, then pass prebuilt kernel groups through one
+  `_drive_per_electron_batches` implementation for capacity replay, compaction,
+  exit-code accounting, and optional device joining. Focused tests and all 20
+  goldens pass bit-for-bit after the hoist.
 
-Remaining: M4 (factory), M5 (batching.py driver hoist), M6 (full checks incl.
+Remaining: M4 (factory), M6 (full checks incl.
 `test-suite core`, `--numba`, `pyrite-dev verify`, duplicate-window scan
 139 -> <20, physics-ledger-auditor). See issue #66 acceptance for thresholds.
 
@@ -166,5 +171,5 @@ Verify commands:
 - [x] M0 baselines, M1 goldens
 - [x] M2 grouped parameter tuples on all 5 kernels; goldens hold
 - [ ] M4 factory generates all 4 (+5th) kernels; goldens hold
-- [ ] M5 batching.py per-electron driver hoist
+- [x] M5 batching.py per-electron driver hoist
 - [ ] M6 full checks: core suite, --numba, verify, perf, dup scan, ledger audit
