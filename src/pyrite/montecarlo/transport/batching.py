@@ -415,6 +415,33 @@ def _run_per_electron_transport_lut(
     d_stragg = to_dev(stragg_dE)
     _nsys_pop()
 
+    # Grouped kernel argument tuples (issue #66), built once and passed through;
+    # the core never constructs them. ``scratch`` IS the segments tuple.
+    control = (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac)
+    geometry = (
+        n_layers,
+        d_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        d_nel,
+        d_top,
+        d_bot,
+    )
+    lut_args = (
+        lut.E_min_keV,
+        lut.inv_dE_keV,
+        lut.n_energy,
+        d_total_rate,
+        d_dEds,
+        d_inv_beta,
+        d_cdf,
+        d_alpha,
+    )
+    state = (d_alive, d_clock, d_pos, d_dirs, d_E, d_E_cut)
+    straggling_args = (straggle_on, d_stragg)
+
     midpoint = energy_model_code == 1
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     if midpoint:
@@ -439,43 +466,15 @@ def _run_per_electron_transport_lut(
             _nsys_pop()
             _nsys_push("cxr.transport.launch")
             core(
-                e,
-                m,
-                cap,
-                d_keys,
-                d_alive,
-                max_steps,
-                n_layers,
-                d_bounds,
-                elastic_model_code,
-                energy_model_code,
-                max_dE_frac,
-                z_total,
-                finite_footprint,
-                width_ang,
-                height_ang,
-                d_clock,
-                d_pos,
-                d_dirs,
-                d_E_cut,
-                d_nel,
-                d_top,
-                d_bot,
-                lut.E_min_keV,
-                lut.inv_dE_keV,
-                lut.n_energy,
-                d_total_rate,
-                d_dEds,
-                d_inv_beta,
-                d_cdf,
-                d_alpha,
-                d_E,
-                *scratch,
-                seg_count,
-                exit_code,
-                *d_stragg_layers,
-                straggle_on,
-                d_stragg,
+                (e, m, cap, d_keys),
+                control,
+                geometry,
+                lut_args,
+                d_stragg_layers,
+                state,
+                scratch,
+                (seg_count, exit_code),
+                straggling_args,
             )
             _nsys_pop()
 
@@ -644,6 +643,24 @@ def _run_per_electron_transport(
     d_stragg = to_dev(stragg_dE)
     _nsys_pop()
 
+    # Grouped kernel argument tuples (issue #66), built once and passed through;
+    # the core never constructs them. ``scratch`` IS the segments tuple.
+    control = (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac)
+    geometry = (
+        n_layers,
+        d_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        d_layers[11],
+        d_top,
+        d_bot,
+    )
+    d_materials = d_layers[:11]
+    state = (d_alive, d_clock, d_pos, d_dirs, d_E, d_E_cut)
+    straggling_args = (straggle_on, d_stragg)
+
     midpoint = energy_model_code == 1
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     if midpoint:
@@ -670,35 +687,15 @@ def _run_per_electron_transport(
             _nsys_pop()
             _nsys_push("cxr.transport.launch")
             core(
-                e,
-                m,
-                cap,
-                d_keys,
-                d_alive,
-                max_steps,
-                n_layers,
-                d_bounds,
-                elastic_model_code,
-                energy_model_code,
-                max_dE_frac,
-                z_total,
-                finite_footprint,
-                width_ang,
-                height_ang,
-                d_clock,
-                d_pos,
-                d_dirs,
-                d_E_cut,
-                *d_layers,
-                d_top,
-                d_bot,
-                *d_mott,
-                d_E,
-                *scratch,
-                seg_count,
-                exit_code,
-                straggle_on,
-                d_stragg,
+                (e, m, cap, d_keys),
+                control,
+                geometry,
+                d_materials,
+                d_mott,
+                state,
+                scratch,
+                (seg_count, exit_code),
+                straggling_args,
             )
             _nsys_pop()
             # Split from the launch above because on CUDA the launch returns

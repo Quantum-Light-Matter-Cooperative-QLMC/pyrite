@@ -29,53 +29,54 @@ DEFAULT_TRANSPORT_KERNEL_CONFIG = TransportKernelConfig()
 
 
 def run_transport_lut_kernel(
-    e_start,
-    e_count,
-    cap,
-    stream_key,
-    alive,
-    max_steps,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    clock,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_nel,
-    L_top,
-    L_bot,
-    lut_E_min_keV,
-    lut_inv_dE_keV,
-    lut_n_energy,
-    lut_total_rate,
-    lut_dEds,
-    lut_inv_beta,
-    lut_cdf,
-    lut_alpha,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    seg_count,
-    exit_code,
+    run,
+    control,
+    geometry,
+    lut,
+    state,
+    segments,
+    pe_out,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
 ):
     """Launch the energy-LUT transport kernel."""
+    (e_start, e_count, cap, stream_key) = run
+    (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        lut_E_min_keV,
+        lut_inv_dE_keV,
+        lut_n_energy,
+        lut_total_rate,
+        lut_dEds,
+        lut_inv_beta,
+        lut_cdf,
+        lut_alpha,
+    ) = lut
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (seg_count, exit_code) = pe_out
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
@@ -142,72 +143,30 @@ def make_cuda_transport_lut_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
     """Return the LUT CUDA core and CuPy array module for the shared driver."""
 
     def core(*args):
-        # Shared driver (_run_per_electron_transport_lut) appends the
-        # straggling params (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross,
-        # straggle_on, stragg_dE) for the CPU LUT core
-        # (_transport_core_ungrooved_perelectron_lut); the CUDA LUT kernel
-        # has no straggling support (see api.py's NotImplementedError for
-        # straggle_on=True on this path), so drop them before forwarding.
-        run_transport_lut_kernel(*args[:-7], config=config)
+        # Shared driver (_run_per_electron_transport_lut) also passes the CPU
+        # LUT core (_transport_core_ungrooved_perelectron_lut) its straggling
+        # extras -- the exact per-element ``materials`` tables and the
+        # ``straggling`` group; the CUDA LUT kernel has no straggling support
+        # (see api.py's NotImplementedError for straggle_on=True on this path),
+        # so drop them before forwarding.
+        run, control, geometry, lut, _materials, state, segments, pe_out, _straggling = args
+        run_transport_lut_kernel(
+            run, control, geometry, lut, state, segments, pe_out, config=config
+        )
 
     return core, xp
 
 
 def run_transport_kernel(
-    e_start,
-    e_count,
-    cap,
-    stream_key,
-    alive,
-    max_steps,
-    n_layers,
-    internal_bounds,
-    elastic_model_code,
-    energy_model_code,
-    max_dE_frac,
-    z_total,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    clock,
-    pos,
-    dirs,
-    E_cut_by_electrons,
-    L_Js,
-    L_Zs,
-    L_ks,
-    L_coeffs,
-    L_E_cross,
-    L_ncm3,
-    L_sr_rate_numer,
-    L_mott_numer,
-    L_mott_denom1,
-    L_mott_denom2,
-    L_sr_joy_numer,
-    L_nel,
-    L_top,
-    L_bot,
-    mott_has_table,
-    mott_start,
-    mott_len,
-    mott_logE_flat,
-    mott_logA_flat,
-    E_keV,
-    seg_dir,
-    seg_mid,
-    seg_len,
-    seg_E,
-    seg_t0,
-    seg_id,
-    seg_lay,
-    seg_E_end,
-    seg_t_end,
-    seg_flight,
-    seg_substep,
-    seg_count,
-    exit_code,
-    straggle_on,
-    stragg_dE,
+    run,
+    control,
+    geometry,
+    materials,
+    mott,
+    state,
+    segments,
+    pe_out,
+    straggling,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.
@@ -235,6 +194,49 @@ def run_transport_kernel(
     agreement. Direct parity of the first applied loss remains an anchor gap:
     the current first-row test compares row-start ``E_keV``, not ``E_end_keV``.
     """
+    (e_start, e_count, cap, stream_key) = run
+    (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
+    (
+        n_layers,
+        internal_bounds,
+        z_total,
+        finite_footprint,
+        width_ang,
+        height_ang,
+        L_nel,
+        L_top,
+        L_bot,
+    ) = geometry
+    (
+        L_Js,
+        L_Zs,
+        L_ks,
+        L_coeffs,
+        L_E_cross,
+        L_ncm3,
+        L_sr_rate_numer,
+        L_mott_numer,
+        L_mott_denom1,
+        L_mott_denom2,
+        L_sr_joy_numer,
+    ) = materials
+    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+    (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
+    (
+        seg_dir,
+        seg_mid,
+        seg_len,
+        seg_E,
+        seg_t0,
+        seg_id,
+        seg_lay,
+        seg_E_end,
+        seg_t_end,
+        seg_flight,
+        seg_substep,
+    ) = segments
+    (seg_count, exit_code) = pe_out
+    (straggle_on, stragg_dE) = straggling
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
