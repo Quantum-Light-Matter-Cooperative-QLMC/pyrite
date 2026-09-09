@@ -17,6 +17,7 @@ from pyrite.materials.crystal import (
     reciprocal_g_vector,
     refractive_index,
 )
+from pyrite.montecarlo import mc_spectrum
 from pyrite.montecarlo.spectrum.lines import (
     SpectrumRequest,
     _accumulate_batched,
@@ -250,6 +251,29 @@ def test_the_two_routes_agree_on_a_case_both_can_run():
     assert peak > 0.0
     np.testing.assert_allclose(
         batched.spec, per_hkl.spec, rtol=BATCH_RTOL, atol=BATCH_RTOL * 1e-2 * peak
+    )
+
+
+def test_batched_route_supports_non_henke_form_factors():
+    """The non-anomalous form-factor option reaches the batched route."""
+    batched = mc_spectrum(
+        _segments(), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, n_hat=N_HAT, use_henke=False
+    )
+    per_hkl = mc_spectrum(
+        _segments(),
+        E_GRID,
+        CRYSTAL,
+        [HKL],
+        B_ang2=B_ANG2,
+        n_hat=N_HAT,
+        use_henke=False,
+        sinc_cutoff=1.0e6,
+    )
+
+    peak = float(max(batched.max(), per_hkl.max()))
+    assert peak > 0.0
+    np.testing.assert_allclose(
+        batched, per_hkl, rtol=BATCH_RTOL, atol=BATCH_RTOL * 1e-2 * peak
     )
 
 
