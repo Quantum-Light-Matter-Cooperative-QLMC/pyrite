@@ -242,6 +242,21 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+# Detector-response operators are owned by ``detectors``. The Monte Carlo
+# facade preserves their historical exports lazily, so no static transport code
+# may regain a direct dependency on the detector package.
+[[tool.importlinter.contracts]]
+id = "montecarlo-imports-no-detectors"
+name = "Monte Carlo imports no detector package"
+type = "forbidden"
+source_modules = [
+    "pyrite.montecarlo",
+]
+forbidden_modules = [
+    "pyrite.detectors",
+]
+allow_indirect_imports = true
+
 [[tool.importlinter.contracts]]
 id = "material-leaves-stay-independent"
 name = "Material leaves do not import higher material modules"

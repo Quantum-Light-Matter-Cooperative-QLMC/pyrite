@@ -3,6 +3,7 @@
 from importlib import import_module
 from types import ModuleType
 
+from .response import convolve_detector, detector_efficiency
 from .spec import Detector, DetectorResponse, DetectorSpec, EagleXO, EnergyBins, LegacyEDS, Timepix3
 
 __all__ = [
@@ -13,6 +14,8 @@ __all__ = [
     "EnergyBins",
     "LegacyEDS",
     "Timepix3",
+    "convolve_detector",
+    "detector_efficiency",
     "eaglexo_response",
     "grating",
     "timepix_response",

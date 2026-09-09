@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from pyrite._module_deprecations import MODULE_DEPRECATIONS, _window
+from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS, _window
 
 
 def _announces_deprecation(tree: ast.Module) -> bool:
@@ -88,6 +88,13 @@ def test_module_deprecation_support_window() -> None:
         # The paths were carved out in 0.2.0 but stayed silent until 0.3.0 wired
         # `warn_module_deprecation`, so 0.3.0 is the release the window counts
         # from -- a path that never warned has not spent its window (#68).
+        assert entry.deprecated_in == "0.3.0"
+
+
+def test_public_export_deprecation_support_window() -> None:
+    for (module, name), entry in PUBLIC_EXPORT_DEPRECATIONS.items():
+        assert (entry.module, entry.name) == (module, name)
+        assert entry.remove_in == _window(entry.deprecated_in)
         assert entry.deprecated_in == "0.3.0"
 
 

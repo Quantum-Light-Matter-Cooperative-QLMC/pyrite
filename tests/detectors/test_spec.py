@@ -5,8 +5,15 @@ from dataclasses import FrozenInstanceError, asdict
 import numpy as np
 import pytest
 
-from pyrite.detectors import Detector, DetectorSpec, EnergyBins, LegacyEDS, Timepix3
-from pyrite.montecarlo import convolve_detector, detector_efficiency
+from pyrite.detectors import (
+    Detector,
+    DetectorSpec,
+    EnergyBins,
+    LegacyEDS,
+    Timepix3,
+    convolve_detector,
+    detector_efficiency,
+)
 
 
 def test_detector_is_frozen_and_owns_acceptance_binning_and_response():
