@@ -23,7 +23,7 @@ import sys
 
 import click
 
-from ...apps._acp import running_acp
+from ..._acp import running_acp
 from ...paths import app_dir
 from .. import _core as _cli_core
 

@@ -11,6 +11,7 @@ import sys
 import pytest
 from click.testing import CliRunner
 
+from pyrite import _app_defaults
 from pyrite.apps import analyze
 from pyrite.cli.commands import app_analysis as analyze_cli
 from pyrite.materials import CATALOG
@@ -339,21 +340,21 @@ def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):
 
 
 def test_default_material_round_trip(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     assert analyze.get_default_material() is None  # never written yet
     analyze.set_default_material("mose2")
     assert analyze.get_default_material() == "mose2"
 
 
 def test_default_material_missing_file_returns_none(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / "does-not-exist")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / "does-not-exist")
     assert analyze.get_default_material() is None
 
 
 def test_default_material_empty_file_returns_none(tmp_path, monkeypatch):
     f = tmp_path / ".pyrite-analyze-default"
     f.write_text("   \n")
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", f)
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", f)
     assert analyze.get_default_material() is None
 
 
@@ -365,7 +366,7 @@ def _invoke(argv=()):
 
 
 def test_default_flag_without_material_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     result = _invoke(["-d"])
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -373,7 +374,7 @@ def test_default_flag_without_material_errors(tmp_path, monkeypatch):
 
 
 def test_unknown_material_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     result = _invoke(["not-a-real-material"])
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -381,7 +382,7 @@ def test_unknown_material_errors(tmp_path, monkeypatch):
 
 
 def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze_cli,
@@ -396,7 +397,7 @@ def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
 
 
 def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     analyze.set_default_material("hbn")
     launched = {}
     monkeypatch.setattr(
@@ -411,7 +412,7 @@ def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
 
 
 def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze_cli,
@@ -427,7 +428,7 @@ def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
 
 
 def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     monkeypatch.setattr(analyze_cli, "_launch", lambda material, **kw: None)
     result = _invoke(["wse2"])
     assert result.exit_code == 0
@@ -491,7 +492,7 @@ def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(mon
 
 
 def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze_cli, "_launch", lambda material, **kw: launched.update(material=material, **kw)
@@ -520,7 +521,7 @@ def test_command_no_token_omitted_by_default():
 
 
 def test_no_token_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
-    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
+    monkeypatch.setattr(_app_defaults, "ANALYSIS_DEFAULT_FILE", tmp_path / ".pyrite-analyze-default")
     launched = {}
     monkeypatch.setattr(
         analyze_cli, "_launch", lambda material, **kw: launched.update(material=material, **kw)

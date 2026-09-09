@@ -44,41 +44,45 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 ```text
 Components (a + b denotes a static import cycle):
   p0: _entry
-  p1: apps + checkpoints + cli + energy_grid + remote + runs + validation
+  p1: apps
   p2: campaign + results
-  p3: detectors
-  p4: devtools
-  p5: instrument
-  p6: materials
-  p7: montecarlo
-  p8: perf
-  p9: plots
+  p3: checkpoints + cli + energy_grid + remote + runs + validation
+  p4: detectors
+  p5: devtools
+  p6: instrument
+  p7: materials
+  p8: montecarlo
+  p9: perf
+  p10: plots
 Edges (importer -> imported):
-  p0 -> p1
-  p0 -> p6
+  p0 -> p3
+  p0 -> p7
+  p1 -> p10
   p1 -> p2
   p1 -> p3
-  p1 -> p5
-  p1 -> p6
   p1 -> p7
-  p1 -> p8
-  p1 -> p9
-  p2 -> p3
-  p2 -> p5
+  p10 -> p2
+  p10 -> p4
+  p10 -> p7
+  p10 -> p8
+  p2 -> p4
   p2 -> p6
   p2 -> p7
+  p2 -> p8
+  p3 -> p2
+  p3 -> p4
   p3 -> p6
-  p4 -> p1
-  p4 -> p2
-  p4 -> p9
+  p3 -> p7
+  p3 -> p8
+  p3 -> p9
+  p4 -> p7
+  p5 -> p10
+  p5 -> p2
   p5 -> p3
-  p5 -> p6
-  p7 -> p5
-  p7 -> p6
-  p9 -> p2
-  p9 -> p3
-  p9 -> p6
-  p9 -> p7
+  p6 -> p4
+  p6 -> p7
+  p8 -> p6
+  p8 -> p7
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -224,6 +228,24 @@ checkpoint drivers. Owns atomic compact-JSON replacement without importing a
 driver package.
 - Internal: `_ProgressTimer`, `_write_progress_record`.
 - Deps: none (stdlib only).
+
+### `_app_defaults.py`
+Persisted "which material does the app start on" state for the analysis and
+viewer marimo apps: one one-line file per app under `paths.state_dir()`. Sits
+below both sides that read it — the launchers in `cli/commands/` and the
+notebook helpers in `apps/` — so neither package has to import the other.
+- Public: `get_analysis_default`, `set_analysis_default`, `get_viewer_default`,
+  `set_viewer_default`; module-global `ANALYSIS_DEFAULT_FILE`,
+  `VIEWER_DEFAULT_FILE` are the test seam.
+- Deps: `paths`.
+
+### `_acp.py`
+Optional local ACP bridge lifecycle (Claude and Codex stdio-to-WebSocket
+adapters) for marimo developer sessions. Lives at the package root, not under
+`apps/`, because nothing in `apps/` uses it: the callers are the app launchers
+in `cli/commands/` and `pyrite-dev acp-up`/`acp-down`.
+- Public: `running_acp`, `start_acp_servers`, `stop_acp_servers`, `ACP_SERVERS`.
+- Deps: `paths`.
 
 ### `_backend.py`
 Portable array backend shared by every device-dispatching kernel: NumPy,
@@ -934,9 +956,10 @@ keeps a compatibility fallback for older branches.
 
 ### `apps/analyze.py`
 Notebook support for `src/pyrite/apps/analysis_app.py`: checkpoint loading,
-menu building, emission selection, and persisted initial-material state. Free
-of CLI imports so the notebook can load it on its own; the launcher lives in
-`cli/commands/app_analysis.py`.
+menu building, emission selection, and the initial-material precedence rule.
+Free of CLI imports so the notebook can load it on its own; the launcher lives
+in `cli/commands/app_analysis.py` and the persisted default both sides read
+lives in `_app_defaults.py`.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
   `emission_menu`, `pick_spectrum`, `apply_emission`, `checkpoint_stem`,
   `analysis_checkpoint_manifest`, `load_analysis_checkpoint`, `cached_analysis`,
@@ -950,9 +973,11 @@ of CLI imports so the notebook can load it on its own; the launcher lives in
 
 ### `apps/viewer.py`
 Notebook support for `src/pyrite/apps/trace_app.py`: the pure initial-material
-precedence rule and its persisted default. Free of CLI imports; the launcher
-lives in `cli/commands/app_viewer.py`.
-- Public: `initial_material`, `get_default_material`, `set_default_material`.
+precedence rule. Free of CLI imports; the launcher lives in
+`cli/commands/app_viewer.py` and the persisted default both sides read lives in
+`_app_defaults.py`.
+- Public: `initial_material`, `get_default_material`, `set_default_material`
+  (the last two are thin re-spellings of the `_app_defaults` accessors).
 
 ### `apps/check.py`
 Notebook support for `src/pyrite/apps/validation_app.py`: the persisted
@@ -966,9 +991,10 @@ cached-figure export live in `cli/commands/app_validation.py`.
 ### `cli/commands/app_analysis.py`
 `pyrite app analysis launch` owner for `src/pyrite/apps/analysis_app.py`:
 persisted initial-material selection, smoke execution, edit/watch mode, ACP
-bridges, SSH-tunnel-friendly fixed-port launch. Reads the resolution helpers
-from `apps/analyze.py`; that direction is what took `apps` out of the `cli`
-import cycle.
+bridges, SSH-tunnel-friendly fixed-port launch. Imports no `apps` module —
+the persisted default comes from `_app_defaults.py` and the bridges from
+`_acp.py`, which is what takes `apps` out of the driver import cycle entirely
+(contract `nothing-imports-the-marimo-apps`).
 - Public: `command`, `main`.
 
 ### `cli/commands/app_viewer.py`
