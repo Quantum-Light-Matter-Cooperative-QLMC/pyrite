@@ -1,11 +1,13 @@
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
     simulate_trajectories,
     spliced_stopping_keV_per_ang,
 )
+from tests.helpers import scaled_rtol, to_host
 
 CARBON = [("C", 0.1136)]
 
@@ -249,26 +251,35 @@ def test_row_transforms_keep_the_new_fields_in_step_with_the_rows():
             np.testing.assert_array_equal(sliced[key], segments[key][mask])
 
     # 39 keV binds on this 40 keV run; a lower floor clips nothing here.
-    clipped = _clip_segments_to_cutoff(segments, 39.0, CARBON, layers=layers)
+    # The clip stages its rows on the selected backend at the kernels' REAL, so
+    # compare on the host and against the same cast of the transport's rows.
+    raw = _clip_segments_to_cutoff(segments, 39.0, CARBON, layers=layers)
+    clipped = {
+        key: to_host(raw[key])
+        for key in ("L_ang", "E_start_keV", "E_end_keV", "E_repr_keV", "t_end_ang")
+    }
     keep = segments["E_keV"] >= 39.0
-    np.testing.assert_array_equal(clipped["E_start_keV"], segments["E_keV"][keep])
+    np.testing.assert_array_equal(clipped["E_start_keV"], segments["E_keV"][keep].astype(REAL))
     # The clip reapplies the transport core's own midpoint cutoff solve, so a
     # shortened flight ends exactly on the floor and its representative energy
     # is the midpoint of the shortened flight -- reconstructed, never stale.
-    shortened = clipped["L_ang"] < segments["L_ang"][keep]
+    shortened = clipped["L_ang"] < segments["L_ang"][keep].astype(REAL)
     assert shortened.any()
     np.testing.assert_allclose(clipped["E_end_keV"][shortened], 39.0, rtol=0, atol=1e-12)
+    # The midpoint is two roundings of the working precision away from the
+    # oracle -- the sum and the halving -- so bound it at 4 eps(REAL); fp64
+    # keeps the original 1e-12.
     np.testing.assert_allclose(
         clipped["E_repr_keV"],
         0.5 * (clipped["E_start_keV"] + clipped["E_end_keV"]),
-        rtol=1e-12,
+        rtol=scaled_rtol(1e-12, eps_multiple=4.0),
     )
     untouched = ~shortened
     np.testing.assert_array_equal(
-        clipped["E_end_keV"][untouched], segments["E_end_keV"][keep][untouched]
+        clipped["E_end_keV"][untouched], segments["E_end_keV"][keep][untouched].astype(REAL)
     )
     np.testing.assert_array_equal(
-        clipped["t_end_ang"][untouched], segments["t_end_ang"][keep][untouched]
+        clipped["t_end_ang"][untouched], segments["t_end_ang"][keep][untouched].astype(REAL)
     )
 
 

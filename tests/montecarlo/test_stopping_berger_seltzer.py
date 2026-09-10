@@ -28,6 +28,7 @@ from pyrite.montecarlo.transport import (
     _dEds_spliced_packed_scalar,
     spliced_stopping_keV_per_ang,
 )
+from tests.helpers import scaled_rtol, to_device, to_host
 
 # Carbon at the graphite number density the transport tests use.
 _Z, _A, _J_KEV = 6.0, 12.011, 0.078
@@ -354,11 +355,24 @@ def test_stopping_mirrors_agree():
     grid = np.linspace(1.0, 300.0, 97)
     layer_index = np.zeros(grid.size, dtype=np.int64)
 
-    mirrored = lines._spliced_stopping_magnitude_xp(
-        np.asarray(grid, dtype=REAL), layer_index, [composition]
+    # The twin exists because its rows may live on the GPU, so drive it with
+    # rows that actually do on an accelerator session and read the result back.
+    mirrored = to_host(
+        lines._spliced_stopping_magnitude_xp(
+            to_device(grid, REAL), to_device(layer_index), [composition]
+        )
     )
     expected = -spliced_stopping_keV_per_ang(composition, grid)
-    np.testing.assert_allclose(mirrored, expected, rtol=1e-6)
+    # The twin runs at the backend's REAL, so the fp64 host helper is the
+    # oracle for a float32 evaluation. The worst-conditioned step in the model
+    # is ``beta^2 = 1 - gamma^-2``, a cancellation whose amplification is
+    # ``1/beta^2`` -- 256 at this grid's 1 keV floor, and the reason the
+    # low-energy rows are the ones that move. fp64 keeps the original 1e-6.
+    tau_min = float(grid.min()) / _MC2_KEV
+    beta_sq_min = 1.0 - 1.0 / (1.0 + tau_min) ** 2
+    np.testing.assert_allclose(
+        mirrored, expected, rtol=scaled_rtol(1e-6, eps_multiple=1.0 / beta_sq_min)
+    )
 
 
 def test_cost_proxy_delegates_to_the_transport_model():

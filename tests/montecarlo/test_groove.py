@@ -3,7 +3,6 @@ import importlib
 import numpy as np
 import pytest
 
-from pyrite._backend import REAL
 from pyrite.materials.attenuation import _mu_total_inv_ang
 from pyrite.montecarlo import _to_cpu
 from pyrite.montecarlo.groove import (
@@ -22,6 +21,7 @@ from pyrite.montecarlo.transport import (
     simulate_trajectories,
     spliced_stopping_keV_per_ang,
 )
+from tests.helpers import scaled_rtol
 
 TP = np.deg2rad(45.0)
 SPEC = blazed_groove_spec(
@@ -43,7 +43,6 @@ MARCH_SPEC = blazed_groove_spec(
     tilt_azim_rad=np.pi,
 )
 _transport_module = importlib.import_module("pyrite.montecarlo.transport")
-_SPECTRUM_RTOL = max(2e-12, 3.0 * float(np.finfo(REAL).eps))
 
 
 def _z_surf(x, spec):
@@ -865,7 +864,27 @@ def test_brem_groove_gain_matches_beer_lambert_escape():
         composition=composition,
     )
 
-    np.testing.assert_allclose(grooved, expected, rtol=_SPECTRUM_RTOL)
+    # Both sides sum the SAME cross section over the same three segments; what
+    # differs is the precision the sum and the Beer--Lambert weight run at. Two
+    # terms set the bound. The reduction over n_seg positive contributions
+    # carries up to n_seg roundings. The weight is exp(-tau), whose relative
+    # error is tau times the relative error of tau itself -- and tau is a
+    # product of a float32 escape distance and a float32 interpolated mu, so
+    # budget 8 ulps for it. tau reaches 4.4 at the 700 eV end of this grid,
+    # which is why the softest bins are the ones that move. fp64 keeps the
+    # historical 2e-12.
+    n_seg = segments["L_ang"].size
+    tau_max = float(
+        np.max(
+            np.asarray(escape_distance_ang(segments["r_mid"][:, 0], segments["r_mid"][:, 2], SPEC))[
+                :, None
+            ]
+            * _mu_total_inv_ang(composition, grid)[None, :]
+        )
+    )
+    np.testing.assert_allclose(
+        grooved, expected, rtol=scaled_rtol(2e-12, eps_multiple=n_seg + 8.0 * tau_max)
+    )
     assert np.all(grooved >= flat)
 
 

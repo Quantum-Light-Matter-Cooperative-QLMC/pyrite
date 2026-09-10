@@ -27,6 +27,7 @@ from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector, refractive_i
 from pyrite.montecarlo.spectrum import mc_spectrum
 from pyrite.montecarlo.spectrum.lines import _observation_direction
 from pyrite.montecarlo.transport import beta_from_keV
+from tests.helpers import requires_resolvable_grid
 
 CRYSTAL = "hopg"
 HKL = (0, 0, 2)
@@ -39,6 +40,18 @@ HBARC_EV_ANG = 1973.269804
 # order delta * E_res (~6e-2 eV here) instead of drowning in a ~100 eV wide line.
 SEG_LENGTH_ANG = 8000.0
 E_GRID = np.linspace(1599.0, 1601.5, 100_001)
+# A grid step of 2.5e-5 eV at 1600 eV is a fifth of float32's ulp there, and the
+# interference measurements below read an absolute phase of ~3650 rad off a
+# single bin -- a claim float32 cannot state at any grid spacing, since eps
+# alone moves that phase by 4e-4 rad against a 1e-6 tolerance. The device
+# kernels for these two ledger rows are covered by
+# tests/montecarlo/test_xray_dispersion_cuda.py instead.
+_needs_fp64_grid = requires_resolvable_grid(
+    E_GRID, "sub-ulp in-medium line shift and absolute interference phase"
+)
+# Equality between two code paths does not need that resolution, so the checks
+# that only compare paths use a grid every backend can represent.
+_COARSE_GRID = np.arange(1599.0, 1601.5, 1.0e-3)
 
 N_HAT = _observation_direction(np.deg2rad(119.0), None)
 N_Z = float(N_HAT[2])  # detector looks upstream, out the entrance face
@@ -98,6 +111,7 @@ def _in_medium_resonance_eV(passes=6):
     return E
 
 
+@_needs_fp64_grid
 @pytest.mark.parametrize("layers", [None, _single_layer()], ids=["batched", "per_hkl"])
 def test_line_sits_on_the_in_medium_resonance_not_the_vacuum_one(layers):
     """Validation: xray-in-medium-resonance.
@@ -198,6 +212,7 @@ def _phase_terms(z1, z2, E_eV):
     return vacuum_part, medium_part
 
 
+@_needs_fp64_grid
 @pytest.mark.parametrize("sinc_cutoff", [None, 200.0], ids=["batched", "per_hkl"])
 def test_interference_phase_matches_the_in_medium_closed_form(sinc_cutoff):
     """Validation: xray-in-medium-propagation-phase.
@@ -220,6 +235,7 @@ def test_interference_phase_matches_the_in_medium_closed_form(sinc_cutoff):
         assert abs(np.cos(vacuum_part) - measured) > 1e-3
 
 
+@_needs_fp64_grid
 def test_micron_scale_depth_separation_inverts_the_interference():
     """The design brief's headline question, answered by the spectrum itself.
 
@@ -240,6 +256,7 @@ def test_micron_scale_depth_separation_inverts_the_interference():
     np.testing.assert_allclose(measured, -np.cos(vacuum_part), atol=0.05)
 
 
+@_needs_fp64_grid
 def test_single_segment_coherent_is_pure_phase_under_refraction():
     """One segment has no relative phase, so the new factor must cancel in |.|^2."""
     seg = _one_segment(9_000.0)
@@ -265,9 +282,11 @@ def test_runner_and_cases_carry_no_dispersion_selector():
         E_cut_lines_keV=None,
     )
     lines = _lines_for_segments(
-        _segments(), E_GRID, case, _observation_direction(np.deg2rad(119.0), None), None, None
+        _segments(), _COARSE_GRID, case, _observation_direction(np.deg2rad(119.0), None), None, None
     )
-    np.testing.assert_array_equal(lines, _spectrum())
+    np.testing.assert_array_equal(
+        lines, mc_spectrum(_segments(), _COARSE_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
+    )
 
     built = build_cases(Sweep(material="mose2", thickness_ang=1e4))[0]
     assert "xray_dispersion" not in built

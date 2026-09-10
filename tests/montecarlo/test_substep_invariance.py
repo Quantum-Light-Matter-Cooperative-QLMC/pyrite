@@ -14,6 +14,18 @@ import pytest
 
 from pyrite.montecarlo.spectrum import mc_brem_spectrum, mc_spectrum, subdivide_flights
 from pyrite.montecarlo.transport import simulate_trajectories
+from tests.helpers import host_backend_only
+
+# The grouped reduction that makes substeps add as field before they are squared
+# is a segmented COMPLEX reduction with no device port yet, so
+# ``_prepare_spectrum`` fails closed on an accelerator (see its "host-only"
+# guard). Every claim below that drives it therefore states the host requirement
+# instead of asserting a behaviour the selected backend cannot produce; the
+# guard itself is pinned by ``test_substepped_rows_fail_closed_on_unported_options``.
+_grouped_is_host_only = host_backend_only(
+    "flight-grouped incoherent CXR: the segmented complex reduction over "
+    "numerical substeps has no device port"
+)
 
 CARBON = [("C", 0.1136)]
 CXR_KWARGS = {
@@ -130,6 +142,7 @@ def test_brem_representative_energy_beats_the_start_energy_evaluation():
     assert midpoint_error < 0.6 * left_error
 
 
+@_grouped_is_host_only
 def test_incoherent_cxr_converges_under_substep_refinement():
     """Grouping makes refinement converge instead of dismantling the line.
 
@@ -166,6 +179,7 @@ def test_incoherent_cxr_converges_under_substep_refinement():
     assert peak_errors[3] < 1e-4
 
 
+@_grouped_is_host_only
 def test_treating_substeps_as_independent_emitters_destroys_the_line():
     """The regression this grouping exists to prevent, down the same ladder."""
     segments = _flights()
@@ -187,6 +201,7 @@ def test_treating_substeps_as_independent_emitters_destroys_the_line():
     assert ratios[3] < 0.25
 
 
+@_grouped_is_host_only
 def test_grouped_reduction_equals_a_coherent_sum_per_physical_flight():
     """Definition check: coherent within a flight, incoherent across flights."""
     segments = _flights(Ne=6)
@@ -215,7 +230,16 @@ def test_grouped_reduction_equals_a_coherent_sum_per_physical_flight():
     np.testing.assert_allclose(grouped, per_flight, rtol=1e-9, atol=1e-9 * grouped.max())
 
 
-@pytest.mark.parametrize("bad", ["components", "cuda"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        # On a real accelerator the host-only guard fires FIRST and reports the
+        # missing device port, which is the more useful message: dropping
+        # components would not make the run work there.
+        pytest.param("components", marks=_grouped_is_host_only),
+        "cuda",
+    ],
+)
 def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
     segments = _flights(Ne=8)
     rows, _ = subdivide_flights(segments, composition=CARBON, max_dE_frac=1e-3)
@@ -240,6 +264,7 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
             mc_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
 
 
+@_grouped_is_host_only
 @pytest.mark.parametrize("core", ["lockstep", "per-electron"])
 def test_transport_substeps_reach_the_grouped_reduction(core):
     """Slice G's rules were proven on post-hoc splits; transport emits its own.

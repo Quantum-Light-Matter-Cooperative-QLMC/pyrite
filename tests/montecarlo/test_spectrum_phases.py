@@ -29,6 +29,16 @@ from pyrite.montecarlo.spectrum.lines import (
     _prepare_spectrum,
 )
 from pyrite.montecarlo.transport import beta_from_keV
+from tests.helpers import host_backend_only, scaled_rtol, to_device, to_host
+
+# ``_prepare_spectrum`` fails closed on an accelerator once a flight carries
+# numerical substeps: the grouped segmented complex reduction has no device port
+# yet. Claims about that route say so rather than assert a behaviour the
+# selected backend cannot reach.
+_grouped_is_host_only = host_backend_only(
+    "flight-grouped incoherent CXR: the segmented complex reduction over "
+    "numerical substeps has no device port"
+)
 
 CRYSTAL = "hopg"
 HKL = (0, 0, 2)
@@ -137,6 +147,7 @@ def test_prepare_resolves_the_observation_direction_from_the_polar_angle():
     assert st.n_hat[0] == pytest.approx(np.sin(theta))
 
 
+@_grouped_is_host_only
 def test_prepare_groups_numerical_substeps_but_not_whole_flights():
     """Substeps of one flight are integration detail, not independent emitters.
 
@@ -157,8 +168,15 @@ def test_prepare_leaves_coherent_precompute_absent_on_the_incoherent_path():
 
     st_coh = _prepare_spectrum(_request(coherent=True))
     assert st_coh.omega_grid is not None
-    # omega = E / hbar c, per row of the output grid
-    np.testing.assert_allclose(st_coh.omega_grid, E_GRID / HBARC_EV_ANG, rtol=1e-12, atol=0.0)
+    # omega = E / hbar c, per row of the output grid. The precompute is staged
+    # on the selected backend at REAL, so the single division it performs is one
+    # rounding of that precision away from the fp64 oracle.
+    np.testing.assert_allclose(
+        to_host(st_coh.omega_grid),
+        E_GRID / HBARC_EV_ANG,
+        rtol=scaled_rtol(1e-12, eps_multiple=2.0),
+        atol=0.0,
+    )
     assert st_coh.decoherence_active is False  # no sampled offsets in this case
 
 
@@ -188,7 +206,7 @@ def test_prepare_rejects_mutually_exclusive_and_missing_inputs():
         ({"segments": _segments(footprint=True)}, False),
         ({"layers": [(0.0, 4000.0, [("C", 0.1136)])]}, True),
         ({"coherent": True, "sinc_cutoff": 3.0}, True),
-        ({"segments": _segments(flights=True)}, True),
+        pytest.param({"segments": _segments(flights=True)}, True, marks=_grouped_is_host_only),
         ({"coherent": True}, False),
         ({"sinc_cutoff": 3.0}, False),
     ],
@@ -247,10 +265,12 @@ def test_the_two_routes_agree_on_a_case_both_can_run():
     per_hkl = _prepare_spectrum(_request())
     _accumulate_per_hkl(per_hkl)
 
-    peak = float(max(batched.spec.max(), per_hkl.spec.max()))
+    batched_spec = to_host(batched.spec)
+    per_hkl_spec = to_host(per_hkl.spec)
+    peak = float(max(batched_spec.max(), per_hkl_spec.max()))
     assert peak > 0.0
     np.testing.assert_allclose(
-        batched.spec, per_hkl.spec, rtol=BATCH_RTOL, atol=BATCH_RTOL * 1e-2 * peak
+        batched_spec, per_hkl_spec, rtol=BATCH_RTOL, atol=BATCH_RTOL * 1e-2 * peak
     )
 
 
@@ -297,7 +317,7 @@ def test_batched_block_masks_lines_outside_the_padded_window():
 
 def test_finalize_normalises_per_incident_electron():
     st = _prepare_spectrum(_request())
-    st.spec[:] = np.arange(E_GRID.size, dtype=st.spec.dtype)
+    st.spec[:] = to_device(np.arange(E_GRID.size), st.spec.dtype)
 
     out = _finalize_spectrum(st)
 

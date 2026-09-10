@@ -12,6 +12,7 @@ from pyrite.materials.crystal import (
 )
 from pyrite.montecarlo import mc_spectrum
 from pyrite.montecarlo.transport import C_ANG_PER_FS
+from tests.helpers import scaled_rtol
 
 E_GRID = np.arange(700.0, 1500.0)
 
@@ -29,6 +30,22 @@ RTOL = max(1e-12, 100.0 * float(np.finfo(REAL).eps))
 # retaining a peak-scaled absolute floor for bins near an exact zero.
 BATCH_RTOL = max(1e-10, 500.0 * float(np.finfo(REAL).eps))
 ATOL = 1e-8
+
+
+def _blend_rtol(sensitivity):
+    """rtol for a decoherence-blend reconstruction at the backend's REAL.
+
+    A blend ``(1-F) G + F C`` is a convex combination of two spectra the kernel
+    also produces, so the reconstruction error is not the combination's own
+    rounding -- it is the error in the WEIGHT. F is a smooth function of a
+    phase the kernel evaluates in the working precision, and a relative
+    perturbation ``eps`` of omega moves it by ``|dF| <= sensitivity * eps``;
+    since G and C are both O(peak), that absolute weight error is also the
+    fractional error of the blended result. *sensitivity* is therefore
+    ``|dF / (domega/omega)|`` for the specific F under test, evaluated at the
+    grid's high end where it is largest. fp64 keeps the historical 1e-9.
+    """
+    return scaled_rtol(1e-9, eps_multiple=sensitivity)
 
 
 def _assert_batch_close(actual, reference):
@@ -175,7 +192,10 @@ def test_coherent_decoherence_blend_matches_reference_formula():
     expected = ((1.0 - F) * grouped_raw + F * flat_raw) / ne_total
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0
-    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
+    # F = |<exp(i omega t0)>|^2, so dF = 2|chi||dchi| <= 2 |omega t0| eps: the
+    # sensitivity is twice the largest coherent phase in radians (313 here).
+    sensitivity = 2.0 * float(np.max(omega)) * float(np.max(np.abs(t0_values)))
+    np.testing.assert_allclose(actual, expected, rtol=_blend_rtol(sensitivity), atol=peak * 1e-12)
 
 
 def test_coherent_decoherence_blend_holds_on_the_per_hkl_route():
@@ -231,7 +251,10 @@ def test_coherent_decoherence_blend_holds_on_the_per_hkl_route():
     expected = ((1.0 - F) * grouped_raw + F * flat_raw) / ne_total
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0
-    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
+    # F = |<exp(i omega t0)>|^2, so dF = 2|chi||dchi| <= 2 |omega t0| eps: the
+    # sensitivity is twice the largest coherent phase in radians (313 here).
+    sensitivity = 2.0 * float(np.max(omega)) * float(np.max(np.abs(t0_values)))
+    np.testing.assert_allclose(actual, expected, rtol=_blend_rtol(sensitivity), atol=peak * 1e-12)
 
 
 def test_coherent_decoherence_inactive_by_default():
@@ -332,7 +355,11 @@ def test_finite_footprint_partially_coherent_longitudinal_blend():
 
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0
-    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=peak * 1e-12)
+    # F_z = exp(-(omega sigma_z)^2), so dF_z = -2 (omega sigma_z)^2 F_z
+    # domega/omega and the sensitivity is twice that squared phase (5.2 here),
+    # F_z <= 1 bounding the rest.
+    sensitivity = 2.0 * (float(np.max(energy_grid)) / HBARC_EV_ANG * sigma_z_ang) ** 2
+    np.testing.assert_allclose(actual, expected, rtol=_blend_rtol(sensitivity), atol=peak * 1e-12)
 
 
 def test_identical_in_phase_electrons_reach_n_squared_limit():

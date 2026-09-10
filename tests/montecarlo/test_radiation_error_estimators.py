@@ -19,6 +19,7 @@ from pyrite.montecarlo.spectrum import (
     cxr_endpoint_resonance_drift,
 )
 from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
+from tests.helpers import scaled_rtol, to_host
 
 CARBON = [("C", 0.1136)]
 _Z = 6.0
@@ -145,17 +146,26 @@ def test_brem_quadrature_matches_direct_cross_section_evaluation():
     )
     # Independent recomputation: same public cross section (the estimator's
     # contract is the quadrature arithmetic), hand-written trapezoid weights.
-    y_s = CARBON[0][1] * np.asarray(_brem_dsigma_dk(_Z, np.array([T_start]), E_grid))[0]
+    # ``_brem_dsigma_dk`` stages its own operands onto the selected backend, so
+    # the oracle reads its result back rather than assuming a host array.
+    y_s = CARBON[0][1] * to_host(_brem_dsigma_dk(_Z, np.array([T_start]), E_grid))[0]
     y_m = (
-        CARBON[0][1]
-        * np.asarray(_brem_dsigma_dk(_Z, np.array([0.5 * (T_start + T_end)]), E_grid))[0]
+        CARBON[0][1] * to_host(_brem_dsigma_dk(_Z, np.array([0.5 * (T_start + T_end)]), E_grid))[0]
     )
     w = np.empty_like(E_grid)
     w[0], w[-1] = 0.5 * (E_grid[1] - E_grid[0]), 0.5 * (E_grid[-1] - E_grid[-2])
     w[1:-1] = 0.5 * (E_grid[2:] - E_grid[:-2])
     expected = np.abs(y_s - y_m) @ w / (y_m @ w)
     assert out["n_flights"] == 1
-    assert out["integrated_relative_error"]["max"] == pytest.approx(expected, rel=1e-12)
+    # Both sides evaluate the same cross section at the working precision; what
+    # differs is the trapezoid reduction, done here in host fp64. Its error is
+    # bounded by the grid length, and the endpoint DIFFERENCE in the numerator
+    # cancels down to ``expected`` of its own magnitude, so the answer inherits
+    # a further 1/expected amplification.
+    assert out["integrated_relative_error"]["max"] == pytest.approx(
+        expected,
+        rel=scaled_rtol(1e-12, eps_multiple=E_grid.size + 1.0 / expected),
+    )
     assert not out["warned"]
 
 

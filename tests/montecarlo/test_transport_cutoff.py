@@ -11,6 +11,7 @@ from pyrite.montecarlo.spectrum import (
 )
 from pyrite.montecarlo.spectrum.lines import _prepare_spectrum
 from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
+from tests.helpers import scaled_rtol, to_host
 
 CARBON = [("C", 0.1136)]
 
@@ -141,10 +142,18 @@ def test_population_cutoff_clips_length_and_midpoint_but_not_start_state():
         "Ne": 1,
     }
 
-    clipped = _clip_segments_to_cutoff(segments, cutoff, CARBON)
+    # The clip gathers with a backend index, so its rows come back on whatever
+    # device the session selected; compare them on the host.
+    raw = _clip_segments_to_cutoff(segments, cutoff, CARBON)
+    clipped = {key: to_host(raw[key]) for key in ("L_ang", "r_mid", "E_keV", "t_ang", "t0_ang")}
     expected_length = (E0 - cutoff) / _carbon_stopping_keV_per_ang(E0)
-    assert clipped["L_ang"][0] == pytest.approx(expected_length)
-    assert clipped["r_mid"][0, 2] == pytest.approx(expected_length / 2.0)
+    # ``E - E_cut`` is a deliberate near-cancellation here (10.0 - 9.99), so the
+    # clipped length inherits a condition number of E0/(E0 - cutoff) = 1000 on
+    # the working precision. fp64 keeps approx's own 1e-6 default; float32 gets
+    # 1000 eps ~ 1.2e-4 from that ratio, not from the observed 2.3e-5.
+    rel = scaled_rtol(1e-6, eps_multiple=E0 / (E0 - cutoff))
+    assert clipped["L_ang"][0] == pytest.approx(expected_length, rel=rel)
+    assert clipped["r_mid"][0, 2] == pytest.approx(expected_length / 2.0, rel=rel)
     assert clipped["E_keV"][0] == E0
     assert clipped["t_ang"][0] == 12.0
     assert clipped["t0_ang"][0] == 3.0

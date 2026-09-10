@@ -11,6 +11,7 @@ import numpy as np
 
 import pyrite.montecarlo.spectrum.brem as brem_mod
 import pyrite.montecarlo.spectrum.lines as lines_mod
+from tests.helpers import scaled_rtol
 
 
 def _host(value):
@@ -51,6 +52,13 @@ def test_brem_incident_prefactor_reconstructs_original_weighted_cross_section():
     alpha = float(lines_mod.ALPHA_FS)
     zi = 2.0 * np.pi * Z * alpha
     new = np.zeros_like(old, dtype=float)
+    # The Born log's argument is (p_i + p_f) / (p_i - p_f): a soft photon leaves
+    # p_f within 1e-4 of p_i, so the DENOMINATOR is a near-cancellation whose
+    # relative error is p_i/(p_i - p_f) times the working precision, damped by
+    # the log itself. Track that amplification per cell and bound the whole
+    # comparison by its worst value (650 at T = 300 keV, k = 80 eV) instead of
+    # by an observed float32 drift.
+    amplification = 0.0
     for i, Ti in enumerate(T):
         for j, k_ev in enumerate(k_eV):
             k = k_ev * 1.0e-3
@@ -63,8 +71,11 @@ def test_brem_incident_prefactor_reconstructs_original_weighted_cross_section():
             born_log = np.log((p_i_h[i] + pf) / dp)
             den_f = 1.0 - np.exp(-zi / beta_f)
             new[i, j] = pref_h[i] * born_log / (max(k_ev, 1.0e-30) * beta_f * den_f)
+            amplification = max(amplification, (p_i_h[i] / dp) / born_log)
 
-    np.testing.assert_allclose(new, old, rtol=_real_rtol(), atol=0.0)
+    np.testing.assert_allclose(
+        new, old, rtol=scaled_rtol(2e-12, eps_multiple=amplification), atol=0.0
+    )
 
 
 def test_reduced_line_kinematics_matches_expanded_vector_form():

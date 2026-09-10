@@ -335,3 +335,25 @@ def is_device_array(value: Any) -> bool:
     """Return whether *value* belongs to the selected accelerator backend."""
 
     return _GPU and BACKEND.is_array(value)
+
+
+def array_namespace(*values: Any) -> Any:
+    """Array module that OWNS *values*, not the module-global one.
+
+    ``xp`` names the SELECTED backend, which is the right namespace for a
+    kernel fed by the staged device copy of a case. It is the wrong one for a
+    namespace-neutral leaf helper -- pure gather/blend algebra with no device
+    state -- called on host arrays while an accelerator is selected: CuPy's
+    ufuncs reject NumPy operands rather than uploading them, so the helper
+    would fail on data that never needed a device at all. Resolving the
+    namespace from the operands keeps such a helper exact on either kind of
+    input and performs no transfer in either direction; host arrays stay on the
+    host and device arrays stay on the device.
+
+    Mixed operands still resolve to the accelerator and still raise there. That
+    is deliberate: a caller holding one host and one device array has an
+    unstaged seam, and hiding it behind an implicit upload is what this returns
+    a namespace to avoid.
+    """
+
+    return xp if any(is_device_array(value) for value in values) else np

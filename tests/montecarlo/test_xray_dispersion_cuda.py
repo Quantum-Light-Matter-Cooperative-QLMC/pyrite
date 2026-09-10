@@ -842,12 +842,26 @@ def test_coherent_decoherence_device_suite():
     keeps that guarantee for every other test in the run.
     """
     env = dict(os.environ)
+    # Lift the CPU pin for the child ONLY. (This used to set the variable and
+    # then immediately pop it again, which left the child on CPU: every body
+    # below skipped, and -- because this driver's own name matches
+    # "decoherence" -- the child re-selected the driver and spawned a child of
+    # its own, recursing until the box ran out of memory. Deselecting the
+    # driver by name below makes that unreachable even if the pin is lost.)
     env["PYRITE_TEST_BACKEND"] = "cuda"
-    env.pop("PYRITE_TEST_BACKEND", None)
     completed = subprocess.run(  # noqa: S603
         # No -q here: pyproject's addopts already carries one, and -qq drops
         # the summary line this asserts on.
-        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", __file__, "-k", "decoherence"],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            __file__,
+            "-k",
+            "decoherence and not device_suite",
+        ],
         capture_output=True,
         text=True,
         env=env,

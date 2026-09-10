@@ -218,7 +218,28 @@ def _prepare_spectrum(request):
         if layers is not None:
             raise ValueError("groove escape is v1 single-slab only (no layers)")
         _validate_groove_escape_direction(n_hat, groove)
-    E_grid = xp.asarray(E_grid_eV, dtype=REAL)
+    # Fail closed on an output grid the working precision cannot resolve. Every
+    # route treats the grid as strictly ascending: the coherent windowing
+    # divides by ``E_grid[1] - E_grid[0]`` and the line kernels bracket against
+    # it. A grid whose step is finer than REAL's spacing at these energies
+    # collapses adjacent nodes on the cast -- a 2.5e-5 eV step at 1600 eV
+    # loses 80% of its nodes to float32's 1.2e-4 eV ulp -- which turns that
+    # division into a ZeroDivisionError on one route and a silently meaningless
+    # spectrum on another. Checked on the host input, before the upload, so it
+    # costs no device synchronization.
+    E_grid_host = np.asarray(E_grid_eV, dtype=REAL)
+    if E_grid_host.size > 1:
+        collapsed = int(np.count_nonzero(np.diff(E_grid_host) <= 0))
+        if collapsed:
+            raise ValueError(
+                f"E_grid_eV must be strictly increasing in the backend's working "
+                f"precision (REAL={np.dtype(REAL).name}), but {collapsed} of "
+                f"{E_grid_host.size - 1} adjacent nodes are not separated after the "
+                f"cast. Coarsen the grid to at least the precision's spacing at "
+                f"these energies, or run the spectrum on the NumPy backend "
+                f"(PYRITE_MC_BACKEND=cpu) or with PYRITE_FP64=1."
+            )
+    E_grid = xp.asarray(E_grid_host)
     spec = xp.zeros(E_grid.size, dtype=REAL)
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
     spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
