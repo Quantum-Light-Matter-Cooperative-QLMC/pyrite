@@ -2,13 +2,10 @@
 
 a **Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons
 
-PyRITE predicts narrow, tunable X-ray lines from ~30–60 keV electrons in
-crystals, plus detector-visible flux. Active question: expected line flux and
-enhancement at $\theta_{\mathrm{obs}}=90^\circ$ for a 2×2 Timepix3 quad or
-Raptor Eagle XO CCD.
+PyRITE uses a Monte Carlo electron transport model to simulate the expected xray emission of coherent tunable X-ray lines from ~30–60 keV electrons in crystalline materials into detection solid angles.
 
-Research code; absolute predictions remain bounded by
-[validation status](docs/validation/physics-validation-ledger.md) and instrument inputs.
+PyRITE is currently unvalidated research code under active development; absolute predictions
+remain bounded by [validation status](docs/validation/physics-validation-ledger.md).
 
 ## Install
 
@@ -30,7 +27,7 @@ Focused contributor and CI commands are documented in
 command and persistent tab-completion, install the checkout as a uv tool:
 
 ```bash
-uv tool install .
+uv tool install . [--editable]
 uv tool update-shell
 exec "$SHELL"
 pyrite config completion install
@@ -50,8 +47,7 @@ Base `pyrite-xray` is CPU-only. Install exactly one GPU accelerator extra if app
 
 ROCm functionality remains provisional until exercised on AMD hardware.
 
-`PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend; explicit
-accelerator requests fail rather than silently falling back. See
+`PYRITE_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. See
 [execution and acceleration](docs/computation/execution-and-acceleration.md) for
 backend, precision, transport-core, and memory-policy controls.
 
@@ -94,11 +90,11 @@ result = pr.simulate(
 print(result.provenance["identity_digest"])
 ```
 
-For the scalar `Detector` shown here, `simulate` returns response-free source
-spectra in photons per incident electron per eV per sr, plus provenance, without
-reading or writing a checkpoint. Detector acceptance and response remain
-downstream. See the
-[Python API workflow](docs/guides/python-api-workflow.md)
+For the scalar `Detector` shown here, `simulate` returns emitted
+spectra in photons per incident electron per eV per sr, plus run identification,
+without reading or writing a checkpoint. Detector response must be explicitly applied
+to the resulting spectra if required.
+See the [Python API workflow](docs/guides/python-api-workflow.md)
 for scenes, sweeps, detector scoring, and persistence boundaries; use
 `pyrite run` when resumability, profiles, remote execution, or analysis apps
 matter.
@@ -120,7 +116,7 @@ scoring.
   independent piecewise-linear flights use explicit
   elastic collisions and condensed energy loss. The default combines
   Mott-calibrated Browning scattering with Joy--Luo/Berger--Seltzer stopping;
-  beamline space charge and knock-on electrons are not modeled.
+  beamline space charge and secondary electrons are not modeled.
 - **[Crystal source](docs/physics/materials/structure-factor.md):** phase-specific
   structures, complex atomic form factors, Debye--Waller factors, selected
   reflections, and optional mosaicity define the reciprocal-space coupling.
@@ -130,8 +126,8 @@ scoring.
   energy and clock evolution; each row uses one representative velocity, and
   the rows of a flight are summed as a field before squaring. Their in-medium
   Bragg resonance is $\omega=(\mathbf v\cdot\mathbf g)/[1-
-  \operatorname{Re}n(\omega)\,\hat{\mathbf n}\cdot\mathbf v]$. Dynamical
-  diffraction and electron channeling are not modeled.
+  \mathrm{Re}\lbrace n (\omega) \rbrace \ \hat{\mathbf n}\cdot\mathbf v]$. Dynamical
+  diffraction is not modelled, and electron channeling in crystals is currently unsupported.
 - **[Incoherent background](docs/physics/radiation-physics/bremsstrahlung.md):**
   isotropic, unscreened Born Bethe--Heitler bremsstrahlung uses relativistic
   momenta and an Elwert correction; characteristic radiation is not modeled.
@@ -144,13 +140,8 @@ scoring.
   downstream steps.
 
 By default, PyRITE neglects interference between distinct physical flights and
-incident electrons. This is a random-phase/independent-emission approximation,
-not an assertion that elastic scattering destroys coherence. The optional
-[`coherent`/`both` tracking policy](docs/physics/radiation-physics/coherent-emission.md)
-preserves phase across a single-electron trajectory and blends inter-electron
-terms using the sampled bunch form factor. It is independently rederived but
-not human-signed-off and retains documented open boundaries, so it is not yet
-suitable for scientific claims.
+incident electrons. The optional [`coherent`/`both` tracking policy](docs/physics/radiation-physics/coherent-emission.md) preserves phase across a single-electron trajectory and blends inter-electron
+terms using the sampled bunch form factor.
 
 See the [physics model index](docs/physics/index.md) for assumptions, model
 variants, conventions, and links to each implementation-level description.
