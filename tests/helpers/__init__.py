@@ -1,3 +1,14 @@
+from tests.helpers.backend import (
+    IS_FLOAT32,
+    ON_DEVICE,
+    host_backend_only,
+    real_eps,
+    requires_resolvable_grid,
+    scaled_rtol,
+    segments_on_device,
+    to_device,
+    to_host,
+)
 from tests.helpers.cli import assert_clean_result, invoke
 from tests.helpers.external_db_fixtures import (
     cached_lattice_tuple,
@@ -15,6 +26,16 @@ from tests.helpers.runner import fake_out, stub_run_cases, tracking_run_cases_fa
 from tests.helpers.segments import fake_segments, runner_transport_payload
 
 __all__ = [
+    # tests.helpers.backend
+    "IS_FLOAT32",
+    "ON_DEVICE",
+    "host_backend_only",
+    "real_eps",
+    "requires_resolvable_grid",
+    "scaled_rtol",
+    "segments_on_device",
+    "to_device",
+    "to_host",
     # tests.helpers.cli
     "assert_clean_result",
     "invoke",

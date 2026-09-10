@@ -9,7 +9,7 @@ directly.
 
 import numpy as np
 
-from ...._backend import REAL, xp
+from ...._backend import REAL, array_namespace, xp
 from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import HBARC_EV_ANG, M_E_EV, U_g, chi_g
 from ...geometry import first_prism_exit
@@ -195,9 +195,15 @@ def _interp_index(x, grid):
     ``_interp_gather{2d,1d}``) removes that fivefold-redundant index launch
     storm. The per-table gather+blend (``_interp_gather2d`` / ``_interp_gather1d``)
     is bit-for-bit the old per-reflection blend, so no new reassociation beyond
-    the ``line-hkl-batch`` debt the batched path already carries."""
+    the ``line-hkl-batch`` debt the batched path already carries.
+
+    Namespace comes from the operands (``array_namespace``), not from the
+    selected backend: the bracket is pure index algebra with no device state,
+    and the tabulation tests call it on host fp64 grids that must interpolate
+    identically whatever backend the session selected."""
+    _xp = array_namespace(x, grid)
     n = grid.size
-    idx = xp.clip(xp.searchsorted(grid, x), 1, n - 1)
+    idx = _xp.clip(_xp.searchsorted(grid, x), 1, n - 1)
     frac = (x - grid[idx - 1]) / (grid[idx] - grid[idx - 1])
     below = x <= grid[0]
     above = x >= grid[-1]
@@ -214,10 +220,11 @@ def _log_interp_fraction(x, grid, idx):
 
     Validation: line-absorption-tabulation
     """
+    _xp = array_namespace(x, grid, idx)
     x0 = grid[idx - 1]
     x1 = grid[idx]
-    bounded_x = xp.minimum(xp.maximum(x, x0), x1)
-    return xp.log1p((bounded_x - x0) / x0) / xp.log1p((x1 - x0) / x0)
+    bounded_x = _xp.minimum(_xp.maximum(x, x0), x1)
+    return _xp.log1p((bounded_x - x0) / x0) / _xp.log1p((x1 - x0) / x0)
 
 
 def _interp_elemental_mu(idx, log_frac, below, above, log_mu_table):
@@ -229,14 +236,15 @@ def _interp_elemental_mu(idx, log_frac, below, above, log_mu_table):
     is the sum of the interpolated elemental coefficients, not a log-linear
     interpolation of their total. Validation: line-absorption-tabulation
     """
+    _xp = array_namespace(idx, log_frac, log_mu_table)
     f0 = log_mu_table[:, idx - 1]
-    values = xp.exp(f0 + log_frac[None, ...] * (log_mu_table[:, idx] - f0))
+    values = _xp.exp(f0 + log_frac[None, ...] * (log_mu_table[:, idx] - f0))
     endpoint_shape = (log_mu_table.shape[0],) + (1,) * idx.ndim
-    low = xp.exp(log_mu_table[:, 0]).reshape(endpoint_shape)
-    high = xp.exp(log_mu_table[:, -1]).reshape(endpoint_shape)
-    values = xp.where(below[None, ...], low, values)
-    values = xp.where(above[None, ...], high, values)
-    return xp.sum(values, axis=0)
+    low = _xp.exp(log_mu_table[:, 0]).reshape(endpoint_shape)
+    high = _xp.exp(log_mu_table[:, -1]).reshape(endpoint_shape)
+    values = _xp.where(below[None, ...], low, values)
+    values = _xp.where(above[None, ...], high, values)
+    return _xp.sum(values, axis=0)
 
 
 def _elemental_log_mu_table(composition, energy_grid):
@@ -275,10 +283,11 @@ def _interp_gather2d(idx, frac, below, above, tables, gcol):
     per-``g`` ``tables`` of shape ``(N_g, n)`` (``gcol == arange(N_g)``, hoisted
     once). Bit-for-bit the batched per-reflection ``xp.interp`` blend it replaces
     (Validation: line-hkl-batch). This remains unchanged debt."""
+    _xp = array_namespace(idx, frac, tables)
     f0 = tables[gcol, idx - 1]
     y = f0 + frac * (tables[gcol, idx] - f0)
-    y = xp.where(below, tables[gcol, 0], y)
-    y = xp.where(above, tables[gcol, tables.shape[1] - 1], y)
+    y = _xp.where(below, tables[gcol, 0], y)
+    y = _xp.where(above, tables[gcol, tables.shape[1] - 1], y)
     return y
 
 
@@ -286,10 +295,11 @@ def _interp_gather1d(idx, frac, below, above, f):
     """Single-table gather+blend for the shared ``_interp_index`` bracket
     against a g-independent 1-D table ``f`` (the mu(E) column). Bit-for-bit
     identical to ``_interp1``."""
+    _xp = array_namespace(idx, frac, f)
     f0 = f[idx - 1]
     y = f0 + frac * (f[idx] - f0)
-    y = xp.where(below, f[0], y)
-    y = xp.where(above, f[f.size - 1], y)
+    y = _xp.where(below, f[0], y)
+    y = _xp.where(above, f[f.size - 1], y)
     return y
 
 
@@ -497,6 +507,7 @@ def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
 
     Validation: xray-in-medium-resonance
     """
+    _xp = array_namespace(v_dot_n, v_dot_g, n_re_tab, E_tab)
     denom = 1.0 - v_dot_n
     n_re = None
     previous = denom
@@ -508,8 +519,8 @@ def _in_medium_kinematics(v_dot_n, v_dot_g, n_re_tab, E_tab):
         denom = 1.0 - n_re * v_dot_n
     # NaN denominators compare False here and stay NaN, which is the wanted
     # outcome: an out-of-range root is already a rejected pair.
-    settled = xp.abs(denom - previous) <= _RESONANCE_ROOT_RTOL * xp.abs(denom)
-    denom = xp.where(settled, denom, REAL(xp.nan))
+    settled = _xp.abs(denom - previous) <= _RESONANCE_ROOT_RTOL * _xp.abs(denom)
+    denom = _xp.where(settled, denom, REAL(_xp.nan))
     return denom, n_re
 
 
@@ -609,10 +620,22 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     # blocking device->host syncs 46 -> 19 per case and kernel launches 471 ->
     # 366. Keep it an index; reverting to `out[key][keep]` restores the stall.
     keep_idx = xp.nonzero(keep)[0]
+    # ``keep_idx`` lives on the selected backend, so the rows it gathers have to
+    # as well. This runs BEFORE ``_segments_on_device``, i.e. on whatever the
+    # transport handed us -- host arrays on every accelerator run -- and
+    # ``host_rows[device_idx]`` is not an upload: NumPy asks the index for
+    # ``__array__`` and CuPy refuses to sync implicitly. Stage the row here (a
+    # no-op once the caller already staged, and no copy at all on NumPy) rather
+    # than fetch the index back to the host, which would undo the readback this
+    # very index exists to pay only once. Staging with ``_stage_row`` rather
+    # than a bare ``asarray`` keeps the clip's own outputs at the same dtype
+    # ``_segments_on_device`` would give them a moment later, so the fields it
+    # derives below (E_end/E_repr/t_end) are consistent with the rows it emits
+    # instead of mixing transport fp64 with a REAL solve.
     out = dict(segments)
     for key in _SEG_ARRAYS:
         if key in out:
-            out[key] = out[key][keep_idx]
+            out[key] = _stage_row(out[key])[keep_idx]
 
     E = xp.asarray(out["E_keV"], dtype=REAL)
     old_L = xp.asarray(out["L_ang"], dtype=REAL)
@@ -676,8 +699,20 @@ def _segments_on_device(segments):
         a = out.get(k)
         if a is None:
             continue
-        out[k] = xp.asarray(a, dtype=REAL) if a.dtype.kind == "f" else xp.asarray(a)
+        out[k] = _stage_row(a)
     return out
+
+
+def _stage_row(a):
+    """One segment row array on the selected backend at the kernels' dtype.
+
+    Float rows carry ``REAL``; index rows (``elec_id``, ``flight_id``,
+    ``layer``, ...) keep their integer dtype. Shared by ``_segments_on_device``
+    and by the cutoff clip, which runs before staging and so must apply the
+    same rule rather than leave the rows it emits at the transport's dtype.
+    """
+
+    return xp.asarray(a, dtype=REAL) if a.dtype.kind == "f" else xp.asarray(a)
 
 
 def _polarization_pair(k_hat, g_vec):

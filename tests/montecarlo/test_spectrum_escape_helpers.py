@@ -11,6 +11,7 @@ from pyrite.montecarlo.spectrum import (
     mc_brem_spectrum,
     mc_spectrum,
 )
+from tests.helpers import real_eps, scaled_rtol
 
 _TP = np.deg2rad(45.0)
 _GROOVE = blazed_groove_spec(20_000.0, np.pi / 2, _TP, np.pi)
@@ -114,10 +115,21 @@ def test_finite_side_exit_layered_absorption_stays_in_emission_layer():
     )
     reference_line = mc_spectrum(segments, np.arange(700.0, 1500.0), **line_kw)
     layered_line = mc_spectrum(segments, np.arange(700.0, 1500.0), layers=layers, **line_kw)
-    # GPU spectra accumulate in float32, so equivalent absorption paths can
-    # differ by slightly more than NumPy's default 1e-7 relative tolerance.
-    # Observed drift on RTX 3060 Ti-class hardware reaches ~8e-6.
-    np.testing.assert_allclose(layered_line, reference_line, rtol=1e-5)
+    # Equal in exact arithmetic: the W layer starts below the emission depth, so
+    # the escape path never enters it. The two paths reach that answer through
+    # different absorption bookkeeping (per-layer tau stack versus a single
+    # mu L), so each bin differs by the reduction's ABSOLUTE rounding -- order
+    # ``peak * eps(REAL)`` -- not by a relative amount. That is what shows up as
+    # a large relative error in the deep interference minima, where a bin sits
+    # three orders below the peak, so bound it absolutely there and keep the
+    # relative bound at a few eps of the working precision.
+    peak = float(np.max(np.abs(reference_line)))
+    np.testing.assert_allclose(
+        layered_line,
+        reference_line,
+        rtol=scaled_rtol(1e-7, eps_multiple=4.0),
+        atol=peak * 4.0 * real_eps(),
+    )
 
     brem_kw = dict(composition=carbon, n_hat=n_hat)
     reference_brem = mc_brem_spectrum(segments, np.arange(700.0, 5000.0, 50.0), **brem_kw)
