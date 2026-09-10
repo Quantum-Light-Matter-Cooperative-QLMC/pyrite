@@ -115,24 +115,25 @@ scoring.
 - **[Electron transport](docs/physics/beam-transport/electron-transport.md):**
   independent piecewise-linear flights use explicit
   elastic collisions and condensed energy loss. The default combines
-  Mott-calibrated Browning scattering with Joy--Luo/Berger--Seltzer stopping;
+  Mott-calibrated Browning scattering with Joy-Luo/Berger-Seltzer stopping;
   beamline space charge and secondary electrons are not modeled.
 - **[Crystal source](docs/physics/materials/structure-factor.md):** phase-specific
   structures, complex atomic form factors, Debye--Waller factors, selected
   reflections, and optional mosaicity define the reciprocal-space coupling.
 - **[Coherent lines](docs/physics/radiation-physics/coherent-radiation.md):**
-  first-order kinematic Born PXR and CBS amplitudes interfere within each
-  transport row. A collision-free flight may be subdivided to resolve CSDA
-  energy and clock evolution; each row uses one representative velocity, and
-  the rows of a flight are summed as a field before squaring. Their in-medium
+  first-order kinematic Born PXR and CBS amplitudes are coherently summed within
+  each transport segment (between elastic scattering events which change an
+  electron's direction of travel $\mathbf{\hat v}$). A collision-free
+  flight may be subdivided to resolve CSDA energy and clock evolution; each segment
+  uses one representative velocity for radiation calculations. The PXR and CBS in-medium
   Bragg resonance is $\omega=(\mathbf v\cdot\mathbf g)/[1-
   \mathrm{Re}\lbrace n (\omega) \rbrace \ \hat{\mathbf n}\cdot\mathbf v]$. Dynamical
-  diffraction is not modelled, and electron channeling in crystals is currently unsupported.
+  diffraction is not modeled, and electron channeling in crystals is currently unsupported.
 - **[Incoherent background](docs/physics/radiation-physics/bremsstrahlung.md):**
-  isotropic, unscreened Born Bethe--Heitler bremsstrahlung uses relativistic
+  isotropic, unscreened Born Bethe-Heitler bremsstrahlung uses relativistic
   momenta and an Elwert correction; characteristic radiation is not modeled.
 - **[Photon transport](docs/physics/radiation-physics/photon-escape-and-dispersion.md):**
-  straight-ray Beer--Lambert attenuation and bulk refractive dispersion are
+  straight-ray Beer-Lambert attenuation and bulk refractive dispersion are
   passive; interface optics, photon scattering, and re-emission are omitted.
 - **[Detector treatment](docs/physics/detectors/detector-response.md):** source
   spectra are evaluated in a fixed far-field direction; solid-angle acceptance,
