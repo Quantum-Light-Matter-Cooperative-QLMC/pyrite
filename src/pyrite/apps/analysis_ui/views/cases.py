@@ -45,6 +45,7 @@ def render_case_comparison(
         settings,
         include_brem=values["brem"],
         include_line=values["line"],
+        include_characteristic=values["characteristic"],
         x_domain=axes.narrow.x_domain,
         x_type=axes.narrow.x_type,
         y_type=axes.narrow.y_type,
@@ -55,6 +56,7 @@ def render_case_comparison(
         settings,
         include_brem=values["brem"],
         include_line=values["line"],
+        include_characteristic=values["characteristic"],
         x_domain=axes.broad.x_domain,
         x_type=axes.broad.x_type,
         y_type=axes.broad.y_type,
@@ -75,8 +77,10 @@ def render_case_comparison(
         [
             mo.md("**Basket contents**"),
             mo.ui.table(rows, selection=None),
-            controls["line"],
-            controls["brem"],
+            mo.hstack(
+                [controls["line"], controls["brem"], controls["characteristic"]],
+                wrap=True,
+            ),
             axes_panel(mo, controls["axes"]),
         ]
     )

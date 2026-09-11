@@ -180,6 +180,15 @@ def test_slim_case_record_with_wide_brem():
     assert np.array_equal(slim["brem_wide"], rec["brem_wide"])
 
 
+def test_slim_case_record_keeps_characteristic_component():
+    rec = _record(30.0, 20.0, 0.0)
+    rec["spec_characteristic"] = 0.25 * rec["spec"]
+
+    slim = slim_case_record(rec, material="HOPG", label="test label")
+
+    assert slim["spec_characteristic"] is rec["spec_characteristic"]
+
+
 def test_slim_case_record_case_dict_has_material_face_label():
     """slim_case_record returned case dict has material, face, label set
     to passed-in values, and retains original case fields."""

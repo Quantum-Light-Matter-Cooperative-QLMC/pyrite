@@ -435,7 +435,16 @@ _LABEL_FIELDS = ("thickness_ang", "tilt_deg", "tilt_azim_deg")
 # ``plots.altair.spectra._record_frame`` / ``metrics.line_metrics`` -- the same
 # spectral-array set ``slim_results`` trims to, minus ``E_pk``/``hit_frac``/
 # ``eta`` which neither consumer reads.
-_BASKET_RECORD_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide", "fwhm", "scale")
+_BASKET_RECORD_FIELDS = (
+    "E_grid",
+    "spec",
+    "spec_characteristic",
+    "brem",
+    "E_grid_brem",
+    "brem_wide",
+    "fwhm",
+    "scale",
+)
 
 
 def case_label(case, *, material_label=None, face=None, varying=None):

@@ -751,7 +751,7 @@ def _lines_for_case(case, E_grid, *, coherent=None):
     spectrum phases factored out so :func:`pyrite.runs.run.repair_line_spec`
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
-    segs, E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
+    segs, _E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
     segs = _segments_on_device(segs)
     cxr = _lines_for_segments(
         segs,
@@ -763,16 +763,15 @@ def _lines_for_case(case, E_grid, *, coherent=None):
         coherent=coherent,
         Ne=case["Ne"],
     )
-    characteristic_wide = _characteristic_from_segments(
+    characteristic = _characteristic_from_segments(
         segs,
-        E_brem,
+        E_grid,
         case,
         n_hat,
         abs_layers,
         groove=groove,
         Ne=case["Ne_brem"],
     )
-    characteristic = np.interp(E_grid, E_brem, characteristic_wide)
     return cxr + characteristic
 
 
@@ -785,7 +784,7 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
     Returns ``(spec, spec_coherent_or_None)``. With
     ``return_characteristic=True``, append the separately auditable
     characteristic component as a third item."""
-    segs, E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
+    segs, _E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
     segs = _segments_on_device(segs)
@@ -817,16 +816,15 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
         if want_coherent
         else None
     )
-    characteristic_wide = _characteristic_from_segments(
+    characteristic = _characteristic_from_segments(
         segs,
-        E_brem,
+        E_grid,
         case,
         n_hat,
         abs_layers,
         groove=groove,
         Ne=case["Ne_brem"],
     )
-    characteristic = np.interp(E_grid, E_brem, characteristic_wide)
     spec = spec + characteristic
     if spec_coherent is not None:
         spec_coherent = spec_coherent + characteristic
@@ -1021,9 +1019,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # component separately in the result for validation and plotting audits.
     with _nsys_range("cxr.characteristic"):
         try:
-            spec_characteristic_wide = _characteristic_from_segments(
+            spec_characteristic = _characteristic_from_segments(
                 segs_dev,
-                E_brem,
+                E_grid,
                 case,
                 n_hat,
                 abs_layers,
@@ -1034,7 +1032,6 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("brem", error) from error
-    spec_characteristic = np.interp(E_grid, E_brem, spec_characteristic_wide)
     spec = spec + spec_characteristic
     if spec_coherent is not None:
         spec_coherent = spec_coherent + spec_characteristic

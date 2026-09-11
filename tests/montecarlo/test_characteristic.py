@@ -55,7 +55,12 @@ def test_packaged_carbon_eedl_values_and_relaxation_join():
     assert np.isclose(table.shell_fluorescence_yield[0], 0.0014)
     assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.0014)
     assert {266.2, 277.0} <= set(table.line_energy_eV)
+    ka1 = table.line_labels.index("Ka1")
+    # A Lorentzian transition width is the sum of the initial- and final-hole
+    # widths: C K (0.0868 eV) + C L3 (0.0045 eV).
+    assert np.isclose(table.line_fwhm_eV[ka1], 0.0913)
     assert not table.shell_binding_energy_eV.flags.writeable
+    assert not table.line_fwhm_eV.flags.writeable
 
 
 def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkeypatch):
@@ -109,6 +114,52 @@ def test_constant_energy_segment_subdivision_preserves_characteristic_yield(monk
     np.testing.assert_allclose(split, whole, rtol=2.0e-13, atol=0.0)
 
 
+def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(monkeypatch):
+    monkeypatch.setattr(
+        characteristic,
+        "_mu_total_inv_ang",
+        lambda _composition, energy: np.zeros(np.asarray(energy).shape),
+    )
+    energy = np.arange(275.0, 279.0001, 0.02)
+    density_ang3 = 0.1
+    length_ang = 100.0
+
+    spectrum = characteristic.mc_characteristic_spectrum(
+        _carbon_segments([length_ang]),
+        energy,
+        composition=[("C", density_ang3)],
+        electron_limit=1,
+    )
+
+    table = characteristic.load_characteristic_cross_sections("C")
+    sigma_k = np.interp(
+        30_000.0,
+        table.projectile_energy_eV_by_shell[0],
+        table.ionization_cross_sections_cm2_by_shell[0],
+    )
+    in_window = (table.line_energy_eV >= energy[0]) & (table.line_energy_eV <= energy[-1])
+    expected = (
+        density_ang3
+        * 1.0e24
+        * length_ang
+        * 1.0e-8
+        * sigma_k
+        * table.line_yield_per_vacancy[0, in_window].sum()
+        / (4.0 * np.pi)
+    )
+    edges, widths = characteristic._energy_bin_edges_and_widths(energy)
+
+    assert np.count_nonzero(spectrum) == spectrum.size
+    assert np.isclose(np.sum(spectrum * widths), expected, rtol=2.0e-13)
+    peak = int(np.argmax(spectrum))
+    np.testing.assert_allclose(
+        spectrum[peak - 5 : peak],
+        spectrum[peak + 1 : peak + 6][::-1],
+        rtol=1.0e-9,
+        atol=0.0,
+    )
+
+
 def test_absorber_elements_do_not_load_unused_ionization_tables(monkeypatch):
     loaded = []
     real_load = characteristic.load_characteristic_cross_sections
@@ -139,7 +190,7 @@ def test_runner_adds_one_characteristic_component_to_both_line_modes(monkeypatch
 
     energy = np.array([100.0, 200.0, 300.0])
     brem_energy = np.array([100.0, 150.0, 250.0, 300.0])
-    characteristic_wide = np.array([0.1, 0.2, 0.4, 0.5])
+    characteristic_line = np.array([0.1, 0.3, 0.5])
     segments = {
         "L_ang": np.array([1.0]),
         "Ne": 1,
@@ -156,7 +207,7 @@ def test_runner_adds_one_characteristic_component_to_both_line_modes(monkeypatch
         runner,
         "_characteristic_from_segments",
         lambda _segments, grid, *_args, **_kwargs: (
-            np.testing.assert_array_equal(grid, brem_energy) or characteristic_wide
+            np.testing.assert_array_equal(grid, energy) or characteristic_line
         ),
     )
     monkeypatch.setattr(
@@ -184,7 +235,6 @@ def test_runner_adds_one_characteristic_component_to_both_line_modes(monkeypatch
         },
     )
 
-    characteristic = np.interp(energy, brem_energy, characteristic_wide)
-    np.testing.assert_array_equal(output["spec_characteristic"], characteristic)
-    np.testing.assert_array_equal(output["spec"], 1.0 + characteristic)
-    np.testing.assert_array_equal(output["spec_coherent"], 2.0 + characteristic)
+    np.testing.assert_array_equal(output["spec_characteristic"], characteristic_line)
+    np.testing.assert_array_equal(output["spec"], 1.0 + characteristic_line)
+    np.testing.assert_array_equal(output["spec_coherent"], 2.0 + characteristic_line)

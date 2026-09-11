@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from pyrite.apps.analyze import apply_emission, checkpoint_stem, load_analysis_checkpoint
+from pyrite.apps.analyze import (
+    apply_characteristic,
+    apply_emission,
+    checkpoint_stem,
+    load_analysis_checkpoint,
+)
 from pyrite.campaign.config import default_settings
 from pyrite.results import filter_results
 from pyrite.runs.run import cases_from_results
@@ -54,7 +59,13 @@ def load_context(material_widget, face_widget, profile_widget) -> AnalysisContex
     )
 
 
-def select_emission(context: AnalysisContext, emission: str | None) -> AnalysisContext:
+def select_emission(
+    context: AnalysisContext,
+    emission: str | None,
+    *,
+    include_characteristic: bool = True,
+) -> AnalysisContext:
     selected = emission or "incoherent"
     resolved = apply_emission(context.checkpoint_results, selected)
+    resolved = apply_characteristic(resolved, include=include_characteristic)
     return context.with_results(resolved, emission=selected)

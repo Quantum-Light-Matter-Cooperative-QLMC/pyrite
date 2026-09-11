@@ -777,7 +777,11 @@ def reline_checkpoint(
     results = _checkpoint_load(checkpoint_path)
 
     def save_cb(results):
-        _save_recomputed_checkpoint(checkpoint_path, results, components=("line",))
+        _save_recomputed_checkpoint(
+            checkpoint_path,
+            results,
+            components=("characteristic", "line"),
+        )
 
     n = repair_line_spec(
         results,

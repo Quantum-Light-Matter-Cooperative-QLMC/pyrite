@@ -135,7 +135,12 @@ def _checkpoint_load(checkpoint_path):
     return _checkpoint_store.load(path.name, path.parent)
 
 
-def _checkpoint_components_save(checkpoint_path, results, *, components=("line", "brem")):
+def _checkpoint_components_save(
+    checkpoint_path,
+    results,
+    *,
+    components=("line", "brem", "characteristic"),
+):
     """Save component directory, retaining explicit legacy-file compatibility."""
     path = Path(checkpoint_path)
     if path.suffix == ".pkl":

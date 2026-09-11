@@ -42,7 +42,7 @@ CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 CHARACTERISTIC_MODEL = (
     f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
-    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-v1"
+    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-lorentzian-v2"
 )
 _MIN_RELAXATION_CUTOFF_EV = 50.0
 _SHELL_LABELS = {
@@ -112,6 +112,7 @@ class CharacteristicCrossSectionTable:
     line_labels: tuple[str, ...]
     line_initial_shell: tuple[str, ...]
     line_energy_eV: np.ndarray
+    line_fwhm_eV: np.ndarray
     line_yield_per_vacancy: np.ndarray
 
 
@@ -140,6 +141,57 @@ def _require_finite(value: object, name: str, *, positive: bool = False) -> floa
         qualifier = "positive and finite" if positive else "finite"
         raise ValueError(f"{name} must be {qualifier}")
     return number
+
+
+def _level_width_eV(core_widths: Mapping[str, object], level: str) -> float | None:
+    """Resolve one xraydb level width, averaging unresolved level groups."""
+    labels = [level]
+    if "," in level:
+        first, *rest = level.split(",")
+        prefix_match = re.match(r"[A-Z]+", first)
+        if prefix_match is not None:
+            prefix = prefix_match.group(0)
+            labels = [first, *(f"{prefix}{suffix}" for suffix in rest)]
+    widths = []
+    for label in labels:
+        value = core_widths.get(label)
+        try:
+            width = float(str(value))
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(width) and width >= 0.0:
+            widths.append(width)
+    return float(np.mean(widths)) if widths else None
+
+
+def _transition_fwhm_eV(
+    core_widths: Mapping[str, object],
+    *,
+    element: str,
+    line_label: str,
+    initial_level: str,
+    final_level: str,
+) -> float:
+    """Natural Lorentzian FWHM from the pertinent xraydb hole widths.
+
+    Lorentzian initial- and final-hole widths add. Some xraydb transition
+    labels combine unresolved final levels (for example ``M4,5``); their
+    available level widths are averaged. A missing final-level width contributes
+    zero, while a missing initial width is an error because it would leave the
+    transition profile without a physical lifetime scale.
+
+    Validation: characteristic-radiation
+    """
+    initial_width = _level_width_eV(core_widths, initial_level)
+    if initial_width is None or initial_width <= 0.0:
+        raise ValueError(
+            f"xraydb {element} {line_label} has no positive {initial_level} core-hole width"
+        )
+    final_width = _level_width_eV(core_widths, final_level)
+    fwhm = initial_width + (0.0 if final_width is None else final_width)
+    if not np.isfinite(fwhm) or fwhm <= 0.0:
+        raise ValueError(f"xraydb {element} {line_label} has an invalid natural linewidth")
+    return fwhm
 
 
 def _section_vector(
@@ -295,8 +347,9 @@ def _parse_characteristic_file(
     fluorescence_yields: list[float] = []
     projectile_grids: list[np.ndarray] = []
     cross_section_tables: list[np.ndarray] = []
-    line_records: list[tuple[int, str, float, float]] = []
+    line_records: list[tuple[int, str, float, float, float]] = []
     unresolved_radiative_shells: list[str] = []
+    core_widths = xraydb.core_width(element)
     for subshell in parsed_shells:
         shell = _SHELL_LABELS.get(subshell.shell_designator)
         binding = subshell.binding_energy_eV
@@ -347,7 +400,16 @@ def _parse_characteristic_file(
                     f"not requested shell {shell}"
                 )
             intensity_sum += intensity
-            line_records.append((shell_row, str(label), energy, fluorescence_yield * intensity))
+            line_fwhm = _transition_fwhm_eV(
+                core_widths,
+                element=element,
+                line_label=str(label),
+                initial_level=str(line.initial_level),
+                final_level=str(line.final_level),
+            )
+            line_records.append(
+                (shell_row, str(label), energy, line_fwhm, fluorescence_yield * intensity)
+            )
         if lines and not 0.99 <= intensity_sum <= 1.01:
             raise ValueError(
                 f"xraydb {element} {shell} line intensities sum to "
@@ -368,7 +430,7 @@ def _parse_characteristic_file(
     if not ionization_shell_labels:
         raise ValueError(f"{path}: no supported EEDL subshells for {element}")
     line_yields = np.zeros((len(ionization_shell_labels), len(line_records)), dtype=float)
-    for column, (shell_row, _label, _energy, probability) in enumerate(line_records):
+    for column, (shell_row, _label, _energy, _fwhm, probability) in enumerate(line_records):
         line_yields[shell_row, column] = probability
 
     return CharacteristicCrossSectionTable(
@@ -382,11 +444,17 @@ def _parse_characteristic_file(
         ionization_cross_sections_cm2_by_shell=tuple(
             _readonly(table) for table in cross_section_tables
         ),
-        line_labels=tuple(label for _row, label, _energy, _probability in line_records),
+        line_labels=tuple(label for _row, label, _energy, _fwhm, _probability in line_records),
         line_initial_shell=tuple(
-            ionization_shell_labels[row] for row, _label, _energy, _probability in line_records
+            ionization_shell_labels[row]
+            for row, _label, _energy, _fwhm, _probability in line_records
         ),
-        line_energy_eV=_readonly([energy for _row, _label, energy, _probability in line_records]),
+        line_energy_eV=_readonly(
+            [energy for _row, _label, energy, _fwhm, _probability in line_records]
+        ),
+        line_fwhm_eV=_readonly(
+            [fwhm for _row, _label, _energy, fwhm, _probability in line_records]
+        ),
         line_yield_per_vacancy=_readonly(line_yields),
     )
 
@@ -426,18 +494,26 @@ def load_characteristic_cross_sections(
     *,
     data_dir: str | Path | None = None,
 ) -> CharacteristicCrossSectionTable:
-    """Load EEDL electron-impact subshell cross sections and xraydb lines.
+    """Load one element's EEDL ionization and xraydb relaxation table.
 
-    ``data_dir`` may name a monolithic ENDF-6 EEDL file or a directory that
-    contains ``EEDL.endf``. EEDL MF=23/MT=534--572 supplies incident-energy
-    grids, binding energies, and electroionization cross sections in barns;
-    these sections are decoded and validated by endf-parserpy.
-    Fluorescence yields, line energies, and conditional line intensities come
-    from xraydb. EADL MF=28 relaxation files and legacy NIST
-    ``ELEMENT_Xchar.txt`` line-emission exports are intentionally not treated
-    as ionization cross sections. An EEDL shell without explicit xraydb lines
-    is retained and reported with ``RuntimeWarning``; its unresolved photon
-    contribution is zero.
+    Parameters
+    ----------
+    element
+        Chemical symbol, such as ``"C"`` or ``"Si"``.
+    data_dir
+        Optional EEDL ENDF-6 file or directory containing ``EEDL.endf``. The
+        checksum-pinned packaged tape is used by default.
+
+    Returns
+    -------
+    CharacteristicCrossSectionTable
+        Shell cross sections plus line energies, yields, and natural FWHMs.
+
+    Notes
+    -----
+    Data provenance, supported ENDF sections, unresolved relaxation behavior,
+    and assumptions are documented in
+    ``docs/physics/radiation-physics/characteristic-radiation.md``.
     """
     if not isinstance(element, str) or re.fullmatch(r"[A-Z][a-z]?", element) is None:
         raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")
@@ -464,6 +540,31 @@ def _energy_bin_edges_and_widths(E_grid_eV: object) -> tuple[np.ndarray, np.ndar
     edges[0] = grid[0] - 0.5 * (grid[1] - grid[0])
     edges[-1] = grid[-1] + 0.5 * (grid[-1] - grid[-2])
     return edges, np.diff(edges)
+
+
+def _lorentzian_bin_weights(
+    edges_eV: np.ndarray,
+    line_energy_eV: float,
+    fwhm_eV: float,
+) -> np.ndarray:
+    """Exact bin masses for a normalized, window-preserving Lorentzian.
+
+    The analytic CDF difference avoids point-sampling narrow natural lines.
+    Renormalizing over the requested grid preserves the transition yield when
+    its centre is in range, matching the historical delta-line window policy.
+
+    Validation: characteristic-radiation
+    """
+    gamma = 0.5 * _require_finite(fwhm_eV, "line FWHM", positive=True)
+    centre = _require_finite(line_energy_eV, "line energy", positive=True)
+    weights = (
+        np.arctan((edges_eV[1:] - centre) / gamma) - np.arctan((edges_eV[:-1] - centre) / gamma)
+    ) / np.pi
+    weights = np.maximum(weights, 0.0)
+    captured = float(np.sum(weights))
+    if not np.isfinite(captured) or captured <= 0.0:
+        raise ValueError("Lorentzian line has no finite mass on the requested energy grid")
+    return weights / captured
 
 
 def _interpolate_shell_cross_sections(
@@ -519,35 +620,45 @@ def mc_characteristic_spectrum(
     data_dir=None,
     relaxation_cutoff_eV=None,
 ):
-    """Characteristic x-ray spectrum ``d2N/dE dOmega``.
+    """Return the characteristic X-ray density from transport segments.
 
-    Returns photons / eV / sr / incident electron on ``E_grid_eV``. For each
-    transported segment, element, and initially ionized subshell ``i``, the
-    vacancy-production expectation is ``n * L * sigma_i(T)``. For every xraydb
-    line ``line`` from that shell, the photon expectation is multiplied by
-    ``omega_i * I_i,line``, where ``omega_i`` is the xraydb edge fluorescence
-    yield and ``I_i,line`` is the xraydb conditional line intensity.
+    Each xraydb transition is represented by an exactly bin-integrated natural
+    Lorentzian and the result is returned in photons per eV per sr per incident
+    electron. The source equation, linewidth construction, relaxation scope,
+    geometry assumptions, and limiting cases are documented in
+    ``docs/physics/radiation-physics/characteristic-radiation.md``.
 
-    Emission is isotropic and uses PyRITE's established slab, finite-prism,
-    groove, and multilayer Beer--Lambert escape paths. The implementation is a
-    mean track-length estimator, like PyRITE bremsstrahlung; it does not sample
-    discrete ionizations or photon branches.
+    Parameters
+    ----------
+    segments
+        Transport output mapping from :func:`simulate_trajectories`.
+    E_grid_eV
+        Strictly increasing characteristic-spectrum bin centres in eV.
+    element, n_atoms_per_ang3
+        Elemental target symbol and number density, superseded by ``composition``.
+    theta_obs_rad, n_hat
+        Polar observation angle or explicit sample-frame direction.
+    chunk
+        Maximum number of transport segments reduced at once.
+    composition
+        Compound ``(element, number_density)`` pairs in atoms per cubic angstrom.
+    layers
+        Optional film-first absorber stack.
+    groove
+        Optional supported blazed-groove escape geometry.
+    electron_limit
+        Optional leading macro-electron count used for normalization.
+    E_cut_keV
+        Optional post-transport electron-energy cutoff in keV.
+    data_dir
+        Optional EEDL file or containing directory.
+    relaxation_cutoff_eV
+        Lowest emitted line energy admitted from the relaxation data.
 
-    Sources: ENDF-6 File 23 and the 2025 LLNL Evaluated Electron Data Library
-    (EEDL) for shell-resolved electron-impact ionization cross sections; Elam,
-    Ravel, and Sieber, Radiation Physics and Chemistry 63, 121--128 (2002),
-    through xraydb ``xray_edge`` and ``xray_lines`` for relaxation. Assumptions:
-    EEDL interpolation law 2 (lin-lin), isolated single vacancies,
-    independent-atom additivity, xraydb fluorescence yields and line
-    intensities, isotropic prompt x rays, straight photon escape, and
-    bin-integrated delta lines. Auger-fed secondary vacancies, Coster--Kronig
-    redistribution, multiple-vacancy corrections, and Auger-electron transport
-    are not modeled because the xraydb emission-line API does not specify a
-    complete non-radiative cascade. Limiting cases: zero path, density,
-    ionization cross section, fluorescence yield, or line intensity gives zero;
-    a single unattenuated line gives ``n L sigma omega I/(4*pi)``; constant-
-    energy segment subdivision preserves total yield. EEDL shells without an
-    explicit xraydb line list are parsed but contribute zero with a warning.
+    Returns
+    -------
+    numpy.ndarray
+        Characteristic density on ``E_grid_eV``.
 
     Validation: characteristic-radiation
     """
@@ -614,7 +725,9 @@ def mc_characteristic_spectrum(
         table = all_tables[el]
         xraydb_yields = _xraydb_line_yields(table, relaxation_cutoff)
         line_work = []
-        for line_index, line_energy in enumerate(table.line_energy_eV):
+        for line_index, (line_energy, line_fwhm) in enumerate(
+            zip(table.line_energy_eV, table.line_fwhm_eV, strict=True)
+        ):
             if line_energy <= relaxation_cutoff:
                 continue
             bin_index = int(np.searchsorted(edges, line_energy, side="right") - 1)
@@ -622,6 +735,10 @@ def mc_characteristic_spectrum(
                 continue
             if not np.any(xraydb_yields[:, line_index] > 0.0):
                 continue
+            profile = xp.asarray(
+                _lorentzian_bin_weights(edges, line_energy, line_fwhm) / bin_widths,
+                dtype=REAL,
+            )
             if layers is None:
                 mu = _mu_total_inv_ang(
                     comp,
@@ -641,7 +758,7 @@ def mc_characteristic_spectrum(
                     for _z_top, _z_bot, c in layers
                 ]
             response = xp.asarray(xraydb_yields[:, line_index], dtype=REAL)
-            line_work.append((bin_index, response, mu, layer_mu))
+            line_work.append((profile, response, mu, layer_mu))
 
         if not line_work:
             continue
@@ -650,7 +767,7 @@ def mc_characteristic_spectrum(
             sl = slice(start, min(start + chunk, int(seg_E.size)))
             shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl])
             path_cm = seg_L[sl] * 1.0e-8
-            for work_index, (_bin_index, response, mu, layer_mu) in enumerate(line_work):
+            for work_index, (_profile, response, mu, layer_mu) in enumerate(line_work):
                 if layers is None:
                     transmission = xp.exp(-L_esc[sl] * mu)
                 elif finite_footprint:
@@ -675,12 +792,12 @@ def mc_characteristic_spectrum(
                 line_yields[work_index] += xp.sum(
                     number_density_ang3 * 1.0e24 * path_cm * effective_line_sigma_cm2 * transmission
                 )
-        for (bin_index, _response, _mu, _layer_mu), line_yield in zip(
+        for (profile, _response, _mu, _layer_mu), line_yield in zip(
             line_work,
             line_yields,
             strict=True,
         ):
-            spec[bin_index] += line_yield / REAL(bin_widths[bin_index])
+            spec += line_yield * profile
 
     return _to_cpu(spec / (4.0 * xp.pi) / int(Ne))
 

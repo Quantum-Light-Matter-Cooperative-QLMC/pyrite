@@ -205,7 +205,31 @@ def _scale(scale_type, domain=None):
     return alt.Scale(**kwargs) if kwargs else alt.Undefined
 
 
-def _record_frame(r, settings, *, include_brem, include_line=False, include_coherent=False, meta):
+def _characteristic_view(record, *, include_characteristic):
+    characteristic = record.get("spec_characteristic")
+    if include_characteristic or characteristic is None:
+        return record
+
+    view = dict(record)
+    component = np.asarray(characteristic)
+    for key in ("spec", "spec_coherent"):
+        spectrum = record.get(key)
+        if spectrum is not None:
+            view[key] = np.asarray(spectrum) - component
+    return view
+
+
+def _record_frame(
+    r,
+    settings,
+    *,
+    include_brem,
+    include_line=False,
+    include_characteristic=True,
+    include_coherent=False,
+    meta,
+):
+    r = _characteristic_view(r, include_characteristic=include_characteristic)
     E = np.asarray(r["E_grid"], dtype=float)
     scale = r["scale"] * _NA_PER_UA
     line_det, brem_det = _line_brem(r, settings, convolve=False)
@@ -410,6 +434,7 @@ def spectrum_frame(
     *,
     include_brem=True,
     include_line=False,
+    include_characteristic=True,
     include_coherent=False,
     collapse_azimuth=True,
     band="narrow",
@@ -447,6 +472,7 @@ def spectrum_frame(
                     settings,
                     include_brem=include_brem,
                     include_line=include_line,
+                    include_characteristic=include_characteristic,
                     include_coherent=include_coherent,
                     meta=meta,
                 )
@@ -463,6 +489,7 @@ def spectrum_chart(
     tilt_deg=None,
     include_brem=True,
     include_line=False,
+    include_characteristic=True,
     include_coherent=False,
     collapse_azimuth=True,
     x_domain=None,
@@ -494,6 +521,7 @@ def spectrum_chart(
         settings,
         include_brem=include_brem,
         include_line=include_line,
+        include_characteristic=include_characteristic,
         include_coherent=include_coherent,
         collapse_azimuth=collapse_azimuth,
         band=band,
@@ -568,6 +596,7 @@ def _compare_frame(
     hue,
     include_brem=True,
     include_line=False,
+    include_characteristic=True,
     include_coherent=False,
     band="narrow",
     max_points=None,
@@ -588,7 +617,17 @@ def _compare_frame(
 
     frames = []
     for grp in groups.values():
-        r = max(grp, key=lambda rr: float(np.max(rr["spec"])))
+        r = max(
+            grp,
+            key=lambda rr: float(
+                np.max(
+                    _characteristic_view(
+                        rr,
+                        include_characteristic=include_characteristic,
+                    )["spec"]
+                )
+            ),
+        )
         row_meta = {
             "E0_keV": float(r["case"]["E0_keV"]),
             "tilt_deg": float(r["case"]["tilt_deg"]),
@@ -600,6 +639,7 @@ def _compare_frame(
                 settings,
                 include_brem=include_brem,
                 include_line=include_line,
+                include_characteristic=include_characteristic,
                 include_coherent=include_coherent,
                 meta=row_meta,
             )
@@ -617,6 +657,7 @@ def compare_spectrum_chart(
     hue,
     include_brem=True,
     include_line=False,
+    include_characteristic=True,
     include_coherent=False,
     x_domain=None,
     x_type="linear",
@@ -644,6 +685,7 @@ def compare_spectrum_chart(
         hue=hue,
         include_brem=include_brem,
         include_line=include_line,
+        include_characteristic=include_characteristic,
         include_coherent=include_coherent,
         band=band,
         max_points=max_points,
@@ -688,6 +730,7 @@ def _multi_case_frame(
     *,
     include_brem=True,
     include_line=False,
+    include_characteristic=True,
     include_coherent=False,
     band="narrow",
     max_points=None,
@@ -707,6 +750,7 @@ def _multi_case_frame(
                 settings,
                 include_brem=include_brem,
                 include_line=include_line,
+                include_characteristic=include_characteristic,
                 include_coherent=include_coherent,
                 meta={"label": str(label)},
             )
@@ -723,6 +767,7 @@ def multi_case_spectrum_chart(
     *,
     include_brem=True,
     include_line=False,
+    include_characteristic=True,
     include_coherent=False,
     x_domain=None,
     x_type="linear",
@@ -749,6 +794,7 @@ def multi_case_spectrum_chart(
         settings,
         include_brem=include_brem,
         include_line=include_line,
+        include_characteristic=include_characteristic,
         include_coherent=include_coherent,
         band=band,
         max_points=max_points,

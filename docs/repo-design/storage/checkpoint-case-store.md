@@ -42,10 +42,13 @@ accept all historical pickle encodings.
 
 ## Compatibility and migration
 
-Component checkpoints remain materialized under
-`checkpoints/<stem>/{line,brem}.pkl`. Analysis, archive, prune, slim, and remote
-pull retain their existing read contracts; manifest-only consumers belong to
-the checkpoint-command rework.
+Component checkpoints are materialized under
+`checkpoints/<stem>/{line,brem,characteristic}.h5`. `line.h5` is the
+authoritative case index and contains line-only PXR/CBS totals;
+`characteristic.h5` is an optional companion merged into those totals on
+read, and `brem.h5` carries the continuum. Analysis, archive, prune, slim,
+and remote pull retain their merged in-memory contracts; manifest-only
+consumers belong to the checkpoint-command rework.
 
 Legacy plain, gzip, and zstd pickle artifacts are never rewritten merely by
 reading them. Any later normal save uses HDF5, so migration is opportunistic and

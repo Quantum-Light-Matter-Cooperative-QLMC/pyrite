@@ -310,8 +310,10 @@ def _dataset_artifacts(root: Path, stem: str) -> list[Path]:
     artifacts = [
         directory / "line.h5",
         directory / "brem.h5",
+        directory / "characteristic.h5",
         directory / "line.pkl",
         directory / "brem.pkl",
+        directory / "characteristic.pkl",
         directory / "meta.json",
         directory / "cases.json",
         directory / "parts",

@@ -768,7 +768,10 @@ def test_run_sweep_exact_metadata_hit_skips_decode_launch_and_writes(tmp_path, m
     }
     monkeypatch.setattr("pyrite.runs.run.run_cases", stub_run_cases)
     run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False, dataset_identity=identity)
-    paths = [tmp_path / "hopg" / name for name in ("line.h5", "brem.h5", "meta.json")]
+    paths = [
+        tmp_path / "hopg" / name
+        for name in ("line.h5", "brem.h5", "characteristic.h5", "meta.json")
+    ]
     before = {path: path.stat().st_mtime_ns for path in paths}
 
     def forbidden(*_args, **_kwargs):
@@ -956,7 +959,46 @@ def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
     assert "brem_wide" in brem_record and "spec" not in brem_record
 
 
+def test_checkpoint_stores_characteristic_in_independent_component(tmp_path):
+    case = _fake_case("cfg_a", 30.0)
+    record = {
+        "case": case,
+        "E_grid": np.array([100.0, 110.0]),
+        "spec": np.array([5.0, 7.0]),
+        "spec_coherent": np.array([9.0, 11.0]),
+        "spec_characteristic": np.array([1.0, 2.0]),
+        "E_grid_brem": np.array([100.0, 110.0]),
+        "brem_wide": np.array([0.5, 0.25]),
+        "brem": np.array([0.5, 0.25]),
+        "scale": 1.0,
+    }
+    results = {"cfg_a": {30.0: record}}
+
+    _checkpoint_store.save("hopg", tmp_path, results)
+
+    characteristic_path = tmp_path / "hopg" / "characteristic.h5"
+    assert characteristic_path.is_file()
+    line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.h5"))["cfg_a"][30.0]
+    characteristic = _checkpoint_io.load(str(characteristic_path))["cfg_a"][30.0]
+    assert "spec_characteristic" not in line
+    np.testing.assert_array_equal(line["spec"], [4.0, 5.0])
+    np.testing.assert_array_equal(line["spec_coherent"], [8.0, 9.0])
+    assert set(characteristic) == {"case", "E_grid", "scale", "spec_characteristic"}
+
+    merged = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
+    np.testing.assert_array_equal(merged["spec"], record["spec"])
+    np.testing.assert_array_equal(merged["spec_coherent"], record["spec_coherent"])
+    np.testing.assert_array_equal(merged["spec_characteristic"], record["spec_characteristic"])
+
+    characteristic_path.unlink()
+    without_characteristic = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
+    assert "spec_characteristic" not in without_characteristic
+    np.testing.assert_array_equal(without_characteristic["spec"], [4.0, 5.0])
+
+
 def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch):
+    # The default save creates all three current components, even when an older
+    # record has no characteristic field.
     existing = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
@@ -971,7 +1013,29 @@ def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch)
     )
 
     assert (tmp_path / "hopg" / "line.h5").is_file()
+    assert (tmp_path / "hopg" / "characteristic.h5").is_file()
     assert set(load_checkpoint("hopg", checkpoint_dir=str(tmp_path))) == {"cfg_a", "cfg_b"}
+
+
+def test_legacy_line_component_with_characteristic_is_not_double_added(tmp_path):
+    record = {
+        "case": _fake_case("cfg_a", 30.0),
+        "E_grid": np.array([100.0, 110.0]),
+        "spec": np.array([5.0, 7.0]),
+        "spec_coherent": np.array([9.0, 11.0]),
+        "spec_characteristic": np.array([1.0, 2.0]),
+    }
+    store = {"cfg_a": {30.0: record}}
+    line_path = tmp_path / "hopg" / "line.h5"
+    line_path.parent.mkdir()
+    _checkpoint_io.dump(store, str(line_path))
+    _checkpoint_store.save("hopg", tmp_path, store, components=("characteristic",))
+
+    merged = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
+
+    np.testing.assert_array_equal(merged["spec"], record["spec"])
+    np.testing.assert_array_equal(merged["spec_coherent"], record["spec_coherent"])
+    np.testing.assert_array_equal(merged["spec_characteristic"], record["spec_characteristic"])
 
 
 def test_partial_component_save_fully_migrates_legacy_checkpoint(tmp_path):

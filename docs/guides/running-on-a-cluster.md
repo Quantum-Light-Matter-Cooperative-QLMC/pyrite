@@ -1,7 +1,8 @@
 # Running on a cluster (SLURM)
 
 `pyrite run [PROFILE] -m MATERIAL` is the headless entry point for one profile
-member. Canonical full runs write `checkpoints/<material>/{line,brem}.pkl`;
+member. Canonical full runs write
+`checkpoints/<material>/{line,brem,characteristic}.h5`;
 survey and overridden runs use identity-qualified directories. This makes the
 command a clean fit for any batch scheduler without the optional lab-box helper
 below. Install once, submit one job per material, then pull checkpoints back for

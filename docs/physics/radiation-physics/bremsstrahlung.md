@@ -9,6 +9,31 @@ and the per-electron normalization with the [line
 kernel](coherent-radiation.md), and is evaluated on the same spectral grid, so
 line and continuum can be added directly.
 
+## What MF=23/MT=527 and MF=26/MT=527 mean
+
+ENDF-6 organizes evaluated data by **file number** (`MF`, the kind of data)
+and **reaction number** (`MT`, the physical interaction). The pair therefore
+names a section of the EEDL evaluation; it is not a fitted parameter:
+
+- `MF=23` contains integrated photo-atomic and electro-atomic cross sections.
+  Its `MT=527` section is the total electro-atomic bremsstrahlung cross section
+  {math}`\sigma(T)` as a function of incident-electron energy, tabulated in
+  barns.
+- `MF=26` contains secondary-particle energy/angle distributions. Its matching
+  `MT=527` section describes the products of the same bremsstrahlung
+  interaction. PyRITE uses the first subsection, whose `ZAP=0`, `LAW=1`,
+  `LANG=1`, `NA=0` records give an isotropic tabulated photon-energy
+  probability density. The second subsection uses `LAW=8` to report the
+  outgoing electron's average energy loss and is not needed by the photon
+  spectrum estimator.
+
+The two sections are used together because they supply complementary pieces:
+MF=23 fixes the total probability of a bremsstrahlung event, while MF=26 fixes
+the conditional photon-energy shape. Their product is the required
+differential cross section. This follows the ENDF-6 meanings of the sections
+rather than choosing two independently convenient tables
+{cite:p}`trkov2018endf6`.
+
 ## EEDL cross section and spectrum
 
 For element {math}`Z`, incident electron kinetic energy {math}`T`, and photon

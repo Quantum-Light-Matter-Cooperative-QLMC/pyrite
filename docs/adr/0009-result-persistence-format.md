@@ -3,11 +3,13 @@
 - **Status:** Accepted
 - **Date:** 2026-08-13
 - **Revised:** 2026-08-14 — defer interchange format selection
+- **Revised:** 2026-09-10 — current `.h5` path tokens and characteristic component
 - **Context source:** core architecture RFC, Change 6
 
 ## Context
 
-PyRITE's results are pickles. Component stores (`checkpoints/<stem>/{line,brem}.pkl`),
+At the time of this decision, PyRITE's results were pickles. Component stores
+(`checkpoints/<stem>/{line,brem}.pkl`),
 per-config crash shards, content-addressed case blobs, and `slim` transfer
 artifacts are all the same thing: a `pickle` stream behind a compression frame,
 written and read by one module, `checkpoints/_checkpoint_io`.
@@ -78,20 +80,18 @@ MCPL remains a strong candidate when the consumer is Geant4, OpenMC,
 MCNP/PHITS, or McStas/McXtrace. It is not required until such a workflow and
 source-state contract justify it.
 
-### The filename does not change
+### New writes use `.h5` filenames
 
-Files keep their `.pkl` names. 136 literal `.pkl` references across 22 modules
-encode the CAS and component layout, which this change holds fixed;
-`discover()` globs `*.pkl` and `checkpoint_exists` stats `line.pkl`.
-
-`_checkpoint_io.load` has never trusted the extension — it sniffs magic bytes,
-and already dispatches across three generations of stored bytes (plain pickle,
-gzip, zstd). HDF5 is the fourth, recognised by its own signature. The extension
-is a path token, not a format claim.
+Current component, shard, and CAS artifacts use `.h5` filenames, matching their
+HDF5 encoding. Component stores now contain `line.h5`, `brem.h5`, and the
+independently removable `characteristic.h5`. The compatibility reader still
+accepts legacy `.pkl` paths and sniffs their bytes before dispatching across
+plain-pickle, gzip, zstd, and HDF5 generations.
 
 ### Legacy files load forever
 
-There is no flag day and no bulk migration script. Every `.pkl` dataset ever
+There is no flag day and no bulk migration script. Every legacy `.pkl` dataset
+ever
 written stays loadable, indefinitely, by the same `load` call. Migration is
 opportunistic: a store is rewritten as HDF5 the next time something saves it,
 which is exactly what the store already does when it meets the legacy flat

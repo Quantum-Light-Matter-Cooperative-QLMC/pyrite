@@ -8,11 +8,13 @@ from ENDF File 23, MT 534--572. The source file identifies itself as
 
 The packaged bytes are the EPICS2025 distribution downloaded verbatim from
 <https://nuclear.llnl.gov/EPICS/ENDF2025/EEDL2025.ALL>, pinned by SHA-256
-`ce37912435e0b8002f85878f98ccf7c5840cb168f1d46af3c9e915cd16c70ccc`.
+`f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`.
 Upstream records are 75 columns with CRLF line endings. The pin asserts those
 published bytes, so `.gitattributes` marks this file `-text` to exempt it from
 the repository's `eol=lf` normalization; re-normalizing it would break the pin.
-Characteristic line energies, fluorescence yields, and conditional line
-intensities are supplied separately by xraydb's Elam tables at runtime. The
-resolved xraydb version is included in PyRITE's characteristic-model identity
-marker so a relaxation-database update cannot reuse an older checkpoint.
+Characteristic line energies, fluorescence yields, conditional line
+intensities, and natural atomic-level widths are supplied separately by
+xraydb at runtime. PyRITE sums the initial- and final-level widths to obtain
+each transition's Lorentzian FWHM. The resolved xraydb version is included in
+PyRITE's characteristic-model identity marker so a relaxation-database update
+cannot reuse an older checkpoint.

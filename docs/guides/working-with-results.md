@@ -35,11 +35,24 @@ For non-interactive use, inspect `pyrite app analysis export --help`. The genera
 [CLI reference](../repo-design/cli/cli-reference.md) is authoritative for
 accepted arguments and output formats.
 
-Current component paths retain a `.pkl` suffix for compatibility, but new
-writes contain versioned HDF5 data. Legacy plain, gzip, and zstd pickle
-generations remain readable and migrate to HDF5 on the next normal save. Use
-the [result schema](../repo-design/storage/result-schema.md) for independent
-inspection; do not infer the encoding from the suffix.
+Current full checkpoints contain three versioned HDF5 components:
+
+- `line.h5` stores PXR/CBS line results without characteristic radiation;
+- `brem.h5` stores the bremsstrahlung continuum;
+- `characteristic.h5` stores `spec_characteristic` on the fine line grid.
+
+The analysis app merges all available components and shows characteristic
+radiation by default. Clear **show characteristic radiation** to inspect the
+smaller PXR/CBS peaks without changing the checkpoint. Omitting
+`characteristic.h5` is supported: the dataset loads as line-only, which also
+makes intentional exclusion and transfer straightforward.
+
+Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain
+readable and migrate to HDF5 on the next normal save. Legacy line components
+that already contain `spec_characteristic` are recognized and are not
+double-counted. Use the
+[result schema](../repo-design/storage/result-schema.md) for independent
+inspection.
 
 ## Preserve or reduce data
 

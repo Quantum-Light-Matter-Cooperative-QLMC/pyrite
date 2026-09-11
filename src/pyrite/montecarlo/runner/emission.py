@@ -67,14 +67,14 @@ def _brem_wide_from_segments(
 
 def _characteristic_from_segments(
     segs,
-    E_brem,
+    E_grid,
     case,
     n_hat,
     abs_layers,
     groove=None,
     Ne=None,
 ):
-    """Characteristic lines on the wide bremsstrahlung energy grid.
+    """Characteristic lines on the requested fine line-energy grid.
 
     Every material layer emits from its own EEDL subshell cross sections and
     xraydb relaxation data; photons self-absorb through the complete stack.
@@ -87,14 +87,14 @@ def _characteristic_from_segments(
     characteristic_chunk = runner._admit_chunk(
         case.get("brem_chunk")
         or runner._RESOURCE_POLICY.brem_chunk
-        or runner._adaptive_chunk(E_brem.size),
-        E_brem.size,
+        or runner._adaptive_chunk(E_grid.size),
+        E_grid.size,
     )
     n_lay = int(segs.get("n_layers", 1))
     if n_lay == 1:
         return runner.mc_characteristic_spectrum(
             segs,
-            E_brem,
+            E_grid,
             composition=case["composition"],
             n_hat=n_hat,
             chunk=characteristic_chunk,
@@ -103,14 +103,14 @@ def _characteristic_from_segments(
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
         )
-    characteristic = np.zeros(E_brem.shape, dtype=float)
+    characteristic = np.zeros(E_grid.shape, dtype=float)
     for layer_index in range(n_lay):
         layer_segments = runner._segments_in_layer(segs, layer_index)
         if layer_segments["L_ang"].size == 0:
             continue
         characteristic = characteristic + runner.mc_characteristic_spectrum(
             layer_segments,
-            E_brem,
+            E_grid,
             composition=abs_layers[layer_index][2],
             n_hat=n_hat,
             chunk=characteristic_chunk,

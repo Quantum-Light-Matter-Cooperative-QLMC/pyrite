@@ -193,7 +193,12 @@ def _(base_context, emission_ui):
 
 @app.cell(hide_code=True)
 def _(context, emission_ui, face_ui, material_ui, profile_ui):
-    parts = [mo.hstack([material_ui, face_ui, profile_ui, emission_ui], wrap=True)]
+    parts = [
+        mo.hstack(
+            [material_ui, face_ui, profile_ui, emission_ui],
+            wrap=True,
+        )
+    ]
     if context.selected_profile not in (None, context.selected_material):
         parts.append(
             mo.md(

@@ -196,6 +196,37 @@ def test_spectrum_frame_excludes_brem_when_disabled():
     assert set(df["component"]) == {"total"}
 
 
+def test_spectrum_frame_excludes_characteristic_radiation_when_disabled():
+    rec = _record(30.0, -20.0, 0.0)
+    characteristic = 0.25 * rec["spec"]
+    rec["spec_characteristic"] = characteristic
+    rec["spec"] = rec["spec"] + characteristic
+
+    with_characteristic = spectrum_frame(
+        [rec],
+        _settings(),
+        include_brem=False,
+        include_characteristic=True,
+    )
+    without_characteristic = spectrum_frame(
+        [rec],
+        _settings(),
+        include_brem=False,
+        include_characteristic=False,
+    )
+
+    with_total = with_characteristic.loc[
+        with_characteristic.component == "total", "intensity"
+    ].to_numpy()
+    without_total = without_characteristic.loc[
+        without_characteristic.component == "total", "intensity"
+    ].to_numpy()
+    np.testing.assert_allclose(
+        with_total - without_total,
+        characteristic * rec["scale"] * _NA_PER_UA,
+    )
+
+
 def test_spectrum_chart_builds_valid_spec():
     chart = spectrum_chart(_store(), _settings())
     assert isinstance(chart, alt.LayerChart)

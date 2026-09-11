@@ -21,6 +21,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
 
+import numpy as np
+
 from .._app_defaults import get_analysis_default, set_analysis_default
 from .._env import env_value
 from ..checkpoints import _checkpoint_store
@@ -41,8 +43,8 @@ def material_menu(
 ) -> tuple[MaterialMenuRow, ...]:
     """Return configured analysis materials, checkpoint-available ones first.
 
-    A material counts as available if it has a direct ``<material>.pkl``
-    checkpoint OR at least one other stem whose ``meta.json`` sidecar
+    A material counts as available if it has a direct component checkpoint or
+    legacy ``<material>.pkl`` OR at least one other stem whose ``meta.json`` sidecar
     identifies it as that material (a named ``catalog_profile`` run,
     ``--quick``, etc. -- see :func:`profile_menu`, which lists them). An
     unrecognized stem (no sidecar, or a sidecar for a material outside
@@ -95,7 +97,7 @@ def checkpoint_stem(material: str, face: str) -> str:
     for the blazed (sawtooth entrance-face) checkpoint written by
     ``pyrite material blaze``.
     Passing this stem to :func:`~pyrite.runs.run.load_checkpoint` loads the matching
-    ``.pkl`` -- no change to ``load_checkpoint`` / ``checkpoint_path_for`` needed.
+    component directory or legacy ``.pkl``.
     """
     return material if face == "flat" else f"{material}_blazed"
 
@@ -155,10 +157,9 @@ def cached_analysis(material: str, analyze, key, checkpoint_dir: Path | str | No
 def face_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMenuRow, ...]:
     """Two face rows (flat, blazed) for ``material``, each disabled when absent.
 
-    Mirrors :func:`material_menu`'s ``Path(checkpoint_dir).glob("*.pkl")``
-    existence convention so the face menu's ``disabled`` flags stay consistent
-    with the material menu: a face is enabled iff its ``checkpoint_stem`` has a
-    direct ``<stem>.pkl`` child of ``checkpoint_dir``. Flat is listed first
+    Uses the same component-or-legacy discovery convention as
+    :func:`material_menu`, so the face menu's ``disabled`` flags stay consistent:
+    a face is enabled iff its ``checkpoint_stem`` is discoverable. Flat is listed first
     (preferred default via :func:`select_initial_material` semantics).
     """
     available = set(_checkpoint_store.discover(checkpoint_dir))
@@ -318,6 +319,39 @@ def apply_emission(results, emission):
                 new_record = dict(record)
                 new_record["spec"] = chosen
                 picked[name][energy] = new_record
+    return picked
+
+
+def apply_characteristic(results, *, include: bool):
+    """Return a view with characteristic radiation included or removed.
+
+    Checkpoint records retain total ``spec``/``spec_coherent`` arrays plus the
+    independently stored ``spec_characteristic`` component. When ``include`` is
+    false, subtract that component from both available totals in shallow record
+    copies. Missing components are a backward-compatible no-op, and source
+    arrays are never mutated.
+    """
+    if include or not any(
+        record.get("spec_characteristic") is not None
+        for by_energy in (results or {}).values()
+        for record in by_energy.values()
+    ):
+        return results
+    picked: dict = {}
+    for name, by_energy in (results or {}).items():
+        picked[name] = {}
+        for energy, record in by_energy.items():
+            characteristic = record.get("spec_characteristic")
+            if characteristic is None:
+                picked[name][energy] = record
+                continue
+            new_record = dict(record)
+            component = np.asarray(characteristic)
+            for key in ("spec", "spec_coherent"):
+                spectrum = record.get(key)
+                if spectrum is not None:
+                    new_record[key] = np.asarray(spectrum) - component
+            picked[name][energy] = new_record
     return picked
 
 

@@ -794,51 +794,14 @@ def mc_brem_spectrum(
     E_cut_keV=None,
     cross_section_model: BremsstrahlungModel = "eedl",
 ):
-    """
-    Incoherent bremsstrahlung background d2N/dE dOmega
-    [photons / eV / sr / electron] from the same Monte Carlo segments as
-    mc_spectrum: each segment radiates n * dsigma/dk * L_seg photons/eV at its
-    representative kinetic energy, attenuated by the Beer-Lambert escape factor
-    from the segment midpoint along the observation direction. Under
-    ``energy_model="midpoint"`` that representative energy is the transported
-    ``E_repr_keV`` (the flight's midpoint energy), making each row a midpoint
-    quadrature of its own path integral; frozen rows use the start energy.
+    """Return the incoherent bremsstrahlung density from transport segments.
 
-    Approximations: emission taken isotropic (1/4pi) -- the standard
-    assumption at weakly relativistic energies once electron directions are
-    scattering-randomized (and the one Zhai et al. adopt for their
-    estimates); the tiny coherent fraction of the continuum (which is what
-    forms the CBS lines) is not subtracted.
-
-    NOTE: run the transport with a LOW E_cut_keV (~1 keV) for backgrounds --
-    electrons below the CXR cutoff still radiate in the soft X-ray window.
-
-    composition: [(element, n_per_Ang3), ...] for compounds; the emission is
-    additive over elements (each weighted by its own Z^2 cross section), and
-    the self-absorption uses the summed attenuation.
-
-    Finite transverse dimensions stored on ``segments`` attenuate each photon
-    to the first of the rectangular prism's six faces along the fixed far-field
-    observation direction. With both dimensions omitted, the original z-only
-    slab escape branches are retained unchanged.
-
-    groove: optional GrooveSpec replacing the flat/prism escape length with the
-    exact periodic working-facet distance from ``escape_distance_ang``. In the
-    supported blazed geometry, ``n_hat = (cos(tp), 0, -sin(tp))`` crosses
-    working facets outward and is parallel to relief facets, so the first
-    crossing is the complete material path and cannot be followed by re-entry.
-    This changes only the existing Beer--Lambert factor; emission cross sections
-    and kinematics remain unchanged. Transport supplies material segments only,
-    so vacuum legs do not radiate.
-
-    Assumptions: straight photon rays, y-invariant and laterally periodic
-    grooves, single-slab absorption, and the exact working-facet-normal
-    observation direction. Layers and other directions raise rather than
-    silently using flat attenuation. Source: exact periodic ray-plane
-    intersections; see
-    ``docs/validation/geometry/blazed-groove-geometry.md``.
-    Limiting case: ``groove=None`` retains the original flat/prism path
-    bit-for-bit; vanishing groove depth tends to the flat entrance-face path.
+    The result is the isotropic, Beer--Lambert-attenuated track-length estimate
+    in photons per eV per sr per incident electron. EEDL MF=23/MT=527 totals
+    and MF=26/MT=527 photon distributions are the default; the retained
+    Bethe--Heitler backend is selectable and supplies missing-coverage fallback.
+    Source equations, geometry assumptions, interpolation rules, and limiting
+    cases are documented in ``docs/physics/radiation-physics/bremsstrahlung.md``.
 
     Parameters
     ----------

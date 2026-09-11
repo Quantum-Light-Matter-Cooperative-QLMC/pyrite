@@ -107,7 +107,8 @@ Records are immutable once a config completes, so there is no reason to rewrite
 the whole store each time. Each finished config now writes exactly one
 crash-safety **shard** (`<stem>/parts/<hash>.pkl`) — O(1) per config, O(N) per
 sweep. At the end of the sweep (clean finish *or* budget stop) the shards are
-folded **once** into the authoritative `<stem>/{line,brem}.pkl` monolith and the
+folded **once** into the authoritative
+`<stem>/{line,brem,characteristic}.h5` components and the
 `parts/` directory is cleared, so `slim`/`prune`/`archive`/`remote` and the
 analysis app still see the unchanged on-disk contract.
 

@@ -1,6 +1,6 @@
 """Component-aware checkpoint storage.
 
-Active checkpoints live at ``<root>/<stem>/{line,brem}.h5``.  Callers keep
+Active checkpoints live at ``<root>/<stem>/{line,brem,characteristic}.h5``. Callers keep
 using the historical merged ``{name: {E0: record}}`` in-memory shape; this
 module splits records on write and merges them on read.  A legacy
 ``<root>/<stem>.pkl`` remains readable, so migration happens on the next save.
@@ -16,11 +16,12 @@ import numpy as np
 
 from . import _checkpoint_io
 
-COMPONENTS = ("line", "brem")
+COMPONENTS = ("line", "brem", "characteristic")
 _HDF5_SUFFIX = ".h5"
 _LEGACY_SUFFIX = ".pkl"
 _BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide"})
 _BREM_CASE_KEYS = frozenset({"Ne_brem", "E_grid_brem", "brem_chunk", "brem_file"})
+_CHARACTERISTIC_KEYS = frozenset({"spec_characteristic"})
 
 
 def checkpoint_dir(stem: str, root: str | os.PathLike[str]) -> Path:
@@ -85,13 +86,31 @@ def _component_store(results: dict, component: str) -> dict:
         for energy, record in by_energy.items():
             if component == "line":
                 selected[energy] = {
-                    key: value for key, value in record.items() if key not in _BREM_KEYS
+                    key: value
+                    for key, value in record.items()
+                    if key not in _BREM_KEYS and key not in _CHARACTERISTIC_KEYS
                 }
-            else:
+                characteristic = record.get("spec_characteristic")
+                if characteristic is not None:
+                    characteristic_array = np.asarray(characteristic)
+                    for key in ("spec", "spec_coherent"):
+                        total = selected[energy].get(key)
+                        if total is not None:
+                            selected[energy][key] = np.asarray(total) - characteristic_array
+            elif component == "brem":
                 selected[energy] = {
                     key: value
                     for key, value in record.items()
                     if key in _BREM_KEYS or key in {"case", "E_grid", "scale"}
+                }
+            else:
+                characteristic = record.get("spec_characteristic")
+                if characteristic is None:
+                    continue
+                selected[energy] = {
+                    key: value
+                    for key, value in record.items()
+                    if key in _CHARACTERISTIC_KEYS or key in {"case", "E_grid", "scale"}
                 }
             selected[energy]["case"] = copy.deepcopy(record["case"])
         if selected:
@@ -106,7 +125,7 @@ def parts_dir(stem: str, root: str | os.PathLike[str]) -> Path:
     re-serializing the whole growing store on every save (which was O(N^2) in
     total bytes across a sweep).  Shards are the intermediate only: a normal or
     budget-stopped run consolidates them into the authoritative
-    ``{line,brem}.h5`` monolith and clears this directory, so downstream tools
+    ``{line,brem,characteristic}.h5`` monoliths and clears this directory, so downstream tools
     (slim/prune/archive/remote) still see the historical layout.  A hard crash
     leaves shards behind; :func:`load_parts` recovers them on resume.
     """
@@ -188,9 +207,9 @@ def save(
 ) -> None:
     """Atomically replace selected component artifacts.
 
-    When both components change, brem lands before line.  Since line is the
-    authoritative record index, interruption cannot expose a new line record
-    without its matching background.
+    Components land in background, characteristic, line order. Since line is
+    the authoritative record index, interruption cannot expose a new line
+    record without its matching independently stored companions.
     """
     unknown = set(components) - set(COMPONENTS)
     if unknown:
@@ -208,12 +227,14 @@ def save(
                     component_path(stem, component, root),
                     _component_store(legacy, component),
                 )
-    order = ("brem", "line") if set(components) == set(COMPONENTS) else components
+    order = tuple(
+        component for component in ("brem", "characteristic", "line") if component in components
+    )
     for component in order:
         _atomic_dump(component_path(stem, component, root), _component_store(results, component))
 
 
-def _merge(line: dict, brem: dict) -> dict:
+def _merge(line: dict, brem: dict, characteristic: dict) -> dict:
     merged = {}
     for name, by_energy in line.items():
         merged[name] = {}
@@ -236,6 +257,27 @@ def _merge(line: dict, brem: dict) -> dict:
                         np.asarray(wide_grid, float),
                         np.asarray(wide, float),
                     )
+            characteristic_record = characteristic.get(name, {}).get(energy)
+            # Current line artifacts omit characteristic radiation. Legacy line
+            # artifacts carried both the audit array and totals that already
+            # included it; prefer that co-located value to avoid double adding
+            # during an interrupted migration.
+            if record.get("spec_characteristic") is None and characteristic_record is not None:
+                characteristic_grid = characteristic_record.get("E_grid")
+                if characteristic_grid is not None and not np.array_equal(
+                    np.asarray(record.get("E_grid")), np.asarray(characteristic_grid)
+                ):
+                    raise ValueError(
+                        f"characteristic checkpoint grid does not match line grid for {name!r} "
+                        f"at {energy!r} keV"
+                    )
+                component = characteristic_record.get("spec_characteristic")
+                if component is not None:
+                    component_array = np.asarray(component)
+                    record["spec_characteristic"] = component
+                    for key in ("spec", "spec_coherent"):
+                        if record.get(key) is not None:
+                            record[key] = np.asarray(record[key]) + component_array
             merged[name][energy] = record
     return merged
 
@@ -244,14 +286,24 @@ def load(stem: str, root: str | os.PathLike[str]) -> dict:
     line_path = component_read_path(stem, "line", root)
     if line_path.is_file():
         line = _checkpoint_io.load(str(line_path))
+        legacy = None
         brem_path = component_read_path(stem, "brem", root)
         if brem_path.is_file():
             brem = _checkpoint_io.load(str(brem_path))
         elif legacy_path(stem, root).is_file():
-            brem = _component_store(_checkpoint_io.load(str(legacy_path(stem, root))), "brem")
+            legacy = _checkpoint_io.load(str(legacy_path(stem, root)))
+            brem = _component_store(legacy, "brem")
         else:
             brem = {}
-        merged = _merge(line, brem)
+        characteristic_path = component_read_path(stem, "characteristic", root)
+        if characteristic_path.is_file():
+            characteristic = _checkpoint_io.load(str(characteristic_path))
+        elif legacy_path(stem, root).is_file():
+            legacy = _checkpoint_io.load(str(legacy_path(stem, root))) if legacy is None else legacy
+            characteristic = _component_store(legacy, "characteristic")
+        else:
+            characteristic = {}
+        merged = _merge(line, brem, characteristic)
         return _overlay(merged, load_parts(stem, root))
     old = legacy_path(stem, root)
     if old.is_file():
@@ -289,7 +341,7 @@ def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
 # one case's raw transport ``out`` dict, so a case computed by any profile can be
 # replayed (``store_result``) by any other profile whose case hashes equal. The
 # blobs live under the per-material directory alongside its component store; the
-# 2-hex shard names never collide with ``line.h5`` / ``brem.h5`` / ``meta.json``
+# 2-hex shard names never collide with the named component files or ``meta.json``
 # and are invisible to :func:`discover`.
 
 

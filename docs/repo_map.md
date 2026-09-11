@@ -147,7 +147,8 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   bare `--remote` uses the configured target; an explicit value is validated and
   scoped to that invocation. Remote runs accept uniform `--wait` / `--detach`;
   local runs reject them. Local output is canonical
-  `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
+  `checkpoints/<material>/{line,brem,characteristic}.h5` or an identity-qualified
+  variant
   directory. Box shim: `python -m pyrite._entry.scan`.
 - **`pyrite-dev perf [PROFILE] [-m MATERIAL] [-R[=TARGET]]`** → the same run
   machinery with compute-performance telemetry enabled and shared-cache access
@@ -435,8 +436,9 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   stages EEDL panels once per element/grid, and owns `load_external_brem`;
   `brem_jit_kernel.py` owns the fused CUDA EEDL/Bethe--Heitler reduction;
   `characteristic.py` parses the
-  packaged ENDF-6 EEDL File-23 tables, joins xraydb direct-vacancy relaxation,
-  and owns `mc_characteristic_spectrum`; `coherent.py` groups the CUDA-only
+  packaged ENDF-6 EEDL File-23 tables, joins xraydb direct-vacancy relaxation
+  and natural level widths, integrates Lorentzian line profiles over the fine
+  grid, and owns `mc_characteristic_spectrum`; `coherent.py` groups the CUDA-only
   coherent-kernel surface; `diagnostics.py` owns the opt-in,
   host-only radiation error estimators `cxr_endpoint_resonance_drift` and
   `brem_endpoint_quadrature_error` plus `subdivide_flights`, none of which sit
@@ -478,7 +480,8 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case`
   always stores incoherent `spec` and, when requested, `spec_coherent` from the
   same transport, adds the shared characteristic component to both, and keeps
-  it separately as `spec_characteristic`; `_line_pair_for_case` mirrors this
+  it separately as `spec_characteristic`; characteristic emission is evaluated
+  directly on the fine line grid. `_line_pair_for_case` mirrors this
   for `pyrite reline`. Deps:
   `_backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
@@ -675,8 +678,9 @@ Keeps storage layout and serialization policy behind the checkpoint package.
 
 ### `checkpoints/_checkpoint_store.py`
 Component storage adapter: active datasets live under
-`checkpoints/<stem>/{line,brem}.pkl`, merge transparently into historical
-in-memory result records, and migrate legacy `checkpoints/<stem>.pkl` stores on
+`checkpoints/<stem>/{line,brem,characteristic}.h5`, merge transparently into historical
+in-memory result records, treat the characteristic companion as optional, and
+migrate legacy `checkpoints/<stem>.pkl` stores on
 next save. Shared case blobs live at
 `checkpoints/<material>/<first2hex>/<content-key>.pkl` and use atomic writes.
 The `.pkl` suffix remains a layout token; current bytes use the versioned HDF5
