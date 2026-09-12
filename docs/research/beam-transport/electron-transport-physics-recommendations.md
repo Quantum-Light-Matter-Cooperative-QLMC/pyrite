@@ -18,19 +18,16 @@ with particular emphasis on preserving the detailed electron trajectories
 required by coherent radiation calculations such as parametric X-ray radiation
 (PXR) and coherent bremsstrahlung (CBS).
 
+```{important}
 The central design constraint is that PyRITE is not interested only in endpoint
 transport observables such as range, dose, or exit angle. Its coherent-radiation
-solver consumes the intermediate electron trajectory itself. The transport
-engine must therefore preserve a physically meaningful sequence of
+solver consumes the intermediate electron trajectory itself.
+
+The transport engine must therefore preserve a physically realistic sequence of
 approximately straight-line trajectory segments between direction-changing
-interactions.
-
-```{important}
-For PXR/CBS, the detailed trajectory is part of the radiation calculation.
-
-A transport approximation that reproduces only the final angular distribution,
-projected range, or mean energy loss is not automatically sufficient if it
-alters the intermediate path and therefore the coherent radiation phase.
+interactions. A transport approximation that reproduces only the final angular
+distribution, projected range, or mean energy loss is therefore likely
+not sufficient.
 ```
 
 This document incorporates the newer EEDL-based bremsstrahlung and

@@ -2,10 +2,21 @@
 
 a **Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons
 
-PyRITE uses a Monte Carlo electron transport model to simulate the expected xray emission of coherent tunable X-ray lines from ~30–60 keV electrons in crystalline materials into detection solid angles.
+PyRITE is primarily a simulation tool which implements a Monte Carlo electron transport model
+to simulate the expected x-ray emission of coherent tunable X-ray lines from ~30–60 keV electrons
+interacting with crystalline materials.
 
 PyRITE is currently unvalidated research code under active development; absolute predictions
 remain bounded by [validation status](docs/validation/physics-validation-ledger.md).
+
+PyRITE is intended to eventually become a more general-purpose electron transport and radiation
+simulation toolkit for electron transport in the 1 keV - 100 MeV range, with native support for
+low-level GPU acceleration, arbitrary source, target, and detector geometries, and extensible physics,
+making PyRITE Python-based, fast, and an accessible alternative to the more traditional, well-validated,
+but higher barrier-to-entry toolkits such as the FORTRAN-based PENELOPE or the C++-based Geant4,
+while also implementing physics engines not natively supported by those tools, including
+Parametric X-ray radiation (PXR), coherent bremsstrahlung (CBS), and support for electron-channeling
+effects in crystals below 100 MeV.
 
 ## Install
 
