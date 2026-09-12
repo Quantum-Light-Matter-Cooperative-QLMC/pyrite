@@ -4,7 +4,6 @@ import numpy as np
 
 import pyrite.montecarlo.runner as runner
 from pyrite.montecarlo.runner import scheduling
-import pyrite.montecarlo.runner.scheduling as scheduling
 
 
 class DummyOOM(Exception):
@@ -253,7 +252,7 @@ def test_gpu_pipeline_auto_fallback_recognizes_delayed_runtime_oom(monkeypatch):
         yield
 
     monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
-    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", ())    
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", ())
     monkeypatch.setattr(
         runner.BACKEND,
         "is_oom_error",

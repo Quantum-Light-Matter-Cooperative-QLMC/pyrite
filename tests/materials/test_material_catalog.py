@@ -478,6 +478,25 @@ def test_profile_convergence_numerics_are_validated_and_exposed(tmp_path):
         load_material_catalog(path)
 
 
+@pytest.mark.parametrize("field", ["n_families", "max_reflections", "mosaic_nodes"])
+@pytest.mark.parametrize("invalid", ["0", "-1", "true", "1.5"])
+def test_profile_convergence_rejects_invalid_counts_after_rewrite(tmp_path, field, invalid):
+    import os
+
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    path = _catalog_with_two_profiles(tmp_path)
+    text = path.read_text().replace("[profiles.narrowed]\n", f"[profiles.narrowed]\n{field} = 3\n")
+    path.write_text(text)
+    assert load_material_catalog(path).profile_numerics("narrowed")[field] == 3
+
+    stat = path.stat()
+    path.write_text(text.replace(f"{field} = 3", f"{field} = {invalid}"))
+    os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+    with pytest.raises(MaterialConfigError, match=rf"profiles\.narrowed\.{field}"):
+        load_material_catalog(path)
+
+
 def test_profile_names_and_memberships_are_exposed(tmp_path):
     from pyrite.materials import load_material_catalog
 

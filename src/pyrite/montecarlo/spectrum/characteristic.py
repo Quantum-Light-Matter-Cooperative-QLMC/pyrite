@@ -17,6 +17,7 @@ import xraydb
 from endf_parserpy import EndfFile
 
 from ... import DATA_DIR
+from ..._backend import REAL, _to_cpu, xp
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
     _layer_dz,
@@ -24,7 +25,6 @@ from ...materials.attenuation import (
     _mu_total_inv_ang,
     _normalize_composition,
 )
-from ..._backend import REAL, _to_cpu, xp
 from ..groove import escape_distance_ang
 from .lines import (
     _clip_segments_to_cutoff,
@@ -183,16 +183,13 @@ def _extract_eedl_subshell(
     laws_float = _section_vector(section, "INT", path, mt)
     if projectile.size != cross_section_barn.size or projectile.size < 3:
         raise ValueError(
-            f"{path}: EEDL MF=23/MT={mt} must contain at least three paired "
-            "Eint/sigma samples"
+            f"{path}: EEDL MF=23/MT={mt} must contain at least three paired Eint/sigma samples"
         )
     if breakpoints_float.size == 0 or breakpoints_float.size != laws_float.size:
         raise ValueError(f"{path}: EEDL MF=23/MT={mt} has invalid NBT/INT arrays")
     breakpoints = np.rint(breakpoints_float).astype(int)
     laws = np.rint(laws_float).astype(int)
-    if not np.array_equal(breakpoints_float, breakpoints) or not np.array_equal(
-        laws_float, laws
-    ):
+    if not np.array_equal(breakpoints_float, breakpoints) or not np.array_equal(laws_float, laws):
         raise ValueError(f"{path}: EEDL MF=23/MT={mt} NBT/INT values must be integers")
     if breakpoints[-1] != projectile.size or np.any(np.diff(breakpoints) <= 0):
         raise ValueError(f"{path}: invalid EEDL MF=23/MT={mt} interpolation breakpoints")
@@ -261,9 +258,7 @@ def _load_eedl_subshell_tables(
             )
         if matching_materials:
             _mat, subshell_mts, material = matching_materials[0]
-            return tuple(
-                _extract_eedl_subshell(path, mt, material[23, mt]) for mt in subshell_mts
-            )
+            return tuple(_extract_eedl_subshell(path, mt, material[23, mt]) for mt in subshell_mts)
 
     if saw_eadl_relaxation and not saw_eedl_subshell:
         raise ValueError(

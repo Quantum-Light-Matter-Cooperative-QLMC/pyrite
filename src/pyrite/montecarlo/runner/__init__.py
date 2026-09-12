@@ -28,9 +28,13 @@ from ..groove import blazed_groove_spec
 from ..spectrum import (
     _segments_in_layer,
     _segments_on_device,
-    mc_brem_spectrum,
-    mc_characteristic_spectrum,
     mc_spectrum,
+)
+from ..spectrum import (
+    mc_brem_spectrum as mc_brem_spectrum,
+)
+from ..spectrum import (
+    mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
 from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
 
@@ -163,11 +167,10 @@ from .oom import (
 )
 from .oom import _should_free as _should_free
 
+
 def _is_gpu_oom(error):
-    return (
-        isinstance(error, _RESOURCE_POLICY.gpu_oom)
-        or BACKEND.is_oom_error(error)
-    )
+    return isinstance(error, _RESOURCE_POLICY.gpu_oom) or BACKEND.is_oom_error(error)
+
 
 class _TimingAgg:
     """Main-process accumulator for PYRITE_MC_TIMING phase profiling.
@@ -599,166 +602,15 @@ def _transport_case(
     return tp
 
 
-def _brem_wide_from_segments(
-    segs_b,
-    E_brem,
-    case,
-    n_hat,
-    abs_layers,
-    groove=None,
-    Ne=None,
-):
-    """Bremsstrahlung background on ``E_brem`` from already-transported brem
-    segments ``segs_b``. EVERY layer radiates with its OWN composition (each
-    Z^2 cross section) and self-absorbs through the WHOLE stack
-    (``layers=abs_layers``); the per-layer contributions are summed. A single
-    layer (``n_layers == 1``) is exactly the old single-material brem. Honors
-    ``brem_chunk`` (segments per GPU matmul). Pure move of _spectrum_case's brem
-    block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
-    the SAME multilayer background as a live sweep."""
-    brem_chunk = _admit_chunk(
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(E_brem.size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
-        E_brem.size,
-        intermediates=_EEDL_BREM_DENSE_INTERMEDIATES,
-    )
-    n_lay = int(segs_b.get("n_layers", 1))
-
-    if n_lay == 1:
-        return mc_brem_spectrum(
-            segs_b,
-            E_brem,
-            composition=case["composition"],
-            n_hat=n_hat,
-            chunk=brem_chunk,
-            layers=abs_layers,
-            groove=groove,
-            electron_limit=Ne,
-            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-        )
-    brem_wide = np.zeros(E_brem.shape, dtype=float)
-    for L in range(n_lay):
-        sL = _segments_in_layer(segs_b, L)
-        if sL["L_ang"].size == 0:
-            continue
-        brem_wide = brem_wide + mc_brem_spectrum(
-            sL,
-            E_brem,
-            composition=abs_layers[L][2],
-            n_hat=n_hat,
-            chunk=brem_chunk,
-            layers=abs_layers,
-            groove=groove,
-            electron_limit=Ne,
-            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-        )
-    return brem_wide
-
-
-def _characteristic_from_segments(
-    segs,
-    E_brem,
-    case,
-    n_hat,
-    abs_layers,
-    groove=None,
-    Ne=None,
-):
-    """Characteristic lines on the wide bremsstrahlung energy grid.
-
-    Every material layer emits from its own EEDL subshell cross sections and
-    xraydb relaxation data; photons self-absorb through the complete stack.
-    The estimator uses the bremsstrahlung electron population because those
-    tracks continue to the lower, background cutoff and therefore retain the
-    low-energy ionization path that a line-only 5 keV cutoff would discard.
-    """
-    characteristic_chunk = _admit_chunk(
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(E_brem.size),
-        E_brem.size,
-    )
-    n_lay = int(segs.get("n_layers", 1))
-    if n_lay == 1:
-        return mc_characteristic_spectrum(
-            segs,
-            E_brem,
-            composition=case["composition"],
-            n_hat=n_hat,
-            chunk=characteristic_chunk,
-            layers=abs_layers,
-            groove=groove,
-            electron_limit=Ne,
-            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-        )
-    characteristic = np.zeros(E_brem.shape, dtype=float)
-    for layer_index in range(n_lay):
-        layer_segments = _segments_in_layer(segs, layer_index)
-        if layer_segments["L_ang"].size == 0:
-            continue
-        characteristic = characteristic + mc_characteristic_spectrum(
-            layer_segments,
-            E_brem,
-            composition=abs_layers[layer_index][2],
-            n_hat=n_hat,
-            chunk=characteristic_chunk,
-            layers=abs_layers,
-            groove=groove,
-            electron_limit=Ne,
-            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-        )
-    return characteristic
-
-
-def _brem_for_case(case, E_brem):
-    """Regenerate a case's bremsstrahlung background on ``E_brem`` from scratch:
-    build the tilted geometry, transport ``Ne_brem`` electrons through the stack
-    (``layers=abs_layers``, with the same seed as the shared live transport),
-    and sum brem
-    per layer via :func:`_brem_wide_from_segments`. Returns ``brem_wide``.
-
-    This is the brem half of run_case's transport + spectrum phases factored out
-    so :func:`pyrite.runs.run.repair_brem_wide` reuses the EXACT live-sweep path.
-    Previously the repair rebuilt single-slab brem by hand -- ``layers=`` omitted,
-    no per-layer sum, ``brem_chunk`` ignored -- silently dropping substrate
-    backscatter/brem and cross-stack absorption on stacked/multilayer records."""
-    abs_layers = case.get("abs_layers")
-    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
-    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
-    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
-    # Build once, then forward the identical groove through electron entry and
-    # bremsstrahlung photon escape, matching the live-sweep path.
-    groove = None
-    if case.get("groove_spacing_ang") is not None:
-        groove = blazed_groove_spec(
-            case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
-        )
-
-    Ne_brem = case["Ne_brem"]
-    E_cut_brem = case.get("E_cut_brem_keV", 1.0)
-    E_cut_by_electrons = np.full(Ne_brem, E_cut_brem, dtype=np.float64)
-
-    segs_b = simulate_trajectories(
-        case["E0_keV"],
-        case["Ne_brem"],
-        case["thickness_ang"],
-        E_cut_by_electrons=E_cut_by_electrons,
-        composition=case["composition"],
-        seed=case["seed"],
-        beam_dir=beam,
-        layers=abs_layers,
-        **_beam_kwargs(case),
-        crystal_width_mm=case.get("crystal_width_mm"),
-        crystal_height_mm=case.get("crystal_height_mm"),
-        tilt_polar_rad=tilt_polar_rad,
-        tilt_azim_rad=tilt_azim_rad,
-        groove=groove,
-    )
-    return _brem_wide_from_segments(
-        segs_b,
-        E_brem,
-        case,
-        n_hat,
-        abs_layers,
-        groove=groove,
-    )
+from .emission import (
+    _brem_for_case as _brem_for_case,
+)
+from .emission import (
+    _brem_wide_from_segments as _brem_wide_from_segments,
+)
+from .emission import (
+    _characteristic_from_segments as _characteristic_from_segments,
+)
 
 
 def _lines_for_segments(
@@ -994,7 +846,9 @@ def _effective_spec_chunk(case, tp):
 def _effective_brem_chunk(case, tp):
     """Resolve one case's bremsstrahlung chunk without changing the case."""
     return _admit_chunk(
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
+        case.get("brem_chunk")
+        or _RESOURCE_POLICY.brem_chunk
+        or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES),
         tp["E_brem"].size,
         intermediates=_EEDL_BREM_DENSE_INTERMEDIATES,
     )
@@ -1011,7 +865,9 @@ def _halve_case_spec_chunk(case, tp):
 def _halve_case_brem_chunk(case, tp):
     """Halve this case's effective brem chunk in place; preserve line tuning."""
     brem_cur = (
-        case.get("brem_chunk") or _RESOURCE_POLICY.brem_chunk or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES)
+        case.get("brem_chunk")
+        or _RESOURCE_POLICY.brem_chunk
+        or _adaptive_chunk(tp["E_brem"].size, intermediates=_EEDL_BREM_DENSE_INTERMEDIATES)
     )
     case["brem_chunk"] = max(1000, brem_cur // 2)
 

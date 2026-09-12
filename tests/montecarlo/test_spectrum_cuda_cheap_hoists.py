@@ -170,9 +170,7 @@ def test_eedl_brem_raw_kernel_matches_staged_numpy_reference():
         * den_i
         / (p_i * p_i)
     )
-    eedl_weight = cp.float32(density) * L_d * cp.float32(1.0e-8) * cp.asarray(
-        differential_scale
-    )
+    eedl_weight = cp.float32(density) * L_d * cp.float32(1.0e-8) * cp.asarray(differential_scale)
 
     got = run_eedl_brem_reduction_kernel(
         T_d,

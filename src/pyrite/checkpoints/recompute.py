@@ -736,8 +736,11 @@ def repair_line_spec(
         # (no `spec_coherent` key) are orphaned by design -- reline only ever
         # re-derives the incoherent `spec` for those.
         want_coherent = "spec_coherent" in r
-        spec, spec_coherent, spec_characteristic = runner._line_pair_for_case(c, target, want_coherent=want_coherent, return_characteristic=True)
+        spec, spec_coherent, spec_characteristic = runner._line_pair_for_case(
+            c, target, want_coherent=want_coherent, return_characteristic=True
+        )
         r["spec"] = spec
+        r["spec_characteristic"] = spec_characteristic
         if want_coherent:
             r["spec_coherent"] = spec_coherent
         r["E_grid"] = target

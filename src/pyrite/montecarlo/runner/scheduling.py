@@ -10,6 +10,7 @@ from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._energy_grid_encoding import decode_energy_grid
 from ..._env import env_value
 from . import (
+    _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
     _TIMING,
     _adaptive_chunk,
@@ -22,6 +23,7 @@ from . import (
     _ensure_pool_limit,
     _gpu_pipeline_prefetch,
     _gpu_pipeline_workers,
+    _is_gpu_oom,
     _process_pool_kwargs,
     _spectrum_case,
     _spectrum_case_retry,
@@ -29,8 +31,6 @@ from . import (
     _transport_case,
     _worker_init,
     run_case,
-    _EEDL_BREM_DENSE_INTERMEDIATES,
-    _is_gpu_oom,
 )
 
 

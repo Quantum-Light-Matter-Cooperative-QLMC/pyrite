@@ -528,8 +528,7 @@ def _prepare_eedl_grid(
             staged(values) for values in table.photon_energy_eV_by_incident
         ),
         photon_probability_density_per_eV_by_incident=tuple(
-            staged(values)
-            for values in table.photon_probability_density_per_eV_by_incident
+            staged(values) for values in table.photon_probability_density_per_eV_by_incident
         ),
         photon_cumulative_probability_by_incident=tuple(
             staged(values) for values in table.photon_cumulative_probability_by_incident
@@ -933,9 +932,7 @@ def mc_brem_spectrum(
     E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     seg_E = xp.asarray(segments[E_field], dtype=REAL)[brem_idx]
     eedl_contexts = (
-        _prepare_mc_eedl_contexts(comp, seg_E, E_grid)
-        if cross_section_model == "eedl"
-        else {}
+        _prepare_mc_eedl_contexts(comp, seg_E, E_grid) if cross_section_model == "eedl" else {}
     )
 
     z_mid = seg_r[:, 2]
@@ -1024,11 +1021,7 @@ def mc_brem_spectrum(
             if cross_section_model == "eedl" and context is not None:
                 state = context.state
                 eedl_incident_weight = xp.ascontiguousarray(
-                    n_i
-                    * REAL(1.0e24)
-                    * L_jit
-                    * REAL(1.0e-8)
-                    * state.differential_scale_cm2,
+                    n_i * REAL(1.0e24) * L_jit * REAL(1.0e-8) * state.differential_scale_cm2,
                     dtype=REAL,
                 )
                 run_eedl_brem_reduction_kernel(

@@ -7,7 +7,6 @@ records and parsing helpers live in private sibling modules.
 from __future__ import annotations
 
 import functools
-import hashlib
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path
@@ -66,35 +65,31 @@ def load_material_catalog(
         If the file cannot be read, parsed, or validated for ``profile``.
     """
     source = Path(DATA_DIR) / "materials.toml" if path is None else Path(path)
-    # Cache key is the file's CONTENT digest, not its stat. Rewriting the same
-    # path is what the catalog tests do, and mtime/size cannot tell two such
-    # writes apart: a filesystem timestamp is only as fine as the kernel's
-    # coarse clock, so an edit that lands within the same tick and keeps the
-    # byte count -- "n_families = 3" -> "n_families = 0" -- reuses the key and
-    # is served the previous parse. Hashing the bytes we are about to parse
-    # makes a stale hit impossible.
+
     try:
         content = source.read_bytes()
     except OSError as exc:
         raise MaterialConfigError((f"{source}: {exc}",)) from exc
-    digest = hashlib.blake2b(content, digest_size=16).digest()
-    return _load_material_catalog_cached(source, digest, profile)
+
+    return _load_material_catalog_cached(source, content, profile)
 
 
 @functools.lru_cache(maxsize=32)
 def _load_material_catalog_cached(
     source: Path,
-    _digest: bytes,
+    content: bytes,
     profile: str,
 ) -> MaterialCatalog:
     errors = _Errors()
+
     try:
-        with source.open("rb") as stream:
-            raw = tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raw = tomllib.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise MaterialConfigError((f"{source}: {exc}",)) from exc
+
     if not isinstance(raw, Mapping):
         raise MaterialConfigError((f"{source}: root must be a table",))
+
     errors.keys(
         raw,
         "catalog",
