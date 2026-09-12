@@ -237,12 +237,47 @@ def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
     )
     scan = catalog.material("sample").scan
 
-    assert scan.energy_keV.tolist() == [25.0, 30.0, 40.0]
+    # The profile owns the swept axis and here sweeps a subset of the derived
+    # energies; only the derived line/brem grids come out of the artifact.
+    assert scan.energy_keV.tolist() == [25.0, 30.0]
     assert scan.E_grid_line_by_energy is not None
+    assert list(scan.E_grid_line_by_energy) == [25.0, 30.0]
     assert scan.E_grid_line_by_energy[25.0].tolist() == [11.0, 23.0, 35.0, 47.0, 59.0]
     assert scan.E_grid_brem.tolist() == [0.0, 20.0, 40.0, 60.0, 80.0]
     assert catalog.profile_energy_grid_ref("standard", "sample") == stored.digest
     assert catalog.resolved_energy_grid_refs == {"sample": stored.digest}
+
+
+def test_profile_artifact_ref_rejects_beam_energy_the_artifact_never_covered(tmp_path):
+    """A hand-copied ref must fail at load time, not silently swap the axis.
+
+    ``beam_energies_keV`` is a record of what `energy-grid add` derived, written
+    *from* the profile; a profile sweeping an energy outside it means the ref
+    does not belong to that profile.
+    """
+    from pyrite import _energy_grid_artifacts as artifacts
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    identity = artifacts.artifact_identity(
+        "sample",
+        # A line row for 40 keV, so the missing-line-grid check cannot fire and
+        # mask the beam-energy check under test.
+        [
+            {"energy_keV": 25, "start_eV": 11, "stop_eV": 59, "num": 5},
+            {"energy_keV": 30, "start_eV": 12, "stop_eV": 72, "num": 4},
+            {"energy_keV": 40, "start_eV": 20, "stop_eV": 80, "num": 3},
+        ],
+        {"start_eV": 0, "stop_eV": 100, "step_eV": 20},
+        [25, 30],
+    )
+    stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
+    text = _catalog_with_artifact_ref(stored.digest).replace(
+        "energy_keV = { values = [25.0, 30.0] }",
+        "energy_keV = { values = [25.0, 30.0, 40.0] }",
+    )
+
+    with pytest.raises(MaterialConfigError, match="do not include .40.0."):
+        load_material_catalog(_write_catalog(tmp_path, text))
 
 
 def test_profile_artifact_ref_matches_equivalent_legacy_resolution(tmp_path):

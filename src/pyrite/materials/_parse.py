@@ -733,10 +733,14 @@ def _parse_materials(
 
         artifact = profile_artifacts.get(key) if resolves_selected else None
         artifact_line_grids = None
+        artifact_energies: list[float] = []
         if artifact is not None:
             digest, identity = artifact
+            # The artifact records which beam energies the derivation covered;
+            # the profile still owns the swept axis (it is what `energy-grid
+            # add` stamped into the identity in the first place). Only the
+            # derived grids below come back out of the artifact.
             artifact_energies = cast("list[float]", identity["beam_energies_keV"])
-            values["energy_keV"] = {"values": list(artifact_energies)}
             brem = cast("Mapping[str, float]", identity["brem_grid"])
             values["E_grid_brem"] = {
                 "arange": {
@@ -766,6 +770,17 @@ def _parse_materials(
                 )
             ),
         )
+        if artifact is not None and scan is not None:
+            # A profile may sweep a subset of the derived energies; it may never
+            # sweep one the derivation never covered. Catches a hand-copied ref
+            # at load time instead of silently resolving the wrong axis.
+            uncovered = sorted({float(value) for value in scan.energy_keV} - set(artifact_energies))
+            if uncovered:
+                errors.add(
+                    f"profiles.{resolving_profile_name}.energy_grid_refs.{key}",
+                    f"artifact {digest} covers beam energies {artifact_energies}, "
+                    f"which do not include {uncovered}",
+                )
         substrate = row.get("substrate")
         if substrate is not None and (
             not isinstance(substrate, str) or substrate not in crystals and substrate not in media
