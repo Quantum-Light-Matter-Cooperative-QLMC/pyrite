@@ -849,9 +849,13 @@ def test_coherent_decoherence_device_suite():
     # its own, recursing until the box ran out of memory. Deselecting the
     # driver by name below makes that unreachable even if the pin is lost.)
     env["PYRITE_TEST_BACKEND"] = "cuda"
+    # The parent conftest pins PYRITE_MC_BACKEND=cpu.  Remove that inherited
+    # implementation-level pin while retaining the test-only CUDA override
+    # above.  Popping PYRITE_TEST_BACKEND here makes the child identify as
+    # another parent and recursively spawn pytest children until the host runs
+    # out of memory.
+    env.pop("PYRITE_MC_BACKEND", None)
     completed = subprocess.run(  # noqa: S603
-        # No -q here: pyproject's addopts already carries one, and -qq drops
-        # the summary line this asserts on.
         [
             sys.executable,
             "-m",
