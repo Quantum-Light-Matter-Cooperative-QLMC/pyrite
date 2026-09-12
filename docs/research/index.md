@@ -14,6 +14,8 @@ that already govern the repository live under
 :caption: Electron transport physics research
 
 beam-transport/electron-transport-physics-recommendations
+beam-transport/energy-grid-recommendations
+beam-transport/stochastic-sampling-recommendations
 ```
 
 ```{toctree}
@@ -22,6 +24,7 @@ beam-transport/electron-transport-physics-recommendations
 
 physics/relativistic-electron-transport
 physics/channeling-radiation-physics
+physics/transition-radiation-recommendations
 ```
 
 ```{toctree}

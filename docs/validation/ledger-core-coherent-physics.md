@@ -2,6 +2,16 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `tr-interface-energy-scale`
+
+- **Claim:** Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`; illustrative research estimate only
+- **Code:** `docs/research/physics/transition-radiation-recommendations.md` (research claim; no production implementation)
+- **Source:** PDG 2020, Passage of Particles Through Matter, §34.7.3, Eq. (34.45)
+- **Status:** unverified
+- **Checks:** Required: relativistic assumptions, units, vacuum/matched-medium limit, distinction from finite-foil interference and detected photon yield; low-energy extrapolation explicitly excluded
+- **Anchor:** None; not independently validated or a production acceptance bound
+- **Notes:** [Recommendation and assumptions](../research/physics/transition-radiation-recommendations.md). Does not close the proposed `cr-transition-radiation-bound` item: that requires an application-specific spectral-angular calculation through detector acceptance. Human sign-off pending.
+
 ## `coherent-line-spectrum`
 
 - **Claim:** `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average

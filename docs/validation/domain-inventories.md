@@ -9,6 +9,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 
 | ID | Claim | Status |
 |---|---|---|
+| [`tr-interface-energy-scale`](ledger-core-coherent-physics.md#tr-interface-energy-scale) | Relativistic vacuum/material single-interface TR energy scale `W ≈ alpha gamma hbar omega_p / 3` and photon roll-off scale of order `gamma hbar omega_p`; illustrative research estimate only | `unverified` |
 | [`coherent-line-spectrum`](ledger-core-coherent-physics.md#coherent-line-spectrum) | `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average | `rederived` |
 | [`coherent-emission`](ledger-core-coherent-physics.md#coherent-emission) | opt-in phased segment sum `dN/dE dΩ ∝ \|Σ_j A_j·exp{i[ω(t_abs,j−n̂·r_j)−g·r_j]}\|²`; intra-electron plus inter-electron/superradiant cross terms and Gaussian inter-electron form factor `exp[−(ωσ_z)²]` | `rederived` |
 | [`coherent-segment-midpoint-time`](ledger-core-coherent-physics.md#coherent-segment-midpoint-time) | coherent finite-segment phase pairs stored midpoint position with midpoint transport age `t_mid = t_ang + L_ang/(2β)` while preserving `t_ang` as segment-start age | `rederived` |
