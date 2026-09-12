@@ -11,6 +11,13 @@ that already govern the repository live under
 
 ```{toctree}
 :maxdepth: 1
+:caption: Electron transport physics research
+
+beam-transport/electron-transport-phsyics-recommendations
+```
+
+```{toctree}
+:maxdepth: 1
 :caption: Proposed physics
 
 physics/relativistic-electron-transport
