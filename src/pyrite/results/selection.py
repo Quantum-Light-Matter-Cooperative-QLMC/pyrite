@@ -225,13 +225,20 @@ def select_thickness(results, thickness_ang):
 
 
 # record array fields, by size; the wide-brem pair is the largest (full-range grid)
-_RECORD_ARRAY_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide", "spec_coherent")
+_RECORD_ARRAY_FIELDS = (
+    "E_grid",
+    "spec",
+    "brem",
+    "E_grid_brem",
+    "brem_wide",
+    "spec_coherent",
+    "spec_characteristic",
+)
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
-# ``spec_coherent`` is a line-dataset array (same grid, same segments as
-# ``spec``), so a --line-only projection/merge must carry it or a coherent
-# checkpoint silently degrades to incoherent-only on the wire.
-LINE_RECORD_KEYS = ("spec", "E_grid", "spec_coherent")
+# The coherent total and characteristic audit component use the line grid, so a
+# --line-only projection/merge must carry them with the combined ``spec``.
+LINE_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
 
@@ -278,12 +285,13 @@ def merge_dataset(local, incoming, dataset, force=False):
             for k in keys:
                 if k in inc:
                     r[k] = inc[k]
-            # An incoherent line payload overwrites ``spec``/``E_grid`` but carries
-            # no ``spec_coherent``; keeping the local one would pair a stale (and
-            # possibly wrong-length) coherent array with the incoming grid, so drop
-            # it -- same rule reline uses when a record has no coherent companion.
+            # A line payload that lacks an optional companion must remove the old
+            # one: otherwise a stale, possibly wrong-length array is paired with
+            # the incoming line grid.
             if dataset == "line" and "spec" in inc and "spec_coherent" not in inc:
                 r.pop("spec_coherent", None)
+            if dataset == "line" and "spec" in inc and "spec_characteristic" not in inc:
+                r.pop("spec_characteristic", None)
             bw, egb, eg = r.get("brem_wide"), r.get("E_grid_brem"), r.get("E_grid")
             if bw is not None and egb is not None and eg is not None:
                 r["brem"] = np.interp(
@@ -427,7 +435,16 @@ _LABEL_FIELDS = ("thickness_ang", "tilt_deg", "tilt_azim_deg")
 # ``plots.altair.spectra._record_frame`` / ``metrics.line_metrics`` -- the same
 # spectral-array set ``slim_results`` trims to, minus ``E_pk``/``hit_frac``/
 # ``eta`` which neither consumer reads.
-_BASKET_RECORD_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide", "fwhm", "scale")
+_BASKET_RECORD_FIELDS = (
+    "E_grid",
+    "spec",
+    "spec_characteristic",
+    "brem",
+    "E_grid_brem",
+    "brem_wide",
+    "fwhm",
+    "scale",
+)
 
 
 def case_label(case, *, material_label=None, face=None, varying=None):

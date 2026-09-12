@@ -127,6 +127,9 @@ class SpatialResult:
         Physical detector used for geometry and optional measured response.
     coherent_line
         Optional coherent line factors, available for coherent calculations.
+    characteristic_line
+        Optional characteristic-radiation factors, already included in both
+        line totals.
     """
 
     ray_map: PixelRayMap
@@ -134,6 +137,7 @@ class SpatialResult:
     background: SpectralFactors
     detector: PlanarDetector
     coherent_line: SpectralFactors | None = None
+    characteristic_line: SpectralFactors | None = None
 
     def __post_init__(self) -> None:
         for name in ("line", "background"):
@@ -145,6 +149,10 @@ class SpatialResult:
             if not isinstance(self.coherent_line, SpectralFactors):
                 raise TypeError("coherent_line must be SpectralFactors or None")
             self._validate_factor(self.coherent_line)
+        if self.characteristic_line is not None:
+            if not isinstance(self.characteristic_line, SpectralFactors):
+                raise TypeError("characteristic_line must be SpectralFactors or None")
+            self._validate_factor(self.characteristic_line)
         if not isinstance(self.detector, PlanarDetector):
             raise TypeError("detector must be a PlanarDetector")
 
@@ -164,7 +172,11 @@ class SpatialResult:
             if self.coherent_line is None:
                 raise ValueError("coherent line spectrum is not available")
             return self.coherent_line
-        raise ValueError("component must be 'line', 'background', or 'coherent'")
+        if component == "characteristic":
+            if self.characteristic_line is None:
+                raise ValueError("characteristic line spectrum is not available")
+            return self.characteristic_line
+        raise ValueError("component must be 'line', 'background', 'coherent', or 'characteristic'")
 
     def _coordinates(self, *, pixels, region) -> np.ndarray:
         if (pixels is None) == (region is None):
@@ -382,6 +394,9 @@ class Result:
         and dependency versions.
     coherent_spectrum
         Optional coherent line density on ``energy_eV``.
+    characteristic_spectrum
+        Optional characteristic-radiation component on ``energy_eV``. This is
+        already included in ``spectrum`` and ``coherent_spectrum``.
     spatial
         Optional factorized planar-detector result.
     """
@@ -393,6 +408,7 @@ class Result:
     case: Case
     provenance: Mapping[str, Any]
     coherent_spectrum: np.ndarray | None = None
+    characteristic_spectrum: np.ndarray | None = None
     spatial: SpatialResult | None = None
 
     def __post_init__(self) -> None:
@@ -402,6 +418,12 @@ class Result:
         object.__setattr__(self, "background", np.asarray(self.background))
         if self.coherent_spectrum is not None:
             object.__setattr__(self, "coherent_spectrum", np.asarray(self.coherent_spectrum))
+        if self.characteristic_spectrum is not None:
+            object.__setattr__(
+                self,
+                "characteristic_spectrum",
+                np.asarray(self.characteristic_spectrum),
+            )
         object.__setattr__(self, "provenance", MappingProxyType(dict(self.provenance)))
 
         if self.spatial is not None and not isinstance(self.spatial, SpatialResult):

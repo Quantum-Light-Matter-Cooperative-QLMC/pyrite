@@ -19,7 +19,7 @@ def _mem_worker_cap(per_worker_mb=None):
     oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
     two pools pass different budgets: ``_WORKER_MEM_MB`` for full-case workers
-    (transport + spectrum state), ``_PIPELINE_WORKER_MEM_MB`` for the much
+    (transport + spectrum state), ``_RESOURCE_POLICY.pipeline_worker_mem_mb`` for the much
     smaller transport-only pipeline workers. Default is ``_WORKER_MEM_MB``."""
     return min(_available_mem_mb(), int(_RESOURCE_POLICY.total_mem_mb * 0.9)) // (
         per_worker_mb or _RESOURCE_POLICY.worker_mem_mb
@@ -49,7 +49,7 @@ def _pipeline_slot_cap():
 
     A "slot" is one segment payload: either a transport worker building one, or
     an in-flight case whose payload the driver is already holding. Both are
-    charged ``_PIPELINE_WORKER_MEM_MB``, because that budget IS the payload --
+    charged ``_RESOURCE_POLICY.pipeline_worker_mem_mb``, because that budget IS the payload --
     the measured 552-1033 MB child RSS is dominated by the segments the worker
     just built, and the driver holds a copy of exactly those from the moment the
     future completes until the case's spectrum phase runs."""

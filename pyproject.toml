@@ -18,6 +18,7 @@ dependencies = [
     "numba>=0.66.0",
     "tqdm>=4.68.2",
     "h5py>=3.16.0",
+    "endf-parserpy>=0.17.0",
 ]
 
 [project.optional-dependencies]

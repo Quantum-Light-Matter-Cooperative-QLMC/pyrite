@@ -142,7 +142,11 @@ def test_brem_quadrature_matches_direct_cross_section_evaluation():
     E_grid = np.linspace(1.0e3, 2.0e4, 401)
     T_start, T_end = 25.0, 24.0
     out = brem_endpoint_quadrature_error(
-        _segments(T_start, T_end), E_grid, composition=CARBON, warn_threshold=np.inf
+        _segments(T_start, T_end),
+        E_grid,
+        composition=CARBON,
+        warn_threshold=np.inf,
+        cross_section_model="bethe-heitler",
     )
     # Independent recomputation: same public cross section (the estimator's
     # contract is the quadrature arithmetic), hand-written trapezoid weights.

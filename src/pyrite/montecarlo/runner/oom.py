@@ -53,11 +53,11 @@ def _maybe_free_pool():
 def _ensure_pool_limit():
     """Set the CuPy pool fraction cap once per driver process.
 
-    No-op on a CPU box or when cap is disabled (`_GPU_POOL_FRAC <= 0`).
+    No-op on a CPU box or when cap is disabled (`_RESOURCE_POLICY.gpu_pool_fraction <= 0`).
     Idempotent: safe to call on every case; the module flag means the actual
     `set_limit` runs once. Makes an over-budget alloc raise a catchable
     OutOfMemoryError before the driver's own hard-OOM. The cap is divided by
-    `_GPU_POOL_SHARE` so co-tenant scan processes on one GPU sum to _GPU_POOL_FRAC
+    `_RESOURCE_POLICY.gpu_pool_share` so co-tenant scan processes on one GPU sum to _RESOURCE_POLICY.gpu_pool_fraction
     rather than oversubscribing it."""
     if (
         _RESOURCE_POLICY.pool_limit_set

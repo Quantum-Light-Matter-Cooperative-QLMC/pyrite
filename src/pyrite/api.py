@@ -35,6 +35,11 @@ from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
 from .montecarlo.geometry import directions_to_sample_frame
 from .montecarlo.runner import run_case_directions
+from .montecarlo.spectrum import (
+    BREM_ENDF_PARSERPY_VERSION,
+    BREMSSTRAHLUNG_MODEL,
+    CHARACTERISTIC_MODEL,
+)
 from .montecarlo.transport import STOPPING_MODEL
 from .results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
 
@@ -290,6 +295,7 @@ def simulate(
     if scene.brem_source != "mc":
         background = np.zeros_like(background)
     coherent = output.get("spec_coherent")
+    characteristic = output.get("spec_characteristic")
     spectrum = coherent if scene.emission == "coherent" else output["spec"]
     return Result(
         energy_eV=np.asarray(output["E_grid"]),
@@ -302,11 +308,19 @@ def simulate(
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case),
             "stopping_model": STOPPING_MODEL,
+            "characteristic_model": CHARACTERISTIC_MODEL,
+            "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
             "backend": BACKEND.name,
             "device": BACKEND.device,
-            "versions": {"pyrite": __version__, "numpy": np.__version__},
+            "versions": {
+                "pyrite": __version__,
+                "numpy": np.__version__,
+                "xraydb": _package_version("xraydb"),
+                "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
+            },
         },
         coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
+        characteristic_spectrum=(None if characteristic is None else np.asarray(characteristic)),
     )
 
 
@@ -349,12 +363,18 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
             line_mu,
         )
     )
+    characteristic = SpectralFactors(
+        energy,
+        np.asarray(output["spec_characteristic_by_direction"]),
+        line_mu,
+    )
     spatial = SpatialResult(
         ray_map=ray_map,
         line=line,
         background=background,
         detector=detector,
         coherent_line=coherent,
+        characteristic_line=characteristic,
     )
     selected_line = coherent if scene.emission == "coherent" else line
     selected_name = "coherent" if selected_line is coherent else "line"
@@ -366,6 +386,7 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
         (line_mu, background_mu),
     )
     coherent_average = None if coherent is None else spatial.average_density("coherent")
+    characteristic_average = spatial.average_density("characteristic")
     return Result(
         energy_eV=energy,
         spectrum=spatial.average_density(selected_name),
@@ -379,15 +400,19 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
             "observation_identity_digest": observation_digest,
             "observation": observation,
             "stopping_model": STOPPING_MODEL,
+            "characteristic_model": CHARACTERISTIC_MODEL,
+            "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {
                 "pyrite": __version__,
                 "numpy": np.__version__,
                 "xraydb": _package_version("xraydb"),
+                "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
             },
         },
         coherent_spectrum=coherent_average,
+        characteristic_spectrum=characteristic_average,
         spatial=spatial if scene.pixel_scorer is not None else None,
     )
 

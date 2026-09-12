@@ -113,9 +113,10 @@ def _resolve_runner_resource_policy() -> _RunnerResourcePolicy:
 
 # Segments per spectrum matmul. Explicit per-case values still win over policy.
 _RESOURCE_POLICY = _resolve_runner_resource_policy()
+_EEDL_BREM_DENSE_INTERMEDIATES = 8
 
 
-def _adaptive_chunk(nbins):
+def _adaptive_chunk(nbins, *, intermediates=3):
     """Segments per spectrum matmul sized so the ~3 concurrent (chunk, nbins)
     intermediates in the mc_spectrum / mc_brem_spectrum chunk loops fit in
     the policy spectrum budget.
@@ -132,8 +133,7 @@ def _adaptive_chunk(nbins):
     allowed, 8 on the CPU (fp64) -> the original size bit-for-bit.
     """
     itemsize = _real_itemsize()
-    worker_intermediate_arrays = 3
-    per_row_bytes = worker_intermediate_arrays * nbins * itemsize
+    per_row_bytes = int(intermediates) * nbins * itemsize
 
     requested = max(
         1000,
@@ -148,10 +148,11 @@ def _adaptive_chunk(nbins):
         bins=nbins,
         itemsize=itemsize,
         budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _RESOURCE_POLICY.gpu else None),
+        intermediates=int(intermediates),
     )
 
 
-def _admit_chunk(chunk, bins):
+def _admit_chunk(chunk, bins, *, intermediates=3):
     itemsize = _real_itemsize()
 
     return admitted_chunk(
@@ -159,6 +160,7 @@ def _admit_chunk(chunk, bins):
         bins=int(bins),
         itemsize=itemsize,
         budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _RESOURCE_POLICY.gpu else None),
+        intermediates=int(intermediates),
     )
 
 

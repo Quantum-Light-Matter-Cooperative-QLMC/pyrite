@@ -43,8 +43,10 @@ def render_dimension_comparison(
     parts = [
         mo.md(spec.description),
         mo.hstack([energy_widget, pinned_widget, thickness_widget], wrap=True),
-        controls["line"],
-        controls["brem"],
+        mo.hstack(
+            [controls["line"], controls["brem"], controls["characteristic"]],
+            wrap=True,
+        ),
         axes_panel(mo, controls["axes"]),
         controls["varying"],
     ]
@@ -75,6 +77,7 @@ def render_dimension_comparison(
         hue=spec.varying_key,
         include_brem=values["brem"],
         include_line=values["line"],
+        include_characteristic=values["characteristic"],
         include_coherent=context.show_both_emissions,
         x_domain=axes.narrow.x_domain,
         x_type=axes.narrow.x_type,
@@ -87,6 +90,7 @@ def render_dimension_comparison(
         hue=spec.varying_key,
         include_brem=values["brem"],
         include_line=values["line"],
+        include_characteristic=values["characteristic"],
         include_coherent=context.show_both_emissions,
         x_domain=axes.broad.x_domain,
         x_type=axes.broad.x_type,

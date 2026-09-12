@@ -188,6 +188,8 @@ def store_result(results, case, out):
     # overlay, run.repair_line_spec) gates on its presence.
     if out.get("spec_coherent") is not None:
         results[name][E0]["spec_coherent"] = out["spec_coherent"]
+    if out.get("spec_characteristic") is not None:
+        results[name][E0]["spec_characteristic"] = out["spec_characteristic"]
 
 
 def detected_background(r, settings, convolve=None):

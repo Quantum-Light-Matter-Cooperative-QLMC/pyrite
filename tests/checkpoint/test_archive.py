@@ -77,6 +77,7 @@ def test_component_checkpoint_archive_restore_roundtrip(tmp_path):
     archive.archive_checkpoint("hopg", "snap", root=str(tmp_path))
     assert (tmp_path / "archive" / "snap" / "line.h5").is_file()
     assert (tmp_path / "archive" / "snap" / "brem.h5").is_file()
+    assert (tmp_path / "archive" / "snap" / "characteristic.h5").is_file()
 
     for path in (tmp_path / "hopg").iterdir():
         path.unlink()

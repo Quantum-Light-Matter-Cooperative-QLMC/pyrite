@@ -147,7 +147,8 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   bare `--remote` uses the configured target; an explicit value is validated and
   scoped to that invocation. Remote runs accept uniform `--wait` / `--detach`;
   local runs reject them. Local output is canonical
-  `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
+  `checkpoints/<material>/{line,brem,characteristic}.h5` or an identity-qualified
+  variant
   directory. Box shim: `python -m pyrite._entry.scan`.
 - **`pyrite-dev perf [PROFILE] [-m MATERIAL] [-R[=TARGET]]`** → the same run
   machinery with compute-performance telemetry enabled and shared-cache access
@@ -384,8 +385,9 @@ hand-maintained table.
 - Deps: none (leaf; external xraydb).
 
 ### `montecarlo/` (package)
-Simulation core: electron transport, segment-sum PXR+CBS line spectrum,
-bremsstrahlung, parallel case runner, detector-convolution helpers.
+Simulation core: electron transport, segment-sum PXR+CBS and EEDL
+characteristic line spectra, bremsstrahlung, parallel case runner, and
+detector-convolution helpers.
 Split from single module into submodules; **every public and internal name
 re-exported from package** — `from pyrite.montecarlo import X` unchanged
 (`tests/montecarlo/test_exports.py` freeze export set).
@@ -428,9 +430,16 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum/` — compatibility package for the former flat module. `lines/`
   owns `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
-  average) and `mc_spectrum_solid_angle`; `brem.py` owns
-  `mc_brem_spectrum` and `load_external_brem`; `coherent.py` groups the
-  CUDA-only coherent-kernel surface; `diagnostics.py` owns the opt-in,
+  average) and `mc_spectrum_solid_angle`; `brem.py` parses the packaged EEDL
+  MF=23/527 totals and MF=26/527 photon spectra for the default
+  `mc_brem_spectrum`, retains Bethe--Heitler as an optional/fallback backend,
+  stages EEDL panels once per element/grid, and owns `load_external_brem`;
+  `brem_jit_kernel.py` owns the fused CUDA EEDL/Bethe--Heitler reduction;
+  `characteristic.py` parses the
+  packaged ENDF-6 EEDL File-23 tables, joins xraydb direct-vacancy relaxation
+  and natural level widths, integrates Lorentzian line profiles over the fine
+  grid, and owns `mc_characteristic_spectrum`; `coherent.py` groups the CUDA-only
+  coherent-kernel surface; `diagnostics.py` owns the opt-in,
   host-only radiation error estimators `cxr_endpoint_resonance_drift` and
   `brem_endpoint_quadrature_error` plus `subdivide_flights`, none of which sit
   on a default call path. Line, brem, and coherent CUDA kernels are
@@ -465,11 +474,16 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
 - `runner/` — compatibility package for the former flat module. `__init__.py`
   owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py`
   owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum
-  chunk admission; `pool.py` owns host-memory and worker-pool sizing; `oom.py`
-  owns accelerator OOM tags, release cadence, and pool limits. `_spectrum_case`
+  chunk admission, including the larger portable EEDL working-set budget;
+  `pool.py` owns host-memory and worker-pool sizing; `oom.py` owns accelerator
+  OOM tags, release cadence, and pool limits. The backend classifier also
+  recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case`
   always stores incoherent `spec` and, when requested, `spec_coherent` from the
-  same transport; `_line_pair_for_case` mirrors this for `pyrite reline`. Deps:
-  `pyrite._backend`, `transport`, `geometry`, `spectrum`.
+  same transport, adds the shared characteristic component to both, and keeps
+  it separately as `spec_characteristic`; characteristic emission is evaluated
+  directly on the fine line grid. `_line_pair_for_case` mirrors this
+  for `pyrite reline`. Deps:
+  `_backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
 ## Campaign, checkpoints & run drivers
@@ -498,8 +512,10 @@ detector components into a `Scene` and lowers exactly one typed `Case`. Scalar
 detectors call the unchanged `montecarlo.run_case`; physical detectors reuse
 one transport across coarse angular tiles, then attach exact pixel rays and
 finite-filter attenuation as a factorized `SpatialResult`. Source-case and
-observation identities remain separate. The API never reads or writes campaign
-checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are
+observation identities remain separate. Combined line totals include atomic
+characteristic radiation, with the component exposed as
+`Result.characteristic_spectrum` and in spatial factors. The API never reads
+or writes campaign checkpoints. `build_case`, `build_sweep_cases`, and legacy lowering helpers are
 implementation/compatibility seams rather than the root supported surface.
 
 - Public: root-lazy `simulate`.
@@ -598,7 +614,12 @@ collision-stopping splice follows the same pattern with a constant
 `stopping_model` marker, hashed by both `dataset_identity` and
 `case_content_key` -- the latter because the model is not a case field, so
 nothing else would stop the CAS serving a Joy--Luo-era blob for a case that now
-transports differently.
+transports differently. The unconditional EEDL/xraydb characteristic model
+likewise hashes a constant `characteristic_model` marker into both identities,
+preventing reuse of pre-characteristic results.
+The default EEDL bremsstrahlung continuum likewise hashes a constant
+`bremsstrahlung_model` marker into both identities, separating it from spectra
+computed under the retired default Bethe--Heitler backend.
 - Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
   `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
@@ -657,8 +678,9 @@ Keeps storage layout and serialization policy behind the checkpoint package.
 
 ### `checkpoints/_checkpoint_store.py`
 Component storage adapter: active datasets live under
-`checkpoints/<stem>/{line,brem}.pkl`, merge transparently into historical
-in-memory result records, and migrate legacy `checkpoints/<stem>.pkl` stores on
+`checkpoints/<stem>/{line,brem,characteristic}.h5`, merge transparently into historical
+in-memory result records, treat the characteristic companion as optional, and
+migrate legacy `checkpoints/<stem>.pkl` stores on
 next save. Shared case blobs live at
 `checkpoints/<material>/<first2hex>/<content-key>.pkl` and use atomic writes.
 The `.pkl` suffix remains a layout token; current bytes use the versioned HDF5
@@ -719,8 +741,10 @@ package** — `from pyrite.results import X` unchanged
 - `tables` — DataFrame views: `results_dataframe`, `summary_table`,
   `show_summary`.
 - `model` — in-memory `Result` plus factorized `SpatialResult`, `PixelRayMap`,
-  and `SpectralFactors`; selected pixel spectra and images materialize in
-  bounded chunks and are not checkpoint schema fields.
+  and `SpectralFactors`; `Result.characteristic_spectrum` and the
+  `"characteristic"` spatial component preserve the separately auditable EEDL
+  line contribution. Selected pixel spectra and images materialize in bounded
+  chunks and are not checkpoint schema fields.
 - Deps: `montecarlo`, `sweep`.
 
 ### `plots/` (package)

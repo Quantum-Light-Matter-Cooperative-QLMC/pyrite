@@ -287,7 +287,7 @@ def run_sweep(
             on_timing({"checkpoint_seconds": elapsed, "shard_write_seconds": elapsed})
 
     def _consolidate():
-        """Fold shards into the authoritative ``{line,brem}.pkl`` monolith the
+        """Fold shards into authoritative ``{line,brem,characteristic}.h5`` files the
         rest of the toolchain expects, then drop the shard directory."""
         path = Path(checkpoint_path)
         if not _checkpoint_store.has_parts(path.name, path.parent):

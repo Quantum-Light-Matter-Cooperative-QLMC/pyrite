@@ -545,6 +545,11 @@ def test_runner_always_stores_incoherent_spec_and_omits_spec_coherent(monkeypatc
     import pyrite.montecarlo.runner as runner
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *a, **k: np.zeros_like(E_GRID),
+    )
 
     segs = _segments(2)
     tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
@@ -566,6 +571,11 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     from pyrite.montecarlo.spectrum.lines import _kernels as line_kernels
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *a, **k: np.zeros_like(E_GRID),
+    )
     real_chi_g = line_kernels.chi_g
     chi_g_calls = 0
 

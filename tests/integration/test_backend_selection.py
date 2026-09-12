@@ -175,6 +175,33 @@ def test_cupy_backend_cuda_contract_round_trip():
     assert stats["peak_mib"] == 1024 / (1 << 20)
 
 
+def test_cupy_backend_recognizes_delayed_runtime_memory_allocation():
+    module, _, _ = _fake_cupy_module()
+
+    class CUDARuntimeError(Exception):
+        status = 2
+
+    module.cuda.runtime.CUDARuntimeError = CUDARuntimeError
+    module.cuda.runtime.errorMemoryAllocation = 2
+    backend = _backend.CuPyBackend(module)
+
+    assert backend.is_oom_error(CUDARuntimeError("cudaErrorMemoryAllocation: out of memory"))
+    assert not backend.is_oom_error(ValueError("not a CUDA allocation failure"))
+
+
+def test_cupy_backend_does_not_misclassify_other_runtime_errors():
+    module, _, _ = _fake_cupy_module()
+
+    class CUDARuntimeError(Exception):
+        status = 17
+
+    module.cuda.runtime.CUDARuntimeError = CUDARuntimeError
+    module.cuda.runtime.errorMemoryAllocation = 2
+    backend = _backend.CuPyBackend(module)
+
+    assert not backend.is_oom_error(CUDARuntimeError("cudaErrorInvalidDevicePointer"))
+
+
 def test_cupy_backend_hip_reports_rocm_vendor():
     module, _, _ = _fake_cupy_module(is_hip=True, name="Fake AMD GPU")
     backend = _backend.CuPyBackend(module)

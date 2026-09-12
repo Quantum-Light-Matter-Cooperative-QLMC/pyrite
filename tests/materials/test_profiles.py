@@ -25,6 +25,11 @@ from pyrite.campaign.profiles import (
 from pyrite.campaign.sweep import build_cases, target_flat_fields
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import Detector, EnergyBins, Timepix3
+from pyrite.montecarlo.spectrum import (
+    BREMSSTRAHLUNG_MODEL,
+    CHARACTERISTIC_MODEL,
+    CHARACTERISTIC_XRAYDB_VERSION,
+)
 
 
 def _cases_by_key(material, catalog_profile):
@@ -55,7 +60,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
 
     assert case_content_key(case) == case_content_key(case.to_dict())
     assert case_content_key(case) == (
-        "fdf5a886af048cab93bae6343c2151113e88e792dcbe5b821e1c4e5e3b18918d"
+        "91570aec6670850289e0820f871eaae0feec425e9f9d48ced8c6a367dd701ab0"
     )
 
 
@@ -66,7 +71,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "f18b40a29e8ed5d2c4278f656758fbe8a26017366975ae4cbbd206db3f7a2b42"
+        "02a34b6483b91f118b89963c3596befcf6cde6273c9441f9788747bebe4c73e7"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -314,12 +319,47 @@ def test_case_content_key_separates_stopping_models():
     assert joy_luo_era != current
 
 
+def test_characteristic_model_marker_orphans_previous_line_models():
+    """Unconditional characteristic physics, data, and line shape are hashed."""
+    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+
+    assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
+    assert "eedl" in CHARACTERISTIC_MODEL
+    assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
+    assert "lorentzian" in CHARACTERISTIC_MODEL
+
+
+def test_case_content_key_separates_characteristic_models():
+    case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
+    current = case_content_key(case)
+    with mock.patch.object(profiles, "CHARACTERISTIC_MODEL", "characteristic-disabled"):
+        pre_characteristic = case_content_key(case)
+
+    assert pre_characteristic != current
+
+
+def test_bremsstrahlung_model_marker_orphans_bethe_heitler_era_digests():
+    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+
+    assert identity["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
+    assert "mf23-527-mf26-527" in BREMSSTRAHLUNG_MODEL
+
+
+def test_case_content_key_separates_bremsstrahlung_models():
+    case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
+    current = case_content_key(case)
+    with mock.patch.object(profiles, "BREMSSTRAHLUNG_MODEL", "bethe-heitler-only"):
+        bethe_heitler_era = case_content_key(case)
+
+    assert bethe_heitler_era != current
+
+
 def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "f18b40a29e8ed5d2c4278f656758fbe8a26017366975ae4cbbd206db3f7a2b42"
+        "02a34b6483b91f118b89963c3596befcf6cde6273c9441f9788747bebe4c73e7"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -333,42 +373,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "858e0c1a02c5d729c9b7744cb722ef8befb44fad7c0d0ae7d0a8aa8e462fc675",
+            "0cc53d53ed000a35c5aba78c3251966dd4dfe6ec3b23ddaabe1813e9b29bf9f3",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "ee827cc8d6db3c676dfa45f9c3b77d982b9df84c86f8e16e38ae2490e385ca8d",
+            "be2b572d22750fc532b6834e0ecbe0bc3f9d59dff1819dbe96cf68d683948f53",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "8d90a20f3f7d5ea939d6ba6f335f4d6c6b68bfdc2fd8abc7c6131dd987054e77",
+            "dd9ef5c13ea9aebc64d41923bcb4debd286b820428ab1090a5d7016820422e07",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "ccfe90c063cb96e826a85481fda2b3d130f28db0173b97063ddc9fe6865b7823",
+            "4c25c9c0b8d461106af88a3bab1552ba3b98e0a428cf605275e9745075a46f63",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "81531efe19a7dfbb43033dcba88e2fea6a05e8610097b78bd8ac92e702a2af0f",
+            "980ae1a7cff6c6aacedd9bc101518355a488294570ea309703e378469c47fe1b",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "a4e98c580f39541871c118e46d7358239a6329a08bf4e426c6c3c3a3bb338054",
+            "9b519ba1a9d43332c5a0553cb05ffe3657784225f983b0b2fa4c15916bd09215",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "b771a3c5259b4f62b9eda492a19d0b5b7039c6c56b1f591d4e3402a774e136c0",
+            "109bb8d02aeaecc35c84b3e6b1e80909d1a2088e72684404b5bf318fcde300df",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "d7a66ddbdb0a595188e50fe3337716d2c7ab3374036004cbe32b44fa918888fb",
+            "901428128560c86f81f34ad3ca181866a85df3b527253125f4a7dc34337f8213",
         ),
     ],
 )
@@ -378,11 +418,11 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     """Every shipped profile that carried an inline ``[profiles.NAME.beam]`` block
     now carries ``beam = "NAME"`` instead. The reference resolves to values before
     hashing, so the migration itself moved no digest. These pins were re-minted
-    once when the in-medium line kinematics became unconditional, and again when
-    every crystal's cut moved from ``beam_uvw`` to the equivalent ``surface_hkl``
-    -- the same axis to 1 ulp of the rotation, but a different hashed spelling,
-    so each re-mint deliberately orphaned the checkpoint stems of its era. They
-    must stay bit-for-bit from here."""
+    once when the in-medium line kinematics became unconditional, which
+    deliberately orphaned every vacuum-era checkpoint stem; they must stay
+    bit-for-bit from here. They were re-minted again when unconditional EEDL
+    characteristic radiation was introduced, for the EEDL bremsstrahlung
+    generation marker, and for natural Lorentzian characteristic profiles."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
     assert identity["parameter_sha256"] == digest
@@ -521,15 +561,16 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Known incoherent digest (current baseline, re-minted when the in-medium
     # line kinematics became unconditional, again when the Joy--Luo/
     # Berger--Seltzer stopping splice did, and again when every crystal cut
-    # moved to the surface_hkl spelling) must stay bit-for-bit.
+    # moved to the surface_hkl spelling, and again for natural Lorentzian
+    # characteristic profiles) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "f18b40a29e8ed5d2c4278f656758fbe8a26017366975ae4cbbd206db3f7a2b42"
+        "02a34b6483b91f118b89963c3596befcf6cde6273c9441f9788747bebe4c73e7"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "7e2d2af0be78398615f847bcb568a6627472505509573bd0798078530ef60f9b"
+        "5fbe7973c34065a65c150cad11a919b7dd898af33f9eb7de07778a133dd44001"
     )
 
 

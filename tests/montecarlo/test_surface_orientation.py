@@ -204,6 +204,11 @@ def test_runner_forwards_surface_hkl_to_spectrum(monkeypatch):
         "_brem_wide_from_segments",
         lambda *_args, **_kwargs: np.zeros(1),
     )
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *_args, **_kwargs: np.zeros(1),
+    )
     case = {
         "crystal": "mose2",
         "hkl_list": [(0, 0, 2)],

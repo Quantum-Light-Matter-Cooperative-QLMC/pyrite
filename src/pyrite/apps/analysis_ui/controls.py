@@ -137,6 +137,10 @@ def make_energy_controls(mo, results):
             ),
             "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
+            "characteristic": mo.ui.checkbox(
+                value=True,
+                label="show characteristic radiation",
+            ),
             "axes": make_spectrum_axes(
                 mo,
                 narrow_auto=False,
@@ -200,6 +204,10 @@ def make_dimension_controls(mo, results, *, varying_key: str):
             ),
             "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
+            "characteristic": mo.ui.checkbox(
+                value=True,
+                label="show characteristic radiation",
+            ),
             "axes": make_spectrum_axes(
                 mo,
                 narrow_auto=False if varying_key == "tilt_deg" else True,
@@ -265,6 +273,10 @@ def make_case_axes(mo):
         {
             "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
+            "characteristic": mo.ui.checkbox(
+                value=True,
+                label="show characteristic radiation",
+            ),
             "axes": make_spectrum_axes(
                 mo,
                 narrow_auto=True,

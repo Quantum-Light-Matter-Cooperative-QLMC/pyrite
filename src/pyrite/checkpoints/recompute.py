@@ -736,8 +736,11 @@ def repair_line_spec(
         # (no `spec_coherent` key) are orphaned by design -- reline only ever
         # re-derives the incoherent `spec` for those.
         want_coherent = "spec_coherent" in r
-        spec, spec_coherent = runner._line_pair_for_case(c, target, want_coherent=want_coherent)
+        spec, spec_coherent, spec_characteristic = runner._line_pair_for_case(
+            c, target, want_coherent=want_coherent, return_characteristic=True
+        )
         r["spec"] = spec
+        r["spec_characteristic"] = spec_characteristic
         if want_coherent:
             r["spec_coherent"] = spec_coherent
         r["E_grid"] = target
@@ -774,7 +777,11 @@ def reline_checkpoint(
     results = _checkpoint_load(checkpoint_path)
 
     def save_cb(results):
-        _save_recomputed_checkpoint(checkpoint_path, results, components=("line",))
+        _save_recomputed_checkpoint(
+            checkpoint_path,
+            results,
+            components=("characteristic", "line"),
+        )
 
     n = repair_line_spec(
         results,

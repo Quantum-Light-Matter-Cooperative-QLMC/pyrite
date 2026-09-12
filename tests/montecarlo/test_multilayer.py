@@ -335,6 +335,11 @@ def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
 
     monkeypatch.setattr(runner, "mc_spectrum", fake_spec)
     monkeypatch.setattr(runner, "mc_brem_spectrum", lambda *a, **k: np.zeros(3))
+    monkeypatch.setattr(
+        runner,
+        "_characteristic_from_segments",
+        lambda *a, **k: np.zeros(3),
+    )
 
     E = np.linspace(1000.0, 3000.0, 3)
     segs = dict(

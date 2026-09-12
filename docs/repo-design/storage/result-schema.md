@@ -1,9 +1,10 @@
 # Result persistence schema
 
-PyRITE result artifacts use HDF5 schema `pyrite.result`, version 2. Historical
-path tokens still end in `.pkl`; the suffix is part of the checkpoint/CAS
-layout, not a claim about the bytes. Open a current artifact directly with
-`h5py.File("line.pkl")` or any HDF5 reader.
+PyRITE result artifacts use HDF5 schema `pyrite.result`, version 2. Current
+component, shard, and CAS paths end in `.h5`. Historical `.pkl` paths remain
+readable; readers identify the encoding from its signature rather than its
+suffix. Open a current artifact directly with `h5py.File("line.h5")` or any
+HDF5 reader.
 
 Version 1 is read forever and never written again. See
 [Compatibility and writes](#compatibility-and-writes).
@@ -133,8 +134,9 @@ the normative physical form; these tables define the scientific fields.
 | Record field | Dtype | Shape | Unit / meaning |
 | --- | --- | --- | --- |
 | `E_grid` | `float64` | `[N]` | photon energy, eV |
-| `spec` | `float64` | `[N]` | line spectrum, photons/e/sr/eV |
-| `spec_coherent` | `float64` | `[N]` | coherent companion spectrum; key absent when not computed |
+| `spec` | `float64` | `[N]` | line spectrum, photons/e/sr/eV; physically line-only in `line.h5`, with characteristic radiation restored in the merged read |
+| `spec_coherent` | `float64` | `[N]` | coherent companion spectrum with the same physical/merged convention; key absent when not computed |
+| `spec_characteristic` | `float64` | `[N]` | characteristic spectrum in `characteristic.h5`, photons/e/sr/eV |
 | `brem` | `float64` | `[N]` | bremsstrahlung interpolated to `E_grid`, photons/e/sr/eV |
 | `E_grid_brem` | `float64` or null | `[M]` | wide bremsstrahlung photon-energy grid, eV |
 | `brem_wide` | `float64` or null | `[M]` | wide bremsstrahlung spectrum, photons/e/sr/eV |
@@ -182,7 +184,7 @@ This minimal reader requires h5py but no PyRITE import:
 ```python
 import h5py
 
-with h5py.File("checkpoints/hopg/line.pkl", "r") as result:
+with h5py.File("checkpoints/hopg/line.h5", "r") as result:
     assert result.attrs["schema"] == "pyrite.result"
     print(result.attrs["schema_version"])
     result.visit(print)

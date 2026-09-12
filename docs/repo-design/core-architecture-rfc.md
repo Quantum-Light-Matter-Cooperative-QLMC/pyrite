@@ -517,7 +517,8 @@ an implementation detail of catalog resolution. The `derive`, `verify`, and
 
 ### Current state
 
-Checkpoints are pickles — `checkpoints/<stem>/{line,brem}.pkl` — plus
+When this RFC was drafted, checkpoints were pickles —
+`checkpoints/<stem>/{line,brem}.pkl` — plus
 content-addressed case blobs, campaign locks, and manifests. The store design
 is sound; see
 [checkpoint case store](storage/checkpoint-case-store.md) and

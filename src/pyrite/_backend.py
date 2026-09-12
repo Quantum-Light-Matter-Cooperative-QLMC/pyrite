@@ -73,6 +73,10 @@ class ArrayBackend:
     def is_array(self, value: Any) -> bool:
         return isinstance(value, self.array_type)
 
+    def is_oom_error(self, error: BaseException) -> bool:
+        """Return whether *error* is an allocation failure for this backend."""
+        return isinstance(error, self.oom_exceptions)
+
     def synchronize(self) -> None:
         return None
 
@@ -133,10 +137,35 @@ class CuPyBackend(ArrayBackend):
         self.xp = module
         self.array_type = module.ndarray
         self.oom_exceptions = (module.cuda.memory.OutOfMemoryError,)
+        self._runtime_memory_status = getattr(module.cuda.runtime, "errorMemoryAllocation", 2)
         self._peak_bytes = 0
 
     def to_cpu(self, value: Any) -> np.ndarray:
         return self.cp.asnumpy(value) if self.is_array(value) else np.asarray(value)
+
+    def is_oom_error(self, error: BaseException) -> bool:
+        """Recognize pool OOMs and delayed CUDA/HIP allocation failures.
+
+        CuPy normally raises ``cuda.memory.OutOfMemoryError`` while allocating
+        an array. Device work is asynchronous, however, so an allocation
+        failure inside an already-launched operation can first surface at a
+        later stream synchronization as ``CUDARuntimeError``. Only the runtime
+        memory-allocation status/message is promoted to a retryable OOM; other
+        CUDA runtime failures remain hard errors.
+        """
+        if super().is_oom_error(error):
+            return True
+        error_type = type(error)
+        runtime_error = error_type.__name__ in {"CUDARuntimeError", "HIPRuntimeError"} and (
+            error_type.__module__.startswith("cupy")
+            or error_type is getattr(self.cp.cuda.runtime, "CUDARuntimeError", None)
+        )
+        if not runtime_error:
+            return False
+        if getattr(error, "status", None) == self._runtime_memory_status:
+            return True
+        message = str(error).lower().replace("_", "")
+        return "errormemoryallocation" in message or "out of memory" in message
 
     def synchronize(self) -> None:
         self.cp.cuda.get_current_stream().synchronize()

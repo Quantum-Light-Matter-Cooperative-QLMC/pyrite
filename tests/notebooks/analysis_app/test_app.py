@@ -10,6 +10,8 @@ import altair as alt
 from pyrite.apps.analysis_ui.models import AnalysisContext
 
 APP = Path(__file__).parents[3] / "src" / "pyrite" / "apps" / "analysis_app.py"
+CONTROLS = APP.parent / "analysis_ui" / "controls.py"
+VIEWS = APP.parent / "analysis_ui" / "views"
 
 
 def _attribute_path(node: ast.AST) -> tuple[str, ...]:
@@ -81,6 +83,23 @@ def test_in_progress_checkpoint_uses_analysis_safe_reads() -> None:
     assert "load_analysis_checkpoint" in data_source
     assert "loaded = load_analysis_checkpoint(stem)" in data_source
     assert "load_error" in data_source
+
+
+def test_characteristic_checkbox_matches_spectrum_component_controls() -> None:
+    source = APP.read_text()
+    controls_source = CONTROLS.read_text()
+    view_sources = [
+        (VIEWS / name).read_text() for name in ("energy.py", "dimension.py", "cases.py")
+    ]
+
+    assert controls_source.count('"characteristic": mo.ui.checkbox(') == 3
+    assert controls_source.count('label="show characteristic radiation"') == 3
+    assert "characteristic_ui" not in source
+    assert all('controls["characteristic"]' in view_source for view_source in view_sources)
+    assert all(
+        'include_characteristic=values["characteristic"]' in view_source
+        for view_source in view_sources
+    )
 
 
 def test_thickness_controls_and_context_use_shared_human_units() -> None:

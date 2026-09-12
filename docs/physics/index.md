@@ -100,6 +100,7 @@ beam-transport/transport-outputs
 radiation-physics/coherent-radiation
 radiation-physics/coherent-emission
 radiation-physics/bremsstrahlung
+radiation-physics/characteristic-radiation
 radiation-physics/photon-escape-and-dispersion
 radiation-physics/spectral-observables
 ```

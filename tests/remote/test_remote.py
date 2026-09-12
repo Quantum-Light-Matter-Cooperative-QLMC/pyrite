@@ -4458,6 +4458,7 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
 
     assert (tmp_path / "checkpoints" / "hopg" / "line.h5").is_file()
     assert (tmp_path / "checkpoints" / "hopg" / "brem.h5").is_file()
+    assert (tmp_path / "checkpoints" / "hopg" / "characteristic.h5").is_file()
     loaded = _checkpoint_store.load("hopg", tmp_path / "checkpoints")
     assert np.array_equal(loaded["cfg"][30.0]["spec"], np.array([3.0, 4.0]))
     assert len(transfers) == 1

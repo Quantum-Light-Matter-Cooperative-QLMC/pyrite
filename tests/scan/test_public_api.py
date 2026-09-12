@@ -8,6 +8,12 @@ from pyrite.campaign.sweep import Sweep as LegacySweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import run_case
+from pyrite.montecarlo.spectrum import (
+    BREM_ENDF_PARSERPY_VERSION,
+    BREMSSTRAHLUNG_MODEL,
+    CHARACTERISTIC_MODEL,
+    CHARACTERISTIC_XRAYDB_VERSION,
+)
 from pyrite.montecarlo.transport import STOPPING_MODEL
 
 
@@ -48,6 +54,7 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
         return {
             "E_grid": np.array([1.0, 2.0]),
             "spec": np.array([3.0, 4.0]),
+            "spec_characteristic": np.array([0.25, 0.5]),
             "E_grid_brem": np.array([1.0, 2.0, 3.0]),
             "brem_wide": np.array([5.0, 6.0, 7.0]),
             "brem": np.array([5.0, 6.0]),
@@ -58,6 +65,7 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     result = pr.simulate(beam, target, detector, numerics=numerics)
 
     np.testing.assert_array_equal(result.spectrum, [3.0, 4.0])
+    np.testing.assert_array_equal(result.characteristic_spectrum, [0.25, 0.5])
     np.testing.assert_array_equal(result.background, [5.0, 6.0, 7.0])
     assert result.case is seen["case"]
     assert seen["transport_core"] == "auto"
@@ -66,6 +74,10 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     # Which collision-stopping model produced the numbers is part of the record,
     # not just of the digest that separates the two models' checkpoints.
     assert result.provenance["stopping_model"] == STOPPING_MODEL
+    assert result.provenance["characteristic_model"] == CHARACTERISTIC_MODEL
+    assert result.provenance["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
+    assert result.provenance["versions"]["xraydb"] == CHARACTERISTIC_XRAYDB_VERSION
+    assert result.provenance["versions"]["endf-parserpy"] == BREM_ENDF_PARSERPY_VERSION
 
 
 def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
@@ -76,6 +88,10 @@ def test_simulate_is_bit_for_bit_the_existing_single_case_path() -> None:
 
     np.testing.assert_array_equal(result.energy_eV, expected["E_grid"])
     np.testing.assert_array_equal(result.spectrum, expected["spec"])
+    np.testing.assert_array_equal(
+        result.characteristic_spectrum,
+        expected["spec_characteristic"],
+    )
     np.testing.assert_array_equal(result.background, expected["brem_wide"])
 
 

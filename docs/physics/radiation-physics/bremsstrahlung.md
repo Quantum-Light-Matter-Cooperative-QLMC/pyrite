@@ -1,39 +1,94 @@
 # Bremsstrahlung
 
 PyRITE models the smooth incoherent background emitted along transported
-electron segments with a Born Bethe--Heitler cross-section and the
-{cite:t}`elwert1939` Coulomb correction; {cite:t}`kochmotz1959` is the standard
-compilation of the cross-section forms. It shares the transport segments, the escape geometry, and the
-per-electron normalization with the [line
+electron segments with the Livermore Evaluated Electron Data Library (EEDL)
+{cite:p}`perkins1991eedl`. The default cross section is the evaluated total in
+ENDF-6 MF=23/MT=527 multiplied by the normalized photon-energy probability
+density in MF=26/MT=527. It shares the transport segments, the escape geometry,
+and the per-electron normalization with the [line
 kernel](coherent-radiation.md), and is evaluated on the same spectral grid, so
 line and continuum can be added directly.
 
-## Cross section
+## What MF=23/MT=527 and MF=26/MT=527 mean
 
-For element atomic number {math}`Z`, electron kinetic energy {math}`T`, and photon
-energy {math}`k`, the implemented energy-differential form is
+ENDF-6 organizes evaluated data by **file number** (`MF`, the kind of data)
+and **reaction number** (`MT`, the physical interaction). The pair therefore
+names a section of the EEDL evaluation; it is not a fitted parameter:
+
+- `MF=23` contains integrated photo-atomic and electro-atomic cross sections.
+  Its `MT=527` section is the total electro-atomic bremsstrahlung cross section
+  {math}`\sigma(T)` as a function of incident-electron energy, tabulated in
+  barns.
+- `MF=26` contains secondary-particle energy/angle distributions. Its matching
+  `MT=527` section describes the products of the same bremsstrahlung
+  interaction. PyRITE uses the first subsection, whose `ZAP=0`, `LAW=1`,
+  `LANG=1`, `NA=0` records give an isotropic tabulated photon-energy
+  probability density. The second subsection uses `LAW=8` to report the
+  outgoing electron's average energy loss and is not needed by the photon
+  spectrum estimator.
+
+The two sections are used together because they supply complementary pieces:
+MF=23 fixes the total probability of a bremsstrahlung event, while MF=26 fixes
+the conditional photon-energy shape. Their product is the required
+differential cross section. This follows the ENDF-6 meanings of the sections
+rather than choosing two independently convenient tables
+{cite:p}`trkov2018endf6`.
+
+## EEDL cross section and spectrum
+
+For element {math}`Z`, incident electron kinetic energy {math}`T`, and photon
+energy {math}`k`, the default energy-differential cross section is
 
 ```{math}
-\frac{d\sigma}{dk} = \frac{16}{3}\alpha r_e^2 Z^2
-\frac{1}{k p_i^2} \ln \! \left( \frac{p_i+p_f}{p_i-p_f} \right)f_E,
-\qquad 0<k<T,
+\frac{d\sigma_Z}{dk}(T,k) = \sigma_Z^{23,527}(T)\,P_Z^{26,527}(k\mid T),
+\qquad \int_0^T P_Z(k\mid T)\,dk=1.
 
 ```
 
-with relativistic momenta used as a weakly relativistic extension and
+`endf-parserpy` reads both sections from the checksum-pinned packaged
+`EEDL.endf`. PyRITE accepts the tape only when the total and photon tables are
+finite, ordered, non-negative, and declare the supported ENDF lin-lin laws. The
+MF=23 values are converted from barns to cm². Each native MF=26 photon density
+is normalized after parsing to remove only source-record rounding error.
+
+The tape declares lin-lin interpolation for the total cross section, the
+secondary photon-energy axis (`LEP=2`), and the incident-energy panels
+(`INT=2`). PyRITE follows those laws: it interpolates adjacent photon spectra at
+fixed absolute photon energy. That interpolation can retain a small tail above
+an intermediate incident energy because adjacent panels have different upper
+endpoints, so the implementation imposes {math}`0<k\le T` and analytically
+renormalizes the surviving piecewise-linear density. Consequently, integrating
+the differential cross section over the full physical photon range recovers the
+interpolated MF=23 total.
+
+The ENDF-6 electro-atomic format describes the bremsstrahlung photon subsection
+as an isotropic, angle-independent tabulated spectrum (`LAW=1`, `LANG=1`,
+`NA=0`) {cite:p}`trkov2018endf6`. This agrees with and therefore retains
+PyRITE's existing angular model.
+
+## Optional Bethe--Heitler backend
+
+The former analytic model remains available with
+`cross_section_model="bethe-heitler"` on `mc_brem_spectrum`. It is the
+nonrelativistic, unscreened Born Bethe--Heitler form with the
+{cite:t}`elwert1939` correction, using relativistic momenta as a
+weakly-relativistic extension {cite:p}`kochmotz1959`:
 
 ```{math}
-f_E = \frac{\beta_i}{\beta_f} \frac{1-e^{-2\pi\alpha Z/\beta_i}} {1-e^{-2\pi\alpha Z/\beta_f}}
+\frac{d\sigma}{dk}=\frac{16}{3}\alpha r_e^2 Z^2
+\frac{1}{k p_i^2}\ln\!\left(\frac{p_i+p_f}{p_i-p_f}\right)
+\frac{\beta_i}{\beta_f}
+\frac{1-e^{-2\pi\alpha Z/\beta_i}}{1-e^{-2\pi\alpha Z/\beta_f}}.
 
 ```
 
 Momenta are carried in units of {math}`m_ec`, built from the exact relativistic
 relation {math}`p=\sqrt{T(T+2m_ec^2)}/m_ec` and {math}`\beta=p/(1+T/m_ec^2)`, with
- {math}`T_f=T_i-k`. The Born form itself is the nonrelativistic dipole result
-{cite:p}`kochmotz1959`; using relativistic momenta inside
-it is a weakly relativistic extension, not a relativistic derivation. The
-combination is adequate for {math}`Z\lesssim30` and {math}`T\lesssim100` keV; Seltzer--Berger
-tables would be the accuracy upgrade.
+{math}`T_f=T_i-k`. This backend is retained for reproducibility and as the
+fallback when EEDL lacks an element or incident-energy range. Every fallback
+emits a `RuntimeWarning` that identifies the missing coverage. Malformed or
+checksum-mismatched EEDL data are not treated as missing coverage and remain
+hard errors.
 
 ## Per-segment yield
 
@@ -64,6 +119,25 @@ attenuation of the whole composition. In a layered stack each layer's segments
 radiate with that layer's composition and every photon is attenuated across the
 whole stack.
 
+## Runtime implementation
+
+The EEDL tables are prepared once per element and requested photon-energy grid.
+Every native incident-energy panel is interpolated onto that grid once, while
+the incident-panel bracket, interpolation fraction, total cross section, and
+exact cutoff-normalization factor are stored as one-dimensional segment arrays.
+Those staged values are reused for every reduction chunk; the tabulated physics
+is not reparsed or recopied for each chunk.
+
+On CUDA with float32 spectra, one fused kernel interpolates the two adjacent
+panels, applies the {math}`k\le T` support, selects Bethe--Heitler only for
+uncovered segments, applies the existing absorption model, and reduces directly
+into the output bin. This avoids a dense segment-by-energy cross-section scratch
+array. Other backends and float64 use the same equations through the portable
+chunked implementation. Its memory admission uses the larger EEDL working-set
+estimate, and delayed CUDA/ROCm allocation errors are recognized at the point
+where they surface so the runner can retry the bremsstrahlung phase with a
+smaller chunk. Non-memory runtime errors are not retried.
+
 ## Escape and geometry
 
 The escape path reuses the line kernel's geometry: a flat slab uses the z-only
@@ -80,12 +154,14 @@ do not radiate.
 
 ## Energy range and cutoffs
 
-- `k <= 0` and `k >= T` are hard-zero bins.
-- The infrared spectrum rises approximately as {math}`\ln(4T/k)/k` and therefore
-  depends on the configured low-energy bound; the integrated background is not a
-  cutoff-independent number.
-- Born alone vanishes at the tip, while Born times Elwert approaches a finite
-  value immediately below the hard cutoff.
+- `k <= 0` and `k > T` are hard-zero bins for EEDL. The optional analytic
+  backend also zeros its historical endpoint convention.
+- The EEDL tables cover their declared incident and secondary-energy ranges.
+  Requests outside the incident-energy range warn and use Bethe--Heitler for
+  only the affected segments.
+- The normalized EEDL spectrum extends to 0.1 eV in the packaged tape. A
+  simulation grid with a higher lower bound intentionally records only the
+  corresponding partial total cross section.
 - Background runs want a **low transport cutoff** (~1 keV): electrons below the
   line-radiation cutoff still radiate into the soft X-ray window.
 - One transport can be shared by radiation populations with different cutoffs, so
@@ -129,11 +205,12 @@ The intensity must already be in the detected units of the plot it joins.
 
 - emission is isotropic, appropriate only to the intended weakly relativistic
   regime, and carries no polarization;
-- the unscreened Born form is approximate, especially for high {math}`Z` or outside
-  the tens-of-keV regime — atomic screening is absent, so the soft end is
-  overestimated where screening matters;
-- the Elwert factor is a low-energy Coulomb correction and is not a substitute
-  for a relativistic cross section;
+- EEDL is elemental atomic data; molecular bonding, density-dependent emission
+  effects, and interactions below the configured transport cutoff are outside
+  this model;
+- the optional/fallback Bethe--Heitler form is unscreened and approximate,
+  especially for high {math}`Z`; its Elwert factor is not a substitute for an
+  evaluated relativistic cross section;
 - segment contributions and incident electrons are summed incoherently, with no
   phase and therefore no coherent-emission counterpart;
 - the coherent (CBS) fraction of the continuum is not subtracted;
@@ -143,7 +220,8 @@ The intensity must already be in the detected units of the plot it joins.
 
 ## Validation
 
-Ledger rows: `brem-spectrum` for the cross section and per-segment assembly,
+Ledger rows: `brem-spectrum` for EEDL parsing, interpolation, normalization,
+fallback selection, and per-segment assembly,
 `external-brem-subtraction` for the weighted scale-only sideband fit that
 consumes a loaded external background, `substep-radiation-invariance` for the representative-energy evaluation,
 `radiation-error-estimators` for the opt-in quadrature estimator, and
