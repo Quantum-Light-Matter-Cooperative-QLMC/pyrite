@@ -759,7 +759,11 @@ full_name = "Highly Oriented Pyrolytic Graphite"
 formula = "C"
 phase = "2H"
 cod_id = 9011577
-B_ang2 = 0.8
+# B33 = 8*pi^2 * mean(U33) from the same Trucano & Chen neutron refinement this
+# entry's cod_id already cites: C1 U33 = 0.01600, C2 U33 = 0.01700 Ang^2, equal
+# multiplicity -> mean 0.01650 Ang^2. Basal (00l) only; g || c, so U33 is the
+# projection the pinned family probes. See docs/validation/materials/hopg-debye-waller-00l.md
+B_ang2 = 1.30
 surface_hkl = [0, 0, 1]
 mosaic_fwhm_deg = 0.8
 E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
@@ -1023,7 +1027,13 @@ full_name = "Molybdenum Disulfide"
 formula = "MoS2"
 phase = "2H"
 cod_id = 9007660
-B_ang2 = 0.6
+# B33 = 8*pi^2 * multiplicity-weighted U33 from Schoenfeld, Huang & Moss (1983),
+# the paper this entry's cod_id cites. The 2H deposit (COD 9007660) omits the
+# ADP loop; the 3R deposit (COD 9007661) from the same paper carries it, and
+# the two polytypes share identical trigonal-prismatic layers. Mo U33 = 0.00750,
+# S U33 = 0.00510 Ang^2 -> (2*0.00750 + 4*0.00510)/6 = 0.00590 Ang^2.
+# Basal (00l) only. See docs/validation/materials/mos2-debye-waller-00l.md
+B_ang2 = 0.47
 surface_hkl = [0, 0, 2]
 layers_per_cell = 2
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

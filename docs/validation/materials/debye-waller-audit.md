@@ -59,7 +59,7 @@ reflections.
 
 | material | phase, temperature, source | recovered displacement data | decision |
 |---|---|---|---|
-| HOPG | natural 2H graphite, nominal room temperature; Trucano & Chen, *Nature* **258**, 136–137 (1975), [doi:10.1038/258136a0](https://doi.org/10.1038/258136a0), [COD 9011577](https://www.crystallography.net/cod/9011577.html) | inequivalent C sites have `U11=0.00310` and `U33=0.0160/0.0170 Å²`, implying mean `B33=1.30 Å²` | candidate only: natural single crystal is not HOPG specimen state. Freund, Munkholm & Brennan's 1996 HOPG diffraction model uses an assumed scalar rather than a refined HOPG ADP. Keep legacy `0.8 Å²`. |
+| HOPG | natural 2H graphite, nominal room temperature; Trucano & Chen, *Nature* **258**, 136–137 (1975), [doi:10.1038/258136a0](https://doi.org/10.1038/258136a0), [COD 9011577](https://www.crystallography.net/cod/9011577.html) | inequivalent C sites have `U11=0.00310` and `U33=0.0160/0.0170 Å²`, implying mean `B33=1.30 Å²` | **Adopted 2026-09-13**, superseding the earlier "keep legacy `0.8 Å²`" decision. The specimen-state objection does not apply to an ADP: a mean-square displacement is a lattice-dynamical property, while HOPG differs from a natural single crystal in mosaic spread, which `mosaic_fwhm_deg` models separately. COD 9011577 is the record the entry's `cod_id` already cites, so the value now shares its source with the lattice and basis. Freund, Munkholm & Brennan (1996) uses an assumed scalar, not a refined HOPG ADP, so it is not a competing measurement. Basal `(00l)` only; see [hopg-debye-waller-00l](hopg-debye-waller-00l.md). |
 | PdSe2 | ambient Pbca; Kim *et al.*, *Inorg. Chem.* **43**, 1943–1949 (2004), [doi:10.1021/ic0352396](https://doi.org/10.1021/ic0352396), [COD 4310736](https://www.crystallography.net/cod/4310736.html) | Pd `Ueq=0.01341(6)`, Se `Ueq=0.01205(6) Å²`; Pd tensor `(0.00789,0.00765,0.02470)`, Se `(0.00968,0.00888,0.01759) Å²` plus small cross terms; unit occupancies | strong out-of-plane anisotropy and distinct Pd/Se tensors. Keep placeholder pending per-site tensors. |
 | PtBi2 | trigonal `P31m`, 295 K coordinate/ADP table; Feng *et al.*, *Nat. Commun.* **10**, 4765 (2019), [doi:10.1038/s41467-019-12805-2](https://doi.org/10.1038/s41467-019-12805-2), Supplementary Tables II–III | `Ueq`: Pt `0.0202(11)`, Bi1 `0.0234(18)`, Bi2 `0.0199(12)`, Bi3 `0.0202(11) Å²`; `U33`: `0.023(3)`, `0.022(5)`, `0.017(3)`, `0.019(2) Å²`; unit occupancies | four site tensors; source also mixes 273 K cell with 295 K coordinate/ADP table. Keep placeholder pending per-site tensors. |
 | V2O5 | ambient alpha `Pmmn`, 292 K; Enjalbert & Galy, *Acta Cryst. C* **42**, 1467–1469 (1986), [doi:10.1107/S0108270186091825](https://doi.org/10.1107/S0108270186091825), [COD 2020756](https://www.crystallography.net/cod/2020756.html) | isotropic `U`: V `0.0068(1)`, O1 `0.0153(9)`, O2 `0.0100(8)`, O3 `0.0114(13) Å²`; unit occupancies | site values differ by more than 2×. Keep placeholder pending per-site isotropic support. |
@@ -73,12 +73,56 @@ motion.
 
 | materials | recovered primary/deposited record | result |
 |---|---|---|
-| MoS2, MoSe2, MoTe2 | COD 1010993/1531960, 2310945, and 2310465 | matching 2H records contain no usable ADP; converted zero fields rejected |
+| MoS2 (superseded), MoSe2, MoTe2 | COD 1010993/1531960, 2310945, and 2310465 | **Superseded for MoS2 on 2026-09-13**; see the MoS2 row below. MoSe2 (COD 2310945, James & Lavik 1963) and MoTe2 (COD 2310465, Puotinen & Newnham 1961; COD 9009147, Wyckoff 1963 secondary compilation) still contain no usable ADP; converted zero fields rejected. Re-checked 2026-09-13 against the full COD formula listings for `Mo Se2` and `Mo Te2`: no other matching-phase deposit carries displacement data. |
 | WS2, WSe2 | Schutte, de Boer & Jellinek (1987), [doi:10.1016/0022-4596(87)90057-0](https://doi.org/10.1016/0022-4596(87)90057-0), COD 9012191/9012193 | matching 2H deposits provide coordinates but no ADPs |
 | NbS2, NbSe2 | matching 2H records COD 1538044 and 1539310; Brown & Beerntsen COD 2310533 is 3R, not catalog 2H | no usable matching-phase ADP; 1T-NbS2 COD 7204814 reports site-specific values but is the wrong polytype |
 | NbTe2, PdS2, PtS2, PtSe2, PtTe2, 2H-TaSe2, TaTe2, WTe2 | COD 2310357, 2310589, 1537200, 1537202, 1537197, 2310532, 2310358, 2310355 | legacy conversions contain zero placeholders, not reported ADPs |
 | HfS2, HfSe2, HfTe2, ReS2, ZrSe2, ZrTe5 | bundled structure is vendor/DFT/secondary-table based or lacks a primary refinement citation with ADPs | no phase-compatible primary ADP recovered in this pass |
 | VSe2 | catalog structural sources and COD 1538289 provide no usable ADP | no replacement |
+
+## 2026-09-13 pass: five production-critical entries
+
+Scope requested: HOPG, h-BN, MoS2, MoSe2, MoTe2 only. The rest of the catalog
+is out of scope for this pass and its placeholders are unchanged.
+
+| material | before | after | source status |
+|---|---:|---:|---|
+| HOPG | `0.8` (no provenance) | `1.30` | Trucano & Chen 1975 neutron refinement, COD 9011577 — the entry's own `cod_id`. Adopted; see [hopg-debye-waller-00l](hopg-debye-waller-00l.md) |
+| h-BN | `3.45` | `3.45` (unchanged) | Pease room-temperature basal fit, already recorded; no action |
+| MoS2 | `0.6` (placeholder) | `0.47` | Schoenfeld, Huang & Moss 1983, COD 9007661 (3R deposit of the same paper). Cross-polytype transfer, scoped in [mos2-debye-waller-00l](mos2-debye-waller-00l.md) |
+| MoSe2 | `0.6` (placeholder) | `0.6` (unchanged) | **not reported.** Only matching-phase deposit is James & Lavik 1963 (COD 2310945), zeroed `U_iso`. Bronsema, De Boer & Jellinek 1986 (*Z. Anorg. Allg. Chem.* **541**, 15–17, [doi:10.1002/zaac.19865400904](https://doi.org/10.1002/zaac.19865400904)) is the refinement the entry's cell matches (`a=3.289`, `c=12.927`) and is the correct target, but is paywalled and its ADP table was not retrieved |
+| MoTe2 | `0.6` (placeholder) | `0.6` (unchanged) | **not reported.** Puotinen & Newnham 1961 (COD 2310465) carries zeroed `U_iso`; Wyckoff 1963 (COD 9009147) is a secondary compilation with no ADPs |
+
+### Why the two unresolved entries cost little
+
+Pinned-reflection sensitivity at 10 keV, `|F|²` relative to the current
+catalog `B`, computed with `structure_factor` over the pinned basal families:
+
+| material | `|g(002)|` [1/Å] | `(002)` span, `B = 0 … 3.45` | `(004)` span, `B = 0 … 3.45` | `(002)` over `B = 0.3 … 1.5` | `(004)` over `B = 0.3 … 1.5` |
+|---|---:|---:|---:|---:|---:|
+| HOPG | 1.8725 | 14.2% | 45.8% | 5.2% | 19.2% |
+| h-BN | 1.8866 | 14.4% | 46.3% | 5.3% | 19.5% |
+| MoS2 | 1.0222 | 4.5% | 16.7% | 1.6% | 6.2% |
+| MoSe2 | 0.9721 | 4.0% | 15.2% | 1.4% | 5.6% |
+| MoTe2 | 0.9002 | 3.5% | 13.2% | 1.2% | 4.8% |
+
+The last two columns are the honest error bar on a placeholder: `B = 0.3–1.5 Å²`
+brackets any physically plausible room-temperature value for these materials.
+
+The Mo dichalcogenides have long `c` axes (12.3–14.0 Å), so their pinned
+`(00l)` reflections sit at small `|g|` where the Debye–Waller factor is nearly
+flat. Within that realistic band the placeholder costs at most 1.6% on `(002)`
+and 6.2% on `(004)` — and those are full-band spans, so the error from `0.6 Å²`
+specifically is smaller still.
+
+HOPG and h-BN are the opposite case: short `c` axes put `(004)` near
+`|g| = 3.8 1/Å`, where `|F|²` varies by 46% over the full range and ~19% over
+the realistic band. That is why HOPG was the high-value entry in this set, and
+why h-BN was already fixed.
+
+Remaining work for MoSe2 and MoTe2 is source retrieval, not analysis: obtain
+the Bronsema 1986 ADP table for MoSe2, and a modern single-crystal refinement
+for 2H-MoTe2. Neither is on the critical path for present accuracy.
 
 ## Acceptance record
 

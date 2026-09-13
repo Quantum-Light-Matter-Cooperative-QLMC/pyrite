@@ -84,6 +84,8 @@ materials/crystal-db-comparison
 materials/debye-waller-audit
 materials/hbn-structure
 materials/hfs2-structure
+materials/hopg-debye-waller-00l
+materials/mos2-debye-waller-00l
 materials/mosaic-analytic
 materials/mosaic-mc
 materials/multilayer-stack

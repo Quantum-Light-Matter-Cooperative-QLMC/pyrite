@@ -820,6 +820,62 @@ def cxr_lines_fixed(
     }
 
 
+def escape_limited_length_ang(L_z_ang, L_abs_ang, n_z):
+    """
+
+    Absorption-limited effective emitting length [Angstrom] for a slab of
+
+    thickness ``L_z_ang`` viewed along a direction whose beam-axis (z) cosine
+
+    is ``n_z``. Feranchuk-Spence Eq. (9), carrying the escape geometry the
+
+    paper's normal-exit form leaves implicit.
+
+
+
+    A photon born at depth ``z`` travels ``z / |n_z|`` (or ``(t - z) / |n_z|``,
+
+    same integral) of material before it leaves, so the escape-weighted length
+
+    is
+
+
+
+        L_eff = int_0^t exp(-(t - z) / (|n_z| L_abs)) dz
+
+              = |n_z| L_abs [1 - exp(-t / (|n_z| L_abs))]
+
+
+
+    not ``L_abs [1 - exp(-t / L_abs)]``. The two agree only for ``t << L_abs``,
+
+    where both tend to ``t`` and the geometry cancels; in the thick-target
+
+    limit the correct form saturates at ``|n_z| L_abs``, smaller by ``|n_z|``.
+
+
+
+    Limits: ``|n_z| -> 1`` (normal exit) recovers the bare form; ``t -> 0``
+
+    gives ``t`` for any ``n_z``; ``t -> inf`` gives ``|n_z| L_abs``;
+
+    ``n_z -> 0`` (grazing exit, infinite escape path) gives 0.
+
+    """
+
+    cos_esc = np.abs(n_z)
+
+    # Grazing exit: escape path diverges, nothing gets out.
+
+    if np.ndim(cos_esc) == 0 and cos_esc == 0.0:
+        return 0.0 * L_abs_ang
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        depth = cos_esc * L_abs_ang
+
+        return np.where(cos_esc == 0.0, 0.0, depth * (1.0 - np.exp(-L_z_ang / depth)))
+
+
 def photons_per_electron(
     crystal,
     hkl,
@@ -864,9 +920,21 @@ def photons_per_electron(
 
 
 
+    ``L_eff`` is the escape-weighted length of `escape_limited_length_ang`,
+
+    which carries the ``|n_z|`` exit geometry; the bare
+
+    ``L_abs [1 - exp(-t / L_abs)]`` overstates thick-target flux by ``1/|n_z|``.
+
+
+
     omega is in [1/Angstrom], L_eff in [Angstrom] (omega*L dimensionless,
 
     hbar = c = 1). polarization="both" sums sigma and pi.
+
+
+
+    Validation: closed-form-flux
 
     """
 
@@ -899,7 +967,7 @@ def photons_per_electron(
     else:  # "lif": theta_B_normal IS theta_obs
         n_z = np.cos(theta_B_normal)
 
-    L_eff = L_abs_ang * (1.0 - np.exp(-L_z_ang / L_abs_ang))
+    L_eff = escape_limited_length_ang(L_z_ang, L_abs_ang, n_z)
 
     return ALPHA_FS / (2.0 * np.pi) * omega * (L_eff / beta) * A2 * dOmega_sr / (1.0 - beta * n_z)
 

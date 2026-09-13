@@ -59,8 +59,13 @@ def test_typed_case_content_key_matches_pre_case_golden():
     case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
 
     assert case_content_key(case) == case_content_key(case.to_dict())
+    # Moved 2026-09-13 when hopg's B_ang2 went 0.8 -> 1.30 (Trucano & Chen
+    # U33; see docs/validation/materials/hopg-debye-waller-00l.md). B_ang2 is
+    # hashed into the content key, so a catalog value change orphans records
+    # minted under the old value rather than serving them for a case that now
+    # diffracts differently -- the same rule the stopping-model marker follows.
     assert case_content_key(case) == (
-        "91570aec6670850289e0820f871eaae0feec425e9f9d48ced8c6a367dd701ab0"
+        "9fea153e25d8ad02206af7103f59cd6ad494632618264fe63f28f9f15a8f559e"
     )
 
 

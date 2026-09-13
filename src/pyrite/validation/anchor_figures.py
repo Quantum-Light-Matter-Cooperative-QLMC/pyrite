@@ -48,7 +48,7 @@ from tabulate import tabulate
 _HERE = Path(__file__).resolve().parent
 _PACKAGE_ROOT = _HERE.parent
 from pyrite.detectors import Detector, LegacyEDS  # noqa: E402, I001
-from pyrite.materials.crystal import absorption_length_ang  # noqa: E402
+from pyrite.materials.crystal import crystal_absorption_length_ang  # noqa: E402
 from pyrite.montecarlo import (  # noqa: E402
     aperture_fwhm_eV,
     beta_from_keV,
@@ -79,6 +79,9 @@ from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
     line_energy_eV as line_energy_eV,
     single_segment_anchor as single_segment_anchor,
     theory_line_energies as theory_line_energies,
+)
+from pyrite.validation.feranchuk_spence import (  # noqa: E402
+    escape_limited_length_ang,
 )
 from pyrite.validation._zhai import (  # noqa: E402
     ZHAI_CACHE_FORMAT as ZHAI_CACHE_FORMAT,
@@ -801,9 +804,10 @@ def figure_enhancement(anchor: ZhaiAnchor, model: dict):
     mc_enh = float(bulk.max() / film.max())
 
     E_line = line_energy_eV(anchor, E0)
-    L_abs = absorption_length_ang("C", E_line, anchor.n_atoms_per_ang3)
-    leff_bulk = L_abs * (1.0 - np.exp(-anchor.thick_bulk_ang / L_abs))
-    leff_film = L_abs * (1.0 - np.exp(-anchor.thick_film_ang / L_abs))
+    L_abs = crystal_absorption_length_ang(anchor.crystal, E_line)
+    n_z = np.cos(anchor.theta_obs_rad)  # geometry="lif", as feranchuk_line_flux
+    leff_bulk = escape_limited_length_ang(anchor.thick_bulk_ang, L_abs, n_z)
+    leff_film = escape_limited_length_ang(anchor.thick_film_ang, L_abs, n_z)
     ceiling = float(leff_bulk / leff_film)
 
     fig, ax = plt.subplots(figsize=(7, 5))

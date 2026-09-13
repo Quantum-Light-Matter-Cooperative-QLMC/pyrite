@@ -28,7 +28,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`relativistic-ceiling`](ledger-core-coherent-physics.md#relativistic-ceiling) | beam kinetic energies above `BEAM_ENERGY_CEILING_KEV = 300` keV are refused (raise) rather than extrapolated, because the Zhai/Feranchuk PXR/CBS kernels are a nonrelativistic derivation | `unverified` |
 | [`line-energy-dispersion`](ledger-core-coherent-physics.md#line-energy-dispersion) | `ω = v·g / (1 − v·n̂)` tunable line energy | `discrepancy` |
 | [`longitudinal-target-timing`](ledger-core-coherent-physics.md#longitudinal-target-timing) | conditional positive-basal-harmonic target timing: `kγ = β\|g\|cos(tilt)/(1−βcos(theta_obs))`, `Eγ=ℏc kγ`, `T=h/Eγ`, and Gaussian `σt=sqrt(−ln η)/Ω` with `Ω=2π/T` | `anchored` |
-| [`closed-form-flux`](ledger-core-coherent-physics.md#closed-form-flux) | Eq.(12) closed-form line flux (single-segment reference) | `discrepancy` |
+| [`closed-form-flux`](ledger-core-coherent-physics.md#closed-form-flux) | Eq.(12) closed-form line flux (single-segment reference) | `anchored` |
 | [`enhancement-bulk-film`](ledger-core-coherent-physics.md#enhancement-bulk-film) | bulk-vs-film line enhancement | `unverified` |
 | [`spxr-physical-population`](ledger-core-coherent-physics.md#spxr-physical-population) | for a fixed physical population of independent, identically distributed electron fields, the ensemble spectral yield separates into `N <\|E\|²> + N(N-1) \|<E>\|²`, with physical `N = Q/\|e\|` independent of numerical sample count | `unverified` |
 | [`zhai-material-screen-reconstruction`](ledger-core-coherent-physics.md#zhai-material-screen-reconstruction) | material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays | `unverified` |
@@ -40,7 +40,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 |---|---|---|
 | [`structure-factor`](ledger-crystallography-atomic-data.md#structure-factor) | structure factor `F(g)` + Debye–Waller | `anchored` |
 | [`debye-waller-catalog-provenance`](ledger-crystallography-atomic-data.md#debye-waller-catalog-provenance) | every production `B_ang2` is tied to a phase- and temperature-specific primary refinement, with scalar approximation scope stated | `discrepancy` |
-| [`surface-hkl-orientation`](ledger-crystallography-atomic-data.md#surface-hkl-orientation) | reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z` | `unverified` |
+| [`surface-hkl-orientation`](ledger-crystallography-atomic-data.md#surface-hkl-orientation) | reciprocal cleavage-plane normal `g_hkl = h b1 + k b2 + l b3` is mapped to sample `+z` by a proper minimal rotation, followed by the configured right-handed azimuth about `+z` | `rederived` |
 | [`crystals-cif-adapter`](ledger-crystallography-atomic-data.md#crystals-cif-adapter) | `crystals.Crystal`/CIF lattice + symmetry-expanded fractional basis conversion into the internal `CRYSTALS` entry shape | `anchored` |
 | [`cod-lattice-catalog-geometry`](ledger-crystallography-atomic-data.md#cod-lattice-catalog-geometry) | six lattice parameters of every COD-pinned catalog crystal agree with the pinned external COD record | `anchored` |
 | [`atomic-form-factor`](ledger-crystallography-atomic-data.md#atomic-form-factor) | `F(g,E) = f0(g) + f'(E) + i·f''(E)` | `rederived` |
@@ -147,7 +147,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 
 | ID | Claim | Status |
 |---|---|---|
-| [`positioned-filter-attenuation`](ledger-detector-forward-models.md#positioned-filter-attenuation) | primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)` | `unverified` |
+| [`positioned-filter-attenuation`](ledger-detector-forward-models.md#positioned-filter-attenuation) | primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)` | `rederived` |
 | [`detector-eaglexo`](ledger-detector-forward-models.md#detector-eaglexo) | `solid_angle(Ω) × QE(E)` CCD operator | `filtered` |
 | [`detector-timepix`](ledger-detector-forward-models.md#detector-timepix) | Si charge model, diffusion, ~1.9 keV counting threshold | `blocked` |
 | [`detector-line-broadening`](ledger-detector-forward-models.md#detector-line-broadening) | EDS polar-aperture line broadening `FWHM = (2√(2ln2)/3)·(∂Ep/∂θobs)·Δθobs` | `rederived` |

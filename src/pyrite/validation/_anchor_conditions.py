@@ -16,7 +16,7 @@ from pyrite.detectors import Detector, EnergyBins
 from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
-    absorption_length_ang,
+    crystal_absorption_length_ang,
     reciprocal_g_vector,
 )
 from pyrite.montecarlo import Case, beta_from_keV, mc_spectrum
@@ -378,10 +378,18 @@ def theory_line_energies(anchor: ZhaiAnchor) -> dict[float, float]:
 
 def feranchuk_line_flux(anchor: ZhaiAnchor, E0_keV: float, thickness_ang: float) -> float:
     """Feranchuk-Spence Eq. (12) closed-form line flux [photons / electron into
-    dOmega], absorption-limited, at the dispersion-relation line energy."""
+    dOmega], absorption-limited, at the dispersion-relation line energy.
+
+    The Eq. (9) length is escape-weighted by the exit obliquity ``|n_z|``
+    (`escape_limited_length_ang`), so the thick-target value saturates at
+    ``|n_z| L_abs`` rather than ``L_abs``. The attenuation length follows the
+    anchor's own crystal composition, matching the number density it uses.
+
+    Validation: closed-form-flux
+    """
     beta = beta_from_keV(E0_keV)
     E_line = line_energy_eV(anchor, E0_keV)
-    L_abs = absorption_length_ang("C", E_line, anchor.n_atoms_per_ang3)
+    L_abs = crystal_absorption_length_ang(anchor.crystal, E_line)
     return photons_per_electron(
         anchor.crystal,
         anchor.hkl,

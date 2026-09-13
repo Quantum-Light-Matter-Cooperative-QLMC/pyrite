@@ -17,6 +17,7 @@ import pytest
 matplotlib.use("Agg")  # headless; no display in CI
 
 from pyrite.detectors import Detector, LegacyEDS, convolve_detector, detector_efficiency
+from pyrite.materials.crystal import crystal_absorption_length_ang
 from pyrite.validation import anchor_figures as af
 
 _APP_RESOURCES = Path(af.__file__).resolve().parent
@@ -177,6 +178,52 @@ def test_single_segment_lineshape_converges_to_closed_form(anchor):
 
     assert abs(long_ratio - 1.0) < abs(short_ratio - 1.0)
     assert long_ratio == pytest.approx(1.0, abs=5e-4)
+
+
+def test_escape_length_carries_the_exit_obliquity():
+    """Eq. (9) escape length saturates at |n_z| L_abs, not L_abs.
+
+    The single-segment anchor cannot see this: it runs at t << L_abs where both
+    forms tend to t. This pins the thick-target limit the bare form overstated
+    by 1/|n_z| (2.06x at the Zhai anchor's 119 deg take-off).
+    """
+    from pyrite.validation.feranchuk_spence import escape_limited_length_ang as L_eff
+
+    n_z = np.cos(np.deg2rad(119.0))
+    cos_esc = abs(n_z)
+    L_abs = 1.0e5
+
+    # Thin: geometry cancels, both forms give the thickness.
+    assert float(L_eff(1.0, L_abs, n_z)) == pytest.approx(1.0, rel=1e-4)
+
+    # Thick: saturates at |n_z| L_abs, i.e. 1/|n_z| below the bare form.
+    thick = float(L_eff(1.0e9, L_abs, n_z))
+    assert thick == pytest.approx(cos_esc * L_abs, rel=1e-9)
+    assert L_abs / thick == pytest.approx(1.0 / cos_esc, rel=1e-9)
+
+    # Normal exit recovers the bare form; grazing exit emits nothing.
+    assert float(L_eff(1.0e9, L_abs, 1.0)) == pytest.approx(L_abs, rel=1e-9)
+    assert float(L_eff(1.0e9, L_abs, 0.0)) == 0.0
+
+    # Monotone in thickness, and never exceeds the saturated value.
+    lengths = [float(L_eff(t, L_abs, n_z)) for t in (1e2, 1e3, 1e4, 1e5, 1e6)]
+    assert lengths == sorted(lengths)
+    assert lengths[-1] <= cos_esc * L_abs
+
+
+def test_bulk_line_flux_is_escape_weighted(anchor):
+    """The bulk closed form sits 1/|n_z| below the bare-length value."""
+    cos_esc = abs(np.cos(anchor.theta_obs_rad))
+    E0 = anchor.energies_keV[-1]
+
+    bulk = af.feranchuk_line_flux(anchor, E0, anchor.thick_bulk_ang)
+    film = af.feranchuk_line_flux(anchor, E0, anchor.thick_film_ang)
+
+    # 1 mm is deep into saturation, 29 nm is deep into the thin limit, so the
+    # bulk/film ratio is the escape-weighted ceiling, not the bare one.
+    L_abs = crystal_absorption_length_ang(anchor.crystal, af.line_energy_eV(anchor, E0))
+    assert anchor.thick_bulk_ang > 50.0 * cos_esc * L_abs
+    assert bulk / film == pytest.approx(cos_esc * L_abs / anchor.thick_film_ang, rel=2e-2)
 
 
 def _synthetic_model(anchor):

@@ -11,12 +11,12 @@ Compact generated view of the [detailed validation ledger]
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
-| `anchored` | 6 |
-| `rederived` | 40 |
+| `anchored` | 7 |
+| `rederived` | 42 |
 | `filtered` | 8 |
-| `unverified` | 59 |
+| `unverified` | 57 |
 | `blocked` | 1 |
-| `discrepancy` | 6 |
+| `discrepancy` | 5 |
 | **Total** | **120** |
 
 Status meanings and promotion rules are defined in the

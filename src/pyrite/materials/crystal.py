@@ -473,6 +473,47 @@ def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
         return 1.0 / mu
 
 
+def crystal_absorption_length_ang(crystal, photon_E_eV):
+    """
+    Beer--Lambert attenuation length [Angstrom] of a catalog crystal, summing
+    the inverse lengths of its basis elements.
+
+    `absorption_length_ang` is elemental; its own docstring states the compound
+    rule, that inverse lengths add through ``sum_i n_i f2_i``. This applies that
+    rule to a `CRYSTALS` entry, taking each element's number density from the
+    basis occupancy of the unit cell, ``n_i = N_i / V_cell``. For a
+    single-element crystal it reduces exactly to the elemental call at
+    ``n = len(basis) / V_cell``.
+
+    Out-of-range energies propagate NaN from `henke_dispersion`, as in the
+    elemental function.
+
+    Parameters
+    ----------
+    crystal
+        Key into `CRYSTALS`.
+    photon_E_eV
+        Scalar or array photon energy in eV.
+
+    Returns
+    -------
+    numpy.ndarray
+        Attenuation length in angstroms, shaped like ``photon_E_eV``.
+
+    Validation: absorption-length
+    """
+    info = CRYSTALS[crystal]
+    counts: dict[str, int] = {}
+    for element, _ in info["basis"]:
+        counts[element] = counts.get(element, 0) + 1
+    with np.errstate(divide="ignore", invalid="ignore"):
+        inv_mu = sum(
+            1.0 / absorption_length_ang(element, photon_E_eV, n_sites / info["V_cell"])
+            for element, n_sites in counts.items()
+        )
+        return 1.0 / inv_mu
+
+
 # ---- complex refractive index (grazing-incidence optics) --------------------
 def optical_constants(element, photon_E_eV, number_density_per_ang3):
     """
