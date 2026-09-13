@@ -545,8 +545,8 @@ def _run_per_electron_transport_lut(
         d_bot,
     )
     lut_args = (
-        lut.E_min_keV,
-        lut.inv_dE_keV,
+        lut.log_E_min,
+        lut.inv_dlogE,
         lut.n_energy,
         d_total_rate,
         d_dEds,

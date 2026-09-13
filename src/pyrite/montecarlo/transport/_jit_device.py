@@ -236,27 +236,29 @@ def _dEds_spliced_element(J, k, coeff, E_cross, E_i):
 
 
 @jit.rawkernel(device=True)
-def _lut_lerp_at(table, row_base, lut_n_energy, lut_E_min_keV, lut_inv_dE_keV, E_i):
+def _lut_lerp_at(table, row_base, lut_n_energy, lut_log_E_min, lut_inv_dlogE, E_i):
     """Interpolate a flattened LUT row at an arbitrary energy.
 
     The frozen path indexes the grid once per flight and reuses the index for
     every table, so it stays inlined. The midpoint rule evaluates the same
     tables at the cutoff, predictor, and midpoint energies, which needs the
     clamped index lookup as a callable. Same arithmetic as the host
-    ``_lut_index_frac_scalar`` / ``_lut_lerp_2d`` pair; ``row_base`` is
-    ``L * lut_n_energy`` for a per-layer table and zero for a 1-D one.
+    ``_lut_index_frac_scalar`` / ``_lut_lerp_2d`` pair -- including the branch
+    order, which tests the upper clamp first so a non-finite coordinate lands on
+    the lower clamp instead of ``int(x)``; ``row_base`` is ``L * lut_n_energy``
+    for a per-layer table and zero for a 1-D one.
     """
-    x = (E_i - lut_E_min_keV) * lut_inv_dE_keV
+    x = (xp.log(E_i) - lut_log_E_min) * lut_inv_dlogE
     last = lut_n_energy - I32_ONE
-    if x <= F64_ZERO:
-        i = I32_ZERO
-        f = F64_ZERO
-    elif x >= last:
+    if x >= last:
         i = last - I32_ONE
         f = F64_ONE
-    else:
+    elif x > F64_ZERO:
         i = np.int32(x)
         f = x - i
+    else:
+        i = I32_ZERO
+        f = F64_ZERO
     base = row_base + i
     v0 = table[base]
     return v0 + f * (table[base + I32_ONE] - v0)

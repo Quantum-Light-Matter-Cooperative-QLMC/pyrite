@@ -53,8 +53,8 @@ def run_transport_lut_kernel(
         L_bot,
     ) = geometry
     (
-        lut_E_min_keV,
-        lut_inv_dE_keV,
+        lut_log_E_min,
+        lut_inv_dlogE,
         lut_n_energy,
         lut_total_rate,
         lut_dEds,
@@ -113,8 +113,8 @@ def run_transport_lut_kernel(
             np.int32(max_el),
             L_top,
             L_bot,
-            np.float64(lut_E_min_keV),
-            np.float64(lut_inv_dE_keV),
+            np.float64(lut_log_E_min),
+            np.float64(lut_inv_dlogE),
             np.int32(lut_n_energy),
             lut_total_rate.reshape(-1),
             lut_dEds.reshape(-1),

@@ -177,8 +177,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
         else:
             (
-                lut_E_min_keV,
-                lut_inv_dE_keV,
+                lut_log_E_min,
+                lut_inv_dlogE,
                 lut_n_energy,
                 lut_total_rate,
                 lut_dEds,
@@ -281,7 +281,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             z_top_L, z_bot_L, E_j = L_top[L], L_bot[L], E_keV[e]
             if lut:
                 lut_i, lut_f = _lut_index_frac_scalar(
-                    E_j, lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                    E_j, lut_log_E_min, lut_inv_dlogE, lut_n_energy
                 )
                 total_rate = _lut_lerp_2d(lut_total_rate, L, lut_i, lut_f)
             else:
@@ -405,7 +405,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 if lut:
                     if energy_model_code == 1:
                         clk_i, clk_f = _lut_index_frac_scalar(
-                            0.5 * (E_j + E_end_j), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                            0.5 * (E_j + E_end_j), lut_log_E_min, lut_inv_dlogE, lut_n_energy
                         )
                         t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
                     else:
@@ -419,7 +419,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 if energy_model_code == 1:
                     if lut:
                         cut_i, cut_f = _lut_index_frac_scalar(
-                            0.5 * (E_j + E_cut_e), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                            0.5 * (E_j + E_cut_e), lut_log_E_min, lut_inv_dlogE, lut_n_energy
                         )
                         cutoff_rate = _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
                     elif per_electron:
@@ -450,7 +450,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                         E_pred = E_j + dEds * step_j
                         if lut:
                             mid_i, mid_f = _lut_index_frac_scalar(
-                                0.5 * (E_j + E_pred), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                                0.5 * (E_j + E_pred), lut_log_E_min, lut_inv_dlogE, lut_n_energy
                             )
                             mid_rate = _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
                         elif per_electron:
@@ -464,7 +464,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                         E_end_j = E_j + step_j * mid_rate
                     if lut:
                         clk_i, clk_f = _lut_index_frac_scalar(
-                            0.5 * (E_j + E_end_j), lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                            0.5 * (E_j + E_end_j), lut_log_E_min, lut_inv_dlogE, lut_n_energy
                         )
                         t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
                     else:
@@ -645,7 +645,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                             break
                 if lut:
                     alpha_i, alpha_f = _lut_index_frac_scalar(
-                        E_keV[e], lut_E_min_keV, lut_inv_dE_keV, lut_n_energy
+                        E_keV[e], lut_log_E_min, lut_inv_dlogE, lut_n_energy
                     )
                     alpha = _lut_lerp_3d(lut_alpha, L, i_el, alpha_i, alpha_f)
                 elif elastic_model_code == 1 and mott_has_table[L, i_el]:
