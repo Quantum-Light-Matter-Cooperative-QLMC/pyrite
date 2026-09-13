@@ -49,8 +49,12 @@ def save_default_azimuth(value, path=DEFAULTS_PATH):
     )
 
 
+def _cli(*args):
+    return [sys.executable, "-m", "pyrite.cli", *args]
+
+
 def _remote_cli(*args):
-    return [sys.executable, "-m", "pyrite.cli", "remote", *args]
+    return _cli("remote", *args)
 
 
 def probe_remote_zhai(timeout=5):
@@ -85,11 +89,22 @@ def probe_remote_zhai(timeout=5):
     return True, "remote GPU available"
 
 
+_JOB_ID_RE = re.compile(r"JOB (\d{8}-\d{6}-[0-9a-f]{8}) · SUBMITTED")
+
+
 def start_remote_zhai(*, ne, ne_brem, ne_supp, tmd_azimuth, refresh=False):
     """Launch the existing detached remote Zhai job and return its job id."""
-    command = _remote_cli(
-        "check",
-        "--detached",
+    # `pyrite run --preset zhai --remote --detach` is the canonical launch path
+    # (the retired `remote check`/`validate` spelling this used to call is no
+    # longer mounted on the CLI tree, see commit fa3e0aa1). It prints a
+    # `JOB <jobid> · SUBMITTED` banner (`remote/queue.py::start_zhai_queue`) on
+    # success, not the "started zhai job <id>" text this used to look for.
+    command = _cli(
+        "run",
+        "--preset",
+        "zhai",
+        "--remote",
+        "--detach",
         "--ne",
         str(int(ne)),
         "--ne-brem",
@@ -110,7 +125,7 @@ def start_remote_zhai(*, ne, ne_brem, ne_supp, tmd_azimuth, refresh=False):
     )
     if completed.returncode != 0:
         raise RuntimeError((completed.stderr or completed.stdout).strip())
-    match = re.search(r"started zhai job (\d{8}-\d{6})", completed.stdout)
+    match = _JOB_ID_RE.search(completed.stdout)
     if match is None:
         raise RuntimeError(f"remote launch did not report a job id:\n{completed.stdout.strip()}")
     return match.group(1)

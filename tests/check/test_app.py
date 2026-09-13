@@ -52,20 +52,62 @@ def test_remote_probe_checks_configured_host(monkeypatch):
     assert "BatchMode=yes" in calls[0][0]
 
 
+# Real launcher stdout from issue #40's log (`pyrite job attach`/`status`/`logs`
+# hints trimmed to what the id extraction actually needs).
+_ZHAI_JOB_BANNER = (
+    "\nJOB 20260816-084051-40a80198 · SUBMITTED\n"
+    "  SLURM     1665\n"
+    "  Host      qlmc\n"
+    "  Workload  Zhai reproduction\n"
+    "  Monitor   pyrite job attach 20260816-084051-40a80198\n"
+    "  Status    pyrite job status 20260816-084051-40a80198 -vv\n"
+    "  Logs      pyrite job logs 20260816-084051-40a80198 --follow\n"
+    "  Pull      pyrite remote pull --preset zhai  (after completion)\n"
+)
+
+
 def test_start_remote_zhai_returns_detached_job_id(monkeypatch):
+    captured = {}
+
     def fake_run(command, **kwargs):
-        return subprocess.CompletedProcess(
-            command,
-            0,
-            stdout="started zhai job 20260711-123456 on qlmc\n",
-            stderr="",
-        )
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0, stdout=_ZHAI_JOB_BANNER, stderr="")
 
     monkeypatch.setattr(check.subprocess, "run", fake_run)
 
     jobid = check.start_remote_zhai(ne=11, ne_brem=3, ne_supp=5, tmd_azimuth=35.0, refresh=True)
 
-    assert jobid == "20260711-123456"
+    assert jobid == "20260816-084051-40a80198"
+    # The retired `remote check`/`validate` spelling this used to call is no
+    # longer mounted on the CLI tree (commit fa3e0aa1); the canonical launch
+    # path is `run --preset zhai --remote --detach`.
+    assert captured["command"][3:] == [
+        "run",
+        "--preset",
+        "zhai",
+        "--remote",
+        "--detach",
+        "--ne",
+        "11",
+        "--ne-brem",
+        "3",
+        "--ne-supp",
+        "5",
+        "--tmd-azimuth",
+        "35.0",
+        "--refresh",
+    ]
+
+
+def test_start_remote_zhai_raises_when_banner_is_unparseable(monkeypatch):
+    monkeypatch.setattr(
+        check.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, "no job here\n", ""),
+    )
+
+    with pytest.raises(RuntimeError, match="did not report a job id"):
+        check.start_remote_zhai(ne=11, ne_brem=3, ne_supp=5, tmd_azimuth=35.0)
 
 
 @pytest.mark.parametrize(
