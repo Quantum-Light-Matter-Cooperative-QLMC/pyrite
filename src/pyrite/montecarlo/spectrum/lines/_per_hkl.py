@@ -30,6 +30,18 @@ from ._kernels import (
 )
 
 
+def _sinc_window_bounds(E_grid, lo, hi):
+    """Return the padded node slice intersecting ``[lo, hi]``.
+
+    Include the node immediately below ``lo`` and the node immediately above
+    ``hi``, matching the historical uniform-grid arithmetic while deriving the
+    bounds from the coordinates themselves.  ``E_grid`` must be ascending.
+    """
+    i0 = max(int(_to_cpu(xp.searchsorted(E_grid, lo, side="right"))) - 1, 0)
+    i1 = min(int(_to_cpu(xp.searchsorted(E_grid, hi, side="right"))) + 1, E_grid.size)
+    return i0, i1
+
+
 def _row_decoherence_factor(st, g_vec_d):
     """Inter-electron factor for one row.
 
@@ -284,7 +296,6 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
             for c, f in zip(coefs, fields, strict=True):
                 f += c[sl][m] @ SP
     else:
-        dE = E_grid[1] - E_grid[0]
         order = xp.argsort(E_r)
         blk = 8192
         for j0 in range(0, order.size, blk):
@@ -295,11 +306,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
             half = sinc_cutoff / a_width[sel]
             lo = float(_to_cpu((E_r[sel] - half).min()))
             hi = float(_to_cpu((E_r[sel] + half).max()))
-            i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
-            i1 = min(
-                int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
-                E_grid.size,
-            )
+            i0, i1 = _sinc_window_bounds(E_grid, lo, hi)
             if i1 <= i0:
                 continue
             x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
@@ -590,7 +597,6 @@ def _accumulate_reflection(
             for w, tgt in targets:
                 tgt += w[sl][m] @ S
     else:
-        dE = E_grid[1] - E_grid[0]
         order = xp.argsort(E_r)
         blk = 8192
         for j0 in range(0, order.size, blk):
@@ -601,11 +607,7 @@ def _accumulate_reflection(
             half = sinc_cutoff / a_width[sel]
             lo = float(_to_cpu((E_r[sel] - half).min()))
             hi = float(_to_cpu((E_r[sel] + half).max()))
-            i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
-            i1 = min(
-                int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
-                E_grid.size,
-            )
+            i0, i1 = _sinc_window_bounds(E_grid, lo, hi)
             if i1 <= i0:
                 continue
             S = _sincsq_lineshape(a_width[sel][:, None], E_grid[None, i0:i1], E_r[sel][:, None])
