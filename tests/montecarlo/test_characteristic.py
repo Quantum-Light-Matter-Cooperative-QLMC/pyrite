@@ -6,7 +6,19 @@ import hashlib
 
 import numpy as np
 
+from pyrite._backend import REAL, xp
 from pyrite.montecarlo.spectrum import characteristic
+from tests.helpers import scaled_rtol
+
+
+def _zero_mu(_composition, energy):
+    """Transparent stand-in for ``_mu_total_inv_ang``.
+
+    The real coefficient returns on the device of its input, so the stub has to
+    as well: a NumPy-returning lambda blows up under ``PYRITE_TEST_BACKEND=cuda``
+    the moment it is handed a CuPy energy array.
+    """
+    return xp.zeros_like(xp.asarray(energy, dtype=REAL))
 
 
 def _carbon_segments(lengths: list[float]) -> dict[str, object]:
@@ -66,11 +78,7 @@ def test_packaged_carbon_eedl_values_and_relaxation_join():
 
 
 def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkeypatch):
-    monkeypatch.setattr(
-        characteristic,
-        "_mu_total_inv_ang",
-        lambda _composition, energy: np.zeros(np.asarray(energy).shape),
-    )
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
     energy = np.arange(250.0, 291.0, 1.0)
     density_ang3 = 0.1
     length_ang = 100.0
@@ -104,15 +112,18 @@ def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkey
         / (4.0 * np.pi)
     )
     # Uniform 1 eV bins: the density sum is the bin-integrated photon yield.
-    assert np.isclose(spectrum.sum(), expected, rtol=2.0e-13, atol=0.0)
+    # The 41-bin reduction runs at the backend's REAL, so fp32 justifies the
+    # bin count as the amplification; fp64 keeps the original bound.
+    assert np.isclose(
+        spectrum.sum(),
+        expected,
+        rtol=scaled_rtol(2.0e-13, eps_multiple=energy.size),
+        atol=0.0,
+    )
 
 
 def test_constant_energy_segment_subdivision_preserves_characteristic_yield(monkeypatch):
-    monkeypatch.setattr(
-        characteristic,
-        "_mu_total_inv_ang",
-        lambda _composition, energy: np.zeros(np.asarray(energy).shape),
-    )
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
     energy = np.arange(250.0, 291.0, 1.0)
     common = dict(E_grid_eV=energy, composition=[("C", 0.1)], electron_limit=1)
 
@@ -123,11 +134,7 @@ def test_constant_energy_segment_subdivision_preserves_characteristic_yield(monk
 
 
 def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(monkeypatch):
-    monkeypatch.setattr(
-        characteristic,
-        "_mu_total_inv_ang",
-        lambda _composition, energy: np.zeros(np.asarray(energy).shape),
-    )
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
     energy = np.arange(275.0, 279.0001, 0.02)
     density_ang3 = 0.1
     length_ang = 100.0
@@ -158,12 +165,21 @@ def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(m
     edges, widths = characteristic._energy_bin_edges_and_widths(energy)
 
     assert np.count_nonzero(spectrum) == spectrum.size
-    assert np.isclose(np.sum(spectrum * widths), expected, rtol=2.0e-13, atol=0.0)
+    # Same reduction-length argument as the 1 eV-bin case above, over the 201
+    # bins of this finer grid.
+    assert np.isclose(
+        np.sum(spectrum * widths),
+        expected,
+        rtol=scaled_rtol(2.0e-13, eps_multiple=energy.size),
+        atol=0.0,
+    )
     peak = int(np.argmax(spectrum))
+    # Mirrored bins differ only by the rounding of equal bin weights, so a few
+    # ulps of REAL is the whole budget here.
     np.testing.assert_allclose(
         spectrum[peak - 5 : peak],
         spectrum[peak + 1 : peak + 6][::-1],
-        rtol=1.0e-9,
+        rtol=scaled_rtol(1.0e-9, eps_multiple=4.0),
         atol=0.0,
     )
 
@@ -177,11 +193,7 @@ def test_absorber_elements_do_not_load_unused_ionization_tables(monkeypatch):
         return real_load(element, data_dir=data_dir)
 
     monkeypatch.setattr(characteristic, "load_characteristic_cross_sections", tracked_load)
-    monkeypatch.setattr(
-        characteristic,
-        "_mu_total_inv_ang",
-        lambda _composition, energy: np.zeros(np.asarray(energy).shape),
-    )
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
     characteristic.mc_characteristic_spectrum(
         _carbon_segments([100.0]),
         np.arange(250.0, 291.0),

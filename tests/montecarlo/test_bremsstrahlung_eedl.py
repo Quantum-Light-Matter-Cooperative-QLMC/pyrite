@@ -5,7 +5,19 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL, xp
 from pyrite.montecarlo.spectrum import brem
+from tests.helpers import scaled_rtol, to_host
+
+
+def _zero_mu(_composition, energy):
+    """Transparent stand-in for ``_mu_total_inv_ang``.
+
+    The real coefficient returns on the device of its input, so the stub has to
+    as well: a NumPy-returning lambda blows up under ``PYRITE_TEST_BACKEND=cuda``
+    the moment it is handed a CuPy energy array.
+    """
+    return xp.zeros_like(xp.asarray(energy, dtype=REAL))
 
 
 def _single_carbon_segment(T_keV: float, length_ang: float = 100.0):
@@ -47,7 +59,7 @@ def test_eedl_differential_cross_section_integrates_to_total_at_native_panel():
     incident_eV = table.distribution_incident_energy_eV[panel]
     photon_eV = table.photon_energy_eV_by_incident[panel]
 
-    differential = np.asarray(
+    differential = to_host(
         brem._eedl_brem_dsigma_dk("C", np.array([incident_eV / 1.0e3]), photon_eV)
     )[0]
     expected_total = np.interp(
@@ -71,7 +83,7 @@ def test_eedl_interpolated_distribution_is_normalized_after_physical_cutoff():
         )
     )
 
-    differential = np.asarray(
+    differential = to_host(
         brem._eedl_brem_dsigma_dk("C", np.array([incident_eV / 1.0e3]), photon_eV)
     )[0]
     expected_total = np.interp(
@@ -91,11 +103,7 @@ def test_mc_brem_defaults_to_eedl_and_retains_isotropic_angular_model(monkeypatc
     photon_eV = table.photon_energy_eV_by_incident[panel]
     density_ang3 = 0.1
     length_ang = 100.0
-    monkeypatch.setattr(
-        brem,
-        "_mu_total_inv_ang",
-        lambda _composition, energy: np.zeros(np.asarray(energy).shape),
-    )
+    monkeypatch.setattr(brem, "_mu_total_inv_ang", _zero_mu)
 
     spectrum = brem.mc_brem_spectrum(
         _single_carbon_segment(incident_eV / 1.0e3, length_ang),
@@ -117,7 +125,11 @@ def test_mc_brem_defaults_to_eedl_and_retains_isotropic_angular_model(monkeypatc
         / (4.0 * np.pi)
     )
 
-    np.testing.assert_allclose(spectrum, expected, rtol=2.0e-12, atol=0.0)
+    # Each bin is an unreduced product chain evaluated at the backend's REAL, so
+    # a few ulps is the whole budget; fp64 keeps the original bound.
+    np.testing.assert_allclose(
+        spectrum, expected, rtol=scaled_rtol(2.0e-12, eps_multiple=8.0), atol=0.0
+    )
 
 
 def test_bethe_heitler_remains_an_explicit_backend():
@@ -129,7 +141,7 @@ def test_bethe_heitler_remains_an_explicit_backend():
     )
     historical = brem._brem_dsigma_dk(6, T_keV, energy)
 
-    np.testing.assert_array_equal(np.asarray(selected), np.asarray(historical))
+    np.testing.assert_array_equal(to_host(selected), to_host(historical))
 
 
 def test_missing_eedl_element_warns_and_falls_back_to_bethe_heitler(monkeypatch):
@@ -145,7 +157,7 @@ def test_missing_eedl_element_warns_and_falls_back_to_bethe_heitler(monkeypatch)
         selected = brem._bremsstrahlung_dsigma_dk("C", T_keV, energy)
 
     np.testing.assert_array_equal(
-        np.asarray(selected), np.asarray(brem._brem_dsigma_dk(6, T_keV, energy))
+        to_host(selected), to_host(brem._brem_dsigma_dk(6, T_keV, energy))
     )
 
 
@@ -157,7 +169,7 @@ def test_incident_energies_outside_eedl_range_warn_and_fall_back():
         selected = brem._bremsstrahlung_dsigma_dk("C", T_keV, energy)
 
     np.testing.assert_array_equal(
-        np.asarray(selected), np.asarray(brem._brem_dsigma_dk(6, T_keV, energy))
+        to_host(selected), to_host(brem._brem_dsigma_dk(6, T_keV, energy))
     )
 
 
