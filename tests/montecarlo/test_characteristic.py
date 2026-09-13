@@ -50,15 +50,17 @@ def test_packaged_carbon_eedl_values_and_relaxation_join():
         table.projectile_energy_eV_by_shell[0],
         table.ionization_cross_sections_cm2_by_shell[0],
     )
-    # 2025 EEDL MF=23/MT=534, linearly interpolated at 30 keV.
-    assert np.isclose(sigma_k_30kev, 5.4137330932220697e-20, rtol=1.0e-13)
-    assert np.isclose(table.shell_fluorescence_yield[0], 0.0014)
-    assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.0014)
+    # 2025 EEDL MF=23/MT=534, linearly interpolated at 30 keV. Every check
+    # here passes ``atol=0.0``: the default 1e-8 absolute tolerance dwarfs a
+    # ~5.4e-20 cm^2 cross section, so even zero would satisfy it.
+    assert np.isclose(sigma_k_30kev, 5.4137330932220697e-20, rtol=1.0e-13, atol=0.0)
+    assert np.isclose(table.shell_fluorescence_yield[0], 0.0014, atol=0.0)
+    assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.0014, atol=0.0)
     assert {266.2, 277.0} <= set(table.line_energy_eV)
     ka1 = table.line_labels.index("Ka1")
     # A Lorentzian transition width is the sum of the initial- and final-hole
     # widths: C K (0.0868 eV) + C L3 (0.0045 eV).
-    assert np.isclose(table.line_fwhm_eV[ka1], 0.0913)
+    assert np.isclose(table.line_fwhm_eV[ka1], 0.0913, atol=0.0)
     assert not table.shell_binding_energy_eV.flags.writeable
     assert not table.line_fwhm_eV.flags.writeable
 
@@ -86,17 +88,23 @@ def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkey
         table.projectile_energy_eV_by_shell[0],
         table.ionization_cross_sections_cm2_by_shell[0],
     )
+    in_window = (table.line_energy_eV >= energy[0]) & (table.line_energy_eV <= energy[-1])
+    # The emitted photons are the summed per-line yields, not the edge yield
+    # alone: the source branch intensities sum to 1 + 9.7e-8 for carbon and are
+    # deliberately not renormalized, so omega_K differs from their sum at that
+    # relative level. The default 1e-8 absolute tolerance is larger than these
+    # ~6e-7 densities and hid the difference, hence ``atol=0.0``.
     expected = (
         density_ang3
         * 1.0e24
         * length_ang
         * 1.0e-8
         * sigma_k
-        * table.shell_fluorescence_yield[0]
+        * table.line_yield_per_vacancy[0, in_window].sum()
         / (4.0 * np.pi)
     )
     # Uniform 1 eV bins: the density sum is the bin-integrated photon yield.
-    assert np.isclose(spectrum.sum(), expected, rtol=2.0e-13)
+    assert np.isclose(spectrum.sum(), expected, rtol=2.0e-13, atol=0.0)
 
 
 def test_constant_energy_segment_subdivision_preserves_characteristic_yield(monkeypatch):
@@ -150,7 +158,7 @@ def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(m
     edges, widths = characteristic._energy_bin_edges_and_widths(energy)
 
     assert np.count_nonzero(spectrum) == spectrum.size
-    assert np.isclose(np.sum(spectrum * widths), expected, rtol=2.0e-13)
+    assert np.isclose(np.sum(spectrum * widths), expected, rtol=2.0e-13, atol=0.0)
     peak = int(np.argmax(spectrum))
     np.testing.assert_allclose(
         spectrum[peak - 5 : peak],

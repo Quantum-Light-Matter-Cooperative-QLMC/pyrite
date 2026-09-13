@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 import numpy as np
+import pytest
 
 import pyrite.montecarlo.runner as runner
 from pyrite.montecarlo.runner import scheduling
@@ -8,6 +9,20 @@ from pyrite.montecarlo.runner import scheduling
 
 class DummyOOM(Exception):
     pass
+
+
+@pytest.fixture(autouse=True)
+def _chunk_admission_off_device(monkeypatch):
+    """Report chunks without real device-memory admission.
+
+    ``_effective_spec_chunk``/``_effective_brem_chunk`` push the requested chunk
+    through ``_admit_chunk``, which clamps against free VRAM whenever the policy
+    says a GPU is present. On a CUDA box the eight dense EEDL intermediates then
+    drag a requested 100_000 brem chunk down to whatever the device budget
+    allows, so the fixed expectations below would be hardware-dependent. These
+    tests are about retry bookkeeping, not admission, so pin the policy off.
+    """
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
 
 
 def _tp():
@@ -51,7 +66,6 @@ def test_retry_reraises_on_exhaustion(monkeypatch):
             runner._SpectrumPhaseOOM("line", DummyOOM())
         ),
     )
-    import pytest
 
     with pytest.raises(DummyOOM):
         runner._spectrum_case_retry({}, _tp(), max_retries=2)
@@ -145,8 +159,6 @@ def test_delayed_runtime_oom_inside_brem_is_phase_tagged(monkeypatch):
         n_hat=np.array([0.0, 0.0, 1.0]),
         groove=None,
     )
-
-    import pytest
 
     with pytest.raises(runner._SpectrumPhaseOOM) as caught:
         runner._spectrum_case(
@@ -278,8 +290,6 @@ def test_gpu_pipeline_auto_fallback_recognizes_delayed_runtime_oom(monkeypatch):
     )
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
     monkeypatch.setenv("PYRITE_MC_BACKEND", "auto")
-
-    import pytest
 
     timings = []
     with pytest.warns(RuntimeWarning, match="rerunning spectrum phase on CPU NumPy"):
