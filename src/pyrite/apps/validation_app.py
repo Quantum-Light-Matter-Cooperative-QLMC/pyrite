@@ -12,6 +12,7 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
+    import os
     import subprocess
     import sys
     import time
@@ -50,6 +51,7 @@ def _():
                 if filename == "dans_diffraction_oracle.py"
                 else [sys.executable]
             )
+            env = None
             if force_cpu:
                 command = [
                     *interpreter,
@@ -62,12 +64,21 @@ def _():
                     ),
                     str(path),
                 ]
+                # Stubbing cupy is not enough on a GPU-equipped dev box whose
+                # environment pins PYRITE_MC_BACKEND to an accelerator (e.g. the
+                # repo's .envrc setting PYRITE_MC_BACKEND=cuda): _backend.select_backend
+                # then honors that explicit request instead of falling back, and
+                # the stubbed cupy import raises, crashing every child process
+                # regardless of which check is selected. Pin the backend the same
+                # way tests/conftest.py does so "Force CPU" actually forces CPU.
+                env = dict(os.environ, PYRITE_MC_BACKEND="cpu")
             else:
                 command = [*interpreter, str(path)]
             started = time.perf_counter()
             completed = subprocess.run(
                 command,
                 cwd=repo_dir,
+                env=env,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

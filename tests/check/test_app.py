@@ -309,6 +309,23 @@ def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparis
     assert "uv run --group oracle" in source
 
 
+def test_validation_force_cpu_pins_backend_env_for_child_checks():
+    """Regression for issue #37: stubbing cupy alone is not enough on a
+    GPU-equipped dev box whose environment pins PYRITE_MC_BACKEND to an
+    accelerator (e.g. this repo's .envrc setting PYRITE_MC_BACKEND=cuda).
+    _backend.select_backend honors an explicit (non-"auto") request instead of
+    falling back, so the stubbed cupy import raises and every "Force CPU"
+    child process crashes regardless of which anchor is selected. The
+    subprocess env must pin PYRITE_MC_BACKEND=cpu the same way
+    tests/conftest.py does."""
+    source = (Path(__file__).resolve().parents[2] / check_cli.NOTEBOOK).read_text(encoding="utf-8")
+
+    assert "import os" in source
+    force_cpu_branch = source[source.index("if force_cpu:") :]
+    assert 'env = dict(os.environ, PYRITE_MC_BACKEND="cpu")' in force_cpu_branch
+    assert "env=env" in source[source.index("subprocess.run(") :]
+
+
 def test_repository_default_save_names_mutated_setting_and_file():
     source = (Path(__file__).resolve().parents[2] / check_cli.NOTEBOOK).read_text(encoding="utf-8")
 
