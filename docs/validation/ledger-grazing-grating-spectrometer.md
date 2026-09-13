@@ -16,7 +16,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 - **Claim:** Beer-Lambert absorption-efficiency QE, `QE(E) = peak·(1−exp(−t/L_abs(E)))`
 - **Code:** `detectors/grating.py::qe_absorption`
-- **Source:** Beer-Lambert / Henke f2 (via `crystallography.absorption_length_ang`, same as `absorption-length`)
+- **Source:** Beer-Lambert / Henke `f₂` convention with Chantler/FFAST tabulation (via `crystallography.absorption_length_ang`, same as `absorption-length`)
 - **Status:** rederived
 - **Checks:** units (dimensionless, [0,1]) confirmed; thin/thick limiting cases (QE→peak·t/L_abs and QE→peak) independently re-derived from exponential attenuation and numerically spot-checked (thin-limit linear approx vs exact: rel diff 2.2e-6 at E=900 eV); independent from-scratch re-derivation bitwise-matches the code across E=200-8000 eV
 - **Anchor:** `tests/detectors/test_grating.py::test_qe_absorption_bounded_and_thickness_limits`, `::test_qe_absorption_increases_with_thickness`

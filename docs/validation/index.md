@@ -100,6 +100,7 @@ geometry/blazed-groove-geometry
 geometry/finite-beam-size
 geometry/finite-transverse-crystal
 geometry/grazing-beam-projection
+geometry/surface-hkl-orientation
 ```
 
 ```{toctree}

@@ -76,7 +76,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 - **Claim:** X-ray absorption length / μ
 - **Code:** `materials/crystal.py::absorption_length_ang`
-- **Source:** Henke f2 / Beer–Lambert
+- **Source:** Henke `f₂` convention / Beer–Lambert; `f₂` tabulation is Chantler/FFAST via `xraydb.f2_chantler` (legacy `henke_dispersion` name — see `docs/physics/atomic-physics/atomic-data-sources.md`)
 - **Status:** anchored
 - **Checks:** units (`μ` in Å⁻¹, length in Å); passive-medium sign; field-to-intensity factor two; zero-density/zero-`f₂` and mixture limits
 - **Anchor:** `tests/materials/test_crystallography.py::test_absorption_length_matches_henke_f2_coefficient`
