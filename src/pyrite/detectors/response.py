@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from .._grid_semantics import require_uniform_grid
 from ..materials.attenuation import _mu_total_inv_ang
 
 
@@ -84,6 +85,18 @@ def convolve_detector(E_grid_eV, spec, fwhm_eV):
     """
     from scipy.ndimage import gaussian_filter1d
 
+    # gaussian_filter1d works in SAMPLE units, so one sigma expressed in bins is
+    # only a fixed energy width on a uniform grid; on a graded grid the same
+    # kernel would blur a different number of eV in every region.
+    require_uniform_grid(
+        E_grid_eV,
+        consumer="detectors.response.convolve_detector",
+        remedy=(
+            "A fixed-FWHM Gaussian in sample units is not an energy-resolution "
+            "model on a graded grid; resample onto the response's own uniform "
+            "channels first."
+        ),
+    )
     dE = E_grid_eV[1] - E_grid_eV[0]
     sigma_bins = fwhm_eV / (2.0 * np.sqrt(2.0 * np.log(2.0))) / dE
     return gaussian_filter1d(np.asarray(spec, dtype=float), sigma_bins, mode="constant", cval=0.0)

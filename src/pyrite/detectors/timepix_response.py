@@ -85,6 +85,7 @@ quoted front-end figures convert as:
 import numpy as np
 from scipy.special import erf
 
+from .._grid_semantics import require_uniform_grid
 from ..materials.crystal import absorption_length_ang
 from . import _si_sensor
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
@@ -342,7 +343,17 @@ class TimepixResponse:
     ):
         E = np.asarray(E_grid_eV, dtype=float)
         self.E = E  # the fine output grid
-        self.dE_fine = float(E[1] - E[0])  # fine bin width [eV]
+        # The re-binning below spends ONE fine width on every input sample
+        # (spec * dE_fine -> photons per fine bin), so a graded input grid would
+        # mis-weight every bin whose own width differs from the first.
+        self.dE_fine = require_uniform_grid(
+            E,
+            consumer="detectors.timepix_response.TimepixResponse",
+            remedy=(
+                "Conservative rebinning onto the coarse response input needs each "
+                "input bin's own width (or explicit bin masses)."
+            ),
+        )  # fine bin width [eV]
         lo, hi = float(E[0]), float(E[-1])
 
         # --- coarse INPUT grid ---------------------------------------------

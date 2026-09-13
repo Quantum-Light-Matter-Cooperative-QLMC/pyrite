@@ -12,6 +12,7 @@ import warnings
 import numpy as np
 from scipy.signal import find_peaks, peak_widths
 
+from .._grid_semantics import require_uniform_grid
 from .store import beam_current_na
 
 
@@ -140,7 +141,19 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     E = np.asarray(r["E_grid"], dtype=float)
     spec = np.asarray(r["spec"], dtype=float)
     brem = np.asarray(r["brem"], dtype=float)
-    dE = float(E[1] - E[0])
+    # ``peak_widths`` reports a width in SAMPLES, and the dominant-line window
+    # below is likewise cut in samples; both only convert to eV through a single
+    # spacing. On a graded grid the reported FWHM and the window would belong to
+    # whichever part of the grid happens to have the first spacing, not to the
+    # peak. Refuse rather than report a wrong width.
+    dE = require_uniform_grid(
+        E,
+        consumer="results.metrics.line_metrics",
+        remedy=(
+            "Peak width and the integration window must be converted from "
+            "interpolated sample crossings to physical energies first."
+        ),
+    )
     cur, sc = beam_current_na(r, settings), r["scale"]
     smax = float(spec.max()) if spec.size else 0.0
     idx = line_index(spec, rel_prominence, metric)

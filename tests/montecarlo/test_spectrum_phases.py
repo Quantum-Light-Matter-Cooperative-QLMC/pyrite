@@ -194,6 +194,22 @@ def test_prepare_rejects_mutually_exclusive_and_missing_inputs():
         _prepare_spectrum(_request(coherent=True, layers=[(0.0, 4000.0, [("C", 0.1136)])]))
 
 
+def test_prepare_refuses_sinc_windowing_on_a_nonuniform_grid():
+    """sinc_cutoff turns an energy half-width into a node index by dividing by
+    ``E_grid[1] - E_grid[0]``, so a graded grid would silently window the wrong
+    nodes. Issue #98: refuse explicitly; the unwindowed routes evaluate at the
+    nodes themselves and stay allowed."""
+    from pyrite.energy_grid.semantics import NonuniformEnergyGridError
+
+    log_grid = np.logspace(np.log10(700.0), np.log10(1500.0), E_GRID.size)
+
+    with pytest.raises(NonuniformEnergyGridError, match="sinc_cutoff"):
+        _prepare_spectrum(_request(E_grid_eV=log_grid, sinc_cutoff=3.0))
+
+    # unwindowed: allowed, because nothing reads a single spacing
+    assert _prepare_spectrum(_request(E_grid_eV=log_grid)).E_grid.size == log_grid.size
+
+
 # --------------------------------------------------------------------------
 # route choice
 # --------------------------------------------------------------------------
