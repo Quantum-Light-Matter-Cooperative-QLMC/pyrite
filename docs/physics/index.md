@@ -103,6 +103,7 @@ radiation-physics/bremsstrahlung
 radiation-physics/characteristic-radiation
 radiation-physics/photon-escape-and-dispersion
 radiation-physics/spectral-observables
+radiation-physics/energy-grid-semantics
 ```
 
 ```{toctree}
