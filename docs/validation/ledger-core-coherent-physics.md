@@ -212,6 +212,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `src/pyrite/validation/anchor_figures.py::figure_enhancement`
 - **Notes:** **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/physics/geometry/tilt-convention.md`) — enhancement is an intensity ratio, so any prior number here was computed at the old negative-θ (mirror) grids; in the reproduced WSe₂ spot check the old negative tilt had roughly twice the positive-tilt peak (`I(+10°)/I(−10°)≈0.505`), but the enhancement itself still needs regeneration + fresh-context re-verification, not signed-off
 
+## `spxr-physical-population`
+
+- **Claim:** for a fixed physical population of independent, identically distributed electron fields, the ensemble spectral yield separates into `N <|E|²> + N(N-1) |<E>|²`, with physical `N = Q/|e|` independent of numerical sample count
+- **Code:** proposed only; no production estimator
+- **Source:** expansion of the squared field sum under independence; spontaneous/coherent bunch contributions in Feranchuk, San and Skoromnik (2022), DOI 10.1103/PhysRevAccelBeams.25.120702; [research derivation and assumptions](../research/physics/superradiant-pxr.md)
+- **Status:** unverified
+- **Checks:** implementation-context algebra only; dimensionless population multiplies single-channel spectral-yield units; zero mean field leaves the linear self term, identical deterministic fields give the quadratic population limit, and one electron has no pair term
+- **Anchor:** —
+- **Notes:** research-only normalization requirement, not validation of current coherent output. Finite-sample pair-estimator bias, correlated bunches and physical-charge convergence remain to be independently derived and tested. No existing coherence claim is advanced; human sign-off remains required.
+
 ## `zhai-material-screen-reconstruction`
 
 - **Claim:** material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays

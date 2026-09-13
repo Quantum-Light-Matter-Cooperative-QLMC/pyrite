@@ -30,6 +30,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`longitudinal-target-timing`](ledger-core-coherent-physics.md#longitudinal-target-timing) | conditional positive-basal-harmonic target timing: `kγ = β\|g\|cos(tilt)/(1−βcos(theta_obs))`, `Eγ=ℏc kγ`, `T=h/Eγ`, and Gaussian `σt=sqrt(−ln η)/Ω` with `Ω=2π/T` | `anchored` |
 | [`closed-form-flux`](ledger-core-coherent-physics.md#closed-form-flux) | Eq.(12) closed-form line flux (single-segment reference) | `discrepancy` |
 | [`enhancement-bulk-film`](ledger-core-coherent-physics.md#enhancement-bulk-film) | bulk-vs-film line enhancement | `unverified` |
+| [`spxr-physical-population`](ledger-core-coherent-physics.md#spxr-physical-population) | for a fixed physical population of independent, identically distributed electron fields, the ensemble spectral yield separates into `N <\|E\|²> + N(N-1) \|<E>\|²`, with physical `N = Q/\|e\|` independent of numerical sample count | `unverified` |
 | [`zhai-material-screen-reconstruction`](ledger-core-coherent-physics.md#zhai-material-screen-reconstruction) | material/plane mapping and 30/100/150 keV coherent-to-bremsstrahlung ratios reconstructed from the deposited Zhai Figure 2a arrays | `unverified` |
 | [`zhai-hbn-921-detected`](ledger-core-coherent-physics.md#zhai-hbn-921-detected) | end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°) | `discrepancy` |
 

@@ -23,6 +23,8 @@ beam-transport/stochastic-sampling-recommendations
 :caption: Proposed physics
 
 physics/relativistic-electron-transport
+physics/relativistic-pxr-cbs
+physics/superradiant-pxr
 physics/channeling-radiation-physics
 physics/transition-radiation-recommendations
 ```
