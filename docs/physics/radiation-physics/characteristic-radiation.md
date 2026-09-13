@@ -66,11 +66,19 @@ q_{\ell b}=\frac{1}{\pi}
 ```
 
 The weights are normalized over the requested grid whenever the line centre is
-inside that grid. This preserves the integrated historical line yield even
-when Lorentzian tails extend beyond the configured energy window. The spectral
-density contributed to bin {math}`b` is {math}`Y_{jai\ell}q_{\ell b}/\Delta
-E_b`, in photons {math}`\mathrm{eV}^{-1}\,\mathrm{sr}^{-1}` per incident
-electron.
+inside that grid,
+
+```{math}
+\widehat q_{\ell b}=\frac{q_{\ell b}}{\sum_c q_{\ell c}},
+```
+
+the sum running over the admitted bins. This preserves the integrated
+historical line yield even when Lorentzian tails extend beyond the configured
+energy window; it is a conditional, truncated Lorentzian, so changing the
+window rescales the retained bins by {math}`1/\sum_c q_{\ell c}`. The spectral
+density contributed to bin {math}`b` is {math}`Y_{jai\ell}\widehat q_{\ell
+b}/\Delta E_b`, in photons {math}`\mathrm{eV}^{-1}\,\mathrm{sr}^{-1}` per
+incident electron.
 
 Measured transition-metal emission features can require several Lorentzians to
 describe unresolved satellites and asymmetric structure
@@ -118,8 +126,12 @@ a line-only legacy or intentionally excluded dataset.
   intensity gives zero characteristic yield.
 - With zero attenuation, bin integration and grid normalization preserve
   {math}`nL\sigma\omega I/(4\pi N_e)` exactly.
-- Splitting a constant-energy segment preserves the total because the
-  estimator is linear in path length.
+- Splitting a constant-energy segment preserves the total when its attenuation
+  weight is also held fixed (in particular, with zero attenuation), because the
+  estimator is then linear in path length. Subdividing a real absorbing track
+  changes the segment-midpoint escape quadrature and therefore the total: for a
+  uniform path of optical depth 2, one midpoint gives 0.3679, two equal
+  subsegments give 0.4148, and exact path integration gives 0.4323.
 - Increasing optical depth suppresses the line monotonically.
 - Natural Lorentzian broadening is source physics; detector broadening remains
   a separate downstream operation.
