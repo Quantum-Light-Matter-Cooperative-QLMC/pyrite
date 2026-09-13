@@ -8,7 +8,6 @@ needs no Monte-Carlo run."""
 
 import numpy as np
 import pytest
-from scipy.signal import peak_widths
 
 from pyrite.campaign.config import default_settings
 from pyrite.plots import _common
@@ -164,10 +163,13 @@ def test_line_brem_ratio_uses_the_dominant_line_window():
     brem = 0.1 + 0.01 * E
     m = line_metrics(_record(E, spec, brem), default_settings())
     idx = int(np.argmax(spec))
-    width = float(peak_widths(spec, [idx], rel_height=0.5)[0][0])
-    half = max(round(3.0 * width / 2.0), 1)
-    lo, hi = max(idx - half, 0), min(idx + half + 1, spec.size)
-    expected = np.trapezoid(spec[lo:hi], E[lo:hi]) / np.trapezoid(brem[lo:hi], E[lo:hi])
+    half_window_eV = 3.0 * m["fwhm_eV"] / 2.0
+    bounds = (E[idx] - half_window_eV, E[idx] + half_window_eV)
+    inside = (E > bounds[0]) & (E < bounds[1])
+    E_window = np.concatenate(([bounds[0]], E[inside], [bounds[1]]))
+    spec_window = np.interp(E_window, E, spec)
+    brem_window = np.interp(E_window, E, brem)
+    expected = np.trapezoid(spec_window, E_window) / np.trapezoid(brem_window, E_window)
     assert m["line_brem_ratio"] == pytest.approx(expected)
 
 
@@ -184,3 +186,51 @@ def test_line_brem_ratio_is_nan_for_nonpositive_local_brem_integral(brem_level):
 def test_line_brem_ratio_is_a_selection_mode():
     assert selection_score({"line_brem_ratio": 2.0}, "line_brem_ratio") == 2.0
     assert selection_score({"line_brem_ratio": np.nan}, "line_brem_ratio") == -np.inf
+
+
+def test_default_selection_uses_grid_independent_line_flux():
+    metrics = {
+        "line_flux": 4.0,
+        "peak_flux": 100.0,
+        "coherent_flux": 7.0,
+        "line_quality": 0.5,
+    }
+    assert selection_score(metrics) == 2.0
+
+
+def test_peak_density_is_explicit_and_records_local_sample_spacing():
+    E = np.array([80.0, 90.0, 97.0, 100.0, 102.0, 110.0, 125.0])
+    spec = np.exp(-0.5 * ((E - 100.0) / 4.0) ** 2)
+
+    metrics = line_metrics(_record(E, spec, np.zeros_like(E)), default_settings())
+
+    assert metrics["peak_spectral_flux_density"] == metrics["peak_flux"]
+    assert metrics["peak_spectral_flux_density_per_na"] == metrics["peak_flux_per_na"]
+    assert metrics["peak_sample_spacing_eV"] == 2.5
+
+
+def test_fwhm_uses_physical_energies_on_nonuniform_grid():
+    E = np.array([0.0, 1.0, 2.0, 4.0, 7.0, 11.0, 16.0, 22.0, 29.0])
+    sigma_eV = 4.0
+    spec = np.exp(-0.5 * ((E - 11.0) / sigma_eV) ** 2)
+
+    metrics = line_metrics(_record(E, spec, np.zeros_like(E)), default_settings())
+
+    expected_fwhm_eV = 2.0 * np.sqrt(2.0 * np.log(2.0)) * sigma_eV
+    assert metrics["fwhm_eV"] == pytest.approx(expected_fwhm_eV, rel=0.08)
+
+
+def test_fwhm_and_line_flux_are_stable_across_resolution_ladder():
+    sigma_eV = 20.0
+    fwhm_values = []
+    line_flux_values = []
+    for spacing_eV in (12.0, 6.0, 3.0, 1.5, 0.75):
+        E = np.arange(4.0, 196.0 + spacing_eV, spacing_eV)
+        spec = np.exp(-0.5 * ((E - 100.0) / sigma_eV) ** 2)
+        metrics = line_metrics(_record(E, spec, np.zeros_like(E)), default_settings())
+        fwhm_values.append(metrics["fwhm_eV"])
+        line_flux_values.append(metrics["line_flux_per_na"])
+
+    expected_fwhm_eV = 2.0 * np.sqrt(2.0 * np.log(2.0)) * sigma_eV
+    assert fwhm_values == pytest.approx([expected_fwhm_eV] * 5, rel=0.02)
+    assert max(line_flux_values) / min(line_flux_values) < 1.02

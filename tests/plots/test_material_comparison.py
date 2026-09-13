@@ -63,7 +63,8 @@ def test_material_comparison_compares_low_energy_lines_without_a_floor():
     assert "min_line_eV" not in inspect.signature(plot_material_comparison).parameters
     assert fig.axes[0].texts[0].get_text() == "  Test (30 keV, θ=0°, φ=0°)"
     assert (
-        fig.axes[0].get_title() == "Cross-material comparison — highest peak flux "
+        fig.axes[0].get_title()
+        == "Cross-material comparison — highest sampled peak density (spacing-dependent) "
         "(all beam energies, line quality >= 0.5)"
     )
     assert fig.axes[0].title.get_fontsize() == 16
@@ -149,8 +150,8 @@ def test_cross_material_tab_requests_new_comparisons():
     app_source = Path("src/pyrite/apps/analysis_app.py").read_text()
     view_source = Path("src/pyrite/apps/analysis_ui/views/materials.py").read_text()
     # One cached summary per material feeds all three small selections.
-    assert 'comparison("quality_peak")' in view_source
-    assert 'comparison("peak")' in view_source
+    assert 'comparison("quality_line")' in view_source
+    assert 'comparison("line_flux")' in view_source
     assert 'comparison("line_brem_ratio")' in view_source
     assert "select=select" in view_source
     assert "material_comparison_summary(results, settings)" in view_source
