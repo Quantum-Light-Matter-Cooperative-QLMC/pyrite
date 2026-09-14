@@ -746,8 +746,8 @@ def _transport_lut_kernel(
     max_el,
     L_top,
     L_bot,
-    lut_E_min_keV,
-    lut_inv_dE_keV,
+    lut_log_E_min,
+    lut_inv_dlogE,
     lut_n_energy,
     lut_total_rate,
     lut_dEds,
@@ -808,17 +808,21 @@ def _transport_lut_kernel(
         z_bot_L = L_bot[L]
         E_j = E_keV[e]
 
-        lut_x = (E_j - lut_E_min_keV) * lut_inv_dE_keV
+        # Inlined ``_lut_index_frac_scalar`` / ``_lut_lerp_at``: the frozen path
+        # indexes once per flight and reuses the index for every table, so the
+        # arithmetic is spelled out here. Keep it identical to those two,
+        # branch order included, or the backends clamp differently.
+        lut_x = (xp.log(E_j) - lut_log_E_min) * lut_inv_dlogE
         lut_last = lut_n_energy - I32_ONE
-        if lut_x <= F64_ZERO:
-            lut_i = I32_ZERO
-            lut_f = F64_ZERO
-        elif lut_x >= lut_last:
+        if lut_x >= lut_last:
             lut_i = lut_last - I32_ONE
             lut_f = F64_ONE
-        else:
+        elif lut_x > F64_ZERO:
             lut_i = np.int32(lut_x)
             lut_f = lut_x - lut_i
+        else:
+            lut_i = I32_ZERO
+            lut_f = F64_ZERO
 
         layer_lut = L * lut_n_energy + lut_i
         total0 = lut_total_rate[layer_lut]
@@ -906,8 +910,8 @@ def _transport_lut_kernel(
                 lut_dEds,
                 layer_base,
                 lut_n_energy,
-                lut_E_min_keV,
-                lut_inv_dE_keV,
+                lut_log_E_min,
+                lut_inv_dlogE,
                 F64_HALF * (E_j + E_cut_e),
             )
         else:
@@ -945,16 +949,16 @@ def _transport_lut_kernel(
                     lut_dEds,
                     layer_base,
                     lut_n_energy,
-                    lut_E_min_keV,
-                    lut_inv_dE_keV,
+                    lut_log_E_min,
+                    lut_inv_dlogE,
                     F64_HALF * (E_j + E_pred),
                 )
             t_end_j = clock[e] + step_j * _lut_lerp_at(
                 lut_inv_beta,
                 I32_ZERO,
                 lut_n_energy,
-                lut_E_min_keV,
-                lut_inv_dE_keV,
+                lut_log_E_min,
+                lut_inv_dlogE,
                 F64_HALF * (E_j + E_end_j),
             )
         else:
@@ -1040,16 +1044,16 @@ def _transport_lut_kernel(
                                 picked = True
                             k_el += I32_ONE
 
-                    alpha_x = (E_keV[e] - lut_E_min_keV) * lut_inv_dE_keV
-                    if alpha_x <= F64_ZERO:
-                        alpha_i = I32_ZERO
-                        alpha_f = F64_ZERO
-                    elif alpha_x >= lut_last:
+                    alpha_x = (xp.log(E_keV[e]) - lut_log_E_min) * lut_inv_dlogE
+                    if alpha_x >= lut_last:
                         alpha_i = lut_last - I32_ONE
                         alpha_f = F64_ONE
-                    else:
+                    elif alpha_x > F64_ZERO:
                         alpha_i = np.int32(alpha_x)
                         alpha_f = alpha_x - alpha_i
+                    else:
+                        alpha_i = I32_ZERO
+                        alpha_f = F64_ZERO
                     alpha_base = (row + sel) * lut_n_energy + alpha_i
                     a0 = lut_alpha[alpha_base]
                     alpha = a0 + alpha_f * (lut_alpha[alpha_base + I32_ONE] - a0)

@@ -219,13 +219,13 @@ def _prepare_spectrum(request):
             raise ValueError("groove escape is v1 single-slab only (no layers)")
         _validate_groove_escape_direction(n_hat, groove)
     # Fail closed on an output grid the working precision cannot resolve. Every
-    # route treats the grid as strictly ascending: the coherent windowing
-    # divides by ``E_grid[1] - E_grid[0]`` and the line kernels bracket against
-    # it. A grid whose step is finer than REAL's spacing at these energies
+    # route treats the grid as strictly ascending: window bounds and line-table
+    # interpolation both search its coordinates. A grid whose step is finer
+    # than REAL's spacing at these energies
     # collapses adjacent nodes on the cast -- a 2.5e-5 eV step at 1600 eV
-    # loses 80% of its nodes to float32's 1.2e-4 eV ulp -- which turns that
-    # division into a ZeroDivisionError on one route and a silently meaningless
-    # spectrum on another. Checked on the host input, before the upload, so it
+    # loses 80% of its nodes to float32's 1.2e-4 eV ulp, making the coordinate
+    # axis non-injective and therefore the spectrum
+    # ambiguous. Checked on the host input, before the upload, so it
     # costs no device synchronization.
     E_grid_host = np.asarray(E_grid_eV, dtype=REAL)
     if E_grid_host.size > 1:

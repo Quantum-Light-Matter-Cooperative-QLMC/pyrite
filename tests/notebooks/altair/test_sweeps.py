@@ -202,13 +202,13 @@ def test_heatmap_select_chart_click_selection_needs_non_vegafusion_transformer()
 # ---- scan (auto-pick) --------------------------------------------------------
 def test_scan_charts_force_lines_one_per_quantity():
     charts = scan_charts(_store(), _settings(), force="lines")
-    assert len(charts) == 8  # the default _HEATMAP_QUANTITIES set
+    assert len(charts) == 7  # spacing-dependent peak density is opt-in
     assert all(isinstance(c, alt.Chart) for c in charts)
 
 
 def test_scan_charts_force_heatmap():
     charts = scan_charts(_store(), _settings(), force="heatmap")
-    assert len(charts) == 8
+    assert len(charts) == 7
     assert all("facet" in c.to_dict() for c in charts)
 
 

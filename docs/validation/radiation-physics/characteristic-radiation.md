@@ -24,20 +24,20 @@ emitting material, the bin-averaged track-length estimator is
 \sum_{j,a,i,\ell}
 n_a L_j\,\sigma_{ai}(T_j)\,
 \omega_{ai}I_{ai\ell}\,
-\exp[-\tau_j(E_{ai\ell})]\,\widehat q_{ai\ell b}.
+\exp[-\tau_j(E_{ai\ell})]\,q_{ai\ell b}.
 ```
 
 Here $a$ is an element, $i$ an initially ionized subshell, $\ell$ a line from
 that vacancy, $T_j$ the representative electron energy, and $b$ an energy bin.
-The factor $\widehat q_{ai\ell b}$ is the natural Lorentzian mass in bin $b$,
-renormalized over the requested grid:
+The factor $q_{ai\ell b}$ is the unconditioned natural Lorentzian mass in bin
+$b$:
 
 ```{math}
 q_{\ell b}=\frac{1}{\pi}\left[
 \tan^{-1}\!\frac{2(E_b^+-E_\ell)}{\Gamma_\ell}
 -\tan^{-1}\!\frac{2(E_b^--E_\ell)}{\Gamma_\ell}
 \right],\qquad
-\widehat q_{\ell b}=\frac{q_{\ell b}}{\sum_c q_{\ell c}},\qquad
+P_{\ell,W}=\sum_{b\in W}q_{\ell b}\leq1,\qquad
 \Gamma_\ell=\Gamma_{\rm initial}+\Gamma_{\rm final}.
 ```
 
@@ -45,9 +45,9 @@ The result is photons eV$^{-1}$ sr$^{-1}$ per incident electron. The factor
 $1/(4\pi)$ is isotropic emission; $\tau_j$ is the existing PyRITE
 Beer--Lambert optical depth along slab, finite-prism, groove, or multilayer
 escape geometry. Exact CDF differences avoid point-sampling line shapes much
-narrower than a bin. The grid renormalization preserves the full transition
-yield whenever its centre is in the requested window, matching the previous
-delta-line window convention.
+narrower than a bin. A finite requested window retains only the physical
+probability $P_{\ell,W}$, while an off-grid line centre retains its nonzero
+in-window tail. The infinite-window limit gives $P_{\ell,W}\to1$.
 
 ## Units and numerical conventions
 
@@ -57,9 +57,9 @@ delta-line window convention.
 - Dividing the analytically integrated Lorentzian mass by $\Delta E_b$
   produces the spectral density represented on PyRITE's line-grid centres.
   Detector broadening remains a separate downstream operation.
-- A line contributes only when its centre lies inside the requested line grid.
-  Its Lorentzian tails are then normalized on that grid so truncation cannot
-  change the integrated vacancy yield.
+- Every line above the relaxation-data cutoff contributes its physical mass in
+  the requested line grid, including tails from an off-grid centre. No
+  finite-window renormalization is applied.
 - The transition FWHM is the sum of the pertinent initial- and final-hole
   widths. Combined final labels such as `M4,5` use the mean available
   component width. A missing final width contributes zero; a missing initial
@@ -83,9 +83,11 @@ silently approximated.
 Characteristic emission uses the bremsstrahlung electron population and its
 default 1 keV transport cutoff, rather than the PXR/CBS population's default
 5 keV cutoff. This preserves more low-energy ionization path while sharing the
-same trajectories as the rest of a case. The remaining path below 1 keV is not
-modeled unless the case lowers `E_cut_brem_keV`. The 50 eV relaxation cutoff is
-a photon-line data cutoff and does not override the electron transport cutoff.
+same trajectories as the rest of a case. The stopping/scattering model is not
+validated below 1 keV, so characteristic scoring resolves an omitted cutoff to
+1 keV and rejects `E_cut_brem_keV < 1`. Low-binding-energy vacancy production
+below that floor is omitted. The 50 eV relaxation cutoff is a photon-line data
+cutoff and does not override the electron transport-validity boundary.
 
 For multilayers, each layer emits using its own elemental composition and all
 layers attenuate the escaping photon. Passive absorber elements are not loaded
@@ -107,8 +109,11 @@ chemical shifts, and multiple-vacancy broadening are intentionally excluded.
 - If density, segment length, cross section, fluorescence yield, or line
   intensity tends to zero, {eq}`eq-characteristic-track-length` tends to zero.
 - With zero attenuation and one line, summing $\Delta E_b$ times the returned
-  density recovers $nL\sigma\omega I/(4\pi N_e)$ to floating-point
-  precision.
+  density gives $P_{\ell,W}nL\sigma\omega I/(4\pi N_e)$; it approaches the
+  complete yield monotonically as the window tends to the whole energy axis.
+- Narrowing a window cannot increase integrated yield and does not change the
+  density in bins whose edges are unchanged. A line centred outside the
+  window has a positive in-window tail.
 - Splitting a constant-energy segment preserves total yield when its
   attenuation weight is also fixed (in particular, with zero attenuation).
   Changing midpoint escape depth changes attenuation quadrature.
@@ -116,22 +121,95 @@ chemical shifts, and multiple-vacancy broadening are intentionally excluded.
   $\exp(-\tau)$.
 
 `tests/montecarlo/test_characteristic.py` anchors the packaged carbon K-shell
-EEDL value and natural carbon K-alpha width, exact Lorentzian bin integration
-and yield preservation, segment-subdivision invariance, absorber/emitter
+EEDL value and natural carbon K-alpha width, exact Lorentzian bin integration,
+finite-window mass, off-grid tails, the 1 keV floor, segment-subdivision
+invariance, absorber/emitter
 separation, and runner composition into both emission modes. Checkpoint/reline
 tests cover independent `characteristic.h5` persistence, missing-component
 compatibility, and identity boundaries. A small end-to-end HOPG simulation
 also exercises ENDF parsing, electron transport, self-absorption, line
 profiles, and result assembly.
 
-## Validation status
+## Issue #88 implementation-context review, 2026-09-14
 
-The sections above preserve the implementation-context derivation and
-regression record of 2026-09-10, when the ledger status was `filtered` and
-independent verification was pending. The independent review below supersedes
-that pending-review statement; human sign-off remains pending.
+The v3 line-window change removes the historical conditioning factor
+$1/P_{\ell,W}$. This follows directly from the whole-line normalization
+$\int_{-\infty}^{\infty}L_\ell(E)\,dE=1$: integrating over a proper subset
+$W$ must give $P_{\ell,W}\leq1$. Positivity follows from monotonicity of the
+arctangent CDF. Expanding either window boundary can only add nonnegative
+mass, while bins common to two windows retain identical CDF differences.
+When the line centre lies outside $W$, strict CDF monotonicity leaves a
+positive tail for every finite-width line. These limits and the symmetric
+half-mass example $W=[E_\ell-\Gamma_\ell/2,E_\ell+\Gamma_\ell/2]$ are anchored
+without using the implementation to construct the expected values.
 
-## Independent verification, 2026-09-13
+The low-energy choice is an enforced model boundary, not a new transport
+equation. A universal 1 keV cutoff omits some physically possible ionization
+for shells whose thresholds are lower, but evaluating those paths would exceed
+the currently validated stopping/scattering range. `E_cut_keV=None` therefore
+means 1 keV for this estimator and a lower explicit value fails closed. A
+future transport model validated below 1 keV may replace this conservative
+boundary with the lowest scored shell threshold, but that is outside issue
+#88.
+
+The model marker changes from `lorentzian-v2` to `lorentzian-v3`, so checkpoint
+dataset identities and case-content hashes cannot reuse spectra calculated
+under conditional window renormalization. No separate grid-independent
+integrated-yield field is introduced; the stored `spec_characteristic` remains
+the spectrum restricted to its recorded line grid.
+
+This is an implementation-context review only. The new v3 convention has
+units, signs, normalization, narrow/wide/off-grid limits, and a regression
+anchor, but still requires fresh-context source-to-code validation. The ledger
+status is therefore `filtered`; no human sign-off is claimed.
+
+## Issue #101 implementation-context note, 2026-09-14
+
+Two `v3` to `v4` changes, both grid bookkeeping rather than new source physics:
+
+1. **Low bin-edge clamp.** `_energy_bin_edges_and_widths`'s outer edges mirror
+   the adjacent spacing, {math}`E_0^-=E_0-\tfrac12(E_1-E_0)`. That reflection
+   can go negative when the first spacing exceeds the first node -- an
+   unphysical photon energy. `v4` clamps
+   {math}`E_0^-=\max(0,E_0-\tfrac12(E_1-E_0))`; the high edge is never
+   clamped since photon energy has no analogous upper bound here. This changes
+   {math}`\Delta E_0` (and therefore the first bin's reported density) only
+   for grids that hit the negative-edge case; an ordinary evenly- or
+   slowly-varying grid is unaffected because its first edge is already
+   non-negative. Limiting case: a grid whose first spacing does not exceed its
+   first node reduces to the unclamped `v3` formula exactly, since the
+   reflected edge is then never negative.
+2. **Explicit truncation query.** `characteristic_line_window_mass` returns
+   {math}`(P_{\ell,W},\,1-P_{\ell,W})` per line -- the same $P_{\ell,W}$
+   already in {eq}`eq-characteristic-track-length`, just returned as data
+   instead of only implicitly shaping the density. `captured+truncated=1`
+   follows directly from `_lorentzian_bin_weights` being the unconditioned CDF
+   difference (same argument as the v3 review above). `mc_characteristic_spectrum`
+   additionally warns when a line's centre is inside the requested grid but
+   the grid still captures under `CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION`
+   (50%) of that line's mass, so a window that truncates a line at its own
+   edges is reported rather than left for the caller to notice only as a
+   smaller-than-expected peak. A line centred outside the grid does not warn:
+   its small in-window tail is the documented off-grid-line behaviour, not a
+   misconfigured window.
+
+Neither change alters the analytic Lorentzian CDF itself, the vacancy-yield
+estimator, or the transport-validity floor. The model marker moves to
+`lorentzian-v4` because the low-edge clamp can change a stored spectrum's
+first-bin value; checkpoints identity-fork accordingly. This is an
+implementation-context review only, covering units, the clamp's limiting
+case, and the truncation identity above; it does not independently verify the
+change. The ledger status remains `filtered`; no human sign-off is claimed.
+
+## Historical v2 validation status
+
+The independent review below records the v2 implementation verified on
+2026-09-13. Its direct-vacancy, linewidth, attenuation, unit, and normalization
+work remains evidence for unchanged parts of v3. Its conditional-window verdict
+is historical and does not independently verify the issue #88 change. Human
+sign-off remains pending.
+
+## Independent verification of v2, 2026-09-13
 
 ### Derivation frozen before implementation inspection
 

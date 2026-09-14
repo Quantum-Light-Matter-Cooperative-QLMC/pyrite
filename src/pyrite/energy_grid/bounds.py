@@ -8,6 +8,11 @@ See docs/adr/0005-energy-grid-schema-decisions.md.
 import numpy as np
 from scipy.constants import physical_constants
 
+# Catalog convention for a line-grid row's ``start_eV``. The implementation
+# moved to ``pyrite._line_grid_policy`` so ``campaign`` and the runner can reach
+# it without importing this driver-side package; re-exported here unchanged.
+from .._line_grid_policy import line_start_eV as line_start_eV
+
 _ELECTRON_REST_KEV = physical_constants["electron mass energy equivalent in MeV"][0] * 1.0e3
 
 
@@ -124,9 +129,3 @@ def spacing_num(start_eV: float, stop_eV: float, target_spacing_eV: float = 3.0)
     closest to ``target_spacing_eV`` uniform spacing -- the convention already
     used by every ``E_grid_line_by_energy`` row in materials.toml."""
     return int(round((stop_eV - start_eV) / target_spacing_eV)) + 1
-
-
-def line_start_eV(energy_keV: float) -> float:
-    """Catalog convention for a line-grid row's ``start_eV`` when none is
-    already recorded: 10 eV floor at <=60 keV beam energy, 50 eV above."""
-    return 10.0 if float(energy_keV) <= 60.0 else 50.0

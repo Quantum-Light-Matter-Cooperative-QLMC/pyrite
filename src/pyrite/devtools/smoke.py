@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     figure.savefig(matplotlib_png, dpi=110, bbox_inches="tight")
     print(f"[smoke] wrote {matplotlib_png} ({matplotlib_png.stat().st_size} bytes)")
 
-    ranking = top_geometries(filtered, settings, top_n=10, select="quality_peak")
+    ranking = top_geometries(filtered, settings, top_n=10, select="quality_line")
     print(f"[smoke] top geometries ({len(ranking)} rows):")
     print(ranking.head(10).to_string(index=False))
     print("[smoke] OK")

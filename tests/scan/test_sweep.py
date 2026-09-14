@@ -273,26 +273,36 @@ def test_sweep_scene_has_no_energy_grid_fields():
         Sweep(material="mose2", E_grid_line=np.array([75.0]))
 
 
-def test_missing_per_beam_line_grid_fails_before_cases_are_built():
-    with pytest.raises(ValueError, match=r"no E_grid_line configured for beam energy 50"):
-        build_cases(
-            Sweep(
-                material="mose2",
-                beam=BeamSpec(energy_keV=[30.0, 50.0]),
-                detector=_detector(line_by_energy={30.0: np.array([10.0])}),
-            )
+def test_missing_per_beam_line_grid_resolves_automatically(monkeypatch):
+    """Issue #101: a stored mapping that misses a beam energy is not an error.
+    The covered energy keeps its stored coordinates; the uncovered one gets a
+    policy instead."""
+    monkeypatch.delenv("PYRITE_ENERGY_GRID_RTOL", raising=False)
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=[30.0, 50.0]),
+            detector=_detector(line_by_energy={30.0: np.array([10.0])}),
         )
+    )
+    by_energy = {float(case["E0_keV"]): case for case in cases}
+    assert by_energy[30.0].get("line_grid_policy") is None
+    np.testing.assert_array_equal(by_energy[30.0]["E_grid_line"], [10.0])
+    policy = by_energy[50.0]["line_grid_policy"]
+    assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+    assert policy["bandwidth"]["start_eV"] == 10.0
+    assert policy["bandwidth"]["stop_eV"] > policy["bandwidth"]["start_eV"]
 
 
-def test_empty_per_beam_line_grid_fails_with_selected_energy():
-    with pytest.raises(ValueError, match=r"no E_grid_line configured for beam energy 30 keV"):
-        build_cases(
-            Sweep(
-                material="mose2",
-                beam=BeamSpec(energy_keV=30.0),
-                detector=_detector(line_by_energy={}),
-            )
+def test_empty_per_beam_line_grid_resolves_automatically():
+    case = build_cases(
+        Sweep(
+            material="mose2",
+            beam=BeamSpec(energy_keV=30.0),
+            detector=_detector(line_by_energy={}),
         )
+    )[0]
+    assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
 
 
 def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():

@@ -904,8 +904,8 @@ def simulate_trajectories(
                 L_bot,
             ),
             (
-                transport_lut.E_min_keV,
-                transport_lut.inv_dE_keV,
+                transport_lut.log_E_min,
+                transport_lut.inv_dlogE,
                 transport_lut.n_energy,
                 transport_lut.total_rate,
                 transport_lut.dEds,

@@ -12,6 +12,8 @@ response model keeps its own detector physics (charge-sharing MC, QE table,
 
 import numpy as np
 
+from .._grid_semantics import grid_identity, is_uniform_grid, node_bin_edges_and_widths
+
 # ---- silicon sensor physics (fixed material constants) -----------------------
 W_EHP_EV = 3.65  # mean energy to make one electron-hole pair [eV]
 FANO_SI = 0.115  # Fano factor: Var(N) = F * N (sub-Poisson) for Si
@@ -23,12 +25,18 @@ SI_N_PER_ANG3 = SI_DENSITY_G_CM3 / SI_A * 0.602214076
 
 
 def grid_key(E_grid_eV):
-    """Cache-key prefix identifying a uniform energy grid by (size, endpoints).
+    """Cache-key prefix identifying an energy grid by its COMPLETE coordinates.
 
     Both detectors' `get_response` append their own hardware/MC settings
-    after this prefix to build the full cache key."""
-    E = np.asarray(E_grid_eV, dtype=float)
-    return (E.size, round(float(E[0]), 6), round(float(E[-1]), 6))
+    after this prefix to build the full cache key.
+
+    This used to be (size, first, last) only, which is not an identity: two
+    different grids spanning the same interval with the same node count (a
+    linear and a logarithmic one, say) collided and the second caller silently
+    got the first grid's response matrix. The key now carries a digest of the
+    exact node coordinates -- see
+    :func:`pyrite.energy_grid.semantics.grid_identity`."""
+    return grid_identity(E_grid_eV)
 
 
 def prep_spectrum(spec, E_grid_eV, module_name):
@@ -55,6 +63,13 @@ def poisson_core(E_grid_eV, detected_per_s, time_s, rng):
     own the `None` -> `np.random.default_rng()` default so they can reuse the
     same stream for any follow-on noise they add). Returns (counts, expected)."""
     E = np.asarray(E_grid_eV, dtype=float)
-    dE = E[1] - E[0]
-    expected = np.clip(np.asarray(detected_per_s, dtype=float) * dE * time_s, 0.0, None)
+    _, widths = node_bin_edges_and_widths(E)
+    if is_uniform_grid(E):
+        # Preserve the historical uniform path bit-for-bit, including grids
+        # whose constructed nodes carry harmless floating-point jitter.
+        widths = float(E[1] - E[0])
+    density = np.asarray(detected_per_s, dtype=float)
+    if density.shape != E.shape:
+        raise ValueError(f"detected density shape {density.shape} != energy grid {E.shape}")
+    expected = np.clip(density * widths * time_s, 0.0, None)
     return rng.poisson(expected), expected

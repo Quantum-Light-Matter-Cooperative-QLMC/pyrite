@@ -138,23 +138,28 @@ def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
     np.testing.assert_array_equal(scan.E_grid_line_by_energy[30.0], [40.0, 44.0])
 
 
-@pytest.mark.parametrize(
-    ("replacement", "error_path"),
-    [
-        (
-            "{ energy_keV = 25.0, grid = 50.0 },\n  { energy_keV = 25.0, grid = 60.0 }",
-            "energy_grids.sample.line_by_energy[1].energy_keV",
-        ),
-        ("{ energy_keV = 25.0, grid = 50.0 }", "materials.sample.scan"),
-    ],
-)
-def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, error_path):
+def test_per_beam_line_grid_rejects_duplicate_beam_energies(tmp_path):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
+    replacement = "{ energy_keV = 25.0, grid = 50.0 },\n  { energy_keV = 25.0, grid = 60.0 }"
     text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, text))
-    assert error_path in str(caught.value)
+    assert "energy_grids.sample.line_by_energy[1].energy_keV" in str(caught.value)
+
+
+def test_partial_store_coverage_loads_and_keeps_only_covered_rows(tmp_path):
+    """Issue #101: a beam energy with no stored row is no longer a catalog
+    error. The covered energies stay in the mapping; the uncovered one falls
+    through to automatic case-local resolution in campaign.sweep."""
+    from pyrite.materials import load_material_catalog
+
+    text = _catalog_with_per_beam_line_grids().replace(
+        PER_BEAM_ENTRIES, '{ energy_keV = 25.0, grid = 50.0, source = "derived" }'
+    )
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
+    assert scan.E_grid_line is None
+    assert tuple(scan.E_grid_line_by_energy) == (25.0,)
 
 
 def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
@@ -368,22 +373,42 @@ def test_material_without_own_store_entry_falls_back_to_shared_default(tmp_path)
     np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17))
 
 
-def test_missing_beam_energy_errors_without_default_store_coverage(tmp_path):
-    from pyrite.materials import MaterialConfigError, load_material_catalog
+def test_missing_beam_energy_loads_without_default_store_coverage(tmp_path):
+    """Issue #101: `pyrite material energy-grid derive` is no longer a
+    correctness prerequisite. A default store covering only some configured beam
+    energies loads, and the uncovered energy resolves automatically at case
+    build."""
+    from pyrite.materials import load_material_catalog
 
     only_25 = '{ energy_keV = 25.0, grid = { values = [1.0, 2.0] }, source = "derived" }'
     text = _catalog_with_default_store_only(entries=only_25)
 
-    with pytest.raises(MaterialConfigError) as caught:
-        load_material_catalog(_write_catalog(tmp_path, text))
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
 
-    assert any("requires E_grid_line" in error for error in caught.value.errors)
+    assert tuple(scan.E_grid_line_by_energy) == (25.0,)
+
+
+def test_material_with_no_line_grid_at_all_is_valid(tmp_path):
+    """Neither E_grid_line nor any store row: still a loadable material."""
+    from pyrite.materials import load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample]
+display_name = "sample"
+crystal = "mos2"
+"""
+    ).replace(_NO_FLAT_LINE_GRID, "")
+
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
+
+    assert scan.E_grid_line is None
+    assert scan.E_grid_line_by_energy is None
 
 
 def test_material_config_error_groups_identical_messages_across_materials(tmp_path):
-    # A profile-wide setting invalid for every material (no E_grid_line, no
-    # material store entry for the profile's beam energies) must not repeat
-    # one near-duplicate line per material.
+    # A profile-wide setting invalid for every material must not repeat one
+    # near-duplicate line per material.
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog(
@@ -396,18 +421,17 @@ crystal = "mos2"
 display_name = "sample_b"
 crystal = "mos2"
 """
-    ).replace(_NO_FLAT_LINE_GRID, "")
+    ).replace("tilt_azim_deg = 0.0", "tilt_azim_deg = 400.0")
 
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, text))
 
-    assert len(caught.value.errors) == 2
+    assert len(caught.value.errors) == 3
     message = str(caught.value)
-    assert message.count("requires E_grid_line") == 1
-    assert "2 paths (materials.sample_a.scan, materials.sample_b.scan)" in message
+    assert message.count("0 <= tilt_azim_deg <= 360") == 1
     assert (
-        "run `pyrite material energy-grid derive "
-        "--energy 25.0,30.0 --material sample_a,sample_b --profile standard`"
+        "3 paths (profiles.standard.tilt_azim_deg, materials.sample_a.scan.tilt_azim_deg, "
+        "materials.sample_b.scan.tilt_azim_deg)"
     ) in message
 
 
@@ -428,7 +452,7 @@ crystal = "mos2"
 thickness_ang = 1000.0
 energy_keV = 35.0
 tilt_deg = 5.0
-tilt_azim_deg = 95.0
+tilt_azim_deg = 400.0
 E_grid_brem = 0.0
 materials = ["sample_a"]
 """
@@ -438,12 +462,8 @@ materials = ["sample_a"]
         load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
 
     message = str(caught.value)
-    assert "materials.sample_a.scan" in message
+    assert "materials.sample_a.scan.tilt_azim_deg" in message
     assert "materials.sample_b.scan" not in message
-    assert (
-        "run `pyrite material energy-grid derive "
-        "--energy 35.0 --material sample_a --profile narrowed`"
-    ) in message
 
 
 def _catalog_with_two_profiles(tmp_path: Path) -> Path:

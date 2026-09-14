@@ -418,6 +418,27 @@ def test_apply_rejects_invalid_line_domains_before_write(
     assert toml_path.read_text() == BASE_TOML
 
 
+def test_validated_line_row_requires_bandwidth_and_resolution_together():
+    row = {"energy_keV": 30.0, "start_eV": 10.0, "bandwidth": {"stop_eV": 100.0}}
+    with pytest.raises(ValueError, match="bandwidth and resolution together"):
+        apply._validated_line_row(row, field="hopg.line_rows[0]")
+
+
+def test_validated_line_row_flattens_separate_derived_criteria():
+    row = {
+        "energy_keV": 30.0,
+        "start_eV": 10.0,
+        "bandwidth": {"stop_eV": 100.0, "coverage": 0.95},
+        "resolution": {"num": 91, "observable_class": "intrinsic_source"},
+    }
+    assert apply._validated_line_row(row, field="hopg.line_rows[0]") == {
+        "energy_keV": 30.0,
+        "start_eV": 10.0,
+        "stop_eV": 100.0,
+        "num": 91,
+    }
+
+
 def test_set_line_grid_stamps_manual_inline_and_autocomputes_num(tmp_path, monkeypatch, capsys):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)

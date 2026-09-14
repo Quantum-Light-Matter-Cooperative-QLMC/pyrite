@@ -65,20 +65,48 @@ q_{\ell b}=\frac{1}{\pi}
 \right].
 ```
 
-The weights are normalized over the requested grid whenever the line centre is
-inside that grid,
+The bin masses retain the normalization of the physical Lorentzian on the
+whole energy axis. They are not renormalized over the requested window:
 
 ```{math}
-\widehat q_{\ell b}=\frac{q_{\ell b}}{\sum_c q_{\ell c}},
+0 < P_{\ell,W}=\sum_{b\in W}q_{\ell b}\leq 1.
 ```
 
-the sum running over the admitted bins. This preserves the integrated
-historical line yield even when Lorentzian tails extend beyond the configured
-energy window; it is a conditional, truncated Lorentzian, so changing the
-window rescales the retained bins by {math}`1/\sum_c q_{\ell c}`. The spectral
-density contributed to bin {math}`b` is {math}`Y_{jai\ell}\widehat q_{\ell
+Thus a finite window records the fraction {math}`P_{\ell,W}` of the integrated
+line yield and does not redistribute omitted tails into retained bins. A line
+centre outside the window still contributes its physical in-window tail.
+Changing either window boundary leaves every bin with unchanged edges
+unchanged. The
+spectral density contributed to bin {math}`b` is {math}`Y_{jai\ell}q_{\ell
 b}/\Delta E_b`, in photons {math}`\mathrm{eV}^{-1}\,\mathrm{sr}^{-1}` per
 incident electron.
+`pyrite.montecarlo.spectrum.characteristic.characteristic_line_window_mass`
+reports {math}`P_{\ell,W}` and its complement {math}`1-P_{\ell,W}` per line so
+window truncation is an explicit, queryable quantity rather than a number
+folded silently into the returned density. `mc_characteristic_spectrum` also
+warns when a line's centre lies inside the requested grid but the grid still
+captures less than
+`CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION` (50%) of its mass -- the window
+edge, not the line's off-grid centre, is then the reason for the missing mass.
+A line whose centre lies entirely outside the grid does not warn: its small
+in-window tail is the intended off-grid-line behaviour above, not a
+misconfigured window.
+
+### Bin-edge convention
+
+{math}`E_b^-,E_b^+` come from
+`_energy_bin_edges_and_widths`, reusing the interior-midpoint,
+reflected-half-width convention shared with
+`pyrite._grid_semantics.node_bin_edges_and_widths`: interior edges sit at
+{math}`\tfrac12(E_i+E_{i+1})`, and each outer edge mirrors the adjacent spacing
+outward. Photon energy is a one-sided physical coordinate, so the low edge is
+additionally clamped at 0 eV instead of the raw mirror reflection, which can
+go negative whenever the grid's first spacing exceeds its first node (for
+example a log-floored grid whose first two nodes sit close together after a
+wide gap to a lower floor). No coordinate is inserted for that floor -- the
+edge array still holds exactly `grid.size + 1` entries -- only the value of
+the existing first edge changes. The high edge is never clamped; photon energy
+has no equivalent upper physical bound here.
 
 Measured transition-metal emission features can require several Lorentzians to
 describe unresolved satellites and asymmetric structure
@@ -99,9 +127,14 @@ list emits zero and raises a warning rather than being silently approximated.
 
 Characteristic emission uses the bremsstrahlung electron population and its
 default 1 keV transport cutoff. This retains more low-energy ionization path
-than the default 5 keV PXR/CBS population, although path below the configured
-cutoff remains unmodeled. The 50 eV line-data cutoff does not change the
-electron cutoff.
+than the default 5 keV PXR/CBS population. The present stopping and scattering
+model is not validated below 1 keV, so characteristic scoring enforces
+{math}`E_{\rm cut}\geq1\,\mathrm{keV}`: an omitted cutoff resolves to 1 keV and
+an explicitly lower cutoff is rejected. Low-binding-energy vacancies that
+could physically be produced below 1 keV are therefore omitted. PyRITE does
+not claim precision characteristic yields for incident energies near this
+floor. The 50 eV line-data cutoff is a photon-line data boundary and does not
+lower the electron transport-validity floor.
 
 Flat slabs, finite footprints, blazed grooves, and layered samples reuse the
 same photon-escape geometry as the other radiation kernels. In a multilayer,
@@ -124,8 +157,11 @@ a line-only legacy or intentionally excluded dataset.
 
 - Zero density, path length, cross section, fluorescence yield, or branching
   intensity gives zero characteristic yield.
-- With zero attenuation, bin integration and grid normalization preserve
-  {math}`nL\sigma\omega I/(4\pi N_e)` exactly.
+- With zero attenuation, a finite window integrates to
+  {math}`P_{\ell,W}nL\sigma\omega I/(4\pi N_e)`; the infinite-window limit
+  recovers the complete line yield.
+- Narrowing a window only removes Lorentzian probability. It does not rescale
+  bins retained by both windows; off-grid centres retain nonzero tails.
 - Splitting a constant-energy segment preserves the total when its attenuation
   weight is also held fixed (in particular, with zero attenuation), because the
   estimator is then linear in path length. Subdividing a real absorbing track
@@ -135,6 +171,13 @@ a line-only legacy or intentionally excluded dataset.
 - Increasing optical depth suppresses the line monotonically.
 - Natural Lorentzian broadening is source physics; detector broadening remains
   a separate downstream operation.
+
+This window and cutoff convention is encoded in the `lorentzian-v4`
+characteristic-model marker used by dataset identities and case-content keys.
+Older `lorentzian-v2` checkpoints used conditional window renormalization;
+`lorentzian-v3` could emit an unphysical negative low bin edge for a grid
+whose first spacing exceeds its first node. Both are deliberately
+cache-incompatible with `v4`.
 
 Implementation owner:
 `pyrite.montecarlo.spectrum.characteristic.mc_characteristic_spectrum`.

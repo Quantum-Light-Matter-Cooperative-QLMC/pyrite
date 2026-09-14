@@ -42,9 +42,10 @@ CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 CHARACTERISTIC_MODEL = (
     f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
-    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-lorentzian-v2"
+    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-lorentzian-v4"
 )
 _MIN_RELAXATION_CUTOFF_EV = 50.0
+CHARACTERISTIC_TRANSPORT_FLOOR_KEV = 1.0
 _SHELL_LABELS = {
     1: "K",
     2: "L1",
@@ -530,6 +531,21 @@ def load_characteristic_cross_sections(
 
 
 def _energy_bin_edges_and_widths(E_grid_eV: object) -> tuple[np.ndarray, np.ndarray]:
+    """Nonuniform-center bin edges and widths for characteristic-line bins.
+
+    Same convention as :func:`pyrite._grid_semantics.node_bin_edges_and_widths`
+    (interior edges at the midpoint, outer edges a reflected half-width), with
+    one addition: photon energy is a one-sided physical coordinate, so the low
+    edge is clamped at 0 eV instead of the raw mirror reflection, which can go
+    negative when the grid's first spacing exceeds ``grid[0]`` (for example a
+    log-floored grid whose first two nodes are close together after a wide
+    gap). No coordinate is inserted to represent that floor -- the returned
+    array is still ``grid.size + 1`` edges for ``grid.size`` centres -- this
+    only changes what value the existing first edge holds. The high edge is
+    never clamped: no analogous physical ceiling applies to photon energy.
+
+    Validation: characteristic-radiation
+    """
     grid = np.asarray(E_grid_eV, dtype=float)
     if grid.ndim != 1 or grid.size < 2:
         raise ValueError("characteristic spectrum requires at least two energy-bin centres")
@@ -537,7 +553,7 @@ def _energy_bin_edges_and_widths(E_grid_eV: object) -> tuple[np.ndarray, np.ndar
         raise ValueError("characteristic energy-bin centres must be finite and strictly increasing")
     edges = np.empty(grid.size + 1, dtype=float)
     edges[1:-1] = 0.5 * (grid[:-1] + grid[1:])
-    edges[0] = grid[0] - 0.5 * (grid[1] - grid[0])
+    edges[0] = max(0.0, grid[0] - 0.5 * (grid[1] - grid[0]))
     edges[-1] = grid[-1] + 0.5 * (grid[-1] - grid[-2])
     return edges, np.diff(edges)
 
@@ -547,11 +563,12 @@ def _lorentzian_bin_weights(
     line_energy_eV: float,
     fwhm_eV: float,
 ) -> np.ndarray:
-    """Exact bin masses for a normalized, window-preserving Lorentzian.
+    """Exact in-window bin masses for a Lorentzian normalized on all energies.
 
     The analytic CDF difference avoids point-sampling narrow natural lines.
-    Renormalizing over the requested grid preserves the transition yield when
-    its centre is in range, matching the historical delta-line window policy.
+    Probability outside the requested window is not redistributed into it, so
+    the returned masses sum to at most one and off-grid lines retain their
+    physical in-window tails.
 
     Validation: characteristic-radiation
     """
@@ -561,10 +578,83 @@ def _lorentzian_bin_weights(
         np.arctan((edges_eV[1:] - centre) / gamma) - np.arctan((edges_eV[:-1] - centre) / gamma)
     ) / np.pi
     weights = np.maximum(weights, 0.0)
-    captured = float(np.sum(weights))
-    if not np.isfinite(captured) or captured <= 0.0:
+    if not np.all(np.isfinite(weights)):
         raise ValueError("Lorentzian line has no finite mass on the requested energy grid")
-    return weights / captured
+    return weights
+
+
+#: Below this in-window captured fraction, ``mc_characteristic_spectrum`` warns
+#: that a contributing line's window truncation is severe rather than staying
+#: silent. Chosen well below typical coverage -- a +-25 FWHM window already
+#: only captures ~98.7% of a Lorentzian's mass, so a low bar avoids flagging
+#: ordinary heavy-tail truncation and reserves the warning for windows that
+#: miss most of a physically relevant line.
+CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION = 0.5
+
+
+def characteristic_line_window_mass(
+    E_grid_eV: object,
+    element: str,
+    *,
+    data_dir: str | Path | None = None,
+    relaxation_cutoff_eV: float | None = None,
+) -> dict[str, tuple[float, float]]:
+    """Report each xraydb line's in-window captured and truncated mass.
+
+    ``_lorentzian_bin_weights`` integrates each line's normalized Lorentzian
+    exactly over ``E_grid_eV`` and does not redistribute the tail outside the
+    window (Validation: characteristic-radiation). That leaves the truncated
+    fraction computable but, inside ``mc_characteristic_spectrum``, implicit
+    in the returned spectral density. This makes it an explicit, queryable
+    per-line quantity instead: for every line above ``relaxation_cutoff_eV``,
+    ``captured + truncated == 1`` up to floating-point rounding, by
+    construction of the arctan CDF difference on the full real line.
+
+    Returns
+    -------
+    dict[str, tuple[float, float]]
+        Line label to ``(captured_mass, truncated_mass)``, both fractions of
+        the line's total integrated yield.
+
+    Validation: characteristic-radiation
+    """
+    table = load_characteristic_cross_sections(element, data_dir=data_dir)
+    cutoff = (
+        table.recommended_cutoff_eV
+        if relaxation_cutoff_eV is None
+        else _require_finite(relaxation_cutoff_eV, "relaxation_cutoff_eV", positive=True)
+    )
+    edges, _widths = _energy_bin_edges_and_widths(E_grid_eV)
+    report: dict[str, tuple[float, float]] = {}
+    for label, energy, fwhm in zip(
+        table.line_labels, table.line_energy_eV, table.line_fwhm_eV, strict=True
+    ):
+        if energy <= cutoff:
+            continue
+        captured = float(_lorentzian_bin_weights(edges, energy, fwhm).sum())
+        report[str(label)] = (captured, 1.0 - captured)
+    return report
+
+
+def _characteristic_transport_cutoff_keV(E_cut_keV: object) -> float:
+    """Resolve the enforced lower validity boundary for characteristic scoring.
+
+    The current electron transport model is not claimed accurate below 1 keV.
+    Characteristic production therefore defaults to that floor and rejects a
+    lower requested cutoff instead of presenting sub-keV path as validated.
+
+    Validation: characteristic-radiation
+    """
+    if E_cut_keV is None:
+        return CHARACTERISTIC_TRANSPORT_FLOOR_KEV
+    cutoff = _require_finite(E_cut_keV, "E_cut_keV", positive=True)
+    if cutoff < CHARACTERISTIC_TRANSPORT_FLOOR_KEV:
+        raise ValueError(
+            f"characteristic scoring requires E_cut_keV >= "
+            f"{CHARACTERISTIC_TRANSPORT_FLOOR_KEV:g} keV; sub-keV electron transport "
+            "is outside the validated model"
+        )
+    return cutoff
 
 
 def _interpolate_shell_cross_sections(
@@ -649,7 +739,8 @@ def mc_characteristic_spectrum(
     electron_limit
         Optional leading macro-electron count used for normalization.
     E_cut_keV
-        Optional post-transport electron-energy cutoff in keV.
+        Optional post-transport electron-energy cutoff in keV. Characteristic
+        scoring defaults to and enforces a 1 keV transport-validity floor.
     data_dir
         Optional EEDL file or containing directory.
     relaxation_cutoff_eV
@@ -665,6 +756,7 @@ def mc_characteristic_spectrum(
     if isinstance(chunk, bool) or int(chunk) <= 0:
         raise ValueError("chunk must be a positive integer")
     chunk = int(chunk)
+    characteristic_cutoff_keV = _characteristic_transport_cutoff_keV(E_cut_keV)
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     all_tables = {
         el: load_characteristic_cross_sections(el, data_dir=data_dir) for el, _density in comp
@@ -684,7 +776,7 @@ def mc_characteristic_spectrum(
                 f"reliable minimum {minimum_cutoff:g} eV"
             )
 
-    segments = _clip_segments_to_cutoff(segments, E_cut_keV, comp, layers)
+    segments = _clip_segments_to_cutoff(segments, characteristic_cutoff_keV, comp, layers)
     Ne = segments["Ne"] if electron_limit is None else electron_limit
     if isinstance(Ne, bool) or int(Ne) <= 0:
         raise ValueError("electron_limit/segments['Ne'] must be a positive integer")
@@ -720,6 +812,7 @@ def mc_characteristic_spectrum(
     else:
         L_esc = _escape_length(z_mid, thickness, n_hat[2])
     inv_nz = 1.0 / max(abs(float(n_hat[2])), 1.0e-12)
+    severe_truncation: list[tuple[str, str, float]] = []
 
     for el, number_density_ang3 in comp:
         table = all_tables[el]
@@ -730,15 +823,22 @@ def mc_characteristic_spectrum(
         ):
             if line_energy <= relaxation_cutoff:
                 continue
-            bin_index = int(np.searchsorted(edges, line_energy, side="right") - 1)
-            if bin_index < 0 or bin_index >= E_grid.size:
-                continue
             if not np.any(xraydb_yields[:, line_index] > 0.0):
                 continue
-            profile = xp.asarray(
-                _lorentzian_bin_weights(edges, line_energy, line_fwhm) / bin_widths,
-                dtype=REAL,
-            )
+            weights_cpu = _lorentzian_bin_weights(edges, line_energy, line_fwhm)
+            if not np.any(weights_cpu > 0.0):
+                continue
+            captured = float(weights_cpu.sum())
+            peak_in_window = edges[0] <= line_energy <= edges[-1]
+            if peak_in_window and captured < CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION:
+                # The line centre is inside the requested window but the window
+                # itself is too narrow around it -- distinct from a line whose
+                # centre sits entirely outside E_grid_eV and only contributes a
+                # deliberately small physical tail (see
+                # `characteristic_line_window_mass` for that case's breakdown).
+                severe_truncation.append((el, str(table.line_labels[line_index]), captured))
+            profile_cpu = weights_cpu / bin_widths
+            profile = xp.asarray(profile_cpu, dtype=REAL)
             if layers is None:
                 mu = _mu_total_inv_ang(
                     comp,
@@ -799,6 +899,19 @@ def mc_characteristic_spectrum(
         ):
             spec += line_yield * profile
 
+    if severe_truncation:
+        detail = ", ".join(
+            f"{el} {label} captures {captured:.1%}" for el, label, captured in severe_truncation
+        )
+        warnings.warn(
+            f"E_grid_eV truncates {len(severe_truncation)} characteristic line(s) below "
+            f"{CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION:.0%} of their physical Lorentzian mass "
+            f"(not redistributed into retained bins): {detail}. Widen the window or query "
+            "characteristic_line_window_mass for the full per-line breakdown.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
     return _to_cpu(spec / (4.0 * xp.pi) / int(Ne))
 
 
@@ -808,8 +921,11 @@ __all__ = [
     "CHARACTERISTIC_EEDL_SHA256",
     "CHARACTERISTIC_ENDF_PARSERPY_VERSION",
     "CHARACTERISTIC_MODEL",
+    "CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION",
+    "CHARACTERISTIC_TRANSPORT_FLOOR_KEV",
     "CHARACTERISTIC_XRAYDB_VERSION",
     "CharacteristicCrossSectionTable",
+    "characteristic_line_window_mass",
     "load_characteristic_cross_sections",
     "mc_characteristic_spectrum",
 ]

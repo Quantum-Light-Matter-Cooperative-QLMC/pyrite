@@ -484,7 +484,7 @@ def _identity_v1(
         sweep_payload["divergence_mrad"] = beam_payload["divergence_mrad"]
     if beam_payload["energy_spread_frac"] is not None:
         sweep_payload["energy_spread_frac"] = beam_payload["energy_spread_frac"]
-    for key in ("n_electrons", "n_electrons_brem"):
+    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only

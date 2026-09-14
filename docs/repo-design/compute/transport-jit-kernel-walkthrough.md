@@ -350,39 +350,54 @@ collisions.
 
 `_transport_lut_kernel` retains the same thread ownership, RNG, geometry,
 segment writes, optical-depth budget, midpoint rule, and direction rotation.
-It replaces repeated material formulas with linear interpolation on a uniform
-energy grid.
+It replaces repeated material formulas with linear interpolation on a grid
+uniform in $\ln E$, so resolution is constant in *relative* energy and a
+slowing electron keeps it near the cutoff.
 
-For grid minimum $E_{\min}$ and inverse spacing $h^{-1}$, it computes
+For grid minimum $E_{\min}$ and inverse log spacing $h_{\ln}^{-1}$, it computes
 
 $$
-x=(E-E_{\min})h^{-1},
+x=\bigl(\ln E-\ln E_{\min}\bigr)h_{\ln}^{-1},
 \qquad
 i=\lfloor x\rfloor,
 \qquad
 f=x-i,
 $$
 
-clamped to the first or last interval. Any table $T$ is then read as
+clamped to the first or last interval -- one logarithm, one multiply, one
+integer conversion, no search. The clamp tests the *upper* bound first, so a
+non-finite coordinate ($E=0$ gives $-\infty$, $E<0$ gives NaN) fails both
+comparisons and lands on the lower clamp rather than reaching $\lfloor
+x\rfloor$. `_lut_index_frac_scalar`, `_jit_device.py::_lut_lerp_at`, and the two
+inline forms in `_jit_kernel.py` all spell out this same branch order; they must
+stay identical or the CPU and CUDA cores would clamp differently.
+
+Any table $T$ is then read as
 
 $$
 T(E)=T_i+f(T_{i+1}-T_i).
 $$
 
+Values are interpolated directly -- only the coordinate is logarithmic.
+Interpolating $\ln T$ instead was measured and rejected: it costs an
+exponential per table read in the innermost loop, and the residual error at the
+shipped resolution is set by model joins, where the transform buys nothing.
+
 ### Worked LUT interpolation
 
-Take an energy grid $[10,20,30]$ keV and $E=25$ keV, so
-$E_{\min}=10$ keV, $h^{-1}=0.1$ keV$^{-1}$, $x=1.5$, $i=1$, and $f=0.5$.
+Take an energy grid $[10,20,40]$ keV -- uniform in $\ln E$ with node ratio 2 --
+and $E=20\sqrt2\approx28.284$ keV, so $\ln E_{\min}=\ln 10$,
+$h_{\ln}^{-1}=1/\ln 2$, $x=1.5$, $i=1$, and $f=0.5$.
 If the two bracketing total rates are $2.0\times10^7$ and
 $4.0\times10^7$ cm$^{-1}$, the kernel obtains
 
 $$
-R(25)=2.0\times10^7+0.5(4.0-2.0)\times10^7
+R(28.284)=2.0\times10^7+0.5(4.0-2.0)\times10^7
 =3.0\times10^7\ \text{cm}^{-1},
 $$
 
 $$
-\lambda(25)=\frac{10^8}{3.0\times10^7}=\frac{10}{3}\ \text{Å}.
+\lambda(28.284)=\frac{10^8}{3.0\times10^7}=\frac{10}{3}\ \text{Å}.
 $$
 
 Likewise, bracketing stopping values $-0.08$ and $-0.12$ keV/Å interpolate to

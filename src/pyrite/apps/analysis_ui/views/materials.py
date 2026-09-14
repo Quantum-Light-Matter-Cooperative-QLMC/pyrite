@@ -26,7 +26,8 @@ def render_cross_material(
 ):
     description = mo.md(
         "For every material with a checkpoint, show the best dominant line selected "
-        "by quality × peak flux, peak flux, and local line-to-bremsstrahlung ratio. "
+        "by quality × integrated line flux, integrated line flux, and local "
+        "line-to-bremsstrahlung ratio. "
         "Candidate lines with quality below 0.5 are rejected."
     )
     beam_energy = None if compare_all else energy
@@ -97,8 +98,8 @@ def render_cross_material(
         [
             description,
             mo.hstack([compare_all_ui, energy_ui], wrap=True),
-            comparison("quality_peak"),
-            comparison("peak"),
+            comparison("quality_line"),
+            comparison("line_flux"),
             comparison("line_brem_ratio"),
         ]
     )

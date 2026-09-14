@@ -832,8 +832,10 @@ def multi_case_spectrum_chart(
 
 
 _COMPARISON_SELECTION_TITLES = {
-    "quality_peak": "highest line-definition quality",
-    "peak": "highest peak flux",
+    "quality_line": "highest quality-weighted integrated line flux",
+    "line_flux": "highest integrated line flux",
+    "quality_peak": "highest quality-weighted sampled peak density",
+    "peak": "highest sampled peak density (spacing-dependent)",
     "line_brem_ratio": "highest local line-to-bremsstrahlung ratio",
 }
 
@@ -841,7 +843,7 @@ _COMPARISON_SELECTION_TITLES = {
 def material_comparison_chart(
     points,
     dropped,
-    select="quality_peak",
+    select="quality_line",
     beam_energy_keV=None,
     min_line_quality: float | None = 0.5,
     width=760,

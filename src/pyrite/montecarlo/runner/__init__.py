@@ -114,6 +114,7 @@ from .chunking import (
 from .chunking import (
     _real_itemsize as _real_itemsize,
 )
+from .line_grid import resolve_line_grid
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -586,6 +587,11 @@ def _transport_case(
     else:
         segs_all = _transport(False)
 
+    # Line resolution needs the transport distribution, so it is chosen after
+    # the case's own trajectories exist and before the spectrum phase. No second
+    # Monte Carlo job is started for either path; see runner/line_grid.py.
+    E_grid, diagnostic_grid_result = resolve_line_grid(case, segs_all, n_hat, Ne, E_grid)
+
     tp: dict[str, Any] = dict(
         E_grid=E_grid,
         E_brem=E_brem,
@@ -594,6 +600,7 @@ def _transport_case(
         Ne_lines=Ne,
         Ne_brem=Ne_brem,
         groove=groove,
+        diagnostic_grid=diagnostic_grid_result,
     )
     if timed:
         tp["_t_transport"] = perf_counter() - t0
@@ -1098,6 +1105,13 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         crystal=case["crystal"],
         E0_keV=case["E0_keV"],
     )
+    if tp.get("diagnostic_grid") is not None:
+        # Same record either way; two names because the consumers differ.
+        # ``energy_grid.derive`` reads the diagnostic key; run/checkpoint
+        # provenance reads the resolved key for automatic case-local grids.
+        out["line_grid_diagnostic"] = tp["diagnostic_grid"]
+        if case.get("line_grid_policy") is not None:
+            out["line_grid_resolved"] = tp["diagnostic_grid"]
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
     if timed:

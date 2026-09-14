@@ -57,6 +57,7 @@ _CASE_KEY_ORDER = (
     "E_grid",
     "E_grid_line",
     "E_grid_brem",
+    "line_grid_policy",
     "theta_obs_rad",
     "tilt_deg",
     "tilt_azim_deg",
@@ -192,6 +193,13 @@ class Case(Mapping[str, Any]):
     long_offsets_fs: tuple[float, ...] | _Absent = _ABSENT
     longitudinal_distribution: dict[str, object] | _Absent = _ABSENT
     transverse_distribution: dict[str, object] | _Absent = _ABSENT
+    # Automatic case-local line-grid policy (issue #101). Absent means the
+    # coordinates in ``E_grid_line`` are final -- an explicit user grid or a
+    # stored catalog row. Present means ``E_grid_line`` is the coarsest
+    # admissible grid and the runner refines it under this policy from the
+    # case's own trajectories; the policy, not the refined coordinates, is what
+    # identity hashes, because the refinement is a deterministic function of it.
+    line_grid_policy: dict[str, object] | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
     straggling: Literal[True] | _Absent = _ABSENT

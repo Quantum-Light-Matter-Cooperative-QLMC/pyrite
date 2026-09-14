@@ -96,11 +96,49 @@ def line_quality(spec, rel_prominence=0.03, rel_width_max=0.10):
     return float(dominance * contrast * narrowness)
 
 
+def _sample_energy(E: np.ndarray, sample_position: float) -> float:
+    """Map scipy's fractional sample coordinate onto a physical energy axis."""
+    return float(np.interp(sample_position, np.arange(E.size, dtype=float), E))
+
+
+def _peak_sample_spacing(E: np.ndarray, idx: int) -> float:
+    """Local energy interval represented by a sampled peak node."""
+    if E.size < 2:
+        return float("nan")
+    if idx == 0:
+        return float(E[1] - E[0])
+    if idx == E.size - 1:
+        return float(E[-1] - E[-2])
+    return float((E[idx + 1] - E[idx - 1]) / 2.0)
+
+
+def _integrate_energy_window(
+    values: np.ndarray, E: np.ndarray, lower_eV: float, upper_eV: float
+) -> float:
+    """Trapezoidal integral over exact physical-energy bounds."""
+    lower_eV = max(lower_eV, float(E[0]))
+    upper_eV = min(upper_eV, float(E[-1]))
+    if lower_eV >= upper_eV:
+        return 0.0
+    interior = (E > lower_eV) & (E < upper_eV)
+    energies = np.concatenate(([lower_eV], E[interior], [upper_eV]))
+    samples = np.concatenate(
+        (
+            [np.interp(lower_eV, E, values)],
+            values[interior],
+            [np.interp(upper_eV, E, values)],
+        )
+    )
+    return float(np.trapezoid(samples, energies))
+
+
 def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness"):
     """Scalar metrics for one record, used by the heatmaps. Two flux quantities
     are deliberately distinct:
 
-    * ``peak_flux`` is the tallest line-density sample in photons/eV/s.
+    * ``peak_spectral_flux_density`` is the tallest sampled line density in
+      photons/eV/s. ``peak_flux`` is its compatibility alias, not an
+      integrated flux; ``peak_sample_spacing_eV`` records its local sampling.
     * ``coherent_flux`` integrates every line over the complete line grid.
     * ``line_flux`` integrates only the dominant peak over ``n_fwhm`` widths.
     * ``line_eV`` and ``fwhm_eV`` locate and characterize that dominant peak.
@@ -140,7 +178,6 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     E = np.asarray(r["E_grid"], dtype=float)
     spec = np.asarray(r["spec"], dtype=float)
     brem = np.asarray(r["brem"], dtype=float)
-    dE = float(E[1] - E[0])
     cur, sc = beam_current_na(r, settings), r["scale"]
     smax = float(spec.max()) if spec.size else 0.0
     idx = line_index(spec, rel_prominence, metric)
@@ -151,27 +188,36 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         # broad filter on this one call) rather than spamming the scan log.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            w_samp = float(peak_widths(spec, [idx], rel_height=0.5)[0][0])
+            widths = peak_widths(spec, [idx], rel_height=0.5)
+            left_eV = _sample_energy(E, float(widths[2][0]))
+            right_eV = _sample_energy(E, float(widths[3][0]))
+            fwhm_eV = right_eV - left_eV
     except Exception:
-        w_samp = 0.0
-    half = max(round(n_fwhm * w_samp / 2.0), 1)
-    lo, hi = max(idx - half, 0), min(idx + half + 1, spec.size)
-    line_int = float(np.trapezoid(spec[lo:hi], E[lo:hi])) if hi > lo else 0.0
-    brem_line_int = float(np.trapezoid(brem[lo:hi], E[lo:hi])) if hi > lo else 0.0
+        fwhm_eV = 0.0
+    half_window_eV = n_fwhm * fwhm_eV / 2.0
+    lower_eV = float(E[idx]) - half_window_eV
+    upper_eV = float(E[idx]) + half_window_eV
+    line_int = _integrate_energy_window(spec, E, lower_eV, upper_eV)
+    brem_line_int = _integrate_energy_window(brem, E, lower_eV, upper_eV)
     coh_int = float(np.trapezoid(spec, E)) if spec.size else 0.0
     brem_int = float(np.trapezoid(brem, E))
     total_int = coh_int + brem_int
     return {
         # Per-nA values are normalized MC yields. Existing absolute rates
         # use case-derived pulsed-source current: photons/s at its rep rate.
+        "peak_spectral_flux_density_per_na": smax * sc,
+        "peak_sample_spacing_eV": _peak_sample_spacing(E, idx),
+        # Compatibility aliases. Despite their historical names these are
+        # sampled spectral densities, not energy-integrated fluxes.
         "peak_flux_per_na": smax * sc,
         "coherent_flux_per_na": coh_int * sc,
         "line_flux_per_na": line_int * sc,
         "total_flux_per_na": total_int * sc,
+        "peak_spectral_flux_density": smax * sc * cur,
         "peak_flux": smax * sc * cur,
         "coherent_flux": coh_int * sc * cur,
         "line_eV": float(E[idx]),
-        "fwhm_eV": w_samp * dE,
+        "fwhm_eV": fwhm_eV,
         "line_flux": line_int * sc * cur,
         "line_frac": (line_int / total_int) if total_int > 0 else float("nan"),
         "total_flux": total_int * sc * cur,

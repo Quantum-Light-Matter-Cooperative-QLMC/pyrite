@@ -14,16 +14,47 @@ descriptor, profile membership naming an unknown material, beam references to
 an unknown beam, CIF paths outside packaged data, or elements without transport
 support. See the [catalog schema](../repo-design/materials-catalog-schema.md).
 
-## A run asks for an energy grid
+## A beam energy has no stored line grid
 
-The selected profile/material lacks a verified immutable line-grid reference.
-Run `pyrite material energy-grid derive --profile NAME`; add `--remote` for the
-configured compute host. A successful attached derivation installs immutable
-artifacts and repoints that profile automatically. Then run `pyrite-dev
-energy-grid verify`. Detached submission returns before installation; attach to
-the job for progress, then rerun without `--detach` to resume, pull, and install.
-Do not paste
-survey-cropped bounds into the catalog; fidelity reduction happens later.
+Nothing to do: a valid material at a supported beam energy runs without a prior
+derivation. When no explicit grid and no stored `line_by_energy` row cover the
+case, PyRITE resolves a case-local line grid automatically — a closed-form
+kinematic bandwidth, then a sinc-Nyquist resolution measured from the run's own
+trajectories. The resolved policy, tolerance, coordinates, and configuration
+source are recorded in the result's provenance under `line_grid_policy` and
+`line_grid_resolved`, and the policy is part of case/checkpoint identity.
+
+Automatic grids are deliberately conservative — the bandwidth is a bound, not a
+measurement — so they cost more points than a derived row. Tune them through the
+usual precedence chain (per-call/API > `PYRITE_*` > stored artifact > built-in):
+
+| Variable | Meaning |
+|---|---|
+| `PYRITE_ENERGY_GRID_RTOL` | global *fallback* relative tolerance |
+| `PYRITE_ENERGY_GRID_RTOL_INTRINSIC_SOURCE` | per-observable override (default `1e-3`) |
+| `PYRITE_ENERGY_GRID_RTOL_DETECTED_COUNTS` | per-observable override (default `1e-2`) |
+| `PYRITE_ENERGY_GRID_MAX_SPACING_EV` | coarsest admissible spacing (default `3.0`) |
+| `PYRITE_ENERGY_GRID_ULPS` | backend coordinate-precision safety factor |
+| `PYRITE_ENERGY_GRID_MAX_POINTS` | point budget before the run refuses |
+
+Setting any of these turns automatic resolution on even where a stored row
+exists. An explicit `EnergyBins.line` still wins over all of them.
+
+A requested tolerance that cannot be met inside the point budget or the backend
+ULP floor **raises** and names the unmet tolerance and the correction. The grid
+is never silently coarsened; raise the budget, relax that observable's
+tolerance, narrow the bandwidth, or run with `PYRITE_FP64=1`.
+
+## Deriving grids on purpose
+
+`pyrite material energy-grid derive --profile NAME` is an inspection and
+prewarming command, not a prerequisite. It measures a 95%-integrated-coverage
+**bandwidth** (not an accuracy target) and installs immutable artifacts,
+repointing that profile automatically; add `--remote` for the configured compute
+host, then run `pyrite-dev energy-grid verify`. Detached submission returns
+before installation; attach to the job for progress, then rerun without
+`--detach` to resume, pull, and install. Do not paste survey-cropped bounds into
+the catalog; fidelity reduction happens later.
 
 ## A run does not resume the checkpoint I expected
 

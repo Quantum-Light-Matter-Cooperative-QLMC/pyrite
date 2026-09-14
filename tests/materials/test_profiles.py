@@ -64,8 +64,9 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # hashed into the content key, so a catalog value change orphans records
     # minted under the old value rather than serving them for a case that now
     # diffracts differently -- the same rule the stopping-model marker follows.
+    # Re-minted again for issue #88's physical Lorentzian-window marker.
     assert case_content_key(case) == (
-        "9fea153e25d8ad02206af7103f59cd6ad494632618264fe63f28f9f15a8f559e"
+        "4c9114bd1d0cd583ff18610de54ddec579647ae3fda4fb7ac95408e789cc356a"
     )
 
 
@@ -76,7 +77,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "02a34b6483b91f118b89963c3596befcf6cde6273c9441f9788747bebe4c73e7"
+        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -331,7 +332,7 @@ def test_characteristic_model_marker_orphans_previous_line_models():
     assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
     assert "eedl" in CHARACTERISTIC_MODEL
     assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
-    assert "lorentzian" in CHARACTERISTIC_MODEL
+    assert CHARACTERISTIC_MODEL.endswith("direct-vacancy-lorentzian-v4")
 
 
 def test_case_content_key_separates_characteristic_models():
@@ -364,7 +365,7 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "02a34b6483b91f118b89963c3596befcf6cde6273c9441f9788747bebe4c73e7"
+        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -378,42 +379,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "0cc53d53ed000a35c5aba78c3251966dd4dfe6ec3b23ddaabe1813e9b29bf9f3",
+            "20c436962d63d2c07742d6ec333bf66f88d7b0a5051c838d7670a4726c7b4ef1",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "be2b572d22750fc532b6834e0ecbe0bc3f9d59dff1819dbe96cf68d683948f53",
+            "47e335938658db4804710a769d954e0b0c2f7ebc7b4d6b580fe74468c40344fa",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "dd9ef5c13ea9aebc64d41923bcb4debd286b820428ab1090a5d7016820422e07",
+            "5d3b321e19a1d85cc9c3a3240ac93d92f84e9374c999870c34b69f4bcbccf54d",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "4c25c9c0b8d461106af88a3bab1552ba3b98e0a428cf605275e9745075a46f63",
+            "f8b2314e9cb855f390f3c382900a5bb31b9c022c7b37aae59848bae82fd04af5",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "980ae1a7cff6c6aacedd9bc101518355a488294570ea309703e378469c47fe1b",
+            "df1aaedfbc51679aec3c31f8d1fc1f9299ee354efdf636abd32b255020bf788d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "9b519ba1a9d43332c5a0553cb05ffe3657784225f983b0b2fa4c15916bd09215",
+            "01ecd6f8351a437cf358090722c7c1bf0f03921c1b3c0a9780c3804e06a41bf5",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "109bb8d02aeaecc35c84b3e6b1e80909d1a2088e72684404b5bf318fcde300df",
+            "067db189047694420ddfdf60fd94035d30cdcea1b1ba75d5fb3416394e93523c",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "901428128560c86f81f34ad3ca181866a85df3b527253125f4a7dc34337f8213",
+            "c04ab69050708f0ed39996e121fa3e38990230032e7815d1d193b4ae426edefa",
         ),
     ],
 )
@@ -427,7 +428,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     deliberately orphaned every vacuum-era checkpoint stem; they must stay
     bit-for-bit from here. They were re-minted again when unconditional EEDL
     characteristic radiation was introduced, for the EEDL bremsstrahlung
-    generation marker, and for natural Lorentzian characteristic profiles."""
+    generation marker, for natural Lorentzian characteristic profiles, and for
+    issue #88's physical finite-window convention."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
     assert identity["parameter_sha256"] == digest
@@ -567,15 +569,16 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # line kinematics became unconditional, again when the Joy--Luo/
     # Berger--Seltzer stopping splice did, and again when every crystal cut
     # moved to the surface_hkl spelling, and again for natural Lorentzian
-    # characteristic profiles) must stay bit-for-bit.
+    # characteristic profiles, and again for issue #88's physical finite-window
+    # convention) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "02a34b6483b91f118b89963c3596befcf6cde6273c9441f9788747bebe4c73e7"
+        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "5fbe7973c34065a65c150cad11a919b7dd898af33f9eb7de07778a133dd44001"
+        "6767c99d14140ca9b132139a6c50873909a65cbe79f2a260b37911dd1546a1a4"
     )
 
 

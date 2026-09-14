@@ -10,7 +10,7 @@ from .common import themed_chart, thickness_selector
 
 
 def render_rankings(mo, *, context):
-    frame = top_geometries(context.results, context.settings, top_n=20, select="quality_peak")
+    frame = top_geometries(context.results, context.settings, top_n=20, select="quality_line")
     if frame.empty:
         command = "pyrite material blaze" if context.selected_face == "blazed" else "scan_app.py"
         return mo.md(
@@ -20,7 +20,7 @@ def render_rankings(mo, *, context):
     return mo.vstack(
         [
             mo.md(
-                f"Top 20 geometries ranked by *quality × peak flux* "
+                f"Top 20 geometries ranked by *quality × integrated line flux* "
                 f"({context.settings.beam_current_na:g} nA beam; quality score in [0, 1])."
             ),
             mo.ui.table(
@@ -89,8 +89,8 @@ def render_scans(
     sweep = sweep_values(context.results) if records(context.results) else {}
     parts = [
         mo.md(
-            "Scan plots show each swept quantity, followed by 1-D line and peak-flux "
-            "metrics versus polar tilt."
+            "Scan plots show each swept quantity, followed by 1-D integrated line "
+            "and coherent-flux metrics versus polar tilt."
         ),
         thickness_selector(
             mo,
@@ -139,14 +139,14 @@ def render_scans(
         metric="line_flux",
         hue="E0_keV",
     )
-    peak = metric_vs_chart(
+    coherent = metric_vs_chart(
         scan_results,
         context.settings,
         x="tilt_deg",
-        metric="peak_flux",
+        metric="coherent_flux",
         hue="E0_keV",
     )
-    metric_charts = [themed_chart(chart, theme) for chart in (line, peak) if chart is not None]
+    metric_charts = [themed_chart(chart, theme) for chart in (line, coherent) if chart is not None]
     parts.append(mo.vstack(metric_charts) if metric_charts else mo.md("*No metric results.*"))
     parts.append(
         mo.accordion(
@@ -155,7 +155,7 @@ def render_scans(
                     scan_results,
                     context.settings,
                     top_n=12,
-                    select="quality_peak",
+                    select="quality_line",
                 )
             },
             lazy=True,

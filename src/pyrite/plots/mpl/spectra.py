@@ -229,8 +229,12 @@ def plot_full_spectrum(results, settings, collapse_azimuth=True, logy=True, floo
 
 
 def plot_peak_vs_tilt(results, settings):
-    """Overview for big sweeps: best-azimuth peak spectral flux vs polar tilt,
-    one line per beam energy. Peak = max(spectrum) * scale * beam current."""
+    """Legacy overview of sampled peak density versus polar tilt.
+
+    Values are comparable only when the records use the same local energy
+    spacing. Prefer :func:`plot_metric_vs` with ``metric="line_flux"`` for
+    cross-grid comparisons.
+    """
     recs = best_azimuth(records(results))
     if not recs:
         print("no results yet")
@@ -245,8 +249,8 @@ def plot_peak_vs_tilt(results, settings):
         peak = [float(np.max(r["spec"])) * r["scale"] * beam_current_na(r, settings) for r in rs]
         ax.plot(tilts, peak, "o-", color=energy_color(E0, by_E), label=f"{E0:g} keV")
     ax.set_xlabel(r"polar tilt $\theta_\mathrm{tilt}$ (deg)")
-    ax.set_ylabel("best-azimuth peak (Phs/eV/s)")
-    ax.set_title("Peak spectral flux vs polar tilt (best azimuth per point)")
+    ax.set_ylabel("best-azimuth sampled peak density (Phs/eV/s)")
+    ax.set_title("Sampled peak density vs polar tilt (spacing-dependent)")
     ax.grid(alpha=0.3)
     ax.legend(title="beam energy")
     _style_axis(ax)
@@ -316,7 +320,7 @@ def plot_best_spectra(
     results,
     settings,
     top_n=12,
-    select="quality_peak",
+    select="quality_line",
     include_brem=True,
     cases=None,
     ncols=3,
@@ -328,7 +332,7 @@ def plot_best_spectra(
     titled with the geometry, the score components, and the line quality. The
     answer to "thousands of cases, which few do I look at": instead of paging
     every polar tilt, see the best dozen at a glance. ``select`` defaults to
-    peak_flux x line_quality (bright AND well-defined), not the raw peak the
+    line_flux x line_quality (bright AND well-defined), not the sampled peak the
     per-tilt browser collapses on -- so spurious tall spikes don't win."""
     recs = records_for_cases(results, cases)
     if not recs:
@@ -435,7 +439,7 @@ def material_comparison_summary(
 
 def select_material_comparison(
     summary,
-    select="quality_peak",
+    select="quality_line",
     beam_energy_keV=None,
     min_line_quality: float | None = 0.5,
 ):
@@ -481,7 +485,7 @@ def select_material_comparison(
 def material_comparison_point(
     results,
     settings,
-    select="quality_peak",
+    select="quality_line",
     rel_prominence=0.03,
     line_metric="sharpness",
     beam_energy_keV=None,
@@ -500,7 +504,7 @@ def material_comparison_point(
 def draw_material_comparison(
     points,
     dropped,
-    select="quality_peak",
+    select="quality_line",
     beam_energy_keV=None,
     min_line_quality: float | None = 0.5,
 ):
@@ -548,8 +552,10 @@ def draw_material_comparison(
     ax.set_xlabel("dominant coherent line energy (keV)")
     ax.set_ylabel("integrated line flux at best geometry (Phs/s)")
     selection_titles = {
-        "quality_peak": "highest line-definition quality",
-        "peak": "highest peak flux",
+        "quality_line": "highest quality-weighted integrated line flux",
+        "line_flux": "highest integrated line flux",
+        "quality_peak": "highest quality-weighted sampled peak density",
+        "peak": "highest sampled peak density (spacing-dependent)",
         "line_brem_ratio": "highest local line-to-bremsstrahlung ratio",
     }
     selection_title = selection_titles.get(select, select.replace("_", " "))
@@ -580,7 +586,7 @@ def draw_material_comparison(
 def plot_material_comparison(
     results_by_material,
     settings,
-    select="quality_peak",
+    select="quality_line",
     rel_prominence=0.03,
     line_metric="sharpness",
     beam_energy_keV=None,

@@ -85,7 +85,8 @@ def test_material_comparison_chart_title_matches_selection_and_scope():
     chart = material_comparison_chart([_point("Valid")], [], select="peak", beam_energy_keV=60.0)
     title = chart.to_dict()["title"]
     assert title["text"] == (
-        "Cross-material comparison — highest peak flux (60 keV beam energy, line quality >= 0.5)"
+        "Cross-material comparison — highest sampled peak density (spacing-dependent) "
+        "(60 keV beam energy, line quality >= 0.5)"
     )
     assert title["fontSize"] == 18
 

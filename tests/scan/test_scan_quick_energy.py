@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import replace
 
 import numpy as np
-import pytest
 
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import beam_replace, build_cases
@@ -107,8 +106,10 @@ def test_profile_lacking_50_reaches_valid_bounded_cases():
     assert sorted({float(c["E0_keV"]) for c in cases}) == [30.0, 40.0]
 
 
-def test_line_grid_for_energy_still_strict_on_missing():
-    # The downstream invariant remains: an absent per-energy grid fails closed.
+def test_line_grid_for_energy_resolves_automatically_on_missing():
+    # Issue #101: an absent per-energy row no longer fails closed. It falls
+    # through to automatic case-local resolution, which attaches a policy the
+    # runner refines from the case's own trajectories.
     sweep = material_sweep("hopg")
     by_energy = {
         float(e): g
@@ -123,5 +124,7 @@ def test_line_grid_for_energy_still_strict_on_missing():
         ),
     )
     forced = replace(lacking, beam=beam_replace(lacking.beam, energy_keV=[50]))
-    with pytest.raises(ValueError, match="no E_grid_line configured for beam energy 50"):
-        build_cases(forced)
+    case = build_cases(forced)[0]
+    policy = case["line_grid_policy"]
+    assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+    assert policy["resolution"]["policy"] == "sinc-nyquist"
