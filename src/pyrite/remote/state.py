@@ -1,5 +1,7 @@
 """Read-only job and reservation state queries over ssh."""
 
+import json
+
 from . import config, scripts, transport
 
 
@@ -19,6 +21,38 @@ def _completed_materials(jobid, materials):
         ).split()
     )
     return [material for material in materials if material in completed]
+
+
+def _materials_needing_pull(jobid, materials):
+    """Return successful materials whose remote scan added checkpoint cases.
+
+    A repeated remote run can finish successfully using only the box-side case
+    cache.  Its checkpoint is then identical to the one already pulled
+    locally, so avoid retransferring it.  Missing or invalid progress records
+    remain eligible to pull: transfer is safer than assuming equivalence.
+    """
+    transport._check_shell_tokens([jobid, *materials])
+    jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
+    progress = transport._ssh_capture(
+        f'D={jobdir}; for material in {" ".join(materials)}; do '
+        'printf "%s\\t" "$material"; cat "$D/progress/$material.json" 2>/dev/null; '
+        'printf "\\n"; done'
+    )
+    records = {}
+    for line in progress.splitlines():
+        material, separator, payload = line.partition("\t")
+        if not separator or material not in materials:
+            continue
+        try:
+            records[material] = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+    return [
+        material
+        for material in materials
+        if not isinstance(records.get(material, {}).get("completed_new_cases"), int)
+        or records[material]["completed_new_cases"] > 0
+    ]
 
 
 def _job_state(jobid):
