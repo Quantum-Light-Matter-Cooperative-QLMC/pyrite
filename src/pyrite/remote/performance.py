@@ -3,7 +3,7 @@
 import uuid
 from pathlib import Path
 
-from ..cli import dashboard as presentation
+from ..console import dashboard as presentation
 from ..console import output as _cli_core
 from . import config, state, transport
 
@@ -32,8 +32,8 @@ def pull_performance_profile(profile: str) -> list[Path]:
         if (
             not separator
             or not suffix
-            or presentation._SHELL_TOKEN_RE.fullmatch(jobid) is None
-            or presentation._SHELL_TOKEN_RE.fullmatch(material) is None
+            or presentation.SHELL_TOKEN_RE.fullmatch(jobid) is None
+            or presentation.SHELL_TOKEN_RE.fullmatch(material) is None
         ):
             continue
         artifacts.append((jobid, filename))
@@ -80,8 +80,8 @@ def remote_performance_inventory() -> list[tuple[str, str, int, int]]:
         fields = line.split("\t")
         if (
             len(fields) != 4
-            or presentation._SHELL_TOKEN_RE.fullmatch(fields[0]) is None
-            or presentation._SHELL_TOKEN_RE.fullmatch(fields[1]) is None
+            or presentation.SHELL_TOKEN_RE.fullmatch(fields[0]) is None
+            or presentation.SHELL_TOKEN_RE.fullmatch(fields[1]) is None
         ):
             raise SystemExit("refusing performance operation: remote inventory was malformed")
         try:

@@ -12,7 +12,7 @@ from . import state as _state
 # ``@`` is permitted so ``<material>@<label>-<digest>`` checkpoint @-stems pass
 # the token check: it carries no shell meaning as a bare word (array expansion
 # needs ``${...[@]}``), and every stem still reaches remote commands quoted.
-_SHELL_TOKEN_RE = _state._SHELL_TOKEN_RE
+SHELL_TOKEN_RE = _state.SHELL_TOKEN_RE
 
 _STATE_COLORS = _cli_core.COLORS
 # Glyph carried beside every progress track so state is never color-alone
@@ -27,15 +27,15 @@ _FRAME_PREFIX = _state._FRAME_PREFIX
 _FRAME_SECTIONS = _state._FRAME_SECTIONS
 
 
-def _sanitize_terminal(value, *, multiline=False):
-    return _state._sanitize_terminal(value, multiline=multiline)
+def sanitize_terminal(value, *, multiline=False):
+    return _state.sanitize_terminal(value, multiline=multiline)
 
 
 def _encode_sections(sections):
     return _state._encode_sections(sections)
 
 
-def _format_table(headers, rows, *, indent=""):
+def format_table(headers, rows, *, indent=""):
     """Render plain aligned columns; wrapping remains the terminal's choice."""
     string_rows = [tuple(str(value) for value in row) for row in rows]
     widths = [
@@ -54,9 +54,9 @@ def _format_table(headers, rows, *, indent=""):
     )
 
 
-def _style_states(text):
+def style_states(text):
     """Add redundant state color only for an interactive color-capable terminal."""
-    if not _color_enabled():
+    if not color_enabled():
         return text
     groups = {
         "active": ("RUNNING", "SUBMITTED"),
@@ -68,22 +68,22 @@ def _style_states(text):
         pattern = rf"\b({'|'.join(words)})\b"
         text = re.sub(
             pattern,
-            lambda match, role=group: _paint(match.group(0), role),
+            lambda match, role=group: paint(match.group(0), role),
             text,
             flags=re.IGNORECASE,
         )
     return text
 
 
-def _color_enabled():
+def color_enabled():
     return _cli_core.color_enabled(sys.stdout)
 
 
-def _paint(text, group):
+def paint(text, group):
     return _cli_core.paint(text, group, stream=sys.stdout)
 
 
-def _format_fields(rows, *, indent="  "):
+def format_fields(rows, *, indent="  "):
     """Aligned ``label  value`` block; a value with embedded newlines wraps with
     its continuation lines hanging under the value column."""
     width = max(len(str(label)) for label, _value in rows)
@@ -113,12 +113,12 @@ def _format_material_roster(materials, *, include_count=True):
     return prefix + textwrap.fill(joined, width=60)
 
 
-def _metadata_fields(metadata):
-    return _state._metadata_fields(metadata)
+def metadata_fields(metadata):
+    return _state.metadata_fields(metadata)
 
 
-def _mode_summary(metadata):
-    fields = _metadata_fields(metadata)
+def mode_summary(metadata):
+    fields = metadata_fields(metadata)
     if fields.get("kind") == "rebrem":
         parts = ["brem-only recompute"]
         if fields.get("ne_brem") not in (None, "None"):
@@ -298,7 +298,7 @@ def _overall_progress_line(records, materials=(), *, use_cost=False, state_overr
     overall = 0.0 if n_materials == 0 else min(1.0, frac_sum / n_materials)
     percent = round(100 * overall)
     glyph = _STATE_GLYPHS.get(state, "●")
-    accent = _paint(f"{glyph} {_progress_track(percent, 100)}", _progress_group(state))
+    accent = paint(f"{glyph} {_progress_track(percent, 100)}", _progress_group(state))
     if use_cost:
         return f"{accent}  {percent:>3}%"
     missing = max(0, n_materials - len(records))
@@ -433,7 +433,7 @@ def _format_case_progress(records, materials=()):
         state = record["state"]
         glyph = _STATE_GLYPHS.get(state, "●")
         track = _progress_track(completed, total)
-        accent = _paint(f"{glyph} {track}", _progress_group(state))
+        accent = paint(f"{glyph} {track}", _progress_group(state))
         activity = record.get("activity")
         now = (
             _format_now_testing(record.get("current"))
@@ -459,7 +459,7 @@ def _format_case_progress(records, materials=()):
 
 def _format_compute_usage(payload):
     """Render optional host/GPU utilization sampled by the remote status probe."""
-    fields = _scheduler_fields(payload)
+    fields = scheduler_fields(payload)
     specs = [
         ("CPU", "cpu_percent", None, "active"),
         ("Host memory", "memory_percent", ("memory_used_bytes", "memory_total_bytes"), "warning"),
@@ -486,7 +486,7 @@ def _format_compute_usage(payload):
                     suffix = f"  {used:.1f}/{total:.1f} GiB"
                 else:
                     suffix = f"  {used:.0f}/{total:.0f} MiB"
-        track = _paint(_progress_track(round(percent), 100), color)
+        track = paint(_progress_track(round(percent), 100), color)
         lines.append(f"  {label:<11} {track}  {percent:>5.1f}%{suffix}")
     return "\n".join(lines) if lines else "  Resource metrics unavailable."
 
@@ -505,9 +505,9 @@ def _format_performance_profiles(payload):
         profile = record.get("profile")
         if (
             not isinstance(material, str)
-            or _SHELL_TOKEN_RE.fullmatch(material) is None
+            or SHELL_TOKEN_RE.fullmatch(material) is None
             or not isinstance(profile, str)
-            or _SHELL_TOKEN_RE.fullmatch(profile) is None
+            or SHELL_TOKEN_RE.fullmatch(profile) is None
         ):
             continue
         records.append(record)
@@ -607,7 +607,7 @@ def _legacy_progress(log, state):
         progress_state = "running"
     percent = 100 if total == 0 else round(100 * completed / total)
     glyph = _STATE_GLYPHS.get(progress_state, "●")
-    accent = _paint(
+    accent = paint(
         f"{glyph} {_progress_track(completed, total)}",
         _progress_group(progress_state),
     )
@@ -625,27 +625,27 @@ def _clean_recent_log(log, *, limit=12):
     ]
     if not diagnostics:
         return "  (no recent diagnostic messages)"
-    return _sanitize_terminal("\n".join(diagnostics[-limit:]), multiline=True)
+    return sanitize_terminal("\n".join(diagnostics[-limit:]), multiline=True)
 
 
-def _marked_sections(output):
-    return _state._marked_sections(output)
+def marked_sections(output):
+    return _state.marked_sections(output)
 
 
-def _scheduler_fields(payload):
-    return _state._scheduler_fields(payload)
+def scheduler_fields(payload):
+    return _state.scheduler_fields(payload)
 
 
 def _pending_queue_context(payload, target_job_id):
     return _state._pending_queue_context(payload, target_job_id)
 
 
-def _format_job_status(sections, detail):
+def format_job_status(sections, detail):
     metadata = sections.get("META", "")
-    fields = _metadata_fields(metadata)
-    scheduler = _scheduler_fields(sections.get("SQUEUE", ""))
-    jobid = _sanitize_terminal(sections.get("JOB") or fields.get("job", "?"))
-    state_text = _sanitize_terminal(sections.get("STATE") or "(no state yet)", multiline=True)
+    fields = metadata_fields(metadata)
+    scheduler = scheduler_fields(sections.get("SQUEUE", ""))
+    jobid = sanitize_terminal(sections.get("JOB") or fields.get("job", "?"))
+    state_text = sanitize_terminal(sections.get("STATE") or "(no state yet)", multiline=True)
     kind = fields.get("kind", "material-sweep")
     diagnostic = kind == "line-grid-bounds"
     materials = fields.get("materials", "-").split()
@@ -661,7 +661,7 @@ def _format_job_status(sections, detail):
     # Progress is fetched at every verbosity now, so the overall bar and the
     # per-material CASE PROGRESS block render at levels 0/1/2 alike; the log is
     # still only pulled (and legacy-parsed) at -vv.
-    records = {} if diagnostic else _parse_progress_records(sections.get("PROGRESS", ""))
+    records = {} if diagnostic else parse_progress_records(sections.get("PROGRESS", ""))
     cpu_phase = fields.get("cpu_only") == "True" or state_text.startswith(
         ("profiling CPU", "completed CPU", "CPU profile failed", "done CPU", "FAILED CPU")
     )
@@ -734,7 +734,7 @@ def _format_job_status(sections, detail):
         rows.extend(
             [
                 ("Materials", material_summary),
-                ("Mode", _mode_summary(metadata)),
+                ("Mode", mode_summary(metadata)),
             ]
         )
         profile = _profile_summary(fields)
@@ -780,7 +780,7 @@ def _format_job_status(sections, detail):
             )
             if overall is not None:
                 rows.append(("Progress", f"{overall}  ·  {_compute_time_suffix(timing)}"))
-    output = [f"JOB {jobid}", _format_fields(rows)]
+    output = [f"JOB {jobid}", format_fields(rows)]
     if not diagnostic:
         progress = _format_case_progress(records, materials)
         if not records and detail >= 2:
@@ -799,7 +799,7 @@ def _format_job_status(sections, detail):
             ("Reason", scheduler.get("reason", "-")),
             ("Workers", fields.get("workers", "-")),
         ]
-        output.extend(["", "ALLOCATION", _format_fields(allocation)])
+        output.extend(["", "ALLOCATION", format_fields(allocation)])
     if detail >= 2:
         output.extend(
             [
@@ -821,8 +821,8 @@ def _metadata_value(metadata, key):
     return _state._metadata_value(metadata, key)
 
 
-def _parse_progress_records(payload):
-    return _state._parse_progress_records(payload)
+def parse_progress_records(payload):
+    return _state.parse_progress_records(payload)
 
 
 def _sanitize_cost_fields(record):
@@ -833,7 +833,7 @@ def _sanitize_timing_fields(record):
     return _state._sanitize_timing_fields(record)
 
 
-def _render_frame(frame, *, tty):
+def render_frame(frame, *, tty):
     """Repaint one attach frame: in place on a tty, appended when piped."""
     if tty:
         # Home the cursor, clear the screen and scrollback so each poll

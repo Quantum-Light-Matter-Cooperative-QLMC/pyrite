@@ -184,7 +184,7 @@ tail_logs = viewer.tail_logs
 _disconnect_hint = viewer._disconnect_hint
 _POLL_GRACE_POLLS = viewer._POLL_GRACE_POLLS
 _is_terminal_state = viewer._is_terminal_state
-_render_frame = viewer._render_frame
+render_frame = viewer.render_frame
 _attach_header = viewer._attach_header
 _live_status = viewer._live_status
 attach = viewer.attach
@@ -216,37 +216,6 @@ _CLI_EXPORTS = frozenset(
     }
 )
 
-_PRESENTATION_EXPORTS = frozenset(
-    {
-        "_SHELL_TOKEN_RE",
-        "_STATE_COLORS",
-        "_TQDM_FRAME_RE",
-        "_active_work_label",
-        "_aggregate_progress",
-        "_overall_progress_line",
-        "_clean_recent_log",
-        "_color_enabled",
-        "_format_case_progress",
-        "_format_fields",
-        "_format_job_status",
-        "_format_material_roster",
-        "_format_now_testing",
-        "_format_table",
-        "_legacy_progress",
-        "_marked_sections",
-        "_material_label",
-        "_metadata_fields",
-        "_metadata_value",
-        "_mode_summary",
-        "_paint",
-        "_parse_progress_records",
-        "_progress_group",
-        "_progress_track",
-        "_scheduler_fields",
-        "_style_states",
-    }
-)
-
 
 def __getattr__(name):
     """Resolve the retired CLI facade without importing Click from ``remote``."""
@@ -254,8 +223,4 @@ def __getattr__(name):
         from ..cli.commands import remote as remote_cli
 
         return remote_cli if name == "cli" else getattr(remote_cli, name)
-    if name == "presentation" or name in _PRESENTATION_EXPORTS:
-        from ..cli import dashboard
-
-        return dashboard if name == "presentation" else getattr(dashboard, name)
     raise AttributeError(name)

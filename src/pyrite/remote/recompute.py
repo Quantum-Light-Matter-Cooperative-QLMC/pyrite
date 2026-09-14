@@ -2,7 +2,7 @@
 
 import math
 
-from ..cli import dashboard as presentation
+from ..console import dashboard as presentation
 from . import config, scripts, transport
 from .cleanup import _refuse_if_busy
 from .jobs import _stage_job_script, _submit_staged_job
@@ -100,14 +100,14 @@ def start_rebrem_queue(
 
     print(
         f"\nJOB {jobid} · SUBMITTED\n"
-        + presentation._format_fields(
+        + presentation.format_fields(
             [
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Materials", ", ".join(materials)),
                 (
                     "Mode",
-                    presentation._mode_summary(
+                    presentation.mode_summary(
                         scripts._rebrem_queue_metadata(
                             jobid,
                             materials,
@@ -221,14 +221,14 @@ def start_reline_queue(
 
     print(
         f"\nJOB {jobid} · SUBMITTED\n"
-        + presentation._format_fields(
+        + presentation.format_fields(
             [
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Materials", ", ".join(materials)),
                 (
                     "Mode",
-                    presentation._mode_summary(
+                    presentation.mode_summary(
                         scripts._reline_queue_metadata(
                             jobid,
                             materials,

@@ -6,8 +6,8 @@ import time
 
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
-from ..cli import dashboard as presentation
-from ..cli.dashboard import _KeyListener, _render_frame
+from ..console import dashboard as presentation
+from ..console.dashboard import KeyListener, render_frame
 from ..console.json import job_kind
 from . import config, lifecycle, scripts, state, transport
 
@@ -57,7 +57,7 @@ def list_jobs(kind=None):
         if kind is not None and canonical_kind != kind:
             continue
         jobid, scheduler_id, quick, materials, state_ = (
-            presentation._sanitize_terminal(value)
+            presentation.sanitize_terminal(value)
             for value in (jobid, scheduler_id, quick, materials, state_)
         )
         mode = {
@@ -84,8 +84,8 @@ def list_jobs(kind=None):
         )
         return
     print(
-        presentation._style_states(
-            presentation._format_table(
+        presentation.style_states(
+            presentation.format_table(
                 ("JOB", "SLURM", "KIND", "MODE", "MATERIALS", "LAST EVENT"), rows
             )
         )
@@ -93,7 +93,7 @@ def list_jobs(kind=None):
 
 
 def _status_remote_command(job_assign, detail):
-    """One round-trip that emits the marked sections ``_format_job_status`` reads.
+    """One round-trip that emits the marked sections ``format_job_status`` reads.
 
     Progress snapshots are cheap per-material JSON, so they ship at every
     verbosity (the overall bar and CASE PROGRESS block render at 0/1/2 alike);
@@ -171,16 +171,16 @@ def status_sections(jobid=None, detail=0):
     if detail < 0:
         raise ValueError("detail must be non-negative")
     output = transport._ssh_capture(_status_remote_command(scripts._job_assign(jobid), detail))
-    return presentation._marked_sections(output), output
+    return presentation.marked_sections(output), output
 
 
 def job_status(jobid=None, detail=0):
     """Print one structured job report; verbosity adds allocation and log tail."""
     sections, output = status_sections(jobid, detail)
     if not sections:
-        print(presentation._sanitize_terminal(output, multiline=True), end="")
+        print(presentation.sanitize_terminal(output, multiline=True), end="")
         return
-    print(presentation._style_states(presentation._format_job_status(sections, detail)))
+    print(presentation.style_states(presentation.format_job_status(sections, detail)))
 
 
 def tail_logs(jobid=None, follow=False):
@@ -293,7 +293,7 @@ def _is_terminal_state(state):
 # Cancel-keybinding sequence (item 5): a bare 'q'/single keystroke must never
 # tear down a live SLURM allocation, so cancelling is two DIFFERENT keys --
 # 'x' arms, 'y' confirms within the window below; anything else (including a
-# repeated 'x') disarms silently. Checked once per ~2 s poll (see _KeyListener).
+# repeated 'x') disarms silently. Checked once per ~2 s poll (see KeyListener).
 _CANCEL_ARM_KEY = "x"
 _PULL_ARM_KEY = "p"
 _CANCEL_CONFIRM_KEY = "y"
@@ -304,7 +304,7 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
     """One-line banner above each live frame; the counter proves it's polling."""
     if armed:
         action = "PULL" if armed == "pull" else "CANCEL"
-        return presentation._paint(
+        return presentation.paint(
             f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
             f"{action} ARMED -- press {_CANCEL_CONFIRM_KEY} to confirm, any other key aborts",
             "warning",
@@ -315,7 +315,7 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
         if cancel_hint
         else ""
     )
-    return presentation._paint(
+    return presentation.paint(
         f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
         f"Ctrl-C detaches (job keeps running){hint}",
         "inactive",
@@ -324,10 +324,10 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
 
 def _pull_attached_progress(jobid, sections):
     """Pull checkpoint stems that have emitted progress for attached job."""
-    fields = presentation._metadata_fields(sections.get("META", ""))
+    fields = presentation.metadata_fields(sections.get("META", ""))
     if fields.get("cpu_only") == "True":
         raise SystemExit("CPU-only profiling has no primary checkpoints to pull")
-    records = presentation._parse_progress_records(sections.get("PROGRESS", ""))
+    records = presentation.parse_progress_records(sections.get("PROGRESS", ""))
     materials = list(
         dict.fromkeys(
             record["material"] for record in records.values() if record.get("phase") != "cpu"
@@ -356,7 +356,7 @@ def _live_status(jobid, detail):
     The viewer is read-only by default: Ctrl-C or a dropped SSH link tears
     down only this loop, never the SLURM job. The one exception is the
     cancel keybinding (item 5) -- 'x' then 'y' within a few seconds scancels
-    the attached job via :func:`lifecycle._stop_jobid`; see ``_KeyListener``
+    the attached job via :func:`lifecycle._stop_jobid`; see ``KeyListener``
     and ``_CANCEL_ARM_SECONDS``. A chunked chain hops scheduler IDs between
     slices, so the shared status command re-reads the latest recorded ID each
     poll; the same ``_POLL_GRACE_POLLS`` watchdog declares a chain broken only
@@ -365,7 +365,7 @@ def _live_status(jobid, detail):
     disconnect, a stalled chain, or a confirmed user cancel.
     """
     remote = _status_remote_command(scripts._job_assign(jobid), detail)
-    tty = presentation._color_enabled()
+    tty = presentation.color_enabled()
     refresh = 0
     missed = 0
     state_ = ""
@@ -373,7 +373,7 @@ def _live_status(jobid, detail):
     cancelled = False
     pull_requested = False
     stream = None
-    keys = _KeyListener()
+    keys = KeyListener()
     armed_until = None
     armed_action = None
     try:
@@ -382,12 +382,12 @@ def _live_status(jobid, detail):
             stream = _status_stream(remote)
             for output in stream:
                 refresh += 1
-                sections = presentation._marked_sections(output)
+                sections = presentation.marked_sections(output)
                 if not sections:
-                    print(presentation._sanitize_terminal(output, multiline=True), end="")
+                    print(presentation.sanitize_terminal(output, multiline=True), end="")
                     return False
-                state_ = presentation._sanitize_terminal(sections.get("STATE", ""), multiline=True)
-                scheduler = presentation._scheduler_fields(sections.get("SQUEUE", ""))
+                state_ = presentation.sanitize_terminal(sections.get("STATE", ""), multiline=True)
+                scheduler = presentation.scheduler_fields(sections.get("SQUEUE", ""))
                 live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
 
                 if armed_until is not None and time.monotonic() >= armed_until:
@@ -423,9 +423,9 @@ def _live_status(jobid, detail):
                         cancel_hint=keys.active,
                     )
                     + "\n\n"
-                    + presentation._style_states(presentation._format_job_status(sections, detail))
+                    + presentation.style_states(presentation.format_job_status(sections, detail))
                 )
-                _render_frame(frame, tty=tty)
+                render_frame(frame, tty=tty)
                 if pull_requested:
                     pull_requested = False
                     try:

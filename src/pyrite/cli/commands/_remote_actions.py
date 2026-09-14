@@ -7,6 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 
 import click
 
+from ...console import dashboard as presentation
 from ...console import json as cli_json
 from ...console.output import (
     emit_diagnostic,
@@ -14,7 +15,6 @@ from ...console.output import (
     emit_result,
 )
 from ...remote import config, lifecycle, scripts, state, transport, viewer
-from .. import dashboard as presentation
 
 
 def remote_scan(material, quick=False, workers=None, fidelity="full"):
@@ -100,7 +100,7 @@ def _dispatch(handler):
 def _performance_profile_name(ctx, param, value):
     if value is None:
         return None
-    if presentation._SHELL_TOKEN_RE.fullmatch(value) is None:
+    if presentation.SHELL_TOKEN_RE.fullmatch(value) is None:
         raise click.BadParameter(
             "expected letters, digits, underscores, or hyphens",
             ctx=ctx,

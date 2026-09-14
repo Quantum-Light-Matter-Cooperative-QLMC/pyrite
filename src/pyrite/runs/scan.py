@@ -43,7 +43,7 @@ import click
 from .._catalog_keys import material_keys
 from .._env import set_canonical_env
 from .._progress import _ProgressTimer, _write_progress_record
-from ..cli import dashboard as _dashboard
+from ..console import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core
 
@@ -169,15 +169,15 @@ _dashboard_stop = threading.Event()
 
 
 def _dashboard_loop(args, materials, job_records, detail):
-    keys = _dashboard._KeyListener()
+    keys = _dashboard.KeyListener()
     try:
         while not _dashboard_stop.is_set():
             for key in keys.poll():
                 if key.lower() == "v":
                     detail = (detail + 1) % 3
             sections = _build_sections(args, materials, job_records, detail)
-            frame = _dashboard._style_states(_dashboard._format_job_status(sections, detail))
-            _dashboard._render_frame(frame, tty=True)
+            frame = _dashboard.style_states(_dashboard.format_job_status(sections, detail))
+            _dashboard.render_frame(frame, tty=True)
             _dashboard_stop.wait(1.0)
     finally:
         keys.stop()
@@ -403,10 +403,10 @@ def run(args):
             t.join(timeout=2.0)
             sections = _build_sections(args, materials, job_records, getattr(args, "verbose", 0))
             sections["STATE"] = "done" if not incomplete else "paused"
-            frame = _dashboard._style_states(
-                _dashboard._format_job_status(sections, getattr(args, "verbose", 0))
+            frame = _dashboard.style_states(
+                _dashboard.format_job_status(sections, getattr(args, "verbose", 0))
             )
-            _dashboard._render_frame(frame, tty=True)
+            _dashboard.render_frame(frame, tty=True)
             if "PYRITE_LOCAL_DASHBOARD" in os.environ:
                 del os.environ["PYRITE_LOCAL_DASHBOARD"]
 

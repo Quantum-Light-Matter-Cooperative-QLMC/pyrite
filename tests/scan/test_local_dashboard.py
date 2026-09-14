@@ -108,12 +108,12 @@ def test_dashboard_loop_cycles_detail_and_wraps(monkeypatch):
     fake_keys = FakeKeys()
     rendered = []
     monkeypatch.setattr(scan, "_dashboard_stop", fake_stop)
-    monkeypatch.setattr(scan._dashboard, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(scan._dashboard, "KeyListener", lambda: fake_keys)
     monkeypatch.setattr(scan, "_build_sections", lambda *_args: {})
-    monkeypatch.setattr(scan._dashboard, "_format_job_status", lambda _sections, detail: detail)
-    monkeypatch.setattr(scan._dashboard, "_style_states", lambda detail: detail)
+    monkeypatch.setattr(scan._dashboard, "format_job_status", lambda _sections, detail: detail)
+    monkeypatch.setattr(scan._dashboard, "style_states", lambda detail: detail)
     monkeypatch.setattr(
-        scan._dashboard, "_render_frame", lambda detail, *, tty: rendered.append((detail, tty))
+        scan._dashboard, "render_frame", lambda detail, *, tty: rendered.append((detail, tty))
     )
 
     scan._dashboard_loop(MockArgs(), ["hopg"], {}, detail=0)

@@ -6,7 +6,7 @@ import sys
 import threading
 
 
-class _KeyListener:
+class KeyListener:
     """Background nonblocking single-keypress capture for dashboard loops."""
 
     def __init__(self):

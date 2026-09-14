@@ -6,7 +6,7 @@ import math
 import re
 import unicodedata
 
-_SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_@-]+$")
+SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_@-]+$")
 _FRAME_PREFIX = "CXR_REMOTE_V1"
 _FRAME_SECTIONS = frozenset(
     {
@@ -23,7 +23,7 @@ _FRAME_SECTIONS = frozenset(
 )
 
 
-def _sanitize_terminal(value, *, multiline=False):
+def sanitize_terminal(value, *, multiline=False):
     """Render untrusted remote text without terminal-control effects."""
     clean = []
     for character in str(value):
@@ -49,16 +49,16 @@ def _encode_sections(sections):
     return "\n".join(records)
 
 
-def _metadata_fields(metadata):
+def metadata_fields(metadata):
     fields = {}
     for line in metadata.splitlines():
         key, separator, value = line.partition(": ")
         if separator:
-            fields[_sanitize_terminal(key)] = _sanitize_terminal(value)
+            fields[sanitize_terminal(key)] = sanitize_terminal(value)
     return fields
 
 
-def _marked_sections(output):
+def marked_sections(output):
     """Decode versioned base64 sections from one remote round trip."""
     sections = {}
     for line in output.splitlines():
@@ -76,12 +76,12 @@ def _marked_sections(output):
     return sections
 
 
-def _scheduler_fields(payload):
+def scheduler_fields(payload):
     fields = {}
     for item in payload.split("|"):
         key, separator, value = item.partition("=")
         if separator:
-            fields[_sanitize_terminal(key)] = _sanitize_terminal(value)
+            fields[sanitize_terminal(key)] = sanitize_terminal(value)
     return fields
 
 
@@ -95,10 +95,10 @@ def _pending_queue_context(payload, target_job_id):
         fields = {}
         for item in line.split("|"):
             key, separator, value = item.partition("=")
-            key = _sanitize_terminal(key)
+            key = sanitize_terminal(key)
             if not separator or not key or key in fields:
                 return None
-            fields[key] = _sanitize_terminal(value)
+            fields[key] = sanitize_terminal(value)
         return fields
 
     header = strict_fields(lines[0])
@@ -158,7 +158,7 @@ def _metadata_value(metadata, key):
     return values[-1] if values else None
 
 
-def _parse_progress_records(payload):
+def parse_progress_records(payload):
     """Parse complete one-line JSON records, ignoring malformed snapshots."""
     records = {}
     for line in payload.splitlines():
@@ -173,7 +173,7 @@ def _parse_progress_records(payload):
         cached = record.get("cached_cases")
         completed = record.get("completed_new_cases")
         state = record.get("state")
-        if not isinstance(material, str) or not _SHELL_TOKEN_RE.fullmatch(material):
+        if not isinstance(material, str) or not SHELL_TOKEN_RE.fullmatch(material):
             continue
         if not isinstance(total, int) or isinstance(total, bool):
             continue
