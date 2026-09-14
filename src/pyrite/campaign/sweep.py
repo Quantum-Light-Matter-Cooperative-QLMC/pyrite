@@ -33,8 +33,18 @@ from typing import Any
 import numpy as np
 
 from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
+from .._grid_semantics import resolution_num
+from .._line_grid_policy import (
+    AUTOMATIC_BANDWIDTH_POLICY,
+    LineGridPolicy,
+    environment_overrides_present,
+    kinematic_line_stop_eV,
+    line_start_eV,
+    resolve_line_grid_policy,
+)
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
+from ..materials.crystal import reciprocal_g_vector
 from ..montecarlo.case import Case
 from ..montecarlo.transport import spliced_stopping_keV_per_ang
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
@@ -322,6 +332,13 @@ class Sweep:
     #       (serial under CuPy). See docs/physics/materials/crystal-mosaicity.md.
     mosaic_route: str = "analytic"
     mosaic_nodes: int = 5  # Gauss-Hermite nodes/tilt-axis for mosaic_route="mc" (K=nodes^2)
+    # Per-call automatic line-grid policy (issue #101). The TOP of the precedence
+    # chain together with an explicit ``EnergyBins.line``: supplying one here
+    # outranks ``PYRITE_ENERGY_GRID_*`` and any stored catalog row. Accepts
+    # ``max_spacing_eV``, ``backend_safety_ulps``, ``max_points``, and a
+    # per-observable ``rtol`` mapping. ``None`` leaves the chain to env > stored
+    # artifact > built-in automatic resolution.
+    line_grid_policy: dict[str, Any] | None = None
     # film-on-substrate stack (optional; multilayer feature, docs/physics/materials/multilayer-materials.md).
     # substrate=None -> free-standing film (unchanged). Otherwise each case gets an
     # abs_layers stack that drives BOTH multilayer electron transport (substrate
@@ -508,19 +525,69 @@ def _reject_relativistic_energies(energies: np.ndarray) -> None:
         )
 
 
-def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:
-    """Select the detector's fixed, mapped, or material-default line grid."""
+def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> LineGridPolicy:
+    """Resolve the automatic case-local line-grid policy for one beam energy.
+
+    Bandwidth is closed form (:func:`kinematic_line_stop_eV`) and costs a dot
+    product per reflection. Resolution is only *declared* here -- the runner
+    measures it from the case's own trajectories -- so building a case starts no
+    simulation, reads no checkpoint, and writes nothing to the profile or the
+    catalog.
+    """
+    spec = CATALOG.crystal(cp["crystal"])
+    magnitudes = [reciprocal_g_vector(hkl, spec.lattice)[1] for hkl in cp["hkl_list"]]
+    start = line_start_eV(energy_keV)
+    stop = kinematic_line_stop_eV(magnitudes, energy_keV)
+    return resolve_line_grid_policy(
+        start_eV=start,
+        stop_eV=stop,
+        bandwidth_policy=AUTOMATIC_BANDWIDTH_POLICY,
+        per_call=sweep.line_grid_policy,
+    )
+
+
+def _line_grid_for_energy(
+    sweep: Sweep, cp: dict, energy_keV: float
+) -> tuple[np.ndarray, dict | None]:
+    """Select this beam energy's line grid, and any automatic policy behind it.
+
+    Precedence, highest first (issue #101):
+
+    1. an explicit user grid -- ``EnergyBins.line``, or a per-call
+       ``Sweep.line_grid_policy``;
+    2. ``PYRITE_ENERGY_GRID_*`` environment policy, which turns automatic
+       resolution on even where a stored row exists;
+    3. the stored catalog/profile artifact -- this energy's
+       ``E_grid_line_by_energy`` row, or, when no mapping is configured at all,
+       the crystal's own ``E_grid``. Legacy v1 artifacts still decode and are
+       still used here;
+    4. built-in automatic resolution.
+
+    A stored mapping that does not cover this beam energy is no longer an error:
+    it falls through to (4). ``pyrite material energy-grid derive`` is an
+    inspection and prewarming command, not a prerequisite for running a valid
+    material at a supported beam energy.
+
+    Returns ``(grid, policy_payload)``. ``policy_payload`` is ``None`` when the
+    coordinates are final; otherwise ``grid`` is the coarsest admissible grid
+    and the runner refines it under the returned policy, from the case's own
+    trajectories.
+    """
     assert sweep.detector is not None
     bins = sweep.detector.energy_bins
-    fixed = bins.line
-    if fixed is not None:
-        return np.asarray(fixed, dtype=float)
-    if bins.line_by_energy is None:
-        return np.asarray(default_grid, dtype=float)
-    try:
-        return np.asarray(bins.line_by_energy[float(energy_keV)], dtype=float)
-    except KeyError:
-        raise ValueError(f"no E_grid_line configured for beam energy {energy_keV:g} keV") from None
+    override = bool(sweep.line_grid_policy) or environment_overrides_present()
+    if bins.line is not None and not sweep.line_grid_policy:
+        return np.asarray(bins.line, dtype=float), None
+    if not override:
+        if bins.line_by_energy is None:
+            return np.asarray(cp["E_grid"], dtype=float), None
+        stored = bins.line_by_energy.get(float(energy_keV))
+        if stored is not None:
+            return np.asarray(stored, dtype=float), None
+    policy = _automatic_line_grid_policy(sweep, cp, float(energy_keV))
+    num = resolution_num(policy.start_eV, policy.stop_eV, policy.max_spacing_eV)
+    grid = np.linspace(policy.start_eV, policy.stop_eV, num)
+    return grid, policy.payload()
 
 
 def build_cases(
@@ -562,9 +629,9 @@ def build_cases(
     # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
     energies = _seq(sweep.beam.energy_keV)
     _reject_relativistic_energies(energies)
-    line_grids = tuple(
-        _line_grid_for_energy(sweep, cp["E_grid"], float(energy)) for energy in energies
-    )
+    resolved_line = tuple(_line_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
+    line_grids = tuple(grid for grid, _ in resolved_line)
+    line_policies = tuple(policy for _, policy in resolved_line)
     assert sweep.detector is not None
     bins = sweep.detector.energy_bins
     fixed_line_grid = bins.line
@@ -573,10 +640,14 @@ def build_cases(
     else:
         if fixed_line_grid is not None:
             brem_start = float(np.atleast_1d(fixed_line_grid)[0])
-        elif bins.line_by_energy is not None:
+        elif bins.line_by_energy:
             brem_start = min(float(np.atleast_1d(grid)[0]) for grid in bins.line_by_energy.values())
-        else:
+        elif bins.line_by_energy is None:
             brem_start = float(cp["E_grid"][0])
+        else:
+            # A configured-but-empty mapping: every energy resolved
+            # automatically, so the continuum starts where those grids do.
+            brem_start = min(float(np.atleast_1d(grid)[0]) for grid in line_grids)
         brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
 
     assert sweep.detector is not None
@@ -744,6 +815,14 @@ def build_cases(
                         ),
                         E_grid=line_case_grid,  # legacy key (== line grid)
                         E_grid_line=line_case_grid,
+                        # Automatic resolution only. Absent keeps every
+                        # explicit/stored-grid case payload bit-for-bit, so
+                        # existing checkpoints stay addressable.
+                        **(
+                            {"line_grid_policy": line_policies[i_e]}
+                            if line_policies[i_e] is not None
+                            else {}
+                        ),
                         E_grid_brem=(
                             (
                                 brem_case_grid[0],

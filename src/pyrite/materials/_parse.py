@@ -321,18 +321,19 @@ def _scan(
             # not set-hash order: the golden snapshot and E_grid_line_by_energy
             # consumers rely on that ordering.
             configured = list(dict.fromkeys(float(value) for value in energy_grid))
-            available = set(line_grid_store) if line_grid_store else set()
-            missing = sorted(set(configured) - available)
-            if missing:
-                errors.add(
-                    path,
-                    "requires E_grid_line, or an energy_grids store entry covering "
-                    f"beam energies {missing}",
-                )
-            elif line_grid_store:
-                line_grids = MappingProxyType(
-                    {energy: line_grid_store[energy] for energy in configured}
-                )
+            # Partial store coverage is NOT an error (issue #101). A beam energy
+            # with no stored row falls through to automatic case-local line-grid
+            # resolution in campaign.sweep, so `pyrite material energy-grid
+            # derive` is no longer a correctness prerequisite for a valid
+            # material at a supported beam energy.
+            if line_grid_store:
+                covered = {
+                    energy: line_grid_store[energy]
+                    for energy in configured
+                    if energy in line_grid_store
+                }
+                if covered:
+                    line_grids = MappingProxyType(covered)
     thickness = None
     layer_grid = None
     if has_ang:
@@ -376,12 +377,10 @@ def _scan(
                 grid = None
         electron_grids[key] = grid
     ordinary_required = ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem")
-    line_valid = grids["E_grid_line"] is not None or line_grids is not None
-    if (
-        thickness is None
-        or any(grids.get(key) is None for key in ordinary_required)
-        or not line_valid
-    ):
+    # No line-grid key is required: neither E_grid_line nor a store row makes a
+    # material invalid any more (issue #101) -- automatic case-local resolution
+    # covers the gap at case-build time.
+    if thickness is None or any(grids.get(key) is None for key in ordinary_required):
         return None
     energy_keV = grids["energy_keV"]
     tilt_deg = grids["tilt_deg"]

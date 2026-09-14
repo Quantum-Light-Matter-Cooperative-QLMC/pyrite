@@ -172,6 +172,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** none
 - **Notes:** The in-code marker is annotated `(placeholder)` at the constant and bare at the guard; both resolve here. Setting a defensible number needs a physics call — the relativistic correction to `A_PXR`/`A_CBS` evaluated against a stated accuracy target, which would also fix whether the ceiling belongs on `γ`, on `β`, or on the beam energy it is currently written in. Relativistic / channeling support (REGAE 3–5 MeV) is separate future work (TODO On-Hold #1/#2). Until then this row exists so the placeholder is visible in the ledger rather than only in a source comment
 
+## `line-grid-kinematic-bandwidth`
+
+- **Claim:** automatic case-local line grids bound their upper edge by `E_res <= ħc β |g|_max / (1 − β)`, the direction-maximized form of the PXR/CBS resonance `E_res = ħc (v·g)/(1 − n̂·v)`, evaluated at the incident speed over the case's own reflection set
+- **Code:** `_line_grid_policy.py::kinematic_line_stop_eV` (consumed by `campaign/sweep.py::_automatic_line_grid_policy`)
+- **Source:** no new physical law — the resonance is `line-energy-dispersion` / `finite-time-lineshape`, implemented in `montecarlo/spectrum/lines/_kernels.py::_line_kin_core`. This row claims only the bound taken from it
+- **Status:** unverified
+- **Checks:** Required: that maximizing numerator and denominator independently over direction is legitimate here (it is a bound, so independence is conservative, not exact); that `β` at the incident energy is the maximum over the trajectory (slowing down is monotone, so lines only move down); that the reflection set is complete for the case. Numeric sanity against the measured `energy_grid.derive` stops: the bound sits 1.6–2.8× above the derived 95%-coverage `stop` at 300 keV for mose2/hopg, and reproduces the 30–60 keV derived stops within ~5% when the fixed-geometry denominator `1 − β cos θ_obs` is used instead — i.e. the gap at high energy is multiple scattering rotating `v` toward `n̂`, which is exactly what the bound is there to cover
+- **Anchor:** `tests/energy-grid/test_line_grid_policy.py::test_kinematic_stop_bounds_the_resonance_over_random_directions`
+- **Notes:** This is a BANDWIDTH policy, not an accuracy claim: it says the grid cannot clip a line, not that the line is sampled finely enough. Accuracy is the separate resolution policy (`sinc_feature_spacing` under a per-observable tolerance). Being a bound rather than an estimate, it is deliberately wider than the measured `coverage-0.95` artifacts — an automatic grid costs more points than a derived one, and that is the correct trade when no derived row exists. It is *not* a bound on the coherent-route CBS continuum, which is not a resonance; the #97 handoff records that the coherent route's aliasing was never analyzed. Human sign-off pending
+
 ## `line-energy-dispersion`
 
 - **Claim:** `ω = v·g / (1 − v·n̂)` tunable line energy

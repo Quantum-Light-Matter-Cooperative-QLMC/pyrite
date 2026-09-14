@@ -307,6 +307,10 @@ def simulate(
             "scene": scene,
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case),
+            # Automatic case-local line grids (issue #101): the policy is what
+            # identity hashes, the resolved record is what the run actually
+            # sampled. Both absent for an explicit or stored grid.
+            **_line_grid_provenance(case, output),
             "stopping_model": STOPPING_MODEL,
             "characteristic_model": CHARACTERISTIC_MODEL,
             "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
@@ -322,6 +326,25 @@ def simulate(
         coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
         characteristic_spectrum=(None if characteristic is None else np.asarray(characteristic)),
     )
+
+
+def _line_grid_provenance(case, output) -> dict[str, object]:
+    """Resolved line-grid policy and coordinates, when resolution was automatic.
+
+    Records the policy, the per-observable tolerances, the configuration source
+    of each, and the resolved coordinate set -- the provenance half of #101's
+    "record resolved policy, tolerance, coordinate set, and configuration
+    source". The identity half is that the policy sits in the case payload, so
+    ``case_content_key`` already moves when any of it moves.
+    """
+    policy = case.get("line_grid_policy")
+    if policy is None:
+        return {}
+    provenance: dict[str, object] = {"line_grid_policy": policy}
+    resolved = output.get("line_grid_resolved")
+    if resolved is not None:
+        provenance["line_grid_resolved"] = resolved
+    return provenance
 
 
 def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
@@ -397,6 +420,7 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
             "scene": scene,
             "numerics": numerics,
             "identity_digest": source_digest,
+            **_line_grid_provenance(case, output),
             "observation_identity_digest": observation_digest,
             "observation": observation,
             "stopping_model": STOPPING_MODEL,
