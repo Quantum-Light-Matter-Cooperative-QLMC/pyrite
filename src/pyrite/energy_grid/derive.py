@@ -34,7 +34,8 @@ import numpy as np
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
 from pyrite.energy_grid import defaults as lg_defaults
-from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop, resolution_num
+from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop
+from pyrite.energy_grid.semantics import resolution_num
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner import run_cases
 

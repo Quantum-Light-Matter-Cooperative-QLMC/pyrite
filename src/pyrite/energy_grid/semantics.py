@@ -7,7 +7,9 @@ from .._grid_semantics import (
     node_bin_edges_and_widths,
     rebin_piecewise_constant_density,
     require_uniform_grid,
+    resolution_num,
     spacing_spread,
+    validate_backend_spacing,
 )
 
 __all__ = [
@@ -17,5 +19,7 @@ __all__ = [
     "node_bin_edges_and_widths",
     "rebin_piecewise_constant_density",
     "require_uniform_grid",
+    "resolution_num",
     "spacing_spread",
+    "validate_backend_spacing",
 ]

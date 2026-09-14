@@ -21,6 +21,7 @@ import numpy as np
 from ..._backend import BACKEND, REAL
 from ..._energy_grid_encoding import decode_energy_grid
 from ..._env import env_value, set_canonical_env
+from ..._grid_semantics import resolution_num, validate_backend_spacing
 from .. import spectrum as _spectrum_mod
 from ..case import Case
 from ..geometry import tilted_geometry
@@ -592,8 +593,6 @@ def _transport_case(
     # production cases and #101's future case-local resolver stay unchanged.
     diagnostic_grid = case.get("_diagnostic_line_grid")
     if diagnostic_grid is not None:
-        from ...energy_grid.bounds import resolution_num, validate_backend_spacing
-
         target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
             segs_all,
             n_hat,

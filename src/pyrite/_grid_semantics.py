@@ -30,8 +30,10 @@ __all__ = [
     "is_uniform_grid",
     "node_bin_edges_and_widths",
     "rebin_piecewise_constant_density",
+    "resolution_num",
     "require_uniform_grid",
     "spacing_spread",
+    "validate_backend_spacing",
 ]
 
 #: Relative spread of adjacent spacings still accepted as "uniform", measured
@@ -210,3 +212,62 @@ def grid_identity(E_grid_eV) -> tuple[int, float, float, str]:
     E = np.ascontiguousarray(np.asarray(E_grid_eV, dtype=float))
     digest = hashlib.blake2b(E.tobytes(), digest_size=16).hexdigest()
     return (E.size, round(float(E[0]), 6), round(float(E[-1]), 6), digest)
+
+
+# Generated-spacing policy lives here, not in ``energy_grid.bounds``: the runner
+# needs it while choosing a diagnostic line grid, and an edge from
+# ``montecarlo`` into ``energy_grid`` would close an import cycle
+# (``energy_grid.derive`` already imports ``montecarlo.runner``).
+def resolution_num(start_eV: float, stop_eV: float, maximum_spacing_eV: float) -> int:
+    """Endpoint-inclusive count whose actual spacing never exceeds the limit."""
+    values = (float(start_eV), float(stop_eV), float(maximum_spacing_eV))
+    if not all(np.isfinite(value) for value in values) or maximum_spacing_eV <= 0.0:
+        raise ValueError("grid bounds and maximum spacing must be finite; spacing must be positive")
+    if stop_eV <= start_eV:
+        raise ValueError("grid stop must be greater than start")
+    return int(np.ceil((stop_eV - start_eV) / maximum_spacing_eV)) + 1
+
+
+def validate_backend_spacing(
+    start_eV: float,
+    stop_eV: float,
+    num: int,
+    *,
+    dtype=np.float32,
+    safety_ulps: float = 8.0,
+) -> float:
+    """Validate a generated linspace against backend coordinate precision."""
+    if not np.isfinite(safety_ulps) or safety_ulps <= 0.0:
+        raise ValueError("backend ULP safety factor must be finite and positive")
+    if int(num) != num or num < 2:
+        raise ValueError("grid num must be an integer of at least 2")
+    resolved_dtype = np.dtype(dtype)
+    if resolved_dtype.kind != "f":
+        raise ValueError("backend grid dtype must be floating point")
+    spacing = (float(stop_eV) - float(start_eV)) / (int(num) - 1)
+    largest = resolved_dtype.type(max(abs(float(start_eV)), abs(float(stop_eV))))
+    minimum = float(safety_ulps) * abs(float(np.spacing(largest)))
+    if spacing < minimum:
+        raise ValueError(
+            f"requested line-grid spacing {spacing:g} eV is below the {safety_ulps:g}-ULP "
+            f"safety floor {minimum:g} eV for {resolved_dtype.name} at {float(largest):g} eV; "
+            "run with PYRITE_FP64=1 or choose a physically justified coarser tolerance"
+        )
+    cast = np.linspace(start_eV, stop_eV, int(num), dtype=float).astype(resolved_dtype)
+    cast_steps = np.diff(cast)
+    collapsed = int(np.count_nonzero(cast_steps <= 0.0))
+    if collapsed:
+        raise ValueError(
+            f"generated line grid is not strictly increasing after {resolved_dtype.name} cast "
+            f"({collapsed} collapsed intervals); run with PYRITE_FP64=1 or choose a physically "
+            "justified coarser tolerance"
+        )
+    minimum_cast_step = float(cast_steps.min())
+    if minimum_cast_step < minimum:
+        raise ValueError(
+            f"generated line-grid intervals reach {minimum_cast_step:g} eV after "
+            f"{resolved_dtype.name} cast, below the {safety_ulps:g}-ULP safety floor "
+            f"{minimum:g} eV; run with PYRITE_FP64=1 or choose a physically justified "
+            "coarser tolerance"
+        )
+    return spacing

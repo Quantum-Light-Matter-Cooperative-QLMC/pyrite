@@ -6,10 +6,9 @@ from pyrite.energy_grid.bounds import (
     coverage_energy,
     line_shift_fraction,
     margined_stop,
-    resolution_num,
     spacing_num,
-    validate_backend_spacing,
 )
+from pyrite.energy_grid.semantics import resolution_num, validate_backend_spacing
 
 
 def test_coverage_energy_flat_spectrum_half_coverage_is_midpoint():
