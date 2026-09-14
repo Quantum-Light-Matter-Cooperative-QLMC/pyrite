@@ -1467,6 +1467,7 @@ def test_run_defaults_to_attach_and_pull(monkeypatch):
     )
     monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
     monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: list(mats))
+    monkeypatch.setattr(state, "_materials_needing_pull", lambda jobid, mats: list(mats))
     monkeypatch.setattr(scripts, "_stems", lambda mats, *args, **kwargs: list(mats))
     monkeypatch.setattr(
         lifecycle, "pull", lambda stems, **kwargs: events.append(("pull", stems, kwargs))
@@ -1476,6 +1477,58 @@ def test_run_defaults_to_attach_and_pull(monkeypatch):
 
     assert [event[0] for event in events] == ["run", "attach", "pull"]
     assert events[-1][2]["no_sync"] is True
+
+
+def test_run_skips_pull_when_successful_remote_scan_used_only_cached_cases(monkeypatch, capsys):
+    from pyrite.checkpoints import _checkpoint_store
+
+    pulls = []
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, mats: list(mats))
+    monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, _mats: [])
+    monkeypatch.setattr(_checkpoint_store, "checkpoint_exists", lambda *_args: True)
+    monkeypatch.setattr(
+        lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems))
+    )
+
+    _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
+
+    assert pulls == []
+    assert "all successful remote scans used cached cases" in capsys.readouterr().out
+
+
+def test_run_pulls_cached_remote_checkpoint_missing_locally(monkeypatch):
+    from pyrite.checkpoints import _checkpoint_store
+
+    pulls = []
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, mats: list(mats))
+    monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, _mats: [])
+    monkeypatch.setattr(_checkpoint_store, "checkpoint_exists", lambda *_args: False)
+    monkeypatch.setattr(
+        lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems))
+    )
+
+    _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
+
+    assert pulls == [["hopg"]]
+
+
+def test_materials_needing_pull_skips_only_valid_zero_new_case_records(monkeypatch):
+    monkeypatch.setattr(config, "JOBS_SUBDIR", "jobs")
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: (
+            'hopg\t{"completed_new_cases": 0}\n'
+            'wse2\t{"completed_new_cases": 2}\n'
+            "mos2\tnot-json\n"
+        ),
+    )
+
+    assert state._materials_needing_pull("job", ["hopg", "wse2", "mos2"]) == ["wse2", "mos2"]
 
 
 def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatch, tmp_path):
@@ -1502,6 +1555,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
     monkeypatch.setattr(lifecycle, "start_queue", lambda _materials, **_kwargs: "job")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _materials: ["hopg"])
+    monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, mats: list(mats))
 
     def resolve(material, profile, *, fidelity, **_kwargs):
         resolved.append((material, profile, fidelity))
@@ -1609,6 +1663,7 @@ def test_successful_performance_run_auto_pulls_artifacts(monkeypatch):
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True)
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, mats: mats)
+    monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, mats: list(mats))
     monkeypatch.setattr(scripts, "_stems", lambda mats, *_args, **_kwargs: mats)
     monkeypatch.setattr(
         lifecycle,

@@ -416,6 +416,7 @@ def _cli_start(
             "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
         )
         return
+    materials_needing_pull = set(state._materials_needing_pull(jobid, completed))
     if quick or (fidelity == "full" and catalog_profile == "standard"):
         stems = scripts._stems(
             completed,
@@ -432,6 +433,18 @@ def _cli_start(
             lifecycle.resolve_profile_stem(material, catalog_profile, fidelity=fidelity)
             for material in completed
         ]
+    from ...checkpoints import _checkpoint_store
+
+    checkpoint_root = config.LOCAL_ROOT / "checkpoints"
+    stems = [
+        stem
+        for material, stem in zip(completed, stems, strict=True)
+        if material in materials_needing_pull
+        or not _checkpoint_store.checkpoint_exists(stem, checkpoint_root)
+    ]
+    if not stems:
+        emit_result("all successful remote scans used cached cases; checkpoints are already local")
+        return
     lifecycle.pull(
         stems,
         grid=grid,
