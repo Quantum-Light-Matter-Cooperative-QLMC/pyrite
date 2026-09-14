@@ -26,6 +26,8 @@ from pyrite.energy_grid.semantics import (
     NonuniformEnergyGridError,
     grid_identity,
     is_uniform_grid,
+    node_bin_edges_and_widths,
+    rebin_piecewise_constant_density,
     require_uniform_grid,
     spacing_spread,
 )
@@ -68,11 +70,27 @@ def test_guard_returns_the_exact_first_spacing_for_a_uniform_grid():
     )
 
 
-def test_poisson_core_refuses_a_log_grid():
+def test_node_bin_widths_preserve_uniform_behavior_and_follow_local_spacing():
+    _, linear_widths = node_bin_edges_and_widths(LINEAR_GRID)
+    assert np.allclose(linear_widths, LINEAR_GRID[1] - LINEAR_GRID[0], rtol=1e-13)
+    edges, log_widths = node_bin_edges_and_widths(LOG_GRID)
+    assert np.array_equal(log_widths, np.diff(edges))
+    assert log_widths[-1] > log_widths[0]
+
+
+def test_piecewise_constant_rebin_conserves_mass_and_reports_outside_window():
+    masses, outside = rebin_piecewise_constant_density([0.0, 1.0, 3.0], [2.0, 4.0], [0.5, 2.0, 4.0])
+    assert np.array_equal(masses, [5.0, 4.0])
+    assert outside == (1.0, 0.0)
+    assert np.sum(masses) + sum(outside) == pytest.approx(10.0)
+
+
+def test_poisson_core_uses_local_widths_on_a_log_grid():
     rng = np.random.default_rng(0)
     density = np.ones_like(LOG_GRID)
-    with pytest.raises(NonuniformEnergyGridError, match="poisson_core"):
-        _si_sensor.poisson_core(LOG_GRID, density, 1.0, rng)
+    _, expected = _si_sensor.poisson_core(LOG_GRID, density, 3.0, rng)
+    _, widths = node_bin_edges_and_widths(LOG_GRID)
+    assert np.array_equal(expected, density * widths * 3.0)
 
 
 def test_poisson_core_uniform_expected_counts_unchanged():
@@ -93,10 +111,25 @@ def test_convolve_detector_still_runs_on_a_uniform_grid():
     assert out.shape == LINEAR_GRID.shape
 
 
-def test_timepix_response_refuses_a_log_grid():
+def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
     timepix_response = pytest.importorskip("pyrite.detectors.timepix_response")
-    with pytest.raises(NonuniformEnergyGridError, match="TimepixResponse"):
-        timepix_response.TimepixResponse(LOG_GRID, n_mc=8)
+    response = timepix_response.TimepixResponse(LOG_GRID, n_mc=8)
+    _, widths = node_bin_edges_and_widths(LOG_GRID)
+    assert np.array_equal(response.dE_fine, widths)
+    rebinned = np.bincount(
+        response.idx_in,
+        weights=np.ones_like(LOG_GRID) * response.dE_fine,
+        minlength=response.n_in,
+    )
+    conservative, outside = rebin_piecewise_constant_density(
+        response.fine_edges, np.ones_like(LOG_GRID), response.in_edges
+    )
+    assert np.sum(conservative) == pytest.approx(np.sum(widths), rel=1e-14)
+    assert outside == (0.0, 0.0)
+    assert np.sum(rebinned) == pytest.approx(np.sum(conservative), rel=1e-14)
+    detected = response.apply(np.ones_like(LOG_GRID))
+    assert detected.shape == LOG_GRID.shape
+    assert np.all(np.isfinite(detected))
 
 
 def test_line_metrics_is_correct_on_a_log_grid():

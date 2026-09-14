@@ -85,7 +85,11 @@ quoted front-end figures convert as:
 import numpy as np
 from scipy.special import erf
 
-from .._grid_semantics import require_uniform_grid
+from .._grid_semantics import (
+    is_uniform_grid,
+    node_bin_edges_and_widths,
+    rebin_piecewise_constant_density,
+)
 from ..materials.crystal import absorption_length_ang
 from . import _si_sensor
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
@@ -297,7 +301,7 @@ def build_response(
 
 class TimepixResponse:
     """
-    A precomputed detector response bound to one fixed (uniform) energy grid, so
+    A precomputed detector response bound to one fixed energy grid, so
     many spectra share a single Monte Carlo.
 
     Speed/quality strategy -- two deliberately COARSE internal grids:
@@ -318,7 +322,7 @@ class TimepixResponse:
     Parameters
     ----------
     E_grid_eV
-        Fine, uniform photon-energy grid in eV.
+        Fine photon-energy evaluation nodes in eV. They may be nonuniform.
     dE_mc, dE_out
         Coarse response-input and recorded-output bin widths in eV.
     n_mc
@@ -343,23 +347,24 @@ class TimepixResponse:
     ):
         E = np.asarray(E_grid_eV, dtype=float)
         self.E = E  # the fine output grid
-        # The re-binning below spends ONE fine width on every input sample
-        # (spec * dE_fine -> photons per fine bin), so a graded input grid would
-        # mis-weight every bin whose own width differs from the first.
-        self.dE_fine = require_uniform_grid(
-            E,
-            consumer="detectors.timepix_response.TimepixResponse",
-            remedy=(
-                "Conservative rebinning onto the coarse response input needs each "
-                "input bin's own width (or explicit bin masses)."
-            ),
-        )  # fine bin width [eV]
+        fine_edges, fine_widths = node_bin_edges_and_widths(E)
         lo, hi = float(E[0]), float(E[-1])
 
         # --- coarse INPUT grid ---------------------------------------------
         # edges start half a fine-bin below the first sample so each fine bin
         # falls cleanly inside one coarse bin
-        in_edges = np.arange(lo - self.dE_fine / 2, hi + dE_mc, dE_mc)
+        if is_uniform_grid(E):
+            # Retain the original scalar arithmetic on established uniform
+            # grids; this is both faster and bit-for-bit compatible.
+            self.dE_fine = float(E[1] - E[0])
+            self.fine_edges = None
+            in_edges = np.arange(lo - self.dE_fine / 2, hi + dE_mc, dE_mc)
+        else:
+            self.dE_fine = fine_widths
+            self.fine_edges = fine_edges
+            n_coarse = int(np.ceil((fine_edges[-1] - fine_edges[0]) / dE_mc))
+            in_edges = fine_edges[0] + np.arange(n_coarse + 1) * dE_mc
+        self.in_edges = in_edges
         self.E_in = 0.5 * (in_edges[:-1] + in_edges[1:])  # coarse bin centres
         self.n_in = self.E_in.size
         # precompute which coarse-input bin each fine bin maps to, so .apply()
@@ -399,11 +404,12 @@ class TimepixResponse:
         get_response(E_grid). NaN/inf samples (e.g. a bad-geometry case) are
         treated as zero flux rather than poisoning the result.
 
-        Bookkeeping: spec*dE_fine is photons per fine bin; bincount sums those
-        into photons per coarse-input bin; R @ that is detected photons per
-        coarse-OUTPUT bin (R already carries absorption + counting efficiency);
-        dividing by dE_out makes it a density again; interp lifts it back onto
-        the fine grid. Total detected photons are conserved through the chain.
+        Bookkeeping: spec times each node's midpoint-cell width is photons per
+        source bin. A conservative overlap integral rebins those masses onto
+        the coarse input channels (the established uniform path retains its
+        equivalent ``bincount``); R @ that is detected photons per coarse-output
+        bin. Dividing by dE_out makes it a density again; interpolation lifts it
+        back onto the source nodes.
 
         Parameters
         ----------
@@ -416,9 +422,14 @@ class TimepixResponse:
             Detected density on the same fine grid and in the same flux units.
         """
         spec = _si_sensor.prep_spectrum(spec, self.E, "timepix_response")
-        n_in = np.bincount(
-            self.idx_in, weights=spec * self.dE_fine, minlength=self.n_in
-        )  # photons / coarse bin
+        if self.fine_edges is None:
+            n_in = np.bincount(
+                self.idx_in, weights=spec * self.dE_fine, minlength=self.n_in
+            )  # photons / coarse bin
+        else:
+            n_in, outside = rebin_piecewise_constant_density(self.fine_edges, spec, self.in_edges)
+            if outside != (0.0, 0.0):
+                raise RuntimeError("Timepix input-channel edges failed to cover the source grid")
         S_out_coarse = (self.R @ n_in) / self.dE_out  # detected density / eV
         return np.interp(self.E, self.E_out, S_out_coarse, left=0.0, right=0.0)
 

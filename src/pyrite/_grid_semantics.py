@@ -1,4 +1,4 @@
-"""Energy-grid semantics: the uniform-grid guard and full-grid cache identity.
+"""Energy-grid semantics shared by spectrum and detector consumers.
 
 A package-root leaf, like ``_energy_grid_encoding``: every physics-core package
 (``detectors``, ``montecarlo``, ``results``) consumes it, so it must not sit
@@ -28,6 +28,8 @@ __all__ = [
     "NonuniformEnergyGridError",
     "grid_identity",
     "is_uniform_grid",
+    "node_bin_edges_and_widths",
+    "rebin_piecewise_constant_density",
     "require_uniform_grid",
     "spacing_spread",
 ]
@@ -55,6 +57,68 @@ class NonuniformEnergyGridError(ValueError):
     pinned the semantics and audited the consumers; widening a consumer to real
     nonuniform support is tracked separately (issues #99-#101).
     """
+
+
+def node_bin_edges_and_widths(E_grid_eV: object) -> tuple[np.ndarray, np.ndarray]:
+    """Return midpoint bin edges and local widths for evaluation nodes.
+
+    The outer edges use one-sided half-widths.  This is the explicit
+    node-to-histogram conversion defined by :eq:`eq-grid-midpoint-edges` in the
+    energy-grid semantics documentation.  A density multiplied by the returned
+    widths is therefore a per-bin mass, including on a nonuniform grid.
+    """
+    E = np.asarray(E_grid_eV, dtype=float)
+    if E.ndim != 1 or E.size < 2:
+        raise ValueError("energy grid must be 1-D with at least two nodes")
+    if not np.all(np.isfinite(E)) or np.any(np.diff(E) <= 0.0):
+        raise ValueError("energy-grid nodes must be finite and strictly increasing")
+    edges = np.empty(E.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (E[:-1] + E[1:])
+    edges[0] = E[0] - 0.5 * (E[1] - E[0])
+    edges[-1] = E[-1] + 0.5 * (E[-1] - E[-2])
+    return edges, np.diff(edges)
+
+
+def rebin_piecewise_constant_density(
+    source_edges_eV: object,
+    source_density: object,
+    target_edges_eV: object,
+) -> tuple[np.ndarray, tuple[float, float]]:
+    """Integrate a histogram density onto new edges without losing mass.
+
+    Returns target-bin masses plus masses below and above the target window.
+    Density is assumed constant inside each source bin. The cumulative-integral
+    implementation is O(N + M) in storage, rather than constructing a dense
+    source-by-target overlap matrix.
+    """
+    source_edges = np.asarray(source_edges_eV, dtype=float)
+    target_edges = np.asarray(target_edges_eV, dtype=float)
+    density = np.asarray(source_density, dtype=float)
+    for name, edges in (("source", source_edges), ("target", target_edges)):
+        if edges.ndim != 1 or edges.size < 2:
+            raise ValueError(f"{name} edges must be 1-D with at least two entries")
+        if not np.all(np.isfinite(edges)) or np.any(np.diff(edges) <= 0.0):
+            raise ValueError(f"{name} edges must be finite and strictly increasing")
+    if density.shape != (source_edges.size - 1,):
+        raise ValueError(
+            f"source density shape {density.shape} != source bins {(source_edges.size - 1,)}"
+        )
+
+    source_masses = density * np.diff(source_edges)
+    cumulative = np.concatenate(([0.0], np.cumsum(source_masses)))
+
+    def integral_to(points: np.ndarray) -> np.ndarray:
+        clipped = np.clip(points, source_edges[0], source_edges[-1])
+        bins = np.searchsorted(source_edges, clipped, side="right") - 1
+        bins = np.clip(bins, 0, density.size - 1)
+        values = cumulative[bins] + density[bins] * (clipped - source_edges[bins])
+        values = np.where(points <= source_edges[0], 0.0, values)
+        return np.where(points >= source_edges[-1], cumulative[-1], values)
+
+    target_cumulative = integral_to(target_edges)
+    below = float(integral_to(np.asarray([target_edges[0]]))[0])
+    above = float(cumulative[-1] - integral_to(np.asarray([target_edges[-1]]))[0])
+    return np.diff(target_cumulative), (below, above)
 
 
 def spacing_spread(E_grid_eV) -> float:
