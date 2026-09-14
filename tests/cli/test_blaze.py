@@ -8,13 +8,14 @@ from click.testing import CliRunner
 
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
+from pyrite.cli.commands import blaze as blaze_cli
 from pyrite.runs import blaze
 
 MATERIAL = "hopg"  # std tilt_deg grid [5,15,30,45,60,75,85] is groove-legal
 
 
 def _invoke(argv):
-    return CliRunner().invoke(blaze.command, argv, catch_exceptions=False)
+    return CliRunner().invoke(blaze_cli.command, argv, catch_exceptions=False)
 
 
 def _run_and_capture(monkeypatch, argv):

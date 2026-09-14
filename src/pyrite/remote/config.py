@@ -83,7 +83,7 @@ def validate_remote_target(value: str) -> str:
 
 def remote_host() -> str:
     """Return the validated effective SSH-config host alias."""
-    from ..cli import _config as cli_config
+    from ..console import config as cli_config
 
     try:
         resolved = cli_config.resolve("remote.target", HOST)

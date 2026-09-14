@@ -7,7 +7,8 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from pyrite.cli import _core as _cli_core
+from pyrite.cli import _groups
+from pyrite.console import output as _cli_core
 from tests.helpers.cli import assert_clean_result, invoke
 
 
@@ -57,7 +58,7 @@ def test_lazy_group_imports_only_selected_command(monkeypatch):
 
     module.child = child
     monkeypatch.setitem(sys.modules, module_name, module)
-    group = _cli_core.LazyGroup(
+    group = _groups.LazyGroup(
         name="root",
         lazy_commands={"child": f"{module_name}.child"},
     )
@@ -71,7 +72,7 @@ def test_lazy_group_rejects_non_command(monkeypatch):
     module = ModuleType(module_name)
     module.child = object()
     monkeypatch.setitem(sys.modules, module_name, module)
-    group = _cli_core.LazyGroup(
+    group = _groups.LazyGroup(
         name="root",
         lazy_commands={"child": f"{module_name}.child"},
     )

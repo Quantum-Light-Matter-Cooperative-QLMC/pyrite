@@ -24,8 +24,8 @@ import sys
 import click
 
 from ..._acp import running_acp
+from ...console import output as _cli_core
 from ...paths import app_dir
-from .. import _core as _cli_core
 
 NOTEBOOK = str(app_dir() / "validation_app.py")
 TUNNEL_PORT = 2718

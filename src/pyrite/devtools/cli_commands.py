@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from pyrite.cli._core import LazyGroup
+from pyrite.cli._groups import LazyGroup
 
 
 @click.group(

@@ -3,8 +3,8 @@
 import click
 
 from ...checkpoints import _checkpoint_io
+from ...console import output as _cli_core
 from .. import _completion as _cli_completion
-from .. import _core as _cli_core
 
 
 @click.command(

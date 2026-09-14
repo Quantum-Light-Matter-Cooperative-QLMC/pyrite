@@ -36,9 +36,9 @@ import click
 
 from ..._acp import running_acp
 from ..._app_defaults import get_viewer_default, set_viewer_default
+from ...console import output as _cli_core
 from ...paths import app_dir
 from .. import _completion as _cli_completion
-from .. import _core as _cli_core
 from .._deprecations import canonical_option
 
 NOTEBOOK = str(app_dir() / "trace_app.py")

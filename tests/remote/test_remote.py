@@ -17,17 +17,19 @@ from types import SimpleNamespace
 import pytest
 
 from pyrite import remote
-from pyrite.cli import _core as _cli_core
-from pyrite.cli import dashboard as _dashboard
 from pyrite.cli.commands import _remote_actions
+from pyrite.cli.commands import remote as cli  # noqa: F401
 from pyrite.cli.commands import remote as remote_cli
-from pyrite.cli.dashboard import poll as dashboard_poll
+from pyrite.console import dashboard as _dashboard
+from pyrite.console import dashboard as presentation
+from pyrite.console import output as _cli_core
+from pyrite.console.dashboard import poll as dashboard_poll
+from pyrite.console.dashboard import render as dashboard_render
+from pyrite.console.dashboard import state as dashboard_state
 from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
-    cli,
     config,
     lifecycle,
-    presentation,
     scripts,
     state,
     transport,
@@ -62,7 +64,7 @@ def _remote_main(argv):
         from pyrite.cli.commands.job import command as job_command
 
         return _cli_core.run(job_command, [head, *rest], prog_name="pyrite job")
-    return remote.main(argv)
+    return remote_cli.main(argv)
 
 
 lifecycle_pull = importlib.import_module("pyrite.remote.pull")
@@ -801,7 +803,7 @@ def test_status_formats_latest_performance_profile():
         ),
     }
 
-    output = presentation._format_job_status(sections, 0)
+    output = presentation.format_job_status(sections, 0)
 
     assert "PERFORMANCE PROFILE" in output
     assert "CPU  80%" in output
@@ -1897,7 +1899,7 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
         "_ssh_capture",
         lambda command: (
             commands.append(command)
-            or presentation._encode_sections(
+            or dashboard_state._encode_sections(
                 {
                     "JOB": "j",
                     "META": "job: j\nmaterials: hopg\nquick: False\n"
@@ -1939,7 +1941,7 @@ def test_pending_queue_rank_uses_priority_then_job_id(target, expected_rank):
         "job_id=40|state=RUNNING|name=active|partition=gpu|reason=None|priority=999|user=d",
     )
 
-    context = presentation._pending_queue_context(payload, target)
+    context = dashboard_render._pending_queue_context(payload, target)
 
     assert context is not None
     assert (context["rank"], context["count"], context["partition"]) == (
@@ -1957,11 +1959,11 @@ def test_pending_queue_context_changes_with_priority_and_rejects_retired_or_malf
     )
     after = before.replace("priority=20", "priority=5").replace("priority=10", "priority=30")
 
-    assert presentation._pending_queue_context(before, "20")["rank"] == 2
-    assert presentation._pending_queue_context(after, "20")["rank"] == 1
-    assert presentation._pending_queue_context(before, "999") is None
+    assert dashboard_render._pending_queue_context(before, "20")["rank"] == 2
+    assert dashboard_render._pending_queue_context(after, "20")["rank"] == 1
+    assert dashboard_render._pending_queue_context(before, "999") is None
     assert (
-        presentation._pending_queue_context(
+        dashboard_render._pending_queue_context(
             before + "\njob_id=bad|state=PENDING|partition=gpu|priority=nan", "bad"
         )
         is None
@@ -1970,14 +1972,14 @@ def test_pending_queue_context_changes_with_priority_and_rejects_retired_or_malf
         "job_id=20|state=PENDING|name=x|priority=999|partition=gpu|"
         "reason=Priority|priority=10|user=u"
     )
-    assert presentation._pending_queue_context(injected, "20") is None
+    assert dashboard_render._pending_queue_context(injected, "20") is None
 
 
 def test_pending_queue_render_sanitizes_identity_reason_and_explains_backfill(capsys, monkeypatch):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: presentation._encode_sections(
+        lambda _command: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nmaterials: hopg\nslurm_job_id: 20",
@@ -2038,9 +2040,9 @@ def test_status_snapshot_preserves_squeue_failure(monkeypatch, tmp_path):
 
 def test_status_framing_keeps_marker_like_payload_inside_original_section():
     payload = "running\n@@META\njob: forged\nCXR_REMOTE_V1\tJOB\tZm9yZ2Vk"
-    wire = presentation._encode_sections({"STATE": payload, "JOB": "real"})
+    wire = dashboard_state._encode_sections({"STATE": payload, "JOB": "real"})
 
-    sections = remote._marked_sections(wire)
+    sections = presentation.marked_sections(wire)
 
     assert sections == {"STATE": payload, "JOB": "real"}
 
@@ -2065,7 +2067,7 @@ def test_status_shell_framing_round_trip_resists_payload_markers(monkeypatch, tm
         text=True,
     )
 
-    sections = remote._marked_sections(result.stdout)
+    sections = presentation.marked_sections(result.stdout)
     assert sections["JOB"] == "j"
     assert sections["STATE"] == hostile
     assert sections["LOG"] == "log\n@@STATE\nforged"
@@ -2075,7 +2077,7 @@ def test_job_status_sanitizes_hostile_remote_fields(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: presentation._encode_sections(
+        lambda _command: dashboard_state._encode_sections(
             {
                 "JOB": "j\x1b[2J",
                 "META": "job: j\nmaterials: ho\u202epg\nslurm_job_id: 48291",
@@ -2119,7 +2121,7 @@ def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys
         "_ssh_capture",
         lambda command: (
             commands.append(command)
-            or presentation._encode_sections(
+            or dashboard_state._encode_sections(
                 {
                     "JOB": "j",
                     "META": "job: j\nmaterials: hopg\nworkers: None\nslurm_job_id: 48291",
@@ -2149,7 +2151,7 @@ def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
         "_ssh_capture",
         lambda command: (
             commands.append(command)
-            or presentation._encode_sections(
+            or dashboard_state._encode_sections(
                 {
                     "JOB": "j",
                     "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -2216,7 +2218,7 @@ def test_status_collapses_legacy_tqdm_history_to_latest_material_bar(monkeypatch
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: presentation._encode_sections(
+        lambda _command: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -2243,7 +2245,7 @@ def test_status_collapses_legacy_tqdm_history_to_latest_material_bar(monkeypatch
 
 
 def test_failed_legacy_status_marks_incomplete_bar_as_last_batch():
-    output = remote._legacy_progress(
+    output = dashboard_render._legacy_progress(
         "cases: 40%|████      | 2/5 [00:03<00:04, 1.4s/it]\r",
         "FAILED (exit 1) now",
     )
@@ -2258,7 +2260,7 @@ def test_line_grid_bounds_status_uses_diagnostic_metadata(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: presentation._encode_sections(
+        lambda _command: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nkind: line-grid-bounds\nslice_minutes: 10\n"
@@ -2295,7 +2297,7 @@ def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
 def _status_output(state, *, squeue_state="RUNNING", sid="48291", progress=""):
     """Fake one round-trip of the shared status command (the marked sections
     _format_job_status / the attach loop read)."""
-    return presentation._encode_sections(
+    return dashboard_state._encode_sections(
         {
             "JOB": "j",
             "META": f"job: j\nmaterials: hopg\nslurm_job_id: {sid}",
@@ -2398,8 +2400,8 @@ def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
 
 def test_job_attach_repeats_verbose_for_the_live_report(monkeypatch):
     """`remote status -a` retired at 0.3.0; `pyrite job attach` is the door."""
-    from pyrite.cli import _core as core
     from pyrite.cli.commands.job import command as job_command
+    from pyrite.console import output as core
 
     calls = []
     monkeypatch.setattr(viewer, "attach", lambda jobid, detail: calls.append((jobid, detail)))
@@ -2542,7 +2544,7 @@ def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch, capsys
 
 
 class _FakeKeyListener:
-    """Scripted stand-in for viewer._KeyListener: one poll() result per call."""
+    """Scripted stand-in for viewer.KeyListener: one poll() result per call."""
 
     def __init__(self, polls, *, active=True):
         self._polls = list(polls)
@@ -2559,12 +2561,12 @@ class _FakeKeyListener:
 def test_key_listener_inactive_when_stdin_is_not_a_tty(monkeypatch):
     monkeypatch.setattr(dashboard_poll.sys.stdin, "isatty", lambda: False)
 
-    listener = _dashboard._KeyListener()
+    listener = _dashboard.KeyListener()
 
     assert listener.active is False
     assert listener.poll() == []
     listener.stop()  # must be a harmless no-op
-    assert viewer._KeyListener is _dashboard._KeyListener
+    assert viewer.KeyListener is _dashboard.KeyListener
 
 
 def test_attach_header_shows_cancel_hint_only_when_keys_are_active():
@@ -2577,7 +2579,7 @@ def test_attach_header_shows_cancel_hint_only_when_keys_are_active():
 
 def test_attach_verbosity_key_cycles_restarts_stream_and_wraps(monkeypatch):
     running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
-    detailed = presentation._encode_sections(
+    detailed = dashboard_state._encode_sections(
         {
             "JOB": "j",
             "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -2597,9 +2599,9 @@ def test_attach_verbosity_key_cycles_restarts_stream_and_wraps(monkeypatch):
 
     monkeypatch.setattr(viewer, "_status_stream", status_stream)
     fake_keys = _FakeKeyListener([["v"], ["v"], [], ["v"], []])
-    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
     frames = []
-    monkeypatch.setattr(viewer, "_render_frame", lambda frame, *, tty: frames.append(frame))
+    monkeypatch.setattr(viewer, "render_frame", lambda frame, *, tty: frames.append(frame))
 
     assert remote.attach("20260101-000000") is True
 
@@ -2633,7 +2635,7 @@ def test_attach_pull_keybinding_confirms_without_stopping_job(monkeypatch, capsy
     done = _status_output("done now", squeue_state="NOT_QUEUED")
     monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: iter([running, running, done]))
     fake_keys = _FakeKeyListener([["p"], ["y"], []])
-    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
     pulled = []
     monkeypatch.setattr(
         viewer,
@@ -2690,7 +2692,7 @@ def test_attach_cancel_keybinding_confirms_and_scancels_the_job(monkeypatch, cap
     outputs = iter([running, running])
     monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
     fake_keys = _FakeKeyListener([["x"], ["y"]])
-    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
     stopped = []
     monkeypatch.setattr(lifecycle, "_stop_jobid", lambda jobid: stopped.append(jobid))
 
@@ -2709,7 +2711,7 @@ def test_attach_cancel_keybinding_disarms_on_any_other_key(monkeypatch, capsys):
     outputs = iter([running, done])
     monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
     fake_keys = _FakeKeyListener([["x"], ["z"]])
-    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
     stopped = []
     monkeypatch.setattr(lifecycle, "_stop_jobid", lambda jobid: stopped.append(jobid))
 
@@ -2725,7 +2727,7 @@ def test_attach_cancel_arm_expires_without_a_confirm_key(monkeypatch, capsys):
     outputs = iter([running, done])
     monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
     fake_keys = _FakeKeyListener([["x"], []])
-    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
     # First frame arms at t=0 (armed_until = 0 + _CANCEL_ARM_SECONDS); every
     # later monotonic() call reads t=100, well past the window, so the second
     # frame's expiry check must disarm before it ever looks at (the empty)
@@ -2748,7 +2750,7 @@ def test_attach_cancel_request_failure_is_reported_without_a_traceback(monkeypat
     outputs = iter([running, running])
     monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
     fake_keys = _FakeKeyListener([["x"], ["y"]])
-    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(viewer, "KeyListener", lambda: fake_keys)
 
     def _raise(jobid):
         raise SystemExit(f"job {jobid} is not an active SLURM job")
@@ -2879,7 +2881,7 @@ def test_parse_progress_records_ignores_malformed_snapshots():
         ]
     )
 
-    assert remote._parse_progress_records(payload) == {"hopg": valid}
+    assert presentation.parse_progress_records(payload) == {"hopg": valid}
 
 
 def test_parse_progress_records_accepts_paused_state():
@@ -2887,12 +2889,12 @@ def test_parse_progress_records_accepts_paused_state():
         '{"material":"hopg","total_cases":4,"cached_cases":1,'
         '"completed_new_cases":1,"state":"paused"}'
     )
-    records = remote._parse_progress_records(payload)
+    records = presentation.parse_progress_records(payload)
     assert records["hopg"]["state"] == "paused"
 
 
 def test_parse_progress_records_preserves_primary_and_cpu_phases_for_one_material():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         "\n".join(
             [
                 '{"material":"hopg","phase":"primary","total_cases":4,'
@@ -2907,7 +2909,7 @@ def test_parse_progress_records_preserves_primary_and_cpu_phases_for_one_materia
     assert records["hopg"]["phase"] == "primary"
     assert records["hopg:cpu"]["phase"] == "cpu"
 
-    output = remote._format_case_progress(records, ["hopg"])
+    output = dashboard_render._format_case_progress(records, ["hopg"])
     assert output.count("HOPG") == 2
     assert "CPU" in output
 
@@ -2932,7 +2934,7 @@ def test_status_cpu_phase_uses_cpu_progress_without_hiding_primary():
         ),
     }
 
-    output = presentation._format_job_status(sections, 0)
+    output = presentation.format_job_status(sections, 0)
 
     assert "CPU profile" in output
     assert "profiling CPU hopg" in output
@@ -2941,7 +2943,7 @@ def test_status_cpu_phase_uses_cpu_progress_without_hiding_primary():
 
 
 def test_overall_progress_line_sums_cases_and_counts_done_materials():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         "\n".join(
             [
                 '{"material":"hopg","total_cases":4,"cached_cases":2,'
@@ -2952,7 +2954,7 @@ def test_overall_progress_line_sums_cases_and_counts_done_materials():
         )
     )
 
-    line = remote._overall_progress_line(records)
+    line = dashboard_render._overall_progress_line(records)
 
     assert line is not None
     assert "7/10 cases" in line  # 4 (hopg) + 3 (hbn)
@@ -2966,7 +2968,7 @@ def test_overall_progress_line_counts_unstarted_materials_in_the_denominator():
     # 2 of 4 rostered materials have started (one done, one half); the other two
     # have no progress record yet. The headline must weight over ALL four, not
     # read ~75% off the two that reported.
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         "\n".join(
             [
                 '{"material":"hopg","total_cases":4,"cached_cases":4,'
@@ -2977,7 +2979,7 @@ def test_overall_progress_line_counts_unstarted_materials_in_the_denominator():
         )
     )
 
-    line = remote._overall_progress_line(records, ["hopg", "hbn", "mos2", "wse2"])
+    line = dashboard_render._overall_progress_line(records, ["hopg", "hbn", "mos2", "wse2"])
 
     assert line is not None
     # (4/4 + 2/4 + 0 + 0) / 4 = 37.5% -> 38%, not ~75%.
@@ -2987,31 +2989,31 @@ def test_overall_progress_line_counts_unstarted_materials_in_the_denominator():
 
 
 def test_compute_progress_reports_percentage_without_case_counts():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         '{"material":"hopg","total_cases":4,"cached_cases":1,'
         '"completed_new_cases":1,"state":"running",'
         '"done_cost":25.0,"total_cost":100.0}'
     )
 
-    line = remote._overall_progress_line(records, ["hopg"], use_cost=True)
+    line = dashboard_render._overall_progress_line(records, ["hopg"], use_cost=True)
 
     assert " 25%" in line
     assert "cases" not in line
 
 
 def test_paused_overall_progress_uses_warning_state():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         '{"material":"hopg","total_cases":4,"cached_cases":1,'
         '"completed_new_cases":1,"state":"running"}'
     )
 
-    line = remote._overall_progress_line(records, ["hopg"], state_override="paused")
+    line = dashboard_render._overall_progress_line(records, ["hopg"], state_override="paused")
 
     assert "Ⅱ" in line
 
 
 def test_overall_progress_line_is_none_without_records():
-    assert remote._overall_progress_line({}) is None
+    assert dashboard_render._overall_progress_line({}) is None
 
 
 def test_parse_progress_records_keeps_valid_cost_fields():
@@ -3020,7 +3022,7 @@ def test_parse_progress_records_keeps_valid_cost_fields():
         '"completed_new_cases":0,"state":"running",'
         '"done_cost":25.0,"total_cost":100.0}'
     )
-    records = remote._parse_progress_records(payload)
+    records = presentation.parse_progress_records(payload)
     assert records["hopg"]["done_cost"] == 25.0
     assert records["hopg"]["total_cost"] == 100.0
 
@@ -3031,7 +3033,7 @@ def test_parse_progress_records_drops_cost_fields_when_done_exceeds_total():
         '"completed_new_cases":0,"state":"running",'
         '"done_cost":150.0,"total_cost":100.0}'
     )
-    records = remote._parse_progress_records(payload)
+    records = presentation.parse_progress_records(payload)
     assert "done_cost" not in records["hopg"]
     assert "total_cost" not in records["hopg"]
 
@@ -3042,7 +3044,7 @@ def test_parse_progress_records_drops_non_numeric_cost_fields():
         '"completed_new_cases":0,"state":"running",'
         '"done_cost":"lots","total_cost":100.0}'
     )
-    records = remote._parse_progress_records(payload)
+    records = presentation.parse_progress_records(payload)
     assert "done_cost" not in records["hopg"]
     assert "total_cost" not in records["hopg"]
 
@@ -3052,7 +3054,7 @@ def test_overall_progress_line_use_cost_weights_by_compute_not_case_count():
     # only 10% of the material's compute; hbn hasn't started. A case-count bar
     # would read 50% (1 material fully "done" of 2); the compute bar must read
     # far lower since hopg's done work is cheap relative to the whole sweep.
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         "\n".join(
             [
                 '{"material":"hopg","total_cases":1,"cached_cases":0,'
@@ -3065,19 +3067,19 @@ def test_overall_progress_line_use_cost_weights_by_compute_not_case_count():
         )
     )
 
-    cases_line = remote._overall_progress_line(records, ["hopg", "hbn"], use_cost=False)
-    compute_line = remote._overall_progress_line(records, ["hopg", "hbn"], use_cost=True)
+    cases_line = dashboard_render._overall_progress_line(records, ["hopg", "hbn"], use_cost=False)
+    compute_line = dashboard_render._overall_progress_line(records, ["hopg", "hbn"], use_cost=True)
 
     assert " 50%" in cases_line
     assert " 5%" in compute_line  # (10/100 + 0/50) / 2 = 5%
 
 
 def test_overall_progress_line_use_cost_falls_back_to_cases_without_cost_data():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         '{"material":"hopg","total_cases":4,"cached_cases":2,'
         '"completed_new_cases":0,"state":"running"}'
     )
-    line = remote._overall_progress_line(records, ["hopg"], use_cost=True)
+    line = dashboard_render._overall_progress_line(records, ["hopg"], use_cost=True)
     assert " 50%" in line
     assert "cases" not in line
 
@@ -3118,10 +3120,10 @@ def test_compute_eta_is_unavailable_before_a_measured_tick_and_excludes_cached_w
         "hopg": _timed_record(cached=5, seconds=20.0, measured=0),
     }
 
-    estimate = presentation._compute_time_estimate(records, ["hopg"])
+    estimate = dashboard_render._compute_time_estimate(records, ["hopg"])
 
     assert estimate == {"elapsed": 20.0, "remaining": None, "total": None}
-    assert "ETA —" in presentation._compute_time_suffix(estimate)
+    assert "ETA —" in dashboard_render._compute_time_suffix(estimate)
 
 
 def test_compute_eta_uses_measured_work_rate_across_pause_and_chunk_resume():
@@ -3138,7 +3140,7 @@ def test_compute_eta_uses_measured_work_rate_across_pause_and_chunk_resume():
         ),
     }
 
-    estimate = presentation._compute_time_estimate(records, ["hopg"])
+    estimate = dashboard_render._compute_time_estimate(records, ["hopg"])
 
     assert estimate == {"elapsed": 20.0, "remaining": 50.0, "total": 70.0}
 
@@ -3156,7 +3158,7 @@ def test_compute_eta_prefers_cost_weighting():
         )
     }
 
-    estimate = presentation._compute_time_estimate(records, ["hopg"], use_cost=True)
+    estimate = dashboard_render._compute_time_estimate(records, ["hopg"], use_cost=True)
 
     assert estimate == {"elapsed": 10.0, "remaining": 90.0, "total": 100.0}
 
@@ -3167,7 +3169,7 @@ def test_compute_eta_accounts_for_parallel_material_processes_and_unstarted_work
         "hbn": _timed_record(material="hbn", completed=5, seconds=20.0, measured=5),
     }
 
-    estimate = presentation._compute_time_estimate(
+    estimate = dashboard_render._compute_time_estimate(
         records,
         ["hopg", "hbn", "mos2"],
         parallel_materials=2,
@@ -3188,7 +3190,7 @@ def test_compute_eta_accounts_for_parallel_material_processes_and_unstarted_work
     ],
 )
 def test_compute_eta_defines_zero_done_failed_and_legacy_records(record, remaining, total):
-    estimate = presentation._compute_time_estimate({"hopg": record}, ["hopg"])
+    estimate = dashboard_render._compute_time_estimate({"hopg": record}, ["hopg"])
 
     assert estimate["remaining"] == remaining
     assert estimate["total"] == total
@@ -3204,7 +3206,7 @@ def test_parse_progress_records_drops_non_finite_or_hostile_timing_values():
         )
     )
 
-    record = remote._parse_progress_records(payload)["hopg"]
+    record = presentation.parse_progress_records(payload)["hopg"]
 
     assert "active_compute_seconds" not in record
     assert "measured_new_cases" not in record
@@ -3215,7 +3217,7 @@ def test_status_shows_one_compute_bar_at_base_verbosity_when_cost_data_present(m
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _cmd: presentation._encode_sections(
+        lambda _cmd: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -3241,7 +3243,7 @@ def test_status_shows_both_bars_at_verbose_when_cost_data_present(monkeypatch, c
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _cmd: presentation._encode_sections(
+        lambda _cmd: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -3267,7 +3269,7 @@ def test_status_pending_uses_one_state_and_pauses_job_progress(monkeypatch, caps
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _cmd: presentation._encode_sections(
+        lambda _cmd: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": (
@@ -3301,7 +3303,7 @@ def test_status_progress_row_unchanged_without_cost_data(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _cmd: presentation._encode_sections(
+        lambda _cmd: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -3326,7 +3328,7 @@ def test_status_renders_progress_bars_at_base_verbosity(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _cmd: presentation._encode_sections(
+        lambda _cmd: dashboard_state._encode_sections(
             {
                 "JOB": "j",
                 "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
@@ -3363,7 +3365,7 @@ def test_status_always_fetches_progress_even_at_base_verbosity(monkeypatch):
 
 
 def test_static_case_progress_uses_catalog_labels_and_one_row_per_material():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         "\n".join(
             [
                 '{"material":"hopg","total_cases":5,"cached_cases":1,'
@@ -3374,7 +3376,7 @@ def test_static_case_progress_uses_catalog_labels_and_one_row_per_material():
         )
     )
 
-    output = remote._format_case_progress(records, ["hopg", "hbn"])
+    output = dashboard_render._format_case_progress(records, ["hopg", "hbn"])
 
     assert output.count("HOPG") == 1
     assert output.count("h-BN") == 1
@@ -3398,22 +3400,22 @@ def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
     monkeypatch.setenv("TERM", "xterm-256color")
     monkeypatch.setattr(viewer.sys.stdout, "isatty", lambda: True)
 
-    colored = remote._format_case_progress(record, ["hopg"])
+    colored = dashboard_render._format_case_progress(record, ["hopg"])
     monkeypatch.setenv("NO_COLOR", "1")
-    plain = remote._format_case_progress(record, ["hopg"])
+    plain = dashboard_render._format_case_progress(record, ["hopg"])
 
     assert "\033[38;2;92;207;230m" in colored
     assert "\033[" not in plain
 
 
 def test_case_progress_shows_current_crystal_parameters_for_running_material():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         '{"material":"hopg","total_cases":5,"cached_cases":1,'
         '"completed_new_cases":2,"state":"running","activity":"computing",'
         '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
     )
 
-    output = remote._format_case_progress(records, ["hopg"])
+    output = dashboard_render._format_case_progress(records, ["hopg"])
 
     assert "NOW TESTING" in output
     assert "30 keV" in output
@@ -3423,36 +3425,36 @@ def test_case_progress_shows_current_crystal_parameters_for_running_material():
 
 
 def test_case_progress_labels_checkpoint_activity_and_hides_stale_current():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         '{"material":"hopg","total_cases":5,"cached_cases":3,'
         '"completed_new_cases":0,"state":"running","activity":"saving",'
         '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
     )
 
-    output = remote._format_case_progress(records, ["hopg"])
+    output = dashboard_render._format_case_progress(records, ["hopg"])
 
     assert "saving checkpoint" in output
     assert "30 keV" not in output
 
 
 def test_case_progress_omits_current_params_for_non_running_material():
-    records = remote._parse_progress_records(
+    records = presentation.parse_progress_records(
         '{"material":"hopg","total_cases":5,"cached_cases":5,'
         '"completed_new_cases":0,"state":"done",'
         '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
     )
 
-    output = remote._format_case_progress(records, ["hopg"])
+    output = dashboard_render._format_case_progress(records, ["hopg"])
 
     assert "keV" not in output  # done row falls back to the cached/new tally
 
 
 def test_material_roster_summarizes_and_wraps_a_long_list():
-    short = remote._format_material_roster(["hopg", "hbn"])
+    short = dashboard_render._format_material_roster(["hopg", "hbn"])
     assert short == "hopg, hbn"
 
     long_roster = [f"mat{i:02d}" for i in range(20)]
-    rendered = remote._format_material_roster(long_roster)
+    rendered = dashboard_render._format_material_roster(long_roster)
     assert rendered.splitlines()[0] == "20 total"
     assert "mat00" in rendered
     assert "\n" in rendered  # wrapped, not one ragged line
@@ -4990,7 +4992,7 @@ def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
     monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["zhai"])])
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must refuse before syncing"))
     with pytest.raises(SystemExit, match="refusing to start"):
-        remote.remote_check()
+        remote_cli.remote_check()
 
 
 def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
@@ -5000,7 +5002,7 @@ def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
     monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True, raising=False)
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: events.append("pull"))
 
-    remote.remote_check(no_sync=True)
+    remote_cli.remote_check(no_sync=True)
 
     assert events == ["start", ("attach", "j"), "pull"]
 
@@ -5012,7 +5014,7 @@ def test_interrupted_foreground_check_does_not_pull(monkeypatch):
         lifecycle, "pull_zhai_cache", lambda: pytest.fail("must not pull after interruption")
     )
 
-    remote.remote_check(no_sync=True)
+    remote_cli.remote_check(no_sync=True)
 
 
 @pytest.mark.parametrize("job_state", ["FAILED (exit 1)", "cancelled [48291]"])
@@ -5026,7 +5028,7 @@ def test_failed_foreground_check_does_not_pull_stale_cache(monkeypatch, job_stat
     )
 
     with pytest.raises(SystemExit, match="did not complete successfully"):
-        remote.remote_check(no_sync=True)
+        remote_cli.remote_check(no_sync=True)
 
 
 def test_remote_check_no_sync_skips_sync(monkeypatch):
@@ -5036,7 +5038,7 @@ def test_remote_check_no_sync_skips_sync(monkeypatch):
     monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True)
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: calls.append("pull"))
 
-    remote.remote_check(no_sync=True)
+    remote_cli.remote_check(no_sync=True)
 
     assert calls == [
         {
@@ -5063,7 +5065,7 @@ def test_remote_check_non_waiting_modes_skip_attach_and_pull(monkeypatch, mode, 
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: pytest.fail("must not pull"))
 
-    assert remote.remote_check(**{mode: True}) == "j"
+    assert remote_cli.remote_check(**{mode: True}) == "j"
 
     assert calls[0]["dry_run"] is dry_run
 
@@ -5309,7 +5311,7 @@ def test_rebrem_metadata_keys_mode_line_and_live_job_plumbing():
     meta = remote._rebrem_queue_metadata("j", ["hopg"], 1000, 25.0, False)
     assert "kind: rebrem" in meta
     assert "materials: hopg" in meta and "quick: False" in meta  # _live_jobs fields
-    summary = remote._mode_summary(meta)
+    summary = presentation.mode_summary(meta)
     assert "brem-only recompute" in summary
     assert "Ne_brem=1000" in summary and "step 25.0 eV" in summary
     # zhai detection must not shadow rebrem despite the ne_brem field

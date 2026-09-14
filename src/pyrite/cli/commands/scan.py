@@ -7,10 +7,11 @@ from pathlib import Path
 import click
 
 from ..._env import set_canonical_env
+from ...console import config as _cli_config
+from ...console import output as _cli_core
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
-from .. import _config as _cli_config
-from .. import _core as _cli_core
+from .._options import remote_option
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
@@ -230,7 +231,7 @@ def _performance_profile(ctx, param, value):
 @click.option("--refresh", is_flag=True, help="With --preset zhai, recompute matching cache.")
 @click.option("--no-sync", is_flag=True, help="With -R/--remote, skip code upload.")
 @click.option("--dry-run", is_flag=True, help="With -R/--remote, print submission preview only.")
-@_cli_core.remote_option
+@remote_option
 @click.option("--wait", is_flag=True, help="Wait for remote completion and pull results.")
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
 @click.pass_context

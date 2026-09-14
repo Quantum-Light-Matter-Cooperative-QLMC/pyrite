@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from pyrite import _catalog_keys
 from pyrite.checkpoints import _checkpoint_io
 from pyrite.cli import _completion as _cli_completion
 
@@ -27,12 +28,26 @@ def test_comma_separated_material_completion_preserves_prefix_and_omits_duplicat
     assert "hopg,hopg" not in _values(_cli_completion.complete_material_csv(None, None, "hopg,"))
 
 
-def test_material_completion_is_empty_when_catalog_read_fails(monkeypatch):
-    _cli_completion._material_keys.cache_clear()
-    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
-    assert _cli_completion.complete_material(None, None, "") == []
+@pytest.fixture
+def missing_catalog(monkeypatch):
+    """Point the offline catalog reader at a path that cannot be read."""
+    readers = (
+        _catalog_keys.material_keys,
+        _catalog_keys.profile_keys,
+        _catalog_keys.beam_keys,
+        _catalog_keys.detector_keys,
+    )
+    for reader in readers:
+        reader.cache_clear()
+    monkeypatch.setattr(_catalog_keys, "data_dir", lambda: Path("/missing"))
+    yield
     monkeypatch.undo()
-    _cli_completion._material_keys.cache_clear()
+    for reader in readers:
+        reader.cache_clear()
+
+
+def test_material_completion_is_empty_when_catalog_read_fails(missing_catalog):
+    assert _cli_completion.complete_material(None, None, "") == []
 
 
 def test_profile_completion_reads_offline_catalog():
@@ -40,36 +55,24 @@ def test_profile_completion_reads_offline_catalog():
     assert values == ["standard"]
 
 
-def test_profile_completion_is_empty_when_catalog_read_fails(monkeypatch):
-    _cli_completion._profile_keys.cache_clear()
-    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
+def test_profile_completion_is_empty_when_catalog_read_fails(missing_catalog):
     assert _cli_completion.complete_profile(None, None, "") == []
-    monkeypatch.undo()
-    _cli_completion._profile_keys.cache_clear()
 
 
 def test_beam_completion_reads_offline_catalog():
     assert _values(_cli_completion.complete_beam(None, None, "gauss")) == ["gaussian_200fs"]
 
 
-def test_beam_completion_is_empty_when_catalog_read_fails(monkeypatch):
-    _cli_completion._beam_keys.cache_clear()
+def test_beam_completion_is_empty_when_catalog_read_fails(missing_catalog):
+    assert _cli_completion.complete_beam(None, None, "") == []
 
 
 def test_detector_completion_reads_offline_catalog():
     assert _values(_cli_completion.complete_detector(None, None, "def")) == ["default"]
 
 
-def test_detector_completion_is_empty_when_catalog_read_fails(monkeypatch):
-    _cli_completion._detector_keys.cache_clear()
-    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
+def test_detector_completion_is_empty_when_catalog_read_fails(missing_catalog):
     assert _cli_completion.complete_detector(None, None, "") == []
-    monkeypatch.undo()
-    _cli_completion._detector_keys.cache_clear()
-    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
-    assert _cli_completion.complete_beam(None, None, "") == []
-    monkeypatch.undo()
-    _cli_completion._beam_keys.cache_clear()
 
 
 def test_checkpoint_completion_is_nonrecursive_and_excludes_unsafe_files(tmp_path):
@@ -219,10 +222,9 @@ def _callback(command, name):
 
 
 def test_local_commands_wire_material_checkpoint_archive_and_choice_completion():
-    from pyrite.checkpoints import archive, slim
     from pyrite.cli.commands import app_analysis as analyze
+    from pyrite.cli.commands import archive, blaze, scan, slim
     from pyrite.cli.commands import recompute as recompute_cli
-    from pyrite.runs import blaze, scan
 
     for command in (scan.command, blaze.command, analyze.command):
         assert _callback(command, "material") is _cli_completion.complete_material
@@ -245,7 +247,7 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 
 
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
-    from pyrite.remote import cli
+    from pyrite.cli.commands import remote as cli
 
     command = cli.start_command
     assert _callback(command, "catalog_profile") is _cli_completion.complete_profile

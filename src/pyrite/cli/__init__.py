@@ -7,7 +7,8 @@ from collections.abc import Sequence
 import click
 
 from .. import __version__
-from ._core import LazyGroup, color_option, run
+from ..console.output import color_option, run
+from ._groups import LazyGroup
 
 _COMMANDS = {
     "run": "pyrite.cli.commands.scan.command",

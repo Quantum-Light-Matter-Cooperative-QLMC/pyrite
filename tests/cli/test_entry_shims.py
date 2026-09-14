@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib
 import runpy
 import sys
-from types import ModuleType
 
 import pytest
 
@@ -41,13 +40,30 @@ def test_cli_module_entry_point_delegates_to_main(monkeypatch):
     assert error.value.code == 23
 
 
-def test_scan_module_entry_point_delegates_to_scan_main(monkeypatch):
-    scan = ModuleType("pyrite.runs.scan")
-    scan.main = lambda: 23
+def test_scan_module_entry_point_runs_the_scan_command(monkeypatch):
+    """The entry shim binds the Click command to the shared runner.
+
+    ``runs.scan`` owns no Click surface: the shim is what joins the command in
+    ``cli.commands.scan`` to ``console.output.run`` (issue #64, finding 2), so
+    the remote box's ``python -m pyrite._entry.scan`` keeps its exit contract
+    without ``runs`` importing ``cli``.
+    """
+    from pyrite.cli.commands import scan as scan_cli
+    from pyrite.console import output
+
+    seen = {}
+
+    def fake_run(command, argv=None, *, prog_name):
+        seen["command"] = command
+        seen["prog_name"] = prog_name
+        return 23
+
+    monkeypatch.setattr(output, "run", fake_run)
     monkeypatch.delitem(sys.modules, "pyrite._entry.scan", raising=False)
-    monkeypatch.setitem(sys.modules, "pyrite.runs.scan", scan)
 
     with pytest.raises(SystemExit) as error:
         runpy.run_module("pyrite._entry.scan", run_name="__main__")
 
     assert error.value.code == 23
+    assert seen["command"] is scan_cli.command
+    assert seen["prog_name"] == "pyrite run"

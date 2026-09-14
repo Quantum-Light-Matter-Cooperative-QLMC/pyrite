@@ -2,7 +2,7 @@
 
 import subprocess
 
-from ..cli import _core as _cli_core
+from ..console import output as _cli_core
 from . import config, scripts, state, transport
 
 

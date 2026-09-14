@@ -7,6 +7,7 @@ import pytest
 
 from pyrite import remote
 from pyrite.cli.commands import _remote_actions
+from pyrite.cli.commands import remote as remote_cli
 from pyrite.remote import lifecycle, viewer
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -25,13 +26,13 @@ def assert_legacy_run_result(result, *, stderr=""):
 
 
 def test_remote_exports_click_group():
-    assert isinstance(remote.command, click.Group)
-    assert set(remote.command.commands) == set(REMOTE_COMMANDS)
+    assert isinstance(remote_cli.command, click.Group)
+    assert set(remote_cli.command.commands) == set(REMOTE_COMMANDS)
 
 
 @pytest.mark.parametrize("name", REMOTE_COMMANDS)
 def test_every_remote_click_help_path_is_offline(name):
-    result = invoke(remote.command, [name, "--help"])
+    result = invoke(remote_cli.command, [name, "--help"])
 
     assert_clean_result(result)
     assert f"Usage: remote {name} " in result.stdout
@@ -55,9 +56,9 @@ def test_remote_performance_commands_dispatch(monkeypatch):
         lambda profiles, **kwargs: calls.append(("prune", profiles, kwargs)),
     )
 
-    assert_clean_result(invoke(remote.command, ["performance", "list"]))
-    assert_clean_result(invoke(remote.command, ["performance", "pull", "baseline"]))
-    assert_clean_result(invoke(remote.command, ["performance", "rm", "baseline", "--yes"]))
+    assert_clean_result(invoke(remote_cli.command, ["performance", "list"]))
+    assert_clean_result(invoke(remote_cli.command, ["performance", "pull", "baseline"]))
+    assert_clean_result(invoke(remote_cli.command, ["performance", "rm", "baseline", "--yes"]))
 
     assert calls == [
         ("list",),
@@ -75,7 +76,7 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
     )
 
     result = invoke(
-        remote.start_command, ["standard", "-m", "hopg", "--workers", "0", "--headless"]
+        remote_cli.start_command, ["standard", "-m", "hopg", "--workers", "0", "--headless"]
     )
 
     assert_legacy_run_result(result)
@@ -128,7 +129,7 @@ def test_run_cpu_incompatible_inputs_fail_before_submission(monkeypatch, flags, 
         lambda *_args, **_kwargs: pytest.fail("invalid CPU flags must not submit"),
     )
 
-    result = invoke(remote.start_command, ["standard", "-m", "hopg", *flags])
+    result = invoke(remote_cli.start_command, ["standard", "-m", "hopg", *flags])
 
     assert result.exit_code == 2
     assert message in result.stderr
@@ -147,7 +148,7 @@ def test_run_cpu_flags_imply_performance_and_monolithic_dispatch(monkeypatch, fl
     )
 
     result = invoke(
-        remote.start_command,
+        remote_cli.start_command,
         ["standard", "-m", "hopg", flag, "--headless"],
     )
 
@@ -169,7 +170,7 @@ def test_combined_cpu_failure_pulls_retained_primary_performance_artifacts(monke
         lambda profile: pulled.append(profile),
     )
 
-    result = invoke(remote.start_command, ["standard", "-m", "hopg", "--cpu"])
+    result = invoke(remote_cli.start_command, ["standard", "-m", "hopg", "--cpu"])
 
     assert_legacy_run_result(
         result,
@@ -202,7 +203,7 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
     )
 
     result = invoke(
-        remote.start_command,
+        remote_cli.start_command,
         [
             "standard",
             "-m",
@@ -228,7 +229,7 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
 def test_zhai_execution_dispatches_without_a_deprecation_diagnostic(monkeypatch):
     monkeypatch.setattr(_remote_actions, "remote_check", lambda **_kwargs: None)
 
-    result = invoke(remote.check_command, [])
+    result = invoke(remote_cli.check_command, [])
 
     assert result.exit_code == 0
     assert "is deprecated" not in result.stderr
@@ -238,7 +239,7 @@ def test_zhai_pull_dispatches_to_the_cache_retrieval_path(monkeypatch):
     pulled = []
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: pulled.append("pull"))
 
-    result = invoke(remote.check_command, ["--pull"])
+    result = invoke(remote_cli.check_command, ["--pull"])
 
     assert result.exit_code == 0
     assert pulled == ["pull"]
@@ -249,7 +250,7 @@ def test_zhai_detached_follow_submits_and_attaches(monkeypatch):
     monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **_kwargs: "job")
     monkeypatch.setattr(viewer, "attach", lambda jobid: attached.append(jobid))
 
-    result = invoke(remote.check_command, ["--detached", "--follow"])
+    result = invoke(remote_cli.check_command, ["--detached", "--follow"])
 
     assert result.exit_code == 0
     assert attached == ["job"]
@@ -259,9 +260,9 @@ def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
     calls = []
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: calls.append("pull"))
 
-    result = invoke(remote.command, ["pull", "--preset", "zhai"])
-    incompatible = invoke(remote.command, ["pull", "hopg", "--preset", "zhai"])
-    output = invoke(remote.command, ["pull", "--preset", "zhai", "-o", "wide"])
+    result = invoke(remote_cli.command, ["pull", "--preset", "zhai"])
+    incompatible = invoke(remote_cli.command, ["pull", "hopg", "--preset", "zhai"])
+    output = invoke(remote_cli.command, ["pull", "--preset", "zhai", "-o", "wide"])
 
     assert_clean_result(result)
     assert calls == ["pull"]
@@ -290,7 +291,7 @@ def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
     ],
 )
 def test_remote_numeric_domains_fail_at_click_boundary(target, argv, option):
-    result = invoke(getattr(remote, target), argv)
+    result = invoke(getattr(remote_cli, target), argv)
 
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -307,7 +308,7 @@ def test_remote_numeric_domains_fail_at_click_boundary(target, argv, option):
     ],
 )
 def test_remote_incompatible_click_inputs_are_usage_errors(argv, message):
-    result = invoke(remote.command, argv)
+    result = invoke(remote_cli.command, argv)
 
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -327,7 +328,7 @@ def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
         lambda **kwargs: calls.append(("reap", kwargs)),
     )
 
-    result = invoke(remote.command, ["gc"])
+    result = invoke(remote_cli.command, ["gc"])
 
     assert_clean_result(result)
     assert calls == [
@@ -369,7 +370,7 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
             "--headless",
         ]
 
-    result = invoke(getattr(remote, f"{command_name}_command"), argv)
+    result = invoke(getattr(remote_cli, f"{command_name}_command"), argv)
 
     assert_clean_result(result)
     assert calls[0]["fidelity"] == "survey"
@@ -395,7 +396,7 @@ def test_remote_recompute_detach_skips_viewer_and_pull(monkeypatch, command_name
         lambda *_args, **_kwargs: pytest.fail("detached recompute must not pull"),
     )
 
-    result = invoke(getattr(remote, f"{command_name}_command"), ["hopg", "--detach"])
+    result = invoke(getattr(remote_cli, f"{command_name}_command"), ["hopg", "--detach"])
 
     assert_clean_result(result)
 
@@ -419,7 +420,7 @@ def test_run_profile_and_material_dispatch(monkeypatch):
     )
 
     result = invoke(
-        remote.start_command,
+        remote_cli.start_command,
         ["sub_100keV", "-m", "hopg", "--headless"],
     )
 
@@ -445,7 +446,7 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.start_command, ["sub_100keV", "--headless"])
+    result = invoke(remote_cli.start_command, ["sub_100keV", "--headless"])
 
     assert_legacy_run_result(result)
     assert calls[0][0] == ["hopg", "mose2"]
@@ -470,7 +471,7 @@ def test_run_profile_without_membership_uses_catalog_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.start_command, ["sub_100keV", "--headless"])
+    result = invoke(remote_cli.start_command, ["sub_100keV", "--headless"])
 
     assert_legacy_run_result(result)
     assert calls[0][0] == ["mose2", "hopg"]
@@ -484,12 +485,12 @@ def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeyp
         lambda materials, **kwargs: calls.append((materials, kwargs)),
     )
 
-    result = invoke(remote.command, ["pull", "hopg@sub_100keV", "--hash", "abc123"])
+    result = invoke(remote_cli.command, ["pull", "hopg@sub_100keV", "--hash", "abc123"])
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV"]
     assert calls[0][1]["hash_prefix"] == "abc123"
 
-    ambiguous = invoke(remote.command, ["pull", "hopg", "wse2", "--hash", "abc123"])
+    ambiguous = invoke(remote_cli.command, ["pull", "hopg", "wse2", "--hash", "abc123"])
     assert ambiguous.exit_code == 2
     assert "requires exactly one MATERIAL@PROFILE" in ambiguous.stderr
 
@@ -516,7 +517,7 @@ def test_partial_pull_all_forwards_full_material_list(monkeypatch, tmp_path, fla
         lambda materials, **kwargs: seen.update(materials=materials, kwargs=kwargs),
     )
 
-    result = invoke(remote.command, ["pull", "--all", flag])
+    result = invoke(remote_cli.command, ["pull", "--all", flag])
 
     assert_clean_result(result)
     assert seen["materials"] == ["hopg", "hbn", "mos2"]
@@ -542,7 +543,7 @@ def test_clear_implicit_profile_uses_catalog_materials(monkeypatch):
         lambda materials, yes, **kwargs: calls.append((materials, yes, kwargs)),
     )
 
-    result = invoke(remote.command, ["rm", "--profile", "standard"])
+    result = invoke(remote_cli.command, ["rm", "--profile", "standard"])
 
     assert_clean_result(result)
     assert calls == [(["hopg", "hbn"], False, {"catalog_profile": "standard"})]
@@ -565,7 +566,7 @@ def test_pull_profile_expands_membership_to_qualified_selectors(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)),
     )
 
-    result = invoke(remote.command, ["pull", "--profile", "sub_100keV"])
+    result = invoke(remote_cli.command, ["pull", "--profile", "sub_100keV"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV", "mose2@sub_100keV"]
@@ -588,7 +589,7 @@ def test_pull_positional_profile_expands_membership(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)),
     )
 
-    result = invoke(remote.command, ["pull", "sub_100keV"])
+    result = invoke(remote_cli.command, ["pull", "sub_100keV"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV", "mose2@sub_100keV"]
@@ -611,17 +612,19 @@ def test_pull_profile_qualifies_explicit_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)),
     )
 
-    result = invoke(remote.command, ["pull", "hopg", "--profile", "sub_100keV"])
+    result = invoke(remote_cli.command, ["pull", "hopg", "--profile", "sub_100keV"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV"]
 
-    with_all = invoke(remote.command, ["pull", "--all", "--profile", "sub_100keV"])
+    with_all = invoke(remote_cli.command, ["pull", "--all", "--profile", "sub_100keV"])
     assert with_all.exit_code == 0
     assert "warning:" in with_all.stderr
     assert "ignoring --all" in with_all.stderr
 
-    with_selector = invoke(remote.command, ["pull", "hopg@sub_100keV", "--profile", "sub_100keV"])
+    with_selector = invoke(
+        remote_cli.command, ["pull", "hopg@sub_100keV", "--profile", "sub_100keV"]
+    )
     assert with_selector.exit_code == 2
     assert "drop the @PROFILE selector" in with_selector.stderr
 
@@ -644,7 +647,7 @@ def test_pull_profile_without_membership_uses_catalog_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)),
     )
 
-    result = invoke(remote.command, ["pull", "--profile", "sub_100keV"])
+    result = invoke(remote_cli.command, ["pull", "--profile", "sub_100keV"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["mose2@sub_100keV", "hopg@sub_100keV"]
@@ -667,7 +670,7 @@ def test_pull_material_option_narrows_positional_profile(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)),
     )
 
-    result = invoke(remote.command, ["pull", "sub_100keV", "-m", "hopg"])
+    result = invoke(remote_cli.command, ["pull", "sub_100keV", "-m", "hopg"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV"]
@@ -684,7 +687,7 @@ def test_pull_material_option_rejects_material_outside_profile(monkeypatch):
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
 
-    result = invoke(remote.command, ["pull", "sub_100keV", "-m", "hbn"])
+    result = invoke(remote_cli.command, ["pull", "sub_100keV", "-m", "hbn"])
 
     assert result.exit_code == 2
     assert "profile 'sub_100keV' does not include hbn" in result.stderr

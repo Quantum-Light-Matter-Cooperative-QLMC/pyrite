@@ -14,22 +14,8 @@ from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.campaign.profiles import FIDELITY_NAMES, resolve_numerics
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli import json as cli_json
-from pyrite.cli._core import (
-    AZIMUTH_CSV_RANGE,
-    COUNT_CSV,
-    ENERGY_CSV_RANGE,
-    THICKNESS_CSV_RANGE,
-    TILT_CSV_RANGE,
-    CLIError,
-    LazyGroup,
-    confirm_destructive,
-    emit_json_result,
-    emit_result,
-    flatten_option_values,
-    output_option,
-)
 from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands._filter_shared import (
     filter_cli_options,
     filter_row,
@@ -50,6 +36,20 @@ from pyrite.cli.commands._profile_shared import (
 )
 from pyrite.cli.commands._profile_shared import existing_profile as _existing_profile
 from pyrite.cli.commands._profile_shared import write as _write
+from pyrite.console import json as cli_json
+from pyrite.console.output import (
+    AZIMUTH_CSV_RANGE,
+    COUNT_CSV,
+    ENERGY_CSV_RANGE,
+    THICKNESS_CSV_RANGE,
+    TILT_CSV_RANGE,
+    CLIError,
+    confirm_destructive,
+    emit_json_result,
+    emit_result,
+    flatten_option_values,
+    output_option,
+)
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,

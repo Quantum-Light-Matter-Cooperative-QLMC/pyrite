@@ -4,6 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from pyrite.checkpoints import campaign_lock
+from pyrite.cli.commands import scan as scan_cli
 from pyrite.materials import CATALOG
 from pyrite.runs import scan
 
@@ -89,7 +90,7 @@ def _run_scan(monkeypatch, tmp_path, *, ref):
     monkeypatch.setattr(scan, "gate_cases_by_penetration", lambda cases, **kw: (cases, []))
     monkeypatch.setattr(type(CATALOG), "profile_energy_grid_ref", lambda self, name, material: ref)
     result = CliRunner().invoke(
-        scan.command,
+        scan_cli.command,
         ["standard", "-m", "hopg", "--checkpoint-dir", str(tmp_path)],
         catch_exceptions=False,
     )
