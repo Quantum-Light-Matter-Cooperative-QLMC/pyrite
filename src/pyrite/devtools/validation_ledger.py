@@ -7,6 +7,8 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from pyrite.validation.check_records import ValidationRecord, read_records
+
 STATUS_ORDER = (
     "signed-off",
     "anchored",
@@ -148,7 +150,9 @@ def _reject_duplicate_ids(entries: list[LedgerEntry]) -> None:
         raise ValueError(f"duplicate validation IDs: {', '.join(duplicate_ids)}")
 
 
-def render_status_summary(entries: tuple[LedgerEntry, ...]) -> str:
+def render_status_summary(
+    entries: tuple[LedgerEntry, ...], records: tuple[ValidationRecord, ...] = ()
+) -> str:
     """Render the compact project-level status view."""
     counts = Counter(entry.status for entry in entries)
     rows = [
@@ -158,6 +162,15 @@ def render_status_summary(entries: tuple[LedgerEntry, ...]) -> str:
         f"| **Total** | **{len(entries)}** |",
     ]
     signed = counts["signed-off"]
+    latest: dict[str, ValidationRecord] = {}
+    for record in records:
+        previous = latest.get(record.ledger_id)
+        if previous is None or record.recorded_at > previous.recorded_at:
+            latest[record.ledger_id] = record
+    evidence = Counter(
+        latest[entry.validation_id].verdict if entry.validation_id in latest else "missing"
+        for entry in entries
+    )
     return "\n".join(
         [
             GENERATED_NOTICE,
@@ -169,6 +182,15 @@ def render_status_summary(entries: tuple[LedgerEntry, ...]) -> str:
             "`pyrite-dev validation-ledger --write` after editing detailed records.",
             "",
             f"**Publication gate:** {signed} / {len(entries)} claims signed off.",
+            "",
+            "## Latest automated evidence",
+            "",
+            "| Verdict | Claims |",
+            "|---|---:|",
+            *(
+                f"| `{verdict}` | {evidence[verdict]} |"
+                for verdict in ("pass", "fail", "skip", "missing")
+            ),
             "",
             *rows,
             "",
@@ -215,8 +237,9 @@ def render_domain_inventories(entries: tuple[LedgerEntry, ...]) -> str:
 def generated_views(ledger: Path) -> dict[Path, str]:
     """Return generated output paths and their expected contents."""
     entries = parse_ledger_parts(ledger)
+    records = read_records(ledger.with_name("check-records"))
     return {
-        ledger.with_name("status-summary.md"): render_status_summary(entries),
+        ledger.with_name("status-summary.md"): render_status_summary(entries, records),
         ledger.with_name("domain-inventories.md"): render_domain_inventories(entries),
     }
 

@@ -8,6 +8,15 @@ Compact generated view of the [detailed validation ledger]
 
 **Publication gate:** 0 / 121 claims signed off.
 
+## Latest automated evidence
+
+| Verdict | Claims |
+|---|---:|
+| `pass` | 0 |
+| `fail` | 0 |
+| `skip` | 0 |
+| `missing` | 121 |
+
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
