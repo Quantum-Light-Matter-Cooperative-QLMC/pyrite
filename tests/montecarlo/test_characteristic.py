@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 
 import numpy as np
+import pytest
 
 from pyrite._backend import REAL, xp
 from pyrite.montecarlo.spectrum import characteristic
@@ -223,6 +224,91 @@ def test_off_grid_line_contributes_only_its_physical_tail(monkeypatch):
     ).sum()
     assert 0.0 < narrow_mass < wide_mass < 1.0
     assert np.sum(spectrum * widths) > 0.0
+
+
+def test_energy_bin_edges_clamp_negative_first_edge_to_physical_floor():
+    # First spacing (99) exceeds the start (1.0), so the mirrored reflection
+    # 1.0 - 0.5*99 = -48.5 would be an unphysical negative photon energy.
+    grid = np.array([1.0, 100.0, 101.0])
+
+    edges, widths = characteristic._energy_bin_edges_and_widths(grid)
+
+    assert edges[0] == 0.0
+    assert widths[0] == edges[1] - 0.0
+    np.testing.assert_array_equal(edges[1:], [50.5, 100.5, 101.5])
+    assert np.all(widths > 0.0)
+
+
+def test_energy_bin_edges_leave_ordinary_first_edge_unclamped():
+    grid = np.arange(250.0, 291.0, 1.0)
+
+    edges, _widths = characteristic._energy_bin_edges_and_widths(grid)
+
+    assert edges[0] == grid[0] - 0.5 * (grid[1] - grid[0])
+    assert edges[0] > 0.0
+
+
+def test_characteristic_line_window_mass_conserves_captured_plus_truncated():
+    energy = np.arange(275.0, 279.0001, 0.02)
+
+    report = characteristic.characteristic_line_window_mass(energy, "C")
+
+    table = characteristic.load_characteristic_cross_sections("C")
+    physically_relevant = {
+        label
+        for label, line_energy in zip(table.line_labels, table.line_energy_eV, strict=True)
+        if line_energy > table.recommended_cutoff_eV
+    }
+    assert set(report) == physically_relevant
+    for captured, truncated in report.values():
+        assert 0.0 <= captured <= 1.0
+        assert np.isclose(captured + truncated, 1.0, rtol=0.0, atol=1.0e-12)
+    # The K-alpha lines sit inside this narrow window: most of their mass is
+    # captured, not truncated.
+    ka1_captured, ka1_truncated = report["Ka1"]
+    assert ka1_captured > 0.9
+    assert ka1_truncated < 0.1
+
+
+def test_characteristic_line_window_mass_reports_full_truncation_off_grid():
+    # Far below every carbon line: captured mass rounds to zero and the
+    # truncated tail is (numerically) the whole line, i.e. nothing is
+    # silently redistributed into a window that cannot see the line at all.
+    report = characteristic.characteristic_line_window_mass(np.array([1.0, 2.0]), "C")
+
+    for captured, truncated in report.values():
+        assert captured == pytest.approx(0.0, abs=1.0e-4)
+        assert truncated == pytest.approx(1.0, abs=1.0e-4)
+
+
+def test_severely_truncated_window_warns_instead_of_silently_dropping_mass(monkeypatch):
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
+    # The K-alpha centroid (277.0 eV) sits inside this window, but the window
+    # is only ~0.9 FWHM wide, so most of the physical Lorentzian mass is
+    # truncated at its edges rather than captured.
+    energy = np.array([276.98, 277.02])
+
+    with pytest.warns(RuntimeWarning, match="truncates"):
+        characteristic.mc_characteristic_spectrum(
+            _carbon_segments([100.0]),
+            energy,
+            composition=[("C", 0.1)],
+            electron_limit=1,
+        )
+
+
+def test_well_covered_window_does_not_warn_about_truncation(monkeypatch, recwarn):
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
+    energy = np.arange(275.0, 279.0001, 0.02)
+
+    characteristic.mc_characteristic_spectrum(
+        _carbon_segments([100.0]),
+        energy,
+        composition=[("C", 0.1)],
+        electron_limit=1,
+    )
+
+    assert not any(issubclass(w.category, RuntimeWarning) for w in recwarn.list)
 
 
 def test_characteristic_enforces_one_keV_transport_validity_floor(monkeypatch):
