@@ -314,6 +314,61 @@ def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):
     np.testing.assert_array_equal(captured["E_grid_brem"], analyze.WIDE_BREM_EV)
 
 
+def test_build_case_marks_grid_for_post_transport_sinc_resolution(monkeypatch):
+    monkeypatch.setattr(analyze, "material_sweep", lambda *args, **kwargs: object())
+    monkeypatch.setattr(analyze, "build_cases", lambda *args, **kwargs: [{"name": "case"}])
+
+    case = analyze._build_case("hopg", 100.0, 5.0, 100.0, 1.0e7, 10)
+
+    assert case["_diagnostic_line_grid"] == {
+        "start_eV": analyze.WIDE_GRID_START_EV,
+        "stop_eV": analyze.WIDE_GRID_STOP_EV,
+        "aliased_weight_limit": analyze.ALIASED_WEIGHT_LIMIT,
+        "backend_safety_ulps": analyze.BACKEND_SAFETY_ULPS,
+        "maximum_spacing_eV": analyze.MAX_DIAGNOSTIC_SPACING_EV,
+    }
+
+
+def test_candidate_rejects_result_above_alias_budget():
+    E = np.array([10.0, 20.0, 30.0])
+    result = {
+        "E_grid": E,
+        "spec": np.array([1.0, 1.0, 0.0]),
+        "E_grid_brem": E,
+        "brem_wide": np.array([1.0, 1.0, 0.0]),
+        "line_grid_diagnostic": {
+            "target_spacing_eV": 1.0,
+            "actual_spacing_eV": 1.0,
+            "aliased_weight_fraction": 0.02,
+            "aliased_weight_limit": 0.01,
+            "backend_dtype": "float32",
+            "observable_class": "intrinsic_source",
+        },
+    }
+
+    with pytest.raises(ValueError, match="alias budget"):
+        analyze._candidate_from_result("hopg", 5.0, 100.0, 1.0e7, result)
+
+
+def test_diagnostic_transport_resolves_grid_before_spectrum(monkeypatch):
+    from pyrite.montecarlo import runner
+
+    case = analyze._build_case("hopg", 100.0, 5.0, 100.0, 1.0e7, 1)
+    segments = {
+        "E_keV": np.array([100.0]),
+        "L_ang": np.array([1000.0]),
+        "v_hat": np.array([[0.0, 0.0, 1.0]]),
+        "elec_id": np.array([0]),
+    }
+    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: segments)
+
+    transport = runner._transport_case(case, transport_core="lockstep")
+
+    assert transport["E_grid"].size > 2
+    assert np.all(np.diff(transport["E_grid"].astype(np.float32)) > 0.0)
+    assert transport["diagnostic_grid"]["observable_class"] == "intrinsic_source"
+
+
 def test_candidate_brem_channel_refuses_silent_truncation():
     # The incoherent (brem) coverage call must keep allow_shortfall=False: a brem
     # spectrum whose 95% mass sits in the final bin means the true coverage lies
