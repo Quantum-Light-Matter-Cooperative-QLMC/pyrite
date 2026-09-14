@@ -41,8 +41,14 @@ PAYLOAD_SCHEMA = 1
 DEFAULT_SPACING_OVER_ULP = (8.0, 30.0, 100.0, 300.0, 1000.0, 3000.0)
 DEFAULT_WINDOW_EV = 200.0
 DEFAULT_BANDS = ((8192.0, 16384.0), (16384.0, 32768.0))
-#: Locator grid for the strongest in-band line; it only places the window.
+#: Locator grid for the strongest in-band window; it only places the window.
 LOCATOR_STEP_EV = 2.0
+#: A top node and spacing that are exact float32 ulp multiples make every node
+#: exactly representable, which hides the cast jitter a production ``linspace``
+#: carries. The default grid is moved off that lattice by an irrational fraction
+#: of an ulp and an irrational relative stretch of the spacing.
+LATTICE_TOP_OFFSET_ULPS = 0.3819660112501051
+LATTICE_SPACING_STRETCH = 1.0 / (1000.0 * np.pi)
 
 
 def float32_ulp(energy_eV: float) -> float:
@@ -50,15 +56,25 @@ def float32_ulp(energy_eV: float) -> float:
     return float(np.spacing(np.float32(energy_eV)))
 
 
-def ulp_window_grid(top_eV: float, spacing_over_ulp: float, window_eV: float) -> np.ndarray:
-    """Production-style ``linspace`` ending exactly at ``top_eV``.
+def ulp_window_grid(
+    top_eV: float, spacing_over_ulp: float, window_eV: float, *, off_lattice: bool = True
+) -> np.ndarray:
+    """Production-style ``linspace`` whose spacing is ``spacing_over_ulp`` float32 ulps.
 
-    The spacing is ``spacing_over_ulp`` float32 ulps of the top node and the
-    interval count is the nearest integer to ``window_eV / spacing`` (at least 2).
+    The interval count is the nearest integer to ``window_eV / spacing`` (at least
+    2). With ``off_lattice`` (default) the top node sits
+    :data:`LATTICE_TOP_OFFSET_ULPS` ulps above ``top_eV`` and the spacing is
+    stretched by :data:`LATTICE_SPACING_STRETCH`, so nodes are generically not
+    float32-representable; without it the nodes lie exactly on the ulp lattice.
     """
-    step = float(spacing_over_ulp) * float32_ulp(top_eV)
+    ulp = float32_ulp(top_eV)
+    step = float(spacing_over_ulp) * ulp
+    top = float(top_eV)
+    if off_lattice:
+        step *= 1.0 + LATTICE_SPACING_STRETCH
+        top += LATTICE_TOP_OFFSET_ULPS * ulp
     intervals = max(int(round(float(window_eV) / step)), 2)
-    return np.linspace(float(top_eV) - intervals * step, float(top_eV), intervals + 1)
+    return np.linspace(top - intervals * step, top, intervals + 1)
 
 
 def cast_statistics(E_grid_eV: object, dtype=np.float32) -> dict[str, float]:
@@ -81,29 +97,42 @@ def cast_statistics(E_grid_eV: object, dtype=np.float32) -> dict[str, float]:
 def locate_windows(
     lines_fn, bands: Sequence[tuple[float, float]], window_eV: float
 ) -> list[dict[str, float]]:
-    """Top energy of a ``window_eV`` window on the strongest line of each binade."""
+    """Top energy of the ``window_eV`` window with the most line yield in each binade.
+
+    Candidate windows overlap by half and are each evaluated on their own coarse
+    grid, exactly as the measurement evaluates them. That matters: the line
+    kernel culls segments whose resonance misses the requested grid, so a
+    band-wide locator can report far sinc tails where a narrow window holds no
+    line at all.
+    """
     windows = []
-    half = 0.5 * float(window_eV)
+    width = float(window_eV)
+    margin = 10.0  # keeps the widest-spacing, off-lattice window inside the binade
     for low, high in bands:
-        # Keep every node of the widest-spacing window inside the binade.
-        centres = np.arange(low + half + 10.0, high - half - 10.0, LOCATOR_STEP_EV)
-        if centres.size == 0:
-            raise ValueError(f"window {window_eV:g} eV does not fit in band [{low:g}, {high:g})")
-        density = np.asarray(lines_fn(centres), dtype=float)
-        if not np.any(density > 0.0):
+        tops = np.arange(low + width + margin, high - margin, 0.5 * width)
+        if tops.size == 0:
+            raise ValueError(f"window {width:g} eV does not fit in band [{low:g}, {high:g})")
+        best = None
+        for top in tops:
+            grid = np.arange(top - width, top + 0.5 * LOCATOR_STEP_EV, LOCATOR_STEP_EV)
+            density = np.asarray(lines_fn(grid), dtype=float)
+            integral = float(np.trapezoid(density, grid))
+            if integral > 0.0 and (best is None or integral > best[0]):
+                best = (integral, float(top), float(grid[int(np.argmax(density))]))
+        if best is None:
             raise SystemExit(
                 f"no CXR line density in [{low:g}, {high:g}) eV for this case; choose a case "
                 "whose lines reach this float32 binade"
             )
-        peak = float(centres[int(np.argmax(density))])
+        integral, top, peak = best
         windows.append(
             {
                 "band_low_eV": float(low),
                 "band_high_eV": float(high),
                 "peak_eV": peak,
-                "top_eV": peak + half,
-                "ulp_eV": float32_ulp(peak + half),
-                "band_integral": float(np.trapezoid(density, centres)),
+                "top_eV": top,
+                "ulp_eV": float32_ulp(top),
+                "window_integral": integral,
             }
         )
     return windows
@@ -297,8 +326,8 @@ def build_parser() -> argparse.ArgumentParser:
     transport.add_argument("--energy", type=float, default=300.0)
     transport.add_argument("--tilt", type=float, default=5.0)
     transport.add_argument("--azimuth", type=float, default=95.0)
-    transport.add_argument("--thickness", type=float, default=1.0e5)
-    transport.add_argument("--ne", type=int, default=100)
+    transport.add_argument("--thickness", type=float, default=1.0e6)
+    transport.add_argument("--ne", type=int, default=200)
     transport.add_argument("--seed", type=int, default=0)
     transport.add_argument(
         "--bands", default=",".join(f"{low:g}:{high:g}" for low, high in DEFAULT_BANDS)
