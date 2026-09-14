@@ -10,7 +10,10 @@ smallest standard polar tilts (near tilt=0, where E_res is maximized) across
 every standard azimuth, plus a couple of larger-tilt spot checks. Rank by the
 energy at which 95% of coherent-line intensity is captured, refine the top
 candidates at higher Ne, then report a +5%-margined ``stop`` and a ``num`` that
-resolves at least 99% of the sinc-feature intensity proxy. Each coarse/refine batch of
+resolves at least 99% of the sinc-feature intensity proxy. The 95% figure is a
+BANDWIDTH policy (how much spectrum the grid spans) and the sinc-feature budget
+is the independent RESOLUTION policy (how accurately it is sampled); see the
+two labelled constant blocks below. Each coarse/refine batch of
 geometries is run through pyrite.montecarlo.runner.run_cases, which pipelines
 the independent per-geometry transports across a CPU worker pool instead of
 running them one at a time.
@@ -31,6 +34,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
+from pyrite._line_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
 from pyrite.energy_grid import defaults as lg_defaults
@@ -39,10 +43,25 @@ from pyrite.energy_grid.semantics import resolution_num
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner import run_cases
 
+# ---- BANDWIDTH policy (how much spectrum the grid spans) --------------------
+# COVERAGE is a bandwidth statement and nothing else: the energy below which 95%
+# of integrated coherent-line intensity falls, plus a margin, rounded up. It
+# says how much of the spectrum the grid covers, NOT how accurately the covered
+# part is sampled. Conflating the two is the #101 defect this split fixes --
+# raising COVERAGE buys more spectrum, never a more converged line.
 COVERAGE = 0.95
 MARGIN = 0.05
 ROUND_TO_EV = 100.0
+
+# ---- RESOLUTION policy (how finely that span is sampled) --------------------
+# Accuracy tolerance, set independently of COVERAGE and independently per
+# observable. This scan measures the intrinsic-source spectrum only, so it sets
+# that observable's tolerance alone; detector-convolved counts carry their own
+# (pyrite._line_grid_policy.DEFAULT_RTOL) and are never forced onto this one.
+# The t_L^2-weighted fraction of sinc features narrower than the step is the
+# first-order proxy for the relative spectral error the step commits.
 ALIASED_WEIGHT_LIMIT = 0.01
+RESOLUTION_RTOL = {"intrinsic_source": ALIASED_WEIGHT_LIMIT}
 BACKEND_SAFETY_ULPS = 8.0
 MAX_DIAGNOSTIC_SPACING_EV = None
 # Diagnostic histogram grid for measuring coverage. Its CEILING must sit well
@@ -454,15 +473,18 @@ def derive_bounds(
             backend_dtype=resolution_driver.backend_dtype,
             observable_class=resolution_driver.observable_class,
             bandwidth={
+                "policy": COVERAGE_BANDWIDTH_POLICY,
                 "stop_eV": stop_eV,
                 "coverage": COVERAGE,
                 "margin": MARGIN,
                 "raw_eV": driver.coverage_energy_eV,
             },
             resolution={
+                "policy": AUTOMATIC_RESOLUTION_POLICY,
                 "num": num,
                 "target_spacing_eV": resolution_driver.target_spacing_eV,
                 "aliased_weight_limit": ALIASED_WEIGHT_LIMIT,
+                "rtol": dict(RESOLUTION_RTOL),
                 "observable_class": resolution_driver.observable_class,
             },
             driver_material=driver.material,

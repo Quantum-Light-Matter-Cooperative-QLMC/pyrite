@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,44 +35,13 @@ _PROFILE_SCALAR_NUMERICS_KEYS = (*CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 _DEFAULT_PROFILE_DETECTOR_SPEC: Mapping[str, object] = MappingProxyType({})
 
 
-_MISSING_LINE_GRID_RE = re.compile(
-    r"^requires E_grid_line, or an energy_grids store entry covering beam energies (\[.*\])$"
-)
-
-
 def _negative(hkl: tuple[int, int, int]) -> tuple[int, int, int]:
     return cast(tuple[int, int, int], tuple(-value for value in hkl))
 
 
-def _derive_hint(message: str, paths: Sequence[str], profile: str | None) -> str | None:
-    """A canonical energy-grid derivation suggestion for the affected materials when
-    ``message`` is the missing-line-grid error, else ``None``: point the user
-    at the fix, not just the failure."""
-    match = _MISSING_LINE_GRID_RE.match(message)
-    if match is None:
-        return None
-    energies = match.group(1).strip("[]").replace(" ", "")
-    materials = [
-        path.removeprefix("materials.").removesuffix(".scan")
-        for path in paths
-        if path.startswith("materials.") and path.endswith(".scan")
-    ]
-    if not materials:
-        return None
-    material_arg = ",".join(materials)
-    profile_arg = f" --profile {profile}" if profile is not None else ""
-    return (
-        "run `pyrite material energy-grid derive "
-        f"--energy {energies} --material {material_arg}{profile_arg}`"
-    )
-
-
-def _grouped_error_lines(
-    errors: Sequence[str], *, profile: str | None = None, max_paths: int = 3
-) -> list[str]:
+def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[str]:
     """Collapse identical-message errors across many material paths into one
     summary line each. A profile-wide setting invalid for every material
-    (e.g. a beam energy with no material's line-grid store covering it)
     otherwise repeats the same message once per material -- unreadable at
     catalog scale."""
     grouped: dict[str, list[str]] = {}
@@ -95,9 +63,6 @@ def _grouped_error_lines(
             shown_text = ", ".join(shown)
             suffix = f", +{remainder} more" if truncated else ""
             line = f"{len(paths)} paths ({shown_text}{suffix}): {message}"
-        hint = _derive_hint(message, paths, profile)
-        if hint is not None:
-            line = f"{line} -- {hint}"
         lines.append(line)
     return lines
 
@@ -110,7 +75,8 @@ class MaterialConfigError(ValueError):
     errors
         Individual validation messages, normally prefixed by catalog paths.
     profile
-        Optional selected profile used to produce profile-specific repair hints.
+        Optional selected profile, retained for caller compatibility and
+        reporting context.
 
     Attributes
     ----------
@@ -122,7 +88,7 @@ class MaterialConfigError(ValueError):
         self.errors = tuple(errors)
         super().__init__(
             "invalid material catalog:\n"
-            + "\n".join(f"- {e}" for e in _grouped_error_lines(self.errors, profile=profile))
+            + "\n".join(f"- {e}" for e in _grouped_error_lines(self.errors))
         )
 
 

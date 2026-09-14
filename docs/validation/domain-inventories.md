@@ -26,6 +26,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`pxr-amplitude`](ledger-core-coherent-physics.md#pxr-amplitude) | `χ_g` PXR susceptibility amplitude | `rederived` |
 | [`cbs-amplitude`](ledger-core-coherent-physics.md#cbs-amplitude) | `U_g` CBS potential amplitude + relativistic 1/γ braced terms | `rederived` |
 | [`relativistic-ceiling`](ledger-core-coherent-physics.md#relativistic-ceiling) | beam kinetic energies above `BEAM_ENERGY_CEILING_KEV = 300` keV are refused (raise) rather than extrapolated, because the Zhai/Feranchuk PXR/CBS kernels are a nonrelativistic derivation | `unverified` |
+| [`line-grid-kinematic-bandwidth`](ledger-core-coherent-physics.md#line-grid-kinematic-bandwidth) | automatic case-local line grids bound their upper edge by `E_res <= ħc β \|g\|_max / (1 − β)`, the direction-maximized form of the PXR/CBS resonance `E_res = ħc (v·g)/(1 − n̂·v)`, evaluated at the incident speed over the case's own reflection set | `unverified` |
 | [`line-energy-dispersion`](ledger-core-coherent-physics.md#line-energy-dispersion) | `ω = v·g / (1 − v·n̂)` tunable line energy | `discrepancy` |
 | [`longitudinal-target-timing`](ledger-core-coherent-physics.md#longitudinal-target-timing) | conditional positive-basal-harmonic target timing: `kγ = β\|g\|cos(tilt)/(1−βcos(theta_obs))`, `Eγ=ℏc kγ`, `T=h/Eγ`, and Gaussian `σt=sqrt(−ln η)/Ω` with `Ω=2π/T` | `anchored` |
 | [`closed-form-flux`](ledger-core-coherent-physics.md#closed-form-flux) | Eq.(12) closed-form line flux (single-segment reference) | `anchored` |

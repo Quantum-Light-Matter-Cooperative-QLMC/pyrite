@@ -18,10 +18,9 @@ from typing import Any
 
 import numpy as np
 
-from ..._backend import BACKEND, REAL
+from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid
 from ..._env import env_value, set_canonical_env
-from ..._grid_semantics import resolution_num, validate_backend_spacing
 from .. import spectrum as _spectrum_mod
 from ..case import Case
 from ..geometry import tilted_geometry
@@ -37,7 +36,6 @@ from ..spectrum import (
 from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
-from ..spectrum.diagnostics import sinc_feature_spacing
 from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
@@ -116,6 +114,7 @@ from .chunking import (
 from .chunking import (
     _real_itemsize as _real_itemsize,
 )
+from .line_grid import resolve_line_grid
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
 
@@ -588,45 +587,10 @@ def _transport_case(
     else:
         segs_all = _transport(False)
 
-    # Grid derivation needs the transport distribution before choosing line
-    # resolution. This private marker is emitted only by energy_grid.derive;
-    # production cases and #101's future case-local resolver stay unchanged.
-    diagnostic_grid = case.get("_diagnostic_line_grid")
-    if diagnostic_grid is not None:
-        target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
-            segs_all,
-            n_hat,
-            electron_limit=Ne,
-            aliased_weight_limit=diagnostic_grid["aliased_weight_limit"],
-        )
-        maximum_spacing = diagnostic_grid.get("maximum_spacing_eV")
-        if maximum_spacing is not None:
-            if not np.isfinite(maximum_spacing) or maximum_spacing <= 0.0:
-                raise ValueError("diagnostic maximum spacing must be finite and positive")
-            target_step = min(target_step, float(maximum_spacing))
-        start = float(diagnostic_grid["start_eV"])
-        stop = float(diagnostic_grid["stop_eV"])
-        num = resolution_num(start, stop, target_step)
-        actual_step = validate_backend_spacing(
-            start,
-            stop,
-            num,
-            dtype=REAL,
-            safety_ulps=diagnostic_grid["backend_safety_ulps"],
-        )
-        E_grid = np.linspace(start, stop, num)
-        diagnostic_grid_result = {
-            "target_spacing_eV": target_step,
-            "actual_spacing_eV": actual_step,
-            "aliased_weight_fraction": aliased_fraction,
-            "aliased_weight_limit": float(diagnostic_grid["aliased_weight_limit"]),
-            "backend_dtype": np.dtype(REAL).name,
-            "backend_safety_ulps": float(diagnostic_grid["backend_safety_ulps"]),
-            "n_spacing_segments": spacing_segments,
-            "observable_class": "intrinsic_source",
-        }
-    else:
-        diagnostic_grid_result = None
+    # Line resolution needs the transport distribution, so it is chosen after
+    # the case's own trajectories exist and before the spectrum phase. No second
+    # Monte Carlo job is started for either path; see runner/line_grid.py.
+    E_grid, diagnostic_grid_result = resolve_line_grid(case, segs_all, n_hat, Ne, E_grid)
 
     tp: dict[str, Any] = dict(
         E_grid=E_grid,
@@ -1142,7 +1106,12 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         E0_keV=case["E0_keV"],
     )
     if tp.get("diagnostic_grid") is not None:
+        # Same record either way; two names because the consumers differ.
+        # ``energy_grid.derive`` reads the diagnostic key; run/checkpoint
+        # provenance reads the resolved key for automatic case-local grids.
         out["line_grid_diagnostic"] = tp["diagnostic_grid"]
+        if case.get("line_grid_policy") is not None:
+            out["line_grid_resolved"] = tp["diagnostic_grid"]
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
     if timed:
