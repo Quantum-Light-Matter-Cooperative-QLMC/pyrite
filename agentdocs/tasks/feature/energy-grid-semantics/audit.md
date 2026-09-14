@@ -37,7 +37,7 @@ during development, now pinned by
 | `detectors/eaglexo_response.py` (QE-only path) | `eaglexo_response.py:217-243` (`qe`, log-energy `np.interp`), `:322-323` (`apply` is a per-bin multiply) | none — pointwise in `E` | **nonuniform-safe** | none |
 | `detectors/eaglexo_response.py::get_response` cache | `eaglexo_response.py:391` | keys on `grid_key(E) + (...)` | **fixed** via `grid_identity` | same grid-identity test |
 | `detectors/eaglexo_response.py::integrated_charge` | `eaglexo_response.py:363` | `np.trapezoid(charge_density, self.E)` — passes the coordinate | **nonuniform-safe** | none |
-| `results/metrics.py::line_metrics` | `metrics.py:143-158` (pre: `dE = float(E[1]-E[0])` at `:143`), consumed at `:170-173` and `:187` | `peak_widths` returns a width in **samples**; `fwhm_eV = w_samp * dE` and the `n_fwhm` window `lo/hi = idx ± half` are both sample-space, converted to eV by one spacing | **guarded** | `require_uniform_grid` at `:149`; `test_grid_semantics.py::test_line_metrics_refuses_a_log_grid` |
+| `results/metrics.py::line_metrics` | `metrics.py:191-200` (post-#110: `_sample_energy`/`_integrate_energy_window` interpolate on `E` directly) | superseded — #110 replaced the sample-space `w_samp * dE` conversion with physical-energy interpolation; `peak_widths`' fractional sample crossings are mapped through `E` via `np.interp`, so the FWHM window and its integral are exact on any grid | **nonuniform-safe** (was guarded) | `test_grid_semantics.py::test_line_metrics_is_correct_on_a_log_grid` |
 | `results/metrics.py` integrals | `metrics.py:172-175` | `np.trapezoid(spec[lo:hi], E[lo:hi])` — passes the coordinate | **nonuniform-safe** | — |
 | `energy_grid/derive.py` | `derive.py:50-66,707-708` | diagnostic grids are `np.arange` only; `WIDE_BREM_EV` starts at `0.0` (a log grid cannot contain zero); ceilings are constants | **unsafe-unguarded, by design** — descriptor/policy surface, not a runtime consumer | none (scope: no default flips). Ceilings recorded below |
 | `energy_grid/bounds.py::coverage_energy` | `bounds.py:55` | `np.diff(E_grid) * (spec[:-1]+spec[1:]) / 2` — local widths; the physical-energy trapezoid | **nonuniform-safe** | none |
@@ -95,11 +95,10 @@ None of these expand with the requested energy range.
 2. **#100 — conservative detector rebinning.** `TimepixResponse` needs explicit
    input-bin masses rather than `spec * dE_fine`; `_energy_bin_edges_and_widths`
    is the existing helper to reuse. `poisson_core` falls out of the same change.
-3. **#100 — physical-energy peak metrics.** `line_metrics` should convert
-   `peak_widths`' interpolated sample crossings to energies by interpolating
-   `E`, and cut the `n_fwhm` window in eV. That is an independent fix worth
-   making even while grids stay uniform — the current `w_samp * dE` is only
-   accidentally right.
+3. **#100 — physical-energy peak metrics. Done in #110.** `line_metrics` now
+   converts `peak_widths`' interpolated sample crossings to energies by
+   interpolating `E`, and cuts the `n_fwhm` window in eV; see the updated
+   verdict above.
 4. **#101 — grid identity in artifact/case/checkpoint keys.** `grid_identity`
    now protects the in-memory response caches only. The same collision exists
    wherever a grid is summarized by `(start, stop, num)`; the compact codec in

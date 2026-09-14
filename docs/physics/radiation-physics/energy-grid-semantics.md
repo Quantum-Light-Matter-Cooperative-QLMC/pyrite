@@ -172,13 +172,16 @@ correct statements only about a uniform grid, so each one now calls
   the energy-resolution path both `response.py` and `eaglexo_response.py` use.
 * `detectors/timepix_response.py::TimepixResponse` — re-binning onto the coarse
   response input spends one fine width on every input sample.
-* `results/metrics.py::line_metrics` — `scipy.signal.peak_widths` reports a
-  width in samples, and the dominant-line window is cut in samples; both reach
-  eV only through one spacing.
 * The `sinc_cutoff` windowing in `montecarlo/spectrum/lines/_per_hkl.py`
   converts an energy half-width into a node index by dividing by $E_1 - E_0$.
   The unwindowed routes evaluate the profile at the nodes themselves and are
   unaffected.
+
+`results/metrics.py::line_metrics` is nonuniform-safe: it maps
+`scipy.signal.peak_widths`' fractional sample crossings to energies by
+interpolating `E` directly (`_sample_energy`, `_integrate_energy_window`), so
+the dominant-line window and its integral are exact on any grid, not only a
+uniform one.
 
 Grid identity is a related contract: a cache key of (size, first node, last
 node) does not identify a grid, because a linear and a logarithmic grid over the

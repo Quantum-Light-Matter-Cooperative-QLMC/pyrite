@@ -99,16 +99,22 @@ def test_timepix_response_refuses_a_log_grid():
         timepix_response.TimepixResponse(LOG_GRID, n_mc=8)
 
 
-def test_line_metrics_refuses_a_log_grid():
+def test_line_metrics_is_correct_on_a_log_grid():
+    """#110 replaced the sample-space ``w_samp * dE`` peak-width conversion with
+    physical-energy interpolation (``_sample_energy``, ``_integrate_energy_window``)
+    and grid-coordinate trapezoids, so line_metrics no longer needs the uniform
+    guard -- unlike the sample-space consumers above, a log grid is exact here,
+    not merely tolerated."""
     spec = np.exp(-(((LOG_GRID - 3000.0) / 200.0) ** 2))
-    record = {
-        "E_grid": LOG_GRID,
-        "spec": spec,
-        "brem": np.full_like(LOG_GRID, 1e-3),
-        "scale": 1.0,
-    }
-    with pytest.raises(NonuniformEnergyGridError, match="line_metrics"):
-        line_metrics(record, None)
+    brem = np.full_like(LOG_GRID, 1e-3)
+    record = {"E_grid": LOG_GRID, "spec": spec, "brem": brem, "scale": 1.0}
+    metrics = line_metrics(record, None)
+    assert metrics["coherent_flux_per_na"] == pytest.approx(float(np.trapezoid(spec, LOG_GRID)))
+    assert metrics["total_flux_per_na"] == pytest.approx(
+        float(np.trapezoid(spec, LOG_GRID)) + float(np.trapezoid(brem, LOG_GRID))
+    )
+    assert metrics["line_eV"] == pytest.approx(3000.0, abs=50.0)
+    assert metrics["fwhm_eV"] > 0.0
 
 
 def test_grid_identity_separates_grids_that_share_size_and_endpoints():
