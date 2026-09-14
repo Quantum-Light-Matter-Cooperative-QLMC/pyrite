@@ -120,27 +120,88 @@ the midpoint rule on the same flights.
 
 ### Physical flights and numerical substeps
 
-`max_dE_frac` caps one row's left-endpoint prediction
-$C(E_{\rm start})s/E_{\rm start}$ and requires `energy_model="midpoint"`.
-The realized midpoint loss is slightly larger when $C(E)$ rises as the
-electron slows, and an Urban draw is unbounded by this numerical control. When
-the predicted-mean cap binds before any physical event, the
-transport emits a row and resumes the same flight: same direction, same
-`flight_id`, `substep_id + 1`, no deflection, and no new collision draw.
-Numerical substeps are quadrature nodes of a flight's own integrals — never
-collision events, independent emitters, or a source of decoherence.
+**What.** A *physical flight* is the straight path between two physical events:
+an elastic collision, a geometry event (layer interface, exit face, or groove
+facet), the energy cutoff, or termination. Under the continuous-slowing-down
+approximation (CSDA, `straggling=False`) the electron loses energy continuously
+along that path. `max_dE_frac` $=f$ lets transport split one flight into
+several output rows, *numerical substeps*, each covering a predicted mean
+fractional loss of at most $f$. A substep boundary is not an event: the electron
+keeps its direction, `flight_id`, and collision budget, advances
+`substep_id + 1`, and is not deflected. Numerical substeps are quadrature nodes
+of a flight's own integrals — never collision events, independent emitters, or
+a source of decoherence.
 
-The collision is drawn once per physical flight as an optical depth
-$\tau=-\ln U$ and consumed per substep at that substep's own hazard,
-$\tau \to \tau-\Delta s/\lambda(E_{\rm substep})$. This is the discretized
-inversion of $\int ds/\lambda(E(s))=-\ln U$; tabulated $\lambda(E)$ has no
-closed-form inverse. At `max_dE_frac=0` (the default) every iteration is a whole
-flight and the draw reduces exactly to the historical one, so frozen runs stay
-bit-for-bit unchanged.
+**Why.** A row gives its consumers one or two point evaluations of quantities
+that vary along the flight: the stopping power in the energy update, $\beta$ in
+the clock, the elastic hazard $1/\lambda$ in the collision draw, and the
+representative energy at which the radiation kernels evaluate their path
+integrals. Each resulting error is controlled by the flight's fractional loss
+$\Delta E/E_{\rm start}$, not by its length. Flight length is set by the elastic
+mean free path, so nothing else bounds that fraction. Most flights are already
+short in this sense: about 99% lose less than 2% across the validation matrix,
+but low-energy and thick stopping cases reach a per-flight p99 of 3–10%
+(`energy-step-convergence`). Two one-point errors survive the midpoint rule at
+one row per flight:
 
-With straggling, the cap remains deterministic and is applied **before** the
-draw using the mean rate,
-$s_{\rm cap}=fE_{\rm start}/C(E_{\rm start})$. Choosing a substep from the
+- the hazard is held at $\lambda(E_{\rm start})$ for the whole flight, while the
+  elastic cross section rises as the electron slows, so unrefined flights are
+  slightly too long, first order in the fractional loss. The bias is measured
+  below Monte Carlo error at 12 000 electrons (`energy-controlled-propagation`);
+- the line kernel evaluates one resonance per row, while the resonance drifts as
+  $\beta$ falls, so the unrefined line peak is 2.6–5.7% high and converges under
+  refinement. Bremsstrahlung evaluated at $E_{\rm repr}$ is already a midpoint
+  rule and converges from a much smaller error
+  (`substep-radiation-invariance`).
+
+Substepping does not control coherent emission phase. That clock error is
+removed by the midpoint rule itself, and a fractional-loss cap on frozen-energy
+rows misses the phase tolerance at every refinement (`energy-step-convergence`);
+hence the cap requires `energy_model="midpoint"`.
+
+**How.** Each row starts at $E_{\rm start}$ with remaining optical depth $\tau$;
+a new flight first draws $\tau=-\ln U$. The row length is the shortest of:
+
+1. the collision distance $\tau\lambda(E_{\rm start})$;
+2. the distance to the next geometry event;
+3. the cutoff distance, solved with the stopping rate at
+   $(E_{\rm start}+E_{\rm cut})/2$, which also wins an exact tie that involves no
+   geometry event;
+4. unless the cutoff already binds, the cap
+   $s_{\rm cap}=fE_{\rm start}/C(E_{\rm start})$, which wins only when strictly
+   shorter.
+
+The row advances energy and clock with the midpoint update above and debits
+the budget at its own start hazard, $\tau\to\tau-s/\lambda(E_{\rm start})$,
+clamped at zero. If the cap bound, the next row continues the same flight from
+the new state. Otherwise the flight closes, a collision scatters, and the next
+flight redraws $\tau$. The debit is the discretized inversion of
+$\int_0^{s^*}ds/\lambda(E(s))=-\ln U$, which has no closed form for tabulated
+$\lambda(E)$.
+
+The cap bounds the left-endpoint prediction $C(E_{\rm start})s/E_{\rm start}$,
+not the realized loss: the midpoint loss is slightly larger when $C(E)$ rises as
+the electron slows. Because each binding cap removes close to a fraction $f$, a
+flight falling from $E_{\rm start}$ to $E_{\rm end}$ yields roughly
+$\ln(E_{\rm start}/E_{\rm end})/f$ rows, so row count grows as $1/f$ only in
+flights that actually lose energy. At `max_dE_frac=0` (the default) every row
+is a whole flight and the draw reduces exactly to the historical one, so frozen
+runs stay bit-for-bit unchanged.
+
+**Choosing $f$.** Leave it at zero for transport observables and bremsstrahlung
+yields; their refinement shifts sit inside Monte Carlo error on the validation
+matrix. Set it when the CXR line peak or lineshape matters at the percent level.
+`cxr_endpoint_resonance_drift` reports, before any spectrum is computed, how far
+each flight's resonance moves in units of its own linewidth. In the 25 keV
+carbon validation cases, $f=10^{-3}$ converged the grouped line peak to
+$2\times10^{-5}$ for a 3–5× row increase. Refinement decorrelates trajectories,
+because a changed substep grid moves every later collision, so compare ensemble
+means with their errors, never single-seed counts. The flight-grouped line
+reduction that substepped rows need is host-only and rejects `components=True`
+and layered stacks.
+
+**With straggling**, the cap remains deterministic and is applied **before** the
+draw using the same mean-rate $s_{\rm cap}$. Choosing a substep from the
 realized loss would make the partition depend on its increments and invalidate
 the compound-Poisson partition argument. Each accepted row then receives an
 Urban draw addressed by `(electron_id, flight_id, substep_id)`. The precise
