@@ -85,12 +85,18 @@ def remote_run_command(args: argparse.Namespace, uv: str) -> str:
     return " ".join(parts)
 
 
-def _slice_payload(jobdir: str, command: str, remote) -> str:
-    """The derive job's chained-slice contract with this ladder as the body."""
+def _slice_payload(jobdir: str, command: str, remote, sync_block: str) -> str:
+    """The derive job's chained-slice contract with this ladder as the body.
+
+    ``sync_block`` is the standard remote dependency sync
+    (``remote.scripts._uv_sync_block``); the body runs ``uv run --no-sync``, so
+    without it a box whose venv predates the lockfile fails on import.
+    """
     return f"""JOBDIR={remote.shell_word(jobdir)}
 cd {remote.shell_remote_dir()} || exit 1
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 echo "running line-grid convergence $(date -Is)" > "$JOBDIR/state"
+{sync_block}
 rc=0
 {command} >> "$JOBDIR/log" 2>&1 || rc=$?
 if [ "$rc" -eq 0 ]; then
@@ -128,6 +134,7 @@ def _validate(args: argparse.Namespace) -> None:
 def start(args: argparse.Namespace) -> str:
     """Sync, stage, and submit slice zero; return the remote job id."""
     from .. import remote
+    from ..remote.scripts import _uv_sync_block
 
     _validate(args)
     jobid = remote._new_jobid()
@@ -135,7 +142,7 @@ def start(args: argparse.Namespace) -> str:
     command = remote_run_command(args, remote.shell_remote_uv())
     script = remote._slurm_batch_script(
         jobid,
-        _slice_payload(jobdir, command, remote),
+        _slice_payload(jobdir, command, remote, _uv_sync_block(once=True)),
         job_name=REMOTE_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
     )
@@ -201,7 +208,7 @@ def remote_precision_commands(args: argparse.Namespace, uv: str) -> list[str]:
     ]
 
 
-def _precision_payload(jobdir: str, commands: Sequence[str], remote) -> str:
+def _precision_payload(jobdir: str, commands: Sequence[str], remote, sync_block: str) -> str:
     steps = "\n".join(
         f'{command} >> "$JOBDIR/log" 2>&1 || {{ rc=$?; echo "FAILED (precision step {index} '
         f'exit $rc) $(date -Is)" > "$JOBDIR/state"; exit "$rc"; }}'
@@ -211,6 +218,7 @@ def _precision_payload(jobdir: str, commands: Sequence[str], remote) -> str:
 cd {remote.shell_remote_dir()} || exit 1
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 echo "running line-grid precision $(date -Is)" > "$JOBDIR/state"
+{sync_block}
 {steps}
 echo "done $(date -Is)" > "$JOBDIR/state"
 """
@@ -219,6 +227,7 @@ echo "done $(date -Is)" > "$JOBDIR/state"
 def start_precision(args: argparse.Namespace) -> str:
     """Submit the float32-versus-FP64 lineshape measurement as one job."""
     from .. import remote
+    from ..remote.scripts import _uv_sync_block
     from .job import _validate_remote_output_name
 
     _validate_remote_output_name(args.json_out)
@@ -233,7 +242,7 @@ def start_precision(args: argparse.Namespace) -> str:
     commands = remote_precision_commands(args, remote.shell_remote_uv())
     script = remote._slurm_batch_script(
         jobid,
-        _precision_payload(jobdir, commands, remote),
+        _precision_payload(jobdir, commands, remote, _uv_sync_block()),
         job_name=PRECISION_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
     )
