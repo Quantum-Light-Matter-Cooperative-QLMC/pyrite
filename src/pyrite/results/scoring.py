@@ -28,18 +28,17 @@ SELECTION_MODES = (
 )
 
 
-def selection_score(m, mode="quality_peak"):
+def selection_score(m, mode="quality_line"):
     """Score a line_metrics dict ``m`` for "best geometry" selection. Higher wins.
 
-      "peak"          : peak spectral flux (the legacy best_azimuth criterion --
-                        favours the tallest spike, spurious lines included).
+      "peak"          : sampled peak spectral density (legacy and
+                        spacing-dependent; avoid for cross-grid ranking).
       "line_flux"     : integrated flux under the dominant found line.
       "coherent_flux" : integrated flux of ALL coherent lines (no peak finding).
       "line_brem_ratio": dominant-line flux relative to brem in its local peak window.
-      "quality_peak"  : peak_flux * line_quality (DEFAULT) -- favours geometries
-                        that are both bright AND have a well-defined line, so a
-                        tall-but-messy spike loses to a clean line.
-      "quality_line"  : line_flux * line_quality.
+      "quality_peak"  : sampled peak density * line_quality (legacy and
+                        spacing-dependent).
+      "quality_line"  : line_flux * line_quality (DEFAULT).
 
     ``m`` is the dict from line_metrics. Non-finite scores sort to the bottom."""
     q = m.get("line_quality", 1.0)
@@ -63,7 +62,7 @@ def top_geometries(
     results,
     settings,
     top_n=15,
-    select="quality_peak",
+    select="quality_line",
     rel_prominence=0.03,
     line_metric="sharpness",
     names=None,
@@ -72,8 +71,9 @@ def top_geometries(
     the readable alternative to dumping every (tilt, azimuth, energy) row. Ranks
     by results.selection_score(``select``) and returns the top ``top_n`` as a
     best-first DataFrame: polar/azimuth tilt, crystal thickness, beam energy,
-    dominant line energy, line-definition quality, peak spectral flux, integrated
-    coherent flux, and the dominant line's share of the total. Ranks across all
+    dominant line energy, line-definition quality, sampled peak spectral density
+    with its local spacing, integrated coherent flux, and the dominant line's
+    share of the total. Ranks across all
     thicknesses in the store, so the thickness column disambiguates otherwise
     identical geometries. ``names`` restricts to those configs (e.g. one material)."""
     recs = records(results, names)
@@ -96,7 +96,8 @@ def top_geometries(
                 "E [keV]": c["E0_keV"],
                 "line [eV]": round(m["line_eV"]),
                 "quality": round(m["line_quality"], 2),
-                "peak [Phs/eV/s]": float(f"{m['peak_flux']:.3g}"),
+                "peak density [Phs/eV/s]": float(f"{m['peak_flux']:.3g}"),
+                "peak spacing [eV]": float(f"{m['peak_sample_spacing_eV']:.3g}"),
                 "coherent [Phs/s]": float(f"{m['coherent_flux']:.3g}"),
                 "line/tot": (round(m["line_frac"], 2) if np.isfinite(m["line_frac"]) else np.nan),
             }
@@ -104,7 +105,7 @@ def top_geometries(
     return pd.DataFrame(rows).set_index("rank")
 
 
-def show_top(results, settings, top_n=15, select="quality_peak", **kw):
+def show_top(results, settings, top_n=15, select="quality_line", **kw):
     """Print + render the compact :func:`top_geometries` table -- a short, sorted
     'here are the best N geometries' view instead of the full per-row dump."""
     from IPython.display import display

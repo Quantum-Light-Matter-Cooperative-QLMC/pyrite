@@ -93,8 +93,8 @@ _AXIS_SPECS = {
 
 # Line-characterization maps are meaningless where the line is ill-defined --
 # either near-zero emission OR a broad ramp / a cluster of comparable peaks
-# (low line_quality, see results.line_quality). Gate these by BOTH peak flux
-# and line_quality. The always-well-defined maps (peak_flux, coherent_flux,
+# (low line_quality, see results.line_quality). Gate these by BOTH coherent flux
+# and line_quality. The always-well-defined maps (peak density, coherent_flux,
 # total_flux) and the diagnostic line_quality map itself are never gated.
 _FLUX_GATED = {"line_eV", "fwhm_eV", "line_frac", "line_flux"}
 
@@ -115,7 +115,6 @@ def _value_label(key, v):
 
 # (metric key, label + units, colormap)
 _HEATMAP_QUANTITIES = [
-    ("peak_flux", "peak spectral flux  (Phs/eV/s)", "viridis"),
     ("coherent_flux", "integrated coherent flux, all lines  (Phs/s)", "viridis"),
     ("line_flux", "integrated flux under the dominant line  (Phs/s)", "viridis"),
     ("line_eV", "dominant coherent line energy  (eV)", "plasma"),
@@ -130,6 +129,15 @@ _HEATMAP_QUANTITIES = [
 # e.g. plot_scan(..., quantities=["coherent_brem_ratio"]). coherent_brem_ratio is
 # ungated (not in _FLUX_GATED): it's the CXR/brem contrast, valid wherever brem>0.
 _EXTRA_QUANTITIES = {
+    "peak_flux": (
+        "sampled peak spectral density, spacing-dependent  (Phs/eV/s)",
+        "viridis",
+    ),
+    "peak_spectral_flux_density": (
+        "sampled peak spectral density, spacing-dependent  (Phs/eV/s)",
+        "viridis",
+    ),
+    "peak_sample_spacing_eV": ("local spacing at sampled peak  (eV)", "magma"),
     "coherent_brem_ratio": (
         "coherent / incoherent-brem flux ratio  (CXR / brem)",
         "cividis",
@@ -170,7 +178,7 @@ def metric_vs_frame(
     x="thickness_ang",
     metric="line_flux",
     hue="E0_keV",
-    select="quality_peak",
+    select="quality_line",
     cases=None,
     rel_prominence=0.03,
     line_metric="sharpness",
@@ -216,7 +224,7 @@ def heatmap_frame(
     x="tilt_azim_deg",
     y="tilt_deg",
     panel="E0_keV",
-    select="quality_peak",
+    select="quality_line",
     cases=None,
     rel_prominence=0.03,
     line_metric="sharpness",
@@ -247,7 +255,7 @@ def heatmap_frame(
     rows = []
     for pv in sorted({r["case"][panel] for r in recs}):
         er = [r for r in recs if r["case"][panel] == pv]
-        fmax = max((metrics[id(r)]["peak_flux"] for r in er), default=0.0)
+        fmax = max((metrics[id(r)]["coherent_flux"] for r in er), default=0.0)
         floor = min_flux_frac * fmax
         best = {}  # (xv, yv) -> (score, rec)
         for r in er:
@@ -257,7 +265,7 @@ def heatmap_frame(
                 best[ck] = (s, r)
         for (xv, yv), (_, r) in best.items():
             m = metrics[id(r)]
-            if gated and (m["peak_flux"] < floor or m["line_quality"] < min_line_quality):
+            if gated and (m["coherent_flux"] < floor or m["line_quality"] < min_line_quality):
                 continue  # near-zero emission / ill-defined line -> blank
             rows.append(
                 {

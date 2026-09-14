@@ -132,7 +132,7 @@ def plot_heatmaps(
     x="tilt_azim_deg",
     y="tilt_deg",
     panel="E0_keV",
-    select="quality_peak",
+    select="quality_line",
     rel_prominence=0.03,
     line_metric="sharpness",
     min_flux_frac=0.02,
@@ -163,17 +163,18 @@ def plot_heatmaps(
 
     When the sweep varies dimensions OTHER than x/y/panel, several records land in
     one cell; ``select`` (a results.selection_score mode, default
-    "quality_peak" = peak flux x line quality) picks the BEST record and the cell
+    "quality_line" = integrated line flux x line quality) picks the BEST record and the cell
     shows ITS metric -- i.e. "the best achievable here". For the default axes each
     cell is a single case, so the reduction is a no-op (matches the old maps).
 
-    Quantities (see results.line_metrics): peak spectral flux, the integrated
-    coherent flux of ALL lines, the integrated flux under the single dominant
+    Default quantities (see results.line_metrics): the integrated coherent flux
+    of ALL lines, the integrated flux under the single dominant
     line, that line's energy and FWHM, its share of the total flux, a
     line-definition quality map, and the total integrated flux. Maps that need NO
-    peak (peak_flux, coherent_flux, total_flux) and the quality map are valid
-    everywhere; the dominant-line maps are gated by BOTH ``min_flux_frac`` (cell
-    peak flux below this fraction of the panel max -> no emission) AND
+    peak (coherent_flux, total_flux) and the quality map are valid everywhere;
+    the spacing-dependent sampled ``peak_flux`` remains available by explicit
+    request. Dominant-line maps are gated by BOTH ``min_flux_frac`` (cell
+    coherent flux below this fraction of the panel max -> no emission) AND
     ``min_line_quality`` (line_quality below this [0,1] -> no well-defined line:
     a broad ramp or a cluster of comparable peaks). Set either to 0 to disable.
 
@@ -371,7 +372,7 @@ def plot_metric_vs(
     x="thickness_ang",
     metric="line_flux",
     hue="E0_keV",
-    select="quality_peak",
+    select="quality_line",
     cases=None,
     rel_prominence=0.03,
     line_metric="sharpness",
@@ -382,13 +383,14 @@ def plot_metric_vs(
     """1-D parameter scan: ``metric`` vs the swept parameter ``x``, one line per
     ``hue`` value, reducing every OTHER swept dimension to its best geometry
     (results.selection_score ``select``). The line-plot companion to the
-    heatmaps -- e.g. line flux vs thickness, or peak flux vs beam energy::
+    heatmaps -- e.g. line flux vs thickness, or coherent flux vs beam energy::
 
         plot_metric_vs(res, s, x="thickness_ang", metric="line_flux", logx=True)
-        plot_metric_vs(res, s, x="E0_keV", metric="peak_flux", hue="tilt_deg")
+        plot_metric_vs(res, s, x="E0_keV", metric="coherent_flux", hue="tilt_deg")
 
     ``metric`` is any line_metrics key. Generalizes plot_peak_vs_tilt
-    (x="tilt_deg", metric="peak_flux", hue="E0_keV"). ``metrics`` is a
+    The spacing-dependent sampled ``peak_flux`` metric remains available by
+    explicit request. ``metrics`` is a
     precomputed ``_common._metrics_map`` (computed in the frame builder when
     omitted); :func:`plot_scan` passes one shared map across its quantities."""
     recs = records_for_cases(results, cases)
@@ -459,7 +461,7 @@ def plot_scan(
     hue=None,
     quantities=None,
     heatmap_min=4,
-    select="quality_peak",
+    select="quality_line",
     cases=None,
     rel_prominence=0.03,
     line_metric="sharpness",

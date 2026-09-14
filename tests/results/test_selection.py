@@ -112,17 +112,17 @@ def test_case_table_rows_two_records():
         assert "thickness_ang" in row
         assert "tilt_deg" in row
         assert "tilt_azim_deg" in row
-        assert "peak_flux" in row
+        assert "peak_spectral_density" in row
         assert row["name"] == "HOPG bulk"
         assert row["thickness"] == "5um"
         assert row["thickness_ang"] == 5.0e4
         assert row["tilt_deg"] == 20.0
         assert row["tilt_azim_deg"] == 0.0
-        assert isinstance(row["peak_flux"], float)
+        assert isinstance(row["peak_spectral_density"], float)
 
 
-def test_case_table_rows_peak_flux_matches_peak():
-    """case_table_rows peak_flux value equals _peak(record) for each record."""
+def test_case_table_rows_peak_density_matches_peak():
+    """case_table_rows labels its sampled peak value as a spectral density."""
     results = {
         "HOPG bulk": {
             30.0: _record(30.0, 20.0, 0.0),
@@ -130,11 +130,11 @@ def test_case_table_rows_peak_flux_matches_peak():
         }
     }
     rows = case_table_rows(results)
-    # Verify peak_flux matches _peak for each row
+    # Verify sampled peak density matches _peak for each row
     for row in rows:
         rec = results[row["name"]][row["E0_keV"]]
         expected_peak = _peak(rec)
-        assert row["peak_flux"] == expected_peak
+        assert row["peak_spectral_density"] == expected_peak
 
 
 def test_case_table_rows_empty_store():

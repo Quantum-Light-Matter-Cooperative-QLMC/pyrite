@@ -484,8 +484,9 @@ def case_table_rows(results):
     """One plain dict per record in ``results``, for the case-picker table that
     feeds the "Add to comparison" basket flow. Carries the record's own
     ``(name, E0_keV)`` primary key (so a selected row maps straight back to
-    ``results[name][E0]``) plus the case-varying columns and a cheap peak-flux
-    metric -- no heavy per-row analysis. Row order matches :func:`records`."""
+    ``results[name][E0]``) plus the case-varying columns and a cheap sampled
+    peak-density diagnostic -- no heavy per-row analysis. Row order matches
+    :func:`records`."""
     rows = []
     for r in records(results):
         case = r["case"]
@@ -497,7 +498,7 @@ def case_table_rows(results):
                 "thickness_ang": case["thickness_ang"],
                 "tilt_deg": case["tilt_deg"],
                 "tilt_azim_deg": case["tilt_azim_deg"],
-                "peak_flux": _peak(r),
+                "peak_spectral_density": _peak(r),
             }
         )
     return rows
