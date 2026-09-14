@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from ..campaign.sweep import fmt_thickness
+from .._formatting import fmt_thickness
 from ..montecarlo import (
     simulate_trajectories,
     tilted_geometry,

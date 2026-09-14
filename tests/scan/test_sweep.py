@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from pyrite import materials as material_registry
+from pyrite._formatting import fmt_thickness
 from pyrite.campaign.config import (
     MATERIALS,
     PENETRATION_TILT_DEG,
@@ -23,7 +24,6 @@ from pyrite.campaign.sweep import (
     build_cases,
     case_cost,
     crystal_params,
-    fmt_thickness,
     geometry_table,
     scan_grid_rows,
     sweep_cost_weights,
@@ -69,8 +69,19 @@ def _detector(*, line=None, line_by_energy=None, brem=None, detector=None):
     )
 
 
-def test_fmt_thickness_uses_millimetres_at_one_mm():
-    assert fmt_thickness(10_000_000.0) == "1mm"
+@pytest.mark.parametrize(
+    ("thickness_ang", "expected"),
+    [
+        (31.6, "31.6A"),
+        (100.0, "10nm"),
+        (316.0, "31.6nm"),
+        (10_000.0, "1um"),
+        (170_000.0, "17um"),
+        (10_000_000.0, "1mm"),
+    ],
+)
+def test_fmt_thickness(thickness_ang, expected):
+    assert fmt_thickness(thickness_ang) == expected
 
 
 def test_sweep_requires_material():

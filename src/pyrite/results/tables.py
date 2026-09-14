@@ -14,7 +14,7 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from ..campaign.sweep import fmt_thickness
+from .._formatting import fmt_thickness
 from ..detectors import Detector, LegacyEDS
 from ..materials import CATALOG
 from .metrics import line_metrics

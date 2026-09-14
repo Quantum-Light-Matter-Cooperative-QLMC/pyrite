@@ -64,7 +64,6 @@ from .geometry import (  # noqa: F401  (re-exported: pyrite.campaign.sweep is th
     _seq,
     crystal_params,
     film_on_substrate_layers,
-    fmt_thickness,
     layer_radiator,
     retired_flat_input,
     stack_layers,

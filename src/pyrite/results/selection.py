@@ -14,7 +14,7 @@ flux), collapsing hundreds of azimuth runs to one row/curve each.
 
 import numpy as np
 
-from ..campaign.sweep import fmt_thickness
+from .._formatting import fmt_thickness
 
 
 # ---- record selection --------------------------------------------------------

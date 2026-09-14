@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from pyrite._formatting import fmt_thickness
 from pyrite.apps._design import apply_altair_theme
-from pyrite.campaign.sweep import fmt_thickness
 
 
 def axis_warning_block(mo, axes):

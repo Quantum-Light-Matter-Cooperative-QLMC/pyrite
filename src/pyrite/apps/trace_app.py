@@ -34,9 +34,9 @@ def _():
     except Exception:
         alt.data_transformers.disable_max_rows()
 
+    from pyrite._formatting import fmt_thickness
     from pyrite.campaign.beam_metrics import initial_state_metrics
     from pyrite.campaign.config import default_settings, trajectory_sweep
-    from pyrite.campaign.sweep import fmt_thickness
     from pyrite.materials import CATALOG
     from pyrite.plots.altair.trajectories import (
         penetration_survival_chart,
