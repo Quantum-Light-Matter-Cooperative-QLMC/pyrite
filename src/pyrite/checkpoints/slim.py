@@ -21,7 +21,7 @@ import io
 import os
 import sys
 
-from ..cli import _core as _cli_core
+from ..console import output as _cli_core
 from ..results import slim_results
 from . import _checkpoint_io, _checkpoint_store
 

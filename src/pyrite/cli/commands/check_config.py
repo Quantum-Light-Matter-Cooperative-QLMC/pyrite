@@ -12,8 +12,8 @@ from types import SimpleNamespace
 
 import click
 
+from ...console import output as _cli_core
 from ...materials import MaterialConfigError, load_material_catalog
-from .. import _core as _cli_core
 
 
 def _run(args: SimpleNamespace) -> None:

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from .._core import CLIError, confirm_destructive, emit_result
+from ...console.output import CLIError, confirm_destructive, emit_result
 
 _PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 

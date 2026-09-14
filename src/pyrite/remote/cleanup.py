@@ -1,6 +1,6 @@
 """Remote checkpoint and completed-job reclamation."""
 
-from ..cli import _core as _cli_core
+from ..console import output as _cli_core
 from . import config, scripts, state, transport
 from . import pull as pulling
 

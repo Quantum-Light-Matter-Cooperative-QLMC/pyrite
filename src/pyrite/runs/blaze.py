@@ -33,8 +33,8 @@ import os
 import time
 from contextlib import redirect_stderr, redirect_stdout
 
-from ..cli import _core as _cli_core
-from ..cli import json as cli_json
+from ..console import json as cli_json
+from ..console import output as _cli_core
 
 # Lazy runtime bindings keep command help light and focused tests patchable.
 default_settings = None

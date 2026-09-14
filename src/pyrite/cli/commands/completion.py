@@ -11,8 +11,9 @@ from pathlib import Path
 import click
 from click.shell_completion import get_completion_class
 
+from ...console.output import CLIError, emit_result, run
 from ...paths import atomic_write_text, user_data_dir
-from .._core import CLIError, LazyGroup, emit_result, run
+from .._groups import LazyGroup
 
 PROG_NAME = "pyrite"
 COMPLETE_VAR = f"_{PROG_NAME.upper()}_COMPLETE"

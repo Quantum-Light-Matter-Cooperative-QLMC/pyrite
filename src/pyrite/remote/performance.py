@@ -3,8 +3,8 @@
 import uuid
 from pathlib import Path
 
-from ..cli import _core as _cli_core
 from ..cli import dashboard as presentation
+from ..console import output as _cli_core
 from . import config, state, transport
 
 

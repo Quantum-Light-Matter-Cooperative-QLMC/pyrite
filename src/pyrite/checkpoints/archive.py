@@ -32,8 +32,8 @@ from pathlib import Path
 import click
 
 from ..cli import _completion as _cli_completion
-from ..cli import _core as _cli_core
-from ..cli import json as cli_json
+from ..console import json as cli_json
+from ..console import output as _cli_core
 from ..paths import workspace_root
 from . import _checkpoint_io, _checkpoint_store
 

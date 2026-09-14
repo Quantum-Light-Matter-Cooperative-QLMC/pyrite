@@ -7,10 +7,10 @@ from pathlib import Path
 import click
 
 from ..._env import set_canonical_env
+from ...console import output as _cli_core
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _config as _cli_config
-from .. import _core as _cli_core
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 

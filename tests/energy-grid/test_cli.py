@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from pyrite.cli import _core as _cli_core
 from pyrite.cli.commands import energy_grid
 from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
+from pyrite.console import output as _cli_core
 from pyrite.devtools.cli_commands import energy_grid_command as dev_energy_grid_command
 from pyrite.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke

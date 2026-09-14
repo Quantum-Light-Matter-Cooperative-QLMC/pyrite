@@ -8,7 +8,7 @@ import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatc
 
 from ..cli import dashboard as presentation
 from ..cli.dashboard import _KeyListener, _render_frame
-from ..cli.json import job_kind
+from ..console.json import job_kind
 from . import config, lifecycle, scripts, state, transport
 
 

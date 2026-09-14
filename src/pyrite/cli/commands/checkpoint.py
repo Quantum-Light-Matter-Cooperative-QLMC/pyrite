@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import click
 
-from .._core import LazyGroup, run
+from ...console.output import run
+from .._groups import LazyGroup
 
 _COMMANDS = {
     "slim": "pyrite.cli.commands.slim.command",

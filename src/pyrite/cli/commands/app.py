@@ -7,7 +7,7 @@ from importlib import import_module
 
 import click
 
-from .._core import LazyGroup
+from .._groups import LazyGroup
 
 _LEAVES = {
     "analysis": "pyrite.cli.commands.app.analysis_command",

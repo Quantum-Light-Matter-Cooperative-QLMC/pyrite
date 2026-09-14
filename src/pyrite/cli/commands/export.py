@@ -20,8 +20,8 @@ import sys
 
 import click
 
+from ...console import output as _cli_core
 from ...paths import app_dir
-from .. import _core as _cli_core
 
 NOTEBOOK = str(app_dir() / "analysis_app.py")
 

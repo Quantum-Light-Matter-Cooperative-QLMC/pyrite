@@ -19,7 +19,7 @@ from typing import Any
 import click
 
 from ..campaign.profiles import _jsonable, named_profile_identity, named_profile_stem
-from ..cli import _core as _cli_core
+from ..console import output as _cli_core
 from ..materials import CATALOG
 from ..paths import workspace_root
 from . import _checkpoint_store

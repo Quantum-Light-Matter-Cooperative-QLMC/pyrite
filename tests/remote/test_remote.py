@@ -17,11 +17,11 @@ from types import SimpleNamespace
 import pytest
 
 from pyrite import remote
-from pyrite.cli import _core as _cli_core
 from pyrite.cli import dashboard as _dashboard
 from pyrite.cli.commands import _remote_actions
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.dashboard import poll as dashboard_poll
+from pyrite.console import output as _cli_core
 from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
     cli,
@@ -2398,8 +2398,8 @@ def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
 
 def test_job_attach_repeats_verbose_for_the_live_report(monkeypatch):
     """`remote status -a` retired at 0.3.0; `pyrite job attach` is the door."""
-    from pyrite.cli import _core as core
     from pyrite.cli.commands.job import command as job_command
+    from pyrite.console import output as core
 
     calls = []
     monkeypatch.setattr(viewer, "attach", lambda jobid, detail: calls.append((jobid, detail)))

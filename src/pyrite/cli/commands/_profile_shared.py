@@ -10,7 +10,7 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.cli import _catalog_io
-from pyrite.cli._core import CLIError, emit_result
+from pyrite.console.output import CLIError, emit_result
 
 
 def existing_profile(document, name):

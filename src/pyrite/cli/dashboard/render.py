@@ -6,7 +6,7 @@ import re
 import sys
 import textwrap
 
-from .. import _core as _cli_core
+from ...console import output as _cli_core
 from . import state as _state
 
 # ``@`` is permitted so ``<material>@<label>-<digest>`` checkpoint @-stems pass

@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 
 from pyrite import _energy_grid_artifacts as artifacts
-from pyrite.cli import _catalog_io, _core
+from pyrite.cli import _catalog_io
 from pyrite.cli.commands import profile
+from pyrite.console import output as _core
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]

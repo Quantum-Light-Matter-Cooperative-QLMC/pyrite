@@ -12,18 +12,18 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli import json as cli_json
-from pyrite.cli._core import (
+from pyrite.cli.commands._detector_shared import (
+    collect_detector_updates,
+    detector_cli_options,
+    write_detector_fields,
+)
+from pyrite.console import json as cli_json
+from pyrite.console.output import (
     CLIError,
     confirm_destructive,
     emit_json_result,
     emit_result,
     output_option,
-)
-from pyrite.cli.commands._detector_shared import (
-    collect_detector_updates,
-    detector_cli_options,
-    write_detector_fields,
 )
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")

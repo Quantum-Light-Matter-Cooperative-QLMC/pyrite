@@ -542,7 +542,7 @@ def cmd_validation_ledger(args: argparse.Namespace) -> None:
 
 def _run_relocated_click(command, argv: list[str], *, prog_name: str) -> None:
     """Run a relocated Click tree while preserving stream and exit contracts."""
-    from pyrite.cli._core import run as run_cli
+    from pyrite.console.output import run as run_cli
 
     status = run_cli(command, argv, prog_name=prog_name)
     if isinstance(status, int) and status:

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import click
 
+from ...console.output import confirm_destructive, emit_result, output_option
 from ...remote import lifecycle, viewer
 from .. import _completion as _cli_completion
-from .._core import confirm_destructive, emit_result, output_option
 from . import remote as remote_cli
 from ._remote_actions import _cli_jobs, _cli_logs, _cli_status
 

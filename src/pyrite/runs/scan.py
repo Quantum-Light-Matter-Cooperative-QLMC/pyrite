@@ -43,9 +43,9 @@ import click
 from .._env import set_canonical_env
 from .._progress import _ProgressTimer, _write_progress_record
 from ..cli import _completion as _cli_completion
-from ..cli import _core as _cli_core
 from ..cli import dashboard as _dashboard
-from ..cli import json as cli_json
+from ..console import json as cli_json
+from ..console import output as _cli_core
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.

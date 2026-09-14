@@ -7,14 +7,14 @@ from contextlib import redirect_stderr, redirect_stdout
 
 import click
 
-from ...remote import config, lifecycle, scripts, state, transport, viewer
-from .. import dashboard as presentation
-from .. import json as cli_json
-from .._core import (
+from ...console import json as cli_json
+from ...console.output import (
     emit_diagnostic,
     emit_json_result,
     emit_result,
 )
+from ...remote import config, lifecycle, scripts, state, transport, viewer
+from .. import dashboard as presentation
 
 
 def remote_scan(material, quick=False, workers=None, fidelity="full"):
