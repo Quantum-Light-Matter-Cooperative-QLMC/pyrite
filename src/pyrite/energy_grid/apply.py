@@ -63,10 +63,20 @@ def _positive_int(value, field: str) -> int:
 def _validated_line_row(row, *, field: str) -> dict:
     energy = _positive_float(row["energy_keV"], f"{field}.energy_keV")
     start = _positive_float(row.get("start_eV", _line_start_eV(energy)), f"{field}.start_eV")
-    stop = _positive_float(row["stop_eV"], f"{field}.stop_eV")
-    num = _positive_int(row["num"], f"{field}.num")
+    bandwidth = row.get("bandwidth")
+    resolution = row.get("resolution")
+    if (bandwidth is None) != (resolution is None):
+        raise ValueError(f"{field} must supply bandwidth and resolution together")
+    stop_value = bandwidth["stop_eV"] if bandwidth is not None else row["stop_eV"]
+    num_value = resolution["num"] if resolution is not None else row["num"]
+    stop = _positive_float(stop_value, f"{field}.bandwidth.stop_eV")
+    num = _positive_int(num_value, f"{field}.resolution.num")
     if stop <= start:
-        raise ValueError(f"{field}.stop_eV must be greater than start_eV")
+        raise ValueError(f"{field}.bandwidth.stop_eV must be greater than start_eV")
+    if bandwidth is not None and "stop_eV" in row and float(row["stop_eV"]) != stop:
+        raise ValueError(f"{field}.stop_eV conflicts with bandwidth.stop_eV")
+    if resolution is not None and "num" in row and int(row["num"]) != num:
+        raise ValueError(f"{field}.num conflicts with resolution.num")
     return {"energy_keV": energy, "start_eV": start, "stop_eV": stop, "num": num}
 
 

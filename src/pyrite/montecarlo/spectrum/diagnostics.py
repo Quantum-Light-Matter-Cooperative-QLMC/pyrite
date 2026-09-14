@@ -54,6 +54,61 @@ DEFAULT_RESONANCE_DRIFT_WARN = 1.0
 DEFAULT_BREM_QUADRATURE_WARN = 1.0e-2
 
 
+def sinc_feature_spacing(
+    segments,
+    n_hat,
+    *,
+    electron_limit=None,
+    aliased_weight_limit=0.01,
+):
+    """Largest uniform step resolving all but a weighted tail of sinc features.
+
+    The line kernels use ``sinc(a_width * (E - E_res) / pi)**2`` with
+    ``a_width = (1 - v.n) * t_L / (2 HBARC_EV_ANG)``. Thus the Nyquist step
+    to the first zero is ``pi / a_width``. Select its lower weighted quantile,
+    using the kernel's leading ``t_L**2`` intensity factor as an inexpensive
+    pre-spectrum proxy. This is policy derived from the existing line model,
+    not a new radiation equation.
+
+    Returns ``(step_eV, aliased_weight_fraction, n_segments)``. Invalid
+    kinematics are ignored; an empty valid population fails closed.
+    """
+    if not 0.0 <= float(aliased_weight_limit) < 1.0:
+        raise ValueError("aliased_weight_limit must be in [0, 1)")
+    energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    energy = _host(segments[energy_field]).astype(float, copy=False)
+    length = _host(segments["L_ang"]).astype(float, copy=False)
+    direction = _host(segments["v_hat"]).astype(float, copy=False)
+    if electron_limit is not None:
+        line = _host(segments["elec_id"]) < int(electron_limit)
+        energy, length, direction = energy[line], length[line], direction[line]
+
+    beta = beta_from_keV(energy)
+    t_L = length / beta
+    denominator = 1.0 - beta * (direction @ np.asarray(n_hat, dtype=float))
+    width = 2.0 * np.pi * HBARC_EV_ANG / (denominator * t_L)
+    weight = t_L * t_L
+    valid = (
+        np.isfinite(width)
+        & np.isfinite(weight)
+        & (width > 0.0)
+        & (weight > 0.0)
+        & (denominator > 0.0)
+    )
+    width, weight = width[valid], weight[valid]
+    if width.size == 0:
+        raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
+
+    order = np.argsort(width, kind="stable")
+    width, weight = width[order], weight[order]
+    cumulative = np.cumsum(weight)
+    total = float(cumulative[-1])
+    index = int(np.searchsorted(cumulative, float(aliased_weight_limit) * total, side="left"))
+    step = float(width[min(index, width.size - 1)])
+    aliased = float(weight[width < step].sum() / total)
+    return step, aliased, int(width.size)
+
+
 def _host(array):
     get = getattr(array, "get", None)
     return np.asarray(get() if get is not None else array)

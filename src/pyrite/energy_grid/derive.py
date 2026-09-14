@@ -5,12 +5,12 @@ coverage rather than an undocumented cap.
 
 See docs/adr/0005-energy-grid-schema-decisions.md for the
 full method. Summary: for every requested material and standard beam energy,
-run a small-Ne diagnostic spectrum on a wide ``E_grid_line`` at the two
+run a small-Ne diagnostic transport at the two
 smallest standard polar tilts (near tilt=0, where E_res is maximized) across
 every standard azimuth, plus a couple of larger-tilt spot checks. Rank by the
 energy at which 95% of coherent-line intensity is captured, refine the top
-candidates at higher Ne, then report a +5%-margined ``stop`` and the ``num``
-that preserves ~3 eV endpoint-inclusive spacing. Each coarse/refine batch of
+candidates at higher Ne, then report a +5%-margined ``stop`` and a ``num`` that
+resolves at least 99% of the sinc-feature intensity proxy. Each coarse/refine batch of
 geometries is run through pyrite.montecarlo.runner.run_cases, which pipelines
 the independent per-geometry transports across a CPU worker pool instead of
 running them one at a time.
@@ -34,14 +34,16 @@ import numpy as np
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
 from pyrite.energy_grid import defaults as lg_defaults
-from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop, spacing_num
+from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop, resolution_num
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner import run_cases
 
 COVERAGE = 0.95
 MARGIN = 0.05
 ROUND_TO_EV = 100.0
-TARGET_SPACING_EV = 3.0
+ALIASED_WEIGHT_LIMIT = 0.01
+BACKEND_SAFETY_ULPS = 8.0
+MAX_DIAGNOSTIC_SPACING_EV = None
 # Diagnostic histogram grid for measuring coverage. Its CEILING must sit well
 # above the widest true 95% coverage energy at any beam energy, or coverage_energy
 # silently truncates and reports a bound pinned near the ceiling (the failure the
@@ -53,8 +55,9 @@ WIDE_GRID_START_EV = 10.0
 # ceiling, and clears the widest measured 95% line-coverage energy (~18.7 keV raw
 # at the 300 keV beam) with headroom.
 WIDE_GRID_STOP_EV = 20000.0
-WIDE_GRID_STEP_EV = 10.0
-WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
+# Placeholder only: the private diagnostic policy replaces this grid after
+# transport and before spectrum evaluation, using those exact trajectories.
+WIDE_GRID_EV = np.array([WIDE_GRID_START_EV, WIDE_GRID_STOP_EV])
 # Diagnostic brem grid for measuring the incoherent (brem) coverage. The
 # production profile's E_grid_brem tops out at 30 keV, but a per-material bespoke
 # brem stop must be measured on a grid that clears the widest true 95%
@@ -99,6 +102,11 @@ class Candidate:
     # checkpoints/callers stay valid (single-thickness scans use the diagnostic
     # slab).
     thickness_ang: float = DIAGNOSTIC_THICKNESS_ANG
+    target_spacing_eV: float = 3.0
+    actual_spacing_eV: float = 3.0
+    aliased_weight_fraction: float = 0.0
+    backend_dtype: str = "float64"
+    observable_class: str = "intrinsic_source"
 
 
 def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_electrons):
@@ -118,12 +126,40 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_
         E_grid_line_by_energy=None,
         E_grid_brem=WIDE_BREM_EV,
     )
-    return build_cases(sweep, n_electrons=n_electrons)[0]
+    case = build_cases(sweep, n_electrons=n_electrons)[0]
+    return {
+        **case,
+        "_diagnostic_line_grid": {
+            "start_eV": WIDE_GRID_START_EV,
+            "stop_eV": WIDE_GRID_STOP_EV,
+            "aliased_weight_limit": ALIASED_WEIGHT_LIMIT,
+            "backend_safety_ulps": BACKEND_SAFETY_ULPS,
+            "maximum_spacing_eV": MAX_DIAGNOSTIC_SPACING_EV,
+        },
+    }
 
 
 def _candidate_from_result(material, tilt_deg, tilt_azim_deg, thickness_ang, result):
     E_grid, spec = result["E_grid"], result["spec"]
     E_brem, brem = result["E_grid_brem"], result["brem_wide"]
+    diagnostic = result.get("line_grid_diagnostic")
+    if diagnostic is None:
+        spacing = float(E_grid[1] - E_grid[0])
+        diagnostic = {
+            "target_spacing_eV": spacing,
+            "actual_spacing_eV": spacing,
+            "aliased_weight_fraction": 0.0,
+            "aliased_weight_limit": ALIASED_WEIGHT_LIMIT,
+            "backend_dtype": np.asarray(E_grid).dtype.name,
+            "observable_class": "intrinsic_source",
+        }
+    aliased_weight_fraction = float(diagnostic["aliased_weight_fraction"])
+    aliased_weight_limit = float(diagnostic["aliased_weight_limit"])
+    if aliased_weight_fraction > aliased_weight_limit:
+        raise ValueError(
+            "diagnostic line grid exceeds the sinc Nyquist alias budget: "
+            f"{aliased_weight_fraction:.3%} > {aliased_weight_limit:.3%}"
+        )
     return Candidate(
         material=material,
         tilt_deg=tilt_deg,
@@ -133,6 +169,11 @@ def _candidate_from_result(material, tilt_deg, tilt_azim_deg, thickness_ang, res
         incoherent_coverage_energy_eV=coverage_energy(E_brem, brem, COVERAGE),
         incoherent_total_intensity=float(np.trapezoid(brem, E_brem)),
         thickness_ang=thickness_ang,
+        target_spacing_eV=float(diagnostic["target_spacing_eV"]),
+        actual_spacing_eV=float(diagnostic["actual_spacing_eV"]),
+        aliased_weight_fraction=aliased_weight_fraction,
+        backend_dtype=str(diagnostic["backend_dtype"]),
+        observable_class=str(diagnostic["observable_class"]),
     )
 
 
@@ -394,7 +435,8 @@ def derive_bounds(
         existing_row = line_by_energy.get(energy_keV)
         start_eV = float(existing_row[0]) if existing_row is not None else line_start_eV(energy_keV)
         stop_eV = margined_stop(driver.coverage_energy_eV, MARGIN, ROUND_TO_EV)
-        num = spacing_num(start_eV, stop_eV, TARGET_SPACING_EV)
+        resolution_driver = min(refined, key=lambda c: c.target_spacing_eV)
+        num = resolution_num(start_eV, stop_eV, resolution_driver.target_spacing_eV)
         brem_stop_eV = margined_stop(brem_driver.incoherent_coverage_energy_eV, MARGIN, ROUND_TO_EV)
         rows_by_energy[float(energy_keV)] = dict(
             energy_keV=energy_keV,
@@ -402,6 +444,26 @@ def derive_bounds(
             start_eV=start_eV,
             stop_eV=stop_eV,
             num=num,
+            target_spacing_eV=resolution_driver.target_spacing_eV,
+            actual_spacing_eV=(stop_eV - start_eV) / (num - 1),
+            resolution_driver_material=resolution_driver.material,
+            resolution_driver_tilt_deg=resolution_driver.tilt_deg,
+            resolution_driver_azim_deg=resolution_driver.tilt_azim_deg,
+            aliased_weight_fraction=resolution_driver.aliased_weight_fraction,
+            backend_dtype=resolution_driver.backend_dtype,
+            observable_class=resolution_driver.observable_class,
+            bandwidth={
+                "stop_eV": stop_eV,
+                "coverage": COVERAGE,
+                "margin": MARGIN,
+                "raw_eV": driver.coverage_energy_eV,
+            },
+            resolution={
+                "num": num,
+                "target_spacing_eV": resolution_driver.target_spacing_eV,
+                "aliased_weight_limit": ALIASED_WEIGHT_LIMIT,
+                "observable_class": resolution_driver.observable_class,
+            },
             driver_material=driver.material,
             driver_tilt_deg=driver.tilt_deg,
             driver_azim_deg=driver.tilt_azim_deg,
@@ -582,13 +644,15 @@ def derive_all_materials(
 
 def _print_report(rows):
     header = (
-        f"{'energy':>8} {'raw_eV':>10} {'stop_eV':>9} {'num':>6} "
+        f"{'energy':>8} {'raw_eV':>10} {'stop_eV':>9} {'step_eV':>8} {'num':>6} "
         f"{'driver':>14} {'tilt':>6} {'azim':>7} {'spot?':>6} "
         f"{'brem_raw':>10} {'brem_stop':>10} {'brem_drv':>14}"
     )
     print(header)
     print("-" * len(header))
     for row in rows:
+        step_eV = row.get("actual_spacing_eV")
+        step_col = f"{step_eV:>8.3g}" if step_eV is not None else f"{'-':>8}"
         brem_raw = row.get("brem_raw_eV")
         brem_stop = row.get("brem_stop_eV")
         brem_drv = row.get("brem_driver_material", "-")
@@ -599,6 +663,7 @@ def _print_report(rows):
             brem_cols = f"{brem_raw:>10.1f} {brem_stop:>10.1f} {brem_drv:>14}"
         print(
             f"{row['energy_keV']:>8g} {row['raw_eV']:>10.1f} {row['stop_eV']:>9.1f} "
+            f"{step_col} "
             f"{row['num']:>6d} {row['driver_material']:>14} "
             f"{row['driver_tilt_deg']:>6.2f} {row['driver_azim_deg']:>7.2f} "
             f"{'yes' if row['spot_check_flagged'] else 'no':>6} "
@@ -644,8 +709,14 @@ def build_parser():
     parser.add_argument(
         "--grid-step",
         type=float,
-        default=WIDE_GRID_STEP_EV,
-        help="spacing (eV) of the diagnostic coverage grid (default: %(default)g)",
+        default=None,
+        help="optional conservative cap on derived diagnostic spacing in eV",
+    )
+    parser.add_argument(
+        "--backend-ulp-factor",
+        type=float,
+        default=BACKEND_SAFETY_ULPS,
+        help="minimum backend spacing in ulps (default: %(default)g)",
     )
     parser.add_argument(
         "--brem-grid-stop",
@@ -703,8 +774,12 @@ def main(argv=None):
     brem_step_eV = (
         float(args.brem_step) if args.brem_step is not None else persisted["brem_step_ev"]
     )
+    global WIDE_GRID_STOP_EV, BACKEND_SAFETY_ULPS, MAX_DIAGNOSTIC_SPACING_EV
     global WIDE_GRID_EV, WIDE_BREM_EV
-    WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
+    WIDE_GRID_STOP_EV = float(args.grid_stop)
+    BACKEND_SAFETY_ULPS = float(args.backend_ulp_factor)
+    MAX_DIAGNOSTIC_SPACING_EV = None if args.grid_step is None else float(args.grid_step)
+    WIDE_GRID_EV = np.array([WIDE_GRID_START_EV, WIDE_GRID_STOP_EV])
     WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
     materials = (
         args.materials.split(",")

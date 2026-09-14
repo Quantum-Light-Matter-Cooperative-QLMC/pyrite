@@ -6,7 +6,9 @@ from pyrite.energy_grid.bounds import (
     coverage_energy,
     line_shift_fraction,
     margined_stop,
+    resolution_num,
     spacing_num,
+    validate_backend_spacing,
 )
 
 
@@ -65,6 +67,23 @@ def test_margined_stop_rounds_up_past_round_to():
 )
 def test_spacing_num_matches_existing_catalog_grids(start_eV, stop_eV, expected_num):
     assert spacing_num(start_eV, stop_eV) == expected_num
+
+
+def test_resolution_num_never_exceeds_requested_spacing():
+    num = resolution_num(10.0, 20.0, 3.0)
+    assert num == 5
+    assert (20.0 - 10.0) / (num - 1) <= 3.0
+
+
+def test_backend_spacing_rejects_unrepresentable_float32_grid():
+    with pytest.raises(ValueError, match="PYRITE_FP64=1"):
+        validate_backend_spacing(19_999.0, 20_000.0, 10_001, dtype=np.float32, safety_ulps=8.0)
+
+
+def test_backend_spacing_accepts_resolved_grid_and_returns_actual_step():
+    assert validate_backend_spacing(10.0, 20_000.0, 20_000, dtype=np.float32) == pytest.approx(
+        (20_000.0 - 10.0) / 19_999
+    )
 
 
 # ---- beam energy spread vs the derived line window ------------------------
