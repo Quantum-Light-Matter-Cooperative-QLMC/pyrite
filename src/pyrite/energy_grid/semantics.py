@@ -4,6 +4,8 @@ from .._grid_semantics import (
     NonuniformEnergyGridError,
     grid_identity,
     is_uniform_grid,
+    node_bin_edges_and_widths,
+    rebin_piecewise_constant_density,
     require_uniform_grid,
     spacing_spread,
 )
@@ -12,6 +14,8 @@ __all__ = [
     "NonuniformEnergyGridError",
     "grid_identity",
     "is_uniform_grid",
+    "node_bin_edges_and_widths",
+    "rebin_piecewise_constant_density",
     "require_uniform_grid",
     "spacing_spread",
 ]

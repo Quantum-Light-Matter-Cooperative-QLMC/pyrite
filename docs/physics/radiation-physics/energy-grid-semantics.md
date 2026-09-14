@@ -12,8 +12,11 @@ Nothing here is a new physical model. It is the numerical contract the
 [characteristic](characteristic-radiation.md) kernels, and the
 [detector response](../detectors/detector-response.md) all have to share.
 
-The present implementation uses uniform grids throughout. Nonuniform grids are a
-proposal, not a capability; see
+The default grids remain uniform. Nonuniform support is incremental: sampled
+continuum kernels evaluate arbitrary nodes, detector Poisson scoring uses local
+midpoint-cell widths, and Timepix coarse-input rebinning conserves source-bin
+mass. Energy-resolution convolution and the final Timepix recorded-density
+projection remain uniform-grid work; see
 [Energy grids across six decades](../../research/beam-transport/energy-grid-recommendations.md)
 for the recommendation and the [uniform-only consumers](#uniform-only-consumers)
 section below for what currently refuses them.
@@ -159,23 +162,21 @@ log source grid toward zero.
 (uniform-only-consumers)=
 ## Uniform-only consumers
 
-Several consumers read the single spacing $E_1 - E_0$ and apply it across the
-whole grid, or identify a grid by its size and endpoints alone. Those are
-correct statements only about a uniform grid, so each one now calls
-`pyrite.energy_grid.semantics.require_uniform_grid` and raises
+Consumers that still read the single spacing $E_1 - E_0$ and apply it across the
+whole grid call
+`pyrite.energy_grid.semantics.require_uniform_grid` and raise
 `NonuniformEnergyGridError` rather than returning a silently wrong number:
 
-* `detectors/_si_sensor.py::poisson_core` — expected counts are
-  rate × width × live time, and the width must be each bin's own.
 * `detectors/response.py::convolve_detector` — a Gaussian whose $\sigma$ is
   expressed in samples is a fixed energy width only on a uniform grid. This is
   the energy-resolution path both `response.py` and `eaglexo_response.py` use.
-* `detectors/timepix_response.py::TimepixResponse` — re-binning onto the coarse
-  response input spends one fine width on every input sample.
-* The `sinc_cutoff` windowing in `montecarlo/spectrum/lines/_per_hkl.py`
-  converts an energy half-width into a node index by dividing by $E_1 - E_0$.
-  The unwindowed routes evaluate the profile at the nodes themselves and are
-  unaffected.
+`detectors/_si_sensor.py::poisson_core` converts density to bin mass with each
+node's local midpoint-cell width. `TimepixResponse` uses the same explicit
+source edges and overlap integrals when aggregating a nonuniform source mesh
+onto its independent, uniform response-input channels. Both retain their old
+scalar-width arithmetic on uniform grids for bit-for-bit compatibility.
+The `sinc_cutoff` line window now searches the actual energy coordinates and is
+also nonuniform-safe.
 
 `results/metrics.py::line_metrics` is nonuniform-safe: it maps
 `scipy.signal.peak_widths`' fractional sample crossings to energies by

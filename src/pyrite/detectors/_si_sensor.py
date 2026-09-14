@@ -12,7 +12,7 @@ response model keeps its own detector physics (charge-sharing MC, QE table,
 
 import numpy as np
 
-from .._grid_semantics import grid_identity, require_uniform_grid
+from .._grid_semantics import grid_identity, is_uniform_grid, node_bin_edges_and_widths
 
 # ---- silicon sensor physics (fixed material constants) -----------------------
 W_EHP_EV = 3.65  # mean energy to make one electron-hole pair [eV]
@@ -63,13 +63,13 @@ def poisson_core(E_grid_eV, detected_per_s, time_s, rng):
     own the `None` -> `np.random.default_rng()` default so they can reuse the
     same stream for any follow-on noise they add). Returns (counts, expected)."""
     E = np.asarray(E_grid_eV, dtype=float)
-    dE = require_uniform_grid(
-        E,
-        consumer="detectors._si_sensor.poisson_core",
-        remedy=(
-            "Expected counts need each bin's own width (or explicit bin masses); "
-            "score the spectrum onto explicit detector channel edges instead."
-        ),
-    )
-    expected = np.clip(np.asarray(detected_per_s, dtype=float) * dE * time_s, 0.0, None)
+    _, widths = node_bin_edges_and_widths(E)
+    if is_uniform_grid(E):
+        # Preserve the historical uniform path bit-for-bit, including grids
+        # whose constructed nodes carry harmless floating-point jitter.
+        widths = float(E[1] - E[0])
+    density = np.asarray(detected_per_s, dtype=float)
+    if density.shape != E.shape:
+        raise ValueError(f"detected density shape {density.shape} != energy grid {E.shape}")
+    expected = np.clip(density * widths * time_s, 0.0, None)
     return rng.poisson(expected), expected
