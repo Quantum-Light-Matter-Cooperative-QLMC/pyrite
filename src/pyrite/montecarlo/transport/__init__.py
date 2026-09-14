@@ -109,6 +109,7 @@ from .lut import (
     TransportLUTConfig,
     DEFAULT_TRANSPORT_LUT_CONFIG,
     TransportEnergyLUT,
+    TransportLUTToleranceWarning,
     _lut_index_frac_scalar,
     _lut_lerp_1d,
     _lut_lerp_2d,
