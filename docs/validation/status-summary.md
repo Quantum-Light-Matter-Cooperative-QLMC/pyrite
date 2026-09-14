@@ -17,6 +17,8 @@ Compact generated view of the [detailed validation ledger]
 | `skip` | 0 |
 | `missing` | 121 |
 
+Oldest current automated evidence: `—` (UTC timestamp; use it to assess evidence age).
+
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |

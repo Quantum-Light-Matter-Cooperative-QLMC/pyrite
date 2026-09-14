@@ -1,6 +1,9 @@
 """Contracts for standalone-check machine-readable evidence."""
 
+from pathlib import Path
+
 from pyrite.validation.check_records import (
+    CHECK_LEDGER_IDS,
     ValidationRecord,
     current_revision,
     read_records,
@@ -26,3 +29,61 @@ def test_records_round_trip(tmp_path) -> None:
 
 def test_current_revision_is_a_git_sha() -> None:
     assert len(current_revision()) == 40
+
+
+def test_exit_records_cover_each_mapped_claim() -> None:
+    from pyrite.validation.check_records import records_for_exit
+
+    records = records_for_exit("checks/mosaic_mc_check.py", 2, "abc123")
+
+    assert [record.ledger_id for record in records] == list(
+        CHECK_LEDGER_IDS["checks/mosaic_mc_check.py"]
+    )
+    assert {record.verdict for record in records} == {"skip"}
+
+
+def test_mapping_covers_maintained_checks_and_known_ledger_ids() -> None:
+    from pyrite.devtools.validation_ledger import parse_ledger_parts
+
+    root = Path(__file__).parents[2]
+    check_paths = {path.relative_to(root).as_posix() for path in (root / "checks").glob("*.py")}
+    ledger = root / "docs" / "validation" / "physics-validation-ledger.md"
+    ledger_ids = {entry.validation_id for entry in parse_ledger_parts(ledger)}
+
+    assert set(CHECK_LEDGER_IDS) == check_paths
+    assert set().union(*CHECK_LEDGER_IDS.values()) <= ledger_ids
+
+
+def test_validation_records_command_writes_mapped_result(tmp_path, monkeypatch) -> None:
+    from pyrite.devtools import dev_cli
+
+    monkeypatch.setattr(dev_cli, "ROOT", tmp_path)
+    (tmp_path / "checks").mkdir()
+    (tmp_path / "checks" / "dans_diffraction_oracle.py").write_text("", encoding="utf-8")
+    monkeypatch.setattr(dev_cli, "current_revision", lambda: "unused", raising=False)
+    monkeypatch.setattr(
+        dev_cli.subprocess,
+        "run",
+        lambda *args, **kwargs: type("Result", (), {"returncode": 2})(),
+    )
+    monkeypatch.setattr("pyrite.validation.check_records.current_revision", lambda: "abc123")
+
+    parser = dev_cli.build_parser()
+    args = parser.parse_args(
+        [
+            "validation-records",
+            "--output-dir",
+            str(tmp_path / "records"),
+            "--",
+            "checks/dans_diffraction_oracle.py",
+        ]
+    )
+    try:
+        args.func(args)
+    except SystemExit as exc:
+        assert exc.code == 2
+
+    records = read_records(tmp_path / "records")
+    assert [(record.ledger_id, record.verdict) for record in records] == [
+        ("dans-diffraction-oracle", "skip")
+    ]

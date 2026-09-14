@@ -19,7 +19,6 @@ Run (CPU-force on a box with the cupy wheel but no CUDA device):
 
 import os
 import sys
-from pathlib import Path
 
 import numpy as np
 
@@ -34,7 +33,6 @@ from pyrite.montecarlo import (
     mc_spectrum_solid_angle,
     simulate_trajectories,
 )
-from pyrite.validation.check_records import ValidationRecord, current_revision, write_records
 
 THETA = np.deg2rad(119.0)
 E0_KEV = 25.0
@@ -124,20 +122,6 @@ def main():
     )
     shift = abs(_centroid(E_GRID, spec_tp) - _centroid(E_GRID, spec_tp0))
     print(f"    centroid shift n_side={SMALL_NSIDE} vs 1: {shift:.3f} eV (negligible, as expected)")
-    write_records(
-        Path("docs/validation/check-records/detector_solid_angle_check.jsonl"),
-        [
-            ValidationRecord.create(
-                ledger_id="detector-eaglexo",
-                measured_value=rel,
-                reference_value=0.0,
-                tolerance=1e-9,
-                verdict="pass" if ok else "fail",
-                revision=current_revision(),
-                check="checks/detector_solid_angle_check.py",
-            )
-        ],
-    )
     if not ok:
         raise SystemExit(1)
 

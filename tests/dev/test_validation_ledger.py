@@ -124,6 +124,10 @@ def test_status_summary_reports_latest_recorded_evidence() -> None:
         ),
     )
     assert "| `pass` | 1 |" in render_status_summary(entries, records)
+    assert (
+        "Oldest current automated evidence: `2026-09-14T00:00:00+00:00`"
+        in render_status_summary(entries, records)
+    )
 
 
 def test_domain_inventory_links_to_detailed_record() -> None:

@@ -7,10 +7,34 @@ import subprocess
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal, cast
 
 SCHEMA_REVISION = 1
 Verdict = Literal["pass", "fail", "skip"]
+
+CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
+    "checks/coherent_transverse_coherence.py": ("transverse-bunch-form-factor",),
+    "checks/collision_statistics_refinement.py": ("energy-controlled-propagation",),
+    "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),
+    "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
+    "checks/detector_solid_angle_check.py": (
+        "detector-eaglexo",
+        "detector-line-broadening",
+    ),
+    "checks/energy_loss_straggling_observables.py": ("energy-loss-straggling",),
+    "checks/energy_step_convergence_matrix.py": ("energy-step-convergence",),
+    "checks/feranchuk_check_script.py": ("closed-form-flux", "pxr-amplitude", "cbs-amplitude"),
+    "checks/feranchuk_vs_zhai_check.py": ("closed-form-flux", "coherent-line-spectrum"),
+    "checks/kinematic_validity_check.py": ("coherent-line-spectrum", "line-energy-dispersion"),
+    "checks/mosaic_mc_check.py": ("mosaic-analytic", "mosaic-mc"),
+    "checks/multilayer_check.py": ("multilayer-stack", "self-absorption"),
+    "checks/multilayer_slice3_check.py": ("multilayer-stack", "self-absorption"),
+    "checks/multilayer_validation_check.py": ("multilayer-stack", "self-absorption"),
+    "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),
+    "checks/substep_invariance.py": ("substep-radiation-invariance",),
+    "checks/transport_core_goldens.py": ("electron-transport",),
+}
+"""Maintained standalone-check to detailed-ledger claim mappings."""
 
 
 @dataclass(frozen=True)
@@ -82,15 +106,15 @@ class ValidationRecord:
         ):
             raise ValueError("validation record has invalid measured fields")
         return cls(
-            ledger_id=value["ledger_id"],
-            measured_value=value["measured_value"],
-            reference_value=value["reference_value"],
-            tolerance=value["tolerance"],
-            verdict=value["verdict"],  # type: ignore[arg-type]
-            revision=value["revision"],
-            recorded_at=value["recorded_at"],
-            check=value["check"],
-            schema_revision=value["schema_revision"],
+            ledger_id=cast(str, value["ledger_id"]),
+            measured_value=cast(float | str | None, value["measured_value"]),
+            reference_value=cast(float | str | None, value["reference_value"]),
+            tolerance=cast(float | str | None, value["tolerance"]),
+            verdict=cast(Verdict, value["verdict"]),
+            revision=cast(str, value["revision"]),
+            recorded_at=cast(str, value["recorded_at"]),
+            check=cast(str, value["check"]),
+            schema_revision=cast(int, value["schema_revision"]),
         )
 
 
@@ -103,6 +127,27 @@ def write_records(path: Path, records: list[ValidationRecord]) -> None:
         encoding="utf-8",
     )
     staged.replace(path)
+
+
+def records_for_exit(check: str, exit_code: int, revision: str) -> list[ValidationRecord]:
+    """Convert a standalone check process result into records for its claims."""
+    try:
+        ledger_ids = CHECK_LEDGER_IDS[check]
+    except KeyError as exc:
+        raise ValueError(f"no ledger mapping registered for {check}") from exc
+    verdict: Verdict = "pass" if exit_code == 0 else "skip" if exit_code == 2 else "fail"
+    return [
+        ValidationRecord.create(
+            ledger_id=ledger_id,
+            measured_value=None,
+            reference_value=None,
+            tolerance=None,
+            verdict=verdict,
+            revision=revision,
+            check=check,
+        )
+        for ledger_id in ledger_ids
+    ]
 
 
 def current_revision() -> str:

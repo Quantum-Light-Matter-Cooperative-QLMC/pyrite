@@ -171,6 +171,8 @@ def render_status_summary(
         latest[entry.validation_id].verdict if entry.validation_id in latest else "missing"
         for entry in entries
     )
+    dated = [record.recorded_at for record in latest.values()]
+    oldest_evidence = min(dated) if dated else "—"
     return "\n".join(
         [
             GENERATED_NOTICE,
@@ -191,6 +193,8 @@ def render_status_summary(
                 f"| `{verdict}` | {evidence[verdict]} |"
                 for verdict in ("pass", "fail", "skip", "missing")
             ),
+            "",
+            f"Oldest current automated evidence: `{oldest_evidence}` (UTC timestamp; use it to assess evidence age).",
             "",
             *rows,
             "",
