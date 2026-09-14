@@ -2,9 +2,7 @@
 
 import click
 
-from ...remote import config, lifecycle
-from .. import _completion as _cli_completion
-from .._core import (
+from ...console.output import (
     FINITE_FLOAT,
     NONNEGATIVE_FLOAT,
     NONNEGATIVE_INT,
@@ -16,6 +14,8 @@ from .._core import (
     output_option,
     run,
 )
+from ...remote import config, lifecycle
+from .. import _completion as _cli_completion
 from .._deprecations import DeprecatingGroup
 from ._remote_actions import (
     _cli_check,
@@ -399,8 +399,8 @@ def start_command(
     downcast,
     level9,
 ):
+    from ...console import config as cli_config
     from ...runs.scan import resolve_profile_materials
-    from .. import _config as cli_config
 
     try:
         catalog_profile = cli_config.resolve("profile.current", catalog_profile).value

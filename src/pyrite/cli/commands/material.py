@@ -15,20 +15,20 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli import json as cli_json
-from pyrite.cli._core import (
+from pyrite.cli._groups import LazyGroup
+from pyrite.cli.commands._filter_shared import filter_from_row, physical_detector_from_row
+from pyrite.console import json as cli_json
+from pyrite.console.output import (
     AZIMUTH_CSV_RANGE,
     ENERGY_CSV_RANGE,
     THICKNESS_CSV_RANGE,
     TILT_CSV_RANGE,
     CLIError,
-    LazyGroup,
     emit_json_result,
     emit_result,
     flatten_option_values,
     output_option,
 )
-from pyrite.cli.commands._filter_shared import filter_from_row, physical_detector_from_row
 
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
 

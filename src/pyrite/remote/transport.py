@@ -10,7 +10,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-from ..cli import dashboard as presentation
+from ..console import dashboard as presentation
 from . import config
 
 _TRACE_ARG_LIMIT = 100
@@ -86,7 +86,7 @@ def _remote_sha256(path: str) -> str:
 
 def _check_shell_tokens(tokens):
     """Reject tokens that are unsafe to interpolate into remote shell commands."""
-    bad = [token for token in tokens if not presentation._SHELL_TOKEN_RE.fullmatch(token)]
+    bad = [token for token in tokens if not presentation.SHELL_TOKEN_RE.fullmatch(token)]
     if bad:
         raise SystemExit(
             f"invalid remote shell token(s) {bad}: expected only letters, digits, "

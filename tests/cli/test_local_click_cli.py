@@ -5,25 +5,28 @@ import sys
 
 import pytest
 
-from pyrite.checkpoints import _checkpoint_io, archive, slim
+from pyrite.checkpoints import _checkpoint_io, slim
 from pyrite.cli.commands import app_analysis as analyze
 from pyrite.cli.commands import app_validation as check
 from pyrite.cli.commands import app_viewer as viewer
-from pyrite.cli.commands import check_config, export
+from pyrite.cli.commands import archive, check_config, export
+from pyrite.cli.commands import blaze as blaze_cli
 from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.cli.commands import scan as scan_cli
+from pyrite.cli.commands import slim as slim_cli
 from pyrite.cli.commands.scan import performance_command
 from pyrite.runs import blaze, scan
 from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [
-    scan.command,
+    scan_cli.command,
     performance_command,
-    blaze.command,
+    blaze_cli.command,
     analyze.command,
     viewer.command,
     check.command,
     export.command,
-    slim.command,
+    slim_cli.command,
     recompute_cli.brem_command,
     recompute_cli.line_command,
     archive.archive_command,
@@ -55,7 +58,7 @@ def _capture(monkeypatch, module, handler_name):
 def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
     seen = _capture(monkeypatch, scan, "run")
     result = invoke(
-        scan.command,
+        scan_cli.command,
         ["standard", "-m", "hopg", "--workers", "0"],
     )
     assert_clean_result(result)
@@ -91,7 +94,7 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
 )
 def test_run_cache_flag_precedence(monkeypatch, extra, expected):
     seen = _capture(monkeypatch, scan, "run")
-    result = invoke(scan.command, ["standard", "-m", "hopg", *extra])
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", *extra])
     assert_clean_result(result)
     assert (seen["cache_read"], seen["cache_write"]) == expected
 
@@ -99,7 +102,7 @@ def test_run_cache_flag_precedence(monkeypatch, extra, expected):
 def test_run_cache_flags_are_mutually_exclusive(monkeypatch):
     monkeypatch.setattr(scan, "run", lambda _args: None)
     result = invoke(
-        scan.command,
+        scan_cli.command,
         ["standard", "-m", "hopg", "--no-cache", "--recompute"],
     )
     assert result.exit_code == 2
@@ -123,11 +126,13 @@ def test_perf_cache_flag_precedence(monkeypatch, extra, expected):
 
 def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
     seen = _capture(monkeypatch, scan, "run")
-    result = invoke(scan.command, ["standard", "-m", "hopg", "--fidelity", "survey"])
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--fidelity", "survey"])
     assert_clean_result(result)
     assert seen["fidelity"] == "survey"
 
-    conflict = invoke(scan.command, ["standard", "-m", "hopg", "--fidelity", "survey", "--quick"])
+    conflict = invoke(
+        scan_cli.command, ["standard", "-m", "hopg", "--fidelity", "survey", "--quick"]
+    )
     assert conflict.exit_code == 2
     assert "cannot be combined" in conflict.stderr
 
@@ -135,7 +140,7 @@ def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
 def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):
     seen = _capture(monkeypatch, blaze, "run")
     result = invoke(
-        blaze.command,
+        blaze_cli.command,
         [
             "hopg",
             "--energy",
@@ -158,14 +163,14 @@ def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):
 
 
 def test_blaze_short_help_after_variadic_value_remains_eager():
-    result = invoke(blaze.command, ["hopg", "--energy", "30", "-h"])
+    result = invoke(blaze_cli.command, ["hopg", "--energy", "30", "-h"])
 
     assert_clean_result(result)
     assert result.stdout.startswith("Usage:")
 
 
 def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
-    result = invoke(blaze.command, ["hopg", "--energy", "30", "--unknown"])
+    result = invoke(blaze_cli.command, ["hopg", "--energy", "30", "--unknown"])
 
     assert result.exit_code == 2
     assert "No such option '--unknown'" in result.stderr
@@ -190,7 +195,7 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
         ),
         (
             slim,
-            slim.command,
+            slim_cli.command,
             "_cli",
             ["in.pkl", "--line-only"],
             {
@@ -281,9 +286,9 @@ def test_archive_click_dispatch(command, handler_name, argv, expected, monkeypat
 @pytest.mark.parametrize(
     ("command", "argv"),
     [
-        (scan.command, ["standard", "-m", "hopg", "--workers", "-1"]),
-        (blaze.command, ["hopg", "--energy", "0", "--spacing", "1e-6"]),
-        (blaze.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--polar", "90"]),
+        (scan_cli.command, ["standard", "-m", "hopg", "--workers", "-1"]),
+        (blaze_cli.command, ["hopg", "--energy", "0", "--spacing", "1e-6"]),
+        (blaze_cli.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--polar", "90"]),
         (check.command, ["--ne", "0"]),
         (recompute_cli.brem_command, ["hopg", "--save-every", "0"]),
         (recompute_cli.line_command, ["hopg", "--line-step", "nan"]),
@@ -297,7 +302,7 @@ def test_local_click_numeric_domains_are_usage_errors(command, argv):
 
 
 def test_slim_dataset_modes_are_mutually_exclusive():
-    result = invoke(slim.command, ["in.pkl", "--brem-only", "--line-only"])
+    result = invoke(slim_cli.command, ["in.pkl", "--brem-only", "--line-only"])
     assert result.exit_code == 2
     assert result.stdout == ""
     assert "mutually exclusive" in result.stderr
@@ -309,7 +314,7 @@ def test_slim_dataset_modes_are_mutually_exclusive():
         (recompute_cli.brem_command, [], "needs material"),
         (recompute_cli.line_command, ["hopg", "--all"], "--all does not take"),
         (analyze.command, ["--save-default"], "--save-default requires MATERIAL"),
-        (scan.command, ["standard", "-m", "not-a-material"], "not a configured material"),
+        (scan_cli.command, ["standard", "-m", "not-a-material"], "not a configured material"),
     ],
 )
 def test_local_selection_errors_fail_at_click_boundary(command, argv, message):
@@ -338,7 +343,7 @@ def test_local_selection_errors_fail_at_click_boundary(command, argv, message):
     ],
 )
 def test_run_rejects_removed_selection_and_beam_flags(flag):
-    result = invoke(scan.command, ["standard", flag])
+    result = invoke(scan_cli.command, ["standard", flag])
     assert result.exit_code == 2
     assert f"No such option '{flag}'" in result.stderr
 
@@ -360,7 +365,7 @@ class _FakeCatalog:
 
 
 def test_run_unknown_profile_is_usage_error():
-    result = invoke(scan.command, ["bogus"])
+    result = invoke(scan_cli.command, ["bogus"])
     assert result.exit_code == 2
     assert "unknown profile 'bogus'" in result.stderr
     assert "standard" in result.stderr
@@ -378,7 +383,7 @@ def test_run_profile_membership_is_default_selection(monkeypatch):
         seen["materials"] = scan._selected(args)
 
     monkeypatch.setattr(scan, "run", fake_run)
-    result = invoke(scan.command, ["narrowed"])
+    result = invoke(scan_cli.command, ["narrowed"])
     assert_clean_result(result)
     assert seen["materials"] == ["hopg"]
 
@@ -389,7 +394,7 @@ def test_run_explicit_material_outside_profile_is_usage_error(monkeypatch):
     monkeypatch.setattr(
         materials_pkg, "CATALOG", _FakeCatalog(("standard", "narrowed"), {"narrowed": ("hopg",)})
     )
-    result = invoke(scan.command, ["narrowed", "-m", "mos2"])
+    result = invoke(scan_cli.command, ["narrowed", "-m", "mos2"])
     assert result.exit_code == 2
     assert "does not include" in result.stderr
     assert "hopg" in result.stderr
@@ -446,7 +451,7 @@ def test_standalone_click_usage_error_preserves_exit_and_streams():
         [
             sys.executable,
             "-m",
-            "pyrite.runs.scan",
+            "pyrite._entry.scan",
             "standard",
             "-m",
             "hopg",

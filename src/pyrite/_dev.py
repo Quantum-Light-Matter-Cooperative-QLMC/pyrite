@@ -48,7 +48,7 @@ from pathlib import Path
 import yaml
 
 from pyrite._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
-from pyrite.paths import workspace_root
+from pyrite.console.config import workspace_root
 
 ROOT = workspace_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
@@ -542,7 +542,7 @@ def cmd_validation_ledger(args: argparse.Namespace) -> None:
 
 def _run_relocated_click(command, argv: list[str], *, prog_name: str) -> None:
     """Run a relocated Click tree while preserving stream and exit contracts."""
-    from pyrite.cli._core import run as run_cli
+    from pyrite.console.output import run as run_cli
 
     status = run_cli(command, argv, prog_name=prog_name)
     if isinstance(status, int) and status:

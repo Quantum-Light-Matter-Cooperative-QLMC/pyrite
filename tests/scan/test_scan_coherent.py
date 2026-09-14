@@ -12,6 +12,7 @@ from dataclasses import replace
 from click.testing import CliRunner
 
 from pyrite import materials
+from pyrite.cli.commands import scan as scan_cli
 from pyrite.runs import scan
 
 
@@ -35,7 +36,7 @@ def _resolved_run(monkeypatch, argv, emission=None):
             lambda *a, **k: replace(base(*a, **k), emission=emission),
         )
     result = CliRunner().invoke(
-        scan.command, ["standard", "-m", "hopg", *argv], catch_exceptions=False
+        scan_cli.command, ["standard", "-m", "hopg", *argv], catch_exceptions=False
     )
     assert result.exit_code == 0, result.output
     return captured["run"]
@@ -123,13 +124,13 @@ def test_three_emission_modes_never_collide(monkeypatch):
 def test_coherent_incoherent_flags_are_removed():
     # The policy flags no longer exist -- Click rejects them as unknown options.
     for flag in ("--coherent", "--incoherent"):
-        result = CliRunner().invoke(scan.command, ["standard", "-m", "hopg", flag])
+        result = CliRunner().invoke(scan_cli.command, ["standard", "-m", "hopg", flag])
         assert result.exit_code == 2, result.output
         assert "no such option" in result.output.lower()
 
 
 def test_help_no_longer_lists_coherent_incoherent():
-    result = CliRunner().invoke(scan.command, ["--help"])
+    result = CliRunner().invoke(scan_cli.command, ["--help"])
 
     assert result.exit_code == 0
     assert "--coherent" not in result.output

@@ -28,7 +28,7 @@ def _():
         style_sheet,
         theme_switch,
     )
-    from pyrite.paths import workspace_root
+    from pyrite.console.config import workspace_root
     from pyrite.validation import anchor_figures as af
 
     repo_dir = workspace_root()

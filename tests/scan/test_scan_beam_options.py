@@ -5,6 +5,7 @@ import os
 import pytest
 from click.testing import CliRunner
 
+from pyrite.cli.commands import scan as scan_cli
 from pyrite.cli.commands.scan import performance_command
 from pyrite.runs import scan
 
@@ -22,14 +23,14 @@ from pyrite.runs import scan
     ),
 )
 def test_run_rejects_removed_beam_override_options(option):
-    result = CliRunner().invoke(scan.command, ["standard", "-m", "hopg", option, "1"])
+    result = CliRunner().invoke(scan_cli.command, ["standard", "-m", "hopg", option, "1"])
 
     assert result.exit_code == 2
     assert f"No such option '{option}'" in result.output
 
 
 def test_run_help_keeps_beam_overrides_profile_owned():
-    result = CliRunner().invoke(scan.command, ["--help"])
+    result = CliRunner().invoke(scan_cli.command, ["--help"])
 
     assert result.exit_code == 0
     assert "PROFILE defaults to the current configured profile" in result.output
@@ -52,7 +53,7 @@ def test_run_help_keeps_beam_overrides_profile_owned():
     ),
 )
 def test_run_rejects_performance_options(option):
-    result = CliRunner().invoke(scan.command, ["sub_100keV", option])
+    result = CliRunner().invoke(scan_cli.command, ["sub_100keV", option])
 
     assert result.exit_code == 2
     assert f"No such option '{option}'" in result.output

@@ -17,9 +17,11 @@ import click
 
 from pyrite import remote
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli import _config as _cli_config
-from pyrite.cli import json as cli_json
-from pyrite.cli._core import (
+from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._options import remote_option
+from pyrite.console import config as _cli_config
+from pyrite.console import json as cli_json
+from pyrite.console.output import (
     AZIMUTH_CSV,
     AZIMUTH_CSV_TEXT,
     ENERGY_CSV_TEXT,
@@ -36,9 +38,7 @@ from pyrite.cli._core import (
     emit_result,
     invoke_legacy,
     output_option,
-    remote_option,
 )
-from pyrite.cli._deprecations import canonical_option
 from pyrite.energy_grid import apply, defaults, job
 from pyrite.energy_grid import gc as artifact_gc
 

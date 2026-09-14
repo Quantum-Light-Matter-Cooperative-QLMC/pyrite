@@ -5,11 +5,15 @@ import pickle
 
 import pytest
 
-from pyrite import energy_grid, remote
-from pyrite.checkpoints import archive, recompute
+from pyrite import energy_grid
+from pyrite.checkpoints import recompute
 from pyrite.cli import command as root_command
+from pyrite.cli.commands import archive
+from pyrite.cli.commands import blaze as blaze_cli
 from pyrite.cli.commands import job as job_cli
 from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.cli.commands import remote as remote_cli
+from pyrite.cli.commands import scan as scan_cli
 from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
 from pyrite.energy_grid import apply as _energy_grid_apply  # noqa: F401 - binds the submodule
 from pyrite.energy_grid import defaults as _energy_grid_defaults  # noqa: F401 - binds it
@@ -246,7 +250,7 @@ def test_run_json_suppresses_human_output_and_preserves_resumable_exit(
     monkeypatch.setattr(scan, "_run_material", run_material)
 
     document = _document(
-        invoke(scan.command, ["standard", "-m", "hopg", "-o", "json"]), exit_code=exit_code
+        invoke(scan_cli.command, ["standard", "-m", "hopg", "-o", "json"]), exit_code=exit_code
     )
 
     assert document["schema"] == "cxr.operation-summary"
@@ -260,7 +264,7 @@ def test_blaze_json_suppresses_human_output(monkeypatch):
 
     document = _document(
         invoke(
-            blaze.command,
+            blaze_cli.command,
             ["hopg", "--energy", "30", "--spacing", "1e-6", "-o", "json"],
         )
     )
@@ -331,7 +335,7 @@ def test_remote_pull_json_retains_success_when_one_item_fails(monkeypatch):
     monkeypatch.setattr(lifecycle, "pull", pull)
 
     document = _document(
-        invoke(remote.command, ["pull", "hopg", "hbn", "-o", "json"]),
+        invoke(remote_cli.command, ["pull", "hopg", "hbn", "-o", "json"]),
         exit_code=1,
     )
 

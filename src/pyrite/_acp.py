@@ -15,7 +15,8 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from .paths import atomic_write_text, state_dir, workspace_root
+from .console.config import workspace_root
+from .paths import atomic_write_text, state_dir
 
 ROOT = workspace_root()
 ACP_STATE_PATH = state_dir() / "acp-servers.json"

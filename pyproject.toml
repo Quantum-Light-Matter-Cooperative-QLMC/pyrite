@@ -296,6 +296,61 @@ forbidden_modules = [
 ]
 allow_indirect_imports = true
 
+# `cli` drives; `checkpoints`, `runs` and `remote` report progress and emit
+# automation payloads while they work. All three used to reach up into
+# `cli._core`, `cli.json`, `cli._completion` and `cli.dashboard` for that, which
+# is what put `cli` in a bidirectional pair with each of them. The shared
+# primitives now live in `pyrite.console`, below everyone; this contract stops a
+# domain package reaching up again.
+[[tool.importlinter.contracts]]
+id = "domain-packages-stay-below-cli"
+name = "Domain packages do not import the CLI"
+type = "forbidden"
+source_modules = [
+    "pyrite.checkpoints",
+    "pyrite.console",
+    "pyrite.energy_grid",
+    "pyrite.paths",
+    "pyrite.remote",
+    "pyrite.results",
+    "pyrite.runs",
+    "pyrite.validation",
+]
+forbidden_modules = [
+    "pyrite.cli",
+]
+allow_indirect_imports = true
+
+# `console` is the bottom of the presentation stack: colour, prompts, JSON
+# envelopes, the config store and the live dashboard. It may import the path
+# constants and the offline catalog reader, or it stops being safe for the
+# domain packages to depend on. `materials` is not in the forbidden list below:
+# the dashboard resolves one material display label through `CATALOG`, deferred
+# to call time, and `materials` is the bottom of the physics core -- it imports
+# no peer and no driver, so that edge closes nothing.
+[[tool.importlinter.contracts]]
+id = "console-stays-below-every-driver"
+name = "Console imports no driver or domain package"
+type = "forbidden"
+source_modules = [
+    "pyrite.console",
+]
+forbidden_modules = [
+    "pyrite.apps",
+    "pyrite.campaign",
+    "pyrite.checkpoints",
+    "pyrite.detectors",
+    "pyrite.energy_grid",
+    "pyrite.montecarlo",
+    "pyrite.perf",
+    "pyrite.plots",
+    "pyrite.remote",
+    "pyrite.results",
+    "pyrite.runs",
+    "pyrite.validation",
+]
+allow_indirect_imports = true
+
 [[tool.importlinter.contracts]]
 id = "plots-backends-stay-independent"
 name = "Plot backends (mpl, altair, plotly) do not import each other"

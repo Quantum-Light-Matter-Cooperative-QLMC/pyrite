@@ -18,9 +18,10 @@ import click
 
 from ...checkpoints import _checkpoint_store
 from ...checkpoints import recompute as _recompute
+from ...console import json as cli_json
+from ...console import output as _cli_core
 from .. import _completion as _cli_completion
-from .. import _core as _cli_core
-from .. import json as cli_json
+from .._options import remote_option
 
 
 def _brem_cli(args):
@@ -122,7 +123,7 @@ def _remote_controls(function):
     function = click.option("--detach", is_flag=True, help="Return after remote submission.")(
         function
     )
-    return _cli_core.remote_option(function)
+    return remote_option(function)
 
 
 def _remote_requested(

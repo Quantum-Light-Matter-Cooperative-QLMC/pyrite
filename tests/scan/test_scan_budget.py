@@ -4,6 +4,7 @@ import json
 
 from click.testing import CliRunner
 
+from pyrite.cli.commands import scan as scan_cli
 from pyrite.runs import scan
 
 
@@ -16,7 +17,7 @@ def _invoke(material=None, max_minutes=None, progress_file=None, *extra):
     if progress_file is not None:
         argv += ["--progress-file", str(progress_file)]
     argv += list(extra)
-    return CliRunner().invoke(scan.command, argv, catch_exceptions=False)
+    return CliRunner().invoke(scan_cli.command, argv, catch_exceptions=False)
 
 
 def _fake_cases():

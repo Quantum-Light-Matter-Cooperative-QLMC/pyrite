@@ -40,12 +40,12 @@ from typing import Any
 
 import click
 
+from .._catalog_keys import material_keys
 from .._env import set_canonical_env
 from .._progress import _ProgressTimer, _write_progress_record
-from ..cli import _completion as _cli_completion
-from ..cli import _core as _cli_core
-from ..cli import dashboard as _dashboard
-from ..cli import json as cli_json
+from ..console import dashboard as _dashboard
+from ..console import json as cli_json
+from ..console import output as _cli_core
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.
@@ -169,15 +169,15 @@ _dashboard_stop = threading.Event()
 
 
 def _dashboard_loop(args, materials, job_records, detail):
-    keys = _dashboard._KeyListener()
+    keys = _dashboard.KeyListener()
     try:
         while not _dashboard_stop.is_set():
             for key in keys.poll():
                 if key.lower() == "v":
                     detail = (detail + 1) % 3
             sections = _build_sections(args, materials, job_records, detail)
-            frame = _dashboard._style_states(_dashboard._format_job_status(sections, detail))
-            _dashboard._render_frame(frame, tty=True)
+            frame = _dashboard.style_states(_dashboard.format_job_status(sections, detail))
+            _dashboard.render_frame(frame, tty=True)
             _dashboard_stop.wait(1.0)
     finally:
         keys.stop()
@@ -185,7 +185,7 @@ def _dashboard_loop(args, materials, job_records, detail):
 
 def validate_materials(materials: list[str]) -> None:
     """Reject runnable selections that are absent from the material catalog."""
-    valid_materials = _cli_completion._material_keys()
+    valid_materials = material_keys()
     unknown = [material for material in materials if material not in valid_materials]
     if unknown:
         raise SystemExit(f"unknown material(s): {', '.join(unknown)}")
@@ -403,10 +403,10 @@ def run(args):
             t.join(timeout=2.0)
             sections = _build_sections(args, materials, job_records, getattr(args, "verbose", 0))
             sections["STATE"] = "done" if not incomplete else "paused"
-            frame = _dashboard._style_states(
-                _dashboard._format_job_status(sections, getattr(args, "verbose", 0))
+            frame = _dashboard.style_states(
+                _dashboard.format_job_status(sections, getattr(args, "verbose", 0))
             )
-            _dashboard._render_frame(frame, tty=True)
+            _dashboard.render_frame(frame, tty=True)
             if "PYRITE_LOCAL_DASHBOARD" in os.environ:
                 del os.environ["PYRITE_LOCAL_DASHBOARD"]
 
@@ -1031,23 +1031,3 @@ def _run_material(args, material, max_seconds=None):
             f"{args.checkpoint_dir}/{stem}/ ({n} records)"
         )
     return complete
-
-
-def __getattr__(name):
-    # ``command`` moved to pyrite.cli.commands.scan; keep the module-level seam
-    # so ``scan.command`` and dispatch keep resolving without an import cycle.
-    if name == "command":
-        from ..cli.commands.scan import command
-
-        return command
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def main(argv=None):
-    from ..cli.commands.scan import command
-
-    return _cli_core.run(command, argv, prog_name="pyrite run")
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

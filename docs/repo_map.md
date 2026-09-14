@@ -46,43 +46,90 @@ Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
   p2: campaign + results
-  p3: checkpoints + cli + energy_grid + remote + runs + validation
-  p4: detectors
-  p5: devtools
-  p6: instrument
-  p7: materials
-  p8: montecarlo
-  p9: perf
-  p10: plots
+  p3: checkpoints
+  p4: cli
+  p5: console
+  p6: detectors
+  p7: devtools
+  p8: energy_grid
+  p9: instrument
+  p10: materials
+  p11: montecarlo
+  p12: perf
+  p13: plots
+  p14: remote
+  p15: runs
+  p16: validation
 Edges (importer -> imported):
-  p0 -> p3
-  p0 -> p7
+  p0 -> p10
+  p0 -> p16
+  p0 -> p4
+  p0 -> p5
   p1 -> p10
+  p1 -> p13
+  p1 -> p14
+  p1 -> p15
+  p1 -> p16
   p1 -> p2
   p1 -> p3
-  p1 -> p7
-  p10 -> p2
-  p10 -> p4
-  p10 -> p7
-  p10 -> p8
-  p2 -> p4
+  p1 -> p5
+  p11 -> p10
+  p11 -> p9
+  p13 -> p10
+  p13 -> p11
+  p13 -> p2
+  p13 -> p6
+  p14 -> p10
+  p14 -> p15
+  p14 -> p16
+  p14 -> p2
+  p14 -> p3
+  p14 -> p5
+  p15 -> p10
+  p15 -> p11
+  p15 -> p12
+  p15 -> p2
+  p15 -> p3
+  p15 -> p5
+  p16 -> p10
+  p16 -> p11
+  p16 -> p2
+  p16 -> p3
+  p16 -> p5
+  p16 -> p6
+  p2 -> p10
+  p2 -> p11
   p2 -> p6
-  p2 -> p7
-  p2 -> p8
+  p2 -> p9
+  p3 -> p10
+  p3 -> p11
   p3 -> p2
-  p3 -> p4
-  p3 -> p6
-  p3 -> p7
-  p3 -> p8
-  p3 -> p9
-  p4 -> p7
+  p3 -> p5
+  p4 -> p10
+  p4 -> p11
+  p4 -> p12
+  p4 -> p14
+  p4 -> p15
+  p4 -> p2
+  p4 -> p3
+  p4 -> p5
+  p4 -> p6
+  p4 -> p8
+  p4 -> p9
   p5 -> p10
-  p5 -> p2
-  p5 -> p3
-  p6 -> p4
-  p6 -> p7
-  p8 -> p6
-  p8 -> p7
+  p6 -> p10
+  p7 -> p13
+  p7 -> p15
+  p7 -> p2
+  p7 -> p4
+  p7 -> p5
+  p8 -> p10
+  p8 -> p11
+  p8 -> p14
+  p8 -> p2
+  p8 -> p3
+  p9 -> p10
+  p9 -> p6
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
@@ -137,7 +184,7 @@ Packaged data resolve via `pyrite.DATA_DIR` — imports work from any cwd.
   shared per-call > `PYRITE_*` environment > config store > built-in precedence
   chain. The user store is written
   atomically under Click's platform config dir.
-- **`-o/--output table|json|wide`** → `cli._core.output_option`: shared output
+- **`-o/--output table|json|wide`** → `console.output.output_option`: shared output
   selector on JSON-capable non-interactive commands. `table` is the human
   default, `wide` is human-only, and only `json` carries the stable versioned
   envelope contract. Hidden `--json` aliases warn through the D7 window.
@@ -876,7 +923,7 @@ module.
 - Deps: lazy per-command imports from `cli.commands.*` (see `_COMMANDS`), plus
   lazy checkpoint, app-validation, and remote owners reached through their
   canonical packages or retained root compatibility facades. Eager lightweight
-  deps: `cli._core`, `__version__`.
+  deps: `console.output`, `cli._groups`, `__version__`.
 
 ### `cli/_deprecations.py`
 RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command
@@ -886,8 +933,8 @@ path, `DeprecatingGroup(click.Group)` that warns once per invocation in
 [CLI deprecations](repo-design/cli/cli-deprecations.md) from the registry.
 - Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`,
   `invocation_path`, `SUPPORT_WINDOW_MINORS`.
-- Wired into `cli/_core.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`,
-  `cli/commands/sweep.py`, `cli/commands/energy_grid.py`, `remote/cli.py`.
+- Wired into `cli/_groups.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`,
+  `cli/commands/sweep.py`, `cli/commands/energy_grid.py`, `cli/commands/remote.py`.
 
 ### `cli/commands/`
 One module per `pyrite` subcommand group, holding only the Click layer.
@@ -900,13 +947,50 @@ only. `job` owns the canonical remote asynchronous-job lifecycle and delegates
 transport/state operations to `remote/`. Shared validated atomic TOML helpers
 stay in `cli/_catalog_io.py`.
 
-### `cli/dashboard/`
+### `console/`
+Terminal presentation primitives shared by the CLI and the domain packages, and
+the layer everything else may depend on without depending on `cli/`. It imports
+`paths`, `_env` and `_catalog_keys` and nothing else first-party.
+- `output.py` — colour, Click parameter types, destructive-action confirmation,
+  result/diagnostic emission, JSON envelopes, and `run()`, which preserves the
+  pyrite exit contract around Click.
+- `json.py` — stable JSON payload adapters for automation.
+- `config.py` — the persistent context store (`profile.current`,
+  `remote.target`, `workspace.root`), its per-call > `PYRITE_*` > store >
+  built-in precedence resolver, and `workspace_root`.
+- `dashboard/` — below.
+
+`checkpoints`, `runs` and `remote` all emit results and render progress while
+they work. Sourcing that from `cli/` is what put `cli` in a bidirectional pair
+with each of them; the `domain-packages-stay-below-cli` and
+`console-stays-below-every-driver` contracts hold the split.
+
+### `cli/_groups.py`
+`LazyGroup(DeprecatingGroup)`: the Click group that resolves command modules on
+demand. Stays in `cli/` with the command tree and the deprecation registry it
+extends, while the primitives it uses moved to `console/output.py`.
+
+### `cli/_options.py`
+`-R/--remote`: the one shared option whose callback validates through
+`remote.config`, which `console/` sits below and cannot import.
+
+### `_catalog_keys.py`
+Offline `[materials|profiles|beams|detectors].*` key reads straight from the
+packaged TOML, without importing the scientific material modules. Shell
+completion, `runs.scan`'s material validation and checkpoint identity
+resolution all need catalog keys where a `materials` import would be far too
+expensive.
+
+### `console/dashboard/`
 Shared live terminal dashboard package used by local scans and remote jobs.
 `render.py` owns frame composition, `state.py` owns progress parsing and terminal
 sanitization, and `poll.py` owns non-blocking keyboard input. `__init__.py`
-preserves the former private import surface for existing internal callers.
-- Public: internal `_render_frame`, progress/state helpers, `_KeyListener`.
-- Deps: `rich`, CLI core emitters, campaign materials.
+exports the fifteen names with callers outside the package and nothing else;
+anything absent from `__all__` is internal and imported from its owning module.
+- Public: `KeyListener`, `render_frame`, `format_job_status`, `style_states`,
+  `sanitize_terminal`, `marked_sections`, `parse_progress_records`, and the rest
+  of `__all__`.
+- Deps: `console.output` emitters, one deferred `materials.CATALOG` label read.
 
 ### `cli/commands/beam.py`
 Canonical `pyrite beam list|show|create|set|rename|delete` Click layer over
@@ -1061,8 +1145,8 @@ and export consumers are cache-only and direct misses to
 bundled material catalog or an explicit full catalog and print a one-line
 summary. No simulation, network access, or GPU probe. Body and Click wiring are
 both here; the body used to live in `validation/`, which had to reach up into
-`cli._core` for its output helpers — the whole of the `validation` ↔ `cli`
-import cycle.
+`cli._core` (now `console.output`) for its output helpers — the whole of the
+`validation` ↔ `cli` import cycle.
 - Public: `command`; internal `_run`.
 
 ### `remote/`
@@ -1071,8 +1155,9 @@ chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop
 and clear, remote validation jobs.
 - Public CLI: `add_subparser`, `main`.
 - The public package contains the former facade and implementation modules
-  (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`
-  ◄ `cli`; plus `presentation`):
+  (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`;
+  the Click wiring lives in `cli/commands/remote.py` and the frame rendering in
+  `console/dashboard/`):
   - `config.py` — env-driven hosts/paths/SLURM constants.
   - `transport.py` — ssh/scp primitives, streamed downloads, hashing,
     generated-cache-filtered code-tar sync, material checks; one-round-trip
@@ -1088,8 +1173,6 @@ and clear, remote validation jobs.
     job-state, and artifact inventory before deletion.
   - `viewer.py` — one-shot/attached status and logs rendering; attached status
     reuses one framed SSH stream across refreshes.
-  - `cli.py` — Click wiring and subcommand dispatch, including canonical
-    `remote performance list|pull|rm` and performance-mode defaults.
   Names re-export as import-time snapshots; internal cross-module calls resolve
   through the owning submodule, so tests patch the owner (e.g.
   `transport._ssh_capture`), not the facade.
@@ -1098,7 +1181,7 @@ and clear, remote validation jobs.
 `pyrite app analysis export` subcommand — `marimo export html` of `src/pyrite/apps/analysis_app.py`
 → `results/<stem>.html` (replaces the retired nbconvert-PDF path). Body and
 Click wiring are both here; the body used to live in `apps/export.py`, which
-reached back into `cli._core`.
+reached back into `cli._core` (now `console.output`).
 - Public: `command`, `main`.
 
 ### `checkpoints/slim.py`

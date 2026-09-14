@@ -18,7 +18,7 @@ from pathlib import Path
 
 import click
 
-from .. import _core as _cli_core
+from ...console import output as _cli_core
 
 _ENV_KEY = "PYRITE_MC_BACKEND"
 

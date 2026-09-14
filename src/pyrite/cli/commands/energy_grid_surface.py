@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from .._core import LazyGroup
+from .._groups import LazyGroup
 
 
 @click.group(

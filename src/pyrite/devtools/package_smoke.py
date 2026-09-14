@@ -11,7 +11,7 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-from pyrite.paths import workspace_root
+from pyrite.console.config import workspace_root
 
 ROOT = workspace_root()
 EXPECTED_EXTRAS = {"amd", "external-db", "intel", "nvidia"}

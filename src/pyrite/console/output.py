@@ -1,8 +1,12 @@
-"""Shared Click primitives for staged argparse-to-Click migration."""
+"""Shared Click primitives: colour, parameter types, prompts and result emission.
+
+Lives below `cli/` because `checkpoints/`, `runs/` and `remote/` emit results and
+prompt while they work; see :mod:`pyrite.console`. The lazy root group that binds
+these to the command tree stays in :mod:`pyrite.cli._groups`.
+"""
 
 from __future__ import annotations
 
-import importlib
 import json
 import math
 import os
@@ -14,8 +18,6 @@ from types import SimpleNamespace
 from typing import Any
 
 import click
-
-from pyrite.cli._deprecations import DeprecatingGroup
 
 _COLOR_MODE: ContextVar[str] = ContextVar("cxr_cli_color_mode", default="auto")
 
@@ -109,69 +111,6 @@ def hidden_alias(group: click.Group, command: click.Command, name: str) -> click
     alias.hidden = True
     group.add_command(alias)
     return alias
-
-
-class LazyGroup(DeprecatingGroup):
-    """Click group whose command objects import only when resolved."""
-
-    def __init__(
-        self,
-        *args,
-        lazy_commands: Mapping[str, str] | None = None,
-        lazy_help: Mapping[str, str] | None = None,
-        lazy_hidden: Sequence[str] = (),
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self.lazy_commands = dict(lazy_commands or {})
-        self.lazy_help = dict(lazy_help or {})
-        self.lazy_hidden = frozenset(lazy_hidden)
-
-    def list_commands(self, ctx: click.Context) -> list[str]:
-        eager = super().list_commands(ctx)
-        return [*eager, *(name for name in self.lazy_commands if name not in eager)]
-
-    def get_command(self, ctx: click.Context, cmd_name: str) -> click.Command | None:
-        import_path = self.lazy_commands.get(cmd_name)
-        if import_path is None:
-            return super().get_command(ctx, cmd_name)
-        module_name, object_name = import_path.rsplit(".", 1)
-        command = getattr(importlib.import_module(module_name), object_name)
-        if not isinstance(command, click.Command):
-            raise CLIError(f"lazy command {cmd_name!r} resolved to non-command {import_path!r}")
-        if cmd_name in self.lazy_hidden:
-            command = copy(command)
-            command.hidden = True
-        return command
-
-    def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        """Render root summaries without importing lazy command modules."""
-        rows = []
-        for name in self.list_commands(ctx):
-            if name in self.lazy_hidden:
-                continue
-            if name in self.lazy_commands and name in self.lazy_help:
-                rows.append((name, self.lazy_help[name]))
-                continue
-            command = self.get_command(ctx, name)
-            if command is None or command.hidden:
-                continue
-            rows.append((name, command.get_short_help_str()))
-        if rows:
-            with formatter.section(paint("Commands", "active")):
-                formatter.write_dl(rows)
-
-    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        """Render root option heading with same terminal-safe accent."""
-        rows = [
-            record
-            for parameter in self.get_params(ctx)
-            if (record := parameter.get_help_record(ctx)) is not None
-        ]
-        if rows:
-            with formatter.section(paint("Options", "active")):
-                formatter.write_dl(rows)
-        self.format_commands(ctx, formatter)
 
 
 class FiniteRange(click.ParamType):
@@ -439,32 +378,6 @@ def output_option(function):
         is_eager=True,
         callback=_json_selected,
         help="Output format; only json is a stable automation contract.",
-    )(function)
-
-
-def _remote_target(ctx, param, value):
-    if value in (None, "__configured__"):
-        return value
-    from ..remote.config import validate_remote_target
-
-    try:
-        return validate_remote_target(value)
-    except ValueError as exc:
-        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
-
-
-def remote_option(function):
-    """Add the shared optional remote-target execution modifier."""
-    return click.option(
-        "-R",
-        "--remote",
-        "remote_target",
-        is_flag=False,
-        flag_value="__configured__",
-        default=None,
-        callback=_remote_target,
-        metavar="[TARGET]",
-        help="Run remotely; bare uses the configured target, =TARGET overrides it.",
     )(function)
 
 

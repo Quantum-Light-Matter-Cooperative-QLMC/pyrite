@@ -58,7 +58,7 @@ from pyrite.montecarlo import (  # noqa: E402
     simulate_trajectories,
 )
 from pyrite.montecarlo.geometry import tilted_geometry  # noqa: E402
-from pyrite.paths import workspace_root  # noqa: E402
+from pyrite.console.config import workspace_root  # noqa: E402
 from pyrite.validation._anchor_conditions import (  # noqa: E402, F401, I001
     GRAPHITE_B_002 as GRAPHITE_B_002,
     ZHAI_SUPPLEMENTARY_STUDIES as ZHAI_SUPPLEMENTARY_STUDIES,
