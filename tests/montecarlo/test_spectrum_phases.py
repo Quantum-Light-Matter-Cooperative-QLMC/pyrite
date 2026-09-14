@@ -10,6 +10,7 @@ reduction. They are the standing guard that the phases stay separable.
 import numpy as np
 import pytest
 
+import pyrite.montecarlo.spectrum.lines._per_hkl as per_hkl_module
 from pyrite._backend import REAL
 from pyrite.materials.crystal import (
     CRYSTALS,
@@ -28,6 +29,7 @@ from pyrite.montecarlo.spectrum.lines import (
     _needs_per_hkl_route,
     _prepare_spectrum,
 )
+from pyrite.montecarlo.spectrum.lines._per_hkl import _sinc_window_bounds
 from pyrite.montecarlo.transport import beta_from_keV
 from tests.helpers import host_backend_only, scaled_rtol, to_device, to_host
 
@@ -194,20 +196,95 @@ def test_prepare_rejects_mutually_exclusive_and_missing_inputs():
         _prepare_spectrum(_request(coherent=True, layers=[(0.0, 4000.0, [("C", 0.1136)])]))
 
 
-def test_prepare_refuses_sinc_windowing_on_a_nonuniform_grid():
-    """sinc_cutoff turns an energy half-width into a node index by dividing by
-    ``E_grid[1] - E_grid[0]``, so a graded grid would silently window the wrong
-    nodes. Issue #98: refuse explicitly; the unwindowed routes evaluate at the
-    nodes themselves and stay allowed."""
-    from pyrite.energy_grid.semantics import NonuniformEnergyGridError
+def test_prepare_rejects_line_nodes_collapsed_by_working_precision():
+    grid = np.linspace(1599.0, 1601.5, 100_001)
+    if np.dtype(REAL) == np.dtype(np.float32):
+        with pytest.raises(ValueError, match="not separated after the cast"):
+            _prepare_spectrum(_request(E_grid_eV=grid))
+    else:
+        assert _prepare_spectrum(_request(E_grid_eV=grid)).E_grid.size == grid.size
 
-    log_grid = np.logspace(np.log10(700.0), np.log10(1500.0), E_GRID.size)
 
-    with pytest.raises(NonuniformEnergyGridError, match="sinc_cutoff"):
-        _prepare_spectrum(_request(E_grid_eV=log_grid, sinc_cutoff=3.0))
+@pytest.mark.parametrize("dtype", [np.float32, np.float64])
+def test_sinc_window_bounds_use_high_energy_coordinates(dtype):
+    grid = np.arange(16_000.0, 19_000.0, 0.125, dtype=dtype)
+    lo, hi = 17_123.375, 17_456.625
 
-    # unwindowed: allowed, because nothing reads a single spacing
-    assert _prepare_spectrum(_request(E_grid_eV=log_grid)).E_grid.size == log_grid.size
+    got = _sinc_window_bounds(to_device(grid), lo, hi)
+
+    expected = (
+        max(int(np.searchsorted(grid, lo, side="right")) - 1, 0),
+        min(int(np.searchsorted(grid, hi, side="right")) + 1, grid.size),
+    )
+    assert got == expected
+
+
+def test_sinc_window_bounds_resolve_the_catalog_fine_grid_in_float64():
+    grid = np.linspace(1599.0, 1601.5, 100_001, dtype=np.float64)
+    lo, hi = 1599.812_537_5, 1600.137_462_5
+
+    assert _sinc_window_bounds(to_device(grid), lo, hi) == (
+        int(np.searchsorted(grid, lo, side="right")) - 1,
+        int(np.searchsorted(grid, hi, side="right")) + 1,
+    )
+
+
+def test_sinc_window_bounds_support_a_nonuniform_grid():
+    grid = np.array([100.0, 100.25, 101.0, 103.0, 103.125, 110.0], dtype=REAL)
+
+    assert _sinc_window_bounds(to_device(grid), 100.5, 103.0) == (1, 5)
+
+
+def test_sinc_window_bounds_preserve_uniform_grid_brackets():
+    grid = np.arange(700.0, 1500.0, 1.0, dtype=REAL)
+    start = float(grid[0])
+    step = float(grid[1] - grid[0])
+    for lo, hi in [(699.5, 700.25), (711.25, 720.75), (900.0, 901.0), (1499.5, 1501.0)]:
+        legacy = (
+            max(int((lo - start) // step), 0),
+            min(int((hi - start) // step) + 2, grid.size),
+        )
+        assert _sinc_window_bounds(to_device(grid), lo, hi) == legacy
+
+
+@pytest.mark.parametrize("coherent", [False, True], ids=["sinc_squared", "coherent_sinc"])
+def test_uniform_per_hkl_windowing_is_bit_for_bit_legacy(monkeypatch, coherent):
+    request = _request(coherent=coherent, sinc_cutoff=3.0)
+    current = _prepare_spectrum(request)
+    _accumulate_per_hkl(current)
+
+    def legacy_bounds(grid, lo, hi):
+        start = float(to_host(grid[0]))
+        step = float(to_host(grid[1] - grid[0]))
+        return (
+            max(int((lo - start) // step), 0),
+            min(int((hi - start) // step) + 2, grid.size),
+        )
+
+    monkeypatch.setattr(per_hkl_module, "_sinc_window_bounds", legacy_bounds)
+    legacy = _prepare_spectrum(request)
+    _accumulate_per_hkl(legacy)
+
+    np.testing.assert_array_equal(to_host(current.spec), to_host(legacy.spec))
+
+
+@pytest.mark.parametrize("coherent", [False, True], ids=["sinc_squared", "coherent_sinc"])
+def test_per_hkl_windowing_supports_a_nonuniform_grid(coherent):
+    # The first interval is deliberately ten times wider than the rest. The
+    # retired endpoint/spacing arithmetic therefore searched the wrong slice.
+    grid = np.concatenate(([700.0, 710.0], np.arange(711.0, 1500.0)))
+    st = _prepare_spectrum(_request(E_grid_eV=grid, coherent=coherent, sinc_cutoff=3.0))
+
+    _accumulate_per_hkl(st)
+
+    spectrum = to_host(st.spec)
+    uniform = _prepare_spectrum(_request(E_grid_eV=E_GRID, coherent=coherent, sinc_cutoff=3.0))
+    _accumulate_per_hkl(uniform)
+
+    assert spectrum.max() > 0.0
+    # All nodes from 711 eV onward are shared. Coordinate windowing must give
+    # them the same spectrum regardless of the deliberately irregular prefix.
+    np.testing.assert_array_equal(spectrum[2:], to_host(uniform.spec)[11:])
 
 
 # --------------------------------------------------------------------------

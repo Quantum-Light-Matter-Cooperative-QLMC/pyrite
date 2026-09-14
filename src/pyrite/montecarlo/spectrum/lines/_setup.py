@@ -12,7 +12,6 @@ from typing import Any
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
-from ...._grid_semantics import require_uniform_grid
 from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
@@ -220,13 +219,13 @@ def _prepare_spectrum(request):
             raise ValueError("groove escape is v1 single-slab only (no layers)")
         _validate_groove_escape_direction(n_hat, groove)
     # Fail closed on an output grid the working precision cannot resolve. Every
-    # route treats the grid as strictly ascending: the coherent windowing
-    # divides by ``E_grid[1] - E_grid[0]`` and the line kernels bracket against
-    # it. A grid whose step is finer than REAL's spacing at these energies
+    # route treats the grid as strictly ascending: window bounds and line-table
+    # interpolation both search its coordinates. A grid whose step is finer
+    # than REAL's spacing at these energies
     # collapses adjacent nodes on the cast -- a 2.5e-5 eV step at 1600 eV
-    # loses 80% of its nodes to float32's 1.2e-4 eV ulp -- which turns that
-    # division into a ZeroDivisionError on one route and a silently meaningless
-    # spectrum on another. Checked on the host input, before the upload, so it
+    # loses 80% of its nodes to float32's 1.2e-4 eV ulp, making the coordinate
+    # axis non-injective and therefore the spectrum
+    # ambiguous. Checked on the host input, before the upload, so it
     # costs no device synchronization.
     E_grid_host = np.asarray(E_grid_eV, dtype=REAL)
     if E_grid_host.size > 1:
@@ -240,22 +239,6 @@ def _prepare_spectrum(request):
                 f"these energies, or run the spectrum on the NumPy backend "
                 f"(PYRITE_MC_BACKEND=cpu) or with PYRITE_FP64=1."
             )
-    # ``sinc_cutoff`` windowing converts an energy half-width into a NODE index
-    # by dividing by E_grid[1] - E_grid[0] (_per_hkl.py, both the coherent and
-    # the incoherent route). That single spacing is the whole grid's spacing only
-    # if the grid is uniform; on a graded grid the window lands on the wrong
-    # nodes and silently truncates or misplaces every line. The unwindowed
-    # routes evaluate the profile at the nodes themselves and stay correct, so
-    # the guard is scoped to the windowed request.
-    if request.sinc_cutoff is not None:
-        require_uniform_grid(
-            E_grid_host,
-            consumer="montecarlo.spectrum.lines sinc_cutoff windowing",
-            remedy=(
-                "Drop sinc_cutoff (evaluate the full profile) or supply a uniform "
-                "line grid; searching the actual coordinates is issue #100."
-            ),
-        )
     E_grid = xp.asarray(E_grid_host)
     spec = xp.zeros(E_grid.size, dtype=REAL)
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
