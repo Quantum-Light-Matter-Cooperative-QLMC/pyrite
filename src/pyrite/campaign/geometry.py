@@ -32,6 +32,7 @@ from typing import Any
 
 import numpy as np
 
+from .._formatting import fmt_thickness
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import dominant_reflections
@@ -50,17 +51,6 @@ def _quantized_angles(values: ScalarOrSeq) -> np.ndarray:
     scaled = source * 2.0
     quantized = np.copysign(np.floor(np.abs(scaled) + 0.5), scaled) / 2.0
     return np.asarray(list(dict.fromkeys(float(value) for value in quantized)), dtype=float)
-
-
-def fmt_thickness(t_ang):
-    """Compact human thickness label from Angstroms: 316A / 31.6nm / 17um / 1mm."""
-    if t_ang < 1e2:
-        return f"{t_ang:g}A"
-    if t_ang < 1e4:
-        return f"{t_ang / 10:g}nm"
-    if t_ang < 1e7:
-        return f"{t_ang / 1e4:g}um"
-    return f"{t_ang / 1e7:g}mm"
 
 
 def substrate_composition(substrate):

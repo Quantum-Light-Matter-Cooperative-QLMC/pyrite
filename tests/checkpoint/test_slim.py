@@ -194,8 +194,8 @@ def _grid_plus_stale(material="hopg", n_keep=2):
 
 def test_grid_keeps_only_current_grid_names():
     res, keep = _grid_plus_stale()
-    slim = slim_results(res, grid="hopg")
-    assert set(slim) == keep  # stale_* dropped, current grid kept
+    slim = slim_results(res, case_names=keep)
+    assert set(slim) == keep
     assert set(res) == keep | {"stale_old_config_a", "stale_old_config_b"}  # input untouched
 
 
@@ -207,7 +207,7 @@ def test_grid_accepts_survey_profile_selector_and_variant_stem():
     res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
     res["stale_old_config"] = {30.0: _record(0.0, 30.0)}
 
-    slim = slim_results(res, grid=("hopg", "survey"))
+    slim = slim_results(res, case_names=keep)
 
     assert set(slim) == keep
     assert _grid_from_stem(named_profile_stem("hopg", "survey")) == (
@@ -218,10 +218,13 @@ def test_grid_accepts_survey_profile_selector_and_variant_stem():
 
 
 def test_grid_from_stem_resolves_catalog_profile_variant():
-    """A profile-variant stem (materials.toml [profiles.*]) yields the
-    3-tuple grid selector, and slim_results filters on that profile's grid --
-    this is the path `pyrite remote pull --profile` exercises on the box via
-    `pyrite slim --grid`."""
+    """A profile-variant stem resolves to the correct campaign grid selector,
+    whose case names can then be used to slim results.
+
+    This mirrors the `pyrite remote pull --profile` -> `pyrite slim --grid`
+    production path.
+    """
+    from pyrite.campaign.grid import grid_names
     from pyrite.campaign.profiles import named_profile_stem
     from pyrite.checkpoints.slim import _grid_from_stem
 
@@ -232,13 +235,15 @@ def test_grid_from_stem_resolves_catalog_profile_variant():
     keep = set(_grid_config_names("hopg", catalog_profile="sub_100keV")[:2])
     res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
     res["stale_old_config"] = {30.0: _record(0.0, 30.0)}
-    slim = slim_results(res, grid=selector)
+
+    names = grid_names(*selector)
+    slim = slim_results(res, case_names=names)
     assert set(slim) == keep
 
 
 def test_grid_is_lossless_per_record():
     res, keep = _grid_plus_stale()
-    slim = slim_results(res, grid="hopg")
+    slim = slim_results(res, case_names=keep)
     for name in keep:
         assert set(slim[name]) == {25.0, 30.0}  # every energy of a kept config survives
         assert "brem_wide" in slim[name][25.0]  # no per-record trimming from --grid alone
@@ -246,7 +251,7 @@ def test_grid_is_lossless_per_record():
 
 def test_grid_composes_with_downcast_and_drop_wide_brem():
     res, keep = _grid_plus_stale()
-    slim = slim_results(res, grid="hopg", drop_wide_brem=True, downcast=True)
+    slim = slim_results(res, case_names=keep, drop_wide_brem=True, downcast=True)
     assert set(slim) == keep
     rec = slim[sorted(keep)[0]][25.0]
     assert "brem_wide" not in rec and rec["spec"].dtype == np.float32
@@ -254,7 +259,7 @@ def test_grid_composes_with_downcast_and_drop_wide_brem():
 
 def test_grid_composes_with_value_constraints():
     res, keep = _grid_plus_stale()
-    slim = slim_results(res, grid="hopg", E0_keV=25.0)
+    slim = slim_results(res, case_names=keep, E0_keV=25.0)
     assert set(slim) == keep
     for by_E in slim.values():
         assert set(by_E) == {25.0}  # value constraint applied after grid narrowing
@@ -443,3 +448,12 @@ def test_merge_dataset_skips_unmatched_unless_force():
     merged, skipped = merge_dataset(local, incoming, "line", force=True)
     assert (merged, skipped) == (1, 0)
     assert local["n"][50.0]["spec"] == [9.0]
+
+
+def test_case_names_keeps_only_supplied_names():
+    res, keep = _grid_plus_stale()
+
+    slim = slim_results(res, case_names=keep)
+
+    assert set(slim) == keep
+    assert set(res) == keep | {"stale_old_config_a", "stale_old_config_b"}

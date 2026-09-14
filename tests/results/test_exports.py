@@ -35,7 +35,6 @@ FROZEN_EXPORTS = frozenset(
         "thicknesses_by_energy",
         "_RECORD_ARRAY_FIELDS",
         "_WIDE_BREM_FIELDS",
-        "_grid_names",
         "slim_results",
         "project_dataset",
         "merge_dataset",

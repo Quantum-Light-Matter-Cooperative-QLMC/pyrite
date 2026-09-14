@@ -20,12 +20,13 @@ from dataclasses import dataclass
 
 import click
 
-from pyrite._dev import build_parser
 from pyrite.cli import command as pyrite_command
 from pyrite.cli.commands.scan import performance_command as perf_command
 from pyrite.devtools.cli_commands import energy_grid_command, performance_command
 from pyrite.devtools.cli_reference import _walk as _click_walk
 from pyrite.devtools.doc_blocks import FencedBlock
+
+from .dev_cli import build_parser
 
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 

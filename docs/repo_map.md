@@ -45,7 +45,7 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 Components (a + b denotes a static import cycle):
   p0: _entry
   p1: apps
-  p2: campaign + results
+  p2: campaign
   p3: checkpoints
   p4: cli
   p5: console
@@ -58,11 +58,12 @@ Components (a + b denotes a static import cycle):
   p12: perf
   p13: plots
   p14: remote
-  p15: runs
-  p16: validation
+  p15: results
+  p16: runs
+  p17: validation
 Edges (importer -> imported):
   p0 -> p10
-  p0 -> p16
+  p0 -> p17
   p0 -> p4
   p0 -> p5
   p1 -> p10
@@ -70,6 +71,7 @@ Edges (importer -> imported):
   p1 -> p14
   p1 -> p15
   p1 -> p16
+  p1 -> p17
   p1 -> p2
   p1 -> p3
   p1 -> p5
@@ -77,39 +79,47 @@ Edges (importer -> imported):
   p11 -> p9
   p13 -> p10
   p13 -> p11
-  p13 -> p2
+  p13 -> p15
   p13 -> p6
   p14 -> p10
   p14 -> p15
   p14 -> p16
+  p14 -> p17
   p14 -> p2
   p14 -> p3
   p14 -> p5
   p15 -> p10
   p15 -> p11
-  p15 -> p12
-  p15 -> p2
-  p15 -> p3
-  p15 -> p5
+  p15 -> p6
+  p15 -> p9
   p16 -> p10
   p16 -> p11
+  p16 -> p12
+  p16 -> p15
   p16 -> p2
   p16 -> p3
   p16 -> p5
-  p16 -> p6
+  p17 -> p10
+  p17 -> p11
+  p17 -> p2
+  p17 -> p3
+  p17 -> p5
+  p17 -> p6
   p2 -> p10
   p2 -> p11
+  p2 -> p15
   p2 -> p6
   p2 -> p9
   p3 -> p10
   p3 -> p11
+  p3 -> p15
   p3 -> p2
   p3 -> p5
   p4 -> p10
   p4 -> p11
   p4 -> p12
   p4 -> p14
-  p4 -> p15
+  p4 -> p16
   p4 -> p2
   p4 -> p3
   p4 -> p5
@@ -120,9 +130,11 @@ Edges (importer -> imported):
   p6 -> p10
   p7 -> p13
   p7 -> p15
+  p7 -> p16
   p7 -> p2
   p7 -> p4
   p7 -> p5
+  p7 -> p8
   p8 -> p10
   p8 -> p11
   p8 -> p14

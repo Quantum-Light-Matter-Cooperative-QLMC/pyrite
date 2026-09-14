@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from pyrite.campaign.sweep import fmt_thickness
+from pyrite._formatting import fmt_thickness
 from pyrite.results import records, sweep_values, thicknesses_by_energy
 
 

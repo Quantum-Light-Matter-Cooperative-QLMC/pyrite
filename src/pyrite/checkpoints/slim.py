@@ -121,7 +121,18 @@ def _slim_checkpoint(
     ``slim_results``. Returns the slim results dict."""
     # validate the stem before loading: the load is the expensive step, and a bad
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
-    material = _grid_from_stem(in_path) if grid else None
+    grid_selector = _grid_from_stem(in_path) if grid else None
+
+    case_names = None
+
+    if grid_selector is not None:
+        from ..campaign.grid import grid_names
+
+        if isinstance(grid_selector, tuple):
+            case_names = grid_names(*grid_selector)
+        else:
+            case_names = grid_names(grid_selector)
+
     if os.path.isdir(in_path):
         path = os.path.normpath(in_path)
         results = _checkpoint_store.load(os.path.basename(path), os.path.dirname(path))
@@ -143,7 +154,7 @@ def _slim_checkpoint(
 
         results = project_dataset(results, dataset)
     slim = slim_results(
-        results, grid=material, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
+        results, case_names=case_names, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
     )
     if out_path is None:
         if os.path.isdir(in_path):
