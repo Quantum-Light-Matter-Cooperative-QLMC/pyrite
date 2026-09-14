@@ -48,6 +48,10 @@ infrared rise means the integrated background depends on the low-energy bound,
 and the attenuation tables' range determines where $\mu$ is treated as zero. See
 [Bremsstrahlung](bremsstrahlung.md).
 
+What a grid entry means — an evaluation node or a bin edge — and how a
+photons/eV density is integrated on it are pinned separately in
+[Energy-grid semantics](energy-grid-semantics.md).
+
 ## Component splits
 
 `components=True` returns the total alongside PXR-only and CBS-only spectra,

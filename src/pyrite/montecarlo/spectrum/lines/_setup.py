@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
+from ...._grid_semantics import require_uniform_grid
 from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
@@ -239,6 +240,22 @@ def _prepare_spectrum(request):
                 f"these energies, or run the spectrum on the NumPy backend "
                 f"(PYRITE_MC_BACKEND=cpu) or with PYRITE_FP64=1."
             )
+    # ``sinc_cutoff`` windowing converts an energy half-width into a NODE index
+    # by dividing by E_grid[1] - E_grid[0] (_per_hkl.py, both the coherent and
+    # the incoherent route). That single spacing is the whole grid's spacing only
+    # if the grid is uniform; on a graded grid the window lands on the wrong
+    # nodes and silently truncates or misplaces every line. The unwindowed
+    # routes evaluate the profile at the nodes themselves and stay correct, so
+    # the guard is scoped to the windowed request.
+    if request.sinc_cutoff is not None:
+        require_uniform_grid(
+            E_grid_host,
+            consumer="montecarlo.spectrum.lines sinc_cutoff windowing",
+            remedy=(
+                "Drop sinc_cutoff (evaluate the full profile) or supply a uniform "
+                "line grid; searching the actual coordinates is issue #100."
+            ),
+        )
     E_grid = xp.asarray(E_grid_host)
     spec = xp.zeros(E_grid.size, dtype=REAL)
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
