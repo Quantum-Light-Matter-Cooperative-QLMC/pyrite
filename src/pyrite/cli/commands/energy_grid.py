@@ -17,9 +17,9 @@ import click
 
 from pyrite import remote
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli import _config as _cli_config
 from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._options import remote_option
+from pyrite.console import config as _cli_config
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
     AZIMUTH_CSV,

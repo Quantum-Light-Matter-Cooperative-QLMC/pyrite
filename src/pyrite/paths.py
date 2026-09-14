@@ -1,10 +1,14 @@
-"""Installed-safe package, workspace, and user-state path resolution."""
+"""Installed-safe package and user-state path constants.
+
+A leaf: nothing here reads configuration. The workspace root does -- it
+resolves through the config store -- so it lives in
+:mod:`pyrite.console.config`.
+"""
 
 from __future__ import annotations
 
 import os
 import tempfile
-from os import PathLike
 from pathlib import Path
 
 import click
@@ -19,14 +23,6 @@ def data_dir() -> Path:
 def app_dir() -> Path:
     """Return the packaged marimo application and resource directory."""
     return Path(__file__).parent / "apps"
-
-
-def workspace_root(explicit: str | PathLike[str] | None = None) -> Path:
-    """Resolve explicit > ``PYRITE_HOME`` > config store > cwd."""
-    from .cli._config import resolve
-
-    value = resolve("workspace.root", None if explicit is None else str(explicit)).value
-    return Path(value).expanduser().resolve()
 
 
 def state_dir() -> Path:

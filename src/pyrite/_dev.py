@@ -48,7 +48,7 @@ from pathlib import Path
 import yaml
 
 from pyrite._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
-from pyrite.paths import workspace_root
+from pyrite.console.config import workspace_root
 
 ROOT = workspace_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"

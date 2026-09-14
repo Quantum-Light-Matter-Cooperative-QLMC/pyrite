@@ -399,8 +399,8 @@ def start_command(
     downcast,
     level9,
 ):
+    from ...console import config as cli_config
     from ...runs.scan import resolve_profile_materials
-    from .. import _config as cli_config
 
     try:
         catalog_profile = cli_config.resolve("profile.current", catalog_profile).value

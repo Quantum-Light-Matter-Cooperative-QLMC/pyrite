@@ -188,39 +188,3 @@ render_frame = viewer.render_frame
 _attach_header = viewer._attach_header
 _live_status = viewer._live_status
 attach = viewer.attach
-
-_CLI_EXPORTS = frozenset(
-    {
-        "command",
-        "start_command",
-        "check_command",
-        "rebrem_command",
-        "reline_command",
-        "remote_scan",
-        "remote_check",
-        "_ensure_utf8_stdio",
-        "_dispatch",
-        "_selected_materials",
-        "_cli_rebrem",
-        "_cli_pull",
-        "_cli_start",
-        "_cli_jobs",
-        "_cli_status",
-        "_cli_logs",
-        "_cli_stop",
-        "_cli_reap",
-        "_cli_clear",
-        "_cli_sync",
-        "_cli_check",
-        "main",
-    }
-)
-
-
-def __getattr__(name):
-    """Resolve the retired CLI facade without importing Click from ``remote``."""
-    if name == "cli" or name in _CLI_EXPORTS:
-        from ..cli.commands import remote as remote_cli
-
-        return remote_cli if name == "cli" else getattr(remote_cli, name)
-    raise AttributeError(name)

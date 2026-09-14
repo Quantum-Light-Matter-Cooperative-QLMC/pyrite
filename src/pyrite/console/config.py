@@ -1,4 +1,14 @@
-"""Persistent CLI context values and their shared precedence resolver."""
+"""Persistent user context values and their shared precedence resolver.
+
+Below `cli/` (:mod:`pyrite.console`) because `remote.config` and every caller of
+`workspace_root` resolve through this store while the CLI is nowhere in the
+picture; sourcing it from `cli/` is what put `paths` and `remote` in an import
+cycle with `cli` (issue #64, finding 2).
+
+`workspace_root` lives here rather than in :mod:`pyrite.paths` for the same
+reason: it is a config lookup that returns a path, so it belongs above the path
+constants, not beside them.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +16,7 @@ import os
 import tempfile
 import tomllib
 from dataclasses import dataclass
+from os import PathLike
 from pathlib import Path
 
 import tomlkit
@@ -117,3 +128,9 @@ def set_stored(key: str, value: str) -> None:
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
         raise
+
+
+def workspace_root(explicit: str | PathLike[str] | None = None) -> Path:
+    """Resolve explicit > ``PYRITE_HOME`` > config store > cwd."""
+    value = resolve("workspace.root", None if explicit is None else str(explicit)).value
+    return Path(value).expanduser().resolve()

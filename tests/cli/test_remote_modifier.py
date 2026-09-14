@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan
 from pyrite.cli.commands.scan import performance_command
-from pyrite.remote import cli as remote_cli
 from pyrite.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
 

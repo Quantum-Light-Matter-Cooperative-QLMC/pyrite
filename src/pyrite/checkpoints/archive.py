@@ -29,7 +29,7 @@ import re
 import shutil
 from pathlib import Path
 
-from ..paths import workspace_root
+from ..console.config import workspace_root
 from . import _checkpoint_io, _checkpoint_store
 
 DEFAULT_ROOT = str(workspace_root() / "checkpoints")

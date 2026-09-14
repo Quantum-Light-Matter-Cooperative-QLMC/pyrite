@@ -21,7 +21,7 @@ from .._catalog_keys import beam_keys as _beam_keys
 from .._catalog_keys import detector_keys as _detector_keys
 from .._catalog_keys import material_keys as _material_keys
 from .._catalog_keys import profile_keys as _profile_keys
-from ..paths import workspace_root
+from ..console.config import workspace_root
 
 MAX_LOCAL_CANDIDATES = 200
 MAX_REMOTE_CANDIDATES = 100

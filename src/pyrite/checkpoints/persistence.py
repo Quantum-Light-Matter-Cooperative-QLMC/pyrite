@@ -10,7 +10,7 @@ import pickle
 from collections import defaultdict
 from pathlib import Path
 
-from ..paths import workspace_root
+from ..console.config import workspace_root
 from ..results import records, sweep_values
 from . import _checkpoint_io, _checkpoint_store
 

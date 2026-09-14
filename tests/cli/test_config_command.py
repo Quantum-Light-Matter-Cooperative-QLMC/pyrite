@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pyrite.cli import _config
 from pyrite.cli.commands import config as config_command
 from pyrite.cli.commands import scan
+from pyrite.console import config as _config
 from pyrite.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
 

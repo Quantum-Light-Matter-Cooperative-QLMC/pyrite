@@ -247,7 +247,7 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 
 
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
-    from pyrite.remote import cli
+    from pyrite.cli.commands import remote as cli
 
     command = cli.start_command
     assert _callback(command, "catalog_profile") is _cli_completion.complete_profile

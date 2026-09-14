@@ -1,14 +1,9 @@
 from pathlib import Path
 
 from pyrite import DATA_DIR
-from pyrite.cli import _config
-from pyrite.paths import (
-    cache_dir,
-    data_dir,
-    state_dir,
-    user_data_dir,
-    workspace_root,
-)
+from pyrite.console import config as _config
+from pyrite.console.config import workspace_root
+from pyrite.paths import cache_dir, data_dir, state_dir, user_data_dir
 
 
 def test_data_dir_preserves_public_package_constant():

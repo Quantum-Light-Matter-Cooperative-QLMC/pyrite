@@ -6,9 +6,9 @@ from pathlib import Path
 
 import click
 
+from ...console import config as _config
 from ...console.output import CLIError
 from ...remote.config import validate_remote_target
-from .. import _config
 from .._groups import LazyGroup
 
 _KEY = click.Choice(_config.keys(), case_sensitive=True)

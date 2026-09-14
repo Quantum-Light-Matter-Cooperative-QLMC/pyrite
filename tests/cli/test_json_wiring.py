@@ -5,13 +5,14 @@ import pickle
 
 import pytest
 
-from pyrite import energy_grid, remote
+from pyrite import energy_grid
 from pyrite.checkpoints import recompute
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import archive
 from pyrite.cli.commands import blaze as blaze_cli
 from pyrite.cli.commands import job as job_cli
 from pyrite.cli.commands import recompute as recompute_cli
+from pyrite.cli.commands import remote as remote_cli
 from pyrite.cli.commands import scan as scan_cli
 from pyrite.cli.commands.energy_grid_surface import material_command, profile_command
 from pyrite.energy_grid import apply as _energy_grid_apply  # noqa: F401 - binds the submodule
@@ -334,7 +335,7 @@ def test_remote_pull_json_retains_success_when_one_item_fails(monkeypatch):
     monkeypatch.setattr(lifecycle, "pull", pull)
 
     document = _document(
-        invoke(remote.command, ["pull", "hopg", "hbn", "-o", "json"]),
+        invoke(remote_cli.command, ["pull", "hopg", "hbn", "-o", "json"]),
         exit_code=1,
     )
 

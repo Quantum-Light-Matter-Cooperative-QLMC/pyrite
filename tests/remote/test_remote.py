@@ -18,6 +18,7 @@ import pytest
 
 from pyrite import remote
 from pyrite.cli.commands import _remote_actions
+from pyrite.cli.commands import remote as cli  # noqa: F401
 from pyrite.cli.commands import remote as remote_cli
 from pyrite.console import dashboard as _dashboard
 from pyrite.console import dashboard as presentation
@@ -27,7 +28,6 @@ from pyrite.console.dashboard import render as dashboard_render
 from pyrite.console.dashboard import state as dashboard_state
 from pyrite.remote import cleanup as lifecycle_cleanup
 from pyrite.remote import (  # noqa: F401
-    cli,
     config,
     lifecycle,
     scripts,
@@ -64,7 +64,7 @@ def _remote_main(argv):
         from pyrite.cli.commands.job import command as job_command
 
         return _cli_core.run(job_command, [head, *rest], prog_name="pyrite job")
-    return remote.main(argv)
+    return remote_cli.main(argv)
 
 
 lifecycle_pull = importlib.import_module("pyrite.remote.pull")
@@ -4992,7 +4992,7 @@ def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
     monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["zhai"])])
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must refuse before syncing"))
     with pytest.raises(SystemExit, match="refusing to start"):
-        remote.remote_check()
+        remote_cli.remote_check()
 
 
 def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
@@ -5002,7 +5002,7 @@ def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
     monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True, raising=False)
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: events.append("pull"))
 
-    remote.remote_check(no_sync=True)
+    remote_cli.remote_check(no_sync=True)
 
     assert events == ["start", ("attach", "j"), "pull"]
 
@@ -5014,7 +5014,7 @@ def test_interrupted_foreground_check_does_not_pull(monkeypatch):
         lifecycle, "pull_zhai_cache", lambda: pytest.fail("must not pull after interruption")
     )
 
-    remote.remote_check(no_sync=True)
+    remote_cli.remote_check(no_sync=True)
 
 
 @pytest.mark.parametrize("job_state", ["FAILED (exit 1)", "cancelled [48291]"])
@@ -5028,7 +5028,7 @@ def test_failed_foreground_check_does_not_pull_stale_cache(monkeypatch, job_stat
     )
 
     with pytest.raises(SystemExit, match="did not complete successfully"):
-        remote.remote_check(no_sync=True)
+        remote_cli.remote_check(no_sync=True)
 
 
 def test_remote_check_no_sync_skips_sync(monkeypatch):
@@ -5038,7 +5038,7 @@ def test_remote_check_no_sync_skips_sync(monkeypatch):
     monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True)
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: calls.append("pull"))
 
-    remote.remote_check(no_sync=True)
+    remote_cli.remote_check(no_sync=True)
 
     assert calls == [
         {
@@ -5065,7 +5065,7 @@ def test_remote_check_non_waiting_modes_skip_attach_and_pull(monkeypatch, mode, 
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
     monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: pytest.fail("must not pull"))
 
-    assert remote.remote_check(**{mode: True}) == "j"
+    assert remote_cli.remote_check(**{mode: True}) == "j"
 
     assert calls[0]["dry_run"] is dry_run
 
