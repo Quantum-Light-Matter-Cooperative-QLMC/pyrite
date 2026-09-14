@@ -30,6 +30,7 @@ def _carbon_segments(lengths: list[float]) -> dict[str, object]:
         "L_ang": lengths_array,
         "E_keV": np.full(lengths_array.size, 30.0),
         "elec_id": np.zeros(lengths_array.size, dtype=int),
+        "layer": np.zeros(lengths_array.size, dtype=int),
         "Ne": 1,
         "thickness_ang": float(lengths_array.sum()),
     }
@@ -96,20 +97,20 @@ def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkey
         table.projectile_energy_eV_by_shell[0],
         table.ionization_cross_sections_cm2_by_shell[0],
     )
-    in_window = (table.line_energy_eV >= energy[0]) & (table.line_energy_eV <= energy[-1])
-    # The emitted photons are the summed per-line yields, not the edge yield
-    # alone: the source branch intensities sum to 1 + 9.7e-8 for carbon and are
-    # deliberately not renormalized, so omega_K differs from their sum at that
-    # relative level. The default 1e-8 absolute tolerance is larger than these
-    # ~6e-7 densities and hid the difference, hence ``atol=0.0``.
+    edges, _widths = characteristic._energy_bin_edges_and_widths(energy)
+    captured_yield = sum(
+        table.line_yield_per_vacancy[0, line_index]
+        * characteristic._lorentzian_bin_weights(edges, line_energy, line_fwhm).sum()
+        for line_index, (line_energy, line_fwhm) in enumerate(
+            zip(table.line_energy_eV, table.line_fwhm_eV, strict=True)
+        )
+        if line_energy > table.recommended_cutoff_eV
+    )
+    # Each source branch is multiplied by the independently evaluated physical
+    # Lorentzian mass captured by this finite window. Branch intensities and
+    # omitted tails are deliberately not renormalized.
     expected = (
-        density_ang3
-        * 1.0e24
-        * length_ang
-        * 1.0e-8
-        * sigma_k
-        * table.line_yield_per_vacancy[0, in_window].sum()
-        / (4.0 * np.pi)
+        density_ang3 * 1.0e24 * length_ang * 1.0e-8 * sigma_k * captured_yield / (4.0 * np.pi)
     )
     # Uniform 1 eV bins: the density sum is the bin-integrated photon yield.
     # The 41-bin reduction runs at the backend's REAL, so fp32 justifies the
@@ -133,7 +134,20 @@ def test_constant_energy_segment_subdivision_preserves_characteristic_yield(monk
     np.testing.assert_allclose(split, whole, rtol=2.0e-13, atol=0.0)
 
 
-def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(monkeypatch):
+def test_lorentzian_bin_weights_preserve_physical_window_mass():
+    narrow_edges = np.array([9.0, 10.0, 11.0])
+    wide_edges = np.array([8.0, 9.0, 10.0, 11.0, 12.0])
+
+    narrow = characteristic._lorentzian_bin_weights(narrow_edges, 10.0, 2.0)
+    wide = characteristic._lorentzian_bin_weights(wide_edges, 10.0, 2.0)
+
+    np.testing.assert_allclose(narrow, [0.25, 0.25], rtol=0.0, atol=1.0e-15)
+    np.testing.assert_array_equal(narrow, wide[1:3])
+    assert narrow.sum() == 0.5
+    assert narrow.sum() < wide.sum() < 1.0
+
+
+def test_characteristic_line_is_bin_integrated_physically_truncated_lorentzian(monkeypatch):
     monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
     energy = np.arange(275.0, 279.0001, 0.02)
     density_ang3 = 0.1
@@ -152,17 +166,18 @@ def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(m
         table.projectile_energy_eV_by_shell[0],
         table.ionization_cross_sections_cm2_by_shell[0],
     )
-    in_window = (table.line_energy_eV >= energy[0]) & (table.line_energy_eV <= energy[-1])
-    expected = (
-        density_ang3
-        * 1.0e24
-        * length_ang
-        * 1.0e-8
-        * sigma_k
-        * table.line_yield_per_vacancy[0, in_window].sum()
-        / (4.0 * np.pi)
-    )
     edges, widths = characteristic._energy_bin_edges_and_widths(energy)
+    captured_yield = sum(
+        table.line_yield_per_vacancy[0, line_index]
+        * characteristic._lorentzian_bin_weights(edges, line_energy, line_fwhm).sum()
+        for line_index, (line_energy, line_fwhm) in enumerate(
+            zip(table.line_energy_eV, table.line_fwhm_eV, strict=True)
+        )
+        if line_energy > table.recommended_cutoff_eV
+    )
+    expected = (
+        density_ang3 * 1.0e24 * length_ang * 1.0e-8 * sigma_k * captured_yield / (4.0 * np.pi)
+    )
 
     assert np.count_nonzero(spectrum) == spectrum.size
     # Same reduction-length argument as the 1 eV-bin case above, over the 201
@@ -182,6 +197,53 @@ def test_characteristic_line_is_bin_integrated_lorentzian_with_preserved_yield(m
         rtol=scaled_rtol(1.0e-9, eps_multiple=4.0),
         atol=0.0,
     )
+
+
+def test_off_grid_line_contributes_only_its_physical_tail(monkeypatch):
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
+    energy = np.arange(280.0, 284.0001, 0.02)
+
+    spectrum = characteristic.mc_characteristic_spectrum(
+        _carbon_segments([100.0]),
+        energy,
+        composition=[("C", 0.1)],
+        electron_limit=1,
+    )
+
+    table = characteristic.load_characteristic_cross_sections("C")
+    assert np.all((table.line_energy_eV < energy[0]) | (table.line_energy_eV > energy[-1]))
+    assert np.all(spectrum > 0.0)
+    edges, widths = characteristic._energy_bin_edges_and_widths(energy)
+    wide_edges = np.array([250.0, 300.0])
+    narrow_mass = characteristic._lorentzian_bin_weights(
+        edges, table.line_energy_eV[-1], table.line_fwhm_eV[-1]
+    ).sum()
+    wide_mass = characteristic._lorentzian_bin_weights(
+        wide_edges, table.line_energy_eV[-1], table.line_fwhm_eV[-1]
+    ).sum()
+    assert 0.0 < narrow_mass < wide_mass < 1.0
+    assert np.sum(spectrum * widths) > 0.0
+
+
+def test_characteristic_enforces_one_keV_transport_validity_floor(monkeypatch):
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
+
+    with np.testing.assert_raises_regex(ValueError, "requires E_cut_keV >= 1 keV"):
+        characteristic.mc_characteristic_spectrum(
+            _carbon_segments([100.0]),
+            np.arange(250.0, 291.0),
+            composition=[("C", 0.1)],
+            E_cut_keV=0.5,
+        )
+
+    sub_floor = _carbon_segments([100.0])
+    sub_floor["E_keV"] = np.array([0.75])
+    spectrum = characteristic.mc_characteristic_spectrum(
+        sub_floor,
+        np.arange(250.0, 291.0),
+        composition=[("C", 0.1)],
+    )
+    np.testing.assert_array_equal(spectrum, 0.0)
 
 
 def test_absorber_elements_do_not_load_unused_ionization_tables(monkeypatch):
