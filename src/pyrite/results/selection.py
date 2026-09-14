@@ -306,29 +306,8 @@ def merge_dataset(local, incoming, dataset, force=False):
     return n_merged, n_skipped
 
 
-def _grid_names(material, fidelity="full", catalog_profile="standard"):
-    """Config names in the CURRENT grid for ``material`` -- exactly the set
-    ``config.material_sweep(material, catalog_profile=catalog_profile)`` ->
-    ``sweep.build_cases`` produces now. A stale config is any name NOT in this
-    set. ``catalog_profile`` selects the named materials.toml profile whose
-    grid a profile-variant checkpoint was swept on.
-
-    The ``config`` / ``sweep`` imports are function-local on purpose: ``config``
-    imports ``results`` at module load (``from .results import Settings``), so a
-    module-level ``config`` import here would close an import cycle. Deferring it
-    to call time breaks the cycle.
-    """
-    from ..campaign.config import default_settings, material_sweep
-    from ..campaign.sweep import build_cases
-
-    settings = default_settings(fidelity)
-    sweep = material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)
-    cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
-    return {c["name"] for c in cases}
-
-
 def slim_results(
-    results, *, grid=None, drop_wide_brem=False, downcast=False, fields=None, **constraints
+    results, *, case_names=None, grid=None, drop_wide_brem=False, downcast=False, fields=None, **constraints
 ):
     """Return a NEW results store carrying only what a viz session needs, to cut a
     checkpoint's on-disk / transfer size (TODO P2 #5). Does NOT mutate ``results``;
@@ -339,13 +318,7 @@ def slim_results(
     config at full resolution, so transferring it from the GPU box is gigabyte-
     scale and mostly stale for any one plot. This trims it four independent ways:
 
-    grid : a material key, or a ``(material, fidelity[, catalog_profile])``
-        tuple. Keep only the configs in that material's CURRENT grid
-        (:func:`_grid_names`), dropping configs left over from earlier grids --
-        the ``filter_results`` narrowing computed from ``config.py`` alone, so the
-        GPU box can shrink its accumulated union to just the live run before the
-        wire transfer. Lossless per record (only whole stale configs drop). This
-        is applied FIRST, before ``constraints``.
+    case_names : set of strings describing a single case
     constraints : case-field filters, identical to :func:`select_results` (scalar /
         list / callable), e.g. ``tilt_deg=0.0, E0_keV=[25, 30]`` -- keep only those
         records. None given keeps every record.
@@ -363,12 +336,17 @@ def slim_results(
     on-disk wrapper that reports the size saved, see ``run.slim_checkpoint`` /
     ``pyrite slim``.
     """
-    if grid is not None:
-        if isinstance(grid, tuple):
-            names = _grid_names(*grid)
-        else:
-            names = _grid_names(grid)
-        results = {n: by_E for n, by_E in results.items() if n in names}
+    if "grid" in constraints:
+        raise TypeError(
+            "slim_results() no longer accepts 'grid'; "
+            "resolve the campaign grid to case_names first"
+        )
+    if case_names is not None:
+        results = {
+            name: by_E
+            for name, by_E in results.items()
+            if name in case_names
+        }
     base = select_results(results, **constraints) if constraints else results
     drop = set(_WIDE_BREM_FIELDS) if (fields is None and drop_wide_brem) else set()
     keep_keys = (set(fields) | {"case"}) if fields is not None else None
