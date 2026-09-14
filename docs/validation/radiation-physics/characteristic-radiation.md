@@ -163,6 +163,44 @@ units, signs, normalization, narrow/wide/off-grid limits, and a regression
 anchor, but still requires fresh-context source-to-code validation. The ledger
 status is therefore `filtered`; no human sign-off is claimed.
 
+## Issue #101 implementation-context note, 2026-09-14
+
+Two `v3` to `v4` changes, both grid bookkeeping rather than new source physics:
+
+1. **Low bin-edge clamp.** `_energy_bin_edges_and_widths`'s outer edges mirror
+   the adjacent spacing, {math}`E_0^-=E_0-\tfrac12(E_1-E_0)`. That reflection
+   can go negative when the first spacing exceeds the first node -- an
+   unphysical photon energy. `v4` clamps
+   {math}`E_0^-=\max(0,E_0-\tfrac12(E_1-E_0))`; the high edge is never
+   clamped since photon energy has no analogous upper bound here. This changes
+   {math}`\Delta E_0` (and therefore the first bin's reported density) only
+   for grids that hit the negative-edge case; an ordinary evenly- or
+   slowly-varying grid is unaffected because its first edge is already
+   non-negative. Limiting case: a grid whose first spacing does not exceed its
+   first node reduces to the unclamped `v3` formula exactly, since the
+   reflected edge is then never negative.
+2. **Explicit truncation query.** `characteristic_line_window_mass` returns
+   {math}`(P_{\ell,W},\,1-P_{\ell,W})` per line -- the same $P_{\ell,W}$
+   already in {eq}`eq-characteristic-track-length`, just returned as data
+   instead of only implicitly shaping the density. `captured+truncated=1`
+   follows directly from `_lorentzian_bin_weights` being the unconditioned CDF
+   difference (same argument as the v3 review above). `mc_characteristic_spectrum`
+   additionally warns when a line's centre is inside the requested grid but
+   the grid still captures under `CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION`
+   (50%) of that line's mass, so a window that truncates a line at its own
+   edges is reported rather than left for the caller to notice only as a
+   smaller-than-expected peak. A line centred outside the grid does not warn:
+   its small in-window tail is the documented off-grid-line behaviour, not a
+   misconfigured window.
+
+Neither change alters the analytic Lorentzian CDF itself, the vacancy-yield
+estimator, or the transport-validity floor. The model marker moves to
+`lorentzian-v4` because the low-edge clamp can change a stored spectrum's
+first-bin value; checkpoints identity-fork accordingly. This is an
+implementation-context review only, covering units, the clamp's limiting
+case, and the truncation identity above; it does not independently verify the
+change. The ledger status remains `filtered`; no human sign-off is claimed.
+
 ## Historical v2 validation status
 
 The independent review below records the v2 implementation verified on

@@ -79,9 +79,34 @@ Changing either window boundary leaves every bin with unchanged edges
 unchanged. The
 spectral density contributed to bin {math}`b` is {math}`Y_{jai\ell}q_{\ell
 b}/\Delta E_b`, in photons {math}`\mathrm{eV}^{-1}\,\mathrm{sr}^{-1}` per
-incident electron. PyRITE does not currently store a second, grid-independent
-integrated-line-yield diagnostic; adding one would be a distinct output rather
-than a reason to renormalize the displayed spectrum.
+incident electron.
+`pyrite.montecarlo.spectrum.characteristic.characteristic_line_window_mass`
+reports {math}`P_{\ell,W}` and its complement {math}`1-P_{\ell,W}` per line so
+window truncation is an explicit, queryable quantity rather than a number
+folded silently into the returned density. `mc_characteristic_spectrum` also
+warns when a line's centre lies inside the requested grid but the grid still
+captures less than
+`CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION` (50%) of its mass -- the window
+edge, not the line's off-grid centre, is then the reason for the missing mass.
+A line whose centre lies entirely outside the grid does not warn: its small
+in-window tail is the intended off-grid-line behaviour above, not a
+misconfigured window.
+
+### Bin-edge convention
+
+{math}`E_b^-,E_b^+` come from
+`_energy_bin_edges_and_widths`, reusing the interior-midpoint,
+reflected-half-width convention shared with
+`pyrite._grid_semantics.node_bin_edges_and_widths`: interior edges sit at
+{math}`\tfrac12(E_i+E_{i+1})`, and each outer edge mirrors the adjacent spacing
+outward. Photon energy is a one-sided physical coordinate, so the low edge is
+additionally clamped at 0 eV instead of the raw mirror reflection, which can
+go negative whenever the grid's first spacing exceeds its first node (for
+example a log-floored grid whose first two nodes sit close together after a
+wide gap to a lower floor). No coordinate is inserted for that floor -- the
+edge array still holds exactly `grid.size + 1` entries -- only the value of
+the existing first edge changes. The high edge is never clamped; photon energy
+has no equivalent upper physical bound here.
 
 Measured transition-metal emission features can require several Lorentzians to
 describe unresolved satellites and asymmetric structure
@@ -147,10 +172,12 @@ a line-only legacy or intentionally excluded dataset.
 - Natural Lorentzian broadening is source physics; detector broadening remains
   a separate downstream operation.
 
-This window and cutoff convention is encoded in the `lorentzian-v3`
+This window and cutoff convention is encoded in the `lorentzian-v4`
 characteristic-model marker used by dataset identities and case-content keys.
-Older `lorentzian-v2` checkpoints used conditional window renormalization and
-are deliberately cache-incompatible.
+Older `lorentzian-v2` checkpoints used conditional window renormalization;
+`lorentzian-v3` could emit an unphysical negative low bin edge for a grid
+whose first spacing exceeds its first node. Both are deliberately
+cache-incompatible with `v4`.
 
 Implementation owner:
 `pyrite.montecarlo.spectrum.characteristic.mc_characteristic_spectrum`.

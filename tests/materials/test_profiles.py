@@ -66,7 +66,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # diffracts differently -- the same rule the stopping-model marker follows.
     # Re-minted again for issue #88's physical Lorentzian-window marker.
     assert case_content_key(case) == (
-        "dd0926f6f1a38e952042fe8638c0683b472363969965c5a7dab08adeae7ac575"
+        "4c9114bd1d0cd583ff18610de54ddec579647ae3fda4fb7ac95408e789cc356a"
     )
 
 
@@ -77,7 +77,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "b893193acb74b9c1944f996841286a64fe6953a6c436e18d30621d6b3b47df42"
+        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -332,7 +332,7 @@ def test_characteristic_model_marker_orphans_previous_line_models():
     assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
     assert "eedl" in CHARACTERISTIC_MODEL
     assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
-    assert CHARACTERISTIC_MODEL.endswith("direct-vacancy-lorentzian-v3")
+    assert CHARACTERISTIC_MODEL.endswith("direct-vacancy-lorentzian-v4")
 
 
 def test_case_content_key_separates_characteristic_models():
@@ -365,7 +365,7 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "b893193acb74b9c1944f996841286a64fe6953a6c436e18d30621d6b3b47df42"
+        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -379,42 +379,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "72fa451e1b13acd3f12451a725be948c625bac5e0c43a95d5634f22248cc45b4",
+            "20c436962d63d2c07742d6ec333bf66f88d7b0a5051c838d7670a4726c7b4ef1",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "317be2b591d524cf6ac9fa626991343ef7edb18ef597eb00500972dbfff5a510",
+            "47e335938658db4804710a769d954e0b0c2f7ebc7b4d6b580fe74468c40344fa",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "31da0a3b6ed6960e1d212bbb2907516afa96fe1d8209106642294855e9045d67",
+            "5d3b321e19a1d85cc9c3a3240ac93d92f84e9374c999870c34b69f4bcbccf54d",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "f28bbf671b48751f7db60edba753fbf23a18b75160887c4dfb636196f8a10c75",
+            "f8b2314e9cb855f390f3c382900a5bb31b9c022c7b37aae59848bae82fd04af5",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "d74d30e5b35f691aa2ae51ba783d0dcfd48c1cdc11425895801d45dfc881f5c9",
+            "df1aaedfbc51679aec3c31f8d1fc1f9299ee354efdf636abd32b255020bf788d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "adc4d4855be3509668bb09587849a0217ee38bd6a5e7c407b9b6201189efe376",
+            "01ecd6f8351a437cf358090722c7c1bf0f03921c1b3c0a9780c3804e06a41bf5",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "83c60d62bbba51466c46003aeb00add5302ee70d6872d0712eee386db9ee7ac6",
+            "067db189047694420ddfdf60fd94035d30cdcea1b1ba75d5fb3416394e93523c",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "d6bf0f06e79872d53adc6f5ab2811f2845a3be082954dccf1c336e4025341970",
+            "c04ab69050708f0ed39996e121fa3e38990230032e7815d1d193b4ae426edefa",
         ),
     ],
 )
@@ -572,13 +572,13 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # characteristic profiles, and again for issue #88's physical finite-window
     # convention) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "b893193acb74b9c1944f996841286a64fe6953a6c436e18d30621d6b3b47df42"
+        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "b33fb2a3aba1e2febf5b53bef7ae81998c3e3c5d45b05aeba1bd7b6a97171da2"
+        "6767c99d14140ca9b132139a6c50873909a65cbe79f2a260b37911dd1546a1a4"
     )
 
 
