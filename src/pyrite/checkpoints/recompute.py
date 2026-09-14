@@ -745,6 +745,10 @@ def repair_line_spec(
             r["spec_coherent"] = spec_coherent
         r["E_grid"] = target
         c["E_grid_line"] = (float(target[0]), float(target[-1]), len(target))
+        # Recompute pins explicit coordinates, which outrank any automatic
+        # case-local policy the record was built under (issue #101). Drop the
+        # policy so the stored case does not claim a resolution it no longer has.
+        c.pop("line_grid_policy", None)
         bw = r.get("brem_wide")
         egb = r.get("E_grid_brem")
         if bw is not None and egb is not None:
