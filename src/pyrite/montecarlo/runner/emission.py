@@ -81,6 +81,8 @@ def _characteristic_from_segments(
     The estimator uses the bremsstrahlung electron population because those
     tracks continue to the lower, background cutoff and therefore retain the
     low-energy ionization path that a line-only 5 keV cutoff would discard.
+    Characteristic scoring itself enforces its documented 1 keV transport-
+    validity floor even if a case requests a lower background cutoff.
     """
     from .. import runner
 

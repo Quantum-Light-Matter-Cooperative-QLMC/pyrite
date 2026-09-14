@@ -42,9 +42,10 @@ CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 CHARACTERISTIC_MODEL = (
     f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
-    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-lorentzian-v2"
+    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-lorentzian-v3"
 )
 _MIN_RELAXATION_CUTOFF_EV = 50.0
+CHARACTERISTIC_TRANSPORT_FLOOR_KEV = 1.0
 _SHELL_LABELS = {
     1: "K",
     2: "L1",
@@ -547,11 +548,12 @@ def _lorentzian_bin_weights(
     line_energy_eV: float,
     fwhm_eV: float,
 ) -> np.ndarray:
-    """Exact bin masses for a normalized, window-preserving Lorentzian.
+    """Exact in-window bin masses for a Lorentzian normalized on all energies.
 
     The analytic CDF difference avoids point-sampling narrow natural lines.
-    Renormalizing over the requested grid preserves the transition yield when
-    its centre is in range, matching the historical delta-line window policy.
+    Probability outside the requested window is not redistributed into it, so
+    the returned masses sum to at most one and off-grid lines retain their
+    physical in-window tails.
 
     Validation: characteristic-radiation
     """
@@ -561,10 +563,30 @@ def _lorentzian_bin_weights(
         np.arctan((edges_eV[1:] - centre) / gamma) - np.arctan((edges_eV[:-1] - centre) / gamma)
     ) / np.pi
     weights = np.maximum(weights, 0.0)
-    captured = float(np.sum(weights))
-    if not np.isfinite(captured) or captured <= 0.0:
+    if not np.all(np.isfinite(weights)):
         raise ValueError("Lorentzian line has no finite mass on the requested energy grid")
-    return weights / captured
+    return weights
+
+
+def _characteristic_transport_cutoff_keV(E_cut_keV: object) -> float:
+    """Resolve the enforced lower validity boundary for characteristic scoring.
+
+    The current electron transport model is not claimed accurate below 1 keV.
+    Characteristic production therefore defaults to that floor and rejects a
+    lower requested cutoff instead of presenting sub-keV path as validated.
+
+    Validation: characteristic-radiation
+    """
+    if E_cut_keV is None:
+        return CHARACTERISTIC_TRANSPORT_FLOOR_KEV
+    cutoff = _require_finite(E_cut_keV, "E_cut_keV", positive=True)
+    if cutoff < CHARACTERISTIC_TRANSPORT_FLOOR_KEV:
+        raise ValueError(
+            f"characteristic scoring requires E_cut_keV >= "
+            f"{CHARACTERISTIC_TRANSPORT_FLOOR_KEV:g} keV; sub-keV electron transport "
+            "is outside the validated model"
+        )
+    return cutoff
 
 
 def _interpolate_shell_cross_sections(
@@ -649,7 +671,8 @@ def mc_characteristic_spectrum(
     electron_limit
         Optional leading macro-electron count used for normalization.
     E_cut_keV
-        Optional post-transport electron-energy cutoff in keV.
+        Optional post-transport electron-energy cutoff in keV. Characteristic
+        scoring defaults to and enforces a 1 keV transport-validity floor.
     data_dir
         Optional EEDL file or containing directory.
     relaxation_cutoff_eV
@@ -665,6 +688,7 @@ def mc_characteristic_spectrum(
     if isinstance(chunk, bool) or int(chunk) <= 0:
         raise ValueError("chunk must be a positive integer")
     chunk = int(chunk)
+    characteristic_cutoff_keV = _characteristic_transport_cutoff_keV(E_cut_keV)
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     all_tables = {
         el: load_characteristic_cross_sections(el, data_dir=data_dir) for el, _density in comp
@@ -684,7 +708,7 @@ def mc_characteristic_spectrum(
                 f"reliable minimum {minimum_cutoff:g} eV"
             )
 
-    segments = _clip_segments_to_cutoff(segments, E_cut_keV, comp, layers)
+    segments = _clip_segments_to_cutoff(segments, characteristic_cutoff_keV, comp, layers)
     Ne = segments["Ne"] if electron_limit is None else electron_limit
     if isinstance(Ne, bool) or int(Ne) <= 0:
         raise ValueError("electron_limit/segments['Ne'] must be a positive integer")
@@ -730,15 +754,12 @@ def mc_characteristic_spectrum(
         ):
             if line_energy <= relaxation_cutoff:
                 continue
-            bin_index = int(np.searchsorted(edges, line_energy, side="right") - 1)
-            if bin_index < 0 or bin_index >= E_grid.size:
-                continue
             if not np.any(xraydb_yields[:, line_index] > 0.0):
                 continue
-            profile = xp.asarray(
-                _lorentzian_bin_weights(edges, line_energy, line_fwhm) / bin_widths,
-                dtype=REAL,
-            )
+            profile_cpu = _lorentzian_bin_weights(edges, line_energy, line_fwhm) / bin_widths
+            if not np.any(profile_cpu > 0.0):
+                continue
+            profile = xp.asarray(profile_cpu, dtype=REAL)
             if layers is None:
                 mu = _mu_total_inv_ang(
                     comp,
@@ -808,6 +829,7 @@ __all__ = [
     "CHARACTERISTIC_EEDL_SHA256",
     "CHARACTERISTIC_ENDF_PARSERPY_VERSION",
     "CHARACTERISTIC_MODEL",
+    "CHARACTERISTIC_TRANSPORT_FLOOR_KEV",
     "CHARACTERISTIC_XRAYDB_VERSION",
     "CharacteristicCrossSectionTable",
     "load_characteristic_cross_sections",

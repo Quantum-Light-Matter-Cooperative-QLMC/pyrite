@@ -65,20 +65,23 @@ q_{\ell b}=\frac{1}{\pi}
 \right].
 ```
 
-The weights are normalized over the requested grid whenever the line centre is
-inside that grid,
+The bin masses retain the normalization of the physical Lorentzian on the
+whole energy axis. They are not renormalized over the requested window:
 
 ```{math}
-\widehat q_{\ell b}=\frac{q_{\ell b}}{\sum_c q_{\ell c}},
+0 < P_{\ell,W}=\sum_{b\in W}q_{\ell b}\leq 1.
 ```
 
-the sum running over the admitted bins. This preserves the integrated
-historical line yield even when Lorentzian tails extend beyond the configured
-energy window; it is a conditional, truncated Lorentzian, so changing the
-window rescales the retained bins by {math}`1/\sum_c q_{\ell c}`. The spectral
-density contributed to bin {math}`b` is {math}`Y_{jai\ell}\widehat q_{\ell
+Thus a finite window records the fraction {math}`P_{\ell,W}` of the integrated
+line yield and does not redistribute omitted tails into retained bins. A line
+centre outside the window still contributes its physical in-window tail.
+Changing either window boundary leaves every bin with unchanged edges
+unchanged. The
+spectral density contributed to bin {math}`b` is {math}`Y_{jai\ell}q_{\ell
 b}/\Delta E_b`, in photons {math}`\mathrm{eV}^{-1}\,\mathrm{sr}^{-1}` per
-incident electron.
+incident electron. PyRITE does not currently store a second, grid-independent
+integrated-line-yield diagnostic; adding one would be a distinct output rather
+than a reason to renormalize the displayed spectrum.
 
 Measured transition-metal emission features can require several Lorentzians to
 describe unresolved satellites and asymmetric structure
@@ -99,9 +102,14 @@ list emits zero and raises a warning rather than being silently approximated.
 
 Characteristic emission uses the bremsstrahlung electron population and its
 default 1 keV transport cutoff. This retains more low-energy ionization path
-than the default 5 keV PXR/CBS population, although path below the configured
-cutoff remains unmodeled. The 50 eV line-data cutoff does not change the
-electron cutoff.
+than the default 5 keV PXR/CBS population. The present stopping and scattering
+model is not validated below 1 keV, so characteristic scoring enforces
+{math}`E_{\rm cut}\geq1\,\mathrm{keV}`: an omitted cutoff resolves to 1 keV and
+an explicitly lower cutoff is rejected. Low-binding-energy vacancies that
+could physically be produced below 1 keV are therefore omitted. PyRITE does
+not claim precision characteristic yields for incident energies near this
+floor. The 50 eV line-data cutoff is a photon-line data boundary and does not
+lower the electron transport-validity floor.
 
 Flat slabs, finite footprints, blazed grooves, and layered samples reuse the
 same photon-escape geometry as the other radiation kernels. In a multilayer,
@@ -124,8 +132,11 @@ a line-only legacy or intentionally excluded dataset.
 
 - Zero density, path length, cross section, fluorescence yield, or branching
   intensity gives zero characteristic yield.
-- With zero attenuation, bin integration and grid normalization preserve
-  {math}`nL\sigma\omega I/(4\pi N_e)` exactly.
+- With zero attenuation, a finite window integrates to
+  {math}`P_{\ell,W}nL\sigma\omega I/(4\pi N_e)`; the infinite-window limit
+  recovers the complete line yield.
+- Narrowing a window only removes Lorentzian probability. It does not rescale
+  bins retained by both windows; off-grid centres retain nonzero tails.
 - Splitting a constant-energy segment preserves the total when its attenuation
   weight is also held fixed (in particular, with zero attenuation), because the
   estimator is then linear in path length. Subdividing a real absorbing track
@@ -135,6 +146,11 @@ a line-only legacy or intentionally excluded dataset.
 - Increasing optical depth suppresses the line monotonically.
 - Natural Lorentzian broadening is source physics; detector broadening remains
   a separate downstream operation.
+
+This window and cutoff convention is encoded in the `lorentzian-v3`
+characteristic-model marker used by dataset identities and case-content keys.
+Older `lorentzian-v2` checkpoints used conditional window renormalization and
+are deliberately cache-incompatible.
 
 Implementation owner:
 `pyrite.montecarlo.spectrum.characteristic.mc_characteristic_spectrum`.
