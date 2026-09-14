@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from pyrite import _dev
+from pyrite.devtools import dev_cli
 
 
 @pytest.fixture
 def dev_module():
-    return _dev
+    return dev_cli
 
 
 @pytest.fixture
