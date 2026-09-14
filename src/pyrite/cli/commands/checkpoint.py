@@ -10,10 +10,10 @@ from .._groups import LazyGroup
 _COMMANDS = {
     "slim": "pyrite.cli.commands.slim.command",
     "recompute": "pyrite.cli.commands.checkpoint.recompute_command",
-    "archive": "pyrite.checkpoints.archive.archive_command",
-    "restore": "pyrite.checkpoints.archive.restore_command",
-    "list": "pyrite.checkpoints.archive.archives_command",
-    "merge": "pyrite.checkpoints.archive.union_command",
+    "archive": "pyrite.cli.commands.archive.archive_command",
+    "restore": "pyrite.cli.commands.archive.restore_command",
+    "list": "pyrite.cli.commands.archive.archives_command",
+    "merge": "pyrite.cli.commands.archive.union_command",
     "gc": "pyrite.cli.commands.cleanup.gc_command",
     "rm": "pyrite.cli.commands.cleanup.rm_command",
 }

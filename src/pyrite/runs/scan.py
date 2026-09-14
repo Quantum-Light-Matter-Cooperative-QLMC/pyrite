@@ -40,9 +40,9 @@ from typing import Any
 
 import click
 
+from .._catalog_keys import material_keys
 from .._env import set_canonical_env
 from .._progress import _ProgressTimer, _write_progress_record
-from ..cli import _completion as _cli_completion
 from ..cli import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core
@@ -185,7 +185,7 @@ def _dashboard_loop(args, materials, job_records, detail):
 
 def validate_materials(materials: list[str]) -> None:
     """Reject runnable selections that are absent from the material catalog."""
-    valid_materials = _cli_completion._material_keys()
+    valid_materials = material_keys()
     unknown = [material for material in materials if material not in valid_materials]
     if unknown:
         raise SystemExit(f"unknown material(s): {', '.join(unknown)}")
@@ -1031,23 +1031,3 @@ def _run_material(args, material, max_seconds=None):
             f"{args.checkpoint_dir}/{stem}/ ({n} records)"
         )
     return complete
-
-
-def __getattr__(name):
-    # ``command`` moved to pyrite.cli.commands.scan; keep the module-level seam
-    # so ``scan.command`` and dispatch keep resolving without an import cycle.
-    if name == "command":
-        from ..cli.commands.scan import command
-
-        return command
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def main(argv=None):
-    from ..cli.commands.scan import command
-
-    return _cli_core.run(command, argv, prog_name="pyrite run")
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

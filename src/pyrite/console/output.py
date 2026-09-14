@@ -381,32 +381,6 @@ def output_option(function):
     )(function)
 
 
-def _remote_target(ctx, param, value):
-    if value in (None, "__configured__"):
-        return value
-    from ..remote.config import validate_remote_target
-
-    try:
-        return validate_remote_target(value)
-    except ValueError as exc:
-        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
-
-
-def remote_option(function):
-    """Add the shared optional remote-target execution modifier."""
-    return click.option(
-        "-R",
-        "--remote",
-        "remote_target",
-        is_flag=False,
-        flag_value="__configured__",
-        default=None,
-        callback=_remote_target,
-        metavar="[TARGET]",
-        help="Run remotely; bare uses the configured target, =TARGET overrides it.",
-    )(function)
-
-
 FIDELITY_CHOICES = click.Choice(("full", "survey"), case_sensitive=True)
 _DEFAULT_FIDELITY_HELP = "Named settings/grid-reduction policy. survey is provisional and reduced."
 

@@ -259,23 +259,3 @@ def run(args):
         print(f"{_cli_core.paint('paused', 'warning')} (budget) -> {ckpt} ({n} records)")
     if not complete:
         raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
-
-
-def __getattr__(name):
-    # ``command`` moved to pyrite.cli.commands.blaze; keep the module-level seam
-    # so ``blaze.command`` and dispatch keep resolving without an import cycle.
-    if name == "command":
-        from ..cli.commands.blaze import command
-
-        return command
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def main(argv=None):
-    from ..cli.commands.blaze import command
-
-    return _cli_core.run(command, argv, prog_name="blaze.py")
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -21,7 +21,6 @@ import io
 import os
 import sys
 
-from ..console import output as _cli_core
 from ..results import slim_results
 from . import _checkpoint_io, _checkpoint_store
 
@@ -205,21 +204,3 @@ def _cli(args):
         dataset="brem" if args.brem_only else ("line" if args.line_only else None),
         compresslevel=args.compresslevel,
     )
-
-
-def main(argv=None):
-    from ..cli.commands.slim import command
-
-    return _cli_core.run(command, argv, prog_name="pyrite-slim")
-
-
-def __getattr__(name: str):
-    if name == "command":
-        from ..cli.commands.slim import command
-
-        return command
-    raise AttributeError(name)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

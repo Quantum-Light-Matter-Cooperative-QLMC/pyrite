@@ -19,6 +19,7 @@ from pyrite import remote
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli import _config as _cli_config
 from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._options import remote_option
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
     AZIMUTH_CSV,
@@ -37,7 +38,6 @@ from pyrite.console.output import (
     emit_result,
     invoke_legacy,
     output_option,
-    remote_option,
 )
 from pyrite.energy_grid import apply, defaults, job
 from pyrite.energy_grid import gc as artifact_gc

@@ -9,17 +9,18 @@ empty list when its backing data is unavailable.
 from __future__ import annotations
 
 import os
-import re
 import subprocess
-import tomllib
 from collections.abc import Callable, Iterable, Sequence
-from functools import lru_cache
 from pathlib import Path
 
 import click
 from click.shell_completion import CompletionItem
 
-from .. import DATA_DIR
+from .._catalog_keys import SAFE_TOKEN_RE as _SAFE_TOKEN_RE
+from .._catalog_keys import beam_keys as _beam_keys
+from .._catalog_keys import detector_keys as _detector_keys
+from .._catalog_keys import material_keys as _material_keys
+from .._catalog_keys import profile_keys as _profile_keys
 from ..paths import workspace_root
 
 MAX_LOCAL_CANDIDATES = 200
@@ -32,9 +33,6 @@ MAX_REMOTE_CANDIDATES = 100
 # as multi-second hang to the user.
 REMOTE_COMPLETION_TIMEOUT_SECONDS = 0.5
 
-# ``@`` is allowed so ``<material>@<label>-<digest>`` checkpoint @-stems surface
-# in local checkpoint-stem completion alongside legacy ``--<fidelity>-`` stems.
-_SAFE_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]*")
 _DEFAULT_CHECKPOINT_ROOT = Path("checkpoints")
 _ARCHIVE_CHECKPOINT_ROOT = workspace_root() / "checkpoints"
 
@@ -70,62 +68,10 @@ def _items(values: Iterable[str], incomplete: str) -> list[CompletionItem]:
     ]
 
 
-@lru_cache(maxsize=1)
-def _material_keys() -> tuple[str, ...]:
-    """Read catalog keys without importing scientific material modules."""
-    try:
-        with (DATA_DIR / "materials.toml").open("rb") as source:
-            materials = tomllib.load(source).get("materials", {})
-    except (OSError, tomllib.TOMLDecodeError):
-        return ()
-    if not isinstance(materials, dict):
-        return ()
-    return tuple(key for key in materials if _SAFE_TOKEN_RE.fullmatch(key))
-
-
-@lru_cache(maxsize=1)
-def _profile_keys() -> tuple[str, ...]:
-    """Read catalog ``[profiles.*]`` keys without scientific imports."""
-    try:
-        with (DATA_DIR / "materials.toml").open("rb") as source:
-            profiles = tomllib.load(source).get("profiles", {})
-    except (OSError, tomllib.TOMLDecodeError):
-        return ()
-    if not isinstance(profiles, dict):
-        return ()
-    return tuple(key for key in profiles if _SAFE_TOKEN_RE.fullmatch(key))
-
-
-@lru_cache(maxsize=1)
-def _beam_keys() -> tuple[str, ...]:
-    """Read catalog ``[beams.*]`` keys without scientific imports."""
-    try:
-        with (DATA_DIR / "materials.toml").open("rb") as source:
-            beams = tomllib.load(source).get("beams", {})
-    except (OSError, tomllib.TOMLDecodeError):
-        return ()
-    if not isinstance(beams, dict):
-        return ()
-    return tuple(key for key in beams if _SAFE_TOKEN_RE.fullmatch(key))
-
-
 def complete_beam(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete one catalog ``[beams.*]`` name."""
     del ctx, param
     return _items(_beam_keys(), incomplete)
-
-
-@lru_cache(maxsize=1)
-def _detector_keys() -> tuple[str, ...]:
-    """Read catalog ``[detectors.*]`` keys without scientific imports."""
-    try:
-        with (DATA_DIR / "materials.toml").open("rb") as source:
-            detectors = tomllib.load(source).get("detectors", {})
-    except (OSError, tomllib.TOMLDecodeError):
-        return ()
-    if not isinstance(detectors, dict):
-        return ()
-    return tuple(key for key in detectors if _SAFE_TOKEN_RE.fullmatch(key))
 
 
 def complete_detector(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:

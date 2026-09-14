@@ -107,9 +107,9 @@ def dataset_context(
             if str(checkpoint_path).endswith(".pkl")
             else Path(checkpoint_path).name
         )
-        from ..cli import _completion as _cli_completion
+        from .._catalog_keys import material_keys
 
-        if stem in _cli_completion._material_keys():
+        if stem in material_keys():
             material = stem
             resolved_profile = resolved_profile or "standard"
         elif catalog_profile is not None or not require_identity:
