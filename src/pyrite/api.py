@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from dataclasses import fields, is_dataclass, replace
+from dataclasses import fields, is_dataclass
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
@@ -13,16 +13,14 @@ import numpy as np
 
 from . import __version__
 from ._backend import BACKEND
+from .campaign.lowering import build_case, build_sweep_cases
 from .campaign.model import (
     BremSource,
     EmissionMode,
     Numerics,
     Scene,
-    Sweep,
 )
 from .campaign.profiles import case_content_key
-from .campaign.sweep import Sweep as LegacySweep
-from .campaign.sweep import build_cases
 from .detectors import Detector
 from .instrument import FilterPlate, PixelScorer, PlanarDetector
 from .instrument.geometry import (
@@ -141,63 +139,6 @@ def _attenuation_matrix(filters: tuple[FilterPlate, ...], energy_eV: np.ndarray)
     if not filters:
         return np.empty((0, energy_eV.size), dtype=float)
     return np.stack([linear_attenuation_inv_mm(plate.material, energy_eV) for plate in filters])
-
-
-def build_case(scene: Scene, numerics: Numerics) -> Case:
-    """Lower one resolved scene to the existing typed transport input."""
-    convergence = numerics.convergence
-    scalar_detector = (
-        scene.detector.scalar_detector()
-        if isinstance(scene.detector, PlanarDetector)
-        else scene.detector
-    )
-    legacy = LegacySweep(
-        material=scene.target.material,
-        beam=scene.beam,
-        target=scene.target,
-        detector=scalar_detector,
-        n_families=convergence.n_families,
-        max_reflections=convergence.max_reflections,
-        spec_chunk=numerics.spec_chunk,
-        brem_chunk=numerics.brem_chunk,
-        mosaic_route=convergence.mosaic_route,
-        mosaic_nodes=convergence.mosaic_nodes,
-    )
-    cases = build_cases(
-        legacy,
-        n_electrons=numerics.n_electrons,
-        n_electrons_brem=numerics.n_electrons_brem,
-        coherent_emission=scene.emission in {"coherent", "both"},
-        straggling=numerics.straggling,
-        energy_model=numerics.energy_model,
-        max_dE_frac=numerics.max_dE_frac,
-    )
-    if len(cases) != 1:  # Scene rejects every implicit multi-value field.
-        raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
-    return cases[0]
-
-
-def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Case]:
-    """Lower a public sweep; preserve exact D7 expansion for converted sweeps."""
-    if sweep._legacy_source is not None:
-        old_sweep, settings = sweep._legacy_source
-        return build_cases(
-            old_sweep,
-            n_electrons=settings.n_electrons,
-            n_electrons_brem=settings.n_electrons_brem,
-            coherent_emission=settings.coherent_emission,
-            straggling=getattr(settings, "straggling", False),
-            energy_model=getattr(settings, "energy_model", "frozen"),
-            max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
-        )
-    resolved = Numerics() if numerics is None else numerics
-    cases = []
-    for index, (label, scene) in enumerate(sweep.expand()):
-        case = build_case(scene, resolved)
-        if label:
-            case = replace(case, name=f"{case.name} {label}")
-        cases.append(replace(case, seed=index + 1))
-    return cases
 
 
 def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:

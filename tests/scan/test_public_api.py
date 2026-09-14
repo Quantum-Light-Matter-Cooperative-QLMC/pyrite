@@ -123,3 +123,9 @@ def test_scene_model_switches_select_returned_arrays(monkeypatch) -> None:
     np.testing.assert_array_equal(result.spectrum, [7.0, 8.0])
     np.testing.assert_array_equal(result.coherent_spectrum, [7.0, 8.0])
     np.testing.assert_array_equal(result.background, [0.0, 0.0])
+
+
+def test_build_sweep_cases_remains_public_from_api():
+    from pyrite.api import build_sweep_cases
+
+    assert callable(build_sweep_cases)

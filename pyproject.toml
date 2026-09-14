@@ -361,6 +361,30 @@ modules = [
     "pyrite.plots.plotly",
 ]
 
+[[tool.importlinter.contracts]]
+id = "campaign-stays-below-api"
+name = "Campaign does not import api"
+type = "forbidden"
+source_modules = ["pyrite.campaign"]
+forbidden_modules = ["pyrite.api"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+id = "results-stays-below-campaign"
+name = "Results does not import campaign"
+type = "forbidden"
+source_modules = ["pyrite.results"]
+forbidden_modules = ["pyrite.campaign"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+id = "devtools-stays-below-_dev"
+name = "devtools does not import the dev entry point"
+type = "forbidden"
+source_modules = ["pyrite.devtools"]
+forbidden_modules = ["pyrite._dev"]
+allow_indirect_imports = true
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
