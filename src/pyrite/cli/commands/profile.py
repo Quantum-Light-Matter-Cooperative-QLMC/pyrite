@@ -74,6 +74,10 @@ _RANGE_OPTIONS = (
     ("polar", "--polar", TILT_CSV_RANGE, "DEG,..."),
     ("azimuth", "--azimuth", AZIMUTH_CSV_RANGE, "DEG,..."),
 )
+_PROFILE_UPDATE_LABELS = {
+    "ne_line": "line electrons",
+    "ne_brem": "bremsstrahlung electrons",
+}
 
 #: Electron-count profile settings (plan P2.4): single-value grids, sweepable.
 _ACTIVE_DETECTOR_FIELDS = _profile_edit.ACTIVE_DETECTOR_FIELDS
@@ -869,7 +873,23 @@ def set_command(
             action_fields.append("emission")
         action_fields.extend(transport_updates)
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
-    return _write(document, original, dry_run, f"updated profile {name}")
+    changes = "; ".join(
+        (
+            f"{_PROFILE_UPDATE_LABELS.get(label, label)} changed from "
+            f"{_profile_edit.display(overwriting[label])} "
+            f"to {_profile_edit.display(updates[label])}"
+            if label in overwriting
+            else f"{_PROFILE_UPDATE_LABELS.get(label, label)} set to "
+            f"{_profile_edit.display(updates[label])}"
+        )
+        for label in updates
+    )
+    return _write(
+        document,
+        original,
+        dry_run,
+        f"updated profile {name}{': ' + changes if changes else ''}",
+    )
 
 
 def _merge_values(name, updates, *, add):
