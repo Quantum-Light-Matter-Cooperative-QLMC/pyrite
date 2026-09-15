@@ -1,0 +1,207 @@
+"""Deterministic line-window seeds (issue #101).
+
+Kinematic seeds are checked against the closed-form resonance on synthetic
+flights, edge seeds against the Chantler table the attenuation model reads, and
+the provider registry against a synthetic non-PXR component standing in for
+#103 transition-radiation fringes.
+"""
+
+import numpy as np
+import pytest
+
+from pyrite._grid_semantics import validate_backend_coordinates
+from pyrite._line_windows import FeatureSeed, build_window_plan
+from pyrite.materials.atomic import load_henke
+from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+from pyrite.montecarlo.spectrum import line_seeds
+from pyrite.montecarlo.spectrum.line_seeds import (
+    CHARACTERISTIC_SOURCE,
+    EDGE_SOURCE,
+    KINEMATIC_SOURCE,
+    SeedContext,
+    absorption_edge_seeds,
+    characteristic_line_seeds,
+    collect_feature_seeds,
+    kinematic_line_seeds,
+    register_seed_provider,
+)
+from pyrite.montecarlo.transport import beta_from_keV
+
+_CRYSTAL = next(key for key, info in CRYSTALS.items() if {e for e, _ in info["basis"]} == {"C"})
+_N_HAT = np.array([np.sin(np.deg2rad(60.0)), 0.0, np.cos(np.deg2rad(60.0))])
+
+
+def _flights(energies_keV, lengths_ang, directions):
+    directions = np.asarray(directions, dtype=float).reshape(-1, 3)
+    directions = directions / np.linalg.norm(directions, axis=1, keepdims=True)
+    return {
+        "E_keV": np.asarray(energies_keV, dtype=float),
+        "L_ang": np.asarray(lengths_ang, dtype=float),
+        "v_hat": directions,
+        "elec_id": np.zeros(len(energies_keV), dtype=int),
+    }
+
+
+def _resonance_eV(energy_keV, direction, hkl):
+    g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
+    beta = float(beta_from_keV(energy_keV))
+    v = beta * np.asarray(direction, dtype=float) / np.linalg.norm(direction)
+    return HBARC_EV_ANG * float(v @ g_vector) / (1.0 - float(v @ _N_HAT))
+
+
+def test_single_flight_window_is_centred_on_the_closed_form_resonance():
+    hkl = (0, 0, 2)
+    g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
+    segments = _flights([100.0], [2000.0], [g_vector])
+    seeds, summary = kinematic_line_seeds(
+        segments, _N_HAT, crystal=_CRYSTAL, hkl_list=[hkl], feature_width_eV=0.8
+    )
+    (seed,) = seeds
+    assert seed.source == KINEMATIC_SOURCE and seed.label == "(0 0 2)"
+    assert seed.centre_eV == pytest.approx(_resonance_eV(100.0, g_vector, hkl), rel=1e-12)
+    assert seed.below_eV == pytest.approx(2.0 * 0.8)
+    assert seed.above_eV == pytest.approx(2.0 * 0.8)
+    assert seed.spacing_eV == pytest.approx(0.1)
+    assert summary["dropped_reflections"] == []
+
+
+def test_window_covers_the_weighted_band_and_ignores_a_negligible_tail():
+    hkl = (0, 0, 2)
+    g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
+    tilted = g_vector / np.linalg.norm(g_vector) + np.array([0.3, 0.0, 0.0])
+    heavy = [g_vector] * 50 + [tilted] * 50
+    rare = [g_vector + np.array([0.0, 0.9 * np.linalg.norm(g_vector), 0.0])]
+    segments = _flights([100.0] * 101, [1000.0] * 100 + [1.0], heavy + rare)
+    (seed,), _ = kinematic_line_seeds(
+        segments,
+        _N_HAT,
+        crystal=_CRYSTAL,
+        hkl_list=[hkl],
+        feature_width_eV=0.5,
+        aliased_weight_limit=1.0e-3,
+        tail_widths=0.0,
+    )
+    band = sorted([_resonance_eV(100.0, g_vector, hkl), _resonance_eV(100.0, tilted, hkl)])
+    assert seed.centre_eV - seed.below_eV == pytest.approx(band[0], rel=1e-12)
+    assert seed.centre_eV + seed.above_eV == pytest.approx(band[1], rel=1e-12)
+    rare_resonance = _resonance_eV(100.0, rare[0], hkl)
+    assert not seed.centre_eV - seed.below_eV <= rare_resonance <= seed.centre_eV + seed.above_eV
+
+
+def test_a_reflection_that_never_radiates_is_reported_not_seeded():
+    g_vector, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS[_CRYSTAL]["lattice"])
+    segments = _flights([100.0], [2000.0], [g_vector])
+    seeds, summary = kinematic_line_seeds(
+        segments, _N_HAT, crystal=_CRYSTAL, hkl_list=[(0, 0, 2), (0, 0, -2)], feature_width_eV=1.0
+    )
+    assert [seed.label for seed in seeds] == ["(0 0 2)"]
+    assert summary["dropped_reflections"] == ["(0 0 -2)"]
+    assert summary["dropped_weight_fraction"] == 0.0
+
+
+def test_mosaic_spread_widens_the_window():
+    hkl = (0, 0, 2)
+    g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
+    segments = _flights([100.0], [2000.0], [g_vector + np.array([0.2, 0.0, 0.0])])
+    (perfect,), _ = kinematic_line_seeds(
+        segments, _N_HAT, crystal=_CRYSTAL, hkl_list=[hkl], feature_width_eV=0.5, tail_widths=1.0
+    )
+    (mosaic,), _ = kinematic_line_seeds(
+        segments,
+        _N_HAT,
+        crystal=_CRYSTAL,
+        hkl_list=[hkl],
+        feature_width_eV=0.5,
+        tail_widths=1.0,
+        mosaic_fwhm_rad=np.deg2rad(3.0),
+        mosaic_nodes=3,
+    )
+    assert perfect.below_eV + perfect.above_eV == pytest.approx(1.0)
+    assert mosaic.below_eV + mosaic.above_eV > 2.0
+
+
+def test_edge_anchors_bracket_the_chantler_jump_not_the_nominal_edge():
+    seeds, summary = absorption_edge_seeds(["C"], 100.0, 1000.0)
+    native, _f1, f2 = load_henke("C")
+    anchors = sorted(seed.centre_eV for seed in seeds if seed.anchor)
+    assert [seed.label for seed in seeds] == ["C K", "C K above"]
+    assert all(seed.source == EDGE_SOURCE for seed in seeds)
+    below, above = np.searchsorted(native, anchors)
+    assert above == below + 1
+    near = np.flatnonzero((native > 270.0) & (native < 300.0))
+    assert f2[above] / f2[below] == pytest.approx(np.max(f2[near[1:]] / f2[near[:-1]]))
+    assert 284.2 not in anchors
+    assert summary["skipped"] == []
+    assert absorption_edge_seeds(["C"], 1000.0, 2000.0)[0] == []
+
+
+def test_edge_bracket_is_a_single_pair_of_nodes_in_the_plan():
+    seeds, _ = absorption_edge_seeds(["C"], 100.0, 1000.0)
+    grid = build_window_plan(100.0, 1000.0, 3.0, seeds).coordinates()
+    below, above = sorted(seed.centre_eV for seed in seeds)
+    i = int(np.flatnonzero(grid == below)[0])
+    assert grid[i + 1] == above
+
+
+def test_characteristic_windows_follow_the_emitted_lines():
+    seeds, _ = characteristic_line_seeds([[("C", 0.1)]], samples_per_feature=8)
+    by_label = {seed.label: seed for seed in seeds}
+    assert all(seed.source == CHARACTERISTIC_SOURCE for seed in seeds)
+    ka1 = by_label["C Ka1"]
+    assert ka1.centre_eV == pytest.approx(277.0, abs=0.5)
+    fwhm = ka1.spacing_eV * 8
+    assert ka1.below_eV == pytest.approx(10.0 * fwhm)
+    assert characteristic_line_seeds([[("C", 0.1)]], relaxation_cutoff_eV=1000.0)[0] == []
+
+
+def _context():
+    g_vector, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS[_CRYSTAL]["lattice"])
+    return SeedContext(
+        case={"crystal": _CRYSTAL, "hkl_list": [(0, 0, 2)], "composition": [("C", 0.11)]},
+        segments=_flights([30.0], [3000.0], [g_vector]),
+        n_hat=_N_HAT,
+        electron_limit=None,
+        start_eV=10.0,
+        stop_eV=2600.0,
+        feature_width_eV=1.0,
+    )
+
+
+def test_default_providers_build_a_valid_float32_plan_for_a_carbon_case():
+    seeds, summaries = collect_feature_seeds(_context(), line_seeds.DEFAULT_SEED_PROVIDERS)
+    assert {seed.source for seed in seeds} == set(line_seeds.DEFAULT_SEED_PROVIDERS)
+    assert summaries[KINEMATIC_SOURCE]["seeds"] == 1
+    plan = build_window_plan(10.0, 2600.0, 3.0, seeds)
+    grid = plan.coordinates()
+    assert plan.windowed
+    assert validate_backend_coordinates(grid, dtype=np.float32) > 0.0
+
+
+def test_a_registered_non_pxr_component_contributes_windows(monkeypatch):
+    monkeypatch.setattr(line_seeds, "_PROVIDERS", dict(line_seeds._PROVIDERS))
+
+    def fringes(context):
+        centre = 0.5 * (context.start_eV + context.stop_eV)
+        return [
+            FeatureSeed("transition-radiation", f"fringe {k}", centre + 40.0 * k, 5.0, 5.0, 0.05)
+            for k in range(3)
+        ], {"fringes": 3}
+
+    register_seed_provider("transition-radiation", fringes)
+    with pytest.raises(ValueError, match="already registered"):
+        register_seed_provider("transition-radiation", fringes)
+    seeds, summaries = collect_feature_seeds(_context(), ["transition-radiation"])
+    assert summaries == {"transition-radiation": {"fringes": 3, "seeds": 3}}
+    plan = build_window_plan(10.0, 2600.0, 3.0, seeds)
+    assert sum(spacing <= 0.05 for _, _, spacing in plan.pieces) == 3
+
+
+def test_unknown_or_misattributed_providers_are_refused(monkeypatch):
+    monkeypatch.setattr(line_seeds, "_PROVIDERS", dict(line_seeds._PROVIDERS))
+    with pytest.raises(ValueError, match="unknown seed provider"):
+        collect_feature_seeds(_context(), ["no-such-provider"])
+    register_seed_provider(
+        "liar", lambda context: ([FeatureSeed("other", "x", 100.0, 1.0, 1.0, 0.1)], {})
+    )
+    with pytest.raises(ValueError, match="source is 'liar'"):
+        collect_feature_seeds(_context(), ["liar"])
