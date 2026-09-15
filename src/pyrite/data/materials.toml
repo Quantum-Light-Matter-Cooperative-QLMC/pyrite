@@ -268,21 +268,6 @@ materials = ["hopg"]
 emission = "both"
 energy_grid_refs = {hbn = "2273dc2d40d291ad35fc68df85f7dd602eb477b5e2cc4d545f204b2826170687", hopg = "1cf8476fa2938ab26c856a8ad9ea0c6493f2e9ba9d7a8ff4b81b1d3cf2a92699"}
 n_electrons = {values = [20000]}
-[energy_grids.standard]
-line_by_energy = [
-  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
-  # 40/60 keV: provisional interpolated bounds, pending `pyrite energy-grid derive --remote`
-  # rerun (issue: add-40-60kev-energies) -- replace stop/num via `pyrite energy-grid apply` once derived values land.
-  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2800.0, num = 931, endpoint = true } }, source = "derived" },
-  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3000.0, num = 998, endpoint = true } }, source = "derived" },
-  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 4200.0, num = 1398, endpoint = true } }, source = "derived" },
-  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 9000.0, num = 2983, endpoint = true } }, source = "derived" },
-  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 11800.0, num = 3917, endpoint = true } }, source = "derived" },
-  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 13600.0, num = 4517, endpoint = true } }, source = "derived" },
-  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 14800.0, num = 4917, endpoint = true } }, source = "derived" },
-  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 16400.0, num = 5451, endpoint = true } }, source = "derived" },
-]
-
 [energy_grids.hopg]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } }, source = "derived" },

@@ -33,7 +33,6 @@ from pyrite.energy_grid.bounds import line_start_eV as _line_start_eV
 from pyrite.energy_grid.bounds import spacing_num
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
-_DEFAULT_MATERIAL = "standard"
 load_material_catalog = None
 
 
@@ -164,17 +163,12 @@ def _merge_line_rows(document, material: str, new_rows, force: bool, source: str
     A row whose *current* stored ``source`` is ``"manual"`` is preserved
     unless ``force``; the write itself is never consulted against a sidecar
     for line-grid provenance -- that lives inline in the catalog (decision 3).
-    A material with no table of its own yet, but that resolves against the
-    shared default (``energy_grids.standard``), is seeded from it first so a
-    single-energy edit doesn't silently drop the material's other rows.
+    New materials start empty; only this material's existing rows are merged.
     """
     grids_root = document.get("energy_grids")
     own_table = grids_root.get(material) if grids_root else None
     if own_table is not None:
         existing = _existing_line_rows(own_table)
-    elif grids_root is not None and material != _DEFAULT_MATERIAL:
-        default_table = grids_root.get(_DEFAULT_MATERIAL)
-        existing = _existing_line_rows(default_table) if default_table is not None else {}
     else:
         existing = {}
     mat_table = _energy_grid_table(document, material)
@@ -302,11 +296,7 @@ def _existing_artifact_rows(
 
     grids_root = document.get("energy_grids", {})
     own = grids_root.get(material) if isinstance(grids_root, Mapping) else None
-    fallback = grids_root.get(profile) if isinstance(grids_root, Mapping) else None
-    if fallback is None and isinstance(grids_root, Mapping):
-        fallback = grids_root.get(_DEFAULT_MATERIAL)
-    table = own if own is not None else fallback
-    rows = _existing_line_rows(table) if table is not None else {}
+    rows = _existing_line_rows(own) if own is not None else {}
     return rows, None
 
 
@@ -801,9 +791,8 @@ def delete_line_grid(
     The only sanctioned way to remove derived/manual line-grid bounds
     (decision 3, docs/adr/0005-energy-grid-schema-decisions.md): removes the
     whole ``[energy_grids.MATERIAL]`` table once its last row goes, rather
-    than leaving an invalid empty array. Pre-write catalog validation blocks
-    deleting a row a live profile's ``energy_keV`` still needs -- no separate
-    reference check is required; the CLI surfaces that validation failure.
+    than leaving an invalid empty array. Missing energies then resolve through
+    automatic case-local policy; they never inherit another material's rows.
     """
     wanted = {_positive_float(e, "energy") for e in energies}
     original = Path(_MATERIALS_TOML).read_text()
@@ -860,7 +849,7 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
 def resolved_show_inputs(
     *, profile: str = "standard", catalog_path=None
 ) -> tuple[dict, dict, dict[str, dict | None], dict[str, str]]:
-    """Resolve show payloads from explicit artifacts, then legacy fallback."""
+    """Resolve show payloads from explicit artifacts, then own legacy rows."""
     path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
     raw = tomllib.loads(path.read_text())
     profiles = raw.get("profiles", {})
@@ -926,14 +915,15 @@ def show(material=None, band=None, *, profile: str = "standard", catalog_path=No
     keys = [material] if material else list(mats)
     show_line = band in (None, "line")
     show_brem = band in (None, "brem")
-    default_block = energy_grids.get(_DEFAULT_MATERIAL, {})
     out = []
     for key in keys:
         out.append(f"=== {key} ===")
         if key in refs:
             out.append(f"  artifact: sha256:{refs[key]}  [profile {profile}]")
         if show_line:
-            block = energy_grids.get(key, default_block)
+            block = energy_grids.get(key, {})
+            if not block.get("line_by_energy"):
+                out.append("  line grid: no stored per-energy rows")
             for item in block.get("line_by_energy", []):
                 e = float(item["energy_keV"])
                 g = item["grid"]["linspace"]

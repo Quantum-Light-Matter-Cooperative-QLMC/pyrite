@@ -115,8 +115,8 @@ def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
 
 
 def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
-    # A material's own [energy_grids.<material>] entry is authoritative and
-    # replaces the shared default wholesale (decision 3); its E_grid_brem
+    # A material's own [energy_grids.<material>] entry is authoritative;
+    # its E_grid_brem
     # override still lives under [profiles.standard.overrides.<material>], a
     # separate axis untouched by the line-grid store.
     from pyrite.materials import load_material_catalog
@@ -347,10 +347,7 @@ def test_profile_artifact_ref_rejects_missing_or_wrong_material(tmp_path):
 
 
 def _catalog_with_default_store_only(*, entries: str = PER_BEAM_ENTRIES) -> str:
-    """Material "sample" has no ``[energy_grids.sample]`` entry of its own; it
-    resolves against the shared default keyed by its profile's name
-    (``standard`` in Phase 1) -- the fallback ~30 bundled materials.toml
-    materials that never diverged from the profile's own derived bounds use."""
+    """Legacy profile-named store which must not supply material "sample"."""
     base = _minimal_catalog(
         material_rows="""
 [materials.sample]
@@ -361,23 +358,26 @@ crystal = "mos2"
     return base + f"\n[energy_grids.standard]\nline_by_energy = [\n  {entries},\n]\n"
 
 
-def test_material_without_own_store_entry_falls_back_to_shared_default(tmp_path):
+@pytest.mark.parametrize("profile", ["standard", "narrowed"])
+def test_material_without_own_store_entry_ignores_shared_default(tmp_path, profile):
+    import tomlkit
+
     from pyrite.materials import load_material_catalog
 
+    document = tomlkit.parse(_catalog_with_default_store_only())
+    if profile != "standard":
+        document["profiles"][profile] = document["profiles"]["standard"].copy()
+        document["energy_grids"][profile] = document["energy_grids"]["standard"].copy()
     scan = (
-        load_material_catalog(_write_catalog(tmp_path, _catalog_with_default_store_only()))
+        load_material_catalog(_write_catalog(tmp_path, tomlkit.dumps(document)), profile=profile)
         .material("sample")
         .scan
     )
-    assert tuple(scan.E_grid_line_by_energy) == (25.0, 30.0)
-    np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17))
+    assert scan.E_grid_line_by_energy == {}
 
 
 def test_missing_beam_energy_loads_without_default_store_coverage(tmp_path):
-    """Issue #101: `pyrite material energy-grid derive` is no longer a
-    correctness prerequisite. A default store covering only some configured beam
-    energies loads, and the uncovered energy resolves automatically at case
-    build."""
+    """Even partial profile-named rows are ignored by material resolution."""
     from pyrite.materials import load_material_catalog
 
     only_25 = '{ energy_keV = 25.0, grid = { values = [1.0, 2.0] }, source = "derived" }'
@@ -385,7 +385,7 @@ def test_missing_beam_energy_loads_without_default_store_coverage(tmp_path):
 
     scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
 
-    assert tuple(scan.E_grid_line_by_energy) == (25.0,)
+    assert scan.E_grid_line_by_energy == {}
 
 
 def test_material_with_no_line_grid_at_all_is_valid(tmp_path):
@@ -403,7 +403,31 @@ crystal = "mos2"
     scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
 
     assert scan.E_grid_line is None
-    assert scan.E_grid_line_by_energy is None
+    assert scan.E_grid_line_by_energy == {}
+
+
+@pytest.mark.parametrize("own_entries", [None, PER_BEAM_ENTRIES.split(",\n")[0]])
+def test_missing_material_rows_reach_automatic_case_policy(tmp_path, monkeypatch, own_entries):
+    from pyrite._energy_grid_encoding import decode_energy_grid
+    from pyrite.campaign import config
+    from pyrite.campaign.sweep import build_cases
+    from pyrite.materials import load_material_catalog
+
+    text = _catalog_with_default_store_only()
+    if own_entries is not None:
+        text += f"\n[energy_grids.sample]\nline_by_energy = [{own_entries}]\n"
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+    monkeypatch.setattr(config, "CATALOG", catalog)
+    cases = build_cases(config.material_sweep("sample"))
+    for case in cases:
+        if own_entries is not None and case["E0_keV"] == 25.0:
+            assert "line_grid_policy" not in case
+            np.testing.assert_array_equal(
+                decode_energy_grid(case["E_grid"]), np.linspace(10.0, 58.0, 17)
+            )
+        else:
+            assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
+            assert case["line_grid_policy"]["bandwidth"]["policy"] == "kinematic-ceiling"
 
 
 def test_material_config_error_groups_identical_messages_across_materials(tmp_path):
@@ -1357,39 +1381,19 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
     )
 
 
-def test_standard_profile_uses_requested_angles_energies_and_line_grids():
+def test_standard_profile_preserves_scan_axes_without_shared_line_rows():
     from pyrite.materials import CATALOG
 
-    expected_bounds = {
-        30.0: (10.0, 2500.0),
-        40.0: (10.0, 2800.0),
-        50.0: (10.0, 3000.0),
-        60.0: (10.0, 4200.0),
-        100.0: (50.0, 9000.0),
-        150.0: (50.0, 11800.0),
-        200.0: (50.0, 13600.0),
-        250.0: (50.0, 14800.0),
-        300.0: (50.0, 16400.0),
-    }
-    # silicon carries the standard profile unmodified (no per-material overrides),
-    # so it exposes the profile's requested angles, energies, and line grids. The
-    # bespoke crystals (hopg/diamond/wse2/mose2) override the line grids and are
-    # covered by test_material_scan_overrides_apply_bespoke_line_and_brem_grids.
+    expected_energies = [30.0, 40.0, 50.0, 60.0, 100.0, 150.0, 200.0, 250.0, 300.0]
+    # Shared scan axes remain valid; line rows must belong to this material.
     scan = CATALOG.material("silicon").scan
-    np.testing.assert_array_equal(scan.energy_keV, list(expected_bounds))
+    np.testing.assert_array_equal(scan.energy_keV, expected_energies)
     np.testing.assert_array_equal(scan.tilt_deg, [5.0, 15.0, 30.0, 45.0, 60.0, 75.0, 85.0])
     np.testing.assert_array_equal(
         scan.tilt_azim_deg, [95.0, 105.0, 120.0, 135.0, 150.0, 165.0, 180.0]
     )
     assert scan.E_grid_line is None
-    assert tuple(scan.E_grid_line_by_energy) == tuple(expected_bounds)
-    for energy, (start, stop) in expected_bounds.items():
-        grid = scan.E_grid_line_by_energy[energy]
-        assert grid[0] == start
-        assert grid[-1] == stop
-        spacing = np.diff(grid)
-        assert np.all(spacing == pytest.approx(spacing[0]))
-        assert spacing[0] == pytest.approx(3.0, abs=0.002)
+    assert scan.E_grid_line_by_energy == {}
 
 
 def test_exposed_arrays_cannot_have_writes_reenabled():

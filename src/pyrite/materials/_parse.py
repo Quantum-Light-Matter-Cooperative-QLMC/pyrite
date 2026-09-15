@@ -313,7 +313,9 @@ def _scan(
         grids["E_grid_line"] = _grid(values["E_grid_line"], f"{path}.E_grid_line", errors)
     else:
         grids["E_grid_line"] = None
-    line_grids = None
+    # An empty mapping opts missing catalog rows into automatic case-local
+    # resolution. None is reserved for an explicit fixed line grid.
+    line_grids: LineGridByEnergy | None = None if has_line else MappingProxyType({})
     if not has_line:
         energy_grid = grids.get("energy_keV")
         if energy_grid is not None:
@@ -413,7 +415,7 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
     Only well-formedness is checked here (decodable grids, mutual exclusion
     of thickness alternatives). Full semantic validation -- merged against
     the profile's own defaults, including line-grid energy coverage against
-    the shared ``[energy_grids.*]`` store -- happens per material in
+    the material's own ``[energy_grids.MATERIAL]`` rows -- happens per material in
     ``_parse_materials`` via ``_scan``.
     """
     table = _table(raw, path, errors)
@@ -758,15 +760,7 @@ def _parse_materials(
             crystals.get(str(crystal_key)),
             errors,
             line_grid_store=(
-                artifact_line_grids
-                if artifact_line_grids is not None
-                else energy_grids.get(
-                    key,
-                    energy_grids.get(
-                        resolving_profile_name,
-                        energy_grids.get("standard"),
-                    ),
-                )
+                artifact_line_grids if artifact_line_grids is not None else energy_grids.get(key)
             ),
         )
         if artifact is not None and scan is not None:
