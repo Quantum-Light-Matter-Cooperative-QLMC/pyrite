@@ -566,7 +566,6 @@ def cmd_validation_records(args: argparse.Namespace) -> None:
         [sys.executable, str(check_path), *command[1:]],
         cwd=ROOT,
         check=False,
-        env={**os.environ, "PYRITE_VALIDATION_RECORDS_DIR": str(output_dir)},
     )
     records = records_for_exit(check_name, result.returncode, current_revision())
     write_records(output_dir / f"{check_path.stem}.jsonl", records)

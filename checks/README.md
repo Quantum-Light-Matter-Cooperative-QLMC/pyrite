@@ -18,14 +18,14 @@ marks exit code 0 as pass, 2 (explicit skip) or 75 (missing remote/cache
 prerequisite) as skip, and any other nonzero exit as fail.
 
 | Artifact | Purpose |
-|---|---|---|
-| `dans_diffraction_oracle.py` | Pinned external lattice, reciprocal-geometry, and structure-factor comparison. |
+|---|---|
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
 | `cross_reflection_coherence.py` | Bounds the coherent-spectrum effect of omitted cross-reflection terms. |
+| `dans_diffraction_oracle.py` | Pinned external lattice, reciprocal-geometry, and structure-factor comparison. |
 | `detector_solid_angle_check.py` | Solid-angle integration and analytic aperture-width comparison; the integrated-spectrum route is not separately ledgered. |
-| `energy_step_convergence_matrix.py` | Measures energy-controlled transport convergence across the maintained refinement matrix. |
 | `energy_loss_straggling_observables.py` | Paired-seed phase, terminal-fraction, stopped-range, bremsstrahlung, and coherent-line response to Urban straggling. |
+| `energy_step_convergence_matrix.py` | Measures energy-controlled transport convergence across the maintained refinement matrix. |
 | `feranchuk_check_script.py` | Legacy Feranchuk–Spence LiF absolute-flux anchor. |
 | `feranchuk_vs_zhai_check.py` | Analytic-versus-transport comparison through the maintained Zhai anchor pipeline. |
 | `kinematic_validity_check.py` | Kinematic-approximation audit; its validity parameters are supporting diagnostics, not separate ledger claims. |
@@ -36,6 +36,7 @@ prerequisite) as skip, and any other nonzero exit as fail.
 | `radiation_error_estimator_calibration.py` | Calibrates warning thresholds for the radiation error estimator. |
 | `substep_invariance.py` | Measures emitted-radiation invariance under numerical transport substepping. |
 | `transport_core_goldens.py` | Verifies bit-for-bit CPU transport-core golden outputs. |
+| `cxr_analysis_feranchuk.ipynb`, `cxr_analysis_feranchuk.md` | Legacy paired notebook retained for historical Feranchuk analysis; it emits no records. Keep output-free. |
 
 Run commands are documented in each check. Heavy Monte Carlo or GPU work must
 use `pyrite remote`; do not launch it locally from this directory.
