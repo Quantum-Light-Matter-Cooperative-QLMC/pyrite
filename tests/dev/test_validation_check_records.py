@@ -54,6 +54,13 @@ def test_mapping_covers_maintained_checks_and_known_ledger_ids() -> None:
     assert set().union(*CHECK_LEDGER_IDS.values()) <= ledger_ids
 
 
+def test_check_guide_lists_each_mapped_check() -> None:
+    root = Path(__file__).parents[2]
+    guide = (root / "checks" / "README.md").read_text(encoding="utf-8")
+
+    assert all(f"`{Path(check).name}`" in guide for check in CHECK_LEDGER_IDS)
+
+
 def test_validation_records_command_writes_mapped_result(tmp_path, monkeypatch) -> None:
     from pyrite.devtools import dev_cli
 
