@@ -155,6 +155,24 @@ def test_sync_excludes_generated_caches(monkeypatch, tmp_path):
     assert archived == ["src/pkg/module.py"]
 
 
+def test_sync_removes_stale_remote_python_sources_before_extract(monkeypatch, tmp_path):
+    source = tmp_path / "src" / "pyrite"
+    source.mkdir(parents=True)
+    (source / "current.py").write_text("VALUE = 1\n")
+    commands = []
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
+
+    transport.sync_code()
+
+    remote_command = commands[-1]
+    assert remote_command[:3] == ["ssh", "-n", remote.HOST]
+    assert 'find "$p" -type f -name \'*.py\' -delete' in remote_command[3]
+    assert remote_command[3].index("find") < remote_command[3].index("tar xzf")
+
+
 def test_ssh_download_streams_bytes_and_removes_partial_failure(monkeypatch, tmp_path):
     destination = tmp_path / "incoming.pkl"
 
