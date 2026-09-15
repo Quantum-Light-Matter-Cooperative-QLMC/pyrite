@@ -15,8 +15,11 @@ from ..._line_grid_policy import (
     coordinate_cache_key,
     resolved_coordinates,
     store_coordinates,
+    windowed_coordinates,
 )
+from ..._line_windows import build_window_plan, window_plan_from_payload
 from ..spectrum.diagnostics import sinc_feature_spacing
+from ..spectrum.line_seeds import SeedContext, collect_feature_seeds
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
 # deterministic function of these plus the seed, so they content-address the
@@ -51,28 +54,91 @@ _RESOLUTION_INPUT_KEYS = (
 )
 
 
+# Additional case fields the kinematic window seeds read: the reflection rows
+# depend on orientation and mosaic spread, which the sinc spacing does not.
+_WINDOW_INPUT_KEYS = (
+    "beam_uvw",
+    "surface_hkl",
+    "azimuth_rad",
+    "recip_miscut_rad",
+    "mosaic_mc_fwhm_rad",
+    "mosaic_mc_nodes",
+    "layer_radiators",
+)
+
+
+def _cached_grid(cached):
+    """Coordinates of a cache record, or ``None`` when its plan is stale."""
+    plan_payload = cached.get("window_plan")
+    if plan_payload is None:
+        return np.linspace(cached["start_eV"], cached["stop_eV"], int(cached["num"]))
+    try:
+        return window_plan_from_payload(plan_payload).coordinates()
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
+    """Seed, plan and validate a piecewise line axis from this run's segments.
+
+    The backbone is the policy's maximum spacing. Every provider the policy
+    names contributes windows, and kinematic window spacing follows the sinc
+    feature width measured on these same segments.
+    """
+    windows = payload["windows"]
+    start = float(payload["bandwidth"]["start_eV"])
+    stop = float(payload["bandwidth"]["stop_eV"])
+    context = SeedContext(
+        case=case,
+        segments=segments,
+        n_hat=np.asarray(n_hat, dtype=float),
+        electron_limit=Ne,
+        start_eV=start,
+        stop_eV=stop,
+        feature_width_eV=float(feature_width_eV),
+        samples_per_feature=int(windows["samples_per_feature"]),
+        aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
+        tail_widths=float(windows["tail_widths"]),
+    )
+    seeds, summaries = collect_feature_seeds(context, windows["providers"])
+    plan = build_window_plan(start, stop, float(payload["resolution"]["max_spacing_eV"]), seeds)
+    grid, record = windowed_coordinates(payload, plan, dtype=REAL)
+    record["feature_width_eV"] = float(feature_width_eV)
+    record["window_seeds"] = summaries
+    return grid, record
+
+
 def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     """Resolve an automatic case-local line grid from this run's trajectories.
 
     Consults the content-addressed cache first, so a repeated case pays the
     sinc-feature scan once. The cache is a speed cache only: the case payload
     already carries the policy, and the policy plus the case determines the
-    coordinates, so a cold and a warm cache resolve identically.
+    coordinates, so a cold and a warm cache resolve identically. A windowed
+    policy also keys the cache on the orientation inputs its seeds read, and a
+    hit rebuilds the coordinates from the stored plan; a plan this build would
+    not make is treated as a miss.
     """
-    inputs = {key: case[key] for key in _RESOLUTION_INPUT_KEYS if case.get(key, None) is not None}
+    windowed = payload.get("windows") is not None
+    keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed else ())
+    inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
     key = coordinate_cache_key(payload, inputs)
     cached = cached_coordinates(key)
     if cached is not None:
-        grid = np.linspace(cached["start_eV"], cached["stop_eV"], int(cached["num"]))
-        return grid, {**cached, "cache": "hit", "cache_key": key}
+        grid = _cached_grid(cached)
+        if grid is not None:
+            return grid, {**cached, "cache": "hit", "cache_key": key}
     target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
         segments,
         n_hat,
         electron_limit=Ne,
         aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
     )
-    grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
+    if windowed:
+        grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
+    else:
+        grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
     record.update(
         {
             "aliased_weight_fraction": aliased_fraction,

@@ -28,7 +28,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from .._energy_grid_encoding import decode_energy_grid
+from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
+from .._grid_semantics import is_uniform_grid
 from .._progress import _ProgressTimer, _write_progress_record
 from ..montecarlo import runner
 from . import _checkpoint_store
@@ -744,7 +745,12 @@ def repair_line_spec(
         if want_coherent:
             r["spec_coherent"] = spec_coherent
         r["E_grid"] = target
-        c["E_grid_line"] = (float(target[0]), float(target[-1]), len(target))
+        # A windowed (#101) target has no triple form; keep its exact coordinates.
+        c["E_grid_line"] = (
+            (float(target[0]), float(target[-1]), len(target))
+            if is_uniform_grid(target)
+            else encode_energy_grid(target)
+        )
         # Recompute pins explicit coordinates, which outrank any automatic
         # case-local policy the record was built under (issue #101). Drop the
         # policy so the stored case does not claim a resolution it no longer has.

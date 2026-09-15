@@ -45,6 +45,16 @@ ULP floor **raises** and names the unmet tolerance and the correction. The grid
 is never silently coarsened; raise the budget, relax that observable's
 tolerance, narrow the bandwidth, or run with `PYRITE_FP64=1`.
 
+Local line windows are opt-in while their convergence is being measured
+(issue #101). Passing `line_grid_policy={"windows": True}` on a `Sweep` keeps a
+backbone at the maximum spacing and refines windows around PXR/CBS resonances
+(from the run's own segments), absorption edges, and characteristic lines. A
+mapping may set `samples_per_feature` (default `8`), `tail_widths` (default
+`2.0`), and `providers`; `False` disables windows from a stored policy. The
+window plan is recorded under `line_grid_resolved`, and enabling or changing
+windows changes case/checkpoint identity. Windowed grids are nonuniform, so
+`EagleXO(resolve_energy=True)` and `LegacyEDS(convolve=True)` refuse them.
+
 ## Deriving grids on purpose
 
 `pyrite material energy-grid derive --profile NAME` is an inspection and
