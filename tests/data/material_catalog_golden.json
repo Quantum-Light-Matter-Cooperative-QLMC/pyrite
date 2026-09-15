@@ -9461,62 +9461,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -10124,62 +10069,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -11329,62 +11219,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -11547,62 +11382,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -11656,62 +11436,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -11765,62 +11490,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -12204,62 +11874,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -12752,62 +12367,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -13082,62 +12642,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -13415,62 +12920,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -13524,62 +12974,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -13633,62 +13028,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -13851,62 +13191,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -13960,62 +13245,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -14069,62 +13299,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -14287,62 +13462,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -14409,62 +13529,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200
@@ -14518,62 +13583,7 @@
           "sha256": "91f02c38f0ba1c266fbbe66b69e2095bc13890bbcf55539d24422ddd12fefb9f"
         },
         "E_grid_line": null,
-        "E_grid_line_by_energy": {
-          "30.0": {
-            "shape": [
-              831
-            ],
-            "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
-          },
-          "40.0": {
-            "shape": [
-              931
-            ],
-            "sha256": "26458d01b913796a74b7c5cc6772e1e4b1e29ec72ef7842df13adb4de70a839a"
-          },
-          "50.0": {
-            "shape": [
-              998
-            ],
-            "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
-          },
-          "60.0": {
-            "shape": [
-              1398
-            ],
-            "sha256": "4526c191ac5cbf7bfc86988cc2af89017c01ae797d5e11b78057d04cc030b1ec"
-          },
-          "100.0": {
-            "shape": [
-              2983
-            ],
-            "sha256": "a5a3e7e1a9b571c4efc7c3bba253d263f2cfacc5023c3dee12c3f2831e2802b2"
-          },
-          "150.0": {
-            "shape": [
-              3917
-            ],
-            "sha256": "3ab93ea6073b9ed50788875290c89c504459ea70b0e726b572493fc181ef6512"
-          },
-          "200.0": {
-            "shape": [
-              4517
-            ],
-            "sha256": "a3868ca30b801eb2132118f858913989451dd98aef4ecc6b57a44c2cbbe043e6"
-          },
-          "250.0": {
-            "shape": [
-              4917
-            ],
-            "sha256": "145ce29384ce01799bc86608e7cfbe0af53e8b54ce2c73445591fefdc57dfd42"
-          },
-          "300.0": {
-            "shape": [
-              5451
-            ],
-            "sha256": "b971f87c0d22246e77eead79a7447137231c4fad114c9bd19ef22f3c50206061"
-          }
-        },
+        "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
             1200

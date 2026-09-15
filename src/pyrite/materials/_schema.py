@@ -266,7 +266,9 @@ class ScanSpec:
         Shared line photon-energy grid in eV, or ``None`` when energy-specific
         grids are used.
     E_grid_line_by_energy
-        Optional mapping from electron energy in keV to line grids in eV.
+        Mapping from electron energy in keV to this material's stored line grids
+        in eV. Missing energies, including an empty mapping, use automatic
+        case-local policy. ``None`` accompanies an explicit fixed line grid.
     E_grid_brem
         Bremsstrahlung photon-energy grid in eV.
     thickness_layers

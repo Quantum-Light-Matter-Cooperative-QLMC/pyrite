@@ -79,6 +79,38 @@ def test_apply_inserts_new_line_and_brem_blocks_when_absent():
     tomllib.loads(new_text)  # still valid TOML
 
 
+def test_new_material_rows_are_not_seeded_from_shared_grid(tmp_path, monkeypatch):
+    shared = BASE_TOML_NO_GRID.replace("energy_grids.hopg", "energy_grids.standard")
+    # A shared manual row must neither block nor seed a different material.
+    shared = shared.replace('source = "derived"', 'source = "manual"')
+    new_text, skipped = apply.apply_bounds(shared, COMBINED_NO_GRID, provenance_mod=_NoManual())
+    assert skipped == []
+    rows = tomllib.loads(new_text)["energy_grids"]["hfs2"]["line_by_energy"]
+    assert len(rows) == 1
+    assert rows[0]["grid"]["linspace"]["stop"] == 2800.0
+
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(shared)
+    json_path.write_text(_json.dumps(COMBINED_NO_GRID))
+    monkeypatch.setattr(apply, "load_material_catalog", lambda *args, **kwargs: None)
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
+    refs = apply.add_file(json_path, catalog_path=toml_path)
+    from pyrite import _energy_grid_artifacts as artifacts
+
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", refs["hfs2"])
+    assert stored.identity["line_rows"][0]["stop_eV"] == 2800.0
+
+
+def test_show_does_not_report_another_materials_rows(tmp_path):
+    shared = BASE_TOML_NO_GRID.replace("energy_grids.hopg", "energy_grids.standard")
+    path = tmp_path / "materials.toml"
+    path.write_text(shared)
+    output = apply.show("hfs2", "line", catalog_path=path)
+    assert "line grid @" not in output
+    assert "no stored per-energy rows" in output
+
+
 def test_apply_file_writes_and_validates(tmp_path, monkeypatch, capsys):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
@@ -490,9 +522,7 @@ def test_set_brem_rejects_invalid_step_without_writes(tmp_path, monkeypatch):
     assert provenance_path.read_text() == "# existing provenance\n"
 
 
-def test_delete_line_grid_removes_material_entry_and_falls_back_to_shared_default(
-    tmp_path, monkeypatch
-):
+def test_delete_line_grid_removes_material_entry_without_shared_fallback(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     text = (
         BASE_TOML
@@ -512,6 +542,7 @@ def test_delete_line_grid_removes_material_entry_and_falls_back_to_shared_defaul
     new_text = toml_path.read_text()
     assert "[energy_grids.hopg]" not in new_text
     assert "[energy_grids.standard]" in new_text  # untouched
+    assert "line grid @" not in apply.show("hopg", "line", catalog_path=toml_path)
 
 
 def test_delete_line_grid_dry_run_prints_diff_and_writes_nothing(tmp_path, monkeypatch, capsys):
