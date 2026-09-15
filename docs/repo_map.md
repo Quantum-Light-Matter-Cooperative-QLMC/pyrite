@@ -139,8 +139,10 @@ Edges (importer -> imported):
   p8 -> p10
   p8 -> p11
   p8 -> p14
+  p8 -> p15
   p8 -> p2
   p8 -> p3
+  p8 -> p6
   p9 -> p10
   p9 -> p6
 ```
