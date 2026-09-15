@@ -279,7 +279,9 @@ def pull(
             # here sits near the link speed the wire is the wall; if it sits far
             # below it, the box's compress pass is.
             started = time.monotonic()
-            transport._ssh_download(remote_transfer, incoming_local)
+            transport._ssh_download(
+                remote_transfer, incoming_local, label=f"Pulling checkpoint '{stem}'..."
+            )
             elapsed = max(time.monotonic() - started, 1e-9)
             transferred = incoming_local.stat().st_size / 1e6
             print(
@@ -344,5 +346,8 @@ def pull_zhai_cache():
     dest = config.LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)
     for name in names:
-        transport._run(["scp", config.scp_remote_path(f"{remote_dir}/{name}"), str(dest / name)])
+        transport._run(
+            ["scp", config.scp_remote_path(f"{remote_dir}/{name}"), str(dest / name)],
+            label=f"Pulling {name}...",
+        )
     print(f"pulled -> checkpoints/zhai_reproduction/ ({len(names)} cache files)")

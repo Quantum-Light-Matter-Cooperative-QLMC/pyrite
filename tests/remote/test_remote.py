@@ -169,7 +169,7 @@ def test_sync_removes_stale_remote_python_sources_before_extract(monkeypatch, tm
 
     remote_command = commands[-1]
     assert remote_command[:3] == ["ssh", "-n", remote.HOST]
-    assert 'find "$p" -type f -name \'*.py\' -delete' in remote_command[3]
+    assert "find \"$p\" -type f -name '*.py' -delete" in remote_command[3]
     assert remote_command[3].index("find") < remote_command[3].index("tar xzf")
 
 
@@ -192,6 +192,29 @@ def test_ssh_download_streams_bytes_and_removes_partial_failure(monkeypatch, tmp
     with pytest.raises(subprocess.CalledProcessError):
         transport._ssh_download("cat artifact", destination)
     assert not destination.exists()
+
+
+def test_run_hides_raw_command_by_default_and_shows_label(monkeypatch, capsys):
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: None)
+
+    transport._run(["ssh", "-n", "box", "some very secret remote command"])
+    assert capsys.readouterr().err == ""
+
+    transport._run(["ssh", "-n", "box", "some very secret remote command"], label="Doing work...")
+    assert capsys.readouterr().err == "Doing work...\n"
+
+
+def test_verbose_ssh_prints_raw_command_instead_of_label(monkeypatch, capsys):
+    monkeypatch.setattr(subprocess, "run", lambda *_args, **_kwargs: None)
+
+    with transport.verbose_ssh(True):
+        transport._run(["ssh", "-n", "box", "echo hi"], label="Doing work...")
+    err = capsys.readouterr().err
+    assert err == "+ ssh -n box echo hi\n"
+
+    # Restored after the context manager exits.
+    transport._run(["ssh", "-n", "box", "echo hi"], label="Doing work...")
+    assert capsys.readouterr().err == "Doing work...\n"
 
 
 @pytest.mark.parametrize("value", ["relative/path", "/safe\ninjected", "/safe\0injected", ""])
@@ -629,7 +652,7 @@ def test_pull_performance_profile_fetches_each_matching_job(monkeypatch, tmp_pat
     )
     remote_commands = []
 
-    def fake_download(command, destination):
+    def fake_download(command, destination, **_kwargs):
         remote_commands.append(command)
         destination.write_text('{"schema":"cxr.performance.v1"}\n')
 
@@ -661,7 +684,7 @@ def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
         ),
     )
 
-    def fake_download(_command, destination):
+    def fake_download(_command, destination, **_kwargs):
         destination.write_bytes(b"artifact")
 
     monkeypatch.setattr(transport, "_ssh_download", fake_download)
@@ -1506,9 +1529,7 @@ def test_run_skips_pull_when_successful_remote_scan_used_only_cached_cases(monke
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, mats: list(mats))
     monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, _mats: [])
     monkeypatch.setattr(_checkpoint_store, "checkpoint_exists", lambda *_args: True)
-    monkeypatch.setattr(
-        lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems))
-    )
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems)))
 
     _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
 
@@ -1525,9 +1546,7 @@ def test_run_pulls_cached_remote_checkpoint_missing_locally(monkeypatch):
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, mats: list(mats))
     monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, _mats: [])
     monkeypatch.setattr(_checkpoint_store, "checkpoint_exists", lambda *_args: False)
-    monkeypatch.setattr(
-        lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems))
-    )
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems)))
 
     _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
 
@@ -1540,9 +1559,7 @@ def test_materials_needing_pull_skips_only_valid_zero_new_case_records(monkeypat
         transport,
         "_ssh_capture",
         lambda _command: (
-            'hopg\t{"completed_new_cases": 0}\n'
-            'wse2\t{"completed_new_cases": 2}\n'
-            "mos2\tnot-json\n"
+            'hopg\t{"completed_new_cases": 0}\nwse2\t{"completed_new_cases": 2}\nmos2\tnot-json\n'
         ),
     )
 
@@ -1596,7 +1613,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
         ),
     )
 
-    def download(command, destination):
+    def download(command, destination, **_kwargs):
         transfers.append(command)
         assert f"/checkpoints/{remote_stem}" in command
         shutil.copyfile(transfer, destination)
@@ -4521,7 +4538,7 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     _checkpoint_io.dump(payload, str(transfer))
     transfers = []
 
-    def fake_download(command, destination):
+    def fake_download(command, destination, **_kwargs):
         transfers.append((command, destination))
         shutil.copyfile(transfer, destination)
 
@@ -4766,7 +4783,7 @@ def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_p
     transfer = tmp_path / "transfer.pkl"
     _checkpoint_io.dump(payload, str(transfer))
 
-    def fake_download(_command, destination):
+    def fake_download(_command, destination, **_kwargs):
         shutil.copyfile(transfer, destination)
 
     monkeypatch.setattr(transport, "_ssh_download", fake_download)
@@ -4803,7 +4820,7 @@ def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, t
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: f"{survey_stem}\n")
     transfers = []
 
-    def fake_download(command, destination):
+    def fake_download(command, destination, **_kwargs):
         transfers.append((command, destination))
         shutil.copyfile(transfer, destination)
 
@@ -4832,7 +4849,7 @@ def test_pull_quick_stem_does_not_resolve_survey_siblings(monkeypatch, tmp_path)
     transfer = tmp_path / "transfer.pkl"
     _checkpoint_io.dump(payload, str(transfer))
 
-    def fake_download(_command, destination):
+    def fake_download(_command, destination, **_kwargs):
         shutil.copyfile(transfer, destination)
 
     monkeypatch.setattr(transport, "_ssh_download", fake_download)
@@ -5537,7 +5554,7 @@ def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
     )
 
     # Stub the one-session box round-trip into the incoming transfer file.
-    def fake_download(_command, destination):
+    def fake_download(_command, destination, **_kwargs):
         shutil.copy(remote_tmp, destination)
 
     monkeypatch.setattr(lifecycle.transport, "_ssh_download", fake_download)

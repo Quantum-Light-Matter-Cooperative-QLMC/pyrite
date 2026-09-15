@@ -54,7 +54,9 @@ def pull_performance_profile(profile: str) -> list[Path]:
             filename,
         )
         try:
-            transport._ssh_download(f"cat {config.shell_arg(remote)}", temporary)
+            transport._ssh_download(
+                f"cat {config.shell_arg(remote)}", temporary, label=f"Pulling {jobid}/{filename}..."
+            )
             temporary.replace(destination)
         finally:
             temporary.unlink(missing_ok=True)

@@ -106,7 +106,7 @@ def _stop_jobid(jobid):
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
     )
-    transport._run(["ssh", "-n", config.remote_host(), remote])
+    transport._run(["ssh", "-n", config.remote_host(), remote], label=f"Cancelling job {jobid}...")
 
 
 def _stop_jobids(jobids):
@@ -119,7 +119,10 @@ def _stop_jobids(jobids):
     ``scripts._scancel_jobs_command``). Single-job callers (energy_grid) keep
     the granular :func:`_stop_jobid` error semantics."""
     transport._check_shell_tokens(list(jobids))
-    transport._run(["ssh", "-n", config.remote_host(), scripts._scancel_jobs_command(list(jobids))])
+    transport._run(
+        ["ssh", "-n", config.remote_host(), scripts._scancel_jobs_command(list(jobids))],
+        label=f"Cancelling {len(jobids)} job(s)...",
+    )
 
 
 def stop_jobs(materials=None, all_jobs=False, *, yes=True, profile=None):
@@ -203,5 +206,8 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
     if not _cli_core.confirm_destructive(yes, "Release these orphaned reservations?"):
         return
     for jobid in sorted(orphans):
-        transport._run(["ssh", "-n", config.remote_host(), scripts._reap_job_command(jobid)])
+        transport._run(
+            ["ssh", "-n", config.remote_host(), scripts._reap_job_command(jobid)],
+            label=f"Reaping orphaned job {jobid}...",
+        )
     print(f"reaped {len(orphans)} orphaned job(s)")
