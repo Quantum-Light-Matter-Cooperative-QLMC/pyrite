@@ -338,6 +338,7 @@ def evaluate_ladder(
     *,
     segments: Mapping[str, Any] | None = None,
     observables: Callable[..., dict[str, float]] = spectrum_observables,
+    spacings: Sequence[float] | None = None,
     device_peak_mib: Callable[[], float | None] | None = None,
     on_rung: Callable[[Rung], None] | None = None,
 ) -> list[Rung]:
@@ -348,13 +349,28 @@ def evaluate_ladder(
     the first rung and re-checks after every rung, so an evaluator that mutates
     or replaces the trajectories fails loudly instead of producing a ladder of
     incomparable runs.
+
+    ``spacings`` labels each rung with the quantity actually being refined
+    instead of the grid's own largest spacing. A window ladder (#101) refines
+    local windows on a deliberately fixed backbone, so its largest spacing never
+    moves; the labels must still decrease strictly, and every grid is still
+    checked for finite, strictly increasing coordinates.
     """
     reference = None if segments is None else segment_fingerprint(segments)
     rungs: list[Rung] = []
     previous = math.inf
-    for grid in grids:
+    grids = list(grids)
+    if spacings is not None:
+        labels = [float(value) for value in spacings]
+        if len(labels) != len(grids):
+            raise ValueError("ladder spacings must label every grid")
+    else:
+        labels = None
+    for index, grid in enumerate(grids):
         E = np.asarray(grid, dtype=float)
-        spacing = representative_spacing(E)
+        spacing = representative_spacing(E) if labels is None else labels[index]
+        if labels is not None:
+            representative_spacing(E)
         if spacing >= previous:
             raise ValueError("ladder grids must refine strictly: each spacing below the previous")
         previous = spacing
