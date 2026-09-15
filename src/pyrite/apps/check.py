@@ -133,8 +133,10 @@ def start_remote_zhai(*, ne, ne_brem, ne_supp, tmd_azimuth, refresh=False):
 
 def remote_zhai_status(jobid):
     """Return a normalized state plus the complete remote status report."""
+    # `pyrite remote status` is retired (commit fa3e0aa1); job status now
+    # lives under `pyrite job status <jobid>`.
     completed = subprocess.run(
-        _remote_cli("status", jobid),
+        _cli("job", "status", jobid),
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -155,8 +157,10 @@ def remote_zhai_status(jobid):
 
 def pull_remote_zhai():
     """Pull completed remote Zhai caches into the local repository."""
+    # `pyrite remote check --pull` is retired (commit fa3e0aa1); the live
+    # equivalent is `pyrite remote pull --preset zhai`.
     completed = subprocess.run(
-        _remote_cli("check", "--pull"),
+        _remote_cli("pull", "--preset", "zhai"),
         capture_output=True,
         text=True,
         encoding="utf-8",
