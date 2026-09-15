@@ -132,6 +132,21 @@ def test_spectrum_frame_narrow_extends_with_wide_brem_tail():
     assert np.allclose(tail["intensity"].to_numpy(), brem_tail["intensity"].to_numpy())
 
 
+def test_narrow_chart_auto_domain_uses_widest_line_grid():
+    narrow = _record(30.0, -20.0, 0.0, wide_brem=True)
+    widest = _record(60.0, -20.0, 0.0, wide_brem=True)
+    widest["E_grid"] = np.linspace(500.0, 7500.0, 200)
+    store = {"HOPG bulk": {30.0: narrow, 60.0: widest}}
+
+    narrow_chart = spectrum_chart(store, _settings(), band="narrow")
+    broad_chart = spectrum_chart(store, _settings(), band="broad")
+
+    narrow_scale = narrow_chart.to_dict()["layer"][0]["encoding"]["x"]["scale"]
+    broad_encoding = broad_chart.to_dict()["layer"][0]["encoding"]["x"]
+    assert narrow_scale["domain"] == [500.0, 7500.0]
+    assert "scale" not in broad_encoding
+
+
 def test_spectrum_frame_peak_preserving_decimation_keeps_line_peak():
     rec = _record(30.0, -20.0, 0.0, n=1000)
     df = spectrum_frame([rec], _settings(), include_brem=False, max_points=40)
