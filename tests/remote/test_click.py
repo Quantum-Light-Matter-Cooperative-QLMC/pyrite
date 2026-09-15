@@ -38,6 +38,23 @@ def test_every_remote_click_help_path_is_offline(name):
     assert f"Usage: remote {name} " in result.stdout
 
 
+def test_sync_verbose_flag_enables_raw_ssh_echo(monkeypatch):
+    from pyrite.remote import transport
+
+    seen = []
+
+    def fake_sync_code():
+        seen.append(transport._VERBOSE)
+
+    monkeypatch.setattr(transport, "sync_code", fake_sync_code)
+
+    assert_clean_result(invoke(remote_cli.command, ["sync"]))
+    assert_clean_result(invoke(remote_cli.command, ["sync", "-v"]))
+
+    assert seen == [False, True]
+    assert transport._VERBOSE is False
+
+
 def test_remote_performance_commands_dispatch(monkeypatch):
     calls = []
     monkeypatch.setattr(

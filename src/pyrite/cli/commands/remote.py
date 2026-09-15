@@ -14,7 +14,7 @@ from ...console.output import (
     output_option,
     run,
 )
-from ...remote import config, lifecycle
+from ...remote import config, lifecycle, transport
 from .. import _completion as _cli_completion
 from .._deprecations import DeprecatingGroup
 from ._remote_actions import (
@@ -44,10 +44,23 @@ from ._remote_actions import (
 def _invoke_action(handler, **values):
     """Invoke one explicitly-typed remote action under the Click exit contract."""
     _ensure_utf8_stdio()
-    status = handler(**values)
+    ssh_verbose = values.pop("ssh_verbose", False)
+    with transport.verbose_ssh(ssh_verbose):
+        status = handler(**values)
     if isinstance(status, int) and not isinstance(status, bool) and status:
         raise click.exceptions.Exit(status)
     return status
+
+
+def _verbose_option(function):
+    """Shared ``-v/--verbose`` flag for commands that ship work over ssh/scp."""
+    return click.option(
+        "-v",
+        "--verbose",
+        "ssh_verbose",
+        is_flag=True,
+        help="Print raw ssh/scp commands instead of a status line.",
+    )(function)
 
 
 def _reject_all_with_values(command_name, all_, values):
@@ -509,8 +522,9 @@ def performance_list_command():
     help="Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.",
 )
 @click.argument("profile", callback=_performance_profile_name, metavar="PERFORMANCE_PROFILE")
-def performance_pull_command(profile):
-    return _invoke_action(_cli_profile_pull, profile=profile)
+@_verbose_option
+def performance_pull_command(profile, ssh_verbose):
+    return _invoke_action(_cli_profile_pull, profile=profile, ssh_verbose=ssh_verbose)
 
 
 @performance_command.command(
@@ -527,7 +541,8 @@ def performance_pull_command(profile):
 )
 @click.option("--all", "all_profiles", is_flag=True, help="Select every remote profile.")
 @click.option("-y", "--yes", is_flag=True, help="Delete exact previewed directories.")
-def performance_rm_command(profiles, all_profiles, yes):
+@_verbose_option
+def performance_rm_command(profiles, all_profiles, yes, ssh_verbose):
     if all_profiles and profiles:
         raise click.UsageError("remote performance rm --all does not take PROFILE names")
     if not all_profiles and not profiles:
@@ -537,6 +552,7 @@ def performance_rm_command(profiles, all_profiles, yes):
         profiles=list(profiles),
         all_profiles=all_profiles,
         yes=yes,
+        ssh_verbose=ssh_verbose,
     )
 
 
@@ -617,6 +633,7 @@ def performance_rm_command(profiles, all_profiles, yes):
     help="With partial merge, insert records absent locally.",
 )
 @output_option
+@_verbose_option
 @click.pass_context
 def pull_command(
     ctx,
@@ -635,6 +652,7 @@ def pull_command(
     line_only,
     force,
     json_output,
+    ssh_verbose,
 ):
     materials = list(material)
     narrowed = list(narrow_materials)
@@ -663,7 +681,8 @@ def pull_command(
                 "remote pull --preset zhai does not take checkpoint option(s): "
                 + ", ".join(selected)
             )
-        return lifecycle.pull_zhai_cache()
+        with transport.verbose_ssh(ssh_verbose):
+            return lifecycle.pull_zhai_cache()
     if catalog_profile is None:
         from ...materials import CATALOG
 
@@ -713,6 +732,7 @@ def pull_command(
         brem_only=brem_only,
         line_only=line_only,
         force=force,
+        ssh_verbose=ssh_verbose,
     )
 
 
@@ -734,7 +754,8 @@ def pull_command(
 @click.option(
     "-y", "--yes", is_flag=True, help="Delete exact previewed targets; otherwise preview."
 )
-def rm_command(materials, all_checkpoints, catalog_profile, yes):
+@_verbose_option
+def rm_command(materials, all_checkpoints, catalog_profile, yes, ssh_verbose):
     if all_checkpoints and materials:
         raise click.UsageError("rm --all takes no material argument")
     if catalog_profile is not None and (all_checkpoints or materials):
@@ -747,6 +768,7 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes):
         all_checkpoints=all_checkpoints,
         catalog_profile=catalog_profile,
         yes=yes,
+        ssh_verbose=ssh_verbose,
     )
 
 
@@ -780,7 +802,8 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes):
     help="Only release reservations at least this old.",
 )
 @click.option("-y", "--yes", is_flag=True, help="Reclaim exactly what was previewed.")
-def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
+@_verbose_option
+def gc_command(all_profiles, catalog_profile, min_age_minutes, yes, ssh_verbose):
     """Run both reclamations the retired `prune` and `reap` spellings ran separately.
 
     Each half previews unless ``--yes``, so the combined command keeps the
@@ -793,11 +816,13 @@ def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
         all_profiles=all_profiles,
         catalog_profile=catalog_profile,
         yes=yes,
+        ssh_verbose=ssh_verbose,
     )
     return _invoke_action(
         _cli_reap,
         min_age_minutes=min_age_minutes,
         yes=yes,
+        ssh_verbose=ssh_verbose,
     )
 
 
@@ -818,7 +843,8 @@ def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
     help="Prune the NAME / NAME-N job-directory family only.",
 )
 @click.option("-y", "--yes", is_flag=True, help="Delete exact previewed directories.")
-def prune_jobs_command(all_jobs, catalog_profile, yes):
+@_verbose_option
+def prune_jobs_command(all_jobs, catalog_profile, yes, ssh_verbose):
     if all_jobs == (catalog_profile is not None):
         raise click.UsageError("prune-jobs needs exactly one of --profile NAME or --all")
     return _invoke_action(
@@ -826,12 +852,14 @@ def prune_jobs_command(all_jobs, catalog_profile, yes):
         all_jobs=all_jobs,
         catalog_profile=catalog_profile,
         yes=yes,
+        ssh_verbose=ssh_verbose,
     )
 
 
 @command.command("sync", help="Push current code to remote box.")
-def sync_command():
-    return _invoke_action(_cli_sync)
+@_verbose_option
+def sync_command(ssh_verbose):
+    return _invoke_action(_cli_sync, ssh_verbose=ssh_verbose)
 
 
 @click.command(

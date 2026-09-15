@@ -8,12 +8,14 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from ..console import dashboard as presentation
 from . import config
 
 _TRACE_ARG_LIMIT = 100
+_VERBOSE = False
 _SYNC_EXCLUDED_DIRS = {
     "__pycache__",
     ".ipynb_checkpoints",
@@ -24,11 +26,29 @@ _SYNC_EXCLUDED_DIRS = {
 _SYNC_EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 
 
-def _run(cmd, **kw):
-    parts = [
-        a if len(a) <= _TRACE_ARG_LIMIT else a[:_TRACE_ARG_LIMIT] + "...<truncated>" for a in cmd
-    ]
-    print("+", " ".join(parts), flush=True)
+@contextmanager
+def verbose_ssh(enabled: bool):
+    """Temporarily toggle raw ssh/scp command echoing for ``_run`` calls."""
+    global _VERBOSE
+    previous = _VERBOSE
+    _VERBOSE = enabled
+    try:
+        yield
+    finally:
+        _VERBOSE = previous
+
+
+def _run(cmd, *, label=None, **kw):
+    """Run one ssh/scp command. Prints the raw command line when verbose is on
+    (see ``verbose_ssh``); otherwise prints ``label`` if given, or nothing."""
+    if _VERBOSE:
+        parts = [
+            a if len(a) <= _TRACE_ARG_LIMIT else a[:_TRACE_ARG_LIMIT] + "...<truncated>"
+            for a in cmd
+        ]
+        print("+", " ".join(parts), flush=True, file=sys.stderr)
+    elif label is not None:
+        print(label, flush=True, file=sys.stderr)
     subprocess.run(cmd, check=True, **kw)
 
 
@@ -53,12 +73,12 @@ def _ssh_capture(remote_cmd):
     return r.stdout
 
 
-def _ssh_download(remote_cmd: str, destination: Path) -> None:
+def _ssh_download(remote_cmd: str, destination: Path, *, label=None) -> None:
     """Stream one remote command's stdout directly into a local file."""
     destination = Path(destination)
     try:
         with destination.open("wb") as output:
-            _run(["ssh", "-n", config.remote_host(), remote_cmd], stdout=output)
+            _run(["ssh", "-n", config.remote_host(), remote_cmd], stdout=output, label=label)
     except BaseException:
         destination.unlink(missing_ok=True)
         raise
@@ -207,7 +227,10 @@ def sync_code():
                             _add_to_tar(t, f, arc)
                 else:
                     _add_to_tar(t, local, p)
-        _run(["scp", tarpath, config.scp_remote_path("/tmp/cxr_code.tgz")])
+        _run(
+            ["scp", tarpath, config.scp_remote_path("/tmp/cxr_code.tgz")],
+            label="Syncing code to remote box...",
+        )
     # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
     # interactive console stdin and its stdin-forwarding thread never sees EOF,
     # so the client hangs after the remote command (tar) has already exited.
