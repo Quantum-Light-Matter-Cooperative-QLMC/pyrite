@@ -438,11 +438,12 @@ def richardson_acceptance(
 
     For the triple ``(h, h/2, h/4)`` (any strictly refining spacings), with
     ``tol = rtol * |q(h/4)| + atol``, ``d1 = |q(h) - q(h/2)|`` and
-    ``d2 = |q(h/2) - q(h/4)|``, an observable passes when ``d1 < tol`` **and**
-    either ``d2 <= d1`` or ``max(d1, d2) <= NOISE_FRACTION * tol``. The second
-    clause still rejects one lucky pair but accepts converged values whose
-    residual changes are noise. A triple whose finest-rung yield is at or below
-    ``yield_floor`` is accepted as near-zero.
+    ``d2 = |q(h/2) - q(h/4)|``, an observable passes when ``d1 < tol`` (or
+    ``d1 == 0`` for an exactly constant observable) **and** either ``d2 <= d1``
+    or ``max(d1, d2) <= NOISE_FRACTION * tol``. The second clause still rejects
+    one lucky pair but accepts converged values whose residual changes are
+    noise. A triple whose finest-rung yield is at or below ``yield_floor`` is
+    accepted as near-zero.
 
     ``rtol`` maps a tolerance class to its relative tolerance and defaults to
     :data:`HARNESS_RTOL`. A triple passes when every gated observable passes.
