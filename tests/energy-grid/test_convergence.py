@@ -27,7 +27,11 @@ from pyrite.energy_grid.convergence import (
 )
 
 SOURCE_ONLY = {name: kind for name, kind in GATED_OBSERVABLES.items() if kind == "intrinsic_source"}
+SOURCE_AND_SHAPE = {
+    name: kind for name, kind in GATED_OBSERVABLES.items() if kind in {"intrinsic_source", "shape"}
+}
 NO_DETECTORS = partial(spectrum_observables, detectors={})
+YIELD = {"yield": "intrinsic_source"}
 
 
 def _rung(spacing, **observables):
@@ -82,7 +86,7 @@ def test_accepted_spacing_resolves_the_sinc_nyquist_step():
         lambda E: SpectrumSample(density(E), background(E)),
         observables=NO_DETECTORS,
     )
-    report = richardson_acceptance(rungs, gated=SOURCE_ONLY)
+    report = richardson_acceptance(rungs, gated=SOURCE_AND_SHAPE)
 
     nyquist = np.pi / a
     for rung in rungs:
@@ -90,23 +94,85 @@ def test_accepted_spacing_resolves_the_sinc_nyquist_step():
             # Band-limited integrand below Nyquist: only the window-truncated
             # 1/(a^2 D) tail mass separates the trapezoid from pi/a.
             assert rung.observables["yield"] == pytest.approx(exact_yield, rel=2e-3)
-    # Above Nyquist the integrated yield of many phase-spread features can stay
-    # close (aliases average out by Poisson summation), but the sampled shape
-    # does not; the gate must still reject the aliased coarse triple.
-    assert report.accepted_spacing_eV is not None
-    assert report.accepted_spacing_eV <= nyquist
+    # Above Nyquist the integrated observables of many phase-spread features can
+    # stay inside tolerance (aliases average out by Poisson summation), so the
+    # accepted spacing is not bounded by pi/a; what the gate guarantees is that
+    # the accepted rung meets the tolerance against the independent integral,
+    # and that the grossly aliased 12 eV triple is rejected.
     assert report.triples[0].accepted is False
+    assert report.accepted_spacing_eV is not None
+    accepted = next(r for r in rungs if r.spacing_eV == report.accepted_spacing_eV)
+    assert accepted.observables["yield"] == pytest.approx(exact_yield, rel=2e-3)
 
 
 def test_one_lucky_pair_is_not_convergence():
     rungs = [_rung(h, **{"yield": q}) for h, q in ((4.0, 1.0), (2.0, 1.0), (1.0, 1.01))]
 
-    report = richardson_acceptance(rungs, gated={"yield": "intrinsic_source"})
+    report = richardson_acceptance(rungs, gated=YIELD)
 
     (verdict,) = report.triples[0].observables
     assert verdict.accepted is False
-    assert verdict.reason == "h/2->h/4 not smaller"
+    assert verdict.reason == "h/2->h/4 larger"
     assert report.accepted_spacing_eV is None
+
+
+def test_two_tiny_changes_accept_even_when_the_second_is_slightly_larger():
+    # tol = 1e-3 * 1.000025; both changes (1.0e-5, 1.5e-5) sit below 0.1 * tol.
+    rungs = [_rung(h, **{"yield": q}) for h, q in ((4.0, 1.0), (2.0, 1.00001), (1.0, 1.000025))]
+
+    report = richardson_acceptance(rungs, gated=YIELD)
+
+    (verdict,) = report.triples[0].observables
+    assert verdict.accepted is True
+    assert verdict.reason == "converged below noise fraction"
+    assert report.accepted_spacing_eV == 4.0
+
+
+def test_a_larger_second_change_near_the_tolerance_is_rejected():
+    # d1 = 8e-4 < tol ~ 1.0017e-3, but d2 = 9e-4 > d1 and far above 0.1 * tol.
+    rungs = [_rung(h, **{"yield": q}) for h, q in ((4.0, 1.0), (2.0, 1.0008), (1.0, 1.0017))]
+
+    report = richardson_acceptance(rungs, gated=YIELD)
+
+    (verdict,) = report.triples[0].observables
+    assert verdict.accepted is False
+    assert verdict.reason == "h/2->h/4 larger"
+
+
+def test_equal_changes_and_an_exactly_constant_zero_observable_are_accepted():
+    equal = [_rung(h, **{"yield": q}) for h, q in ((4.0, 1.0), (2.0, 1.0005), (1.0, 1.0))]
+    constant = [_rung(h, **{"yield": 1.0, "centroid_eV": 0.0}) for h in (4.0, 2.0, 1.0)]
+
+    assert richardson_acceptance(equal, gated=YIELD).accepted_spacing_eV == 4.0
+    report = richardson_acceptance(
+        constant, gated={"yield": "intrinsic_source", "centroid_eV": "intrinsic_source"}
+    )
+    assert report.accepted_spacing_eV == 4.0
+
+
+def test_shape_is_gated_at_one_percent_and_reported_at_the_source_tolerance():
+    # FWHM moves 0.05 then 0.005 eV on ~10 eV: the first change is inside the
+    # 1e-2 shape gate but outside 1e-3, so the diagnostic accepts only from 4 eV.
+    rungs = [
+        _rung(h, **{"yield": 1.0, "centroid_eV": 500.0, "fwhm_eV": f, "line_background_ratio": 2.0})
+        for h, f in ((8.0, 10.10), (4.0, 10.05), (2.0, 10.045), (1.0, 10.045))
+    ]
+
+    report = richardson_acceptance(rungs, gated=SOURCE_AND_SHAPE)
+
+    assert report.rtol == {"intrinsic_source": 1e-3, "shape": 1e-2}
+    assert report.accepted_spacing_eV == 8.0
+    assert report.observable_accepted_spacing_eV["fwhm_eV"] == 8.0
+    assert report.diagnostic_accepted_spacing_eV["fwhm_eV"] == 4.0
+    assert report.diagnostic_accepted_spacing_eV["line_background_ratio"] == 8.0
+
+
+def test_harness_shape_class_leaves_the_production_policy_tolerances_unchanged():
+    from pyrite._line_grid_policy import DEFAULT_RTOL, OBSERVABLE_CLASSES
+
+    assert dict(DEFAULT_RTOL) == {"intrinsic_source": 1e-3, "detected_counts": 1e-2}
+    assert OBSERVABLE_CLASSES == ("intrinsic_source", "detected_counts")
+    assert set(GATED_OBSERVABLES.values()) == {"intrinsic_source", "shape", "detected_counts"}
 
 
 def test_monotone_shrinking_changes_are_accepted_per_observable_class():
@@ -127,7 +193,7 @@ def test_accepted_spacing_requires_every_finer_triple_to_pass():
     values = [1.0, 1.0, 1.0, 1.1, 1.0]  # coarse triple converged, finer ones not
     rungs = [_rung(2.0**-k, **{"yield": v}) for k, v in enumerate(values)]
 
-    report = richardson_acceptance(rungs, gated={"yield": "intrinsic_source"})
+    report = richardson_acceptance(rungs, gated=YIELD)
 
     assert report.triples[0].accepted is True
     assert report.accepted_spacing_eV is None

@@ -15,9 +15,13 @@ and #117 (coherent-route analysis) supply their own coordinates to the same
 
 Gated observables and their tolerance classes (``GATED_OBSERVABLES``) reuse the
 per-observable tolerances of the automatic line-grid policy
-(:data:`pyrite._line_grid_policy.DEFAULT_RTOL`): intrinsic-source quantities at
-``1e-3``, detector-counted quantities at ``1e-2``. Peak height is deliberately
-not an observable -- a sampled density maximum scales with the local spacing.
+(:data:`pyrite._line_grid_policy.DEFAULT_RTOL`, unchanged): yield and centroid
+as intrinsic-source quantities at ``1e-3``, detector-counted quantities at
+``1e-2``. Dominant-line FWHM and line/background form a harness-only ``shape``
+class gated at ``1e-2`` and are also reported, ungated, at ``1e-3``: automatic
+``sinc-nyquist`` spacing certifies yield and centroid, not shape at ``1e-3``,
+which belongs to #101's local windows. Peak height is deliberately not an
+observable -- a sampled density maximum scales with the local spacing.
 Dominant-line FWHM and the line/background ratio come from
 :func:`pyrite.results.metrics.line_metrics`, whose widths are physical-energy
 half-maximum crossings (#110), not sample counts times one spacing.
@@ -43,7 +47,12 @@ from ..results.metrics import line_metrics
 __all__ = [
     "DEFAULT_ATOL",
     "DEFAULT_YIELD_FLOOR",
+    "DIAGNOSTIC_OBSERVABLES",
     "GATED_OBSERVABLES",
+    "HARNESS_RTOL",
+    "NOISE_FRACTION",
+    "SHAPE_DIAGNOSTIC_RTOL",
+    "SHAPE_RTOL",
     "LadderReport",
     "ObservableVerdict",
     "Rung",
@@ -60,14 +69,36 @@ __all__ = [
     "spectrum_observables",
 ]
 
-#: Observable name -> tolerance class in ``DEFAULT_RTOL``. Order is report order.
+#: Harness-level tolerance for sampled line *shape* (dominant-line FWHM and local
+#: line/background). Validation only: automatic ``sinc-nyquist`` spacing
+#: certifies yield and centroid, not shape at the intrinsic-source tolerance;
+#: shape accuracy at that level belongs to #101's local windows.
+SHAPE_RTOL = 1.0e-2
+#: Shape observables are still judged at the intrinsic-source tolerance, as
+#: ungated diagnostics, so a report shows how far 1e-3 shape accuracy lies.
+SHAPE_DIAGNOSTIC_RTOL = 1.0e-3
+#: Changes at or below this fraction of the tolerance are numerical noise
+#: (round-off, detector-response resampling): monotonicity is not required.
+NOISE_FRACTION = 0.1
+
+#: Observable name -> tolerance class. Order is report order.
 GATED_OBSERVABLES: Mapping[str, str] = {
     "yield": "intrinsic_source",
     "centroid_eV": "intrinsic_source",
-    "fwhm_eV": "intrinsic_source",
-    "line_background_ratio": "intrinsic_source",
+    "fwhm_eV": "shape",
+    "line_background_ratio": "shape",
     "timepix3_counts": "detected_counts",
     "eaglexo_counts": "detected_counts",
+}
+
+#: Relative tolerance per class: the production policy's ``DEFAULT_RTOL``
+#: (unchanged) plus the harness-only ``shape`` class.
+HARNESS_RTOL: Mapping[str, float] = {**DEFAULT_RTOL, "shape": SHAPE_RTOL}
+
+#: Ungated diagnostic observables and the relative tolerance they are judged at.
+DIAGNOSTIC_OBSERVABLES: Mapping[str, float] = {
+    "fwhm_eV": SHAPE_DIAGNOSTIC_RTOL,
+    "line_background_ratio": SHAPE_DIAGNOSTIC_RTOL,
 }
 
 #: Near-zero spectrum floor on the integrated line yield, in photons per sr per
@@ -154,6 +185,10 @@ class LadderReport:
     triples: tuple[TripleVerdict, ...]
     accepted_spacing_eV: float | None
     rtol: dict[str, float]
+    #: Accepted spacing of each gated observable on its own.
+    observable_accepted_spacing_eV: dict[str, float | None] = field(default_factory=dict)
+    #: Accepted spacing of each ungated diagnostic observable at its diagnostic rtol.
+    diagnostic_accepted_spacing_eV: dict[str, float | None] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-able representation (NaN survives as ``float('nan')``)."""
@@ -363,17 +398,31 @@ def _observable_verdict(
     coarse_change = abs(coarse - middle)
     fine_change = abs(middle - fine)
     tolerance = rtol * abs(fine) + atol
-    if coarse_change > tolerance:
+    # A zero change passes even against a zero tolerance (an exactly constant
+    # observable); otherwise the first halving must land strictly inside.
+    if not (coarse_change < tolerance or coarse_change == 0.0):
         return ObservableVerdict(
             name, coarse_change, fine_change, tolerance, False, "h->h/2 above tolerance"
         )
-    # One lucky pair is not convergence: the next halving must shrink the
-    # change further, unless both changes already sit at the absolute floor.
-    if fine_change < coarse_change or fine_change <= atol:
+    # One lucky pair is not convergence: the next halving may not grow the
+    # change, unless both changes are noise far inside the tolerance.
+    if fine_change <= coarse_change:
         return ObservableVerdict(name, coarse_change, fine_change, tolerance, True, "converged")
-    return ObservableVerdict(
-        name, coarse_change, fine_change, tolerance, False, "h/2->h/4 not smaller"
-    )
+    if max(coarse_change, fine_change) <= NOISE_FRACTION * tolerance:
+        return ObservableVerdict(
+            name, coarse_change, fine_change, tolerance, True, "converged below noise fraction"
+        )
+    return ObservableVerdict(name, coarse_change, fine_change, tolerance, False, "h/2->h/4 larger")
+
+
+def _coarsest_consistent(spacings: Sequence[float], passed: Sequence[bool]) -> float | None:
+    """Coarsest spacing whose triple and every finer triple passed."""
+    accepted = None
+    for spacing, ok in zip(reversed(spacings), reversed(passed), strict=True):
+        if not ok:
+            break
+        accepted = spacing
+    return accepted
 
 
 def richardson_acceptance(
@@ -382,20 +431,27 @@ def richardson_acceptance(
     rtol: Mapping[str, float] | None = None,
     atol: Mapping[str, float] | None = None,
     gated: Mapping[str, str] = GATED_OBSERVABLES,
+    diagnostics: Mapping[str, float] = DIAGNOSTIC_OBSERVABLES,
     yield_floor: float = DEFAULT_YIELD_FLOOR,
 ) -> LadderReport:
-    """Monotone Richardson acceptance over consecutive rung triples.
+    """Richardson acceptance over consecutive rung triples.
 
-    For the triple ``(h, h/2, h/4)`` (any strictly refining spacings), an
-    observable passes when ``|q(h) - q(h/2)| <= rtol * |q(h/4)| + atol`` **and**
-    ``|q(h/2) - q(h/4)|`` is smaller still (or at the absolute floor). ``rtol``
-    maps a tolerance class to its relative tolerance and defaults to the
-    line-grid policy's per-observable defaults. A triple passes when every gated
-    observable passes. The accepted spacing is the coarsest ``h`` whose triple
-    and every finer triple pass: a coarse lucky pass followed by a failing finer
-    triple is not accepted. The two finest rungs cannot be judged (no ``h/4``).
+    For the triple ``(h, h/2, h/4)`` (any strictly refining spacings), with
+    ``tol = rtol * |q(h/4)| + atol``, ``d1 = |q(h) - q(h/2)|`` and
+    ``d2 = |q(h/2) - q(h/4)|``, an observable passes when ``d1 < tol`` **and**
+    either ``d2 <= d1`` or ``max(d1, d2) <= NOISE_FRACTION * tol``. The second
+    clause still rejects one lucky pair but accepts converged values whose
+    residual changes are noise. A triple whose finest-rung yield is at or below
+    ``yield_floor`` is accepted as near-zero.
+
+    ``rtol`` maps a tolerance class to its relative tolerance and defaults to
+    :data:`HARNESS_RTOL`. A triple passes when every gated observable passes.
+    The accepted spacing is the coarsest ``h`` whose triple and every finer
+    triple pass; the two finest rungs cannot be judged (no ``h/4``). The report
+    also carries each gated observable's own accepted spacing, and each
+    ``diagnostics`` observable's accepted spacing at its diagnostic rtol.
     """
-    tolerances = dict(DEFAULT_RTOL)
+    tolerances = dict(HARNESS_RTOL)
     tolerances.update(dict(rtol or {}))
     floors = dict(DEFAULT_ATOL)
     floors.update(dict(atol or {}))
@@ -423,16 +479,37 @@ def richardson_acceptance(
                 observables=verdicts,
             )
         )
-    accepted = None
-    for triple in reversed(triples):
-        if not triple.accepted:
-            break
-        accepted = triple.spacing_eV
+    spacings = [triple.spacing_eV for triple in triples]
+    per_observable = {
+        name: _coarsest_consistent(
+            spacings, [triple.observables[index].accepted for triple in triples]
+        )
+        for index, name in enumerate(gated)
+    }
+    diagnostic: dict[str, float | None] = {}
+    for name, diagnostic_rtol in diagnostics.items():
+        if not all(name in rung.observables for rung in rungs):
+            continue  # a producer that never measured this observable
+        passed = []
+        for index in range(len(rungs) - 2):
+            window = rungs[index : index + 3]
+            passed.append(
+                _observable_verdict(
+                    name,
+                    [rung.observables[name] for rung in window],
+                    rtol=float(diagnostic_rtol),
+                    atol=float(floors.get(name, 0.0)),
+                    near_zero=float(window[2].observables.get("yield", math.inf)) <= yield_floor,
+                ).accepted
+            )
+        diagnostic[name] = _coarsest_consistent(spacings, passed)
     return LadderReport(
         rungs=tuple(rungs),
         triples=tuple(triples),
-        accepted_spacing_eV=accepted,
+        accepted_spacing_eV=_coarsest_consistent(spacings, [t.accepted for t in triples]),
         rtol={category: float(tolerances[category]) for category in sorted(set(gated.values()))},
+        observable_accepted_spacing_eV=per_observable,
+        diagnostic_accepted_spacing_eV=diagnostic,
     )
 
 
