@@ -5,6 +5,8 @@ The remote box invokes ``python -m pyrite._entry.reproduce_zhai`` inside its
 uv-synced checkout. Populates checkpoints/zhai_reproduction/ for every cache the
 validation app's Zhai sections hit -- no figures, no display -- so a later ``pyrite
 remote pull --preset zhai`` (or plain local ``pyrite check``) sees an instant cache hit.
+``pyrite run --preset zhai`` runs this same workload in-process; add ``--remote``
+to queue it on the box instead.
 
 Run (defaults match the app's own UI defaults, so the pulled cache is guaranteed
 to hit locally):
@@ -15,7 +17,7 @@ to hit locally):
 
 import argparse
 
-from ..validation.anchor_figures import reproduce_all
+from ..validation.anchor_figures import format_reproduction_row, reproduce_all
 
 
 def main(argv=None):
@@ -58,8 +60,7 @@ def main(argv=None):
         refresh=args.refresh,
     )
     for label, path, cache_hit in results:
-        status = "cached" if cache_hit else "computed"
-        print(f"{label:16s} {status:9s} {path}")
+        print(format_reproduction_row(label, path, cache_hit))
 
 
 if __name__ == "__main__":

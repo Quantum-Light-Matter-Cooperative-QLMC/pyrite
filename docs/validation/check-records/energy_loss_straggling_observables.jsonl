@@ -1,0 +1,1 @@
+{"check": "checks/energy_loss_straggling_observables.py", "ledger_id": "energy-loss-straggling", "measured_value": null, "recorded_at": "2026-09-15T16:00:26.899139+00:00", "reference_value": null, "revision": "1091b74ab1c7feaec8be98eee443445c4f6e4c65", "schema_revision": 1, "tolerance": null, "verdict": "pass"}

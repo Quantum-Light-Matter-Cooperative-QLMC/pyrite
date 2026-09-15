@@ -28,6 +28,26 @@ def _performance_profile(ctx, param, value):
     return value
 
 
+def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
+    """Populate the Zhai reproduction cache in this process.
+
+    Same workload the box runs as ``python -m pyrite._entry.reproduce_zhai``;
+    ``--remote`` queues it there instead. Heavy at the default sample counts.
+    """
+    import importlib
+
+    anchor_figures = importlib.import_module("pyrite.validation.anchor_figures")
+    results = anchor_figures.reproduce_all(
+        ne=ne,
+        ne_brem=ne_brem,
+        ne_supp=ne_supp,
+        tmd_exploratory_azimuth_deg=tmd_azimuth,
+        refresh=refresh,
+    )
+    for label, path, cache_hit in results:
+        click.echo(anchor_figures.format_reproduction_row(label, path, cache_hit))
+
+
 @click.command(
     "run",
     help=(
@@ -197,7 +217,7 @@ def _performance_profile(ctx, param, value):
     "--preset",
     type=click.Choice(("zhai",), case_sensitive=True),
     default=None,
-    help="Run a named reproduction workflow; zhai requires -R/--remote.",
+    help="Run a named reproduction workflow; zhai runs here unless -R/--remote.",
 )
 @click.option(
     "--ne",
@@ -286,8 +306,8 @@ def _command(
         raise click.UsageError("--wait and --detach are mutually exclusive")
     if remote_target is None and (wait or detach):
         raise click.UsageError("--wait/--detach require -R/--remote")
-    if remote_target is None and (preset is not None or no_sync or dry_run):
-        raise click.UsageError("--preset/--no-sync/--dry-run require -R/--remote")
+    if remote_target is None and (no_sync or dry_run):
+        raise click.UsageError("--no-sync/--dry-run require -R/--remote")
     if remote_target is None and (cpu or cpu_only):
         raise click.UsageError("--cpu/--cpu-only require -R/--remote")
     if no_cache and recompute:
@@ -306,61 +326,62 @@ def _command(
     ]
     if preset is None and explicit_zhai:
         raise click.UsageError(f"Zhai option(s) require --preset zhai: {', '.join(explicit_zhai)}")
-    if remote_target is not None:
-        if preset == "zhai":
-            normal_run_parameters = {
-                "catalog_profile": "PROFILE",
-                "material": "--material",
-                "workers": "--workers",
-                "fidelity": "--fidelity",
-                "quick": "--quick",
-                "n_families": "--n-families",
-                "checkpoint_dir": "--checkpoint-dir",
-                "max_minutes": "--max-minutes",
-                "perf": "--perf",
-                "performance_profile": "--performance-profile",
-                "performance_dir": "--performance-dir",
-                "performance_interval": "--perf-interval",
-                "spec_chunk": "--spec-chunk",
-                "brem_chunk": "--brem-chunk",
-                "nsys": "--nsys",
-                "cpu": "--cpu",
-                "cpu_only": "--cpu-only",
-                "no_cache": "--no-cache",
-                "recompute": "--recompute",
-                "progress_file": "--progress-file",
-                "progress_phase": "--progress-phase",
-                "no_progress": "--no-progress",
-                "json_output": "--output",
-                "verbose": "--verbose",
-            }
-            explicit_normal = [
-                flag
-                for parameter, flag in normal_run_parameters.items()
-                if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
-            ]
-            if raw_catalog_profile is not None and "PROFILE" not in explicit_normal:
-                explicit_normal.insert(0, "PROFILE")
-            if explicit_normal:
-                raise click.UsageError(
-                    "--preset zhai does not support normal-run option(s): "
-                    + ", ".join(explicit_normal)
-                )
-            from ...remote import config as remote_config
-            from . import remote as remote_cli
+    if preset == "zhai":
+        normal_run_parameters = {
+            "catalog_profile": "PROFILE",
+            "material": "--material",
+            "workers": "--workers",
+            "fidelity": "--fidelity",
+            "quick": "--quick",
+            "n_families": "--n-families",
+            "checkpoint_dir": "--checkpoint-dir",
+            "max_minutes": "--max-minutes",
+            "perf": "--perf",
+            "performance_profile": "--performance-profile",
+            "performance_dir": "--performance-dir",
+            "performance_interval": "--perf-interval",
+            "spec_chunk": "--spec-chunk",
+            "brem_chunk": "--brem-chunk",
+            "nsys": "--nsys",
+            "cpu": "--cpu",
+            "cpu_only": "--cpu-only",
+            "no_cache": "--no-cache",
+            "recompute": "--recompute",
+            "progress_file": "--progress-file",
+            "progress_phase": "--progress-phase",
+            "no_progress": "--no-progress",
+            "json_output": "--output",
+            "verbose": "--verbose",
+        }
+        explicit_normal = [
+            flag
+            for parameter, flag in normal_run_parameters.items()
+            if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+        ]
+        if raw_catalog_profile is not None and "PROFILE" not in explicit_normal:
+            explicit_normal.insert(0, "PROFILE")
+        if explicit_normal:
+            raise click.UsageError(
+                "--preset zhai does not support normal-run option(s): " + ", ".join(explicit_normal)
+            )
+        if remote_target is None:
+            return _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh)
+        from ...remote import config as remote_config
+        from . import remote as remote_cli
 
-            target = None if remote_target == "__configured__" else remote_target
-            with remote_config.override_remote_host(target):
-                return remote_cli.remote_check(
-                    ne=ne,
-                    ne_brem=ne_brem,
-                    ne_supp=ne_supp,
-                    tmd_azimuth=tmd_azimuth,
-                    refresh=refresh,
-                    no_sync=no_sync,
-                    detach=detach,
-                    dry_run=dry_run,
-                )
+        target = None if remote_target == "__configured__" else remote_target
+        with remote_config.override_remote_host(target):
+            return remote_cli.remote_check(
+                ne=ne,
+                ne_brem=ne_brem,
+                ne_supp=ne_supp,
+                tmd_azimuth=tmd_azimuth,
+                refresh=refresh,
+                no_sync=no_sync,
+                detach=detach,
+                dry_run=dry_run,
+            )
+    if remote_target is not None:
         if json_output:
             raise click.UsageError("remote run does not yet support --output json")
         local_only = {

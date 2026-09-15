@@ -17,6 +17,17 @@ On remote workers, use the collector's `--output-dir`; copy reviewed records int
 marks exit code 0 as pass, 2 (explicit skip) or 75 (missing remote/cache
 prerequisite) as skip, and any other nonzero exit as fail.
 
+Records carry the git revision but not the compute backend. Several anchors are
+host-only -- flight-grouped incoherent CXR has no device port -- so run the
+collector with `PYRITE_MC_BACKEND=cpu` unless a check documents otherwise; a
+CUDA-pinned shell records a spurious `fail` for those.
+
+`transport_core_goldens.py` has no committed baseline record. It compares
+against a golden directory captured from an earlier revision (`--dir`), which is
+a local working artifact, so capture-then-check on one revision is circular and
+its `electron-transport` claim stays `missing` until a reviewed golden set is
+run through the collector.
+
 | Artifact | Purpose |
 |---|---|
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |

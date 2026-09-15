@@ -303,7 +303,9 @@ def test_validation_app_never_falls_back_to_heavy_local_cache_population():
     assert "af.reproduce_all(" not in source
     assert source.count("cache_only=True") >= 2
     assert "Heavy cache preparation was not started locally" in source
-    assert "pyrite run --preset zhai --remote" in source
+    # The app still points at the preset rather than populating caches itself;
+    # --remote is now optional for that command, so only the command is pinned.
+    assert "pyrite run --preset zhai" in source
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():

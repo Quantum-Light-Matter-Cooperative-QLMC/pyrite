@@ -1,0 +1,1 @@
+{"check": "checks/radiation_error_estimator_calibration.py", "ledger_id": "radiation-error-estimators", "measured_value": null, "recorded_at": "2026-09-15T15:58:47.461960+00:00", "reference_value": null, "revision": "1091b74ab1c7feaec8be98eee443445c4f6e4c65", "schema_revision": 1, "tolerance": null, "verdict": "pass"}
