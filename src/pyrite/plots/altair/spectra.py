@@ -205,6 +205,20 @@ def _scale(scale_type, domain=None):
     return alt.Scale(**kwargs) if kwargs else alt.Undefined
 
 
+def _narrow_line_domain(records, band, x_domain):
+    """Resolve an automatic narrowband domain from the widest line grid."""
+    if band != "narrow" or x_domain is not None:
+        return x_domain
+
+    domains = []
+    for record in records:
+        energy = np.asarray(record["E_grid"], dtype=float)
+        finite = energy[np.isfinite(energy)]
+        if finite.size:
+            domains.append((float(finite.min()), float(finite.max())))
+    return max(domains, key=lambda domain: domain[1] - domain[0], default=None)
+
+
 def _characteristic_view(record, *, include_characteristic):
     characteristic = record.get("spec_characteristic")
     if include_characteristic or characteristic is None:
@@ -530,12 +544,14 @@ def spectrum_chart(
     if df.empty:
         return None
 
+    automatic_x_domain = x_domain is None
+    x_domain = _narrow_line_domain(recs, band, x_domain)
     title = _case_title(recs[0]["case"], "response-free source", latex=False)
     x_scale = _scale(x_type, x_domain)
     y_scale = (
-        _log_y_scale(_windowed_frame(df, x_domain))
+        _log_y_scale(_windowed_frame(df, None if automatic_x_domain else x_domain))
         if y_type == "log"
-        else _linear_y_scale(df, x_domain)
+        else _linear_y_scale(df, None if automatic_x_domain else x_domain)
     )
 
     compact = _compact_component_frame(df)
@@ -693,12 +709,14 @@ def compare_spectrum_chart(
     if df.empty:
         return None
 
+    automatic_x_domain = x_domain is None
+    x_domain = _narrow_line_domain(recs, band, x_domain)
     title = _case_title(recs[0]["case"], "comparison", latex=False)
     x_scale = _scale(x_type, x_domain)
     y_scale = (
-        _log_y_scale(_windowed_frame(df, x_domain))
+        _log_y_scale(_windowed_frame(df, None if automatic_x_domain else x_domain))
         if y_type == "log"
-        else _linear_y_scale(df, x_domain)
+        else _linear_y_scale(df, None if automatic_x_domain else x_domain)
     )
     hue_title = _COMPARE_HUE_FIELDS[hue]
 
@@ -802,11 +820,13 @@ def multi_case_spectrum_chart(
     if df.empty:
         return None
 
+    automatic_x_domain = x_domain is None
+    x_domain = _narrow_line_domain((record for record, _ in cases), band, x_domain)
     x_scale = _scale(x_type, x_domain)
     y_scale = (
-        _log_y_scale(_windowed_frame(df, x_domain))
+        _log_y_scale(_windowed_frame(df, None if automatic_x_domain else x_domain))
         if y_type == "log"
-        else _linear_y_scale(df, x_domain)
+        else _linear_y_scale(df, None if automatic_x_domain else x_domain)
     )
 
     compact = _compact_component_frame(df)
