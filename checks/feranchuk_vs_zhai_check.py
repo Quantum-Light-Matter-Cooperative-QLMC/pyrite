@@ -73,8 +73,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description="compare canonical Zhai Monte Carlo against Feranchuk Eq. 12"
     )
-    parser.add_argument("--ne", type=int, default=800)
-    parser.add_argument("--ne-brem", type=int, default=400)
+    parser.add_argument("--ne", type=int, default=20_000)
+    parser.add_argument("--ne-brem", type=int, default=200)
     args = parser.parse_args(argv)
 
     anchor = ZhaiAnchor()
