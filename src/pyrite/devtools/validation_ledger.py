@@ -7,6 +7,8 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
+from pyrite.validation.check_records import ValidationRecord, read_records
+
 STATUS_ORDER = (
     "signed-off",
     "anchored",
@@ -148,7 +150,9 @@ def _reject_duplicate_ids(entries: list[LedgerEntry]) -> None:
         raise ValueError(f"duplicate validation IDs: {', '.join(duplicate_ids)}")
 
 
-def render_status_summary(entries: tuple[LedgerEntry, ...]) -> str:
+def render_status_summary(
+    entries: tuple[LedgerEntry, ...], records: tuple[ValidationRecord, ...] = ()
+) -> str:
     """Render the compact project-level status view."""
     counts = Counter(entry.status for entry in entries)
     rows = [
@@ -158,6 +162,26 @@ def render_status_summary(entries: tuple[LedgerEntry, ...]) -> str:
         f"| **Total** | **{len(entries)}** |",
     ]
     signed = counts["signed-off"]
+    latest: dict[tuple[str, str], ValidationRecord] = {}
+    for record in records:
+        key = (record.ledger_id, record.check)
+        previous = latest.get(key)
+        if previous is None or record.recorded_at > previous.recorded_at:
+            latest[key] = record
+    verdicts_by_claim: dict[str, set[str]] = {}
+    for record in latest.values():
+        verdicts_by_claim.setdefault(record.ledger_id, set()).add(record.verdict)
+
+    def claim_verdict(validation_id: str) -> str:
+        verdicts = verdicts_by_claim.get(validation_id, set())
+        return next(
+            (verdict for verdict in ("fail", "pass", "skip") if verdict in verdicts),
+            "missing",
+        )
+
+    evidence = Counter(claim_verdict(entry.validation_id) for entry in entries)
+    dated = [record.recorded_at for record in latest.values()]
+    oldest_evidence = min(dated) if dated else "—"
     return "\n".join(
         [
             GENERATED_NOTICE,
@@ -169,6 +193,17 @@ def render_status_summary(entries: tuple[LedgerEntry, ...]) -> str:
             "`pyrite-dev validation-ledger --write` after editing detailed records.",
             "",
             f"**Publication gate:** {signed} / {len(entries)} claims signed off.",
+            "",
+            "## Latest automated evidence",
+            "",
+            "| Verdict | Claims |",
+            "|---|---:|",
+            *(
+                f"| `{verdict}` | {evidence[verdict]} |"
+                for verdict in ("pass", "fail", "skip", "missing")
+            ),
+            "",
+            f"Oldest current automated evidence: `{oldest_evidence}` (UTC timestamp; use it to assess evidence age).",
             "",
             *rows,
             "",
@@ -215,8 +250,9 @@ def render_domain_inventories(entries: tuple[LedgerEntry, ...]) -> str:
 def generated_views(ledger: Path) -> dict[Path, str]:
     """Return generated output paths and their expected contents."""
     entries = parse_ledger_parts(ledger)
+    records = read_records(ledger.with_name("check-records"))
     return {
-        ledger.with_name("status-summary.md"): render_status_summary(entries),
+        ledger.with_name("status-summary.md"): render_status_summary(entries, records),
         ledger.with_name("domain-inventories.md"): render_domain_inventories(entries),
     }
 

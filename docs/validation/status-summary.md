@@ -8,6 +8,17 @@ Compact generated view of the [detailed validation ledger]
 
 **Publication gate:** 0 / 122 claims signed off.
 
+## Latest automated evidence
+
+| Verdict | Claims |
+|---|---:|
+| `pass` | 10 |
+| `fail` | 0 |
+| `skip` | 0 |
+| `missing` | 111 |
+
+Oldest current automated evidence: `2026-09-15T00:01:51.695754+00:00` (UTC timestamp; use it to assess evidence age).
+
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |

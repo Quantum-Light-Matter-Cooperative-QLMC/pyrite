@@ -1,0 +1,2 @@
+{"check": "checks/multilayer_check.py", "ledger_id": "multilayer-stack", "measured_value": null, "recorded_at": "2026-09-15T00:19:48.473875+00:00", "reference_value": null, "revision": "ba7c1626d13b038c9e88e0f0fe4ef84869561dc0", "schema_revision": 1, "tolerance": null, "verdict": "pass"}
+{"check": "checks/multilayer_check.py", "ledger_id": "self-absorption", "measured_value": null, "recorded_at": "2026-09-15T00:19:48.473888+00:00", "reference_value": null, "revision": "ba7c1626d13b038c9e88e0f0fe4ef84869561dc0", "schema_revision": 1, "tolerance": null, "verdict": "pass"}
