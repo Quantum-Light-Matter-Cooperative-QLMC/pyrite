@@ -192,6 +192,9 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
     monkeypatch.setattr(remote.state, "_job_succeeded", lambda _jobid: True)
     monkeypatch.setattr(remote.state, "_completed_materials", lambda _jobid, materials: materials)
     monkeypatch.setattr(
+        remote.state, "_materials_needing_pull", lambda _jobid, materials: list(materials)
+    )
+    monkeypatch.setattr(
         lifecycle,
         "pull_performance_profile",
         lambda profile: performance_pulled.append(profile),
