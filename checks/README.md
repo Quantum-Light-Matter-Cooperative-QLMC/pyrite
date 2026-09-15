@@ -14,7 +14,8 @@ uv run pyrite-dev validation-records -- checks/dans_diffraction_oracle.py
 
 On remote workers, use the collector's `--output-dir`; copy reviewed records into
 `docs/validation/check-records/` before regenerating the status summary. The collector
-marks exit code 0 as pass, 2 as skip, and any other nonzero exit as fail.
+marks exit code 0 as pass, 2 (explicit skip) or 75 (missing remote/cache
+prerequisite) as skip, and any other nonzero exit as fail.
 
 | Artifact | Purpose |
 |---|---|---|

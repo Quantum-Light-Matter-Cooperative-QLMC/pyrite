@@ -42,6 +42,22 @@ def test_exit_records_cover_each_mapped_claim() -> None:
     assert {record.verdict for record in records} == {"skip"}
 
 
+def test_temporary_failure_records_skipped_claims() -> None:
+    from pyrite.validation.check_records import records_for_exit
+
+    records = records_for_exit("checks/feranchuk_vs_zhai_check.py", 75, "abc123")
+
+    assert {record.verdict for record in records} == {"skip"}
+
+
+def test_check_failure_records_failed_claims() -> None:
+    from pyrite.validation.check_records import records_for_exit
+
+    records = records_for_exit("checks/kinematic_validity_check.py", 1, "abc123")
+
+    assert {record.verdict for record in records} == {"fail"}
+
+
 def test_mapping_covers_maintained_checks_and_known_ledger_ids() -> None:
     from pyrite.devtools.validation_ledger import parse_ledger_parts
 

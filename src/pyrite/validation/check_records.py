@@ -135,7 +135,10 @@ def records_for_exit(check: str, exit_code: int, revision: str) -> list[Validati
         ledger_ids = CHECK_LEDGER_IDS[check]
     except KeyError as exc:
         raise ValueError(f"no ledger mapping registered for {check}") from exc
-    verdict: Verdict = "pass" if exit_code == 0 else "skip" if exit_code == 2 else "fail"
+    # Exit 2 is the conventional explicit skip used by standalone checks. Exit
+    # 75 (EX_TEMPFAIL) means required remote work or cached evidence is not yet
+    # available, so no claim was evaluated and a failure would be misleading.
+    verdict: Verdict = "pass" if exit_code == 0 else "skip" if exit_code in {2, 75} else "fail"
     return [
         ValidationRecord.create(
             ledger_id=ledger_id,
