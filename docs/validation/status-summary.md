@@ -12,8 +12,8 @@ Compact generated view of the [detailed validation ledger]
 
 | Verdict | Claims |
 |---|---:|
-| `pass` | 8 |
-| `fail` | 2 |
+| `pass` | 10 |
+| `fail` | 0 |
 | `skip` | 0 |
 | `missing` | 111 |
 
