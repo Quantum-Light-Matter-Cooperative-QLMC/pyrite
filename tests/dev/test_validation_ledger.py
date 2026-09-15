@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from pyrite.devtools.validation_ledger import parse_ledger, render_status_summary
+from pyrite.validation.check_records import ValidationRecord
 
 
 def test_parser_extracts_domains_and_statuses() -> None:
@@ -85,6 +86,89 @@ def test_status_summary_is_derived_from_rows() -> None:
     assert "0 / 2 claims signed off" in summary
     assert "| `anchored` | 1 |" in summary
     assert "| `discrepancy` | 1 |" in summary
+
+
+def test_status_summary_reports_latest_recorded_evidence() -> None:
+    entries = parse_ledger(
+        "# Domain\n"
+        + """## `one`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** anchored
+- **Checks:** checks
+- **Anchor:** test
+- **Notes:** note
+"""
+    )
+    records = (
+        ValidationRecord.create(
+            ledger_id="one",
+            measured_value=1.0,
+            reference_value=0.0,
+            tolerance=2.0,
+            verdict="fail",
+            revision="old",
+            check="checks/one.py",
+            recorded_at="2026-09-13T00:00:00+00:00",
+        ),
+        ValidationRecord.create(
+            ledger_id="one",
+            measured_value=1.0,
+            reference_value=0.0,
+            tolerance=2.0,
+            verdict="pass",
+            revision="new",
+            check="checks/one.py",
+            recorded_at="2026-09-14T00:00:00+00:00",
+        ),
+    )
+    assert "| `pass` | 1 |" in render_status_summary(entries, records)
+    assert (
+        "Oldest current automated evidence: `2026-09-14T00:00:00+00:00`"
+        in render_status_summary(entries, records)
+    )
+
+
+def test_status_summary_aggregates_latest_evidence_from_each_check() -> None:
+    entries = parse_ledger(
+        "# Domain\n"
+        + """## `one`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** anchored
+- **Checks:** checks
+- **Anchor:** test
+- **Notes:** note
+"""
+    )
+    records = (
+        ValidationRecord.create(
+            ledger_id="one",
+            measured_value=None,
+            reference_value=None,
+            tolerance=None,
+            verdict="pass",
+            revision="pass-revision",
+            check="checks/pass.py",
+            recorded_at="2026-09-13T00:00:00+00:00",
+        ),
+        ValidationRecord.create(
+            ledger_id="one",
+            measured_value=None,
+            reference_value=None,
+            tolerance=None,
+            verdict="skip",
+            revision="skip-revision",
+            check="checks/skip.py",
+            recorded_at="2026-09-14T00:00:00+00:00",
+        ),
+    )
+
+    summary = render_status_summary(entries, records)
+    assert "| `pass` | 1 |" in summary
+    assert "| `skip` | 0 |" in summary
 
 
 def test_domain_inventory_links_to_detailed_record() -> None:

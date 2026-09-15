@@ -31,6 +31,7 @@ Commands:
     cli-reference     write or --check docs/repo-design/cli/cli-reference.md
     cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
     validation-ledger write or --check generated validation-ledger views
+    validation-records run one standalone check and write its evidence records
 """
 
 from __future__ import annotations
@@ -221,6 +222,7 @@ def cmd_repo_map(args: argparse.Namespace) -> None:
         "uv run pyrite-dev cli-reference --check",
         "uv run pyrite-dev cli-deprecations --check",
         "uv run pyrite-dev validation-ledger --check",
+        "uv run pyrite-dev validation-records -- checks/dans_diffraction_oracle.py",
         "uv run pyrite-dev repo-map --check",
         "uv run pyrite-dev sync-skills",
         "uv run pyrite-dev check-skills",
@@ -540,6 +542,36 @@ def cmd_validation_ledger(args: argparse.Namespace) -> None:
         raise SystemExit(1)
 
 
+def cmd_validation_records(args: argparse.Namespace) -> None:
+    """Run a mapped standalone check and persist one result per ledger claim."""
+    from pyrite.validation.check_records import current_revision, records_for_exit, write_records
+
+    command = list(args.command)
+    if command[:1] == ["--"]:
+        command.pop(0)
+    if not command:
+        raise SystemExit("validation-records requires a check command after `--`")
+    check = Path(command[0])
+    check_path = check if check.is_absolute() else ROOT / check
+    try:
+        check_name = check_path.resolve().relative_to(ROOT).as_posix()
+    except ValueError as exc:
+        raise SystemExit(f"check must be beneath {ROOT}: {check}") from exc
+    try:
+        records_for_exit(check_name, 0, "pending")
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    output_dir = args.output_dir or ROOT / "docs" / "validation" / "check-records"
+    result = subprocess.run(
+        [sys.executable, str(check_path), *command[1:]],
+        cwd=ROOT,
+        check=False,
+    )
+    records = records_for_exit(check_name, result.returncode, current_revision())
+    write_records(output_dir / f"{check_path.stem}.jsonl", records)
+    raise SystemExit(result.returncode)
+
+
 def _run_relocated_click(command, argv: list[str], *, prog_name: str) -> None:
     """Run a relocated Click tree while preserving stream and exit contracts."""
     from pyrite.console.output import run as run_cli
@@ -686,6 +718,17 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     validation_mode.add_argument("--write", action="store_true")
     validation_mode.add_argument("--check", action="store_true")
     validation_ledger.set_defaults(func=cmd_validation_ledger)
+    validation_records = sub.add_parser(
+        "validation-records",
+        help="run a mapped standalone check and write its machine-readable evidence",
+    )
+    validation_records.add_argument(
+        "--output-dir",
+        type=Path,
+        help="write records here instead of docs/validation/check-records",
+    )
+    validation_records.add_argument("command", nargs=argparse.REMAINDER)
+    validation_records.set_defaults(func=cmd_validation_records)
     return ap
 
 

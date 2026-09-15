@@ -169,8 +169,10 @@ def _remote_energy_grid_artifacts() -> frozenset[str]:
 
 def sync_code():
     """Tar SYNC_PATHS up (CRLF->LF normalized for text, via _add_to_tar) and
-    extract them over the repo on the box. Generated interpreter/tool caches
-    are excluded: they are host-specific, unnecessary, and expensive to gzip.
+    extract them over the repo on the box. Stale Python sources are removed
+    immediately before extraction so deleted or relocated modules cannot affect
+    imports or source-keyed caches. Generated interpreter/tool caches are
+    excluded: they are host-specific, unnecessary, and expensive to gzip.
 
     Normalizing line endings here keeps the edit-locally / run-remotely loop --
     it ships the current WORKING tree (no commit required) yet stays LF-clean, so
@@ -215,6 +217,8 @@ def sync_code():
             "-n",
             config.remote_host(),
             f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} "
+            '&& for p in src/pyrite checks; do if [ -d "$p" ]; then '
+            "find \"$p\" -type f -name '*.py' -delete; fi; done "
             "&& tar xzf /tmp/cxr_code.tgz && rm -f /tmp/cxr_code.tgz",
         ]
     )
