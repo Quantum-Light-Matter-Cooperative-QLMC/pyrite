@@ -119,16 +119,51 @@ def test_start_remote_zhai_raises_when_banner_is_unparseable(monkeypatch):
     ],
 )
 def test_remote_zhai_status_parses_job_state(monkeypatch, report, expected):
-    monkeypatch.setattr(
-        check.subprocess,
-        "run",
-        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, report, ""),
-    )
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0, report, "")
+
+    monkeypatch.setattr(check.subprocess, "run", fake_run)
 
     state, output = check.remote_zhai_status("20260711-123456")
 
     assert state == expected
     assert output == report.rstrip()
+    # `pyrite remote status` is retired (commit fa3e0aa1); the live path is
+    # `pyrite job status <jobid>`, not nested under `remote`.
+    assert captured["command"][3:] == ["job", "status", "20260711-123456"]
+
+
+def test_pull_remote_zhai_uses_live_remote_pull_path(monkeypatch):
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return subprocess.CompletedProcess(command, 0, "pulled 1 cache\n", "")
+
+    monkeypatch.setattr(check.subprocess, "run", fake_run)
+
+    output = check.pull_remote_zhai()
+
+    assert output == "pulled 1 cache"
+    # `pyrite remote check --pull` is retired (commit fa3e0aa1); the live
+    # path is `pyrite remote pull --preset zhai`.
+    assert captured["command"][3:] == ["remote", "pull", "--preset", "zhai"]
+
+
+def test_pull_remote_zhai_raises_on_failure(monkeypatch):
+    monkeypatch.setattr(
+        check.subprocess,
+        "run",
+        lambda command, **kwargs: subprocess.CompletedProcess(
+            command, 1, "", "no completed zhai cache found\n"
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="no completed zhai cache found"):
+        check.pull_remote_zhai()
 
 
 def test_command_uses_run_by_default():
