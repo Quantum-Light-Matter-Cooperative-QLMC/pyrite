@@ -13,7 +13,7 @@ resolve or persist.
     pyrite app validation --edit      # `marimo edit` instead of `marimo run`
     pyrite app validation export      # skip marimo; render the full Zhai figure
                                     # set from checkpoints/zhai_reproduction/
-                                    # (see `pyrite run --preset zhai --remote`) to figures/
+                                    # (see `pyrite run --preset zhai`) to figures/
 """
 
 import importlib

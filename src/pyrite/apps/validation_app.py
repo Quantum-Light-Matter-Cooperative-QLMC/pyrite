@@ -457,7 +457,7 @@ def _(af, anchor, mo, ne_brem_ui, ne_ui, run_zhai_ui):
     else:
         with mo.status.spinner(
             title="Loading Monte Carlo spectra",
-            subtitle="Cache misses are populated only through pyrite run --preset zhai --remote.",
+            subtitle="Cache misses are populated through pyrite run --preset zhai.",
         ):
             try:
                 zhai_model, zhai_cache_hit, zhai_cache_path = af.cached_model_spectra(
@@ -713,9 +713,10 @@ def _(mo):
     This optional launcher prepares all expensive Zhai caches using the values
     currently selected above. It first probes the configured SSH GPU host. When
     available, it starts a detached job that continues after this app closes;
-    status is polled below and completed caches are pulled automatically. Heavy
-    cache populations never fall back to local WSL; use `pyrite run --preset zhai --remote`
-    after restoring remote access.
+    status is polled below and completed caches are pulled automatically. This
+    launcher never falls back to local WSL on its own; run `pyrite run --preset zhai`
+    yourself to populate the caches here, or add `--remote` once remote access is
+    restored.
     """)
     return (remote_intro,)
 
@@ -792,7 +793,8 @@ def _(
         else:
             set_remote_zhai_message(
                 f"{_reason} Heavy cache preparation was not started locally; "
-                "restore remote access and run `pyrite run --preset zhai --remote`."
+                "run `pyrite run --preset zhai` here, or restore remote access "
+                "and add --remote."
             )
     elif _jobid is not None:
         _state, _report = check_support.remote_zhai_status(_jobid)
@@ -836,7 +838,7 @@ def _(
         try:
             with mo.status.spinner(
                 title="Loading detector-convolved supplementary spectra",
-                subtitle="Cache misses are populated only through pyrite run --preset zhai --remote.",
+                subtitle="Cache misses are populated through pyrite run --preset zhai.",
             ):
                 spectra, cache_hit, cache_path = af.cached_coherent_spectra(
                     study,

@@ -27,7 +27,8 @@ and `union` spellings were removed at 0.3.0 and now exit as unknown
 commands.
 
 Validation uses `pyrite app validation` and `pyrite material validate`; the
-Zhai reproduction uses `pyrite run --preset zhai --remote`. Remote runs use
+Zhai reproduction uses `pyrite run --preset zhai`, which runs locally unless
+`--remote` is given. Remote runs use
 `pyrite run --remote`. The `check`, `check-config`, `remote run`,
 `remote validate`, and `remote check` spellings were removed at 0.3.0.
 Energy-grid job lifecycle uses the top-level `pyrite job ...` paths; the
@@ -123,8 +124,8 @@ Options:
                                   repopulate the shared per-case cache with the results.
   --no-progress                   Disable progress bars/dashboard.
   -v, --verbose                   Increase dashboard detail.
-  --preset [zhai]                 Run a named reproduction workflow; zhai requires
-                                  -R/--remote.
+  --preset [zhai]                 Run a named reproduction workflow; zhai runs here
+                                  unless -R/--remote.
   --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per energy.
                                   [default: 20000]
   --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung electrons
