@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from .._grid_semantics import require_uniform_grid
+from .._grid_semantics import is_uniform_grid, node_bin_edges_and_widths
 from ..materials.attenuation import _mu_total_inv_ang
 
 
@@ -66,13 +66,19 @@ def convolve_detector(E_grid_eV, spec, fwhm_eV):
     mode="same" returned an OVERSIZED array whenever the kernel outgrew the
     spectrum -- large FWHM on a short grid; truncating the kernel instead
     distorts the lineshape). Edges are zero-padded: counts blurred past the
-    grid ends are lost, consistent with a detector band edge. Requires a
-    uniform energy grid.
+    grid ends are lost, consistent with a detector band edge.
+
+    On a uniform grid this is exactly the previous sample-space
+    ``gaussian_filter1d`` path (bit-for-bit; one sigma in bins is a fixed
+    energy width there). On a graded grid, sample-space bins are not a fixed
+    energy width, so the kernel is evaluated directly in physical energy and
+    each source node is weighted by its own local width
+    (:func:`node_bin_edges_and_widths`) rather than one shared ``dE``.
 
     Parameters
     ----------
     E_grid_eV
-        Uniform photon-energy coordinate in eV.
+        Photon-energy coordinate in eV; need not be uniform.
     spec
         Spectral samples on ``E_grid_eV``.
     fwhm_eV
@@ -83,20 +89,20 @@ def convolve_detector(E_grid_eV, spec, fwhm_eV):
     numpy.ndarray
         Convolved spectrum with the same shape and units as ``spec``.
     """
-    from scipy.ndimage import gaussian_filter1d
+    E = np.asarray(E_grid_eV, dtype=float)
+    values = np.asarray(spec, dtype=float)
+    sigma_eV = fwhm_eV / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+    if is_uniform_grid(E):
+        from scipy.ndimage import gaussian_filter1d
 
-    # gaussian_filter1d works in SAMPLE units, so one sigma expressed in bins is
-    # only a fixed energy width on a uniform grid; on a graded grid the same
-    # kernel would blur a different number of eV in every region.
-    require_uniform_grid(
-        E_grid_eV,
-        consumer="detectors.response.convolve_detector",
-        remedy=(
-            "A fixed-FWHM Gaussian in sample units is not an energy-resolution "
-            "model on a graded grid; resample onto the response's own uniform "
-            "channels first."
-        ),
-    )
-    dE = E_grid_eV[1] - E_grid_eV[0]
-    sigma_bins = fwhm_eV / (2.0 * np.sqrt(2.0 * np.log(2.0))) / dE
-    return gaussian_filter1d(np.asarray(spec, dtype=float), sigma_bins, mode="constant", cval=0.0)
+        dE = E[1] - E[0]
+        sigma_bins = sigma_eV / dE
+        return gaussian_filter1d(values, sigma_bins, mode="constant", cval=0.0)
+    # Direct quadrature in physical energy: kernel[i, j] is the Gaussian
+    # response at E[i] to a unit-density source at E[j], weighted by E[j]'s
+    # own local width so density * width is the per-node mass being blurred.
+    _, widths = node_bin_edges_and_widths(E)
+    kernel = np.exp(-0.5 * ((E[:, None] - E[None, :]) / sigma_eV) ** 2)
+    kernel *= widths[None, :] / (sigma_eV * np.sqrt(2.0 * np.pi))
+    flattened = values.reshape(-1, E.size)
+    return (flattened @ kernel.T).reshape(values.shape)

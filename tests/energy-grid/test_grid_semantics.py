@@ -101,14 +101,36 @@ def test_poisson_core_uniform_expected_counts_unchanged():
     assert np.array_equal(expected, np.clip(density * dE * 3.0, 0.0, None))
 
 
-def test_convolve_detector_refuses_a_log_grid():
-    with pytest.raises(NonuniformEnergyGridError, match="convolve_detector"):
-        response.convolve_detector(LOG_GRID, np.ones_like(LOG_GRID), 50.0)
-
-
 def test_convolve_detector_still_runs_on_a_uniform_grid():
     out = response.convolve_detector(LINEAR_GRID, np.ones_like(LINEAR_GRID), 50.0)
     assert out.shape == LINEAR_GRID.shape
+
+
+def test_convolve_detector_conserves_mass_on_a_log_grid_away_from_edges():
+    """#100: convolve_detector no longer requires a uniform grid. Away from the
+    zero-padded edges, the graded-grid quadrature path (node_bin_edges_and_widths
+    local weights) should conserve mass like the uniform sample-space path does."""
+    density = np.exp(-0.5 * ((LOG_GRID - 3_000.0) / 20.0) ** 2)
+    out = response.convolve_detector(LOG_GRID, density, 50.0)
+
+    assert out.shape == LOG_GRID.shape
+    assert np.all(np.isfinite(out))
+    assert np.all(out >= 0.0)
+    _, widths = node_bin_edges_and_widths(LOG_GRID)
+    input_mass = np.sum(density * widths)
+    output_mass = np.sum(out * widths)
+    assert output_mass == pytest.approx(input_mass, rel=0.05)
+
+
+def test_eagle_response_resolve_energy_accepts_a_log_grid():
+    eaglexo_response = pytest.importorskip("pyrite.detectors.eaglexo_response")
+
+    resp = eaglexo_response.EagleResponse(LOG_GRID, resolve_energy=True)
+    detected = resp.apply(np.ones_like(LOG_GRID))
+
+    assert detected.shape == LOG_GRID.shape
+    assert np.all(np.isfinite(detected))
+    assert np.all(detected >= 0.0)
 
 
 def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():

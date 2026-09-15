@@ -284,8 +284,8 @@ class EagleResponse:
     Parameters
     ----------
     E_grid_eV
-        One-dimensional spectrum grid in eV. It need not be uniform for quantum
-        efficiency alone; ``resolve_energy=True`` requires uniform spacing.
+        One-dimensional spectrum grid in eV; need not be uniform, including
+        with ``resolve_energy=True`` (see :func:`convolve_detector`).
     coating
         ``"BN"`` (default) or ``"BEN"`` entrance coating.
     resolve_energy
