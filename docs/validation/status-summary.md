@@ -13,9 +13,9 @@ Compact generated view of the [detailed validation ledger]
 | Verdict | Claims |
 |---|---:|
 | `pass` | 8 |
-| `fail` | 0 |
+| `fail` | 2 |
 | `skip` | 0 |
-| `missing` | 113 |
+| `missing` | 111 |
 
 Oldest current automated evidence: `2026-09-15T00:01:51.695754+00:00` (UTC timestamp; use it to assess evidence age).
 

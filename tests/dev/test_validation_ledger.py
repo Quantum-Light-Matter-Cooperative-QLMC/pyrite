@@ -130,6 +130,47 @@ def test_status_summary_reports_latest_recorded_evidence() -> None:
     )
 
 
+def test_status_summary_aggregates_latest_evidence_from_each_check() -> None:
+    entries = parse_ledger(
+        "# Domain\n"
+        + """## `one`
+- **Claim:** claim
+- **Code:** code
+- **Source:** source
+- **Status:** anchored
+- **Checks:** checks
+- **Anchor:** test
+- **Notes:** note
+"""
+    )
+    records = (
+        ValidationRecord.create(
+            ledger_id="one",
+            measured_value=None,
+            reference_value=None,
+            tolerance=None,
+            verdict="pass",
+            revision="pass-revision",
+            check="checks/pass.py",
+            recorded_at="2026-09-13T00:00:00+00:00",
+        ),
+        ValidationRecord.create(
+            ledger_id="one",
+            measured_value=None,
+            reference_value=None,
+            tolerance=None,
+            verdict="skip",
+            revision="skip-revision",
+            check="checks/skip.py",
+            recorded_at="2026-09-14T00:00:00+00:00",
+        ),
+    )
+
+    summary = render_status_summary(entries, records)
+    assert "| `pass` | 1 |" in summary
+    assert "| `skip` | 0 |" in summary
+
+
 def test_domain_inventory_links_to_detailed_record() -> None:
     from pyrite.devtools.validation_ledger import render_domain_inventories
 

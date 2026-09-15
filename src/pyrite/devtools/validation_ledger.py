@@ -162,15 +162,24 @@ def render_status_summary(
         f"| **Total** | **{len(entries)}** |",
     ]
     signed = counts["signed-off"]
-    latest: dict[str, ValidationRecord] = {}
+    latest: dict[tuple[str, str], ValidationRecord] = {}
     for record in records:
-        previous = latest.get(record.ledger_id)
+        key = (record.ledger_id, record.check)
+        previous = latest.get(key)
         if previous is None or record.recorded_at > previous.recorded_at:
-            latest[record.ledger_id] = record
-    evidence = Counter(
-        latest[entry.validation_id].verdict if entry.validation_id in latest else "missing"
-        for entry in entries
-    )
+            latest[key] = record
+    verdicts_by_claim: dict[str, set[str]] = {}
+    for record in latest.values():
+        verdicts_by_claim.setdefault(record.ledger_id, set()).add(record.verdict)
+
+    def claim_verdict(validation_id: str) -> str:
+        verdicts = verdicts_by_claim.get(validation_id, set())
+        return next(
+            (verdict for verdict in ("fail", "pass", "skip") if verdict in verdicts),
+            "missing",
+        )
+
+    evidence = Counter(claim_verdict(entry.validation_id) for entry in entries)
     dated = [record.recorded_at for record in latest.values()]
     oldest_evidence = min(dated) if dated else "—"
     return "\n".join(
