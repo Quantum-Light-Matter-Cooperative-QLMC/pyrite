@@ -129,7 +129,10 @@ def composition(info):
 
 
 def mean_free_path_ang(comp, E_keV):
-    inv = sum(n * 1e24 * _sigma_browning_cm2(Z_TABLE[el], E_keV) for el, n in comp)  # 1/cm
+    energies_keV = np.asarray([E_keV], dtype=float)
+    inv = sum(
+        n * 1e24 * _sigma_browning_cm2(Z_TABLE[el], energies_keV)[0] for el, n in comp
+    )  # 1/cm
 
     return 1e8 / inv
 
