@@ -464,7 +464,10 @@ def test_set_replaces_grid_and_membership(tmp_path, monkeypatch):
         ["set", "sub_100keV", "--material", "hopg,mose2"],
     )
 
-    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert_clean_result(
+        result,
+        stdout="updated profile sub_100keV: polar changed from 5 to 10, 20, 30\n",
+    )
     assert_clean_result(members, stdout="updated profile sub_100keV\n")
     text = catalog.read_text()
     assert "tilt_deg = {values = [10.0, 20.0, 30.0]}" in text
@@ -481,6 +484,17 @@ def test_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
 
     assert_clean_result(result)
     assert "energy_keV = {values = [30.0, 75.0, 100.0]}" in catalog.read_text()
+
+
+def test_set_reports_a_new_profile_parameter(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--ne-line", "100,200"])
+
+    assert_clean_result(
+        result,
+        stdout="updated profile sub_100keV: line electrons set to 100, 200\n",
+    )
 
 
 def test_set_unknown_material_in_membership_errors(tmp_path, monkeypatch):
@@ -502,7 +516,10 @@ def test_set_on_standard_prompts_and_yes_skips(tmp_path, monkeypatch):
     assert catalog.read_text() == original
 
     accepted = invoke(profile.command, ["set", "standard", "--energy", "40", "-y"])
-    assert_clean_result(accepted, stdout="updated profile standard\n")
+    assert_clean_result(
+        accepted,
+        stdout="updated profile standard: energy changed from 30, 60 to 40\n",
+    )
     assert "energy_keV = {values = [40.0]}" in catalog.read_text()
 
 
@@ -512,7 +529,10 @@ def test_set_nonstandard_never_prompts(tmp_path, monkeypatch):
     # No input supplied: an unwanted prompt would hit EOF and abort.
     result = invoke(profile.command, ["set", "sub_100keV", "--energy", "40"])
 
-    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert_clean_result(
+        result,
+        stdout="updated profile sub_100keV: energy changed from 30, 50 to 40\n",
+    )
 
 
 def test_add_unions_sorts_deduplicates(tmp_path, monkeypatch):

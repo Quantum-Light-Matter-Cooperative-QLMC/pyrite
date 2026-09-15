@@ -523,7 +523,11 @@ def set_profile(
     material_keys = (
         validate_materials(document, csv_materials(materials)) if materials is not None else None
     )
-    overwriting = [label for label in updates if catalog_key(label) in target]
+    overwriting = {
+        label: range_values(target, catalog_key(label))
+        for label in updates
+        if catalog_key(label) in target
+    }
     for label, values in updates.items():
         target[catalog_key(label)] = values_item(values)
     if beam_name is not None:
