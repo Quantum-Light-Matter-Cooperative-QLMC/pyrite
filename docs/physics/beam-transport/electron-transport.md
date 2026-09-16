@@ -255,7 +255,10 @@ finite-jump remainder rather than testing only the linearized $-CC'$ term.
 `(electron_id, flight_id)` is the stable physical key, independent of batching
 and backend row order; `flight_id` is zero-based and monotonic per electron and
 `substep_id` is zero-based within its flight. Collision, boundary, and terminal
-events close a flight; a numerical energy-limit event does not.
+events close a flight; a numerical energy-limit event does not. Each row names
+its end event in `event_kind`; the codes, the reserved hard-event codes, and the
+invariants every core satisfies are in
+[Transport outputs](transport-outputs.md#row-events-and-physical-segments).
 
 ### Stochastic cutoff crossing
 
@@ -318,10 +321,10 @@ are compatibility aliases of `E_start_keV` and `t_start_ang`; `elec_id` is a
 compatibility alias of `electron_id`. Midpoint transport adds `E_end_keV`,
 `t_end_ang`, the representative energy `E_repr_keV` $=(E_{\rm start}+E_{\rm
 end})/2$ that the radiation kernels evaluate their one-point path integrals at,
-and the `flight_id`/`substep_id` identifiers. New fields appear only under the
-rule that produces them, so the frozen schema is never partially extended.
-Checkpoints store reduced spectra rather than raw rows, so no stored-result
-migration follows from the added fields.
+the `flight_id`/`substep_id` identifiers, and the row-end `event_kind`. New
+fields appear only under the rule that produces them, so the frozen schema is
+never partially extended. Checkpoints store reduced spectra rather than raw
+rows, so no stored-result migration follows from the added fields.
 
 When straggling is enabled, `straggle_dE_keV` stores the summed sampled loss per
 electron. On a cutoff row it includes the sampled overshoot even though the

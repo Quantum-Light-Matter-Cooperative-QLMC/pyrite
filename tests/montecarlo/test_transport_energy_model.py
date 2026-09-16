@@ -125,8 +125,9 @@ def test_midpoint_adds_end_state_without_adding_rows():
         "t_end_ang",
         "flight_id",
         "substep_id",
+        "event_kind",
     }
-    for key in ("E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id"):
+    for key in ("E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id", "event_kind"):
         assert midpoint[key].shape == midpoint["L_ang"].shape
     np.testing.assert_allclose(
         midpoint["E_repr_keV"],
@@ -438,8 +439,9 @@ def test_per_electron_midpoint_carries_the_lockstep_schema(use_lut):
         "t_end_ang",
         "flight_id",
         "substep_id",
+        "event_kind",
     }
-    for key in ("E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id"):
+    for key in ("E_end_keV", "E_repr_keV", "t_end_ang", "flight_id", "substep_id", "event_kind"):
         assert midpoint[key].shape == midpoint["L_ang"].shape
     assert np.all(midpoint["substep_id"] == 0)
     assert np.all(midpoint["E_end_keV"] < midpoint["E_start_keV"])

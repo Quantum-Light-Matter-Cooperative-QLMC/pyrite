@@ -68,14 +68,146 @@ in the schema is reinterpreted when a new rule is selected.
 E_{\rm repr} = \tfrac12\left(E_{\rm start} + E_{\rm end}\right),
 ```
 
-and the `flight_id` / `substep_id` identifiers. {eq}`eq-outputs-representative-energy`
-is the point at which the radiation kernels evaluate their one-point path
-integrals, turning each row from a left-endpoint into a midpoint rule.
+the `flight_id` / `substep_id` identifiers, and the row-end `event_kind`.
+{eq}`eq-outputs-representative-energy` is the point at which the radiation
+kernels evaluate their one-point path integrals, turning each row from a
+left-endpoint into a midpoint rule.
 
 New fields appear **only** under the rule that produces them. The frozen schema is
 never partially extended, so a consumer that finds `E_repr_keV` can rely on the
 rest of the midpoint fields being present, and one that does not can rely on
 every row being a whole physical flight.
+
+## Row events and physical segments
+
+Every midpoint row records, in `event_kind` (`int8`), the event that ended it.
+The event sits at the row's far end, so the row itself carries the pre-event
+state — `v_hat` is the incoming direction, `E_end_keV` and `t_end_ang` the
+incoming energy and age — and the next row of the same electron carries the
+post-event state. No separate event table is needed, and an event's position is
+`r_mid + L_ang v_hat / 2`.
+
+```{list-table} Row-end event codes, pyrite.montecarlo.transport.SegmentEvent.
+:name: tbl-outputs-event-kinds
+:header-rows: 1
+
+* - Code
+  - Name
+  - Kind
+  - Closes the flight
+  - Direction after
+* - 0
+  - `ELASTIC`
+  - physical interaction
+  - yes
+  - resampled
+* - 1
+  - `SUBSTEP`
+  - numerical node
+  - no
+  - unchanged
+* - 2
+  - `LAYER_BOUNDARY`
+  - geometry
+  - yes
+  - unchanged
+* - 3
+  - `GROOVE_SURFACE`
+  - geometry
+  - yes
+  - unchanged (vacuum leg or escape)
+* - 4, 5, 6
+  - `EXIT_TOP`, `EXIT_BOTTOM`, `EXIT_SIDE`
+  - geometry, terminal
+  - yes
+  - —
+* - 7
+  - `CUTOFF`
+  - terminal
+  - yes
+  - —
+* - 8
+  - `HARD_INELASTIC` (reserved)
+  - physical interaction
+  - yes
+  - resampled
+* - 9
+  - `HARD_RADIATIVE` (reserved)
+  - physical interaction
+  - yes
+  - unchanged
+* - 10
+  - `DELTA` (reserved)
+  - numerical node
+  - no
+  - unchanged
+```
+
+**Physical segment boundaries.** Elastic collisions, hard inelastic
+collisions, and hard radiative events are the physical interactions. Each one
+closes the flight: the next row opens `flight_id + 1` at `substep_id = 0`, and
+the default radiation reductions add the two flights incoherently. A hard
+radiative event keeps the electron's direction — the photon's recoil is not
+modelled, the PENELOPE-2024 convention (NEA/MBDAV/R(2024)1, §3.3), which
+assigns the angular deflection to the elastic model — but its discrete energy loss still ends the flight, because the
+emission resonance and phase velocity jump with the energy. Geometry events and
+the cutoff also close the flight. They are bookkeeping boundaries rather than
+interactions, and they preserve today's behaviour: the collision budget is
+redrawn after them, which the memoryless free-path law makes exact.
+
+**Numerical nodes.** A `SUBSTEP` row, and a future fictitious (`DELTA`)
+interaction of a majorant free-path sampler, are integration detail. The next
+row keeps `flight_id`, advances `substep_id` by one, and continues the
+direction, energy, clock, position, and collision budget unchanged. Such rows
+never decohere a flight: the flight-grouped CXR reduction sums them as one
+complex amplitude (see `substep-radiation-invariance`).
+
+**Invariants.** `check_segment_event_contract` enforces, on rows in any order:
+
+- every electron opens flight 0 at substep 0;
+- flight-continuing rows continue their flight, and every other row opens the
+  next one;
+- energy is continuous across every event except the hard events, where it may
+  only fall;
+- direction is unchanged across `SUBSTEP`, `DELTA`, `LAYER_BOUNDARY`,
+  `GROOVE_SURFACE`, and `HARD_RADIATIVE`;
+- clock and position are continuous across every event except a groove
+  surface, whose vacuum leg advances both;
+- a terminal event is its electron's last row, and every electron's last row is
+  terminal or a groove surface through which it escaped.
+
+The exit codes tally one-to-one against `n_backscattered`, `n_transmitted`,
+`n_side_exited`, and `n_cutoff_stopped`. The reserved codes fix what the
+hard-event transport slices must emit; no current core produces them.
+
+**Event metadata.** No event carries a payload array; the pair of rows around
+it is the record, which is why the contract costs one `int8` per row and every
+core writes it from an outcome flag it already held. The event sits at
+`r_mid + L_ang v_hat / 2` of the row it ends. Its pre-event state is that row's
+`E_end_keV`, `t_end_ang`, and `v_hat`; its post-event state is the next row's
+`E_start_keV`, `t_start_ang`, and `v_hat` — next in
+`(electron_id, flight_id, substep_id)`, not in array order, which is step-major
+on the lockstep core. The energy the event transferred is therefore the row's
+`E_end_keV` less the next row's `E_start_keV`: the emitted photon's energy for
+`HARD_RADIATIVE`, the collision's loss for `HARD_INELASTIC`, and zero at every
+other event by the continuity invariant. The deflection is the angle between
+the two `v_hat`.
+
+A transported secondary — a delta ray, or a photon followed as its own track —
+is a new `electron_id`, not a new field on the primary's rows. Every invariant
+above is per track, so a secondaries slice adds a parent link (the parent's
+`electron_id` and the `flight_id` of the event that created it) under the
+existing rule that a field appears only with the model that produces it; it
+changes no rule here and no row of a run without secondaries.
+
+**Downstream transforms.** `_clip_segments_to_cutoff` marks as `CUTOFF` every
+row a consumer's energy floor shortens or ends. `subdivide_flights` marks the
+inserted pieces `SUBSTEP` and keeps the parent's event on its last piece, so
+subdivision changes neither the event sequence nor the incoherent partition.
+
+**Frozen rows** carry no `event_kind`. Each is a whole flight ending in a
+closing event; which one is not recorded. Hard-event transport requires the
+midpoint schema.
 
 ## Per-electron incident diagnostics
 
@@ -153,7 +285,8 @@ convergence protocol the validation records use — is collected in the
 
 ## Validation
 
-`Validation: electron-transport` for the segment semantics,
+`Validation: electron-transport` for the segment semantics and the row-event
+contract,
 `transport-midpoint-stopping` and `substep-radiation-invariance` for the
 midpoint fields and their reduction, `radiation-error-estimators` for the
 diagnostic estimators, and `beam-phase-space-metrics` for the incident-diagnostic

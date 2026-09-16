@@ -36,6 +36,7 @@ from ..._backend import _to_cpu
 from ...materials.attenuation import _normalize_composition
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport import (
+    SegmentEvent,
     _percentile_summary,
     beta_from_keV,
     spliced_stopping_keV_per_ang,
@@ -276,6 +277,15 @@ def subdivide_flights(segments, composition=None, layers=None, max_dE_frac=0.0, 
             "layer": layer_index[parent],
         }
     )
+    if segments.get("event_kind") is not None:
+        # Inserted nodes are substeps; the parent's own end event stays on its
+        # last piece.
+        last_piece = within == (n_sub[parent] - 1)
+        out["event_kind"] = np.where(
+            last_piece,
+            _host(segments["event_kind"]).astype(np.int8, copy=False)[parent],
+            np.int8(SegmentEvent.SUBSTEP),
+        ).astype(np.int8)
     return out, parent
 
 

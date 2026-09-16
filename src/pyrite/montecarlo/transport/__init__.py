@@ -135,6 +135,12 @@ from .cores import (
     _transport_core_ungrooved_perelectron_lut,
 )
 
+from .events import (
+    SegmentEvent,
+    check_segment_event_contract,
+    closes_flight,
+)
+
 from .batching import (
     pack_layer_tables,
     _percentile_summary,

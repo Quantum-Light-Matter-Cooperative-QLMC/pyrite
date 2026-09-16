@@ -458,6 +458,7 @@ def _run_grooved(
     seg_t_end = np.empty(0)
     seg_flight = np.empty(0, dtype=np.int64)
     seg_substep = np.empty(0, dtype=np.int64)
+    seg_event = np.empty(0, dtype=np.int8)
     vac_start = np.empty((max_vac, 3))
     vac_end = np.empty((max_vac, 3))
     vac_E = np.empty(max_vac)
@@ -526,6 +527,7 @@ def _run_grooved(
                 seg_t_end,
                 seg_flight,
                 seg_substep,
+                seg_event,
             ),
             (straggle_on, stream_keys_arr, stragg_dE),
         )
