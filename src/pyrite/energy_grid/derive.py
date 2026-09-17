@@ -110,7 +110,8 @@ class Candidate:
     material: str
     tilt_deg: float
     tilt_azim_deg: float
-    # coherent = PXR/CBS line spectrum (r["spec"]); incoherent = bremsstrahlung
+    # coherent = PXR/CBS line spectrum (r["spec"], no characteristic);
+    # incoherent = bremsstrahlung
     # background (r["brem_wide"]). Both channels' 95% coverage is tracked so the
     # line grid and the brem grid are each bounded separately (issue_notes.md #1).
     coverage_energy_eV: float
@@ -160,6 +161,10 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_
 
 
 def _candidate_from_result(material, tilt_deg, tilt_azim_deg, thickness_ang, result):
+    # The line bandwidth policy owns the PXR/CBS channel only: `spec` excludes
+    # characteristic emission, whose low-energy K lines (C K near 277 eV for
+    # hopg) would otherwise own the cumulative integral (#123). Characteristic
+    # spanning belongs to the line-window seeds (#88/#101).
     E_grid, spec = result["E_grid"], result["spec"]
     E_brem, brem = result["E_grid_brem"], result["brem_wide"]
     diagnostic = result.get("line_grid_diagnostic")

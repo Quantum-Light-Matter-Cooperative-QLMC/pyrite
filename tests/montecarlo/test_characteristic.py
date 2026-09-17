@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from pyrite._backend import REAL, xp
+from pyrite._spectral_components import line_spectrum
 from pyrite.montecarlo.spectrum import characteristic
 from tests.helpers import scaled_rtol
 
@@ -353,7 +354,7 @@ def test_absorber_elements_do_not_load_unused_ionization_tables(monkeypatch):
     assert loaded == ["C"]
 
 
-def test_runner_adds_one_characteristic_component_to_both_line_modes(monkeypatch):
+def test_runner_keeps_characteristic_separate_from_both_line_modes(monkeypatch):
     from pyrite.montecarlo import runner
 
     energy = np.array([100.0, 200.0, 300.0])
@@ -404,5 +405,7 @@ def test_runner_adds_one_characteristic_component_to_both_line_modes(monkeypatch
     )
 
     np.testing.assert_array_equal(output["spec_characteristic"], characteristic_line)
-    np.testing.assert_array_equal(output["spec"], 1.0 + characteristic_line)
-    np.testing.assert_array_equal(output["spec_coherent"], 2.0 + characteristic_line)
+    np.testing.assert_array_equal(output["spec"], np.full(energy.shape, 1.0))
+    np.testing.assert_array_equal(output["spec_coherent"], np.full(energy.shape, 2.0))
+    np.testing.assert_array_equal(line_spectrum(output), 1.0 + characteristic_line)
+    np.testing.assert_array_equal(line_spectrum(output, coherent=True), 2.0 + characteristic_line)

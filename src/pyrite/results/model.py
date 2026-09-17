@@ -10,8 +10,12 @@ from typing import Any
 
 import numpy as np
 
+from .._spectral_components import line_spectrum
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
+
+#: Spatial result components. ``*_total`` adds characteristic radiation.
+COMPONENTS = ("line", "background", "coherent", "characteristic", "line_total", "coherent_total")
 
 
 def _readonly_array(value: object, *, dtype=None) -> np.ndarray:
@@ -128,8 +132,9 @@ class SpatialResult:
     coherent_line
         Optional coherent line factors, available for coherent calculations.
     characteristic_line
-        Optional characteristic-radiation factors, already included in both
-        line totals.
+        Optional characteristic-radiation factors. ``line`` and
+        ``coherent_line`` exclude it; the ``"line_total"`` and
+        ``"coherent_total"`` components add it.
     """
 
     ray_map: PixelRayMap
@@ -176,7 +181,19 @@ class SpatialResult:
             if self.characteristic_line is None:
                 raise ValueError("characteristic line spectrum is not available")
             return self.characteristic_line
-        raise ValueError("component must be 'line', 'background', 'coherent', or 'characteristic'")
+        if component in {"line_total", "coherent_total"}:
+            base = self._factor(component.removesuffix("_total"))
+            extra = self.characteristic_line
+            if extra is None:
+                return base
+            # Both factors share the line grid and attenuation, so the
+            # pre-filter densities add tile by tile.
+            return SpectralFactors(
+                base.energy_eV,
+                base.intrinsic_by_tile + extra.intrinsic_by_tile,
+                base.mu_by_filter_inv_mm,
+            )
+        raise ValueError(f"component must be one of {', '.join(map(repr, COMPONENTS))}")
 
     def _coordinates(self, *, pixels, region) -> np.ndarray:
         if (pixels is None) == (region is None):
@@ -250,7 +267,9 @@ class SpatialResult:
             ``(row_slice, column_slice)`` selection. Mutually exclusive with
             ``pixels``.
         component
-            ``"line"``, ``"background"``, or ``"coherent"``.
+            One of :data:`COMPONENTS`. ``"line"`` and ``"coherent"`` exclude
+            characteristic radiation; ``"line_total"`` and ``"coherent_total"``
+            include it.
         measured
             Apply the detector response after geometric scoring.
         fwhm_eV
@@ -294,7 +313,9 @@ class SpatialResult:
         energy_range_eV
             Finite increasing ``(low, high)`` bounds in eV, inclusive.
         component
-            ``"line"``, ``"background"``, or ``"coherent"``.
+            One of :data:`COMPONENTS`. ``"line"`` and ``"coherent"`` exclude
+            characteristic radiation; ``"line_total"`` and ``"coherent_total"``
+            include it.
         measured
             Apply detector response before integration.
         fwhm_eV
@@ -347,7 +368,9 @@ class SpatialResult:
         Parameters
         ----------
         component
-            ``"line"``, ``"background"``, or ``"coherent"``.
+            One of :data:`COMPONENTS`. ``"line"`` and ``"coherent"`` exclude
+            characteristic radiation; ``"line_total"`` and ``"coherent_total"``
+            include it.
         pixel_chunk
             Positive maximum pixels materialized per working chunk.
 
@@ -395,8 +418,9 @@ class Result:
     coherent_spectrum
         Optional coherent line density on ``energy_eV``.
     characteristic_spectrum
-        Optional characteristic-radiation component on ``energy_eV``. This is
-        already included in ``spectrum`` and ``coherent_spectrum``.
+        Optional characteristic-radiation density on ``energy_eV``.
+        ``spectrum`` and ``coherent_spectrum`` exclude it; use
+        :meth:`line_total` for the sum.
     spatial
         Optional factorized planar-detector result.
     """
@@ -428,6 +452,30 @@ class Result:
 
         if self.spatial is not None and not isinstance(self.spatial, SpatialResult):
             raise TypeError("spatial must be a SpatialResult or None")
+
+    def line_total(self, *, coherent: bool = False, characteristic: bool = True) -> np.ndarray:
+        """Return the line-grid emission density on ``energy_eV``.
+
+        Parameters
+        ----------
+        coherent
+            Use ``coherent_spectrum`` instead of ``spectrum``.
+        characteristic
+            Add ``characteristic_spectrum`` when present.
+
+        Returns
+        -------
+        numpy.ndarray
+            Photons per incident electron per eV per sr.
+        """
+        if coherent and self.coherent_spectrum is None:
+            raise ValueError("coherent spectrum is not available")
+        record = {
+            "spec": self.spectrum,
+            "spec_coherent": self.coherent_spectrum,
+            "spec_characteristic": self.characteristic_spectrum,
+        }
+        return line_spectrum(record, coherent=coherent, characteristic=characteristic)
 
 
 __all__ = ["PixelRayMap", "Result", "SpatialResult", "SpectralFactors"]

@@ -6,6 +6,7 @@ Response-free source-spectrum figures: by-energy, full-range, peak-vs-tilt, mosa
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ..._spectral_components import line_spectrum
 from ...detectors import Detector, LegacyEDS
 from ...montecarlo import mosaic_psi_rad
 from ...results import (
@@ -246,7 +247,9 @@ def plot_peak_vs_tilt(results, settings):
     for _i, (E0, rs) in enumerate(sorted(by_E.items())):
         rs = sorted(rs, key=lambda r: r["case"]["tilt_deg"])
         tilts = [r["case"]["tilt_deg"] for r in rs]
-        peak = [float(np.max(r["spec"])) * r["scale"] * beam_current_na(r, settings) for r in rs]
+        peak = [
+            float(np.max(line_spectrum(r))) * r["scale"] * beam_current_na(r, settings) for r in rs
+        ]
         ax.plot(tilts, peak, "o-", color=energy_color(E0, by_E), label=f"{E0:g} keV")
     ax.set_xlabel(r"polar tilt $\theta_\mathrm{tilt}$ (deg)")
     ax.set_ylabel("best-azimuth sampled peak density (Phs/eV/s)")
@@ -281,7 +284,7 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
             fwhm = line_fwhm_eV(case, E_pk, np.deg2rad(grade))
             lbl = rf"mosaic {grade:g}$\degree$"
         detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=True))
-        det = detector.score(E, r["spec"], fwhm_eV=fwhm, scale=r["scale"])
+        det = detector.score(E, line_spectrum(r), fwhm_eV=fwhm, scale=r["scale"])
         curves.append((lbl, fwhm, det))
 
     if ax is None:

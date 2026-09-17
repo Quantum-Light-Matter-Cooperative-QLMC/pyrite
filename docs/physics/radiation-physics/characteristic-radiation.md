@@ -144,13 +144,15 @@ different layer.
 
 ## Composition, storage, and analysis
 
-Atomic relaxation is incoherent. The computed component is added once to both
-the incoherent and optional coherent PXR/CBS totals, while remaining available
-as `spec_characteristic`. Checkpoints store it in `characteristic.h5`, separate
-from the line-only `line.h5` and continuum `brem.h5` datasets. The analysis app
-shows characteristic radiation by default and provides a **show characteristic
-radiation** checkbox that can subtract it from both displayed totals without
-changing stored results. A missing characteristic file is valid and behaves as
+Atomic relaxation is incoherent, so one component adds to either the
+incoherent or the optional coherent PXR/CBS spectrum. It is kept as its own
+array, `spec_characteristic`; `spec` and `spec_coherent` exclude it, and
+consumers add it once through `pyrite._spectral_components.line_spectrum`
+(`Result.line_total()` for API results). Checkpoints store it in
+`characteristic.h5`, separate from the line `line.h5` and continuum `brem.h5`
+datasets. The analysis app shows characteristic radiation by default and
+provides a **show characteristic radiation** checkbox that drops the component
+from the displayed records without changing stored results. A missing characteristic file is valid and behaves as
 a line-only legacy or intentionally excluded dataset.
 
 ## Limits and validation

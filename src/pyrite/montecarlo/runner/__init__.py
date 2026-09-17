@@ -753,14 +753,14 @@ def _transport_lines_for_case(case, E_grid=None):
 def _lines_for_case(case, E_grid, *, coherent=None):
     """Regenerate a case's line spectrum on ``E_grid`` from scratch (re-transport
     + per-layer line kernel via :func:`_lines_for_segments`). Returns one
-    ``spec``. ``coherent`` overrides the kernel coherence (``None`` = derive from
-    ``case["coherent_emission"]``). The line half of run_case's transport +
+    PXR/CBS ``spec``, without characteristic emission. ``coherent`` overrides
+    the kernel coherence (``None`` = derive from ``case["coherent_emission"]``). The line half of run_case's transport +
     spectrum phases factored out so :func:`pyrite.runs.run.repair_line_spec`
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
     segs, _E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
     segs = _segments_on_device(segs)
-    cxr = _lines_for_segments(
+    return _lines_for_segments(
         segs,
         E_grid,
         case,
@@ -770,16 +770,6 @@ def _lines_for_case(case, E_grid, *, coherent=None):
         coherent=coherent,
         Ne=case["Ne"],
     )
-    characteristic = _characteristic_from_segments(
-        segs,
-        E_grid,
-        case,
-        n_hat,
-        abs_layers,
-        groove=groove,
-        Ne=case["Ne_brem"],
-    )
-    return cxr + characteristic
 
 
 def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=False):
@@ -788,9 +778,9 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
     ``want_coherent``) a ``spec_coherent`` from the SAME segments, so a
     ``pyrite reline`` that moves a ``coherent``/``both`` checkpoint onto a new grid
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
-    Returns ``(spec, spec_coherent_or_None)``. With
-    ``return_characteristic=True``, append the separately auditable
-    characteristic component as a third item."""
+    Returns ``(spec, spec_coherent_or_None)``, both PXR/CBS only. With
+    ``return_characteristic=True``, append the separate characteristic
+    component as a third item."""
     segs, _E_brem, n_hat, abs_layers, groove = _transport_lines_for_case(case, E_grid)
     # Both kernels read the same segments; stage one device copy as the live
     # sweep does rather than uploading the pair separately.
@@ -823,6 +813,8 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
         if want_coherent
         else None
     )
+    if not return_characteristic:
+        return spec, spec_coherent
     characteristic = _characteristic_from_segments(
         segs,
         E_grid,
@@ -832,12 +824,7 @@ def _line_pair_for_case(case, E_grid, *, want_coherent, return_characteristic=Fa
         groove=groove,
         Ne=case["Ne_brem"],
     )
-    spec = spec + characteristic
-    if spec_coherent is not None:
-        spec_coherent = spec_coherent + characteristic
-    if return_characteristic:
-        return spec, spec_coherent, characteristic
-    return spec, spec_coherent
+    return spec, spec_coherent, characteristic
 
 
 def _effective_spec_chunk(case, tp):
@@ -1021,9 +1008,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
 
     # CHARACTERISTIC: EEDL shell-ionization track-length estimator on the
     # lower-cutoff bremsstrahlung electron population. Atomic relaxation is
-    # incoherent, so the same characteristic component is added to both the
-    # default PXR/CBS spectrum and its optional coherent companion. Preserve the
-    # component separately in the result for validation and plotting audits.
+    # incoherent, so one component serves both the PXR/CBS spectrum and its
+    # coherent companion. It stays a separate array; consumers combine
+    # components through pyrite._spectral_components (issue #123).
     with _nsys_range("cxr.characteristic"):
         try:
             spec_characteristic = _characteristic_from_segments(
@@ -1039,9 +1026,6 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             if not _is_gpu_oom(error):
                 raise
             raise _SpectrumPhaseOOM("brem", error) from error
-    spec = spec + spec_characteristic
-    if spec_coherent is not None:
-        spec_coherent = spec_coherent + spec_characteristic
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed

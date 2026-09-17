@@ -12,6 +12,7 @@ import warnings
 import numpy as np
 from scipy.signal import find_peaks, peak_widths
 
+from .._spectral_components import line_spectrum
 from .store import beam_current_na
 
 
@@ -176,7 +177,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         line-to-background ratios, and finite-footprint hit fraction.
     """
     E = np.asarray(r["E_grid"], dtype=float)
-    spec = np.asarray(r["spec"], dtype=float)
+    spec = np.asarray(line_spectrum(r), dtype=float)
     brem = np.asarray(r["brem"], dtype=float)
     cur, sc = beam_current_na(r, settings), r["scale"]
     smax = float(spec.max()) if spec.size else 0.0

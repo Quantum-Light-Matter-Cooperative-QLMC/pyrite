@@ -981,8 +981,8 @@ def test_checkpoint_stores_characteristic_in_independent_component(tmp_path):
     line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.h5"))["cfg_a"][30.0]
     characteristic = _checkpoint_io.load(str(characteristic_path))["cfg_a"][30.0]
     assert "spec_characteristic" not in line
-    np.testing.assert_array_equal(line["spec"], [4.0, 5.0])
-    np.testing.assert_array_equal(line["spec_coherent"], [8.0, 9.0])
+    np.testing.assert_array_equal(line["spec"], record["spec"])
+    np.testing.assert_array_equal(line["spec_coherent"], record["spec_coherent"])
     assert set(characteristic) == {"case", "E_grid", "scale", "spec_characteristic"}
 
     merged = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
@@ -993,7 +993,7 @@ def test_checkpoint_stores_characteristic_in_independent_component(tmp_path):
     characteristic_path.unlink()
     without_characteristic = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
     assert "spec_characteristic" not in without_characteristic
-    np.testing.assert_array_equal(without_characteristic["spec"], [4.0, 5.0])
+    np.testing.assert_array_equal(without_characteristic["spec"], record["spec"])
 
 
 def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch):
@@ -1017,7 +1017,14 @@ def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch)
     assert set(load_checkpoint("hopg", checkpoint_dir=str(tmp_path))) == {"cfg_a", "cfg_b"}
 
 
-def test_legacy_line_component_with_characteristic_is_not_double_added(tmp_path):
+def test_legacy_line_component_with_characteristic_is_separated_once(tmp_path):
+    # Containers written before the separate-component contract (no
+    # emission_components attribute) stored line totals that included the
+    # co-located characteristic array.
+    import h5py
+
+    from pyrite._spectral_components import COMPONENTS_ATTR
+
     record = {
         "case": _fake_case("cfg_a", 30.0),
         "E_grid": np.array([100.0, 110.0]),
@@ -1029,13 +1036,21 @@ def test_legacy_line_component_with_characteristic_is_not_double_added(tmp_path)
     line_path = tmp_path / "hopg" / "line.h5"
     line_path.parent.mkdir()
     _checkpoint_io.dump(store, str(line_path))
+    with h5py.File(line_path, "r+") as h5:
+        del h5.attrs[COMPONENTS_ATTR]
     _checkpoint_store.save("hopg", tmp_path, store, components=("characteristic",))
 
     merged = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
 
-    np.testing.assert_array_equal(merged["spec"], record["spec"])
-    np.testing.assert_array_equal(merged["spec_coherent"], record["spec_coherent"])
+    np.testing.assert_array_equal(merged["spec"], [4.0, 5.0])
+    np.testing.assert_array_equal(merged["spec_coherent"], [8.0, 9.0])
     np.testing.assert_array_equal(merged["spec_characteristic"], record["spec_characteristic"])
+
+    # Re-saving writes the separate contract; reloading must not subtract again.
+    _checkpoint_store.save("hopg", tmp_path, {"cfg_a": {30.0: merged}})
+    resaved = _checkpoint_store.load("hopg", tmp_path)["cfg_a"][30.0]
+    np.testing.assert_array_equal(resaved["spec"], [4.0, 5.0])
+    np.testing.assert_array_equal(resaved["spec_coherent"], [8.0, 9.0])
 
 
 def test_partial_component_save_fully_migrates_legacy_checkpoint(tmp_path):

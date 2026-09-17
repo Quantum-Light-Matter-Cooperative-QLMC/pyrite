@@ -109,3 +109,37 @@ def test_spatial_materialization_rejects_noninteger_pixel_chunks(method, pixel_c
 def test_spectra_rejects_ambiguous_or_invalid_selection(kwargs) -> None:
     with pytest.raises((ValueError, IndexError)):
         _spatial().spectra(**kwargs)
+
+
+def test_total_components_add_characteristic_to_each_line() -> None:
+    base = _spatial()
+    characteristic = SpectralFactors(
+        energy_eV=base.line.energy_eV,
+        intrinsic_by_tile=np.array([[0.5, 0.5, 0.5], [1.0, 1.0, 1.0]]),
+        mu_by_filter_inv_mm=base.line.mu_by_filter_inv_mm,
+    )
+    spatial = SpatialResult(
+        base.ray_map,
+        base.line,
+        base.background,
+        base.detector,
+        coherent_line=base.line,
+        characteristic_line=characteristic,
+    )
+
+    for total, line in (("line_total", "line"), ("coherent_total", "coherent")):
+        np.testing.assert_allclose(
+            spatial.average_density(total),
+            spatial.average_density(line) + spatial.average_density("characteristic"),
+            rtol=1.0e-15,
+        )
+
+
+def test_total_component_without_characteristic_is_the_line() -> None:
+    spatial = _spatial()
+
+    np.testing.assert_array_equal(
+        spatial.average_density("line_total"), spatial.average_density("line")
+    )
+    with pytest.raises(ValueError, match="coherent line spectrum is not available"):
+        spatial.average_density("coherent_total")

@@ -11,13 +11,21 @@ Version 1 is read forever and never written again. See
 
 ## Container header
 
-The HDF5 root has three required attributes:
+The HDF5 root has three required attributes and one contract marker:
 
 | Attribute | Type | Current value | Meaning |
 | --- | --- | --- | --- |
 | `schema` | UTF-8 string | `pyrite.result` | Format discriminator |
 | `schema_version` | integer | `2` | Container/tree encoding version |
 | `identity_version` | integer | `1` | Dataset-identity normalization version |
+| `emission_components` | UTF-8 string | `separate` | Emission arrays exclude one another; absent on older artifacts |
+
+A container without `emission_components`, and every pickle, predates the
+separate-component contract: its `spec` and `spec_coherent` include any
+co-located `spec_characteristic`. The reader subtracts that component once, so
+loaded records always follow the current contract. The marker is on the
+container rather than on records so slim, dataset-merge, and basket key
+projections cannot drop it.
 
 The root group `value` contains the encoded payload; the root group `blobs`, when
 present, is the array pool. Readers must reject an unknown `schema` or
@@ -134,9 +142,9 @@ the normative physical form; these tables define the scientific fields.
 | Record field | Dtype | Shape | Unit / meaning |
 | --- | --- | --- | --- |
 | `E_grid` | `float64` | `[N]` | photon energy, eV |
-| `spec` | `float64` | `[N]` | line spectrum, photons/e/sr/eV; physically line-only in `line.h5`, with characteristic radiation restored in the merged read |
-| `spec_coherent` | `float64` | `[N]` | coherent companion spectrum with the same physical/merged convention; key absent when not computed |
-| `spec_characteristic` | `float64` | `[N]` | characteristic spectrum in `characteristic.h5`, photons/e/sr/eV |
+| `spec` | `float64` | `[N]` | incoherent PXR/CBS line spectrum, photons/e/sr/eV; excludes characteristic radiation |
+| `spec_coherent` | `float64` | `[N]` | coherent PXR/CBS companion spectrum; excludes characteristic radiation; key absent when not computed |
+| `spec_characteristic` | `float64` | `[N]` | characteristic spectrum, photons/e/sr/eV; stored in `characteristic.h5`, co-located in CAS blobs and slim stores |
 | `brem` | `float64` | `[N]` | bremsstrahlung interpolated to `E_grid`, photons/e/sr/eV |
 | `E_grid_brem` | `float64` or null | `[M]` | wide bremsstrahlung photon-energy grid, eV |
 | `brem_wide` | `float64` or null | `[M]` | wide bremsstrahlung spectrum, photons/e/sr/eV |

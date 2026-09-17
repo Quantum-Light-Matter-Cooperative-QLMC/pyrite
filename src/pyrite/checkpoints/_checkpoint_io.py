@@ -27,6 +27,8 @@ import numpy as np
 # stdlib since 3.14 (the version this project pins); ty's typeshed lags.
 from compression import zstd
 
+from pyrite._spectral_components import COMPONENTS_ATTR, SEPARATE_CONTRACT, separate_legacy
+
 from . import _result_v2
 
 _HDF5_MAGIC = b"\x89HDF\r\n\x1a\n"
@@ -94,6 +96,7 @@ def _write_container(obj: Any, target: str, *, shuffle: bool) -> None:
         h5.attrs["schema"] = SCHEMA
         h5.attrs["schema_version"] = SCHEMA_VERSION
         h5.attrs["identity_version"] = IDENTITY_VERSION
+        h5.attrs[COMPONENTS_ATTR] = SEPARATE_CONTRACT
         _result_v2.write(h5, obj, shuffle=shuffle)
 
 
@@ -148,12 +151,27 @@ def dump_stream(
 
 
 def load(path: str) -> Any:
-    """Load any generation: framed or bare HDF5, or any legacy pickle."""
+    """Load any generation: framed or bare HDF5, or any legacy pickle.
+
+    Result records always come back in the separate emission-component
+    contract. Containers written before it (no :data:`COMPONENTS_ATTR`) are
+    converted by :func:`pyrite._spectral_components.separate_legacy`.
+    """
+    obj, separate = _load_raw(path)
+    return obj if separate else separate_legacy(obj)
+
+
+def _read_h5(h5: h5py.File) -> tuple[Any, bool]:
+    separate = h5.attrs.get(COMPONENTS_ATTR) == SEPARATE_CONTRACT
+    return _read_container(h5), separate
+
+
+def _load_raw(path: str) -> tuple[Any, bool]:
     with open(path, "rb") as stream:
         head = stream.read(8)
     if head == _HDF5_MAGIC:
         with h5py.File(path, "r") as h5:
-            return _read_container(h5)
+            return _read_h5(h5)
     if head[:4] == _ZSTD_MAGIC:
         # Both a framed HDF5 artifact and the legacy zstd pickle start here.
         with zstd.ZstdFile(path, "rb") as stream:
@@ -161,11 +179,11 @@ def load(path: str) -> Any:
                 stream.seek(0)
                 payload = io.BytesIO(stream.read())
                 with h5py.File(payload, "r") as h5:
-                    return _read_container(h5)
+                    return _read_h5(h5)
             stream.seek(0)
-            return pickle.load(stream)
+            return pickle.load(stream), False
     if head[:2] == _GZIP_MAGIC:
         with gzip.GzipFile(path, "rb") as stream:
-            return pickle.load(stream)
+            return pickle.load(stream), False
     with open(path, "rb") as stream:
-        return pickle.load(stream)
+        return pickle.load(stream), False

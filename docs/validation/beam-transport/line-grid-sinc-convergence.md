@@ -479,12 +479,28 @@ standard-profile artifact (job 1742: the persisted diagnostic geometry, 1 mm,
 coarse $N_e = 200$, refine $N_e = 2000$, alias budget $10^{-2}$). Its
 resolution targets follow the transport, not the catalog bandwidth. Its
 bandwidth outputs are not usable: the 95% coverage `stop` collapses to 300 eV
-at 30 keV (catalog 2600 eV) and the bremsstrahlung stop reaches 140 keV,
-consistent with coverage now integrating the characteristic lines added to the
-line spectrum (C K near 277 eV). The resolution below therefore keeps each
-row's catalog `start` and `stop` and sets
+at 30 keV (catalog 2600 eV) because line coverage integrated the
+characteristic lines added to the line spectrum (C K near 277 eV); #123 fixes
+that channel. The 140 keV bremsstrahlung stop is not the same defect: the
+bremsstrahlung channel carries no characteristic emission. The per-material
+bremsstrahlung stop is the maximum over all row energies up to 300 keV, and
+140 keV agrees with the 140.7 keV override of diamond, which is also carbon.
+That points to the 40 keV hopg override as stale rather than to a coverage
+defect; the catalog is not regenerated here. The resolution below therefore
+keeps each row's catalog `start` and `stop` and sets
 `num = resolution_num(start, stop, target)`. Every row passes the float32
 8-ulp backend check.
+
+Issue #123's separated-component implementation was rerun remotely at the same
+1 mm, 5 deg polar, 95 deg azimuth geometry for hopg and wse2 (job 1768,
+`20260917-105036-f96fc59f`). At hopg 30 keV, the raw PXR/CBS-only 95% coverage
+is 2470.3 eV and the margin policy rounds it to 2600 eV, exactly the catalog
+stop; the characteristic-contaminated run had rounded to 300 eV. The same row's
+bremsstrahlung raw/rounded stops remain 13.55/14.3 keV, inside hopg's 40 keV
+override. Across matching catalog rows, rounded line stops were at or below the
+catalog stops except wse2 at 100 keV (3300 vs 3100 eV) and 150 keV (4400 vs
+4300 eV). Those two rows require review before any later catalog regeneration;
+no artifacts or profile references were changed here.
 
 ```{list-table} hopg standard-profile rows: catalog num and the num at the derived target spacing, with the derived target.
 :name: tbl-line-grid-sinc-hopg-rows

@@ -112,7 +112,9 @@ line_image = spatial.image((4_000.0, 6_000.0), component="line")
 ```
 
 Selected spectra include each pixel's solid angle and therefore have units of
-photons per incident electron per eV. `Result.spectrum` remains a detector-
+photons per incident electron per eV. `component="line"` and `"coherent"` are
+PXR/CBS only; `"characteristic"` is the atomic-relaxation component, and
+`"line_total"`/`"coherent_total"` add it to the corresponding line. `Result.spectrum` remains a detector-
 averaged density per sr. `SpatialResult` stores tile spectra, pixel rays, and
 attenuation coefficients as separate factors; `spectra` materializes only the
 selection and `image` works in bounded pixel chunks rather than allocating a

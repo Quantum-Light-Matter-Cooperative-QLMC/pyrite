@@ -49,7 +49,12 @@ coordinates are `energy_eV` and `background_energy_eV`. `Result.provenance`
 records the resolved scene, numerics, content identity, backend/device, and
 library versions. Coherent or
 `both` emission also exposes `coherent_spectrum`; coherent-only simulation
-selects that array as `spectrum`. The high-level API does not currently accept
+selects that array as `spectrum`. `spectrum` and `coherent_spectrum` are
+PXR/CBS only; characteristic radiation is the separate
+`characteristic_spectrum`, and `Result.line_total()` returns their sum
+(`coherent=True` for the coherent line, `characteristic=False` to omit it).
+Before issue #123 `spectrum` already included characteristic radiation. The
+high-level API does not currently accept
 an external background array, so both `none` and `external` return a zero
 background on the resolved continuum grid.
 

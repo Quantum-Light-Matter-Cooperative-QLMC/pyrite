@@ -117,7 +117,8 @@ OBSERVABLE_CLASSES = ("intrinsic_source", "detected_counts")
 DEFAULT_RTOL: Mapping[str, float] = {"intrinsic_source": 1.0e-3, "detected_counts": 1.0e-2}
 
 #: BANDWIDTH policy of the stored ``E_grid_line_by_energy`` artifacts: the
-#: energy below which 95% of integrated coherent-line intensity falls. It states
+#: energy below which 95% of integrated PXR/CBS line intensity falls
+#: (characteristic emission excluded). It states
 #: how much spectrum is covered, NOT how accurately it is sampled.
 DEFAULT_BANDWIDTH_COVERAGE = 0.95
 COVERAGE_BANDWIDTH_POLICY = "coverage-0.95"

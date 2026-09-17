@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from .._formatting import fmt_thickness
+from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..materials import CATALOG
 from .metrics import line_metrics
@@ -111,10 +112,11 @@ def summary_table(recs, settings):
         c = r["case"]
         cur = beam_current_na(r, settings)
         detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=True))
-        line_det = detector.score(r["E_grid"], r["spec"], fwhm_eV=r["fwhm"])
+        line = line_spectrum(r)
+        line_det = detector.score(r["E_grid"], line, fwhm_eV=r["fwhm"])
         brem_det = detected_background(r, settings) / r["scale"]
         i_pk = np.argmax(line_det)
-        line_cts_per_na = np.trapezoid(r["spec"], r["E_grid"]) * r["scale"]
+        line_cts_per_na = np.trapezoid(line, r["E_grid"]) * r["scale"]
         line_cts = line_cts_per_na * cur
         # brem over the FULL measured range (the wide grid) when available, so the
         # total rate reflects the real measurement out to the beam energy; fall

@@ -35,6 +35,7 @@ import numpy as np
 import pandas as pd
 from altair.utils.schemapi import UndefinedType
 
+from ..._spectral_components import incident_spectrum, line_spectrum
 from ...detectors import Detector, Timepix3
 from ...detectors import eaglexo_response as eag
 from ...results import beam_current_na
@@ -128,7 +129,7 @@ def _broad_incident(r):
     E_brem = r.get("E_grid_brem")
     brem_wide = r.get("brem_wide")
     if E_brem is None or brem_wide is None:
-        incident = np.asarray(r["spec"], dtype=float) + np.asarray(r["brem"], dtype=float)
+        incident = np.asarray(incident_spectrum(r), dtype=float)
         return E_line, incident * r["scale"]
 
     E = np.asarray(E_brem, dtype=float)
@@ -139,7 +140,7 @@ def _broad_incident(r):
     mask = E >= float(np.nanmin(E_line))
     E = E[mask]
     brem = brem[mask]
-    coherent = np.interp(E, E_line, np.asarray(r["spec"], dtype=float), left=0.0, right=0.0)
+    coherent = np.interp(E, E_line, np.asarray(line_spectrum(r), dtype=float), left=0.0, right=0.0)
     return E, (coherent + brem) * r["scale"]
 
 
@@ -429,7 +430,7 @@ def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True,
             cur = beam_current_na(r, settings)
             resp = eag.get_response(r["E_grid"], coating=coating)
             E = np.asarray(r["E_grid"], dtype=float)
-            cd_line = resp.charge_density((r["spec"] + r["brem"]) * r["scale"]) * cur
+            cd_line = resp.charge_density(incident_spectrum(r) * r["scale"]) * cur
             az = float(r["case"]["tilt_azim_deg"])
             frames.append(
                 pd.DataFrame(

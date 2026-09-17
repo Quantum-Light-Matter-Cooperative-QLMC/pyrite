@@ -18,6 +18,7 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 
 import numpy as np
 
+from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
     aperture_fwhm_eV,
@@ -156,7 +157,7 @@ def store_result(results, case, out):
     """Post-process one finished case into ``results[name][E0]`` (in place)."""
     name, E0 = case["name"], case["E0_keV"]
     E_grid = out["E_grid"]
-    E_pk = E_grid[np.argmax(out["spec"])]
+    E_pk = E_grid[np.argmax(line_spectrum(out))]
     # crystal mosaicity (analytic): add the mosaic broadening in quadrature when the
     # run enabled it (case["mosaic_fwhm_rad"] from build_cases; None/absent -> skip,
     # an exact no-op so old checkpoints and mosaic=False runs are unchanged). The

@@ -535,9 +535,10 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   OOM tags, release cadence, and pool limits. The backend classifier also
   recognizes delayed CUDA/ROCm runtime allocation failures. `_spectrum_case`
   always stores incoherent `spec` and, when requested, `spec_coherent` from the
-  same transport, adds the shared characteristic component to both, and keeps
-  it separately as `spec_characteristic`; characteristic emission is evaluated
-  directly on the fine line grid. `_line_pair_for_case` mirrors this
+  same transport, plus the shared characteristic component as the separate
+  `spec_characteristic` (no array includes another; `_spectral_components`
+  combines them); characteristic emission is evaluated directly on the fine
+  line grid. `_line_pair_for_case` mirrors this
   for `pyrite reline`. Deps:
   `_backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.

@@ -15,6 +15,7 @@ flux), collapsing hundreds of azimuth runs to one row/curve each.
 import numpy as np
 
 from .._formatting import fmt_thickness
+from .._spectral_components import line_spectrum
 
 
 # ---- record selection --------------------------------------------------------
@@ -236,8 +237,8 @@ _RECORD_ARRAY_FIELDS = (
 )
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
-# The coherent total and characteristic audit component use the line grid, so a
-# --line-only projection/merge must carry them with the combined ``spec``.
+# The coherent and characteristic components use the line grid, so a
+# --line-only projection/merge must carry them with ``spec``.
 LINE_RECORD_KEYS = ("spec", "E_grid", "spec_coherent", "spec_characteristic")
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
@@ -307,7 +308,14 @@ def merge_dataset(local, incoming, dataset, force=False):
 
 
 def slim_results(
-    results, *, case_names=None, grid=None, drop_wide_brem=False, downcast=False, fields=None, **constraints
+    results,
+    *,
+    case_names=None,
+    grid=None,
+    drop_wide_brem=False,
+    downcast=False,
+    fields=None,
+    **constraints,
 ):
     """Return a NEW results store carrying only what a viz session needs, to cut a
     checkpoint's on-disk / transfer size (TODO P2 #5). Does NOT mutate ``results``;
@@ -338,15 +346,10 @@ def slim_results(
     """
     if "grid" in constraints:
         raise TypeError(
-            "slim_results() no longer accepts 'grid'; "
-            "resolve the campaign grid to case_names first"
+            "slim_results() no longer accepts 'grid'; resolve the campaign grid to case_names first"
         )
     if case_names is not None:
-        results = {
-            name: by_E
-            for name, by_E in results.items()
-            if name in case_names
-        }
+        results = {name: by_E for name, by_E in results.items() if name in case_names}
     base = select_results(results, **constraints) if constraints else results
     drop = set(_WIDE_BREM_FIELDS) if (fields is None and drop_wide_brem) else set()
     keep_keys = (set(fields) | {"case"}) if fields is not None else None
@@ -375,7 +378,7 @@ def slim_results(
 
 def _peak(r):
     """The selection metric: the highest spectral flux value, max(spectrum)."""
-    return float(np.max(r["spec"]))
+    return float(np.max(line_spectrum(r)))
 
 
 def best_azimuth(recs):
