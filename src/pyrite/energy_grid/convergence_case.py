@@ -455,7 +455,7 @@ def _affordable_rungs(
         if grid.size > max_points:
             cut = index
             break
-    skipped = [
+    skipped: list[dict[str, Any]] = [
         {
             "samples_per_feature": int(window_rungs[index]["samples_per_feature"]),
             "n_points": int(coordinates[index].size),
@@ -463,7 +463,7 @@ def _affordable_rungs(
         }
         for index in range(cut, len(coordinates))
     ]
-    return list(window_rungs[:cut]), list(coordinates[:cut]), skipped
+    return [dict(rung) for rung in window_rungs[:cut]], list(coordinates[:cut]), skipped
 
 
 def run_window_config(
