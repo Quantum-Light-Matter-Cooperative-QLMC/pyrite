@@ -38,11 +38,18 @@ import numpy as np
 from .._backend import BACKEND, _to_cpu
 from .._grid_semantics import resolution_num
 from .._line_grid_policy import DEFAULT_RTOL
+from .._line_windows import build_window_plan
 from ..campaign.config import material_sweep
 from ..campaign.sweep import build_cases
 from ..materials import CATALOG
 from ..montecarlo import runner
 from ..montecarlo.spectrum.diagnostics import sinc_feature_spacing
+from ..montecarlo.spectrum.line_seeds import (
+    DEFAULT_SEED_PROVIDERS,
+    DEFAULT_TAIL_WIDTHS,
+    SeedContext,
+    collect_feature_seeds,
+)
 from .convergence import (
     Rung,
     SpectrumSample,
@@ -52,9 +59,23 @@ from .convergence import (
     richardson_acceptance,
     segment_fingerprint,
 )
-from .convergence_job import DEFAULT_NE, DEFAULT_THICKNESS_ANG, add_ladder_arguments
+from .convergence_job import (
+    DEFAULT_NE,
+    DEFAULT_THICKNESS_ANG,
+    add_ladder_arguments,
+    add_window_arguments,
+)
 
 CHECKPOINT_SCHEMA = 1
+#: Checkpoint version of the window-refinement ladder (#101). Separate from the
+#: uniform ladder's: its rungs are window plans, not uniform grids.
+WINDOW_CHECKPOINT_SCHEMA = 1
+#: Samples per feature, coarsest first. Each rung halves the window spacing.
+DEFAULT_WINDOW_SAMPLES = (2, 4, 8, 16, 32)
+#: Fixed backbone between windows, the policy's own maximum spacing.
+DEFAULT_WINDOW_BACKBONE_EV = 3.0
+#: Point budget of the dense uniform reference the windowed axis is judged against.
+DEFAULT_REFERENCE_POINTS = 400_000
 
 
 def build_ladder_case(
@@ -215,6 +236,100 @@ def ladder_grids(start_eV: float, stop_eV: float, spacings_eV: Sequence[float]) 
     ]
 
 
+def window_ladder(
+    ladder: CaseLadder,
+    samples: Sequence[int],
+    *,
+    backbone_eV: float,
+    providers: Sequence[str] = DEFAULT_SEED_PROVIDERS,
+    tail_widths: float = DEFAULT_TAIL_WIDTHS,
+    aliased_weight_limit: float = DEFAULT_RTOL["intrinsic_source"],
+) -> tuple[float, list[dict[str, Any]]]:
+    """Window plans over one case's own segments at rising samples per feature.
+
+    Seeds are rebuilt for every rung because the spacing each one asks for
+    scales with ``samples_per_feature``; their positions and extents do not
+    move, coming from the same segments and tables each time. The rung label is
+    the kinematic window spacing, ``feature width / samples``, the quantity
+    being refined: the backbone is fixed on purpose, so the grid's own largest
+    spacing would not move at all and could not order the ladder.
+
+    Returns ``(feature_width_eV, rungs)``, coarsest first.
+    """
+    counts = [int(value) for value in samples]
+    if any(value < 1 for value in counts) or any(
+        b <= a for a, b in zip(counts, counts[1:], strict=False)
+    ):
+        raise ValueError("window ladder samples must be positive and strictly increasing")
+    start, stop = ladder.bandwidth_eV
+    width = float(ladder.sinc_estimate(aliased_weight_limit)["target_spacing_eV"])
+    rungs: list[dict[str, Any]] = []
+    for count in counts:
+        context = SeedContext(
+            case=ladder.case,
+            segments=ladder.segments,
+            n_hat=np.asarray(ladder.transport["n_hat"], dtype=float),
+            electron_limit=ladder.transport["Ne_lines"],
+            start_eV=start,
+            stop_eV=stop,
+            feature_width_eV=width,
+            samples_per_feature=count,
+            aliased_weight_limit=float(aliased_weight_limit),
+            tail_widths=float(tail_widths),
+        )
+        seeds, summaries = collect_feature_seeds(context, providers)
+        plan = build_window_plan(start, stop, float(backbone_eV), seeds)
+        rungs.append(
+            {
+                "samples_per_feature": count,
+                "spacing_eV": width / count,
+                "plan": plan,
+                "seeds": summaries,
+            }
+        )
+    return width, rungs
+
+
+def reference_grid(
+    start_eV: float, stop_eV: float, spacing_eV: float, *, max_points: int
+) -> tuple[np.ndarray, float]:
+    """Dense uniform reference grid: the finest window spacing, capped by a budget.
+
+    The windowed axis is judged against a uniform grid at least as fine as its
+    finest window. When that exceeds ``max_points`` the reference is coarsened
+    to the budget and its actual spacing is reported, so a comparison is never
+    silently made against a grid finer than the one evaluated.
+    """
+    span = float(stop_eV) - float(start_eV)
+    spacing = max(float(spacing_eV), span / float(max_points))
+    num = resolution_num(start_eV, stop_eV, spacing)
+    grid = np.linspace(start_eV, stop_eV, num)
+    return grid, float(np.diff(grid).max())
+
+
+def _observable_mapping(value: object) -> dict[str, float]:
+    """Observables read back from a checkpoint, coerced to plain floats."""
+    if not isinstance(value, Mapping):
+        raise TypeError("checkpoint observables must be a mapping")
+    return {str(name): float(entry) for name, entry in value.items()}
+
+
+def _relative_differences(
+    candidate: Mapping[str, float], reference: Mapping[str, float]
+) -> dict[str, float]:
+    """Relative difference per observable, NaN where the reference is zero."""
+    out = {}
+    for name, value in reference.items():
+        other = candidate.get(name)
+        if other is None or not math.isfinite(value) or not math.isfinite(other):
+            out[name] = float("nan")
+        elif value == 0.0:
+            out[name] = float("nan") if other != 0.0 else 0.0
+        else:
+            out[name] = abs(other - value) / abs(value)
+    return out
+
+
 def _device_peak_mib() -> float | None:
     peak = BACKEND.allocator_stats().get("peak_mib")
     return None if peak is None else float(peak)
@@ -318,6 +433,196 @@ def run_config(
     return state, True
 
 
+def _affordable_rungs(
+    window_rungs: Sequence[Mapping[str, Any]],
+    coordinates: Sequence[np.ndarray],
+    max_points: int,
+) -> tuple[list[dict[str, Any]], list[np.ndarray], list[dict[str, Any]]]:
+    """Keep the rungs that fit ``max_points``; return them with what was dropped.
+
+    Point count rises with samples per feature, so the affordable set is a
+    prefix; the scan stops at the first rung over budget rather than trusting
+    that. The coarsest rung is kept unconditionally -- if it alone is over
+    budget the ladder has nothing to measure and says so.
+    """
+    if coordinates and coordinates[0].size > max_points:
+        raise ValueError(
+            f"coarsest window rung needs {coordinates[0].size} points, over the "
+            f"{max_points}-point budget; raise --max-points or coarsen --backbone"
+        )
+    cut = len(coordinates)
+    for index, grid in enumerate(coordinates):
+        if grid.size > max_points:
+            cut = index
+            break
+    skipped: list[dict[str, Any]] = [
+        {
+            "samples_per_feature": int(window_rungs[index]["samples_per_feature"]),
+            "n_points": int(coordinates[index].size),
+            "reason": "point budget",
+        }
+        for index in range(cut, len(coordinates))
+    ]
+    return [dict(rung) for rung in window_rungs[:cut]], list(coordinates[:cut]), skipped
+
+
+def run_window_config(
+    config: Mapping[str, Any],
+    samples: Sequence[int],
+    *,
+    backbone_eV: float = DEFAULT_WINDOW_BACKBONE_EV,
+    providers: Sequence[str] = DEFAULT_SEED_PROVIDERS,
+    tail_widths: float = DEFAULT_TAIL_WIDTHS,
+    reference_points: int = DEFAULT_REFERENCE_POINTS,
+    max_points: int = DEFAULT_REFERENCE_POINTS,
+    state: dict[str, Any] | None = None,
+    save=None,
+    out_of_time=None,
+    transport_core: str = "auto",
+) -> tuple[dict[str, Any], bool]:
+    """Run or resume one window-refinement ladder; return ``(state, complete)``.
+
+    Windows refine on a fixed backbone over one transport, and the finest
+    windowed rung is then compared with a dense uniform reference evaluated on
+    the same segments -- the measurement the windowed axis has to pass, since
+    refinement alone cannot see an error the backbone or the seed coverage
+    shares across every rung. Rungs already present are kept; transport re-runs
+    at the stored seed and must reproduce the stored fingerprint first.
+
+    ``max_points`` truncates the ladder at the finest rung that fits, recording
+    the dropped rungs in ``state["skipped_samples"]``. It defaults to
+    ``reference_points`` because a windowed rung denser than the uniform
+    reference it is judged against has already lost the argument for windows,
+    and because refining past a device's admissible bin count aborts the whole
+    campaign instead of the one rung (measured: hopg 300 keV at 32 samples per
+    feature asks for 1.26 M bins, which an 11 GiB budget cannot chunk). The
+    coarsest rung is never dropped: a ladder that cannot afford even that
+    raises rather than reporting a truncation that means nothing.
+    """
+    state = dict(state or {})
+    counts = [int(value) for value in samples]
+    settings = {
+        "samples_per_feature": counts,
+        "backbone_eV": float(backbone_eV),
+        "providers": list(providers),
+        "tail_widths": float(tail_widths),
+        "reference_points": int(reference_points),
+        "max_points": int(max_points),
+    }
+    if state.get("settings") not in (None, settings):
+        raise ValueError(
+            f"checkpoint for {config_key(config)} used window settings "
+            f"{state['settings']}, not {settings}; use a new --json-out"
+        )
+    if state.get("report") is not None and state.get("comparison") is not None:
+        return state, True
+    case = build_ladder_case(
+        config["material"],
+        config["energy_keV"],
+        config["tilt_deg"],
+        config["tilt_azim_deg"],
+        thickness_ang=config["thickness_ang"],
+        n_electrons=config["n_electrons"],
+        seed=config["seed"],
+    )
+    ladder = CaseLadder(case, transport_core=transport_core)
+    if state.get("fingerprint") is not None:
+        require_identical_segments(state["fingerprint"], ladder.fingerprint)
+    start, stop = ladder.bandwidth_eV
+    width, window_rungs = window_ladder(
+        ladder,
+        counts,
+        backbone_eV=float(backbone_eV),
+        providers=providers,
+        tail_widths=float(tail_widths),
+    )
+    coordinates = [rung["plan"].coordinates() for rung in window_rungs]
+    window_rungs, coordinates, skipped = _affordable_rungs(
+        window_rungs, coordinates, int(max_points)
+    )
+    state.update(
+        config=dict(config),
+        settings=settings,
+        fingerprint=ladder.fingerprint,
+        bandwidth_eV=[start, stop],
+        feature_width_eV=width,
+        windows=[
+            {
+                "samples_per_feature": rung["samples_per_feature"],
+                "spacing_eV": rung["spacing_eV"],
+                "n_points": int(grid.size),
+                "min_spacing_eV": float(np.diff(grid).min()),
+                "max_spacing_eV": float(np.diff(grid).max()),
+                "n_pieces": len(rung["plan"].pieces),
+                "seeds": rung["seeds"],
+                "dropped_seeds": list(rung["plan"].payload()["dropped"]),
+            }
+            for rung, grid in zip(window_rungs, coordinates, strict=True)
+        ],
+        skipped_samples=skipped,
+    )
+    state.setdefault("transport_wall_s", []).append(ladder.transport_wall_s)
+    state.setdefault(
+        "sinc_estimate",
+        {name: ladder.sinc_estimate(limit) for name, limit in DEFAULT_RTOL.items()},
+    )
+    rungs = [Rung(**value) for value in state.get("rungs", [])]
+    if save is not None:
+        save(state)
+    for rung, grid in list(zip(window_rungs, coordinates, strict=True))[len(rungs) :]:
+        if out_of_time is not None and out_of_time():
+            return state, False
+        rungs.extend(
+            evaluate_ladder(
+                [grid],
+                ladder.evaluate,
+                spacings=[rung["spacing_eV"]],
+                segments=ladder.segments,
+                device_peak_mib=_device_peak_mib,
+            )
+        )
+        state["rungs"] = [asdict(item) for item in rungs]
+        if save is not None:
+            save(state)
+    if state.get("reference") is None:
+        if out_of_time is not None and out_of_time():
+            return state, False
+        finest = min(float(np.diff(grid).min()) for grid in coordinates)
+        grid, spacing = reference_grid(start, stop, finest, max_points=int(reference_points))
+        reference = evaluate_ladder(
+            [grid],
+            ladder.evaluate,
+            spacings=[spacing],
+            segments=ladder.segments,
+            device_peak_mib=_device_peak_mib,
+        )[0]
+        state["reference"] = {**asdict(reference), "requested_spacing_eV": finest}
+        if save is not None:
+            save(state)
+    state["report"] = richardson_acceptance(rungs).to_dict()
+    state["report"].pop("rungs", None)
+    finest_rung = rungs[-1]
+    reference_state = state["reference"]
+    reference_observables = _observable_mapping(reference_state["observables"])
+    state["comparison"] = {
+        "reference_spacing_eV": reference_state["spacing_eV"],
+        "reference_points": reference_state["n_points"],
+        "windowed_points": finest_rung.n_points,
+        "point_ratio": finest_rung.n_points / float(reference_state["n_points"]),
+        "wall_ratio": (
+            finest_rung.wall_s / float(reference_state["wall_s"])
+            if reference_state["wall_s"]
+            else float("nan")
+        ),
+        "relative_difference": _relative_differences(
+            finest_rung.observables, reference_observables
+        ),
+    }
+    if save is not None:
+        save(state)
+    return state, True
+
+
 def _floats(text: str) -> list[float]:
     return [float(value) for value in text.split(",") if value.strip()]
 
@@ -402,17 +707,102 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _summary_line_windows(state: Mapping[str, Any]) -> str:
+    config = state["config"]
+    report = state.get("report") or {}
+    accepted = report.get("accepted_spacing_eV")
+    comparison = state.get("comparison") or {}
+    difference = comparison.get("relative_difference", {})
+    finest = state["windows"][-1]
+    skipped = state.get("skipped_samples") or []
+    truncation = (
+        ""
+        if not skipped
+        else f", ladder cut at {finest['samples_per_feature']} samples "
+        f"({len(skipped)} rung(s) over the point budget)"
+    )
+    return (
+        f"{config['material']:>6} {config['energy_keV']:>5g} keV tilt {config['tilt_deg']:>4g}: "
+        f"accepted window h={'-' if accepted is None else f'{accepted:.4g}'} eV, "
+        f"finest {finest['n_points']} points vs reference "
+        f"{comparison.get('reference_points', '-')} at "
+        f"{comparison.get('reference_spacing_eV', float('nan')):.4g} eV, "
+        f"yield {difference.get('yield', float('nan')):.3g}, "
+        f"centroid {difference.get('centroid_eV', float('nan')):.3g}, "
+        f"fwhm {difference.get('fwhm_eV', float('nan')):.3g}"
+        f"{truncation}"
+    )
+
+
+def cmd_run_windows(args: argparse.Namespace) -> int:
+    samples = [int(value) for value in args.samples.split(",") if value.strip()]
+    providers = tuple(value for value in args.providers.split(",") if value)
+    path = Path(args.json_out)
+    payload: dict[str, Any] = {"schema": WINDOW_CHECKPOINT_SCHEMA, "mode": "windows", "configs": {}}
+    if path.exists():
+        payload = json.loads(path.read_text())
+        if payload.get("schema") != WINDOW_CHECKPOINT_SCHEMA or payload.get("mode") != "windows":
+            raise SystemExit(
+                f"{path} is not a schema-{WINDOW_CHECKPOINT_SCHEMA} window ladder checkpoint"
+            )
+    started = time.monotonic()
+    budget = None if args.max_minutes is None else float(args.max_minutes) * 60.0
+
+    def out_of_time() -> bool:
+        return budget is not None and time.monotonic() - started >= budget
+
+    complete = True
+    for config in _configs(args):
+        key = config_key(config)
+
+        def save(state, key=key):
+            payload["configs"][key] = state
+            _atomic_write_json(path, payload)
+
+        if out_of_time():
+            complete = False
+            break
+        state, done = run_window_config(
+            config,
+            samples,
+            backbone_eV=float(args.backbone),
+            providers=providers,
+            tail_widths=float(args.tail_widths),
+            reference_points=int(args.reference_points),
+            max_points=int(args.max_points),
+            state=payload["configs"].get(key),
+            save=save,
+            out_of_time=out_of_time,
+        )
+        if done:
+            print(_summary_line_windows(state), flush=True)
+        if not done:
+            complete = False
+            break
+    if not complete:
+        print("[line-window-convergence] slice budget exhausted; work remains", flush=True)
+        return 75
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run", help="run or resume ladders in this process")
     add_ladder_arguments(run)
     run.add_argument("--max-minutes", type=float, default=None)
+    windows = commands.add_parser(
+        "run-windows", help="run or resume window-refinement ladders in this process"
+    )
+    add_window_arguments(windows)
+    windows.add_argument("--max-minutes", type=float, default=None)
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "run-windows":
+        return cmd_run_windows(args)
     return cmd_run(args)
 
 

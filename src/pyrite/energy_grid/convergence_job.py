@@ -45,6 +45,15 @@ DEFAULT_PRECISION_BANDS = "8192:16384,16384:32768"
 DEFAULT_PRECISION_TIME_LIMIT_MINUTES = 60
 _LIST_CHARS = frozenset("0123456789abcdefghijklmnopqrstuvwxyz,._-")
 
+#: Window-refinement ladder (#101): samples per feature, coarsest first, on a
+#: fixed backbone, judged against a dense uniform reference.
+WINDOW_JOB_KIND = "line-grid-window-convergence"
+DEFAULT_WINDOW_SAMPLES = "2,4,8,16,32"
+DEFAULT_WINDOW_BACKBONE = 3.0
+DEFAULT_WINDOW_PROVIDERS = "pxr-kinematic,absorption-edge,characteristic"
+DEFAULT_WINDOW_TAIL_WIDTHS = 2.0
+DEFAULT_REFERENCE_POINTS = 400_000
+
 
 def add_ladder_arguments(parser: argparse.ArgumentParser) -> None:
     """Ladder selection flags shared by the local ``run`` and remote ``start``."""
@@ -61,6 +70,60 @@ def add_ladder_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--json-out", default=f"line_grid_convergence_{date.today()}.json", help="checkpoint JSON"
     )
+
+
+def add_window_arguments(parser: argparse.ArgumentParser) -> None:
+    """Window-ladder flags shared by the local ``run-windows`` and remote ``start-windows``."""
+    parser.add_argument("--materials", default=DEFAULT_MATERIALS)
+    parser.add_argument("--energies", default=DEFAULT_ENERGIES)
+    parser.add_argument("--tilts", default=DEFAULT_TILTS)
+    parser.add_argument(
+        "--azimuth", type=float, default=None, help="default: each material's first catalog azimuth"
+    )
+    parser.add_argument("--thickness", type=float, default=DEFAULT_THICKNESS_ANG)
+    parser.add_argument("--ne", type=int, default=DEFAULT_NE)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--samples", default=DEFAULT_WINDOW_SAMPLES)
+    parser.add_argument("--backbone", type=float, default=DEFAULT_WINDOW_BACKBONE)
+    parser.add_argument("--providers", default=DEFAULT_WINDOW_PROVIDERS)
+    parser.add_argument("--tail-widths", type=float, default=DEFAULT_WINDOW_TAIL_WIDTHS)
+    parser.add_argument("--reference-points", type=int, default=DEFAULT_REFERENCE_POINTS)
+    parser.add_argument(
+        "--max-points",
+        type=int,
+        default=DEFAULT_REFERENCE_POINTS,
+        help="truncate the ladder at the finest rung within this many points",
+    )
+    parser.add_argument(
+        "--json-out", default=f"line_window_convergence_{date.today()}.json", help="checkpoint JSON"
+    )
+
+
+def remote_windows_command(args: argparse.Namespace, uv: str) -> str:
+    """The slice body: one budgeted ``convergence_case run-windows`` invocation."""
+    parts = [
+        "PYRITE_MC_FREE_EVERY=40",
+        "PYRITE_MC_FREE_WATERMARK_MB=15000",
+        uv,
+        "run --no-sync python -m pyrite.energy_grid.convergence_case run-windows",
+        f"--materials {shlex.quote(args.materials)}",
+        f"--energies {shlex.quote(args.energies)}",
+        f"--tilts {shlex.quote(args.tilts)}",
+        f"--samples {shlex.quote(args.samples)}",
+        f"--providers {shlex.quote(args.providers)}",
+        f"--backbone {float(args.backbone):g}",
+        f"--tail-widths {float(args.tail_widths):g}",
+        f"--reference-points {int(args.reference_points)}",
+        f"--max-points {int(args.max_points)}",
+        f"--thickness {float(args.thickness):g}",
+        f"--ne {int(args.ne)}",
+        f"--seed {int(args.seed)}",
+        f"--json-out {shlex.quote(args.json_out)}",
+        f"--max-minutes {float(args.slice_minutes):g}",
+    ]
+    if args.azimuth is not None:
+        parts.append(f"--azimuth {float(args.azimuth):g}")
+    return " ".join(parts)
 
 
 def remote_run_command(args: argparse.Namespace, uv: str) -> str:
@@ -131,6 +194,26 @@ def _validate(args: argparse.Namespace) -> None:
         raise SystemExit("--time-limit-minutes must exceed --slice-minutes")
 
 
+def _validate_windows(args: argparse.Namespace) -> None:
+    from .job import _validate_remote_output_name
+
+    _validate_remote_output_name(args.json_out)
+    for name in ("materials", "energies", "tilts", "samples", "providers"):
+        value = getattr(args, name)
+        if not value or not set(value.lower()) <= _LIST_CHARS:
+            raise SystemExit(f"--{name} may contain only letters, digits, ',', '.', '_', '-'")
+    if args.backbone <= 0.0:
+        raise SystemExit("--backbone must be positive")
+    if args.tail_widths < 0.0:
+        raise SystemExit("--tail-widths must be non-negative")
+    if args.reference_points < 2:
+        raise SystemExit("--reference-points must be at least 2")
+    if args.slice_minutes <= 0:
+        raise SystemExit("--slice-minutes must be positive")
+    if args.time_limit_minutes <= args.slice_minutes:
+        raise SystemExit("--time-limit-minutes must exceed --slice-minutes")
+
+
 def start(args: argparse.Namespace) -> str:
     """Sync, stage, and submit slice zero; return the remote job id."""
     from .. import remote
@@ -156,6 +239,51 @@ def start(args: argparse.Namespace) -> str:
             f"energies: {args.energies}",
             f"tilts: {args.tilts}",
             f"spacings: {args.spacings}",
+            f"ne: {int(args.ne)}",
+            "progress_dashboard: False",
+            "",
+        ]
+    )
+    if args.dry_run:
+        print(script)
+        return jobid
+    if not args.no_sync:
+        remote.sync_code()
+    remote._stage_job_script(jobid, [], remote._write_job_script_command(jobdir, metadata), script)
+    scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
+    print(f"submitted SLURM job {scheduler_id} as {jobid}")
+    print(f"status: python -m pyrite.energy_grid.convergence_job status {jobid}")
+    print(f"pull:   python -m pyrite.energy_grid.convergence_job pull --json-out {args.json_out}")
+    return jobid
+
+
+def start_windows(args: argparse.Namespace) -> str:
+    """Sync, stage, and submit slice zero of the window ladder; return the job id."""
+    from .. import remote
+    from ..remote.scripts import _uv_sync_block
+
+    _validate_windows(args)
+    jobid = remote._new_jobid()
+    jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
+    command = remote_windows_command(args, remote.shell_remote_uv())
+    script = remote._slurm_batch_script(
+        jobid,
+        _slice_payload(jobdir, command, remote, _uv_sync_block(once=True)),
+        job_name=WINDOW_JOB_KIND,
+        time_limit=str(int(args.time_limit_minutes)),
+    )
+    metadata = "\n".join(
+        [
+            f"job: {jobid}",
+            f"kind: {WINDOW_JOB_KIND}",
+            f"slice_minutes: {float(args.slice_minutes):g}",
+            f"json_out: {args.json_out}",
+            f"materials: {args.materials}",
+            f"energies: {args.energies}",
+            f"tilts: {args.tilts}",
+            f"samples: {args.samples}",
+            f"providers: {args.providers}",
+            f"backbone_eV: {float(args.backbone):g}",
             f"ne: {int(args.ne)}",
             "progress_dashboard: False",
             "",
@@ -295,6 +423,14 @@ def build_parser() -> argparse.ArgumentParser:
     submit.add_argument("--time-limit-minutes", type=int, default=DEFAULT_TIME_LIMIT_MINUTES)
     submit.add_argument("--no-sync", action="store_true")
     submit.add_argument("--dry-run", action="store_true")
+    windows = commands.add_parser(
+        "start-windows", help="submit a chained remote window-refinement ladder job"
+    )
+    add_window_arguments(windows)
+    windows.add_argument("--slice-minutes", type=float, default=DEFAULT_SLICE_MINUTES)
+    windows.add_argument("--time-limit-minutes", type=int, default=DEFAULT_TIME_LIMIT_MINUTES)
+    windows.add_argument("--no-sync", action="store_true")
+    windows.add_argument("--dry-run", action="store_true")
     precision = commands.add_parser(
         "start-precision", help="submit the float32-versus-FP64 lineshape measurement"
     )
@@ -328,6 +464,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "start":
         start(args)
+        return 0
+    if args.command == "start-windows":
+        start_windows(args)
         return 0
     if args.command == "start-precision":
         start_precision(args)

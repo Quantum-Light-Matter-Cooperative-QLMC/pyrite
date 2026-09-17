@@ -33,6 +33,7 @@ __all__ = [
     "resolution_num",
     "require_uniform_grid",
     "spacing_spread",
+    "validate_backend_coordinates",
     "validate_backend_spacing",
 ]
 
@@ -271,3 +272,57 @@ def validate_backend_spacing(
             "coarser tolerance"
         )
     return spacing
+
+
+def validate_backend_coordinates(
+    E_grid_eV,
+    *,
+    dtype=np.float32,
+    safety_ulps: float = 8.0,
+) -> float:
+    """Validate explicit coordinates against backend precision, interval by interval.
+
+    The nonuniform counterpart of :func:`validate_backend_spacing`. Each
+    interval must span ``safety_ulps`` ulp of ``dtype`` at its own larger node,
+    before and after the cast: a fine window at 200 eV is judged by the
+    precision at 200 eV, not at the top of the axis. On a uniform grid this is
+    weaker than :func:`validate_backend_spacing`, which judges every interval at
+    the largest node. Returns the smallest interval after the cast, in eV.
+    """
+    if not np.isfinite(safety_ulps) or safety_ulps <= 0.0:
+        raise ValueError("backend ULP safety factor must be finite and positive")
+    resolved_dtype = np.dtype(dtype)
+    if resolved_dtype.kind != "f":
+        raise ValueError("backend grid dtype must be floating point")
+    E = np.asarray(E_grid_eV, dtype=float)
+    if E.ndim != 1 or E.size < 2:
+        raise ValueError("energy grid must be 1-D with at least two nodes")
+    if not np.all(np.isfinite(E)) or np.any(np.diff(E) <= 0.0):
+        raise ValueError("energy-grid nodes must be finite and strictly increasing")
+    magnitude = np.maximum(np.abs(E[:-1]), np.abs(E[1:])).astype(resolved_dtype)
+    floor = float(safety_ulps) * np.abs(np.spacing(magnitude)).astype(float)
+
+    def _refuse(steps: np.ndarray, stage: str) -> None:
+        short = steps < floor
+        if not short.any():
+            return
+        first = int(np.argmax(short))
+        raise ValueError(
+            f"{int(short.sum())} line-grid intervals are below the {safety_ulps:g}-ULP "
+            f"safety floor for {resolved_dtype.name} {stage}; the first is "
+            f"{float(steps[first]):g} eV at {float(E[first + 1]):g} eV and needs at least "
+            f"{float(floor[first]):g} eV; run with PYRITE_FP64=1 or choose a physically "
+            "justified coarser tolerance"
+        )
+
+    _refuse(np.diff(E), "before the cast")
+    cast_steps = np.diff(E.astype(resolved_dtype)).astype(float)
+    collapsed = int(np.count_nonzero(cast_steps <= 0.0))
+    if collapsed:
+        raise ValueError(
+            f"line grid is not strictly increasing after {resolved_dtype.name} cast "
+            f"({collapsed} collapsed intervals); run with PYRITE_FP64=1 or choose a physically "
+            "justified coarser tolerance"
+        )
+    _refuse(cast_steps, "after the cast")
+    return float(cast_steps.min())

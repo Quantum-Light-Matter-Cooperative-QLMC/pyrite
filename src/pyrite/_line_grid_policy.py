@@ -21,9 +21,17 @@ resolution
     per-observable relative tolerance. Never silently coarsened: a spacing that
     cannot be met inside the point budget or the backend ULP floor raises.
 
+windows
+    Optional piecewise refinement (``feature-windows``): a backbone at the
+    maximum spacing plus fine windows seeded from kinematics, absorption edges
+    and characteristic lines (:mod:`pyrite._line_windows`). Off unless a
+    per-call or stored policy asks for it; a policy without windows keeps its
+    historical payload bit-for-bit.
+
 This module is a leaf on purpose. ``energy_grid`` imports ``montecarlo.runner``,
 so the runner cannot import ``energy_grid``; and #64 may move the energy-grid CLI
-entirely. Only ``numpy``, ``pyrite._env``, ``pyrite.paths`` and the pure
+entirely. Only ``numpy``, ``pyrite._env``, ``pyrite.paths``, the grid leaves
+``_grid_semantics`` and ``_line_windows``, and the pure
 ``pyrite.materials.crystal`` kinematics are used here.
 """
 
@@ -41,7 +49,12 @@ from typing import Any
 import numpy as np
 
 from ._env import env_value
-from ._grid_semantics import resolution_num, validate_backend_spacing
+from ._grid_semantics import (
+    resolution_num,
+    validate_backend_coordinates,
+    validate_backend_spacing,
+)
+from ._line_windows import WindowPlan
 from .paths import cache_dir
 
 __all__ = [
@@ -49,22 +62,41 @@ __all__ = [
     "AUTOMATIC_RESOLUTION_POLICY",
     "COVERAGE_BANDWIDTH_POLICY",
     "DEFAULT_BANDWIDTH_COVERAGE",
+    "FLOAT32_LINESHAPE_BINADE_EV",
     "LINE_GRID_POLICY_SCHEMA",
     "OBSERVABLE_CLASSES",
+    "WINDOWED_LINE_GRID_POLICY_SCHEMA",
+    "WINDOW_POLICY",
     "LineGridPolicy",
+    "LineShapePrecisionWarning",
     "cached_coordinates",
     "coordinate_cache_key",
     "environment_overrides_present",
     "kinematic_line_stop_eV",
+    "lineshape_precision_warning",
     "line_start_eV",
     "resolve_line_grid_policy",
     "resolved_coordinates",
     "store_coordinates",
+    "windowed_coordinates",
 ]
 
 #: Payload version. Bump when a field changes meaning: the payload is hashed
 #: into case identity, so a silent reinterpretation would reuse stale results.
 LINE_GRID_POLICY_SCHEMA = 1
+#: Payload version of a policy carrying a ``windows`` block. A policy without
+#: one keeps :data:`LINE_GRID_POLICY_SCHEMA` and its payload bit-for-bit, so
+#: existing automatic case identities do not move.
+WINDOWED_LINE_GRID_POLICY_SCHEMA = 2
+
+#: Window policy name and defaults. Restated from
+#: ``montecarlo.spectrum.line_seeds`` so this module stays a leaf; a test pins
+#: the two against each other.
+WINDOW_POLICY = "feature-windows"
+DEFAULT_WINDOW_SAMPLES_PER_FEATURE = 8
+DEFAULT_WINDOW_TAIL_WIDTHS = 2.0
+DEFAULT_WINDOW_PROVIDERS = ("pxr-kinematic", "absorption-edge", "characteristic")
+_WINDOW_KEYS = ("providers", "samples_per_feature", "tail_widths")
 
 #: Observables whose accuracy tolerance is set independently. One global
 #: tolerance is refused by design (#101): an intrinsic-source spectrum and a
@@ -74,6 +106,14 @@ OBSERVABLE_CLASSES = ("intrinsic_source", "detected_counts")
 #: Built-in per-observable relative accuracy tolerances. Precision intrinsic
 #: yield is held an order tighter than detected counts, which are dominated by
 #: response convolution and Monte Carlo statistics rather than by grid error.
+#:
+#: Each value is the *grid* share of the total error, not the total error of a
+#: spectrum: transport and Monte Carlo statistics are separate additive terms
+#: that the refinement ladder holds fixed rather than bounds. The split of each
+#: total among bandwidth, quadrature, interpolation and backend precision is
+#: allocated in ``docs/validation/beam-transport/line-spectrum-error-budget.md``
+#: (table ``tbl-line-budget-allocation``); this mapping is that table's
+#: intrinsic-source and detected-counts column totals.
 DEFAULT_RTOL: Mapping[str, float] = {"intrinsic_source": 1.0e-3, "detected_counts": 1.0e-2}
 
 #: BANDWIDTH policy of the stored ``E_grid_line_by_energy`` artifacts: the
@@ -88,6 +128,9 @@ AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
 #: convention, so automatic resolution is never worse than the legacy grids.
 DEFAULT_MAX_SPACING_EV = 3.0
 #: Backend coordinate-precision safety factor, shared with ``energy_grid.derive``.
+#: Holds the backend-precision row of ``tbl-line-budget-allocation`` (1e-4 of the
+#: intrinsic-source share); #109 measured float32-versus-FP64 deviation flat in
+#: ``spacing/ulp``, so this collapse floor, not a spacing floor, is the control.
 DEFAULT_BACKEND_SAFETY_ULPS = 8.0
 #: Refuse rather than coarsen beyond this many line coordinates.
 DEFAULT_MAX_POINTS = 200_000
@@ -191,6 +234,31 @@ class LineGridToleranceError(ValueError):
     """A requested tolerance cannot be met within the declared budget."""
 
 
+class LineShapePrecisionWarning(UserWarning):
+    """A float32 line window reaches the binade where lineshape exceeds its share."""
+
+
+#: Lower edge of the ``[2**14, 2**15)`` eV float32 binade. Measured on identical
+#: segments (diamond 300 keV), a window reaching it keeps yield and centroid
+#: inside their backend-precision shares but not dominant-line FWHM
+#: (1.0-1.8e-3 against 1e-3); see
+#: ``docs/validation/beam-transport/line-spectrum-error-budget.md``.
+FLOAT32_LINESHAPE_BINADE_EV = 16384.0
+
+
+def lineshape_precision_warning(record: Mapping[str, Any]) -> str | None:
+    """The float32 lineshape warning a resolved-grid record calls for, if any."""
+    reach = record.get("float32_lineshape_window_eV")
+    if reach is None:
+        return None
+    return (
+        f"a float32 line window reaches {reach:g} eV, in the "
+        f">= {FLOAT32_LINESHAPE_BINADE_EV:g} eV binade where dominant-line FWHM was "
+        "measured at 1-2x its 1e-3 backend-precision share (yield and centroid stay "
+        "inside theirs); set PYRITE_FP64=1 if lineshape is gated"
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class LineGridPolicy:
     """Resolved, result-affecting line-grid policy for one case.
@@ -212,10 +280,11 @@ class LineGridPolicy:
     backend_safety_ulps: float
     max_points: int
     sources: tuple[tuple[str, str], ...]
+    windows: tuple[tuple[str, Any], ...] | None = None
 
     def payload(self) -> dict[str, Any]:
         """Canonical JSON-able payload carried on the case."""
-        return {
+        payload = {
             "schema": LINE_GRID_POLICY_SCHEMA,
             "bandwidth": {
                 "policy": self.bandwidth_policy,
@@ -232,6 +301,11 @@ class LineGridPolicy:
             "rtol": dict(self.rtol),
             "sources": dict(self.sources),
         }
+        if self.windows is not None:
+            windows = dict(self.windows)
+            payload["schema"] = WINDOWED_LINE_GRID_POLICY_SCHEMA
+            payload["windows"] = {**windows, "providers": list(windows["providers"])}
+        return payload
 
     @property
     def strictest_rtol(self) -> float:
@@ -278,6 +352,44 @@ def _rtol_mapping(value: object, label: str) -> dict[str, float]:
             f"known classes are {list(OBSERVABLE_CLASSES)}"
         )
     return {str(name): float(entry) for name, entry in value.items()}
+
+
+def _window_block(value: object, label: str) -> dict[str, Any] | None:
+    """Normalize a ``windows`` request: ``False`` disables, ``True`` takes defaults."""
+    if value is False:
+        return None
+    if value is True:
+        value = {}
+    if not isinstance(value, Mapping):
+        raise TypeError(f"{label} windows must be a bool or a mapping")
+    unknown = sorted(set(value) - set(_WINDOW_KEYS))
+    if unknown:
+        raise ValueError(
+            f"{label} windows names unknown keys {unknown}; known keys are {list(_WINDOW_KEYS)}"
+        )
+    samples = value.get("samples_per_feature", DEFAULT_WINDOW_SAMPLES_PER_FEATURE)
+    if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
+        raise ValueError(f"{label} windows samples_per_feature must be an integer >= 1")
+    tail = float(value.get("tail_widths", DEFAULT_WINDOW_TAIL_WIDTHS))
+    if not math.isfinite(tail) or tail <= 0.0:
+        # zero leaves a single-valued reflection population an empty window
+        raise ValueError(f"{label} windows tail_widths must be finite and positive")
+    requested = value.get("providers", DEFAULT_WINDOW_PROVIDERS)
+    if isinstance(requested, str):
+        raise TypeError(f"{label} windows providers must be a sequence of provider names")
+    providers = tuple(requested)
+    if (
+        not providers
+        or any(not isinstance(name, str) or not name for name in providers)
+        or len(set(providers)) != len(providers)
+    ):
+        raise ValueError(f"{label} windows providers must be unique non-empty names")
+    return {
+        "policy": WINDOW_POLICY,
+        "providers": providers,
+        "samples_per_feature": samples,
+        "tail_widths": tail,
+    }
 
 
 def resolve_line_grid_policy(
@@ -383,6 +495,19 @@ def resolve_line_grid_policy(
     strictest = min(rtol.values())
     sources["aliased_weight_limit"] = "derived from rtol"
 
+    # Windows follow per-call > stored > built-in (off). No environment layer:
+    # the PYRITE_ENERGY_GRID_* names would otherwise outrank stored rows for a
+    # structural choice. A per-call False disables stored windows. The source
+    # is recorded only when windows are on, keeping window-free payloads
+    # unchanged.
+    windows = None
+    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
+        if layer.get("windows") is not None:
+            windows = _window_block(layer["windows"], label)
+            if windows is not None:
+                sources["windows"] = label
+            break
+
     return LineGridPolicy(
         bandwidth_policy=str(bandwidth_policy),
         start_eV=float(start_eV),
@@ -394,6 +519,7 @@ def resolve_line_grid_policy(
         backend_safety_ulps=ulps,
         max_points=max_points,
         sources=tuple(sorted(sources.items())),
+        windows=None if windows is None else tuple(sorted(windows.items())),
     )
 
 
@@ -460,6 +586,82 @@ def resolved_coordinates(
     return grid, record
 
 
+def windowed_coordinates(
+    payload: Mapping[str, Any],
+    plan: WindowPlan,
+    *,
+    dtype=np.float32,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Validate a window plan against the policy budget and backend precision.
+
+    The windowed counterpart of :func:`resolved_coordinates`. The plan must span
+    the policy bandwidth on a backbone at the declared maximum spacing. A point
+    budget or backend ULP shortfall raises :class:`LineGridToleranceError`; the
+    plan is never coarsened. Precision is judged interval by interval, so a fine
+    window low on the axis is held to the ulp at its own energy.
+    """
+    bandwidth = payload["bandwidth"]
+    resolution = payload["resolution"]
+    windows = payload.get("windows")
+    if windows is None:
+        raise ValueError("line-grid policy payload carries no windows block")
+    start = float(bandwidth["start_eV"])
+    stop = float(bandwidth["stop_eV"])
+    backbone = float(resolution["max_spacing_eV"])
+    if (plan.start_eV, plan.stop_eV, plan.backbone_spacing_eV) != (start, stop, backbone):
+        raise ValueError(
+            "window plan bounds and backbone must equal the policy bandwidth and maximum spacing"
+        )
+    rtol = dict(payload["rtol"])
+    governing = min(rtol, key=lambda name: rtol[name])
+    max_points = int(resolution["max_points"])
+    num = plan.num
+    if num > max_points:
+        raise LineGridToleranceError(
+            f"automatic line-grid resolution cannot meet rtol={rtol[governing]:g} for "
+            f"{governing!r}: its {len(plan.seeds)} feature windows need {num} coordinates "
+            f"over [{start:g}, {stop:g}] eV, above the {max_points}-point budget. Raise the "
+            "budget with PYRITE_ENERGY_GRID_MAX_POINTS, relax the tolerance with "
+            f"PYRITE_ENERGY_GRID_RTOL_{governing.upper()}, lower the windows' "
+            "samples_per_feature, narrow the bandwidth, or supply an explicit grid. The grid "
+            "is not coarsened automatically."
+        )
+    grid = plan.coordinates()
+    try:
+        smallest = validate_backend_coordinates(
+            grid, dtype=dtype, safety_ulps=float(resolution["backend_safety_ulps"])
+        )
+    except ValueError as exc:
+        raise LineGridToleranceError(
+            f"automatic line-grid resolution cannot meet rtol={rtol[governing]:g} for "
+            f"{governing!r} in backend precision: {exc}"
+        ) from None
+    record = {
+        "schema": int(payload.get("schema", WINDOWED_LINE_GRID_POLICY_SCHEMA)),
+        "bandwidth_policy": str(bandwidth["policy"]),
+        "resolution_policy": str(resolution["policy"]),
+        "window_policy": str(windows["policy"]),
+        "start_eV": start,
+        "stop_eV": stop,
+        "num": int(num),
+        "backbone_spacing_eV": backbone,
+        "min_spacing_eV": float(np.diff(grid).min()),
+        "min_cast_spacing_eV": float(smallest),
+        "rtol": rtol,
+        "governing_observable": governing,
+        "sources": dict(payload.get("sources", {})),
+        "window_plan": plan.payload(),
+    }
+    if np.dtype(dtype) == np.float32:
+        reach = max(
+            (hi for _lo, hi, spacing in plan.pieces if spacing < backbone),
+            default=0.0,
+        )
+        if reach >= FLOAT32_LINESHAPE_BINADE_EV:
+            record["float32_lineshape_window_eV"] = float(reach)
+    return grid, record
+
+
 def coordinate_cache_key(payload: Mapping[str, Any], resolution_inputs: Mapping[str, Any]) -> str:
     """Content address for one automatically resolved grid.
 
@@ -489,7 +691,10 @@ def cached_coordinates(key: str) -> dict[str, Any] | None:
             record = json.load(stream)
     except (OSError, ValueError):
         return None
-    if not isinstance(record, dict) or record.get("schema") != LINE_GRID_POLICY_SCHEMA:
+    if not isinstance(record, dict) or record.get("schema") not in (
+        LINE_GRID_POLICY_SCHEMA,
+        WINDOWED_LINE_GRID_POLICY_SCHEMA,
+    ):
         return None
     return record
 

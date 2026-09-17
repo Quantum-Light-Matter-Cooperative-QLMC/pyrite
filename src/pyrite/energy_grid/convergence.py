@@ -79,6 +79,9 @@ SHAPE_RTOL = 1.0e-2
 SHAPE_DIAGNOSTIC_RTOL = 1.0e-3
 #: Changes at or below this fraction of the tolerance are numerical noise
 #: (round-off, detector-response resampling): monotonicity is not required.
+#: The resampling half of that is the measured Timepix3 drift of up to 1e-3 per
+#: halving, which sits inside the interpolation row of
+#: ``tbl-line-budget-allocation`` (2e-3 of the detected-counts share).
 NOISE_FRACTION = 0.1
 
 #: Observable name -> tolerance class. Order is report order.
@@ -92,7 +95,13 @@ GATED_OBSERVABLES: Mapping[str, str] = {
 }
 
 #: Relative tolerance per class: the production policy's ``DEFAULT_RTOL``
-#: (unchanged) plus the harness-only ``shape`` class.
+#: (unchanged) plus the harness-only ``shape`` class. Each value is a column
+#: total of ``tbl-line-budget-allocation`` in
+#: ``docs/validation/beam-transport/line-spectrum-error-budget.md``, which
+#: allocates it among bandwidth, backbone quadrature, window quadrature,
+#: interpolation and backend precision. The ladder gates that grid share only:
+#: transport and Monte Carlo statistics are held identical across rungs by the
+#: segment fingerprint and cancel, rather than being bounded here.
 HARNESS_RTOL: Mapping[str, float] = {**DEFAULT_RTOL, "shape": SHAPE_RTOL}
 
 #: Ungated diagnostic observables and the relative tolerance they are judged at.
@@ -338,6 +347,7 @@ def evaluate_ladder(
     *,
     segments: Mapping[str, Any] | None = None,
     observables: Callable[..., dict[str, float]] = spectrum_observables,
+    spacings: Sequence[float] | None = None,
     device_peak_mib: Callable[[], float | None] | None = None,
     on_rung: Callable[[Rung], None] | None = None,
 ) -> list[Rung]:
@@ -348,13 +358,28 @@ def evaluate_ladder(
     the first rung and re-checks after every rung, so an evaluator that mutates
     or replaces the trajectories fails loudly instead of producing a ladder of
     incomparable runs.
+
+    ``spacings`` labels each rung with the quantity actually being refined
+    instead of the grid's own largest spacing. A window ladder (#101) refines
+    local windows on a deliberately fixed backbone, so its largest spacing never
+    moves; the labels must still decrease strictly, and every grid is still
+    checked for finite, strictly increasing coordinates.
     """
     reference = None if segments is None else segment_fingerprint(segments)
     rungs: list[Rung] = []
     previous = math.inf
-    for grid in grids:
+    grids = list(grids)
+    if spacings is not None:
+        labels = [float(value) for value in spacings]
+        if len(labels) != len(grids):
+            raise ValueError("ladder spacings must label every grid")
+    else:
+        labels = None
+    for index, grid in enumerate(grids):
         E = np.asarray(grid, dtype=float)
-        spacing = representative_spacing(E)
+        spacing = representative_spacing(E) if labels is None else labels[index]
+        if labels is not None:
+            representative_spacing(E)
         if spacing >= previous:
             raise ValueError("ladder grids must refine strictly: each spacing below the previous")
         previous = spacing
