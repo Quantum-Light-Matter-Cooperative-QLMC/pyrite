@@ -12,6 +12,9 @@ GitHub issue: #101. Branch: `issue-101-line-windows`.
 | `cfb0f988` | opt-in `windows` policy block, schema 2, runner wiring, windowed cache keys |
 | `0ef0860b` | window-refinement ladder, `reference_grid`, `convergence_job start-windows` |
 | `886ef66c` | error-budget doc; `--max-points` ladder budget |
+| `59ee4b35` | fresh-context validation write-up; row to `discrepancy` |
+| `b014b5c8` | ladder-budget typecheck; backend check registered |
+| `16b9d38c` | secondary absorption edges seeded; in-medium claim corrected |
 
 ## Campaign record
 
@@ -65,8 +68,17 @@ deliberately untracked, matching the #109 campaign.
       `test_line_grid_policy.py`, and `test_a_stale_cached_plan_is_recomputed`.
       `case_content_key` is the single identity function checkpoint persistence
       uses, so case and checkpoint identity are the same test.
-- [ ] Ledger row `line-window-seeding` is `unverified`; fresh-context
-      verification and human sign-off pending.
+- [ ] Ledger row `line-window-seeding`: fresh-context pass 2026-09-17
+      (`59ee4b35`, write-up `docs/validation/beam-transport/line-window-seeding.md`)
+      set it to `discrepancy`. Kernel conventions, the 2-eps drop bound,
+      Chantler-bracket offsets, characteristic cutoff and both limiting cases
+      pass. Failures: (a) the in-medium resonance shift is not bounded by the
+      tail margin (up to 5.4 widths); (b) secondary edges within 5% of a
+      stronger jump were silently dropped. `16b9d38c` fixes (b) and corrects
+      the (a) claim to "coverage rests on band width" (measured 6e-6).
+      Remaining: fresh-context re-check of (a)/(b), then human sign-off.
+      Open question from (a): seed from `_in_medium_kinematics` instead of
+      the vacuum root.
 
 ## Findings worth carrying forward
 
