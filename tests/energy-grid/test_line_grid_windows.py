@@ -22,6 +22,8 @@ from pyrite._line_grid_policy import (
     LINE_GRID_POLICY_SCHEMA,
     WINDOWED_LINE_GRID_POLICY_SCHEMA,
     LineGridToleranceError,
+    LineShapePrecisionWarning,
+    lineshape_precision_warning,
     resolve_line_grid_policy,
     windowed_coordinates,
 )
@@ -30,6 +32,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import build_cases
 from pyrite.montecarlo.geometry import tilted_geometry
+from pyrite.montecarlo.runner import line_grid as runner_line_grid
 from pyrite.montecarlo.runner.line_grid import resolve_line_grid
 from pyrite.montecarlo.spectrum import line_seeds
 
@@ -162,6 +165,40 @@ def test_windowed_coordinates_report_a_backend_precision_shortfall():
     assert record["num"] == grid.size
     assert record["window_plan"] == plan.payload()
     assert record["min_spacing_eV"] <= 5.0e-3
+
+
+@pytest.mark.parametrize(
+    ("seed", "dtype", "reach"),
+    [
+        (_seed(16_390.0, 5.0, 0.1), np.float32, 16_395.0),
+        (_seed(16_390.0, 5.0, 0.1), np.float64, None),
+        (_seed(16_000.0, 5.0, 0.1), np.float32, None),
+        (None, np.float32, None),  # a 3 eV backbone above the binade is not a window
+    ],
+)
+def test_a_float32_window_in_the_20_kev_binade_is_flagged(seed, dtype, reach):
+    stop = 16_400.0 if seed is None or seed.centre_eV > 16_384.0 else 16_100.0
+    plan = build_window_plan(50.0, stop, 3.0, [] if seed is None else [seed])
+    _grid, record = windowed_coordinates(_windowed_payload(stop_eV=stop), plan, dtype=dtype)
+    assert record.get("float32_lineshape_window_eV") == reach
+    message = lineshape_precision_warning(record)
+    assert (message is None) == (reach is None)
+    if message is not None:
+        assert "PYRITE_FP64=1" in message and "FWHM" in message
+
+
+def test_runner_warns_on_a_binade_window_from_a_cold_and_a_warm_cache(monkeypatch):
+    # A float32 backend with the binade lowered into this 77 keV case's band.
+    monkeypatch.setattr(runner_line_grid, "REAL", np.float32)
+    monkeypatch.setattr(_line_grid_policy, "FLOAT32_LINESHAPE_BINADE_EV", 100.0)
+    case, segments, n_hat = _case_and_segments(windows=True)
+    placeholder = decode_energy_grid(case["E_grid_line"])
+    with pytest.warns(LineShapePrecisionWarning, match="PYRITE_FP64=1"):
+        _grid, record = resolve_line_grid(case, segments, n_hat, 2, placeholder)
+    assert record["cache"] == "miss"
+    with pytest.warns(LineShapePrecisionWarning):
+        _grid, record = resolve_line_grid(case, segments, n_hat, 2, placeholder)
+    assert record["cache"] == "hit"
 
 
 def test_windowed_coordinates_refuse_a_plan_for_another_bandwidth():

@@ -62,15 +62,18 @@ __all__ = [
     "AUTOMATIC_RESOLUTION_POLICY",
     "COVERAGE_BANDWIDTH_POLICY",
     "DEFAULT_BANDWIDTH_COVERAGE",
+    "FLOAT32_LINESHAPE_BINADE_EV",
     "LINE_GRID_POLICY_SCHEMA",
     "OBSERVABLE_CLASSES",
     "WINDOWED_LINE_GRID_POLICY_SCHEMA",
     "WINDOW_POLICY",
     "LineGridPolicy",
+    "LineShapePrecisionWarning",
     "cached_coordinates",
     "coordinate_cache_key",
     "environment_overrides_present",
     "kinematic_line_stop_eV",
+    "lineshape_precision_warning",
     "line_start_eV",
     "resolve_line_grid_policy",
     "resolved_coordinates",
@@ -229,6 +232,31 @@ _ELECTRON_REST_EV = 510998.95
 
 class LineGridToleranceError(ValueError):
     """A requested tolerance cannot be met within the declared budget."""
+
+
+class LineShapePrecisionWarning(UserWarning):
+    """A float32 line window reaches the binade where lineshape exceeds its share."""
+
+
+#: Lower edge of the ``[2**14, 2**15)`` eV float32 binade. Measured on identical
+#: segments (diamond 300 keV), a window reaching it keeps yield and centroid
+#: inside their backend-precision shares but not dominant-line FWHM
+#: (1.0-1.8e-3 against 1e-3); see
+#: ``docs/validation/beam-transport/line-spectrum-error-budget.md``.
+FLOAT32_LINESHAPE_BINADE_EV = 16384.0
+
+
+def lineshape_precision_warning(record: Mapping[str, Any]) -> str | None:
+    """The float32 lineshape warning a resolved-grid record calls for, if any."""
+    reach = record.get("float32_lineshape_window_eV")
+    if reach is None:
+        return None
+    return (
+        f"a float32 line window reaches {reach:g} eV, in the "
+        f">= {FLOAT32_LINESHAPE_BINADE_EV:g} eV binade where dominant-line FWHM was "
+        "measured at 1-2x its 1e-3 backend-precision share (yield and centroid stay "
+        "inside theirs); set PYRITE_FP64=1 if lineshape is gated"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -624,6 +652,13 @@ def windowed_coordinates(
         "sources": dict(payload.get("sources", {})),
         "window_plan": plan.payload(),
     }
+    if np.dtype(dtype) == np.float32:
+        reach = max(
+            (hi for _lo, hi, spacing in plan.pieces if spacing < backbone),
+            default=0.0,
+        )
+        if reach >= FLOAT32_LINESHAPE_BINADE_EV:
+            record["float32_lineshape_window_eV"] = float(reach)
     return grid, record
 
 

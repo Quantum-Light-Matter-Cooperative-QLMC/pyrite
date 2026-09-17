@@ -433,9 +433,14 @@ this budget in float32, but **dominant-line FWHM from such a window needs
 `PYRITE_FP64=1`** to stay inside its share. Caveats: one case, $N_e = 60$, one
 window per binade, and the binade window's line is weak
 (integral $5.2\times10^{-9}$ against $2.6\times10^{-8}$ one binade down), so a
-shape statistic on it is the noisiest thing in the table. Whether the automatic
-policy should warn when a plan's top node lands in that binade is a policy
-question this measurement does not settle.
+shape statistic on it is the noisiest thing in the table.
+
+The automatic policy therefore warns rather than refuses. When a float32 plan
+has a fine window (spacing below the backbone) reaching $2^{14}$ eV,
+`windowed_coordinates` records `float32_lineshape_window_eV`, and runner
+resolution raises `LineShapePrecisionWarning` on cold and warm cache alike,
+pointing at `PYRITE_FP64=1`. Refusing would be wrong for the yield and centroid
+this binade still carries within budget.
 
 ### Transport — $\varepsilon_\mathrm{trans}$
 

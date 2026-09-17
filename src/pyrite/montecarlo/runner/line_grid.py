@@ -6,13 +6,17 @@ budget; it is runner-internal and has no other consumer.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from ..._backend import REAL
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
+    LineShapePrecisionWarning,
     cached_coordinates,
     coordinate_cache_key,
+    lineshape_precision_warning,
     resolved_coordinates,
     store_coordinates,
     windowed_coordinates,
@@ -130,6 +134,7 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     if cached is not None:
         grid = _cached_grid(cached)
         if grid is not None:
+            _warn_lineshape_precision(cached)
             return grid, {**cached, "cache": "hit", "cache_key": key}
     target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
         segments,
@@ -152,7 +157,14 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
         }
     )
     store_coordinates(key, record)
+    _warn_lineshape_precision(record)
     return grid, {**record, "cache": "miss", "cache_key": key}
+
+
+def _warn_lineshape_precision(record):
+    message = lineshape_precision_warning(record)
+    if message is not None:
+        warnings.warn(message, LineShapePrecisionWarning, stacklevel=3)
 
 
 def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
