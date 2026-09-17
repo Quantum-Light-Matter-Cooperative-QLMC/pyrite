@@ -3,7 +3,8 @@
 Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
 Branch: `issue-100-nonuniform-photon-continua`
 
-Status: two slices checkpointed on this branch; issue stays open, remaining scope below.
+Status: two slices checkpointed and one additional slice implemented on this
+branch; issue stays open, remaining scope below.
 
 ## Context
 
@@ -53,6 +54,23 @@ was found.
   MC matrix, and detected-count agreement within `1e-3` under source-grid
   halving (`n_mc=64`, seed 7).
 
+## Explicit Gaussian edge-loss accounting
+
+- `convolve_detector(..., return_outside=True)` now returns the unchanged
+  blurred density plus `(below, above)` photon masses outside the output
+  window. The masses integrate each source-node mass against the Gaussian CDF
+  tails at the grid's midpoint-cell edges; the default array-only return stays
+  backward compatible and the historical uniform-grid values remain bit-for-bit
+  unchanged.
+- `EagleResponse.apply(..., return_outside=True)` exposes the same accounting
+  after QE and energy resolution. With resolution disabled, no blur crosses the
+  window and both reported masses are zero.
+- Regressions cover uniform compatibility, lower-edge loss and mass balance on
+  a graded grid, and upper-edge loss through Eagle XO.
+- The existing convergence harness already carries absolute photon-yield and
+  detector-count floors. A new nonzero floor-scale regression pins that these
+  floors, rather than relative tolerance alone, accept an almost-dark spectrum.
+
 ## Verification
 
 `pyrite-dev lint`, `typecheck`, `docs`: all clean. `pyrite-dev test`: 3919
@@ -66,16 +84,17 @@ coarse-near-zero convergence failure motivated the explicit 0 eV edge above
 and passes on rerun. Remaining failures require unavailable live database/SYCL
 access or sandbox-denied multiprocessing sockets.
 
+Third slice: detector/grid/convergence set is 106 passed; lint and typecheck are
+clean. The broader core run reached 2133 passed / 37 skipped / 42 failures;
+all failures are the same unavailable live crystallography DB, missing Intel
+SYCL dependency, or sandbox-denied multiprocessing socket constraints above.
+
 ## Remaining on #100 (not touched here)
 
 - Refine the geometric photon-continuum baseline near material edges and
   kinematic endpoints.
 - Choose a physically justified positive photon floor; explicit zero-based
   detector-channel edge.
-- Out-of-window photon accounting for `response.py`/`eaglexo_response.py`
-  (Timepix already reports `outside`; the Gaussian blur here still silently
-  drops mass past the grid ends, only documented, not reported).
-- Near-zero spectral regions covered by absolute tolerances.
 - Continuum observables (yield, centroid, detected counts, line/background
   ratio) shown to converge under refinement.
 - CUDA and fallback routes verified for the continuum-scoring path.

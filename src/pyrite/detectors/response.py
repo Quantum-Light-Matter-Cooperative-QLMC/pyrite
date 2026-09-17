@@ -59,7 +59,22 @@ def detector_efficiency(E_eV, polymer_nm=300.0, al_nm=40.0, grid_open=0.78):
     return grid_open * np.exp(-mu_poly * polymer_nm * 10.0 - mu_al * al_nm * 10.0)
 
 
-def convolve_detector(E_grid_eV, spec, fwhm_eV):
+def _gaussian_outside_mass(E, values, sigma_eV):
+    """Gaussian-blurred source mass below and above the grid's cell edges."""
+    from scipy.special import ndtr
+
+    edges, widths = node_bin_edges_and_widths(E)
+    source_mass = values * widths
+    below_probability = ndtr((edges[0] - E) / sigma_eV)
+    above_probability = ndtr((E - edges[-1]) / sigma_eV)
+    below = np.sum(source_mass * below_probability, axis=-1)
+    above = np.sum(source_mass * above_probability, axis=-1)
+    if values.ndim == 1:
+        return float(below), float(above)
+    return below, above
+
+
+def convolve_detector(E_grid_eV, spec, fwhm_eV, *, return_outside=False):
     """
     Convolve a spectrum with a unit-area Gaussian of the given FWHM [eV].
     Output always matches the input length for ANY fwhm (np.convolve with
@@ -83,11 +98,18 @@ def convolve_detector(E_grid_eV, spec, fwhm_eV):
         Spectral samples on ``E_grid_eV``.
     fwhm_eV
         Positive Gaussian full width at half maximum in eV.
+    return_outside
+        If true, also return the photon mass blurred below and above the
+        output window. Mass is computed against the midpoint-cell edges of
+        ``E_grid_eV`` and has units of ``spec`` times eV.
 
     Returns
     -------
-    numpy.ndarray
-        Convolved spectrum with the same shape and units as ``spec``.
+    numpy.ndarray or tuple
+        Convolved spectrum with the same shape and units as ``spec``. With
+        ``return_outside=True``, returns ``(spectrum, (below, above))``;
+        ``below`` and ``above`` are floats for a one-dimensional spectrum and
+        arrays over leading dimensions otherwise.
     """
     E = np.asarray(E_grid_eV, dtype=float)
     values = np.asarray(spec, dtype=float)
@@ -97,12 +119,16 @@ def convolve_detector(E_grid_eV, spec, fwhm_eV):
 
         dE = E[1] - E[0]
         sigma_bins = sigma_eV / dE
-        return gaussian_filter1d(values, sigma_bins, mode="constant", cval=0.0)
-    # Direct quadrature in physical energy: kernel[i, j] is the Gaussian
-    # response at E[i] to a unit-density source at E[j], weighted by E[j]'s
-    # own local width so density * width is the per-node mass being blurred.
-    _, widths = node_bin_edges_and_widths(E)
-    kernel = np.exp(-0.5 * ((E[:, None] - E[None, :]) / sigma_eV) ** 2)
-    kernel *= widths[None, :] / (sigma_eV * np.sqrt(2.0 * np.pi))
-    flattened = values.reshape(-1, E.size)
-    return (flattened @ kernel.T).reshape(values.shape)
+        blurred = gaussian_filter1d(values, sigma_bins, mode="constant", cval=0.0)
+    else:
+        # Direct quadrature in physical energy: kernel[i, j] is the Gaussian
+        # response at E[i] to a unit-density source at E[j], weighted by E[j]'s
+        # own local width so density * width is the per-node mass being blurred.
+        _, widths = node_bin_edges_and_widths(E)
+        kernel = np.exp(-0.5 * ((E[:, None] - E[None, :]) / sigma_eV) ** 2)
+        kernel *= widths[None, :] / (sigma_eV * np.sqrt(2.0 * np.pi))
+        flattened = values.reshape(-1, E.size)
+        blurred = (flattened @ kernel.T).reshape(values.shape)
+    if return_outside:
+        return blurred, _gaussian_outside_mass(E, values, sigma_eV)
+    return blurred

@@ -214,6 +214,22 @@ def test_empty_spectrum_is_accepted_through_the_absolute_floor():
     assert report.accepted_spacing_eV == rungs[0].spacing_eV
 
 
+def test_nonzero_floor_scale_spectrum_uses_absolute_tolerance():
+    """#100: relative error alone must not reject a nearly dark continuum."""
+    rungs = [
+        _rung(4.0, **{"yield": 2.0e-15}),
+        _rung(2.0, **{"yield": 1.5e-15}),
+        _rung(1.0, **{"yield": 1.25e-15}),
+    ]
+
+    report = richardson_acceptance(rungs, gated=YIELD)
+    verdict = report.triples[0].observables[0]
+
+    assert verdict.coarse_change > 1.0e-3 * rungs[-1].observables["yield"]
+    assert verdict.reason == "converged"
+    assert report.accepted_spacing_eV == rungs[0].spacing_eV
+
+
 def test_undefined_shape_observable_fails_closed_for_a_real_spectrum():
     rungs = [
         _rung(4.0, **{"yield": 1.0, "fwhm_eV": float("nan")}),

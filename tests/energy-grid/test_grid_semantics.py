@@ -102,8 +102,16 @@ def test_poisson_core_uniform_expected_counts_unchanged():
 
 
 def test_convolve_detector_still_runs_on_a_uniform_grid():
-    out = response.convolve_detector(LINEAR_GRID, np.ones_like(LINEAR_GRID), 50.0)
+    density = np.ones_like(LINEAR_GRID)
+    out = response.convolve_detector(LINEAR_GRID, density, 50.0)
+    accounted, outside = response.convolve_detector(
+        LINEAR_GRID, density, 50.0, return_outside=True
+    )
+
     assert out.shape == LINEAR_GRID.shape
+    np.testing.assert_array_equal(accounted, out)
+    assert outside[0] > 0.0
+    assert outside[1] > 0.0
 
 
 def test_convolve_detector_conserves_mass_on_a_log_grid_away_from_edges():
@@ -122,6 +130,24 @@ def test_convolve_detector_conserves_mass_on_a_log_grid_away_from_edges():
     assert output_mass == pytest.approx(input_mass, rel=0.05)
 
 
+def test_convolve_detector_reports_mass_blurred_outside_window():
+    """#100: zero-padded edge loss must be observable, not silently dropped."""
+    density = np.exp(-0.5 * ((LOG_GRID - LOG_GRID[0]) / 10.0) ** 2)
+    blurred, outside = response.convolve_detector(
+        LOG_GRID, density, 50.0, return_outside=True
+    )
+
+    edges, widths = node_bin_edges_and_widths(LOG_GRID)
+    input_mass = np.sum(density * widths)
+    output_mass = np.sum(blurred * widths)
+    below, above = outside
+
+    assert below > 0.0
+    assert above == pytest.approx(0.0, abs=1e-12)
+    assert output_mass + below + above == pytest.approx(input_mass, rel=0.02)
+    assert edges[0] < LOG_GRID[0]
+
+
 def test_eagle_response_resolve_energy_accepts_a_log_grid():
     eaglexo_response = pytest.importorskip("pyrite.detectors.eaglexo_response")
 
@@ -131,6 +157,18 @@ def test_eagle_response_resolve_energy_accepts_a_log_grid():
     assert detected.shape == LOG_GRID.shape
     assert np.all(np.isfinite(detected))
     assert np.all(detected >= 0.0)
+
+
+def test_eagle_response_exposes_energy_blur_outside_mass():
+    eaglexo_response = pytest.importorskip("pyrite.detectors.eaglexo_response")
+
+    resp = eaglexo_response.EagleResponse(LOG_GRID, resolve_energy=True)
+    incident = np.exp(-0.5 * ((LOG_GRID - LOG_GRID[-1]) / 20.0) ** 2)
+    detected, outside = resp.apply(incident, return_outside=True)
+
+    assert detected.shape == LOG_GRID.shape
+    assert outside[0] == pytest.approx(0.0, abs=1e-12)
+    assert outside[1] > 0.0
 
 
 def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
