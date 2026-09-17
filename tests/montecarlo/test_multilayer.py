@@ -1,10 +1,15 @@
-"""Film-on-substrate (multilayer) first slice: the layered-absorber escape
-geometry and the sweep plumbing.
+"""Film-on-substrate (multilayer) escape geometry and sweep plumbing.
 
-Pure-CPU/numpy tests only -- the project keeps tests/ off the GPU; the full
-mc_spectrum / mc_brem_spectrum bit-for-bit + absorption checks live in
-checks/multilayer_check.py. These pin the escape-path math and the wiring."""
+The ordinary tests stay CPU/NumPy so their fp64 assertions remain reproducible.
+The one end-to-end CUDA regression runs in an explicitly spawned device session:
+it protects the float32 multilayer accumulation contract without relaxing the
+CPU anchor in ``checks/multilayer_slice3_check.py``.
+"""
 
+import os
+import pathlib
+import subprocess
+import sys
 from typing import Any
 
 import numpy as np
@@ -22,13 +27,28 @@ from pyrite.campaign.sweep import (
     substrate_composition,
     substrate_radiator,
 )
+from pyrite.detectors import Detector, EnergyBins
 from pyrite.montecarlo import (
     _layer_dz,
     _layer_path_length,
     _mu_total_inv_ang,
+    _segments_in_layer,
+    _spectrum_case,
     _stack_tau,
+    _transport_case,
+    mc_characteristic_spectrum,
+    mc_spectrum,
     simulate_trajectories,
 )
+
+try:
+    import cupy as cp
+
+    _HAS_CUDA = cp.cuda.runtime.getDeviceCount() > 0
+except Exception:  # pragma: no cover - depends on CUDA runtime presence
+    _HAS_CUDA = False
+
+_DEVICE_SESSION = os.environ.get("PYRITE_TEST_BACKEND") == "cuda"
 
 
 def test_layer_dz_back_exit():
@@ -386,3 +406,138 @@ def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
     )
     runner._spectrum_case(case, tp)
     assert [c["azimuth_rad"] for c in calls] == [0.0, 0.5]
+
+
+# ---- CUDA multilayer accumulation -------------------------------------------
+
+_CUDA_ACCUMULATION_RTOL = 2e-5
+_CUDA_ACCUMULATION_ATOL_FRACTION = 2e-6
+
+
+def _cuda_accumulation_case():
+    """Small crystalline film/substrate case with both layer radiators active."""
+    line = np.arange(100.0, 3500.0, 20.0)
+    brem = np.arange(100.0, 30000.0, 200.0)
+    sweep = Sweep(
+        material="mose2",
+        tilt_deg=-30.0,
+        beam=BeamSpec(energy_keV=30.0),
+        target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
+        detector=Detector(energy_bins=EnergyBins(line=line, brem=brem)),
+    )
+    case = build_cases(sweep, n_electrons=48, n_electrons_brem=24)[0]
+    # The manual reference below uses the same bounded launches as the runner;
+    # it only changes the association of the four per-layer contributions.
+    case["spec_chunk"] = 128
+    case["brem_chunk"] = 128
+    return case
+
+
+def _manual_cuda_layer_sum(case, transport):
+    """Independently associate coherent + characteristic terms per layer."""
+    manual = np.zeros_like(transport["E_grid"], dtype=float)
+    for layer, radiator in enumerate(case["layer_radiators"]):
+        segments = _segments_in_layer(transport["segs"], layer)
+        if segments["L_ang"].size == 0:
+            continue
+        characteristic = mc_characteristic_spectrum(
+            segments,
+            transport["E_grid"],
+            composition=case["abs_layers"][layer][2],
+            n_hat=transport["n_hat"],
+            chunk=case["brem_chunk"],
+            layers=case["abs_layers"],
+            electron_limit=transport["Ne_brem"],
+            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+        )
+        coherent = np.zeros_like(manual)
+        if radiator is not None:
+            coherent = mc_spectrum(
+                segments,
+                transport["E_grid"],
+                crystal=radiator["crystal"],
+                hkl_list=radiator["hkl_list"],
+                n_hat=transport["n_hat"],
+                B_ang2=radiator["B_ang2"],
+                composition=case["abs_layers"][layer][2],
+                beam_uvw=radiator.get("beam_uvw"),
+                surface_hkl=radiator.get("surface_hkl"),
+                azimuth_rad=radiator.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
+                recip_miscut_rad=radiator.get("recip_miscut_rad", case.get("recip_miscut_rad")),
+                sinc_cutoff=case.get("sinc_cutoff"),
+                chunk=case["spec_chunk"],
+                layers=case["abs_layers"],
+                coherent=False,
+                electron_limit=transport["Ne_lines"],
+                E_cut_keV=case.get("E_cut_lines_keV", 5.0),
+            )
+        manual += coherent + characteristic
+    return manual
+
+
+@pytest.mark.skipif(
+    not _DEVICE_SESSION,
+    reason="end-to-end CUDA backend body; driven by the CUDA child-session test",
+)
+def test_cuda_multilayer_spectrum_case_matches_per_layer_sum():
+    """CUDA transport and spectrum retain both crystalline-layer contributions.
+
+    The runner sums coherent layers first and characteristic layers second;
+    the reference instead sums each layer's coherent and characteristic terms
+    together.  CUDA uses float32 kernels, so their non-associative reductions
+    differ by bounded rounding.  ``2e-5`` is roughly 168 float32 epsilons for
+    the reduction/association chain; ``2e-6 * peak`` is the absolute floor for
+    bins near a cancellation, where a relative comparison alone is unstable.
+    """
+    from pyrite._backend import REAL, xp
+
+    assert getattr(xp, "__name__", "") == "cupy"
+    assert np.dtype(REAL) == np.dtype(np.float32)
+
+    case = _cuda_accumulation_case()
+    transport = _transport_case(case, transport_core="cuda", keep_segments_on_device=True)
+    assert int(transport["segs"]["n_layers"]) == 2
+    assert _segments_in_layer(transport["segs"], 1)["L_ang"].size > 0
+
+    actual = _spectrum_case(case, transport)["spec"]
+    expected = _manual_cuda_layer_sum(case, transport)
+    peak = float(np.max(np.abs(expected)))
+    assert peak > 0.0
+    np.testing.assert_allclose(
+        actual,
+        expected,
+        rtol=_CUDA_ACCUMULATION_RTOL,
+        atol=peak * _CUDA_ACCUMULATION_ATOL_FRACTION,
+    )
+
+
+@pytest.mark.skipif(_DEVICE_SESSION, reason="this is the CUDA child session")
+@pytest.mark.skipif(not _HAS_CUDA, reason="CUDA device required")
+def test_cuda_multilayer_spectrum_case_device_suite():
+    """Run the end-to-end multilayer body with the CUDA backend selected.
+
+    ``tests/conftest.py`` deliberately pins normal test sessions to CPU.  A
+    child process lifts only that pin, then asserts that its selected test
+    passed so a missing backend cannot turn this regression into a silent skip.
+    """
+    env = dict(os.environ)
+    env["PYRITE_TEST_BACKEND"] = "cuda"
+    env.pop("PYRITE_MC_BACKEND", None)
+    completed = subprocess.run(  # noqa: S603
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-p",
+            "no:cacheprovider",
+            __file__,
+            "-k",
+            "cuda_multilayer_spectrum_case_matches_per_layer_sum",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(pathlib.Path(__file__).resolve().parents[2]),
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "1 passed" in completed.stdout, completed.stdout
