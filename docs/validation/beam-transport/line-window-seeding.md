@@ -7,11 +7,15 @@ and `src/pyrite/_line_windows.py::build_window_plan`. Acceptance evidence
 the row cites:
 [line-spectrum error budget](line-spectrum-error-budget.md).
 
-Fresh-context verification, 2026-09-17. The derivation below was written from
-the ledger row, the docstrings, and the cited upstream rows before the function
-bodies were read. No implementation file was modified.
+Initial fresh-context verification, 2026-09-17. The derivation below was
+written from the ledger row, the docstrings, and the cited upstream rows before
+the function bodies were read. No implementation file was modified.
 
-## Verdict summary
+The initial `discrepancy` verdict records the pre-fix implementation. Section 6
+records the independent re-verification after commits `16b9d38c` and `971648f1`;
+the current verdict is **`anchored`**, with human sign-off pending.
+
+## Initial verdict summary (pre-fix)
 
 - **Claim**: `line-window-seeding`. Code: `montecarlo/spectrum/line_seeds.py::kinematic_line_seeds`,
   `::absorption_edge_seeds`, `::characteristic_line_seeds`, and
@@ -446,7 +450,7 @@ With these qualifications, the acceptance evidence is plausible. It does not
 test the two coverage findings, because the ladder cannot see them, and the
 reference comparison did not flag them in the cases run.
 
-## 5. Adjudication and recommended actions
+## 5. Initial adjudication and recommended actions (pre-fix)
 
 Status: **`discrepancy`**. No radiation equation is wrong, and the kernel
 conventions are reproduced exactly. The discrepancy is that two coverage
@@ -468,3 +472,41 @@ properties the row claims do not hold as stated.
    under substeps.
 
 Human sign-off remains required.
+
+## 6. Fresh-context re-verification after remediation
+
+Fresh-context re-verification on 2026-09-17 started again from the cited
+source equations, units, assumptions, and limiting cases before inspecting the
+remediated implementation. No implementation file was modified.
+
+- **Claim**: `line-window-seeding` —
+  `montecarlo/spectrum/line_seeds.py::kinematic_line_seeds`,
+  `::absorption_edge_seeds`, and `::characteristic_line_seeds`. The governing
+  equations are the in-medium resonance
+  $E_{\rm res}=\hbar c\,(\mathbf v\cdot\mathbf g)/
+  (1-\operatorname{Re}n(E_{\rm res})\,\mathbf v\cdot\hat{\mathbf n})$ and the
+  finite-time first-zero width $2\pi\hbar c/(D t_L)$, together with the
+  Chantler $f_2$ edge brackets and xraydb characteristic energies and widths.
+- **Filters**: units pass; limiting cases pass; signs and conventions pass,
+  conditional on the repository's inherited positive-$\mathbf g$ convention.
+  This claim does not resolve the separate `line-energy-dispersion`
+  harmonic-sign discrepancy.
+- **Re-derivation**: `matches`. Production passes the case band and composition
+  into kinematic seeding; seeding builds the kernels' padded native-node table,
+  calls their `_in_medium_kinematics`, rejects the same unsettled roots, and
+  derives feature widths from the same denominator as `a_width`. The
+  independent pointwise-Brent regression pins the in-medium centre.
+- **Secondary-edge remediation**: `matches`. Shells are processed strongest
+  first, but each weaker shell selects the strongest qualifying bracket outside
+  already claimed native-node windows. The Se L2 regression pins the previously
+  omitted nearby edge; independent probes also found W M4/L1 and Mo/Ga/As/Ti L2
+  anchors within 0.24% of their nominal edges.
+- **Verdict**: `rederived`; existing regression anchors advance the ledger state
+  to **`anchored`**. Human sign-off remains required.
+
+Focused verification reported 54 passing seed/window tests and five passing
+documentation tests. The built page contained rendered `math notranslate`
+nodes with no surviving dollar delimiters. A supplementary Z=3--92 catalog
+sweep was incomplete because the current xraydb/SciPy stack rejects Cs's
+non-strictly-increasing Chantler coordinates; this does not affect the targeted
+secondary-edge checks above.

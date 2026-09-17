@@ -22,12 +22,12 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
-| `anchored` | 7 |
+| `anchored` | 8 |
 | `rederived` | 41 |
 | `filtered` | 9 |
 | `unverified` | 59 |
 | `blocked` | 1 |
-| `discrepancy` | 6 |
+| `discrepancy` | 5 |
 | **Total** | **123** |
 
 Status meanings and promotion rules are defined in the

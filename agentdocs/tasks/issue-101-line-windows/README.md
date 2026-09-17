@@ -68,17 +68,18 @@ deliberately untracked, matching the #109 campaign.
       `test_line_grid_policy.py`, and `test_a_stale_cached_plan_is_recomputed`.
       `case_content_key` is the single identity function checkpoint persistence
       uses, so case and checkpoint identity are the same test.
-- [ ] Ledger row `line-window-seeding`: fresh-context pass 2026-09-17
+- [x] Ledger row `line-window-seeding`: fresh-context pass 2026-09-17
       (`59ee4b35`, write-up `docs/validation/beam-transport/line-window-seeding.md`)
-      set it to `discrepancy`. Kernel conventions, the 2-eps drop bound,
+      initially set it to `discrepancy`. Kernel conventions, the 2-eps drop bound,
       Chantler-bracket offsets, characteristic cutoff and both limiting cases
       pass. Failures: (a) the in-medium resonance shift is not bounded by the
       tail margin (up to 5.4 widths); (b) secondary edges within 5% of a
       stronger jump were silently dropped. `16b9d38c` fixes (b) and corrects
       the (a) claim to "coverage rests on band width" (measured 6e-6).
-      Remaining: fresh-context re-check of (a)/(b), then human sign-off.
-      Open question from (a): seed from `_in_medium_kinematics` instead of
-      the vacuum root.
+      Fresh-context re-check of `16b9d38c` and `971648f1` passes both findings:
+      production now seeds from `_in_medium_kinematics`, and the secondary-edge
+      selection is pinned by Se L2 plus independent nearby-shell probes. The
+      ledger advances to `anchored`; human sign-off remains pending.
 
 ## Findings worth carrying forward
 
