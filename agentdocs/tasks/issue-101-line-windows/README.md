@@ -41,19 +41,49 @@ deliberately untracked, matching the #109 campaign.
       nodes per feature resolve the fringes. A finer fringe-only quantile is not
       warranted -- see the width-tail table in the error-budget doc. Coherent
       route excluded; that is #117.
-- [ ] CUDA and fallback line routes agree on the windowed axis (float32 and
-      FP64). Not started — the campaign ran one backend only.
-- [ ] Windows reaching the >= 20 keV float32 binade checked against FP64. No
-      catalog line of the measured cases reaches it, so still unmeasured.
-- [ ] Seed interface tested with a synthetic non-PXR component standing in for
-      #103. `register_seed_provider` exists; the stand-in test does not.
-- [ ] Window-plan identity: payload changes move case/checkpoint/cache identity,
+- [x] CUDA and fallback line routes agree on the windowed axis (float32 and
+      FP64). Measured by `checks/line_window_backend_agreement.py` on hopg
+      30 keV and wse2 300 keV: CUDA FP64 vs CPU FP64 yield 2.2e-16 / 2.2e-16,
+      centroid and FWHM bit-identical; CUDA float32 vs CPU FP64 yield 1.67e-7 /
+      1.71e-7, FWHM 3.1e-5 / 8.3e-7, pointwise 1.3e-4 / 9.8e-6.
+- [x] Windows reaching the >= 20 keV float32 binade checked against FP64.
+      Diamond at 300 keV is the first catalog case with line yield in
+      [16384, 32768) eV (bandwidth to 18900 eV, line at 17084 eV). Reused
+      `precision_ladder`, not a fork. Yield and centroid stay inside their
+      shares; dominant-line FWHM does not (1.0-1.8e-3 against a 1e-3 share) --
+      see the error-budget doc. One case, Ne=60, weak in-window line.
+- [x] Seed interface tested with a synthetic non-PXR component standing in for
+      #103. Already covered:
+      `test_a_registered_non_pxr_component_contributes_windows` registers a
+      `transition-radiation` provider and asserts its three fringe windows reach
+      the plan.
+- [x] Window-plan identity: payload changes move case/checkpoint/cache identity,
       and existing automatic payloads without windows stay bit-for-bit. Covered
-      by `tests/energy-grid/test_line_grid_windows.py`; re-read before claiming.
+      by `test_policy_without_windows_keeps_the_historical_payload`,
+      `test_window_policy_changes_case_identity` (four distinct policies, four
+      distinct `case_content_key`s), the cache-key tests in
+      `test_line_grid_policy.py`, and `test_a_stale_cached_plan_is_recomputed`.
+      `case_content_key` is the single identity function checkpoint persistence
+      uses, so case and checkpoint identity are the same test.
 - [ ] Ledger row `line-window-seeding` is `unverified`; fresh-context
       verification and human sign-off pending.
 
 ## Findings worth carrying forward
+
+- Float32 lineshape distortion in the 20 keV binade breaches the FWHM share
+  while yield and centroid hold. The 8-ulp collapse floor does not see it (zero
+  collapsed intervals at every rung), and the deviation stays flat in
+  `spacing/ulp`, so no spacing floor would help either -- #109's conclusion
+  extends to this binade. A window reaching it needs `PYRITE_FP64=1` if
+  dominant-line FWHM is gated. Whether the automatic policy should warn on such
+  a plan is undecided.
+- Local GPU (RTX 3060 Ti, 4 GiB admitted of 8) cannot evaluate a 326k-point
+  diamond window plan in FP64; the lab box handled 400k in float32. Use narrow
+  `precision_ladder` windows locally, or `pyrite remote` for full plans.
+- Running GPU work in this worktree needs `uv sync --extra nvidia` once (cupy is
+  a large download, several minutes) and then `PYRITE_MC_BACKEND=cuda`;
+  `PYRITE_FP64=1` selects FP64. Without the extra the backend probe fails closed
+  rather than falling back, so CPU work needs an explicit `PYRITE_MC_BACKEND=cpu`.
 
 - The sinc width distribution is bounded below, not heavy tailed: the longest
   single flight floors `t_L` and flight lengths have no long tail, so the

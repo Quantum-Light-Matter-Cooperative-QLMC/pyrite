@@ -382,10 +382,60 @@ only the 8-ulp collapse floor. The residual appears to track
 $\mathrm{ulp}/(\text{feature width})$ — resonance-energy rounding — which is
 inferred from the binade dependence, not proven.
 
-**Unmeasured:** no catalog line of the measured cases reaches the 20 keV
-float32 binade, where $\mathrm{ulp} \approx 1.95\times10^{-3}$ eV. A window that
-reaches it is checked against FP64 on identical trajectories before its result
-is quoted inside this share, or run under `PYRITE_FP64=1`.
+**The 20 keV binade is now measured, and dominant-line FWHM breaches its
+share there.** `line-grid-sinc-convergence` left the $[16384, 32768)$ eV binade
+unmeasured because no hopg or wse2 line reaches it. Thirty-three of the
+forty-nine catalog materials do clear it kinematically at 300 keV, and diamond
+is the first with real line yield inside it: its automatic bandwidth runs to
+18 900 eV and `precision_ladder` locates a window on a line at 17 084 eV
+(peak yield $5.2\times10^{-9}$, $\mathrm{ulp} = 1.95\times10^{-3}$ eV). On
+identical trajectories (diamond, 300 keV, tilt 5, $N_e = 60$, 48 061 segments,
+both precisions on the same CUDA device):
+
+```{list-table} Float32 deviation from FP64 in the two upper binades of one diamond case, over spacing/ulp. Window 1 is the 20 keV binade.
+:name: tbl-line-budget-binade
+:header-rows: 1
+
+* - Window (top)
+  - $h/\mathrm{ulp}$
+  - yield
+  - FWHM
+  - centroid / ulp
+  - pointwise
+* - 11 802 eV
+  - 8 … 3000
+  - $5.3\times10^{-7}$ … $1.3\times10^{-5}$
+  - $3.9\times10^{-6}$ … $1.2\times10^{-4}$
+  - 0.12 … 0.46
+  - $\approx 6.7\times10^{-4}$
+* - 17 094 eV
+  - 8 … 3000
+  - $1.7\times10^{-6}$ … $8.9\times10^{-5}$
+  - $1.2\times10^{-5}$ … $1.8\times10^{-3}$
+  - 0.21 … 1.24
+  - $\approx 1.8\times10^{-3}$
+```
+
+Three readings. **The flatness holds**: deviation does not scale with
+$h/\mathrm{ulp}$ in the 20 keV binade either, so the #109 conclusion — an
+$\mathrm{ulp}/\mathrm{rtol}$ spacing floor protects nothing — extends to it, and
+no interval collapsed at any rung. **Yield and centroid stay inside their
+shares**: worst yield $8.9\times10^{-5}$ against $10^{-4}$, and the worst
+centroid shift of 1.24 ulp is $2.4\times10^{-3}$ eV on a 17 keV line, a relative
+$1.4\times10^{-7}$. **FWHM does not**: at $1.0$–$1.8\times10^{-3}$ it sits at one
+to two times the $10^{-3}$ shape backend-precision share, against
+$2.3\times10^{-5}$ measured in the 5 and 10 keV binades. Lineshape distortion
+arrives well before node collapse, exactly as the #97 handoff predicted, and the
+8-ulp floor does not see it.
+
+So a window reaching the $\ge 20$ keV binade carries yield and centroid inside
+this budget in float32, but **dominant-line FWHM from such a window needs
+`PYRITE_FP64=1`** to stay inside its share. Caveats: one case, $N_e = 60$, one
+window per binade, and the binade window's line is weak
+(integral $5.2\times10^{-9}$ against $2.6\times10^{-8}$ one binade down), so a
+shape statistic on it is the noisiest thing in the table. Whether the automatic
+policy should warn when a plan's top node lands in that binade is a policy
+question this measurement does not settle.
 
 ### Transport — $\varepsilon_\mathrm{trans}$
 
@@ -495,8 +545,9 @@ budget a result was produced under.
 - The width-tail measurement behind {numref}`tbl-line-budget-width-tail` covers
   four cases at $N_e \le 240$; the campaign's own $N_e = 2000$ minima are not
   measured, only the quantile ratio that the argument rests on.
-- The $\ge 20$ keV float32 binade is unmeasured — no catalog line of the
-  measured cases reaches it.
+- The $\ge 20$ keV float32 binade FWHM breach rests on one diamond case at
+  $N_e = 60$ with a weak in-window line; it is not reproduced on a second
+  material, and no runtime guard warns when a plan reaches that binade.
 - The interpolation share rests on a point-wise $\mu$ bound; the spectrum-level
   exact-versus-tabulated A/B of `line-absorption-tabulation` is still open.
 - The resonance-drift estimator's conversion from linewidths of sweep to a share
