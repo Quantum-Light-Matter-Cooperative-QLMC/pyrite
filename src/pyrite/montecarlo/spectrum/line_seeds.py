@@ -34,6 +34,7 @@ __all__ = [
     "DEFAULT_TAIL_WIDTHS",
     "EDGE_SOURCE",
     "KINEMATIC_SOURCE",
+    "SEEDING_REVISION",
     "SeedContext",
     "absorption_edge_seeds",
     "characteristic_line_seeds",
@@ -67,6 +68,11 @@ EDGE_MIN_F2_RATIO = 1.05
 #: Native Chantler nodes kept on each side of the steepest bracket; the
 #: measured jumps are complete within three.
 EDGE_NATIVE_NODES = 3
+
+#: Bumped whenever the same inputs would seed different windows; it keys the
+#: resolved-grid speed cache so a plan from older seeding is not reused.
+#: 2: in-medium kinematic root; secondary absorption edges.
+SEEDING_REVISION = 2
 
 #: Kinematic resonances below this are dropped by the line kernels too.
 _MIN_RESONANCE_EV = 10.0
@@ -103,29 +109,35 @@ def kinematic_line_seeds(
     mosaic_nodes: int = 1,
     electron_limit: int | None = None,
     label_prefix: str = "",
+    composition: Iterable[tuple[str, float]] | None = None,
+    band_eV: tuple[float, float] | None = None,
 ) -> tuple[list[FeatureSeed], dict[str, Any]]:
     """One window per reflection over its weighted resonance population.
 
-    Source equation: the vacuum resonance the line kernels start from,
-    ``E_res = hbar c (v . g) / (1 - v . n_hat)`` with ``v = beta v_hat``
-    (Zhai SI Eq. 10; ``lines/_per_hkl.py`` step 1; ledger row
-    ``line-energy-dispersion``). ``g`` is built exactly as the kernels build
-    their rows: ``R_m R_orient g_hkl`` over the case orientation and each
-    mosaic quadrature orientation, weighted by the quadrature weight.
+    Source equation: the resonance the line kernels place each segment's line
+    at, ``E_res = hbar c (v . g) / (1 - Re n(E_res) v . n_hat)`` with
+    ``v = beta v_hat`` (Zhai SI Eq. 10 with the bulk dispersion
+    ``k = Re n omega``; ledger rows ``line-energy-dispersion`` and
+    ``xray-in-medium-resonance``). Given ``band_eV``, the root is solved by the
+    kernels' own ``lines/_kernels.py::_in_medium_kinematics`` on the table they
+    build for an axis spanning ``band_eV`` (``_line_tabulation_grid`` over the
+    crystal basis and ``composition``, ``refractive_index(crystal, ...)``), so
+    pairs the kernels reject as unsettled are left out here too. Without
+    ``band_eV`` the vacuum root ``Re n = 1`` is used. ``g`` is built exactly as
+    the kernels build their rows: ``R_m R_orient g_hkl`` over the case
+    orientation and each mosaic quadrature orientation, weighted by the
+    quadrature weight.
 
     Assumptions: ``t_L**2`` is the intensity proxy, as in
     :func:`~pyrite.montecarlo.spectrum.diagnostics.sinc_feature_spacing`;
     ``|A|**2``, absorption, and the line-electron energy cutoff are ignored, so
-    the band is conservative. The kernels solve the in-medium root
-    (``lines/_kernels.py::_in_medium_kinematics``), which sits
-    ``dE ~ -E delta beta cos(Theta) / (1 - beta cos(Theta))`` from the vacuum
-    root. In a segment's own feature widths that is ``delta cos(Theta) L /
-    lambda``, which ``delta`` does not bound: the ``tail_widths`` margin does
-    not cover it per segment (up to 5.4 widths above 300 eV at hopg 300 keV;
-    18-35 below 300 eV, where ``Re n > 1``). Coverage rests on the weighted
-    quantile band being much wider than that shift, not on the margin --
-    measured in-medium weight inside the window matched vacuum to 6e-6
-    (``docs/validation/beam-transport/line-window-seeding.md``).
+    the band is conservative. The vacuum root sits
+    ``dE ~ -E delta beta cos(Theta) / (1 - beta cos(Theta))`` from the
+    in-medium one, which is ``delta cos(Theta) L / lambda`` of a segment's own
+    feature widths and not bounded by ``delta`` -- measured up to 5.4 widths
+    above 300 eV (``docs/validation/beam-transport/line-window-seeding.md``) --
+    which is why production seeding passes ``band_eV``. Feature widths use the
+    same in-medium denominator the kernels' ``a_width`` does.
 
     Coverage: each window spans the ``[eps/2, 1 - eps/2]`` weighted quantiles,
     ``eps = aliased_weight_limit``, widened by ``tail_widths`` feature widths.
@@ -170,23 +182,34 @@ def kinematic_line_seeds(
         energy, length, direction = energy[line], length[line], direction[line]
     beta = beta_from_keV(energy)
     velocity = beta[:, None] * direction
-    denominator = 1.0 - velocity @ np.asarray(n_hat, dtype=float)
+    v_dot_n = velocity @ np.asarray(n_hat, dtype=float)
     weight = (length / beta) ** 2
-    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(denominator) & (denominator > 0.0)
-    velocity, denominator, weight = velocity[usable], denominator[usable], weight[usable]
+    usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(v_dot_n) & (v_dot_n < 1.0)
+    velocity, v_dot_n, weight = velocity[usable], v_dot_n[usable], weight[usable]
+    flight_time = np.sqrt(weight)
+    refractive = None
+    if band_eV is not None:
+        from ...materials.crystal import refractive_index
+        from .lines._kernels import _in_medium_kinematics, _line_tabulation_grid
+
+        # The kernels' table for an axis spanning band_eV (lines/_setup.py).
+        start, stop = float(band_eV[0]), float(band_eV[1])
+        pad = 0.2 * (stop - start)
+        table_energy = _line_tabulation_grid(
+            CRYSTALS[crystal], list(composition or ()), max(start - pad, 1.0), stop + pad
+        )
+        refractive = (
+            np.asarray(refractive_index(crystal, table_energy).real, dtype=float),
+            table_energy,
+        )
 
     # The spacing above resolves the eps-quantile feature, not the narrowest one.
     # Measured over hopg/wse2 at 30-100 keV the two coincide to within 11% -- the
     # longest single flight floors t_L, so the width distribution has no narrow
     # tail -- but that is a property of these cases, not a theorem. Report the
-    # narrowest feature so a case where the quantile drifts above it is visible
-    # instead of silently under-resolved.
-    flight_time = np.sqrt(weight)
-    narrowest = (
-        float((2.0 * np.pi * HBARC_EV_ANG / (denominator * flight_time)).min())
-        if flight_time.size
-        else float("nan")
-    )
+    # narrowest radiating feature so a case where the quantile drifts above it is
+    # visible instead of silently under-resolved.
+    narrowest = float("inf")
 
     lattice = CRYSTALS[crystal]["lattice"]
     rotation = _orientation_R(
@@ -202,9 +225,17 @@ def kinematic_line_seeds(
         energies, weights = [], []
         for mosaic_rotation, mosaic_weight in orientations:
             g_row = g_vector if mosaic_rotation is None else mosaic_rotation @ g_vector
+            v_dot_g = velocity @ g_row
             with np.errstate(divide="ignore", invalid="ignore"):
-                resonance = HBARC_EV_ANG * (velocity @ g_row) / denominator
+                if refractive is None:
+                    denominator = 1.0 - v_dot_n
+                else:
+                    denominator, _ = _in_medium_kinematics(v_dot_n, v_dot_g, *refractive)
+                resonance = HBARC_EV_ANG * v_dot_g / denominator
             radiating = np.isfinite(resonance) & (resonance > _MIN_RESONANCE_EV)
+            if radiating.any():
+                widths = 2.0 * np.pi * HBARC_EV_ANG / (denominator * flight_time)
+                narrowest = min(narrowest, float(widths[radiating].min()))
             energies.append(resonance[radiating])
             weights.append(weight[radiating] * float(mosaic_weight))
         label = label_prefix + "(" + " ".join(str(int(index)) for index in hkl) + ")"
@@ -214,6 +245,8 @@ def kinematic_line_seeds(
             (label, population_energy, population_weight, float(population_weight.sum()))
         )
 
+    if not np.isfinite(narrowest):
+        narrowest = float("nan")
     total = sum(entry[3] for entry in populations)
     summary: dict[str, Any] = {
         "reflections": len(populations),
@@ -438,7 +471,7 @@ def _kinematic_provider(context: SeedContext):
 
     case = context.case
 
-    def _seeds(segments, radiator, label_prefix=""):
+    def _seeds(segments, radiator, composition, label_prefix=""):
         # Orientation keys fall back to the case, as _lines_for_segments does.
         return kinematic_line_seeds(
             segments,
@@ -457,11 +490,14 @@ def _kinematic_provider(context: SeedContext):
             mosaic_nodes=case.get("mosaic_mc_nodes", 1),
             electron_limit=context.electron_limit,
             label_prefix=label_prefix,
+            composition=composition,
+            band_eV=(context.start_eV, context.stop_eV),
         )
 
+    compositions = _case_compositions(case)
     radiators = case.get("layer_radiators")
     if radiators is None:
-        return _seeds(context.segments, case)
+        return _seeds(context.segments, case, compositions[0])
     seeds: list[FeatureSeed] = []
     summary: dict[str, Any] = {}
     for layer, radiator in enumerate(radiators):
@@ -470,7 +506,9 @@ def _kinematic_provider(context: SeedContext):
         layer_segments = _segments_in_layer(context.segments, layer)
         if layer_segments["L_ang"].size == 0:
             continue
-        layer_seeds, layer_summary = _seeds(layer_segments, radiator, f"layer {layer} ")
+        layer_seeds, layer_summary = _seeds(
+            layer_segments, radiator, compositions[layer], f"layer {layer} "
+        )
         seeds.extend(layer_seeds)
         summary[f"layer {layer}"] = layer_summary
     return seeds, summary

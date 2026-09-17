@@ -19,7 +19,7 @@ from ..._line_grid_policy import (
 )
 from ..._line_windows import build_window_plan, window_plan_from_payload
 from ..spectrum.diagnostics import sinc_feature_spacing
-from ..spectrum.line_seeds import SeedContext, collect_feature_seeds
+from ..spectrum.line_seeds import SEEDING_REVISION, SeedContext, collect_feature_seeds
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
 # deterministic function of these plus the seed, so they content-address the
@@ -123,6 +123,8 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed else ())
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
+    if windowed:
+        inputs["seeding_revision"] = SEEDING_REVISION
     key = coordinate_cache_key(payload, inputs)
     cached = cached_coordinates(key)
     if cached is not None:

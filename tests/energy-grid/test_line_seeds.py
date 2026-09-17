@@ -8,11 +8,17 @@ the provider registry against a synthetic non-PXR component standing in for
 
 import numpy as np
 import pytest
+from scipy.optimize import brentq
 
 from pyrite._grid_semantics import validate_backend_coordinates
 from pyrite._line_windows import FeatureSeed, build_window_plan
 from pyrite.materials.atomic import load_henke
-from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+from pyrite.materials.crystal import (
+    CRYSTALS,
+    HBARC_EV_ANG,
+    reciprocal_g_vector,
+    refractive_index,
+)
 from pyrite.montecarlo.spectrum import line_seeds
 from pyrite.montecarlo.spectrum.line_seeds import (
     CHARACTERISTIC_SOURCE,
@@ -48,6 +54,49 @@ def _resonance_eV(energy_keV, direction, hkl):
     beta = float(beta_from_keV(energy_keV))
     v = beta * np.asarray(direction, dtype=float) / np.linalg.norm(direction)
     return HBARC_EV_ANG * float(v @ g_vector) / (1.0 - float(v @ _N_HAT))
+
+
+def _in_medium_denominator(energy_keV, direction, hkl):
+    """``1 - Re n(E) v.n`` at the root of ``E = hbar c v.g / (1 - Re n(E) v.n)``.
+
+    Solved with pointwise ``refractive_index`` rather than the kernels' table.
+    """
+    g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
+    beta = float(beta_from_keV(energy_keV))
+    v = beta * np.asarray(direction, dtype=float) / np.linalg.norm(direction)
+    v_dot_g, v_dot_n = float(v @ g_vector), float(v @ _N_HAT)
+
+    def n_re(energy_eV):
+        return float(np.real(refractive_index(_CRYSTAL, np.array([energy_eV]))[0]))
+
+    vacuum = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n)
+    root = brentq(
+        lambda e: e * (1.0 - n_re(e) * v_dot_n) - HBARC_EV_ANG * v_dot_g,
+        0.9 * vacuum,
+        1.1 * vacuum,
+        xtol=1e-9,
+    )
+    return root, 1.0 - n_re(root) * v_dot_n
+
+
+def test_band_seeds_centre_on_the_in_medium_root_the_kernels_use():
+    hkl = (0, 0, 2)
+    g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
+    segments = _flights([30.0], [3000.0], [g_vector])
+    (seed,), _ = kinematic_line_seeds(
+        segments,
+        _N_HAT,
+        crystal=_CRYSTAL,
+        hkl_list=[hkl],
+        feature_width_eV=0.8,
+        composition=[("C", 0.11)],
+        band_eV=(10.0, 2600.0),
+    )
+    root, _ = _in_medium_denominator(30.0, g_vector, hkl)
+    vacuum = _resonance_eV(30.0, g_vector, hkl)
+    # Tabulated Re n puts the kernels' root within a few percent of the shift.
+    assert abs(seed.centre_eV - root) < 0.05 * abs(root - vacuum)
+    assert abs(root - vacuum) > 0.02  # eV; the in-medium shift at this geometry
 
 
 def test_single_flight_window_is_centred_on_the_closed_form_resonance():
@@ -233,10 +282,10 @@ def test_kinematic_summary_reports_the_narrowest_feature_not_only_the_quantile()
     kinematic = summary[line_seeds.KINEMATIC_SOURCE]
 
     g_vector, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS[_CRYSTAL]["lattice"])
-    direction = g_vector / np.linalg.norm(g_vector)
-    beta = float(beta_from_keV(30.0))
-    t_L = 3000.0 / beta
-    expected = 2.0 * np.pi * HBARC_EV_ANG / ((1.0 - beta * float(direction @ _N_HAT)) * t_L)
+    t_L = 3000.0 / float(beta_from_keV(30.0))
+    # The kernels' a_width carries the in-medium denominator.
+    _root, denominator = _in_medium_denominator(30.0, g_vector, (0, 0, 2))
+    expected = 2.0 * np.pi * HBARC_EV_ANG / (denominator * t_L)
 
-    assert kinematic["narrowest_feature_width_eV"] == pytest.approx(expected)
+    assert kinematic["narrowest_feature_width_eV"] == pytest.approx(expected, rel=1e-6)
     assert kinematic["samples_at_narrowest"] == pytest.approx(expected / kinematic["spacing_eV"])
