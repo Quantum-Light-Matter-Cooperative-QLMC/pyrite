@@ -60,8 +60,12 @@ per-row brem stops from the job 1742 JSON during the remote check.
       Its brem raw/rounded stops are 13.55/14.3 keV, inside the 40 keV hopg
       override. Reviewed every hopg and wse2 catalog energy; see the validation
       write-up. No catalog regeneration performed.
-- [ ] Fresh-context physics review of the `characteristic-radiation` ledger
-      wording change (combination point moved; equation unchanged).
+- [x] Fresh-context physics review of the `characteristic-radiation` ledger
+      wording change: combination-point subclaim `rederived`; units, limits,
+      signs, and source-to-code agreement pass. The overall ledger row remains
+      `filtered` for its separately pending v3/v4 verification and human
+      sign-off. Review found and the branch fixed Altair duplicate-hue ranking
+      against the displayed characteristic-inclusive line total.
 
 ## Known pre-existing failures (base `4da0a8ea`)
 

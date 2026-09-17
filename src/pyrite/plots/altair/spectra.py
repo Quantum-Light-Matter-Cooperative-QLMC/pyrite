@@ -38,6 +38,7 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
+from ..._spectral_components import line_spectrum
 from ...results import records
 from ...results.store import _detected_background_wide
 from .._common import _best_azimuth, _case_title, _comparison_drop_message, _line_brem
@@ -614,8 +615,8 @@ def _compare_frame(
     arbitrary case field (``hue``). Duplicate records sharing a ``hue`` value
     (e.g. several azimuths at the same polar tilt) collapse to the single
     strongest-peak record, exactly like :func:`_best_azimuth`'s per-energy
-    selection (``max(np.max(r["spec"]))`` wins). ``band`` and ``max_points`` have
-    the same meaning as in :func:`spectrum_frame`.
+    selection (the largest displayed line peak wins). ``band`` and
+    ``max_points`` have the same meaning as in :func:`spectrum_frame`.
     """
     _validate_band(band)
     groups: dict[float, list] = {}
@@ -628,12 +629,7 @@ def _compare_frame(
         r = max(
             grp,
             key=lambda rr: float(
-                np.max(
-                    _characteristic_view(
-                        rr,
-                        include_characteristic=include_characteristic,
-                    )["spec"]
-                )
+                np.max(line_spectrum(rr, characteristic=include_characteristic))
             ),
         )
         row_meta = {

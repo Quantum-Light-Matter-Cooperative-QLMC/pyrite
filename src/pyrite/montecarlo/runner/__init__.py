@@ -1010,7 +1010,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # lower-cutoff bremsstrahlung electron population. Atomic relaxation is
     # incoherent, so one component serves both the PXR/CBS spectrum and its
     # coherent companion. It stays a separate array; consumers combine
-    # components through pyrite.results.components (issue #123).
+    # components through pyrite._spectral_components (issue #123).
     with _nsys_range("cxr.characteristic"):
         try:
             spec_characteristic = _characteristic_from_segments(

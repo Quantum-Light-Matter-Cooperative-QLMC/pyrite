@@ -209,6 +209,36 @@ def test_compare_chart_duplicate_hue_values_collapse_to_max_peak():
     assert azims == {45.0}  # the boosted (stronger-peak) record's azimuth won
 
 
+def test_compare_chart_characteristic_peak_can_reverse_duplicate_hue_winner():
+    store = {
+        "HOPG bulk": {
+            30.0: _record(30.0, 20.0, 0.0, peak_center=2500.0),
+            30.1: _record(30.0, 20.0, 45.0, peak_center=2500.0),
+        }
+    }
+    first = store["HOPG bulk"][30.0]
+    second = store["HOPG bulk"][30.1]
+    second["spec"] = second["spec"] * 0.5
+    first["spec_characteristic"] = np.zeros_like(first["spec"])
+    second["spec_characteristic"] = second["spec"] * 4.0
+
+    with_characteristic = compare_spectrum_chart(
+        store,
+        _settings(),
+        hue="tilt_deg",
+        include_characteristic=True,
+    )
+    without_characteristic = compare_spectrum_chart(
+        store,
+        _settings(),
+        hue="tilt_deg",
+        include_characteristic=False,
+    )
+
+    assert {row["tilt_azim_deg"] for row in _dataset(with_characteristic.to_dict())} == {45.0}
+    assert {row["tilt_azim_deg"] for row in _dataset(without_characteristic.to_dict())} == {0.0}
+
+
 # ---- correctness oracle -------------------------------------------------------
 def test_compare_chart_matches_spectrum_chart_for_hue_E0_single_tilt():
     """compare_spectrum_chart(hue="E0_keV") on a single-tilt slice must reproduce
