@@ -67,7 +67,10 @@ def line_spectrum(
 
     ``coherent`` selects ``spec_coherent`` instead of ``spec`` (``KeyError``
     when the record has none). A record without ``spec_characteristic``
-    contributes no characteristic term.
+    contributes no characteristic term. Characteristic emission is incoherent
+    with PXR/CBS, so its intensity adds once to either line spectrum.
+
+    Validation: characteristic-radiation
     """
     line = np.asarray(record["spec_coherent" if coherent else "spec"])
     component = record.get("spec_characteristic") if characteristic else None
