@@ -16,6 +16,7 @@ from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
 from pyrite.montecarlo.spectrum import line_seeds
 from pyrite.montecarlo.spectrum.line_seeds import (
     CHARACTERISTIC_SOURCE,
+    EDGE_MIN_F2_RATIO,
     EDGE_SOURCE,
     KINEMATIC_SOURCE,
     SeedContext,
@@ -133,6 +134,19 @@ def test_edge_anchors_bracket_the_chantler_jump_not_the_nominal_edge():
     assert 284.2 not in anchors
     assert summary["skipped"] == []
     assert absorption_edge_seeds(["C"], 1000.0, 2000.0)[0] == []
+
+
+def test_a_secondary_shell_beside_a_stronger_jump_gets_its_own_anchors():
+    # Se L2 (1474 eV) sits 2.8% above L3; Chantler smears the L3 jump over
+    # several brackets, and L2 must anchor on its own step, not L3's tail.
+    seeds, _ = absorption_edge_seeds(["Se"], 1000.0, 2000.0)
+    native, _f1, f2 = load_henke("Se")
+    centres = {seed.label: seed.centre_eV for seed in seeds}
+    assert set(centres) == {"Se L3", "Se L3 above", "Se L2", "Se L2 above"}
+    assert centres["Se L3"] == pytest.approx(1433.9, rel=5e-3)
+    assert centres["Se L2"] == pytest.approx(1474.3, rel=5e-3)
+    below = int(np.searchsorted(native, centres["Se L2"]))
+    assert f2[below + 1] / f2[below] >= EDGE_MIN_F2_RATIO
 
 
 def test_edge_bracket_is_a_single_pair_of_nodes_in_the_plan():

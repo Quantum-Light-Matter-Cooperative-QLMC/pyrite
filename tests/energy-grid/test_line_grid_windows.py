@@ -106,6 +106,7 @@ def test_windows_take_defaults_bump_the_schema_and_record_their_source():
         ({"samples_per_feature": 0}, ValueError),
         ({"samples_per_feature": 2.5}, ValueError),
         ({"tail_widths": -1.0}, ValueError),
+        ({"tail_widths": 0.0}, ValueError),
         ({"providers": "pxr-kinematic"}, TypeError),
         ({"providers": []}, ValueError),
         ({"providers": ["pxr-kinematic", "pxr-kinematic"]}, ValueError),

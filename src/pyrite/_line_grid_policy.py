@@ -343,8 +343,9 @@ def _window_block(value: object, label: str) -> dict[str, Any] | None:
     if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
         raise ValueError(f"{label} windows samples_per_feature must be an integer >= 1")
     tail = float(value.get("tail_widths", DEFAULT_WINDOW_TAIL_WIDTHS))
-    if not math.isfinite(tail) or tail < 0.0:
-        raise ValueError(f"{label} windows tail_widths must be finite and non-negative")
+    if not math.isfinite(tail) or tail <= 0.0:
+        # zero leaves a single-valued reflection population an empty window
+        raise ValueError(f"{label} windows tail_widths must be finite and positive")
     requested = value.get("providers", DEFAULT_WINDOW_PROVIDERS)
     if isinstance(requested, str):
         raise TypeError(f"{label} windows providers must be a sequence of provider names")

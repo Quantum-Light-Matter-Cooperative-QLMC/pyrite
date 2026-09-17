@@ -116,11 +116,16 @@ def kinematic_line_seeds(
     Assumptions: ``t_L**2`` is the intensity proxy, as in
     :func:`~pyrite.montecarlo.spectrum.diagnostics.sinc_feature_spacing`;
     ``|A|**2``, absorption, and the line-electron energy cutoff are ignored, so
-    the band is conservative. The kernels solve the in-medium root, which moves
-    ``E_res`` by ``O(delta) ~ 1e-5`` relative in the X-ray regime -- inside the
-    ``tail_widths`` margin -- but not in the optical ``Re n > 1`` regime below
-    about 300 eV, where the kernels' own root is not reliable either
-    (``lines/_kernels.py::_in_medium_kinematics``).
+    the band is conservative. The kernels solve the in-medium root
+    (``lines/_kernels.py::_in_medium_kinematics``), which sits
+    ``dE ~ -E delta beta cos(Theta) / (1 - beta cos(Theta))`` from the vacuum
+    root. In a segment's own feature widths that is ``delta cos(Theta) L /
+    lambda``, which ``delta`` does not bound: the ``tail_widths`` margin does
+    not cover it per segment (up to 5.4 widths above 300 eV at hopg 300 keV;
+    18-35 below 300 eV, where ``Re n > 1``). Coverage rests on the weighted
+    quantile band being much wider than that shift, not on the margin --
+    measured in-medium weight inside the window matched vacuum to 6e-6
+    (``docs/validation/beam-transport/line-window-seeding.md``).
 
     Coverage: each window spans the ``[eps/2, 1 - eps/2]`` weighted quantiles,
     ``eps = aliased_weight_limit``, widened by ``tail_widths`` feature widths.
@@ -277,7 +282,12 @@ def absorption_edge_seeds(
     ``mu`` jumps 18-fold.
 
     Shells whose steepest ratio is below :data:`EDGE_MIN_F2_RATIO` are reported
-    as ``skipped``; brackets shared by two shells are seeded once.
+    as ``skipped``. Chantler smears a jump over several brackets, so shells are
+    visited strongest xraydb jump first and each takes the steepest bracket
+    outside the native-node windows already seeded. A secondary jump within
+    :data:`EDGE_SEARCH_FRACTION` of a stronger one (Se L2 beside L3) then gets
+    its own anchors; a shell with no such bracket at or above
+    :data:`EDGE_MIN_F2_RATIO` lies inside a window already seeded.
 
     Validation: line-window-seeding
     """
@@ -290,14 +300,17 @@ def absorption_edge_seeds(
     start, stop = float(start_eV), float(stop_eV)
     for element in sorted(set(elements)):
         native, _f1, f2 = load_henke(element)
-        seen: set[int] = set()
+        claimed: set[int] = set()  # bracket indices inside an already-seeded window
         edges = sorted(
-            xraydb.xray_edges(element).items(), key=lambda item: (item[1].energy, item[0])
+            (
+                (shell, edge)
+                for shell, edge in xraydb.xray_edges(element).items()
+                if edge.jump_ratio is not None and float(edge.jump_ratio) > 1.0
+            ),
+            key=lambda item: (-float(item[1].jump_ratio), item[1].energy, item[0]),
         )
         for shell, edge in edges:
             nominal = float(edge.energy)
-            if not (edge.jump_ratio is not None and float(edge.jump_ratio) > 1.0):
-                continue
             lower, upper = (
                 nominal * (1.0 - EDGE_SEARCH_FRACTION),
                 nominal * (1.0 + EDGE_SEARCH_FRACTION),
@@ -312,16 +325,16 @@ def absorption_edge_seeds(
             with np.errstate(divide="ignore", invalid="ignore"):
                 ratio = f2[near + 1] / f2[near]
             ratio = np.where(np.isfinite(ratio), ratio, 0.0)
-            steepest = int(np.argmax(ratio))
-            if ratio[steepest] < EDGE_MIN_F2_RATIO:
+            if ratio.max() < EDGE_MIN_F2_RATIO:
                 skipped.append(label)
                 continue
-            index = int(near[steepest])
-            if index in seen:
-                continue
-            seen.add(index)
+            unclaimed = ~np.isin(near, list(claimed))
+            if not (unclaimed & (ratio >= EDGE_MIN_F2_RATIO)).any():
+                continue  # its jump lies inside a stronger shell's window
+            index = int(near[np.argmax(np.where(unclaimed, ratio, 0.0))])
             first = max(index - EDGE_NATIVE_NODES, 0)
             last = min(index + 1 + EDGE_NATIVE_NODES, native.size - 1)
+            claimed.update(range(first, last))
             spacing = float(np.median(np.diff(native[first : last + 1])))
             below_node, above_node = float(native[index]), float(native[index + 1])
             seeds.append(
