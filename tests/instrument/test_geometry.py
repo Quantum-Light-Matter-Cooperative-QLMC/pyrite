@@ -30,6 +30,36 @@ def test_pixel_centres_follow_documented_y_x_index_order() -> None:
     assert np.all(rays.solid_angle_sr > 0.0)
 
 
+def test_unpixelated_detector_uses_exact_finite_face_solid_angle() -> None:
+    width_mm, height_mm, distance_mm = 20.0, 10.0, 10.0
+    detector = PlanarDetector(
+        pose=PlanarPose((0.0, 0.0, distance_mm)), size_mm=(width_mm, height_mm)
+    )
+
+    solid_angle = planar_detector_rays(detector).solid_angle_sr[0, 0]
+    a, b = width_mm / 2.0, height_mm / 2.0
+    expected = 4.0 * np.arctan(a * b / (distance_mm * np.sqrt(a**2 + b**2 + distance_mm**2)))
+
+    np.testing.assert_allclose(solid_angle, expected, rtol=1.0e-15)
+    assert not np.isclose(solid_angle, width_mm * height_mm / distance_mm**2, rtol=0.1)
+
+
+def test_fine_pixel_grid_remains_close_to_exact_finite_face_solid_angle() -> None:
+    width_mm, height_mm, distance_mm = 20.0, 10.0, 10.0
+    unpixelated = PlanarDetector(
+        pose=PlanarPose((0.0, 0.0, distance_mm)), size_mm=(width_mm, height_mm)
+    )
+    fine_grid = PlanarDetector(
+        pose=PlanarPose((0.0, 0.0, distance_mm)),
+        pixels=PixelGrid((100, 200), (height_mm / 100, width_mm / 200)),
+    )
+
+    exact = planar_detector_rays(unpixelated).solid_angle_sr[0, 0]
+    sampled = np.sum(planar_detector_rays(fine_grid).solid_angle_sr)
+
+    np.testing.assert_allclose(sampled, exact, rtol=2.0e-5)
+
+
 def test_normal_plate_path_is_exact_thickness() -> None:
     rays = planar_detector_rays(_detector(shape=(1, 1), distance=10.0))
     plate = FilterPlate("silicon", 0.2, (10.0, 10.0), PlanarPose((0.0, 0.0, 5.0)))

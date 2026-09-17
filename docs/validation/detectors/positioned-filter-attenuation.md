@@ -498,9 +498,9 @@ solid_angle = pixel_area_mm2 * obliquity / distance**2
 
 which is the small-pixel $\Delta\Omega_p = A_p\cos\theta_p/D_p^{2}$ of
 [I.5](#i5-solid-angle-and-the-flux-definition), including the $\cos\theta_p$
-projection. `obliquity <= 0` raises. It is **not** the exact rectangular-pyramid
-solid angle that `detectors/eaglexo_response.py::solid_angle_sr` implements for
-the scalar-detector path; see [III.3](#iii3-findings-and-scope-limits).
+projection. `obliquity <= 0` raises. For an unpixelated detector, the same
+function instead integrates its finite rectangular face exactly; the scalar
+Eagle path reuses the centred-rectangle specialization.
 
 `results/model.py::SpatialResult._materialize` assembles
 
@@ -653,15 +653,12 @@ all are scope or provenance items a human should weigh before sign-off.
    deliberately nested. The additivity of [I.2](#i2-bouguerbeer-law) assumes
    disjointness. Worth a scene-validation check or an explicit documented
    caveat; it is a scene-construction gap, not an error in the three anchors.
-4. **$\Delta\Omega_p$ is the small-pixel approximation.** `planar_detector_rays`
-   uses $A_p\cos\theta_p/D_p^{2}$, while `eaglexo_response.solid_angle_sr`
-   implements the exact rectangular-pyramid form
-   $\Omega = 4\arctan\!\bigl[(w/2)(h/2)\big/\bigl(d\sqrt{(w/2)^2+(h/2)^2+d^2}\bigr)\bigr]$.
-   For a pixelated detector the point-sample error is $O(A_p/D_p^{2})$ and
-   negligible; for an **unpixelated** `PlanarDetector`, `planar_detector_rays`
-   takes one centre sample carrying the *full active area*, where the two forms
-   can differ appreciably at short working distance. The exact form is available
-   in-tree; the approximation should at least be stated in the ledger `Notes`.
+4. **Finite-face solid angle.** `planar_detector_rays` integrates an
+   unpixelated `PlanarDetector` face exactly, reducing to
+   $\Omega = 4\arctan\!\bigl[(w/2)(h/2)\big/\bigl(d\sqrt{(w/2)^2+(h/2)^2+d^2}\bigr)\bigr]$
+   for a centred face. Pixel grids retain the centre-ray
+   $A_p\cos\theta_p/D_p^{2}$ approximation; its fine-grid convergence is an
+   explicit regression anchor.
 5. **Phasor-convention wording.** Part IV writes the passive index as
    $\tilde n = 1-\delta+i\beta$ under $\exp(-i\omega t)$, whereas
    `crystal.py::optical_constants` documents $n = 1-\delta-i\beta$. Both are

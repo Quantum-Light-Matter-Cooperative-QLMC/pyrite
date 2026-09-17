@@ -15,6 +15,52 @@ def _readonly_float_array(value: object) -> np.ndarray:
     return array
 
 
+def solid_angle_sr(width_mm: float, height_mm: float, distance_mm: float) -> float:
+    """Return the exact on-axis solid angle [sr] of a rectangular face.
+
+    The source lies on the rectangle normal through its centre. The result
+    tends to ``width * height / distance²`` in the far field.
+    """
+    a, b, d = 0.5 * width_mm, 0.5 * height_mm, float(distance_mm)
+    return float(4.0 * np.arctan(a * b / (d * np.sqrt(a * a + b * b + d * d))))
+
+
+def _triangle_solid_angle_sr(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
+    """Return the unsigned solid angle [sr] of a source-to-corner triangle."""
+    denominator = (
+        np.linalg.norm(a) * np.linalg.norm(b) * np.linalg.norm(c)
+        + np.dot(a, b) * np.linalg.norm(c)
+        + np.dot(b, c) * np.linalg.norm(a)
+        + np.dot(c, a) * np.linalg.norm(b)
+    )
+    return float(2.0 * np.arctan2(abs(np.dot(a, np.cross(b, c))), denominator))
+
+
+def _rectangle_solid_angle_sr(
+    center_mm: np.ndarray,
+    x_axis: np.ndarray,
+    y_axis: np.ndarray,
+    width_mm: float,
+    height_mm: float,
+) -> float:
+    """Return the exact point-source solid angle [sr] of a planar rectangle."""
+    distance = float(np.linalg.norm(center_mm))
+    normal = np.cross(x_axis, y_axis)
+    if np.isclose(abs(np.dot(center_mm / distance, normal)), 1.0, rtol=0.0, atol=1.0e-14):
+        return solid_angle_sr(width_mm, height_mm, distance)
+
+    half_width, half_height = 0.5 * width_mm, 0.5 * height_mm
+    corners = (
+        center_mm - half_width * x_axis - half_height * y_axis,
+        center_mm + half_width * x_axis - half_height * y_axis,
+        center_mm + half_width * x_axis + half_height * y_axis,
+        center_mm - half_width * x_axis + half_height * y_axis,
+    )
+    return _triangle_solid_angle_sr(corners[0], corners[1], corners[2]) + _triangle_solid_angle_sr(
+        corners[0], corners[2], corners[3]
+    )
+
+
 @dataclass(frozen=True, eq=False)
 class PixelRays:
     """Point-source rays and differential acceptance for a detector grid."""
@@ -50,7 +96,9 @@ def planar_detector_rays(detector: PlanarDetector) -> PixelRays:
     """Construct lab-frame source-to-pixel-centre rays.
 
     Pixels are point samples with their full pitch area. An unpixelated
-    detector is one centre sample carrying the full active area.
+    detector instead uses its exact finite-rectangle solid angle.
+
+    Validation: positioned-filter-attenuation
     """
     if not isinstance(detector, PlanarDetector):
         raise TypeError("detector must be a PlanarDetector")
@@ -79,7 +127,13 @@ def planar_detector_rays(detector: PlanarDetector) -> PixelRays:
     obliquity = directions @ normal
     if np.any(obliquity <= 0.0):
         raise ValueError("detector pixels must see the source through their local -z face")
-    solid_angle = pixel_area_mm2 * obliquity / distance**2
+    if detector.pixels is None:
+        assert detector.size_mm is not None
+        solid_angle = np.array(
+            [[_rectangle_solid_angle_sr(center, x_axis, y_axis, *detector.size_mm)]]
+        )
+    else:
+        solid_angle = pixel_area_mm2 * obliquity / distance**2
     return PixelRays(centers, directions, distance, solid_angle)
 
 
