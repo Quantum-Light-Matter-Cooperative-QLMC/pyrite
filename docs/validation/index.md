@@ -40,6 +40,7 @@ beam-transport/energy-loss-straggling
 beam-transport/energy-step-convergence
 beam-transport/line-grid-sinc-convergence
 beam-transport/line-spectrum-error-budget
+beam-transport/line-window-seeding
 beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
 beam-transport/radiation-error-estimators
