@@ -129,6 +129,15 @@ def kinematic_line_seeds(
     the proxy weight is left to the backbone. Spacing is
     ``feature_width_eV / samples_per_feature``.
 
+    ``feature_width_eV`` resolves the ``eps``-quantile feature rather than the
+    narrowest one, so the summary also reports ``narrowest_feature_width_eV``
+    and ``samples_at_narrowest``. Measured on hopg and wse2 at 30-100 keV the
+    two widths coincide to within 11% -- the longest single flight floors
+    ``t_L``, leaving the width distribution no narrow tail -- so the nominal
+    ``samples_per_feature`` nodes do land across the narrowest shape-bearing
+    feature. A case where that stops being true shows it in
+    ``samples_at_narrowest`` instead of under-resolving silently.
+
     Limiting case: a single straight flight gives a window centred on its
     closed-form resonance with ``tail_widths`` feature widths on each side.
 
@@ -161,6 +170,19 @@ def kinematic_line_seeds(
     usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(denominator) & (denominator > 0.0)
     velocity, denominator, weight = velocity[usable], denominator[usable], weight[usable]
 
+    # The spacing above resolves the eps-quantile feature, not the narrowest one.
+    # Measured over hopg/wse2 at 30-100 keV the two coincide to within 11% -- the
+    # longest single flight floors t_L, so the width distribution has no narrow
+    # tail -- but that is a property of these cases, not a theorem. Report the
+    # narrowest feature so a case where the quantile drifts above it is visible
+    # instead of silently under-resolved.
+    flight_time = np.sqrt(weight)
+    narrowest = (
+        float((2.0 * np.pi * HBARC_EV_ANG / (denominator * flight_time)).min())
+        if flight_time.size
+        else float("nan")
+    )
+
     lattice = CRYSTALS[crystal]["lattice"]
     rotation = _orientation_R(
         lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=surface_hkl
@@ -192,6 +214,8 @@ def kinematic_line_seeds(
         "reflections": len(populations),
         "coverage": 1.0 - epsilon,
         "feature_width_eV": width,
+        "narrowest_feature_width_eV": narrowest,
+        "samples_at_narrowest": narrowest / spacing,
         "spacing_eV": spacing,
         "dropped_reflections": [],
         "dropped_weight_fraction": 0.0,

@@ -34,8 +34,13 @@ deliberately untracked, matching the #109 campaign.
 
 ## Open checklist (from the issue)
 
-- [ ] Resolve PXR/CBS interference fringes inside windows separately from
-      backbone continuum spacing. Not started.
+- [x] Resolve PXR/CBS interference fringes inside windows separately from
+      backbone continuum spacing. Answered by measurement, not code: window
+      spacing (0.03-0.9 eV) is already separate from the fixed 3 eV backbone,
+      and the sidelobe period equals the main-lobe width, so the same eight
+      nodes per feature resolve the fringes. A finer fringe-only quantile is not
+      warranted -- see the width-tail table in the error-budget doc. Coherent
+      route excluded; that is #117.
 - [ ] CUDA and fallback line routes agree on the windowed axis (float32 and
       FP64). Not started — the campaign ran one backend only.
 - [ ] Windows reaching the >= 20 keV float32 binade checked against FP64. No
@@ -49,6 +54,19 @@ deliberately untracked, matching the #109 campaign.
       verification and human sign-off pending.
 
 ## Findings worth carrying forward
+
+- The sinc width distribution is bounded below, not heavy tailed: the longest
+  single flight floors `t_L` and flight lengths have no long tail, so the
+  intrinsic-source quantile width `w(1e-3)` equals the narrowest feature width
+  to within 11% (1.00/1.11/1.00/1.00 over hopg 30 and 100 keV, wse2 30 keV, at
+  Ne=60 and 240). That is why `samples_per_feature` nodes really do land across
+  the narrowest shape-bearing feature even though the spacing is derived from a
+  quantile. `kinematic_line_seeds` now reports `narrowest_feature_width_eV` and
+  `samples_at_narrowest` so a case that breaks the property is visible.
+  Reproduce with the scratch script pattern: build a `CaseLadder`, recompute
+  `2*pi*HBARC_EV_ANG/(denominator*t_L)` per segment, and compare its minimum
+  against `sinc_feature_spacing`. Run CPU-only with `PYRITE_MC_BACKEND=cpu` --
+  the worktree venv has no cupy, and the backend probe otherwise fails closed.
 
 - The cost argument for windows is energy dependent. Against a uniform grid at
   the finest window's own spacing: 10.4x/13.4x saving at hopg 30 keV, 5.1x/5.6x

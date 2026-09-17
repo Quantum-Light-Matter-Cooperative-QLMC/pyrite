@@ -205,3 +205,24 @@ def test_unknown_or_misattributed_providers_are_refused(monkeypatch):
     )
     with pytest.raises(ValueError, match="source is 'liar'"):
         collect_feature_seeds(_context(), ["liar"])
+
+
+def test_kinematic_summary_reports_the_narrowest_feature_not_only_the_quantile():
+    """The spacing resolves the eps-quantile width; the summary exposes the floor.
+
+    Issue #101. Nothing guarantees the quantile width tracks the narrowest
+    feature, so a run has to be able to see how many nodes actually land across
+    the narrowest one. On these cases the two coincide, which is the evidence
+    that the ``samples_per_feature`` heuristic means what it says.
+    """
+    _seeds, summary = collect_feature_seeds(_context(), [line_seeds.KINEMATIC_SOURCE])
+    kinematic = summary[line_seeds.KINEMATIC_SOURCE]
+
+    g_vector, _ = reciprocal_g_vector((0, 0, 2), CRYSTALS[_CRYSTAL]["lattice"])
+    direction = g_vector / np.linalg.norm(g_vector)
+    beta = float(beta_from_keV(30.0))
+    t_L = 3000.0 / beta
+    expected = 2.0 * np.pi * HBARC_EV_ANG / ((1.0 - beta * float(direction @ _N_HAT)) * t_L)
+
+    assert kinematic["narrowest_feature_width_eV"] == pytest.approx(expected)
+    assert kinematic["samples_at_narrowest"] == pytest.approx(expected / kinematic["spacing_eV"])

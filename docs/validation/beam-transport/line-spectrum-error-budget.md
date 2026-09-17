@@ -263,6 +263,70 @@ shape observable riding on a small background can be unstable while the
 integrated quantities are exact. The same shape-class limitation that
 `line-grid-sinc-convergence` found under uniform refinement survives windowing.
 
+**Why `samples_per_feature` means what it says — and the fringe question.**
+`sinc_feature_spacing` returns the width at the $\varepsilon$-weighted *lower
+quantile*, not the narrowest width, so the window spacing
+$w(\varepsilon)/\texttt{samples}$ nominally resolves a quantile feature and
+leaves $\varepsilon$ of $t_L^2$-weight aliased. Whether that still puts eight
+nodes across the *narrowest* shape-bearing feature — what the issue's plan
+actually asks for — depends on the tail of the width distribution, which is a
+property of the transport rather than of the grid policy.
+
+Measured directly over each case's own segments (hopg 30/100 keV, wse2 30 keV,
+$N_e = 60$ and 240):
+
+```{list-table} Width at the intrinsic-source quantile against the narrowest feature of the same segment population.
+:name: tbl-line-budget-width-tail
+:header-rows: 1
+
+* - Case
+  - $w(10^{-3})$
+  - narrowest
+  - ratio
+* - hopg 30 keV, tilt 5, $N_e=60$
+  - 0.915 eV
+  - 0.915 eV
+  - 1.00
+* - hopg 30 keV, tilt 5, $N_e=240$
+  - 1.095 eV
+  - 0.983 eV
+  - 1.11
+* - hopg 100 keV, tilt 5
+  - 0.403 eV
+  - 0.403 eV
+  - 1.00
+* - wse2 30 keV, tilt 85
+  - 7.40 eV
+  - 7.40 eV
+  - 1.00
+```
+
+The width distribution is bounded below rather than heavy tailed: with
+$\pi/a_w \propto 1/\big((1 - \boldsymbol\beta\cdot\hat{\mathbf n})\,t_L\big)$,
+the longest single flight floors $t_L$, and the elastic mean free path gives
+flight lengths no long tail. So the quantile width *is* the narrowest width to
+within 11%, the nominal eight nodes do land across the narrowest feature, and
+the interference fringes inside a window — the $\operatorname{sinc}^2$ sidelobes,
+whose period is the same $\pi/a_w$ as the main lobe — are sampled at the same
+eight nodes per period.
+
+Two consequences. First, **fringe resolution inside windows is already separate
+from backbone continuum spacing** by construction: window spacing runs
+0.03–0.9 eV against a fixed 3 eV backbone. A *further* separate fringe control,
+a finer quantile used only inside windows, would buy at most 11% finer spacing
+at proportionally more points, and nothing at all in three of the four cases
+measured — the same shape of argument that retired the $\mathrm{ulp}/\mathrm{rtol}$
+spacing floor in `line-grid-sinc-convergence`. It is not warranted by these
+data. Second, because this is a measured property of four cases and not a
+theorem, `kinematic_line_seeds` reports `narrowest_feature_width_eV` and
+`samples_at_narrowest` in its seed summary, so a case whose quantile drifts
+above its narrowest feature shows it rather than under-resolving silently.
+
+This covers the incoherent route only. The coherent route sums complex
+amplitudes before squaring, where the fringe period is set by phase differences
+across segments rather than by any single $\pi/a_w$; that is #117's scope and
+remains open.
+
 **The hopg 300 keV ladder is truncated.** At 16 and 32 samples per feature the
 plan asks for 630 280 and 1 260 300 points, over the 400 000-point budget, so
 those two rungs were dropped and recorded in `skipped_samples`. The 300 keV
@@ -425,7 +489,12 @@ budget a result was produced under.
   the ratio's background window is unresolved.
 - Coherent-route (`coherent=True`) aliasing is not analyzed; the band-limit
   argument does not transfer to a sum of complex amplitudes squared after the
-  fact. Owned by #117, which gates coherent acceptance of windows.
+  fact, and the in-window fringe period is then set by phase differences across
+  segments rather than by any single $\pi/a_w$. Owned by #117, which gates
+  coherent acceptance of windows.
+- The width-tail measurement behind {numref}`tbl-line-budget-width-tail` covers
+  four cases at $N_e \le 240$; the campaign's own $N_e = 2000$ minima are not
+  measured, only the quantile ratio that the argument rests on.
 - The $\ge 20$ keV float32 binade is unmeasured — no catalog line of the
   measured cases reaches it.
 - The interpolation share rests on a point-wise $\mu$ bound; the spectrum-level
