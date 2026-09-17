@@ -10,8 +10,16 @@ bit-identical trajectories.
 import numpy as np
 import pytest
 
+from pyrite.detectors.spec import EagleXO, Timepix3
 from pyrite.energy_grid import convergence_case as cc
-from pyrite.energy_grid.convergence import SegmentMismatchError, segment_fingerprint
+from pyrite.energy_grid.convergence import (
+    SegmentMismatchError,
+    SpectrumSample,
+    evaluate_ladder,
+    richardson_acceptance,
+    segment_fingerprint,
+    spectrum_observables,
+)
 from pyrite.montecarlo import runner
 
 TINY = dict(thickness_ang=1.0e4, n_electrons=3, seed=0)
@@ -75,6 +83,58 @@ def test_spectrum_only_ladder_never_reruns_transport(ladder, monkeypatch):
     assert segment_fingerprint(ladder.segments) == ladder.fingerprint
 
 
+def test_continuum_is_evaluated_directly_on_each_candidate_grid(ladder, monkeypatch):
+    original = runner._brem_wide_from_segments
+    evaluated = []
+
+    def record_grid(segments, energy_eV, *args, **kwargs):
+        evaluated.append(np.asarray(energy_eV).copy())
+        return original(segments, energy_eV, *args, **kwargs)
+
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", record_grid)
+    grids = [np.geomspace(100.0, 29_000.0, size) for size in (65, 129)]
+
+    continua = [ladder.continuum(grid) for grid in grids]
+
+    assert [continuum.shape for continuum in continua] == [grid.shape for grid in grids]
+    assert all(
+        np.array_equal(actual, expected)
+        for actual, expected in zip(evaluated, grids, strict=True)
+    )
+    assert segment_fingerprint(ladder.segments) == ladder.fingerprint
+
+
+def test_continuum_observables_converge_on_identical_trajectories(ladder):
+    grids = [np.geomspace(100.0, 29_000.0, size) for size in (2049, 4097, 8193)]
+    detectors = {
+        "timepix3_counts": Timepix3(n_mc=32, seed=7),
+        "eaglexo_counts": EagleXO(),
+    }
+
+    def evaluate(grid):
+        continuum = ladder.continuum(grid)
+        return SpectrumSample(np.zeros_like(continuum), continuum)
+
+    rungs = evaluate_ladder(
+        grids,
+        evaluate,
+        segments=ladder.segments,
+        observables=lambda E, line, continuum: spectrum_observables(
+            E, line, continuum, detectors=detectors
+        ),
+    )
+    gated = {
+        "continuum_yield": "intrinsic_source",
+        "continuum_centroid_eV": "intrinsic_source",
+        "timepix3_continuum_counts": "detected_counts",
+        "eaglexo_continuum_counts": "detected_counts",
+    }
+    report = richardson_acceptance(rungs, gated=gated, diagnostics={})
+
+    assert report.accepted_spacing_eV == rungs[0].spacing_eV
+    assert all(verdict.accepted for verdict in report.triples[0].observables)
+
+
 def test_run_config_checkpoints_per_rung_and_resumes_on_identical_segments():
     checks = iter([False, True])
     saved = []
@@ -100,7 +160,15 @@ def test_run_config_checkpoints_per_rung_and_resumes_on_identical_segments():
     assert len(finished["report"]["triples"]) == 1
     assert finished["sinc_estimate"]["intrinsic_source"]["aliased_weight_limit"] == 1e-3
     for rung in finished["rungs"]:
-        assert set(rung["observables"]) >= {"yield", "timepix3_counts", "eaglexo_counts"}
+        assert set(rung["observables"]) >= {
+            "yield",
+            "continuum_yield",
+            "continuum_centroid_eV",
+            "timepix3_counts",
+            "eaglexo_counts",
+            "timepix3_continuum_counts",
+            "eaglexo_continuum_counts",
+        }
         assert rung["wall_s"] >= 0.0 and rung["host_peak_rss_mib"] > 0.0
 
 

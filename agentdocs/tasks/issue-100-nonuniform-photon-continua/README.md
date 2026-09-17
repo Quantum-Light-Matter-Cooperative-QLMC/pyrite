@@ -3,7 +3,7 @@
 Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
 Branch: `issue-100-nonuniform-photon-continua`
 
-Status: two slices checkpointed and one additional slice implemented on this
+Status: three slices checkpointed and one additional slice implemented on this
 branch; issue stays open, remaining scope below.
 
 ## Context
@@ -71,6 +71,25 @@ was found.
   detector-count floors. A new nonzero floor-scale regression pins that these
   floors, rather than relative tolerance alone, accept an almost-dark spectrum.
 
+## Fixed-trajectory continuum convergence
+
+- The convergence harness now reports and gates continuum yield and centroid at
+  `1e-3`, and Timepix3/Eagle XO continuum counts at `1e-2`, alongside the
+  existing line yield, centroid, detected counts, FWHM, and line/background
+  ratio.
+- `CaseLadder` evaluates bremsstrahlung directly on every candidate photon grid
+  from the same transported segments. It no longer mistakes interpolation of a
+  fixed production bremsstrahlung grid for continuum-grid convergence.
+- Near-zero classification is component-specific: an empty line spectrum no
+  longer causes a nonzero continuum to pass as `near-zero`.
+- The resumable convergence checkpoint schema is now 2 because stored reports
+  contain the new continuum observables and use direct continuum evaluation.
+- A deterministic `seed=0`, three-electron HOPG regression holds transport
+  fixed and verifies all four continuum observables converge across nested
+  geometric grids of 2,049, 4,097, and 8,193 nodes. The Timepix response uses
+  `n_mc=32`, `seed=7`; this seed affects only its fixed response matrix, not
+  differences between grid rungs.
+
 ## Verification
 
 `pyrite-dev lint`, `typecheck`, `docs`: all clean. `pyrite-dev test`: 3919
@@ -89,14 +108,18 @@ clean. The broader core run reached 2133 passed / 37 skipped / 42 failures;
 all failures are the same unavailable live crystallography DB, missing Intel
 SYCL dependency, or sandbox-denied multiprocessing socket constraints above.
 
+Fourth slice: affected detector/grid/convergence set is 116 passed; lint,
+typecheck, and docs are clean. The broader core run reached 2136 passed / 37
+skipped / 42 failures; all failures are the same unavailable live
+crystallography DB, missing Intel SYCL dependency, or sandbox-denied
+multiprocessing socket constraints above.
+
 ## Remaining on #100 (not touched here)
 
 - Refine the geometric photon-continuum baseline near material edges and
   kinematic endpoints.
 - Choose a physically justified positive photon floor; explicit zero-based
   detector-channel edge.
-- Continuum observables (yield, centroid, detected counts, line/background
-  ratio) shown to converge under refinement.
 - CUDA and fallback routes verified for the continuum-scoring path.
 
 Given these, #100 stays open after this PR merges.
