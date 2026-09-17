@@ -58,6 +58,7 @@ _CASE_KEY_ORDER = (
     "E_grid_line",
     "E_grid_brem",
     "line_grid_policy",
+    "line_quadrature",
     "theta_obs_rad",
     "tilt_deg",
     "tilt_azim_deg",
@@ -142,6 +143,9 @@ class Case(Mapping[str, Any]):
         Resolved declarative phase-space policies.
     groove_spacing_ang
         Optional blazed-groove period in angstroms.
+    line_quadrature
+        Optional ``"bin-mean"`` closed-form bin integration of the incoherent
+        ``sinc^2`` lines; absent samples nodes.
     coherent_emission, straggling, energy_model, max_dE_frac
         Result-affecting opt-in transport and radiation policies.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
@@ -200,6 +204,10 @@ class Case(Mapping[str, Any]):
     # case's own trajectories; the policy, not the refined coordinates, is what
     # identity hashes, because the refinement is a deterministic function of it.
     line_grid_policy: dict[str, object] | _Absent = _ABSENT
+    # Line quadrature (issue #116), divergence-only: absent is node sampling.
+    # Its own key rather than only a policy field, so a recompute that pins
+    # explicit coordinates and drops the policy keeps the quadrature it used.
+    line_quadrature: Literal["bin-mean"] | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
     straggling: Literal[True] | _Absent = _ABSENT
@@ -256,6 +264,20 @@ class Case(Mapping[str, Any]):
             _positive("max_dE_frac", self.max_dE_frac)
             if self.energy_model != "midpoint":
                 raise ValueError("max_dE_frac requires energy_model='midpoint'")
+        if self.line_quadrature is not _ABSENT:
+            if self.line_quadrature != "bin-mean":
+                raise ValueError("line_quadrature must be absent or 'bin-mean'")
+            # Validation: sinc-bin-integration
+            if self.coherent_emission is not _ABSENT:
+                raise ValueError(
+                    "line_quadrature='bin-mean' is incoherent-only; coherent_emission "
+                    "squares a sum of amplitudes (#117)"
+                )
+            if self.max_dE_frac is not _ABSENT:
+                raise ValueError(
+                    "line_quadrature='bin-mean' is incompatible with max_dE_frac: "
+                    "numerical substeps add amplitudes before squaring"
+                )
 
     def to_dict(self) -> dict[str, Any]:
         """Return the exact legacy mapping shape and insertion order.

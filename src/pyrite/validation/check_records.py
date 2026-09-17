@@ -32,6 +32,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/multilayer_slice3_check.py": ("multilayer-stack", "self-absorption"),
     "checks/multilayer_validation_check.py": ("multilayer-stack", "self-absorption"),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),
+    "checks/sinc_bin_integration.py": ("sinc-bin-integration",),
     "checks/substep_invariance.py": ("substep-radiation-invariance",),
     "checks/transport_core_goldens.py": ("electron-transport",),
 }
