@@ -3,7 +3,7 @@
 Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
 Branch: `issue-100-nonuniform-photon-continua`
 
-Status: three slices checkpointed and one additional slice implemented on this
+Status: four slices checkpointed and one additional slice implemented on this
 branch; issue stays open, remaining scope below.
 
 ## Context
@@ -90,6 +90,18 @@ was found.
   `n_mc=32`, `seed=7`; this seed affects only its fixed response matrix, not
   differences between grid rungs.
 
+## CUDA/fallback parity gate
+
+- Existing CPU coverage already exercises the full EEDL continuum evaluator on
+  nonuniform native and geometric grids, while existing CUDA tests cover the
+  fused raw kernels on irregular energy coordinates.
+- A new hardware-gated regression now drives the full `mc_brem_spectrum` EEDL
+  dispatcher over a 257-node geometric continuum and compares the fused CUDA
+  reduction with the generic chunked CUDA fallback on identical segments.
+- Local collection passes with the CUDA test skipped because this worktree has
+  no CuPy/CUDA device. Run it on the lab box with:
+  `PYRITE_TEST_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_spectrum_cuda_cheap_hoists.py -k nonuniform_eedl_continuum_matches_chunked_cuda_fallback`.
+
 ## Verification
 
 `pyrite-dev lint`, `typecheck`, `docs`: all clean. `pyrite-dev test`: 3919
@@ -114,12 +126,16 @@ skipped / 42 failures; all failures are the same unavailable live
 crystallography DB, missing Intel SYCL dependency, or sandbox-denied
 multiprocessing socket constraints above.
 
+Fifth slice preparation: EEDL/fallback set is 9 passed / 1 CUDA-module skip;
+lint and typecheck are clean. Hardware execution remains required before the
+CUDA acceptance item can close.
+
 ## Remaining on #100 (not touched here)
 
 - Refine the geometric photon-continuum baseline near material edges and
   kinematic endpoints.
 - Choose a physically justified positive photon floor; explicit zero-based
   detector-channel edge.
-- CUDA and fallback routes verified for the continuum-scoring path.
+- Execute the prepared CUDA/fallback parity gate on a CUDA lab box.
 
 Given these, #100 stays open after this PR merges.
