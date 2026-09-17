@@ -10,6 +10,7 @@ import os
 import pathlib
 import subprocess
 import sys
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -424,12 +425,13 @@ def _cuda_accumulation_case():
         target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
         detector=Detector(energy_bins=EnergyBins(line=line, brem=brem)),
     )
-    case = build_cases(sweep, n_electrons=48, n_electrons_brem=24)[0]
     # The manual reference below uses the same bounded launches as the runner;
     # it only changes the association of the four per-layer contributions.
-    case["spec_chunk"] = 128
-    case["brem_chunk"] = 128
-    return case
+    return replace(
+        build_cases(sweep, n_electrons=48, n_electrons_brem=24)[0],
+        spec_chunk=128,
+        brem_chunk=128,
+    )
 
 
 def _manual_cuda_layer_sum(case, transport):
