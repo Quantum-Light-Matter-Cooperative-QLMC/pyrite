@@ -420,7 +420,6 @@ def _cuda_accumulation_case():
     brem = np.arange(100.0, 30000.0, 200.0)
     sweep = Sweep(
         material="mose2",
-        tilt_deg=-30.0,
         beam=BeamSpec(energy_keV=30.0),
         target=Stack.on_substrate("mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0),
         detector=Detector(energy_bins=EnergyBins(line=line, brem=brem)),
