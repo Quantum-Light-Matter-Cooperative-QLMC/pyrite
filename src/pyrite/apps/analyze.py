@@ -21,8 +21,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
 
-import numpy as np
-
 from .._app_defaults import get_analysis_default, set_analysis_default
 from .._env import env_value
 from ..checkpoints import _checkpoint_store
@@ -325,11 +323,10 @@ def apply_emission(results, emission):
 def apply_characteristic(results, *, include: bool):
     """Return a view with characteristic radiation included or removed.
 
-    Checkpoint records retain total ``spec``/``spec_coherent`` arrays plus the
-    independently stored ``spec_characteristic`` component. When ``include`` is
-    false, subtract that component from both available totals in shallow record
-    copies. Missing components are a backward-compatible no-op, and source
-    arrays are never mutated.
+    Records keep ``spec_characteristic`` separate from the line arrays, and
+    consumers add it through :func:`pyrite._spectral_components.line_spectrum`.
+    When ``include`` is false, return shallow record copies without that
+    component. Source records are never mutated.
     """
     if include or not any(
         record.get("spec_characteristic") is not None
@@ -341,17 +338,12 @@ def apply_characteristic(results, *, include: bool):
     for name, by_energy in (results or {}).items():
         picked[name] = {}
         for energy, record in by_energy.items():
-            characteristic = record.get("spec_characteristic")
-            if characteristic is None:
+            if "spec_characteristic" not in record:
                 picked[name][energy] = record
                 continue
-            new_record = dict(record)
-            component = np.asarray(characteristic)
-            for key in ("spec", "spec_coherent"):
-                spectrum = record.get(key)
-                if spectrum is not None:
-                    new_record[key] = np.asarray(spectrum) - component
-            picked[name][energy] = new_record
+            picked[name][energy] = {
+                key: value for key, value in record.items() if key != "spec_characteristic"
+            }
     return picked
 
 

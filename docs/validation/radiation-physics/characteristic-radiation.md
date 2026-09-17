@@ -92,11 +92,11 @@ cutoff and does not override the electron transport-validity boundary.
 For multilayers, each layer emits using its own elemental composition and all
 layers attenuate the escaping photon. Passive absorber elements are not loaded
 as EEDL emitters for another layer. Atomic relaxation is incoherent, so the
-same characteristic component is added once to both PyRITE's incoherent and
-optional coherent PXR/CBS totals. It is retained as `spec_characteristic` for
-audit and plotting, persisted in its own `characteristic.h5` component, and can
-be hidden in the analysis app without modifying stored totals. The control
-defaults to showing the component.
+same characteristic component is added once to whichever of PyRITE's
+incoherent or optional coherent PXR/CBS spectra a consumer selects. It is kept
+as its own array, `spec_characteristic`, persisted in its own
+`characteristic.h5` component, and can be hidden in the analysis app without
+modifying stored results. The control defaults to showing the component.
 
 A single natural-width Lorentzian is used per xraydb transition. The empirical
 multi-Lorentzian fits of Hölzer et al. demonstrate satellite and asymmetric
@@ -360,7 +360,7 @@ factor.
 | Density, path and angular normalization | `mc_characteristic_spectrum` multiplies density by `1.0e24`, path by `1.0e-8`, then divides by bin width, `4*pi`, and incident `Ne` | Matches |
 | Escape evaluated at line centre | `mc_characteristic_spectrum` evaluates material attenuation once per transition and uses the segment-midpoint escape path | Matches the stated quadrature approximation |
 | Each layer emits from its own composition | `_characteristic_from_segments` selects segments by layer and retains the complete absorber stack | Matches |
-| One common additive intensity | `runner/__init__.py` adds `spec_characteristic` once to `spec` and once to an existing `spec_coherent` | Matches |
+| One common additive intensity | `runner/__init__.py` keeps `spec_characteristic` separate from `spec`/`spec_coherent`; `_spectral_components.line_spectrum` adds it once to the selected line spectrum | Matches |
 
 The EEDL threshold and xraydb line/edge energies originate in different
 compilations. They are joined by element and shell; this review verifies that

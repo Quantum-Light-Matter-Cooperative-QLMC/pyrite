@@ -42,7 +42,8 @@ def test_ladder_rung_at_the_case_grid_is_the_production_spectrum(case, ladder):
 
     parts = ladder.evaluate_components(ladder.transport["E_grid"])
 
-    assert np.array_equal(parts["lines"] + parts["characteristic"], np.asarray(production["spec"]))
+    assert np.array_equal(parts["lines"], np.asarray(production["spec"]))
+    assert np.array_equal(parts["characteristic"], np.asarray(production["spec_characteristic"]))
     assert np.array_equal(parts["brem"], np.asarray(production["brem"]))
 
 

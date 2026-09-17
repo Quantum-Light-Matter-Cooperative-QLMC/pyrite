@@ -44,9 +44,10 @@ accept all historical pickle encodings.
 
 Component checkpoints are materialized under
 `checkpoints/<stem>/{line,brem,characteristic}.h5`. `line.h5` is the
-authoritative case index and contains line-only PXR/CBS totals;
-`characteristic.h5` is an optional companion merged into those totals on
-read, and `brem.h5` carries the continuum. Analysis, archive, prune, slim,
+authoritative case index and contains PXR/CBS line spectra;
+`characteristic.h5` is an optional companion attached on read as its own
+`spec_characteristic` array, and `brem.h5` carries the continuum. No merged
+record array includes another component. Analysis, archive, prune, slim,
 and remote pull retain their merged in-memory contracts; manifest-only
 consumers belong to the checkpoint-command rework.
 

@@ -351,15 +351,15 @@ def test_candidate_rejects_result_above_alias_budget():
         analyze._candidate_from_result("hopg", 5.0, 100.0, 1.0e7, result)
 
 
-def test_candidate_line_coverage_excludes_characteristic_spike():
-    # The runner folds characteristic emission into `spec`; a strong low-energy
-    # characteristic line must not own the PXR/CBS bandwidth coverage (#123).
+def test_candidate_line_coverage_ignores_characteristic_component():
+    # A strong low-energy characteristic line sits beside `spec`, never in it,
+    # and must not own the PXR/CBS bandwidth coverage (#123).
     E = np.arange(10.0, 3010.0, 10.0)
     pxr = np.where((E >= 1000.0) & (E <= 2500.0), 1.0, 0.0)
     characteristic = np.where(E == 280.0, 1.0e4, 0.0)
     result = {
         "E_grid": E,
-        "spec": pxr + characteristic,
+        "spec": pxr,
         "spec_characteristic": characteristic,
         "E_grid_brem": E,
         "brem_wide": np.ones_like(E),
@@ -370,16 +370,6 @@ def test_candidate_line_coverage_excludes_characteristic_spike():
     assert candidate.coverage_energy_eV == coverage_energy(E, pxr, analyze.COVERAGE)
     assert 2300.0 <= candidate.coverage_energy_eV <= 2500.0
     assert candidate.total_intensity == pytest.approx(np.trapezoid(pxr, E))
-
-
-def test_candidate_line_coverage_accepts_results_without_characteristic():
-    E = np.arange(10.0, 3010.0, 10.0)
-    pxr = np.where((E >= 1000.0) & (E <= 2500.0), 1.0, 0.0)
-    result = {"E_grid": E, "spec": pxr, "E_grid_brem": E, "brem_wide": np.ones_like(E)}
-
-    candidate = analyze._candidate_from_result("hopg", 5.0, 100.0, 1.0e7, result)
-
-    assert candidate.coverage_energy_eV == coverage_energy(E, pxr, analyze.COVERAGE)
 
 
 def test_diagnostic_transport_resolves_grid_before_spectrum(monkeypatch):

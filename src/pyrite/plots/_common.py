@@ -9,6 +9,7 @@ mpl/altair/plotly backends. No matplotlib, Altair or Plotly imports here --
 
 import numpy as np
 
+from .._spectral_components import incident_spectrum, line_spectrum
 from ..detectors import Detector, EagleXO, LegacyEDS, Timepix3
 from ..detectors import eaglexo_response as eag
 from ..detectors import timepix_response as tpx
@@ -35,7 +36,7 @@ def _mode(settings):
 def _peak_line(r):
     """Response-free source line peak of one record -- the azimuth-selection key
     (strongest line wins)."""
-    return float(np.max(r["spec"]))
+    return float(np.max(line_spectrum(r)))
 
 
 def _best_azimuth(grp, collapse_azimuth):
@@ -126,7 +127,7 @@ def _line_brem(r, settings, convolve=None):
     side by side."""
     do_conv = getattr(settings, "convolve_with_det", False) if convolve is None else convolve
     detector = Detector(response=LegacyEDS(apply_qe=settings.apply_detector_qe, convolve=do_conv))
-    line_det = detector.score(r["E_grid"], r["spec"], fwhm_eV=r["fwhm"])
+    line_det = detector.score(r["E_grid"], line_spectrum(r), fwhm_eV=r["fwhm"])
     brem_det = detected_background(r, settings, convolve=do_conv) / r["scale"]
     return line_det, brem_det
 
@@ -146,7 +147,7 @@ def _thr_keV():
 def _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed):
     """Incident and Timepix3-detected (line + brem) [Phs/eV/s/nA] on r['E_grid'];
     the per-grid response is cached by tpx.get_response."""
-    incident = (r["spec"] + r["brem"]) * r["scale"]
+    incident = incident_spectrum(r) * r["scale"]
     detector = Detector(
         response=Timepix3(
             n_mc=n_mc,
@@ -155,15 +156,15 @@ def _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed):
             bias_v=bias_v,
         )
     )
-    return incident, detector.score(r["E_grid"], r["spec"] + r["brem"], scale=r["scale"])
+    return incident, detector.score(r["E_grid"], incident_spectrum(r), scale=r["scale"])
 
 
 def _eag_detected(r, settings, coating="BN", resolve_energy=False):
     """Incident and Eagle-detected (line + brem) [Phs/eV/s/nA] on r['E_grid'];
     the per-grid response is cached by eag.get_response."""
-    incident = (r["spec"] + r["brem"]) * r["scale"]
+    incident = incident_spectrum(r) * r["scale"]
     detector = Detector(response=EagleXO(coating=coating, resolve_energy=resolve_energy))
-    return incident, detector.score(r["E_grid"], r["spec"] + r["brem"], scale=r["scale"])
+    return incident, detector.score(r["E_grid"], incident_spectrum(r), scale=r["scale"])
 
 
 def _eag_wide_brem(r, coating="BN"):

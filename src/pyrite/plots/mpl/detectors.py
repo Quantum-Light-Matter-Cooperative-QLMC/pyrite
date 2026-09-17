@@ -6,6 +6,7 @@ Timepix3 and Eagle XO detector-view figures (efficiency, detected, charge).
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ..._spectral_components import incident_spectrum, line_spectrum
 from ...detectors import eaglexo_response as eag
 from ...detectors import timepix_response as tpx
 from ...results import (
@@ -429,7 +430,7 @@ def _eag_charge_rate(r, coating="BN"):
     Coherent lines come from the fine line grid; the brem from the wide grid (or
     the line-grid brem as a fallback) so the two don't double-count their overlap."""
     resp = eag.get_response(r["E_grid"], coating=coating)
-    q = resp.integrated_charge(r["spec"] * r["scale"])  # coherent lines [e-/s/nA]
+    q = resp.integrated_charge(line_spectrum(r) * r["scale"])  # lines [e-/s/nA]
     if r.get("brem_wide") is not None:
         Eb, cd_b = _eag_wide_charge(r, coating)
         q += float(np.trapezoid(cd_b, Eb))
@@ -460,7 +461,7 @@ def _draw_eaglexo_charge(
             cur = beam_current_na(r, settings)
             resp = eag.get_response(r["E_grid"], coating=coating)
             E = np.asarray(r["E_grid"], dtype=float)
-            cd_line = resp.charge_density((r["spec"] + r["brem"]) * r["scale"]) * cur
+            cd_line = resp.charge_density(incident_spectrum(r) * r["scale"]) * cur
             xlo, xhi = min(xlo, float(E[0])), max(xhi, float(E[-1]))
             fin = cd_line[np.isfinite(cd_line)]
             if fin.size:

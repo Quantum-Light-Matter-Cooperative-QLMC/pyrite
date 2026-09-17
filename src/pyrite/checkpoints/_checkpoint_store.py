@@ -90,13 +90,6 @@ def _component_store(results: dict, component: str) -> dict:
                     for key, value in record.items()
                     if key not in _BREM_KEYS and key not in _CHARACTERISTIC_KEYS
                 }
-                characteristic = record.get("spec_characteristic")
-                if characteristic is not None:
-                    characteristic_array = np.asarray(characteristic)
-                    for key in ("spec", "spec_coherent"):
-                        total = selected[energy].get(key)
-                        if total is not None:
-                            selected[energy][key] = np.asarray(total) - characteristic_array
             elif component == "brem":
                 selected[energy] = {
                     key: value
@@ -258,10 +251,9 @@ def _merge(line: dict, brem: dict, characteristic: dict) -> dict:
                         np.asarray(wide, float),
                     )
             characteristic_record = characteristic.get(name, {}).get(energy)
-            # Current line artifacts omit characteristic radiation. Legacy line
-            # artifacts carried both the audit array and totals that already
-            # included it; prefer that co-located value to avoid double adding
-            # during an interrupted migration.
+            # Line artifacts omit characteristic radiation; attach it as its own
+            # array. A legacy line artifact that still carries a co-located
+            # component was already separated on load, so keep that one.
             if record.get("spec_characteristic") is None and characteristic_record is not None:
                 characteristic_grid = characteristic_record.get("E_grid")
                 if characteristic_grid is not None and not np.array_equal(
@@ -273,11 +265,7 @@ def _merge(line: dict, brem: dict, characteristic: dict) -> dict:
                     )
                 component = characteristic_record.get("spec_characteristic")
                 if component is not None:
-                    component_array = np.asarray(component)
                     record["spec_characteristic"] = component
-                    for key in ("spec", "spec_coherent"):
-                        if record.get(key) is not None:
-                            record[key] = np.asarray(record[key]) + component_array
             merged[name][energy] = record
     return merged
 

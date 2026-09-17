@@ -220,17 +220,9 @@ def _narrow_line_domain(records, band, x_domain):
 
 
 def _characteristic_view(record, *, include_characteristic):
-    characteristic = record.get("spec_characteristic")
-    if include_characteristic or characteristic is None:
+    if include_characteristic or "spec_characteristic" not in record:
         return record
-
-    view = dict(record)
-    component = np.asarray(characteristic)
-    for key in ("spec", "spec_coherent"):
-        spectrum = record.get(key)
-        if spectrum is not None:
-            view[key] = np.asarray(spectrum) - component
-    return view
+    return {key: value for key, value in record.items() if key != "spec_characteristic"}
 
 
 def _record_frame(
