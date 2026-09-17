@@ -49,102 +49,96 @@ Components (a + b denotes a static import cycle):
   p3: checkpoints
   p4: cli
   p5: console
-  p6: detectors
+  p6: detectors + instrument
   p7: devtools
   p8: energy_grid
-  p9: instrument
-  p10: materials
-  p11: montecarlo
-  p12: perf
-  p13: plots
-  p14: remote
-  p15: results
-  p16: runs
-  p17: validation
+  p9: materials
+  p10: montecarlo
+  p11: perf
+  p12: plots
+  p13: remote
+  p14: results
+  p15: runs
+  p16: validation
 Edges (importer -> imported):
-  p0 -> p10
-  p0 -> p17
+  p0 -> p16
   p0 -> p4
   p0 -> p5
-  p1 -> p10
+  p0 -> p9
+  p1 -> p12
   p1 -> p13
   p1 -> p14
   p1 -> p15
   p1 -> p16
-  p1 -> p17
   p1 -> p2
   p1 -> p3
   p1 -> p5
-  p11 -> p10
-  p11 -> p9
-  p13 -> p10
-  p13 -> p11
+  p1 -> p9
+  p10 -> p6
+  p10 -> p9
+  p12 -> p10
+  p12 -> p14
+  p12 -> p6
+  p12 -> p9
+  p13 -> p14
   p13 -> p15
-  p13 -> p6
+  p13 -> p16
+  p13 -> p2
+  p13 -> p3
+  p13 -> p5
+  p13 -> p9
   p14 -> p10
-  p14 -> p15
-  p14 -> p16
-  p14 -> p17
-  p14 -> p2
-  p14 -> p3
-  p14 -> p5
+  p14 -> p6
+  p14 -> p9
   p15 -> p10
   p15 -> p11
-  p15 -> p6
+  p15 -> p14
+  p15 -> p2
+  p15 -> p3
+  p15 -> p5
   p15 -> p9
   p16 -> p10
-  p16 -> p11
-  p16 -> p12
-  p16 -> p15
   p16 -> p2
   p16 -> p3
   p16 -> p5
-  p17 -> p10
-  p17 -> p11
-  p17 -> p2
-  p17 -> p3
-  p17 -> p5
-  p17 -> p6
+  p16 -> p6
+  p16 -> p9
   p2 -> p10
-  p2 -> p11
-  p2 -> p15
+  p2 -> p14
   p2 -> p6
   p2 -> p9
   p3 -> p10
-  p3 -> p11
-  p3 -> p15
+  p3 -> p14
   p3 -> p2
   p3 -> p5
+  p3 -> p9
   p4 -> p10
   p4 -> p11
-  p4 -> p12
-  p4 -> p14
-  p4 -> p16
+  p4 -> p13
+  p4 -> p15
   p4 -> p2
   p4 -> p3
   p4 -> p5
   p4 -> p6
   p4 -> p8
   p4 -> p9
-  p5 -> p10
-  p6 -> p10
-  p7 -> p13
+  p5 -> p9
+  p6 -> p9
+  p7 -> p12
+  p7 -> p14
   p7 -> p15
   p7 -> p16
-  p7 -> p17
   p7 -> p2
   p7 -> p4
   p7 -> p5
   p7 -> p8
   p8 -> p10
-  p8 -> p11
+  p8 -> p13
   p8 -> p14
-  p8 -> p15
   p8 -> p2
   p8 -> p3
   p8 -> p6
-  p9 -> p10
-  p9 -> p6
+  p8 -> p9
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->
 
