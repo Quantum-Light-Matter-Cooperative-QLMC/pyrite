@@ -154,6 +154,40 @@ def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
     assert np.all(np.isfinite(detected))
 
 
+def test_timepix_response_channels_do_not_shift_with_source_mesh_refinement():
+    """#100: detector channels and their seeded MC must be source-mesh independent."""
+    timepix_response = pytest.importorskip("pyrite.detectors.timepix_response")
+    coarse_grid = np.linspace(1_000.0, 3_000.0, 101)
+    fine_grid = np.linspace(1_000.0, 3_000.0, 201)
+    coarse = timepix_response.TimepixResponse(coarse_grid, n_mc=64, seed=7)
+    fine = timepix_response.TimepixResponse(fine_grid, n_mc=64, seed=7)
+
+    np.testing.assert_array_equal(coarse.in_edges, fine.in_edges)
+    np.testing.assert_array_equal(coarse.E_in, fine.E_in)
+    np.testing.assert_array_equal(coarse.E_out, fine.E_out)
+    np.testing.assert_array_equal(coarse.R, fine.R)
+    assert coarse.R is fine.R
+
+    coarse_density = np.exp(-0.5 * ((coarse_grid - 2_000.0) / 100.0) ** 2)
+    fine_density = np.exp(-0.5 * ((fine_grid - 2_000.0) / 100.0) ** 2)
+    _, coarse_widths = node_bin_edges_and_widths(coarse_grid)
+    _, fine_widths = node_bin_edges_and_widths(fine_grid)
+    coarse_counts = np.sum(coarse.apply(coarse_density) * coarse_widths)
+    fine_counts = np.sum(fine.apply(fine_density) * fine_widths)
+    assert coarse_counts == pytest.approx(fine_counts, rel=1e-3)
+
+
+def test_timepix_response_uses_an_explicit_zero_energy_detector_edge():
+    timepix_response = pytest.importorskip("pyrite.detectors.timepix_response")
+    grid = np.array([1.0, 97.0, 193.0])
+
+    detector = timepix_response.TimepixResponse(grid, n_mc=8)
+
+    assert detector.fine_edges[0] == 0.0
+    assert detector.in_edges[0] == 0.0
+    assert np.all(np.isfinite(detector.apply(np.ones_like(grid))))
+
+
 def test_line_metrics_is_correct_on_a_log_grid():
     """#110 replaced the sample-space ``w_samp * dE`` peak-width conversion with
     physical-energy interpolation (``_sample_energy``, ``_integrate_energy_window``)

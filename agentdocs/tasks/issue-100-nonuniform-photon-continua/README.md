@@ -3,7 +3,7 @@
 Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
 Branch: `issue-100-nonuniform-photon-continua`
 
-Status: one slice landed (this branch); issue stays open, remaining scope below.
+Status: two slices checkpointed on this branch; issue stays open, remaining scope below.
 
 ## Context
 
@@ -34,12 +34,37 @@ was found.
   from the (documented, still zero-padded) edges, plus a new
   `EagleResponse(resolve_energy=True)` log-grid coverage test.
 
+## Source-mesh-independent Timepix channels
+
+- `TimepixResponse` now anchors its coarse input edges to absolute multiples of
+  `dE_mc`, with one channel of band padding, instead of anchoring them to the
+  first source-bin edge. Refining a source mesh over the same modeled band no
+  longer shifts the characterized photon energies.
+- All source meshes use the conservative piecewise-constant overlap integral;
+  uniform source bins may straddle the fixed detector edges and therefore can
+  no longer use the former whole-bin `bincount` shortcut.
+- The expensive seeded response matrix is cached by its fixed input/output
+  channels, hardware, and MC settings. Grid-specific wrappers remain cached by
+  full source-grid identity.
+- If midpoint reflection would put the first source-bin edge below zero, the
+  Timepix scoring path clamps that edge to its explicit physical 0 eV detector
+  boundary. This does not choose the continuum's still-open positive node floor.
+- A deterministic regression verifies identical channels, an identical shared
+  MC matrix, and detected-count agreement within `1e-3` under source-grid
+  halving (`n_mc=64`, seed 7).
+
 ## Verification
 
 `pyrite-dev lint`, `typecheck`, `docs`: all clean. `pyrite-dev test`: 3919
 passed, 79 skipped, 1 known-unrelated failure
 (`test_intel_machine_selects_sycl_backend`, missing `dpctl` in this
 worktree's `.venv`, not a code issue).
+
+Second slice: affected detector/grid set is 110 passed; lint and typecheck are
+clean. The broader core run reached 2128 passed / 37 skipped; its relevant
+coarse-near-zero convergence failure motivated the explicit 0 eV edge above
+and passes on rerun. Remaining failures require unavailable live database/SYCL
+access or sandbox-denied multiprocessing sockets.
 
 ## Remaining on #100 (not touched here)
 
