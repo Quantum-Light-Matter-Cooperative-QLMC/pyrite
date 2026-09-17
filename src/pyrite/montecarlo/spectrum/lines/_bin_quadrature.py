@@ -32,8 +32,10 @@ evaluated in FP64 and cast to the working precision only as a finished bin mean.
   below -- power series for ``t <= 4``, the modified-Lentz continued fraction
   of ``E1(i t)`` for ``4 < t < 48``, the same asymptotic series above. Measured
   against 40-digit ``mpmath`` on 1,500 points over ``[0, 1e12]``: absolute
-  error <= 7e-16 for ``t <= 4`` and <= 2.1e-15/t beyond, i.e. relative to the
-  ``1/t`` envelope of ``Si(t) - pi/2``.
+  error <= 1e-15 for ``t <= 4`` and <= 2.1e-15/t beyond, i.e. relative to the
+  ``1/t`` envelope of ``Si(t) - pi/2``. The ``t <= 4`` bound is stated with
+  margin: it is libm- and compiler-dependent, and an independent host
+  ``gcc -O2 -ffp-contract=off`` build measures 7.8e-16.
 * Other accelerators (SYCL): the NumPy evaluator on host.
 
 Validation: sinc-bin-integration
