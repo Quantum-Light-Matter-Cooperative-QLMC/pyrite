@@ -86,6 +86,7 @@ is W_Si = 3.65 eV/pair (each absorbed photon of energy E makes E/W_Si electrons)
 import numpy as np
 
 from .. import DATA_DIR
+from ..instrument.geometry import solid_angle_sr
 from ..materials.crystal import absorption_length_ang
 from ._si_sensor import (
     FANO_SI,
@@ -123,22 +124,6 @@ FULL_WELL_E = 100_000.0  # full-well capacity [e-] (100 ke- typical)
 
 # QE table: digitized datasheet curve (energy_eV, QE_BN_%, QE_BEN_%)
 _QE_PATH = DATA_DIR / "eaglexo_qe.csv"
-
-
-# ---- geometry: the solid angle (knob 1) --------------------------------------
-def solid_angle_sr(width_mm, height_mm, distance_mm):
-    """Exact on-axis solid angle [sr] of a rectangular sensor of full size
-    (width, height) whose centre is a distance ``distance_mm`` from the source,
-    facing it:
-
-        Omega = 4 * arctan( a b / (d sqrt(a^2 + b^2 + d^2)) ),  a=w/2, b=h/2.
-
-    This is the rigorous result for a centred rectangle (not the small-angle
-    A/d^2, though it reduces to it when a, b << d: the Eagle's 27.6 mm sensor at
-    0.4 m differs from A/d^2 by about 0.12%, but at a few cm the exact form matters).
-    Scalar in, scalar out."""
-    a, b, d = 0.5 * width_mm, 0.5 * height_mm, float(distance_mm)
-    return 4.0 * np.arctan(a * b / (d * np.sqrt(a * a + b * b + d * d)))
 
 
 def geometry(sensor=DEFAULT_SENSOR, distance_m=None):
