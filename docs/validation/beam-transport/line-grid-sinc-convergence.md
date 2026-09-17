@@ -491,6 +491,17 @@ keeps each row's catalog `start` and `stop` and sets
 `num = resolution_num(start, stop, target)`. Every row passes the float32
 8-ulp backend check.
 
+Issue #123's separated-component implementation was rerun remotely at the same
+1 mm, 5 deg polar, 95 deg azimuth geometry for hopg and wse2 (job 1768,
+`20260917-105036-f96fc59f`). At hopg 30 keV, the raw PXR/CBS-only 95% coverage
+is 2470.3 eV and the margin policy rounds it to 2600 eV, exactly the catalog
+stop; the characteristic-contaminated run had rounded to 300 eV. The same row's
+bremsstrahlung raw/rounded stops remain 13.55/14.3 keV, inside hopg's 40 keV
+override. Across matching catalog rows, rounded line stops were at or below the
+catalog stops except wse2 at 100 keV (3300 vs 3100 eV) and 150 keV (4400 vs
+4300 eV). Those two rows require review before any later catalog regeneration;
+no artifacts or profile references were changed here.
+
 ```{list-table} hopg standard-profile rows: catalog num and the num at the derived target spacing, with the derived target.
 :name: tbl-line-grid-sinc-hopg-rows
 :header-rows: 1

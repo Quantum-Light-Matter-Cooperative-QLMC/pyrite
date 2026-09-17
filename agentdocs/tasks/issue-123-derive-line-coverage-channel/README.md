@@ -54,9 +54,12 @@ per-row brem stops from the job 1742 JSON during the remote check.
 - [x] Docs: storage schema, results guide, API, physics page, validation
       write-up/ledger wording, repo map.
 - [x] Record the decisions in issue #123.
-- [ ] Remote check (via `pyrite remote`, never local): hopg 30 keV line `stop`
-      within margin of measured 95% PXR/CBS coverage (catalog 2600 eV); review
-      hopg and wse2 against catalog rows. No catalog regeneration in this task.
+- [x] Remote check (job 1768 / `20260917-105036-f96fc59f`, 1 mm, 5 deg,
+      95 deg): hopg 30 keV raw 95% PXR/CBS coverage is 2470.3 eV and rounds
+      to a 2600 eV `stop`, exactly the catalog row rather than the old 300 eV.
+      Its brem raw/rounded stops are 13.55/14.3 keV, inside the 40 keV hopg
+      override. Reviewed every hopg and wse2 catalog energy; see the validation
+      write-up. No catalog regeneration performed.
 - [ ] Fresh-context physics review of the `characteristic-radiation` ledger
       wording change (combination point moved; equation unchanged).
 
