@@ -53,7 +53,7 @@ per-row brem stops from the job 1742 JSON during the remote check.
 - [x] API `Result.line_total()`; spatial `*_total` components.
 - [x] Docs: storage schema, results guide, API, physics page, validation
       write-up/ledger wording, repo map.
-- [ ] Record the decisions in issue #123.
+- [x] Record the decisions in issue #123.
 - [ ] Remote check (via `pyrite remote`, never local): hopg 30 keV line `stop`
       within margin of measured 95% PXR/CBS coverage (catalog 2600 eV); review
       hopg and wse2 against catalog rows. No catalog regeneration in this task.
