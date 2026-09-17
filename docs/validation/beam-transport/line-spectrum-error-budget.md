@@ -183,8 +183,8 @@ The term splits along the window plan:
   fixed backbone and judges each observable under the Richardson gate of
   {eq}`eq-line-grid-richardson-gate`, then compares the finest windowed rung
   against a dense uniform reference. The $5\times10^{-4}$ share is what that
-  comparison must meet; until the campaign lands this share is **allocated but
-  unmeasured**.
+  comparison must meet. It is met in all twelve measured cases
+  ({numref}`tbl-line-budget-window-measured`).
 
 Absorption-edge windows are a deliberate exception inside this term: their
 spacing follows the Chantler table's own node density and does not refine with
@@ -193,6 +193,81 @@ characteristic window convergence only. Edge-region error appears in the
 dense-reference comparison instead. The edges are not optional seeds — 95% of
 30 keV coherent-line intensity lands in one 3 eV bin at the carbon K edge, where
 $\mu$ jumps by a factor of 18.
+
+#### Measured window quadrature
+
+Campaign of 2026-09-16: `convergence_job start-windows` at $N_e = 2000$ through a
+1 mm slab, samples per feature 2/4/8/16/32 on a fixed 3 eV backbone, all three
+seed providers, two tail widths, against a uniform reference capped at 400 001
+points. Twelve cases — hopg and wse2, 30/100/300 keV, tilts 5 and 85 deg — each
+evaluated on one transport, every rung sharing its segment fingerprint.
+
+**Every observable of every case meets its share.** Worst case across the twelve,
+against the dense uniform reference:
+
+```{list-table} Worst relative difference between the finest windowed rung and the dense uniform reference, over twelve cases, against the window row of tbl-line-budget-allocation.
+:name: tbl-line-budget-window-measured
+:header-rows: 1
+
+* - Observable
+  - Worst relative difference
+  - Case
+  - Window share
+* - yield
+  - $1.4\times10^{-4}$
+  - hopg 300 keV, tilt 5
+  - $5\times10^{-4}$
+* - centroid
+  - $1.3\times10^{-4}$
+  - hopg 300 keV, tilt 85
+  - $5\times10^{-4}$
+* - dominant-line FWHM
+  - $8.7\times10^{-4}$
+  - hopg 300 keV, tilt 85
+  - $5\times10^{-3}$
+* - line/background
+  - $7.1\times10^{-4}$
+  - wse2 100 keV, tilt 85
+  - $5\times10^{-3}$
+* - Timepix3 counts
+  - $2.6\times10^{-4}$
+  - hopg 30 keV, tilt 5
+  - $5\times10^{-3}$
+* - EagleXO counts
+  - $1.2\times10^{-4}$
+  - wse2 30 keV, tilt 85
+  - $5\times10^{-3}$
+```
+
+Three results qualify that headline.
+
+**The point saving falls with beam energy, and the windows degenerate toward
+uniform.** Measured against a uniform grid at the finest window's own spacing
+over the same bandwidth, the windowed axis costs 10.4x and 13.4x fewer points at
+hopg 30 keV, 5.1x and 5.6x at 100 keV, and only 2.5x and 2.9x at 300 keV; wse2
+runs 5.6x down to 1.9x over the same range. The issue's ~10x estimate therefore
+holds at 30 keV and not at 300 keV. The mechanism is visible in the plans: the
+kinematic seed spans the weighted quantile range of $E_\mathrm{res}$ over the
+case's own segments, and multiple scattering broadens that population with
+energy, so windows widen and merge. At hopg 100 keV tilt 5 they merge to cover
+the axis outright — the plan's largest spacing is 0.01 eV, not the 3 eV backbone,
+which is a windowed grid that has become a fine uniform one. Accuracy is
+unaffected; the cost argument for windows is what erodes.
+
+**One case accepts no spacing under the Richardson gate while agreeing with the
+reference to $2.7\times10^{-8}$.** wse2 100 keV tilt 85 converges in yield,
+centroid, FWHM and both detector counts, but its line/background ratio never
+passes {eq}`eq-line-grid-richardson-gate` anywhere on the ladder. The gate is a
+statement about rung-to-rung stability, not about distance from truth, and a
+shape observable riding on a small background can be unstable while the
+integrated quantities are exact. The same shape-class limitation that
+`line-grid-sinc-convergence` found under uniform refinement survives windowing.
+
+**The hopg 300 keV ladder is truncated.** At 16 and 32 samples per feature the
+plan asks for 630 280 and 1 260 300 points, over the 400 000-point budget, so
+those two rungs were dropped and recorded in `skipped_samples`. The 300 keV
+acceptance therefore rests on the 2/4/8 triple only, and the reference comparison
+above is against a windowed rung at 8 samples per feature rather than 32.
 
 ### Interpolation — $\varepsilon_\mathrm{interp}$
 
@@ -337,9 +412,17 @@ budget a result was produced under.
 
 ## Open
 
-- The feature-window quadrature share of $5\times10^{-4}$ is allocated but
-  unmeasured until the window-refinement campaign lands (30/100/300 keV, hopg
-  and wse2, tilts near 5 and 85 deg, against a dense uniform reference).
+- The window-quadrature share is measured on twelve hopg/wse2 cases and met in
+  every one, but the hopg 300 keV ladder is truncated at 8 samples per feature
+  by the point budget, so its acceptance rests on a single Richardson triple.
+- The cost argument for windows is energy dependent and erodes above ~100 keV:
+  broadening of the resonance population merges windows until the plan is a fine
+  uniform grid. Narrower seeding — per-reflection rather than per-case windows —
+  is the obvious lever and is not attempted here.
+- wse2 100 keV tilt 85 accepts no spacing because its line/background ratio never
+  stabilises rung to rung, though it matches the dense reference to
+  $7.1\times10^{-4}$. Whether that is a real shape instability or an artifact of
+  the ratio's background window is unresolved.
 - Coherent-route (`coherent=True`) aliasing is not analyzed; the band-limit
   argument does not transfer to a sum of complex amplitudes squared after the
   fact. Owned by #117, which gates coherent acceptance of windows.
