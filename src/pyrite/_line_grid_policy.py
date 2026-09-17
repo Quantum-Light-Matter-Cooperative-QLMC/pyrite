@@ -103,6 +103,14 @@ OBSERVABLE_CLASSES = ("intrinsic_source", "detected_counts")
 #: Built-in per-observable relative accuracy tolerances. Precision intrinsic
 #: yield is held an order tighter than detected counts, which are dominated by
 #: response convolution and Monte Carlo statistics rather than by grid error.
+#:
+#: Each value is the *grid* share of the total error, not the total error of a
+#: spectrum: transport and Monte Carlo statistics are separate additive terms
+#: that the refinement ladder holds fixed rather than bounds. The split of each
+#: total among bandwidth, quadrature, interpolation and backend precision is
+#: allocated in ``docs/validation/beam-transport/line-spectrum-error-budget.md``
+#: (table ``tbl-line-budget-allocation``); this mapping is that table's
+#: intrinsic-source and detected-counts column totals.
 DEFAULT_RTOL: Mapping[str, float] = {"intrinsic_source": 1.0e-3, "detected_counts": 1.0e-2}
 
 #: BANDWIDTH policy of the stored ``E_grid_line_by_energy`` artifacts: the
@@ -117,6 +125,9 @@ AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
 #: convention, so automatic resolution is never worse than the legacy grids.
 DEFAULT_MAX_SPACING_EV = 3.0
 #: Backend coordinate-precision safety factor, shared with ``energy_grid.derive``.
+#: Holds the backend-precision row of ``tbl-line-budget-allocation`` (1e-4 of the
+#: intrinsic-source share); #109 measured float32-versus-FP64 deviation flat in
+#: ``spacing/ulp``, so this collapse floor, not a spacing floor, is the control.
 DEFAULT_BACKEND_SAFETY_ULPS = 8.0
 #: Refuse rather than coarsen beyond this many line coordinates.
 DEFAULT_MAX_POINTS = 200_000

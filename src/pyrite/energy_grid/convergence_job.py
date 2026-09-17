@@ -89,6 +89,12 @@ def add_window_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tail-widths", type=float, default=DEFAULT_WINDOW_TAIL_WIDTHS)
     parser.add_argument("--reference-points", type=int, default=DEFAULT_REFERENCE_POINTS)
     parser.add_argument(
+        "--max-points",
+        type=int,
+        default=DEFAULT_REFERENCE_POINTS,
+        help="truncate the ladder at the finest rung within this many points",
+    )
+    parser.add_argument(
         "--json-out", default=f"line_window_convergence_{date.today()}.json", help="checkpoint JSON"
     )
 
@@ -108,6 +114,7 @@ def remote_windows_command(args: argparse.Namespace, uv: str) -> str:
         f"--backbone {float(args.backbone):g}",
         f"--tail-widths {float(args.tail_widths):g}",
         f"--reference-points {int(args.reference_points)}",
+        f"--max-points {int(args.max_points)}",
         f"--thickness {float(args.thickness):g}",
         f"--ne {int(args.ne)}",
         f"--seed {int(args.seed)}",

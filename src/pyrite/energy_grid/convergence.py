@@ -79,6 +79,9 @@ SHAPE_RTOL = 1.0e-2
 SHAPE_DIAGNOSTIC_RTOL = 1.0e-3
 #: Changes at or below this fraction of the tolerance are numerical noise
 #: (round-off, detector-response resampling): monotonicity is not required.
+#: The resampling half of that is the measured Timepix3 drift of up to 1e-3 per
+#: halving, which sits inside the interpolation row of
+#: ``tbl-line-budget-allocation`` (2e-3 of the detected-counts share).
 NOISE_FRACTION = 0.1
 
 #: Observable name -> tolerance class. Order is report order.
@@ -92,7 +95,13 @@ GATED_OBSERVABLES: Mapping[str, str] = {
 }
 
 #: Relative tolerance per class: the production policy's ``DEFAULT_RTOL``
-#: (unchanged) plus the harness-only ``shape`` class.
+#: (unchanged) plus the harness-only ``shape`` class. Each value is a column
+#: total of ``tbl-line-budget-allocation`` in
+#: ``docs/validation/beam-transport/line-spectrum-error-budget.md``, which
+#: allocates it among bandwidth, backbone quadrature, window quadrature,
+#: interpolation and backend precision. The ladder gates that grid share only:
+#: transport and Monte Carlo statistics are held identical across rungs by the
+#: segment fingerprint and cancel, rather than being bounded here.
 HARNESS_RTOL: Mapping[str, float] = {**DEFAULT_RTOL, "shape": SHAPE_RTOL}
 
 #: Ungated diagnostic observables and the relative tolerance they are judged at.

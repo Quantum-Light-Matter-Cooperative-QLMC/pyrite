@@ -87,3 +87,39 @@ def test_reference_grid_is_capped_by_its_point_budget():
     coarse, capped = cc.reference_grid(10.0, 2010.0, 0.05, max_points=2000)
     assert coarse.size <= 2001
     assert capped == pytest.approx(1.0, rel=1e-6)
+
+
+def test_point_budget_truncates_the_ladder_and_records_what_it_dropped(ladder):
+    _width, rungs = _rungs(ladder)
+    grids = [rung["plan"].coordinates() for rung in rungs]
+    budget = grids[1].size
+
+    kept, coordinates, skipped = cc._affordable_rungs(rungs, grids, budget)
+
+    assert [rung["samples_per_feature"] for rung in kept] == list(SAMPLES[:2])
+    assert [grid.size for grid in coordinates] == [grids[0].size, grids[1].size]
+    assert skipped == [
+        {
+            "samples_per_feature": SAMPLES[2],
+            "n_points": grids[2].size,
+            "reason": "point budget",
+        }
+    ]
+
+
+def test_point_budget_keeps_every_rung_that_fits(ladder):
+    _width, rungs = _rungs(ladder)
+    grids = [rung["plan"].coordinates() for rung in rungs]
+
+    kept, coordinates, skipped = cc._affordable_rungs(rungs, grids, grids[-1].size)
+
+    assert len(kept) == len(coordinates) == len(SAMPLES)
+    assert skipped == []
+
+
+def test_a_budget_under_the_coarsest_rung_raises_instead_of_reporting_nothing(ladder):
+    _width, rungs = _rungs(ladder)
+    grids = [rung["plan"].coordinates() for rung in rungs]
+
+    with pytest.raises(ValueError, match="coarsest window rung"):
+        cc._affordable_rungs(rungs, grids, grids[0].size - 1)

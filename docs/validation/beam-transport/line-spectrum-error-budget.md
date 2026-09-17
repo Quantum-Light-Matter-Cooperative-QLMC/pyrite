@@ -1,0 +1,366 @@
+# Line-spectrum error budget
+
+Issue #101. How the accuracy tolerances that gate a PyRITE line spectrum are
+divided among the independent error terms that produce it, and which measured
+result bounds each term.
+
+This page allocates; it derives no physics and certifies no equation. It has no
+ledger row of its own. Every number it quotes is either a code constant, named
+with its defining symbol, or a measurement that belongs to another row, cited to
+that row. Where a term is unmeasured it says so instead of assigning it a
+plausible value.
+
+Related: [`line-grid-sinc-convergence`](line-grid-sinc-convergence.md) (uniform
+resolution and backend precision),
+[`line-absorption-tabulation`](../radiation-physics/line-absorption-tabulation.md)
+(interpolation), [`energy-step-convergence`](energy-step-convergence.md) and
+[`radiation-error-estimators`](radiation-error-estimators.md) (transport).
+
+## Decomposition
+
+A reported line observable $q$ — integrated yield, centroid, dominant-line
+FWHM, or a detected count rate — carries five independent error terms plus a
+backend-precision term:
+
+```{math}
+:label: eq-line-budget-decomposition
+
+\left|\frac{\hat q - q}{q}\right| \;\le\;
+\underbrace{\varepsilon_\mathrm{band}}_{\text{bandwidth}}
++ \underbrace{\varepsilon_\mathrm{quad}}_{\text{quadrature}}
++ \underbrace{\varepsilon_\mathrm{interp}}_{\text{interpolation}}
++ \underbrace{\varepsilon_\mathrm{fp}}_{\text{backend precision}}
++ \underbrace{\varepsilon_\mathrm{trans}}_{\text{transport}}
++ \underbrace{\varepsilon_\mathrm{stat}}_{\text{Monte Carlo}} .
+```
+
+The sum is linear, not in quadrature. Only $\varepsilon_\mathrm{stat}$ is
+random; the other five are deterministic biases of one case and may align, so a
+root-sum-square would understate the worst case. Bandwidth truncation and
+quadrature aliasing in particular have fixed signs — truncation always removes
+yield, and an under-sampled $\operatorname{sinc}^2$ comb aliases into the same
+bins on every rung of a ladder.
+
+**The first four terms are grid error; the last two are not.** That split is
+what makes the budget measurable. The refinement ladder of
+`energy_grid/convergence.py` evaluates every rung on one fixed set of transport
+segments and proves the identity with a segment fingerprint, so
+$\varepsilon_\mathrm{trans}$ and $\varepsilon_\mathrm{stat}$ are held exactly
+constant across rungs and cancel in every rung-to-rung difference. What the
+ladder gates is therefore
+$\varepsilon_\mathrm{band} + \varepsilon_\mathrm{quad} + \varepsilon_\mathrm{interp} + \varepsilon_\mathrm{fp}$,
+and that is the quantity the production tolerances of
+`pyrite._line_grid_policy.DEFAULT_RTOL` bound. Those tolerances are the **grid
+share of the budget, not the total error of a spectrum**: at production electron
+counts $\varepsilon_\mathrm{stat}$ is usually the largest single term in
+{eq}`eq-line-budget-decomposition`.
+
+## Allocation of the grid share
+
+```{list-table} Grid-error allocation per observable class. The class totals are the production tolerances of DEFAULT_RTOL (intrinsic source, detected counts) and the harness-only convergence.SHAPE_RTOL.
+:name: tbl-line-budget-allocation
+:header-rows: 1
+
+* - Term
+  - Intrinsic source (total $10^{-3}$)
+  - Detected counts (total $10^{-2}$)
+  - Shape (harness, total $10^{-2}$)
+  - Controlled by
+* - bandwidth
+  - $0$
+  - $0$
+  - $0$
+  - `kinematic_line_stop_eV`, `line_start_eV`
+* - quadrature, backbone
+  - $2\times10^{-4}$
+  - $2\times10^{-3}$
+  - $2\times10^{-3}$
+  - `sinc_feature_spacing`, `DEFAULT_MAX_SPACING_EV`
+* - quadrature, feature windows
+  - $5\times10^{-4}$
+  - $5\times10^{-3}$
+  - $5\times10^{-3}$
+  - `samples_per_feature`, `tail_widths`
+* - interpolation
+  - $2\times10^{-4}$
+  - $2\times10^{-3}$
+  - $2\times10^{-3}$
+  - `_interp_elemental_mu`, detector response resampling
+* - backend precision
+  - $1\times10^{-4}$
+  - $1\times10^{-3}$
+  - $1\times10^{-3}$
+  - `DEFAULT_BACKEND_SAFETY_ULPS`, `PYRITE_FP64`
+```
+
+The shares are a policy split of a policy tolerance. They are not derived from
+any physical law: they encode that the windowed quadrature term is the one the
+grid policy actively trades against cost, so it gets the largest share, and that
+the three terms already measured far inside their shares get the remainder. The
+detected-counts and shape columns are the intrinsic-source column times ten,
+matching the ratio already fixed by `DEFAULT_RTOL`.
+
+## The terms
+
+### Bandwidth — $\varepsilon_\mathrm{band}$
+
+Intensity outside $[\texttt{start}, \texttt{stop}]$ is not sampled at all, so
+bandwidth error is pure truncation loss, always of one sign.
+
+The automatic policy sets the upper edge from the closed-form direction-maximized
+resonance bound of the ledgered
+[`line-grid-kinematic-bandwidth`](../ledger-core-coherent-physics.md#line-grid-kinematic-bandwidth)
+row,
+
+$$
+E_\mathrm{res} \le \frac{\hbar c\,\beta\,|\mathbf g|_\mathrm{max}}{1 - \beta},
+$$
+
+evaluated at the incident speed over the case's own reflection set. No PXR/CBS
+line of the case can exist above it, so **coherent bandwidth truncation is zero
+by construction** and the term consumes none of the budget. This is a bound and
+not an estimate: it is deliberately loose, and pays for its exactness in points,
+not in accuracy.
+
+Two qualifications bound the claim:
+
+- **`coverage-0.95` forfeits the entire budget.** The stored catalog artifacts
+  carry a *bandwidth* policy that stops where 95% of integrated coherent-line
+  intensity has accumulated (`DEFAULT_BANDWIDTH_COVERAGE`). Its truncation is
+  $5\times10^{-2}$ by definition — fifty times the whole intrinsic-source grid
+  budget, five times the detected-counts budget. A run on a legacy
+  `coverage-0.95` grid is outside this budget entirely and cannot be brought
+  inside it by refinement. `COVERAGE_BANDWIDTH_POLICY` is a fallback for
+  reproducing stored results, never an accuracy statement.
+- **Characteristic lines are reported, not budgeted.** A characteristic line
+  centred inside the window still loses its Lorentzian tails past the grid
+  edges. Since #88 that loss is exact data rather than a silent bias:
+  `characteristic.py::characteristic_line_window_mass` returns each line's
+  captured/truncated split, and `mc_characteristic_spectrum` warns when an
+  in-window line is truncated below 50% of its mass by the grid's own edges. A
+  consumer that needs characteristic yield inside this budget must read that
+  split; the 50% warn threshold is a loudness floor, not a budget share.
+
+### Quadrature — $\varepsilon_\mathrm{quad}$
+
+The dominant controllable term, and the one the window plan exists to buy down.
+The line kernels evaluate the finite-time lineshape of the ledgered
+`finite-time-lineshape` row,
+
+$$
+\frac{d^2N}{dE\,d\Omega} \propto t_L^2\,
+\operatorname{sinc}^2\!\left(\frac{a_w\,(E - E_\mathrm{res})}{\pi}\right),
+\qquad
+a_w = \frac{(1 - \boldsymbol\beta\cdot\hat{\mathbf n})\,t_L}{2\hbar c},
+$$
+
+and the spectrum is the trapezoid rule over the grid's own coordinates. The
+feature is band limited: the trapezoid rule is exact for $h \le \pi/a_w$, the
+first-zero step returned by `sinc_feature_spacing`, and aliases above it. The
+width $\pi/a_w$ carries no dependence on the photon energy $E$, which is why the
+axis is piecewise uniform and not logarithmic.
+
+The term splits along the window plan:
+
+- **Backbone.** The uniform piece spanning $[\texttt{start}, \texttt{stop}]$ at
+  `DEFAULT_MAX_SPACING_EV` $=3$ eV, carrying the continuum between features.
+  Measured under uniform refinement by
+  [`line-grid-sinc-convergence`](line-grid-sinc-convergence.md): at the derived
+  `sinc-nyquist` spacing, hopg yield error is at most $7.7\times10^{-5}$ and
+  centroid shift at most $0.017$ eV, inside the $2\times10^{-4}$ share. The same
+  measurement shows the fixed 3 eV catalog rows carrying 0.12–4.7% yield error
+  and up to 30 eV centroid shift — three to four orders outside the share —
+  which is the evidence that the backbone alone cannot hold the budget where
+  features are unresolved.
+- **Feature windows.** The fine uniform pieces the planner
+  (`_line_windows.build_window_plan`) lays over deterministically seeded
+  features. The starting heuristic is
+  `line_seeds.DEFAULT_SAMPLES_PER_FEATURE` $=8$ nodes across the narrowest
+  shape-bearing feature, with `DEFAULT_TAIL_WIDTHS` $=2$ sinc widths of tail on
+  each side. **The heuristic is not the certificate.** The window-refinement
+  ladder (`convergence_case.window_ladder`, submitted by
+  `convergence_job start-windows`) refines samples per feature on a deliberately
+  fixed backbone and judges each observable under the Richardson gate of
+  {eq}`eq-line-grid-richardson-gate`, then compares the finest windowed rung
+  against a dense uniform reference. The $5\times10^{-4}$ share is what that
+  comparison must meet; until the campaign lands this share is **allocated but
+  unmeasured**.
+
+Absorption-edge windows are a deliberate exception inside this term: their
+spacing follows the Chantler table's own node density and does not refine with
+`samples_per_feature`, so the ladder's Richardson gate measures kinematic and
+characteristic window convergence only. Edge-region error appears in the
+dense-reference comparison instead. The edges are not optional seeds — 95% of
+30 keV coherent-line intensity lands in one 3 eV bin at the carbon K edge, where
+$\mu$ jumps by a factor of 18.
+
+### Interpolation — $\varepsilon_\mathrm{interp}$
+
+Two distinct resamplings, both onto the line axis.
+
+**Self-absorption.** $\tau = L_\mathrm{esc}\,\mu(E_\mathrm{res})$ reads per-element
+$\log \mu_i$ tables interpolated linearly in $\log E$ and summed as
+$\mu = \sum_i \mu_i$ ([`line-absorption-tabulation`](../radiation-physics/line-absorption-tabulation.md),
+status `rederived`). Measured against direct xraydb evaluation: $\le 2\times10^{-12}$
+relative in float64 and $\le 1\times10^{-4}$ in float32 on HOPG. The float64 figure
+is eight orders inside the $2\times10^{-4}$ share; the float32 figure sits at half
+of it, which is one more reason the backend-precision term below is kept
+separate rather than folded in here. That row's open item — a spectrum-level
+exact-versus-tabulated A/B — is the missing evidence that the point-wise bound
+propagates to an integrated observable.
+
+**Detector response.** Detected counts convolve the line density with a response
+whose input channels are coarser than the line axis, so refining the grid moves
+the response's own sampling. `line-grid-sinc-convergence` measures Timepix3
+counts drifting by up to $10^{-3}$ per halving from that effect alone. Against
+the detected-counts share of $2\times10^{-3}$ that is a factor of two of headroom
+and no more, and it is why `convergence.NOISE_FRACTION` exists: rung-to-rung
+changes at or below 10% of the tolerance are treated as resampling noise rather
+than as non-monotone convergence.
+
+### Backend precision — $\varepsilon_\mathrm{fp}$
+
+Float32 coordinates quantize the line axis, and locally fine windows are where
+that first bites. Two guards, one floor:
+
+- `_grid_semantics.validate_backend_coordinates` judges **each interval at its
+  own ulp** against `DEFAULT_BACKEND_SAFETY_ULPS` $=8$, the interval-wise
+  counterpart of the uniform `validate_backend_spacing`. A plan that would
+  collapse nodes after the cast is refused, never silently coarsened.
+- `_setup.py`'s post-cast monotonicity check (#111) remains the final gate.
+
+Measured share consumption, on identical segments (wse2 300 keV, 1.22 M
+segments): float32 deviates from FP64 by at most $3.4\times10^{-6}$ in yield,
+$2.3\times10^{-5}$ in dominant-line FWHM, 0.39 ulp in centroid, and
+$5.8\times10^{-5}$ pointwise. Against the $1\times10^{-4}$ intrinsic-source share
+that is one to two orders of headroom.
+
+The important negative result: the deviation is **flat** in
+$h/\mathrm{ulp}(E_\mathrm{max})$ from 8 to 3000 across the 5 and 10 keV binades.
+It does not scale as $\mathrm{ulp}/h$, so a spacing floor proportional to
+$\mathrm{ulp}/\mathrm{rtol}$ would buy nothing, and the 2026-09-14 decision keeps
+only the 8-ulp collapse floor. The residual appears to track
+$\mathrm{ulp}/(\text{feature width})$ — resonance-energy rounding — which is
+inferred from the binade dependence, not proven.
+
+**Unmeasured:** no catalog line of the measured cases reaches the 20 keV
+float32 binade, where $\mathrm{ulp} \approx 1.95\times10^{-3}$ eV. A window that
+reaches it is checked against FP64 on identical trajectories before its result
+is quoted inside this share, or run under `PYRITE_FP64=1`.
+
+### Transport — $\varepsilon_\mathrm{trans}$
+
+Not grid error, and not bounded by any tolerance in
+{numref}`tbl-line-budget-allocation`. The spectrum is built from segments whose
+emission coefficients are frozen at each flight's start energy, so the term is
+the discretization error of the flight sequence itself.
+
+What is measured ([`energy-step-convergence`](energy-step-convergence.md)):
+replacing the frozen rule with the midpoint rule shifts no exit fraction,
+retained energy, or transit clock by more than 1.6 combined Monte Carlo standard
+errors at 4000 electrons across 14 cases. The one resolved difference is the
+mean path length of the 5 keV carbon stopping case, where the frozen rule
+overstates the CSDA range by 1.2% — below the CXR regime of this budget. For
+coherent CXR the binding constraint is the absolute emission phase, met by the
+propagation rule rather than by the substep count.
+
+What controls it per run ([`radiation-error-estimators`](radiation-error-estimators.md)):
+the CXR endpoint resonance-drift estimator reports each flight's resonance sweep
+in units of its own sinc linewidth and warns above
+`DEFAULT_RESONANCE_DRIFT_WARN` at p99. A drift of one linewidth means the frozen
+line is displaced by its own width over a single flight — that is the regime
+where a window seeded at the start-energy resonance no longer covers the feature
+it was seeded for, and both the seeding and this budget fail together. The
+estimator measures the sweep, not the resulting spectral error; the conversion
+to a share of {eq}`eq-line-budget-decomposition` is **not established**.
+
+### Monte Carlo statistics — $\varepsilon_\mathrm{stat}$
+
+The only random term, scaling as $N_e^{-1/2}$, and at production electron counts
+usually the largest in {eq}`eq-line-budget-decomposition`. It has no allocated
+share because it is not a property of the grid: the run's own standard errors
+report it, and it is driven down by electrons rather than by points.
+
+Its role here is a methodological constraint, and it is absolute:
+
+> **Never compare grid error across separate Monte Carlo runs.**
+
+At any practical $N_e$, $\varepsilon_\mathrm{stat}$ dwarfs the entire
+$10^{-3}$ grid budget, so a rung-to-rung difference taken across two runs
+measures statistics and not grid. The harness isolates the grid share by
+evaluating only the spectrum phase on one cached `simulate_trajectories` result,
+or on a fixed seed with `n_segments` asserted identical, and proves it with
+`convergence.segment_fingerprint` before any rung is compared. That the grid does
+not enter the RNG stream is empirical — the 30 keV ladder reproduces to
+$10^{-7}$ — and the seeding code is the place that has to keep it true.
+
+## Where each gate cites its share
+
+Each tolerance that gates a line observable names its share of
+{numref}`tbl-line-budget-allocation`:
+
+```{list-table}
+:name: tbl-line-budget-gate-citations
+:header-rows: 1
+
+* - Gate
+  - Constant
+  - Share cited
+* - automatic policy, intrinsic source
+  - `_line_grid_policy.DEFAULT_RTOL["intrinsic_source"]`
+  - the intrinsic-source column total, $10^{-3}$
+* - automatic policy, detected counts
+  - `_line_grid_policy.DEFAULT_RTOL["detected_counts"]`
+  - the detected-counts column total, $10^{-2}$
+* - ladder, yield and centroid
+  - `convergence.HARNESS_RTOL["intrinsic_source"]`
+  - the same $10^{-3}$, unchanged from the policy
+* - ladder, detected counts
+  - `convergence.HARNESS_RTOL["detected_counts"]`
+  - the same $10^{-2}$, unchanged from the policy
+* - ladder, FWHM and line/background
+  - `convergence.SHAPE_RTOL`
+  - the shape column total, $10^{-2}$; the ungated
+    `SHAPE_DIAGNOSTIC_RTOL` reports the distance to $10^{-3}$
+* - window plan, node collapse
+  - `_line_grid_policy.DEFAULT_BACKEND_SAFETY_ULPS`
+  - the backend-precision row, $10^{-4}$ intrinsic source
+* - ladder, resampling noise
+  - `convergence.NOISE_FRACTION`
+  - 10% of whichever class tolerance applies
+```
+
+A tolerance raised above its share, per call or through
+`PYRITE_ENERGY_GRID_RTOL[_<OBSERVABLE>]`, leaves this budget. The policy reports
+the source of every tolerance it resolved, so a provenance record states which
+budget a result was produced under.
+
+## Open
+
+- The feature-window quadrature share of $5\times10^{-4}$ is allocated but
+  unmeasured until the window-refinement campaign lands (30/100/300 keV, hopg
+  and wse2, tilts near 5 and 85 deg, against a dense uniform reference).
+- Coherent-route (`coherent=True`) aliasing is not analyzed; the band-limit
+  argument does not transfer to a sum of complex amplitudes squared after the
+  fact. Owned by #117, which gates coherent acceptance of windows.
+- The $\ge 20$ keV float32 binade is unmeasured — no catalog line of the
+  measured cases reaches it.
+- The interpolation share rests on a point-wise $\mu$ bound; the spectrum-level
+  exact-versus-tabulated A/B of `line-absorption-tabulation` is still open.
+- The resonance-drift estimator's conversion from linewidths of sweep to a share
+  of the spectral error is not established.
+
+## Reproduce
+
+```bash
+# window-refinement ladder against a dense uniform reference (remote; heavy)
+uv run python -m pyrite.energy_grid.convergence_job start-windows \
+    --json-out line_window_convergence.json
+uv run python -m pyrite.energy_grid.convergence_job status
+uv run python -m pyrite.energy_grid.convergence_job pull \
+    --json-out line_window_convergence.json
+
+# uniform resolution ladder and the float32/FP64 precision table (#109)
+uv run python -m pyrite.energy_grid.convergence_job start
+uv run python -m pyrite.energy_grid.convergence_job start-precision
+```

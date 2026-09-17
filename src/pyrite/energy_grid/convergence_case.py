@@ -433,6 +433,39 @@ def run_config(
     return state, True
 
 
+def _affordable_rungs(
+    window_rungs: Sequence[Mapping[str, Any]],
+    coordinates: Sequence[np.ndarray],
+    max_points: int,
+) -> tuple[list[dict[str, Any]], list[np.ndarray], list[dict[str, Any]]]:
+    """Keep the rungs that fit ``max_points``; return them with what was dropped.
+
+    Point count rises with samples per feature, so the affordable set is a
+    prefix; the scan stops at the first rung over budget rather than trusting
+    that. The coarsest rung is kept unconditionally -- if it alone is over
+    budget the ladder has nothing to measure and says so.
+    """
+    if coordinates and coordinates[0].size > max_points:
+        raise ValueError(
+            f"coarsest window rung needs {coordinates[0].size} points, over the "
+            f"{max_points}-point budget; raise --max-points or coarsen --backbone"
+        )
+    cut = len(coordinates)
+    for index, grid in enumerate(coordinates):
+        if grid.size > max_points:
+            cut = index
+            break
+    skipped = [
+        {
+            "samples_per_feature": int(window_rungs[index]["samples_per_feature"]),
+            "n_points": int(coordinates[index].size),
+            "reason": "point budget",
+        }
+        for index in range(cut, len(coordinates))
+    ]
+    return list(window_rungs[:cut]), list(coordinates[:cut]), skipped
+
+
 def run_window_config(
     config: Mapping[str, Any],
     samples: Sequence[int],
@@ -441,6 +474,7 @@ def run_window_config(
     providers: Sequence[str] = DEFAULT_SEED_PROVIDERS,
     tail_widths: float = DEFAULT_TAIL_WIDTHS,
     reference_points: int = DEFAULT_REFERENCE_POINTS,
+    max_points: int = DEFAULT_REFERENCE_POINTS,
     state: dict[str, Any] | None = None,
     save=None,
     out_of_time=None,
@@ -454,6 +488,16 @@ def run_window_config(
     refinement alone cannot see an error the backbone or the seed coverage
     shares across every rung. Rungs already present are kept; transport re-runs
     at the stored seed and must reproduce the stored fingerprint first.
+
+    ``max_points`` truncates the ladder at the finest rung that fits, recording
+    the dropped rungs in ``state["skipped_samples"]``. It defaults to
+    ``reference_points`` because a windowed rung denser than the uniform
+    reference it is judged against has already lost the argument for windows,
+    and because refining past a device's admissible bin count aborts the whole
+    campaign instead of the one rung (measured: hopg 300 keV at 32 samples per
+    feature asks for 1.26 M bins, which an 11 GiB budget cannot chunk). The
+    coarsest rung is never dropped: a ladder that cannot afford even that
+    raises rather than reporting a truncation that means nothing.
     """
     state = dict(state or {})
     counts = [int(value) for value in samples]
@@ -463,6 +507,7 @@ def run_window_config(
         "providers": list(providers),
         "tail_widths": float(tail_widths),
         "reference_points": int(reference_points),
+        "max_points": int(max_points),
     }
     if state.get("settings") not in (None, settings):
         raise ValueError(
@@ -492,6 +537,9 @@ def run_window_config(
         tail_widths=float(tail_widths),
     )
     coordinates = [rung["plan"].coordinates() for rung in window_rungs]
+    window_rungs, coordinates, skipped = _affordable_rungs(
+        window_rungs, coordinates, int(max_points)
+    )
     state.update(
         config=dict(config),
         settings=settings,
@@ -511,6 +559,7 @@ def run_window_config(
             }
             for rung, grid in zip(window_rungs, coordinates, strict=True)
         ],
+        skipped_samples=skipped,
     )
     state.setdefault("transport_wall_s", []).append(ladder.transport_wall_s)
     state.setdefault(
@@ -665,6 +714,13 @@ def _summary_line_windows(state: Mapping[str, Any]) -> str:
     comparison = state.get("comparison") or {}
     difference = comparison.get("relative_difference", {})
     finest = state["windows"][-1]
+    skipped = state.get("skipped_samples") or []
+    truncation = (
+        ""
+        if not skipped
+        else f", ladder cut at {finest['samples_per_feature']} samples "
+        f"({len(skipped)} rung(s) over the point budget)"
+    )
     return (
         f"{config['material']:>6} {config['energy_keV']:>5g} keV tilt {config['tilt_deg']:>4g}: "
         f"accepted window h={'-' if accepted is None else f'{accepted:.4g}'} eV, "
@@ -674,6 +730,7 @@ def _summary_line_windows(state: Mapping[str, Any]) -> str:
         f"yield {difference.get('yield', float('nan')):.3g}, "
         f"centroid {difference.get('centroid_eV', float('nan')):.3g}, "
         f"fwhm {difference.get('fwhm_eV', float('nan')):.3g}"
+        f"{truncation}"
     )
 
 
@@ -712,6 +769,7 @@ def cmd_run_windows(args: argparse.Namespace) -> int:
             providers=providers,
             tail_widths=float(args.tail_widths),
             reference_points=int(args.reference_points),
+            max_points=int(args.max_points),
             state=payload["configs"].get(key),
             save=save,
             out_of_time=out_of_time,
