@@ -479,10 +479,15 @@ standard-profile artifact (job 1742: the persisted diagnostic geometry, 1 mm,
 coarse $N_e = 200$, refine $N_e = 2000$, alias budget $10^{-2}$). Its
 resolution targets follow the transport, not the catalog bandwidth. Its
 bandwidth outputs are not usable: the 95% coverage `stop` collapses to 300 eV
-at 30 keV (catalog 2600 eV) and the bremsstrahlung stop reaches 140 keV,
-consistent with coverage now integrating the characteristic lines added to the
-line spectrum (C K near 277 eV). The resolution below therefore keeps each
-row's catalog `start` and `stop` and sets
+at 30 keV (catalog 2600 eV) because line coverage integrated the
+characteristic lines added to the line spectrum (C K near 277 eV); #123 fixes
+that channel. The 140 keV bremsstrahlung stop is not the same defect: the
+bremsstrahlung channel carries no characteristic emission. The per-material
+bremsstrahlung stop is the maximum over all row energies up to 300 keV, and
+140 keV agrees with the 140.7 keV override of diamond, which is also carbon.
+That points to the 40 keV hopg override as stale rather than to a coverage
+defect; the catalog is not regenerated here. The resolution below therefore
+keeps each row's catalog `start` and `stop` and sets
 `num = resolution_num(start, stop, target)`. Every row passes the float32
 8-ulp backend check.
 

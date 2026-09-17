@@ -110,7 +110,8 @@ class Candidate:
     material: str
     tilt_deg: float
     tilt_azim_deg: float
-    # coherent = PXR/CBS line spectrum (r["spec"]); incoherent = bremsstrahlung
+    # coherent = PXR/CBS line spectrum (r["spec"] minus
+    # r["spec_characteristic"]); incoherent = bremsstrahlung
     # background (r["brem_wide"]). Both channels' 95% coverage is tracked so the
     # line grid and the brem grid are each bounded separately (issue_notes.md #1).
     coverage_energy_eV: float
@@ -160,7 +161,16 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_
 
 
 def _candidate_from_result(material, tilt_deg, tilt_azim_deg, thickness_ang, result):
-    E_grid, spec = result["E_grid"], result["spec"]
+    # The line bandwidth policy owns the PXR/CBS channel only. The runner folds
+    # characteristic emission into `spec`, where a low-energy K line (C K near
+    # 277 eV for hopg) would own the cumulative integral and collapse the stop
+    # (#123); characteristic spanning belongs to the line-window seeds (#88/#101).
+    # `brem_wide` never carries characteristic emission.
+    E_grid = result["E_grid"]
+    spec = np.asarray(result["spec"], dtype=float)
+    characteristic = result.get("spec_characteristic")
+    if characteristic is not None:
+        spec = spec - np.asarray(characteristic, dtype=float)
     E_brem, brem = result["E_grid_brem"], result["brem_wide"]
     diagnostic = result.get("line_grid_diagnostic")
     if diagnostic is None:

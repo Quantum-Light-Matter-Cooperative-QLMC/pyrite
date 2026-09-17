@@ -38,16 +38,20 @@ handling) and needs a separate explanation.
 
 ## Plan
 
-- [ ] Subtract `spec_characteristic` from `spec` for line coverage and total
+- [x] Subtract `spec_characteristic` from `spec` for line coverage and total
       intensity; tolerate results without the key (older checkpoints) by
       treating it as zero. Document the channel in `derive.py`.
-- [ ] Decide whether the derived grid must still span characteristic lines.
-      Default: bandwidth policy does not measure them; spanning and window
-      semantics stay with #88/#101 seeds. Record the decision here and in the
-      issue.
-- [ ] Audit the incoherent path: reproduce the 140 keV hopg brem stop from the
-      #109 data or a small local case, explain it, fix or document.
-- [ ] Regression test: synthetic result with a strong low-energy characteristic
+- [x] Decide whether the derived grid must still span characteristic lines.
+      Decision (default taken): bandwidth policy does not measure them;
+      spanning and window semantics stay with #88/#101 seeds. Needs recording
+      in the issue.
+- [x] Audit the incoherent path (static): `brem_wide` has no characteristic
+      term. `_brem_grid_for_rows` takes the max over all row energies (job 1742
+      spanned 30-300 keV), and 140 keV matches diamond's 140.7 keV override
+      (also carbon), so the 40 keV hopg override looks stale. Documented in
+      `line-grid-sinc-convergence.md`. Confirm the per-row brem stops from the
+      job 1742 JSON during the remote check.
+- [x] Regression test: synthetic result with a strong low-energy characteristic
       spike yields the PXR/CBS coverage energy, not the spike.
 - [ ] Remote check (via `pyrite remote`, never local): hopg 30 keV line `stop`
       within margin of measured 95% PXR/CBS coverage (catalog 2600 eV); review
