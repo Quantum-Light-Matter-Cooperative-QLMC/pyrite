@@ -1,22 +1,26 @@
 # Independent validation: finite transverse crystal
 
-- **Claim**: `finite-transverse-crystal` —
-  `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/spectrum/lines.py::mc_spectrum`; `montecarlo/spectrum/brem.py::mc_brem_spectrum` — rectangular-prism ray intersection + Beer--Lambert.
-- **Source and intended quantity**: The validated design defines the sample-frame
-  prism `[-W/2,W/2] x [-H/2,H/2] x [z_min,z_max]`. The geometry helper returns
-  the first strictly forward ray-boundary intersection. Transport stops at that
-  boundary; radiation from a segment is multiplied by its Beer--Lambert escape
-  factor along the fixed photon ray to that same first boundary. `W` and `H`
-  enter public configuration in mm and the physics boundary uses Angstrom.
-- **Assumptions**: origin is inside the prism; the ray direction is expressed in
-  the sample frame; a finite footprint has positive paired dimensions; and the
-  far-field observation direction is fixed. Omitting both transverse dimensions
-  is the laterally infinite z-only slab.
+- **Claim id:** `finite-transverse-crystal`
+- **Code:** `montecarlo/geometry.py::first_prism_exit`;
+  `montecarlo/transport/api.py::simulate_trajectories`;
+  `montecarlo/spectrum/lines/_spectrum.py::mc_spectrum`; and
+  `montecarlo/spectrum/brem.py::mc_brem_spectrum`
+- **Source:** rectangular-prism ray intersection and Beer–Lambert attenuation
+- **Quantity:** For the sample-frame prism
+  $[-W/2,W/2] \times [-H/2,H/2] \times [z_{\min},z_{\max}]$, the geometry
+  helper returns the first strictly forward ray-boundary intersection.
+  Transport stops there, and each segment's radiation receives its
+  Beer–Lambert escape factor along the fixed photon ray to the same boundary.
+  Public widths and heights are in mm; geometry uses Å.
+- **Assumptions:** the origin lies inside the prism; directions are in the
+  sample frame; a finite footprint has two positive dimensions; and the
+  observation direction is fixed in the far field. With both transverse
+  dimensions omitted, the model is the laterally infinite $z$-only slab.
 
 ## Independent re-derivation (before implementation inspection)
 
-Let `r=(x,y,z)` and `d=(d_x,d_y,d_z)`. For each coordinate `q` with lower
-and upper faces `q_-`, `q_+`, the only forward face candidate is
+Let $\mathbf r=(x,y,z)$ and $\mathbf d=(d_x,d_y,d_z)$. For coordinate $q$,
+with lower and upper faces $q_-$ and $q_+$, the forward candidate is
 
 $$
 t_q = \begin{cases}
@@ -29,65 +33,60 @@ $$
 Thus, for a finite prism,
 
 $$
-t_{\\rm exit}=\\min(t_x,t_y,t_z),\qquad r_{\\rm exit}=r+t_{\\rm exit}d.
+t_{\mathrm{exit}}=\min(t_x,t_y,t_z),\qquad
+\mathbf r_{\mathrm{exit}}=\mathbf r+t_{\mathrm{exit}}\mathbf d.
 $$
 
 All finite candidates are positive for a strictly interior origin. Equal
-candidates are a geometrical corner/edge; they have the same distance, so a
-fixed face-order tie rule gives deterministic identity without changing the
-physics. The stated convention is the lowest face constant. If `W,H` are
-both omitted, remove `t_x,t_y` and retain the original z-face result. In
-particular, a lateral ray (`d_z=0`) has no z-face candidate and exits through
-a transverse face if the footprint is finite.
+candidates describe an edge or corner. A fixed face order gives a deterministic
+face identity without changing the distance; the convention is the face with
+the lowest constant. If both transverse dimensions are omitted, only the two
+$z$ faces remain. Thus a lateral ray ($d_z=0$) exits through a transverse face
+when the footprint is finite.
 
 The public conversion is
 
 $$
-W_{\\mathring{\\rm A}}=10^7 W_{\\rm mm},\qquad
-H_{\\mathring{\\rm A}}=10^7 H_{\\rm mm},
+W_{\mathrm{\mathring A}}=10^7 W_{\mathrm{mm}},\qquad
+H_{\mathrm{\mathring A}}=10^7 H_{\mathrm{mm}},
 $$
 
-because `1 mm = 10^7 Angstrom`; it must occur once before the ray calculation.
+because $1\ \mathrm{mm}=10^7\ \mathrm{\mathring A}$. Convert once before
+the ray calculation.
 
-For a photon emitted at `r_0` in direction `n`, use the same expression with
-`d=n` to obtain a capped path `T=t_exit`. With piecewise-constant linear
-attenuation coefficient `mu_j [Angstrom^-1]` in z layer `j`, the independent
-Beer--Lambert result is
+For a photon emitted at $\mathbf r_0$ in direction $\mathbf n$, use the same
+expression with $\mathbf d=\mathbf n$ to obtain the capped path
+$T=t_{\mathrm{exit}}$. With piecewise-constant attenuation coefficient
+$\mu_j\,[\mathrm{\mathring A}^{-1}]$ in layer $j$, Beer–Lambert attenuation is
 
 $$
-A=\\exp(-\\tau),\qquad
-\\tau=\\int_0^T\\mu(z_0+s n_z)\\,ds
-     =\\sum_j\\mu_j L_j,
+A=\exp(-\tau),\qquad
+\tau=\int_0^T \mu(z_0+s n_z)\,ds
+     =\sum_j \mu_j L_j,
 $$
 
-where `L_j` is the length of `[0,T]` whose z coordinate lies in layer `j`.
-For `n_z != 0`, layer-boundary parameters are
-`s_i=(Z_i-z_0)/n_z`; intersect consecutive resulting parameter intervals with
-`[0,T]` and sum their lengths. This both includes every layer crossed before
-a top/bottom exit and clips the final interval at the prism exit. For
-`n_z=0`, `z(s)=z_0`, so `tau=mu_current*T`: a lateral escape remains entirely
-in its emitting z layer and no division by `n_z` is permitted.
+where $L_j$ is the portion of $[0,T]$ that lies in layer $j$. For $n_z\ne0$,
+the layer-boundary parameters are $s_i=(Z_i-z_0)/n_z$; intersect each resulting
+interval with $[0,T]$ and sum their lengths. This includes every crossed layer
+and clips the last interval at the prism exit. For $n_z=0$, $z(s)=z_0$ and
+$\tau=\mu_{\mathrm{current}}T$: lateral escape stays in the emitting layer,
+without division by $n_z$.
 
-Electron free-flight candidates obey the identical minimum-distance rule. A
-finite Gaussian beam entry outside the footprint has no material path and
-therefore no segments, but it is still an incident trial. Consequently a
-per-incident spectrum is proportional to `sum(segment contributions)/Ne`,
-not divided by the number of entered or radiating trajectories. With all
-entries missed, the typed empty segment representation must yield a finite
-zero spectrum. With both dimensions `None`, no transverse coordinate may
-affect transport or attenuation, so the pre-footprint z-only result is
+Electron free flights follow the same minimum-distance rule. A Gaussian-beam
+entry outside the footprint has no material path or segments, but remains an
+incident trial. A spectrum is therefore normalized by `Ne`, not by the number
+of entered or radiating electrons. All misses yield typed empty segments and a
+finite zero spectrum. With both dimensions `None`, transverse coordinates do
+not affect transport or attenuation, so the preceding $z$-only result is
 bit-for-bit recoverable.
 
-## Filters and implementation comparison
+## Implementation comparison
 
-### Comparison
-
-`first_prism_exit` implements the six candidate quotients above, replaces
-zero-direction candidates with infinity, discards non-positive candidates,
-and takes their minimum. Its ordered face constants are `X_MIN, X_MAX, Y_MIN,
-Y_MAX, Z_MIN, Z_MAX`; therefore `argmin` realizes the stated lowest-constant
-corner tie convention. The all-`None` branch constructs only the two z
-candidates.
+`first_prism_exit` implements the six candidates above, replaces
+zero-direction candidates with infinity, discards non-positive candidates, and
+takes their minimum. Its face order is `X_MIN`, `X_MAX`, `Y_MIN`, `Y_MAX`,
+`Z_MIN`, `Z_MAX`; `argmin` therefore realizes the specified tie convention.
+The all-`None` branch constructs only the two $z$ candidates.
 
 `simulate_trajectories` validates the public pair, converts each dimension as
 `mm * 1e7` once, and uses the common exit helper for each finite free flight.
@@ -96,17 +95,16 @@ incident count. The line spectrum returns its accumulated result divided by
 `Ne`; the bremsstrahlung spectrum does the same (and its `1/(4 pi)` factor is
 the stated isotropic solid-angle convention, not a changed normalization).
 
-Both spectrum paths obtain their finite `L_esc` from the same helper. The
-single-material optical depth is `L_esc * mu(E)`. The layered paths call the
-interval expression derived above: `_layer_path_length` has an explicit
-`n_z == 0` current-layer branch and otherwise clips every layer interval at
-`L_esc`. Thus a lateral face cannot add a deeper layer, whereas a z-facing ray
-adds every layer reached before its cap.
+Both spectrum paths obtain finite `L_esc` from the same helper. For a single
+material, $\tau=L_{\mathrm{esc}}\mu(E)$. Layered paths use the interval
+expression above: `_layer_path_length` handles `n_z == 0` in the current layer
+and otherwise clips each layer interval at `L_esc`. A lateral exit therefore
+cannot add a deeper layer; a $z$-facing ray includes every layer before its cap.
 
 ### Independent numerical checks
 
-All distances below are Angstrom ray parameters (the supplied directions are
-unit unless noted):
+All distances below are Å ray parameters; supplied directions are unit vectors
+unless noted.
 
 * For `W=10`, `H=20`, `z in [0,10]`, the independent face distances for
   origins at `(0,0,5)` are `5` to `+x`, `5` to `-x`, and `10` to `+y`; a
@@ -124,7 +122,7 @@ unit unless noted):
 
 ### Anchor evidence
 
-Using the worktree virtual environment, the following all passed:
+The following focused selections passed:
 
 * `tests/montecarlo/test_finite_transverse_geometry.py`,
   `tests/montecarlo/test_spectrum_escape_helpers.py`, `tests/montecarlo/test_multilayer.py`, and
