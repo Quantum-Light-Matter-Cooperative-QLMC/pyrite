@@ -108,10 +108,51 @@ here, because it is libm- and compiler-dependent: an independent host
 ## Routes and measurements
 
 The deterministic CPU mass, limit, policy, per-hkl, and batched-route checks are
-anchored in the tests listed above. CUDA/CuPy kernel checks are present but need
-a CUDA runner. The fixed-transport 300 keV yield and backend/precision comparison
-is prepared in `checks/sinc_bin_integration.py`; that heavy measurement remains
-to be run on the remote GPU box.
+anchored in the tests listed above.
+
+### Fixed-transport 300 keV measurement
+
+`checks/sinc_bin_integration.py` ran on the remote GPU box (RTX 5080, SLURM jobs
+1772/1773) on 2026-09-19: hopg, 300 keV, 5 deg tilt, 95 deg azimuth, 1 mm,
+`ne=200`, seed 0, 50--9098 eV. One transport (466,417 segments, fingerprint
+`e217a05a4ee2e8c09b643efcde6b4903`) feeds every row below, so a difference is
+quadrature, route, or precision and never Monte Carlo. The narrowest line
+feature is 0.180 eV; the node reference is uniform at 0.09375 eV, below it,
+where the band-limited node sum is the exact integral.
+
+Integrated incoherent line yield, relative to that reference (CPU FP64; CUDA
+FP64 agrees to the digits shown):
+
+| grid | node | bin-mean |
+| --- | --- | --- |
+| uniform 3 eV | $-5.32\times10^{-2}$ | $-1.2\times10^{-12}$ |
+| uniform 0.375 eV | $-6.46\times10^{-5}$ | $-1.2\times10^{-12}$ |
+| reference 0.09375 eV | 0 (reference) | $-1.2\times10^{-12}$ |
+| windowed (#101, 2 samples) | $-1.52\times10^{-3}$ | $+6.0\times10^{-8}$ |
+
+Bin-mean is spacing-independent to $10^{-12}$ across a 32x spacing range and
+holds on the nonuniform windowed axis to $6\times10^{-8}$, against the 0.1%
+intrinsic-yield tolerance. Node sampling at the 3 eV production spacing is 5.3%
+low: the aliasing this quadrature removes.
+
+Route and precision agreement against CPU FP64, worst row over all eight grids:
+
+| candidate | bin-mean yield | pointwise |
+| --- | --- | --- |
+| CUDA FP64 (CuPy fallback) | $1.3\times10^{-15}$ | $1.2\times10^{-11}$ |
+| CUDA float32 (fused kernel) | $2.2\times10^{-7}$ | $1.0\times10^{-2}$ |
+
+The float32 pointwise spread is ordinary single-precision accumulation noise on
+per-bin densities -- node rows on the same backend spread by the same
+$10^{-2}$ -- and the check does not gate it; the gated quantity is the
+yield-only claim, which float32 holds to $2.2\times10^{-7}$. The CUDA-marked
+tests ran on that runner in the same job: 45 passed across
+`test_sinc_bin_integration_cuda.py`, `test_sinc_bin_integration.py`, and
+`test_line_grid_quadrature.py`.
+
+No `validation-records` JSONL evidence accompanies this run: the collector calls
+`git rev-parse HEAD` in the source tree, and the box holds an exported checkout
+rather than a repository.
 
 
 (independent-re-derivation)=
