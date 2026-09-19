@@ -39,6 +39,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
 from pyrite.energy_grid import defaults as lg_defaults
 from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop
+from pyrite.energy_grid.floor import photon_continuum_floor_eV
 from pyrite.energy_grid.semantics import resolution_num
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner import run_cases
@@ -86,7 +87,6 @@ WIDE_GRID_EV = np.array([WIDE_GRID_START_EV, WIDE_GRID_STOP_EV])
 # grid; overridable via --brem-grid-stop. Step matches the production E_grid_brem.
 WIDE_BREM_STOP_EV = 40000.0
 WIDE_BREM_STEP_EV = 25.0
-WIDE_BREM_EV = np.arange(0.0, WIDE_BREM_STOP_EV, WIDE_BREM_STEP_EV)
 COARSE_NE = 200
 REFINE_NE = 2000
 TOP_K = 3
@@ -103,6 +103,40 @@ COARSE_ENGINE = "auto"
 # slab bounds the widest grid any thinner production crystal needs. No thickness
 # scan here -- only tilt/azimuth vary.
 DIAGNOSTIC_THICKNESS_ANG = 1.0e7
+
+
+def wide_brem_grid(material, stop_eV=None, step_eV=WIDE_BREM_STEP_EV):
+    """Diagnostic brem grid for one medium: the absolute step lattice, floored.
+
+    The nodes are multiples of ``step_eV`` exactly as before, so a coverage
+    quantile measured here lands on the same coordinates it always did. What
+    changes is where the grid *starts*: at the medium's own derived continuum
+    floor (:func:`~pyrite.energy_grid.floor.photon_continuum_floor_eV`) rather
+    than at ``0.0``, which sat below the band the escape model is valid over and
+    put a node at an energy where it is not defined at all.
+
+    The lattice stays uniform deliberately. A geometric grid equidistributes
+    *relative* quadrature error, but what this grid measures is a cumulative
+    95% quantile in absolute energy near 13-20 keV, rounded to 100 eV by
+    :func:`~pyrite.energy_grid.bounds.margined_stop`; holding that rounding
+    quantum at the 40 keV ceiling needs ~2,900 geometric nodes against 1,600
+    uniform ones. Geometric spacing is right for the continuum grids the
+    spectrum is *evaluated* on (:mod:`pyrite.energy_grid.refine`) and wrong
+    here, so the two are not forced to share a shape.
+    """
+    stop = WIDE_BREM_STOP_EV if stop_eV is None else float(stop_eV)
+    step = float(step_eV)
+    if step <= 0.0:
+        raise ValueError("brem grid step must be positive")
+    floor = photon_continuum_floor_eV(material)
+    first = int(np.ceil(floor / step))
+    count = int(np.ceil(stop / step))
+    if first >= count:
+        raise ValueError(
+            f"brem diagnostic band is empty for {material!r}: the derived floor "
+            f"{floor:g} eV is at or above the {stop:g} eV ceiling"
+        )
+    return step * np.arange(first, count, dtype=float)
 
 
 @dataclass(frozen=True)
@@ -137,6 +171,7 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_
     pure, running happens in a batch via _run_specs so the whole scan shares one
     worker pool instead of paying pool-startup and per-call overhead once per
     geometry."""
+    brem_grid = wide_brem_grid(material)
     sweep = material_sweep(
         material,
         thickness_ang=thickness_ang,
@@ -145,7 +180,7 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_
         tilt_azim_deg=tilt_azim_deg,
         E_grid_line=WIDE_GRID_EV,
         E_grid_line_by_energy=None,
-        E_grid_brem=WIDE_BREM_EV,
+        E_grid_brem=brem_grid,
     )
     case = build_cases(sweep, n_electrons=n_electrons)[0]
     return {
@@ -156,6 +191,14 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_
             "aliased_weight_limit": ALIASED_WEIGHT_LIMIT,
             "backend_safety_ulps": BACKEND_SAFETY_ULPS,
             "maximum_spacing_eV": MAX_DIAGNOSTIC_SPACING_EV,
+        },
+        # The brem coverage a run reports is only as meaningful as the band it
+        # was measured over, so the band travels with the case.
+        "_diagnostic_brem_grid": {
+            "floor_eV": float(brem_grid[0]),
+            "stop_eV": WIDE_BREM_STOP_EV,
+            "step_eV": WIDE_BREM_STEP_EV,
+            "num": int(brem_grid.size),
         },
     }
 
@@ -803,12 +846,13 @@ def main(argv=None):
         float(args.brem_step) if args.brem_step is not None else persisted["brem_step_ev"]
     )
     global WIDE_GRID_STOP_EV, BACKEND_SAFETY_ULPS, MAX_DIAGNOSTIC_SPACING_EV
-    global WIDE_GRID_EV, WIDE_BREM_EV
+    global WIDE_GRID_EV, WIDE_BREM_STOP_EV
     WIDE_GRID_STOP_EV = float(args.grid_stop)
     BACKEND_SAFETY_ULPS = float(args.backend_ulp_factor)
     MAX_DIAGNOSTIC_SPACING_EV = None if args.grid_step is None else float(args.grid_step)
     WIDE_GRID_EV = np.array([WIDE_GRID_START_EV, WIDE_GRID_STOP_EV])
-    WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
+    # The ceiling is the override; each case's floor comes from its own medium.
+    WIDE_BREM_STOP_EV = float(args.brem_grid_stop)
     materials = (
         args.materials.split(",")
         if args.materials

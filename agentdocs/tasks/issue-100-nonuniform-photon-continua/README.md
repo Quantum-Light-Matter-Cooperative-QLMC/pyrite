@@ -3,9 +3,8 @@
 Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
 Branch: `issue-100-nonuniform-photon-continua`
 
-Status: seven slices implemented on this branch (six checkpointed, the
-node-refinement slice checkpointed here); issue stays open, remaining scope
-below.
+Status: eight slices implemented and checkpointed on this branch; issue stays
+open, remaining scope below.
 
 ## Context
 
@@ -207,6 +206,45 @@ was found.
   this slice; the observable and endpoint-placement figures re-measured
   unchanged.
 
+## Production routing: the brem diagnostic band
+
+- `derive.py::wide_brem_grid(material)` replaces the module-level
+  `WIDE_BREM_EV = np.arange(0.0, 40_000.0, 25.0)`. The diagnostic band now
+  starts at the medium's own derived continuum floor instead of at `0.0`, which
+  sat below the band the escape model is valid over and put a node at an energy
+  where it is not defined at all. `--brem-grid-stop` now overrides
+  `WIDE_BREM_STOP_EV`; each case's floor comes from its own medium.
+- **The lattice stays uniform, deliberately, and this is the measured reason.**
+  What this grid measures is a cumulative 95% quantile *in absolute energy*
+  near 13-20 keV, returned as a node coordinate and then rounded to 100 eV by
+  `margined_stop`. Holding that 100 eV quantum at the 40 keV ceiling costs
+  ~2,900 geometric nodes against 1,600 uniform ones, and a coarser geometric
+  grid quantizes the quantile outright: measured on hopg/30 keV, a 221-node
+  geometric grid moved the coverage energy from 13,575 to 14,136 eV and the
+  derived stop from 15,700 to 16,300 eV. Geometric spacing is right for the
+  grids the continuum is *evaluated* on and wrong for this one, so the issue's
+  "brem diagnostic grid cannot go log" item is answered by routing the floor,
+  not by changing the shape.
+- Nodes are the same multiples of the step the 0-based grid used, so only the
+  sub-floor nodes are dropped. Measured on hopg/30 keV (1 mm slab, 8 electrons,
+  `seed=0`): coverage energy `13,575 eV` and derived stop `15,700 eV` are
+  **identical** before and after, and the total escaping intensity differs by
+  `6e-7` relative -- the dropped 0-50 eV band carries densities of order
+  `1e-15` because self-absorption has already removed it. So the modelled band
+  is now honest and no derived catalog value moves.
+- First node by medium: `hopg`/`silicon`/`diamond` `50 eV`, `wse2`/`ptbi2`
+  `75 eV`. The case carries a `_diagnostic_brem_grid` provenance record
+  (floor/stop/step/num) beside the existing `_diagnostic_line_grid`.
+- Noted while verifying, not changed here: `campaign/sweep.py:825-833` re-spans
+  a **uniform** (triple-encoded) brem grid to each case's beam energy
+  (`E0*1e3 + step`), but passes a **nonuniform** one through unchanged. A
+  floored uniform lattice still encodes as a triple, so that behaviour is
+  preserved exactly; a nonuniform production brem grid, however, would keep its
+  nodes above the kinematic endpoint rather than being truncated to it. Those
+  nodes are zero rather than wrong -- and the refinement slice puts a bin edge
+  exactly at the endpoint -- but the asymmetry is real and belongs with whoever
+  gives nonuniform grids a sweep-level spelling.
+
 ## Verification
 
 `pyrite-dev lint`, `typecheck`, `docs`: all clean. `pyrite-dev test`: 3919
@@ -257,18 +295,23 @@ exports `PYRITE_ONLINE_TESTS=1` and `PYRITE_RUN_INTEL_SYCL_TESTS=1`, which force
 `mp_api`) and `test_intel_machine_selects_sycl_backend` (needs `dpctl`) to run
 instead of skip; neither extra is installed in this worktree's `.venv`.
 
+Eighth slice (brem diagnostic band): `pyrite-dev lint`, `typecheck`, and `docs`
+are clean. `tests/energy-grid` + `tests/scan` + `tests/checkpoint` +
+`montecarlo/test_case.py` is 823 passed. Real-case probe (not monkeypatched):
+`_build_case("wse2", ...)` carries `(75.0, 30025.0, 25.0)` -- floored start,
+and the same beam-energy re-spanning the 0-based grid got.
+
 ## Remaining on #100 (not touched here)
 
 - Execute the prepared CUDA/fallback parity gate on a CUDA lab box.
 - Human sign-off on the `photon-continuum-floor` and
   `continuum-node-refinement` ledger rows (both `rederived`); an agent must not
   mark them.
-- Outside the convergence ladders, no caller selects the derived floor or the
-  refined grid: `derive.py`'s wide brem diagnostic grid is still
-  `np.arange(0.0, ...)` (`:89`, `:811`) and cannot go log until the floor is
-  routed through it, and `apply.py` emits sweep grids as `linspace` inline
-  tables only (`:105-116`, `:136-141`, `:876`), so a geometric grid has no
-  sweep-level spelling. Both change production numbers, so they are their own
-  slice.
+- `apply.py` emits sweep grids as `linspace` inline tables only (`:105-116`,
+  `:136-141`, `:876`), so a nonuniform production grid still has no sweep-level
+  spelling, and the uniform-only consumers behind it (`metrics.py:143`,
+  `checkpoints/recompute.py:463,466,516`, `bounds.py::spacing_num`) keep their
+  guards. That is the remaining production-routing slice; it changes a
+  documented CLI contract and needs `cli-reference.md` regenerated.
 
 Given these, #100 stays open after this PR merges.

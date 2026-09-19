@@ -6,6 +6,7 @@ import pytest
 
 from pyrite.energy_grid import derive as analyze
 from pyrite.energy_grid.bounds import coverage_energy
+from pyrite.energy_grid.floor import photon_continuum_floor_eV
 
 
 def test_geometry_plan_is_full_curated_tilt_azimuth_product():
@@ -312,7 +313,61 @@ def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):
     analyze._build_case("hopg", 100.0, 5.0, 100.0, analyze.DIAGNOSTIC_THICKNESS_ANG, 10)
 
     assert "E_grid_brem" in captured
-    np.testing.assert_array_equal(captured["E_grid_brem"], analyze.WIDE_BREM_EV)
+    np.testing.assert_array_equal(captured["E_grid_brem"], analyze.wide_brem_grid("hopg"))
+
+
+def test_wide_brem_grid_starts_at_the_medium_derived_floor():
+    """#100: the diagnostic band starts where the escape model is valid.
+
+    The old grid was ``arange(0.0, ...)``, whose first node sits at an energy
+    the model is not defined at and whose first bins lie below the medium's
+    plasma energy.
+    """
+    floor = photon_continuum_floor_eV("hopg")
+    grid = analyze.wide_brem_grid("hopg")
+
+    assert grid[0] >= floor
+    assert grid[0] - analyze.WIDE_BREM_STEP_EV < floor  # the FIRST admissible node
+    assert grid[0] != 0.0
+
+
+def test_wide_brem_grid_keeps_the_absolute_step_lattice():
+    """Nodes are the same multiples of the step the 0-based grid used.
+
+    The coverage quantile is reported as a node coordinate, so re-anchoring the
+    lattice would move a derived stop for no physical reason. Only the nodes
+    below the floor are dropped.
+    """
+    legacy = np.arange(0.0, analyze.WIDE_BREM_STOP_EV, analyze.WIDE_BREM_STEP_EV)
+    grid = analyze.wide_brem_grid("hopg")
+
+    np.testing.assert_array_equal(grid, legacy[legacy >= grid[0]])
+    assert grid[-1] == legacy[-1]
+
+
+def test_wide_brem_grid_floor_is_material_specific():
+    """Denser media have a higher plasma energy, so a later first node."""
+    assert analyze.wide_brem_grid("ptbi2")[0] > analyze.wide_brem_grid("hopg")[0]
+
+
+def test_wide_brem_grid_refuses_a_ceiling_below_the_floor():
+    with pytest.raises(ValueError, match="band is empty"):
+        analyze.wide_brem_grid("hopg", stop_eV=10.0)
+
+
+def test_build_case_records_the_diagnostic_brem_band(monkeypatch):
+    monkeypatch.setattr(analyze, "material_sweep", lambda *args, **kwargs: object())
+    monkeypatch.setattr(analyze, "build_cases", lambda *args, **kwargs: [{"name": "case"}])
+
+    case = analyze._build_case("hopg", 100.0, 5.0, 100.0, 1.0e7, 10)
+
+    grid = analyze.wide_brem_grid("hopg")
+    assert case["_diagnostic_brem_grid"] == {
+        "floor_eV": float(grid[0]),
+        "stop_eV": analyze.WIDE_BREM_STOP_EV,
+        "step_eV": analyze.WIDE_BREM_STEP_EV,
+        "num": int(grid.size),
+    }
 
 
 def test_build_case_marks_grid_for_post_transport_sinc_resolution(monkeypatch):
