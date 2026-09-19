@@ -90,6 +90,7 @@ def _coherent_electron_grouped_row(
     cdtype = st.cdtype
     omega_grid = st.omega_grid
     delta_omega_grid = st.delta_omega_grid
+    sinc_cutoff = req.sinc_cutoff
 
     gid = _to_cpu(elec_id_sel)
     perm = np.argsort(gid, kind="stable")
@@ -106,10 +107,14 @@ def _coherent_electron_grouped_row(
     coefs_p = [c[perm_xp] for c in coefs_sel]
     for ka, kb in _flight_blocks(bounds, chunk):
         rows = slice(bounds[ka], bounds[kb])
-        x = aw_p[rows][:, None] * (E_grid[None, :] - Er_p[rows][:, None]) / xp.pi
+        x_unscaled = aw_p[rows][:, None] * (E_grid[None, :] - Er_p[rows][:, None])
+        x = x_unscaled / xp.pi
         arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
         arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
-        SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
+        sinc = xp.sinc(x)
+        if sinc_cutoff is not None:
+            sinc = xp.where(xp.abs(x_unscaled) <= sinc_cutoff, sinc, 0.0)
+        SP = sinc.astype(cdtype) * xp.exp(1j * arg)
         offsets = bounds[ka:kb] - bounds[ka]
         for c in coefs_p:
             field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
@@ -122,8 +127,8 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
     reduction kernel -- the device counterpart of
     ``_coherent_electron_grouped_row`` above.
 
-    No new device code is needed: ``run_coherent_reduction_kernel``
-    already computes |sum of the lines it is handed|^2 and ACCUMULATES
+    ``run_coherent_reduction_kernel`` computes |sum of the lines it is
+    handed|^2 and ACCUMULATES
     (``spec[k] += wm * ...``), so calling it once per electron over that
     electron's own lines, with ``mosaic_weight=1``, into one zeroed
     buffer sums the per-electron squares exactly. The cost is Ne extra
@@ -133,7 +138,9 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
     ``per_line_sel`` is the 8-tuple the kernel takes (E_r, a_width,
     phase_slope, g_phase, and the two complex polarization coefficients
     split into real/imag), already restricted to this row's kept lines
-    and sharing one length with ``elec_id_sel``/``L_esc_sel``."""
+    and sharing one length with ``elec_id_sel``/``L_esc_sel``. The request's
+    sinc cutoff is forwarded unchanged so the grouped and flat terms retain
+    identical line support."""
     E_grid = st.E_grid
     delta_omega_grid = st.delta_omega_grid
 
@@ -163,6 +170,7 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
             mosaic_weight=1.0,
             L_esc=L_p[sl],
             delta_omega=dom_c,
+            sinc_cutoff=st.request.sinc_cutoff,
             config=DEFAULT_COHERENT_KERNEL_CONFIG,
         )
     return out
@@ -204,19 +212,11 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
     coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
     good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
 
-    if decoherence_active and sinc_cutoff is not None:
-        raise ValueError(
-            "coherent emission with a nonzero bunch_length_fs/"
-            "beam_fwhm_mm and sinc_cutoff together is not yet "
-            "supported (the electron-grouped decoherence floor "
-            "does not implement sinc_cutoff windowing)"
-        )
-
     # GPU float32 fast path: reduce the two complex polarization fields
     # directly in a raw kernel. This avoids materializing the dense
     # complex SP[segment, energy] matrix and avoids both complex GEMVs.
     # The exact CuPy path below remains the fallback for CPU/other
-    # backends, float64, and sinc_cutoff windowing. A nonzero
+    # backends and float64. A nonzero
     # bunch_length_fs/beam_fwhm_mm stays ON the kernel: the fused
     # kernel squares whatever line set it is handed and ACCUMULATES,
     # so the electron-grouped floor sum_e|S_e|^2 is just one call per
@@ -233,7 +233,6 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
         _policy._USE_JIT_COHERENT_REDUCTION
         and getattr(xp, "__name__", "") == "cupy"
         and np.dtype(REAL) == np.dtype(np.float32)
-        and sinc_cutoff is None
     )
     if _use_jit_coherent_reduction:
         from ..coherent_jit_kernel import (
@@ -267,6 +266,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
                 mosaic_weight=1.0 if decoherence_active else wm,
                 L_esc=L_esc_sel,
                 delta_omega=dom_c,
+                sinc_cutoff=sinc_cutoff,
                 config=DEFAULT_COHERENT_KERNEL_CONFIG,
             )
             if decoherence_active:
@@ -309,11 +309,13 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
             i0, i1 = _sinc_window_bounds(E_grid, lo, hi)
             if i1 <= i0:
                 continue
-            x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
+            x_unscaled = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None])
+            x = x_unscaled / xp.pi
             arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
             arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
             ph = xp.exp(1j * arg)
-            SP = xp.sinc(x).astype(cdtype) * ph
+            sinc = xp.where(xp.abs(x_unscaled) <= sinc_cutoff, xp.sinc(x), 0.0)
+            SP = sinc.astype(cdtype) * ph
             for c, f in zip(coefs, fields, strict=True):
                 f[i0:i1] += c[sel] @ SP
     flat_total = sum(xp.abs(f) ** 2 for f in fields)

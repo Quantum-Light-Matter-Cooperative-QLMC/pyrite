@@ -990,7 +990,6 @@ def _accumulate_batched(st):
         and _policy._USE_JIT_COHERENT_STREAM
         and getattr(xp, "__name__", "") == "cupy"
         and np.dtype(REAL) == np.dtype(np.float32)
-        and sinc_cutoff is None
     )
     if _use_jit_coherent_stream:
         from ..coherent_stream_jit_kernel import (
@@ -1070,6 +1069,7 @@ def _accumulate_batched(st):
                 # the prologue's other outputs are pair-sized.
                 "L_esc": L_esc_full[sel].reshape(-1),
                 "delta_omega": delta_omega_grid,
+                "sinc_cutoff": sinc_cutoff,
                 "config": DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             }
             if group_starts is None:

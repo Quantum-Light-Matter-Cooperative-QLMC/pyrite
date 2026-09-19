@@ -62,6 +62,13 @@ def _sinc_unscaled(x):
     return xp.sin(x) / x
 
 
+@jit.rawkernel(device=True)
+def _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff):
+    if use_sinc_cutoff and (x < -sinc_cutoff or x > sinc_cutoff):
+        return F32_ZERO
+    return _sinc_unscaled(x)
+
+
 @jit.rawkernel()
 def _kernel_1e(
     E_r,
@@ -78,6 +85,8 @@ def _kernel_1e(
     spec,
     wm,
     use_medium,
+    sinc_cutoff,
+    use_sinc_cutoff,
     n_lines,
     n_E,
 ):
@@ -108,7 +117,7 @@ def _kernel_1e(
         cpr = cp_re[line]
         cpi = cp_im[line]
         x = aa * (E0 - Er)
-        s = _sinc_unscaled(x)
+        s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
         phase = ps * E0 - gp
         if use_medium:
             phase = phase - Lj * dw0
@@ -163,6 +172,8 @@ def _kernel_2e(
     spec,
     wm,
     use_medium,
+    sinc_cutoff,
+    use_sinc_cutoff,
     n_lines,
     n_E,
 ):
@@ -205,7 +216,7 @@ def _kernel_2e(
         cpr = cp_re[line]
         cpi = cp_im[line]
         x = aa * (E0 - Er)
-        s = _sinc_unscaled(x)
+        s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
         phase = ps * E0 - gp
         if use_medium:
             phase = phase - Lj * dw0
@@ -217,7 +228,7 @@ def _kernel_2e(
         pi0 += s * (cpr * sph + cpi * cph)
         if has1:
             x = aa * (E1 - Er)
-            s = _sinc_unscaled(x)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
             phase = ps * E1 - gp
             if use_medium:
                 phase = phase - Lj * dw1
@@ -290,6 +301,8 @@ def _kernel_3e(
     spec,
     wm,
     use_medium,
+    sinc_cutoff,
+    use_sinc_cutoff,
     n_lines,
     n_E,
 ):
@@ -344,7 +357,7 @@ def _kernel_3e(
         cpr = cp_re[line]
         cpi = cp_im[line]
         x = aa * (E0 - Er)
-        s = _sinc_unscaled(x)
+        s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
         phase = ps * E0 - gp
         if use_medium:
             phase = phase - Lj * dw0
@@ -356,7 +369,7 @@ def _kernel_3e(
         pi0 += s * (cpr * sph + cpi * cph)
         if has1:
             x = aa * (E1 - Er)
-            s = _sinc_unscaled(x)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
             phase = ps * E1 - gp
             if use_medium:
                 phase = phase - Lj * dw1
@@ -368,7 +381,7 @@ def _kernel_3e(
             pi1 += s * (cpr * sph + cpi * cph)
         if has2:
             x = aa * (E2 - Er)
-            s = _sinc_unscaled(x)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
             phase = ps * E2 - gp
             if use_medium:
                 phase = phase - Lj * dw2
@@ -461,6 +474,7 @@ def run_coherent_reduction_kernel(
     mosaic_weight=1.0,
     L_esc=None,
     delta_omega=None,
+    sinc_cutoff=None,
     config=DEFAULT_COHERENT_KERNEL_CONFIG,
 ):
     """Accumulate one reflection/orientation's coherent intensity into ``out``.
@@ -477,6 +491,8 @@ def run_coherent_reduction_kernel(
     ``phase_slope``. Both must be given together or both omitted; when omitted
     the kernel evaluates the vacuum phase expression unchanged (the in-medium
     term sits behind a launch-uniform branch, so vacuum stays bit-for-bit).
+    When ``sinc_cutoff`` is given, line contributions whose unscaled sinc
+    argument exceeds it in magnitude are omitted.
     """
     nthreads = int(config.nthreads)
     epb = int(config.energies_per_block)
@@ -501,6 +517,8 @@ def run_coherent_reduction_kernel(
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
+    use_sinc_cutoff = sinc_cutoff is not None
+    cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
     nblocks = (n_E + epb - 1) // epb
     shared_bytes = 4 * epb * nthreads * np.dtype(np.float32).itemsize
     kernel(
@@ -521,6 +539,8 @@ def run_coherent_reduction_kernel(
             out,
             np.float32(mosaic_weight),
             np.uint32(1 if use_medium else 0),
+            cutoff,
+            np.uint32(1 if use_sinc_cutoff else 0),
             np.uint32(E_r.size),
             np.uint32(n_E),
         ),

@@ -8,7 +8,8 @@ over a detector solid angle.
 
 import numpy as np
 
-from ...._backend import _to_cpu
+from ...._backend import REAL, _to_cpu, xp
+from . import _policy
 from ._batched import _accumulate_batched
 from ._per_hkl import _accumulate_per_hkl
 from ._setup import SpectrumRequest, _prepare_spectrum
@@ -192,8 +193,9 @@ def _needs_per_hkl_route(st):
     The batched ``(n_seg, N_g)`` path covers the single-slab absorber, with or
     without a finite crystal footprint -- the escape DISTANCE is g-independent
     either way, so it hoists -- for both coherent and incoherent emission.
-    Layered and grooved absorbers, and coherent runs that ask for sinc_cutoff
-    windowing, stay on the proven per-hkl loop, bit-for-bit.
+    Layered and grooved absorbers stay on the proven per-hkl loop. Coherent
+    sinc-windowed runs use it except when the CUDA-fp32 streaming kernel can
+    apply the same cutoff without materializing dense field matrices.
 
     The flight-grouped reduction lives there too: its segmented complex sum
     has no batched or device counterpart yet, and correctness of the default
@@ -201,8 +203,13 @@ def _needs_per_hkl_route(st):
     substepped configuration.
     """
     req = st.request
+    stream_handles_cutoff = (
+        _policy._USE_JIT_COHERENT_STREAM
+        and getattr(xp, "__name__", "") == "cupy"
+        and np.dtype(REAL) == np.dtype(np.float32)
+    )
     return bool(
-        (req.coherent and req.sinc_cutoff is not None)
+        (req.coherent and req.sinc_cutoff is not None and not stream_handles_cutoff)
         or req.groove is not None
         or req.layers is not None
         or st.grouped
