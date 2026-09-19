@@ -3,8 +3,9 @@
 Issue: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/100
 Branch: `issue-100-nonuniform-photon-continua`
 
-Status: five slices checkpointed and one additional slice implemented on this
-branch; issue stays open, remaining scope below.
+Status: seven slices implemented on this branch (six checkpointed, the
+node-refinement slice checkpointed here); issue stays open, remaining scope
+below.
 
 ## Context
 
@@ -163,6 +164,49 @@ was found.
   **not** signed off -- only a human does that. Generated ledger views
   regenerated (`0 / 124` claims signed off).
 
+## Derived node placement: edges and the kinematic endpoint
+
+- `energy_grid/refine.py::refined_continuum_grid` takes the geometric baseline
+  and refines it only where the modelled continuum is not smooth on the scale of
+  its own step: absorption edges, and the bremsstrahlung kinematic endpoint. The
+  argument is a midpoint-quadrature error one -- a grid uniform in `u = ln E`
+  equidistributes `eps_i ~ (h_i^2/24)|n''/n|` for a locally power-law integrand,
+  and both features degrade the straddling interval from `O(h^2)` to `O(h)`,
+  which no globally finer geometric spacing fixes at better than first order.
+- Edges are **located, never listed**: the steepest adjacent Chantler `f2` ratio
+  near each xraydb edge energy, read from the same table the escape model
+  attenuates with. `line_seeds.py::absorption_edge_seeds` was split so its
+  locator (`absorption_edge_brackets`, returning `EdgeBracket`) is shared with
+  the continuum axis rather than copied; the line-window seeds keep their exact
+  prior output. Elements come from the medium's own catalog composition plus the
+  silicon sensor both detector models share.
+- Endpoints need no taper: one anchor pair straddling `E*` at the grid's own
+  local spacing puts a midpoint bin *edge* exactly on the cutoff, so the bin
+  below carries the tip and the bin above is exactly empty.
+- Marks merge into the baseline by displacement, not accumulation: a baseline
+  node within half a mark's spacing of a mark node is replaced by it, and marks
+  overlapping each other merge on the finer spacing. Without that, float drift
+  in a sample lattice opens near-degenerate intervals that
+  `validate_backend_coordinates` rightly refuses at float32.
+- `CaseLadder.continuum_grids` / `continuum_ladder_grids` are the production
+  selectors, so the convergence ladders now start at the medium's own derived
+  floor (closing the sixth slice's "no production caller" gap) and carry the
+  refinement, with the endpoint read from the case's own incident energy.
+- Physics record: `Validation: continuum-node-refinement`, derivation in
+  `docs/physics/radiation-physics/energy-grid-semantics.md`
+  (`continuum-node-refinement`, `eq-grid-quadrature-error`) and a ledger row in
+  `docs/validation/ledger-crystallography-atomic-data.md`. Status `rederived`;
+  **not** signed off. Generated views regenerated (`0 / 125` claims signed off).
+- Measured on the fixed-trajectory HOPG case (`seed=0`, 3 electrons, 30 keV):
+  every gated continuum observable moves far inside budget (yield `2.6e-6`,
+  centroid `2.5e-6`, Timepix3 `9.4e-6`, Eagle XO `4.9e-6` at 2049 nodes; the
+  centroid rises to `2.5e-5` with the endpoint inside the band, still `40x`
+  inside a `1e-3` budget) and every delta shrinks as the baseline refines. Cost
+  is `+19`/`+16`/`+10` nodes on 2049/4097/8193. The ledger's earlier
+  `+22`/`+19`/`+13` was a stale pre-merge-rule measurement and was corrected in
+  this slice; the observable and endpoint-placement figures re-measured
+  unchanged.
+
 ## Verification
 
 `pyrite-dev lint`, `typecheck`, `docs`: all clean. `pyrite-dev test`: 3919
@@ -203,18 +247,28 @@ which the live-crystallography-DB and multiprocessing-socket cases skip rather
 than fail. Note `pyrite-dev format` reformats seven files unrelated to this
 slice; those were reverted rather than committed.
 
+Seventh slice (node refinement): `pyrite-dev lint`, `typecheck`, and `docs` are
+clean (`docs` again needs `pyrite-dev validation-ledger --write` first, since the
+new row makes the generated views stale). The affected
+energy-grid/montecarlo/seed set is 134 passed / 2 skipped. The broader
+`test-suite core` run is 6 failures, all environment, none code: this shell
+exports `PYRITE_ONLINE_TESTS=1` and `PYRITE_RUN_INTEL_SYCL_TESTS=1`, which force
+`tests/materials/test_crystal_external_db.py` (needs the `external-db` extra,
+`mp_api`) and `test_intel_machine_selects_sycl_backend` (needs `dpctl`) to run
+instead of skip; neither extra is installed in this worktree's `.venv`.
+
 ## Remaining on #100 (not touched here)
 
-- Refine the geometric photon-continuum baseline near material edges and
-  kinematic endpoints. `geometric_continuum_grid` deliberately builds the
-  unrefined baseline only, so this slice is the natural next owner of node
-  placement between floor and ceiling.
 - Execute the prepared CUDA/fallback parity gate on a CUDA lab box.
-- Human sign-off on the `photon-continuum-floor` ledger row (status
-  `rederived`); an agent must not mark it.
-- No production caller selects `photon_continuum_floor_eV` yet -- the
-  convergence ladders still build their geometric grids with a literal
-  `100.0 eV` start. Routing them through the derived floor changes their
-  numbers, so it belongs with the refinement slice rather than here.
+- Human sign-off on the `photon-continuum-floor` and
+  `continuum-node-refinement` ledger rows (both `rederived`); an agent must not
+  mark them.
+- Outside the convergence ladders, no caller selects the derived floor or the
+  refined grid: `derive.py`'s wide brem diagnostic grid is still
+  `np.arange(0.0, ...)` (`:89`, `:811`) and cannot go log until the floor is
+  routed through it, and `apply.py` emits sweep grids as `linspace` inline
+  tables only (`:105-116`, `:136-141`, `:876`), so a geometric grid has no
+  sweep-level spelling. Both change production numbers, so they are their own
+  slice.
 
 Given these, #100 stays open after this PR merges.
