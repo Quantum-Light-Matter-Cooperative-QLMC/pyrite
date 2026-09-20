@@ -137,6 +137,32 @@ environment, not the WarpX-specific `jrozells` Conda environment.
 fails before batch-script generation until those lab-box module/profiler paths
 are validated, so NVIDIA commands are never emitted for another vendor.
 
+One shared checkout, one code identity. `sync` unpacks into a single directory
+on the box, so a second working tree syncing mid-run would otherwise rewrite
+`src/pyrite` and `checks/` underneath a job that is already running — silently
+mixing two revisions into one set of results. Each sync therefore identifies its
+payload by content (every synced file's arcname plus its content hash, after the
+CRLF→LF normalization, so a Windows and a Linux checkout of the same code agree)
+and records that identity in `<REMOTE_DIR>/.pyrite-sync` as the last step of a
+successful extraction, together with the local `git` revision, a dirty flag, a
+timestamp, and the source host and worktree. Submission copies those `code_`
+fields into each job's `jobs/<id>/meta`, so a job's code identity is fixed when
+it is queued, and evidence collected on the box can name a revision even though
+the remote checkout is an exported tree rather than a repository.
+
+A sync then refuses, before transferring anything, when a live job recorded a
+different payload identity — naming the job, its recorded digest and revision,
+and the incoming one. Syncing the *same* payload is silent, so starting a second
+material during a long run keeps working. Jobs queued before code stamping
+record no identity; they are reported as unverifiable rather than treated as a
+conflict. Override with `pyrite remote sync --force`, which proceeds and warns,
+naming every live job whose remaining steps may now import a different revision
+than they started with:
+
+```bash
+pyrite remote sync --force
+```
+
 Review the exact batch script and `sbatch --parsable` submission command without
 contacting the lab box:
 
