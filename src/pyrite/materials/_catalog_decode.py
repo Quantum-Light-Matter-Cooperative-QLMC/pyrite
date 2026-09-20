@@ -193,6 +193,36 @@ def _energy_grid_rows(value: object, path: str, errors: _Errors) -> LineGridByEn
     return MappingProxyType(parsed) if parsed else None
 
 
+def grid_descriptor_kind(value: object) -> str | None:
+    """The single grid-kind key in a descriptor mapping, else ``None``.
+
+    ``None`` covers both "not a grid descriptor" and "not exactly one kind";
+    :func:`resolve_grid_descriptor` is what reports *why* a descriptor is
+    malformed.
+    """
+    if not isinstance(value, Mapping):
+        return None
+    kinds = [key for key in value if key in _GRID_KINDS]
+    if len(kinds) != 1 or len(value) != 1:
+        return None
+    return kinds[0]
+
+
+def resolve_grid_descriptor(value: object, path: str = "grid") -> np.ndarray:
+    """Resolve one grid descriptor to its coordinates, raising on any error.
+
+    :func:`_grid` collects errors because the catalog parse reports all of a
+    document's problems at once. Callers outside that parse -- the CLI
+    reporting and catalog-writer paths -- want one exception instead, and must
+    not grow a second decoder that can drift from the schema this one defines.
+    """
+    errors = _Errors()
+    out = _grid(value, path, errors)
+    if out is None:
+        raise ValueError("; ".join(errors.items) or f"{path}: invalid grid descriptor")
+    return out
+
+
 def _table(value: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
     if not isinstance(value, Mapping):
         errors.add(path, "must be a table")
@@ -200,4 +230,9 @@ def _table(value: object, path: str, errors: _Errors) -> Mapping[str, object] | 
     return cast(Mapping[str, object], value)
 
 
-__all__ = ["GridValue", "LineGridByEnergy"]
+__all__ = [
+    "GridValue",
+    "LineGridByEnergy",
+    "grid_descriptor_kind",
+    "resolve_grid_descriptor",
+]

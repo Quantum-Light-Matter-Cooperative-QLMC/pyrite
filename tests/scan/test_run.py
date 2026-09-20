@@ -1882,7 +1882,20 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
     calls.clear()
     rebrem.rebrem_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
 
-    assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
+    # Compared key by key: a graded profile continuum (hopg/survey is refined,
+    # so its grid carries two step sizes) resolves to a ``brem_nodes`` array,
+    # and a dict holding one cannot be compared with ``==``.
+    by_name = {name: kwargs for name, kwargs in calls}
+    explicit_by_name = {name: kwargs for name, kwargs in explicit}
+    assert by_name.keys() == explicit_by_name.keys()
+    for name, got in by_name.items():
+        want = explicit_by_name[name]
+        assert got.keys() == want.keys()
+        for key in got:
+            if isinstance(got[key], np.ndarray) or isinstance(want[key], np.ndarray):
+                assert np.array_equal(np.asarray(got[key]), np.asarray(want[key])), (name, key)
+            else:
+                assert got[key] == want[key], (name, key)
     assert {kwargs["ne_brem"] for _, kwargs in calls} == {30}
     assert {kwargs["fidelity"] for _, kwargs in calls} == {"survey"}
 
@@ -2463,3 +2476,142 @@ def test_recomputed_checkpoint_publishes_cas_before_component_and_manifest(monke
     assert events[0][1] == "hopg"
     assert len(events[0][2]) == 64
     assert events[-1][2] == identity
+
+
+# ---------------------------------------------------------------------------
+# repair_brem_wide: graded retune targets (#153)
+# ---------------------------------------------------------------------------
+
+
+def _graded_record(brem_wide=None):
+    Eb = np.arange(0.0, 500.0, 50.0)
+    return dict(
+        E_grid=np.arange(100.0, 200.0, 10.0),
+        spec=np.ones(10),
+        brem=np.ones(10) * 0.01,
+        E_grid_brem=Eb,
+        brem_wide=np.full_like(Eb, 0.001) if brem_wide is None else brem_wide,
+        eta=0.05,
+        scale=1.0,
+        case=_fake_case("cfg_a", 30.0),
+    )
+
+
+def test_repair_brem_wide_retunes_onto_explicit_graded_nodes(monkeypatch):
+    """A graded target has no (start, stop, step); retune onto the coordinates."""
+    nodes = np.geomspace(50.0, 30000.0, 17)
+    record = _graded_record()
+    monkeypatch.setattr(
+        "pyrite.montecarlo._brem_for_case",
+        lambda c, E_brem: np.full(np.asarray(E_brem, float).shape, 0.002),
+    )
+
+    n = repair_brem_wide(
+        {"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False, brem_nodes=nodes
+    )
+
+    assert n == 1
+    assert np.array_equal(record["E_grid_brem"], nodes)
+    # the case carries the exact coordinates, not a uniform triple
+    assert np.array_equal(np.asarray(record["case"]["E_grid_brem"]), nodes)
+    assert not isinstance(record["case"]["E_grid_brem"], tuple)
+
+
+def test_repair_brem_wide_skips_a_record_already_on_the_graded_target(monkeypatch):
+    nodes = np.geomspace(50.0, 30000.0, 17)
+    record = _graded_record(brem_wide=np.full(nodes.shape, 0.001))
+    record["E_grid_brem"] = nodes
+    record["case"]["E_grid_brem"] = nodes
+    monkeypatch.setattr(
+        "pyrite.montecarlo._brem_for_case",
+        lambda c, E_brem: pytest.fail("already at target; must not recompute"),
+    )
+
+    n = repair_brem_wide(
+        {"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False, brem_nodes=nodes
+    )
+
+    assert n == 0
+
+
+def test_repair_brem_wide_refuses_graded_nodes_mixed_with_a_uniform_triple():
+    with pytest.raises(ValueError, match="cannot be combined"):
+        repair_brem_wide(
+            {"cfg_a": {30.0: _graded_record()}},
+            progress=False,
+            brem_nodes=np.geomspace(50.0, 30000.0, 17),
+            brem_step_eV=25.0,
+        )
+
+
+def test_repair_brem_wide_rejects_a_degenerate_node_array():
+    with pytest.raises(ValueError, match="at least two nodes"):
+        repair_brem_wide(
+            {"cfg_a": {30.0: _graded_record()}}, progress=False, brem_nodes=np.array([50.0])
+        )
+
+
+def test_rebrem_retunes_onto_a_graded_profile_grid(monkeypatch, tmp_path):
+    """A graded profile continuum must reach the retune, not be silently dropped.
+
+    ``uniform_bounds`` raises on a nonuniform grid, and that raise used to land
+    in the same ``except`` branch that handles derived stems with no catalog
+    row -- so the profile grid was discarded and the record kept its own (#153).
+    """
+    from pyrite.checkpoints import recompute as rebrem
+
+    (tmp_path / "hopg.pkl").write_bytes(b"")
+    nodes = np.geomspace(50.0, 30000.0, 21)
+
+    class _Bins:
+        brem = nodes
+
+    class _Detector:
+        energy_bins = _Bins()
+
+    class _Sweep:
+        detector = _Detector()
+
+    monkeypatch.setattr("pyrite.checkpoints.recompute_defaults.sweep", lambda *a, **k: _Sweep())
+    calls = []
+    monkeypatch.setattr(
+        "pyrite.checkpoints.recompute.repair_checkpoint",
+        lambda path, **kwargs: calls.append(kwargs) or {},
+    )
+
+    rebrem.rebrem_checkpoints(materials=["hopg"], checkpoint_dir=tmp_path, fidelity="survey")
+
+    assert len(calls) == 1
+    assert np.array_equal(calls[0]["brem_nodes"], nodes)
+    # a graded target carries no uniform triple alongside it
+    assert calls[0]["brem_start_eV"] is None
+    assert calls[0]["brem_step_eV"] is None
+
+
+def test_rebrem_keeps_the_uniform_triple_for_a_uniform_profile_grid(monkeypatch, tmp_path):
+    """The uniform path is untouched: no brem_nodes, start/step resolved as before."""
+    from pyrite.checkpoints import recompute as rebrem
+
+    (tmp_path / "hopg.pkl").write_bytes(b"")
+
+    class _Bins:
+        brem = np.arange(50.0, 1000.0, 25.0)
+
+    class _Detector:
+        energy_bins = _Bins()
+
+    class _Sweep:
+        detector = _Detector()
+
+    monkeypatch.setattr("pyrite.checkpoints.recompute_defaults.sweep", lambda *a, **k: _Sweep())
+    calls = []
+    monkeypatch.setattr(
+        "pyrite.checkpoints.recompute.repair_checkpoint",
+        lambda path, **kwargs: calls.append(kwargs) or {},
+    )
+
+    rebrem.rebrem_checkpoints(materials=["hopg"], checkpoint_dir=tmp_path, fidelity="survey")
+
+    assert calls[0]["brem_nodes"] is None
+    assert calls[0]["brem_start_eV"] == 50.0
+    assert calls[0]["brem_step_eV"] == 25.0

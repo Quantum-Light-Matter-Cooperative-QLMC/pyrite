@@ -640,6 +640,25 @@ def gc_command(checkpoint_dir, prune_all, yes):
     metavar="EV",
     help="Grid spacing in eV; preserve current value if omitted.",
 )
+@click.option(
+    "--spacing",
+    type=click.Choice(["uniform", "geometric"]),
+    default="uniform",
+    show_default=True,
+    help="Node spacing; geometric declares a nonuniform continuum override.",
+)
+@click.option(
+    "--num",
+    type=click.IntRange(min=2),
+    metavar="N",
+    help="Node count; required for --spacing geometric, rejected otherwise.",
+)
+@click.option(
+    "--start",
+    type=POSITIVE_FLOAT,
+    metavar="EV",
+    help="Lowest node in eV for --spacing geometric; default is the medium's derived floor.",
+)
 @click.option("--note", help="Provenance note stored with manual override.")
 @click.option(
     "--profile",
@@ -648,9 +667,37 @@ def gc_command(checkpoint_dir, prune_all, yes):
     shell_complete=_cli_completion.complete_profile,
     help="Repoint profile NAME; precedence: flag > PYRITE_PROFILE > config store > standard.",
 )
-def set_brem_command(material, stop, step, note, catalog_profile):
-    """Set a bremsstrahlung grid by repointing an immutable artifact."""
+def set_brem_command(material, stop, step, spacing, num, start, note, catalog_profile):
+    """Set a bremsstrahlung grid by repointing an immutable artifact.
+
+    --spacing geometric instead writes explicit nodes into the profile's
+    override table, because artifact identity stores a uniform band only.
+    """
     resolved_profile = _cli_config.resolve("profile.current", catalog_profile).value
+    if spacing == "geometric":
+        if step is not None:
+            _expected_failure(
+                ValueError("--step names a uniform band; drop it for --spacing geometric")
+            )
+        if num is None:
+            _expected_failure(ValueError("--spacing geometric requires --num"))
+        try:
+            band = apply.set_brem_geometric(
+                material,
+                stop,
+                num,
+                profile=resolved_profile,
+                start_eV=start,
+                note=note,
+            )
+        except (KeyError, ValueError, OSError) as exc:
+            _expected_failure(exc)
+        emit_result(f"set {resolved_profile}/{material} brem grid -> {band}")
+        return 0
+    if num is not None:
+        _expected_failure(ValueError("--num applies to --spacing geometric only"))
+    if start is not None:
+        _expected_failure(ValueError("--start applies to --spacing geometric only"))
     try:
         digest = apply.set_brem_artifact(
             material,

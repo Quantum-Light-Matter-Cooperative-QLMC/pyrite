@@ -140,6 +140,13 @@ def _line_item(row: dict, source: str):
     return item
 
 
+def _line_grid_kind(grid) -> str:
+    """The grid kind of one ``line_by_energy`` row, named even when malformed."""
+    from pyrite.materials._catalog_decode import grid_descriptor_kind
+
+    return grid_descriptor_kind(grid) or "malformed"
+
+
 def _line_by_energy_array(rows: dict):
     array = tomlkit.array()
     array.multiline(True)
@@ -149,10 +156,24 @@ def _line_by_energy_array(rows: dict):
 
 
 def _existing_line_rows(mat_table) -> dict:
+    """Seed a merge from stored rows, which the writer can only respell as ``linspace``.
+
+    A hand-written ``values``/``logspace`` line row is legal schema but has no
+    ``(start, stop, num)`` to merge against, so it is refused by name here
+    rather than raising ``KeyError: 'linspace'`` three frames deeper. Reporting
+    such a row is a separate path and does not come through here.
+    """
     out = {}
     for item in mat_table.get("line_by_energy", []):
         energy = float(item["energy_keV"])
-        linspace = item["grid"]["linspace"]
+        grid = item["grid"]
+        kind = _line_grid_kind(grid)
+        if kind != "linspace":
+            raise ValueError(
+                f"line row @ {energy:g} keV is a {kind} grid; the catalog writer "
+                "stores line rows as linspace only"
+            )
+        linspace = grid["linspace"]
         out[energy] = {
             "energy_keV": energy,
             "start_eV": float(linspace["start"]),
@@ -210,13 +231,13 @@ def _merge_line_rows(document, material: str, new_rows, force: bool, source: str
     return skipped
 
 
-def _material_override_table(document, material: str):
-    """Return (creating if absent) ``[profiles.standard.overrides.MATERIAL]``."""
-    standard = document["profiles"]["standard"]
-    overrides = standard.get("overrides")
+def _material_override_table(document, material: str, profile: str = "standard"):
+    """Return (creating if absent) ``[profiles.PROFILE.overrides.MATERIAL]``."""
+    selected = document["profiles"][profile]
+    overrides = selected.get("overrides")
     if overrides is None:
         overrides = tomlkit.table()
-        standard["overrides"] = overrides
+        selected["overrides"] = overrides
     target = overrides.get(material)
     if target is None:
         target = tomlkit.table()
@@ -263,15 +284,72 @@ def apply_bounds(toml_text, combined, *, force=False, provenance_mod=_provenance
     return tomlkit.dumps(document), skipped
 
 
+def resolved_grid_band(descriptor, field: str):
+    """One catalog grid descriptor as ``kind`` + its payload + resolved ``nodes``.
+
+    The declarative schema has always accepted four spellings
+    (:mod:`pyrite.materials._catalog_decode`), but every reader here indexed
+    the uniform one, so a ``values``/``logspace`` grid either raised
+    ``KeyError`` or resolved to ``None`` and vanished from its own report. The
+    payload keys are spread in unchanged, so an ``arange`` band still answers
+    to ``start``/``stop``/``step`` and uniform callers are untouched.
+    """
+    from pyrite.materials._catalog_decode import grid_descriptor_kind, resolve_grid_descriptor
+
+    kind = grid_descriptor_kind(descriptor)
+    if kind is None:
+        return None
+    nodes = resolve_grid_descriptor(descriptor, field)
+    payload = descriptor[kind]
+    # ``payload`` is kept verbatim alongside the spread keys so a machine-readable
+    # report can echo a grid that round-trips, including ``values`` -- a list,
+    # which has no keys to spread.
+    band = {"kind": kind, "nodes": nodes, "payload": payload}
+    if isinstance(payload, Mapping):
+        band.update({str(key): value for key, value in payload.items()})
+    return band
+
+
+def _nonuniform_summary(nodes, kind: str) -> str:
+    """Endpoints, node count, and spelling -- the honest report for a graded grid.
+
+    A nonuniform grid has no single step to name, so the count and the kind
+    carry what ``step`` carries for a uniform one.
+    """
+    return f"[{float(nodes[0]):g}, {float(nodes[-1]):g}] eV x {nodes.size} pts ({kind})"
+
+
+def _band_summary(band: Mapping) -> str:
+    """Render one resolved ``E_grid_brem`` band for the text report."""
+    if band.get("kind") == "arange":
+        return f"[{band['start']:g}, {band['stop']:g}] eV step {band['step']:g}"
+    return _nonuniform_summary(band["nodes"], str(band["kind"]))
+
+
+def _grid_summary(descriptor, field: str) -> str:
+    """Render one stored line-row grid descriptor for the text report."""
+    from pyrite.materials._catalog_decode import resolve_grid_descriptor
+
+    kind = _line_grid_kind(descriptor)
+    if kind == "linspace":
+        g = descriptor["linspace"]
+        return f"[{g['start']:g}, {g['stop']:g}] eV x {g['num']} pts"
+    return _nonuniform_summary(resolve_grid_descriptor(descriptor, field), kind)
+
+
 def effective_brem(raw: dict, material: str, profile: str = "standard"):
-    """Effective ``E_grid_brem`` arange for MATERIAL: its own
-    profile override, else that profile's default."""
+    """Effective ``E_grid_brem`` band for MATERIAL: its own
+    profile override, else that profile's default.
+
+    Resolves every grid spelling, not only ``arange`` -- see
+    :func:`resolved_grid_band` for why the other three used to report nothing.
+    """
     selected = raw.get("profiles", {}).get(profile, {})
     override = selected.get("overrides", {}).get(material, {})
     brem = override.get("E_grid_brem") or selected.get("E_grid_brem")
     if not isinstance(brem, dict):
         return None
-    return brem.get("arange")
+    return resolved_grid_band(brem, f"profiles.{profile} E_grid_brem")
 
 
 def _profile_row(document, profile: str):
@@ -397,6 +475,13 @@ def add_file(
         if not force and _provenance.is_manual_brem(material, profile=profile):
             if current_brem is None:
                 raise ValueError(f"{material}: manual brem provenance has no configured grid")
+            if current_brem.get("kind") not in (None, "arange"):
+                # Reported by name rather than as a ``float(None)`` TypeError:
+                # artifact identity stores a uniform band only.
+                raise ValueError(
+                    f"{material}: manual brem grid is a {current_brem['kind']} grid; "
+                    "immutable artifacts store a uniform (start, stop, step) band only"
+                )
             brem = {
                 "start_eV": float(current_brem.get("start", current_brem.get("start_eV", 0.0))),
                 "stop_eV": float(current_brem.get("stop", current_brem.get("stop_eV"))),
@@ -869,6 +954,87 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
     _warn_stale_golden()
 
 
+def _artifact_ref_for(document, material: str, profile: str) -> str | None:
+    """The artifact digest a profile pins for MATERIAL, if it pins one."""
+    selected = _profile_row(document, profile)
+    refs = selected.get("energy_grid_refs")
+    if not isinstance(refs, Mapping):
+        return None
+    digest = refs.get(material)
+    return digest if isinstance(digest, str) else None
+
+
+def set_brem_geometric(
+    material: str,
+    stop_eV,
+    num,
+    *,
+    profile: str = "standard",
+    start_eV=None,
+    note=None,
+    catalog_path=None,
+) -> str:
+    """Declare MATERIAL's continuum as geometric nodes in the override table.
+
+    Writes the ``values`` spelling rather than ``logspace``. The nodes come
+    from :func:`pyrite.energy_grid.floor.geometric_continuum_grid`, whose first
+    node is *exactly* the medium's derived photon-continuum floor; recording
+    the band as ``logspace`` exponents would hand that endpoint to
+    ``np.logspace`` on the way back in and can round it a hair below the floor,
+    which is precisely the placement that function refuses. Explicit
+    coordinates round-trip bit-for-bit and keep the floor guarantee the ledger
+    row makes.
+
+    Refused when the profile pins an artifact for this material: artifact
+    identity stores a uniform ``(start, stop, step)`` band only, and
+    ``materials/_parse.py`` lets that artifact overwrite ``E_grid_brem``, so
+    the row written here would be silently discarded at load.
+
+    Returns the rendered band for the caller to report.
+    """
+    from pyrite.energy_grid.floor import geometric_continuum_grid
+
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    original = path.read_text()
+    document = tomlkit.parse(original)
+    if material not in document.get("materials", {}):
+        raise ValueError(f"unknown material: {material}")
+    digest = _artifact_ref_for(document, material, profile)
+    if digest is not None:
+        raise ValueError(
+            f"{profile}/{material} pins artifact sha256:{digest}, which stores a uniform "
+            "band only and overrides this row at load; drop the ref before declaring a "
+            "geometric continuum"
+        )
+    count = _positive_int(num, "num")
+    nodes = geometric_continuum_grid(
+        material,
+        _positive_float(stop_eV, "stop"),
+        count,
+        floor_eV=None if start_eV is None else _positive_float(start_eV, "start"),
+    )
+
+    values = tomlkit.array()
+    values.extend(float(node) for node in nodes)
+    values.multiline(True)
+    item = tomlkit.inline_table()
+    item["values"] = values
+    _material_override_table(document, material, profile)["E_grid_brem"] = item
+
+    new_text = tomlkit.dumps(document)
+    _validate_catalog_text(path, new_text, profile=profile)
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
+    _atomic_write(path, new_text)
+    try:
+        _provenance.set_brem(material, "manual", note=note, profile=profile)
+    except BaseException:
+        _atomic_write(path, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
+    _warn_stale_golden()
+    return _nonuniform_summary(nodes, "values")
+
+
 def resolved_show_inputs(
     *, profile: str = "standard", catalog_path=None
 ) -> tuple[dict, dict, dict[str, dict | None], dict[str, str]]:
@@ -923,16 +1089,23 @@ def resolved_show_inputs(
             ]
         }
         brem = stored.identity["brem_grid"]
+        # Immutable artifacts store a uniform band only, so this is always an
+        # ``arange`` -- stated, not implied, because the flooring below keys on it.
         brem_by_material[material] = {
+            "kind": "arange",
             "start": brem["start_eV"],
             "stop": brem["stop_eV"],
             "step": brem["step_eV"],
         }
     # A copy per material, never in place: ``effective_brem`` hands back the
     # profile default's own dict, which every material inheriting it shares.
+    # Only a uniform band is floored, mirroring ``campaign/sweep.py::build_cases``:
+    # it raises a declared ``start`` on a ``(start, stop, step)`` band and passes
+    # a nonuniform grid through untouched, because that grid's builder already
+    # resolved its own floor. Flooring one here would report a band no case gets.
     brem_by_material = {
         material: brem
-        if brem is None
+        if brem is None or brem.get("kind") != "arange"
         else {
             **brem,
             "start": max(float(brem["start"]), _brem_start_eV(material, float(brem["step"]))),
@@ -968,22 +1141,17 @@ def show(material=None, band=None, *, profile: str = "standard", catalog_path=No
                 out.append("  line grid: no stored per-energy rows")
             for item in block.get("line_by_energy", []):
                 e = float(item["energy_keV"])
-                g = item["grid"]["linspace"]
                 source = item.get("source", "derived")
                 note_rec = _provenance.get_line(key, e, profile=profile)
                 note = note_rec.get("note") if note_rec else None
                 tag = f"manual: {note}" if source == "manual" and note else source
                 out.append(
-                    f"  line grid @ {e:g} keV: [{g['start']:g}, {g['stop']:g}] eV"
-                    f" x {g['num']} pts  [{tag}]"
+                    f"  line grid @ {e:g} keV: {_grid_summary(item['grid'], 'line grid')}  [{tag}]"
                 )
         if show_brem:
             brem = brem_by_material.get(key)
             if brem:
                 rec = _provenance.get_brem(key, profile=profile)
                 tag = rec["source"] if rec else "derived"
-                out.append(
-                    f"  brem grid: [{brem['start']:g}, {brem['stop']:g}] eV"
-                    f" step {brem['step']:g}  [{tag}]"
-                )
+                out.append(f"  brem grid: {_band_summary(brem)}  [{tag}]")
     return "\n".join(out)
