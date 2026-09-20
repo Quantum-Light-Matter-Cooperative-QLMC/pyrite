@@ -9,8 +9,8 @@ item recorded there -- human sign-off on the `photon-continuum-floor` and
 `continuum-node-refinement` ledger rows -- is not in scope and an agent must
 not mark it.
 
-Status: first slice (read/report) implemented and checkpointed. Write side and
-retune side remain.
+Status: all three slices (read/report, write, retune) implemented and
+checkpointed. Remaining scope below is deliberately out of scope, not unfinished.
 
 ## Context
 
