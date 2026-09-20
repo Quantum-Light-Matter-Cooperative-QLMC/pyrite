@@ -67,6 +67,8 @@ from .convergence_job import (
     add_ladder_arguments,
     add_window_arguments,
 )
+from .floor import geometric_continuum_grid
+from .refine import case_endpoint_eV, refined_continuum_grid
 
 # Schema 2 adds direct per-rung continuum evaluation and continuum observables.
 CHECKPOINT_SCHEMA = 2
@@ -138,6 +140,28 @@ class CaseLadder:
         """``(start, stop)`` of the case's resolved line grid."""
         grid = np.asarray(self.transport["E_grid"], dtype=float)
         return float(grid[0]), float(grid[-1])
+
+    def continuum_grids(
+        self,
+        counts: Sequence[int],
+        stop_eV: float,
+        *,
+        refine: bool = True,
+    ) -> list[np.ndarray]:
+        """Continuum ladder rungs for *this* case's own medium and endpoint.
+
+        The floor comes from the case's medium and the kinematic endpoint from
+        the case's incident energy, so neither can drift from the run being
+        measured. This is the production selector for the derived floor:
+        :func:`continuum_ladder_grids` with the case supplying both arguments.
+        """
+        return continuum_ladder_grids(
+            str(self.case["crystal"]),
+            stop_eV,
+            counts,
+            endpoint_eV=case_endpoint_eV(self.case),
+            refine=refine,
+        )
 
     def _brem_wide_density(self):
         if self._brem_wide is None:
@@ -226,6 +250,38 @@ class CaseLadder:
             "aliased_weight_fraction": float(aliased),
             "n_spacing_segments": int(count),
         }
+
+
+def continuum_ladder_grids(
+    material: str,
+    stop_eV: float,
+    counts: Sequence[int],
+    *,
+    endpoint_eV: float | None = None,
+    refine: bool = True,
+) -> list[np.ndarray]:
+    """Continuum ladder rungs from the medium's own derived floor.
+
+    Every rung starts at
+    :func:`~pyrite.energy_grid.floor.photon_continuum_floor_eV` for ``material``
+    rather than at a chosen round number, so the ladder measures convergence of
+    the band the model is actually valid over. With ``refine`` (the default)
+    each rung additionally carries the absorption-edge and kinematic-endpoint
+    nodes :mod:`pyrite.energy_grid.refine` derives for that band;
+    ``refine=False`` gives the plain geometric baseline, which is what the
+    refined ladder is measured against.
+
+    ``counts`` are endpoint-inclusive node counts, coarsest first.
+    """
+    grids = []
+    for count in counts:
+        if refine:
+            grids.append(
+                refined_continuum_grid(material, stop_eV, int(count), endpoint_eV=endpoint_eV)
+            )
+        else:
+            grids.append(geometric_continuum_grid(material, stop_eV, int(count)))
+    return grids
 
 
 def ladder_grids(start_eV: float, stop_eV: float, spacings_eV: Sequence[float]) -> list[np.ndarray]:

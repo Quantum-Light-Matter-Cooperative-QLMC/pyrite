@@ -348,6 +348,87 @@ physically different:
 So a detector whose channel physically starts at 0 eV keeps its own boundary
 rather than inheriting the continuum's positive floor.
 
+(continuum-node-refinement)=
+### Where the nodes go: refinement is derived too
+
+The floor fixes where a continuum grid *starts*. Where its nodes go between
+floor and ceiling is a second derived choice, and
+`energy_grid/refine.py::refined_continuum_grid` makes it.
+
+**Why geometric is the right baseline.** Multiplying a density by its local
+midpoint width {eq}`eq-grid-midpoint-edges` is a midpoint quadrature, whose
+error on an interval of width $h$ is $(h^3/24)\,|n''|$, so the *relative* error
+contributed by that interval is
+
+```{math}
+:label: eq-grid-quadrature-error
+
+\varepsilon_i \simeq \frac{h_i^2}{24}\,\left|\frac{n''(E_i)}{n(E_i)}\right| .
+```
+
+On a grid uniform in $u = \ln E$ the step is $h_i = E_i\rho$ with
+$\rho = \ln(E_\mathrm{stop}/E_\mathrm{floor})/(N-1)$, and for a local power law
+$n \propto E^{-p}$ the combination $h_i^2\, n''/n$ is *independent of $E$*. A
+geometric grid therefore equidistributes {eq}`eq-grid-quadrature-error` across
+the band — which is exactly why it is the baseline, and exactly why it says
+nothing about an integrand that is not smooth on the scale of its own step.
+
+**Where that fails.** {eq}`eq-grid-quadrature-error` assumes $n$ has a bounded
+second derivative across the interval. The modelled escaping continuum
+$n(E) = S(E)\,e^{-\mu(E)\ell}$ violates that in exactly two places, and in both
+the straddling interval's error degrades from $O(h^2)$ to $O(h)$ — a term no
+globally finer geometric spacing removes at better than first order:
+
+* **Absorption edges.** $\mu$ steps by a finite ratio across an interval far
+  narrower than the local $E\rho$. The emitted $S$ is smooth there —
+  bremsstrahlung has no feature at an absorber's edge — so the whole
+  discontinuity sits in the escape factor.
+* **Kinematic endpoints.** $S$ is identically zero above the highest
+  instantaneous electron energy $E^\ast$, which for a run that only loses energy
+  is the incident energy. At $E^\ast$ the density steps to zero: a jump of
+  relative size 1.
+
+**The rule.** Put a grid coordinate *on* the discontinuity, and refine no
+further than the resolution at which the model itself represents it.
+
+* *Edges* are **located, never listed.** The escape model attenuates with $\mu$
+  from the Chantler $f_2$ table, so the jump is found in that table — the
+  steepest adjacent $f_2$ ratio near each xraydb edge energy
+  (`montecarlo/spectrum/line_seeds.py::absorption_edge_brackets`, shared with the
+  line-window seeds so one locator serves both axes). Both nodes of the located
+  native bracket become exact grid coordinates, so the jump lies inside a single
+  interval bounded by tabulated energies, and the surrounding native nodes are
+  sampled at their own median spacing. Below that spacing the model carries no
+  information, so refinement stops. Elements come from the medium's own catalog
+  composition plus the detection path, which in this repository is the silicon
+  sensor shared by both detector models.
+* *Endpoints* need **no taper at all.** Placing a bin *edge* exactly at $E^\ast$
+  removes the first-order term outright, and with midpoint edges that is one
+  node pair straddling $E^\ast$ at the grid's own local spacing: two nodes, no
+  budget question. The bin below then carries the tip and the bin above is
+  exactly empty.
+
+*Assumptions.* The medium is the absorber whose edges enter the escape factor
+(detector-path edges act through the response instead, not through $\ell$); the
+emitted $S$ is smooth across an absorber edge; $\mu$ is piecewise-linear on the
+Chantler tabulation, as the model interpolates it; and the modelled cutoff at
+$E^\ast$ is sharp — which it is in EEDL, where the photon spectrum is tabulated
+to $k = T$ and is zero above.
+
+*Limiting case.* A band containing no located edge and no interior kinematic
+endpoint returns the geometric baseline **identically, node for node**. Adding
+structure adds nodes; adding none changes nothing. Equally, an edge whose jump
+falls outside $[E_\mathrm{floor}, E_\mathrm{stop}]$ is reported and dropped,
+never refused: it places no requirement on a grid over a band it is not in.
+
+*Cost, structurally.* Refinement only ever *adds interior* nodes and never moves
+the band endpoints, so the outermost midpoint half-widths can only narrow. Two
+consequences follow without measurement: a source mesh already covered by the
+Timepix padded input band stays covered, keeping its channels and its seeded
+response matrix; and the added node count *falls* as the baseline gets finer,
+because more baseline nodes are displaced by mark nodes than are added beside
+them.
+
 (uniform-only-consumers)=
 ## Uniform-only consumers
 

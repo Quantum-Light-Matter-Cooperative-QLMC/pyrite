@@ -92,20 +92,21 @@ def test_continuum_is_evaluated_directly_on_each_candidate_grid(ladder, monkeypa
         return original(segments, energy_eV, *args, **kwargs)
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", record_grid)
-    grids = [np.geomspace(100.0, 29_000.0, size) for size in (65, 129)]
+    grids = ladder.continuum_grids((65, 129), 29_000.0)
 
     continua = [ladder.continuum(grid) for grid in grids]
 
     assert [continuum.shape for continuum in continua] == [grid.shape for grid in grids]
     assert all(
-        np.array_equal(actual, expected)
-        for actual, expected in zip(evaluated, grids, strict=True)
+        np.array_equal(actual, expected) for actual, expected in zip(evaluated, grids, strict=True)
     )
     assert segment_fingerprint(ladder.segments) == ladder.fingerprint
 
 
 def test_continuum_observables_converge_on_identical_trajectories(ladder):
-    grids = [np.geomspace(100.0, 29_000.0, size) for size in (2049, 4097, 8193)]
+    # Rungs start at the medium's own derived continuum floor and carry the
+    # edge/endpoint refinement (#100), not a literal 100.0 eV geometric start.
+    grids = ladder.continuum_grids((2049, 4097, 8193), 29_000.0)
     detectors = {
         "timepix3_counts": Timepix3(n_mc=32, seed=7),
         "eaglexo_counts": EagleXO(),
