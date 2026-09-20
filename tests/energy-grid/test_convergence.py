@@ -1,9 +1,11 @@
 """Refinement-ladder harness: nesting, Richardson acceptance, segment identity.
 
-The analytic spectra here are sums of the line kernels' ``sinc^2`` feature,
-whose exact integral ``pi / a`` and exact trapezoid threshold ``h <= pi / a``
-(issue #109) are independent of the harness, so the accepted spacing is checked
-against sampling theory rather than against the harness's own arithmetic.
+The analytic spectra here are sums of the line kernels' ``sinc^2`` feature.
+Its exact integral ``pi / a`` and sufficient exact-trapezoid threshold
+``h <= pi / a`` (issue #109) are independent of the harness.  Aggregate
+phase cancellation may still make a coarser rung accurate, so the accepted
+spacing is checked against the independent integral rather than treated as
+Nyquist-bounded by construction.
 """
 
 from functools import partial
@@ -77,7 +79,7 @@ def test_nested_uniform_ladder_halves_exactly_and_nests():
         assert np.array_equal(fine[::2], coarse)
 
 
-def test_accepted_spacing_resolves_the_sinc_nyquist_step():
+def test_sinc_nyquist_is_sufficient_not_an_acceptance_ceiling():
     a = 1.0  # first-zero step pi/a ~= 3.14 eV
     # Gaussian-quantile resonance energies: a smooth multiple-scattering-like
     # envelope (sigma = 40 eV) built from features far narrower than it, with no
@@ -107,6 +109,7 @@ def test_accepted_spacing_resolves_the_sinc_nyquist_step():
     # and that the grossly aliased 12 eV triple is rejected.
     assert report.triples[0].accepted is False
     assert report.accepted_spacing_eV is not None
+    assert report.accepted_spacing_eV > nyquist
     accepted = next(r for r in rungs if r.spacing_eV == report.accepted_spacing_eV)
     assert accepted.observables["yield"] == pytest.approx(exact_yield, rel=2e-3)
 
