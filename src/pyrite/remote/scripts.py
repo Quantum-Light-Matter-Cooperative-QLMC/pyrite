@@ -330,7 +330,7 @@ def _prune_checkpoint_stems_command(
         raise ValueError("all_profiles and catalog_profile are mutually exclusive")
     reserve = _reserve_checkpoint_stems_command(jobid, stems)
     release = _release_checkpoint_stems_command(jobid, stems)
-    args = ["prune"]
+    args = ["checkpoint", "gc"]
     if all_profiles:
         args.append("--all")
     elif catalog_profile is not None:

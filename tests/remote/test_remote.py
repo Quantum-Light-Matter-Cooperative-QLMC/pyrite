@@ -4126,8 +4126,8 @@ def test_prune_checkpoint_command_reserves_runs_and_releases():
 
     assert "for stem in hopg hopg--survey-deadbeef0000" in command
     assert "trap release_prune EXIT" in command
-    assert "run --no-sync pyrite prune --profile standard --yes" in command
-    assert command.index("for stem in hopg") < command.index("run --no-sync pyrite prune")
+    assert "run --no-sync pyrite checkpoint gc --profile standard --yes" in command
+    assert command.index("for stem in hopg") < command.index("run --no-sync pyrite checkpoint gc")
 
 
 def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
@@ -4146,7 +4146,7 @@ def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
 
     assert len(commands) == 1
     assert "for stem in hopg" in commands[0]
-    assert "pyrite prune --profile standard" in commands[0]
+    assert "pyrite checkpoint gc --profile standard" in commands[0]
     assert "would prune remote" in capsys.readouterr().out
 
 
@@ -4205,7 +4205,7 @@ def test_prune_remote_obsolete_only_confirmation_reuses_exact_selection(monkeypa
     assert len(discoveries) == 1
     assert len(commands) == 2
     assert all(old in command for command in commands)
-    assert "pyrite prune --profile hopg_hbn --yes" in commands[1]
+    assert "pyrite checkpoint gc --profile hopg_hbn --yes" in commands[1]
 
 
 def _bash_or_skip(tmp_path):
@@ -5449,7 +5449,7 @@ def test_rebrem_queue_script_flags_progress_and_markers():
     s = remote._rebrem_queue_script(
         "20260101-000000", ["hopg", "hbn"], ne_brem=1000, brem_step_eV=25.0, redo_all=True
     )
-    assert "pyrite rebrem" in s
+    assert "pyrite checkpoint recompute brem" in s
     assert "--ne-brem 1000" in s and "--step 25" in s and "--redo-all" in s
     # per-material progress record feeds the shared plain/attached status dashboard
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s
@@ -5491,7 +5491,7 @@ def test_rebrem_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
     jobid = remote.start_rebrem_queue(["hopg"], ne_brem=1000, dry_run=True)
 
     out = capsys.readouterr().out
-    assert jobid in out and "pyrite rebrem" in out
+    assert jobid in out and "pyrite checkpoint recompute brem" in out
 
 
 def test_rebrem_cli_submits_attaches_and_pulls_completed(monkeypatch):
@@ -5551,7 +5551,7 @@ def test_rebrem_chunked_queue_script_self_resubmits():
     s = scripts._rebrem_chunked_queue_script(
         "J1", ["mos2", "w"], ne_brem=1000, brem_step_eV=None, redo_all=False, chunk_minutes=10.0
     )
-    assert "pyrite rebrem" in s
+    assert "pyrite checkpoint recompute brem" in s
     assert "--ne-brem 1000" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
@@ -5568,15 +5568,19 @@ def test_reline_queue_script_and_metadata():
     s = scripts._reline_chunked_queue_script(
         "J1", ["mos2", "w"], line_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
     )
-    assert "pyrite reline" in s
+    assert "pyrite checkpoint recompute line" in s
     assert "--line-ne 40000" in s
     assert "--redo-all" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
     assert "--progress-file" in s
-    # The monolithic (chunk_minutes==0) path still runs `pyrite reline` per material.
+    # The monolithic (chunk_minutes==0) path still recomputes lines per material.
     mono = scripts._reline_queue_script("J1", ["mos2", "w"], 40000, None, True)
-    assert "pyrite reline" in mono and "--line-ne 40000" in mono and "--redo-all" in mono
+    assert (
+        "pyrite checkpoint recompute line" in mono
+        and "--line-ne 40000" in mono
+        and "--redo-all" in mono
+    )
     assert "--progress-file" in mono
     meta = scripts._reline_queue_metadata("J1", ["mos2", "w"], 40000, None, True)
     assert "kind: reline" in meta

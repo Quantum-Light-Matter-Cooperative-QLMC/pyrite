@@ -20,14 +20,15 @@ def start_rebrem_queue(
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
-    """Submit a brem-only checkpoint recompute (``pyrite rebrem``) to SLURM.
+    """Submit a brem-only checkpoint recompute (``pyrite checkpoint recompute
+    brem``) to SLURM.
 
-    Reserves the same ``<material>.pkl`` stems as a sweep -- rebrem rewrites
-    those checkpoints in place, so it must not race a live scan of the same
-    material (and vice versa). By default the recompute is chunked: each
-    ~chunk_minutes slice does bounded work via ``pyrite rebrem --max-minutes`` and
-    self-resubmits with ``--nice=10000`` so the single-GPU box stays shareable
-    at every slice boundary. Pass ``chunk_minutes=0`` for the original
+    Reserves the same ``<material>.pkl`` stems as a sweep -- the recompute
+    rewrites those checkpoints in place, so it must not race a live scan of the
+    same material (and vice versa). By default the recompute is chunked: each
+    ~chunk_minutes slice does bounded work via that command's ``--max-minutes``
+    and self-resubmits with ``--nice=10000`` so the single-GPU box stays
+    shareable at every slice boundary. Pass ``chunk_minutes=0`` for the original
     monolithic allocation. Returns the local job id."""
     transport._check_materials(materials)
     if not dry_run:
@@ -142,14 +143,15 @@ def start_reline_queue(
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    """Submit a line-only checkpoint recompute (``pyrite reline``) to SLURM.
+    """Submit a line-only checkpoint recompute (``pyrite checkpoint recompute
+    line``) to SLURM.
 
-    Reserves the same ``<material>.pkl`` stems as a sweep/rebrem. By default the
-    recompute is chunked: each ~chunk_minutes slice does bounded work via ``pyrite
-    reline --max-minutes`` and self-resubmits with ``--nice=10000`` so the
-    single-GPU box stays shareable at every slice boundary. Pass
-    ``chunk_minutes=0`` for the original monolithic allocation. Returns the
-    local job id."""
+    Reserves the same ``<material>.pkl`` stems as a sweep or brem recompute. By
+    default the recompute is chunked: each ~chunk_minutes slice does bounded
+    work via that command's ``--max-minutes`` and self-resubmits with
+    ``--nice=10000`` so the single-GPU box stays shareable at every slice
+    boundary. Pass ``chunk_minutes=0`` for the original monolithic allocation.
+    Returns the local job id."""
     transport._check_materials(materials)
     if not dry_run:
         _refuse_if_busy(materials, False)
