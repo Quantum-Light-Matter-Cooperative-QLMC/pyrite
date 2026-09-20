@@ -216,12 +216,29 @@ def elam_scattering_cross_section_ang2(element, E_eV):
     physical model: the caller multiplies by a number density to get an
     attenuation coefficient (see ``crystal.scattering_attenuation_inv_ang``).
 
-    Energies are CLAMPED into ``[ELAM_E_MIN_EV, ELAM_E_MAX_EV]`` rather than
-    returned as NaN, unlike ``henke_dispersion``. Below 100 eV scattering is
-    ~5e-5 of the total cross section, so the clamped value is negligible
-    against the photoabsorption term it is added to, whereas a NaN would
-    poison the soft-X-ray attenuation that is otherwise well tabulated. The
-    clamp also keeps xraydb's own out-of-range warnings out of library output.
+    The two ends of the table are treated ASYMMETRICALLY, because the physics
+    is asymmetric.
+
+    Below ``ELAM_E_MIN_EV`` the energy is CLAMPED rather than returned as NaN,
+    unlike ``henke_dispersion``. Photoabsorption dominates there by orders of
+    magnitude -- the frozen scattering term is ~5e-5 of carbon's total at
+    50 eV, and even for the worst case among the catalog's elements (Se, whose
+    photoabsorption sits in an inter-shell minimum there) it is 4.7%, at an
+    attenuation length of ~1e3 Angstrom where transmission is numerically zero
+    either way. A NaN would instead poison soft-X-ray attenuation that is
+    otherwise well tabulated, and production brem grids do start at 0-75 eV,
+    so this path is exercised.
+
+    Above ``ELAM_E_MAX_EV`` the result is NaN. Freezing there would be the
+    opposite situation: scattering is essentially all of ``mu`` above 800 keV,
+    so a frozen value over-estimates it by the Klein-Nishina ratio (x1.11 at
+    1 MeV, x2.8 at 5 MeV) and pair production is missing above 1.022 MeV as
+    well. NaN puts the band under the same out-of-domain policy as the
+    Chantler table, whose own ceiling (~966 keV) is just above it. No catalog
+    grid reaches either: the widest ``E_grid_brem`` stop is 262.4 keV.
+
+    The clamp also keeps xraydb's own out-of-range warnings out of library
+    output.
 
     Parameters
     ----------
@@ -252,12 +269,14 @@ def elam_scattering_cross_section_ang2(element, E_eV):
         _ELAM_MEMO.move_to_end(key)
         return cached
 
-    Eflat = np.clip(np.atleast_1d(E).ravel(), ELAM_E_MIN_EV, ELAM_E_MAX_EV)
-    mu_rho = np.asarray(xraydb.mu_elam(element, Eflat, "coh"), dtype=float) + np.asarray(
-        xraydb.mu_elam(element, Eflat, "incoh"), dtype=float
+    Eflat = np.atleast_1d(E).ravel()
+    queried = np.clip(Eflat, ELAM_E_MIN_EV, ELAM_E_MAX_EV)
+    mu_rho = np.asarray(xraydb.mu_elam(element, queried, "coh"), dtype=float) + np.asarray(
+        xraydb.mu_elam(element, queried, "incoh"), dtype=float
     )
     # cm^2/g -> cm^2/atom -> Angstrom^2/atom.
     sigma = mu_rho * (_atomic_mass_g_per_mol(element) / _AVOGADRO) * 1.0e16
+    sigma[Eflat > ELAM_E_MAX_EV] = np.nan
     out = sigma.reshape(shape)
     out.flags.writeable = False
 

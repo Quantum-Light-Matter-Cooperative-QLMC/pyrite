@@ -23,8 +23,8 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 9 |
-| `rederived` | 43 |
-| `filtered` | 10 |
+| `rederived` | 44 |
+| `filtered` | 9 |
 | `unverified` | 59 |
 | `blocked` | 1 |
 | `discrepancy` | 5 |

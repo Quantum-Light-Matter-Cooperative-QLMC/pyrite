@@ -193,3 +193,65 @@ def test_refractive_index_path_stays_photoabsorption_only() -> None:
         mu_from_beta, 1.0 / absorption_length_ang("Al", energy, number_density), rtol=1.0e-12
     )
     assert np.all(mu_from_beta < _mu_total_inv_ang([("Al", number_density)], energy))
+
+
+def test_scattering_clamps_below_the_table_but_refuses_above_it() -> None:
+    """Asymmetric out-of-domain policy; see the accessor's docstring.
+
+    Below 100 eV the frozen value is negligible against photoabsorption and
+    production brem grids really do start there, so it is clamped. Above
+    800 keV scattering is essentially all of ``mu``, so freezing would
+    over-estimate it by the Klein--Nishina ratio and a frozen value is worse
+    than none: that end is NaN, under the same policy as the Chantler table.
+    """
+    from pyrite.materials.atomic import (
+        ELAM_E_MAX_EV,
+        ELAM_E_MIN_EV,
+        elam_scattering_cross_section_ang2,
+    )
+
+    low = elam_scattering_cross_section_ang2("C", np.array([5.0, 50.0, ELAM_E_MIN_EV]))
+    assert np.all(np.isfinite(low))
+    np.testing.assert_allclose(low, low[-1], rtol=0.0)
+
+    high = elam_scattering_cross_section_ang2(
+        "C", np.array([ELAM_E_MAX_EV, ELAM_E_MAX_EV * 1.01, 5.0e6])
+    )
+    assert np.isfinite(high[0])
+    assert np.all(np.isnan(high[1:]))
+
+    # The whole coefficient inherits the refusal, and callers' nan_to_num
+    # policy then owns the bin -- exactly as it already does above the
+    # Chantler ceiling.
+    assert np.isnan(_mu_total_inv_ang([("C", N_GRAPHITE_PER_ANG3)], np.array([5.0e6]))[0])
+
+
+def test_no_packaged_brem_grid_reaches_the_elam_ceiling() -> None:
+    """The NaN band above is unreachable from the packaged catalog.
+
+    Read straight out of the shipped TOML rather than through the catalog
+    objects, so the guard holds whatever the projection layer does with the
+    field.
+    """
+    import tomllib
+    from pathlib import Path
+
+    from pyrite.materials.atomic import ELAM_E_MAX_EV
+    from pyrite.materials.catalog import DATA_DIR
+
+    data = tomllib.loads((Path(DATA_DIR) / "materials.toml").read_text(encoding="utf-8"))
+
+    def _stops(node):
+        if isinstance(node, dict):
+            grid = node.get("E_grid_brem")
+            if isinstance(grid, dict) and "arange" in grid:
+                yield float(grid["arange"]["stop"])
+            for value in node.values():
+                yield from _stops(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from _stops(value)
+
+    stops = list(_stops(data))
+    assert stops, "expected the packaged catalog to declare brem grids"
+    assert max(stops) < ELAM_E_MAX_EV
