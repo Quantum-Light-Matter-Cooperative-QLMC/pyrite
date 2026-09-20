@@ -51,7 +51,8 @@ of the ledgered `finite-time-lineshape` row,
 \qquad a_w = \frac{(1 - \boldsymbol\beta\cdot\hat{\mathbf n})\,t_L}{2\hbar c},
 ```
 
-with $t_L$ the flight time of a segment, $\hat{\mathbf n}$ the observation
+with $t_L$ the $c=1$ length-equivalent flight time of a segment,
+$\hat{\mathbf n}$ the observation
 direction, and $E_\mathrm{res}$ the resonance energy. The feature is band
 limited, and the trapezoid rule on a uniform grid of spacing $h$ integrates it
 exactly when $h \le \pi / a_w$ (the first-zero, or Nyquist, step used by
@@ -91,6 +92,69 @@ pass. Relative tolerances per class are:
   change the production policy classes.
 
 Shape observables are also reported, ungated, at $10^{-3}$.
+
+## Independent verification basis
+
+This section records the issue #126 verifier's derivation before inspection of
+the convergence-harness implementation. The source claim is the ledgered
+`finite-time-lineshape` result. The intended measurement maps one fixed segment
+set and a nested sequence of line-grid coordinate arrays to per-rung line
+spectra, observables, and a segment-identity fingerprint; the precision study
+maps one serialized transport to paired float32 and FP64 evaluations. The
+reported yield has units photons sr$^{-1}$ electron$^{-1}$, centroid and FWHM
+have units eV, line/background is dimensionless, and detected counts retain the
+detector response's count normalization.
+
+Write $x = E-E_\mathrm{res}$ and use NumPy's normalized sinc convention. A
+single finite-segment factor is
+
+$$
+f(x)
+= \operatorname{sinc}^2\!\left(\frac{a_w x}{\pi}\right)
+= \left(\frac{\sin(a_w x)}{a_w x}\right)^2.
+$$
+
+Here $t_L=L_\mathrm{seg}/\beta$ is the source derivation's $c=1$
+length-equivalent flight time, so
+$a_w=(1-\boldsymbol\beta\mathbin{\cdot}\hat{\mathbf n})t_L/(2\hbar c)$
+has units eV$^{-1}$ and the sinc argument is dimensionless. The Fourier
+transform of $f$ is triangular with support $|k|\leq 2a_w$. Poisson summation
+places the nearest replicas of that support at $2\pi/h$ for a uniform grid of
+spacing $h$. Therefore the sampled zero-frequency component, and hence the
+infinite-grid trapezoid area, is unaliased when
+
+$$
+\frac{2\pi}{h}\geq 2a_w
+\quad\Longleftrightarrow\quad
+h\leq\frac{\pi}{a_w}.
+$$
+
+Equality is admissible because the triangular transform vanishes at its
+boundary. Above this step replicas can contribute to the area, so the band
+limit alone no longer certifies exactness. It does not forbid a particular sum
+of phase-shifted features from integrating accurately through cancellation; a
+convergence gate may therefore accept such a spacing when it is checked against
+an independent integral tolerance. The checks assume a uniform effectively
+unbounded grid for the exact area statement; a finite window additionally
+carries its omitted-tail error, and sums of sinc features retain the strictest
+individual sufficient band limit.
+
+For the Richardson gate, $d_1$, $d_2$, and $\tau$ all have the units of the
+observable. The first clause enforces the requested tolerance on the coarse
+pair, with an explicit exact-zero escape when $\tau=0$. The $d_2\leq d_1$
+branch requires non-growing refinement changes. The alternative
+$\max(d_1,d_2)\leq0.1\tau$ permits non-monotone residuals only when both are a
+fixed decade inside tolerance. Requiring the candidate triple and every finer
+available triple to pass prevents a single lucky coarse pair; adding finer
+rungs may expose a later failure, while already judgeable shared acceptances
+remain depth-independent only as an empirical property of the stored ladder.
+The $10^{-15}$ yield floor is dimensionally a yield and is a harness policy for
+an effectively empty spectrum, not a consequence of Richardson extrapolation.
+
+These filters establish the sinc band limit and the dimensional and logical
+consistency of the gate. They do not establish the measured convergence or
+float32 bounds; those require comparison with the implementation, anchor tests,
+and stored artifacts below.
 
 ## Observables
 
@@ -863,3 +927,61 @@ The artifact schema remains available as an opt-in performance mechanism.
   respond to grid refinement and to backend precision.
 - It does not claim that opt-in stored grids are intrinsically invalid; they
   require explicit ownership and revalidation when relevant physics changes.
+
+## Independent verifier outcome
+
+The issue #126 fresh-context audit found that the implementation matches the
+measurement contract and Richardson equation, but the ledger's required
+Nyquist check does not match the implemented or documented acceptance claim.
+
+- **Measurement identity and RNG isolation: confirmed.** `CaseLadder`
+  transports once and evaluates every rung through the production spectrum
+  reductions. `evaluate_ladder` hashes every spectrum-consumed segment field
+  before the first rung and after every evaluation, and resumed runs compare
+  the new fixed-seed transport with the stored count and digest. The case-grid
+  anchor compares line, characteristic, and bremsstrahlung arrays bit for bit
+  with the runner spectrum phase. `simulate_trajectories` has no photon-grid
+  argument: its stochastic inputs derive from `seed`, `SeedSequence(seed)`
+  children, or SplitMix64 keys formed from seed and electron id with draws
+  addressed by counter. `_transport_case` calls transport before
+  `resolve_line_grid`. The grid-isolation anchor reproduces the segment
+  fingerprint after replacing the line grid.
+- **Band limit: derivation confirmed; required acceptance check differs.** The
+  independent triangular-support derivation above gives exact infinite-grid
+  trapezoid area for $h\leq\pi/a_w$. However, the ledger and issue require that
+  the analytic ladder accept no spacing above Nyquist. The anchor explicitly
+  implements a different claim: phase-spread aliases may average out, the
+  accepted spacing is not bounded by $\pi/a_w$, the grossly aliased 12 eV
+  triple must fail, and the accepted rung's yield must agree with the analytic
+  integral to its finite-window tolerance. The first exact divergence is thus
+  the asserted upper bound on accepted spacing, not a factor in the sinc
+  transform.
+- **Richardson gate: confirmed.** `_observable_verdict` implements the two
+  clauses of {eq}`eq-line-grid-richardson-gate` literally, including exact-zero
+  acceptance, the $0.1\tau$ escape, and the finest-rung yield floor.
+  `_coarsest_consistent` accepts only a suffix of passing triples, so one lucky
+  coarse pair cannot pass. The focused anchors cover a growing second change,
+  two changes below $0.1\tau$, exact zero, the near-zero floor, and a later
+  failing triple. This algorithm can change an earlier acceptance when newly
+  added finer data fail; the narrower six-versus-eight-rung stability claim is
+  empirical and therefore depends on the stored measurements.
+- **One-transport precision instrument: confirmed.** `cmd_transport` serializes
+  one case transport and fingerprint. Each precision process constructs its
+  `CaseLadder` from that transport without rerunning Monte Carlo and rejects a
+  fingerprint mismatch. `compare` requires the float64/float32 pairing and
+  identical fingerprints, windows, ratios, and grids. The CPU control anchor
+  runs both sides through this pipeline and obtains exactly zero deviation.
+- **Stored-number audit: unavailable.** No ladder checkpoint JSON, precision
+  JSON/NPZ/pickle, or issue #125 audit artifact is tracked in the repository or
+  present in the validation worktree. The write-up names remote jobs and the
+  remote output `line_grid_precision_109.json`, but does not retain the source
+  rungs alongside the ledger. Consequently the case tables, six-versus-eight
+  acceptances, catalog-grid errors, resource timings, float32 deviation bounds
+  and slopes, 20 keV search, and issue #125 material percentages cannot be
+  recomputed independently from repository evidence. Their internal summaries
+  are not a substitute for the requested artifact comparison.
+
+**Verdict: discrepancy.** The code-level instrument and governing equations
+match, but the required no-above-Nyquist acceptance statement is contradicted
+by its anchor, and the measured numerical claims lack repository-accessible
+source artifacts for independent verification. Human sign-off remains pending.
