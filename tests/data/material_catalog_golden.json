@@ -9137,9 +9137,9 @@
         "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
-            996
+            1598
           ],
-          "sha256": "f33a3b889cb8d5c01f2ef4435a89d5c35d1b9e3878e224f05553b29041f399eb"
+          "sha256": "405bc9ad4a5b46fbafa0ff54c2d15b442436ad211b47cbf6553b51aaf5e1c4fb"
         }
       }
     },
@@ -9191,9 +9191,9 @@
         "E_grid_line_by_energy": {},
         "E_grid_brem": {
           "shape": [
-            1004
+            1618
           ],
-          "sha256": "9d3d7f933fc65ba7ff3301f4903aa02fab188b68ef7eb034cc34947705ace69b"
+          "sha256": "a588cc6e3aeb8d2f5dabcff720c161bebcab8482089cb098e977de0e7b117b6a"
         }
       }
     },
