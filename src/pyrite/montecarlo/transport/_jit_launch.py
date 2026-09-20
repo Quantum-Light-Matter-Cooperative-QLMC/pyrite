@@ -75,6 +75,7 @@ def run_transport_lut_kernel(
         seg_t_end,
         seg_flight,
         seg_substep,
+        seg_event,
     ) = segments
     (seg_count, exit_code) = pe_out
     nthreads = int(config.nthreads)
@@ -133,6 +134,7 @@ def run_transport_lut_kernel(
             seg_t_end,
             seg_flight,
             seg_substep,
+            seg_event,
             seg_count,
             exit_code,
         ),
@@ -234,6 +236,7 @@ def run_transport_kernel(
         seg_t_end,
         seg_flight,
         seg_substep,
+        seg_event,
     ) = segments
     (seg_count, exit_code) = pe_out
     (straggle_on, stragg_dE) = straggling
@@ -301,6 +304,7 @@ def run_transport_kernel(
             seg_t_end,
             seg_flight,
             seg_substep,
+            seg_event,
             seg_count,
             exit_code,
             np.int32(1 if straggle_on else 0),

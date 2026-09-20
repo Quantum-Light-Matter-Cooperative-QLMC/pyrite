@@ -465,8 +465,12 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   with `PYRITE_MC_TRANSPORT_CORE`. `energy_model` selects the propagation rule
   (`"frozen"` default left-endpoint, `"midpoint"` predictor--corrector);
   `max_dE_frac` splits a physical flight into numerical substeps under
-  `"midpoint"` and adds the `E_end_keV`/`t_end_ang`/`E_repr_keV` and
-  `flight_id`/`substep_id` row fields. How the Urban sampler is applied inside
+  `"midpoint"` and adds the `E_end_keV`/`t_end_ang`/`E_repr_keV`,
+  `flight_id`/`substep_id`, and `event_kind` row fields. `events.py` owns the
+  row-end event codes (`SegmentEvent`, reserved hard-event codes included) and
+  `check_segment_event_contract`, the flight/event invariants every CPU and CUDA
+  core must satisfy; it imports no accelerator module so both core families
+  read its constants. How the Urban sampler is applied inside
   the cores — the cutoff crossing rule under a random loss, what substepping
   still guarantees, and the per-core bookkeeping — is derived in [straggled
   transport integration](repo-design/compute/straggled-transport-integration.md);

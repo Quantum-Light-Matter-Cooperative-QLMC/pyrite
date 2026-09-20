@@ -222,8 +222,9 @@ def simulate_trajectories(
           E_end = E_start + (dE/ds)((E_start+E_pred)/2)*s, with
           the clock advanced by s/beta at that representative energy and the
           cutoff truncation distance solved for E_end == E_cut. Adds
-          E_end_keV, t_end_ang, and E_repr_keV = (E_start+E_end)/2 (the
-          energy radiation kernels evaluate the row at) to the returned rows.
+          E_end_keV, t_end_ang, E_repr_keV = (E_start+E_end)/2 (the
+          energy radiation kernels evaluate the row at), and event_kind --
+          the row-end event code of `transport.events` -- to the returned rows.
           Elastic hazard stays frozen at the start energy within each row;
           `max_dE_frac` substeps re-evaluate it at the next row's start. The
           lockstep, per-electron, grooved, and CUDA cores all implement the
@@ -705,6 +706,7 @@ def simulate_trajectories(
     seg_t_end = np.empty(n_end_rows, dtype=float)
     seg_flight = np.empty(n_end_rows, dtype=np.int64)
     seg_substep = np.empty(n_end_rows, dtype=np.int64)
+    seg_event = np.empty(n_end_rows, dtype=np.int8)
     _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
@@ -770,6 +772,7 @@ def simulate_trajectories(
         seg_t_end,
         seg_flight,
         seg_substep,
+        seg_event,
     )
     materials_ragged = (
         L_Js,
@@ -874,6 +877,7 @@ def simulate_trajectories(
                 seg_t_end,
                 seg_flight,
                 seg_substep,
+                seg_event,
                 stragg_layer_tables,
                 straggle_on,
                 stragg_dE,
@@ -987,6 +991,7 @@ def simulate_trajectories(
                 seg_t_end,
                 seg_flight,
                 seg_substep,
+                seg_event,
                 straggle_on,
                 stragg_dE,
                 config=per_electron_config,
@@ -1076,7 +1081,7 @@ def simulate_trajectories(
         # Already sized to `nseg` by the join, in the scratch's field order.
         v_hat, r_mid, L_ang, E_seg, t_ang, elec_id, layer = dev_segs[:7]
         if energy_model == "midpoint":
-            seg_E_end, seg_t_end, seg_flight, seg_substep = dev_segs[7:]
+            seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event = dev_segs[7:]
 
     vacuum_start_ang = vac_start
     vacuum_end_ang = vac_end
@@ -1146,6 +1151,9 @@ def simulate_trajectories(
         # indexes numerical rows inside one flight and is integration detail.
         result["flight_id"] = seg_flight[:nseg]
         result["substep_id"] = seg_substep[:nseg]
+        # What ended each row; `transport.events` holds the codes and the
+        # contract (`check_segment_event_contract`).
+        result["event_kind"] = seg_event[:nseg]
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

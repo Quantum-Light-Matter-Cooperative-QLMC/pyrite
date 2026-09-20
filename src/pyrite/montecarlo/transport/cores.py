@@ -5,6 +5,16 @@ from numba import njit
 
 from ..geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
+from .events import (
+    EVENT_CUTOFF,
+    EVENT_ELASTIC,
+    EVENT_EXIT_BOTTOM,
+    EVENT_EXIT_SIDE,
+    EVENT_EXIT_TOP,
+    EVENT_GROOVE_SURFACE,
+    EVENT_LAYER_BOUNDARY,
+    EVENT_SUBSTEP,
+)
 from .kinematics import _SM64_ONE, _SM64_ZERO, _stream_uniform_scalar, beta_from_keV_scalar
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
 from .scattering import (
@@ -199,6 +209,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             seg_t_end,
             seg_flight,
             seg_substep,
+            seg_event,
         ) = segments
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
@@ -477,6 +488,24 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                         else clock[e] + step_j / beta_from_keV_scalar(E_j)
                     )
 
+            # The row's end event, in the precedence the outcome flags already
+            # encode: a winning cap, cutoff, or surface clears the flags below it.
+            if limited_j:
+                event_j = EVENT_SUBSTEP
+            elif cutoff_j:
+                event_j = EVENT_CUTOFF
+            elif exit_top_j:
+                event_j = EVENT_EXIT_TOP
+            elif exit_bot_j:
+                event_j = EVENT_EXIT_BOTTOM
+            elif exit_side_j:
+                event_j = EVENT_EXIT_SIDE
+            elif surface_first:
+                event_j = EVENT_GROOVE_SURFACE
+            elif cross_up_j or cross_dn_j:
+                event_j = EVENT_LAYER_BOUNDARY
+            else:
+                event_j = EVENT_ELASTIC
             if per_electron:
                 i = e - e_start
                 slot, record = i * cap + local_nseg[e], local_nseg[e] < cap
@@ -494,6 +523,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 if energy_model_code == 1:
                     seg_E_end[slot], seg_t_end[slot] = E_end_j, t_end_j
                     seg_flight[slot], seg_substep[slot] = flight_id[e], substep_id[e]
+                    seg_event[slot] = event_j
             if per_electron:
                 local_nseg[e] += 1
             else:

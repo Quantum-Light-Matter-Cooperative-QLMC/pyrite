@@ -19,6 +19,7 @@ from ...transport import (
     _LN2,
     _MC2_KEV,
     TRANSPORT_ELEMENTS,
+    SegmentEvent,
     _element_crossover_keV,
     beta_from_keV,
 )
@@ -44,6 +45,7 @@ _SEG_ARRAYS = (
     "electron_id",
     "flight_id",
     "substep_id",
+    "event_kind",
     "layer",
 )
 
@@ -663,6 +665,13 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
         # longer describes it -- but the clip rule above is the transport core's
         # own cutoff solve, whose end state is E_cut by construction.
         shortened = new_L < old_L
+        if "event_kind" in out:
+            # The consumer's floor is now the end event of every row it
+            # shortened or whose successor it dropped (E_end below the floor).
+            floored = shortened | (xp.asarray(out["E_end_keV"], dtype=REAL) < E_cut)
+            out["event_kind"] = xp.where(
+                floored, np.int8(SegmentEvent.CUTOFF), xp.asarray(out["event_kind"])
+            ).astype(xp.int8)
         out["E_end_keV"] = xp.where(shortened, E_cut, xp.asarray(out["E_end_keV"], dtype=REAL))
         out["E_repr_keV"] = xp.where(
             shortened, E_repr_cut, xp.asarray(out["E_repr_keV"], dtype=REAL)

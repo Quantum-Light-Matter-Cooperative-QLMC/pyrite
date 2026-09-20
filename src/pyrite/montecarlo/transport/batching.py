@@ -488,6 +488,7 @@ def _run_per_electron_transport_lut(
     seg_t_end,
     seg_flight,
     seg_substep,
+    seg_event,
     stragg_layer_tables,
     straggle_on,
     stragg_dE,
@@ -559,7 +560,7 @@ def _run_per_electron_transport_lut(
 
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     if energy_model_code == 1:
-        out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep)
+        out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event)
     core_args = (control, geometry, lut_args, d_stragg_layers, state)
     return _drive_per_electron_batches(
         core,
@@ -619,6 +620,7 @@ def _run_per_electron_transport(
     seg_t_end,
     seg_flight,
     seg_substep,
+    seg_event,
     straggle_on,
     stragg_dE,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
@@ -704,7 +706,7 @@ def _run_per_electron_transport(
 
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     if energy_model_code == 1:
-        out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep)
+        out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event)
     core_args = (control, geometry, d_materials, d_mott, state)
     return _drive_per_electron_batches(
         core,
@@ -730,9 +732,10 @@ def _run_per_electron_transport(
 def _alloc_scratch(xp, m, cap, midpoint=False):
     """Slot buffers for one batch, in the segment field order.
 
-    The four flight end-state/identity buffers exist only under the midpoint
-    rule; frozen runs allocate them at length zero so the core signature stays
-    fixed while the frozen row schema stays exactly seven fields wide.
+    The five flight end-state/identity/event buffers exist only under the
+    midpoint rule; frozen runs allocate them at length zero so the core
+    signature stays fixed while the frozen row schema stays exactly seven fields
+    wide.
     """
     n = m * cap
     n_end = n if midpoint else 0
@@ -748,4 +751,5 @@ def _alloc_scratch(xp, m, cap, midpoint=False):
         xp.empty(n_end, dtype=xp.float64),
         xp.empty(n_end, dtype=xp.int64),
         xp.empty(n_end, dtype=xp.int64),
+        xp.empty(n_end, dtype=xp.int8),
     )

@@ -83,6 +83,15 @@ from ._jit_device import (
     _urban_ionisation,
     _urban_stream_key,
 )
+from .events import (
+    EVENT_CUTOFF,
+    EVENT_ELASTIC,
+    EVENT_EXIT_BOTTOM,
+    EVENT_EXIT_SIDE,
+    EVENT_EXIT_TOP,
+    EVENT_LAYER_BOUNDARY,
+    EVENT_SUBSTEP,
+)
 
 
 @jit.rawkernel()
@@ -138,6 +147,7 @@ def _transport_kernel(
     seg_t_end,
     seg_flight,
     seg_substep,
+    seg_event,
     seg_count,
     exit_code,
     straggle_on,
@@ -572,6 +582,22 @@ def _transport_kernel(
                 beta_j = _beta_from_keV(E_j)
         t_end_j = clock[e] + step_j / beta_j
 
+        # The row's end event; see `transport.events`. A winning cap or
+        # cutoff has already cleared the geometry flags below it.
+        event_j = EVENT_ELASTIC
+        if limited_j:
+            event_j = EVENT_SUBSTEP
+        elif cutoff_j:
+            event_j = EVENT_CUTOFF
+        elif exit_top_j:
+            event_j = EVENT_EXIT_TOP
+        elif exit_bot_j:
+            event_j = EVENT_EXIT_BOTTOM
+        elif exit_side_j:
+            event_j = EVENT_EXIT_SIDE
+        elif cross_up_j or cross_dn_j:
+            event_j = EVENT_LAYER_BOUNDARY
+
         if local_nseg < cap:
             slot = i * cap + local_nseg
             s3 = slot * I32_THREE
@@ -591,6 +617,7 @@ def _transport_kernel(
                 seg_t_end[slot] = t_end_j
                 seg_flight[slot] = flight_id
                 seg_substep[slot] = substep_id
+                seg_event[slot] = event_j
         local_nseg += I32_ONE
 
         # 4. Advance position, energy, transport clock, and optical depth.
@@ -766,6 +793,7 @@ def _transport_lut_kernel(
     seg_t_end,
     seg_flight,
     seg_substep,
+    seg_event,
     seg_count,
     exit_code,
 ):
@@ -968,6 +996,22 @@ def _transport_lut_kernel(
                 E_end_j = E_j + dEds * step_j
             t_end_j = clock[e] + step_j * inv_beta_j
 
+        # The row's end event; see `transport.events`. A winning cap or
+        # cutoff has already cleared the geometry flags below it.
+        event_j = EVENT_ELASTIC
+        if limited_j:
+            event_j = EVENT_SUBSTEP
+        elif cutoff_j:
+            event_j = EVENT_CUTOFF
+        elif exit_top_j:
+            event_j = EVENT_EXIT_TOP
+        elif exit_bot_j:
+            event_j = EVENT_EXIT_BOTTOM
+        elif exit_side_j:
+            event_j = EVENT_EXIT_SIDE
+        elif cross_up_j or cross_dn_j:
+            event_j = EVENT_LAYER_BOUNDARY
+
         if local_nseg < cap:
             slot = i * cap + local_nseg
             s3 = slot * I32_THREE
@@ -987,6 +1031,7 @@ def _transport_lut_kernel(
                 seg_t_end[slot] = t_end_j
                 seg_flight[slot] = flight_id
                 seg_substep[slot] = substep_id
+                seg_event[slot] = event_j
         local_nseg += I32_ONE
 
         pos[e3] = px + step_j * dx
