@@ -105,8 +105,8 @@ $\hat n$, so it is ~2.5 mm in every case measured below, essentially
 independent of material and beam energy. Those inter-electron fringes are one
 realization of the sampled offsets — speckle, which `lines/_setup.py` already
 notes "does not shrink with electron count". Whether they are an observable
-at all is a modelling question outside this row; see the follow-up issue
-recorded in #117.
+at all is a modelling question outside this row; it is tracked separately as
+issue #155.
 
 ## Measurements
 
