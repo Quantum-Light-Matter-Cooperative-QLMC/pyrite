@@ -601,9 +601,15 @@ def _target_line_grid(
 
     eg = np.asarray(r["E_grid"], float)
     if from_config and sweep is not None:
-        from ..campaign.sweep import _line_grid_for_energy
+        from ..campaign.sweep import _line_grid_for_energy, sweep_crystal_params
 
-        base = np.asarray(_line_grid_for_energy(sweep, eg, float(r["case"]["E0_keV"])), float)
+        # Coordinates only: a returned policy payload describes a resolution the
+        # runner would refine from its own trajectories, and reline pins the
+        # explicit coordinates instead (it drops `case["line_grid_policy"]`).
+        coordinates, _policy = _line_grid_for_energy(
+            sweep, sweep_crystal_params(sweep), float(r["case"]["E0_keV"])
+        )
+        base = np.asarray(coordinates, float)
     else:
         base = eg
     if any(value is not None for value in (line_start_eV, line_stop_eV, line_step_eV)):
