@@ -105,7 +105,7 @@ def plasma_energy_eV(material: str | MediumSpec) -> float:
 
     This is the low-energy edge of the band in which this repository's X-ray
     optics is meaningful at all, so it is what sets the photon-continuum grid
-    floor (``energy_grid/floor.py``); it is not itself part of any transport or
+    floor (``_photon_continuum_floor.py``); it is not itself part of any transport or
     emission kernel.
 
     Source equation. For an electron gas of number density ``n_e`` the Drude

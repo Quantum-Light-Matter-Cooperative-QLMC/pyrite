@@ -64,10 +64,13 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # hashed into the content key, so a catalog value change orphans records
     # minted under the old value rather than serving them for a case that now
     # diffracts differently -- the same rule the stopping-model marker follows.
-    # Re-minted again for issue #88's physical Lorentzian-window marker and for
-    # issue #125's switch from stored rows to automatic line-grid policy.
+    # Re-minted again for issue #88's physical Lorentzian-window marker, and
+    # again for issue #100's derived photon-continuum floor: a case's
+    # E_grid_brem now starts at the medium's own floor instead of 0 eV, so the
+    # band the record was computed over genuinely changed and pre-floor records
+    # must be orphaned rather than served for a different band.
     assert case_content_key(case) == (
-        "1bf886b42ee14a716fe6a00756822b6c15746c4038c14c88a044a3890fb968d5"
+        "7b3e068bbb7cc21018caa1b14e75f8fc64193c63670a3bf724d2fff536c4d5a7"
     )
 
 
@@ -430,8 +433,13 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     bit-for-bit from here. They were re-minted again when unconditional EEDL
     characteristic radiation was introduced, for the EEDL bremsstrahlung
     generation marker, for natural Lorentzian characteristic profiles, and for
-    issue #88's physical finite-window convention, and issue #125's automatic
-    line-grid default."""
+    issue #88's physical finite-window convention.
+
+    Issue #100's derived photon-continuum floor deliberately did NOT move these:
+    it raises a brem grid's ``start`` where the band meets the material, in
+    ``build_cases``, so the declared sweep payload these digests hash is
+    untouched. The *case* content key does move; see
+    :func:`test_typed_case_content_key_matches_pre_case_golden`."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
     assert identity["parameter_sha256"] == digest
@@ -580,8 +588,13 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
+    # Re-minted for issue #100: mose2 carries its own E_grid_brem override, and
+    # that row's `start` now records the medium's derived photon-continuum floor
+    # instead of 0 eV, so the declared sweep payload this digest hashes moved.
+    # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
+    # bandwidth request the resolver raises, so it was left alone.
     assert survey_incoherent["parameter_sha256"] == (
-        "d32fd7f5e02aeedb83187fda3221b5b986b405c66fd47836640671759155ca71"
+        "c3a3cecdf11942c6f0e235148e61b02365d90bd86d7655b1202632d5616dae36"
     )
 
 

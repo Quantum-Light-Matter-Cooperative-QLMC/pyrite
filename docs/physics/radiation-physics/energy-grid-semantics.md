@@ -262,7 +262,7 @@ disguise, and it silently sets a physics result.
 
 ### The floor is derived, not chosen
 
-`energy_grid/floor.py::photon_continuum_floor_eV` returns the larger of two
+`_photon_continuum_floor.py::photon_continuum_floor_eV` returns the larger of two
 independently derived bounds, and neither is a tuning knob.
 
 **The modelled band.** A continuum node is only meaningful where the medium's
@@ -307,7 +307,7 @@ $5\times10^{-5}$ relative, from different data through different code.
 **Data support.** The second bound is the lowest energy at which every table the
 continuum pipeline evaluates carries a real tabulated value rather than an
 extrapolation, measured from the packaged data and recorded with its provenance
-in `energy_grid/floor.py::DATA_SUPPORT_LIMITS_EV`: EEDL MF=26/MT=527 photon
+in `_photon_continuum_floor.py::DATA_SUPPORT_LIMITS_EV`: EEDL MF=26/MT=527 photon
 spectra reach 0.1 eV for every transport element, Chantler/FFAST reaches 1.01 eV
 (admitted on the strict interior, so 1.01 eV itself reads as out of range), and
 the digitized Eagle XO QE curve is documented valid from 12 eV. The QE table
@@ -321,6 +321,35 @@ support binds only in the dilute limit above. HOPG's floor is 30.661 eV.
 Choosing where the nodes go *between* floor and ceiling — refinement near
 absorption edges and kinematic endpoints — is a separate concern from the
 geometric baseline `geometric_continuum_grid` builds.
+
+**Where the floor is applied, and why not in the catalog.** A uniform
+production bremsstrahlung band (`E_grid_brem`) declares a `start`, but that
+number is a *bandwidth request*, not the band the case gets: the floor belongs
+to the medium, and the same catalog row is inherited by profiles that must
+agree about the material they share. `campaign/sweep.py::build_cases` therefore
+raises a declared start to `floored_lattice_start_eV(material, step)` — the
+lowest multiple of the grid's own step at or above the medium's floor — the
+first place the band and the material meet. Three consequences follow, and each
+is load-bearing:
+
+* **The nodes do not move, they are only dropped.** Snapping to the step
+  lattice rather than starting at the floor itself leaves every surviving node
+  on the coordinate it had, so a quantity measured on the grid — a cumulative
+  coverage quantile, say — is read at the same energies as before.
+* **A declared start *above* the floor is kept.** Narrowing the band is an
+  ordinary bandwidth choice, exactly as in `geometric_continuum_grid`; only
+  widening it downward, past model validity, is refused.
+* **A profile-level default stores `0.0`.** Naming no medium, it can carry no
+  floor of its own, and `0.0` reads as "no bound beyond the medium's". Storing
+  a *per-profile* floor instead would make two profiles disagree about the same
+  material's grid and silently stop sharing cases they are meant to share.
+
+The diagnostic band the `stop` is measured on
+(`energy_grid/derive.py::wide_brem_grid`) starts at the same energy, through the
+same helper, so the band a bound is measured over is the band it is installed
+for. On HOPG at 30 keV this drops the nodes at 0 and 25 eV; those carry about
+$1.3\times10^{-3}$ of the total escaping intensity, and the derived coverage
+energy and catalog `stop` are unchanged by their removal.
 
 Detector channels are a separate coordinate from the source mesh, and a real
 instrument does have a channel that starts at zero recorded energy — the

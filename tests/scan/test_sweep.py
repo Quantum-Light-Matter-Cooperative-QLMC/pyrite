@@ -31,6 +31,7 @@ from pyrite.campaign.sweep import (
 )
 from pyrite.detectors import Detector, EnergyBins, Timepix3
 from pyrite.energy_grid.encoding import decode_energy_grid
+from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.materials import (
     CATALOG,
     LayerSpec,
@@ -322,6 +323,14 @@ def test_empty_per_beam_line_grid_resolves_automatically():
 
 
 def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
+    """The lowest per-beam line-grid start picks the band; the medium sets its floor.
+
+    The implicit choice here is 10 eV, which is below mose2's derived
+    photon-continuum floor, so ``build_cases`` raises it onto the grid's own
+    step lattice (issue #100). What the implicit rule still owns is that one
+    band is shared by every beam energy, and that it is derived from the
+    *lowest* per-beam start rather than per case.
+    """
     cases = build_cases(
         Sweep(
             material="mose2",
@@ -334,8 +343,13 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
             ),
         )
     )
+    steps = {case["E_grid_brem"][2] for case in cases}
+    assert len(steps) == 1
+    step = steps.pop()
 
-    assert {case["E_grid_brem"][0] for case in cases} == {10.0}
+    assert {case["E_grid_brem"][0] for case in cases} == {
+        max(10.0, floored_lattice_start_eV("mose2", step))
+    }
 
 
 def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
@@ -422,7 +436,11 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
 
     assert case["E_grid_line"] == (50.0, 100.0, 5.0)
     assert case["E_grid"] == (50.0, 100.0, 5.0)
-    assert case["E_grid_brem"] == (0.0, 30100.0, 100.0)
+    # Still a triple, and still re-spanned to the beam energy; only the start
+    # moves, off 0 eV and onto the lattice multiple at or above mose2's derived
+    # photon-continuum floor (issue #100).
+    assert case["E_grid_brem"] == (floored_lattice_start_eV("mose2", 100.0), 30100.0, 100.0)
+    assert case["E_grid_brem"][0] == 100.0
 
 
 def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeypatch):

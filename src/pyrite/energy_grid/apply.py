@@ -87,6 +87,25 @@ def _validated_brem(brem, *, field: str) -> dict:
     }
 
 
+def _brem_start_eV(material: str, step_eV: float) -> float:
+    """First node of MATERIAL's installed bremsstrahlung grid, in eV.
+
+    The medium's own derived photon-continuum floor, snapped up onto the same
+    absolute ``step_eV`` lattice the grid's nodes have always sat on
+    (``energy_grid/floor.py::floored_lattice_start_eV``). Every surviving node
+    keeps the coordinate it had; only the sub-floor ones are dropped, and with
+    them the nodes below the band the emission and escape models are defined
+    over. The diagnostic band this grid's ``stop`` is measured on
+    (``derive.py::wide_brem_grid``) starts at the same energy.
+
+    Imported lazily to keep this module's import free of the material catalog,
+    the same reason :func:`_validate_catalog_text` defers its loader.
+    """
+    from pyrite.energy_grid.floor import floored_lattice_start_eV
+
+    return floored_lattice_start_eV(material, step_eV)
+
+
 def _validated_combined(combined) -> dict:
     validated = {}
     for material, entry in combined.items():
@@ -209,10 +228,11 @@ def _merge_brem(document, material: str, brem, force: bool, provenance_mod) -> l
     if not force and provenance_mod.is_manual_brem(material):
         return [f"{material}:brem"]
     target = _material_override_table(document, material)
+    step = float(brem["step_eV"])
     arange = tomlkit.inline_table()
-    arange["start"] = 0.0
+    arange["start"] = _brem_start_eV(material, step)
     arange["stop"] = float(brem["stop_eV"])
-    arange["step"] = float(brem["step_eV"])
+    arange["step"] = step
     item = tomlkit.inline_table()
     item["arange"] = arange
     target["E_grid_brem"] = item
@@ -384,7 +404,10 @@ def add_file(
             }
             skipped.append(f"{material}:brem")
         else:
-            brem = {"start_eV": 0.0, **entry["brem"]}
+            brem = {
+                "start_eV": _brem_start_eV(material, float(entry["brem"]["step_eV"])),
+                **entry["brem"],
+            }
 
         rows = [
             {
@@ -849,7 +872,15 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
 def resolved_show_inputs(
     *, profile: str = "standard", catalog_path=None
 ) -> tuple[dict, dict, dict[str, dict | None], dict[str, str]]:
-    """Resolve show payloads from explicit artifacts, then own legacy rows."""
+    """Resolve show payloads from explicit artifacts, then own legacy rows.
+
+    Bremsstrahlung ``start`` is reported as the band a case will actually be
+    evaluated over, not as the number the row happens to store: a declared
+    start below the medium's derived photon-continuum floor is raised, the same
+    way ``campaign/sweep.py::build_cases`` raises it. A profile-level default
+    stores ``0.0`` precisely because it names no medium, so showing it verbatim
+    would report a band no case ever gets.
+    """
     path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
     raw = tomllib.loads(path.read_text())
     profiles = raw.get("profiles", {})
@@ -897,6 +928,17 @@ def resolved_show_inputs(
             "stop": brem["stop_eV"],
             "step": brem["step_eV"],
         }
+    # A copy per material, never in place: ``effective_brem`` hands back the
+    # profile default's own dict, which every material inheriting it shares.
+    brem_by_material = {
+        material: brem
+        if brem is None
+        else {
+            **brem,
+            "start": max(float(brem["start"]), _brem_start_eV(material, float(brem["step"]))),
+        }
+        for material, brem in brem_by_material.items()
+    }
     return raw, energy_grids, brem_by_material, refs
 
 

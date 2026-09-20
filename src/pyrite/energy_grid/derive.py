@@ -39,7 +39,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _quantized_angles, build_cases
 from pyrite.energy_grid import defaults as lg_defaults
 from pyrite.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop
-from pyrite.energy_grid.floor import photon_continuum_floor_eV
+from pyrite.energy_grid.floor import floored_lattice_start_eV
 from pyrite.energy_grid.semantics import resolution_num
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.runner import run_cases
@@ -113,7 +113,11 @@ def wide_brem_grid(material, stop_eV=None, step_eV=WIDE_BREM_STEP_EV):
     changes is where the grid *starts*: at the medium's own derived continuum
     floor (:func:`~pyrite.energy_grid.floor.photon_continuum_floor_eV`) rather
     than at ``0.0``, which sat below the band the escape model is valid over and
-    put a node at an energy where it is not defined at all.
+    put a node at an energy where it is not defined at all. The snap onto the
+    lattice is :func:`~pyrite.energy_grid.floor.floored_lattice_start_eV`,
+    shared with the installed production grid so the two agree about where a
+    medium's modelled band begins; it also resolves a film-on-substrate catalog
+    entry to its own emitting crystal.
 
     The lattice stays uniform deliberately. A geometric grid equidistributes
     *relative* quadrature error, but what this grid measures is a cumulative
@@ -128,13 +132,14 @@ def wide_brem_grid(material, stop_eV=None, step_eV=WIDE_BREM_STEP_EV):
     step = float(step_eV)
     if step <= 0.0:
         raise ValueError("brem grid step must be positive")
-    floor = photon_continuum_floor_eV(material)
-    first = int(np.ceil(floor / step))
+    start = floored_lattice_start_eV(material, step)
+    first = int(round(start / step))
     count = int(np.ceil(stop / step))
     if first >= count:
         raise ValueError(
-            f"brem diagnostic band is empty for {material!r}: the derived floor "
-            f"{floor:g} eV is at or above the {stop:g} eV ceiling"
+            f"brem diagnostic band is empty for {material!r}: the first lattice node "
+            f"at or above the derived floor, {start:g} eV, is already at or above the "
+            f"{stop:g} eV ceiling"
         )
     return step * np.arange(first, count, dtype=float)
 

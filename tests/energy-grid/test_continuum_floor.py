@@ -10,6 +10,8 @@ See ``docs/physics/radiation-physics/energy-grid-semantics.md`` and the
 ``photon-continuum-floor`` ledger row.
 """
 
+import tomllib
+
 import numpy as np
 import pytest
 
@@ -18,14 +20,25 @@ from pyrite._grid_semantics import (
     rebin_piecewise_constant_density,
     zero_based_detector_edges,
 )
+from pyrite.campaign.config import material_sweep
+from pyrite.campaign.sweep import build_cases
+from pyrite.energy_grid.apply import _MATERIALS_TOML, apply_bounds, resolved_show_inputs
+from pyrite.energy_grid.derive import wide_brem_grid
 from pyrite.energy_grid.floor import (
     DATA_SUPPORT_LIMITS_EV,
+    continuum_medium_key,
     data_support_floor_eV,
+    floored_lattice_start_eV,
     geometric_continuum_grid,
     photon_continuum_floor_eV,
 )
 from pyrite.materials import MediumSpec
 from pyrite.materials.attenuation import plasma_energy_eV
+
+
+def _catalog_profiles() -> list[str]:
+    return list(tomllib.loads(_MATERIALS_TOML.read_text())["profiles"])
+
 
 # --- the floor itself -------------------------------------------------------
 
@@ -235,3 +248,122 @@ def test_zero_channel_leaves_uniform_grid_scoring_bit_for_bit_unchanged():
 
     assert reference_outside == (0.0, 0.0)
     assert np.array_equal(resp.apply(density), reference)
+
+
+# --- routing the floor into the installed production grid -------------------
+
+
+def test_lattice_start_keeps_the_nodes_and_drops_only_the_sub_floor_ones():
+    """Snapping to the lattice must move nodes, never shift them."""
+    start = floored_lattice_start_eV("hopg", 25.0)
+    floor = photon_continuum_floor_eV("hopg")
+
+    assert start % 25.0 == 0.0
+    assert start >= floor
+    # The *lowest* such multiple: one step down would fall below the floor.
+    assert start - 25.0 < floor
+
+
+def test_lattice_start_resolves_a_film_on_substrate_entry_to_its_crystal():
+    """``mos2-on-sapphire`` is a catalog material, not a medium the tables know."""
+    assert continuum_medium_key("mos2-on-sapphire") == "mos2"
+    assert floored_lattice_start_eV("mos2-on-sapphire", 25.0) == floored_lattice_start_eV(
+        "mos2", 25.0
+    )
+    # A bare medium key, and an explicit medium, pass through untouched.
+    assert continuum_medium_key("hopg") == "hopg"
+    medium = MediumSpec(key="test-graphite", composition=(("C", 0.1128),))
+    assert continuum_medium_key(medium) is medium
+
+
+def test_lattice_start_refuses_a_nonpositive_step():
+    for step in (0.0, -25.0, float("inf")):
+        with pytest.raises(ValueError, match="finite positive"):
+            floored_lattice_start_eV("hopg", step)
+
+
+@pytest.mark.parametrize("profile_name", sorted(_catalog_profiles()))
+def test_no_profile_declares_a_start_that_differs_per_profile(profile_name):
+    """A stored ``start`` is a bandwidth request; the floor is resolved per medium.
+
+    A profile-level default names no medium, so it may not carry a floor of its
+    own -- it stays at ``0.0``, meaning "no bound beyond the medium's". A
+    per-material override names one, so its value must be exactly that medium's
+    resolved start. Any other stored value would make two profiles disagree
+    about the same material's grid, which is what
+    ``test_case_content_key_matches_across_profiles_for_shared_cases`` forbids.
+    """
+    raw = tomllib.loads(_MATERIALS_TOML.read_text())
+    profile = raw["profiles"][profile_name]
+
+    default = profile.get("E_grid_brem")
+    if default is not None:
+        assert float(default["arange"]["start"]) == 0.0
+
+    for material, override in profile.get("overrides", {}).items():
+        grid = override.get("E_grid_brem")
+        if grid is None:
+            continue
+        step = float(grid["arange"]["step"])
+        assert float(grid["arange"]["start"]) == floored_lattice_start_eV(material, step)
+
+
+@pytest.mark.parametrize("material", ["hopg", "silicon", "mose2", "wse2"])
+def test_built_cases_start_inside_the_modelled_band_in_every_profile(material):
+    """The grid a case actually carries, which is the one that matters."""
+    resolved = set()
+    for profile_name in _catalog_profiles():
+        try:
+            sweep = material_sweep(material, catalog_profile=profile_name)
+        except (KeyError, ValueError):
+            continue  # profile does not carry this material
+        start, _, step = build_cases(sweep)[0]["E_grid_brem"]
+        assert start == floored_lattice_start_eV(material, step)
+        assert start >= photon_continuum_floor_eV(material)
+        resolved.add((start, step))
+
+    # One medium, one answer: the floor cannot depend on which profile asked.
+    assert len(resolved) == 1
+
+
+def test_a_declared_start_above_the_floor_is_a_bandwidth_choice_and_is_kept():
+    """Raising the floor narrows the band on purpose; only lowering it is refused."""
+    narrow = material_sweep("hopg", E_grid_brem=(5_000.0, 30_000.0, 25.0))
+
+    assert build_cases(narrow)[0]["E_grid_brem"][0] == 5_000.0
+
+
+def test_artifact_resolved_brem_grids_start_inside_the_modelled_band():
+    """Artifact-backed materials resolve their grid from the store, not the row."""
+    _, _, brem_by_material, refs = resolved_show_inputs()
+    assert refs, "expected at least one artifact-backed material to cover this path"
+
+    for material in refs:
+        brem = brem_by_material[material]
+        assert float(brem["start"]) == floored_lattice_start_eV(material, float(brem["step"]))
+
+
+def test_derived_brem_row_is_written_at_the_medium_floor_not_zero():
+    """``apply_bounds`` is where a derived grid's first node is decided."""
+    text = _MATERIALS_TOML.read_text()
+    combined = {
+        "hopg": {
+            "line_rows": [{"energy_keV": 30.0, "stop_eV": 9_000.0, "num": 2_001}],
+            "brem": {"stop_eV": 40_000.0, "step_eV": 25.0},
+        }
+    }
+
+    updated, skipped = apply_bounds(text, combined, force=True)
+
+    row = tomllib.loads(updated)["profiles"]["standard"]["overrides"]["hopg"]["E_grid_brem"]
+    assert skipped == []
+    assert row["arange"]["start"] == floored_lattice_start_eV("hopg", 25.0)
+    assert row["arange"]["start"] > 0.0
+
+
+def test_diagnostic_band_and_installed_grid_agree_on_where_the_band_starts():
+    """The stop is measured on one grid and installed on another; both are floored."""
+    diagnostic = wide_brem_grid("hopg")
+    _, _, brem_by_material, _ = resolved_show_inputs()
+
+    assert float(diagnostic[0]) == float(brem_by_material["hopg"]["start"])
