@@ -8,5 +8,4 @@ def test_dev_entrypoint_delegates_to_dev_cli(monkeypatch):
 
     _dev.main(["lint"])
 
-    assert calls == [((["lint"],), {'prog_name': 'pyrite-dev'})]
-
+    assert calls == [((["lint"],), {"prog_name": "pyrite-dev"})]

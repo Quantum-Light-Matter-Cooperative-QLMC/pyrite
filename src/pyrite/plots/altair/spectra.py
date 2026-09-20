@@ -628,9 +628,7 @@ def _compare_frame(
     for grp in groups.values():
         r = max(
             grp,
-            key=lambda rr: float(
-                np.max(line_spectrum(rr, characteristic=include_characteristic))
-            ),
+            key=lambda rr: float(np.max(line_spectrum(rr, characteristic=include_characteristic))),
         )
         row_meta = {
             "E0_keV": float(r["case"]["E0_keV"]),

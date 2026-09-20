@@ -34,7 +34,7 @@ def _materials_needing_pull(jobid, materials):
     transport._check_shell_tokens([jobid, *materials])
     jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
     progress = transport._ssh_capture(
-        f'D={jobdir}; for material in {" ".join(materials)}; do '
+        f"D={jobdir}; for material in {' '.join(materials)}; do "
         'printf "%s\\t" "$material"; cat "$D/progress/$material.json" 2>/dev/null; '
         'printf "\\n"; done'
     )

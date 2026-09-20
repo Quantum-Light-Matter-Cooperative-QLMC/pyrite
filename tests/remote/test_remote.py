@@ -1700,9 +1700,7 @@ def test_style_states_colors_step_warnings_as_warning_not_success(monkeypatch):
     warning_color = "\033[38;2;255;213;128m"
 
     clean = dashboard_render.style_states("done [3/3] 2026-09-19T00:00:00+00:00")
-    warned = dashboard_render.style_states(
-        "done with 2 warning(s) [3/3] 2026-09-19T00:00:00+00:00"
-    )
+    warned = dashboard_render.style_states("done with 2 warning(s) [3/3] 2026-09-19T00:00:00+00:00")
 
     assert clean.startswith(f"{done_color}done\033[0m")
     assert warned.startswith(f"{warning_color}done\033[0m")

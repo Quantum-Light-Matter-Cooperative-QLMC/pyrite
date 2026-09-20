@@ -243,9 +243,7 @@ def test_nonzero_continuum_is_not_near_zero_when_line_is_empty():
         _rung(1.0, **{"yield": 0.0, "continuum_yield": 1.1}),
     ]
 
-    report = richardson_acceptance(
-        rungs, gated={"continuum_yield": "intrinsic_source"}
-    )
+    report = richardson_acceptance(rungs, gated={"continuum_yield": "intrinsic_source"})
 
     assert report.triples[0].observables[0].reason != "near-zero"
     assert report.accepted_spacing_eV is None

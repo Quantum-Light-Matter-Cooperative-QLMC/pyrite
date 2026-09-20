@@ -240,21 +240,15 @@ def test_coherent_decoherence_blend_holds_on_the_per_hkl_route(sinc_cutoff):
 
     active = _flat(2)
     active.update(t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3)))
-    actual = mc_spectrum(
-        active, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs
-    )
+    actual = mc_spectrum(active, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
 
     ne_total = active["Ne"]
     flat_raw = (
-        mc_spectrum(
-            _flat(2), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs
-        )
+        mc_spectrum(_flat(2), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
         * ne_total
     )
     grouped_raw = sum(
-        mc_spectrum(
-            _flat(1), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs
-        )
+        mc_spectrum(_flat(1), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs)
         for _ in range(2)
     )
     omega = energy_grid / HBARC_EV_ANG

@@ -153,9 +153,7 @@ def test_run_config_checkpoints_per_rung_and_resumes_on_identical_segments():
     assert complete is True
     expected_grids = cc.ladder_grids(*finished["bandwidth_eV"], SPACINGS)
     expected_spacings = [float(np.diff(grid)[0]) for grid in expected_grids]
-    assert [rung["spacing_eV"] for rung in finished["rungs"]] == pytest.approx(
-        expected_spacings
-    )
+    assert [rung["spacing_eV"] for rung in finished["rungs"]] == pytest.approx(expected_spacings)
     assert finished["fingerprint"] == partial["fingerprint"]
     assert len(finished["transport_wall_s"]) == 2
     assert len(finished["report"]["triples"]) == 1

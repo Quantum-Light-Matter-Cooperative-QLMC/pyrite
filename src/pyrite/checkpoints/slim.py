@@ -154,7 +154,11 @@ def _slim_checkpoint(
 
         results = project_dataset(results, dataset)
     slim = slim_results(
-        results, case_names=case_names, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
+        results,
+        case_names=case_names,
+        drop_wide_brem=drop_wide_brem,
+        downcast=downcast,
+        **constraints,
     )
     if out_path is None:
         if os.path.isdir(in_path):
