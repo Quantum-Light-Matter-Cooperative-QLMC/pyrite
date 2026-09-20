@@ -56,6 +56,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`xray-in-medium-resonance`](ledger-crystallography-atomic-data.md#xray-in-medium-resonance) | CXR line kinematics on the in-medium photon dispersion `k = Re n(ω) ω n̂`: resonance `ω_res = v·g / (1 − Re n (v·n̂))`, `k·v = ω(1 − denom)`, `k·g = Re n ω (n̂·g)`, PXR detuning `\|k+g\|² − k² = g² + 2k·g` and PXR numerator `k² = (Re n ω)²` | `rederived` |
 | [`xray-in-medium-propagation-phase`](ledger-crystallography-atomic-data.md#xray-in-medium-propagation-phase) | coherent segment-to-segment propagation phase on the in-medium wavevector: segment `j` accumulates `−δ(E) ω(E) L_esc,j` on top of the vacuum `ω d_j`, with `d_j = t_j − n̂·r_j` and `L_esc,j` the in-crystal escape path | `rederived` |
 | [`self-absorption`](ledger-crystallography-atomic-data.md#self-absorption) | per-segment Beer–Lambert path-to-surface, cross-stack | `rederived` |
+| [`photon-continuum-floor`](ledger-crystallography-atomic-data.md#photon-continuum-floor) | a photon-continuum grid's strictly positive lowest node is the larger of the medium's bulk free-electron plasma energy `ħω_p = ħ√(n_e e²/ε₀mₑ)`, with `n_e = Σᵢ nᵢ Zᵢ` from the medium's own catalog number densities, and the lowest energy at which every table the continuum pipeline evaluates has real support | `rederived` |
 
 ## Crystal structure & CIF provenance
 

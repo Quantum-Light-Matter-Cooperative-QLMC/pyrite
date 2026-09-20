@@ -87,8 +87,8 @@ from scipy.special import erf
 
 from .._grid_semantics import (
     is_uniform_grid,
-    node_bin_edges_and_widths,
     rebin_piecewise_constant_density,
+    zero_based_detector_edges,
 )
 from ..materials.crystal import absorption_length_ang
 from . import _si_sensor
@@ -386,13 +386,12 @@ class TimepixResponse:
     ):
         E = np.asarray(E_grid_eV, dtype=float)
         self.E = E  # the fine output grid
-        fine_edges, fine_widths = node_bin_edges_and_widths(E)
-        if fine_edges[0] < 0.0:
-            # Detector channels have an explicit physical zero-energy edge;
-            # never assign density at a positive evaluation node to a
-            # reflected, negative-energy half-bin.
-            fine_edges[0] = 0.0
-            fine_widths = np.diff(fine_edges)
+        # The detector owns an explicit physical 0 eV boundary, whatever the
+        # source mesh starts at: a reflected negative half-bin is clamped up to
+        # it, and a positive continuum floor gets a separate empty channel
+        # beneath it rather than having its first bin stretched down to zero.
+        fine_edges, edge_widths, self.zero_channel = zero_based_detector_edges(E)
+        fine_widths = edge_widths[1:] if self.zero_channel else edge_widths
         lo, hi = float(E[0]), float(E[-1])
 
         # --- coarse INPUT grid ---------------------------------------------
@@ -407,6 +406,16 @@ class TimepixResponse:
         self.fine_edges = fine_edges
         first_channel = max(0, int(np.floor(lo / dE_mc)) - 1)
         last_channel = int(np.ceil(hi / dE_mc)) + 1
+        # One channel of padding assumes the outermost midpoint cell is narrower
+        # than dE_mc, which a uniform mesh satisfies but a coarse geometric one
+        # does not -- its top half-width grows with energy. Widen only when the
+        # source edges actually escape the padded band, so every mesh that was
+        # already covered keeps exactly the channels (and the seeded MC) it had.
+        source_edges = fine_edges[1:] if self.zero_channel else fine_edges
+        if first_channel * dE_mc > source_edges[0]:
+            first_channel = max(0, int(np.floor(source_edges[0] / dE_mc)) - 1)
+        if last_channel * dE_mc < source_edges[-1]:
+            last_channel = int(np.ceil(source_edges[-1] / dE_mc)) + 1
         in_edges = np.arange(first_channel, last_channel + 1, dtype=float) * dE_mc
         self.in_edges = in_edges
         self.E_in = 0.5 * (in_edges[:-1] + in_edges[1:])  # coarse bin centres
@@ -465,6 +474,10 @@ class TimepixResponse:
             Detected density on the same fine grid and in the same flux units.
         """
         spec = _si_sensor.prep_spectrum(spec, self.E, "timepix_response")
+        if self.zero_channel:
+            # The explicit [0, first source edge) detector channel carries no
+            # source mass: the continuum model has no support below its floor.
+            spec = np.concatenate(([0.0], spec))
         n_in, outside = rebin_piecewise_constant_density(self.fine_edges, spec, self.in_edges)
         if outside != (0.0, 0.0):
             raise RuntimeError("Timepix input-channel edges failed to cover the source grid")

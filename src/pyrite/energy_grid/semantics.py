@@ -10,6 +10,7 @@ from .._grid_semantics import (
     resolution_num,
     spacing_spread,
     validate_backend_spacing,
+    zero_based_detector_edges,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "resolution_num",
     "spacing_spread",
     "validate_backend_spacing",
+    "zero_based_detector_edges",
 ]

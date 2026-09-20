@@ -104,9 +104,7 @@ def test_poisson_core_uniform_expected_counts_unchanged():
 def test_convolve_detector_still_runs_on_a_uniform_grid():
     density = np.ones_like(LINEAR_GRID)
     out = response.convolve_detector(LINEAR_GRID, density, 50.0)
-    accounted, outside = response.convolve_detector(
-        LINEAR_GRID, density, 50.0, return_outside=True
-    )
+    accounted, outside = response.convolve_detector(LINEAR_GRID, density, 50.0, return_outside=True)
 
     assert out.shape == LINEAR_GRID.shape
     np.testing.assert_array_equal(accounted, out)
@@ -133,9 +131,7 @@ def test_convolve_detector_conserves_mass_on_a_log_grid_away_from_edges():
 def test_convolve_detector_reports_mass_blurred_outside_window():
     """#100: zero-padded edge loss must be observable, not silently dropped."""
     density = np.exp(-0.5 * ((LOG_GRID - LOG_GRID[0]) / 10.0) ** 2)
-    blurred, outside = response.convolve_detector(
-        LOG_GRID, density, 50.0, return_outside=True
-    )
+    blurred, outside = response.convolve_detector(LOG_GRID, density, 50.0, return_outside=True)
 
     edges, widths = node_bin_edges_and_widths(LOG_GRID)
     input_mass = np.sum(density * widths)
@@ -181,8 +177,14 @@ def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
         weights=np.ones_like(LOG_GRID) * response.dE_fine,
         minlength=response.n_in,
     )
+    # fine_edges carries the detector's explicit 0 eV channel below the source
+    # floor (#100); it holds no source mass, so the density pads with a zero.
+    unit_density = np.ones_like(LOG_GRID)
+    padded_density = (
+        np.concatenate(([0.0], unit_density)) if response.zero_channel else unit_density
+    )
     conservative, outside = rebin_piecewise_constant_density(
-        response.fine_edges, np.ones_like(LOG_GRID), response.in_edges
+        response.fine_edges, padded_density, response.in_edges
     )
     assert np.sum(conservative) == pytest.approx(np.sum(widths), rel=1e-14)
     assert outside == (0.0, 0.0)

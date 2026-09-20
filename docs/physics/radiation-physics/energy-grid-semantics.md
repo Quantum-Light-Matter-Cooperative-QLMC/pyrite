@@ -260,12 +260,93 @@ An arbitrarily small epsilon used only to keep the logarithm finite is therefore
 not acceptable. It is an unexamined infrared cutoff wearing a numerical
 disguise, and it silently sets a physics result.
 
+### The floor is derived, not chosen
+
+`energy_grid/floor.py::photon_continuum_floor_eV` returns the larger of two
+independently derived bounds, and neither is a tuning knob.
+
+**The modelled band.** A continuum node is only meaningful where the medium's
+optics is. `materials/crystal.py::optical_constants` writes the medium as
+$n = 1 - \delta - i\beta$ with $\delta = (r_e \lambda^2 / 2\pi)\, n_a f_1$. In
+the high-frequency limit every electron responds freely, $f_1 \to Z$, and that
+expression is *identically* the free-electron result
+
+```{math}
+:label: eq-grid-plasma-floor
+
+\delta(\omega) = \frac{\omega_p^2}{2\omega^2},
+\qquad
+\omega_p = \sqrt{\frac{n_e e^2}{\varepsilon_0 m_e}},
+\qquad
+n_e = \sum_i n_i Z_i ,
+```
+
+with $n_i$ the medium's own catalog number densities. At $\omega = \omega_p$,
+{eq}`eq-grid-plasma-floor` gives $\delta = 1/2$: the weakly-refracting,
+transparent-medium expansion that photon escape and self-absorption both rest on
+has collapsed, and below $\omega_p$ the medium reflects rather than transmits. So
+$\hbar\omega_p$ is where *this repository's own* optics stops being valid, not an
+imported convention. `materials/attenuation.py::plasma_energy_eV` computes it.
+
+*Assumptions.* All $Z$ electrons respond as free — exact only for $\omega$ well
+above every binding energy; near and below $\omega_p$ the real response is
+collective and band-structure dependent, which is the point. Homogeneous
+isotropic bulk medium, so no surface, porosity, or anisotropy term. No Drude
+damping, which shifts a real plasmon resonance by order $(1/\tau)/\omega_p$.
+
+*Limiting case.* $n_e \to 0$ gives $\hbar\omega_p \to 0$: an empty medium imposes
+no low-energy bound, and the floor falls back to pure table support.
+
+*Cross-check.* The PDG/Sternheimer density-effect parameterization carries the
+same quantity as $\bar{C} = 2\ln(I/\hbar\omega_p) + 1$. Inverting the packaged
+$\bar{C}$ and mean excitation energy for silicon
+(`materials/_transport_data.py`) gives 31.0482 eV against the 31.0498 eV
+{eq}`eq-grid-plasma-floor` gives from the catalog number density — agreement to
+$5\times10^{-5}$ relative, from different data through different code.
+
+**Data support.** The second bound is the lowest energy at which every table the
+continuum pipeline evaluates carries a real tabulated value rather than an
+extrapolation, measured from the packaged data and recorded with its provenance
+in `energy_grid/floor.py::DATA_SUPPORT_LIMITS_EV`: EEDL MF=26/MT=527 photon
+spectra reach 0.1 eV for every transport element, Chantler/FFAST reaches 1.01 eV
+(admitted on the strict interior, so 1.01 eV itself reads as out of range), and
+the digitized Eagle XO QE curve is documented valid from 12 eV. The QE table
+therefore binds, at 12 eV.
+
+For every condensed medium in the catalog the plasma energy is the larger term —
+the smallest is `sio2` at 30.201 eV, the largest `ptbi2` at 66.248 eV — so the
+floor is a derived, material-specific number rather than a round one, and data
+support binds only in the dilute limit above. HOPG's floor is 30.661 eV.
+
+Choosing where the nodes go *between* floor and ceiling — refinement near
+absorption edges and kinematic endpoints — is a separate concern from the
+geometric baseline `geometric_continuum_grid` builds.
+
 Detector channels are a separate coordinate from the source mesh, and a real
 instrument does have a channel that starts at zero recorded energy — the
 Timepix output histogram begins at 0 eV so that charge-loss events below the
 input energy are still scored. Represent that channel with an **explicit edge at
 zero** in the detector's own edge array. Do not try to obtain it by lowering a
 log source grid toward zero.
+
+`_grid_semantics.py::zero_based_detector_edges` builds exactly that, and keeps
+the two coordinates distinct once the source mesh carries a positive floor. Its
+first edge is always exactly 0 eV, reached one of two ways, because the two are
+physically different:
+
+* the midpoint reflection of the first node lands **below** zero — there is no
+  negative-energy half-bin, so the outer edge is clamped up to zero and the first
+  node keeps one narrower bin;
+* the reflection lands **above** zero, the ordinary case for a floored grid — the
+  first node's bin is already correct and must **not** be widened, since
+  stretching it down to zero would multiply that node's density by the extra
+  width and invent photons. A *separate* explicit channel $[0, \epsilon_0)$ is
+  prepended instead, carrying no source mass because the continuum model has no
+  support below its floor. Callers prepend one zero to the density to stay
+  aligned.
+
+So a detector whose channel physically starts at 0 eV keeps its own boundary
+rather than inheriting the continuum's positive floor.
 
 (uniform-only-consumers)=
 ## Uniform-only consumers
