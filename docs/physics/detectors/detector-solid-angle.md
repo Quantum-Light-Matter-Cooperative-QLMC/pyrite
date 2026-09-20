@@ -29,45 +29,33 @@ broadening. It is an excellent approximation for the **small** Timepix acceptanc
 
 ---
 
-## Improvement — integrate over the face (IMPLEMENTED as an opt-in tool)
+## Face integration
 
-### Status (TODO P2 #4)
-
-`montecarlo.detector_directions()` + `montecarlo.mc_spectrum_solid_angle()` implement the
-face integral as an **opt-in tool**, validated in `checks/detector_solid_angle_check.py`
-and `tests/detectors/test_solid_angle.py`:
-
-- `detector_directions(theta_obs, tilt, …, n_side, chip_mm, dist_mm, domega_sr)` lays the
-  `n_side × n_side` grid on the flat chip facing the source and returns sample-frame `n̂_i`
-  plus weights `dΩ_i = dA_i cos ψ_i / r_i²`, rescaled so `Σ dΩ_i = domega_sr`.
-- `mc_spectrum_solid_angle(…, n_hats, weights)` accumulates `Σ_i w_i · mc_spectrum(n̂=n̂_i)`,
-  reusing the **validated single-angle** `mc_spectrum` per direction (no GPU-kernel surgery).
+Tile the flat detector face with directions `n̂_i` and integrate the spectrum with
+their solid-angle weights, `Σ_i dΩ_i · spec(n̂_i)`. The weights follow
+`dΩ_i = dA_i cos ψ_i / r_i²` and are normalized so `Σ_i dΩ_i = Ω`.
 - **Regression:** `n_side = 1` reproduces `spec · Ω` to machine precision (max rel ≈ 5e-15).
 - **Wide detector (Δθ ≈ 37°):** the integrated line shifts (≈ −50 eV) and broadens
   (13 → 123 eV) into the true asymmetric shape, and the integrated width is *narrower* than
   the symmetric `aperture_fwhm_eV` (196 eV), as anticipated below. **Timepix (Δθ ≈ 2°):**
   centroid shift ≈ 0.02 eV (negligible).
 
-**Deliberately deferred** — the genuinely expensive, risky part (see Cons): the
-unit-convention refactor that bakes Ω into the checkpoint pipeline (`results.store_result`
-`scale`, dropping the `aperture_fwhm_eV` term, and the `integrated` flag every consumer must
-branch on). The tool above returns the Ω-integrated spectrum directly and does **not** mutate
-that single-`n̂` convention, so it is safe for the wide-detector study without destabilising
-the sweep/plot pipeline.
+The Ω-integrated spectrum and the per-steradian single-angle spectrum have distinct
+unit conventions. The checkpoint workflow retains the latter, including flat-Ω flux
+scaling and analytic aperture broadening.
 
-### Functionality
+### Operation
 
-Replace the single `n̂` with a grid of directions `{n̂_i}` tiling the detector face, compute
-the spectrum for each, and accumulate a solid-angle-weighted sum:
+The calculation replaces the single `n̂` with a grid of directions `{n̂_i}` tiling the
+detector face, computes the spectrum for each, and accumulates a solid-angle-weighted sum:
 
-- Add a `detector_directions(θ_obs, tilt, …, n_side, chip/dist)` helper alongside
-  `tilted_geometry` that lays an `n_side × n_side` grid on the **flat rectangular chip** at
-  distance d **facing the source**, in the **lab frame**, and returns per-cell directions
+- An `n_side × n_side` grid lies on the **flat rectangular chip** at distance d **facing
+  the source**, in the **lab frame**, and supplies per-cell directions
   plus solid-angle weights `dΩ_i = dA_i cos ψ_i / r_i²` (inverse-square + obliquity).
   Each direction is mapped into the sample frame through the same `R.T` as the single `n̂`.
-- Wrap the per-reflection body of `mc_spectrum` in an outer loop over `n̂`, accumulating
-  `Σ_i w_i · spec_i`. The result is the **Ω-integrated** line spectrum (already × Ω).
-- `n_side = 1` returns the single central direction with weight Ω — i.e. **exactly today**.
+- The result is the **Ω-integrated** line spectrum (already × Ω).
+- `n_side = 1` returns the single central direction with weight Ω, matching the
+  single-angle spectrum × Ω exactly.
 
 The per-direction quantities that must be recomputed inside the loop: the polarization
 pair `e_s/e_p`, `denom = 1 − v·n̂` / `E_res`, the sinc width `a_width`, the photon
