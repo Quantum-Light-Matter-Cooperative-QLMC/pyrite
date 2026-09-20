@@ -5,9 +5,10 @@ Instrument: `src/pyrite/energy_grid/convergence.py` (grid-agnostic harness),
 `convergence_case.py` (catalog-case adapter and resumable driver),
 `precision_ladder.py` (float32 versus FP64), submitted through
 `convergence_job.py`. No kernel or numerical-policy constant changes;
-this row records measured grid convergence of the existing line kernels and
-the evidence for the resolution policy of issue #109 and the backend-precision
-floor of issue #101.
+this row records the reproducible convergence-instrument contract and the
+sampling argument behind the resolution policy of issue #109. Historical
+remote measurements are retained below as provenance only; their source
+artifacts were deliberately retired and they are not validation evidence.
 
 ## Claim
 
@@ -15,28 +16,19 @@ floor of issue #101.
    difference between two line grids is pure quadrature error. The harness
    evaluates only the spectrum phase on those segments, proves identity with a
    segment fingerprint, and never compares separate Monte Carlo runs.
-2. **Resolution.** Under the gate of {eq}`eq-line-grid-richardson-gate`, the
-   integrated line yield and centroid converge at the $10^{-3}$ intrinsic-source
-   tolerance at spacings of the order of the `sinc_feature_spacing` estimate:
-   hopg at 1.5, 0.75, and 0.375–0.75 eV at 30, 100, and 300 keV, and wse2 at
-   6–12 eV. On the exact catalog grids at $N_e = 2000$, the fixed 3 eV hopg rows
-   carry 0.12–4.7% yield error and centroid shifts up to 30 eV. Rows at the
-   derived spacing (num 2036, 7112, and 30399 at 30, 100, and 300 keV) carry at
-   most $7.7\times10^{-5}$ and 0.017 eV. The wse2 3 eV rows are converged to
-   $2.1\times10^{-4}$. Automatic `sinc-nyquist` spacing certifies yield and
-   centroid, not line shape at $10^{-3}$. Dominant-line FWHM and the
-   line/background ratio are gated at $10^{-2}$ as a harness-only shape class;
-   at $10^{-3}$ they need 2–32 times finer spacing where they converge within
-   the ladder at all. Shape accuracy at $10^{-3}$ belongs to local windows
-   (#101).
-3. **Backend precision.** On identical trajectories, float32 line spectra
-   deviate from FP64 by at most $3.4\times10^{-6}$ in yield, $2.3\times10^{-5}$ in
-   dominant-line FWHM, 0.39 ulp in centroid, and $5.8\times10^{-5}$ pointwise,
-   flat in `spacing/ulp(E_max)` from 8 to 3000 in the 5 and 10 keV float32
-   binades. The distortion does not scale like ulp/$h$ and grows with ulp at
-   fixed features. The 8-ulp collapse floor already holds it two to three orders
-   below the policy tolerances, so these data do not support a ulp/rtol spacing
-   floor. No catalog line of the measured cases reaches the 20 keV binade.
+2. **Resolution contract.** The `sinc^2` band limit makes
+   $h\leq\pi/a_w$ a sufficient exact-integration condition on an infinite
+   uniform grid, not a ceiling on empirical Richardson acceptance. A sum of
+   phase-shifted features may pass at a coarser spacing when aliases cancel;
+   the analytic anchor therefore requires the accepted yield to match the
+   independent integral and separately rejects the grossly aliased coarse
+   triple.
+3. **Gate and precision instruments.** The Richardson gate implements
+   {eq}`eq-line-grid-richardson-gate`, including its absolute floor, the
+   $0.1\tau$ noise clause, and the all-finer-triples suffix. The precision
+   comparison evaluates float32 and FP64 from one serialized transport and
+   rejects mismatched fingerprints. No backend-error magnitude is claimed
+   without a retained measurement artifact.
 
 ## Governing equations and where they come from
 
@@ -51,7 +43,8 @@ of the ledgered `finite-time-lineshape` row,
 \qquad a_w = \frac{(1 - \boldsymbol\beta\cdot\hat{\mathbf n})\,t_L}{2\hbar c},
 ```
 
-with $t_L$ the flight time of a segment, $\hat{\mathbf n}$ the observation
+with $t_L$ the $c=1$ length-equivalent flight time of a segment,
+$\hat{\mathbf n}$ the observation
 direction, and $E_\mathrm{res}$ the resonance energy. The feature is band
 limited, and the trapezoid rule on a uniform grid of spacing $h$ integrates it
 exactly when $h \le \pi / a_w$ (the first-zero, or Nyquist, step used by
@@ -91,6 +84,69 @@ pass. Relative tolerances per class are:
   change the production policy classes.
 
 Shape observables are also reported, ungated, at $10^{-3}$.
+
+## Independent verification basis
+
+This section records the issue #126 verifier's derivation before inspection of
+the convergence-harness implementation. The source claim is the ledgered
+`finite-time-lineshape` result. The intended measurement maps one fixed segment
+set and a nested sequence of line-grid coordinate arrays to per-rung line
+spectra, observables, and a segment-identity fingerprint; the precision study
+maps one serialized transport to paired float32 and FP64 evaluations. The
+reported yield has units photons sr$^{-1}$ electron$^{-1}$, centroid and FWHM
+have units eV, line/background is dimensionless, and detected counts retain the
+detector response's count normalization.
+
+Write $x = E-E_\mathrm{res}$ and use NumPy's normalized sinc convention. A
+single finite-segment factor is
+
+$$
+f(x)
+= \operatorname{sinc}^2\!\left(\frac{a_w x}{\pi}\right)
+= \left(\frac{\sin(a_w x)}{a_w x}\right)^2.
+$$
+
+Here $t_L=L_\mathrm{seg}/\beta$ is the source derivation's $c=1$
+length-equivalent flight time, so
+$a_w=(1-\boldsymbol\beta\mathbin{\cdot}\hat{\mathbf n})t_L/(2\hbar c)$
+has units eV$^{-1}$ and the sinc argument is dimensionless. The Fourier
+transform of $f$ is triangular with support $|k|\leq 2a_w$. Poisson summation
+places the nearest replicas of that support at $2\pi/h$ for a uniform grid of
+spacing $h$. Therefore the sampled zero-frequency component, and hence the
+infinite-grid trapezoid area, is unaliased when
+
+$$
+\frac{2\pi}{h}\geq 2a_w
+\quad\Longleftrightarrow\quad
+h\leq\frac{\pi}{a_w}.
+$$
+
+Equality is admissible because the triangular transform vanishes at its
+boundary. Above this step replicas can contribute to the area, so the band
+limit alone no longer certifies exactness. It does not forbid a particular sum
+of phase-shifted features from integrating accurately through cancellation; a
+convergence gate may therefore accept such a spacing when it is checked against
+an independent integral tolerance. The checks assume a uniform effectively
+unbounded grid for the exact area statement; a finite window additionally
+carries its omitted-tail error, and sums of sinc features retain the strictest
+individual sufficient band limit.
+
+For the Richardson gate, $d_1$, $d_2$, and $\tau$ all have the units of the
+observable. The first clause enforces the requested tolerance on the coarse
+pair, with an explicit exact-zero escape when $\tau=0$. The $d_2\leq d_1$
+branch requires non-growing refinement changes. The alternative
+$\max(d_1,d_2)\leq0.1\tau$ permits non-monotone residuals only when both are a
+fixed decade inside tolerance. Requiring the candidate triple and every finer
+available triple to pass prevents a single lucky coarse pair; adding finer
+rungs may expose a later failure, while already judgeable shared acceptances
+remain depth-independent only as an empirical property of the stored ladder.
+The $10^{-15}$ yield floor is dimensionally a yield and is a harness policy for
+an effectively empty spectrum, not a consequence of Richardson extrapolation.
+
+These filters establish the sinc band limit and the dimensional and logical
+consistency of the gate. They do not establish the measured convergence or
+float32 bounds; those require comparison with the implementation, anchor tests,
+and stored artifacts below.
 
 ## Observables
 
@@ -165,7 +221,7 @@ their yield is recorded per rung as an ungated informational value.
 - **Band-limited sampling.** For a sum of `sinc^2` features of known $a_w$, the
   trapezoid yield equals the analytic $\sum A\,\pi/a_w$ at every rung with
   $h \le \pi/a_w$
-  (`tests/energy-grid/test_convergence.py::test_accepted_spacing_resolves_the_sinc_nyquist_step`).
+  (`tests/energy-grid/test_convergence.py::test_sinc_nyquist_is_sufficient_not_an_acceptance_ceiling`).
   Above Nyquist the integrated observables of many phase-spread features can
   stay inside tolerance, because aliases average out by Poisson summation. The
   accepted spacing is therefore not bounded by $\pi/a_w$; the gate guarantees
@@ -181,7 +237,12 @@ their yield is recorded per rung as an ungated informational value.
   `test_two_tiny_changes_accept_even_when_the_second_is_slightly_larger`,
   `test_accepted_spacing_requires_every_finer_triple_to_pass`).
 
-## Refinement ladder
+## Historical refinement ladder (non-validating)
+
+The source rung artifacts for this section were retired from the remote store.
+The values below remain only as a record of the investigation that motivated
+the current automatic-grid policy. They are not part of this row's validated
+claim and must not be used as current quantitative evidence.
 
 Configuration: hopg and wse2; 30, 100, and 300 keV; tilts 5 and 85 deg at each
 material's first catalog azimuth (95 deg); the 1 mm diagnostic slab of
@@ -472,7 +533,7 @@ $4\times10^{-5}$ (wse2 30 keV). At 85 deg the drift keeps one sign across four
 halvings, so it is a systematic grid dependence of the response's shifting
 coarse input channels, not sampling noise.
 
-## hopg catalog resolution at the derived spacing
+## Historical hopg catalog resolution (non-validating)
 
 `energy_grid.derive` was run remotely for hopg at every row energy of the
 standard-profile artifact (job 1742: the persisted diagnostic geometry, 1 mm,
@@ -650,7 +711,7 @@ converges at 12 eV against estimates of 2.0–7.3 eV), so a ratio above one does
 not by itself establish a yield error above tolerance. Only hopg and wse2 are
 measured.
 
-## Float32 versus FP64 lineshape distortion
+## Historical float32 versus FP64 study (non-validating)
 
 The #101 question: does float32 coordinate precision distort the line spectrum
 like ulp/$h$, which would justify a tolerance-derived floor
@@ -834,7 +895,7 @@ python -m pyrite.energy_grid.convergence_job start-precision --json-out line_gri
 python -m pyrite.energy_grid.convergence_job pull --json-out line_grid_precision_109.json
 ```
 
-## Issue #125 bundled-default audit
+## Historical issue #125 bundled-default audit (non-validating)
 
 On 2026-09-19, jobs `20260919-181223-fc93ad6e` (Slurm 1774) and
 `20260919-182327-1c1a04ba` (Slurm 1775, resumed as 1776) ran the same
@@ -863,3 +924,61 @@ The artifact schema remains available as an opt-in performance mechanism.
   respond to grid refinement and to backend precision.
 - It does not claim that opt-in stored grids are intrinsically invalid; they
   require explicit ownership and revalidation when relevant physics changes.
+
+## Independent verifier outcome
+
+The issue #126 fresh-context audit found that the implementation matches the
+measurement contract, sampling derivation, and Richardson equation. Its
+original discrepancy exposed an incorrect acceptance criterion in the ledger:
+Nyquist is a sufficient exactness bound, not an empirical acceptance ceiling.
+The ledger and analytic anchor now state the same contract explicitly.
+
+- **Measurement identity and RNG isolation: confirmed.** `CaseLadder`
+  transports once and evaluates every rung through the production spectrum
+  reductions. `evaluate_ladder` hashes every spectrum-consumed segment field
+  before the first rung and after every evaluation, and resumed runs compare
+  the new fixed-seed transport with the stored count and digest. The case-grid
+  anchor compares line, characteristic, and bremsstrahlung arrays bit for bit
+  with the runner spectrum phase. `simulate_trajectories` has no photon-grid
+  argument: its stochastic inputs derive from `seed`, `SeedSequence(seed)`
+  children, or SplitMix64 keys formed from seed and electron id with draws
+  addressed by counter. `_transport_case` calls transport before
+  `resolve_line_grid`. The grid-isolation anchor reproduces the segment
+  fingerprint after replacing the line grid.
+- **Band limit and acceptance: confirmed.** The
+  independent triangular-support derivation above gives exact infinite-grid
+  trapezoid area for $h\leq\pi/a_w$. Phase-spread aliases may average out above
+  that sufficient bound, so the anchor explicitly requires an above-Nyquist
+  accepted rung to agree with the analytic integral while the grossly aliased
+  12 eV triple fails.
+- **Richardson gate: confirmed.** `_observable_verdict` implements the two
+  clauses of {eq}`eq-line-grid-richardson-gate` literally, including exact-zero
+  acceptance, the $0.1\tau$ escape, and the finest-rung yield floor.
+  `_coarsest_consistent` accepts only a suffix of passing triples, so one lucky
+  coarse pair cannot pass. The focused anchors cover a growing second change,
+  two changes below $0.1\tau$, exact zero, the near-zero floor, and a later
+  failing triple. This algorithm can change an earlier acceptance when newly
+  added finer data fail; the narrower six-versus-eight-rung stability claim is
+  empirical and therefore depends on the stored measurements.
+- **One-transport precision instrument: confirmed.** `cmd_transport` serializes
+  one case transport and fingerprint. Each precision process constructs its
+  `CaseLadder` from that transport without rerunning Monte Carlo and rejects a
+  fingerprint mismatch. `compare` requires the float64/float32 pairing and
+  identical fingerprints, windows, ratios, and grids. The CPU control anchor
+  runs both sides through this pipeline and obtains exactly zero deviation.
+- **Historical stored-number audit: retired.** No ladder checkpoint JSON, precision
+  JSON/NPZ/pickle, or issue #125 audit artifact is tracked in the repository or
+  present in the validation worktree. The write-up names remote jobs and the
+  remote output `line_grid_precision_109.json`, but does not retain the source
+  rungs alongside the ledger. Consequently the case tables, six-versus-eight
+  acceptances, catalog-grid errors, resource timings, float32 deviation bounds
+  and slopes, 20 keV search, and issue #125 material percentages cannot be
+  recomputed independently from repository evidence. Their internal summaries
+  are not a substitute for artifact comparison. Those values are therefore
+  retained only as non-validating provenance and excluded from this row's
+  claim.
+
+**Verdict: anchored.** The code-level instrument, governing equations, and
+Nyquist-as-sufficient acceptance semantics match focused regression anchors.
+Retired remote measurements make no validated quantitative claim. Human
+sign-off remains pending.
