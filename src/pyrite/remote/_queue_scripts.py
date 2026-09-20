@@ -557,12 +557,12 @@ def _rebrem_queue_script(
 ):
     """CXR payload for a brem-only checkpoint recompute in a SLURM allocation.
 
-    One sequential ``pyrite rebrem`` per material (brem is cheap; no in-allocation
-    parallelism needed), each writing the SAME per-material JSON progress
-    record a scan does (``--progress-file``), so ``status``/``attach`` render
-    the shared case-progress dashboard. The ``completed:``/``failed:`` log
-    markers match the scan queue's so ``state._completed_materials`` drives the
-    post-attach pull unchanged."""
+    One sequential ``pyrite checkpoint recompute brem`` per material (brem is
+    cheap; no in-allocation parallelism needed), each writing the SAME
+    per-material JSON progress record a scan does (``--progress-file``), so
+    ``status``/``attach`` render the shared case-progress dashboard. The
+    ``completed:``/``failed:`` log markers match the scan queue's so
+    ``state._completed_materials`` drives the post-attach pull unchanged."""
     flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, fidelity, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -579,7 +579,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync pyrite rebrem "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute brem "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: rebrem failed for $m; continuing" >> "$JOBDIR/log"
@@ -611,10 +611,11 @@ def _rebrem_chunked_queue_script(
 ):
     """One SLURM slice of a self-resubmitting brem-only recompute chain.
 
-    Mirror of ``_reline_chunked_queue_script`` for ``pyrite rebrem``: each slice
-    resumes from checkpoint, does about ``chunk_minutes`` of work via ``pyrite
-    rebrem --max-minutes``, and either terminates the chain (all materials
-    completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
+    Mirror of ``_reline_chunked_queue_script`` for ``pyrite checkpoint recompute
+    brem``: each slice resumes from checkpoint, does about ``chunk_minutes`` of
+    work via that command's ``--max-minutes``, and either terminates the chain
+    (all materials completed:/failed:) or self-resubmits with
+    ``--nice=10000``. Exit-code
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
@@ -643,7 +644,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync pyrite rebrem "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute brem "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -720,11 +721,11 @@ def _reline_queue_script(
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    """CXR payload for a line-only checkpoint recompute (``pyrite reline``) in a
-    SLURM allocation. One sequential reline per material; each writes the same
-    per-material JSON progress record a scan/rebrem does, and the
-    ``completed:``/``failed:`` markers match so ``state._completed_materials``
-    drives the post-attach pull unchanged."""
+    """CXR payload for a line-only checkpoint recompute (``pyrite checkpoint
+    recompute line``) in a SLURM allocation. One sequential recompute per
+    material; each writes the same per-material JSON progress record a scan or
+    brem recompute does, and the ``completed:``/``failed:`` markers match so
+    ``state._completed_materials`` drives the post-attach pull unchanged."""
     flags = _reline_flags(line_ne, line_step_eV, redo_all, fidelity, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -741,7 +742,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync pyrite reline "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute line "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
@@ -773,10 +774,11 @@ def _reline_chunked_queue_script(
 ):
     """One SLURM slice of a self-resubmitting line-only recompute chain.
 
-    Mirror of ``_chunked_queue_script`` for ``pyrite reline``: each slice resumes
-    from checkpoint, does about ``chunk_minutes`` of work via ``pyrite reline
-    --max-minutes``, and either terminates the chain (all materials
-    completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
+    Mirror of ``_chunked_queue_script`` for ``pyrite checkpoint recompute
+    line``: each slice resumes from checkpoint, does about ``chunk_minutes`` of
+    work via that command's ``--max-minutes``, and either terminates the chain
+    (all materials completed:/failed:) or self-resubmits with
+    ``--nice=10000``. Exit-code
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
@@ -805,7 +807,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync pyrite reline "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync pyrite checkpoint recompute line "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
