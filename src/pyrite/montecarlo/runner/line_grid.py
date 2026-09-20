@@ -22,7 +22,7 @@ from ..._line_grid_policy import (
     windowed_coordinates,
 )
 from ..._line_windows import build_window_plan, window_plan_from_payload
-from ..spectrum.diagnostics import sinc_feature_spacing
+from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
 from ..spectrum.line_seeds import SEEDING_REVISION, SeedContext, collect_feature_seeds
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
@@ -112,6 +112,40 @@ def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
     return grid, record
 
 
+def _refuse_coherent_resolution(case, segments, n_hat, Ne):
+    """Refuse automatic resolution on the coherent route (issue #117).
+
+    The automatic policy derives its spacing from ``sinc_feature_spacing``,
+    whose band limit is the per-segment retardation increment. The coherent
+    route sums the complex field across segments first, so its fringes follow
+    the *total* span of that quantity and are finer by the segment count --
+    a difference of principle, not of calibration. Measured on identical
+    trajectories, the coherent yield is still ~5e-2 from convergence at the
+    spacing where the incoherent yield reaches 3e-8.
+
+    Resolving those fringes is not affordable (order 1e7 points over a keV
+    band), so this refuses rather than silently aliasing or silently
+    refining. An explicit ``E_grid_line`` is unaffected.
+
+    Validation: coherent-line-grid-fringe-spacing.
+    """
+    if not bool(case.get("coherent_emission", False)):
+        return
+    step, span, _ = coherent_fringe_spacing(segments, n_hat, electron_limit=Ne)
+    grouped_step, grouped_span, _ = coherent_fringe_spacing(
+        segments, n_hat, electron_limit=Ne, grouped=True
+    )
+    raise ValueError(
+        "automatic line-grid resolution does not support coherent_emission: the "
+        "sinc feature width bounds the incoherent route only, and the coherent "
+        "route's fringe spacing is derived from the retardation span. This case "
+        f"needs {step:.3e} eV (span {span:.4g} Ang) to resolve the inter-electron "
+        f"term and {grouped_step:.3e} eV (span {grouped_span:.4g} Ang) for the "
+        "decoherence-grouped floor. Supply an explicit E_grid_line, or run with "
+        "coherent_emission disabled. See issue #117."
+    )
+
+
 def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     """Resolve an automatic case-local line grid from this run's trajectories.
 
@@ -123,6 +157,7 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     hit rebuilds the coordinates from the stored plan; a plan this build would
     not make is treated as a miss.
     """
+    _refuse_coherent_resolution(case, segments, n_hat, Ne)
     windowed = payload.get("windows") is not None
     keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed else ())
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}

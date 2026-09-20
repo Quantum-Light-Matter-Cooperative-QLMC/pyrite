@@ -110,6 +110,77 @@ def sinc_feature_spacing(
     return step, aliased, int(width.size)
 
 
+
+def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=False):
+    """Largest uniform step resolving the coherent route's interference fringes.
+
+    The coherent route sums the complex field before squaring, so the spectrum
+    carries cross terms between segments ``j, k`` whose phase difference runs
+    over the output grid as ``(s_j - s_k) E`` with the per-segment slope
+
+        s_j = d_j / HBARC_EV_ANG,   d_j = t_mid,j - n_hat . r_j   [Ang, c=1]
+
+    (the ``-g.r_j`` term is energy-independent and the in-medium
+    ``L_esc delta_omega`` term is smaller by ``1 - n_re ~ 1e-5``). The fastest
+    fringe therefore has period ``2 pi / (s_max - s_min)`` and the Nyquist step
+    is ``pi HBARC_EV_ANG / D_span`` over the span of ``d``.
+
+    This is NOT the incoherent :func:`sinc_feature_spacing` width. Along one
+    segment the increment of ``d`` is exactly ``(1 - beta v.n) t_L``, the very
+    quantity setting that function's first zero, so the incoherent step follows
+    the *per-segment* increment while this one follows the *total* span. The
+    incoherent estimator cannot bound the coherent route in principle.
+
+    ``grouped=True`` returns the widest single-electron span, which is the
+    band limit of the ``sum_e |S_e|^2`` decoherence floor; the default spans
+    every segment, the band limit of the ``|sum_e S_e|^2`` term.
+
+    Returns ``(step_eV, span_ang, n_segments)``. Validation: coherent-line-grid-fringe-spacing.
+    """
+    energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    energy = _host(segments[energy_field]).astype(float, copy=False)
+    length = _host(segments["L_ang"]).astype(float, copy=False)
+    direction = _host(segments["v_hat"]).astype(float, copy=False)
+    r_mid = _host(segments["r_mid"]).astype(float, copy=False)
+    start_time = segments.get("t_ang")
+    start_time = (
+        np.zeros(energy.size)
+        if start_time is None
+        else _host(start_time).astype(float, copy=False)
+    )
+    elec_id = _host(segments["elec_id"])
+    if electron_limit is not None:
+        line = elec_id < int(electron_limit)
+        energy, length, direction = energy[line], length[line], direction[line]
+        r_mid, start_time, elec_id = r_mid[line], start_time[line], elec_id[line]
+
+    n_vec = np.asarray(n_hat, dtype=float)
+    beta = beta_from_keV(energy)
+    t_L = length / beta
+    denominator = 1.0 - beta * (direction @ n_vec)
+    # Geometric (offset-free) retardation scalar, matching the phase the
+    # coherent reducer actually applies; see lines/_setup.py.
+    d = (start_time + 0.5 * t_L) - (r_mid @ n_vec)
+    valid = np.isfinite(d) & np.isfinite(denominator) & (denominator > 0.0) & (t_L > 0.0)
+    d, elec_id = d[valid], elec_id[valid]
+    if d.size == 0:
+        raise ValueError("cannot derive coherent spacing: diagnostic transport has no valid segments")
+
+    if grouped:
+        order = np.argsort(elec_id, kind="stable")
+        d_sorted, id_sorted = d[order], elec_id[order]
+        bounds = np.flatnonzero(np.diff(id_sorted)) + 1
+        span = max(
+            (float(part.max() - part.min()) for part in np.split(d_sorted, bounds) if part.size > 1),
+            default=0.0,
+        )
+    else:
+        span = float(d.max() - d.min())
+    if span <= 0.0:
+        return float("inf"), 0.0, int(d.size)
+    return float(np.pi * HBARC_EV_ANG / span), span, int(d.size)
+
+
 def _host(array):
     get = getattr(array, "get", None)
     return np.asarray(get() if get is not None else array)
