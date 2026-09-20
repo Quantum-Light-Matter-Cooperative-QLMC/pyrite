@@ -198,12 +198,12 @@ def test_coherent_decoherence_blend_matches_reference_formula():
     np.testing.assert_allclose(actual, expected, rtol=_blend_rtol(sensitivity), atol=peak * 1e-12)
 
 
-def test_coherent_decoherence_blend_holds_on_the_per_hkl_route():
+@pytest.mark.parametrize("sinc_cutoff", [None, 4.0], ids=["exact", "windowed"])
+def test_coherent_decoherence_blend_holds_on_the_per_hkl_route(sinc_cutoff):
     """Same blend on the per-(reflection, orientation) ``_accumulate`` loop,
     which owns its own reduction separate from the batched path the test above
-    exercises.  Reached here through the grooved-escape branch -- the only
-    coherent route off the batched path a nonzero bunch offset can still take
-    (``sinc_cutoff`` and ``layers`` both raise).
+    exercises. Reached here through the grooved-escape branch, which keeps the
+    test on the compatibility route with and without sinc windowing.
 
     LONGITUDINAL offsets only: the groove's escape distance depends on the
     lateral emission point, so a transverse offset would move S_e's amplitude
@@ -240,11 +240,23 @@ def test_coherent_decoherence_blend_holds_on_the_per_hkl_route():
 
     active = _flat(2)
     active.update(t0_ang=t0_values, initial_t0_ang=t0_values, initial_r_ang=np.zeros((2, 3)))
-    actual = mc_spectrum(active, energy_grid, coherent=True, **kwargs)
+    actual = mc_spectrum(
+        active, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs
+    )
 
     ne_total = active["Ne"]
-    flat_raw = mc_spectrum(_flat(2), energy_grid, coherent=True, **kwargs) * ne_total
-    grouped_raw = sum(mc_spectrum(_flat(1), energy_grid, coherent=True, **kwargs) for _ in range(2))
+    flat_raw = (
+        mc_spectrum(
+            _flat(2), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs
+        )
+        * ne_total
+    )
+    grouped_raw = sum(
+        mc_spectrum(
+            _flat(1), energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **kwargs
+        )
+        for _ in range(2)
+    )
     omega = energy_grid / HBARC_EV_ANG
     F = np.abs(np.mean(np.exp(1j * omega[:, None] * t0_values[None, :]), axis=1)) ** 2
 

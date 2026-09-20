@@ -263,9 +263,10 @@ the streaming path holds prologue scratch for a fixed pair target plus the four
 persistent $(N_g, N_E)$ planes, and releases the scratch after each accumulation
 launch so the pool can reuse it.
 
-The CPU, `float64`, `sinc_cutoff`, layered, grooved, and explicitly disabled
-paths retain their prior implementations. The `float32` reassociation this
-kernel introduces is
+The CPU, `float64`, layered, grooved, and explicitly disabled paths retain their
+prior implementations. CUDA-fp32 coherent `sinc_cutoff` requests use the same
+streaming kernel with a launch-uniform window branch. The `float32`
+reassociation this kernel introduces is
 [tracked as validation debt](precision-and-tolerances.md#float32-reassociation).
 
 ## Device residency

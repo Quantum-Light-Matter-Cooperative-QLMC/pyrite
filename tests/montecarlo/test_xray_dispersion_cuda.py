@@ -54,7 +54,7 @@ def _reduction_inputs():
     )
 
 
-def _reduction_reference(d, *, use_medium):
+def _reduction_reference(d, *, use_medium, sinc_cutoff=None):
     E = d["E"].astype(float)
     ref = np.zeros(E.size, dtype=np.float64)
     for k, Ek in enumerate(E):
@@ -63,6 +63,8 @@ def _reduction_reference(d, *, use_medium):
         for j in range(d["n_lines"]):
             x = float(d["aw"][j]) * (Ek - float(d["E_r"][j]))
             sinc = 1.0 if x == 0.0 else np.sin(x) / x
+            if sinc_cutoff is not None and abs(x) > sinc_cutoff:
+                sinc = 0.0
             phase = float(d["phase_slope"][j]) * Ek - float(d["g_phase"][j])
             if use_medium:
                 phase -= float(d["L_esc"][j]) * float(d["delta_omega"][k])
@@ -73,7 +75,7 @@ def _reduction_reference(d, *, use_medium):
     return ref
 
 
-def _run_reduction(d, *, epb, L_esc=None, delta_omega=None):
+def _run_reduction(d, *, epb, L_esc=None, delta_omega=None, sinc_cutoff=None):
     from pyrite.montecarlo.spectrum.coherent_jit_kernel import (
         CoherentKernelConfig,
         run_coherent_reduction_kernel,
@@ -93,6 +95,7 @@ def _run_reduction(d, *, epb, L_esc=None, delta_omega=None):
         out=out,
         L_esc=None if L_esc is None else cp.asarray(L_esc),
         delta_omega=None if delta_omega is None else cp.asarray(delta_omega),
+        sinc_cutoff=sinc_cutoff,
         config=CoherentKernelConfig(nthreads=32, energies_per_block=epb),
     )
     cp.cuda.Stream.null.synchronize()
@@ -105,6 +108,16 @@ def test_reduction_kernel_carries_the_in_medium_phase(epb):
     d = _reduction_inputs()
     got = _run_reduction(d, epb=epb, L_esc=d["L_esc"], delta_omega=d["delta_omega"])
     np.testing.assert_allclose(got, _reduction_reference(d, use_medium=True), rtol=2e-5, atol=2e-5)
+
+
+@pytest.mark.parametrize("epb", [1, 2, 3])
+def test_reduction_kernel_applies_sinc_cutoff(epb):
+    d = _reduction_inputs()
+    cutoff = 0.35
+    got = _run_reduction(d, epb=epb, sinc_cutoff=cutoff)
+    expected = _reduction_reference(d, use_medium=False, sinc_cutoff=cutoff)
+    assert np.count_nonzero(expected) < expected.size
+    np.testing.assert_allclose(got, expected, rtol=2e-5, atol=2e-5)
 
 
 @pytest.mark.parametrize("epb", [1, 2, 3])
@@ -164,7 +177,7 @@ def _stream_inputs():
     )
 
 
-def _stream_reference(d, *, use_medium):
+def _stream_reference(d, *, use_medium, sinc_cutoff=None):
     E = d["E"].astype(float)
     ref = np.zeros(E.size, dtype=np.float64)
     for k, Ek in enumerate(E):
@@ -175,6 +188,8 @@ def _stream_reference(d, *, use_medium):
                 line = g * d["n_seg"] + seg
                 x = float(d["aw"][seg]) * (Ek - float(d["E_r"][line]))
                 sinc = 1.0 if x == 0.0 else np.sin(x) / x
+                if sinc_cutoff is not None and abs(x) > sinc_cutoff:
+                    sinc = 0.0
                 phase = float(d["phase_slope"][seg]) * Ek - float(d["g_phase"][line])
                 if use_medium:
                     phase -= float(d["L_esc"][seg]) * float(d["delta_omega"][k])
@@ -185,7 +200,7 @@ def _stream_reference(d, *, use_medium):
     return ref
 
 
-def _run_stream(d, *, epb, L_esc=None, delta_omega=None):
+def _run_stream(d, *, epb, L_esc=None, delta_omega=None, sinc_cutoff=None):
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
         allocate_coherent_fields,
@@ -215,6 +230,7 @@ def _run_stream(d, *, epb, L_esc=None, delta_omega=None):
         n_seg=d["n_seg"],
         L_esc=None if L_esc is None else cp.asarray(L_esc),
         delta_omega=None if delta_omega is None else cp.asarray(delta_omega),
+        sinc_cutoff=sinc_cutoff,
         config=config,
     )
     out = cp.zeros(d["E"].size, dtype=cp.float32)
@@ -233,6 +249,16 @@ def test_stream_field_kernel_carries_the_in_medium_phase(epb):
 
 
 @pytest.mark.parametrize("epb", [1, 2])
+def test_stream_field_kernel_applies_sinc_cutoff(epb):
+    d = _stream_inputs()
+    cutoff = 0.35
+    got = _run_stream(d, epb=epb, sinc_cutoff=cutoff)
+    expected = _stream_reference(d, use_medium=False, sinc_cutoff=cutoff)
+    assert np.count_nonzero(expected) < expected.size
+    np.testing.assert_allclose(got, expected, rtol=2e-5, atol=2e-5)
+
+
+@pytest.mark.parametrize("epb", [1, 2])
 def test_stream_field_kernel_vacuum_is_bit_for_bit_without_the_new_arguments(epb):
     d = _stream_inputs()
     base = _run_stream(d, epb=epb)
@@ -243,7 +269,8 @@ def test_stream_field_kernel_vacuum_is_bit_for_bit_without_the_new_arguments(epb
 
 
 @pytest.mark.parametrize("epb", [1, 2])
-def test_stream_grouped_decoherence_kernel_matches_independent_reference(epb):
+@pytest.mark.parametrize("sinc_cutoff", [None, 0.35], ids=["exact", "windowed"])
+def test_stream_grouped_decoherence_kernel_matches_independent_reference(epb, sinc_cutoff):
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
         run_coherent_grouped_intensity_kernel,
@@ -261,6 +288,8 @@ def test_stream_grouped_decoherence_kernel_matches_independent_reference(epb):
                     line = g * d["n_seg"] + seg
                     x = float(d["aw"][seg]) * (float(energy) - float(d["E_r"][line]))
                     sinc = 1.0 if x == 0.0 else np.sin(x) / x
+                    if sinc_cutoff is not None and abs(x) > sinc_cutoff:
+                        sinc = 0.0
                     phase = (
                         float(d["phase_slope"][seg]) * float(energy)
                         - float(d["g_phase"][line])
@@ -289,6 +318,7 @@ def test_stream_grouped_decoherence_kernel_matches_independent_reference(epb):
         n_seg=d["n_seg"],
         L_esc=cp.asarray(d["L_esc"]),
         delta_omega=cp.asarray(d["delta_omega"]),
+        sinc_cutoff=sinc_cutoff,
         config=config,
     )
     cp.cuda.Stream.null.synchronize()
@@ -743,6 +773,33 @@ def test_coherent_decoherence_jit_paths_match_the_generic_fallback(route, monkey
     generic_calls = _count_kernel_calls(monkeypatch, route)
     generic = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
     assert generic_calls[0] == 0
+
+    peak = float(max(np.max(np.abs(fast)), np.max(np.abs(generic))))
+    assert peak > 0.0
+    np.testing.assert_allclose(fast, generic, rtol=_DECOH_RTOL, atol=peak * _DECOH_ATOL_FRAC)
+
+
+@_device_only
+@pytest.mark.parametrize("route", ["stream", "per-hkl"])
+def test_coherent_decoherence_jit_paths_support_sinc_cutoff(route, monkeypatch):
+    """The cutoff applies to both terms in the per-row decoherence blend."""
+    from pyrite.montecarlo.spectrum import mc_spectrum
+    from pyrite.montecarlo.spectrum.lines import _policy
+
+    call_kwargs = {
+        **_DECOH_KWARGS,
+        **_DECOH_MOSAIC,
+        **_decoh_route_kwargs(route, monkeypatch),
+        "sinc_cutoff": 4.0,
+    }
+
+    calls = _count_kernel_calls(monkeypatch, route)
+    fast = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
+    assert calls[0] > 0, "the cutoff-aware CUDA-JIT fast path was not taken"
+
+    monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_STREAM", False)
+    monkeypatch.setattr(_policy, "_USE_JIT_COHERENT_REDUCTION", False)
+    generic = mc_spectrum(_decoh_active_segments(), _DECOH_E_GRID, coherent=True, **call_kwargs)
 
     peak = float(max(np.max(np.abs(fast)), np.max(np.abs(generic))))
     assert peak > 0.0

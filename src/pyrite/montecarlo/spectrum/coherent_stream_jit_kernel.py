@@ -325,6 +325,13 @@ def _sinc_unscaled(x):
     return xp.sin(x) / x
 
 
+@jit.rawkernel(device=True)
+def _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff):
+    if use_sinc_cutoff and (x < -sinc_cutoff or x > sinc_cutoff):
+        return F32_ZERO
+    return _sinc_unscaled(x)
+
+
 @jit.rawkernel()
 def _field_kernel_1e(
     E_r,
@@ -345,6 +352,8 @@ def _field_kernel_1e(
     aw_pair,
     slope_pair,
     use_medium,
+    sinc_cutoff,
+    use_sinc_cutoff,
     n_seg,
     n_g,
     n_E,
@@ -390,7 +399,7 @@ def _field_kernel_1e(
             if use_medium:
                 Lj = L_esc[seg]
             x = aa * (E0 - Er)
-            s = _sinc_unscaled(x)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
             phase = ps * E0 - gp
             if use_medium:
                 phase = phase - Lj * dw0
@@ -449,6 +458,8 @@ def _field_kernel_2e(
     aw_pair,
     slope_pair,
     use_medium,
+    sinc_cutoff,
+    use_sinc_cutoff,
     n_seg,
     n_g,
     n_E,
@@ -508,7 +519,7 @@ def _field_kernel_2e(
                 Lj = L_esc[seg]
 
             x = aa * (E0 - Er)
-            s = _sinc_unscaled(x)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
             phase = ps * E0 - gp
             if use_medium:
                 phase = phase - Lj * dw0
@@ -521,7 +532,7 @@ def _field_kernel_2e(
 
             if has1:
                 x = aa * (E1 - Er)
-                s = _sinc_unscaled(x)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
                 phase = ps * E1 - gp
                 if use_medium:
                     phase = phase - Lj * dw1
@@ -599,6 +610,8 @@ def _grouped_intensity_kernel(
     aw_pair,
     slope_pair,
     use_medium,
+    sinc_cutoff,
+    use_sinc_cutoff,
     n_seg,
     n_groups,
     n_g,
@@ -665,7 +678,7 @@ def _grouped_intensity_kernel(
                     Lj = L_esc[seg]
 
                 x = aa * (E0 - Er)
-                s = _sinc_unscaled(x)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
                 phase = ps * E0 - gp
                 if use_medium:
                     phase = phase - Lj * dw0
@@ -678,7 +691,7 @@ def _grouped_intensity_kernel(
 
                 if has1:
                     x = aa * (E1 - Er)
-                    s = _sinc_unscaled(x)
+                    s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
                     phase = ps * E1 - gp
                     if use_medium:
                         phase = phase - Lj * dw1
@@ -954,6 +967,7 @@ def run_coherent_field_accumulation_kernel(
     n_seg,
     L_esc=None,
     delta_omega=None,
+    sinc_cutoff=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Add one segment block's complex fields into persistent g-by-energy planes.
@@ -971,7 +985,8 @@ def run_coherent_field_accumulation_kernel(
     ``delta_omega[k] = (1 - Re n(E_k)) * omega(E_k)``. Together they add
     ``- L_esc[j] * delta_omega[k]`` to the propagation phase. Both must be given
     together or both omitted; when omitted the kernel evaluates the vacuum
-    phase expression unchanged.
+    phase expression unchanged. When ``sinc_cutoff`` is given, each line is
+    omitted outside that magnitude of the unscaled sinc argument.
     """
     nthreads = int(config.reduction_nthreads)
     _validate_threads(nthreads, "reduction_nthreads")
@@ -1002,6 +1017,8 @@ def run_coherent_field_accumulation_kernel(
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
+    use_sinc_cutoff = sinc_cutoff is not None
+    cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
 
     e_blocks = (n_E + epb - 1) // epb
     nblocks = n_g * e_blocks
@@ -1029,6 +1046,8 @@ def run_coherent_field_accumulation_kernel(
             np.uint32(1 if aw_pair else 0),
             np.uint32(1 if slope_pair else 0),
             np.uint32(1 if use_medium else 0),
+            cutoff,
+            np.uint32(1 if use_sinc_cutoff else 0),
             np.uint32(n_seg),
             np.uint32(n_g),
             np.uint32(n_E),
@@ -1056,9 +1075,14 @@ def run_coherent_grouped_intensity_kernel(
     n_seg,
     L_esc=None,
     delta_omega=None,
+    sinc_cutoff=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
-    """Add grouped field intensities for one compact, whole-electron block."""
+    """Add grouped field intensities for one compact, whole-electron block.
+
+    ``sinc_cutoff`` uses the same unscaled-argument window as the flat field
+    accumulator so both terms of the decoherence blend have identical support.
+    """
     nthreads = int(config.reduction_nthreads)
     _validate_threads(nthreads, "reduction_nthreads")
     epb = int(config.energies_per_block)
@@ -1090,6 +1114,8 @@ def run_coherent_grouped_intensity_kernel(
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
+    use_sinc_cutoff = sinc_cutoff is not None
+    cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
     e_blocks = (n_E + epb - 1) // epb
     _grouped_intensity_kernel(
         (n_g * e_blocks,),
@@ -1111,6 +1137,8 @@ def run_coherent_grouped_intensity_kernel(
             np.uint32(1 if aw_pair else 0),
             np.uint32(1 if slope_pair else 0),
             np.uint32(1 if use_medium else 0),
+            cutoff,
+            np.uint32(1 if use_sinc_cutoff else 0),
             np.uint32(n_seg),
             np.uint32(n_groups),
             np.uint32(n_g),

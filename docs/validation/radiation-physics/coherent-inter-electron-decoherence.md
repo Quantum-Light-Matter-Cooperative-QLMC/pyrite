@@ -275,9 +275,12 @@ profile begins using them. The existing `_USE_JIT_COHERENT_STREAM` and
   limitation.
   `test_coherent_decoherence_blend_holds_on_the_per_hkl_route` therefore pins
   the grooved route with longitudinal offsets only.
-- **`sinc_cutoff` excluded when the blend is active, and rejected explicitly**
-  — an implementation gap (the windowed-energy-range optimization is not
-  implemented for the electron-grouped floor), not a physics one.
+- **`sinc_cutoff` applies identically to both blend terms.** Each segment field
+  is zero outside the documented unscaled-sinc window before either the flat
+  coherent square or the electron-grouped floor is reduced. The CPU/CuPy
+  compatibility route and both CUDA-JIT reducers share that boundary rule;
+  `test_coherent_decoherence_blend_holds_on_the_per_hkl_route` and the CUDA
+  cutoff parity tests cover the windowed blend.
 - **Correlated transverse–longitudinal phase space** (breaks Assumption A) and
   **correlated/structured bunches** (breaks Assumption B) are not checked and
   would invalidate the boxed $F$ if present; not currently reachable given how

@@ -9,8 +9,8 @@ counts to the host, and concatenates/slices those arrays before launching the
 existing per-g coherent reduction.
 
 This change replaces that CUDA-fp32 path with a bounded streaming pipeline.
-CPU, fp64, `sinc_cutoff`, layered, grooved, and explicitly disabled paths retain
-the prior implementations.
+CPU, fp64, layered, grooved, and explicitly disabled paths retain the prior
+implementations. CUDA-fp32 `sinc_cutoff` requests use this streaming path.
 
 ## Algebra
 
@@ -60,7 +60,9 @@ coefficients; no compaction is required.
 block. Threads stride over the current segment block, reduce sigma/pi real and
 imaginary fields in shared memory, and add one partial field to each persistent
 `(g,E)` cell. There is exactly one writer to a field cell per launch, so no
-atomics are needed.
+atomics are needed. When `sinc_cutoff` is set, each segment field is zeroed when
+the magnitude of its unscaled sinc argument exceeds the cutoff; the grouped
+decoherence-floor kernel applies the identical test before squaring each group.
 
 ### 3. Finalize
 
