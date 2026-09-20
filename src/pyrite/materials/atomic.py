@@ -28,6 +28,7 @@ from functools import cache
 
 import numpy as np
 import xraydb
+from scipy.constants import Avogadro as _AVOGADRO
 
 
 # ---- atomic numbers ---------------------------------------------------------
@@ -181,6 +182,89 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
         if len(_HENKE_MEMO) > _HENKE_MEMO_MAX:
             _HENKE_MEMO.popitem(last=False)
     return out_fp, out_fpp
+
+
+# Coherent+incoherent scattering shares henke_dispersion's access pattern (same
+# element, same energy grid, re-requested once per reflection), but mu_elam is
+# ~20x costlier per call than f2_chantler because xraydb rebuilds the spline
+# each time. Memoize on the exact energy bytes, as above.
+_ELAM_MEMO: "OrderedDict[tuple, np.ndarray]" = OrderedDict()
+_ELAM_MEMO_MAX = 256
+
+# xraydb warns outside this band; the Elam tables are not claimed to hold there.
+ELAM_E_MIN_EV = 100.0
+ELAM_E_MAX_EV = 8.0e5
+
+
+@cache
+def _atomic_mass_g_per_mol(element):
+    """Elam-table standard atomic weight [g/mol]; one sqlite hit per element."""
+    return float(xraydb.atomic_mass(element))
+
+
+def elam_scattering_cross_section_ang2(element, E_eV):
+    """Per-atom coherent + incoherent scattering cross section, in Angstrom^2.
+
+    ``xraydb.mu_elam`` returns the Elam/Scofield mass attenuation coefficient
+    ``(mu/rho)`` in cm^2/g, partitioned into ``photo``, ``coh`` and ``incoh``.
+    The scattering part is converted to a per-atom cross section by the atomic
+    mass ``m_a = A / N_A``,
+
+        sigma_scat(E) = [(mu/rho)_coh + (mu/rho)_incoh] * A / N_A * 1e16,
+
+    the last factor being cm^2 -> Angstrom^2. This is atomic data access, not a
+    physical model: the caller multiplies by a number density to get an
+    attenuation coefficient (see ``crystal.scattering_attenuation_inv_ang``).
+
+    Energies are CLAMPED into ``[ELAM_E_MIN_EV, ELAM_E_MAX_EV]`` rather than
+    returned as NaN, unlike ``henke_dispersion``. Below 100 eV scattering is
+    ~5e-5 of the total cross section, so the clamped value is negligible
+    against the photoabsorption term it is added to, whereas a NaN would
+    poison the soft-X-ray attenuation that is otherwise well tabulated. The
+    clamp also keeps xraydb's own out-of-range warnings out of library output.
+
+    Parameters
+    ----------
+    element
+        Element symbol.
+    E_eV
+        Scalar or array photon energies in eV.
+
+    Returns
+    -------
+    numpy.ndarray
+        Read-only cross sections in Angstrom^2 per atom, shaped like ``E_eV``.
+
+    Raises
+    ------
+    KeyError
+        If ``element`` is unknown.
+    """
+    if element not in Z_TABLE:
+        raise KeyError(f"Unknown element symbol '{element}'.")
+    E = np.asarray(E_eV, dtype=float)
+    shape = E.shape
+
+    digest = hashlib.blake2b(np.ascontiguousarray(E).tobytes()).digest()
+    key = (element, shape, digest)
+    cached = _ELAM_MEMO.get(key)
+    if cached is not None:
+        _ELAM_MEMO.move_to_end(key)
+        return cached
+
+    Eflat = np.clip(np.atleast_1d(E).ravel(), ELAM_E_MIN_EV, ELAM_E_MAX_EV)
+    mu_rho = np.asarray(xraydb.mu_elam(element, Eflat, "coh"), dtype=float) + np.asarray(
+        xraydb.mu_elam(element, Eflat, "incoh"), dtype=float
+    )
+    # cm^2/g -> cm^2/atom -> Angstrom^2/atom.
+    sigma = mu_rho * (_atomic_mass_g_per_mol(element) / _AVOGADRO) * 1.0e16
+    out = sigma.reshape(shape)
+    out.flags.writeable = False
+
+    _ELAM_MEMO[key] = out
+    if len(_ELAM_MEMO) > _ELAM_MEMO_MAX:
+        _ELAM_MEMO.popitem(last=False)
+    return out
 
 
 def atomic_form_factor(element, g, E_eV, on_out_of_range="nan"):
