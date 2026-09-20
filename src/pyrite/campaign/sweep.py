@@ -525,6 +525,20 @@ def _reject_relativistic_energies(energies: np.ndarray) -> None:
         )
 
 
+def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
+    """The crystallography mapping a sweep's cases are built from.
+
+    :func:`build_cases` and the reline path (:mod:`pyrite.checkpoints.recompute`)
+    must agree on this, since it is the ``cp`` argument
+    :func:`_line_grid_for_energy` resolves a line grid against.
+    """
+    assert sweep.target is not None  # Sweep.__post_init__ always resolves one
+    cp = crystal_params(sweep.target.material, sweep.n_families)
+    if sweep.max_reflections is not None:
+        cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
+    return cp
+
+
 def _automatic_line_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> LineGridPolicy:
     """Resolve the automatic case-local line-grid policy for one beam energy.
 
@@ -618,9 +632,7 @@ def build_cases(
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     target = sweep.target
-    cp = crystal_params(target.material, sweep.n_families)
-    if sweep.max_reflections is not None:
-        cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
+    cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
     # binning). brem grid: coarse + wide
     # -- each case spans up to that case's beam energy because brem cuts off at

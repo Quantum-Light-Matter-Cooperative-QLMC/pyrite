@@ -2208,6 +2208,61 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
     assert s["complete"] is False
 
 
+def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(monkeypatch):
+    """The bespoke-grid reline workflow (issue #135).
+
+    ``from_config=True`` rebuilds each record's target from the material's
+    CURRENT configuration, so the relined grid must equal the one
+    :func:`build_cases` resolves at that record's E0 -- both for an energy the
+    catalog stores an ``E_grid_line_by_energy`` row for and for one that falls
+    through to automatic resolution (issue #101). Regression: the call passed the
+    record's energy grid where the crystal parameters belong and left the
+    returned ``(grid, policy)`` pair unpacked, so this path always raised.
+    """
+    from dataclasses import replace
+
+    import numpy as np
+
+    from pyrite._energy_grid_encoding import decode_energy_grid
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import build_cases
+    from pyrite.runs import run
+
+    stored_keV, auto_keV = 30.0, 37.0
+    sweep = material_sweep("mos2")
+    line_by_energy = sweep.detector.energy_bins.line_by_energy
+    assert stored_keV in line_by_energy and auto_keV not in line_by_energy
+
+    # what building this material from config would put on each case
+    expected = {}
+    for E0 in (stored_keV, auto_keV):
+        cases = build_cases(replace(sweep, beam=replace(sweep.beam, energy_keV=E0)))
+        expected[E0] = decode_energy_grid(cases[0]["E_grid_line"])
+    np.testing.assert_allclose(expected[stored_keV], np.asarray(line_by_energy[stored_keV], float))
+
+    monkeypatch.setattr(
+        run.runner,
+        "_line_pair_for_case",
+        lambda case, E_grid, *, want_coherent, return_characteristic: (
+            np.full(E_grid.shape, 5.0),
+            None,
+            np.full(E_grid.shape, 1.0),
+        ),
+    )
+    records = {E0: _line_record(E0=E0) for E0 in (stored_keV, auto_keV)}
+    results = {"mos2@30": {stored_keV: records[stored_keV], auto_keV: records[auto_keV]}}
+
+    n = run.repair_line_spec(results, material="mos2")
+
+    assert n == 2
+    for E0, r in records.items():
+        np.testing.assert_allclose(r["E_grid"], expected[E0])
+        assert r["spec"].shape == r["E_grid"].shape
+        assert r["brem"].shape == r["E_grid"].shape
+        # explicit coordinates outrank any automatic case-local policy
+        assert "line_grid_policy" not in r["case"]
+
+
 def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
     from pyrite.checkpoints import recompute as reline
 
