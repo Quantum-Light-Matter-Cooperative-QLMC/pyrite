@@ -16,7 +16,7 @@ import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 _TERMINAL_STATES = frozenset({"done", "finished", "completed", "failed", "cancelled"})
 _MATERIAL_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -372,20 +372,13 @@ def line_grid_show(
         for row in block.get("line_by_energy", []) if show_line else []:
             try:
                 energy = float(row["energy_keV"])
-                grid = row["grid"]["linspace"]
                 note_record = line_provenance.get(f"{energy:g}", {})
                 if not isinstance(note_record, Mapping):
                     note_record = {}
                 lines.append(
                     {
                         "energy_keV": energy,
-                        "grid": {
-                            "kind": "linspace",
-                            "start_eV": float(grid["start"]),
-                            "stop_eV": float(grid["stop"]),
-                            "points": int(grid["num"]),
-                            "endpoint": bool(grid.get("endpoint", True)),
-                        },
+                        "grid": _line_grid_payload(row["grid"], energy),
                         "provenance": {
                             "source": _optional_text(row.get("source")) or "derived",
                             "note": _optional_text(note_record.get("note")),
@@ -399,10 +392,7 @@ def line_grid_show(
             brem = brem_by_material.get(material) if show_brem else None
             if brem is not None:
                 brem_output = {
-                    "kind": "arange",
-                    "start_eV": float(brem["start"]),
-                    "stop_eV": float(brem["stop"]),
-                    "step_eV": float(brem["step"]),
+                    **_brem_grid_payload(brem),
                     "provenance": _provenance_record(material_provenance.get("brem", {})),
                 }
         except (KeyError, TypeError, ValueError) as exc:
@@ -420,6 +410,56 @@ def line_grid_show(
         {"profile": _text(profile), "materials": output},
         tuple(errors),
     )
+
+
+def _nonuniform_grid_payload(nodes: Any, kind: str, payload: object) -> dict[str, object]:
+    """Resolved endpoints and count, plus the descriptor that round-trips them.
+
+    A graded grid has no ``step_eV``, and a ``logspace`` descriptor's own
+    ``start``/``stop`` are exponents rather than energies, so the resolved
+    endpoints are reported from the coordinates and the spelling is echoed
+    verbatim under ``descriptor`` instead of being flattened per kind.
+    """
+    return {
+        "kind": kind,
+        "start_eV": float(nodes[0]),
+        "stop_eV": float(nodes[-1]),
+        "points": int(nodes.size),
+        "descriptor": payload,
+    }
+
+
+def _line_grid_payload(grid: object, energy: float) -> dict[str, object]:
+    """One stored line-row grid as JSON; ``linspace`` keeps its legacy shape."""
+    from pyrite.materials._catalog_decode import grid_descriptor_kind, resolve_grid_descriptor
+
+    kind = grid_descriptor_kind(grid)
+    if kind == "linspace":
+        descriptor = cast("Mapping[str, Any]", grid)["linspace"]
+        return {
+            "kind": "linspace",
+            "start_eV": float(descriptor["start"]),
+            "stop_eV": float(descriptor["stop"]),
+            "points": int(descriptor["num"]),
+            "endpoint": bool(descriptor.get("endpoint", True)),
+        }
+    if kind is None:
+        raise ValueError(f"line grid @ {energy:g} keV is not one grid descriptor")
+    nodes = resolve_grid_descriptor(grid, f"line grid @ {energy:g} keV")
+    return _nonuniform_grid_payload(nodes, kind, cast("Mapping[str, Any]", grid)[kind])
+
+
+def _brem_grid_payload(brem: Mapping[str, Any]) -> dict[str, object]:
+    """One resolved brem band as JSON; ``arange`` keeps its legacy shape."""
+    kind = brem.get("kind", "arange")
+    if kind == "arange":
+        return {
+            "kind": "arange",
+            "start_eV": float(brem["start"]),
+            "stop_eV": float(brem["stop"]),
+            "step_eV": float(brem["step"]),
+        }
+    return _nonuniform_grid_payload(brem["nodes"], str(kind), brem.get("payload"))
 
 
 def _provenance_record(value: object) -> dict[str, str | None]:
