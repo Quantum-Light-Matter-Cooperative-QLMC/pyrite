@@ -231,13 +231,13 @@ def _merge_line_rows(document, material: str, new_rows, force: bool, source: str
     return skipped
 
 
-def _material_override_table(document, material: str):
-    """Return (creating if absent) ``[profiles.standard.overrides.MATERIAL]``."""
-    standard = document["profiles"]["standard"]
-    overrides = standard.get("overrides")
+def _material_override_table(document, material: str, profile: str = "standard"):
+    """Return (creating if absent) ``[profiles.PROFILE.overrides.MATERIAL]``."""
+    selected = document["profiles"][profile]
+    overrides = selected.get("overrides")
     if overrides is None:
         overrides = tomlkit.table()
-        standard["overrides"] = overrides
+        selected["overrides"] = overrides
     target = overrides.get(material)
     if target is None:
         target = tomlkit.table()
@@ -952,6 +952,87 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
         _restore(_provenance.PROVENANCE_PATH, provenance_original)
         raise
     _warn_stale_golden()
+
+
+def _artifact_ref_for(document, material: str, profile: str) -> str | None:
+    """The artifact digest a profile pins for MATERIAL, if it pins one."""
+    selected = _profile_row(document, profile)
+    refs = selected.get("energy_grid_refs")
+    if not isinstance(refs, Mapping):
+        return None
+    digest = refs.get(material)
+    return digest if isinstance(digest, str) else None
+
+
+def set_brem_geometric(
+    material: str,
+    stop_eV,
+    num,
+    *,
+    profile: str = "standard",
+    start_eV=None,
+    note=None,
+    catalog_path=None,
+) -> str:
+    """Declare MATERIAL's continuum as geometric nodes in the override table.
+
+    Writes the ``values`` spelling rather than ``logspace``. The nodes come
+    from :func:`pyrite.energy_grid.floor.geometric_continuum_grid`, whose first
+    node is *exactly* the medium's derived photon-continuum floor; recording
+    the band as ``logspace`` exponents would hand that endpoint to
+    ``np.logspace`` on the way back in and can round it a hair below the floor,
+    which is precisely the placement that function refuses. Explicit
+    coordinates round-trip bit-for-bit and keep the floor guarantee the ledger
+    row makes.
+
+    Refused when the profile pins an artifact for this material: artifact
+    identity stores a uniform ``(start, stop, step)`` band only, and
+    ``materials/_parse.py`` lets that artifact overwrite ``E_grid_brem``, so
+    the row written here would be silently discarded at load.
+
+    Returns the rendered band for the caller to report.
+    """
+    from pyrite.energy_grid.floor import geometric_continuum_grid
+
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    original = path.read_text()
+    document = tomlkit.parse(original)
+    if material not in document.get("materials", {}):
+        raise ValueError(f"unknown material: {material}")
+    digest = _artifact_ref_for(document, material, profile)
+    if digest is not None:
+        raise ValueError(
+            f"{profile}/{material} pins artifact sha256:{digest}, which stores a uniform "
+            "band only and overrides this row at load; drop the ref before declaring a "
+            "geometric continuum"
+        )
+    count = _positive_int(num, "num")
+    nodes = geometric_continuum_grid(
+        material,
+        _positive_float(stop_eV, "stop"),
+        count,
+        floor_eV=None if start_eV is None else _positive_float(start_eV, "start"),
+    )
+
+    values = tomlkit.array()
+    values.extend(float(node) for node in nodes)
+    values.multiline(True)
+    item = tomlkit.inline_table()
+    item["values"] = values
+    _material_override_table(document, material, profile)["E_grid_brem"] = item
+
+    new_text = tomlkit.dumps(document)
+    _validate_catalog_text(path, new_text, profile=profile)
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
+    _atomic_write(path, new_text)
+    try:
+        _provenance.set_brem(material, "manual", note=note, profile=profile)
+    except BaseException:
+        _atomic_write(path, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
+    _warn_stale_golden()
+    return _nonuniform_summary(nodes, "values")
 
 
 def resolved_show_inputs(

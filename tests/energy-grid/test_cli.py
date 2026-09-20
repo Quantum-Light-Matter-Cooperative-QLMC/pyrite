@@ -697,3 +697,45 @@ def test_click_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
     assert result.stdout == ""
     assert stderr_text in result.stderr
     assert "Traceback" not in result.output
+
+
+@pytest.mark.parametrize(
+    ("argv", "stderr_text"),
+    [
+        (
+            ["brem", "set", "hopg", "--stop", "40000", "--spacing", "geometric"],
+            "--spacing geometric requires --num",
+        ),
+        (
+            [
+                "brem",
+                "set",
+                "hopg",
+                "--stop",
+                "40000",
+                "--spacing",
+                "geometric",
+                "--num",
+                "12",
+                "--step",
+                "25",
+            ],
+            "--step names a uniform band",
+        ),
+        (
+            ["brem", "set", "hopg", "--stop", "40000", "--num", "12"],
+            "--num applies to --spacing geometric only",
+        ),
+        (
+            ["brem", "set", "hopg", "--stop", "40000", "--start", "50"],
+            "--start applies to --spacing geometric only",
+        ),
+    ],
+)
+def test_brem_set_spacing_flags_are_mutually_consistent(argv, stderr_text):
+    """Each refusal names the flag combination, and nothing is written (#153)."""
+    result = _invoke_grid(argv)
+
+    assert result.exit_code != 0
+    assert stderr_text in result.stderr
+    assert "Traceback" not in result.output

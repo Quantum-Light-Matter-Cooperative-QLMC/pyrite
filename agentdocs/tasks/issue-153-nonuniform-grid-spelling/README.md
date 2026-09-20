@@ -85,14 +85,71 @@ Reproduced by execution on `main` (350f493a), not by reading:
   pre-existing drift the ninth slice of #100 recorded. Reverted, not
   committed.
 
+## Second slice (write side)
+
+Route chosen after establishing where a nonuniform continuum can actually
+live. Two stores can hold a material's brem grid: the override table
+(`[profiles.<p>.overrides.<material>] E_grid_brem`) and an immutable artifact
+pinned by `energy_grid_refs`. When a ref exists the artifact **wins** --
+`materials/_parse.py:745` overwrites `E_grid_brem` with the artifact's
+`arange` -- and artifact identity stores only `{start_eV, stop_eV, step_eV}`,
+which a graded grid cannot express.
+
+Measured before choosing: a `logspace` override reaches production today
+(hopg `ScanSpec.E_grid_brem` comes back as 300 graded nodes over
+`[50.12, 39811]` eV against 1598 uniform ones), the shipped catalog contains
+**zero** `energy_grid_refs`, and `data/energy-grid-artifacts/` is empty. So
+the override table is both the working path and the only one in use;
+extending artifact identity would have moved content-addressed digests for no
+present consumer.
+
+- `apply.py::set_brem_geometric` writes the nodes of
+  `energy_grid.floor.geometric_continuum_grid` into the override table, and
+  refuses by name when the profile pins an artifact for that material, since
+  the row would otherwise be silently discarded at load.
+- It emits the **`values`** spelling, not `logspace`. A `logspace` descriptor
+  hands the floor endpoint back to `np.logspace` on decode and can round it a
+  hair *below* the floor -- exactly the placement `geometric_continuum_grid`
+  refuses, and the placement the `photon-continuum-floor` ledger row is about.
+  Explicit coordinates round-trip bit-for-bit and keep that guarantee.
+- `_material_override_table` gained a `profile` argument; `_merge_brem`'s call
+  is unchanged.
+- CLI: `pyrite-dev energy-grid brem set` gains `--spacing uniform|geometric`,
+  `--num`, and `--start`. `uniform` keeps the existing artifact route
+  untouched. Each invalid flag combination is refused by name rather than
+  reaching the writer.
+
+### Verified
+
+- Real end-to-end probe against the actual shipped catalog, then reverted:
+  `pyrite-dev energy-grid brem set hopg --stop 40000 --spacing geometric
+  --num 12` wrote the row, `energy-grid brem show hopg` reported
+  `[30.6614, 40000] eV x 12 pts (values)  [manual]`, and the catalog decoded
+  back to a grid `np.array_equal` to `geometric_continuum_grid`'s own output,
+  with the first node exactly the derived floor `30.66142745725104` eV. Note
+  the geometric grid starts *at* the floor where the uniform lattice starts at
+  `50` eV, because a uniform lattice must snap to a step multiple and a
+  geometric one need not.
+- `cli-reference --check` passes: `brem set` is a `pyrite-dev` maintainer
+  command and is not part of the user-facing `pyrite` reference, so nothing
+  needed regenerating. Stated rather than assumed.
+- `test-suite cli` 1208 passed / 2 skipped. New tests: 4 flag-consistency
+  cases in `test_cli.py`, 4 writer cases in `test_nonuniform_grid_spelling.py`
+  (exact nodes, artifact-ref refusal with nothing written, unknown material,
+  floor placement).
+- `lint` and `typecheck` clean. The new worktree's fresh `.venv` first
+  reported 54 unresolved-import diagnostics for optional extras; those cleared
+  after `uv sync --group dev --group notebooks --group test --group lint` and
+  were an environment artifact, not code.
+
 ## Remaining on #153
 
-- **Write side.** `pyrite material energy-grid brem set` has no spelling for a
-  nonuniform grid, and `_merge_brem` emits `arange` only. Artifact identity
-  stores brem as `{start_eV, stop_eV, step_eV}`, so this is a stored-identity
-  change, not only a writer change, and will move digests.
 - **Retune side.** `checkpoints/recompute.py` retunes brem through
-  `(start, stop, step)` only (`:482`, `:525-526`).
-- Both change documented CLI command/help/output contracts and will need
-  `docs/repo-design/cli/cli-reference.md` regenerated, which this slice did
-  not.
+  `(start, stop, step)` only (`:482`, `:525-526`), so a checkpoint cannot be
+  retuned onto a graded target. The *storage* side already copes:
+  `_stored_brem_grid` decodes through `decode_energy_grid`, which accepts an
+  explicit array. Only the target specification is uniform-only.
+- **Artifacts stay uniform-only.** A geometric continuum cannot currently be
+  frozen into an immutable artifact. That costs nothing today (no shipped
+  profile pins one) but would need an artifact schema v2 if artifacts come
+  into use.

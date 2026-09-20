@@ -146,3 +146,80 @@ def test_merge_refuses_a_line_row_it_cannot_respell(nonuniform_catalog):
 class _NoManual:
     def is_manual_brem(self, *args, **kwargs):
         return False
+
+
+# --- write side -------------------------------------------------------------
+
+WRITABLE_TOML = """schema_version = 1
+
+[profiles.standard]
+energy_keV = { values = [30.0] }
+E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
+
+[profiles.pinned]
+energy_keV = { values = [30.0] }
+energy_grid_refs = { graded = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+
+[materials.graded]
+display_name = "Graded"
+"""
+
+
+@pytest.fixture
+def writable_catalog(tmp_path, monkeypatch):
+    path = tmp_path / "materials.toml"
+    path.write_text(WRITABLE_TOML)
+    monkeypatch.setattr(apply, "_validate_catalog_text", lambda *a, **k: None)
+    monkeypatch.setattr(apply, "_warn_stale_golden", lambda *a, **k: None)
+    monkeypatch.setattr(apply._provenance, "set_brem", lambda *a, **k: None)
+    return path
+
+
+def test_set_brem_geometric_writes_exact_nodes(writable_catalog, monkeypatch):
+    """The stored row must decode to the builder's own coordinates.
+
+    This is why the writer emits ``values`` and not ``logspace``: a logspace
+    descriptor hands the floor endpoint back to ``np.logspace`` on decode and
+    can round it below the floor, which ``geometric_continuum_grid`` refuses.
+    """
+    import numpy as np
+
+    from pyrite.energy_grid import floor
+
+    nodes = np.geomspace(40.0, 4000.0, 9)
+    monkeypatch.setattr(floor, "geometric_continuum_grid", lambda *a, **k: nodes)
+
+    band = apply.set_brem_geometric("graded", 4000.0, 9, catalog_path=writable_catalog)
+    assert band == "[40, 4000] eV x 9 pts (values)"
+
+    stored = tomllib.loads(writable_catalog.read_text())
+    written = stored["profiles"]["standard"]["overrides"]["graded"]["E_grid_brem"]["values"]
+    assert written == [float(node) for node in nodes]
+
+    # and it round-trips through the reader added by the first slice
+    resolved = apply.effective_brem(stored, "graded")
+    assert np.array_equal(resolved["nodes"], nodes)
+
+
+def test_set_brem_geometric_refuses_when_an_artifact_pins_the_material(writable_catalog):
+    """An artifact would overwrite the row at load, so refuse instead of writing it."""
+    with pytest.raises(ValueError, match=r"pins artifact sha256:0123"):
+        apply.set_brem_geometric(
+            "graded", 4000.0, 9, profile="pinned", catalog_path=writable_catalog
+        )
+    # nothing written
+    assert "overrides" not in tomllib.loads(writable_catalog.read_text())["profiles"]["pinned"]
+
+
+def test_set_brem_geometric_rejects_an_unknown_material(writable_catalog):
+    with pytest.raises(ValueError, match="unknown material: nope"):
+        apply.set_brem_geometric("nope", 4000.0, 9, catalog_path=writable_catalog)
+
+
+def test_set_brem_geometric_first_node_is_the_derived_floor(writable_catalog, monkeypatch):
+    """Not a step multiple: a geometric grid can sit exactly on the floor."""
+    from pyrite.energy_grid import floor
+
+    monkeypatch.setattr(floor, "photon_continuum_floor_eV", lambda *a, **k: 30.6614)
+    band = apply.set_brem_geometric("graded", 40000.0, 12, catalog_path=writable_catalog)
+    assert band.startswith("[30.6614, 40000] eV x 12 pts")
