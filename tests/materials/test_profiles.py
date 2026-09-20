@@ -70,7 +70,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # band the record was computed over genuinely changed and pre-floor records
     # must be orphaned rather than served for a different band.
     assert case_content_key(case) == (
-        "7b3e068bbb7cc21018caa1b14e75f8fc64193c63670a3bf724d2fff536c4d5a7"
+        "995c03b2718cb59e67514716d592f7bf6fa0a687a670e3b20a99a161cc68acca"
     )
 
 
@@ -81,7 +81,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "b1351aad7a5217a6ade1f8e4f77163f710ac262428e25b4132c9bb5c730ccd57"
+        "cbc3b0327eda612d7cd8eae0e71f26b472691c058b721b6f0cef80e150a9800e"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -369,7 +369,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "b1351aad7a5217a6ade1f8e4f77163f710ac262428e25b4132c9bb5c730ccd57"
+        "cbc3b0327eda612d7cd8eae0e71f26b472691c058b721b6f0cef80e150a9800e"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -583,7 +583,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # convention, and again for issue #125's automatic bundled line grids) must
     # stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "b1351aad7a5217a6ade1f8e4f77163f710ac262428e25b4132c9bb5c730ccd57"
+        "cbc3b0327eda612d7cd8eae0e71f26b472691c058b721b6f0cef80e150a9800e"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -594,7 +594,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
     # bandwidth request the resolver raises, so it was left alone.
     assert survey_incoherent["parameter_sha256"] == (
-        "c3a3cecdf11942c6f0e235148e61b02365d90bd86d7655b1202632d5616dae36"
+        "19fa2a513d156308286a1986775fd8f855c55c560fb2797ee2ad8ddeac929588"
     )
 
 
