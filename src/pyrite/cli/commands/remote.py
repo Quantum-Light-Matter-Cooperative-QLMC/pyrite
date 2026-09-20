@@ -1,5 +1,7 @@
 """Click command group for remote orchestration."""
 
+from dataclasses import dataclass
+
 import click
 
 from ...console.output import (
@@ -61,6 +63,17 @@ def _verbose_option(function):
         is_flag=True,
         help="Print raw ssh/scp commands instead of a status line.",
     )(function)
+
+
+def _option_group(*options):
+    """Bundle Click decorators into one, preserving their declared help order."""
+
+    def decorate(function):
+        for option in reversed(options):
+            function = option(function)
+        return function
+
+    return decorate
 
 
 def _reject_all_with_values(command_name, all_, values):
@@ -219,6 +232,305 @@ def reline_command(
     )
 
 
+@dataclass(frozen=True)
+class _StartFlags:
+    """Raw ``remote run`` option values, before compatibility resolution."""
+
+    catalog_profile: str | None
+    material: str | None
+    fidelity: str
+    quick: bool
+    workers: int | None
+    parallel_materials: int | None
+    chunk_minutes: float | None
+    perf: bool
+    performance_repetitions: int
+    performance_interval: float
+    spec_chunk: int | None
+    brem_chunk: int | None
+    nsys: bool
+    cpu: bool
+    cpu_only: bool
+    no_cache: bool
+    recompute: bool
+    no_sync: bool
+    dry_run: bool
+    headless: bool
+    no_pull: bool
+    grid: bool
+    drop_wide_brem: bool
+    downcast: bool
+    level9: bool
+
+
+@dataclass(frozen=True)
+class _StartPlan:
+    """``remote run`` settings derived from one validated flag combination."""
+
+    performance_profile: str | None
+    chunk_minutes: float
+
+
+def _reject_exclusive_start_flags(flags):
+    """Reject ``remote run`` flag pairs that cannot describe one session."""
+    if flags.cpu and flags.cpu_only:
+        raise click.UsageError("--cpu and --cpu-only are mutually exclusive")
+    if flags.no_cache and flags.recompute:
+        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
+    if flags.cpu_only and flags.nsys:
+        raise click.UsageError("--cpu-only cannot be combined with --nsys")
+    if flags.cpu_only and flags.performance_repetitions != 1:
+        raise click.UsageError("--cpu-only cannot be combined with --perf-reps")
+    if flags.cpu_only and flags.performance_interval != 5.0:
+        raise click.UsageError("--cpu-only cannot be combined with --perf-interval")
+    if flags.cpu_only and (flags.spec_chunk is not None or flags.brem_chunk is not None):
+        raise click.UsageError("--cpu-only cannot be combined with GPU chunk pins")
+
+
+def _resolve_performance_profile(flags, catalog_profile):
+    """Name the profile to instrument, or reject telemetry knobs given without --perf."""
+    if flags.perf or flags.nsys or flags.cpu or flags.cpu_only:
+        return catalog_profile
+    if flags.performance_repetitions != 1:
+        raise click.UsageError("--perf-reps requires --perf")
+    if flags.performance_interval != 5.0:
+        raise click.UsageError("--perf-interval requires --perf")
+    if flags.spec_chunk is not None:
+        raise click.UsageError("--spec-chunk requires --perf")
+    if flags.brem_chunk is not None:
+        raise click.UsageError("--brem-chunk requires --perf")
+    return None
+
+
+def _resolve_start_chunk_minutes(flags):
+    """Default the SLURM slice length; profiling modes need one monolithic job."""
+    if flags.chunk_minutes is not None:
+        return flags.chunk_minutes
+    monolithic = flags.performance_repetitions > 1 or flags.nsys or flags.cpu or flags.cpu_only
+    return 0.0 if monolithic else 10.0
+
+
+def _reject_start_allocation_conflicts(flags, chunk_minutes):
+    """Reject modes that need one unchunked material process per allocation."""
+    if flags.performance_repetitions > 1 and chunk_minutes != 0:
+        raise click.UsageError("--perf-reps requires --chunk-minutes 0")
+    if flags.performance_repetitions > 1 and flags.parallel_materials not in (None, 1):
+        raise click.UsageError("--perf-reps requires one material process per GPU")
+    if flags.nsys and chunk_minutes != 0:
+        raise click.UsageError("--nsys requires --chunk-minutes 0")
+    if flags.nsys and flags.performance_repetitions != 1:
+        raise click.UsageError("--nsys requires --perf-reps 1")
+    if flags.nsys and flags.parallel_materials not in (None, 1):
+        raise click.UsageError("--nsys requires one material process per GPU")
+    if flags.cpu and chunk_minutes != 0:
+        raise click.UsageError("--cpu requires --chunk-minutes 0")
+    if flags.cpu_only and chunk_minutes != 0:
+        raise click.UsageError("--cpu-only requires --chunk-minutes 0")
+    if flags.parallel_materials is not None and chunk_minutes != 0:
+        raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
+
+
+def _reject_start_mode_conflicts(flags):
+    """Reject fidelity, grid, and attachment combinations ``remote run`` cannot honour."""
+    if flags.quick and flags.fidelity != "full":
+        raise click.UsageError("--quick cannot be combined with --fidelity survey")
+    if flags.quick and flags.grid:
+        raise click.UsageError(
+            "run --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
+        )
+    if flags.headless and flags.no_pull:
+        raise click.UsageError("--headless cannot be combined with --no-pull")
+
+
+def _plan_start(flags, catalog_profile):
+    """Validate one ``remote run`` flag combination and resolve its derived settings.
+
+    Checks run in the order the command has always applied them, so the first
+    rule a user violates still decides the ``UsageError`` they see.
+    """
+    _reject_exclusive_start_flags(flags)
+    performance_profile = _resolve_performance_profile(flags, catalog_profile)
+    if flags.nsys and flags.material is None:
+        raise click.UsageError("--nsys requires one explicit -m/--material")
+    chunk_minutes = _resolve_start_chunk_minutes(flags)
+    _reject_start_allocation_conflicts(flags, chunk_minutes)
+    _reject_start_mode_conflicts(flags)
+    return _StartPlan(performance_profile=performance_profile, chunk_minutes=chunk_minutes)
+
+
+_start_selection_options = _option_group(
+    click.argument(
+        "catalog_profile",
+        required=False,
+        default=None,
+        metavar="[PROFILE]",
+        shell_complete=_cli_completion.complete_profile,
+    ),
+    click.option(
+        "-m",
+        "--material",
+        shell_complete=_cli_completion.complete_material,
+        help="Run one material from PROFILE instead of its full membership.",
+    ),
+    fidelity_option(help="Named settings/grid policy. survey is provisional and reduced."),
+    click.option("--quick", is_flag=True, help="Use tiny smoke-test grid."),
+)
+
+
+_start_allocation_options = _option_group(
+    click.option(
+        "--workers",
+        type=NONNEGATIVE_INT,
+        default=None,
+        help="Transport workers (default: auto; 0 runs serially).",
+    ),
+    click.option(
+        "--parallel-materials",
+        type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
+        default=None,
+        metavar="N",
+        help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
+        shell_complete=_cli_completion.choice_completer(
+            range(1, config.MAX_PARALLEL_MATERIALS + 1)
+        ),
+    ),
+    click.option(
+        "--chunk-minutes",
+        type=NONNEGATIVE_FLOAT,
+        default=None,
+        help=(
+            "Self-resubmitting SLURM slice length; defaults to 10, or 0 for "
+            "--perf-reps >1, --nsys, and CPU profiling."
+        ),
+    ),
+)
+
+
+_start_performance_options = _option_group(
+    click.option(
+        "-p",
+        "--perf",
+        is_flag=True,
+        help=(
+            "Log CPU pressure, RAM/swap, GPU clocks/VRAM, process, phase timing, "
+            "queue, worker, chunk, and case metrics for PROFILE."
+        ),
+    ),
+    click.option(
+        "-r",
+        "--perf-reps",
+        "performance_repetitions",
+        type=click.IntRange(1, 20),
+        default=1,
+        show_default=True,
+        metavar="N",
+        help=(
+            "Run N uncached sessions per material with isolated job-local checkpoints; "
+            "requires --perf and --chunk-minutes 0. Profiling checkpoints "
+            "are not pulled."
+        ),
+    ),
+    click.option(
+        "-i",
+        "--perf-interval",
+        "performance_interval",
+        type=POSITIVE_FLOAT,
+        default=5.0,
+        show_default=True,
+        metavar="SECONDS",
+        help="Performance telemetry sampling interval; requires --perf.",
+    ),
+    click.option(
+        "--spec-chunk",
+        type=POSITIVE_INT,
+        default=None,
+        metavar="N",
+        help="Pin line-spectrum segments per GPU chunk; requires --perf.",
+    ),
+    click.option(
+        "--brem-chunk",
+        type=POSITIVE_INT,
+        default=None,
+        metavar="N",
+        help="Pin bremsstrahlung segments per GPU chunk; requires --perf.",
+    ),
+    click.option(
+        "--nsys",
+        is_flag=True,
+        help=(
+            "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
+            "and Python-stack tracing; implies --perf, --perf-reps 1, and "
+            "--chunk-minutes 0; requires one explicit -m/--material."
+        ),
+    ),
+    click.option(
+        "-c",
+        "--cpu",
+        is_flag=True,
+        help=(
+            "After the primary run, capture one bounded serial CPU cProfile pass; "
+            "implies --perf and --chunk-minutes 0."
+        ),
+    ),
+    click.option(
+        "--cpu-only",
+        is_flag=True,
+        help=(
+            "Capture only the bounded serial CPU cProfile pass; starts no primary "
+            "GPU/Nsight scan and implies --perf and --chunk-minutes 0."
+        ),
+    ),
+)
+
+
+_start_cache_options = _option_group(
+    click.option(
+        "--no-cache",
+        is_flag=True,
+        help=(
+            "Neither read nor write the shared per-case checkpoint cache: an "
+            "ephemeral run that recomputes every case and stores nothing shared."
+        ),
+    ),
+    click.option(
+        "--recompute",
+        is_flag=True,
+        help=(
+            "Ignore cached cases and recompute fresh, but repopulate the shared "
+            "per-case cache with the results."
+        ),
+    ),
+)
+
+
+_start_transfer_options = _option_group(
+    click.option("--no-sync", is_flag=True, help="Skip code upload."),
+    click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect."),
+    click.option(
+        "--headless",
+        is_flag=True,
+        help="Return after submission without attaching or pulling.",
+    ),
+    click.option(
+        "--no-pull",
+        is_flag=True,
+        help="Attach and track, but do not pull completed checkpoints or performance artifacts.",
+    ),
+    click.option(
+        "--grid",
+        is_flag=True,
+        help="Grid-filter checkpoint before pulling; incompatible with --quick.",
+    ),
+    click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem."),
+    click.option("--downcast", is_flag=True, help="With --grid, downcast to float32."),
+    click.option(
+        "--level9",
+        is_flag=True,
+        help="Recompress completed checkpoints at max compression before automatic pull.",
+    ),
+)
+
+
 @click.command(
     "run",
     help=(
@@ -234,272 +546,50 @@ def reline_command(
         "another job under the same profile is live."
     ),
 )
-@click.argument(
-    "catalog_profile",
-    required=False,
-    default=None,
-    metavar="[PROFILE]",
-    shell_complete=_cli_completion.complete_profile,
-)
-@click.option(
-    "-m",
-    "--material",
-    shell_complete=_cli_completion.complete_material,
-    help="Run one material from PROFILE instead of its full membership.",
-)
-@fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
-@click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
-@click.option(
-    "--workers",
-    type=NONNEGATIVE_INT,
-    default=None,
-    help="Transport workers (default: auto; 0 runs serially).",
-)
-@click.option(
-    "--parallel-materials",
-    type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
-    default=None,
-    metavar="N",
-    help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
-    shell_complete=_cli_completion.choice_completer(range(1, config.MAX_PARALLEL_MATERIALS + 1)),
-)
-@click.option(
-    "--chunk-minutes",
-    type=NONNEGATIVE_FLOAT,
-    default=None,
-    help=(
-        "Self-resubmitting SLURM slice length; defaults to 10, or 0 for "
-        "--perf-reps >1, --nsys, and CPU profiling."
-    ),
-)
-@click.option(
-    "-p",
-    "--perf",
-    is_flag=True,
-    help=(
-        "Log CPU pressure, RAM/swap, GPU clocks/VRAM, process, phase timing, "
-        "queue, worker, chunk, and case metrics for PROFILE."
-    ),
-)
-@click.option(
-    "-r",
-    "--perf-reps",
-    "performance_repetitions",
-    type=click.IntRange(1, 20),
-    default=1,
-    show_default=True,
-    metavar="N",
-    help=(
-        "Run N uncached sessions per material with isolated job-local checkpoints; "
-        "requires --perf and --chunk-minutes 0. Profiling checkpoints "
-        "are not pulled."
-    ),
-)
-@click.option(
-    "-i",
-    "--perf-interval",
-    "performance_interval",
-    type=POSITIVE_FLOAT,
-    default=5.0,
-    show_default=True,
-    metavar="SECONDS",
-    help="Performance telemetry sampling interval; requires --perf.",
-)
-@click.option(
-    "--spec-chunk",
-    type=POSITIVE_INT,
-    default=None,
-    metavar="N",
-    help="Pin line-spectrum segments per GPU chunk; requires --perf.",
-)
-@click.option(
-    "--brem-chunk",
-    type=POSITIVE_INT,
-    default=None,
-    metavar="N",
-    help="Pin bremsstrahlung segments per GPU chunk; requires --perf.",
-)
-@click.option(
-    "--nsys",
-    is_flag=True,
-    help=(
-        "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
-        "and Python-stack tracing; implies --perf, --perf-reps 1, and "
-        "--chunk-minutes 0; requires one explicit -m/--material."
-    ),
-)
-@click.option(
-    "-c",
-    "--cpu",
-    is_flag=True,
-    help=(
-        "After the primary run, capture one bounded serial CPU cProfile pass; "
-        "implies --perf and --chunk-minutes 0."
-    ),
-)
-@click.option(
-    "--cpu-only",
-    is_flag=True,
-    help=(
-        "Capture only the bounded serial CPU cProfile pass; starts no primary "
-        "GPU/Nsight scan and implies --perf and --chunk-minutes 0."
-    ),
-)
-@click.option(
-    "--no-cache",
-    is_flag=True,
-    help=(
-        "Neither read nor write the shared per-case checkpoint cache: an "
-        "ephemeral run that recomputes every case and stores nothing shared."
-    ),
-)
-@click.option(
-    "--recompute",
-    is_flag=True,
-    help=(
-        "Ignore cached cases and recompute fresh, but repopulate the shared "
-        "per-case cache with the results."
-    ),
-)
-@click.option("--no-sync", is_flag=True, help="Skip code upload.")
-@click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
-@click.option(
-    "--headless",
-    is_flag=True,
-    help="Return after submission without attaching or pulling.",
-)
-@click.option(
-    "--no-pull",
-    is_flag=True,
-    help="Attach and track, but do not pull completed checkpoints or performance artifacts.",
-)
-@click.option(
-    "--grid",
-    is_flag=True,
-    help="Grid-filter checkpoint before pulling; incompatible with --quick.",
-)
-@click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem.")
-@click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
-@click.option(
-    "--level9",
-    is_flag=True,
-    help="Recompress completed checkpoints at max compression before automatic pull.",
-)
-def start_command(
-    catalog_profile,
-    material,
-    fidelity,
-    quick,
-    workers,
-    parallel_materials,
-    chunk_minutes,
-    perf,
-    performance_repetitions,
-    performance_interval,
-    spec_chunk,
-    brem_chunk,
-    nsys,
-    cpu,
-    cpu_only,
-    no_cache,
-    recompute,
-    no_sync,
-    dry_run,
-    headless,
-    no_pull,
-    grid,
-    drop_wide_brem,
-    downcast,
-    level9,
-):
+@_start_selection_options
+@_start_allocation_options
+@_start_performance_options
+@_start_cache_options
+@_start_transfer_options
+def start_command(**params):
     from ...console import config as cli_config
     from ...runs.scan import resolve_profile_materials
 
+    flags = _StartFlags(**params)
     try:
-        catalog_profile = cli_config.resolve("profile.current", catalog_profile).value
+        catalog_profile = cli_config.resolve("profile.current", flags.catalog_profile).value
     except cli_config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
 
-    materials = resolve_profile_materials(catalog_profile, material)
-    if cpu and cpu_only:
-        raise click.UsageError("--cpu and --cpu-only are mutually exclusive")
-    if no_cache and recompute:
-        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
-    if cpu_only and nsys:
-        raise click.UsageError("--cpu-only cannot be combined with --nsys")
-    if cpu_only and performance_repetitions != 1:
-        raise click.UsageError("--cpu-only cannot be combined with --perf-reps")
-    if cpu_only and performance_interval != 5.0:
-        raise click.UsageError("--cpu-only cannot be combined with --perf-interval")
-    if cpu_only and (spec_chunk is not None or brem_chunk is not None):
-        raise click.UsageError("--cpu-only cannot be combined with GPU chunk pins")
-    performance_profile = catalog_profile if perf or nsys or cpu or cpu_only else None
-    if performance_profile is None:
-        if performance_repetitions != 1:
-            raise click.UsageError("--perf-reps requires --perf")
-        if performance_interval != 5.0:
-            raise click.UsageError("--perf-interval requires --perf")
-        if spec_chunk is not None:
-            raise click.UsageError("--spec-chunk requires --perf")
-        if brem_chunk is not None:
-            raise click.UsageError("--brem-chunk requires --perf")
-    if nsys and material is None:
-        raise click.UsageError("--nsys requires one explicit -m/--material")
-    if (performance_repetitions > 1 or nsys or cpu or cpu_only) and chunk_minutes is None:
-        chunk_minutes = 0.0
-    elif chunk_minutes is None:
-        chunk_minutes = 10.0
-    if performance_repetitions > 1 and chunk_minutes != 0:
-        raise click.UsageError("--perf-reps requires --chunk-minutes 0")
-    if performance_repetitions > 1 and parallel_materials not in (None, 1):
-        raise click.UsageError("--perf-reps requires one material process per GPU")
-    if nsys and chunk_minutes != 0:
-        raise click.UsageError("--nsys requires --chunk-minutes 0")
-    if nsys and performance_repetitions != 1:
-        raise click.UsageError("--nsys requires --perf-reps 1")
-    if nsys and parallel_materials not in (None, 1):
-        raise click.UsageError("--nsys requires one material process per GPU")
-    if cpu and chunk_minutes != 0:
-        raise click.UsageError("--cpu requires --chunk-minutes 0")
-    if cpu_only and chunk_minutes != 0:
-        raise click.UsageError("--cpu-only requires --chunk-minutes 0")
-    if parallel_materials is not None and chunk_minutes != 0:
-        raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
-    if quick and fidelity != "full":
-        raise click.UsageError("--quick cannot be combined with --fidelity survey")
-    if quick and grid:
-        raise click.UsageError(
-            "run --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
-        )
-    if headless and no_pull:
-        raise click.UsageError("--headless cannot be combined with --no-pull")
+    materials = resolve_profile_materials(catalog_profile, flags.material)
+    plan = _plan_start(flags, catalog_profile)
     return _invoke_action(
         _cli_start,
         materials=materials,
-        fidelity=fidelity,
+        fidelity=flags.fidelity,
         catalog_profile=catalog_profile,
-        quick=quick,
-        workers=workers,
-        parallel_materials=parallel_materials,
-        chunk_minutes=chunk_minutes,
-        performance_profile=performance_profile,
-        performance_repetitions=performance_repetitions,
-        performance_interval=performance_interval,
-        spec_chunk=spec_chunk,
-        brem_chunk=brem_chunk,
-        nsys=nsys,
-        cpu=cpu,
-        cpu_only=cpu_only,
-        no_cache=no_cache,
-        recompute=recompute,
-        no_sync=no_sync,
-        dry_run=dry_run,
-        headless=headless,
-        no_pull=no_pull,
-        grid=grid,
-        drop_wide_brem=drop_wide_brem,
-        downcast=downcast,
-        level9=level9,
+        quick=flags.quick,
+        workers=flags.workers,
+        parallel_materials=flags.parallel_materials,
+        chunk_minutes=plan.chunk_minutes,
+        performance_profile=plan.performance_profile,
+        performance_repetitions=flags.performance_repetitions,
+        performance_interval=flags.performance_interval,
+        spec_chunk=flags.spec_chunk,
+        brem_chunk=flags.brem_chunk,
+        nsys=flags.nsys,
+        cpu=flags.cpu,
+        cpu_only=flags.cpu_only,
+        no_cache=flags.no_cache,
+        recompute=flags.recompute,
+        no_sync=flags.no_sync,
+        dry_run=flags.dry_run,
+        headless=flags.headless,
+        no_pull=flags.no_pull,
+        grid=flags.grid,
+        drop_wide_brem=flags.drop_wide_brem,
+        downcast=flags.downcast,
+        level9=flags.level9,
     )
 
 
