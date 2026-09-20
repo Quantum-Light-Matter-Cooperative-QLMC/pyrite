@@ -149,6 +149,7 @@ def test_sync_excludes_generated_caches(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
     monkeypatch.setattr(transport, "_run", inspect_transfer)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
 
     transport.sync_code()
 
@@ -164,6 +165,7 @@ def test_sync_removes_stale_remote_python_sources_before_extract(monkeypatch, tm
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
     monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
 
     transport.sync_code()
 
@@ -5779,3 +5781,287 @@ def test_prune_jobs_cli_rejects_bad_selectors(monkeypatch):
 
     assert _remote_main(["prune-jobs"]) == 2
     assert _remote_main(["prune-jobs", "--all", "--profile", "sub_100keV"]) == 2
+
+
+# --- code-sync identity (issue #142): a live job's code cannot change underneath it
+
+
+def _stub_sync_tree(tmp_path, monkeypatch, *, text="VALUE = 1\n"):
+    """A minimal two-file sync payload rooted at ``tmp_path``."""
+    source = tmp_path / "src" / "pyrite"
+    source.mkdir(parents=True)
+    (source / "module.py").write_text(text, newline="")
+    (source / "table.bin").write_bytes(b"\x00\x01\x02")
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
+    return source
+
+
+def _live_job_line(jobid, digest, revision="deadbeef", material="hopg"):
+    return f"{jobid}\tFalse\t{material}\t{digest}\t{revision}\n"
+
+
+def test_payload_digest_ignores_line_endings_and_mtimes(tmp_path, monkeypatch):
+    """Identity is CONTENT: a CRLF checkout and an LF one ship the same code.
+
+    The digest must also survive a touched mtime, or every sync would look like
+    a new revision and refuse against its own live jobs."""
+    source = _stub_sync_tree(tmp_path, monkeypatch, text="VALUE = 1\nOTHER = 2\n")
+    lf = transport._payload_digest(transport._sync_entries())
+
+    (source / "module.py").write_bytes(b"VALUE = 1\r\nOTHER = 2\r\n")
+    assert transport._payload_digest(transport._sync_entries()) == lf
+
+    os.utime(source / "module.py", (0, 0))
+    os.utime(source / "table.bin", (0, 0))
+    assert transport._payload_digest(transport._sync_entries()) == lf
+
+
+def test_payload_digest_tracks_every_synced_file(tmp_path, monkeypatch):
+    """Changed text, changed binary, added or renamed file: all new identities."""
+    source = _stub_sync_tree(tmp_path, monkeypatch)
+    baseline = transport._payload_digest(transport._sync_entries())
+
+    (source / "module.py").write_text("VALUE = 2\n", newline="")
+    changed_text = transport._payload_digest(transport._sync_entries())
+    assert changed_text != baseline
+
+    (source / "table.bin").write_bytes(b"\x00\x01\x03")
+    assert transport._payload_digest(transport._sync_entries()) != changed_text
+
+    (source / "table.bin").write_bytes(b"\x00\x01\x02")
+    (source / "module.py").write_text("VALUE = 1\n", newline="")
+    assert transport._payload_digest(transport._sync_entries()) == baseline
+
+    (source / "module.py").rename(source / "renamed.py")
+    assert transport._payload_digest(transport._sync_entries()) != baseline
+
+
+def test_sync_refuses_when_a_live_job_runs_different_code(tmp_path, monkeypatch, capsys):
+    """The #142 failure: a second tree's sync rewrote src/ under SLURM job 1772."""
+    _stub_sync_tree(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: _live_job_line("20260919-134800-ab12cd34", "f" * 64),
+    )
+    monkeypatch.setattr(
+        transport, "_run", lambda *_args, **_kwargs: pytest.fail("refusal must not transfer")
+    )
+
+    with pytest.raises(SystemExit) as refusal:
+        transport.sync_code()
+
+    message = str(refusal.value)
+    assert "20260919-134800-ab12cd34" in message
+    assert "ffffffffffff" in message
+    assert "deadbeef" in message
+    assert "--force" in message
+
+
+def test_sync_proceeds_when_the_live_job_runs_this_payload(tmp_path, monkeypatch):
+    """Identical payloads sync silently: starting a second material mid-run is
+    a supported workflow (cleanup._refuse_if_busy allows it)."""
+    _stub_sync_tree(tmp_path, monkeypatch)
+    digest = transport._payload_digest(transport._sync_entries())
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: _live_job_line("job-1", digest))
+    transferred = []
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: transferred.append(command[0]))
+
+    transport.sync_code()
+
+    assert transferred == ["scp", "ssh"]
+
+
+def test_sync_reports_but_does_not_refuse_an_unstamped_live_job(tmp_path, monkeypatch, capsys):
+    """A job queued before code stamping is unverifiable, not a conflict --
+    refusing on absence would train every caller to pass --force."""
+    _stub_sync_tree(tmp_path, monkeypatch)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "legacy\tFalse\thopg\t\t\n")
+    transferred = []
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: transferred.append(command[0]))
+
+    transport.sync_code()
+
+    assert transferred == ["scp", "ssh"]
+    assert "legacy" in capsys.readouterr().err
+
+
+def test_sync_force_overrides_conflict_and_names_the_jobs_at_risk(tmp_path, monkeypatch, capsys):
+    _stub_sync_tree(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: _live_job_line("job-1", "f" * 64) + _live_job_line("job-2", "e" * 64),
+    )
+    transferred = []
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: transferred.append(command[0]))
+
+    transport.sync_code(force=True)
+
+    warning = capsys.readouterr().err
+    assert transferred == ["scp", "ssh"]
+    assert "WARNING" in warning
+    assert "job-1" in warning
+    assert "job-2" in warning
+
+
+def test_sync_stamps_the_remote_checkout_once_after_extraction(tmp_path, monkeypatch):
+    """The stamp must describe code that actually landed, so it is chained after
+    a successful tar with && rather than sent as its own command."""
+    _stub_sync_tree(tmp_path, monkeypatch)
+    digest = transport._payload_digest(transport._sync_entries())
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+    commands = []
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: commands.append(command))
+
+    transport.sync_code()
+
+    assert [command[0] for command in commands] == ["scp", "ssh"]
+    remote_command = commands[-1][3]
+    assert remote_command.count(config.SYNC_STAMP_NAME) == 1
+    assert remote_command.index("tar xzf") < remote_command.index(config.SYNC_STAMP_NAME)
+    assert "&& printf %s " in remote_command
+    assert f"code_digest: {digest}" in remote_command
+    assert "code_revision: " in remote_command
+
+
+def test_sync_stamp_records_revision_evidence_without_keying_identity_to_it(tmp_path, monkeypatch):
+    """Revision is evidence; an unavailable one is recorded as dirty, never as a
+    clean revision nobody could reproduce."""
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_local_revision", lambda: ("unknown", True))
+
+    stamp = transport._sync_stamp("a" * 64)
+
+    rendered = stamp.render()
+    assert rendered.startswith(f"code_digest: {'a' * 64}\n")
+    assert "code_revision: unknown\n" in rendered
+    assert "code_dirty: True\n" in rendered
+    assert rendered.endswith("\n")
+    assert "\n\n" not in rendered
+
+
+def test_sync_guard_runs_before_any_transfer_or_inventory(tmp_path, monkeypatch):
+    """A refusal costs one squeue join, never an scp or an artifact inventory."""
+    _stub_sync_tree(tmp_path, monkeypatch)
+    captured = []
+
+    def capture(command):
+        captured.append(command)
+        return _live_job_line("job-1", "f" * 64)
+
+    monkeypatch.setattr(transport, "_ssh_capture", capture)
+    monkeypatch.setattr(
+        transport, "_run", lambda *_a, **_kw: pytest.fail("refusal must not transfer")
+    )
+
+    with pytest.raises(SystemExit):
+        transport.sync_code()
+
+    assert len(captured) == 1
+    assert "squeue" in captured[0]
+
+
+def test_live_job_code_reports_each_live_job_recorded_stamp(monkeypatch, tmp_path):
+    """The recorded digest rides the existing squeue join -- no second round trip."""
+    bash = _bash_or_skip(tmp_path)
+    jobs = tmp_path / "jobs"
+    for jobid, scheduler_id, stamp in (
+        ("stamped", "12", "code_digest: abc123\ncode_revision: feedface\n"),
+        ("legacy", "13", ""),
+    ):
+        jobdir = jobs / jobid
+        jobdir.mkdir(parents=True)
+        (jobdir / "meta").write_text(
+            f"slurm_job_id: {scheduler_id}\nquick: False\nmaterials: hopg\n{stamp}"
+        )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    squeue = bin_dir / "squeue"
+    squeue.write_text("#!/bin/sh\necho 12\necho 13\n")
+    squeue.chmod(0o755)
+
+    def run_remote(command):
+        result = subprocess.run(
+            [bash, "-c", command],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        )
+        assert result.returncode == 0, result.stderr
+        return result.stdout
+
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(transport, "_ssh_capture", run_remote)
+
+    assert sorted(state._live_job_code()) == [
+        ("legacy", False, ["hopg"], "", ""),
+        ("stamped", False, ["hopg"], "abc123", "feedface"),
+    ]
+    # Existing checkpoint-ownership callers keep the three-field shape.
+    assert sorted(state._live_jobs()) == [
+        ("legacy", False, ["hopg"]),
+        ("stamped", False, ["hopg"]),
+    ]
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        pytest.param(scripts._queue_metadata("j", ["hopg"], False, None), id="scan"),
+        pytest.param(scripts._zhai_queue_metadata("j", 1, 2, 3), id="zhai"),
+        pytest.param(scripts._rebrem_queue_metadata("j", ["hopg"], 10, 25.0, False), id="rebrem"),
+        pytest.param(scripts._reline_queue_metadata("j", ["hopg"], 10, 25.0, False), id="reline"),
+    ],
+)
+def test_submitted_job_meta_carries_the_synced_code_stamp(monkeypatch, tmp_path, metadata):
+    """Every queue kind fixes its code identity when it is queued, read from the
+    box's own stamp so a --no-sync submit records the code actually there."""
+    bash = _bash_or_skip(tmp_path)
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    (tmp_path / config.SYNC_STAMP_NAME).write_text(
+        "code_digest: abc123\ncode_revision: feedface\ncode_dirty: False\n"
+        "code_synced_at: 2026-09-19T14:14:00+00:00\ncode_source: laptop:/home/a/dev/pyrite\n"
+    )
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.parent.mkdir(parents=True)
+
+    command = scripts._write_job_script_command(jobdir.as_posix(), metadata)
+    result = subprocess.run(
+        [bash, "-c", command], input="#!/bin/sh\n", capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    written = (jobdir / "meta").read_text()
+    assert written.startswith(metadata)
+    assert "code_digest: abc123\n" in written
+    assert "code_revision: feedface\n" in written
+
+
+def test_submission_without_a_stamped_checkout_still_writes_job_meta(monkeypatch, tmp_path):
+    """A checkout predating code stamping must submit, not fail; the missing
+    stamp is what `sync` later reads as unverifiable."""
+    bash = _bash_or_skip(tmp_path)
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.parent.mkdir(parents=True)
+    metadata = scripts._queue_metadata("j", ["hopg"], False, None)
+
+    command = scripts._write_job_script_command(jobdir.as_posix(), metadata)
+    result = subprocess.run(
+        [bash, "-c", command], input="#!/bin/sh\n", capture_output=True, text=True
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (jobdir / "meta").read_text() == metadata
+
+
+def test_sync_cli_exposes_force_and_defaults_to_refusing(monkeypatch):
+    seen = []
+    monkeypatch.setattr(transport, "sync_code", lambda *, force=False: seen.append(force))
+
+    assert _remote_main(["sync"]) in (0, None)
+    assert _remote_main(["sync", "--force"]) in (0, None)
+
+    assert seen == [False, True]

@@ -564,8 +564,8 @@ def _cli_prune_jobs(*, catalog_profile, all_jobs, yes):
     )
 
 
-def _cli_sync():
-    transport.sync_code()
+def _cli_sync(*, force: bool = False):
+    transport.sync_code(force=force)
 
 
 def _cli_check(

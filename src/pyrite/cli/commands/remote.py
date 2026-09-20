@@ -857,9 +857,14 @@ def prune_jobs_command(all_jobs, catalog_profile, yes, ssh_verbose):
 
 
 @command.command("sync", help="Push current code to remote box.")
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Sync even while a live job is running different code.",
+)
 @_verbose_option
-def sync_command(ssh_verbose):
-    return _invoke_action(_cli_sync, ssh_verbose=ssh_verbose)
+def sync_command(force, ssh_verbose):
+    return _invoke_action(_cli_sync, force=force, ssh_verbose=ssh_verbose)
 
 
 @click.command(

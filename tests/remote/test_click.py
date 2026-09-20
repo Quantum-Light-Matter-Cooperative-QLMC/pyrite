@@ -43,7 +43,7 @@ def test_sync_verbose_flag_enables_raw_ssh_echo(monkeypatch):
 
     seen = []
 
-    def fake_sync_code():
+    def fake_sync_code(*, force=False):
         seen.append(transport._VERBOSE)
 
     monkeypatch.setattr(transport, "sync_code", fake_sync_code)

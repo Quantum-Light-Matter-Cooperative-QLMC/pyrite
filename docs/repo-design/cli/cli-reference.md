@@ -875,6 +875,7 @@ Usage: pyrite remote sync [OPTIONS]
   Push current code to remote box.
 
 Options:
+  --force        Sync even while a live job is running different code.
   -v, --verbose  Print raw ssh/scp commands instead of a status line.
   -h, --help     Show this message and exit.
 ```

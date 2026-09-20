@@ -208,13 +208,24 @@ printf '%s\\n' "$SID"
 
 
 def _write_job_script_command(jobdir, metadata):
-    """Exclusively create a job directory, then receive its script on stdin."""
+    """Exclusively create a job directory, then receive its script on stdin.
+
+    The ``code_*`` lines of ``<REMOTE_DIR>/.pyrite-sync`` are appended to the
+    job's ``meta`` here, so every queue kind records the code identity it was
+    staged against, fixed at submission time. Reading the box's own stamp -- not
+    the submitting client's idea of it -- keeps ``--no-sync`` submissions honest:
+    they record the code that is actually there. A checkout with no stamp yet
+    (predating code stamping) records no ``code_`` lines, which ``sync`` reads as
+    unverifiable rather than as a conflict.
+    """
     jobdir_word = config.shell_single_word(jobdir)
     run_script_word = config.shell_single_word(f"{jobdir}/run.sh")
     metadata_word = config.shell_single_word(f"{jobdir}/meta")
+    stamp_word = config.shell_single_word(config.remote_sync_stamp_path())
     return (
         f"mkdir {jobdir_word} && cat > {run_script_word} && "
-        f"printf %s {shlex.quote(metadata)} > {metadata_word}"
+        f"printf %s {shlex.quote(metadata)} > {metadata_word} && "
+        f"{{ sed -n '/^code_/p' {stamp_word} 2>/dev/null >> {metadata_word} || true; }}"
     )
 
 
