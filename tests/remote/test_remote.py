@@ -1672,6 +1672,43 @@ def test_run_no_pull_still_attaches(monkeypatch):
     assert attached == ["j"]
 
 
+@pytest.mark.parametrize(
+    ("job_state", "expected"),
+    [
+        ("done [3/3] 2026-09-19T00:00:00+00:00", True),
+        ("done CPU profile [3/3] 2026-09-19T00:00:00+00:00", True),
+        ("done with 2 warning(s) [3/3] 2026-09-19T00:00:00+00:00", False),
+        ("FAILED (exit 1) 2026-09-19T00:00:00+00:00", False),
+        ("cancelled [932] 2026-09-19T00:00:00+00:00", False),
+        ("running hopg [1/3] since 2026-09-19T00:00:00+00:00", False),
+        ("", False),
+    ],
+)
+def test_job_succeeded_distinguishes_clean_done_from_step_warnings(
+    monkeypatch, job_state, expected
+):
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: job_state)
+
+    assert state._job_succeeded("j") is expected
+
+
+def test_style_states_colors_step_warnings_as_warning_not_success(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setattr(dashboard_render.sys.stdout, "isatty", lambda: True)
+    done_color = "\033[38;2;170;217;76m"
+    warning_color = "\033[38;2;255;213;128m"
+
+    clean = dashboard_render.style_states("done [3/3] 2026-09-19T00:00:00+00:00")
+    warned = dashboard_render.style_states(
+        "done with 2 warning(s) [3/3] 2026-09-19T00:00:00+00:00"
+    )
+
+    assert clean.startswith(f"{done_color}done\033[0m")
+    assert warned.startswith(f"{warning_color}done\033[0m")
+    assert done_color not in warned
+
+
 def test_performance_no_pull_skips_all_artifact_pulls(monkeypatch):
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
@@ -1727,6 +1764,35 @@ def test_failed_performance_run_skips_artifact_pull(monkeypatch, capsys):
         lifecycle,
         "pull_performance_profile",
         lambda _profile: pytest.fail("failed job must not auto-pull performance artifacts"),
+    )
+
+    _remote_main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
+
+    assert "did not complete successfully" in capsys.readouterr().err
+
+
+def test_performance_run_with_step_warnings_skips_artifact_pull(monkeypatch, capsys):
+    """A job that continued past a failed material must not auto-pull.
+
+    Exercises the real ``_job_succeeded`` (only its ``_job_state`` dependency
+    is faked) against the terminal state a queue script actually writes when
+    some materials fail (``_queue_scripts._queue_script``/
+    ``_chunked_queue_tail``), regression-covering #143.
+    """
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(
+        state,
+        "_job_state",
+        lambda _jobid: "done with 1 warning(s) [3/3] 2026-09-19T00:00:00+00:00",
+    )
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda _profile: pytest.fail(
+            "a job with failed steps must not auto-pull performance artifacts"
+        ),
     )
 
     _remote_main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])

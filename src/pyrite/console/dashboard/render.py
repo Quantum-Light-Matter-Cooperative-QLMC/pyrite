@@ -58,6 +58,20 @@ def style_states(text):
     """Add redundant state color only for an interactive color-capable terminal."""
     if not color_enabled():
         return text
+    # A persisted job state of "done with N warning(s) ..." (see
+    # remote/state.py::_job_succeeded) means the job continued past a failed
+    # step rather than completing cleanly; color it as a warning, not as
+    # plain success, before the generic "done" match below would otherwise
+    # paint just the leading word green. This substitution's trailing "m"
+    # (from the ANSI color escape) sits directly before the literal "done"
+    # text, so the later \bDONE\b pattern no longer sees a word boundary
+    # there and will not repaint it.
+    text = re.sub(
+        r"\bdone(?=\s+with\s+\d+\s+warning\(s\))",
+        lambda match: paint(match.group(0), "warning"),
+        text,
+        flags=re.IGNORECASE,
+    )
     groups = {
         "active": ("RUNNING", "SUBMITTED"),
         "done": ("DONE", "FINISHED", "COMPLETED"),

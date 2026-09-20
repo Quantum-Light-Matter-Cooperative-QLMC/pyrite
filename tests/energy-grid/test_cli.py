@@ -206,6 +206,28 @@ def test_click_derive_remote_failed_job_exits_nonzero(monkeypatch):
     assert result.stderr == "Error: energy-grid derivation failed; skipping automatic pull\n"
 
 
+def test_click_derive_remote_step_warnings_exits_nonzero(monkeypatch):
+    """A job that continued past a failed step must not auto-pull (#143).
+
+    Exercises the real ``remote._job_succeeded`` (only its ``_job_state``
+    dependency is faked) against the terminal state a queue script actually
+    writes when some steps fail.
+    """
+    monkeypatch.setattr(energy_grid.job, "start", lambda **_kwargs: "job7")
+    monkeypatch.setattr(energy_grid.remote, "attach", lambda _jobid: True)
+    monkeypatch.setattr(
+        energy_grid.remote.state,
+        "_job_state",
+        lambda _jobid: "done with 1 warning(s) [3/3] 2026-09-19T00:00:00+00:00",
+    )
+
+    result = _invoke_grid(["derive", "--remote"])
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert result.stderr == "Error: energy-grid derivation failed; skipping automatic pull\n"
+
+
 def test_click_derive_rejects_incompatible_locality_controls():
     conflict = _invoke_grid(["derive", "--remote", "--wait", "--detach"])
     local_only = _invoke_grid(["derive", "--dry-run"])
