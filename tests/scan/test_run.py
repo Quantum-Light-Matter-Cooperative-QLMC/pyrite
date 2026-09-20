@@ -2213,23 +2213,38 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
 
     ``from_config=True`` rebuilds each record's target from the material's
     CURRENT configuration, so the relined grid must equal the one
-    :func:`build_cases` resolves at that record's E0 -- both for an energy the
-    catalog stores an ``E_grid_line_by_energy`` row for and for one that falls
-    through to automatic resolution (issue #101). Regression: the call passed the
-    record's energy grid where the crystal parameters belong and left the
-    returned ``(grid, policy)`` pair unpacked, so this path always raised.
+    :func:`build_cases` resolves at that record's E0 -- both for an energy an
+    opt-in stored ``E_grid_line_by_energy`` row covers and for one that falls
+    through to automatic resolution (issue #101; bundled profiles carry no
+    stored rows since ADR-0013, so the stored branch is exercised here through
+    an injected sweep rather than the real catalog). Regression: the call
+    passed the record's energy grid where the crystal parameters belong and
+    left the returned ``(grid, policy)`` pair unpacked, so this path always
+    raised.
     """
     from dataclasses import replace
 
     import numpy as np
 
     from pyrite._energy_grid_encoding import decode_energy_grid
+    from pyrite.campaign import config as campaign_config
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.sweep import build_cases
     from pyrite.runs import run
 
     stored_keV, auto_keV = 30.0, 37.0
-    sweep = material_sweep("mos2")
+    stored_grid = np.linspace(10.0, 2000.0, 500)
+    base_sweep = material_sweep("mos2")
+    sweep = replace(
+        base_sweep,
+        detector=replace(
+            base_sweep.detector,
+            energy_bins=replace(
+                base_sweep.detector.energy_bins,
+                line_by_energy={stored_keV: stored_grid},
+            ),
+        ),
+    )
     line_by_energy = sweep.detector.energy_bins.line_by_energy
     assert stored_keV in line_by_energy and auto_keV not in line_by_energy
 
@@ -2240,6 +2255,9 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
         expected[E0] = decode_energy_grid(cases[0]["E_grid_line"])
     np.testing.assert_allclose(expected[stored_keV], np.asarray(line_by_energy[stored_keV], float))
 
+    # repair_line_spec rebuilds the material's sweep from the catalog itself;
+    # inject the stored-row sweep in its place rather than editing the catalog.
+    monkeypatch.setattr(campaign_config, "material_sweep", lambda *a, **k: sweep)
     monkeypatch.setattr(
         run.runner,
         "_line_pair_for_case",

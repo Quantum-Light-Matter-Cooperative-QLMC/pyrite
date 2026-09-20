@@ -64,9 +64,10 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # hashed into the content key, so a catalog value change orphans records
     # minted under the old value rather than serving them for a case that now
     # diffracts differently -- the same rule the stopping-model marker follows.
-    # Re-minted again for issue #88's physical Lorentzian-window marker.
+    # Re-minted again for issue #88's physical Lorentzian-window marker and for
+    # issue #125's switch from stored rows to automatic line-grid policy.
     assert case_content_key(case) == (
-        "4c9114bd1d0cd583ff18610de54ddec579647ae3fda4fb7ac95408e789cc356a"
+        "1bf886b42ee14a716fe6a00756822b6c15746c4038c14c88a044a3890fb968d5"
     )
 
 
@@ -77,7 +78,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
+        "b1351aad7a5217a6ade1f8e4f77163f710ac262428e25b4132c9bb5c730ccd57"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -178,7 +179,7 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
     }
 
 
-def test_survey_profile_reduces_every_expensive_sweep_dimension():
+def test_survey_profile_reduces_configured_expensive_sweep_dimensions():
     full = material_sweep("mose2")
     survey = material_sweep("mose2", fidelity="survey")
     settings = default_settings("survey")
@@ -192,12 +193,12 @@ def test_survey_profile_reduces_every_expensive_sweep_dimension():
     assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
     assert survey.n_families == 2
     assert len(survey.detector.energy_bins.brem) < len(full.detector.energy_bins.brem)
-    assert max(len(grid) for grid in survey.detector.energy_bins.line_by_energy.values()) < max(
-        len(grid) for grid in full.detector.energy_bins.line_by_energy.values()
-    )
+    assert not survey.detector.energy_bins.line_by_energy
+    assert not full.detector.energy_bins.line_by_energy
     cases = build_cases(survey, settings.n_electrons, settings.n_electrons_brem)
     assert cases
     assert all(len(case["hkl_list"]) <= 4 for case in cases)
+    assert all(case.get("line_grid_policy") is not None for case in cases)
 
 
 def test_profile_convergence_overrides_fidelity_and_forks_identity(monkeypatch):
@@ -360,12 +361,12 @@ def test_case_content_key_separates_bremsstrahlung_models():
     assert bethe_heitler_era != current
 
 
-def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
+def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
+        "b1351aad7a5217a6ade1f8e4f77163f710ac262428e25b4132c9bb5c730ccd57"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -379,42 +380,42 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "20c436962d63d2c07742d6ec333bf66f88d7b0a5051c838d7670a4726c7b4ef1",
+            "ddf673c9d3764e3e9daee383c8dd4232a784a5f7d0e1f678d3463fd3e20638b1",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "47e335938658db4804710a769d954e0b0c2f7ebc7b4d6b580fe74468c40344fa",
+            "a6c6a98562b8999b4ea2e7957810fa797baac3d893fcc08574f162e8a3a24a5e",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "5d3b321e19a1d85cc9c3a3240ac93d92f84e9374c999870c34b69f4bcbccf54d",
+            "d1c79e66a0c58211256854dfbe0a85356358c3d91c6f7af391858638789fb79f",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "f8b2314e9cb855f390f3c382900a5bb31b9c022c7b37aae59848bae82fd04af5",
+            "9aab100c359b4a0925c9af870a2b97129570473d1be8e7101accab19f4b90708",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "df1aaedfbc51679aec3c31f8d1fc1f9299ee354efdf636abd32b255020bf788d",
+            "bf2457a333321a6a53f5e21c0fa43c5b7a99119df88bbdceee800e5a6cd15f28",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "01ecd6f8351a437cf358090722c7c1bf0f03921c1b3c0a9780c3804e06a41bf5",
+            "e63f08f2d16795ca1fe19f1cfaedf52b911d186d6c7bd26bc63f59bc47a93c33",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "067db189047694420ddfdf60fd94035d30cdcea1b1ba75d5fb3416394e93523c",
+            "bf26990766a829db174470ed6ef67af34e3a58e0ad38f1e1ae90c22d79d89852",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "c04ab69050708f0ed39996e121fa3e38990230032e7815d1d193b4ae426edefa",
+            "dabb9a17dc5839d0c527997a27fef01f871145bb18a395d18613070c69d69c96",
         ),
     ],
 )
@@ -429,7 +430,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     bit-for-bit from here. They were re-minted again when unconditional EEDL
     characteristic radiation was introduced, for the EEDL bremsstrahlung
     generation marker, for natural Lorentzian characteristic profiles, and for
-    issue #88's physical finite-window convention."""
+    issue #88's physical finite-window convention, and issue #125's automatic
+    line-grid default."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
     assert identity["parameter_sha256"] == digest
@@ -570,15 +572,16 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Berger--Seltzer stopping splice did, and again when every crystal cut
     # moved to the surface_hkl spelling, and again for natural Lorentzian
     # characteristic profiles, and again for issue #88's physical finite-window
-    # convention) must stay bit-for-bit.
+    # convention, and again for issue #125's automatic bundled line grids) must
+    # stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "a0c2bf921887179cda074417cbaf29127654278a97e5d20925cd557fa2927316"
+        "b1351aad7a5217a6ade1f8e4f77163f710ac262428e25b4132c9bb5c730ccd57"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
     )
     assert survey_incoherent["parameter_sha256"] == (
-        "6767c99d14140ca9b132139a6c50873909a65cbe79f2a260b37911dd1546a1a4"
+        "d32fd7f5e02aeedb83187fda3221b5b986b405c66fd47836640671759155ca71"
     )
 
 

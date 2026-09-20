@@ -3,6 +3,7 @@
 from dataclasses import replace
 from unittest import mock
 
+import numpy as np
 import pytest
 
 from pyrite.campaign.config import material_sweep
@@ -41,14 +42,22 @@ def test_transport_controls_lower_into_case_and_content_identity():
 
 
 def test_runner_falls_back_from_cuda_lut_to_exact_for_straggling():
+    # Fixed line grid keeps this fallback-plumbing test independent of
+    # automatic line-grid resolution, which needs real transport segments.
     case = build_cases(
-        material_sweep("hopg", energy_keV=[30.0], thickness_ang=[1000.0]),
+        material_sweep(
+            "hopg",
+            energy_keV=[30.0],
+            thickness_ang=[1000.0],
+            E_grid_line=np.array([10.0, 2600.0]),
+        ),
         n_electrons=1,
         n_electrons_brem=1,
         straggling=True,
         energy_model="midpoint",
         max_dE_frac=0.02,
     )[0]
+    assert case.get("line_grid_policy") is None
     segments = {"sentinel": object()}
 
     with (

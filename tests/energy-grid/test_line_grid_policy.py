@@ -55,6 +55,26 @@ def _uncovered_energy_sweep(energy_keV=77.0):
     return replace(sweep, beam=replace(sweep.beam, energy_keV=energy_keV))
 
 
+def _stored_energy_sweep():
+    """An explicit stored-row fixture independent of bundled catalog defaults."""
+    sweep = material_sweep("hopg")
+    stored = np.linspace(10.0, 2600.0, 864)
+    return (
+        replace(
+            sweep,
+            beam=replace(sweep.beam, energy_keV=30.0),
+            detector=replace(
+                sweep.detector,
+                energy_bins=replace(
+                    sweep.detector.energy_bins,
+                    line_by_energy={30.0: stored},
+                ),
+            ),
+        ),
+        stored,
+    )
+
+
 # ---- physics: the kinematic bandwidth bound ---------------------------------
 def test_leaf_constants_match_the_materials_package():
     """The leaf restates hbar*c and m_e c^2 to stay dependency-free; they must
@@ -181,18 +201,15 @@ def test_supported_energy_without_a_stored_row_builds_cases():
 
 
 def test_stored_row_still_wins_over_automatic_resolution():
-    sweep = material_sweep("hopg")
-    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=30.0))
+    sweep, stored = _stored_energy_sweep()
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     assert case.get("line_grid_policy") is None
-    stored = np.asarray(sweep.detector.energy_bins.line_by_energy[30.0], dtype=float)
     np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), stored)
 
 
 def test_environment_policy_outranks_a_stored_row(monkeypatch):
     monkeypatch.setenv("PYRITE_ENERGY_GRID_MAX_SPACING_EV", "1.0")
-    sweep = material_sweep("hopg")
-    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=30.0))
+    sweep, _ = _stored_energy_sweep()
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     payload = case["line_grid_policy"]
     assert payload["resolution"]["max_spacing_eV"] == 1.0
@@ -283,8 +300,7 @@ def test_changing_resolved_coordinates_changes_case_identity():
 def test_case_payload_without_automatic_resolution_is_unchanged():
     """Absent-by-default: an explicit or stored grid keeps the historical case
     payload, so existing checkpoints stay addressable."""
-    sweep = material_sweep("hopg")
-    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=30.0))
+    sweep, _ = _stored_energy_sweep()
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     assert "line_grid_policy" not in case.to_dict()
 

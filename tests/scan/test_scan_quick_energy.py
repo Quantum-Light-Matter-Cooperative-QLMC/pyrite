@@ -1,9 +1,8 @@
 """Profile-aware quick beam-energy resolution.
 
 Covers ``scan._select_quick_energies``: ``--quick`` must pick a bounded,
-deterministic beam-energy subset whose line grids the effective profile/material
-configures, so ``build_cases`` never requests an absent per-energy line grid
-(the fixed ``[30, 50]`` failure). ``sweep._line_grid_for_energy`` stays strict.
+deterministic beam-energy subset. Automatic profiles keep the nominal energies;
+an opt-in partial stored mapping selects only its covered energies.
 """
 
 from __future__ import annotations
@@ -85,9 +84,9 @@ def test_profile_lacking_50_reaches_valid_bounded_cases():
     # from a real standard sweep reproduces the pre-fix ValueError condition.
     sweep = material_sweep("hopg")
     by_energy = {
-        float(e): g
-        for e, g in sweep.detector.energy_bins.line_by_energy.items()
-        if float(e) != 50.0
+        float(energy): _grid(energy)
+        for energy in np.asarray(sweep.beam.energy_keV)
+        if float(energy) != 50.0
     }
     lacking = replace(
         sweep,
@@ -112,9 +111,9 @@ def test_line_grid_for_energy_resolves_automatically_on_missing():
     # runner refines from the case's own trajectories.
     sweep = material_sweep("hopg")
     by_energy = {
-        float(e): g
-        for e, g in sweep.detector.energy_bins.line_by_energy.items()
-        if float(e) != 50.0
+        float(energy): _grid(energy)
+        for energy in np.asarray(sweep.beam.energy_keV)
+        if float(energy) != 50.0
     }
     lacking = replace(
         sweep,

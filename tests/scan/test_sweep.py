@@ -229,14 +229,19 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
         assert case["E_grid"] is case["E_grid_line"]
 
 
-def test_catalog_line_grid_is_selected_for_each_standard_beam_energy():
+def test_bundled_catalog_resolves_automatic_grid_for_each_standard_beam_energy():
     sweep = material_sweep("mose2")
     cases = build_cases(sweep)
 
+    assert not CATALOG.material("mose2").scan.E_grid_line_by_energy
     assert {case["E0_keV"] for case in cases} == set(sweep.beam.energy_keV)
     for case in cases:
-        expected = CATALOG.material("mose2").scan.E_grid_line_by_energy[case["E0_keV"]]
-        np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), expected)
+        policy = case["line_grid_policy"]
+        grid = decode_energy_grid(case["E_grid_line"])
+        assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+        assert policy["resolution"]["policy"] == "sinc-nyquist"
+        assert grid[0] == policy["bandwidth"]["start_eV"]
+        assert grid[-1] == policy["bandwidth"]["stop_eV"]
 
 
 def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():

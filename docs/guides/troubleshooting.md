@@ -14,11 +14,10 @@ descriptor, profile membership naming an unknown material, beam references to
 an unknown beam, CIF paths outside packaged data, or elements without transport
 support. See the [catalog schema](../repo-design/materials-catalog-schema.md).
 
-## A beam energy has no stored line grid
+## How line grids are selected
 
-Nothing to do: a valid material at a supported beam energy runs without a prior
-derivation. When no explicit grid and no stored `line_by_energy` row cover the
-case, PyRITE resolves a case-local line grid automatically — a closed-form
+Bundled profiles have no stored line-grid rows. PyRITE resolves a case-local
+line grid automatically — a closed-form
 kinematic bandwidth, then a sinc-Nyquist resolution measured from the run's own
 trajectories. The resolved policy, tolerance, coordinates, and configuration
 source are recorded in the result's provenance under `line_grid_policy` and
@@ -37,8 +36,8 @@ usual precedence chain (per-call/API > `PYRITE_*` > stored artifact > built-in):
 | `PYRITE_ENERGY_GRID_ULPS` | backend coordinate-precision safety factor |
 | `PYRITE_ENERGY_GRID_MAX_POINTS` | point budget before the run refuses |
 
-Setting any of these turns automatic resolution on even where a stored row
-exists. An explicit `EnergyBins.line` still wins over all of them.
+Setting any of these selects automatic resolution even where an opt-in stored
+row exists. An explicit `EnergyBins.line` still wins over all of them.
 
 A requested tolerance that cannot be met inside the point budget or the backend
 ULP floor **raises** and names the unmet tolerance and the correction. The grid

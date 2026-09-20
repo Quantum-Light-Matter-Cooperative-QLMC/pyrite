@@ -4,7 +4,7 @@ Ledger row: [`line-grid-sinc-convergence`](../ledger-core-coherent-physics.md).
 Instrument: `src/pyrite/energy_grid/convergence.py` (grid-agnostic harness),
 `convergence_case.py` (catalog-case adapter and resumable driver),
 `precision_ladder.py` (float32 versus FP64), submitted through
-`convergence_job.py`. No production default, kernel, or catalog row changes;
+`convergence_job.py`. No kernel or numerical-policy constant changes;
 this row records measured grid convergence of the existing line kernels and
 the evidence for the resolution policy of issue #109 and the backend-precision
 floor of issue #101.
@@ -834,10 +834,32 @@ python -m pyrite.energy_grid.convergence_job start-precision --json-out line_gri
 python -m pyrite.energy_grid.convergence_job pull --json-out line_grid_precision_109.json
 ```
 
+## Issue #125 bundled-default audit
+
+On 2026-09-19, jobs `20260919-181223-fc93ad6e` (Slurm 1774) and
+`20260919-182327-1c1a04ba` (Slurm 1775, resumed as 1776) ran the same
+fixed-trajectory ladder at 300 keV, 5 degrees, 1 mm, and $N_e=2000$ for the
+nine suspected worst offenders. The fine ladder used spacings from 12 to
+0.09375 eV.
+
+Three materials still had bundled 3 eV rows. Against the 0.09375 eV reference,
+hBN had 6.48% yield error and a 100.69 eV centroid shift; diamond had 0.154%
+and 12.17 eV; black phosphorus had 1.26% and 1.88 eV. Their yield/centroid
+acceptances were 0.375/0.749 eV, 1.500/3.000 eV, and 1.496/1.496 eV,
+respectively. Silicon, 4H-SiC, 6H-SiC, V2O5, sapphire, and TiS2 already used
+automatic resolution and accepted approximately 0.375 eV in the aggregate
+gate.
+
+The audit supports [ADR-0013](../../adr/0013-automatic-line-grids-by-default.md):
+remove every bundled stored row and artifact reference, and route all bundled
+profiles through the existing `kinematic-ceiling` plus `sinc-nyquist` policy.
+The artifact schema remains available as an opt-in performance mechanism.
+
 ## What this row does not claim
 
 - No default changes. `DEFAULT_RTOL`, `DEFAULT_MAX_SPACING_EV`, and
   `DEFAULT_BACKEND_SAFETY_ULPS` are unchanged.
 - It does not claim the line spectra are physically correct, only how they
   respond to grid refinement and to backend precision.
-- It does not regenerate catalog `line_by_energy` rows.
+- It does not claim that opt-in stored grids are intrinsically invalid; they
+  require explicit ownership and revalidation when relevant physics changes.
