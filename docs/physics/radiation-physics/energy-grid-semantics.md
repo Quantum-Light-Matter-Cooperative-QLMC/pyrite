@@ -139,6 +139,114 @@ Mixing the two in one sum double-counts or drops line yield. Any spectrum that
 adds narrow lines to a smooth continuum must state, per component, which of the
 two it is, and convert deliberately if they have to meet.
 
+(sinc-bin-mean-quadrature)=
+### Bin-mean quadrature for PXR/CBS lines
+
+The incoherent PXR/CBS line density is a sum of finite-time profiles
+$\operatorname{sinc}^2\!\left(a_j (E - E_{\mathrm{res},j})/\pi\right)$ with
+$a_j = (1 - \mathbf{v}\cdot\hat{\mathbf{n}})\, t_{L,j} / (2\hbar c)$
+([finite-time lineshape](../../validation/radiation-physics/finite-time-lineshape.md)).
+By default each profile is *sampled* at the nodes; a profile narrower than the
+node spacing then aliases and the trapezoid of
+{eq}`eq-grid-physical-integral` misses or double-counts its yield. The opt-in
+`line_quadrature="bin-mean"` instead writes, at each node, the profile's mean
+over that node's bin from {eq}`eq-grid-midpoint-edges`:
+
+```{math}
+:label: eq-grid-sinc-bin-mean
+
+\bar S_{ij}
+= \frac{\pi}{a_j\,(\epsilon_{i+1} - \epsilon_i)}
+\left[F(x_{i+1,j}) - F(x_{i,j})\right],
+\qquad
+x_{i,j} = \frac{a_j\,(\epsilon_i - E_{\mathrm{res},j})}{\pi},
+```
+
+with the antiderivative of the normalized sinc squared
+
+```{math}
+:label: eq-grid-sinc-antiderivative
+
+F(x) = \int_0^x \operatorname{sinc}^2 u\,\mathrm{d}u
+= \frac{\operatorname{Si}(2\pi x)}{\pi} - x\operatorname{sinc}^2 x,
+\qquad
+F(\pm\infty) = \pm\tfrac12 .
+```
+
+Differentiating {eq}`eq-grid-sinc-antiderivative` returns
+$\sin(2\pi x)/(\pi x) - \sin(2\pi x)/(\pi x) + \sin^2(\pi x)/(\pi x)^2
+= \operatorname{sinc}^2 x$; $x\operatorname{sinc}^2 x$ is the
+$\sin^2(\pi x)/(\pi^2 x)$ term with its removable $x = 0$ point made explicit.
+(A spelling with $\operatorname{Si}(2\pi x)/(2\pi)$ is wrong by a factor two
+in that term.) The result stays a density in photons/eV, so every consumer of
+the line array is unchanged; its yield is
+$\sum_i \bar S_i\,(\epsilon_{i+1} - \epsilon_i)$, which is the in-window line
+mass exactly, at any spacing and on nonuniform (windowed) grids alike.
+
+Assumptions and scope:
+
+* **Bin mean, not node value.** $\bar S_i$ is a bin average, so bin-mean
+  spectra must be integrated with the bin widths of
+  {eq}`eq-grid-midpoint-edges`. Those equal the trapezoid weights of
+  {eq}`eq-grid-physical-integral` except in the two end bins, where the
+  trapezoid takes half; a line within one bin of either end of the grid is
+  misweighted by a trapezoid.
+* **Truncation is reported, not folded back.** Mass beyond the outer edges is
+  dropped, as for the characteristic Lorentzians; the dropped part is returned
+  by `montecarlo/spectrum/lines/_bin_quadrature.py::sincsq_window_mass`, and
+  captured plus truncated equals $\pi / a_j$. This is the bookkeeping the
+  trapezoid/line-mass ban above protects: a bin-mean array is a bin mass per
+  width, the same object `characteristic.py` writes, and it must not be
+  resampled as if it were a node value.
+* **Yield only.** Averaging over a bin smooths the profile: peak height falls
+  and apparent width grows once the bin is comparable to $\pi / a_j$. Peak
+  heights and FWHM keep the node quadrature and its resolution policy.
+* **Incoherent only.** The coherent route squares a sum of amplitudes, and
+  the flight-grouped reduction (numerical substeps) adds substep amplitudes
+  before squaring; neither has a per-line bin mass, and both refuse
+  `bin-mean`, as does the `sinc_cutoff` truncation (#117 owns the coherent
+  route).
+
+Limiting cases: as $\epsilon_{i+1} - \epsilon_i \to 0$, $\bar S_i$ tends to
+the node sample of a uniform grid, whose node is the bin centre; as
+$a_j \to \infty$ all of $\pi / a_j$ lands in the bin containing
+$E_{\mathrm{res},j}$.
+
+Numerics. $F$ is evaluated through its tail complement
+$R(x) = F(x) - \tfrac12\operatorname{sgn}^{+}(x)$ (with
+$\operatorname{sgn}^{+}(0) = +1$), which decays like $-1/(2\pi^2 x)$; a bin
+mass is $R(x_{i+1}) - R(x_i)$ plus one whole line when
+$x_i < 0 \le x_{i+1}$. $\operatorname{Si}(t) - \pi/2$ is computed directly,
+never by subtracting from $\pi/2$, and everything is FP64 until the finished
+bin mean is cast to the working precision, so narrow bins and far tails do not
+cancel in float32. $\operatorname{Si}$ has one host evaluator
+(`scipy.special.sici` below $t = 48$, the auxiliary-function asymptotic series
+above) and one C evaluator shared by the CuPy fallback and the fused CUDA
+reduction (power series, continued fraction of $E_1(it)$, the same asymptotic
+series); the C evaluator is within $7\times10^{-16}$ of 40-digit `mpmath` for
+$t \le 4$ and within $2.1\times10^{-15}/t$ beyond.
+
+[Validation: `sinc-bin-integration`](../../validation/radiation-physics/sinc-bin-integration.md).
+
+#### Why one explicit switch
+
+The opt-in is one `quadrature` field of the line-grid policy
+(`_line_grid_policy.py`, values `node`/`bin-mean`), mirrored onto the case as
+the divergence-only `line_quadrature` key, rather than a per-observable-class
+field. A run produces one line spectrum. A per-observable field would either
+compute a spectrum per observable class or let the policy guess which class the
+single spectrum serves; the caller already knows, and an explicit switch makes
+that statement auditable in the case payload. Precedence is per-call, then
+stored configuration, then the `node` default, with no environment layer, for
+the same reason as `windows`: it is a structural choice, not a tolerance. A
+`bin-mean` policy has payload schema 3 and records its source, so case,
+checkpoint and cache identity move; a `node` policy keeps its historical payload
+bit-for-bit. The case key exists because a recompute that pins explicit
+coordinates drops the policy, and must not drop the quadrature the stored
+spectrum was computed with. Selecting it does not change the automatic
+`sinc-nyquist` resolution, which still refines for the node quadrature's shape
+observables.
+
 ## A logarithmic grid cannot contain zero
 
 $\ln 0$ is undefined, so a log grid has a strictly positive lower bound. That

@@ -42,6 +42,7 @@ def mc_spectrum(
     E_cut_keV=None,
     _table_cache=None,
     longitudinal_rms_fs=None,
+    line_quadrature="node",
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -118,6 +119,14 @@ def mc_spectrum(
         optional post-transport electron-energy cutoff in keV.
     longitudinal_rms_fs
         Resolved Gaussian RMS bunch duration for analytic coherent averaging.
+    line_quadrature
+        ``"node"`` (default) samples ``sinc^2`` at each grid node. ``"bin-mean"``
+        writes each node's bin mean of the closed-form integrated profile, so
+        ``sum(spec * bin_width)`` is the in-window line yield at any spacing;
+        bins follow ``characteristic._energy_bin_edges_and_widths``. A
+        yield-only quadrature: it smooths peak height and width. Incoherent
+        only; refused with ``coherent``, ``sinc_cutoff``, or numerical
+        substeps. Validation: sinc-bin-integration
 
     Returns
     -------
@@ -164,6 +173,7 @@ def mc_spectrum(
         E_cut_keV=E_cut_keV,
         _table_cache=_table_cache,
         longitudinal_rms_fs=longitudinal_rms_fs,
+        line_quadrature=line_quadrature,
     )
     return _mc_spectrum(request)
 

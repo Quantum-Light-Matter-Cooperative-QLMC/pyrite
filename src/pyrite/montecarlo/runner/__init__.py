@@ -661,6 +661,8 @@ def _lines_for_segments(
         coherent = bool(case.get("coherent_emission", False))
     else:
         coherent = bool(coherent)
+    # Divergence-only case key (#116); mc_spectrum refuses it on coherent calls.
+    line_quadrature = case.get("line_quadrature", "node")
     longitudinal = case.get("longitudinal_distribution") or {}
     longitudinal_kind = longitudinal.get("kind")
     if longitudinal_kind in {"gaussian", "compressed"}:
@@ -691,6 +693,7 @@ def _lines_for_segments(
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
+            line_quadrature=line_quadrature,
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -721,6 +724,7 @@ def _lines_for_segments(
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             _table_cache=table_cache,
+            line_quadrature=line_quadrature,
             **mosaic_kw,
         )
     return spec

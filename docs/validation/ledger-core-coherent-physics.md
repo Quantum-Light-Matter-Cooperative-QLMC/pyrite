@@ -142,6 +142,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/notebooks/test_anchor_figures.py::test_single_segment_lineshape_converges_to_closed_form`
 - **Notes:** independent derivation matches the implementation's factor of two, `π`, `1−v·n̂`, and `ℏc`; [validation write-up](radiation-physics/finite-time-lineshape.md)
 
+## `sinc-bin-integration`
+
+- **Claim:** for the incoherent finite-time line profile $S(E) = \operatorname{sinc}^2[a(E-E_{\mathrm{res}})/\pi]$, the opt-in yield quadrature writes the exact bin mean $\bar S_i = \pi\{F(x_{i+1})-F(x_i)\}/[a(\epsilon_{i+1}-\epsilon_i)]$, where $x_i=a(\epsilon_i-E_{\mathrm{res}})/\pi$ and $F(x)=\operatorname{Si}(2\pi x)/\pi-x\operatorname{sinc}^2x$. Thus the summed in-window bin mass is independent of grid spacing; the array remains a density in photons/eV
+- **Code:** `montecarlo/spectrum/lines/_bin_quadrature.py::sincsq_bin_lineshape`, `::run_bin_mean_reduction_kernel`; selected by `_line_grid_policy.py::resolve_line_grid_policy` and `montecarlo/spectrum/lines/_setup.py::_prepare_spectrum`
+- **Source:** the finite interaction-time profile of `finite-time-lineshape`; standard sine-integral antiderivative $\int \operatorname{sinc}^2x\,\mathrm{d}x = \operatorname{Si}(2\pi x)/\pi-x\operatorname{sinc}^2x$
+- **Status:** anchored
+- **Checks:** dimensions and normalization; derivative of $F$; $F(\pm\infty)=\pm1/2$ and whole-line mass $\pi/a$; bin width $\to0$ recovers node sampling; $a\to\infty$ concentrates the mass in the resonance bin; stable tail-complement evaluation avoids far-tail and float32 cancellation; uniform 3 eV/0.375 eV and nonuniform windowed-grid mass identities; CPU per-hkl/batched agreement; CUDA/CuPy matrix and fused-kernel FP64/float32 agreement measured on an RTX 5080 runner (2026-09-19)
+- **Anchor:** `tests/montecarlo/test_sinc_bin_integration.py`, `tests/montecarlo/test_sinc_bin_integration_cuda.py`, `tests/energy-grid/test_line_grid_quadrature.py`; real-trajectory/backend measurement `checks/sinc_bin_integration.py`
+- **Notes:** opt-in and incoherent-only. The bin mean preserves integrated yield, not peak height or FWHM; coherent emission, flight-grouped numerical substeps, and `sinc_cutoff` are refused explicitly. The policy and case payload record the non-default quadrature, while default node sampling keeps historical identity. Fresh-context re-derivation (2026-09-17, [independent re-derivation](radiation-physics/sinc-bin-integration.md#independent-re-derivation)) matches the antiderivative, Jacobian, tail crossing term, signs, units, limiting cases, and the host-compiled CUDA preamble. The fixed-transport 300 keV measurement ran on the remote GPU box (2026-09-19): bin-mean yield is spacing-independent to $10^{-12}$ over 3 eV/0.375 eV/0.09375 eV and to $6\times10^{-8}$ on the #101 windowed axis, where node sampling at 3 eV is 5.3% low; CPU FP64, CUDA FP64, and fused float32 agree on bin-mean yield to $1.3\times10^{-15}$ and $2.2\times10^{-7}$ respectively. Human sign-off pending. [validation write-up](radiation-physics/sinc-bin-integration.md)
+
 ## `pxr-amplitude`
 
 - **Claim:** `χ_g` PXR susceptibility amplitude

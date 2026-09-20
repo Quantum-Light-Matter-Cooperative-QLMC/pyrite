@@ -11,6 +11,7 @@ The implementation is split by phase, bottom-up:
 
 ``_policy``    the five device-kernel dispatch switches
 ``_kernels``   leaf array numerics: lineshape, interpolation, segment geometry
+``_bin_quadrature``  closed-form sinc^2 bin masses (``line_quadrature="bin-mean"``)
 ``_setup``     ``SpectrumRequest`` and the one-shot ``_prepare_spectrum``
 ``_per_hkl``   accumulation one reflection at a time (the reference route)
 ``_batched``   accumulation over stacked reflection tables (the default route)

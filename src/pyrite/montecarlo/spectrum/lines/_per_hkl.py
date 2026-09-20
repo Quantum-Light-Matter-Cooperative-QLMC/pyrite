@@ -13,6 +13,7 @@ from ....materials.attenuation import _mu_total_inv_ang, _stack_tau
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ...groove import escape_distance_ang
 from . import _policy
+from ._bin_quadrature import sincsq_bin_lineshape
 from ._kernels import (
     _flight_blocks,
     _in_medium_kinematics,
@@ -589,7 +590,19 @@ def _accumulate_reflection(
     a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
     good = xp.isfinite(weight) & (weight > 0)
 
-    if sinc_cutoff is None:
+    if st.bin_edges is not None:
+        # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
+        # integrated over each node's bin, written as the bin mean.
+        # Validation: sinc-bin-integration
+        for j0 in range(0, idx.size, chunk):
+            sl = slice(j0, min(j0 + chunk, idx.size))
+            m = good[sl]
+            if not m.any():
+                continue
+            S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
+            for w, tgt in targets:
+                tgt += w[sl][m] @ S
+    elif sinc_cutoff is None:
         for j0 in range(0, idx.size, chunk):
             sl = slice(j0, min(j0 + chunk, idx.size))
             m = good[sl]

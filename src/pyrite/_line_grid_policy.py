@@ -28,6 +28,16 @@ windows
     per-call or stored policy asks for it; a policy without windows keeps its
     historical payload bit-for-bit.
 
+quadrature
+    How the ``sinc^2`` line profile is evaluated on those coordinates (#116).
+    ``node`` (default) samples it at each node; ``bin-mean`` writes the
+    closed-form mean over each node's bin, which makes integrated yield exact
+    at any spacing but is a yield-only choice -- it smooths peak height and
+    width. One explicit switch, not a per-observable field: a run produces one
+    line spectrum, so the choice is the caller's statement of what that
+    spectrum is for. Off unless a per-call or stored policy asks for it; a
+    ``node`` policy keeps its historical payload bit-for-bit.
+
 This module is a leaf on purpose. ``energy_grid`` imports ``montecarlo.runner``,
 so the runner cannot import ``energy_grid``; and #64 may move the energy-grid CLI
 entirely. Only ``numpy``, ``pyrite._env``, ``pyrite.paths``, the grid leaves
@@ -64,6 +74,8 @@ __all__ = [
     "DEFAULT_BANDWIDTH_COVERAGE",
     "FLOAT32_LINESHAPE_BINADE_EV",
     "LINE_GRID_POLICY_SCHEMA",
+    "LINE_QUADRATURES",
+    "QUADRATURE_LINE_GRID_POLICY_SCHEMA",
     "OBSERVABLE_CLASSES",
     "WINDOWED_LINE_GRID_POLICY_SCHEMA",
     "WINDOW_POLICY",
@@ -72,6 +84,7 @@ __all__ = [
     "cached_coordinates",
     "coordinate_cache_key",
     "environment_overrides_present",
+    "line_quadrature_from_payload",
     "kinematic_line_stop_eV",
     "lineshape_precision_warning",
     "line_start_eV",
@@ -88,6 +101,15 @@ LINE_GRID_POLICY_SCHEMA = 1
 #: one keeps :data:`LINE_GRID_POLICY_SCHEMA` and its payload bit-for-bit, so
 #: existing automatic case identities do not move.
 WINDOWED_LINE_GRID_POLICY_SCHEMA = 2
+#: Payload version of a policy selecting a non-default line quadrature (#116),
+#: with or without windows. A ``node`` policy keeps schema 1 or 2 unchanged.
+QUADRATURE_LINE_GRID_POLICY_SCHEMA = 3
+
+#: Line quadratures, default first. Restated from
+#: ``montecarlo.spectrum.lines._bin_quadrature`` so this module stays a leaf; a
+#: test pins the two against each other.
+LINE_QUADRATURES = ("node", "bin-mean")
+DEFAULT_LINE_QUADRATURE = LINE_QUADRATURES[0]
 
 #: Window policy name and defaults. Restated from
 #: ``montecarlo.spectrum.line_seeds`` so this module stays a leaf; a test pins
@@ -282,6 +304,7 @@ class LineGridPolicy:
     max_points: int
     sources: tuple[tuple[str, str], ...]
     windows: tuple[tuple[str, Any], ...] | None = None
+    quadrature: str = DEFAULT_LINE_QUADRATURE
 
     def payload(self) -> dict[str, Any]:
         """Canonical JSON-able payload carried on the case."""
@@ -306,6 +329,9 @@ class LineGridPolicy:
             windows = dict(self.windows)
             payload["schema"] = WINDOWED_LINE_GRID_POLICY_SCHEMA
             payload["windows"] = {**windows, "providers": list(windows["providers"])}
+        if self.quadrature != DEFAULT_LINE_QUADRATURE:
+            payload["schema"] = QUADRATURE_LINE_GRID_POLICY_SCHEMA
+            payload["quadrature"] = self.quadrature
         return payload
 
     @property
@@ -391,6 +417,24 @@ def _window_block(value: object, label: str) -> dict[str, Any] | None:
         "samples_per_feature": samples,
         "tail_widths": tail,
     }
+
+
+def _quadrature(value: object, label: str) -> str:
+    if value not in LINE_QUADRATURES:
+        raise ValueError(
+            f"{label} quadrature must be one of {list(LINE_QUADRATURES)}, got {value!r}"
+        )
+    return str(value)
+
+
+def line_quadrature_from_payload(payload: Mapping[str, Any] | None) -> str:
+    """The line quadrature a policy payload selects; ``node`` when absent.
+
+    Validation: sinc-bin-integration
+    """
+    if payload is None:
+        return DEFAULT_LINE_QUADRATURE
+    return _quadrature(payload.get("quadrature", DEFAULT_LINE_QUADRATURE), "policy payload")
 
 
 def resolve_line_grid_policy(
@@ -509,6 +553,18 @@ def resolve_line_grid_policy(
                 sources["windows"] = label
             break
 
+    # Quadrature follows the same per-call > stored > built-in order as windows,
+    # and for the same reason has no environment layer. The source is recorded
+    # only for a non-default choice, keeping ``node`` payloads unchanged.
+    # Validation: sinc-bin-integration
+    quadrature = DEFAULT_LINE_QUADRATURE
+    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
+        if layer.get("quadrature") is not None:
+            quadrature = _quadrature(layer["quadrature"], label)
+            if quadrature != DEFAULT_LINE_QUADRATURE:
+                sources["quadrature"] = label
+            break
+
     return LineGridPolicy(
         bandwidth_policy=str(bandwidth_policy),
         start_eV=float(start_eV),
@@ -521,6 +577,7 @@ def resolve_line_grid_policy(
         max_points=max_points,
         sources=tuple(sorted(sources.items())),
         windows=None if windows is None else tuple(sorted(windows.items())),
+        quadrature=quadrature,
     )
 
 
@@ -695,6 +752,7 @@ def cached_coordinates(key: str) -> dict[str, Any] | None:
     if not isinstance(record, dict) or record.get("schema") not in (
         LINE_GRID_POLICY_SCHEMA,
         WINDOWED_LINE_GRID_POLICY_SCHEMA,
+        QUADRATURE_LINE_GRID_POLICY_SCHEMA,
     ):
         return None
     return record

@@ -504,7 +504,9 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
 - `spectrum/lines/` — the line spectrum split by phase, bottom-up (issue #65).
   `_policy` owns the five device-kernel dispatch switches; `_kernels` the leaf
   array numerics (lineshape, interpolation, per-segment geometry, reflection
-  tabulation); `_setup` the `SpectrumRequest` record and the one-shot
+  tabulation); `_bin_quadrature` the opt-in `line_quadrature="bin-mean"`
+  closed-form `sinc^2` bin masses (host, CuPy, and fused CUDA; issue #116);
+  `_setup` the `SpectrumRequest` record and the one-shot
   `_prepare_spectrum`; `_per_hkl` the reference route that walks one reflection
   at a time (layered stacks, grooved escape, flight-grouped coherence);
   `_batched` the default route over stacked reflection tables; `_spectrum` the
