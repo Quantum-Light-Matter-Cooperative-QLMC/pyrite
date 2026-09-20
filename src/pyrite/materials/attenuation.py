@@ -3,7 +3,8 @@ materials.attenuation
 
 Composition handling and X-ray self-absorption shared across transport,
 spectrum and detector: normalize a single-element / compound material spec,
-the total linear attenuation summed over elements, and the layered
+the total narrow-beam linear attenuation summed over elements
+(photoabsorption + coherent + incoherent), and the layered
 (film-on-substrate) Beer-Lambert optical depth.
 """
 
@@ -15,18 +16,26 @@ from scipy.constants import hbar as _HBAR
 
 from . import CATALOG, MediumSpec
 from .atomic import Z_TABLE
-from .crystal import absorption_length_ang
+from .crystal import absorption_length_ang, scattering_attenuation_inv_ang
 
 
 def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> np.ndarray:
     """Return total linear X-ray attenuation on a positive energy grid [mm^-1].
 
-    Element contributions add as
-    ``mu(E) = sum_i 1 / L_abs,i(E)``. The underlying Henke/Chantler
-    absorption lengths assume homogeneous, passive primary-beam attenuation;
-    this helper adds no scattering, fluorescence, diffraction, or secondary
-    production. As every elemental absorption coefficient tends to zero, so
-    does the returned coefficient.
+    This is the *narrow-beam* coefficient: the probability per unit path that a
+    photon is removed from the unscattered ray by any channel. Element
+    contributions add as
+
+        ``mu(E) = sum_i [ 1 / L_abs,i(E) + n_i sigma_scat,i(E) ]``,
+
+    photoabsorption from the Chantler ``f2`` absorption length plus the
+    coherent + incoherent term of
+    :func:`~pyrite.materials.crystal.scattering_attenuation_inv_ang`. Both are
+    homogeneous and passive; this helper adds no fluorescence, diffraction,
+    secondary production, or build-up factor, so it assumes good geometry --
+    scattered photons leave the collection solid angle rather than reaching the
+    pixel. As every elemental coefficient tends to zero, so does the returned
+    coefficient.
 
     ``material`` is either a catalog crystal/medium key or an explicit
     :class:`~pyrite.materials.catalog.MediumSpec`. Runnable target-material
@@ -189,25 +198,48 @@ def _normalize_composition(element, n_atoms_per_ang3, composition):
 
 
 def _mu_total_inv_ang(comp, E_eV):
-    """Total linear attenuation 1/L_abs [1/Angstrom] summed over elements.
+    """Total narrow-beam linear attenuation [1/Angstrom] summed over elements.
 
-    absorption_length_ang (from crystallography) is CPU-only, so the sum
-    is always computed on the CPU. The result is returned on the SAME device as
-    E_eV: a GPU array if the caller passed one (mc_spectrum, mixing it with
-    on-device factors), a numpy array otherwise (detector_efficiency, whose
-    output is multiplied into the host-side spectra in the notebook). Keying off
-    the input device -- not the global _GPU flag -- keeps the CPU post-processing
-    path numpy even when a GPU is present.
+    Per element this is photoabsorption plus coherent plus incoherent removal,
+
+        mu_i = 1 / L_abs,i(E)  +  n_i sigma_scat,i(E),
+
+    the first term from ``absorption_length_ang`` (Chantler f2) and the second
+    from ``scattering_attenuation_inv_ang`` (Elam). Every consumer of this
+    helper -- filter plates, crystal-source self-absorption, the brem and
+    characteristic escape factors, the per-line tabulation, and the detector
+    window -- models removal of a photon from an unscattered ray, so all of
+    them want the total, not the photoabsorption part. Callers that want the
+    photoabsorption coefficient alone, because they are building a refractive
+    index, must use ``absorption_length_ang``/``optical_constants`` directly.
+
+    absorption_length_ang and the Elam accessor (from crystallography and the
+    atomic-data layer) are CPU-only, so the sum is always computed on the CPU.
+    The result is returned on the SAME device as E_eV: a GPU array if the
+    caller passed one (mc_spectrum, mixing it with on-device factors), a numpy
+    array otherwise (detector_efficiency, whose output is multiplied into the
+    host-side spectra in the notebook). Keying off the input device -- not the
+    global _GPU flag -- keeps the CPU post-processing path numpy even when a
+    GPU is present.
+
+    Out-of-domain energies keep the photoabsorption path's NaN policy: the
+    scattering term is finite everywhere (the Elam accessor clamps), so a bin
+    outside the Chantler table stays NaN through the sum and is handled by the
+    callers' existing ``nan_to_num``.
 
     The backend import stays function-local for import cost, not for cycles:
     importing pyrite._backend runs the accelerator probe, and the catalog and
-    CLI paths that pull in this module must not pay for it."""
+    CLI paths that pull in this module must not pay for it.
+
+    Validation: narrow-beam-total-attenuation
+    """
     from .._backend import REAL, _to_cpu, is_device_array, xp
 
     E_cpu = _to_cpu(E_eV)
     mu = 0.0
     for el, n_i in comp:
         mu = mu + 1.0 / absorption_length_ang(el, E_cpu, n_i)
+        mu = mu + scattering_attenuation_inv_ang(el, E_cpu, n_i)
     if is_device_array(E_eV):
         return xp.asarray(mu, dtype=REAL)
     return mu

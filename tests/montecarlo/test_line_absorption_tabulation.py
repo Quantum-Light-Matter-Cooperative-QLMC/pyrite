@@ -31,8 +31,21 @@ def test_elemental_log_mu_matches_pinned_chantler_interpolation(crystal, lo, hi)
 
     The oracle is the repository-pinned xraydb path used by
     ``_mu_total_inv_ang``. xraydb interpolates Chantler ``f2`` linearly in
-    log(f2) versus log(E); since ``mu_i`` is proportional to ``f2_i / E``,
-    log(mu_i) is linear on the same intervals.
+    log(f2) versus log(E); since ``mu_photo,i`` is proportional to
+    ``f2_i / E``, log(mu_photo,i) is exactly linear on the same intervals, and
+    the tabulation reproduces it to rounding.
+
+    Since #104 the tabulated coefficient also carries the Elam coherent +
+    incoherent term, which lives on its own nodes. ``log(a + b)`` is not linear
+    when ``log a`` and ``log b`` are linear with different slopes, so the
+    midpoints now carry a genuine interpolation residual instead of pure
+    rounding. Measured worst case over the production bands is ``1.5e-4``
+    (MoS2, 350-3500 eV), reached where the photoabsorption and scattering
+    log-log slopes differ most, just above an edge. It enters the physics as
+    a relative error on ``tau``, so the escape factor is unaffected at any
+    depth of interest -- four orders below the ~109% bias the scattering term
+    removes. The node values themselves stay exact, which the second assertion
+    below still pins at ``5e-15``.
     """
     composition = _composition(crystal)
     grid = _line_tabulation_grid(CRYSTALS[crystal], composition, lo, hi)
@@ -45,9 +58,9 @@ def test_elemental_log_mu_matches_pinned_chantler_interpolation(crystal, lo, hi)
     expected = _mu_total_inv_ang(composition, query)
     finite = np.isfinite(expected)
 
-    # FITPACK's evaluation at an inserted non-native node contributes ~1e-12
-    # relative rounding; this remains twelve orders below the old edge error.
-    np.testing.assert_allclose(got[finite], expected[finite], rtol=2e-12, atol=0.0)
+    # Log-linear interpolation of a two-slope sum, bounded above; see the
+    # docstring. FITPACK rounding (~1e-12) is far inside this.
+    np.testing.assert_allclose(got[finite], expected[finite], rtol=5e-4, atol=0.0)
     assert np.all(got[finite] > 0.0)
 
     node_idx, _node_frac, node_below, node_above = _interp_index(grid, grid)
@@ -77,7 +90,9 @@ def test_float32_edge_midpoints_stay_within_backend_tolerance(crystal, lo, hi):
     expected = _mu_total_inv_ang(composition, query.astype(np.float64))
     finite = np.isfinite(expected)
 
-    np.testing.assert_allclose(got[finite], expected[finite], rtol=1e-4, atol=0.0)
+    # float32 storage (~1e-7 relative) on top of the float64 interpolation
+    # residual documented in the test above.
+    np.testing.assert_allclose(got[finite], expected[finite], rtol=5e-4, atol=0.0)
 
 
 def test_explicit_absorber_contributes_native_nodes_and_clamps_endpoints():

@@ -7,6 +7,21 @@
 earlier 2026-08-14 re-derivation and the original author packet are retained
 below as [Part IV](#part-iv--retained-author-packet-and-2026-08-14-verifier-record).
 
+> [!important]
+> **2026-09-20 — finding III.3(2) is resolved in code.** $\mu_j$ is no longer
+> photoabsorption-only: `_mu_total_inv_ang` now adds the Elam coherent +
+> incoherent term, so $T_p$ uses the narrow-beam **total** attenuation
+> coefficient. The new claim is
+> [`narrow-beam-total-attenuation`](../ledger-crystallography-atomic-data.md#narrow-beam-total-attenuation);
+> the fix reaches crystal-source self-absorption by the same helper
+> ([#104](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/104)).
+> Parts I-IV below are the verifiers' records as written and are **not**
+> retro-edited: where they say $\mu$ omits scattering, read that as the state
+> of the code at the time of that pass. The quantified missing fractions they
+> report are now inside $\mu$. What survives unresolved is the *geometry*
+> condition -- good geometry is assumed, no build-up factor is applied -- and
+> findings III.3(1) and (3)-(7).
+
 **Code:**
 `src/pyrite/materials/attenuation.py::linear_attenuation_inv_mm`,
 `src/pyrite/instrument/geometry.py::ray_box_path_lengths`,
@@ -316,6 +331,9 @@ individually, and it is the one part of the ledger claim that the three code
 anchors do not by themselves establish.
 
 ### I.6 Physical scope of the model
+
+*Superseded in part as of 2026-09-20; see the note at the top of this file. The
+first bullet below describes the code as it stood at this pass.*
 
 $\mu$ built from Henke $f_2$ is the **photoabsorption** coefficient. The correct
 narrow-beam attenuation coefficient for a primary-beam transmission factor is the
@@ -645,6 +663,11 @@ all are scope or provenance items a human should weigh before sign-off.
    filters below $\sim10\ \mathrm{keV}$ and at first order for low-$Z$ filters
    above $\sim15\ \mathrm{keV}$. The absence of a build-up factor pushes the
    other way but does not cancel it. This belongs in the ledger `Notes`.
+   **Resolved 2026-09-20** by [#104](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/104):
+   the scattering term is now summed into $\mu$ under the
+   [`narrow-beam-total-attenuation`](../ledger-crystallography-atomic-data.md#narrow-beam-total-attenuation)
+   claim. The build-up factor is still absent, so the good-geometry condition
+   this finding implies remains an open scope limit rather than a bias.
 3. **No plate-overlap validation.** `instrument/model.py::validate_downstream_scene`
    checks name uniqueness, downstream normal orientation, and that each plate
    volume lies between source and detector plane — but never that plate

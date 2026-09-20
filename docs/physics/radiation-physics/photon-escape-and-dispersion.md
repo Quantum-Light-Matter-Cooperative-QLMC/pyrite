@@ -8,25 +8,46 @@ here feeds back on emission: attenuation is passive.
 
 ## Attenuation coefficient
 
-For an element of number density $n$ and Henke/Chantler imaginary scattering
-factor $f_2(E)$, the intensity attenuation coefficient follows from
-$\beta_{\rm idx}=r_e\lambda^2 n f_2/(2\pi)$ and $\mu=2k\beta_{\rm idx}$:
+Escape is a **narrow-beam** problem: a photon counts as escaped only if it
+reaches the surface unscattered, so every interaction channel removes it, not
+only the ones that absorb it. The coefficient is therefore the total
 
 $$
-\mu(E)=2\,r_e\,\lambda\,n\,f_2(E)\quad[\text{\AA}^{-1}],
+\mu(E)=\mu_{\rm photo}(E)+\mu_{\rm scat}(E)
+     = n\bigl[\sigma_{\rm photo}+\sigma_{\rm coh}+\sigma_{\rm incoh}\bigr]
+  \quad[\text{\AA}^{-1}],
 \qquad I(z)=I(0)e^{-\mu z}.
 $$
 
-Compounds add inverse lengths, $\mu=\sum_i \mu_i$ through $\sum_i n_i f_{2,i}$.
-The absorber composition defaults to the crystal's own basis at its total atom
-density — exact for elemental crystals — and can be given explicitly as
+The photoabsorption part comes from the Henke/Chantler imaginary scattering
+factor $f_2(E)$, through $\beta_{\rm idx}=r_e\lambda^2 n f_2/(2\pi)$ and
+$\mu_{\rm photo}=2k\beta_{\rm idx}$:
+
+$$
+\mu_{\rm photo}(E)=2\,r_e\,\lambda\,n\,f_2(E).
+$$
+
+The coherent (Rayleigh) and incoherent (Compton) part comes from the Elam
+cross sections. It is not a small correction at the hard end: for graphite at
+20 keV it is 52 % of $\mu$, so dropping it would understate the escape
+exponent by a factor 2.09. No build-up factor is applied, which is the other
+half of the narrow-beam assumption — scattered photons are removed from the
+escaping ray and never returned to it.
+
+Compounds add inverse lengths, $\mu=\sum_i \mu_i$. The absorber composition
+defaults to the crystal's own basis at its total atom density — exact for
+elemental crystals — and can be given explicitly as
 `[(element, n_per_Ang3), ...]`.
 
 The line kernel needs $\mu$ at each segment's own resonance energy, which would
 otherwise mean a host round-trip per segment. Instead each element's
 $\log\mu_i$ is tabulated and interpolated **linearly in $\log E$**, then summed:
-that reproduces the pinned xraydb rule for non-`f1` Chantler data, whereas
-interpolating the compound total in either linear or log space does not. The
+that reproduces the pinned xraydb rule for non-`f1` Chantler data exactly for
+the photoabsorption part, whereas interpolating the compound total in either
+linear or log space does not. The scattering term rides on the same tabulation
+and is *not* exactly log-linear there, since a sum of two log-linear terms with
+different slopes is not one; the residual is bounded at $1.5\times10^{-4}$
+relative over the production bands, with node values still exact. The
 shared grid is a 1 eV mesh unioned with the native Chantler nodes of every basis
 *and* explicitly named absorber element, so edge jumps — tens of percent at, say,
 the C K-edge — are resolved rather than smeared. Layered and grooved escape keep
@@ -93,9 +114,12 @@ with the square root taken exactly rather than linearized. In the X-ray regime
 $\delta\sim10^{-5}$--$10^{-3}$: negligible per Ångström, but it accumulates over
 micron-scale trajectories, which is exactly what this model tracks.
 
-**Only $\mathrm{Re}\,n$ is applied.** $\mathrm{Im}\,n$ is the same absorption
-already carried by the Beer--Lambert $\mu(E)$, so folding it in here as well
-would double count it.
+**Only $\mathrm{Re}\,n$ is applied.** $\mathrm{Im}\,n$ is exactly the
+photoabsorption part already carried by the Beer--Lambert $\mu(E)$, so folding
+it in here as well would double count it. The scattering part of $\mu$ has no
+counterpart in $n$ and so cannot double count: $\beta$ is by construction
+$f_2$, which is why the optical constants keep the photoabsorption-only
+coefficient.
 
 ### Resonance
 

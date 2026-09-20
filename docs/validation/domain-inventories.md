@@ -50,6 +50,7 @@ Generated browsing views of every claim in the [detailed validation ledger]
 | [`atomic-form-factor`](ledger-crystallography-atomic-data.md#atomic-form-factor) | `F(g,E) = f0(g) + f'(E) + i·f''(E)` | `rederived` |
 | [`dans-diffraction-oracle`](ledger-crystallography-atomic-data.md#dans-diffraction-oracle) | optional independent `Dans_Diffraction` lattice, reciprocal-geometry, and `\|F_hkl\|²` comparison harness | `unverified` |
 | [`absorption-length`](ledger-crystallography-atomic-data.md#absorption-length) | X-ray absorption length / μ | `anchored` |
+| [`narrow-beam-total-attenuation`](ledger-crystallography-atomic-data.md#narrow-beam-total-attenuation) | the linear attenuation coefficient in a narrow-beam (good-geometry) Bouguer–Beer exponent is the **total** removal rate `μ_tot(E) = n_a[σ_photo + σ_coh + σ_incoh]`, not photoabsorption alone; the coherent+incoherent term is `μ_scat = n_a σ_scat` from the Elam compilation | `rederived` |
 | [`grazing-optical-constants`](ledger-crystallography-atomic-data.md#grazing-optical-constants) | complex refractive index `n = 1 − δ − iβ` (δ, β from f1=Z+f′, f2) | `rederived` |
 | [`xray-chi-zero`](ledger-crystallography-atomic-data.md#xray-chi-zero) | g=0 unit-cell susceptibility `χ₀ = −rₑλ²/(πV_cell) · Σᵢ(f1ᵢ + i f2ᵢ)`, `f1 = Z + f′`, `f2 = f″` | `rederived` |
 | [`xray-refractive-index`](ledger-crystallography-atomic-data.md#xray-refractive-index) | complex crystal refractive index `n(E) = √(1 + χ₀(E)) ≈ 1 − δ − iβ` | `rederived` |

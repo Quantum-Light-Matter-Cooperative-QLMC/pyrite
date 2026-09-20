@@ -101,6 +101,29 @@ def test_stack_tau_single_layer_matches_slab():
         assert np.allclose(tau, L_esc * mu)
 
 
+def test_stack_tau_carries_scattering_for_a_crystalline_source():
+    """Crystal-source self-absorption uses the narrow-beam total, not f2 alone.
+
+    ``_stack_tau`` is the escape factor for photons born inside the crystal, so
+    a coherent or incoherent scatter on the way out removes the photon from the
+    line/brem ray exactly as photoabsorption does (#104). Pinned on graphite at
+    20 keV, where the scattering term is the larger half of ``mu``: a
+    photoabsorption-only escape would be wrong by a factor 2.09 in ``tau``.
+    """
+    from pyrite.materials.crystal import absorption_length_ang
+
+    n_c = 2.26 / 12.011 * 0.602214076
+    comp = [("C", n_c)]
+    z = np.array([100.0, 900.0])
+    E = np.full(2, 20_000.0)
+    thickness, n_z = 2000.0, +0.6
+
+    tau = _stack_tau([(0.0, thickness, comp)], z, n_z, E)
+    tau_photo = ((thickness - z) / n_z) * (1.0 / absorption_length_ang("C", E, n_c))
+
+    assert np.allclose(tau / tau_photo, 2.0893, rtol=2.0e-3)
+
+
 def test_stack_tau_substrate_adds_depth_on_back_exit():
     # adding a substrate behind the film increases tau for a back exit
     z = np.array([100.0, 300.0])
