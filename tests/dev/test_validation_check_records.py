@@ -2,9 +2,13 @@
 
 from pathlib import Path
 
+import pytest
+
 from pyrite.validation.check_records import (
     CHECK_LEDGER_IDS,
+    SYNC_STAMP_NAME,
     ValidationRecord,
+    _revision_for,
     current_revision,
     read_records,
     write_records,
@@ -29,6 +33,43 @@ def test_records_round_trip(tmp_path) -> None:
 
 def test_current_revision_is_a_git_sha() -> None:
     assert len(current_revision()) == 40
+
+
+def _write_stamp(root: Path, **fields: str) -> None:
+    (root / SYNC_STAMP_NAME).write_text(
+        "".join(f"{key}: {value}\n" for key, value in fields.items()), encoding="utf-8"
+    )
+
+
+def test_revision_falls_back_to_the_synced_stamp_outside_a_git_checkout(tmp_path) -> None:
+    """The box runs an exported tree, so `git rev-parse` there exits nonzero and
+    used to abort `pyrite-dev validation-records` outright."""
+    _write_stamp(tmp_path, code_digest="a" * 64, code_revision="f" * 40, code_dirty="False")
+
+    assert _revision_for(tmp_path) == "f" * 40
+
+
+def test_stamped_revision_marks_a_dirty_payload(tmp_path) -> None:
+    """Evidence must not claim a clean revision for an uncommitted working tree."""
+    _write_stamp(tmp_path, code_digest="a" * 64, code_revision="f" * 40, code_dirty="True")
+
+    assert _revision_for(tmp_path) == f"{'f' * 40}-dirty"
+
+
+def test_stamped_revision_falls_back_to_the_payload_digest(tmp_path) -> None:
+    _write_stamp(tmp_path, code_digest="a" * 64, code_revision="unknown", code_dirty="True")
+
+    assert _revision_for(tmp_path) == f"synced-{'a' * 64}"
+
+
+def test_revision_reports_a_tree_with_neither_git_nor_a_stamp(tmp_path) -> None:
+    with pytest.raises(RuntimeError, match="not a git checkout"):
+        _revision_for(tmp_path)
+
+
+def test_git_revision_wins_over_a_stale_local_stamp() -> None:
+    """A developer checkout that has synced carries a stamp; git still decides."""
+    assert len(_revision_for(Path(__file__).parents[2])) == 40
 
 
 def test_exit_records_cover_each_mapped_claim() -> None:

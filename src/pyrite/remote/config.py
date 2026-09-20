@@ -35,6 +35,13 @@ LOCAL_ROOT = Path(__file__).resolve().parents[3]
 JOBS_SUBDIR = "jobs"
 RESERVATIONS_SUBDIR = "reservations"
 
+# `sync` records what it just unpacked in <REMOTE_DIR>/.pyrite-sync: the payload
+# content digest plus revision evidence. It is the only code-identity marker the
+# box has -- the remote checkout is an exported tree, not a repository -- so a
+# later sync can tell whether a live job is running that same code, and evidence
+# collected there can name a revision instead of shelling out to git.
+SYNC_STAMP_NAME = ".pyrite-sync"
+
 # The Zhai reproduction job has no crystal key of its own, but reusing the
 # existing material-stem bookkeeping (_refuse_if_busy / _live_jobs /
 # stop_jobs) needs one to key off of -- this is that synthetic token.
@@ -156,6 +163,11 @@ def remote_path(*parts: str) -> str:
     root = remote_dir().rstrip("/") or "/"
     suffix = "/".join(part.strip("/") for part in parts)
     return f"{root}/{suffix}" if suffix and root != "/" else f"{root}{suffix}"
+
+
+def remote_sync_stamp_path() -> str:
+    """Absolute path of the code-identity stamp `sync` writes on the box."""
+    return remote_path(SYNC_STAMP_NAME)
 
 
 def shell_word(value: str) -> str:

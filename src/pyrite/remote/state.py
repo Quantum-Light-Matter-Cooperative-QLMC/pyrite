@@ -62,13 +62,17 @@ def _job_state(jobid):
     return transport._ssh_capture(f'D={jobdir}; head -n1 "$D/state" 2>/dev/null').strip()
 
 
-def _live_jobs():
-    """[(jobid, quick, [materials])] for jobs still reported by SLURM.
+def _live_job_code():
+    """[(jobid, quick, [materials], code_digest, code_revision)] for live jobs.
 
     Legacy job directories without a recorded scheduler ID are deliberately
     non-live: PID liveness is not a safe fallback for scheduler-managed work.
     Query SLURM once, then join live scheduler IDs against recorded metadata so
     accumulated job history does not cause one ``squeue`` process per job.
+
+    The code stamp each job recorded at submission travels on the same round
+    trip, so ``sync`` can tell whether a live job is running the payload it is
+    about to unpack. Jobs submitted before code stamping report ``""``.
     """
     remote = (
         f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
@@ -79,15 +83,17 @@ def _live_jobs():
         'exit "$STATUS"; fi; '
         'LIVE=" $(printf "%s\\n" "$LIVE" | tr "\\n" " ") "; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
-        '[ -f "$d/meta" ] || continue; SID=; q=; m=; '
+        '[ -f "$d/meta" ] || continue; SID=; q=; m=; cdg=; crv=; '
         'while IFS= read -r line; do case "$line" in '
         '"slurm_job_id: "*) SID=${line#*: } ;; '
         '"quick: "*) q=${line#*: } ;; '
-        '"materials: "*) m=${line#*: } ;; esac; done < "$d/meta"; '
+        '"materials: "*) m=${line#*: } ;; '
+        '"code_digest: "*) cdg=${line#*: } ;; '
+        '"code_revision: "*) crv=${line#*: } ;; esac; done < "$d/meta"; '
         "case \"$SID\" in ''|*[!0-9]*) continue ;; esac; "
         'case "$LIVE" in *" $SID "*) ;; *) continue ;; esac; '
         "jobid=${d%/}; jobid=${jobid##*/}; "
-        'printf "%s\\t%s\\t%s\\n" "$jobid" "$q" "$m"; done'
+        'printf "%s\\t%s\\t%s\\t%s\\t%s\\n" "$jobid" "$q" "$m" "$cdg" "$crv"; done'
     )
     jobs = []
     for line in transport._ssh_capture(remote).splitlines():
@@ -95,8 +101,19 @@ def _live_jobs():
         if len(parts) < 3:
             continue
         jobid, q, mats = parts[0].strip(), parts[1].strip(), parts[2].split()
-        jobs.append((jobid, q == "True", mats))
+        digest = parts[3].strip() if len(parts) > 3 else ""
+        revision = parts[4].strip() if len(parts) > 4 else ""
+        jobs.append((jobid, q == "True", mats, digest, revision))
     return jobs
+
+
+def _live_jobs():
+    """[(jobid, quick, [materials])] for jobs still reported by SLURM.
+
+    The code-identity fields of ``_live_job_code`` are dropped here: every
+    checkpoint-ownership caller keys off materials alone.
+    """
+    return [(jobid, quick, materials) for jobid, quick, materials, _d, _r in _live_job_code()]
 
 
 def _reservation_holders(stems: list[str]) -> list[tuple[str, str]]:

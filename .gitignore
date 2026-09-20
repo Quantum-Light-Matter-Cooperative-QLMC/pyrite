@@ -250,6 +250,11 @@ zhai_fig1c_analog.png
 # remote.py detached-job bookkeeping (created on the GPU box under <repo>/jobs/)
 jobs/
 
+# code-identity stamp written by `pyrite remote sync` into the synced checkout
+# root on the GPU box; keeping it untracked preserves the clean `git status`
+# there that the CRLF->LF sync normalization exists to protect.
+.pyrite-sync
+
 # Local session logs (full conversation transcripts written by the /compress skill)
 /CC-Session-Logs/*
 

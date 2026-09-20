@@ -155,16 +155,69 @@ def records_for_exit(check: str, exit_code: int, revision: str) -> list[Validati
     ]
 
 
-def current_revision() -> str:
-    """Return the checked-out source revision used to produce an evidence record."""
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=Path(__file__).parents[3],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+SYNC_STAMP_NAME: Final = ".pyrite-sync"
+"""Code-identity stamp ``pyrite remote sync`` leaves in a synced checkout root."""
+
+
+def _stamped_revision(root: Path) -> str | None:
+    """Return the revision recorded by the last code sync into ``root``.
+
+    ``pyrite remote sync`` unpacks an exported tree, not a repository, so on the
+    box this stamp is the only revision evidence there is. A dirty payload is
+    reported as ``<revision>-dirty``: the working tree it came from is not
+    reproducible from that revision alone, and evidence must say so. A stamp
+    whose own revision is unknown yields the payload digest instead, which at
+    least identifies the exact code that ran.
+    """
+    try:
+        lines = (root / SYNC_STAMP_NAME).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    fields: dict[str, str] = {}
+    for line in lines:
+        key, separator, value = line.partition(": ")
+        if separator:
+            fields[key.strip()] = value.strip()
+    revision = fields.get("code_revision", "")
+    digest = fields.get("code_digest", "")
+    if revision and revision != "unknown":
+        return f"{revision}-dirty" if fields.get("code_dirty") == "True" else revision
+    return f"synced-{digest}" if digest else None
+
+
+def _revision_for(root: Path) -> str:
+    """Return ``root``'s git revision, or the revision its last code sync stamped.
+
+    The git revision wins whenever there is one: a developer checkout can carry
+    a stale stamp from a sync it made earlier.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        stamped = _stamped_revision(root)
+        if stamped is None:
+            raise RuntimeError(
+                f"cannot determine source revision: {root} is not a git checkout and "
+                f"carries no {SYNC_STAMP_NAME} stamp from pyrite remote sync"
+            ) from exc
+        return stamped
     return result.stdout.strip()
+
+
+def current_revision() -> str:
+    """Return the checked-out source revision used to produce an evidence record.
+
+    Falls back to the synced code stamp when the tree is not a git checkout, so
+    evidence collected on the remote box carries a revision instead of crashing
+    on ``git rev-parse``.
+    """
+    return _revision_for(Path(__file__).parents[3])
 
 
 def read_records(root: Path) -> tuple[ValidationRecord, ...]:

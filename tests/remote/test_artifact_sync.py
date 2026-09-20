@@ -54,6 +54,8 @@ def test_sync_code_skips_remote_hashes_and_sends_only_missing_objects(tmp_path, 
     inventory_commands = []
 
     def remote_inventory(command):
+        if "squeue" in command:  # code-sync live-job guard, not the inventory
+            return ""
         inventory_commands.append(command)
         return (
             f"{present.digest}  /remote/src/pyrite/data/energy-grid-artifacts/"
