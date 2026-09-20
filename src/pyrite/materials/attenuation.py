@@ -8,8 +8,13 @@ the total linear attenuation summed over elements, and the layered
 """
 
 import numpy as np
+from scipy.constants import electron_mass as _M_E
+from scipy.constants import elementary_charge as _E_CHARGE
+from scipy.constants import epsilon_0 as _EPS_0
+from scipy.constants import hbar as _HBAR
 
 from . import CATALOG, MediumSpec
+from .atomic import Z_TABLE
 from .crystal import absorption_length_ang
 
 
@@ -61,6 +66,18 @@ def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> 
     if not np.all(np.isfinite(energy)) or np.any(energy <= 0.0):
         raise ValueError("energy_eV must contain only finite positive values")
 
+    composition = _resolve_composition(material)
+    coefficient = np.asarray(_mu_total_inv_ang(composition, energy), dtype=float) * 1.0e7
+    coefficient.setflags(write=False)
+    return coefficient
+
+
+def _resolve_composition(material: str | MediumSpec) -> tuple[tuple[str, float], ...]:
+    """Catalog key or explicit medium to a validated ``(element, n)`` list.
+
+    Runnable target-material keys are intentionally unreachable: their
+    film/stack composition is not a single homogeneous medium.
+    """
     if isinstance(material, str):
         if material in CATALOG.media:
             composition = CATALOG.media[material].composition
@@ -80,9 +97,78 @@ def linear_attenuation_inv_mm(material: str | MediumSpec, energy_eV: object) -> 
         for element, density in composition
     ):
         raise ValueError("filter composition must contain positive element number densities")
-    coefficient = np.asarray(_mu_total_inv_ang(composition, energy), dtype=float) * 1.0e7
-    coefficient.setflags(write=False)
-    return coefficient
+    return composition
+
+
+def plasma_energy_eV(material: str | MediumSpec) -> float:
+    r"""Bulk free-electron plasma energy ``hbar*omega_p`` of a medium, in eV.
+
+    This is the low-energy edge of the band in which this repository's X-ray
+    optics is meaningful at all, so it is what sets the photon-continuum grid
+    floor (``_photon_continuum_floor.py``); it is not itself part of any transport or
+    emission kernel.
+
+    Source equation. For an electron gas of number density ``n_e`` the Drude
+    (collisionless, free-electron) dielectric function is
+    ``eps(omega) = 1 - omega_p^2 / omega^2`` with
+
+        omega_p = sqrt(n_e e^2 / (eps_0 m_e)),
+
+    so the plasma energy is ``hbar*omega_p``. Jackson, *Classical
+    Electrodynamics* 3rd ed., Sec. 7.5 (plasma frequency of a free-electron
+    medium); the same quantity appears as ``hbar*omega_p = 28.816
+    sqrt(rho <Z/A>) eV`` in the PDG's "Passage of particles through matter"
+    presentation of the Sternheimer density effect. Here ``n_e = sum_i n_i Z_i``
+    is summed over the medium's own catalog number densities ``n_i``
+    [Angstrom^-3], converted to m^-3.
+
+    Why this is the model edge. ``crystal.py::optical_constants`` writes the
+    medium as ``n = 1 - delta - i beta`` with ``delta = (r_e lambda^2 / 2 pi)
+    n_a f1``. In the high-frequency limit every electron responds freely,
+    ``f1 -> Z``, and that expression is identically ``delta = omega_p^2 /
+    (2 omega^2)``. At ``omega = omega_p`` it gives ``delta = 1/2``: the
+    weakly-refracting, transparent-medium expansion that the photon-escape and
+    self-absorption models rest on has collapsed, and below ``omega_p`` the
+    medium reflects rather than transmits. So ``hbar*omega_p`` is where *this
+    code's own* optics stops being valid, not an imported convention.
+
+    Assumptions. All ``Z`` electrons respond as free (exact only for
+    ``omega`` well above every binding energy; near and below ``omega_p`` the
+    real response is collective and band-structure dependent, which is the
+    point -- the model is not claimed to hold there). Homogeneous, isotropic
+    bulk medium at the catalog's number densities, so no surface, porosity, or
+    anisotropy term. No damping: the Drude collision frequency is dropped,
+    which shifts a real plasmon resonance by order ``(1/tau)/omega_p``.
+
+    Limiting case. ``n_e -> 0`` (vacuum, or an arbitrarily dilute medium) gives
+    ``hbar*omega_p -> 0``: an empty medium imposes no low-energy bound, and the
+    continuum floor then falls back to pure table support. Independent
+    cross-check: inverting the PDG/Sternheimer ``C_bar = 2 ln(I / hbar omega_p)
+    + 1`` with the packaged ``I`` and ``C_bar`` for silicon
+    (``materials/_transport_data.py``) gives ``31.0482 eV`` against the
+    ``31.0498 eV`` this function returns from the catalog number density --
+    agreement to ``5e-5`` relative, from data that shares no code path with
+    this one.
+
+    Parameters
+    ----------
+    material
+        Catalog crystal/media key or explicit homogeneous medium.
+
+    Returns
+    -------
+    float
+        Plasma energy in eV; strictly positive for any real medium.
+
+    Validation: photon-continuum-floor
+    """
+    composition = _resolve_composition(material)
+    # Angstrom^-3 -> m^-3 is 1e30; Z from the shared atomic table.
+    electron_density_per_m3 = (
+        sum(float(n) * Z_TABLE[element] for element, n in composition) * 1.0e30
+    )
+    omega_p = np.sqrt(electron_density_per_m3 * _E_CHARGE**2 / (_EPS_0 * _M_E))
+    return float(_HBAR * omega_p / _E_CHARGE)
 
 
 def _normalize_composition(element, n_atoms_per_ang3, composition):
@@ -186,4 +272,4 @@ def _stack_tau(layers, z_mid, n_z, E, *, exit_distance_ang=None):
     return tau
 
 
-__all__ = ["linear_attenuation_inv_mm"]
+__all__ = ["linear_attenuation_inv_mm", "plasma_energy_eV"]

@@ -35,6 +35,7 @@ __all__ = [
     "spacing_spread",
     "validate_backend_coordinates",
     "validate_backend_spacing",
+    "zero_based_detector_edges",
 ]
 
 #: Relative spread of adjacent spacings still accepted as "uniform", measured
@@ -80,6 +81,46 @@ def node_bin_edges_and_widths(E_grid_eV: object) -> tuple[np.ndarray, np.ndarray
     edges[0] = E[0] - 0.5 * (E[1] - E[0])
     edges[-1] = E[-1] + 0.5 * (E[-1] - E[-2])
     return edges, np.diff(edges)
+
+
+def zero_based_detector_edges(E_grid_eV: object) -> tuple[np.ndarray, np.ndarray, bool]:
+    """Midpoint source-bin edges anchored to a detector's explicit 0 eV boundary.
+
+    A real instrument has a channel that starts at zero recorded energy -- the
+    Timepix output histogram begins at 0 eV so charge-loss events below the
+    incident energy are still scored -- and that boundary belongs to the
+    detector, not to the source mesh. Once a continuum grid carries a positive
+    floor (:mod:`pyrite.energy_grid.floor`), the two no longer coincide, and the
+    detector must keep its own zero rather than inherit the floor.
+
+    Returns ``(edges, widths, padded)`` where ``edges[0]`` is exactly ``0.0``.
+    Two distinct cases, because they are physically different:
+
+    * The midpoint reflection of the first node lands **below** zero. There is
+      no such thing as a negative-energy half-bin, so the outer edge is clamped
+      up to zero and the first node keeps a single, narrower bin. ``padded`` is
+      ``False`` and the caller's density array is unchanged.
+    * The reflection lands **above** zero, which is the ordinary case for a grid
+      with a positive floor. The first node's own bin is correct as it stands
+      and must not be widened -- stretching it down to zero would multiply that
+      node's density by the extra width and invent photons. So a *separate*
+      explicit channel ``[0, edges[0])`` is prepended instead. ``padded`` is
+      ``True`` and the caller must prepend one zero to its density array to stay
+      aligned. That channel carries no source mass: the continuum model has no
+      support below its floor.
+
+    The clamp branch is the behaviour ``TimepixResponse`` already relied on; the
+    pad branch is what a positive continuum floor additionally requires.
+    """
+    edges, widths = node_bin_edges_and_widths(E_grid_eV)
+    if edges[0] < 0.0:
+        edges = edges.copy()
+        edges[0] = 0.0
+        return edges, np.diff(edges), False
+    if edges[0] > 0.0:
+        edges = np.concatenate(([0.0], edges))
+        return edges, np.diff(edges), True
+    return edges, widths, False
 
 
 def rebin_piecewise_constant_density(

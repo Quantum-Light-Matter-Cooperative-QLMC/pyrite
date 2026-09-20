@@ -260,12 +260,203 @@ An arbitrarily small epsilon used only to keep the logarithm finite is therefore
 not acceptable. It is an unexamined infrared cutoff wearing a numerical
 disguise, and it silently sets a physics result.
 
+### The floor is derived, not chosen
+
+`_photon_continuum_floor.py::photon_continuum_floor_eV` returns the larger of two
+independently derived bounds, and neither is a tuning knob.
+
+**The modelled band.** A continuum node is only meaningful where the medium's
+optics is. `materials/crystal.py::optical_constants` writes the medium as
+$n = 1 - \delta - i\beta$ with $\delta = (r_e \lambda^2 / 2\pi)\, n_a f_1$. In
+the high-frequency limit every electron responds freely, $f_1 \to Z$, and that
+expression is *identically* the free-electron result
+
+```{math}
+:label: eq-grid-plasma-floor
+
+\delta(\omega) = \frac{\omega_p^2}{2\omega^2},
+\qquad
+\omega_p = \sqrt{\frac{n_e e^2}{\varepsilon_0 m_e}},
+\qquad
+n_e = \sum_i n_i Z_i ,
+```
+
+with $n_i$ the medium's own catalog number densities. At $\omega = \omega_p$,
+{eq}`eq-grid-plasma-floor` gives $\delta = 1/2$: the weakly-refracting,
+transparent-medium expansion that photon escape and self-absorption both rest on
+has collapsed, and below $\omega_p$ the medium reflects rather than transmits. So
+$\hbar\omega_p$ is where *this repository's own* optics stops being valid, not an
+imported convention. `materials/attenuation.py::plasma_energy_eV` computes it.
+
+*Assumptions.* All $Z$ electrons respond as free — exact only for $\omega$ well
+above every binding energy; near and below $\omega_p$ the real response is
+collective and band-structure dependent, which is the point. Homogeneous
+isotropic bulk medium, so no surface, porosity, or anisotropy term. No Drude
+damping, which shifts a real plasmon resonance by order $(1/\tau)/\omega_p$.
+
+*Limiting case.* $n_e \to 0$ gives $\hbar\omega_p \to 0$: an empty medium imposes
+no low-energy bound, and the floor falls back to pure table support.
+
+*Cross-check.* The PDG/Sternheimer density-effect parameterization carries the
+same quantity as $\bar{C} = 2\ln(I/\hbar\omega_p) + 1$. Inverting the packaged
+$\bar{C}$ and mean excitation energy for silicon
+(`materials/_transport_data.py`) gives 31.0482 eV against the 31.0498 eV
+{eq}`eq-grid-plasma-floor` gives from the catalog number density — agreement to
+$5\times10^{-5}$ relative, from different data through different code.
+
+**Data support.** The second bound is the lowest energy at which every table the
+continuum pipeline evaluates carries a real tabulated value rather than an
+extrapolation, measured from the packaged data and recorded with its provenance
+in `_photon_continuum_floor.py::DATA_SUPPORT_LIMITS_EV`: EEDL MF=26/MT=527 photon
+spectra reach 0.1 eV for every transport element, Chantler/FFAST reaches 1.01 eV
+(admitted on the strict interior, so 1.01 eV itself reads as out of range), and
+the digitized Eagle XO QE curve is documented valid from 12 eV. The QE table
+therefore binds, at 12 eV.
+
+For every condensed medium in the catalog the plasma energy is the larger term —
+the smallest is `sio2` at 30.201 eV, the largest `ptbi2` at 66.248 eV — so the
+floor is a derived, material-specific number rather than a round one, and data
+support binds only in the dilute limit above. HOPG's floor is 30.661 eV.
+
+Choosing where the nodes go *between* floor and ceiling — refinement near
+absorption edges and kinematic endpoints — is a separate concern from the
+geometric baseline `geometric_continuum_grid` builds.
+
+**Where the floor is applied, and why not in the catalog.** A uniform
+production bremsstrahlung band (`E_grid_brem`) declares a `start`, but that
+number is a *bandwidth request*, not the band the case gets: the floor belongs
+to the medium, and the same catalog row is inherited by profiles that must
+agree about the material they share. `campaign/sweep.py::build_cases` therefore
+raises a declared start to `floored_lattice_start_eV(material, step)` — the
+lowest multiple of the grid's own step at or above the medium's floor — the
+first place the band and the material meet. Three consequences follow, and each
+is load-bearing:
+
+* **The nodes do not move, they are only dropped.** Snapping to the step
+  lattice rather than starting at the floor itself leaves every surviving node
+  on the coordinate it had, so a quantity measured on the grid — a cumulative
+  coverage quantile, say — is read at the same energies as before.
+* **A declared start *above* the floor is kept.** Narrowing the band is an
+  ordinary bandwidth choice, exactly as in `geometric_continuum_grid`; only
+  widening it downward, past model validity, is refused.
+* **A profile-level default stores `0.0`.** Naming no medium, it can carry no
+  floor of its own, and `0.0` reads as "no bound beyond the medium's". Storing
+  a *per-profile* floor instead would make two profiles disagree about the same
+  material's grid and silently stop sharing cases they are meant to share.
+
+The diagnostic band the `stop` is measured on
+(`energy_grid/derive.py::wide_brem_grid`) starts at the same energy, through the
+same helper, so the band a bound is measured over is the band it is installed
+for. On HOPG at 30 keV this drops the nodes at 0 and 25 eV; those carry about
+$1.3\times10^{-3}$ of the total escaping intensity, and the derived coverage
+energy and catalog `stop` are unchanged by their removal.
+
 Detector channels are a separate coordinate from the source mesh, and a real
 instrument does have a channel that starts at zero recorded energy — the
 Timepix output histogram begins at 0 eV so that charge-loss events below the
 input energy are still scored. Represent that channel with an **explicit edge at
 zero** in the detector's own edge array. Do not try to obtain it by lowering a
 log source grid toward zero.
+
+`_grid_semantics.py::zero_based_detector_edges` builds exactly that, and keeps
+the two coordinates distinct once the source mesh carries a positive floor. Its
+first edge is always exactly 0 eV, reached one of two ways, because the two are
+physically different:
+
+* the midpoint reflection of the first node lands **below** zero — there is no
+  negative-energy half-bin, so the outer edge is clamped up to zero and the first
+  node keeps one narrower bin;
+* the reflection lands **above** zero, the ordinary case for a floored grid — the
+  first node's bin is already correct and must **not** be widened, since
+  stretching it down to zero would multiply that node's density by the extra
+  width and invent photons. A *separate* explicit channel $[0, \epsilon_0)$ is
+  prepended instead, carrying no source mass because the continuum model has no
+  support below its floor. Callers prepend one zero to the density to stay
+  aligned.
+
+So a detector whose channel physically starts at 0 eV keeps its own boundary
+rather than inheriting the continuum's positive floor.
+
+(continuum-node-refinement)=
+### Where the nodes go: refinement is derived too
+
+The floor fixes where a continuum grid *starts*. Where its nodes go between
+floor and ceiling is a second derived choice, and
+`energy_grid/refine.py::refined_continuum_grid` makes it.
+
+**Why geometric is the right baseline.** Multiplying a density by its local
+midpoint width {eq}`eq-grid-midpoint-edges` is a midpoint quadrature, whose
+error on an interval of width $h$ is $(h^3/24)\,|n''|$, so the *relative* error
+contributed by that interval is
+
+```{math}
+:label: eq-grid-quadrature-error
+
+\varepsilon_i \simeq \frac{h_i^2}{24}\,\left|\frac{n''(E_i)}{n(E_i)}\right| .
+```
+
+On a grid uniform in $u = \ln E$ the step is $h_i = E_i\rho$ with
+$\rho = \ln(E_\mathrm{stop}/E_\mathrm{floor})/(N-1)$, and for a local power law
+$n \propto E^{-p}$ the combination $h_i^2\, n''/n$ is *independent of $E$*. A
+geometric grid therefore equidistributes {eq}`eq-grid-quadrature-error` across
+the band — which is exactly why it is the baseline, and exactly why it says
+nothing about an integrand that is not smooth on the scale of its own step.
+
+**Where that fails.** {eq}`eq-grid-quadrature-error` assumes $n$ has a bounded
+second derivative across the interval. The modelled escaping continuum
+$n(E) = S(E)\,e^{-\mu(E)\ell}$ violates that in exactly two places, and in both
+the straddling interval's error degrades from $O(h^2)$ to $O(h)$ — a term no
+globally finer geometric spacing removes at better than first order:
+
+* **Absorption edges.** $\mu$ steps by a finite ratio across an interval far
+  narrower than the local $E\rho$. The emitted $S$ is smooth there —
+  bremsstrahlung has no feature at an absorber's edge — so the whole
+  discontinuity sits in the escape factor.
+* **Kinematic endpoints.** $S$ is identically zero above the highest
+  instantaneous electron energy $E^\ast$, which for a run that only loses energy
+  is the incident energy. At $E^\ast$ the density steps to zero: a jump of
+  relative size 1.
+
+**The rule.** Put a grid coordinate *on* the discontinuity, and refine no
+further than the resolution at which the model itself represents it.
+
+* *Edges* are **located, never listed.** The escape model attenuates with $\mu$
+  from the Chantler $f_2$ table, so the jump is found in that table — the
+  steepest adjacent $f_2$ ratio near each xraydb edge energy
+  (`montecarlo/spectrum/line_seeds.py::absorption_edge_brackets`, shared with the
+  line-window seeds so one locator serves both axes). Both nodes of the located
+  native bracket become exact grid coordinates, so the jump lies inside a single
+  interval bounded by tabulated energies, and the surrounding native nodes are
+  sampled at their own median spacing. Below that spacing the model carries no
+  information, so refinement stops. Elements come from the medium's own catalog
+  composition plus the detection path, which in this repository is the silicon
+  sensor shared by both detector models.
+* *Endpoints* need **no taper at all.** Placing a bin *edge* exactly at $E^\ast$
+  removes the first-order term outright, and with midpoint edges that is one
+  node pair straddling $E^\ast$ at the grid's own local spacing: two nodes, no
+  budget question. The bin below then carries the tip and the bin above is
+  exactly empty.
+
+*Assumptions.* The medium is the absorber whose edges enter the escape factor
+(detector-path edges act through the response instead, not through $\ell$); the
+emitted $S$ is smooth across an absorber edge; $\mu$ is piecewise-linear on the
+Chantler tabulation, as the model interpolates it; and the modelled cutoff at
+$E^\ast$ is sharp — which it is in EEDL, where the photon spectrum is tabulated
+to $k = T$ and is zero above.
+
+*Limiting case.* A band containing no located edge and no interior kinematic
+endpoint returns the geometric baseline **identically, node for node**. Adding
+structure adds nodes; adding none changes nothing. Equally, an edge whose jump
+falls outside $[E_\mathrm{floor}, E_\mathrm{stop}]$ is reported and dropped,
+never refused: it places no requirement on a grid over a band it is not in.
+
+*Cost, structurally.* Refinement only ever *adds interior* nodes and never moves
+the band endpoints, so the outermost midpoint half-widths can only narrow. Two
+consequences follow without measurement: a source mesh already covered by the
+Timepix padded input band stays covered, keeping its channels and its seeded
+response matrix; and the added node count *falls* as the baseline gets finer,
+because more baseline nodes are displaced by mark nodes than are added beside
+them.
 
 (uniform-only-consumers)=
 ## Uniform-only consumers

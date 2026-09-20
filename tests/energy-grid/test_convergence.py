@@ -26,9 +26,15 @@ from pyrite.energy_grid.convergence import (
     spectrum_observables,
 )
 
-SOURCE_ONLY = {name: kind for name, kind in GATED_OBSERVABLES.items() if kind == "intrinsic_source"}
+SOURCE_ONLY = {
+    name: kind
+    for name, kind in GATED_OBSERVABLES.items()
+    if kind == "intrinsic_source" and not name.startswith("continuum_")
+}
 SOURCE_AND_SHAPE = {
-    name: kind for name, kind in GATED_OBSERVABLES.items() if kind in {"intrinsic_source", "shape"}
+    name: kind
+    for name, kind in GATED_OBSERVABLES.items()
+    if kind in {"intrinsic_source", "shape"} and not name.startswith("continuum_")
 }
 NO_DETECTORS = partial(spectrum_observables, detectors={})
 YIELD = {"yield": "intrinsic_source"}
@@ -214,6 +220,37 @@ def test_empty_spectrum_is_accepted_through_the_absolute_floor():
     assert report.accepted_spacing_eV == rungs[0].spacing_eV
 
 
+def test_nonzero_floor_scale_spectrum_uses_absolute_tolerance():
+    """#100: relative error alone must not reject a nearly dark continuum."""
+    rungs = [
+        _rung(4.0, **{"yield": 2.0e-15}),
+        _rung(2.0, **{"yield": 1.5e-15}),
+        _rung(1.0, **{"yield": 1.25e-15}),
+    ]
+
+    report = richardson_acceptance(rungs, gated=YIELD)
+    verdict = report.triples[0].observables[0]
+
+    assert verdict.coarse_change > 1.0e-3 * rungs[-1].observables["yield"]
+    assert verdict.reason == "converged"
+    assert report.accepted_spacing_eV == rungs[0].spacing_eV
+
+
+def test_nonzero_continuum_is_not_near_zero_when_line_is_empty():
+    rungs = [
+        _rung(4.0, **{"yield": 0.0, "continuum_yield": 1.0}),
+        _rung(2.0, **{"yield": 0.0, "continuum_yield": 1.2}),
+        _rung(1.0, **{"yield": 0.0, "continuum_yield": 1.1}),
+    ]
+
+    report = richardson_acceptance(
+        rungs, gated={"continuum_yield": "intrinsic_source"}
+    )
+
+    assert report.triples[0].observables[0].reason != "near-zero"
+    assert report.accepted_spacing_eV is None
+
+
 def test_undefined_shape_observable_fails_closed_for_a_real_spectrum():
     rungs = [
         _rung(4.0, **{"yield": 1.0, "fwhm_eV": float("nan")}),
@@ -293,9 +330,15 @@ def test_fixed_seed_resume_requires_identical_segment_count_and_kinematics():
 def test_detected_counts_are_finite_through_both_default_detectors():
     E = np.linspace(1000.0, 3000.0, 401)
     line = np.exp(-(((E - 2000.0) / 50.0) ** 2))
+    continuum = np.full_like(E, 1e-3)
 
-    observables = spectrum_observables(E, line, np.full_like(E, 1e-3))
+    observables = spectrum_observables(E, line, continuum)
 
     for name in ("timepix3_counts", "eaglexo_counts"):
         assert np.isfinite(observables[name])
         assert 0.0 < observables[name] <= observables["yield"]
+    assert observables["continuum_yield"] == pytest.approx(np.trapezoid(continuum, E))
+    assert observables["continuum_centroid_eV"] == pytest.approx(2000.0)
+    for name in ("timepix3_continuum_counts", "eaglexo_continuum_counts"):
+        assert np.isfinite(observables[name])
+        assert 0.0 < observables[name] <= observables["continuum_yield"]

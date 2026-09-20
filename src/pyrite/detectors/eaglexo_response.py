@@ -269,8 +269,8 @@ class EagleResponse:
     Parameters
     ----------
     E_grid_eV
-        One-dimensional spectrum grid in eV. It need not be uniform for quantum
-        efficiency alone; ``resolve_energy=True`` requires uniform spacing.
+        One-dimensional spectrum grid in eV; need not be uniform, including
+        with ``resolve_energy=True`` (see :func:`convolve_detector`).
     coating
         ``"BN"`` (default) or ``"BEN"`` entrance coating.
     resolve_energy
@@ -288,7 +288,7 @@ class EagleResponse:
         self.n_pix = n_pix
         self.qe = qe(self.E, coating=coating)  # QE on the grid, in [0,1]
 
-    def apply(self, spec):
+    def apply(self, spec, *, return_outside=False):
         """Detected spectral density on the SAME grid and in the SAME flux units
         as the input (e.g. Phs/eV/s/nA): ``spec * QE(E)``, optionally blurred by
         the photon-counting energy resolution. NaN/inf samples (a bad-geometry
@@ -298,17 +298,28 @@ class EagleResponse:
         ----------
         spec
             Incident photon spectral density on the response grid.
+        return_outside
+            If true, also return the detected photon mass blurred below and
+            above the response grid. Both values are zero when energy
+            resolution is disabled.
 
         Returns
         -------
-        numpy.ndarray
-            Detected photon density on the same grid and in the same flux units.
+        numpy.ndarray or tuple
+            Detected photon density on the same grid and in the same flux
+            units. With ``return_outside=True``, returns
+            ``(density, (below, above))`` where the latter values have units
+            of the input density times eV.
         """
         spec = prep_spectrum(spec, self.E, "eaglexo_response")
         det = spec * self.qe
         if self.resolve_energy:
             fwhm = float(np.median(energy_fwhm_eV(self.E, self.n_pix)))
-            det = convolve_detector(self.E, det, fwhm)  # ~const, sqrt(E)-weak
+            return convolve_detector(
+                self.E, det, fwhm, return_outside=return_outside
+            )  # ~const, sqrt(E)-weak
+        if return_outside:
+            return det, (0.0, 0.0)
         return det
 
     def detection_efficiency(self, E_eV=None):

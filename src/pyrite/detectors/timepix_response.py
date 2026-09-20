@@ -87,8 +87,8 @@ from scipy.special import erf
 
 from .._grid_semantics import (
     is_uniform_grid,
-    node_bin_edges_and_widths,
     rebin_piecewise_constant_density,
+    zero_based_detector_edges,
 )
 from ..materials.crystal import absorption_length_ang
 from . import _si_sensor
@@ -299,6 +299,43 @@ def build_response(
     )
 
 
+_MATRIX_CACHE = {}
+
+
+def _cached_response_matrix(
+    E_in,
+    out_edges,
+    *,
+    n_mc,
+    seed,
+    thickness_um,
+    bias_v,
+):
+    """Reuse the seeded MC for identical detector channels and hardware."""
+    thick = SENSOR_THICKNESS_UM if thickness_um is None else thickness_um
+    bias = BIAS_VOLTAGE_V if bias_v is None else bias_v
+    key = (
+        _si_sensor.grid_key(E_in),
+        _si_sensor.grid_key(out_edges),
+        n_mc,
+        seed,
+        thick,
+        bias,
+    )
+    response = _MATRIX_CACHE.get(key)
+    if response is None:
+        response = build_response(
+            E_in,
+            out_edges,
+            n_mc=n_mc,
+            seed=seed,
+            thickness_um=thickness_um,
+            bias_v=bias_v,
+        )
+        _MATRIX_CACHE[key] = response
+    return response
+
+
 class TimepixResponse:
     """
     A precomputed detector response bound to one fixed energy grid, so
@@ -314,10 +351,12 @@ class TimepixResponse:
       * coarse OUTPUT grid (dE_out, ~25 eV): the recorded-energy histogram. Wider
         bins -> more counts per bin -> a smoother response with the same n_mc.
 
-    .apply() then (1) bins a fine input spectrum into the coarse input grid
-    conserving total photons, (2) matmuls through R, (3) interpolates the
-    detected density back onto the fine grid. The detector's own blur makes that
-    interpolation lossless in practice.
+    The detector input channels are anchored to absolute multiples of ``dE_mc``
+    and therefore do not shift when the source mesh is refined.  .apply() then
+    (1) conservatively rebins a fine input spectrum onto those fixed channels,
+    (2) matmuls through R, and (3) interpolates the detected density back onto
+    the fine grid. The detector's own blur makes that interpolation lossless in
+    practice.
 
     Parameters
     ----------
@@ -347,23 +386,37 @@ class TimepixResponse:
     ):
         E = np.asarray(E_grid_eV, dtype=float)
         self.E = E  # the fine output grid
-        fine_edges, fine_widths = node_bin_edges_and_widths(E)
+        # The detector owns an explicit physical 0 eV boundary, whatever the
+        # source mesh starts at: a reflected negative half-bin is clamped up to
+        # it, and a positive continuum floor gets a separate empty channel
+        # beneath it rather than having its first bin stretched down to zero.
+        fine_edges, edge_widths, self.zero_channel = zero_based_detector_edges(E)
+        fine_widths = edge_widths[1:] if self.zero_channel else edge_widths
         lo, hi = float(E[0]), float(E[-1])
 
         # --- coarse INPUT grid ---------------------------------------------
-        # edges start half a fine-bin below the first sample so each fine bin
-        # falls cleanly inside one coarse bin
+        # Anchor channels to the detector's absolute energy lattice, not to a
+        # source-bin edge.  One channel of padding on either side covers the
+        # midpoint cells of ordinary source meshes without moving the MC
+        # energies when that mesh is refined.
         if is_uniform_grid(E):
-            # Retain the original scalar arithmetic on established uniform
-            # grids; this is both faster and bit-for-bit compatible.
             self.dE_fine = float(E[1] - E[0])
-            self.fine_edges = None
-            in_edges = np.arange(lo - self.dE_fine / 2, hi + dE_mc, dE_mc)
         else:
             self.dE_fine = fine_widths
-            self.fine_edges = fine_edges
-            n_coarse = int(np.ceil((fine_edges[-1] - fine_edges[0]) / dE_mc))
-            in_edges = fine_edges[0] + np.arange(n_coarse + 1) * dE_mc
+        self.fine_edges = fine_edges
+        first_channel = max(0, int(np.floor(lo / dE_mc)) - 1)
+        last_channel = int(np.ceil(hi / dE_mc)) + 1
+        # One channel of padding assumes the outermost midpoint cell is narrower
+        # than dE_mc, which a uniform mesh satisfies but a coarse geometric one
+        # does not -- its top half-width grows with energy. Widen only when the
+        # source edges actually escape the padded band, so every mesh that was
+        # already covered keeps exactly the channels (and the seeded MC) it had.
+        source_edges = fine_edges[1:] if self.zero_channel else fine_edges
+        if first_channel * dE_mc > source_edges[0]:
+            first_channel = max(0, int(np.floor(source_edges[0] / dE_mc)) - 1)
+        if last_channel * dE_mc < source_edges[-1]:
+            last_channel = int(np.ceil(source_edges[-1] / dE_mc)) + 1
+        in_edges = np.arange(first_channel, last_channel + 1, dtype=float) * dE_mc
         self.in_edges = in_edges
         self.E_in = 0.5 * (in_edges[:-1] + in_edges[1:])  # coarse bin centres
         self.n_in = self.E_in.size
@@ -378,7 +431,7 @@ class TimepixResponse:
         self.dE_out = dE_out
 
         # run the Monte Carlo once; everything below is reused on every .apply()
-        resp = build_response(
+        resp = _cached_response_matrix(
             self.E_in,
             out_edges,
             n_mc=n_mc,
@@ -406,10 +459,9 @@ class TimepixResponse:
 
         Bookkeeping: spec times each node's midpoint-cell width is photons per
         source bin. A conservative overlap integral rebins those masses onto
-        the coarse input channels (the established uniform path retains its
-        equivalent ``bincount``); R @ that is detected photons per coarse-output
-        bin. Dividing by dE_out makes it a density again; interpolation lifts it
-        back onto the source nodes.
+        the fixed coarse input channels; R @ that is detected photons per
+        coarse-output bin. Dividing by dE_out makes it a density again;
+        interpolation lifts it back onto the source nodes.
 
         Parameters
         ----------
@@ -422,14 +474,13 @@ class TimepixResponse:
             Detected density on the same fine grid and in the same flux units.
         """
         spec = _si_sensor.prep_spectrum(spec, self.E, "timepix_response")
-        if self.fine_edges is None:
-            n_in = np.bincount(
-                self.idx_in, weights=spec * self.dE_fine, minlength=self.n_in
-            )  # photons / coarse bin
-        else:
-            n_in, outside = rebin_piecewise_constant_density(self.fine_edges, spec, self.in_edges)
-            if outside != (0.0, 0.0):
-                raise RuntimeError("Timepix input-channel edges failed to cover the source grid")
+        if self.zero_channel:
+            # The explicit [0, first source edge) detector channel carries no
+            # source mass: the continuum model has no support below its floor.
+            spec = np.concatenate(([0.0], spec))
+        n_in, outside = rebin_piecewise_constant_density(self.fine_edges, spec, self.in_edges)
+        if outside != (0.0, 0.0):
+            raise RuntimeError("Timepix input-channel edges failed to cover the source grid")
         S_out_coarse = (self.R @ n_in) / self.dE_out  # detected density / eV
         return np.interp(self.E, self.E_out, S_out_coarse, left=0.0, right=0.0)
 
@@ -441,9 +492,8 @@ class TimepixResponse:
         return np.interp(E, self.E_in, self.P_det)
 
 
-# Responses are pure functions of (energy grid, hardware, MC settings), so cache
-# them: a results set that mixes grids (e.g. a stale checkpoint with both 2500
-# and 3000 eV runs) then transparently gets one response per distinct grid.
+# Fine-grid wrappers remain grid-specific, while _MATRIX_CACHE above shares the
+# expensive detector MC whenever those grids resolve to identical fixed channels.
 _RESPONSE_CACHE = {}
 
 
@@ -459,16 +509,15 @@ def get_response(
 ):
     """Return a cached Timepix response for a grid and hardware settings.
 
-    Built once per
-    unique (grid, hardware, MC) signature and reused thereafter. Prefer this over
-    constructing TimepixResponse directly when looping over many spectra -- every
-    spectrum gets a response matching ITS grid, instead of one shared matrix that
-    only fits the first grid encountered.
+    Built once per unique (grid, hardware, MC) signature and reused thereafter.
+    Prefer this over constructing TimepixResponse directly when looping over many
+    spectra. Fine-grid wrappers remain distinct, but source meshes spanning the
+    same fixed detector channels share their expensive seeded response matrix.
 
     Parameters
     ----------
     E_grid_eV
-        Fine, uniform photon-energy grid in eV.
+        Fine photon-energy evaluation nodes in eV; need not be uniform.
     dE_mc, dE_out
         Coarse input and output bin widths in eV.
     n_mc, seed
@@ -484,8 +533,8 @@ def get_response(
     E = np.asarray(E_grid_eV, dtype=float)
     thick = SENSOR_THICKNESS_UM if thickness_um is None else thickness_um
     bias = BIAS_VOLTAGE_V if bias_v is None else bias_v
-    # grid identity = (size, endpoints) since the grids are uniform; plus the
-    # hardware/MC settings that change the matrix
+    # The wrapper is bound to the complete fine grid; its matrix is cached
+    # separately by fixed input/output channels and hardware settings.
     key = _si_sensor.grid_key(E) + (dE_mc, dE_out, n_mc, seed, thick, bias)
     resp = _RESPONSE_CACHE.get(key)
     if resp is None:

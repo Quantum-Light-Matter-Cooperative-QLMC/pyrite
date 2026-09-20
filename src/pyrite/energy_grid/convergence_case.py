@@ -1,17 +1,19 @@
-"""Catalog-case adapter and resumable driver for the line-grid refinement ladder.
+"""Catalog-case adapter and resumable driver for photon-grid refinement ladders.
 
 :mod:`pyrite.energy_grid.convergence` is grid- and producer-agnostic. This
 module binds it to one production case: transport runs exactly once through the
 runner's own transport phase, and every rung re-evaluates only the production
-spectrum reductions (lines, characteristic, bremsstrahlung under the lines) on
-those segments. ``CaseLadder.evaluate_components`` at the case's own grid is
-pinned bit-for-bit against the runner's spectrum phase by a regression test, so
-the ladder measures the production spectrum rather than a re-implementation.
+spectrum reductions on those segments. ``CaseLadder.evaluate_components`` at
+the case's own grid is pinned bit-for-bit against the runner's spectrum phase
+by a regression test. Ladder evaluation keeps that production line reduction
+but evaluates bremsstrahlung directly on every candidate grid, rather than
+measuring interpolation of the production continuum grid.
 
-Gated observables use the CXR line density alone. Characteristic lines are
-deposited as exact Lorentzian bin masses, a different, grid-exact
-discretization whose sampled FWHM is the bin width by construction; it is
-recorded per rung as an ungated informational yield.
+Gated observables cover CXR line and bremsstrahlung-continuum yield, centroid,
+and detector counts, plus dominant-line shape and line/background ratio.
+Characteristic lines are deposited as exact Lorentzian bin masses, a
+different, grid-exact discretization whose sampled FWHM is the bin width by
+construction; it is recorded per rung as an ungated informational yield.
 
 Heavy ladders are remote work, submitted and pulled through the light
 :mod:`pyrite.energy_grid.convergence_job`. ``run`` below is the slice body that
@@ -65,8 +67,11 @@ from .convergence_job import (
     add_ladder_arguments,
     add_window_arguments,
 )
+from .floor import geometric_continuum_grid
+from .refine import case_endpoint_eV, refined_continuum_grid
 
-CHECKPOINT_SCHEMA = 1
+# Schema 2 adds direct per-rung continuum evaluation and continuum observables.
+CHECKPOINT_SCHEMA = 2
 #: Checkpoint version of the window-refinement ladder (#101). Separate from the
 #: uniform ladder's: its rungs are window plans, not uniform grids.
 WINDOW_CHECKPOINT_SCHEMA = 1
@@ -136,24 +141,46 @@ class CaseLadder:
         grid = np.asarray(self.transport["E_grid"], dtype=float)
         return float(grid[0]), float(grid[-1])
 
+    def continuum_grids(
+        self,
+        counts: Sequence[int],
+        stop_eV: float,
+        *,
+        refine: bool = True,
+    ) -> list[np.ndarray]:
+        """Continuum ladder rungs for *this* case's own medium and endpoint.
+
+        The floor comes from the case's medium and the kinematic endpoint from
+        the case's incident energy, so neither can drift from the run being
+        measured. This is the production selector for the derived floor:
+        :func:`continuum_ladder_grids` with the case supplying both arguments.
+        """
+        return continuum_ladder_grids(
+            str(self.case["crystal"]),
+            stop_eV,
+            counts,
+            endpoint_eV=case_endpoint_eV(self.case),
+            refine=refine,
+        )
+
     def _brem_wide_density(self):
         if self._brem_wide is None:
-            tp = self.transport
-            self._brem_wide = np.asarray(
-                _to_cpu(
-                    runner._brem_wide_from_segments(
-                        self._segments_device,
-                        tp["E_brem"],
-                        self.case,
-                        tp["n_hat"],
-                        self.case.get("abs_layers"),
-                        groove=tp.get("groove"),
-                        Ne=tp["Ne_brem"],
-                    )
-                ),
-                dtype=float,
-            )
+            self._brem_wide = self.continuum(self.transport["E_brem"])
         return self._brem_wide
+
+    def continuum(self, E_grid_eV: object) -> np.ndarray:
+        """Production bremsstrahlung density evaluated directly on ``E_grid_eV``."""
+        tp = self.transport
+        brem = runner._brem_wide_from_segments(
+            self._segments_device,
+            np.asarray(E_grid_eV, dtype=float),
+            self.case,
+            tp["n_hat"],
+            self.case.get("abs_layers"),
+            groove=tp.get("groove"),
+            Ne=tp["Ne_brem"],
+        )
+        return np.asarray(_to_cpu(brem), dtype=float)
 
     def lines(self, E_grid_eV: object) -> np.ndarray:
         """Production incoherent CXR line density alone, on host."""
@@ -171,36 +198,41 @@ class CaseLadder:
         )
         return np.asarray(_to_cpu(lines), dtype=float)
 
-    def evaluate_components(self, E_grid_eV: object) -> dict[str, np.ndarray]:
-        """Production line, characteristic, and under-line brem densities."""
+    def _characteristic(self, E_grid_eV: object) -> np.ndarray:
+        """Production characteristic density alone, on host."""
         tp = self.transport
-        E = np.asarray(E_grid_eV, dtype=float)
-        lines = self.lines(E)
         characteristic = runner._characteristic_from_segments(
             self._segments_device,
-            E,
+            np.asarray(E_grid_eV, dtype=float),
             self.case,
             tp["n_hat"],
             self.case.get("abs_layers"),
             groove=tp.get("groove"),
             Ne=tp["Ne_brem"],
         )
+        return np.asarray(_to_cpu(characteristic), dtype=float)
+
+    def evaluate_components(self, E_grid_eV: object) -> dict[str, np.ndarray]:
+        """Production line, characteristic, and under-line brem densities."""
+        tp = self.transport
+        E = np.asarray(E_grid_eV, dtype=float)
+        lines = self.lines(E)
         brem = np.interp(E, tp["E_brem"], self._brem_wide_density())
         return {
             "lines": lines,
-            "characteristic": np.asarray(_to_cpu(characteristic), dtype=float),
+            "characteristic": self._characteristic(E),
             "brem": brem,
         }
 
     def evaluate(self, E_grid_eV: object) -> SpectrumSample:
-        """Harness evaluator: CXR lines gated; characteristic yield informational."""
+        """Harness evaluator with line and continuum densities on the candidate grid."""
         E = np.asarray(E_grid_eV, dtype=float)
-        parts = self.evaluate_components(E)
+        characteristic = self._characteristic(E)
         return SpectrumSample(
-            line=parts["lines"],
-            background=parts["brem"],
+            line=self.lines(E),
+            background=self.continuum(E),
             informational={
-                "characteristic_yield": float(np.trapezoid(parts["characteristic"], E)),
+                "characteristic_yield": float(np.trapezoid(characteristic, E)),
             },
         )
 
@@ -218,6 +250,38 @@ class CaseLadder:
             "aliased_weight_fraction": float(aliased),
             "n_spacing_segments": int(count),
         }
+
+
+def continuum_ladder_grids(
+    material: str,
+    stop_eV: float,
+    counts: Sequence[int],
+    *,
+    endpoint_eV: float | None = None,
+    refine: bool = True,
+) -> list[np.ndarray]:
+    """Continuum ladder rungs from the medium's own derived floor.
+
+    Every rung starts at
+    :func:`~pyrite.energy_grid.floor.photon_continuum_floor_eV` for ``material``
+    rather than at a chosen round number, so the ladder measures convergence of
+    the band the model is actually valid over. With ``refine`` (the default)
+    each rung additionally carries the absorption-edge and kinematic-endpoint
+    nodes :mod:`pyrite.energy_grid.refine` derives for that band;
+    ``refine=False`` gives the plain geometric baseline, which is what the
+    refined ladder is measured against.
+
+    ``counts`` are endpoint-inclusive node counts, coarsest first.
+    """
+    grids = []
+    for count in counts:
+        if refine:
+            grids.append(
+                refined_continuum_grid(material, stop_eV, int(count), endpoint_eV=endpoint_eV)
+            )
+        else:
+            grids.append(geometric_continuum_grid(material, stop_eV, int(count)))
+    return grids
 
 
 def ladder_grids(start_eV: float, stop_eV: float, spacings_eV: Sequence[float]) -> list[np.ndarray]:

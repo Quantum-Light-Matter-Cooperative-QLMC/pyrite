@@ -35,7 +35,9 @@ __all__ = [
     "EDGE_SOURCE",
     "KINEMATIC_SOURCE",
     "SEEDING_REVISION",
+    "EdgeBracket",
     "SeedContext",
+    "absorption_edge_brackets",
     "absorption_edge_seeds",
     "characteristic_line_seeds",
     "collect_feature_seeds",
@@ -295,45 +297,66 @@ def kinematic_line_seeds(
     return seeds, summary
 
 
-def absorption_edge_seeds(
+@dataclass(frozen=True, slots=True)
+class EdgeBracket:
+    """One absorption jump, located in the table the attenuation model reads.
+
+    ``below_eV``/``above_eV`` are the two adjacent *native* Chantler nodes the
+    steepest ``f2`` step lies between, so the discontinuity is bounded by exact
+    tabulated coordinates. ``first_eV``/``last_eV`` bound the kept native
+    neighbourhood and ``spacing_eV`` is its median native spacing -- the
+    resolution at which the model itself represents the edge, and therefore the
+    finest placement any consumer can justify here.
+    """
+
+    label: str
+    below_eV: float
+    above_eV: float
+    first_eV: float
+    last_eV: float
+    spacing_eV: float
+
+
+def absorption_edge_brackets(
     elements: Iterable[str],
     start_eV: float,
     stop_eV: float,
-) -> tuple[list[FeatureSeed], dict[str, Any]]:
-    """Anchored windows on the absorption jumps the attenuation model contains.
+) -> tuple[list[EdgeBracket], dict[str, Any]]:
+    """Locate the absorption jumps the attenuation model actually contains.
 
-    The line kernels attenuate with ``mu`` from the Chantler ``f2`` table
-    (``materials.crystal.absorption_length_ang``), so the jump is located in
-    that table: the steepest adjacent ``f2`` ratio within
-    :data:`EDGE_SEARCH_FRACTION` of each xraydb edge energy. Both nodes of that
-    bracket become anchors, so the discontinuity is bracketed by exact line
-    coordinates rather than falling inside one interval, and the window keeps
-    :data:`EDGE_NATIVE_NODES` native nodes on each side at the median native
-    spacing there -- the resolution at which the model itself represents the
-    edge. Edges are mandatory seeds: at 30 keV, 95% of hopg coherent-line
-    intensity was measured in the one 3 eV bin at the carbon K edge, where
-    ``mu`` jumps 18-fold.
+    The emission and escape models attenuate with ``mu`` from the Chantler
+    ``f2`` table (``materials.crystal.absorption_length_ang``), so a jump is
+    located in *that* table rather than taken from a nominal edge energy: the
+    steepest adjacent ``f2`` ratio within :data:`EDGE_SEARCH_FRACTION` of each
+    xraydb edge energy. The two tables disagree by up to ~2.1% below 1 keV, so
+    the xraydb energy is only a locator.
 
     Shells whose steepest ratio is below :data:`EDGE_MIN_F2_RATIO` are reported
     as ``skipped``. Chantler smears a jump over several brackets, so shells are
     visited strongest xraydb jump first and each takes the steepest bracket
-    outside the native-node windows already seeded. A secondary jump within
-    :data:`EDGE_SEARCH_FRACTION` of a stronger one (Se L2 beside L3) then gets
-    its own anchors; a shell with no such bracket at or above
-    :data:`EDGE_MIN_F2_RATIO` lies inside a window already seeded.
+    outside the native-node neighbourhoods already claimed. A secondary jump
+    within :data:`EDGE_SEARCH_FRACTION` of a stronger one (Se L2 beside L3) then
+    gets its own bracket; a shell with no such bracket at or above
+    :data:`EDGE_MIN_F2_RATIO` lies inside one already claimed.
 
-    Validation: line-window-seeding
+    An edge whose search interval does not overlap ``[start_eV, stop_eV]`` is
+    dropped silently: it is outside the modelled band and places no requirement
+    on a grid over that band.
+
+    Shared by the line-axis window seeds (issue #101) and the photon-continuum
+    node refinement (:mod:`pyrite.energy_grid.refine`, issue #100) so both read
+    one locator rather than two copies of an edge list.
     """
     import xraydb
 
     from ...materials.atomic import load_henke
 
-    seeds: list[FeatureSeed] = []
+    brackets: list[EdgeBracket] = []
     skipped: list[str] = []
     start, stop = float(start_eV), float(stop_eV)
     for element in sorted(set(elements)):
         native, _f1, f2 = load_henke(element)
-        claimed: set[int] = set()  # bracket indices inside an already-seeded window
+        claimed: set[int] = set()  # bracket indices inside an already-claimed window
         edges = sorted(
             (
                 (shell, edge)
@@ -368,31 +391,63 @@ def absorption_edge_seeds(
             first = max(index - EDGE_NATIVE_NODES, 0)
             last = min(index + 1 + EDGE_NATIVE_NODES, native.size - 1)
             claimed.update(range(first, last))
-            spacing = float(np.median(np.diff(native[first : last + 1])))
-            below_node, above_node = float(native[index]), float(native[index + 1])
-            seeds.append(
-                FeatureSeed(
-                    source=EDGE_SOURCE,
+            brackets.append(
+                EdgeBracket(
                     label=label,
-                    centre_eV=below_node,
-                    below_eV=below_node - float(native[first]),
-                    above_eV=float(native[last]) - below_node,
-                    spacing_eV=spacing,
-                    anchor=True,
+                    below_eV=float(native[index]),
+                    above_eV=float(native[index + 1]),
+                    first_eV=float(native[first]),
+                    last_eV=float(native[last]),
+                    spacing_eV=float(np.median(np.diff(native[first : last + 1]))),
                 )
             )
-            seeds.append(
-                FeatureSeed(
-                    source=EDGE_SOURCE,
-                    label=f"{label} above",
-                    centre_eV=above_node,
-                    below_eV=0.0,
-                    above_eV=0.0,
-                    spacing_eV=spacing,
-                    anchor=True,
-                )
+    return brackets, {"skipped": skipped}
+
+
+def absorption_edge_seeds(
+    elements: Iterable[str],
+    start_eV: float,
+    stop_eV: float,
+) -> tuple[list[FeatureSeed], dict[str, Any]]:
+    """Anchored windows on the absorption jumps the attenuation model contains.
+
+    Edge positions come from :func:`absorption_edge_brackets`. Both nodes of the
+    located bracket become anchors, so the discontinuity is bracketed by exact
+    line coordinates rather than falling inside one interval, and the window
+    keeps :data:`EDGE_NATIVE_NODES` native nodes on each side at the median
+    native spacing there -- the resolution at which the model itself represents
+    the edge. Edges are mandatory seeds: at 30 keV, 95% of hopg coherent-line
+    intensity was measured in the one 3 eV bin at the carbon K edge, where
+    ``mu`` jumps 18-fold.
+
+    Validation: line-window-seeding
+    """
+    brackets, summary = absorption_edge_brackets(elements, start_eV, stop_eV)
+    seeds: list[FeatureSeed] = []
+    for bracket in brackets:
+        seeds.append(
+            FeatureSeed(
+                source=EDGE_SOURCE,
+                label=bracket.label,
+                centre_eV=bracket.below_eV,
+                below_eV=bracket.below_eV - bracket.first_eV,
+                above_eV=bracket.last_eV - bracket.below_eV,
+                spacing_eV=bracket.spacing_eV,
+                anchor=True,
             )
-    return seeds, {"skipped": skipped}
+        )
+        seeds.append(
+            FeatureSeed(
+                source=EDGE_SOURCE,
+                label=f"{bracket.label} above",
+                centre_eV=bracket.above_eV,
+                below_eV=0.0,
+                above_eV=0.0,
+                spacing_eV=bracket.spacing_eV,
+                anchor=True,
+            )
+        )
+    return seeds, summary
 
 
 def characteristic_line_seeds(

@@ -1,6 +1,6 @@
-"""Refinement-ladder convergence harness for line-grid resolution (issue #109).
+"""Refinement-ladder convergence harness for photon-energy grids.
 
-The harness answers one question: *on fixed trajectories, which line-grid
+The harness answers one question: *on fixed trajectories, which photon-grid
 spacing has converged?* It evaluates only the spectrum phase on one set of
 transport segments across a ladder of photon-energy grids, so every difference
 between rungs is pure grid (quadrature) error. It never compares separate Monte
@@ -15,10 +15,11 @@ and #117 (coherent-route analysis) supply their own coordinates to the same
 
 Gated observables and their tolerance classes (``GATED_OBSERVABLES``) reuse the
 per-observable tolerances of the automatic line-grid policy
-(:data:`pyrite._line_grid_policy.DEFAULT_RTOL`, unchanged): yield and centroid
-as intrinsic-source quantities at ``1e-3``, detector-counted quantities at
-``1e-2``. Dominant-line FWHM and line/background form a harness-only ``shape``
-class gated at ``1e-2`` and are also reported, ungated, at ``1e-3``: automatic
+(:data:`pyrite._line_grid_policy.DEFAULT_RTOL`, unchanged): line and continuum
+yield and centroid as intrinsic-source quantities at ``1e-3``, detector-counted
+quantities at ``1e-2``. Dominant-line FWHM and line/background form a
+harness-only ``shape`` class gated at ``1e-2`` and are also reported, ungated,
+at ``1e-3``: automatic
 ``sinc-nyquist`` spacing certifies yield and centroid, not shape at ``1e-3``,
 which belongs to #101's local windows. Peak height is deliberately not an
 observable -- a sampled density maximum scales with the local spacing.
@@ -88,10 +89,14 @@ NOISE_FRACTION = 0.1
 GATED_OBSERVABLES: Mapping[str, str] = {
     "yield": "intrinsic_source",
     "centroid_eV": "intrinsic_source",
+    "continuum_yield": "intrinsic_source",
+    "continuum_centroid_eV": "intrinsic_source",
     "fwhm_eV": "shape",
     "line_background_ratio": "shape",
     "timepix3_counts": "detected_counts",
     "eaglexo_counts": "detected_counts",
+    "timepix3_continuum_counts": "detected_counts",
+    "eaglexo_continuum_counts": "detected_counts",
 }
 
 #: Relative tolerance per class: the production policy's ``DEFAULT_RTOL``
@@ -123,11 +128,24 @@ DEFAULT_YIELD_FLOOR = 1.0e-15
 DEFAULT_ATOL: Mapping[str, float] = {
     "yield": DEFAULT_YIELD_FLOOR,
     "centroid_eV": 0.0,
+    "continuum_yield": DEFAULT_YIELD_FLOOR,
+    "continuum_centroid_eV": 0.0,
     "fwhm_eV": 0.0,
     "line_background_ratio": 0.0,
     "timepix3_counts": DEFAULT_YIELD_FLOOR,
     "eaglexo_counts": DEFAULT_YIELD_FLOOR,
+    "timepix3_continuum_counts": DEFAULT_YIELD_FLOOR,
+    "eaglexo_continuum_counts": DEFAULT_YIELD_FLOOR,
 }
+
+_CONTINUUM_OBSERVABLES = frozenset(
+    {
+        "continuum_yield",
+        "continuum_centroid_eV",
+        "timepix3_continuum_counts",
+        "eaglexo_continuum_counts",
+    }
+)
 
 _SEGMENT_FIELDS = ("E_keV", "L_ang", "v_hat", "r_mid", "elec_id", "layer")
 
@@ -292,14 +310,16 @@ def spectrum_observables(
     rel_prominence: float = 0.03,
     detectors: Mapping[str, Any] | None = None,
 ) -> dict[str, float]:
-    """Grid-aware scalar observables of one line spectrum.
+    """Grid-aware scalar observables of line and continuum spectra.
 
-    ``yield`` and ``centroid_eV`` are trapezoids over the rung's own
-    coordinates. ``fwhm_eV`` and ``line_background_ratio`` are the dominant
+    Line ``yield`` / ``centroid_eV`` and ``continuum_yield`` /
+    ``continuum_centroid_eV`` are trapezoids over the rung's own coordinates.
+    ``fwhm_eV`` and ``line_background_ratio`` are the dominant
     (largest-prominence) line's physical-energy FWHM and its local line/
     background ratio from :func:`pyrite.results.metrics.line_metrics`.
-    Detected counts integrate each read-time detector response of the line
-    density (default: :class:`~pyrite.detectors.spec.Timepix3` and
+    Detected counts integrate each read-time detector response separately for
+    the line and continuum densities (default:
+    :class:`~pyrite.detectors.spec.Timepix3` and
     :class:`~pyrite.detectors.spec.EagleXO` at their defaults). Every value is
     per incident electron per sr (or eV for positions and widths).
     """
@@ -310,6 +330,12 @@ def spectrum_observables(
         raise ValueError("line and background densities must match the grid shape")
     total = float(np.trapezoid(line, E))
     centroid = float(np.trapezoid(E * line, E) / total) if total > 0.0 else float("nan")
+    continuum_total = float(np.trapezoid(background, E))
+    continuum_centroid = (
+        float(np.trapezoid(E * background, E) / continuum_total)
+        if continuum_total > 0.0
+        else float("nan")
+    )
     metrics = line_metrics(
         {"E_grid": E, "spec": line, "brem": background, "scale": 1.0},
         None,
@@ -321,6 +347,8 @@ def spectrum_observables(
     out = {
         "yield": total,
         "centroid_eV": centroid,
+        "continuum_yield": continuum_total,
+        "continuum_centroid_eV": continuum_centroid,
         "fwhm_eV": fwhm if fwhm > 0.0 else float("nan"),
         "line_background_ratio": ratio,
     }
@@ -332,6 +360,10 @@ def spectrum_observables(
     for name, response in responses.items():
         detected = response.score(E, line, fwhm_eV=None, scale=1.0)
         out[name] = float(np.trapezoid(np.asarray(detected, dtype=float), E))
+        continuum_detected = response.score(E, background, fwhm_eV=None, scale=1.0)
+        out[f"{name.removesuffix('_counts')}_continuum_counts"] = float(
+            np.trapezoid(np.asarray(continuum_detected, dtype=float), E)
+        )
     return out
 
 
@@ -487,14 +519,19 @@ def richardson_acceptance(
     triples: list[TripleVerdict] = []
     for index in range(len(rungs) - 2):
         window = rungs[index : index + 3]
-        near_zero = float(window[2].observables.get("yield", math.inf)) <= yield_floor
         verdicts = tuple(
             _observable_verdict(
                 name,
                 [rung.observables[name] for rung in window],
                 rtol=float(tolerances[category]),
                 atol=float(floors.get(name, 0.0)),
-                near_zero=near_zero,
+                near_zero=float(
+                    window[2].observables.get(
+                        "continuum_yield" if name in _CONTINUUM_OBSERVABLES else "yield",
+                        math.inf,
+                    )
+                )
+                <= yield_floor,
             )
             for name, category in gated.items()
         )
@@ -525,7 +562,13 @@ def richardson_acceptance(
                     [rung.observables[name] for rung in window],
                     rtol=float(diagnostic_rtol),
                     atol=float(floors.get(name, 0.0)),
-                    near_zero=float(window[2].observables.get("yield", math.inf)) <= yield_floor,
+                    near_zero=float(
+                        window[2].observables.get(
+                            "continuum_yield" if name in _CONTINUUM_OBSERVABLES else "yield",
+                            math.inf,
+                        )
+                    )
+                    <= yield_floor,
                 ).accepted
             )
         diagnostic[name] = _coarsest_consistent(spacings, passed)

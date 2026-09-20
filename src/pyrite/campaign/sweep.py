@@ -43,6 +43,7 @@ from .._line_grid_policy import (
     line_start_eV,
     resolve_line_grid_policy,
 )
+from .._photon_continuum_floor import floored_lattice_start_eV
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import reciprocal_g_vector
@@ -747,6 +748,21 @@ def build_cases(
     mosaic_mc_rad = mosaic_fwhm_rad if mosaic_mc else None
 
     brem_case_grid = encode_energy_grid(brem_grid)
+    if isinstance(brem_case_grid, tuple) and sweep.material is not None:
+        # A uniform band declares a `start`, but the energy below which the
+        # continuum and photon-escape models carry no validity is a property of
+        # the *medium*, not of the profile that declared the band. Resolving it
+        # here -- the first place the band and the material meet -- is what lets
+        # a profile-level default stay at 0.0 and still never produce a node
+        # outside the modelled band, and what keeps two profiles sharing the
+        # same material agreeing on the grid, which a per-profile stored start
+        # could not do. A declared start ABOVE the floor is an ordinary
+        # bandwidth choice and is kept, matching
+        # ``energy_grid.floor.geometric_continuum_grid``. Nonuniform grids are
+        # passed through: their builders resolve their own floor, and a sweep
+        # with no catalog material names no medium to take a floor from.
+        start, stop, step = brem_case_grid
+        brem_case_grid = (max(start, floored_lattice_start_eV(sweep.material, step)), stop, step)
 
     def _electron_counts(grid, fallback, label):
         if grid is None:

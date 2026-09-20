@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from pyrite._backend import BACKEND
 from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
 
 cp = pytest.importorskip("cupy")
@@ -15,6 +16,50 @@ except Exception:  # pragma: no cover - depends on CUDA runtime presence
     _NDEV = 0
 
 pytestmark = pytest.mark.skipif(_NDEV < 1, reason="CUDA device required")
+
+
+@pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda")
+def test_nonuniform_eedl_continuum_matches_chunked_cuda_fallback(monkeypatch):
+    """#100: the fused and generic CUDA routes consume the same graded nodes."""
+    from pyrite.montecarlo.spectrum import brem
+
+    segments = {
+        "r_mid": np.array(
+            [[0.0, 0.0, 20.0], [0.0, 0.0, 45.0], [0.0, 0.0, 80.0]],
+            dtype=np.float32,
+        ),
+        "v_hat": np.tile([0.0, 0.0, 1.0], (3, 1)).astype(np.float32),
+        "L_ang": np.array([45.0, 130.0, 300.0], dtype=np.float32),
+        "E_keV": np.array([12.0, 31.0, 78.0], dtype=np.float32),
+        "elec_id": np.arange(3),
+        "Ne": 3,
+        "thickness_ang": 100.0,
+    }
+    energy_eV = np.geomspace(80.0, 40_000.0, 257).astype(np.float32)
+    monkeypatch.setattr(
+        brem,
+        "_mu_total_inv_ang",
+        lambda _composition, energy: brem.xp.zeros_like(energy),
+    )
+
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", True)
+    fused = brem.mc_brem_spectrum(
+        segments,
+        energy_eV,
+        composition=[("C", 0.1)],
+        chunk=2,
+    )
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", False)
+    fallback = brem.mc_brem_spectrum(
+        segments,
+        energy_eV,
+        composition=[("C", 0.1)],
+        chunk=2,
+    )
+
+    assert np.all(np.isfinite(fused))
+    assert np.max(fused) > 0.0
+    np.testing.assert_allclose(fused, fallback, rtol=3e-4, atol=1e-20)
 
 
 def _old_weighted_brem_reference(T, L, paths, mu, E, *, Z, density_cm3):

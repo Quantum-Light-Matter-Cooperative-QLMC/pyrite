@@ -101,14 +101,70 @@ def test_poisson_core_uniform_expected_counts_unchanged():
     assert np.array_equal(expected, np.clip(density * dE * 3.0, 0.0, None))
 
 
-def test_convolve_detector_refuses_a_log_grid():
-    with pytest.raises(NonuniformEnergyGridError, match="convolve_detector"):
-        response.convolve_detector(LOG_GRID, np.ones_like(LOG_GRID), 50.0)
-
-
 def test_convolve_detector_still_runs_on_a_uniform_grid():
-    out = response.convolve_detector(LINEAR_GRID, np.ones_like(LINEAR_GRID), 50.0)
+    density = np.ones_like(LINEAR_GRID)
+    out = response.convolve_detector(LINEAR_GRID, density, 50.0)
+    accounted, outside = response.convolve_detector(LINEAR_GRID, density, 50.0, return_outside=True)
+
     assert out.shape == LINEAR_GRID.shape
+    np.testing.assert_array_equal(accounted, out)
+    assert outside[0] > 0.0
+    assert outside[1] > 0.0
+
+
+def test_convolve_detector_conserves_mass_on_a_log_grid_away_from_edges():
+    """#100: convolve_detector no longer requires a uniform grid. Away from the
+    zero-padded edges, the graded-grid quadrature path (node_bin_edges_and_widths
+    local weights) should conserve mass like the uniform sample-space path does."""
+    density = np.exp(-0.5 * ((LOG_GRID - 3_000.0) / 20.0) ** 2)
+    out = response.convolve_detector(LOG_GRID, density, 50.0)
+
+    assert out.shape == LOG_GRID.shape
+    assert np.all(np.isfinite(out))
+    assert np.all(out >= 0.0)
+    _, widths = node_bin_edges_and_widths(LOG_GRID)
+    input_mass = np.sum(density * widths)
+    output_mass = np.sum(out * widths)
+    assert output_mass == pytest.approx(input_mass, rel=0.05)
+
+
+def test_convolve_detector_reports_mass_blurred_outside_window():
+    """#100: zero-padded edge loss must be observable, not silently dropped."""
+    density = np.exp(-0.5 * ((LOG_GRID - LOG_GRID[0]) / 10.0) ** 2)
+    blurred, outside = response.convolve_detector(LOG_GRID, density, 50.0, return_outside=True)
+
+    edges, widths = node_bin_edges_and_widths(LOG_GRID)
+    input_mass = np.sum(density * widths)
+    output_mass = np.sum(blurred * widths)
+    below, above = outside
+
+    assert below > 0.0
+    assert above == pytest.approx(0.0, abs=1e-12)
+    assert output_mass + below + above == pytest.approx(input_mass, rel=0.02)
+    assert edges[0] < LOG_GRID[0]
+
+
+def test_eagle_response_resolve_energy_accepts_a_log_grid():
+    eaglexo_response = pytest.importorskip("pyrite.detectors.eaglexo_response")
+
+    resp = eaglexo_response.EagleResponse(LOG_GRID, resolve_energy=True)
+    detected = resp.apply(np.ones_like(LOG_GRID))
+
+    assert detected.shape == LOG_GRID.shape
+    assert np.all(np.isfinite(detected))
+    assert np.all(detected >= 0.0)
+
+
+def test_eagle_response_exposes_energy_blur_outside_mass():
+    eaglexo_response = pytest.importorskip("pyrite.detectors.eaglexo_response")
+
+    resp = eaglexo_response.EagleResponse(LOG_GRID, resolve_energy=True)
+    incident = np.exp(-0.5 * ((LOG_GRID - LOG_GRID[-1]) / 20.0) ** 2)
+    detected, outside = resp.apply(incident, return_outside=True)
+
+    assert detected.shape == LOG_GRID.shape
+    assert outside[0] == pytest.approx(0.0, abs=1e-12)
+    assert outside[1] > 0.0
 
 
 def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
@@ -121,8 +177,14 @@ def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
         weights=np.ones_like(LOG_GRID) * response.dE_fine,
         minlength=response.n_in,
     )
+    # fine_edges carries the detector's explicit 0 eV channel below the source
+    # floor (#100); it holds no source mass, so the density pads with a zero.
+    unit_density = np.ones_like(LOG_GRID)
+    padded_density = (
+        np.concatenate(([0.0], unit_density)) if response.zero_channel else unit_density
+    )
     conservative, outside = rebin_piecewise_constant_density(
-        response.fine_edges, np.ones_like(LOG_GRID), response.in_edges
+        response.fine_edges, padded_density, response.in_edges
     )
     assert np.sum(conservative) == pytest.approx(np.sum(widths), rel=1e-14)
     assert outside == (0.0, 0.0)
@@ -130,6 +192,40 @@ def test_timepix_response_accepts_a_log_grid_and_uses_local_input_widths():
     detected = response.apply(np.ones_like(LOG_GRID))
     assert detected.shape == LOG_GRID.shape
     assert np.all(np.isfinite(detected))
+
+
+def test_timepix_response_channels_do_not_shift_with_source_mesh_refinement():
+    """#100: detector channels and their seeded MC must be source-mesh independent."""
+    timepix_response = pytest.importorskip("pyrite.detectors.timepix_response")
+    coarse_grid = np.linspace(1_000.0, 3_000.0, 101)
+    fine_grid = np.linspace(1_000.0, 3_000.0, 201)
+    coarse = timepix_response.TimepixResponse(coarse_grid, n_mc=64, seed=7)
+    fine = timepix_response.TimepixResponse(fine_grid, n_mc=64, seed=7)
+
+    np.testing.assert_array_equal(coarse.in_edges, fine.in_edges)
+    np.testing.assert_array_equal(coarse.E_in, fine.E_in)
+    np.testing.assert_array_equal(coarse.E_out, fine.E_out)
+    np.testing.assert_array_equal(coarse.R, fine.R)
+    assert coarse.R is fine.R
+
+    coarse_density = np.exp(-0.5 * ((coarse_grid - 2_000.0) / 100.0) ** 2)
+    fine_density = np.exp(-0.5 * ((fine_grid - 2_000.0) / 100.0) ** 2)
+    _, coarse_widths = node_bin_edges_and_widths(coarse_grid)
+    _, fine_widths = node_bin_edges_and_widths(fine_grid)
+    coarse_counts = np.sum(coarse.apply(coarse_density) * coarse_widths)
+    fine_counts = np.sum(fine.apply(fine_density) * fine_widths)
+    assert coarse_counts == pytest.approx(fine_counts, rel=1e-3)
+
+
+def test_timepix_response_uses_an_explicit_zero_energy_detector_edge():
+    timepix_response = pytest.importorskip("pyrite.detectors.timepix_response")
+    grid = np.array([1.0, 97.0, 193.0])
+
+    detector = timepix_response.TimepixResponse(grid, n_mc=8)
+
+    assert detector.fine_edges[0] == 0.0
+    assert detector.in_edges[0] == 0.0
+    assert np.all(np.isfinite(detector.apply(np.ones_like(grid))))
 
 
 def test_line_metrics_is_correct_on_a_log_grid():
