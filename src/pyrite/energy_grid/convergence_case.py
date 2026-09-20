@@ -116,6 +116,7 @@ class CaseLadder:
         *,
         transport_core: str = "auto",
         transport: Mapping[str, Any] | None = None,
+        coherent: bool = False,
     ):
         """Transport ``case`` once, or adopt an already-computed ``transport``.
 
@@ -123,6 +124,11 @@ class CaseLadder:
         different backend precision) is used as-is; no Monte Carlo runs here.
         """
         self.case = case
+        # Route selector for the line spectrum only; the continuum and
+        # characteristic evaluators are route-independent. One transport
+        # serves both routes, so a coherent and an incoherent ladder built
+        # from the same injected transport compare on identical trajectories.
+        self.coherent = bool(coherent)
         started = time.perf_counter()
         if transport is None:
             self.transport = runner._transport_case(case, transport_core=transport_core)
@@ -183,7 +189,12 @@ class CaseLadder:
         return np.asarray(_to_cpu(brem), dtype=float)
 
     def lines(self, E_grid_eV: object) -> np.ndarray:
-        """Production incoherent CXR line density alone, on host."""
+        """Production CXR line density alone, on host.
+
+        Follows this ladder's route: ``coherent=False`` sums ``|A|^2`` per
+        segment, ``coherent=True`` sums the complex field across segments
+        before squaring.
+        """
         tp = self.transport
         lines = runner._lines_for_segments(
             self._segments_device,
@@ -192,7 +203,7 @@ class CaseLadder:
             tp["n_hat"],
             self.case.get("abs_layers"),
             tp.get("groove"),
-            coherent=False,
+            coherent=self.coherent,
             Ne=tp["Ne_lines"],
             table_cache={},
         )

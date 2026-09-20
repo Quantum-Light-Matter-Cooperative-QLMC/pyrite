@@ -34,6 +34,7 @@ atomic-physics/structure-factor
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
+beam-transport/coherent-line-grid-fringe-spacing
 beam-transport/electron-transport
 beam-transport/energy-controlled-propagation
 beam-transport/energy-loss-straggling
