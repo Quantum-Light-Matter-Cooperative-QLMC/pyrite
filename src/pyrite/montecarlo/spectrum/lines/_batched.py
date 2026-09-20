@@ -15,6 +15,7 @@ import numpy as np
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from . import _policy
+from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
 from ._kernels import (
     _PREF_C1,
     _RESONANCE_ROOT_RTOL,
@@ -116,9 +117,13 @@ class _LineBatch:
     the batched route's incoherent step be its own function.
     """
 
-    def __init__(self, spec, E_grid):
+    def __init__(self, spec, E_grid, bin_edges=None, bin_inv_width=None):
         self.spec = spec
         self.E_grid = E_grid
+        # Set only under bin-mean quadrature, which swaps the node-sampling
+        # kernel for its closed-form bin-mean counterpart.
+        self.bin_edges = bin_edges
+        self.bin_inv_width = bin_inv_width
         self.E_r = []
         self.aw = []
         self.w = []
@@ -155,14 +160,24 @@ class _LineBatch:
 
         _nsys_push("cxr.lines.reduce")
 
-        run_reduction_kernel(
-            E_r_batch,
-            aw_batch,
-            w_batch,
-            self.E_grid,
-            out=self.spec,
-            config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
-        )
+        if self.bin_edges is not None:  # Validation: sinc-bin-integration
+            run_bin_mean_reduction_kernel(
+                E_r_batch,
+                aw_batch,
+                w_batch,
+                self.bin_edges,
+                self.bin_inv_width,
+                out=self.spec,
+            )
+        else:
+            run_reduction_kernel(
+                E_r_batch,
+                aw_batch,
+                w_batch,
+                self.E_grid,
+                out=self.spec,
+                config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
+            )
 
         _nsys_pop()
 
@@ -690,7 +705,10 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
             w_f = w.reshape(-1)[gm_idx]
             for j0 in range(0, E_r_f.size, chunk):
                 sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
-                S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
+                if st.bin_edges is not None:  # Validation: sinc-bin-integration
+                    S = sincsq_bin_lineshape(aw_f[sl2], E_r_f[sl2], st.bin_edges, st.bin_inv_width)
+                else:
+                    S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
                 tgt += w_f[sl2] @ S
     _nsys_pop()
 
@@ -1107,7 +1125,11 @@ def _accumulate_batched(st):
     # it is active.
     coh_blocks = []
     coh_counts = []
-    line_batch = _LineBatch(spec, E_grid) if _use_jit_line_reduction else None
+    line_batch = (
+        _LineBatch(spec, E_grid, st.bin_edges, st.bin_inv_width)
+        if _use_jit_line_reduction
+        else None
+    )
 
     for s0 in range(0, n_seg, seg_block):
         sb = slice(s0, min(s0 + seg_block, n_seg))

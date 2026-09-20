@@ -70,6 +70,7 @@ radiation-physics/line-absorption-tabulation
 radiation-physics/line-energy-dispersion
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption
+radiation-physics/sinc-bin-integration
 radiation-physics/transverse-bunch-form-factor
 radiation-physics/xray-chi-zero
 radiation-physics/xray-in-medium-propagation-phase

@@ -46,6 +46,7 @@ run through the collector.
 | `multilayer_slice3_check.py` | Per-layer crystalline-radiation and incoherent-sum checks. |
 | `multilayer_validation_check.py` | Closed-form stack attenuation and depth-range scaling anchors. |
 | `radiation_error_estimator_calibration.py` | Calibrates warning thresholds for the radiation error estimator. |
+| `sinc_bin_integration.py` | Bin-mean line quadrature on one transport: yield against an exact node reference, and CPU/CuPy/fused-CUDA agreement (remote only at 300 keV). |
 | `substep_invariance.py` | Measures emitted-radiation invariance under numerical transport substepping. |
 | `transport_core_goldens.py` | Verifies bit-for-bit CPU transport-core golden outputs. |
 | `cxr_analysis_feranchuk.ipynb`, `cxr_analysis_feranchuk.md` | Legacy paired notebook retained for historical Feranchuk analysis; it emits no records. Keep output-free. |

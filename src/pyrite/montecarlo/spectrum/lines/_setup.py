@@ -16,6 +16,7 @@ from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
+from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_line_quadrature
 from ._kernels import (
     _clip_segments_to_cutoff,
     _elemental_log_mu_table,
@@ -28,7 +29,7 @@ from ._kernels import (
 
 @dataclass(frozen=True, eq=False)
 class SpectrumRequest:
-    """The 26 inputs of :func:`mc_spectrum`, bound into one value.
+    """The 27 inputs of :func:`mc_spectrum`, bound into one value.
 
     Grouping them is what lets the spectrum phases below be module-level
     functions instead of closures over ``mc_spectrum``'s locals: a phase takes
@@ -69,6 +70,7 @@ class SpectrumRequest:
     E_cut_keV: Any = None
     _table_cache: Any = None
     longitudinal_rms_fs: Any = None
+    line_quadrature: Any = "node"
 
 
 @dataclass
@@ -128,6 +130,10 @@ class _SpectrumSetup:
     decoherence_A_pop: Any
     xy0_pop: Any
     L_esc_all: Any = None
+    # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
+    # accumulation routes' device (``_bin_quadrature.bin_axis``).
+    bin_edges: Any = None
+    bin_inv_width: Any = None
 
 
 def _prepare_spectrum(request):
@@ -310,6 +316,30 @@ def _prepare_spectrum(request):
             "coherently (the A_PXR*A_CBS cross term survives). Request the "
             "total, or transport without max_dE_frac."
         )
+
+    # Closed-form bin integration covers the incoherent, per-row intensity sum
+    # only. Each refusal names a reduction whose square is taken after a sum of
+    # amplitudes, or a truncation the bin masses would silently disagree with.
+    # Validation: sinc-bin-integration
+    bin_edges = bin_inv_width = None
+    if validate_line_quadrature(request.line_quadrature) == BIN_MEAN_QUADRATURE:
+        if coherent:
+            raise ValueError(
+                "line_quadrature='bin-mean' is incoherent-only: the coherent route "
+                "squares a sum of amplitudes, which has no per-line bin mass (#117)"
+            )
+        if grouped:
+            raise ValueError(
+                "line_quadrature='bin-mean' is incompatible with numerical substeps: "
+                "flight-grouped rows add amplitudes before squaring. Transport "
+                "without max_dE_frac, or use line_quadrature='node'."
+            )
+        if request.sinc_cutoff is not None:
+            raise ValueError(
+                "line_quadrature='bin-mean' integrates each line's whole profile; "
+                "sinc_cutoff truncation is not supported with it"
+            )
+        bin_edges, bin_inv_width = bin_axis(E_grid_eV)
 
     # chi_g / U_g are smooth in energy AWAY from absorption edges, so evaluate
     # them on a tabulation grid and interpolate at the per-segment resonance
@@ -514,4 +544,6 @@ def _prepare_spectrum(request):
         finite_footprint_F=finite_footprint_F,
         decoherence_A_pop=decoherence_A_pop,
         xy0_pop=xy0_pop,
+        bin_edges=bin_edges,
+        bin_inv_width=bin_inv_width,
     )

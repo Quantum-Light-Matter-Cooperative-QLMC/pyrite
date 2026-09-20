@@ -39,6 +39,7 @@ from .._line_grid_policy import (
     LineGridPolicy,
     environment_overrides_present,
     kinematic_line_stop_eV,
+    line_quadrature_from_payload,
     line_start_eV,
     resolve_line_grid_policy,
 )
@@ -820,6 +821,12 @@ def build_cases(
                         **(
                             {"line_grid_policy": line_policies[i_e]}
                             if line_policies[i_e] is not None
+                            else {}
+                        ),
+                        # Divergence-only (#116): node sampling keeps its payload.
+                        **(
+                            {"line_quadrature": "bin-mean"}
+                            if line_quadrature_from_payload(line_policies[i_e]) == "bin-mean"
                             else {}
                         ),
                         E_grid_brem=(
