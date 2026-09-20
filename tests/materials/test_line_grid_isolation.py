@@ -17,10 +17,43 @@ from pyrite.materials import load_material_catalog
 
 @pytest.fixture
 def catalog_path(tmp_path):
-    shutil.copytree(DATA_DIR / "energy-grid-artifacts", tmp_path / "energy-grid-artifacts")
+    (tmp_path / "energy-grid-artifacts").mkdir()
     path = tmp_path / "materials.toml"
     shutil.copyfile(DATA_DIR / "materials.toml", path)
     return path
+
+
+def _install_legacy_hopg_row(catalog_path):
+    document = tomlkit.parse(catalog_path.read_text())
+    document["energy_grids"] = {
+        "hopg": {
+            "line_by_energy": [
+                {
+                    "energy_keV": 30.0,
+                    "grid": {"linspace": {"start": 10.0, "stop": 2500.0, "num": 831}},
+                    "source": "manual",
+                }
+            ]
+        }
+    }
+    catalog_path.write_text(tomlkit.dumps(document))
+
+
+def _install_hopg_artifact(catalog_path):
+    from pyrite import _energy_grid_artifacts as artifacts
+
+    identity = artifacts.artifact_identity(
+        "hopg",
+        [{"energy_keV": 30, "start_eV": 10, "stop_eV": 2500, "num": 831}],
+        {"start_eV": 0, "stop_eV": 30000, "step_eV": 10},
+        [30, 35, 40, 50, 60, 100, 150, 200, 250, 300],
+    )
+    stored = artifacts.write_artifact(catalog_path.parent / "energy-grid-artifacts", identity)
+    document = tomlkit.parse(catalog_path.read_text())
+    for profile in ("standard", "hopg_hbn", "hopg_hbn_straggling", "hopg_short"):
+        document["profiles"][profile]["energy_grid_refs"] = {"hopg": stored.digest}
+    catalog_path.write_text(tomlkit.dumps(document))
+    return stored
 
 
 def _coordinates(catalog):
@@ -34,10 +67,8 @@ def _coordinates(catalog):
 
 
 def test_changing_hopg_legacy_rows_only_changes_hopg(catalog_path, monkeypatch):
+    _install_legacy_hopg_row(catalog_path)
     document = tomlkit.parse(catalog_path.read_text())
-    # Exercise the legacy row independently of the artifact that usually wins.
-    del document["profiles"]["standard"]["energy_grid_refs"]["hopg"]
-    catalog_path.write_text(tomlkit.dumps(document))
     before = load_material_catalog(catalog_path)
     document["energy_grids"]["hopg"]["line_by_energy"][0]["grid"]["linspace"]["stop"] += 100
     catalog_path.write_text(tomlkit.dumps(document))
@@ -67,6 +98,7 @@ def test_changing_hopg_legacy_rows_only_changes_hopg(catalog_path, monkeypatch):
 
 
 def test_regenerating_hopg_artifact_isolated_across_materials_and_profiles(catalog_path, tmp_path):
+    stored = _install_hopg_artifact(catalog_path)
     document = tomlkit.parse(catalog_path.read_text())
     profiles = ("standard", "hopg_hbn", "hopg_hbn_straggling", "hopg_short")
     before = {profile: load_material_catalog(catalog_path, profile=profile) for profile in profiles}
@@ -76,7 +108,7 @@ def test_regenerating_hopg_artifact_isolated_across_materials_and_profiles(catal
     from pyrite import _energy_grid_artifacts as artifacts
 
     old_digest = original_refs["standard"]["hopg"]
-    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", old_digest)
+    assert artifacts.load_artifact(tmp_path / "energy-grid-artifacts", old_digest) == stored
     rows = json.loads(json.dumps(stored.identity["line_rows"]))
     rows[0]["stop_eV"] += 100
     brem = stored.identity["brem_grid"]

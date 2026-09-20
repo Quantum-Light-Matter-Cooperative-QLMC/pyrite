@@ -49,7 +49,11 @@ def test_ladder_rung_at_the_case_grid_is_the_production_spectrum(case, ladder):
 
 def test_line_grid_does_not_enter_the_transport_rng_stream(case, ladder):
     start, stop = ladder.bandwidth_eV
-    regridded = {**case, "E_grid_line": np.linspace(start, stop, 7 * 1000 + 1)}
+    regridded = {
+        **case,
+        "E_grid_line": np.linspace(start, stop, 7 * 1000 + 1),
+        "line_grid_policy": None,
+    }
 
     transport = runner._transport_case(regridded, transport_core="lockstep")
 
@@ -86,8 +90,10 @@ def test_run_config_checkpoints_per_rung_and_resumes_on_identical_segments():
     finished, complete = cc.run_config(CONFIG, SPACINGS, state=partial)
 
     assert complete is True
+    expected_grids = cc.ladder_grids(*finished["bandwidth_eV"], SPACINGS)
+    expected_spacings = [float(np.diff(grid)[0]) for grid in expected_grids]
     assert [rung["spacing_eV"] for rung in finished["rungs"]] == pytest.approx(
-        [96.0 * 2590.0 / 2592.0 / 2**k for k in range(3)]
+        expected_spacings
     )
     assert finished["fingerprint"] == partial["fingerprint"]
     assert len(finished["transport_wall_s"]) == 2

@@ -2,12 +2,13 @@
 
 `pyrite run` accepts two named, independently resolved fidelity policies:
 
-- `full` preserves production behavior: catalog grids, 300 line electrons,
+- `full` preserves production behavior: automatic case-local line grids, 300 line electrons,
   150 bremsstrahlung electrons, and complete configured reflection sets.
 - `survey` is provisional. It uses 60/30 electrons, at most two beam energies,
   three thicknesses, five polar tilts, two azimuths, two reflection families
-  (at most four resolved reflections), and photon grids cropped to their
-  central 70% then sampled at one-quarter density.
+  (at most four resolved reflections), and any explicit photon grids cropped
+  to their central 70% then sampled at one-quarter density. Automatic line
+  grids remain case-local under either fidelity.
 
 Run a survey with:
 
@@ -26,12 +27,12 @@ workflow](python-api-workflow.md). The internal
 `pyrite.campaign.config.default_settings` and `material_sweep` helpers remain
 campaign compatibility surfaces rather than the supported library entry point.
 
-`pyrite material energy-grid derive`, locally or with `--remote`, is upstream
-of this choice: it measures catalog-ready line and bremsstrahlung bounds
-without a fidelity setting and installs those full bounds for `--profile NAME`
-(or the configured current profile). Later
-`pyrite run --fidelity survey` reduces the stored photon grids together with
-other sweep axes; `full` uses them unchanged.
+`pyrite material energy-grid derive`, locally or with `--remote`, is an
+optional optimization upstream of this choice: it measures line and
+bremsstrahlung bounds without a fidelity setting and installs those bounds for
+`--profile NAME` (or the configured current profile). Survey fidelity reduces
+an installed explicit grid together with other sweep axes; otherwise both
+fidelities use automatic line-grid resolution.
 
 ## Calculation numerics
 

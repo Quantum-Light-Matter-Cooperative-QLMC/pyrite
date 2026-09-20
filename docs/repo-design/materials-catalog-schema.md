@@ -23,23 +23,22 @@ schema_version = 1
 `detectors` are optional. `energy_grids` is accepted only as a legacy compatibility input;
 new grids are immutable artifacts referenced from profiles.
 
-Line rows resolve from the selected profile's artifact reference for that
-material, then its own `[energy_grids.MATERIAL]` legacy table. There is no
+Bundled profiles contain neither artifact references nor legacy line rows, so
+every bundled material uses automatic case-local line grids. For an opt-in
+fixed grid, line rows resolve from the selected profile's artifact reference
+for that material, then its own `[energy_grids.MATERIAL]` legacy table. There is no
 cross-material fallback: profile-named tables, including
 `[energy_grids.standard]`, do not supply or seed another material's rows.
-Explicit fixed line grids remain supported. Without a fixed grid, missing
-energies (including materials with no stored rows) use the existing automatic
+Explicit fixed line grids remain supported. Without a fixed grid, all energies
+use the existing automatic
 `sinc-nyquist` resolution and `kinematic-ceiling` bandwidth policy from the
 case's own material and trajectories. Derivation is not a prerequisite.
 
-Updating one material's immutable artifact repoints only that material in the
+Installing one material's immutable artifact repoints only that material in the
 selected profile. Other materials and profiles retaining the old digest keep
-their coordinates. Removing the former shared fallback changes case/cache
-identity for these 18 materials, so their existing checkpoints are not reused:
-`4h_sic`, `6h_sic`, `fes2`, `gep`, `ges`, `mos2-on-sapphire`,
-`mos2-on-sio2-si`, `mote2_product`, `rese2`, `sapphire`, `silicon`, `tis2`,
-`tise2`, `tite2`, `v2o5`, `vte2`, `ws2`, and `zrte5`. Own-material rows and
-artifact coordinates are preserved; checkpoints are not deleted.
+their coordinates. Removing bundled fixed coordinates changes case/cache
+identity once for every affected profile; existing checkpoints are not reused
+or deleted. See [ADR-0013](../adr/0013-automatic-line-grids-by-default.md).
 
 ## Crystals and media
 

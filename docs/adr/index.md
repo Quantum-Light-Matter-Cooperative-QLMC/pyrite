@@ -45,6 +45,7 @@ In other words:
 0009-result-persistence-format
 0010-reduce-cli-noun-surface
 0012-backlog-in-github-issues
+0013-automatic-line-grids-by-default
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -60,3 +61,4 @@ In other words:
 | [0009](0009-result-persistence-format.md)           | Result persistence format           | Accepted                               |
 | [0010](0010-reduce-cli-noun-surface.md)             | Reduce the CLI noun surface          | Accepted                               |
 | [0012](0012-backlog-in-github-issues.md)            | Backlog in GitHub Issues, not TODO.md | Accepted                               |
+| [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted                               |

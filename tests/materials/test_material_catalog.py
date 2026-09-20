@@ -18,6 +18,17 @@ def test_public_schema_types_keep_catalog_pickle_identity():
     assert pickle.loads(pickle.dumps(MaterialValidationSpec())) == MaterialValidationSpec()
 
 
+def test_bundled_catalog_uses_automatic_line_grids_for_every_material():
+    """Bundled profiles must not silently bypass the converged automatic policy."""
+    from pyrite.materials import CATALOG
+
+    assert all(
+        not CATALOG.material(material).scan.E_grid_line_by_energy
+        for material in CATALOG.material_keys
+    )
+    assert all(not refs for refs in CATALOG.profile_energy_grid_refs.values())
+
+
 def _write_catalog(tmp_path: Path, text: str) -> Path:
     path = tmp_path / "materials.toml"
     path.write_text(text)
