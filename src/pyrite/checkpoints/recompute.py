@@ -123,7 +123,10 @@ def rebrem_checkpoints(
         resolved_ne = ne_brem
         resolved_start = brem_start_eV
         resolved_step = brem_step_eV
+        resolved_nodes = None
         if context.identified or fidelity is not None or require_identity:
+            import numpy as np
+
             from .recompute_defaults import settings, sweep, uniform_bounds
 
             profile_settings = settings(context.fidelity)
@@ -135,18 +138,37 @@ def rebrem_checkpoints(
                     context.fidelity,
                     catalog_profile=context.catalog_profile,
                 )
-                profile_start, _profile_stop, profile_step = uniform_bounds(
-                    profile_sweep.detector.energy_bins.brem
-                )
             except (KeyError, TypeError, ValueError):
                 # Derived stems (for example ``*_blazed``) have no catalog row.
                 # Keep their stored grid while still applying profile Ne/provenance.
                 pass
             else:
-                if resolved_start is None:
-                    resolved_start = profile_start
-                if resolved_step is None:
-                    resolved_step = profile_step
+                profile_brem = profile_sweep.detector.energy_bins.brem
+                profile_grid = None if profile_brem is None else np.asarray(profile_brem, float)
+                if (
+                    profile_grid is not None
+                    and profile_grid.size >= 2
+                    and not is_uniform_grid(profile_grid)
+                ):
+                    # A graded profile continuum has no (start, stop, step) to
+                    # retune through. ``uniform_bounds`` raises on one, and that
+                    # raise used to land in the except branch above -- so the
+                    # profile grid was silently ignored and the record kept its
+                    # own. Retune onto the coordinates instead.
+                    if not any(
+                        value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)
+                    ):
+                        resolved_nodes = profile_grid
+                else:
+                    try:
+                        profile_start, _profile_stop, profile_step = uniform_bounds(profile_grid)
+                    except (TypeError, ValueError):
+                        pass
+                    else:
+                        if resolved_start is None:
+                            resolved_start = profile_start
+                        if resolved_step is None:
+                            resolved_step = profile_step
         kw = {}
         if progress_file is not None:
             latest = {"total_cases": 0, "cached_cases": 0, "completed_new_cases": 0}
@@ -178,6 +200,7 @@ def rebrem_checkpoints(
                 brem_start_eV=resolved_start,
                 brem_stop_eV=brem_stop_eV,
                 brem_step_eV=resolved_step,
+                brem_nodes=resolved_nodes,
                 max_seconds=max_seconds,
                 status=status,
                 **repair_options,
@@ -373,6 +396,7 @@ def repair_brem_wide(
     brem_start_eV=None,
     brem_stop_eV=None,
     brem_step_eV=None,
+    brem_nodes=None,
     fidelity=None,
     on_progress=None,
     max_seconds=None,
@@ -433,7 +457,17 @@ def repair_brem_wide(
 
     from ..montecarlo import _brem_for_case
 
-    retune = any(
+    if brem_nodes is not None and any(
+        value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)
+    ):
+        raise ValueError(
+            "brem_nodes names the target coordinates outright; it cannot be combined "
+            "with brem_start_eV/brem_stop_eV/brem_step_eV"
+        )
+    target_nodes = None if brem_nodes is None else np.asarray(brem_nodes, dtype=float)
+    if target_nodes is not None and (target_nodes.ndim != 1 or target_nodes.size < 2):
+        raise ValueError("brem_nodes must be a one-dimensional grid of at least two nodes")
+    retune = target_nodes is not None or any(
         value is not None
         for value in (ne_brem, brem_start_eV, brem_stop_eV, brem_step_eV, fidelity)
     )
@@ -452,7 +486,11 @@ def repair_brem_wide(
                         at_target = False
                     if fidelity is not None and c.get("brem_profile") != fidelity:
                         at_target = False
-                    if any(
+                    if target_nodes is not None:
+                        g = _stored_brem_grid(r)
+                        if g.shape != target_nodes.shape or not np.array_equal(g, target_nodes):
+                            at_target = False
+                    elif any(
                         value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)
                     ):
                         g = _stored_brem_grid(r)
@@ -511,7 +549,13 @@ def repair_brem_wide(
             c["Ne_brem"] = int(ne_brem)
         if fidelity is not None:
             c["brem_profile"] = fidelity
-        if any(value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)):
+        if target_nodes is not None:
+            # A graded target is already final: build_cases likewise passes a
+            # nonuniform grid through for every beam energy instead of extending
+            # it to E0, so the retuned record matches what a live sweep would get.
+            E_brem = target_nodes
+            c["E_grid_brem"] = encode_energy_grid(E_brem)
+        elif any(value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)):
             stored = _stored_brem_grid(r)
             step_b = (
                 float(brem_step_eV) if brem_step_eV is not None else float(stored[1] - stored[0])

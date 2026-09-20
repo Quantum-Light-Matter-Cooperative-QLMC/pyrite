@@ -142,13 +142,60 @@ present consumer.
   after `uv sync --group dev --group notebooks --group test --group lint` and
   were an environment artifact, not code.
 
+## Third slice (retune side)
+
+`checkpoints/recompute.py` could only express a retune target as
+`(start, stop, step)`. The interesting part was not the missing feature but a
+silent one: `recompute_defaults.uniform_bounds` *raises* on a nonuniform grid,
+and that raise landed in the same `except (KeyError, TypeError, ValueError)`
+branch that exists to tolerate derived stems with no catalog row. So a profile
+declaring a graded continuum had its grid quietly discarded and every record
+kept its own -- the same shape of silent drop as `effective_brem` in the first
+slice.
+
+- `repair_brem_wide` gained `brem_nodes`: an explicit coordinate target, used
+  for the at-target comparison and written to the case through
+  `encode_energy_grid`, which already stores an exact array. Combining it with
+  `brem_start_eV`/`brem_stop_eV`/`brem_step_eV` is refused, as is a degenerate
+  array.
+- The retuned grid is used as-is for every beam energy rather than extended to
+  `E0 + step`, matching `build_cases`, which passes a nonuniform grid straight
+  through.
+- `rebrem_checkpoints` now separates "no catalog row" from "graded catalog
+  row": the `sweep(...)` lookup keeps its own `except`, and a nonuniform
+  profile grid resolves to `brem_nodes` instead of falling through. An explicit
+  `--brem-*` triple still wins.
+- No new `rebrem` flags. The workflow is `brem set --spacing geometric` to
+  declare the grid, then `checkpoint recompute brem --profile <p>` to retune
+  onto it, so the target has one owner.
+
+### Verified
+
+- 7 new tests in `tests/scan/test_run.py`: graded retune writes exact
+  coordinates to record and case, an already-graded record is skipped without
+  recomputing, both refusals, and two driver tests pinning that a graded
+  profile grid reaches `brem_nodes` while a uniform one still resolves
+  `start`/`step` and passes `brem_nodes=None`.
+- `lint`, `typecheck`, `format` clean.
+
+### A live profile was already affected
+
+`hopg`/`survey` resolves to a **graded** brem grid on `main` today: 281 nodes
+carrying two step sizes (50 eV and 100 eV), the node refinement #100 landed.
+So this was not a latent path waiting for someone to declare a geometric grid
+-- `rebrem --fidelity survey` on `hopg` was silently keeping each record's own
+grid instead of retuning onto the one a live sweep actually builds. It now
+retunes, which means such records are correctly seen as not-at-target and are
+recomputed.
+
+`test_rebrem_profile_defaults_match_for_explicit_materials_and_all` had to be
+made array-aware as a result: it compared whole kwargs dicts with `==`, and
+one value is now a coordinate array. Rewritten to compare key by key, still
+keyed by material name so it stays order-insensitive -- the original property
+it was testing.
+
 ## Remaining on #153
 
-- **Retune side.** `checkpoints/recompute.py` retunes brem through
-  `(start, stop, step)` only (`:482`, `:525-526`), so a checkpoint cannot be
-  retuned onto a graded target. The *storage* side already copes:
-  `_stored_brem_grid` decodes through `decode_energy_grid`, which accepts an
-  explicit array. Only the target specification is uniform-only.
 - **Artifacts stay uniform-only.** A geometric continuum cannot currently be
   frozen into an immutable artifact. That costs nothing today (no shipped
   profile pins one) but would need an artifact schema v2 if artifacts come
