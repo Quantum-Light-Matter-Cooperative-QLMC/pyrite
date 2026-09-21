@@ -38,8 +38,12 @@ Verified from source headers and upstream READMEs on 2026-09-21.
   in `Interpolate_DCS/Interpolate_DCS.f90` and in `Brems/{Brems,
   Bremsstrahlung, FitExp, Born_SM_appr, Brems_common}.f90` plus
   `Read_S_integrals.f90`. The CC BY 4.0 terms apply to the published *dataset*
-  deposit, not the code. Confirm at the deposit before relying on the data
-  terms.
+  deposit, not the code — **confirmed 2026-09-21** from the deposit's own
+  licence metadata: CC BY 4.0 International. Citation: Poškus, Andrius (2025),
+  “BremsLib v2.0.8”, Mendeley Data, V9, DOI `10.17632/6zfsc9xsz8.9`. The
+  deposit's terms themselves caution that further permission may be required
+  for third-party content within it, which is how the bundled GPL-3 sources
+  are to be read.
 
 PyRITE is distributed under the UCLA Academic Software License
 (academic/nonprofit use only), so the NC clauses impose no additional
@@ -540,11 +544,24 @@ marker, and ledger row; only a human marks `signed-off`.
 
 ## Open items
 
-- Confirm that shipping no BremsLib-derived tables is acceptable long term,
-  given it makes the BremsLib path unavailable to users without their own
-  copy. Revisiting means confirming the dataset deposit's terms (the code is
-  GPL-3; CC BY 4.0 is assumed for the data but unverified) — deferred with
-  D8.
+- **Live, and no longer blocked:** whether to ship BremsLib-*derived* tables
+  for the built-in catalogue. This item previously deferred on confirming the
+  dataset terms; they are now confirmed as CC BY 4.0 (above), which is the
+  precondition it named.
+
+  CC BY 4.0 carries neither NonCommercial nor ShareAlike, so it permits
+  redistributing the dataset and adaptations of it — derived tables included —
+  provided attribution is given and changes are indicated. The 462 MB deposit
+  stays impractical to redistribute wholesale, but that was never the
+  proposal; per-material derived tables are small.
+
+  If taken, this removes the constraint that currently forces `"eedl"` to
+  remain the packaged default, since BremsLib-backed bremsstrahlung would no
+  longer require every user to obtain the library themselves. That touches D6,
+  the D6 sequencing note, and #86/#87/#95, so it is a decision to take
+  deliberately rather than a consequence to absorb. The GPL-3 sources remain
+  non-redistributable under PyRITE's licence either way, and D7's no-port rule
+  is unaffected.
 - Whether the `xsgen` scratch directory should fall back to copying when the
   filesystem does not support symlinks (Windows without developer mode, some
   network mounts). Symlinks are the plan of record; a copy fallback is cheap
