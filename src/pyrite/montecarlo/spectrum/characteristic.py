@@ -42,7 +42,7 @@ CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 CHARACTERISTIC_MODEL = (
     f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
-    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-direct-vacancy-lorentzian-v4"
+    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-l-shell-ck-lorentzian-v5"
 )
 _MIN_RELAXATION_CUTOFF_EV = 50.0
 CHARACTERISTIC_TRANSPORT_FLOOR_KEV = 1.0
@@ -97,9 +97,13 @@ class CharacteristicCrossSectionTable:
     EEDL subshells may have different incident-energy grids, so
     ``projectile_energy_eV_by_shell`` and
     ``ionization_cross_sections_cm2_by_shell`` contain one read-only array per
-    entry in ``ionization_shell_labels``. ``line_yield_per_vacancy`` has shape
-    ``(n_ionized_shell, n_line)`` and stores ``fluorescence_yield *
-    conditional_line_intensity`` from xraydb.
+    entry in ``ionization_shell_labels``. ``vacancy_transfer`` has shape
+    ``(n_ionized_shell, n_ionized_shell)`` and holds the L-shell Coster--Kronig
+    vacancy redistribution of :func:`_l_shell_vacancy_transfer`.
+    ``line_yield_per_vacancy`` has shape ``(n_ionized_shell, n_line)`` and is
+    that transfer applied to xraydb's ``fluorescence_yield *
+    conditional_line_intensity``, so row ``i`` is the photons per *primary*
+    vacancy in shell ``i`` and may name lines of another L subshell.
     """
 
     element: str
@@ -114,6 +118,7 @@ class CharacteristicCrossSectionTable:
     line_initial_shell: tuple[str, ...]
     line_energy_eV: np.ndarray
     line_fwhm_eV: np.ndarray
+    vacancy_transfer: np.ndarray
     line_yield_per_vacancy: np.ndarray
 
 
@@ -325,6 +330,76 @@ def _load_eedl_subshell_tables(
     )
 
 
+_L_SHELL_CK_ROUTES = (("L1", "L2"), ("L1", "L3"), ("L2", "L3"))
+
+
+def _l_shell_vacancy_transfer(
+    element: str,
+    shell_labels: tuple[str, ...],
+) -> np.ndarray:
+    r"""Expected L-vacancy destinations per primary vacancy, from xraydb CK data.
+
+    Row ``i`` of the returned ``(n_shell, n_shell)`` matrix is the expected
+    number of vacancies each subshell holds after one primary vacancy in ``i``
+    has undergone Coster--Kronig transfer:
+
+    .. math::
+
+        n_{L1} &= (1 - f_{12} - f_{13})\,N_{L1} \\
+        n_{L2} &= (1 - f_{23})\,N_{L2} + f_{12}N_{L1} \\
+        n_{L3} &= N_{L3} + f_{23}N_{L2} + f_{13}N_{L1}
+
+    with :math:`f_{ij}` the Elam/Krause Coster--Kronig probabilities exposed by
+    ``xraydb.ck_probability``. Those are *total* probabilities: :math:`f_{13}`
+    already contains the L1 -> L2 -> L3 route, so it is applied to the primary
+    L1 population and :math:`f_{23}` only to the primary L2 population.
+    Routing the transferred :math:`f_{12}N_{L1}` through :math:`f_{23}` as well
+    would count that path twice.
+
+    Assumptions and scope:
+
+    - Coster--Kronig moves one L hole outward without creating a second L hole,
+      so every row sums to one. The outer-shell spectator vacancy left behind by
+      the ejected Coster--Kronig electron is not propagated, and neither are the
+      Auger daughters of any shell: every non-L row is the identity.
+    - Only the L shell is redistributed. xraydb's M-shell values are not a
+      probability distribution -- the finals of Cr M1 sum to 3.82 -- so they are
+      excluded until EADL supplies a normalized cascade topology.
+    - A route is wired only when both of its subshells are present in
+      ``shell_labels``.
+
+    Limiting case: an element with no tabulated L Coster--Kronig (Z <= 11 in
+    xraydb) returns the identity, reproducing the direct-vacancy product
+    ``omega_i * I_il`` exactly.
+
+    Validation: characteristic-radiation
+    """
+    transfer = np.eye(len(shell_labels), dtype=float)
+    index = {label: position for position, label in enumerate(shell_labels)}
+    outflow: dict[str, float] = {}
+    for initial, final in _L_SHELL_CK_ROUTES:
+        if initial not in index or final not in index:
+            continue
+        probability = _require_finite(
+            xraydb.ck_probability(element, initial, final),
+            f"xraydb {element} {initial}->{final} Coster--Kronig probability",
+        )
+        if not 0.0 <= probability <= 1.0:
+            raise ValueError(
+                f"xraydb {element} {initial}->{final} Coster--Kronig probability must lie in [0, 1]"
+            )
+        transfer[index[initial], index[final]] = probability
+        outflow[initial] = outflow.get(initial, 0.0) + probability
+    for initial, total in outflow.items():
+        if total > 1.0:
+            raise ValueError(
+                f"xraydb {element} {initial} Coster--Kronig probabilities sum to "
+                f"{total:.8g}, which is not a vacancy distribution"
+            )
+        transfer[index[initial], index[initial]] = 1.0 - total
+    return transfer
+
+
 def _parse_characteristic_file(
     path: Path,
     element: str,
@@ -430,9 +505,13 @@ def _parse_characteristic_file(
 
     if not ionization_shell_labels:
         raise ValueError(f"{path}: no supported EEDL subshells for {element}")
-    line_yields = np.zeros((len(ionization_shell_labels), len(line_records)), dtype=float)
+    emission = np.zeros((len(ionization_shell_labels), len(line_records)), dtype=float)
     for column, (shell_row, _label, _energy, _fwhm, probability) in enumerate(line_records):
-        line_yields[shell_row, column] = probability
+        emission[shell_row, column] = probability
+    # Row i must count photons per *primary* vacancy in i, and an L1 hole may
+    # have moved to L2 or L3 by Coster--Kronig before it radiated.
+    vacancy_transfer = _l_shell_vacancy_transfer(element, tuple(ionization_shell_labels))
+    line_yields = vacancy_transfer @ emission
 
     return CharacteristicCrossSectionTable(
         element=element,
@@ -456,6 +535,7 @@ def _parse_characteristic_file(
         line_fwhm_eV=_readonly(
             [fwhm for _row, _label, _energy, fwhm, _probability in line_records]
         ),
+        vacancy_transfer=_readonly(vacancy_transfer),
         line_yield_per_vacancy=_readonly(line_yields),
     )
 
@@ -681,13 +761,16 @@ def _xraydb_line_yields(
     table: CharacteristicCrossSectionTable,
     cutoff_eV: float,
 ) -> np.ndarray:
-    """Return xraydb photons per initial vacancy after the energy cutoff.
+    """Return xraydb photons per primary vacancy after the energy cutoff.
 
     xraydb stores an edge fluorescence yield ``omega_i`` and conditional
-    radiative-line intensities ``I_i,line``. The direct line probability is
-    ``omega_i * I_i,line``. This intentionally does not invent Auger daughter
-    shells or Coster--Kronig cascades that xraydb's emission-line API does not
-    specify.
+    radiative-line intensities ``I_i,line``, whose product is the direct line
+    probability for a vacancy that radiates from the shell it was created in.
+    ``table.line_yield_per_vacancy`` is that product after L-shell
+    Coster--Kronig redistribution (:func:`_l_shell_vacancy_transfer`), so a
+    primary L1 vacancy also emits L2 and L3 lines. It still does not invent the
+    Auger daughter vacancies or the M-shell Coster--Kronig topology that
+    xraydb's tables do not specify.
     """
     response = np.array(table.line_yield_per_vacancy, dtype=float, copy=True)
     response[:, table.line_energy_eV <= cutoff_eV] = 0.0

@@ -10,11 +10,12 @@ Each section declares interpolation law 2, so the incident-energy dependence
 is evaluated piecewise linearly and set to zero outside the tabulated range.
 
 EEDL supplies vacancy-production cross sections, but not the relaxation data
-used here. Line energy $E_{ai\ell}$, fluorescence yield $\omega_{ai}$, and
-conditional radiative intensity $I_{ai\ell}$ come from the Elam tables exposed
-by xraydb. Natural initial- and final-hole widths come from xraydb's compiled
-Krause--Oliver and Keski-Rahkonen--Krause tables. For segment $j$ in an
-emitting material, the bin-averaged track-length estimator is
+used here. Line energy $E_{ai\ell}$, fluorescence yield $\omega_{ai}$,
+conditional radiative intensity $I_{ai\ell}$, and L-shell Coster--Kronig
+probabilities $f_{ij}$ come from the Elam tables exposed by xraydb. Natural
+initial- and final-hole widths come from xraydb's compiled Krause--Oliver and
+Keski-Rahkonen--Krause tables. For segment $j$ in an emitting material, the
+bin-averaged track-length estimator is
 
 ```{math}
 :label: eq-characteristic-track-length
@@ -22,13 +23,30 @@ emitting material, the bin-averaged track-length estimator is
 \left.\frac{d^2N}{dE\,d\Omega}\right|_b
 =\frac{1}{4\pi N_e\,\Delta E_b}
 \sum_{j,a,i,\ell}
-n_a L_j\,\sigma_{ai}(T_j)\,
-\omega_{ai}I_{ai\ell}\,
+n_a L_j\,\sigma_{ai}(T_j)
+\left[\sum_{i'}T^a_{ii'}\,\omega_{ai'}I_{ai'\ell}\right]
 \exp[-\tau_j(E_{ai\ell})]\,q_{ai\ell b}.
 ```
 
-Here $a$ is an element, $i$ an initially ionized subshell, $\ell$ a line from
-that vacancy, $T_j$ the representative electron energy, and $b$ an energy bin.
+Here $a$ is an element, $i$ the subshell the incident electron ionized, $i'$ the
+subshell the photon was emitted from, $\ell$ a line from that vacancy, $T_j$ the
+representative electron energy, and $b$ an energy bin. $T^a$ is the L-shell
+Coster--Kronig vacancy transfer
+
+```{math}
+:label: eq-characteristic-ck-transfer
+
+T^a_{L_1L_1}&=1-f_{12}-f_{13}, & T^a_{L_1L_2}&=f_{12}, & T^a_{L_1L_3}&=f_{13},\\
+T^a_{L_2L_2}&=1-f_{23}, & T^a_{L_2L_3}&=f_{23}, & T^a_{ii}&=1\ \text{otherwise},
+```
+
+all other entries zero. Every row sums to one: Coster--Kronig moves one L hole
+outward without creating a second L hole. xraydb's $f_{13}$ is a *total*
+probability that already contains the $L_1\to L_2\to L_3$ route, so it acts on
+the primary $L_1$ population while $f_{23}$ acts only on the primary $L_2$
+population; feeding the transferred $f_{12}N_{L_1}$ through $f_{23}$ as well
+would count that route twice. With $T^a=\mathbb{1}$ the estimator reduces to the
+direct-vacancy form $\omega_{ai}I_{ai\ell}$ exactly.
 The factor $q_{ai\ell b}$ is the unconditioned natural Lorentzian mass in bin
 $b$:
 
@@ -71,14 +89,33 @@ in-window tail. The infinite-window limit gives $P_{\ell,W}\to1$.
 
 ## Assumptions and scope
 
-The estimator treats independent atoms and isolated, directly created
-vacancies. It multiplies the xraydb edge fluorescence yield by the conditional
-line intensity for that same initial shell. It does not invent Auger-fed
-daughter vacancies, Coster--Kronig redistribution, multiple-vacancy shifts, or
-Auger-electron transport because xraydb's line API is not a complete cascade
-model. An EEDL shell with a nonzero fluorescence yield but no xraydb line list
-is retained, emits zero photons, and raises a `RuntimeWarning` rather than being
-silently approximated.
+The estimator treats independent atoms. A primary L vacancy is redistributed
+across the L subshells by {eq}`eq-characteristic-ck-transfer` before the
+radiative yields are applied; every other vacancy radiates from the subshell it
+was created in.
+
+Excluded, because xraydb's tables do not specify them:
+
+- Auger-fed daughter vacancies, including the outer-shell spectator vacancy the
+  Coster--Kronig electron leaves behind. Bound where it can be bounded: whenever
+  the K shell is open the K-fed L population is under 2% of the direct L
+  population, since $\sigma_L\gg\sigma_K$. The M and N population fed by L Auger
+  decay is larger and is not bounded here.
+- M-shell Coster--Kronig. xraydb's M-shell values are not a probability
+  distribution -- the finals of Cr M1 sum to 3.82, and 134 (Z, initial) pairs
+  exceed one -- so they are excluded rather than renormalized. L-shell values sum
+  to at most one for every $3\leq Z\leq98$, which is what makes $T^a$
+  row-stochastic.
+- Radiative branching outside the Elam line list. $\omega_{ai}$ is distributed
+  over only the lines xraydb tabulates for that subshell, whose intensities sum
+  to one by construction; that conserves the subshell's radiative total but
+  over-assigns intensity to tabulated lines wherever the source table omits weak
+  ones. An EEDL shell with a nonzero fluorescence yield and no xraydb line list
+  at all is retained, emits zero photons, and raises a `RuntimeWarning` rather
+  than being silently approximated.
+- Secondary fluorescence: $\exp(-\tau_j)$ is a pure sink, so an absorbed
+  characteristic photon does not re-emit.
+- Auger-electron transport, multiple-vacancy shifts, satellite structure.
 
 Characteristic emission uses the bremsstrahlung electron population and its
 default 1 keV transport cutoff, rather than the PXR/CBS population's default
@@ -493,3 +530,68 @@ and its subdivision bullet now carries the fixed-attenuation condition and the
 optical-depth-2 midpoint-quadrature numbers. No code was changed. The weak
 `np.isclose` absolute tolerance on the carbon cross-section assertion is left
 as a recorded ledger finding for a separate test-improvement task.
+
+## Issue #91 implementation-context note, 2026-09-21
+
+`v4` to `v5` adds one physical process: L-shell Coster--Kronig redistribution of
+primary vacancies, {eq}`eq-characteristic-ck-transfer`, applied in
+`_l_shell_vacancy_transfer` and folded into `line_yield_per_vacancy` at table
+construction. Nothing in the Lorentzian convention, the window treatment, the
+bin-edge clamp, the escape geometry, or the transport floor changes, and the
+hot loop is untouched — `line_yield_per_vacancy` was already
+`(n_shell, n_line)` and simply becomes dense, so the change costs nothing per
+segment.
+
+Why it is a correction rather than a refinement: the Elam $\omega_i$ are Krause
+pure subshell radiative yields — Au's 0.107 / 0.334 / 0.320 reproduce Krause &
+Oliver (1979) exactly — so Coster--Kronig transfer is by construction *absent*
+from them. Applying $\omega_i$ to the primary population therefore leaves the L
+holes in the subshell that created them, which is not where they radiate from.
+
+Checks that do not use the implementation to construct their expected values:
+
+- **Row normalization.** Each row of $T^a$ sums to one by inspection of
+  {eq}`eq-characteristic-ck-transfer`. Sampled across $3\leq Z\leq98$, the
+  L-shell outflow $f_{12}+f_{13}$ never exceeds one — the tightest case is Mn at
+  0.997, leaving $T^a_{L_1L_1}=0.003$ — so the diagonal never goes negative and
+  the matrix is a vacancy distribution, not a rescale. A source table that
+  violated this fails closed with a `ValueError`.
+- **Triangularity.** Decay fills a hole from a less-bound subshell, so vacancies
+  only move to higher indices and $T^a$ is upper triangular. This is the
+  property that will let the full EADL cascade of #91 be solved exactly by a
+  finite Neumann series rather than an iteration with a cutoff.
+- **Limiting case.** xraydb tabulates no L Coster--Kronig for $Z\leq11$, so
+  $T^a=\mathbb{1}$ there and the estimator reduces to the pre-cascade product
+  exactly. The carbon anchors in `tests/montecarlo/test_characteristic.py` are
+  unchanged, which is the regression evidence for that limit.
+- **Magnitude, computed from the source tables alone.** With
+  $n=T^{a\mathsf T}N$ from the Elam $f_{ij}$ and the EEDL primary populations,
+  total L emission $\sum_i n_i\omega_i$ over $\sum_i N_i\omega_i$ is 1.235 (Cu,
+  30 keV), 1.232 (Cu, 15 keV), 1.114 (Mo, 60 keV), 1.079 (Au, 100 keV), 1.064
+  (Au, 30 keV) and 1.033 (Ta, 30 keV). The sign is forced:
+  $\omega_{L_3}>\omega_{L_2}>\omega_{L_1}$ for every element with tabulated CK,
+  and transfer only moves holes outward, so redistribution can only raise total
+  L emission. Per-line ratios move much further than totals — Cu's L1-origin
+  share of L photons falls from 0.031 to 0.0005, so Lβ3,4/Lα was previously
+  wrong by more than 10x.
+- **No double counting.** $T^a_{L_1L_3}=f_{13}$ is asserted to differ from
+  $f_{13}+f_{12}f_{23}$, which is what the total-vs-direct confusion would
+  produce.
+
+This supersedes the "Direct branching $\omega_i b_{if}$" row of the frozen
+2026-09-13 comparison table above: the stored product is now
+$\sum_{i'}T^a_{ii'}\omega_{ai'}I_{ai'\ell}$. The cutoff-zeroing behaviour of
+`_xraydb_line_yields` is unchanged.
+
+The model marker moves to `l-shell-ck-lorentzian-v5`, so dataset identities and
+case-content keys fork from `v4`; `v4` records hold un-redistributed L line
+yields and are not the same spectrum. The shipped profile digest pins in
+`tests/materials/test_profiles.py` were re-minted accordingly.
+
+This is an implementation-context review only. Units, row normalization, the
+$T^a=\mathbb{1}$ limit, the forced sign, and the double-counting guard all have
+anchors, but fresh-context source-to-code validation of the Coster--Kronig
+claim — in particular whether Elam's tabulated $f_{ij}$ are the total
+probabilities this derivation assumes, checked against Krause (1979) or Campbell
+(2003) directly rather than through xraydb — is still pending. The ledger status
+therefore stays `filtered`; no human sign-off is claimed.

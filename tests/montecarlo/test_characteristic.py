@@ -6,6 +6,7 @@ import hashlib
 
 import numpy as np
 import pytest
+import xraydb
 
 from pyrite._backend import REAL, xp
 from pyrite._spectral_components import line_spectrum
@@ -409,3 +410,136 @@ def test_runner_keeps_characteristic_separate_from_both_line_modes(monkeypatch):
     np.testing.assert_array_equal(output["spec_coherent"], np.full(energy.shape, 2.0))
     np.testing.assert_array_equal(line_spectrum(output), 1.0 + characteristic_line)
     np.testing.assert_array_equal(line_spectrum(output, coherent=True), 2.0 + characteristic_line)
+
+
+def _l_shell_ck(element: str) -> tuple[float, float, float]:
+    return (
+        xraydb.ck_probability(element, "L1", "L2"),
+        xraydb.ck_probability(element, "L1", "L3"),
+        xraydb.ck_probability(element, "L2", "L3"),
+    )
+
+
+def test_ck_free_light_element_keeps_an_identity_vacancy_transfer():
+    """Elements without tabulated L Coster--Kronig reduce to the direct product.
+
+    xraydb reports no L Coster--Kronig for Z <= 11, so carbon's transfer must be
+    the identity and its line yields must stay at the pre-cascade
+    ``omega_i * I_il``. This is the limiting case that keeps the v4 carbon
+    anchors above valid.
+    """
+    table = characteristic.load_characteristic_cross_sections("C")
+
+    assert _l_shell_ck("C") == (0.0, 0.0, 0.0)
+    assert np.array_equal(table.vacancy_transfer, np.eye(len(table.ionization_shell_labels)))
+    assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.0014, atol=0.0)
+    assert not table.vacancy_transfer.flags.writeable
+
+
+def test_copper_l_shell_coster_kronig_redistributes_primary_vacancies():
+    """Row ``i`` holds where one primary vacancy in ``i`` ends up.
+
+    Coster--Kronig moves the L hole outward without creating a second L hole,
+    so every row sums to one. xraydb's ``f13`` is a *total* probability that
+    already contains the L1 -> L2 -> L3 route, which is why it is fed from the
+    primary L1 population and ``f23`` is applied only to the primary L2
+    population: routing ``f12 * N_L1`` through ``f23`` as well would count that
+    path twice.
+    """
+    table = characteristic.load_characteristic_cross_sections("Cu")
+    index = {label: i for i, label in enumerate(table.ionization_shell_labels)}
+    f12, f13, f23 = _l_shell_ck("Cu")
+    transfer = table.vacancy_transfer
+
+    assert (f12, f13, f23) == (0.3, 0.681, 0.47)
+    assert transfer[index["L1"], index["L1"]] == pytest.approx(1.0 - f12 - f13)
+    assert transfer[index["L1"], index["L2"]] == pytest.approx(f12)
+    assert transfer[index["L1"], index["L3"]] == pytest.approx(f13)
+    assert transfer[index["L1"], index["L3"]] != pytest.approx(f13 + f12 * f23)
+    assert transfer[index["L2"], index["L2"]] == pytest.approx(1.0 - f23)
+    assert transfer[index["L2"], index["L3"]] == pytest.approx(f23)
+    assert transfer[index["L3"], index["L3"]] == 1.0
+    assert np.allclose(transfer.sum(axis=1), 1.0)
+    # Decay fills a hole from a less-bound shell, so vacancies only ever move
+    # to higher indices: the transfer is upper triangular.
+    assert not np.tril(transfer, -1).any()
+
+
+def test_m_and_k_shell_rows_are_left_as_identity():
+    """Only the L shell is redistributed by this slice.
+
+    xraydb's M-shell Coster--Kronig values are not a probability distribution --
+    the finals of Cr M1 sum to 3.82 and 134 (Z, initial) pairs exceed one -- so
+    they are deliberately excluded until EADL supplies a normalized topology.
+    A K vacancy's own transfer stays the identity because its Auger daughters
+    are not propagated by this slice either.
+    """
+    table = characteristic.load_characteristic_cross_sections("Cu")
+    index = {label: i for i, label in enumerate(table.ionization_shell_labels)}
+    identity = np.eye(len(table.ionization_shell_labels))
+
+    for label in ("K", "M1", "M2", "M3", "M4", "M5"):
+        assert np.array_equal(table.vacancy_transfer[index[label]], identity[index[label]])
+
+
+def test_copper_l_emission_gains_the_independently_computed_ck_factor():
+    """Total L emission against an expectation built only from source tables.
+
+    Expected total is ``sum_i n_i omega_i`` with ``n`` from the
+    Krause/Elam Coster--Kronig factors and ``N`` the EEDL primary populations;
+    the pre-cascade value is ``sum_i N_i omega_i``. For Cu at 30 keV that
+    ratio is 1.2347 -- the L1 hole is the one being moved, and omega_L3 is
+    6.9x omega_L1.
+    """
+    table = characteristic.load_characteristic_cross_sections("Cu")
+    index = {label: i for i, label in enumerate(table.ionization_shell_labels)}
+    f12, f13, f23 = _l_shell_ck("Cu")
+    sigma = {
+        label: float(
+            np.interp(
+                30_000.0,
+                table.projectile_energy_eV_by_shell[index[label]],
+                table.ionization_cross_sections_cm2_by_shell[index[label]],
+            )
+        )
+        for label in ("L1", "L2", "L3")
+    }
+    omega = {
+        label: float(table.shell_fluorescence_yield[index[label]]) for label in ("L1", "L2", "L3")
+    }
+    populated = {
+        "L1": sigma["L1"] * (1.0 - f12 - f13),
+        "L2": sigma["L2"] * (1.0 - f23) + f12 * sigma["L1"],
+        "L3": sigma["L3"] + f23 * sigma["L2"] + f13 * sigma["L1"],
+    }
+    expected = sum(populated[label] * omega[label] for label in populated)
+    direct = sum(sigma[label] * omega[label] for label in sigma)
+
+    emitted = sum(
+        sigma[label] * float(table.line_yield_per_vacancy[index[label]].sum()) for label in sigma
+    )
+
+    assert emitted == pytest.approx(expected, rel=1.0e-12)
+    assert emitted / direct == pytest.approx(1.2347, abs=5.0e-4)
+
+
+def test_l_shell_transfer_rejects_coster_kronig_probabilities_over_one(monkeypatch):
+    """A CK table whose L1 finals exceed unity is a data error, not a rescale."""
+    monkeypatch.setattr(characteristic.xraydb, "ck_probability", lambda *_a, **_k: 0.6)
+
+    with pytest.raises(ValueError, match="Coster--Kronig"):
+        characteristic._l_shell_vacancy_transfer("Cu", ("K", "L1", "L2", "L3"))
+
+
+def test_l_shell_transfer_skips_absent_subshells():
+    """Transfer is only wired between subshells the EEDL table actually carries."""
+    transfer = characteristic._l_shell_vacancy_transfer("Cu", ("K", "L1", "L2"))
+    f12, _f13, _f23 = _l_shell_ck("Cu")
+
+    assert transfer[1, 2] == pytest.approx(f12)
+    assert transfer[1, 1] == pytest.approx(1.0 - f12)
+    assert np.allclose(transfer.sum(axis=1), 1.0)
+
+
+def test_characteristic_model_marker_records_the_ck_relaxation():
+    assert characteristic.CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-v5")

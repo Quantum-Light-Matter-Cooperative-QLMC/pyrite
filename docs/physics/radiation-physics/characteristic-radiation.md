@@ -1,9 +1,10 @@
 # Characteristic radiation
 
 PyRITE models electron-impact characteristic X rays as direct atomic
-vacancies followed by radiative relaxation. Vacancy-production cross sections
-come from EEDL; line energies, fluorescence yields, branching intensities, and
-natural level widths come from xraydb. The result is an incoherent,
+vacancies, L-shell Coster--Kronig redistribution of those vacancies, and
+radiative relaxation. Vacancy-production cross sections come from EEDL; line
+energies, fluorescence yields, branching intensities, Coster--Kronig
+probabilities, and natural level widths come from xraydb. The result is an incoherent,
 self-absorbed track-length estimate evaluated on the fine line-energy grid.
 
 ## Atomic data and vacancy yield
@@ -18,12 +19,39 @@ packaged tape is checksum-pinned before it is parsed.
 xraydb's Elam tables {cite:p}`elam2002` provide a fluorescence yield
 {math}`\omega_{ai}` and
 conditional intensity {math}`I_{ai\ell}` for each radiative line {math}`\ell`
-from that vacancy. A material segment of length {math}`L_j` therefore produces
-the expected integrated line yield
+from that vacancy.
+
+A vacancy need not radiate from the subshell it was created in. PyRITE
+redistributes L-shell vacancies by Coster--Kronig transfer before applying the
+radiative yields, using the Elam/Krause probabilities
+{math}`f_{ij}` that xraydb exposes:
+
+```{math}
+:label: eq-characteristic-l-shell-ck
+
+n_{L_1} &= (1-f_{12}-f_{13})\,N_{L_1},\\
+n_{L_2} &= (1-f_{23})\,N_{L_2} + f_{12}N_{L_1},\\
+n_{L_3} &= N_{L_3} + f_{23}N_{L_2} + f_{13}N_{L_1},
+```
+
+where {math}`N_i` is the directly produced (primary) vacancy population and
+{math}`n_i` the population that radiates. xraydb's {math}`f_{13}` is a *total*
+probability and already contains the {math}`L_1\to L_2\to L_3` route, so it is
+applied to the primary {math}`N_{L_1}` and {math}`f_{23}` only to the primary
+{math}`N_{L_2}`; routing the transferred {math}`f_{12}N_{L_1}` through
+{math}`f_{23}` as well would count that path twice. Written as a matrix,
+{math}`n_{i'}=\sum_i T^a_{ii'}N_i` with {math}`T^a` the row-stochastic transfer
+of `_l_shell_vacancy_transfer`: Coster--Kronig moves one L hole outward without
+creating a second L hole, so every row of {math}`T^a` sums to one, and every
+non-L row is the identity.
+
+A material segment of length {math}`L_j` therefore produces the expected
+integrated line yield
 
 ```{math}
 Y_{jai\ell}
-=\frac{n_a L_j\,\sigma_{ai}(T_j)\,\omega_{ai}I_{ai\ell}}
+=\frac{n_a L_j\,\sigma_{ai}(T_j)
+       \sum_{i'}T^a_{ii'}\,\omega_{ai'}I_{ai'\ell}}
        {4\pi N_e}
   \exp[-\tau_j(E_{ai\ell})].
 ```
@@ -32,6 +60,12 @@ Here {math}`n_a` is the elemental number density, {math}`N_e` is the number of
 incident electrons, and {math}`\tau_j` is the Beer--Lambert optical depth from
 the segment midpoint to the surface along the observation direction. The
 {math}`1/(4\pi)` factor is the isotropic-emission approximation.
+
+Index {math}`i` is now the subshell the *electron* ionized and {math}`i'` the
+subshell the photon came from. With {math}`T^a=\mathbb{1}` — any element for
+which xraydb tabulates no L Coster--Kronig, which is every {math}`Z\leq11` —
+this reduces exactly to the earlier direct-vacancy product
+{math}`\omega_{ai}I_{ai\ell}`.
 
 ## Natural Lorentzian line shape
 
@@ -107,11 +141,38 @@ multiple-vacancy broadening are therefore outside this model.
 
 ## Relaxation and transport scope
 
-The relaxation model treats independent atoms and isolated, directly created
-vacancies. It does not synthesize Auger-fed daughter vacancies,
-Coster--Kronig redistribution, multiple-vacancy shifts, or Auger-electron
-transport. An EEDL shell with nonzero fluorescence yield but no xraydb line
-list emits zero and raises a warning rather than being silently approximated.
+The relaxation model treats independent atoms. A primary L vacancy is
+redistributed across the L subshells by {eq}`eq-characteristic-l-shell-ck`
+before it radiates; every other vacancy radiates from the subshell it was
+created in.
+
+Still outside the model:
+
+- **Auger-fed daughter vacancies.** A vacancy's nonradiative decay is counted
+  only through its effect on the fluorescence yield, so the vacancies its Auger
+  electrons leave behind never radiate. This includes the outer-shell spectator
+  vacancy left by a Coster--Kronig electron. Whenever the K shell is open the
+  K-fed L population is under 2% of the direct L population, because
+  {math}`\sigma_L\gg\sigma_K`; the untracked M and N population fed by L Auger
+  decay is larger and is not bounded here.
+- **M-shell Coster--Kronig.** xraydb's M-shell values are not a probability
+  distribution — the finals of Cr M1 sum to 3.82, and 134 (Z, initial) pairs
+  exceed one — so they are excluded rather than renormalized. L-shell values sum
+  to at most one for every {math}`3\leq Z\leq98`.
+- **Radiative branching outside the Elam line list.** {math}`\omega_{ai}` is
+  distributed over only the lines xraydb tabulates for that subshell, whose
+  intensities sum to one by construction. That conserves the subshell's total
+  radiative yield but over-assigns intensity to tabulated lines wherever the
+  source table omits weak ones. An EEDL shell with nonzero fluorescence yield
+  and no xraydb line list at all emits zero and raises a warning rather than
+  being silently approximated — most notably the M and N shells of heavy
+  elements, so PyRITE does not claim M-shell spectra.
+- **Secondary fluorescence.** {math}`\exp(-\tau_j)` is a pure sink: a
+  characteristic photon absorbed on its way out does not re-emit. The error is
+  small for a line below its own element's absorption edge and is not bounded
+  for alloys or multilayers.
+- **Auger-electron transport**, multiple-vacancy shifts, and satellite
+  structure.
 
 Characteristic emission uses the bremsstrahlung electron population and its
 default 1 keV transport cutoff. This retains more low-energy ionization path
@@ -147,6 +208,17 @@ characteristic file is valid and contributes no characteristic component.
 
 - Zero density, path length, cross section, fluorescence yield, or branching
   intensity gives zero characteristic yield.
+- An element with no tabulated L Coster--Kronig gives {math}`T^a=\mathbb{1}` and
+  the pre-cascade direct-vacancy yield exactly; that covers every
+  {math}`Z\leq11`, so the carbon anchors are unchanged by
+  {eq}`eq-characteristic-l-shell-ck`.
+- Each row of {math}`T^a` sums to one, so redistribution moves L emission
+  between subshells without creating or destroying an L vacancy. Because
+  {math}`\omega_{L_3}>\omega_{L_2}>\omega_{L_1}`, it always raises total L
+  emission: the factor is 1.235 for Cu at 30 keV, 1.114 for Mo at 60 keV, 1.079
+  for Au at 100 keV, and 1.033 for Ta at 30 keV. Per-line ratios move much
+  further than the totals — Cu's L1-origin share of L photons falls from 0.031
+  to 0.0005.
 - With zero attenuation, a finite window integrates to
   {math}`P_{\ell,W}nL\sigma\omega I/(4\pi N_e)`; the infinite-window limit
   recovers the complete line yield.
@@ -162,9 +234,11 @@ characteristic file is valid and contributes no characteristic component.
 - Natural Lorentzian broadening is source physics; detector broadening remains
   a separate downstream operation.
 
-This window and cutoff convention is encoded in the `lorentzian-v4`
+This window and cutoff convention, and the L-shell Coster--Kronig
+redistribution, are encoded in the `l-shell-ck-lorentzian-v5`
 characteristic-model marker used by dataset identities and case-content keys.
-Earlier model markers are cache-incompatible with `v4`.
+Earlier model markers are cache-incompatible with `v5`: `v4` records hold
+un-redistributed L line yields, not the same spectrum.
 
 Implementation owner:
 `pyrite.montecarlo.spectrum.characteristic.mc_characteristic_spectrum`.
