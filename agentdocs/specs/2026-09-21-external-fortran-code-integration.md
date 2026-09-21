@@ -137,8 +137,9 @@ Measured 2026-09-21:
 | artifact | size | decision |
 | --- | --- | --- |
 | ELSEPA source + `database/` | 4.6 MB | vendor |
-| SBETHE `sbethe.f` | ~0.5 MB | vendor |
-| SBETHE `sdbase/` | 20 MB (599 files) | fetch on demand |
+| SBETHE `sbethe.f` | 0.13 MB | vendor |
+| SBETHE `sdbase/` | 18.4 MB, 498 files | fetch on demand |
+| SBETHE `docs/`, `sbethe.exe` | 9.0 MB | neither vendored nor extracted |
 | BREMS `*.f90` sources | 1.7 MB | not redistributed (GPL, see above) |
 | BREMS `V/` + `CS_int/` | 24 MB | not redistributed |
 | BremsLib precomputed library | 810 MB payload (1.5 GB on disk) | not redistributed |
@@ -154,7 +155,8 @@ local checkout, defaulting to `../BremsLib_v2.0.8` relative to the PyRITE
 checkout and overridable through `xsgen.sources`. Absence is an actionable
 error naming the expected path, never a silent fallback.
 
-Net wheel growth ≈ 10 MB against 26 MB of existing packaged data (of which
+Net wheel growth ≈ 4.8 MB (ELSEPA 4.6 MB + `sbethe.f` 0.13 MB) against 26 MB
+of existing packaged data (of which
 `EEDL.endf` is 25 MB — the precedent that a single large vendored data file is
 already accepted practice here).
 
@@ -293,9 +295,20 @@ directories symlinked in and `cwd` set to it. This is mandatory for
 concurrency, not a convenience — concurrent runs in a shared directory
 overwrite each other's output.
 
+Verified for SBETHE on 2026-09-21: every database path in `sbethe.f` is a
+cwd-relative literal — `'./sdbase/eshcor-'` etc. at lines 270-274, and
+`'./sdbase/'` at 905, 984, 1425, 2349. The upstream readme's phrasing ("the
+subdirectory './sdbase' of its own directory") is loose; Fortran `OPEN`
+resolves against the process cwd, so setting `cwd` to the scratch directory and
+symlinking `sdbase` into it is sufficient and the built binary may live
+anywhere.
+
 SBETHE is prompt-driven rather than deck-driven; its input is fed on stdin and
-its `<mname>.mat` cache file is written into the scratch directory. ELSEPA
-reads a deck on stdin (`elscata < deck.in`).
+its `<mname>.mat` cache file is written into the scratch directory — which is
+also why runs must not share one: the `.mat` file is read back in preference to
+the prompts whenever it exists, so a stale sibling silently overrides the
+requested material parameters. ELSEPA reads a deck on stdin
+(`elscata < deck.in`).
 
 Runs are cached content-addressed on the same key as the resulting table, so
 an expensive sweep runs once.
@@ -374,6 +387,54 @@ resolves a DCS that becomes extremely forward-peaked at those energies.
 Neither is answered by the 1–300 keV range #89 currently states.
 
 ### SBETHE → #90, and secondary outputs for #93 and #86
+
+#### Upstream source (resolved 2026-09-21)
+
+The whole of SBETHE — program, database and documentation — is published as a
+**single zip** in one Mendeley Data deposit, not as separately addressable
+parts. There is no independent `sdbase` URL to pin; the fetch pulls the zip and
+extracts from it.
+
+| field | value |
+| --- | --- |
+| landing page | <https://data.mendeley.com/datasets/7zw25f428t/1> |
+| DOI | `10.17632/7zw25f428t.1` (version-pinned, immutable) |
+| file | `sbethe.zip`, 12 046 759 bytes |
+| SHA-256 | `693d447d7189dff05045cf9288ba4a1704e06747c4502a3572b35ff30b70845d` |
+| direct URL | `https://data.mendeley.com/public-files/datasets/7zw25f428t/files/4fe30d66-1e6b-4de3-ac9c-a9f9cc9dae96/file_downloaded` |
+| licence | CC BY-NC 3.0, confirmed from the deposit's own `data_licence` field |
+| authors | F. Salvat (U. Barcelona), P. Andreo (Karolinska) |
+
+Mendeley's public API publishes that SHA-256 *before* the download, at
+`https://data.mendeley.com/public-api/datasets/7zw25f428t/files?folder_id=root&version=1`,
+so the pin is verifiable against upstream rather than against whatever bytes we
+happened to receive first. Both the hash and the licence above were checked
+against a real download on 2026-09-21. Prefer the versioned API endpoint for
+re-verification; treat the opaque file-id URL as a cache, not as the identity.
+
+Extraction rules:
+
+- Extract `sdbase/` only. **Do not extract or redistribute `sbethe.exe`** — a
+  1.29 MB prebuilt Windows binary of unverified provenance. `xsgen` builds from
+  `sbethe.f` through `toolchain.py`.
+- Skip `docs/` (7.7 MB of PDFs). `rpwba.pdf` is the PWBA/GOS reference cited in
+  the ionization-scope section; cite it, do not ship it.
+- 27.6 MB extracted for a 12.0 MB download, of which 18.4 MB is the database we
+  actually want.
+
+`sdbase/` holds four per-element families for Z=1-99 — `oos<Z>.tab`,
+`shcor-<Z>.tab`, `pshcor-<Z>.tab`, `eshcor-<Z>.tab` — plus the Seltzer-Berger
+bremsstrahlung tables `pdebr<Z>.p08` that D8 and #86 want, and two global files,
+`pdatconf.p14` and `pdcompos.pen`.
+
+`pdcompos.pen` carries SBETHE's own catalogue of 280 predefined materials
+(indexed by `material-list.txt`). PyRITE does **not** key off those IDs — the
+material identity hash of D2 comes from `pyrite.materials`, which stays the
+source of truth — but the 280 entries are a free cross-check oracle for
+composition, density and mean excitation energy on any material both catalogues
+contain.
+
+#### Interface
 
 Material-scoped: needs composition, density, and mean excitation energy, and
 emits `<mname>.mat`. Couples to `materials/catalog.py` through the material
@@ -466,8 +527,6 @@ marker, and ledger row; only a human marks `signed-off`.
 
 ## Open items
 
-- Decide whether SBETHE `sdbase` fetch has a stable upstream URL to pin, or
-  whether it must be a user-supplied path only.
 - Confirm that shipping no BremsLib-derived tables is acceptable long term,
   given it makes the BremsLib path unavailable to users without their own
   copy. Revisiting means confirming the dataset deposit's terms (the code is
