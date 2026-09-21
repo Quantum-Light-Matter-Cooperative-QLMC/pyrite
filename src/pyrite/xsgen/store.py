@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -74,6 +74,35 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, np.ndarray):
         return value.tolist()
     raise TypeError(f"{type(value).__name__} is not part of a table key")
+
+
+def arrays_digest(arrays: Mapping[str, np.ndarray]) -> str:
+    """Return a SHA-256 over the stored array payload itself.
+
+    The rest of the manifest describes how a table was *made*; this describes
+    what it *contains*. Without it two tables can share a manifest digest
+    despite holding different numbers -- same code, same deck, same shapes and
+    dtypes, written within the same second, which is exactly what regenerating
+    a table looks like. Since that digest is what invalidates checkpoints, the
+    collision would serve results computed from the superseded table.
+
+    Byte order is normalized to little-endian so a manifest shipped with a
+    table verifies on a big-endian host rather than appearing corrupt.
+    """
+    digest = hashlib.sha256()
+    for name in sorted(arrays):
+        values = np.ascontiguousarray(arrays[name])
+        little = values.astype(values.dtype.newbyteorder("<"), copy=False)
+        for part in (
+            name.encode("utf-8"),
+            str(values.dtype).encode("utf-8"),
+            repr(values.shape).encode("utf-8"),
+        ):
+            digest.update(part)
+            digest.update(b"\0")
+        digest.update(little.tobytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _digest(payload: Any) -> str:
@@ -274,6 +303,7 @@ class TableManifest:
     pyrite_version: str
     created_utc: str
     arrays: Mapping[str, Any]
+    arrays_sha256: str
     source_origin: str | None = None
     upstream: str | None = None
     modifications: str = MODIFICATIONS_NOTE
@@ -295,6 +325,7 @@ class TableManifest:
             "pyrite_version": self.pyrite_version,
             "created_utc": self.created_utc,
             "arrays": dict(self.arrays),
+            "arrays_sha256": self.arrays_sha256,
             "source_origin": self.source_origin,
             "upstream": self.upstream,
             "modifications": self.modifications,
@@ -304,11 +335,11 @@ class TableManifest:
     def digest(self) -> str:
         """Hex SHA-256 of the manifest record.
 
-        Excludes nothing: a table regenerated from the same inputs at a
-        different time has a different digest, which is the conservative
-        direction. Checkpoints being invalidated by a regeneration that
-        happened to produce identical numbers costs recomputation; the
-        converse would serve numbers from a table that no longer exists.
+        Covers both how the table was made and, through
+        :attr:`arrays_sha256`, what it holds. A regeneration that produced
+        identical numbers at a different timestamp still re-keys, which costs
+        recomputation; the converse -- serving numbers from a table that no
+        longer exists -- is the failure this exists to prevent.
         """
         return _digest(self.record())
 
@@ -476,6 +507,7 @@ def store(
             name: {"shape": list(value.shape), "dtype": str(value.dtype)}
             for name, value in sorted(prepared.items())
         },
+        arrays_sha256=arrays_digest(prepared),
         source_origin=source_origin,
         upstream=upstream,
     )
@@ -488,6 +520,26 @@ def store(
     np.savez_compressed(payload, **prepared)
     manifest_path.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return StoredTable(key=request.key, path=payload, manifest=body, tier="user")
+
+
+def identity_markers(tables: Iterable[StoredTable]) -> dict[str, str]:
+    """Map each table's key to its provenance-manifest digest, for run identity.
+
+    What a run records so that changing a table it read invalidates the
+    results computed from it. The manifest digest covers the Fortran source,
+    the compiler, the deck, the model parameters and the PyRITE version, so
+    every way a table can become a different table moves this value.
+
+    Both identity surfaces take it: :func:`pyrite.campaign.profiles.dataset_identity`,
+    which gates the checkpoint stem, and
+    :func:`pyrite.campaign.profiles.case_content_key`, which gates the
+    content-addressable blob store. Passing it to only one leaves the other
+    serving results computed from the superseded table.
+
+    An empty result means the run read no generated table, and both surfaces
+    then leave their digests exactly as they were.
+    """
+    return {table.key: table.digest for table in tables}
 
 
 def iter_stored() -> Iterator[StoredTable]:
@@ -516,6 +568,8 @@ __all__ = [
     "TableManifest",
     "TableRequest",
     "Target",
+    "arrays_digest",
+    "identity_markers",
     "iter_stored",
     "material_identity",
     "packaged_table_dir",

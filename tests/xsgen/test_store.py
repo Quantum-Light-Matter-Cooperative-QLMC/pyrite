@@ -19,6 +19,7 @@ from pyrite.xsgen.store import (
     ElementTarget,
     MaterialTarget,
     TableRequest,
+    arrays_digest,
     iter_stored,
     material_identity,
     require,
@@ -256,3 +257,36 @@ def test_a_table_without_its_manifest_is_not_served():
     (user_table_dir() / f"{request.key}.json").unlink()
     assert resolve(request.key) is None
     assert list(iter_stored()) == []
+
+
+# --- the manifest covers the payload, not just the recipe -----------------
+
+
+def test_the_manifest_digest_tracks_the_stored_numbers():
+    """Two tables with the same recipe but different numbers must differ.
+
+    Same code, deck, shapes and dtypes, written within the same second: every
+    "how it was made" field agrees and the timestamp has one-second
+    resolution, so without hashing the payload the two manifests collide --
+    and that digest is what invalidates checkpoints.
+    """
+    request = _request()
+    first = store(request, {"dcs": np.array([1.0, 2.0])})
+    first_digest = first.digest
+    second = store(request, {"dcs": np.array([3.0, 4.0])}, overwrite=True)
+
+    assert second.key == first.key
+    assert second.digest != first_digest
+
+
+def test_the_content_digest_ignores_how_the_arrays_were_spelled():
+    """Equal arrays digest equally, or nothing would ever resume."""
+    values = np.linspace(0.0, 1.0, 8)
+    assert arrays_digest({"dcs": values}) == arrays_digest({"dcs": values.copy()})
+    assert arrays_digest({"dcs": values}) != arrays_digest({"dcs": values + 1.0e-12})
+
+
+def test_the_content_digest_separates_shape_from_contents():
+    flat = np.arange(6.0)
+    assert arrays_digest({"x": flat}) != arrays_digest({"x": flat.reshape(2, 3)})
+    assert arrays_digest({"x": flat}) != arrays_digest({"y": flat})

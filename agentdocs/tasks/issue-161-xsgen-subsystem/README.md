@@ -79,11 +79,79 @@ D5's `BREMSSTRAHLUNG_MODEL` prerequisite is untouched by this and stays with
 #86/#87, per the spec: it must land in the same change that exposes the model
 selector.
 
+### F3 - ELSEPA compiles from `elscata.f` alone
+
+`elscata.f` opens with `INCLUDE 'radial.f'` and `INCLUDE 'elsepa2020.f'`.
+Naming all three on the compiler command line compiles the included bodies
+twice and the link fails on dozens of duplicate symbols (`sfas0_`, `dbas_`,
+`splset_`, ...). The build therefore passes `elscata.f` only, plus
+`-I<tree root>` so the INCLUDE lines resolve from the cache directory the
+build runs in.
+
+All three files stay in `digest_sources`: they are part of the binary, so
+patching `radial.f` is a different code even though the compiler is never
+pointed at it directly.
+
+Found by the `extern_codes` anchor, not by review. The spec's architecture
+section does not mention it.
+
+### F4 - the symlink copy fallback is implemented
+
+The spec leaves "should the scratch directory fall back to copying when the
+filesystem refuses symlinks" open. Implemented in the safe direction:
+`_link_dir` tries `symlink_to` and falls back to `copytree`, recording which
+was used in `RunResult.link_modes`. The codes only ever `OPEN` paths *beneath*
+the directory, so a copy is behaviourally identical and differs only in cost.
+Still untested against a real symlink-refusing filesystem.
+
+### Vendor anchor result
+
+`elscata.in` (Z=80, the shipped deck) reproduces
+`test-run-output/dcs_1p000e03.dat`: 649/649 lines, 24 differing only in the
+last of six significant digits, confined to the interference column
+(~1e-9 against a 1e-12 to 1e-15 DCS scale, 1 part in 5.6e5). That is a libm
+difference between our gfortran 15.2.0 and the vendor's compiler, so the
+anchor compares numerically at `rtol=1e-5` -- one last-digit unit at six
+significant figures -- rather than byte-for-byte. A byte comparison would be
+an assertion about gfortran, not about ELSEPA.
+
+### F5 - run identity has two surfaces, not one
+
+D5 names `campaign/profiles.py` and `api.py`. The identity that gates
+*checkpoint stems* is `_identity_v1` -> `parameter_sha256`, but there is a
+second, independent cache: `case_content_key` keys the content-addressable
+blob store (`checkpoints/_checkpoint_store.py`, `runs/run.py`,
+`checkpoints/persistence.py`). Its own docstring already records why the
+stopping/characteristic/bremsstrahlung constants are in it -- "without them a
+blob from an earlier physics/data generation could be served silently".
+
+A table marker in `dataset_identity` alone would move the stem while the blob
+store still served arrays computed from the superseded table. Both take
+`xsgen_tables`, and both take it conditionally.
+
+`api.py`'s `bremsstrahlung_model` entries are provenance *record* fields
+written into results, not identity inputs, so they need nothing here.
+
+### F6 - the manifest had to cover the payload, not just the recipe
+
+The first `identity_markers` test failed: regenerating a table with different
+numbers produced the *same* manifest digest. Every "how it was made" field
+agreed (same code, deck, shapes, dtypes) and `created_utc` has one-second
+resolution, so two writes in the same second collided -- and that digest is
+exactly what invalidates checkpoints.
+
+The manifest now carries `arrays_sha256` over the stored arrays, normalized to
+little-endian so a shipped manifest verifies on a big-endian host. Found by
+the test, not by review.
+
 ## Checklist
 
-- [ ] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
-- [ ] M1 tests: scratch isolation, symlinks, cwd, fake binary; store round-trip
-- [ ] M2 `pyrite tables` group, `cli-reference --check` clean
-- [ ] M3 conditional identity marker + stale-checkpoint regression test
-- [ ] import-linter contracts pass with `xsgen` populated
+- [x] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
+- [x] M1 tests: scratch isolation, symlinks, cwd, fake binary; store round-trip
+- [x] M1 `extern_codes` anchors against the real ELSEPA tree (opt in with
+      `PYRITE_EXTERN_CODES_TESTS=1`; ~84 s)
+- [x] M2 `pyrite tables` group (`path`, `list`, `show`, `sources list|set`),
+      `cli-reference --check` clean. `generate`/`fetch` deferred to M5/M4.
+- [x] M3 conditional identity marker on both surfaces + regression tests
+- [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
 - [ ] `pyrite-dev verify`

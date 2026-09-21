@@ -380,6 +380,7 @@ def _identity_v1(
     *,
     variant: str | None = None,
     catalog_profile: str = "standard",
+    xsgen_tables: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Return profile plus exact resolved parameters and stable SHA-256 digest."""
     assert sweep.target is not None
@@ -544,6 +545,21 @@ def _identity_v1(
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
     resolved["bremsstrahlung_model"] = BREMSSTRAHLUNG_MODEL
+    # Externally generated cross-section tables (issue #161), as table key ->
+    # provenance-manifest digest. A *divergence-only* key, like `emission` and
+    # `transport_numerics` above and unlike the four model constants: a run
+    # that resolves no xsgen table omits it entirely and keeps its historical
+    # digest bit-for-bit. The four constants each perturbed every digest once,
+    # deliberately, because the physics they name changed for every run; no
+    # consumer resolves an xsgen table yet, so an unconditional marker here
+    # would orphan every checkpoint in exchange for no change in the numbers.
+    #
+    # Once a table does participate, its manifest digest covers the Fortran
+    # source, the compiler, the deck and the model parameters, so regenerating
+    # a table under different settings re-keys the run rather than resuming
+    # into checkpoints computed from the old one.
+    if xsgen_tables:
+        resolved["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,
@@ -571,8 +587,15 @@ def dataset_identity(
     variant: str | None = None,
     catalog_profile: str = "standard",
     identity_version: int = CURRENT_IDENTITY_VERSION,
+    xsgen_tables: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Resolve a dataset identity through its explicit versioned algorithm."""
+    """Resolve a dataset identity through its explicit versioned algorithm.
+
+    ``xsgen_tables`` maps table key to provenance-manifest digest for every
+    externally generated cross-section table this run reads, from
+    :func:`pyrite.xsgen.store.identity_markers`. Omitted or empty leaves the
+    digest exactly as it was before issue #161.
+    """
     try:
         migration = IDENTITY_MIGRATIONS[identity_version]
     except KeyError, TypeError:
@@ -584,6 +607,7 @@ def dataset_identity(
         sweep,
         variant=variant,
         catalog_profile=catalog_profile,
+        xsgen_tables=xsgen_tables,
     )
 
 
@@ -601,7 +625,11 @@ def normalize_dataset_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def case_content_key(case: Case | Mapping[str, Any]) -> str:
+def case_content_key(
+    case: Case | Mapping[str, Any],
+    *,
+    xsgen_tables: Mapping[str, str] | None = None,
+) -> str:
     """Content-addressable key for one :func:`pyrite.campaign.sweep.build_cases` case.
 
     A canonical SHA-256 over the resolved case mapping minus
@@ -623,6 +651,15 @@ def case_content_key(case: Case | Mapping[str, Any]) -> str:
     payload as constants alongside the case. They are not case fields -- all are
     unconditional -- but they determine the stored arrays, and without them a
     blob from an earlier physics/data generation could be served silently.
+
+    ``xsgen_tables`` is the same thing for externally generated cross-section
+    tables (issue #161), and has to be here as well as in
+    :func:`dataset_identity` rather than instead of it: the two gate different
+    caches. The dataset identity gates the checkpoint *stem*, while this key
+    gates the content-addressable blob store, and a run whose stem moved would
+    otherwise still be served a blob computed from the superseded table. Unlike
+    the three constants it is conditional, so a run reading no xsgen table
+    keeps its existing content key and every stored blob stays reachable.
     """
     payload = {
         "schema": CASE_CONTENT_KEY_SCHEMA,
@@ -633,6 +670,8 @@ def case_content_key(case: Case | Mapping[str, Any]) -> str:
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),
     }
+    if xsgen_tables:
+        payload["xsgen_tables"] = {str(key): str(value) for key, value in xsgen_tables.items()}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
