@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..console import config as _config
-from ..paths import data_dir
+from ..paths import data_dir, user_data_dir
 from ._errors import SourceUnavailableError
 
 #: Chunk size for hashing Fortran sources. They are small (the largest is
@@ -174,9 +174,18 @@ def vendored_root(code: str) -> Path:
     """Return where a vendored tree for ``code`` would live.
 
     The path is returned whether or not it exists, so callers can quote it in
-    an error message. Nothing is vendored yet; the trees land with M4 of #161.
+    an error message.
     """
     return data_dir() / "xsgen" / code_spec(code).name
+
+
+def fetched_data_dir(code: str, name: str) -> Path:
+    """Return the user-data location for a fetched code data directory."""
+    spec = code_spec(code)
+    if name not in spec.data_dirs:
+        known = ", ".join(spec.data_dirs) or "none"
+        raise KeyError(f"{code!r} has no data directory {name!r}; known: {known}")
+    return user_data_dir() / "xsgen" / "reference-data" / spec.name / name
 
 
 def _accepts(spec: CodeSpec, candidate: Path) -> bool:
@@ -204,8 +213,13 @@ class ResolvedSource:
 
     @property
     def data_dirs(self) -> dict[str, Path]:
-        """Map each required data directory name to its path in this tree."""
-        return {name: self.root / name for name in self.spec.data_dirs}
+        """Map required data names to tree-local or fetched directories."""
+        resolved: dict[str, Path] = {}
+        for name in self.spec.data_dirs:
+            local = self.root / name
+            fetched = fetched_data_dir(self.spec.name, name)
+            resolved[name] = local if local.is_dir() else fetched
+        return resolved
 
 
 def resolve_source(code: str, override: str | Path | None = None) -> ResolvedSource:
@@ -361,6 +375,7 @@ __all__ = [
     "ResolvedSource",
     "code_names",
     "code_spec",
+    "fetched_data_dir",
     "iter_sources",
     "missing_data_dirs",
     "resolve_source",

@@ -1,8 +1,8 @@
 """End-to-end anchors against the real external codes.
 
 Everything else in this package drives a fake binary. These tests compile and
-run the genuine article, which CI cannot do -- no Fortran compiler, and the
-code trees are obtained by the user -- so they carry the ``extern_codes``
+run the genuine article, which CI cannot do because it has no Fortran compiler,
+so they carry the ``extern_codes``
 marker and are skipped unless ``PYRITE_EXTERN_CODES_TESTS=1``, following the
 ``online`` marker's convention. The ELSEPA anchor takes about 80 s.
 
@@ -22,7 +22,12 @@ import pytest
 
 from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen._run import run_program
-from pyrite.xsgen.sources import missing_data_dirs, resolve_source, source_digest
+from pyrite.xsgen.sources import (
+    missing_data_dirs,
+    resolve_source,
+    source_digest,
+    vendored_root,
+)
 from pyrite.xsgen.toolchain import build, find_toolchain
 
 pytestmark = pytest.mark.extern_codes
@@ -36,7 +41,7 @@ def _elsepa():
     if shutil.which("gfortran") is None and not os.environ.get("PYRITE_XSGEN_FC"):
         pytest.skip("no Fortran compiler")
     try:
-        source = resolve_source("elsepa")
+        source = resolve_source("elsepa", vendored_root("elsepa"))
     except SourceUnavailableError as exc:
         pytest.skip(f"no ELSEPA tree: {exc}")
     if missing_data_dirs(source):

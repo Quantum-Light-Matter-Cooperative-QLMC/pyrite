@@ -3,11 +3,9 @@
 Covers the store and the source configuration: what tables exist, where they
 came from, where they live, and which code trees PyRITE can currently reach.
 
-``generate`` and ``fetch`` are deliberately absent. ``generate`` needs the
-per-code deck writers and output parsers, and ``fetch`` needs the pinned
-SBETHE download; both land with the milestones that give them something to do.
-A command that parses and then reports that it cannot do the thing is worse
-than one that is not there yet.
+``generate`` is deliberately absent until the per-code deck writers and output
+parsers land. ``fetch`` installs SBETHE's pinned reference database without
+extracting the archive's prebuilt executable or documentation.
 """
 
 from __future__ import annotations
@@ -94,6 +92,7 @@ def command() -> None:
       pyrite tables path
       pyrite tables list
       pyrite tables show 4f3a9c
+      pyrite tables fetch sbethe
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
     """
@@ -175,6 +174,39 @@ def show_command(key: str, json_output: bool) -> None:
         emit_json("pyrite.tables.show.v1", {"tier": table.tier, "manifest": manifest})
         return
     emit_result(json.dumps(manifest, indent=2, sort_keys=True))
+
+
+@command.command("fetch")
+@click.argument("code", type=click.Choice(["sbethe"], case_sensitive=False))
+@output_option
+def fetch_command(code: str, json_output: bool) -> None:
+    """Fetch the pinned large reference database for CODE.
+
+    SBETHE's source ships with PyRITE, but its 18 MB ``sdbase/`` directory is
+    installed on demand into your user data directory. The complete upstream
+    archive is SHA-256 verified; only ``sdbase/`` is extracted. A complete
+    existing install returns successfully without network access.
+    """
+    from ...xsgen import DataFetchError
+    from ...xsgen.fetch import fetch_sbethe
+
+    try:
+        result = fetch_sbethe()
+    except DataFetchError as exc:
+        raise CLIError(str(exc)) from exc
+
+    payload = {
+        "code": code.lower(),
+        "path": str(result.path),
+        "archive_sha256": result.archive_sha256,
+        "file_count": result.file_count,
+        "installed": result.installed,
+    }
+    if json_output:
+        emit_json("pyrite.tables.fetch.v1", payload)
+        return
+    action = "installed" if result.installed else "already installed"
+    emit_result(f"{action}: {result.path} ({result.file_count} files)")
 
 
 @command.group("sources", cls=LazyGroup)

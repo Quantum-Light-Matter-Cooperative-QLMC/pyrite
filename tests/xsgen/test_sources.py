@@ -153,6 +153,27 @@ def test_missing_data_directories_are_reported_separately(elsepa_tree):
     assert missing_data_dirs(resolve_source("elsepa", elsepa_tree)) == ("database",)
 
 
+def test_fetched_data_directory_fills_a_tree_that_only_ships_source(
+    monkeypatch,
+    tmp_path,
+):
+    source_root = tmp_path / "packaged" / "xsgen" / "sbethe"
+    source_root.mkdir(parents=True)
+    (source_root / "sbethe.f").write_text("      PROGRAM sbethe\n")
+    fetched = tmp_path / "user" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
+    fetched.mkdir(parents=True)
+    monkeypatch.setattr("pyrite.xsgen.sources.data_dir", lambda: tmp_path / "packaged")
+    monkeypatch.setattr("pyrite.xsgen.sources.user_data_dir", lambda: tmp_path / "user")
+    monkeypatch.delenv("PYRITE_XSGEN_SBETHE_SOURCE", raising=False)
+    monkeypatch.setattr("pyrite.console.config._read_store", dict)
+
+    resolved = resolve_source("sbethe")
+
+    assert resolved.origin == "vendored"
+    assert resolved.data_dirs == {"sdbase": fetched}
+    assert missing_data_dirs(resolved) == ()
+
+
 def test_vendored_root_is_reportable_before_anything_is_vendored():
     assert vendored_root("elsepa").name == "elsepa"
     assert vendored_root("elsepa").parent.name == "xsgen"

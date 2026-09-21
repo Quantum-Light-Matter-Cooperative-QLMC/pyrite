@@ -5,3 +5,7 @@
 
 # Upstream EEDL ships CRLF; its SHA-256 pin asserts the published bytes.
 src/pyrite/data/characteristic_cross_sections/EEDL.endf -text
+
+# Vendored upstream payloads retain their deposit bytes for provenance hashes.
+src/pyrite/data/xsgen/elsepa/** -text -diff
+src/pyrite/data/xsgen/sbethe/sbethe.f -text -diff

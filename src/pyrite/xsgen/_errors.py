@@ -1,10 +1,10 @@
 """Error taxonomy for the external-code table generator.
 
-Four distinct failure modes, because the remedy differs for each and D9
-forbids papering over any of them with a surrogate model: the code tree is
-missing, the Fortran compiler is missing, the build failed, or the program ran
-and failed. Every message must name what to install or configure -- a bare
-``FileNotFoundError`` from deep inside :mod:`subprocess` does not.
+Distinct failure modes carry distinct remedies, and D9 forbids papering over
+any of them with a surrogate model: source, reference-data fetch, toolchain,
+build, run, and table-resolution errors stay separate. Every message must name
+what to install or configure -- a bare ``FileNotFoundError`` from deep inside
+:mod:`subprocess` does not.
 """
 
 from __future__ import annotations
@@ -21,6 +21,10 @@ class SourceUnavailableError(XsgenError):
     conventional sibling checkout resolves. The message names every location
     tried, the config key that overrides them, and the upstream deposit.
     """
+
+
+class DataFetchError(XsgenError):
+    """A pinned external reference-data download or install failed."""
 
 
 class ToolchainUnavailableError(XsgenError):
@@ -50,6 +54,7 @@ class TableNotFoundError(XsgenError):
 
 __all__ = [
     "BuildError",
+    "DataFetchError",
     "RunError",
     "SourceUnavailableError",
     "TableNotFoundError",

@@ -23,16 +23,15 @@ delegation.** Issue checkboxes stay unticked; this file is the local record.
 
 | M | Scope | State |
 | --- | --- | --- |
-| M1 | `sources.py`, `toolchain.py`, `_run.py`, `store.py` + fake-binary tests | this session |
-| M2 | `pyrite tables` group + `cli-reference.md` regeneration | this session |
-| M3 | manifest hash into run identity; stale checkpoints cannot be served | this session |
-| M4 | vendor ELSEPA + `sbethe.f`, `.gitattributes` `-text`, `tables fetch` | not this session |
-| M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | not this session |
+| M1 | `sources.py`, `toolchain.py`, `_run.py`, `store.py` + fake-binary tests | complete |
+| M2 | `pyrite tables` group + `cli-reference.md` regeneration | complete |
+| M3 | manifest hash into run identity; stale checkpoints cannot be served | complete |
+| M4 | vendor ELSEPA + `sbethe.f`, `.gitattributes` `-text`, `tables fetch` | complete |
+| M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | next |
 | M6 | shipped BremsLib-derived tables + maintainer refresh path | gated, see below |
 
-M4-M6 are deliberately out of this session's scope. M6 is additionally gated on
-a measurement the issue requires *before* committing tables: derived-table size
-across the built-in catalogue.
+M6 is gated on a measurement the issue requires *before* committing tables:
+derived-table size across the built-in catalogue.
 
 ## Local environment
 
@@ -144,6 +143,13 @@ The manifest now carries `arrays_sha256` over the stored arrays, normalized to
 little-endian so a shipped manifest verifies on a big-endian host. Found by
 the test, not by review.
 
+### F7 - the pinned SBETHE archive contains 599 sdbase files
+
+The issue and spec say 498 files, but the extracted archive pinned by SHA-256
+contains 599: six 99-element families plus five shared files. Fetch validation
+therefore checks the archive digest and required shared markers rather than an
+incorrect file-count constant. The CLI reports the observed count.
+
 ## Checklist
 
 - [x] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
@@ -153,5 +159,8 @@ the test, not by review.
 - [x] M2 `pyrite tables` group (`path`, `list`, `show`, `sources list|set`),
       `cli-reference --check` clean. `generate`/`fetch` deferred to M5/M4.
 - [x] M3 conditional identity marker on both surfaces + regression tests
+- [x] M4 vendored ELSEPA source/database/reference anchor and `sbethe.f`
+- [x] M4 pinned `tables fetch sbethe`, selective/atomic extraction, fetched-data overlay
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
-- [ ] `pyrite-dev verify`
+- [x] `pyrite-dev verify` for M1-M3 (4361 passed, 90 skipped)
+- [x] `pyrite-dev verify` after M4 (4369 passed, 90 skipped)

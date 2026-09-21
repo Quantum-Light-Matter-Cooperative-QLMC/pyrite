@@ -135,10 +135,57 @@ def test_show_of_an_unknown_key_fails_with_a_pointer(isolated):
     assert result.stdout == ""
 
 
+# --- fetch ---------------------------------------------------------------
+
+
+def test_fetch_reports_the_installed_sbethe_database(isolated, monkeypatch, tmp_path):
+    from pyrite.xsgen.fetch import FetchResult
+
+    destination = tmp_path / "data" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
+    monkeypatch.setattr(
+        "pyrite.xsgen.fetch.fetch_sbethe",
+        lambda: FetchResult("sbethe", destination, "a" * 64, 599, True),
+    )
+
+    result = invoke(tables_command.command, ["fetch", "sbethe"])
+
+    assert_clean_result(result, stdout=f"installed: {destination} (599 files)\n")
+
+
+def test_fetch_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_path):
+    from pyrite.xsgen.fetch import FetchResult
+
+    destination = tmp_path / "sdbase"
+    monkeypatch.setattr(
+        "pyrite.xsgen.fetch.fetch_sbethe",
+        lambda: FetchResult("sbethe", destination, "b" * 64, 599, False),
+    )
+
+    result = invoke(tables_command.command, ["fetch", "sbethe", "-o", "json"])
+
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "pyrite.tables.fetch.v1"
+    assert envelope["payload"]["installed"] is False
+    assert envelope["payload"]["path"] == str(destination)
+    assert result.stderr == ""
+
+
+def test_fetch_rejects_a_code_without_downloadable_data(isolated):
+    result = invoke(tables_command.command, ["fetch", "elsepa"])
+
+    assert result.exit_code == 2
+    assert "sbethe" in result.stderr
+    assert result.stdout == ""
+
+
 # --- sources --------------------------------------------------------------
 
 
-def test_sources_list_reports_every_code_even_when_one_is_missing(isolated, elsepa_tree, tmp_path):
+def test_sources_list_distinguishes_missing_tree_from_missing_database(
+    isolated,
+    elsepa_tree,
+    tmp_path,
+):
     invoke(tables_command.command, ["sources", "set", "elsepa", str(elsepa_tree)])
     result = invoke(tables_command.command, ["sources", "list"])
 
@@ -146,7 +193,9 @@ def test_sources_list_reports_every_code_even_when_one_is_missing(isolated, else
     rows = {line.split("\t")[0]: line for line in result.stdout.splitlines()[1:] if "\t" in line}
     assert set(rows) >= {"elsepa", "sbethe", "bremslib"}
     assert "ready" in rows["elsepa"]
-    assert "missing" in rows["sbethe"]
+    assert "incomplete" in rows["sbethe"]
+    assert "missing data directories: sdbase" in result.stdout
+    assert "missing" in rows["bremslib"]
 
 
 def test_sources_set_stores_a_resolved_path(isolated, elsepa_tree, monkeypatch):

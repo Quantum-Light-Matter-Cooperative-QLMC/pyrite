@@ -2016,6 +2016,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables path
     pyrite tables list
     pyrite tables show 4f3a9c
+    pyrite tables fetch sbethe
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
 
@@ -2023,10 +2024,29 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
+  fetch    Fetch the pinned large reference database...
   list     List stored tables, most-preferred tier...
   path     Print the directory your generated tables...
   show     Print the provenance manifest for the...
   sources  Show and configure where the external code...
+```
+
+## `pyrite tables fetch`
+
+```text
+Usage: pyrite tables fetch [OPTIONS] {sbethe}
+
+  Fetch the pinned large reference database for CODE.
+
+  SBETHE's source ships with PyRITE, but its 18 MB ``sdbase/`` directory is installed on
+  demand into your user data directory. The complete upstream archive is SHA-256
+  verified; only ``sdbase/`` is extracted. A complete existing install returns
+  successfully without network access.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite tables list`

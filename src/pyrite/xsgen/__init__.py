@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from ._errors import (
     BuildError,
+    DataFetchError,
     RunError,
     SourceUnavailableError,
     TableNotFoundError,
@@ -36,6 +37,7 @@ from .store import (
 
 __all__ = [
     "BuildError",
+    "DataFetchError",
     "ElementTarget",
     "MaterialTarget",
     "RunError",
