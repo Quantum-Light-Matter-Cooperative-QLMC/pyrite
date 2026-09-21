@@ -146,18 +146,41 @@ Measured 2026-09-21:
 | SBETHE `docs/`, `sbethe.exe` | 9.0 MB | neither vendored nor extracted |
 | BREMS `*.f90` sources | 1.7 MB | not redistributed (GPL, see above) |
 | BREMS `V/` + `CS_int/` | 24 MB | not redistributed |
-| BremsLib precomputed library | 810 MB payload (1.5 GB on disk) | not redistributed |
+| BremsLib precomputed library | 810 MB payload (1.5 GB on disk) | not redistributed (size) |
+| BremsLib-*derived* tables | small, per material | **ship for the built-in catalogue** |
 
 Rule: always vendor the generator source where licensing permits; vendor a
 reference database only when small; ship derived tables for the built-in
 catalog; fetch large reference databases on demand into `user_data_dir()`,
 SHA-256 pinned.
 
-**Nothing from BremsLib is redistributed** — not the GPL sources, not the
-data library, not tables derived from it. For now PyRITE reads an existing
-local checkout, defaulting to `../BremsLib_v2.0.8` relative to the PyRITE
+**Revised 2026-09-21.** The three BremsLib artifacts are now treated
+separately, because they are under different terms and hit different limits:
+
+- **GPL-3 Fortran sources** — never redistributed, never ported (D7). A
+  licence constraint, and not negotiable under PyRITE's nonprofit-only terms.
+- **The precomputed data library** — not redistributed. A *size* constraint
+  (810 MB payload), not a licence one. CC BY 4.0 would permit it.
+- **Tables derived from that library** — **shipped** for the built-in
+  catalogue, which brings BremsLib into line with the general rule above
+  rather than leaving it as the one exception to it.
+
+This supersedes the earlier "nothing from BremsLib is redistributed" position.
+It rested on the dataset terms being unverified; they were confirmed CC BY 4.0
+on 2026-09-21 (see Licensing). CC BY 4.0 carries neither NonCommercial nor
+ShareAlike, so adaptations — derived tables — may be redistributed under
+PyRITE's own terms provided Poškus is credited, the licence is linked, and the
+tables are marked as modified. Those three obligations are discharged by
+`THIRD-PARTY-NOTICES.md` plus the per-table provenance manifest of D5, which
+already carries a modifications note; shipped tables must not be added without
+them.
+
+Generating a table for a material *outside* the built-in catalogue still needs
+a local checkout, defaulting to `../BremsLib_v2.0.8` relative to the PyRITE
 checkout and overridable through `xsgen.sources`. Absence is an actionable
-error naming the expected path, never a silent fallback.
+error naming the expected path, never a silent fallback. This is the same
+shape as ELSEPA and SBETHE: shipped tables cover the catalogue, generation
+covers everything else.
 
 Net wheel growth ≈ 4.8 MB (ELSEPA 4.6 MB + `sbethe.f` 0.13 MB) against 26 MB
 of existing packaged data (of which
@@ -218,6 +241,12 @@ Sequencing constraint: the default flips **after** #86 demonstrates the
 accuracy claim, not before. #86's existing comparison work is the gate.
 `"eedl"` remains a selectable model for regression and continuity;
 `"bethe-heitler"` remains as the analytic fallback.
+
+There were two independent reasons `"eedl"` had to stay the packaged default.
+**Availability** — BremsLib-backed emission required every user to obtain the
+library themselves — is removed by shipping derived tables (D4, revised).
+**Accuracy** — #86 has not yet demonstrated the claim — stands, and is now the
+only gate. Do not read the first being lifted as the second being lifted.
 
 ### D7 — Do not reproduce `Interpolate_DCS`
 
@@ -502,12 +531,16 @@ contains; PyRITE reads the precomputed library in place and interpolates (D7).
 Supplies both SDCS and shape function per D6.
 
 Located at `../BremsLib_v2.0.8` relative to the PyRITE checkout by default,
-overridable through `xsgen.sources`. Nothing from BremsLib is vendored,
-shipped, or redistributed — neither the GPL Fortran nor the data library nor
-tables derived from it. That means BremsLib-backed bremsstrahlung is
-available only to users who have obtained the library themselves, so the
-`"eedl"` model must remain selectable and must stay the packaged default
-until that constraint is revisited.
+overridable through `xsgen.sources`. Neither the GPL-3 Fortran nor the 810 MB
+data library is vendored or redistributed; **tables derived from the library
+are shipped** for the built-in catalogue, attributed and marked as adaptations
+per D4 (revised) and the Licensing section.
+
+So BremsLib-backed bremsstrahlung is available to every user for catalogue
+materials, and requires a local checkout only for materials outside it.
+`"eedl"` remains selectable for regression and continuity, and stays the
+packaged default until #86 demonstrates the accuracy claim — now on accuracy
+grounds alone.
 
 ## Testing
 
@@ -544,24 +577,24 @@ marker, and ledger row; only a human marks `signed-off`.
 
 ## Open items
 
-- **Live, and no longer blocked:** whether to ship BremsLib-*derived* tables
-  for the built-in catalogue. This item previously deferred on confirming the
-  dataset terms; they are now confirmed as CC BY 4.0 (above), which is the
-  precondition it named.
+- **Decided 2026-09-21: ship BremsLib-derived tables** for the built-in
+  catalogue. Recorded in D4 (revised) and the BremsLib section; supersedes the
+  earlier blanket no-redistribution position, which rested on dataset terms
+  that are now confirmed CC BY 4.0. The GPL-3 sources and the 810 MB library
+  remain non-redistributable, and D7's no-port rule is untouched.
 
-  CC BY 4.0 carries neither NonCommercial nor ShareAlike, so it permits
-  redistributing the dataset and adaptations of it — derived tables included —
-  provided attribution is given and changes are indicated. The 462 MB deposit
-  stays impractical to redistribute wholesale, but that was never the
-  proposal; per-material derived tables are small.
+  Still to settle inside that decision:
 
-  If taken, this removes the constraint that currently forces `"eedl"` to
-  remain the packaged default, since BremsLib-backed bremsstrahlung would no
-  longer require every user to obtain the library themselves. That touches D6,
-  the D6 sequencing note, and #86/#87/#95, so it is a decision to take
-  deliberately rather than a consequence to absorb. The GPL-3 sources remain
-  non-redistributable under PyRITE's licence either way, and D7's no-port rule
-  is unaffected.
+  - **Unmeasured:** the on-disk size of the derived SDCS + shape-function
+    tables across the built-in catalogue, and therefore the real wheel cost.
+    D4's growth figure (≈4.8 MB) predates this decision and does not include
+    them. Measure before committing tables, not after.
+  - **Unbuilt:** the maintainer-side generation path. Shipped tables have to
+    be produced by someone holding a BremsLib checkout and refreshed when the
+    upstream deposit versions. That is a release step this spec does not yet
+    describe, and it needs the provenance manifest to record the deposit
+    version (V9, `10.17632/6zfsc9xsz8.9`) so a stale table is detectable.
+
 - Whether the `xsgen` scratch directory should fall back to copying when the
   filesystem does not support symlinks (Windows without developer mode, some
   network mounts). Symlinks are the plan of record; a copy fallback is cheap

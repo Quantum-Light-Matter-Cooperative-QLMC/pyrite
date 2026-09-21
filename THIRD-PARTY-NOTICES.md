@@ -72,17 +72,27 @@ require derived or adapted material to be marked as such.
     terms caution that further permission may be required for content within
     it identified as belonging to a third party — which is how the GPL-3
     sources bundled inside it are to be read.
-- **Nature of PyRITE's use**: PyRITE redistributes **nothing** from
-  BremsLib — not the GPL-3 Fortran sources, not the data library, and not
-  tables derived from it. PyRITE reads a precomputed BremsLib library from a
-  local checkout that the user obtains themselves, and interpolates from it;
-  it does not build or run any BremsLib program. PyRITE does **not** port or
-  translate BremsLib routines (in particular `Interpolate_DCS.f90` and
-  `Brems_CS_interp.f90`) into its own code, since a translation would be a
-  GPL-3 derivative work incompatible with PyRITE's nonprofit-only
-  distribution terms (GPL-3 section 7 forbids adding field-of-use
-  restrictions). Clean-room reimplementation from the published manuals is
-  how the equivalent functionality is obtained.
+- **Nature of PyRITE's use**: PyRITE reads a precomputed BremsLib library
+  from a local checkout that the user obtains themselves, and interpolates
+  from it; it does not build or run any BremsLib program. The three artifacts
+  are treated differently:
+  - PyRITE does **not** redistribute the GPL-3 Fortran sources, and does
+    **not** port or translate BremsLib routines (in particular
+    `Interpolate_DCS.f90` and `Brems_CS_interp.f90`) into its own code, since
+    a translation would be a GPL-3 derivative work incompatible with PyRITE's
+    nonprofit-only distribution terms (GPL-3 section 7 forbids adding
+    field-of-use restrictions). Clean-room reimplementation from the published
+    manuals is how the equivalent functionality is obtained.
+  - PyRITE does **not** redistribute the precomputed data library itself,
+    which is impractically large.
+  - PyRITE **does** redistribute cross-section tables **derived** from that
+    library, for the materials in its built-in catalogue. These are
+    **adaptations** of a CC BY 4.0 work: they are resampled and interpolated
+    onto PyRITE's own grids and are not the upstream data. Andrius Poškus is
+    credited as the author of the source dataset, the CC BY 4.0 licence is
+    linked above, and each shipped table carries a provenance manifest
+    recording the upstream deposit version and the nature of the
+    modifications, as CC BY 4.0 requires.
 - **Documentation**: the manuals `BremsLib_v2.0.pdf` and
   `Interpolate_DCS.pdf` are published alongside the library in the same
   deposit and are the basis for any clean-room reimplementation.
