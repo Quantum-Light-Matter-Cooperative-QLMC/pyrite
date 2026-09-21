@@ -30,20 +30,43 @@ and say so explicitly; a single verdict would be wrong for at least two of them.
 **A. Target / electron-transport geometry (ADR-0008 non-goal).** The binding
 constraint is the GPU. The transport hot path is one algorithm maintained as a
 CPU/Numba twin and a `cupyx.jit` device core
-(`src/pyrite/montecarlo/transport.py`,
-`src/pyrite/montecarlo/transport_jit_kernel.py`,
+(`src/pyrite/montecarlo/transport/cores.py`,
+`src/pyrite/montecarlo/transport/_jit_kernel.py`,
 [GPU transport design](../../../../docs/repo-design/compute/gpu-transport-rawkernel.md)).
 Three specialized implementations of ADR-0008's named seam already exist:
 
-- layer crossing by depth — `materials/attenuation.py:107` (`_layer_dz`),
-  `:117` (`_layer_path_length`), plus the kernel-side layer search at
-  `montecarlo/transport_jit_kernel.py:265`;
-- prism face intersection — `montecarlo/transport.py:797`
-  (`_first_prism_exit_scalar`), called from every CPU core variant
-  (`:968`, `:1209`, `:1501`, `:1615`, `:1893`, `:2115`) and *inlined by hand*
-  into the device core at `montecarlo/transport_jit_kernel.py:308`;
-- groove facet intersection — `montecarlo/groove.py:259` (`first_surface_event`),
-  `:303` (`escape_distance_ang`), `:87` (`surface_depth_ang`).
+- layer crossing by depth — `materials/attenuation.py:249` (`_layer_dz`),
+  `:259` (`_layer_path_length`), `:279` (`_stack_tau`), plus the navigator-side
+  layer search at `montecarlo/transport/cores.py:283` (per-electron) and `:285`
+  (lockstep), duplicated on the device at
+  `montecarlo/transport/_jit_kernel.py:201` and `:832`;
+- prism face intersection — `montecarlo/transport/cores.py:67`
+  (`_first_prism_exit_scalar`), called from the single generated CPU body at
+  `:330` and `:553`, and *inlined by hand twice* into the device cores at
+  `montecarlo/transport/_jit_kernel.py:243` and `:875`. The duplication is
+  forced: a `cupyx.jit` device function returns one value, so `(distance, face)`
+  cannot be a device call. Any region-table query returning `(s, region)` pays
+  the same tax — pack the pair or issue two calls. Record which, per candidate;
+- groove facet intersection — `montecarlo/groove.py:259`
+  (`first_surface_event`), `:303` (`escape_distance_ang`), `:87`
+  (`surface_depth_ang`), with the scalar Numba kernel at `:153`
+  (`_first_surface_event_scalar_numba`) called from
+  `montecarlo/transport/cores.py:350` and `:549`.
+
+**The grooved core is the repository's existing material→vacuum→material
+prototype**, and the survey must treat it as prior art rather than as a side
+branch. `montecarlo/transport/cores.py:547-590` already performs the full
+inter-body cycle: exit the solid, record a vacuum flight
+(`vac_start`/`vac_end`/`vac_E`/`vac_t0`/`vac_id`, provisioned
+`max_vac = Ne * max_steps` at `montecarlo/transport/api.py:364`), advance the
+clock by `entry_distance / beta`, nudge off the face by `surface_eps`, search
+for re-entry, and guard runaway surface events. It is restricted to a 2D
+sawtooth in x–z, exists only as a lockstep CPU specialization
+(`make_cpu_transport_core` rejects `per_electron` and `lut`), and has no device
+core at all — `resolve_transport_core` forces `lockstep` whenever
+`groove is not None` (`montecarlo/transport/batching.py:303`). A general region
+table subsumes it, which is the one place where generalization *removes* a
+maintained algorithm instead of adding one.
 
 ADR-0008 states any general replacement **must** be a flat, bounded-depth,
 device-representable region table interpreted by one loop on host and device —
@@ -53,11 +76,12 @@ candidate in this consumer class.
 **B. Post-emission photon instrument geometry (already sanctioned, bounded).**
 ADR-0008 explicitly permits reviewed analytic plane/box elements after emission,
 outside `Target` and outside the electron navigator. `src/pyrite/instrument/`
-landed under that clause: `geometry.py:86` (`ray_box_path_lengths`), `:153`
-(`filter_path_lengths`), `model.py` (`PlanarPose`, `PixelGrid`, `FilterPlate`,
-`PlanarDetector`, `PixelScorer`). Generalizing *this* surface — collimators,
-apertures, non-rectangular foils, multi-chip detector mounts — needs no ADR
-reversal, only a judgement about whether a library beats more closed types.
+landed under that clause: `geometry.py:140` (`ray_box_path_lengths`), `:207`
+(`filter_path_lengths`), `model.py:50` (`PlanarPose`), `:169` (`PixelGrid`),
+`:215` (`FilterPlate`), `:289` (`PlanarDetector`), `:413` (`PixelScorer`).
+Generalizing *this* surface — collimators, apertures, non-rectangular foils,
+multi-chip detector mounts — needs no ADR reversal, only a judgement about
+whether a library beats more closed types.
 See `agentdocs/tasks/feature/positioned-photon-filters/README.md` and P3 item 3.
 
 **C. Visualization and authoring only.** `plots/plotly/trajectories.py`,
@@ -83,10 +107,15 @@ Deliverables, in order:
 3. GitHub issue follow-ups on `main` for whatever the survey recommends —
    implementation tasks are **not** created by this task.
 
-No `src/` owner. Read-only touchpoints for evidence gathering: `montecarlo/
-transport.py`, `transport_jit_kernel.py`, `groove.py`, `_backend.py`,
-`materials/attenuation.py`, `campaign/geometry.py`, `instrument/`,
-`campaign/profiles.py` (identity digests).
+No `src/` owner. Read-only touchpoints for evidence gathering:
+`montecarlo/transport/` (`cores.py`, `_jit_kernel.py`, `_jit_device.py`,
+`_jit_launch.py`, `batching.py`, `api.py`, `events.py`),
+`montecarlo/groove.py`, `montecarlo/geometry.py`, `materials/attenuation.py`,
+`montecarlo/runner/emission.py`, `montecarlo/runner/__init__.py` (per-layer
+radiator dispatch), `montecarlo/spectrum/lines/_kernels.py`,
+`montecarlo/spectrum/line_seeds.py`, `pyrite/_backend.py`,
+`campaign/geometry.py`, `instrument/`, `campaign/profiles.py` (identity
+digests).
 
 ## Candidates to evaluate
 
@@ -152,7 +181,10 @@ Every candidate scored against the same axes; the matrix goes in the write-up.
    accurately before evaluating anything.
 2. Inventory the existing seam implementations at the anchors listed above.
    Record what each one actually computes, its device duplication, and what a
-   general engine would have to reproduce exactly.
+   general engine would have to reproduce exactly. Inventory the **emission and
+   absorption** side in the same pass, at the anchors in "Emission is already
+   region-resolved" below; a survey that costs only the navigator overstates the
+   bill.
 3. Establish the consumer split (A/B/C) with the specific call sites that would
    change for each.
 4. Settle the bent-crystal question in "Driver geometries" before scoring: is
@@ -221,10 +253,15 @@ against unbounded generality. Each is already in GitHub Issues or `docs/`:
    target-geometry driver in the backlog and the canonical stress test.
 2. **Finite/irregular target shapes** — targets that are not an axis-aligned
    rectangular prism. `_first_prism_exit_scalar` assumes exactly that
-   (`transport.py:3082`); this is the cheapest possible generalization and the
-   honest low bar.
+   (`montecarlo/transport/cores.py:67`); this is the cheapest possible
+   generalization and the honest low bar.
 3. **Multi-object scenes** — several materials at arbitrary relative pose, the
-   literal ADR-0008 non-goal wording.
+   literal ADR-0008 non-goal wording. Sharpened by the user 2026-09-20: this
+   includes **external bodies the electrons scatter into**, amorphous ones
+   included, not only a generalization of the target's own boundary. How such a
+   material *radiates* is settled (see the emission-stage finding below); what
+   is unsettled is navigation and tracking. Score this driver on the four items
+   in that section, not on ray/box math.
 4. **Downstream instrument geometry** — collimators, apertures, non-rectangular
    foils, multi-chip detector mounts (consumer B; no ADR reversal needed).
 
@@ -240,20 +277,122 @@ must say so plainly rather than letting the engine comparison carry the
 conclusion. Verify this against the channeling and relativistic-transport
 research notes (`docs/research/physics/`) before scoring candidates.
 
+### Emission is already region-resolved (recorded 2026-09-20)
+
+**This finding lowers the cost of consumer A and changes what an external engine
+has to beat. It was not in the original triage and the survey must not
+rediscover it late.**
+
+The multi-material half of a multi-object scene is already implemented, for the
+layered stack. Established by reading the current tree:
+
+- **Amorphous is already a supported material class.** `layer_radiators` is a
+  per-layer list aligned with the stack — a crystal-params dict for a
+  crystalline layer, **`None` for an amorphous one** (no coherent lines). Read
+  at `montecarlo/runner/__init__.py:651` (`_lines_for_segments`) and acted on at
+  `:701-703`, where a `None` radiator is skipped outright; documented in the
+  block comment at `:964-970`.
+- **Per-region emission with scene-wide absorption already works.** Every layer
+  radiates with its **own** composition and self-absorbs through the **whole**
+  stack (`layers=abs_layers`); the contributions are summed.
+  `montecarlo/runner/emission.py:37-65` (bremsstrahlung), `:96-124`
+  (characteristic), `montecarlo/runner/__init__.py:701-729` (lines),
+  `montecarlo/spectrum/line_seeds.py:561` (line seeds).
+- **The cross-region coherence rule is already decided and already correct for
+  multi-object scenes:** separate crystals sum **incoherently**, no cross-layer
+  coherent sum — the per-radiator results are added as real spectra at
+  `montecarlo/runner/__init__.py:707`, stated in the comment at `:964-965`.
+- **A per-segment region id already flows end to end.** The core writes
+  `seg_lay` at `montecarlo/transport/cores.py:522`; `_segments_in_layer`
+  partitions on it downstream.
+- **`escape_path` already exists in the ADR's shape**, specialized to z-slabs:
+  `tau = sum_i mu_i(E) * path_i(ray)` in `materials/attenuation.py:279`
+  (`_stack_tau`).
+- **The device kernels never ray-trace.** Escape reaches them as a precomputed
+  scalar `L_esc` or optical depth
+  (`montecarlo/spectrum/coherent_jit_kernel.py:487`,
+  `coherent_stream_jit_kernel.py:983`), produced host-side by
+  `_segment_escape_distance` (`montecarlo/spectrum/lines/_kernels.py:761`).
+  Generalizing escape geometry therefore does **not** require in-kernel
+  traversal. Only the electron navigator does.
+
+So for driver 3 the remaining work is navigation and bookkeeping, not physics:
+
+1. **The vacuum-phase query the code has never needed.** Inside material the
+   core only ever asks "distance to my own boundary". A scene also needs, from
+   vacuum, "distance to the nearest entry among N bodies" — plus a scene bound
+   or kill surface, since nothing currently terminates an unbounded vacuum
+   flight. An N-body loop is device-representable for small N; the point at
+   which it is not is exactly where ADR-0008's AdePT/divergence argument starts
+   to bite, and the survey should locate that N rather than assert it.
+2. **Exit currently means death.** `died_j -> alive[e] = False`
+   (`montecarlo/transport/cores.py:591`, `:623`) must become "enter the vacuum
+   phase". The `n_back` / `n_trans` / `n_side` tallies are slab-relative labels
+   with no meaning in a scene and need a per-body or per-surface replacement.
+3. **Region identity must stop being a depth ordinal.** The `internal_bounds`
+   search (`cores.py:283`, `:285`; `_jit_kernel.py:201`, `:832`) becomes a
+   region lookup in the flat table, with a `region -> material_index`
+   indirection so two bodies can share a material and sit at arbitrary pose.
+   `_segments_in_layer` becomes `_segments_in_region` — close to a rename, given
+   that `seg_lay` already carries the id.
+4. **The z-axis-isms go.** The boundary nudge `pos[e, 2] += ±EPS`
+   (`cores.py:595`, `:629`), `exit_top = z_top_L <= 0` / `exit_bot = z_bot_L >=
+   z_total`, and `inv = 1/|n_z|` in `_stack_tau:299` all become along-ray, and
+   `_layer_dz` / `_layer_path_length` become a ray-march of the region table
+   with vacuum gaps contributing zero.
+
+Consequences to state in the write-up rather than discover later:
+
+- **Throughput, not correctness, is what multi-object costs on the device.**
+  Variable per-electron step counts are already handled by the capacity replay
+  (`montecarlo/transport/batching.py:393-400`), but long vacuum-hop chains raise
+  `seen_max`, which grows `cap`, which shrinks `_batch_size` against a fixed
+  byte budget, which lowers occupancy. Quantify this for any candidate that
+  reaches consumer A.
+- **The bit-identical gate is unchanged and still the hard part.** Draws are
+  counter-addressed per `(electron, flight, substep)`, so the region-table path
+  must reduce *exactly* to today's arithmetic for slab and stack — including
+  face-order ties in `_first_prism_exit_scalar` and the "geometry wins an exact
+  tie" cutoff rule, both covered by
+  `montecarlo/transport/events.py::check_segment_event_contract`.
+- **Existing ledger rows that a change here perturbs:** `self-absorption`
+  (`_stack_tau`), `finite-transverse-crystal` (`rederived`), and
+  `blazed-groove-geometry` (still `unverified`). The last one matters: the
+  grooved path is the prior art being generalized, and it has not been
+  independently verified.
+
+**Suggested de-risking slice, if the recommendation reaches implementation** (a
+separate task; this one still produces documentation only): make the groove's
+vacuum machinery generic at N=2 regions — one solid plus vacuum, driven by a
+flat half-space table — and prove slab, stack, and groove bit-identical. That
+collapses the second core, carries vacuum hops onto CUDA for the first time, and
+builds the exact seam ADR-0008 names. N bodies is then a table-size change
+rather than an architecture change.
+
 ### Backend reality check
 
 CUDA-only is accepted, with two consequences that go in the write-up:
 
-- `pyproject.toml:37` ships an `intel` extra (`dpnp>=0.20.0`) and
-  `montecarlo/_backend.py` supports dpnp/SYCL. A CUDA-only engine either strands
+- `pyproject.toml:39` ships an `intel` extra (`dpnp>=0.20.0`) and
+  `src/pyrite/_backend.py` supports dpnp/SYCL. A CUDA-only engine either strands
   that path or forces a permanent two-implementation split for target geometry —
   the exact "one algorithm" invariant ADR-0008 leans on. State which.
-- **The development box is Intel-only**: `lspci` reports Intel UHD Graphics and
-  an Arc A370M, with no `nvidia-smi`. If the "home setup" is this machine, a
-  CUDA-only candidate cannot be exercised locally at all, and every GPU
-  measurement must go to the lab box. Confirm which machine is meant before
-  planning the spike; if the home setup does have an NVIDIA card, record it
-  here and this constraint relaxes.
+- **Corrected 2026-09-20: there are two development machines, not one.** The
+  earlier note in this section claimed the development box was Intel-only with
+  no `nvidia-smi`; it described the laptop and is withdrawn.
+  - **Home desktop — NVIDIA GeForce RTX 3060 Ti** (confirmed by `nvidia-smi`).
+    A CUDA-only candidate *can* be exercised locally here for correctness and
+    small-scale timing.
+  - **Laptop — Intel Arc A370M** plus Intel UHD Graphics. The dpnp/SYCL path is
+    locally testable here.
+
+  Together these make the "what happens to dpnp/SYCL" question answerable by
+  measurement rather than assertion, on either side. The repo rule is unchanged
+  for load-bearing numbers: heavy sweeps and any GPU measurement that enters the
+  write-up go to the lab box through `pyrite remote`. "The home setup" in
+  "Authorized spike" therefore resolves to whichever machine the spike needs —
+  desktop for CUDA, laptop for SYCL — and the write-up must name the machine
+  alongside its hardware, driver, and library versions.
 
 ### Authorized spike
 
@@ -310,6 +449,11 @@ Bounded, and throwaway:
   is merged.
 - The in-house region table (candidate 1) is costed on the same axes as the
   external options.
+- The emission-stage finding is carried into the scoring: the write-up states
+  which of `locate` / `distance_to_boundary` / `escape_path` each candidate
+  actually supplies, given that per-region emission, amorphous radiators, and
+  the cross-region coherence rule are already implemented. A candidate scored as
+  if it also delivered the physics plumbing is mis-scored.
 - Coherent-emission fitness and identity/determinism are addressed for every
   candidate that reaches consumer A, not just the device story.
 - The ADR outcome exists as a file: a superseding ADR-0011 or a dated amendment
