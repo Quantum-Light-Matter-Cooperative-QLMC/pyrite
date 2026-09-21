@@ -1,8 +1,10 @@
 # External Fortran code integration (ELSEPA, SBETHE, BremsLib)
 
 Date: 2026-09-21
-Status: draft, awaiting review
+Status: accepted 2026-09-21; implementation tracked by #161
 Issues: #161 (subsystem), #84 (roadmap parent), #86, #87, #89, #90, #93, #94, #95
+
+Source paths below are relative to `src/pyrite/` unless stated otherwise.
 
 ## Problem
 
@@ -114,8 +116,9 @@ wiring.
 ### D3 — Two-tier table resolution
 
 `xsgen.store.resolve(key)` checks the user table directory first, then the
-packaged `paths.data_dir()` fallback. Every consumer (`transport/lut.py`,
-`scattering.py`, `stopping.py`, `spectrum/brem.py`) goes through that single
+packaged `paths.data_dir()` fallback. Every consumer (`montecarlo/transport/lut.py`,
+`montecarlo/transport/scattering.py`, `montecarlo/transport/stopping.py`,
+`montecarlo/spectrum/brem.py`) goes through that single
 function and never learns where the bytes came from.
 
 User tables live under `paths.user_data_dir()` — per-user, shared across
@@ -174,15 +177,15 @@ This is the highest-risk piece. Without it, a user regenerating an element
 with different deck parameters (`MABS 2` versus `MABS 0`) silently reuses
 checkpoints computed from the old table.
 
-**Prerequisite for D6:** `BREMSSTRAHLUNG_MODEL` (`spectrum/brem.py:44`) is a
+**Prerequisite for D6:** `BREMSSTRAHLUNG_MODEL` (`montecarlo/spectrum/brem.py:44`) is a
 module-level constant, not a function of the selected model, and
 `campaign/profiles.py:548,633` and `api.py:257,369` record that constant into
 run identity.
 
 This is correct today and is not a live defect. The production path
-(`runner/emission.py:38,54`) never passes `cross_section_model`, so every
+(`montecarlo/runner/emission.py:38,54`) never passes `cross_section_model`, so every
 checkpointed run uses EEDL; `"bethe-heitler"` is reachable only through
-`spectrum/diagnostics.py`, an analysis surface that writes no identity or
+`montecarlo/spectrum/diagnostics.py`, an analysis surface that writes no identity or
 checkpoints. The constant therefore describes what production actually
 computes.
 
@@ -197,7 +200,7 @@ identity.
 Supersedes the standing constraint in #84 ("Preserve the EEDL bremsstrahlung
 energy spectrum") and in #86 ("EEDL remains the supported baseline").
 
-Rationale: EEDL supplies an energy spectrum only. `brem.py:261` rejects any
+Rationale: EEDL supplies an energy spectrum only. `montecarlo/spectrum/brem.py:260` rejects any
 EEDL panel with `NA != 0`, so the packaged data carries no angular information
 at all — which is precisely why emission is isotropic today (#87). BremsLib
 supplies both SDCS and DDCS from one evaluation. Taking the spectrum from
@@ -302,7 +305,7 @@ an expensive sweep runs once.
 Committed and cached tables use each code's native dense grid, not PyRITE's
 electron energy grid. PyRITE's grid is configurable (`energy_grid/`), so
 baking it into the data file makes every table stale on a grid change.
-Resampling happens at load in `transport/lut.py`, where interpolation already
+Resampling happens at load in `montecarlo/transport/lut.py`, where interpolation already
 lives.
 
 Interpolate cross sections in log–log. For ELSEPA, build the normalized
@@ -350,7 +353,7 @@ list: `RMUF` from the nearest-neighbour distance, and density plus band gap
 into `MABS`/`VABSA`/`VABSD`.
 
 Output replaces `src/pyrite/data/mott_transport_cross_sections/`, whose
-consumer in `transport/lut.py` is already wired.
+consumer in `montecarlo/transport/lut.py` is already wired.
 
 Energy coverage must be decided against #94 and #13, not only #89.
 
@@ -470,5 +473,7 @@ marker, and ledger row; only a human marks `signed-off`.
   copy. Revisiting means confirming the dataset deposit's terms (the code is
   GPL-3; CC BY 4.0 is assumed for the data but unverified) — deferred with
   D8.
-- No GitHub issue yet covers the `xsgen` subsystem itself; the per-code issues
-  cover only their own physics.
+- Whether the `xsgen` scratch directory should fall back to copying when the
+  filesystem does not support symlinks (Windows without developer mode, some
+  network mounts). Symlinks are the plan of record; a copy fallback is cheap
+  but untested against the codes' relative-path assumptions.
