@@ -1,10 +1,10 @@
 # Photon escape and in-medium dispersion
 
-Both radiation kernels emit inside the sample, so every photon must be
-transported out of it. PyRITE does that with a straight-ray Beer--Lambert model
-evaluated from the emitting segment's midpoint, plus an optional bulk refractive
-correction to the photon's dispersion relation and propagation phase. Nothing
-here feeds back on emission: attenuation is passive.
+Line, bremsstrahlung, and characteristic radiation use straight-ray
+Beer--Lambert attenuation from each segment midpoint to the sample boundary.
+The PXR/CBS line model also uses bulk refractive dispersion in its resonance
+and coherent propagation phase. Attenuation is passive and does not feed back
+on emission.
 
 ## Attenuation coefficient
 
@@ -28,11 +28,8 @@ $$
 $$
 
 The coherent (Rayleigh) and incoherent (Compton) part comes from the Elam
-cross sections. It is not a small correction at the hard end: for graphite at
-20 keV it is 52 % of $\mu$, so dropping it would understate the escape
-exponent by a factor 2.09. No build-up factor is applied, which is the other
-half of the narrow-beam assumption — scattered photons are removed from the
-escaping ray and never returned to it.
+cross sections. No build-up factor is applied: scattered photons leave the ray
+and are not returned to it.
 
 Compounds add inverse lengths, $\mu=\sum_i \mu_i$. The absorber composition
 defaults to the crystal's own basis at its total atom density — exact for
@@ -74,10 +71,8 @@ fixed observation direction $\hat{\mathbf n}$, in one of four geometries:
 | Layered stack | piecewise $\sum_i \mu_i\,\Delta z_i$ across every crossed layer, with $\Delta z_i$ scaled by $1/\lvert n_z\rvert$ |
 | Blazed groove | exact periodic ray--plane distance to the nearest working facet |
 
-The layered path is what makes a film-on-substrate sample predictive: a soft line
-born in the film is attenuated by the whole stack, and for lines below ~4.5 keV
-the substrate is often optically thick enough to dominate the correction. See
-[Multilayer materials](../materials/multilayer-materials.md).
+In a stack, emission is attenuated by every layer crossed on the escape path.
+See [Multilayer materials](../materials/multilayer-materials.md).
 
 For the blazed groove, the working facet is perpendicular to $\hat{\mathbf n}$
 and the relief facet is perpendicular to the beam, so a photon leaving through
@@ -114,12 +109,11 @@ with the square root taken exactly rather than linearized. In the X-ray regime
 $\delta\sim10^{-5}$--$10^{-3}$: negligible per Ångström, but it accumulates over
 micron-scale trajectories, which is exactly what this model tracks.
 
-**Only $\mathrm{Re}\,n$ is applied.** $\mathrm{Im}\,n$ is exactly the
-photoabsorption part already carried by the Beer--Lambert $\mu(E)$, so folding
-it in here as well would double count it. The scattering part of $\mu$ has no
-counterpart in $n$ and so cannot double count: $\beta$ is by construction
-$f_2$, which is why the optical constants keep the photoabsorption-only
-coefficient.
+Only $\mathrm{Re}\,n$ enters the resonance and propagation phase.
+Photoabsorption is already included in the Beer--Lambert factor and must not
+be applied a second time through a complex wavevector. The optical constants
+use photoabsorption data; total narrow-beam attenuation also includes
+scattering.
 
 ### Resonance
 
@@ -131,28 +125,16 @@ $$
 {1-\mathrm{Re}\,n(\omega_{\rm res})\,(\mathbf v\cdot\hat{\mathbf n})} .
 $$
 
-It is solved by fixed-point iteration from the vacuum root. In the X-ray regime
-the map's derivative is of order $\delta\sim10^{-5}$, so each pass gains about
-five digits and two are already at float64 rounding; three are taken for margin.
+The implementation takes three fixed-point iterations from the vacuum root.
+Away from absorption edges in the X-ray regime, the refractive correction is
+small and iteration converges rapidly. This is not guaranteed near low-energy
+roots where the refractive index can differ substantially from unity.
 
-**That contraction is conditional, and it is checked rather than assumed.** The
-rate above rests on $\mathrm{Re}\,n=1-\delta$, which only holds off-edge in the
-X-ray regime. A segment scattered nearly perpendicular to $\mathbf g$ puts the
-vacuum root down in the optical/UV, where the tabulations honestly carry
-$\mathrm{Re}\,n>1$ (carbon: $6.24$--$285$ eV, peaking at $4.766$). There
-$\mathrm{Re}\,n\,(\mathbf v\cdot\hat{\mathbf n})$ can approach unity, the
-denominator collapses toward a spurious Cherenkov-like zero, and the map becomes
-an expansive 2-cycle rather than a contraction — three passes then return
-whichever half of the cycle the last pass landed on. So the last pass must move
-the denominator by less than a relative $10^{-3}$; pairs that fail carry NaN out
-and drop on the same finite mask as out-of-range tabulation energies. A genuine
-contraction moves it by $\sim\delta^3$, five orders inside the tolerance. This
-is rejection, not repair: such samples violate the CBS amplitude's own
-perturbative validity condition
-$\lvert U_{\mathbf g}\rvert g^2/(\gamma mc^2(\mathbf v\cdot\mathbf g)^2)\ll1$, so
-there is no correct value to compute for them. At the catalog's 1000 Å
-production thickness the guard rejects no pairs at all; it fires only in thick,
-fast, many-segment cases (0.233% at $10^6$ Å).
+The final denominator update must be below a relative $10^{-3}$. Pairs that
+fail carry NaN and are dropped by the finite-value mask, as are out-of-range
+tabulation energies. This guard rejects an unsettled root; it does not repair
+the resonance or extend the perturbative emission model into that regime.
+See [Validation: `xray-in-medium-resonance`](../../validation/radiation-physics/xray-in-medium-resonance.md).
 
 The substitution leaves
 every kinematic identity intact — $\mathbf k\cdot\mathbf v=\omega(1-{\rm denom})$
@@ -182,10 +164,14 @@ $$
 =-\delta(E)\,\omega(E)\,L_{{\rm esc},j}.
 $$
 
-Equivalently, the escape leg contributes
-$e^{\,i n \omega L}=e^{\,i\omega L}\,e^{-i\delta\omega L}\,e^{-\beta\omega L}$,
-whose last factor is $\sqrt{e^{-\mu L}}$ — the Beer–Lambert amplitude the
-coherent path already applies. Only the two together are one complex $n$.
+The implementation keeps real propagation and attenuation separate. The escape
+factor is
+$e^{i\,\operatorname{Re}n\,\omega L}\sqrt{T_{\rm abs}}
+=e^{i\omega L}e^{-i\delta\omega L}e^{-\tau/2}$.
+Here $\tau$ includes total narrow-beam attenuation, not only the
+photoabsorption associated with the imaginary optical index. Keeping the
+factors separate also avoids mixing the sign convention for complex $n$ with
+the convention for the propagated field.
 
 This is deliberately **not** $k(E)\,\hat{\mathbf n}\cdot\mathbf r_j$, which would
 charge the medium's index for the whole flight to the detector. The two agree
@@ -211,19 +197,24 @@ at the line energy.
   perturbative expansion has failed there;
 - attenuation does not feed back on emission, and emission does not deplete the
   incident beam;
-- interfaces are sharp, static, and perpendicular to $z$;
-- the refractive model is bit-for-bit inert when unselected, so vacuum runs are
-  unaffected by its presence.
+- layer interfaces are sharp, static, and perpendicular to $z$;
+- vacuum dispersion is recovered in the physical limit $\chi_0\to0$;
+  there is no runtime switch to disable the bulk response.
 
 ## Validation
 
-Ledger rows: `absorption-length` (`anchored`) for $\mu$ itself,
+Ledger rows: `absorption-length` for photoabsorption and
+`narrow-beam-total-attenuation` for total removal,
 `line-absorption-tabulation` and `self-absorption` for the interpolated and
 layered escape, `multilayer-stack` for the stack, `finite-transverse-crystal` for
 the prism escape, `blazed-groove-geometry` (**`unverified`**) for the groove, and
 `xray-chi-zero`, `xray-refractive-index`, `xray-in-medium-resonance`,
-`xray-in-medium-propagation-phase` for the dispersion model. All are `rederived`
-or better except the groove row; none is human `signed-off`. Consult the
+`xray-in-medium-propagation-phase` for the dispersion model.
+
+The propagation-phase derivation record still contains a complex-index
+factorization with an inconsistent attenuation sign; the separate real-phase
+and transmission factors above match the implementation. That record needs
+correction before sign-off. Consult the
 [validation ledger](../../validation/physics-validation-ledger.md) before
 scientific use.
 

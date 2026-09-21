@@ -1,18 +1,10 @@
 # Precision and tolerances
 
-Which floating-point type each stage of a run uses, why the choices differ, and
-what vocabulary the tests and validation records use when they say two numbers
-agree.
-
-This page exists because "the GPU result differs" is not one question but four,
-and they have different answers: a *type* difference, a *library* difference, a
-*reassociation* difference, and a *realization* difference. Only the last is
-about physics.
+Transport and spectrum calculations use different floating-point policies.
+When results differ, distinguish changes in type, math-library implementation,
+summation order, and sampled trajectories. Each requires a different comparison.
 
 ## The working real type
-
-Transport and the spectrum kernels have different precision policies, and the
-split is deliberate.
 
 ```{list-table} Floating-point policy by stage.
 :name: tbl-precision-policy
@@ -57,35 +49,24 @@ two types live in one reduction.
 
 ### Why transport is not configurable
 
-Transport arithmetic is `float64` on every core, and the device kernel is
-textually identical to the host core so that **any divergence is attributable to
-the math library alone**. That attribution is the whole verification strategy
-for the port; a type difference layered on top would destroy it.
+Transport arithmetic and lookup tables use `float64` on every core.
+The CPU per-electron reference and CUDA kernel use the same algorithm and
+precision, allowing comparisons of their math-library behavior.
 
-`float32` would roughly double throughput on a consumer card, and it is still
-not offered. Transport is chaotic — a scattering-angle difference compounds over
-the several hundred events an electron undergoes — so single precision would
-change trajectories *qualitatively* rather than at rounding scale. That is a
-different physical sample, not a cheaper one, and it would not be visible as a
-tolerance failure in any test that looks at aggregates.
+Small rounding differences in scattering angles can grow over hundreds of
+events. Keeping transport precision fixed avoids adding a type difference to
+those comparisons. Segment arrays also remain `float64` when retained on the
+device for spectrum calculations.
 
-The segment payload therefore stays `float64` even when it is left resident on
-the device for the spectrum kernels, which is why residency costs the device
-memory it does. Compacting the join to the spectrum working type would nearly
-halve that, at the price of changing the dtype the transport function documents.
+### Why spectrum precision is configurable
 
-### Why the spectrum kernels are
+Spectrum reductions have large working sets. Using `float32` halves the
+storage per value and the transient footprint used to size chunks. Device
+staging casts each shared segment array to the working type once for reuse
+across kernels.
 
-The spectrum reductions are sums of many comparable-magnitude terms into energy
-bins. Their conditioning is good, their working set is large, and `float32`
-halves both the bandwidth and the transient footprint that bounds the chunk
-size. The cast to the working type happens exactly **once**, at device staging,
-rather than once per kernel — three kernels over one case previously performed
-the same cast independently, and hoisting it left the spectra bit-for-bit
-identical while removing two thirds of the uploads.
-
-The exception is the global coherent sum, whose conditioning is *not* good. That
-is a property of the estimator rather than of the precision, and it is treated
+The global coherent sum is sensitive to cancellation. Its conditioning is
+a property of the estimator and is discussed
 in [statistical methods](statistical-methods.md#coherent-versus-incoherent-statistics).
 
 ## Four kinds of difference
@@ -98,9 +79,8 @@ agrees to $10^{-14}$ in double should be expected near $10^{-7}$ in single. This
 is predictable and can be checked by rerunning with `PYRITE_FP64=1`.
 
 **Library.** The same expression in the same type, evaluated by different
-implementations of `log`, `exp`, `pow`, `sin`, `cos`. CUDA's are accurate to a
-few ulp but are not the host libm's. This difference is irreducible: it cannot
-be engineered away, only bounded.
+implementations of `log`, `exp`, `pow`, `sin`, `cos`. Host and device libraries can round these functions differently even at the
+same precision.
 
 **Reassociation.** The same terms summed in a different order or grouping.
 Exact in real arithmetic, not in floating point. This is what chunking, block
@@ -113,46 +93,37 @@ $1/\sqrt{N}$ statistics instead. See
 [random number streams](random-streams.md) and
 [statistical methods](statistical-methods.md).
 
-The first three shrink as precision improves. The fourth does not, and reporting
-it as a numerical discrepancy is the most common category error in reading a
-core comparison.
+Higher precision can reduce arithmetic differences. It does not remove
+differences between independently sampled trajectories.
 
 ## Float32 reassociation
 
-The streaming coherent kernel is where single precision meets a genuinely
-reordered reduction, so it gets its own accounting.
-
-The streaming coherent path introduces two reassociations against its
-predecessor, and both are tracked as validation debt rather than assumed
-harmless.
+The streaming coherent kernel has two sources of rounding differences compared
+with an elementwise, unblocked reduction. Both remain tracked as validation debt.
 
 1. **Expression-tree rounding.** The RawKernel's interpolation and compiler
-   expression tree may round differently from the elementwise path it replaced.
+   expression tree may round differently from the elementwise path.
 2. **Block partials.** A case larger than one internal segment block reduces
    each block's field first and adds the block partials afterwards, rather than
    performing one monolithic reduction.
 
-The second is the interesting one, because it is the streaming identity
-{eq}`eq-execution-streaming-identity` in
-[execution and acceleration](execution-and-acceleration.md) doing exactly what
-it promises — and floating-point addition is not associative, so "exactly" holds
-in real arithmetic only.
+Block accumulation uses {eq}`eq-execution-streaming-identity` from
+[execution and acceleration](execution-and-acceleration.md). The identity is
+exact in real arithmetic, but floating-point addition is not associative.
 
-What makes this acceptable is that the partitioning happens on the **field**,
-not on the intensity. Intensity is formed once, after the last block, from four
-persistent field planes. Had the kernel reduced intensity per block, the
-cancellation structure of the coherent sum would have been destroyed rather than
-merely reordered, which is a physics change and not a rounding one.
+The kernel accumulates fields in four persistent planes and forms intensity
+once after the final block. Forming intensity per block would lose cross-block
+interference and change the physical calculation.
 
-The measured envelope: a `float64` A/B against the previous path agrees to the
+The measured envelope: a `float64` A/B against the non-streaming path agrees to the
 level expected of double precision, and the on-device `float32` sibling
 comparison measured $2.0 \times 10^{-5}$ relative. That is consistent with the
 epsilon-ratio expectation for a sum with real cancellation in it, and it is the
 figure to compare a future change against.
 
-Both reassociations require CUDA goldens and an A/B before human sign-off, and
-that regeneration is still owed. Until then, the `float32` coherent spectrum is
-correct-in-envelope rather than pinned.
+Both reassociations require CUDA golden regeneration and an A/B comparison
+before human sign-off. These checks remain outstanding; the measured envelope
+does not replace them.
 
 ## Tolerance vocabulary
 
@@ -162,7 +133,7 @@ not say what was tested. The four that recur:
 `rtol=1e-12`, single step
 : Used for **first-step agreement** between the CPU per-electron core and the
   CUDA kernel. It is a tight tolerance applied to a single evaluation, before
-  chaos has anything to amplify. Even this is not exact, because the first
+  rounding differences have accumulated along a trajectory. Even this is not exact, because the first
   recorded segment already passes through a logarithm.
 
 Bit-for-bit
@@ -186,10 +157,8 @@ Envelope figures
   describe a measured difference at a stated configuration; they are evidence,
   not thresholds, and they do not gate anything on their own.
 
-The rule that ties them together: **choose the tolerance from what is claimed,
-not from what passes.** A comparison across a stream change cannot be rescued by
-loosening a numerical tolerance, because no tolerance is the right instrument
-for it.
+Choose the tolerance to match the claim. Comparisons across different random
+streams require statistical errors, not a looser numerical tolerance.
 
 ### Straggling does not relax numerical tolerances
 
@@ -204,7 +173,7 @@ first-row state numerically, but compare whole straggled runs statistically.
 Conversely, a straggling on/off comparison at matched seeds is a paired physics
 comparison, not a numerical tolerance test. The disabled-path claim is the one
 that is bit-for-bit: the sampler, its keys and its output field are absent.
-Five CUDA straggling tests pass on an RTX 5080. They establish disabled-path
+CUDA straggling tests cover disabled-path
 identity, deterministic replay, finite energy bookkeeping, first-row transport
 state, and ensemble agreement. They do not yet compare the first row's applied
 loss (`E_end_keV`) against the host, so the `rtol=1e-12` loss-parity claim is not

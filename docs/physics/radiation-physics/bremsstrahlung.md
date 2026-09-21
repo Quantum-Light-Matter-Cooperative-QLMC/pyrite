@@ -6,8 +6,9 @@ electron segments with the Livermore Evaluated Electron Data Library (EEDL)
 ENDF-6 MF=23/MT=527 multiplied by the normalized photon-energy probability
 density in MF=26/MT=527. It shares the transport segments, the escape geometry,
 and the per-electron normalization with the [line
-kernel](coherent-radiation.md), and is evaluated on the same spectral grid, so
-line and continuum can be added directly.
+kernel](coherent-radiation.md), but can use a separate photon-energy grid. Combining line and continuum
+requires compatible energy coordinates and density conventions; see
+[spectral observables](spectral-observables.md).
 
 ## What MF=23/MT=527 and MF=26/MT=527 mean
 
@@ -30,8 +31,7 @@ names a section of the EEDL evaluation; it is not a fitted parameter:
 The two sections are used together because they supply complementary pieces:
 MF=23 fixes the total probability of a bremsstrahlung event, while MF=26 fixes
 the conditional photon-energy shape. Their product is the required
-differential cross section. This follows the ENDF-6 meanings of the sections
-rather than choosing two independently convenient tables
+differential cross section. The section definitions follow ENDF-6
 {cite:p}`trkov2018endf6`.
 
 ## EEDL cross section and spectrum
@@ -63,12 +63,11 @@ interpolated MF=23 total.
 
 The ENDF-6 electro-atomic format describes the bremsstrahlung photon subsection
 as an isotropic, angle-independent tabulated spectrum (`LAW=1`, `LANG=1`,
-`NA=0`) {cite:p}`trkov2018endf6`. This agrees with and therefore retains
-PyRITE's existing angular model.
+`NA=0`) {cite:p}`trkov2018endf6`. PyRITE uses this isotropic angular model.
 
 ## Optional Bethe--Heitler backend
 
-The former analytic model remains available with
+An analytic alternative is available with
 `cross_section_model="bethe-heitler"` on `mc_brem_spectrum`. It is the
 nonrelativistic, unscreened Born Bethe--Heitler form with the
 {cite:t}`elwert1939` correction, using relativistic momenta as a
@@ -83,8 +82,8 @@ weakly-relativistic extension {cite:p}`kochmotz1959`:
 ```
 
 Momenta are carried in units of {math}`m_ec`, built from the exact relativistic
-relation {math}`p=\sqrt{T(T+2m_ec^2)}/m_ec` and {math}`\beta=p/(1+T/m_ec^2)`, with
-{math}`T_f=T_i-k`. This backend is retained for reproducibility and as the
+relation {math}`p=\sqrt{T(T+2m_ec^2)}/(m_ec^2)` and {math}`\beta=p/(1+T/m_ec^2)`, with
+{math}`T_f=T_i-k`. This backend is also the
 fallback when EEDL lacks an element or incident-energy range. Every fallback
 emits a `RuntimeWarning` that identifies the missing coverage. Malformed or
 checksum-mismatched EEDL data are not treated as missing coverage and remain
@@ -106,15 +105,16 @@ and electrons and divided by the electron count, so the returned quantity is
 **photons per eV per steradian per incident electron** — the same units as the
 line spectrum.
 
-Isotropy is the standard assumption at weakly relativistic energies once
-electron directions are scattering-randomized, and is the one adopted for the
-comparison estimates this model was built against. The small coherent fraction
+Isotropy approximates a scattering-randomized electron population in the
+intended weakly relativistic regime; it does not resolve directional emission
+from an individual electron. The small coherent fraction
 of the continuum — which is what forms the CBS lines — is **not** subtracted
 here, so adding the line and continuum spectra slightly double counts that
 fraction.
 
-Compound targets add element contributions with their own {math}`Z^2` weighting at
-their own number densities, while the self-absorption uses the summed
+Compound targets sum each element's cross section at its own number density.
+The analytic backend carries explicit {math}`Z^2` scaling; EEDL supplies an
+evaluated cross section for each element. Self-absorption uses the summed
 attenuation of the whole composition. In a layered stack each layer's segments
 radiate with that layer's composition and every photon is attenuated across the
 whole stack.
@@ -155,14 +155,14 @@ do not radiate.
 ## Energy range and cutoffs
 
 - `k <= 0` and `k > T` are hard-zero bins for EEDL. The optional analytic
-  backend also zeros its historical endpoint convention.
+  backend also sets the endpoint {math}`k=T` to zero.
 - The EEDL tables cover their declared incident and secondary-energy ranges.
   Requests outside the incident-energy range warn and use Bethe--Heitler for
   only the affected segments.
 - The normalized EEDL spectrum extends to 0.1 eV in the packaged tape. A
   simulation grid with a higher lower bound intentionally records only the
   corresponding partial total cross section.
-- Background runs want a **low transport cutoff** (~1 keV): electrons below the
+- Background calculations use a low transport cutoff (typically 1 keV): electrons below the
   line-radiation cutoff still radiate into the soft X-ray window.
 - One transport can be shared by radiation populations with different cutoffs, so
   each kernel re-applies the stopping rule to a population-specific energy floor.
@@ -172,25 +172,24 @@ do not radiate.
   midpoint rule, so the shortened flight's state is reconstructed rather than
   lost. A higher-cutoff consumer therefore cannot recover radiation from the
   lower-cutoff tail.
-- The Henke/Chantler attenuation tables span roughly 20 eV--30 keV. Outside that
-  range {math}`\mu` is unavailable, and the wide background grid treats it as **zero**
-  (fully transparent) rather than propagating NaN through the integrated count
-  rate. Hard X-rays do escape essentially unattenuated, but the softest bins
-  below the table floor are also silently unattenuated — read the extremes of a
-  wide grid with that in mind.
+- Attenuation is available only within the optical tables' supported ranges.
+  Where {math}`\mu` is unavailable, the background kernel substitutes zero
+  attenuation. This is a numerical fallback, not evidence that the material is
+  transparent. Production grids apply the material-dependent floor described
+  in [energy-grid semantics](energy-grid-semantics.md); explicit grids still
+  need their data support checked.
 
 ## Path-integral order
 
 Each row contributes one evaluation of the integrand rather than a quadrature
 along the flight. Under `energy_model="midpoint"` that evaluation uses the
 representative energy `E_repr_keV`, making it a midpoint rule (second order in
-the flight length); frozen rows keep the left-endpoint one (first order). This is
-what makes the yield insensitive to how many numerical substeps a flight was
-integrated in. `brem_endpoint_quadrature_error` measures the residual difference,
+the flight length); frozen rows keep the left-endpoint one (first order). Refinement controls the residual path-quadrature error. `brem_endpoint_quadrature_error` measures the residual difference,
 opt-in and read-only.
 
-Unlike the line kernel, the continuum needs no flight grouping: the contribution
-is linear in segment length, so splitting a flight is exact by construction.
+The continuum needs no coherent flight grouping. Its contribution is linear
+in segment length when energy and attenuation are held fixed. Subdivision of
+an evolving, absorbing track changes the quadrature and is not exactly invariant.
 
 ## External backgrounds
 

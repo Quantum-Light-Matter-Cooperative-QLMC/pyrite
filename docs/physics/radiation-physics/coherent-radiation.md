@@ -28,10 +28,10 @@ parallax is taken.
 The far-field expansion keeps the linear retardation $-\omega\hat{\mathbf n}
 \cdot\mathbf r$ exactly and drops only the curvature term $\omega r_\perp^2/2R$,
 where $R$ is the source-to-detector distance and $r_\perp$ is the component of
-the emission point transverse to $\hat{\mathbf n}$. Separation **along**
-$\hat{\mathbf n}$ therefore carries no error at all — slab depth is exact — and
-the validity condition involves the transverse extent of the emitting volume
-alone:
+the emission point transverse to $\hat{\mathbf n}$. A displacement parallel
+to the observation direction has no curvature term. Slab depth contributes
+to $r_\perp$ when observation is oblique, so the condition must use the full
+emitting volume:
 
 ```{math}
 :label: eq-coherent-radiation-far-field
@@ -39,17 +39,11 @@ alone:
 r_\perp\ll\sqrt{\frac{\lambda R}{\pi}},
 ```
 
-the radius at which the neglected phase reaches one radian.
-{eq}`eq-coherent-radiation-far-field` bounds the **phase** error only. For the reference
-HOPG case the emitting volume is $\approx6.5\,\mu$m across at 25 keV, against a
-one-radian patch of 12.7 µm at the 400 mm Timepix distance (0.066 rad neglected,
-negligible) but only 3.5 µm at the 30 mm `detector_directions` default
-(0.87 rad) and 2.0 µm at 10 mm (2.6 rad). Short working distances need the
-condition checked, not assumed. It therefore matters
-only under the coherent policy; for incoherent sums the induced observation-angle
-error $\delta\theta\approx r_\perp/R$ shifts the line by $\ll0.1$ eV, some two
-orders of magnitude below the detector-acceptance broadening it sits inside.
-Measured by `checks/coherent_transverse_coherence.py`.
+where the right-hand side is the transverse radius at which the neglected
+phase reaches one radian. This is a phase-error condition; check it for the
+actual source extent, photon wavelength, and detector distance. Incoherent
+calculations also incur a direction error of order $r_\perp/R$, which must be
+small enough for the desired spectral resolution.
 
 Reciprocal vectors are oriented before the sum. `beam_uvw` names the direct-lattice
 axis placed along $+z$; `surface_hkl` instead names the reciprocal-lattice plane
@@ -57,16 +51,18 @@ normal placed along $+z$, which is the exact cleavage-plane contract for
 nonorthogonal cells. Either choice is applied as the minimal proper rotation,
 followed by `azimuth_rad` about $+z$ for the in-plane setting relative to the
 detector azimuth. `recip_miscut_rad` adds a further tilt to the reciprocal
-vectors **only**, leaving the transported slab normal untouched — the escape
-hatch for an asymmetric reflection where $\mathbf g$ is not parallel to
+vectors **only**, leaving the transported slab normal untouched — useful
+for an asymmetric reflection where $\mathbf g$ is not parallel to
 $\hat{\mathbf n}$'s exit face, and not yet wired into any campaign grid. Conventions are shared with
 [Tilt convention](../geometry/tilt-convention.md).
 
 Reflections arrive as a pinned catalog family list expanded to **both**
 reciprocal directions, $\pm\mathbf g$. Distinct reflections are treated as
 spectrally separated and therefore summed incoherently; the kernel does not
-evaluate cross-$\mathbf g$ interference, and that assumption is not yet a
-ledgered claim.
+evaluate cross-$\mathbf g$ interference, and the tested scope is recorded under
+[Validation: `cross-reflection-coherence`](../../validation/radiation-physics/cross-reflection-coherence.md).
+The bound covers the catalog basal-plane families, not arbitrary
+near-degenerate reflections.
 
 ## Resonance condition
 
@@ -159,7 +155,8 @@ $\hat{\mathbf e}_p=\hat{\mathbf e}_s\times\hat{\mathbf k}$ (a degenerate
 $\hat{\mathbf k}\parallel\mathbf g$ falls back to an arbitrary transverse seed).
 The two polarizations are orthogonal modes and always add **incoherently**.
 
-Per polarization $\hat{\mathbf e}$, with $\mathbf k=\omega\hat{\mathbf n}$,
+Per polarization $\hat{\mathbf e}$, with $\mathbf k=k\hat{\mathbf n}$ and
+$k=\operatorname{Re}n(\omega)\,\omega$ in the implementation,
 detuning $\Delta=|\mathbf k+\mathbf g|^2-k^2=g^2+2\,\mathbf k\cdot\mathbf g$,
 and the transverse-to-velocity product
 $\{\mathbf a;\mathbf b\}=\mathbf a\cdot\mathbf b-(\mathbf a\cdot\mathbf v)(\mathbf b\cdot\mathbf v)$,
@@ -211,7 +208,9 @@ treatment by the finite-time factor of Eq. (8) of {cite:t}`feranchuk2000`. A
 segment of length $L$ traversed at speed $\beta$ radiates for
 $t_L=L/\beta$ (in Å, $c=1$). Integrating a constant amplitude over that centered
 duration gives the unsquared factor $Q=t_L\,{\rm sinc}(Pt_L/\pi)$ with
-$P=(1-\beta\hat{\mathbf v}\cdot\hat{\mathbf n})(\omega-\omega_{\rm res})/2$, so
+$P=D(\omega-\omega_{\rm res})/2$, with the frozen resonance denominator
+$D=1-\operatorname{Re}n(\omega_{\rm res})\,\mathbf v\cdot\hat{\mathbf n}$.
+In the vacuum limit $D=1-\mathbf v\cdot\hat{\mathbf n}$. Thus
 the incoherent intensity carries
 
 ```{math}
@@ -223,13 +222,13 @@ the incoherent intensity carries
 using the normalized-sinc convention. At zero detuning {eq}`eq-coherent-radiation-lineshape` is $t_L^2$; in the
 long-duration limit $|Q|^2/(\pi t_L)\to\delta(P)$ distributionally. The
 half-width to the first zero is
-$W=2\pi\hbar c/[(1-\hat{\mathbf n}\cdot\mathbf v)\,t_L]$, which is what sets the
+$W=2\pi\hbar c/(D\,t_L)$, which sets the
 simulated linewidth before any detector broadening. The factor assumes constant
 velocity and constant amplitude across the segment.
 
 `sinc_cutoff=C` truncates each lineshape at $|Pt_L|>C$ and processes segments in
-resonance-sorted blocks against only the relevant grid window. It requires a
-uniform energy grid, loses about $1/(\pi C)$ of each line's integral (0.3% at
+resonance-sorted blocks against the relevant energy coordinates, including on
+nonuniform grids. It loses about $1/(\pi C)$ of each line's integral (0.3% at
 $C=100$), and leaves peak heights unaffected. The default evaluates every
 segment over the full grid exactly.
 
@@ -321,7 +320,8 @@ validation boundary.
 - straight, constant-velocity, constant-amplitude motion within each transport
   segment; the finite-time factor and the midpoint pairing both rest on this;
 - reflections and polarizations add incoherently; cross-$\mathbf g$ interference
-  is assumed negligible and is not yet ledgered;
+  is bounded only for the reflection families tested under
+  `cross-reflection-coherence`;
 - couplings frozen at $\omega_{\rm res}$ across each line;
 - tabulated or CIF-derived crystal structure, form factors, Debye–Waller
   factors, and the selected orientation fully determine the coupling — a wrong
@@ -329,9 +329,9 @@ validation boundary.
 - a single fixed far-field observation direction per evaluation; the finite
   detector face is handled by summing directions, not by parallax within one;
 - Beer–Lambert attenuation handles escape, with no feedback on emission;
-- integrated yield is exact but **line peak height is segmentation dependent**,
-  so absolute peak comparisons against a paper inherit an implicit dependence on
-  the transport's segment-length distribution;
+- the analytic finite-time profile has a known integral, but numerical spectra
+  still have finite-window, grid, and segment-quadrature errors. Peak height
+  also depends on the physical flight-length distribution;
 - detector response is downstream and must not be folded into source physics.
 
 ## Validation
@@ -344,9 +344,11 @@ harmonic sign), `line-absorption-tabulation`, `self-absorption`, `mosaic-mc`, an
 `substep-radiation-invariance`. The evaluation-order rows `line-hkl-batch`,
 `coherent-line-hkl-batch`, `line-amplitude-fusion`, and `line-gemv-elementwise`
 cover the batched and fused arithmetic paths, which are algebraically identical
-to the reference loop up to float reassociation. `closed-form-flux` is an open
-discrepancy against the analytic single-segment comparison, so absolute
-normalization against literature is not yet settled.
+to the reference loop up to float reassociation. `closed-form-flux` is
+`anchored`: the reference includes the exit-angle
+factor in its escape length. The corrected escape term still awaits an
+independent derivation check and human sign-off; this status does not settle
+all absolute comparisons with literature.
 
 Follow those rows in the [validation
 ledger](../../validation/physics-validation-ledger.md) before scientific use; no

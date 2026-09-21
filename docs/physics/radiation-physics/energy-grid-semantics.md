@@ -1,25 +1,16 @@
 # Energy-grid semantics
 
-Every spectral quantity in the simulation lives on a photon-energy coordinate,
-and almost every numerical error that survives a physics review comes from
-disagreeing about what that coordinate *is*. This page pins the conventions:
-what a grid entry means, what a spectral value means, how the two combine into
-an integral, and which of those combinations are forbidden.
+Source spectra use photon-energy coordinates in eV. Correct integration
+depends on whether each stored value is a sampled density, a bin-averaged
+density, or a bin mass. These conventions are shared by
+[spectral observables](spectral-observables.md), the radiation kernels, and
+[detector response](../detectors/detector-response.md).
 
-Nothing here is a new physical model. It is the numerical contract the
-[spectral observables](spectral-observables.md), the
-[bremsstrahlung](bremsstrahlung.md) and
-[characteristic](characteristic-radiation.md) kernels, and the
-[detector response](../detectors/detector-response.md) all have to share.
-
-The default grids remain uniform. Nonuniform support is incremental: sampled
-continuum kernels evaluate arbitrary nodes, detector Poisson scoring uses local
-midpoint-cell widths, and Timepix coarse-input rebinning conserves source-bin
-mass. Energy-resolution convolution and the final Timepix recorded-density
-projection remain uniform-grid work; see
-[Energy grids across six decades](../../research/beam-transport/energy-grid-recommendations.md)
-for the recommendation and the [uniform-only consumers](#uniform-only-consumers)
-section below for what currently refuses them.
+Default grids are uniform. Continuum kernels also accept nonuniform nodes;
+Poisson scoring uses local cell widths, and Timepix input rebinning conserves
+source-bin mass. Energy-resolution convolution and final Timepix
+recorded-density projection require uniform grids. See
+[uniform-only consumers](#uniform-only-consumers).
 
 ## Evaluation nodes are not bin edges
 
@@ -63,21 +54,20 @@ midpoints with one-sided outer half-widths:
 
 {eq}`eq-grid-midpoint-edges` holds for nonuniform centres as written;
 `montecarlo/spectrum/characteristic.py::_energy_bin_edges_and_widths`
-implements it and is the reference for any new edge construction.
+uses this construction with the low edge additionally clamped to 0 eV.
+Its bin widths, including that clamp, must also be used when integrating
+characteristic and bin-mean PXR/CBS spectra.
 
-## A density in photons/eV stays a density in photons/eV
+## Density units
 
 The primary quantity is a spectral density,
 $\mathrm{d}^2N/\mathrm{d}E\,\mathrm{d}\Omega$, in
-photons eV⁻¹ sr⁻¹ electron⁻¹. That is a property of the *physics*, not of the
-sampling. Putting the samples on a logarithmic grid does not convert the
+photons eV⁻¹ sr⁻¹ electron⁻¹. Putting the samples on a logarithmic grid does not convert the
 quantity to photons per decade, per $\ln E$, or per bin; it only changes where
 the same density is evaluated.
 
-Consequently a stored spectrum array is never self-describing enough to
-integrate without its coordinate. Nothing may assume that adjacent samples are
-separated by a constant width, and nothing may treat a density as if it were
-already a per-bin photon count.
+A stored spectrum needs its coordinates and quadrature convention to be
+integrated. A density is not a per-bin photon count.
 
 ## Integrate in physical energy with local widths
 
@@ -119,27 +109,22 @@ across a wide band. Either integrate in physical energy with
 {eq}`eq-grid-physical-integral`, or integrate in $u$ with the explicit $E$
 factor. Both are correct; mixing them is not.
 
-### The trapezoid/line-mass ban
+### Sampled densities and bin-integrated masses
 
-A node-centred trapezoidal integral of a sampled density and a sum of
-bin-integrated line masses are **not** interchangeable conventions, and code
-must never swap one for the other:
+A trapezoidal integral approximates the area under a function sampled at
+nodes. It can miss a line narrower than the node spacing.
 
-* The trapezoid sum of {eq}`eq-grid-physical-integral` approximates the area
-  under a function that is assumed smooth between nodes. It is wrong by an
-  arbitrary factor for a feature narrower than the node spacing.
-* A bin-integrated line mass is the exact integral of a known profile over a
-  bin — for instance the Lorentzian CDF difference in
-  `characteristic.py::_lorentzian_bin_weights`. It conserves the transition
-  yield regardless of how coarse the bins are, but it is a *per-bin mass*, not a
-  density sample, and dividing it by a width to "make it a density" throws away
-  exactly the truncation bookkeeping that made it exact.
+An analytically integrated line profile instead gives the probability or yield
+inside each bin. Dividing that mass by the bin width produces a valid
+bin-averaged density, as the characteristic kernel does. Recover the mass by
+multiplying by the same width. Applying node-based trapezoid weights to that
+array changes the endpoint weights and need not preserve its yield.
 
-Mixing the two in one sum double-counts or drops line yield. Any spectrum that
-adds narrow lines to a smooth continuum must state, per component, which of the
-two it is, and convert deliberately if they have to meet.
+Keep the quadrature convention with each component when combining a sampled
+continuum with bin-integrated lines.
 
 (sinc-bin-mean-quadrature)=
+
 ### Bin-mean quadrature for PXR/CBS lines
 
 The incoherent PXR/CBS line density is a sum of finite-time profiles
@@ -177,9 +162,8 @@ Differentiating {eq}`eq-grid-sinc-antiderivative` returns
 $\sin(2\pi x)/(\pi x) - \sin(2\pi x)/(\pi x) + \sin^2(\pi x)/(\pi x)^2
 = \operatorname{sinc}^2 x$; $x\operatorname{sinc}^2 x$ is the
 $\sin^2(\pi x)/(\pi^2 x)$ term with its removable $x = 0$ point made explicit.
-(A spelling with $\operatorname{Si}(2\pi x)/(2\pi)$ is wrong by a factor two
-in that term.) The result stays a density in photons/eV, so every consumer of
-the line array is unchanged; its yield is
+The result is a bin-averaged density in photons/eV. Consumers must preserve
+that interpretation; its yield is
 $\sum_i \bar S_i\,(\epsilon_{i+1} - \epsilon_i)$, which is the in-window line
 mass exactly, at any spacing and on nonuniform (windowed) grids alike.
 
@@ -195,7 +179,7 @@ Assumptions and scope:
   dropped, as for the characteristic Lorentzians; the dropped part is returned
   by `montecarlo/spectrum/lines/_bin_quadrature.py::sincsq_window_mass`, and
   captured plus truncated equals $\pi / a_j$. This is the bookkeeping the
-  trapezoid/line-mass ban above protects: a bin-mean array is a bin mass per
+  distinction between node values and bin means protects: a bin-mean array is a bin mass per
   width, the same object `characteristic.py` writes, and it must not be
   resampled as if it were a node value.
 * **Yield only.** Averaging over a bin smooths the profile: peak height falls
@@ -204,8 +188,7 @@ Assumptions and scope:
 * **Incoherent only.** The coherent route squares a sum of amplitudes, and
   the flight-grouped reduction (numerical substeps) adds substep amplitudes
   before squaring; neither has a per-line bin mass, and both refuse
-  `bin-mean`, as does the `sinc_cutoff` truncation (#117 owns the coherent
-  route).
+  `bin-mean`, as does `sinc_cutoff` truncation.
 
 Limiting cases: as $\epsilon_{i+1} - \epsilon_i \to 0$, $\bar S_i$ tends to
 the node sample of a uniform grid, whose node is the bin centre; as
@@ -228,23 +211,17 @@ $t \le 4$ and within $2.1\times10^{-15}/t$ beyond.
 
 [Validation: `sinc-bin-integration`](../../validation/radiation-physics/sinc-bin-integration.md).
 
-#### Why one explicit switch
+#### Quadrature selection
 
-The opt-in is one `quadrature` field of the line-grid policy
-(`_line_grid_policy.py`, values `node`/`bin-mean`), mirrored onto the case as
-the divergence-only `line_quadrature` key, rather than a per-observable-class
-field. A run produces one line spectrum. A per-observable field would either
-compute a spectrum per observable class or let the policy guess which class the
-single spectrum serves; the caller already knows, and an explicit switch makes
-that statement auditable in the case payload. Precedence is per-call, then
-stored configuration, then the `node` default, with no environment layer, for
-the same reason as `windows`: it is a structural choice, not a tolerance. A
-`bin-mean` policy has payload schema 3 and records its source, so case,
-checkpoint and cache identity move; a `node` policy keeps its historical payload
-bit-for-bit. The case key exists because a recompute that pins explicit
-coordinates drops the policy, and must not drop the quadrature the stored
-spectrum was computed with. Selecting it does not change the automatic
-`sinc-nyquist` resolution, which still refines for the node quadrature's shape
+The line-grid policy's `quadrature` field accepts `node` or `bin-mean`.
+It resolves from the per-call value, then stored configuration, then the
+`node` default; there is no environment override. The case's
+`line_quadrature` key preserves the choice when recomputation pins explicit
+coordinates and drops the policy.
+
+A `bin-mean` policy uses payload schema 3 and participates in case, checkpoint,
+and cache identity. Selecting it does not change the automatic
+`sinc-nyquist` resolution policy, which still targets node-sampled shape
 observables.
 
 ## A logarithmic grid cannot contain zero
@@ -256,14 +233,11 @@ tables and by where the model stops being meaningful. The
 [bremsstrahlung](bremsstrahlung.md) infrared rise makes the choice observable —
 the integrated background depends on it.
 
-An arbitrarily small epsilon used only to keep the logarithm finite is therefore
-not acceptable. It is an unexamined infrared cutoff wearing a numerical
-disguise, and it silently sets a physics result.
+A small positive epsilon would impose an arbitrary infrared cutoff.
+`_photon_continuum_floor.py::photon_continuum_floor_eV` instead uses the larger
+of a material-dependent plasma-energy scale and the data-support floor.
 
-### The floor is derived, not chosen
-
-`_photon_continuum_floor.py::photon_continuum_floor_eV` returns the larger of two
-independently derived bounds, and neither is a tuning knob.
+### Continuum floor
 
 **The modelled band.** A continuum node is only meaningful where the medium's
 optics is. `materials/crystal.py::optical_constants` writes the medium as
@@ -281,28 +255,19 @@ expression is *identically* the free-electron result
 n_e = \sum_i n_i Z_i ,
 ```
 
-with $n_i$ the medium's own catalog number densities. At $\omega = \omega_p$,
-{eq}`eq-grid-plasma-floor` gives $\delta = 1/2$: the weakly-refracting,
-transparent-medium expansion that photon escape and self-absorption both rest on
-has collapsed, and below $\omega_p$ the medium reflects rather than transmits. So
-$\hbar\omega_p$ is where *this repository's own* optics stops being valid, not an
-imported convention. `materials/attenuation.py::plasma_energy_eV` computes it.
+with $n_i$ the catalog number densities. The implementation uses
+$\hbar\omega_p$ as a material-dependent lower-bound scale, computed by
+`materials/attenuation.py::plasma_energy_eV`.
+Extrapolating the weak-refraction expression to $\omega=\omega_p$ gives
+$\delta=1/2$, outside its small-$\delta$ regime.
 
-*Assumptions.* All $Z$ electrons respond as free — exact only for $\omega$ well
-above every binding energy; near and below $\omega_p$ the real response is
-collective and band-structure dependent, which is the point. Homogeneous
-isotropic bulk medium, so no surface, porosity, or anisotropy term. No Drude
-damping, which shifts a real plasmon resonance by order $(1/\tau)/\omega_p$.
+This is a free-electron estimate, not an exact optical threshold for each
+crystal. It assumes all $Z$ electrons respond freely in a homogeneous,
+isotropic, undamped bulk medium. Near the resulting scale, binding,
+collective response, and band structure limit that approximation.
 
 *Limiting case.* $n_e \to 0$ gives $\hbar\omega_p \to 0$: an empty medium imposes
 no low-energy bound, and the floor falls back to pure table support.
-
-*Cross-check.* The PDG/Sternheimer density-effect parameterization carries the
-same quantity as $\bar{C} = 2\ln(I/\hbar\omega_p) + 1$. Inverting the packaged
-$\bar{C}$ and mean excitation energy for silicon
-(`materials/_transport_data.py`) gives 31.0482 eV against the 31.0498 eV
-{eq}`eq-grid-plasma-floor` gives from the catalog number density — agreement to
-$5\times10^{-5}$ relative, from different data through different code.
 
 **Data support.** The second bound is the lowest energy at which every table the
 continuum pipeline evaluates carries a real tabulated value rather than an
@@ -313,43 +278,20 @@ spectra reach 0.1 eV for every transport element, Chantler/FFAST reaches 1.01 eV
 the digitized Eagle XO QE curve is documented valid from 12 eV. The QE table
 therefore binds, at 12 eV.
 
-For every condensed medium in the catalog the plasma energy is the larger term —
-the smallest is `sio2` at 30.201 eV, the largest `ptbi2` at 66.248 eV — so the
-floor is a derived, material-specific number rather than a round one, and data
-support binds only in the dilute limit above. HOPG's floor is 30.661 eV.
+The plasma-energy term sets a material-dependent floor where it exceeds the
+data-support bound. Node placement above the floor is handled separately.
 
-Choosing where the nodes go *between* floor and ceiling — refinement near
-absorption edges and kinematic endpoints — is a separate concern from the
-geometric baseline `geometric_continuum_grid` builds.
+Uniform production bremsstrahlung grids apply the floor when material and
+requested band are resolved together in `campaign/sweep.py::build_cases`.
+If the declared start is too low, `floored_lattice_start_eV(material, step)`
+raises it to the first step multiple at or above the floor. A declared start
+above the floor is retained. A profile default of `0.0` means no additional
+lower bound beyond the material's floor.
 
-**Where the floor is applied, and why not in the catalog.** A uniform
-production bremsstrahlung band (`E_grid_brem`) declares a `start`, but that
-number is a *bandwidth request*, not the band the case gets: the floor belongs
-to the medium, and the same catalog row is inherited by profiles that must
-agree about the material they share. `campaign/sweep.py::build_cases` therefore
-raises a declared start to `floored_lattice_start_eV(material, step)` — the
-lowest multiple of the grid's own step at or above the medium's floor — the
-first place the band and the material meet. Three consequences follow, and each
-is load-bearing:
+The diagnostic band used to derive the upper endpoint,
+`energy_grid/derive.py::wide_brem_grid`, uses the same floor helper.
 
-* **The nodes do not move, they are only dropped.** Snapping to the step
-  lattice rather than starting at the floor itself leaves every surviving node
-  on the coordinate it had, so a quantity measured on the grid — a cumulative
-  coverage quantile, say — is read at the same energies as before.
-* **A declared start *above* the floor is kept.** Narrowing the band is an
-  ordinary bandwidth choice, exactly as in `geometric_continuum_grid`; only
-  widening it downward, past model validity, is refused.
-* **A profile-level default stores `0.0`.** Naming no medium, it can carry no
-  floor of its own, and `0.0` reads as "no bound beyond the medium's". Storing
-  a *per-profile* floor instead would make two profiles disagree about the same
-  material's grid and silently stop sharing cases they are meant to share.
-
-The diagnostic band the `stop` is measured on
-(`energy_grid/derive.py::wide_brem_grid`) starts at the same energy, through the
-same helper, so the band a bound is measured over is the band it is installed
-for. On HOPG at 30 keV this drops the nodes at 0 and 25 eV; those carry about
-$1.3\times10^{-3}$ of the total escaping intensity, and the derived coverage
-energy and catalog `stop` are unchanged by their removal.
+[Validation: `photon-continuum-floor`](../../validation/physics-validation-ledger.md).
 
 Detector channels are a separate coordinate from the source mesh, and a real
 instrument does have a channel that starts at zero recorded energy — the
@@ -378,14 +320,15 @@ So a detector whose channel physically starts at 0 eV keeps its own boundary
 rather than inheriting the continuum's positive floor.
 
 (continuum-node-refinement)=
-### Where the nodes go: refinement is derived too
+
+### Continuum-node refinement
 
 The floor fixes where a continuum grid *starts*. Where its nodes go between
 floor and ceiling is a second derived choice, and
 `energy_grid/refine.py::refined_continuum_grid` makes it.
 
-**Why geometric is the right baseline.** Multiplying a density by its local
-midpoint width {eq}`eq-grid-midpoint-edges` is a midpoint quadrature, whose
+**Geometric baseline.** Multiplying a density by its local
+midpoint width {eq}`eq-grid-midpoint-edges` approximates midpoint quadrature for sufficiently fine cells. Its
 error on an interval of width $h$ is $(h^3/24)\,|n''|$, so the *relative* error
 contributed by that interval is
 
@@ -395,18 +338,17 @@ contributed by that interval is
 \varepsilon_i \simeq \frac{h_i^2}{24}\,\left|\frac{n''(E_i)}{n(E_i)}\right| .
 ```
 
-On a grid uniform in $u = \ln E$ the step is $h_i = E_i\rho$ with
+On a fine grid uniform in $u = \ln E$, the local spacing is approximately
+$h_i = E_i\rho$ with
 $\rho = \ln(E_\mathrm{stop}/E_\mathrm{floor})/(N-1)$, and for a local power law
 $n \propto E^{-p}$ the combination $h_i^2\, n''/n$ is *independent of $E$*. A
 geometric grid therefore equidistributes {eq}`eq-grid-quadrature-error` across
-the band — which is exactly why it is the baseline, and exactly why it says
-nothing about an integrand that is not smooth on the scale of its own step.
+the smooth parts of the band. Edges and endpoints need separate treatment.
 
-**Where that fails.** {eq}`eq-grid-quadrature-error` assumes $n$ has a bounded
+**Edges and endpoints.** {eq}`eq-grid-quadrature-error` assumes $n$ has a bounded
 second derivative across the interval. The modelled escaping continuum
-$n(E) = S(E)\,e^{-\mu(E)\ell}$ violates that in exactly two places, and in both
-the straddling interval's error degrades from $O(h^2)$ to $O(h)$ — a term no
-globally finer geometric spacing removes at better than first order:
+$n(E) = S(E)\,e^{-\mu(E)\ell}$ can have unresolved structure at absorption edges and kinematic endpoints.
+An unresolved jump produces a first-order quadrature error:
 
 * **Absorption edges.** $\mu$ steps by a finite ratio across an interval far
   narrower than the local $E\rho$. The emitted $S$ is smooth there —
@@ -420,7 +362,7 @@ globally finer geometric spacing removes at better than first order:
 **The rule.** Put a grid coordinate *on* the discontinuity, and refine no
 further than the resolution at which the model itself represents it.
 
-* *Edges* are **located, never listed.** The escape model attenuates with $\mu$
+* **Absorption edges.** The escape model attenuates with $\mu$
   from the Chantler $f_2$ table, so the jump is found in that table — the
   steepest adjacent $f_2$ ratio near each xraydb edge energy
   (`montecarlo/spectrum/line_seeds.py::absorption_edge_brackets`, shared with the
@@ -431,16 +373,14 @@ further than the resolution at which the model itself represents it.
   information, so refinement stops. Elements come from the medium's own catalog
   composition plus the detection path, which in this repository is the silicon
   sensor shared by both detector models.
-* *Endpoints* need **no taper at all.** Placing a bin *edge* exactly at $E^\ast$
+* **Kinematic endpoints.** Placing a bin *edge* exactly at $E^\ast$
   removes the first-order term outright, and with midpoint edges that is one
-  node pair straddling $E^\ast$ at the grid's own local spacing: two nodes, no
-  budget question. The bin below then carries the tip and the bin above is
+  node pair straddling $E^\ast$ at the grid's own local spacing: a local pair of nodes. The bin below then carries the tip and the bin above is
   exactly empty.
 
 *Assumptions.* The medium is the absorber whose edges enter the escape factor
 (detector-path edges act through the response instead, not through $\ell$); the
-emitted $S$ is smooth across an absorber edge; $\mu$ is piecewise-linear on the
-Chantler tabulation, as the model interpolates it; and the modelled cutoff at
+emitted $S$ is smooth across an absorber edge; the edge locator uses the native Chantler tabulation; and the modelled cutoff at
 $E^\ast$ is sharp — which it is in EEDL, where the photon spectrum is tabulated
 to $k = T$ and is zero above.
 
@@ -450,15 +390,12 @@ structure adds nodes; adding none changes nothing. Equally, an edge whose jump
 falls outside $[E_\mathrm{floor}, E_\mathrm{stop}]$ is reported and dropped,
 never refused: it places no requirement on a grid over a band it is not in.
 
-*Cost, structurally.* Refinement only ever *adds interior* nodes and never moves
-the band endpoints, so the outermost midpoint half-widths can only narrow. Two
-consequences follow without measurement: a source mesh already covered by the
-Timepix padded input band stays covered, keeping its channels and its seeded
-response matrix; and the added node count *falls* as the baseline gets finer,
-because more baseline nodes are displaced by mark nodes than are added beside
-them.
+Refinement preserves the band endpoints and concentrates nodes around the
+located features. The derivation, assumptions, and checks are recorded in
+[Validation: `continuum-node-refinement`](../../validation/physics-validation-ledger.md).
 
 (uniform-only-consumers)=
+
 ## Uniform-only consumers
 
 Consumers that still read the single spacing $E_1 - E_0$ and apply it across the
@@ -469,19 +406,19 @@ whole grid call
 * `detectors/response.py::convolve_detector` — a Gaussian whose $\sigma$ is
   expressed in samples is a fixed energy width only on a uniform grid. This is
   the energy-resolution path both `response.py` and `eaglexo_response.py` use.
+
 `detectors/_si_sensor.py::poisson_core` converts density to bin mass with each
 node's local midpoint-cell width. `TimepixResponse` uses the same explicit
 source edges and overlap integrals when aggregating a nonuniform source mesh
-onto its independent, uniform response-input channels. Both retain their old
-scalar-width arithmetic on uniform grids for bit-for-bit compatibility.
-The `sinc_cutoff` line window now searches the actual energy coordinates and is
+onto its independent, uniform response-input channels. Uniform grids use scalar-width arithmetic.
+The `sinc_cutoff` line window searches the actual energy coordinates and is
 also nonuniform-safe.
 
 `results/metrics.py::line_metrics` is nonuniform-safe: it maps
 `scipy.signal.peak_widths`' fractional sample crossings to energies by
 interpolating `E` directly (`_sample_energy`, `_integrate_energy_window`), so
-the dominant-line window and its integral are exact on any grid, not only a
-uniform one.
+the dominant-line window and its integral use the actual energy coordinates.
+This supports nonuniform grids without making unresolved features exact.
 
 Grid identity is a related contract: a cache key of (size, first node, last
 node) does not identify a grid, because a linear and a logarithmic grid over the

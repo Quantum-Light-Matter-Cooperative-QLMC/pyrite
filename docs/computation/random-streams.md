@@ -1,20 +1,17 @@
 # Random number streams
 
-Reproducibility here is a design constraint, not a convenience, and it is
-achieved through **stream structure** rather than through a single global seed.
+PyRITE separates random draws by physical input and transport process.
+Enabling a beam spot, energy spread, bunch length, or energy-loss straggling
+does not consume draws from the free-path and scattering stream.
 
-The property the structure buys is unusually strong and worth stating up front:
-enabling an optional physical input — a finite beam spot, an energy spread, a
-bunch length, or energy-loss straggling — takes no draw from the pre-existing
-transport stream. For the input distributions this leaves otherwise unaffected
-arrays bit-for-bit identical. Straggling deliberately changes the later energy
-history, but its first-row free-path and scattering draws remain identical and
-the disabled path is bit-for-bit historical. These are exact, tested contracts,
-not rounding-scale approximations.
+For input distributions, this leaves otherwise unaffected arrays bit-for-bit
+identical. Straggling changes the subsequent energy history, but preserves the
+first row's free-path and scattering draws. Disabling it preserves the
+deterministic-loss path exactly.
 
 ## Two independent mechanisms
 
-The package uses two different constructions, for two different problems.
+The package uses two stream mechanisms:
 
 ```{list-table} The two stream mechanisms and what each solves.
 :name: tbl-streams-mechanisms
@@ -73,13 +70,11 @@ The main free-path and scattering-angle draws use the run generator directly and
 are never spawned from, which is what makes the children disjoint from transport
 rather than merely different.
 
-### Why disjoint children make inertness provable
+### What separate child streams preserve
 
-Consider enabling a finite beam spot. If the offsets were drawn from the
-transport generator, every subsequent free path and scattering angle would shift
-— not because the physics changed, but because the stream position did. The run
-would be a different realization, and no test could separate the geometric
-effect from the stream effect.
+Drawing beam offsets from the transport generator would shift every later
+free-path and scattering draw. Separate child streams let comparisons isolate
+the effect of the input distribution.
 
 With a disjoint child, the transport stream is untouched. In the laterally
 infinite limit the spot is a rigid per-electron translation, so every returned
@@ -91,21 +86,17 @@ The same argument gives every optional distribution a clean zero limit:
 * `beam_fwhm_mm → 0` recovers the point source exactly, because
   $\sigma \to 0$ gives identically zero offsets;
 * `bunch_length_fs → 0` and an unset distribution both give an all-zero
-  arrival-offset array — the legacy point bunch, bit-for-bit;
+  arrival-offset array and reproduce the point bunch exactly;
 * zero emittance gives zero slopes, so every direction is the shared beam
   direction *exactly*, which is what makes the collimated limit bit-for-bit
   rather than merely close;
 * an unset energy spread leaves the monoenergetic beam untouched.
 
-There is one deliberate subtlety in the elliptical-spot case. Drawing a standard
-normal of shape $(N_e, 2)$ and scaling each column afterwards consumes the
-stream identically to drawing at a scalar width, so an isotropic beam stays
-bit-for-bit compatible with the historical scalar-spot path even though the code
-now supports independent widths per plane.
+For an elliptical spot, the sampler draws a standard normal array of shape
+$(N_e, 2)$ and then scales each column. Equal widths therefore consume the same
+draws as the scalar-width case and produce bit-for-bit identical offsets.
 
 ### Where inertness stops
-
-The guarantee is scoped, and the scope matters.
 
 **A finite crystal footprint breaks it.** Sampled transverse positions classify
 missed entries and can cause side-face exits, and segment positions feed the
@@ -126,19 +117,11 @@ using a finite spot with coherent emission.
 
 ## Counter-addressed streams
 
-The lockstep transport core is written as an outer step loop over an inner
-electron loop for one reason: a single generator serves every electron, so the
-draws must be consumed in a fixed interleaved order. That order is exactly what
-a device cannot reproduce, since one thread per electron runs its electron to
-completion and therefore consumes its stream contiguously.
+The lockstep core consumes one generator in a fixed order across steps and
+electrons. The per-electron and CUDA cores instead compute each draw from its
+address, so electrons can run independently to completion.
 
-The two conventional fixes both make the result unverifiable. Per-thread cuRAND
-states make results depend on how threads were assigned; an atomic output
-counter makes segment order depend on scheduling. Either would force a full
-golden regeneration on every launch-configuration change.
-
-Randomness is therefore **addressed** rather than streamed. Draw $c$ of electron
-$e$ is
+Draw $c$ of electron $e$ is
 
 ```{math}
 :label: eq-streams-counter-address
@@ -151,10 +134,8 @@ u(e, c) = \bigl(\operatorname{splitmix64}(k_e + \Phi\,(c+1)) \gg 11\bigr)\,2^{-5
 with $\Phi = \texttt{0x9E3779B97F4A7C15}$ and SplitMix64's finalizer, which is a
 bijection on 64 bits and passes BigCrush in counter mode{cite:p}`steele2014`.
 
-Two implementation choices follow from the requirement that host and device
-agree exactly. Keys are built on the host, so device code needs no 64-bit
-integer casts and both cores provably address the same streams. And the whole
-construction is integer arithmetic plus one exact `uint64 → double` conversion —
+Keys are built on the host so both cores address the same streams. The
+construction uses integer arithmetic and one exact `uint64 → double` conversion:
 the shifted value is below $2^{53}$, so the conversion is lossless.
 
 The generator is therefore **bit-for-bit identical on host and device**, and it
@@ -171,10 +152,10 @@ run is independent of:
 * **capacity replay** — an overflowing batch replayed at larger capacity
   reproduces itself exactly.
 
-The third is what makes the [capacity policy](execution-and-acceleration.md#output-addressing-and-capacity-replay)
-safe: an overflow costs time and nothing else. It is also what makes the
-device-OOM fallback safe, since replaying the same seed with segments downloaded
-is exact rather than merely equivalent.
+Exact replay supports the
+[capacity policy](execution-and-acceleration.md#output-addressing-and-capacity-replay)
+and device out-of-memory recovery: a batch can be rerun with more capacity or
+with downloaded segments without changing its result.
 
 ### The straggling namespace
 
@@ -197,8 +178,7 @@ far wider than any reachable `max_steps` or substep count.
 
 This addressing also defines the cross-core contract. Given the same row state
 and `(seed, electron, flight, substep)`, every host core calls the same sampler;
-the exact CUDA kernel carries a transcription of the same key derivation. Five
-hardware-gated tests pass on an RTX 5080 (driver 610.47, CuPy 14.1.1), covering
+the exact CUDA kernel carries a transcription of the same key derivation. Hardware-gated tests cover
 disabled-path identity, replay, finite energy bookkeeping, first-row transport
 state, and ensemble agreement. The first-row test currently compares the state
 *entering* the loss update, not `E_end_keV`, so exact host/device parity of one
@@ -218,8 +198,7 @@ has the same address and that enabling straggling does not consume a free-path
 or scattering variate. Once the first random loss changes the energy, later
 trajectory states may diverge physically.
 
-This is structural and cannot be fixed. It also is not a defect — but it does
-determine what may be compared how:
+Comparisons must account for those different stream assignments:
 
 * `per-electron` versus `cuda`: same stream addressing, so they may be compared
   numerically on the first-row entering state and statistically over complete
@@ -227,12 +206,8 @@ determine what may be compared how:
   loss to 2% and cutoff counts to 5% (or two electrons); it does not establish
   field-by-field equality. What separates the implementations before
   trajectory divergence is math-library rounding alone.
-* Either versus `lockstep`: different stream order, so they may be compared only
-  **statistically**, with ensemble means and error bars. The measured difference
-  is not small — of order a percent on line spectra and tens of percent on
-  small-population coherent observables — and every one of those figures tracks
-  $1/\sqrt{N}$ for its own population, which is the signature of a realization
-  change rather than a physics change.
+* Either versus `lockstep`: different stream order, so compare ensemble means
+  with statistical error bars.
 
 [Statistical methods](statistical-methods.md) covers how such a comparison is
 actually performed.
@@ -242,16 +217,13 @@ actually performed.
 A seed reaches a case as an ordinary case parameter and is recorded with the
 result, so a checkpoint carries the seed that produced it.
 
-The important asymmetry: **the transport core is not part of a case's physical
-parameters.** Two runs with the same seed and the same physics on different
-cores produce different realizations while hashing identically. That is correct
-— the parameters really are the same — but it means a pinned spectrum taken at
-more than 1000 electrons on a CUDA machine is not reproduced by the lockstep
-core, and must be regenerated or compared statistically.
+The transport core is not part of a case's physical parameters. Runs with the
+same seed and physics can therefore hash identically while producing different
+realizations on different cores.
 
-`PYRITE_MC_TRANSPORT_CORE` exists for exactly this. Pinning it for a process is
-how a run reproduces a pre-threshold result, or bisects a host/device difference
-by holding the stream order fixed while changing only the arithmetic.
+Pin `PYRITE_MC_TRANSPORT_CORE` when reproducing a result. A comparison between
+`per-electron` and `cuda` preserves stream addressing; a comparison with
+`lockstep` also changes draw order.
 
 ## Adding a new random input
 
@@ -263,16 +235,11 @@ Choose the mechanism from where the randomness is consumed:
 
 Neither shares an existing namespace or draws from the transport generator.
 
-The consequences the rule protects are worth restating, since sharing a stream
-is the tempting shortcut and its damage is invisible until someone tries to
-verify something:
+Sharing with transport would shift free-path and scattering draws whenever the
+input is enabled. Sharing with a sibling distribution would make one input's
+sample depend on whether the other is enabled.
 
-* sharing with transport destroys inertness for *every* run that enables the new
-  input, and cannot be undone by a later fix without changing results again;
-* sharing with a sibling distribution couples two physically independent inputs,
-  so enabling one silently changes the other's sample.
-
-The accompanying test shape has two parts, and both are required:
+Tests must cover:
 
 1. **A zero-limit test asserting bit-for-bit identity**, not closeness — the
    disabled or zero-parameter case must reproduce the previous run exactly,
@@ -284,8 +251,7 @@ An in-core counter namespace additionally needs an offline address-replay test,
 plus invariance under batching and capacity replay. If it has a device twin,
 the host and device must reconstruct the same keys independently.
 
-One correlation caveat: when a single policy owns more than one moment of the
-same distribution, it must own them from **one** stream. The Courant–Snyder
+Correlated quantities from one distribution must share a stream. The Courant–Snyder
 policy draws positions and slopes together for this reason — splitting them
 across two children would break the position–slope correlation the emittance
 encodes. "One child per physical input" is the rule, not "one child per array".
