@@ -31,9 +31,9 @@ on a shared leaf.
 ## Invariant
 
 - Open GitHub Issues are the single source of truth: one issue per item,
-  labelled `priority:*`/`status:*`/`area:*`, with a branch/task pointer in the
-  body where one exists. Branch `agentdocs/tasks/` copies are disposable and
-  need not match the issue verbatim.
+  labelled `status:*`/`area:*`, with a branch/task pointer in the body where
+  one exists. Branch `agentdocs/tasks/` copies are disposable and need not
+  match the issue verbatim.
 - Branch detail never enters an issue body or durable `docs/`.
 - Always have `dispatch-task` close a completed task's issue when retiring
   landed work — the authoritative writer (`gh issue close`, with a comment
@@ -41,10 +41,10 @@ on a shared leaf.
 
 ## Workflow
 
-1. Use `triage` on existing `status:needs-triage` issues, `>user<` prose, or
+1. Use `triage` on issues carrying no `status:*` label, `>user<` prose, or
    invoke `/triage <text>` directly: read linked design, split independently
    ownable tasks, draft each `agentdocs/tasks/<branch-name>/README.md`, open or
-   relabel the canonical GitHub issue (priority/area labels, branch/task-doc
+   relabel the canonical GitHub issue (status/area labels, branch/task-doc
    pointer in the body), and commit the task-doc setup on `main`.
 2. Create each new branch/worktree from the setup commit, push `main` and the
    task branches, then stop for review. Address review through `triage` with a

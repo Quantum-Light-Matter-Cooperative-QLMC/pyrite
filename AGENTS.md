@@ -16,8 +16,8 @@ prose keep required format.
   `docs/guides/`, `docs/physics/`, `docs/validation/`, `docs/research/`,
   `docs/repo-design/`, or `docs/adr/`; see
   `docs/repo-design/documentation.md`. Backlog: GitHub Issues
-  (`gh issue list`), labelled `priority:p1`/`p2`/`p3`/`long-term`,
-  `status:active`/`gated`/`paused`/`needs-triage`, and `area:*`.
+  (`gh issue list`), labelled `status:active`/`gated`/`paused`/`backlog`
+  and `area:*`.
 - Use Context7 only for current external-library docs. Headroom shapes agent and
   tool output; it is not a shell wrapper or code index. Do not use Tokensave or
   RTK.
@@ -63,8 +63,8 @@ If `uv run` cannot write project environment, add
 
 ## Task dispatch
 
-- Use `triage` for new `>user<` prose, `status:needs-triage` GitHub issues, or
-  `/triage <text>` direct input. It drafts task docs and local
+- Use `triage` for new `>user<` prose, GitHub issues carrying no `status:*`
+  label, or `/triage <text>` direct input. It drafts task docs and local
   branches/worktrees, opens/updates the canonical GitHub issue (labels,
   branch/task-doc pointer in the body), commits task-doc setup on `main`,
   pushes `main` and the task branches, then stops for review.
@@ -91,13 +91,13 @@ If `uv run` cannot write project environment, add
 ## Backlog and physics
 
 Backlog is tracked in GitHub Issues (`gh issue list`/`gh issue view`), not a
-repo file. One issue per item, labelled `priority:*`/`status:*`/`area:*`, with
-a branch and `agentdocs/tasks/<branch-name>/` pointer in the body where one
-exists. `dispatch-task` closes an issue when its task lands. Tracked agent
-plans and handoffs live only in `agentdocs/`, outside the public documentation
-tree. Branch detail belongs in `agentdocs/tasks/<branch-name>/` (full task
-branch name; entry doc `README.md`); see `agentdocs/README.md`. `todo-sync`
-audits open-issue/task-doc consistency read-only.
+repo file. One issue per item, labelled `status:*`/`area:*`, with a branch and
+`agentdocs/tasks/<branch-name>/` pointer in the body where one exists.
+`dispatch-task` closes an issue when its task lands. Tracked agent plans and
+handoffs live only in `agentdocs/`, outside the public documentation tree.
+Branch detail belongs in `agentdocs/tasks/<branch-name>/` (full task branch
+name; entry doc `README.md`); see `agentdocs/README.md`. `todo-sync` audits
+open-issue/task-doc consistency read-only.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks
