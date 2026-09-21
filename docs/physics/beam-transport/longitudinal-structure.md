@@ -12,8 +12,7 @@ decides whether emitters add in phase. See
 
 ## Two clocks
 
-Transport keeps two independent time-like quantities per segment, and they are
-never mixed:
+Transport keeps two independent time-like quantities per segment:
 
 ```{list-table} Time quantities carried through transport.
 :name: tbl-longitudinal-clocks
@@ -158,7 +157,7 @@ $D = 0$ is the plain Gaussian, and intermediate values model partial bunching.
 - Snapping centers to the spacing grid adds a negligible $T_{\rm spacing}^2/12$
   to the center variance.
 - Timing jitter multiplies the coherent enhancement by
-  $\exp[-\Omega^{2}\sigma_{\rm jitter}^{2}]$ — jitter comparable to the optical
+  $\exp[-\Omega^{2}\sigma_{\rm jitter}^{2}]$; jitter comparable to the optical
   period destroys the effect it was meant to expose.
 - Partial depth gives approximately $D^{2}\eta$ when the envelope itself is
   decoherent, so a half-modulated train retains about a quarter of the
@@ -169,9 +168,9 @@ $D = 0$ is the plain Gaussian, and intermediate values model partial bunching.
 The bunch draw takes its own RNG child stream (`SeedSequence(seed).spawn(4)[3]`),
 disjoint from the free-path and scattering streams and from the transverse and
 energy-spread streams. Enabling or changing a bunch policy therefore never
-perturbs the trajectories themselves — the same electrons are transported, and
+perturbs the trajectories themselves: the same electrons are transported, and
 only their $t_0$ labels change. The degenerate case (no policy, no legacy field)
-returns all-zero offsets bit-for-bit, which is the pure-geometry coherent limit.
+returns all-zero offsets bit-for-bit, the pure-geometry coherent limit.
 
 ## Limiting cases
 
@@ -179,7 +178,7 @@ returns all-zero offsets bit-for-bit, which is the pure-geometry coherent limit.
 - $\Omega\sigma_t \gg 1$: {eq}`eq-longitudinal-form-factor` vanishes and the
   coherent sum degenerates to the incoherent one up to shot noise.
 - $\eta \to 1$: {eq}`eq-longitudinal-sigma-from-eta` gives zero microbunch
-  width — an unreachable ideal, and the reason `retained_coherence` is bounded
+  width, an unreachable ideal, and the reason `retained_coherence` is bounded
   strictly above zero and at most one.
 - `spacing_periods = 1`: $\Omega T_{\rm spacing} = 2\pi$, adjacent microbunches
   exactly one optical cycle apart.

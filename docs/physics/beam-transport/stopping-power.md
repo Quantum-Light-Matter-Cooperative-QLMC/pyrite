@@ -6,18 +6,17 @@ sampling individual inelastic events. This is the condensed-history
 losses are replaced by their mean rate $dE/ds$, evaluated along the
 flight{cite:p}`nistestar,akkerman1978`.
 
-CSDA does not require many inelastic events between every pair of elastic
-collisions. The inelastic and elastic mean free paths are distinct,
-material- and energy-dependent scales{cite:p}`akkerman1978,shinotsuka2015`.
-The local scale-separation check is instead the fractional mean loss over an
-elastic free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves
-slowly compared with the explicitly sampled directional changes. Optional
-straggling restores fluctuations around that mean without changing it.
+The local scale-separation check is the fractional mean loss over an elastic
+free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves slowly
+compared with the explicitly sampled directional changes. The inelastic and
+elastic mean free paths are distinct, material- and energy-dependent
+scales{cite:p}`akkerman1978,shinotsuka2015`. Optional straggling restores
+fluctuations around that mean without changing it.
 
 ## Joy–Luo modified Bethe law
 
-Below each element's Joy–Luo/Berger–Seltzer crossover — see Per-element splice,
-below — stopping is the Joy–Luo modification of the Bethe
+Below each element's Joy–Luo/Berger–Seltzer crossover (see Per-element splice,
+below), stopping is the Joy–Luo modification of the Bethe
 expression{cite:p}`joyluo1989`
 
 ```{math}
@@ -42,12 +41,11 @@ $E$ and $J$ in keV, $\rho$ in $\mathrm{g\,cm^{-3}}$, and $A$ the standard atomic
 weight. The prefactor is the conventional $7.85\times10^{4}\ \mathrm{keV\,cm^{-1}}$
 coefficient converted to keV per ångström.
 
-The $kJ$ term is the whole point of the modification. Unmodified Bethe stopping
-has $\ln(1.166\,E/J)$, which passes through zero at $E = J/1.166$ and turns
-*negative* below it — the electron would gain energy. Adding $kJ$ inside the
-logarithm keeps the argument above unity down to zero kinetic energy, so the law
-stays physically signed across the whole range the transport can reach, and $k$
-is fitted so the modified curve tracks measured low-energy stopping.
+Unmodified Bethe stopping has $\ln(1.166\,E/J)$, which passes through zero at
+$E = J/1.166$ and turns *negative* below it, so the electron would gain energy.
+The $kJ$ term keeps the logarithm's argument above unity down to zero kinetic
+energy, and $k$ is fitted so the modified curve tracks measured low-energy
+stopping.
 
 ## Compounds
 
@@ -91,9 +89,8 @@ weights for $A$ (`materials/_transport_data.py`); see
 This is **not** the source Joy and Luo fitted $k$ against, which used
 Berger–Seltzer values. The two disagree for light elements: carbon is 78 eV here
 against 100 eV in the fit, worth roughly 4% in stopping power at 25 keV. Silicon
-agrees to 0.3%. The choice favors a single consistent, citable atomic dataset
-across the catalog over exact fidelity to one 1989 fit, and the discrepancy is
-recorded in the ledger rather than tuned away.
+agrees to 0.3%. The discrepancy is recorded in the ledger rather than tuned
+away.
 
 ## Berger–Seltzer relativistic branch
 
@@ -155,8 +152,7 @@ rather than of an element, so unlike $I$ it factors out of the Bragg sum and
 enters as one scalar per layer rather than per element. It is **omitted**:
 every call site passes $\delta = 0$.
 
-That omission is now measured rather than assumed. With
-$x = \log_{10}\beta\gamma$, the Sternheimer parameterization is
+With $x = \log_{10}\beta\gamma$, the Sternheimer parameterization is
 
 $$
 \delta(x) =
@@ -173,16 +169,14 @@ muon energy-loss table headers already cited for $I$ and land in
 transport path reads them, and `transport.sternheimer_delta` exists only to
 size what is being dropped.
 
-An earlier version of this page argued $\delta$ was negligible because
-$\beta\gamma \le 1.24$ over the swept range "sits below the onset $x_1$".
-That reasoning was wrong: the onset is $x_0$, not $x_1$, and graphite's
-$x_0 = -0.009$, so the swept range sits *above* onset for this repository's
-primary material. The conclusion survives the correction, but only because the
-numbers are small, not because the range is below threshold.
+Onset is at $x_0$. Graphite's $x_0 = -0.009$, so the swept range
+($\beta\gamma \le 1.24$) sits *above* onset for this repository's primary
+material, and the omission is justified by its measured size rather than by
+sitting below threshold.
 
 Measured over all 24 catalog elements, the fractional error in $|dE/ds|$ from
-dropping $\delta$ — that is, $\delta$ divided by the bracket of
-{eq}`eq-stopping-bs` — is
+dropping $\delta$, that is $\delta$ divided by the bracket of
+{eq}`eq-stopping-bs`, is
 
 ```{list-table} Cost of omitting $\delta$, worst catalog element
 :name: tbl-stopping-density-effect
@@ -203,13 +197,11 @@ dropping $\delta$ — that is, $\delta$ divided by the bracket of
 ```
 
 $\delta$ rises monotonically with $\beta\gamma$, so the 300 keV row bounds the
-whole range. At 25 keV — the operating point that motivated this branch — the
-omission is about 45 times smaller than the 6% Joy–Luo error
-{eq}`eq-stopping-bs` was introduced to remove, and it is below the unmodeled
-shell corrections and omitted delta-ray transport listed under *Assumptions
-and limits*. Straggling is modeled separately and preserves this mean stopping
-power exactly. At the 300 keV ceiling it is 1.5%, which is stated rather than
-corrected. Applying $\delta$ properly would need per-*material* coefficients:
+whole range. At 25 keV the omission is about 45 times smaller than the 6%
+Joy–Luo error {eq}`eq-stopping-bs` was introduced to remove, and below the
+unmodeled shell corrections and omitted delta-ray transport listed under
+*Assumptions and limits*. At the 300 keV ceiling it is 1.5%, stated and
+uncorrected. Applying $\delta$ properly would need per-*material* coefficients:
 it does not Bragg-add, so the per-element values above bound a compound's
 $\delta$ without being able to compose it. The Sternheimer–Peierls general
 rules reproduce the tabulated $\bar{C}$ from $I$ and $\hbar\omega_p$ exactly
@@ -230,26 +222,25 @@ Joy–Luo compound rule.
 The crossover between {eq}`eq-stopping-joy-luo` and {eq}`eq-stopping-bs` is
 strongly $Z$-dependent, so there is no single splice energy that works well
 everywhere: measured across the 24 catalog elements the two laws cross at
-2.66 keV (B) through 10.46 keV (Bi), monotone in $I$. The 2% agreement at
-10 keV this page used to quote for the crossover is a carbon number and does
-not generalize — at 10 keV the ratio runs from 0.976 (B) to 1.003 (Bi).
-Forcing one global crossover leaves a step in every other element; the best
-available global choice, 8.0 keV, still steps by 1.84% in the worst element.
+2.66 keV (B) through 10.46 keV (Bi), monotone in $I$. At 10 keV the ratio of the
+two laws runs from 0.976 (B) to 1.003 (Bi), so forcing one global crossover
+leaves a step in every other element; the best available global choice, 8.0 keV,
+still steps by 1.84% in the worst element.
 
 Because stopping is additive over elements ({eq}`eq-stopping-compound`), the
 splice does not have to be global. Each element's term switches at *its own*
 crossover, found once per element at table-build time by solving
-{eq}`eq-stopping-joy-luo` $=$ {eq}`eq-stopping-bs` numerically — the two forms
+{eq}`eq-stopping-joy-luo` $=$ {eq}`eq-stopping-bs` numerically; the two forms
 differ in the shape of the logarithm, not by a constant, so there is no closed
 form for the crossing point. That makes every term continuous by construction,
 and therefore the compound sum for any material, with no per-material tuning
-and no fitted blend — verified to $10^{-12}$ relative for all 24 elements and
+and no fitted blend, verified to $10^{-12}$ relative for all 24 elements and
 all 50 catalog materials. The crossover is well posed because it sits far
 above the energy where the Berger–Seltzer bracket
 $\bigl[\ln(\cdot) + F^-(T)\bigr]$ changes sign (below 0.71 keV for every
 catalog element, versus a 2.66–10.46 keV crossover).
 
-The splice is continuous in *value* only — it is $C^0$, not $C^1$. The
+The splice is continuous in *value* only: $C^0$, not $C^1$. The
 log-slope $\left(\mathrm{d}\ln|\frac{\mathrm{d}E}{\mathrm{d}s}| / \mathrm{d}\ln E \right)$ steps across the crossover by 0.0145 (B, 2.0%
 of the local slope) to 0.0587 (Bi, 8.9%), worst at high $Z$, where the
 crossover sits highest. {eq}`eq-stopping-cutoff-distance`, below, needs only
@@ -257,13 +248,11 @@ the stopping-power value at one point, not its slope, so the kink does not
 affect the cutoff solve; the transport-energy lookup table resolves the kink
 to better than $10^{-5}$ relative on its energy grid.
 
-## Validity ceiling — resolved above each element's crossover
+## Joy–Luo drift above its validated range
 
-The table below is the measurement that motivated the Berger–Seltzer branch
-above: it records how far {eq}`eq-stopping-joy-luo` drifts from relativistic
-ICRU-37 stopping when used *unbounded*, past the energy where it is
-validated. It is retained as that record, not as a description of what the
-transport does today.
+Used *unbounded*, {eq}`eq-stopping-joy-luo` drifts from relativistic ICRU-37
+stopping past the energy where it is validated. That drift is what motivates the
+Berger–Seltzer branch above.
 
 ```{list-table} Joy–Luo stopping power relative to relativistic ICRU-37 Bethe, unbounded.
 :name: tbl-stopping-validity-ceiling
@@ -285,15 +274,14 @@ transport does today.
   - 0.52
 ```
 
-Per the per-element splice above, every element switches to {eq}`eq-stopping-bs`
-at its own crossover (2.66–10.46 keV), so above that point results follow the
-relativistic law rather than the degrading ratio in
-{numref}`tbl-stopping-validity-ceiling`. Below the crossover — where the
-table's own numbers show the two laws already agreeing to a few percent —
-Joy–Luo remains the model, and it is the validated branch there.
+Every element switches to {eq}`eq-stopping-bs` at its own crossover
+(2.66–10.46 keV), so above that point results follow the relativistic law rather
+than the degrading ratio in {numref}`tbl-stopping-validity-ceiling`. Below the
+crossover the two laws agree to a few percent, and Joy–Luo is the validated
+branch there.
 
-The practical size of the change is the CSDA range at the default
-`E_cut_keV` = 5 keV, analytic Joy–Luo versus the spliced model:
+The practical size of the splice is the CSDA range at the default
+`E_cut_keV` = 5 keV, unspliced Joy–Luo versus the spliced model:
 
 ```{list-table} Change in CSDA range from the splice.
 :name: tbl-stopping-splice-range-change
@@ -324,47 +312,44 @@ At 300 keV graphite's CSDA range goes from 643 to 416 μm.
 
 The range change is nearly material-independent: measured over all 50 catalog
 materials it spans −4.2% to −2.6% at 25 keV, −15.1% to −14.1% at 100 keV, and
-−35.4% to −34.6% at 300 keV — a band under 1.1 points wide at every energy. It
+−35.4% to −34.6% at 300 keV, a band under 1.1 points wide at every energy. It
 has to be narrow, because the only material dependence in the ratio of the two
 laws enters through the mean excitation energies, and only logarithmically.
 Low-$Z$ materials sit at the strongly-shortened end (graphite and diamond are
 the extreme) and high-$Z$ at the weakly-shortened end.
 
-One thing stays open, and one is now closed. $\delta$ is measured: omitting it
-costs at most 0.13% of $|dE/ds|$ at 25 keV and 1.50% at 300 keV
-({numref}`tbl-stopping-density-effect`), so it stays omitted with that error
-stated. Still open: the 1–10 keV window is not cleanly owned by either form: for
-the higher-crossover elements it sits above where Joy–Luo fits best and below
-where Berger–Seltzer is used. `E_cut_keV` defaults to 5 keV, which bounds most
-of that exposure, but the residual uncertainty there is stated rather than
-inherited silently.
+Omitting $\delta$ costs at most 0.13% of $|dE/ds|$ at 25 keV and 1.50% at
+300 keV ({numref}`tbl-stopping-density-effect`), so it stays omitted with that
+error stated. The 1–10 keV window remains unowned by either form: for the
+higher-crossover elements it sits above where Joy–Luo fits best and below where
+Berger–Seltzer is used. `E_cut_keV` defaults to 5 keV, which bounds most of that
+exposure; the residual uncertainty there is stated and uncorrected.
 
 ## What the change does downstream
 
-{numref}`tbl-stopping-splice-range-change` is the input, not the answer. The
-quantities the campaign reports respond very differently to it depending on how
-much of the range the target actually occupies.
+Observables respond to the shortened range of
+{numref}`tbl-stopping-splice-range-change` in proportion to how much of that
+range the target occupies.
 
 **Thin films are almost untouched.** At the catalog's 1000 Å production
-thickness — about 1/60 of the 25 keV CSDA range — an electron crosses the film
+thickness, about 1/60 of the 25 keV CSDA range, an electron crosses the film
 having lost a per-mille fraction of its energy, so which stopping law was used
 barely enters. Measured on graphite, silicon, and WSe₂ at 30, 100, and 300 keV,
 the total bremsstrahlung yield, its mean photon energy, the characteristic-line
 yield, and the coherent-line peak position all move by less than 1%, and the
 shape of the normalized bremsstrahlung spectrum by less than 0.1% in any bin.
-The largest single shift is the coherent yield at 30 keV, +0.97%, which is a
-path-length effect: the electron's in-film trajectory is very slightly shorter,
-so the phase it accumulates changes. Repeated with 4000 electrons per seed over
-16 seeds, every one of those shifts is consistent with zero at its own Monte
-Carlo error — so at production thickness the splice is not merely small, it is
-unresolvable.
+The largest single shift is the coherent yield at 30 keV, +0.97%, a path-length
+effect: the electron's in-film trajectory is very slightly shorter, so the phase
+it accumulates changes. Repeated with 4000 electrons per seed over 16 seeds,
+every one of those shifts is consistent with zero at its own Monte Carlo
+error.
 
 **Thick targets change materially.** Once the target is a sizeable fraction of
 the range, the shortened range redistributes the electron fates. Measured with
 20 000 electrons per model per seed, four seeds, on a slab about half the old
 CSDA range thick:
 
-```{list-table} Electron fates under Joy–Luo versus the splice. Slab thickness ≈ half the retired model's CSDA range; $E_\mathrm{cut}$ = 5 keV, Mott elastic scattering.
+```{list-table} Electron fates under Joy–Luo versus the splice. Slab thickness ≈ half the unspliced model's CSDA range; $E_\mathrm{cut}$ = 5 keV, Mott elastic scattering.
 :name: tbl-stopping-splice-fates
 :header-rows: 1
 
@@ -394,12 +379,12 @@ CSDA range thick:
   - 0.479 → 0.515 (+7.5%)
 ```
 
-Both loss channels shrink and the stopped fraction absorbs the difference,
-which is the expected signature of a shorter range: fewer electrons reach the
-far face, and fewer survive the walk back out to be counted as backscattered.
-Backscatter falls even in the semi-infinite WSe₂ case, where transmission is
-identically zero, so this is not a thickness artifact — an electron that loses
-energy faster on the outbound leg has less left for the return.
+Both loss channels shrink and the stopped fraction absorbs the difference, the
+expected signature of a shorter range: fewer electrons reach the far face, and
+fewer survive the walk back out to be counted as backscattered. Backscatter
+falls even in the semi-infinite WSe₂ case, where transmission is identically
+zero: an electron that loses energy faster on the outbound leg has less left for
+the return.
 
 Mean deposition depth moves much less than the range does (−0.1% to −2.2% for
 graphite and silicon, −22% for WSe₂ at 300 keV), because in a target thinner
@@ -443,8 +428,8 @@ by the range.
   - +9.60 ± 1.30%
 ```
 
-The sign flip is the physically interesting part, and both signs come from the
-same shortened range acting on different sides of the target thickness:
+Both signs come from the same shortened range acting on different sides of the
+target thickness:
 
 - Where the target is **thicker than the range** (30 keV, 100 keV at 100 μm),
   the electron was always going to stop inside. A shorter range simply means
@@ -463,10 +448,9 @@ a few tenths of a point (−5.04% brem at 30 keV/10 μm, +2.14% at 100 keV).
 
 The collision stopping power here is the same quantity NIST's
 [ESTAR](https://physics.nist.gov/PhysRefData/Star/Text/ESTAR.html) tabulates,
-so ESTAR is available as an external oracle. Querying the web service is not
-redistribution, so this needs no licensing determination — but for that reason
-the comparison is run by hand rather than wired into the test suite, and the
-repository packages no ESTAR data.
+so ESTAR is available as an external oracle. The comparison is run by hand
+rather than wired into the test suite, and the repository packages no ESTAR
+data.
 
 Two things must be matched before the numbers are comparable:
 
@@ -514,17 +498,17 @@ Spliced-model ranges from `E_cut_keV` = 5 keV, in μm, for that comparison:
   - 160.1
 ```
 
-`tests/montecarlo/test_stopping_csda_range.py` pins these, and pins the retired
-model's values beside them, so a regression that moved both together would
-still be caught.
+`tests/montecarlo/test_stopping_csda_range.py` pins these alongside the
+unspliced Joy–Luo values, so a regression that moved both together is still
+caught.
 
 ## Evaluation along a flight
 
-Where {eq}`eq-stopping-compound` is evaluated is set by `energy_model`, not by
-this page: the frozen rule holds it at the flight-start energy, the midpoint rule
+Where {eq}`eq-stopping-compound` is evaluated is set by `energy_model`: the
+frozen rule holds it at the flight-start energy, the midpoint rule
 evaluates it at $(E_{\rm start}+E_{\rm end})/2$ through one predictor–corrector
 pass. Because $|\frac{dE}{ds}|$ *grows* as $E$ falls, the frozen rule systematically
-overstates how far an electron travels for a given loss — measurably, 1.2% on
+overstates how far an electron travels for a given loss: measurably, 1.2% on
 mean path length in the thick 5 keV carbon case. See
 [Electron transport](electron-transport.md#energy-controlled-propagation).
 

@@ -5,9 +5,9 @@ layered matter as piecewise-linear segments. Each segment records position,
 direction, kinetic energy, path length, material, and elapsed flight time for
 the radiation kernels.
 
-This page is the section overview: it states the transport loop and the
-propagation rules that control it. The models it calls are documented separately
-in [Elastic scattering](elastic-scattering.md) and
+This page states the transport loop and the propagation rules that control it.
+The models it calls are documented separately in
+[Elastic scattering](elastic-scattering.md) and
 [Stopping power and the energy cutoff](stopping-power.md), the beam it starts
 from in [Beam phase space](beam-phase-space.md) and
 [Longitudinal bunch structure](longitudinal-structure.md), the boundaries that
@@ -58,8 +58,8 @@ $$
         +\Sigma_3E_0T_{\max}\right).
 $$
 
-These are the analytic Urban moments. The implementation samples Poisson counts
-by inverse CDF. A mean above 64 is decomposed into equal independent chunks no
+The implementation samples Poisson counts by inverse CDF. A mean above 64 is
+decomposed into equal independent chunks no
 larger than 64 and the counts are summed. Poisson additivity therefore preserves
 the exact count law, including its higher moments and infinite divisibility,
 without underflowing the recurrence's starting probability. The measured
@@ -73,8 +73,8 @@ the two sum rules are re-solved with $f_1=1$ and $E_1=I$. This preserves the
 mean exactly while leaving a documented high-$Z$, low-energy width limitation.
 As $s\to0$, every Poisson mean vanishes, so
 $P(\Delta E=0)\to1$ and both moments vanish linearly. Disabling straggling
-removes the keys, draws and output field entirely and reproduces the historical
-transport bit-for-bit.
+removes the keys, draws and output field entirely and reproduces the
+deterministic transport bit-for-bit.
 
 The derivation, domain limits and measured observable response are
 [`energy-loss-straggling`](../../validation/beam-transport/energy-loss-straggling.md).
@@ -86,8 +86,7 @@ The derivation, domain limits and measured observable response are
 it. `"frozen"` (the default) is the historical left-endpoint rule: energy,
 speed, stopping power, and elastic hazard are held at the flight-start value for
 the whole flight. `Numerics`, campaign profiles and the CLI expose this setting,
-`max_dE_frac`, and `straggling`; their defaults preserve historical case and
-dataset identities.
+`max_dE_frac`, and `straggling`.
 
 `"midpoint"` advances the flight with explicit midpoint RK2:
 
@@ -113,8 +112,8 @@ $(E_{\rm start}+E_{\rm end})/2$ for `"midpoint"` — and therefore the returned
 row schema. The Urban mean is a left-endpoint $C(E_{\rm start})s$ quadrature;
 `max_dE_frac` controls its energy-drift error.
 
-For coherent emission the midpoint rule is a prerequisite rather than an
-optimization: holding $\beta$ fixed across a flight costs hundreds of radians of
+For coherent emission the midpoint rule is a prerequisite: holding $\beta$ fixed
+across a flight costs hundreds of radians of
 emission phase per micron of trajectory, against $10^{-3}$--$10^{-1}$ rad for
 the midpoint rule on the same flights.
 
@@ -126,11 +125,10 @@ facet), the energy cutoff, or termination. Under the continuous-slowing-down
 approximation (CSDA, `straggling=False`) the electron loses energy continuously
 along that path. `max_dE_frac` $=f$ lets transport split one flight into
 several output rows, *numerical substeps*, each covering a predicted mean
-fractional loss of at most $f$. A substep boundary is not an event: the electron
-keeps its direction, `flight_id`, and collision budget, advances
-`substep_id + 1`, and is not deflected. Numerical substeps are quadrature nodes
-of a flight's own integrals — never collision events, independent emitters, or
-a source of decoherence.
+fractional loss of at most $f$. A substep boundary is a quadrature node of the
+flight's own integrals, not an event: the electron keeps its direction,
+`flight_id`, and collision budget, advances `substep_id + 1`, and is not
+deflected.
 
 **Why.** A row gives its consumers one or two point evaluations of quantities
 that vary along the flight: the stopping power in the energy update, $\beta$ in
@@ -206,8 +204,7 @@ realized loss would make the partition depend on its increments and invalidate
 the compound-Poisson partition argument. Each accepted row then receives an
 Urban draw addressed by `(electron_id, flight_id, substep_id)`. The precise
 salt and counter construction live in
-[Random number streams](../../computation/random-streams.md#the-straggling-namespace);
-the physics page does not duplicate that plumbing.
+[Random number streams](../../computation/random-streams.md#the-straggling-namespace).
 
 At frozen energy, substep invariance of the loss is exact in distribution for
 any fixed partition because compound-Poisson increments are infinitely
@@ -316,15 +313,11 @@ physical flight are phase-summed; default spectra then add physical-flight and
 electron intensities under a random-phase approximation. Experimental coherent
 emission additionally uses segment midpoint times and bunch offsets.
 
-`E_keV` and `t_ang` keep flight-start semantics under both propagation rules and
-are compatibility aliases of `E_start_keV` and `t_start_ang`; `elec_id` is a
-compatibility alias of `electron_id`. Midpoint transport adds `E_end_keV`,
-`t_end_ang`, the representative energy `E_repr_keV` $=(E_{\rm start}+E_{\rm
-end})/2$ that the radiation kernels evaluate their one-point path integrals at,
-the `flight_id`/`substep_id` identifiers, and the row-end `event_kind`. New
-fields appear only under the rule that produces them, so the frozen schema is
-never partially extended. Checkpoints store reduced spectra rather than raw
-rows, so no stored-result migration follows from the added fields.
+Midpoint transport adds `E_end_keV`, `t_end_ang`, the representative energy
+`E_repr_keV` $=(E_{\rm start}+E_{\rm end})/2$ that the radiation kernels
+evaluate their one-point path integrals at, the `flight_id`/`substep_id`
+identifiers, and the row-end `event_kind`. New fields appear only under the rule
+that produces them.
 
 When straggling is enabled, `straggle_dE_keV` stores the summed sampled loss per
 electron. On a cutoff row it includes the sampled overshoot even though the

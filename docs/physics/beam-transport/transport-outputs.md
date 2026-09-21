@@ -1,20 +1,19 @@
 # Transport outputs
 
 What a transport run hands to the radiation kernels, and what those quantities do
-and do not mean. This is the interface every spectrum in the package is built on,
-so its semantics are part of the physical model rather than an implementation
-detail.
+and do not mean. This is the interface every spectrum in the package is built
+on.
 
 ## Segments are histories, not events
 
 A segment is one straight flight of one electron through one material. It is
-**not** a detector event, not a photon, and not an independent emitter. The line
-and bremsstrahlung kernels each read the same segment table and reduce it their
-own way; nothing in transport anticipates either.
+**not** a detector event, a photon, or an independent emitter. The line and
+bremsstrahlung kernels each read the same segment table and reduce it their own
+way; nothing in transport anticipates either.
 
-Two consequences follow immediately:
+Two consequences:
 
-- segment counts have no physical normalization of their own — refining the
+- segment counts have no physical normalization of their own: refining the
   numerical step raises the row count without changing any observable;
 - the physically meaningful key is `(electron_id, flight_id)`, the physical
   flight, which is stable under batching and independent of row order.
@@ -55,8 +54,7 @@ Two consequences follow immediately:
 ```
 
 `E_keV`, `t_ang`, and `elec_id` are compatibility aliases of the canonical
-spellings and keep flight-start semantics under every propagation rule. Nothing
-in the schema is reinterpreted when a new rule is selected.
+spellings and keep flight-start semantics under every propagation rule.
 
 ### Fields added by midpoint propagation
 
@@ -73,10 +71,9 @@ the `flight_id` / `substep_id` identifiers, and the row-end `event_kind`.
 kernels evaluate their one-point path integrals, turning each row from a
 left-endpoint into a midpoint rule.
 
-New fields appear **only** under the rule that produces them. The frozen schema is
-never partially extended, so a consumer that finds `E_repr_keV` can rely on the
-rest of the midpoint fields being present, and one that does not can rely on
-every row being a whole physical flight.
+New fields appear **only** under the rule that produces them, so a consumer that
+finds `E_repr_keV` can rely on the rest of the midpoint fields being present, and
+one that does not can rely on every row being a whole physical flight.
 
 ## Row events and physical segments
 
@@ -84,8 +81,7 @@ Every midpoint row records, in `event_kind` (`int8`), the event that ended it.
 The event sits at the row's far end, so the row itself carries the pre-event
 state — `v_hat` is the incoming direction, `E_end_keV` and `t_end_ang` the
 incoming energy and age — and the next row of the same electron carries the
-post-event state. No separate event table is needed, and an event's position is
-`r_mid + L_ang v_hat / 2`.
+post-event state. An event's position is `r_mid + L_ang v_hat / 2`.
 
 ```{list-table} Row-end event codes, pyrite.montecarlo.transport.SegmentEvent.
 :name: tbl-outputs-event-kinds
@@ -147,13 +143,13 @@ post-event state. No separate event table is needed, and an event's position is
 collisions, and hard radiative events are the physical interactions. Each one
 closes the flight: the next row opens `flight_id + 1` at `substep_id = 0`, and
 the default radiation reductions add the two flights incoherently. A hard
-radiative event keeps the electron's direction — the photon's recoil is not
-modelled, the PENELOPE-2024 convention (NEA/MBDAV/R(2024)1, §3.3), which
-assigns the angular deflection to the elastic model — but its discrete energy loss still ends the flight, because the
-emission resonance and phase velocity jump with the energy. Geometry events and
-the cutoff also close the flight. They are bookkeeping boundaries rather than
-interactions, and they preserve today's behaviour: the collision budget is
-redrawn after them, which the memoryless free-path law makes exact.
+radiative event keeps the electron's direction, following the PENELOPE-2024
+convention (NEA/MBDAV/R(2024)1, §3.3), which leaves the photon recoil unmodelled
+and assigns the angular deflection to the elastic model; its discrete energy loss
+still ends the flight, because the emission resonance and phase velocity jump
+with the energy. Geometry events and the cutoff also close the flight. They are
+bookkeeping boundaries rather than interactions: the collision budget is redrawn
+after them, which the memoryless free-path law makes exact.
 
 **Numerical nodes.** A `SUBSTEP` row, and a future fictitious (`DELTA`)
 interaction of a majorant free-path sampler, are integration detail. The next
@@ -181,11 +177,9 @@ The exit codes tally one-to-one against `n_backscattered`, `n_transmitted`,
 hard-event transport slices must emit; no current core produces them.
 
 **Event metadata.** No event carries a payload array; the pair of rows around
-it is the record, which is why the contract costs one `int8` per row and every
-core writes it from an outcome flag it already held. The event sits at
-`r_mid + L_ang v_hat / 2` of the row it ends. Its pre-event state is that row's
+it is the record, at one `int8` per row. Its pre-event state is that row's
 `E_end_keV`, `t_end_ang`, and `v_hat`; its post-event state is the next row's
-`E_start_keV`, `t_start_ang`, and `v_hat` — next in
+`E_start_keV`, `t_start_ang`, and `v_hat`, next in
 `(electron_id, flight_id, substep_id)`, not in array order, which is step-major
 on the lockstep core. The energy the event transferred is therefore the row's
 `E_end_keV` less the next row's `E_start_keV`: the emitted photon's energy for
@@ -193,12 +187,10 @@ on the lockstep core. The energy the event transferred is therefore the row's
 other event by the continuity invariant. The deflection is the angle between
 the two `v_hat`.
 
-A transported secondary — a delta ray, or a photon followed as its own track —
-is a new `electron_id`, not a new field on the primary's rows. Every invariant
-above is per track, so a secondaries slice adds a parent link (the parent's
-`electron_id` and the `flight_id` of the event that created it) under the
-existing rule that a field appears only with the model that produces it; it
-changes no rule here and no row of a run without secondaries.
+A transported secondary (a delta ray, or a photon followed as its own track) is
+a new `electron_id`, not a new field on the primary's rows. Every invariant above
+is per track, so a secondaries slice adds only a parent link: the parent's
+`electron_id` and the `flight_id` of the event that created it.
 
 **Downstream transforms.** `_clip_segments_to_cutoff` marks as `CUTOFF` every
 row a consumer's energy floor shortens or ends. `subdivide_flights` marks the
@@ -213,15 +205,15 @@ midpoint schema.
 
 `initial_r_ang`, `initial_v_hat`, `initial_E_keV`, and `initial_t0_ang` carry one
 row per **sampled** electron, including those that missed a finite footprint and
-produced no segment. They are the realized phase space at the entrance plane —
+produced no segment. They are the realized phase space at the entrance plane,
 the sampled counterpart of the specification in
 [Beam phase space](beam-phase-space.md) and
-[Longitudinal bunch structure](longitudinal-structure.md) — and they are what
+[Longitudinal bunch structure](longitudinal-structure.md), and they are what
 `beam_metrics.sampled_beam_metrics` reduces to emittance, Twiss parameters, and
 spot size.
 
-Because misses are retained, these arrays also record the incident distribution
-that was *attempted*, not just the part that entered the crystal.
+Because misses are retained, these arrays record the incident distribution that
+was *attempted*, not only the part that entered the crystal.
 
 ## Vacuum legs
 
@@ -236,22 +228,21 @@ them.
 
 The exit tallies are listed in
 [Transport geometry](../geometry/transport-geometry.md#termination). All of them
-count electrons, and all yields in the package are **per incident electron** — the
-$N_e$ denominator includes missed entries. A run that overruns its sample
+count electrons, and all yields in the package are **per incident electron**;
+the $N_e$ denominator includes missed entries. A run that overruns its sample
 therefore reports a reduced yield, which is the physical answer.
 
 What the outputs deliberately do **not** carry:
 
-- **no statistical weights.** Every electron counts once. There is no variance
-  reduction, no splitting, no Russian roulette, and consequently no weight
-  bookkeeping to get wrong;
+- **no statistical weights.** Every electron counts once: no variance reduction,
+  no splitting, no Russian roulette;
 - **no absolute flux.** `bunch_charge_pc` and `rep_rate_hz` are inert to the
   transport draw and no photons-per-second normalization is applied anywhere. A
   spectrum is per incident electron until a caller supplies a multiplier;
 - **no physical electron count.** A 1 pC bunch is $6.24\times10^{6}$ electrons
   against a few hundred macro-particles; the transport never conflates the two.
-  Coherent emission genuinely scales with the physical count, so this is a
-  deliberate, tested boundary rather than an oversight.
+  Coherent emission does scale with the physical count, so the boundary is
+  tested rather than incidental.
 
 ## Optional diagnostics
 
@@ -264,12 +255,12 @@ propagation, and retains no per-flight arrays.
 Two matching radiation-side estimators, `cxr_endpoint_resonance_drift` and
 `brem_endpoint_quadrature_error`, report the spectral consequence of one-point
 evaluation. None of these are on a default call path; they are instruments for
-deciding whether a step control is fine enough, not part of any result.
+deciding whether a step control is fine enough.
 
 ## Checking convergence
 
 Nothing in the output signals whether a run is converged. Two independent axes
-have to be checked, and they behave differently:
+have to be checked:
 
 - **electron count and seed.** Ordinary Monte Carlo error, falling as
   $1/\sqrt{N}$. Aggregate observables must be compared with their standard
@@ -279,8 +270,8 @@ have to be checked, and they behave differently:
   reasons that carry no information. Convergence must be read from ensemble means
   with Monte Carlo errors.
 
-Statistical technique — estimators, error bars, seed handling, and the
-convergence protocol the validation records use — is collected in the
+Statistical technique (estimators, error bars, seed handling, and the
+convergence protocol the validation records use) is collected in the
 [computation section](../../computation/index.md).
 
 ## Validation

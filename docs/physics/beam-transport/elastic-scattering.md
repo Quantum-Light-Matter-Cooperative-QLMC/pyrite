@@ -32,9 +32,9 @@ condensed into a continuous slowing-down law
   - none
 ```
 
-The two differ in both the collision *rate* and the momentum-transfer rate. They
-are separate physical models, not a fast path and an accurate path; the ledger
-records backscatter coefficients for both.
+The two differ in both the collision *rate* and the momentum-transfer rate, and
+are separate physical models; the ledger records backscatter coefficients for
+both.
 
 ## Free path
 
@@ -62,16 +62,16 @@ the flight is subdivided into numerical substeps the same $\tau$ is consumed
 across them at each substep's hazard; see
 [Electron transport](electron-transport.md#physical-flights-and-numerical-substeps).
 
-This elastic mean free path is not the inelastic mean free path. The latter is
-derived from the material energy-loss function and can be comparable to, longer
-than, or shorter than the elastic scale depending on energy and composition;
-published calculations tabulate it independently alongside stopping and
+The inelastic mean free path is a separate scale, derived from the material
+energy-loss function. Depending on energy and composition it can be comparable
+to, longer than, or shorter than the elastic one, and published calculations
+tabulate it independently alongside stopping and
 straggling{cite:p}`akkerman1978,shinotsuka2015`.
 
 The elastic hazard is evaluated at the flight-start energy under **both**
 propagation rules. `energy_model="midpoint"` controls stopping and the transport
-clock only, so a rising hazard along a lossy flight is not resolved by the
-propagator — it is resolved, if at all, by `max_dE_frac` substepping.
+clock only, so a rising hazard along a lossy flight is resolved, if at all, by
+`max_dE_frac` substepping.
 
 ### Browning total cross section
 
@@ -89,7 +89,7 @@ elastic cross sections.{cite:p}`browning1994,srd64`
 
 **Stated validity is 0.1–30 keV and $Z \le 92$.** PyRITE evaluates it above
 30 keV with no guard, because the sweep axis runs to the 300 keV model ceiling.
-The extrapolation is a known and ledgered limitation, not a checked result.
+The extrapolation is a ledgered limitation.
 
 ### Relativistic screened-Rutherford total cross section
 
@@ -177,8 +177,8 @@ endpoints.
 The result is a model whose collision rate matches Mott totals and whose
 momentum-transfer rate matches Mott transport cross sections, while retaining the
 analytically invertible angular law. It does **not** reproduce the full Mott
-differential cross section: structure beyond the first moment — diffraction
-minima, large-angle detail — is absorbed into a single effective screening
+differential cross section: structure beyond the first moment (diffraction
+minima, large-angle detail) is absorbed into a single effective screening
 parameter.
 
 ### Missing tables
@@ -186,8 +186,7 @@ parameter.
 Elements without a NIST transport table (tungsten among them) fall back to
 {eq}`eq-elastic-screening-joy` for the angular draw while keeping the Browning
 total. The miss is cached per element per process and logged once at `DEBUG`
-(`PYRITE_MC_DEBUG=1` to see it). A worker pool re-logs once per worker, since each
-worker holds its own cache.
+(`PYRITE_MC_DEBUG=1` to see it); a worker pool logs once per worker.
 
 ## Compounds and layers
 
