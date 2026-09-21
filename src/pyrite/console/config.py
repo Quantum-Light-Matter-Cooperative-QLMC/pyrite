@@ -24,10 +24,18 @@ from .._env import env_value
 from ..paths import state_dir
 
 CONFIG_PATH = state_dir() / "config.toml"
+# The three ``xsgen.*_source`` defaults are the conventional sibling checkout
+# beside the PyRITE checkout, relative to the working directory. They resolve
+# last: :mod:`pyrite.xsgen.sources` prefers a vendored tree over an unmodified
+# default, and distinguishes the two by ``ResolvedValue.source``. A default
+# that does not exist is not an error here -- only using it is.
 _SETTINGS = {
     "profile.current": ("PYRITE_PROFILE", "standard"),
     "remote.target": ("PYRITE_REMOTE_HOST", "qlmc"),
     "workspace.root": ("PYRITE_HOME", "."),
+    "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
+    "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
+    "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
 }
 
 

@@ -128,7 +128,7 @@ markers = [
     "oracle: test requires the pinned optional independent-validation backend",
     "hardware: requires specific physical hardware or device drivers",
     "intel_sycl: requires a working Intel SYCL dpnp/dpctl backend",
-    "extern_codes: compiles and runs the vendored external Fortran codes (ELSEPA, SBETHE, BremsLib); CI cannot run Fortran",
+    "extern_codes: compiles and runs the external Fortran codes (ELSEPA, SBETHE, BremsLib); CI cannot run Fortran, so skipped unless PYRITE_EXTERN_CODES_TESTS=1 and a code tree and compiler are present",
 ]
 
 [tool.coverage.run]
