@@ -428,11 +428,24 @@ bremsstrahlung tables `pdebr<Z>.p08` that D8 and #86 want, and two global files,
 `pdatconf.p14` and `pdcompos.pen`.
 
 `pdcompos.pen` carries SBETHE's own catalogue of 280 predefined materials
-(indexed by `material-list.txt`). PyRITE does **not** key off those IDs — the
-material identity hash of D2 comes from `pyrite.materials`, which stays the
-source of truth — but the 280 entries are a free cross-check oracle for
-composition, density and mean excitation energy on any material both catalogues
-contain.
+(indexed by `material-list.txt`).
+
+**Decided 2026-09-21: PyRITE's materials catalogue stays the source, for now.**
+`xsgen` always supplies composition, density and mean excitation energy
+explicitly and never passes an SBETHE material ID. Keying off those IDs would
+introduce a second identity namespace for the subset of materials both
+catalogues happen to contain, which is exactly the split D2 exists to prevent —
+and it would make a table's key depend on an upstream numbering PyRITE does not
+control.
+
+The 280 entries remain useful as a **cross-check oracle**: for any material in
+both catalogues, SBETHE's composition, density and mean excitation energy are an
+independent second opinion on ours. Worth a test; not worth a dependency.
+
+Revisit only if a concrete disagreement shows up — if our I-value for a shared
+material diverges from SBETHE's enough to move stopping power outside #90's
+tolerance, that is a finding about our catalogue, and the question of which one
+is authoritative becomes real rather than hypothetical.
 
 #### Interface
 
