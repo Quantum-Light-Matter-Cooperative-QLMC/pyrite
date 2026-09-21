@@ -57,14 +57,21 @@ require derived or adapted material to be marked as such.
 
 ## BremsLib (2.0.8)
 
-- **License**: GPL-3.0-or-later for the Fortran sources (GPL headers present
-  in `Interpolate_DCS/Interpolate_DCS.f90` and in `Brems/{Brems,
-  Bremsstrahlung, FitExp, Born_SM_appr, Brems_common}.f90` plus
-  `Read_S_integrals.f90`, per source-header verification on 2026-09-21). The
-  CC BY 4.0 terms that apply to the separately published dataset deposit
-  apply to that dataset only, not to the code; that assumption is recorded as
-  unverified in the design spec and must be confirmed at the deposit before
-  it is relied upon.
+- **Author**: Andrius Poškus.
+- **Citation**: Poškus, Andrius (2025), “BremsLib v2.0.8”, Mendeley Data, V9,
+  DOI [10.17632/6zfsc9xsz8.9](https://doi.org/10.17632/6zfsc9xsz8.9).
+- **License**: two distinct sets of terms cover this deposit, and they must
+  not be conflated.
+  - The **Fortran sources** are GPL-3.0-or-later (GPL headers present in
+    `Interpolate_DCS/Interpolate_DCS.f90` and in `Brems/{Brems,
+    Bremsstrahlung, FitExp, Born_SM_appr, Brems_common}.f90` plus
+    `Read_S_integrals.f90`, per source-header verification on 2026-09-21).
+  - The **dataset deposit** is CC BY 4.0 International,
+    <https://creativecommons.org/licenses/by/4.0>, confirmed from the
+    deposit's own license metadata on 2026-09-21. Note that the deposit's own
+    terms caution that further permission may be required for content within
+    it identified as belonging to a third party — which is how the GPL-3
+    sources bundled inside it are to be read.
 - **Nature of PyRITE's use**: PyRITE redistributes **nothing** from
   BremsLib — not the GPL-3 Fortran sources, not the data library, and not
   tables derived from it. PyRITE reads a precomputed BremsLib library from a
@@ -76,7 +83,6 @@ require derived or adapted material to be marked as such.
   distribution terms (GPL-3 section 7 forbids adding field-of-use
   restrictions). Clean-room reimplementation from the published manuals is
   how the equivalent functionality is obtained.
-- **Attribution**: upstream authorship and citation are to be recorded here
-  when the BremsLib integration lands under #86/#87/#95; no BremsLib checkout
-  is present in this repository to read them from, and they are not
-  fabricated here.
+- **Documentation**: the manuals `BremsLib_v2.0.pdf` and
+  `Interpolate_DCS.pdf` are published alongside the library in the same
+  deposit and are the basis for any clean-room reimplementation.
