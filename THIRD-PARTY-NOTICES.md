@@ -2,41 +2,58 @@
 
 PyRITE is distributed under the UCLA Academic Software License (see
 `LICENSE.txt`; academic/nonprofit use only). The external codes below are
-integrated as separate driver-tier tooling (tracked under
+integrated as separate driver-tier tooling (`pyrite.xsgen`, tracked under
 `agentdocs/specs/2026-09-21-external-fortran-code-integration.md` and GitHub
 issue #161) and carry their own licenses and attribution requirements. This
 notice lists them in advance of that integration landing, per issue #162.
 
 None of PyRITE's own source is licensed under any of the terms below. This
-file exists to satisfy the attribution obligations that follow from invoking
-these codes and from redistributing tables derived or resampled from their
-output.
+file exists to satisfy the attribution obligations that follow from
+redistributing these codes, from invoking them, and from redistributing
+tables derived or resampled from their output.
+
+ELSEPA and SBETHE are both CC BY-NC 3.0. PyRITE is itself distributed for
+academic/nonprofit use only, so the NonCommercial clause imposes no
+additional restriction, and neither carries ShareAlike, so no copyleft
+reaches PyRITE's own code from either. Both require attribution, and both
+require derived or adapted material to be marked as such.
 
 ## ELSEPA (2020 release)
 
+- **Authors**: Francesc Salvat, Aleksander Jablonski, Cedric J. Powell.
 - **License**: CC BY-NC 3.0 (Creative Commons Attribution-NonCommercial 3.0
-  Unported), as labeled on the official Mendeley Data archive.
-- **Archive / citation**: ELSEPA 2020/2021, archive version 1, DOI
-  [10.17632/w4hm5vymym.1](https://doi.org/10.17632/w4hm5vymym.1); program
-  article DOI [10.1016/j.cpc.2020.107704](https://doi.org/10.1016/j.cpc.2020.107704).
-- **Nature of PyRITE's use**: PyRITE invokes the ELSEPA `elscata` program to
-  generate elastic electron/positron scattering cross-section tables and does
-  not vendor or redistribute ELSEPA source. Because PyRITE is itself
-  distributed under a nonprofit-only license, the CC BY-NC clause imposes no
-  additional restriction. Tables derived or resampled from ELSEPA output are
-  adaptations under the license and are marked as such at their point of use.
+  Unported), <https://creativecommons.org/licenses/by-nc/3.0>, as recorded on
+  the Mendeley Data deposit.
+- **Archive**: DOI [10.17632/w4hm5vymym.1](https://doi.org/10.17632/w4hm5vymym.1)
+  (version-pinned). Program article: DOI
+  [10.1016/j.cpc.2020.107704](https://doi.org/10.1016/j.cpc.2020.107704).
+- **Nature of PyRITE's use**: PyRITE **redistributes** the ELSEPA Fortran
+  source and its `database/` directory inside the PyRITE distribution, so
+  that elastic-table generation works offline. PyRITE compiles that source
+  and invokes the `elscata` program to generate elastic scattering
+  cross-section tables. Redistribution is unmodified unless a modification is
+  recorded at the vendored tree; tables derived or resampled from ELSEPA
+  output are **adaptations** under the license and are marked as such in the
+  provenance manifest stored beside each generated table.
 
 ## SBETHE
 
+- **Authors**: Francesc Salvat, Pedro Andreo.
 - **License**: CC BY-NC 3.0 (Creative Commons Attribution-NonCommercial 3.0
-  Unported), verified against source headers and upstream documentation on
-  2026-09-21 (see the design spec cited above).
-- **Nature of PyRITE's use**: PyRITE invokes the SBETHE program to generate
-  material-scoped stopping-power and related inelastic-scattering tables and
-  does not vendor or redistribute SBETHE source. Because PyRITE is itself
-  distributed under a nonprofit-only license, the CC BY-NC clause imposes no
-  additional restriction. Tables derived or resampled from SBETHE output are
-  adaptations under the license and are marked as such at their point of use.
+  Unported), <https://creativecommons.org/licenses/by-nc/3.0>, as recorded in
+  the Mendeley Data deposit's own license metadata (verified 2026-09-21).
+- **Archive**: DOI [10.17632/7zw25f428t.1](https://doi.org/10.17632/7zw25f428t.1)
+  (version-pinned), <https://data.mendeley.com/datasets/7zw25f428t/1>.
+- **Nature of PyRITE's use**: PyRITE **redistributes** the SBETHE Fortran
+  source `sbethe.f` inside the PyRITE distribution, compiles it, and invokes
+  the resulting program to generate material-scoped stopping-power and
+  related inelastic cross-section tables. PyRITE does **not** redistribute
+  the accompanying `sdbase/` database, the bundled prebuilt Windows binary,
+  or the bundled documentation; `sdbase/` is downloaded on demand from the
+  pinned deposit above into the user's own data directory. Tables derived or
+  resampled from SBETHE output are **adaptations** under the license and are
+  marked as such in the provenance manifest stored beside each generated
+  table.
 
 ## BremsLib (2.0.8)
 
@@ -45,15 +62,21 @@ output.
   Bremsstrahlung, FitExp, Born_SM_appr, Brems_common}.f90` plus
   `Read_S_integrals.f90`, per source-header verification on 2026-09-21). The
   CC BY 4.0 terms that apply to the separately published dataset deposit
-  apply to that dataset only, not to the code.
-- **Nature of PyRITE's use**: PyRITE invokes BremsLib as an external
-  subprocess to generate bremsstrahlung cross-section tables and does **not**
-  vendor the BremsLib Fortran sources and does **not** port or translate
-  BremsLib routines (in particular `Interpolate_DCS.f90` and
-  `Brems_CS_interp.f90`) into PyRITE's own code, since a translation would be
-  a GPL-3 derivative work incompatible with PyRITE's nonprofit-only
+  apply to that dataset only, not to the code; that assumption is recorded as
+  unverified in the design spec and must be confirmed at the deposit before
+  it is relied upon.
+- **Nature of PyRITE's use**: PyRITE redistributes **nothing** from
+  BremsLib — not the GPL-3 Fortran sources, not the data library, and not
+  tables derived from it. PyRITE reads a precomputed BremsLib library from a
+  local checkout that the user obtains themselves, and interpolates from it;
+  it does not build or run any BremsLib program. PyRITE does **not** port or
+  translate BremsLib routines (in particular `Interpolate_DCS.f90` and
+  `Brems_CS_interp.f90`) into its own code, since a translation would be a
+  GPL-3 derivative work incompatible with PyRITE's nonprofit-only
   distribution terms (GPL-3 section 7 forbids adding field-of-use
-  restrictions). Running the program and consuming its output is
-  unrestricted by the GPL, which does not reach program output. Tables
-  derived or resampled from BremsLib output are adaptations under the
-  license and are marked as such at their point of use.
+  restrictions). Clean-room reimplementation from the published manuals is
+  how the equivalent functionality is obtained.
+- **Attribution**: upstream authorship and citation are to be recorded here
+  when the BremsLib integration lands under #86/#87/#95; no BremsLib checkout
+  is present in this repository to read them from, and they are not
+  fabricated here.
