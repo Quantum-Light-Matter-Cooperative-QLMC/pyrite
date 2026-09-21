@@ -13,6 +13,13 @@ _KEY = click.Choice(_config.keys(), case_sensitive=True)
 
 
 def _validated(key: str, value: str) -> str:
+    """Validate VALUE for KEY, returning the spelling that gets stored.
+
+    Dispatches on the key explicitly rather than falling through to the
+    profile check: the fall-through treated every key it did not name as
+    ``profile.current``, so a new key added to the store would be validated
+    against the catalog's profile names and rejected.
+    """
     if key == "remote.target":
         try:
             return validate_remote_target(value)
@@ -20,14 +27,35 @@ def _validated(key: str, value: str) -> str:
             raise click.BadParameter(str(exc), param_hint="VALUE") from exc
     if key == "workspace.root":
         return str(Path(value).expanduser().resolve())
-    from ...materials import CATALOG
+    if key.startswith("xsgen."):
+        return _validated_code_source(key, value)
+    if key == "profile.current":
+        from ...materials import CATALOG
 
-    if value not in CATALOG.profile_names:
-        choices = ", ".join(CATALOG.profile_names)
-        raise click.BadParameter(
-            f"unknown profile {value!r}; choose one of: {choices}", param_hint="VALUE"
-        )
-    return value
+        if value not in CATALOG.profile_names:
+            choices = ", ".join(CATALOG.profile_names)
+            raise click.BadParameter(
+                f"unknown profile {value!r}; choose one of: {choices}", param_hint="VALUE"
+            )
+        return value
+    raise click.BadParameter(f"no validation rule for {key!r}", param_hint="KEY")
+
+
+def _validated_code_source(key: str, value: str) -> str:
+    """Check that an external-code source path holds the code it claims to.
+
+    Rejected here rather than at generation time, where the failure would
+    surface much later and further from the mistake. The rule itself lives in
+    :mod:`pyrite.xsgen.sources` so ``pyrite tables sources set`` rejects the
+    same paths with the same message.
+    """
+    from ...xsgen.sources import SourceUnavailableError, validate_source_path
+
+    code = key.removeprefix("xsgen.").removesuffix("_source")
+    try:
+        return str(validate_source_path(code, value))
+    except SourceUnavailableError as exc:
+        raise click.BadParameter(str(exc), param_hint="VALUE") from exc
 
 
 @click.group(

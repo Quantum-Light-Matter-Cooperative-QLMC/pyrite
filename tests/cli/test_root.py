@@ -77,4 +77,7 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         "material",
         "beam",
         "detector",
+        # Added by #161: generated cross-section tables and the external code
+        # trees they come from.
+        "tables",
     }

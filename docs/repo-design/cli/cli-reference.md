@@ -89,6 +89,7 @@ Commands:
   material    Inspect, validate, edit, and blaze individual materials.
   beam        Manage named beams, attachable to profiles by name.
   detector    Manage named detector geometries.
+  tables      Inspect generated cross-section tables and external code trees.
 ```
 
 ## `pyrite run`
@@ -583,7 +584,8 @@ Commands:
 ## `pyrite config get`
 
 ```text
-Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root}
+Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root|xsgen.b
+                         remslib_source|xsgen.elsepa_source|xsgen.sbethe_source}
 
   Print the effective value for KEY.
 
@@ -605,7 +607,8 @@ Options:
 ## `pyrite config set`
 
 ```text
-Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root} VALUE
+Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root|xsgen.b
+                         remslib_source|xsgen.elsepa_source|xsgen.sbethe_source} VALUE
 
   Persist VALUE for KEY.
 
@@ -1996,4 +1999,125 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables`
+
+```text
+Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
+
+  Inspect generated cross-section tables and external code trees.
+
+  Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib) and resolved
+  in two tiers: your own tables first, then the tables shipped with PyRITE. Consumers
+  cannot tell the two apart.
+
+  Examples:
+    pyrite tables path
+    pyrite tables list
+    pyrite tables show 4f3a9c
+    pyrite tables sources list
+    pyrite tables sources set elsepa ../elsepa-2020
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  list     List stored tables, most-preferred tier...
+  path     Print the directory your generated tables...
+  show     Print the provenance manifest for the...
+  sources  Show and configure where the external code...
+```
+
+## `pyrite tables list`
+
+```text
+Usage: pyrite tables list [OPTIONS]
+
+  List stored tables, most-preferred tier first.
+
+  A table present in both tiers is listed once, as the tier that would be served.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables path`
+
+```text
+Usage: pyrite tables path [OPTIONS]
+
+  Print the directory your generated tables are written to.
+
+  Tables live in your user data directory rather than the workspace: they are expensive
+  and target-scoped, not run-specific, so they are shared across every workspace.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables show`
+
+```text
+Usage: pyrite tables show [OPTIONS] KEY
+
+  Print the provenance manifest for the table named by KEY.
+
+  KEY may be an unambiguous prefix of a table key, the way a commit is named by its
+  short hash.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables sources`
+
+```text
+Usage: pyrite tables sources [OPTIONS] COMMAND [ARGS]...
+
+  Show and configure where the external code trees live.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  list  Report which external code trees PyRITE...
+  set   Persist PATH as the source tree for CODE.
+```
+
+## `pyrite tables sources list`
+
+```text
+Usage: pyrite tables sources list [OPTIONS]
+
+  Report which external code trees PyRITE can currently reach.
+
+  Reports every code even when one cannot be found, so a single missing tree does not
+  hide the state of the others. A missing tree is a reported status, not a command
+  failure.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables sources set`
+
+```text
+Usage: pyrite tables sources set [OPTIONS] CODE PATH
+
+  Persist PATH as the source tree for CODE.
+
+  Stored resolved, so the value keeps its meaning from any working directory, and
+  rejected up front if PATH does not hold that code.
+
+Options:
+  -h, --help  Show this message and exit.
 ```
