@@ -110,7 +110,6 @@ def sinc_feature_spacing(
     return step, aliased, int(width.size)
 
 
-
 def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=False):
     """Largest uniform step resolving the coherent route's interference fringes.
 
@@ -144,9 +143,7 @@ def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=Fal
     r_mid = _host(segments["r_mid"]).astype(float, copy=False)
     start_time = segments.get("t_ang")
     start_time = (
-        np.zeros(energy.size)
-        if start_time is None
-        else _host(start_time).astype(float, copy=False)
+        np.zeros(energy.size) if start_time is None else _host(start_time).astype(float, copy=False)
     )
     elec_id = _host(segments["elec_id"])
     if electron_limit is not None:
@@ -164,14 +161,20 @@ def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=Fal
     valid = np.isfinite(d) & np.isfinite(denominator) & (denominator > 0.0) & (t_L > 0.0)
     d, elec_id = d[valid], elec_id[valid]
     if d.size == 0:
-        raise ValueError("cannot derive coherent spacing: diagnostic transport has no valid segments")
+        raise ValueError(
+            "cannot derive coherent spacing: diagnostic transport has no valid segments"
+        )
 
     if grouped:
         order = np.argsort(elec_id, kind="stable")
         d_sorted, id_sorted = d[order], elec_id[order]
         bounds = np.flatnonzero(np.diff(id_sorted)) + 1
         span = max(
-            (float(part.max() - part.min()) for part in np.split(d_sorted, bounds) if part.size > 1),
+            (
+                float(part.max() - part.min())
+                for part in np.split(d_sorted, bounds)
+                if part.size > 1
+            ),
             default=0.0,
         )
     else:
