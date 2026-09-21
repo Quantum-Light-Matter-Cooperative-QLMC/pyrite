@@ -3,6 +3,11 @@ name = "pyrite-xray"
 version = "0.3.0"
 description = "Coherent X-ray radiation and electron transport in crystals."
 readme = "README.md"
+license = { file = "LICENSE.txt" }
+license-files = ["LICENSE.txt", "THIRD-PARTY-NOTICES.md"]
+classifiers = [
+    "License :: Other/Proprietary License",
+]
 requires-python = ">=3.14"
 dependencies = [
     "click>=8.4.1",
@@ -123,6 +128,7 @@ markers = [
     "oracle: test requires the pinned optional independent-validation backend",
     "hardware: requires specific physical hardware or device drivers",
     "intel_sycl: requires a working Intel SYCL dpnp/dpctl backend",
+    "extern_codes: compiles and runs the vendored external Fortran codes (ELSEPA, SBETHE, BremsLib); CI cannot run Fortran",
 ]
 
 [tool.coverage.run]
@@ -220,6 +226,7 @@ forbidden_modules = [
     "pyrite.results",
     "pyrite.runs",
     "pyrite.validation",
+    "pyrite.xsgen",
 ]
 allow_indirect_imports = true
 
@@ -240,6 +247,7 @@ forbidden_modules = [
     "pyrite.energy_grid",
     "pyrite.instrument",
     "pyrite.montecarlo",
+    "pyrite.xsgen",
 ]
 allow_indirect_imports = true
 
