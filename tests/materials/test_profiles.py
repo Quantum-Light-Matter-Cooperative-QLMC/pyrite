@@ -68,9 +68,12 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # again for issue #100's derived photon-continuum floor: a case's
     # E_grid_brem now starts at the medium's own floor instead of 0 eV, so the
     # band the record was computed over genuinely changed and pre-floor records
-    # must be orphaned rather than served for a different band.
+    # must be orphaned rather than served for a different band. Re-minted again
+    # for issue #91's `l-shell-ck-lorentzian-v5` marker: L-shell Coster--Kronig
+    # redistribution changes the L line yields themselves, so v4 records are not
+    # the same spectrum.
     assert case_content_key(case) == (
-        "995c03b2718cb59e67514716d592f7bf6fa0a687a670e3b20a99a161cc68acca"
+        "2e2e319d8fa3806acd27d815f7487444e40793c38c2321ad770e012aec6fd090"
     )
 
 
@@ -81,7 +84,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "cbc3b0327eda612d7cd8eae0e71f26b472691c058b721b6f0cef80e150a9800e"
+        "eab4730a5335f10e695864d6961d8e3497646035bde9b4a749905ad6c0a8b8f0"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -336,7 +339,7 @@ def test_characteristic_model_marker_orphans_previous_line_models():
     assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
     assert "eedl" in CHARACTERISTIC_MODEL
     assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
-    assert CHARACTERISTIC_MODEL.endswith("direct-vacancy-lorentzian-v4")
+    assert CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-v5")
 
 
 def test_case_content_key_separates_characteristic_models():
@@ -369,7 +372,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "cbc3b0327eda612d7cd8eae0e71f26b472691c058b721b6f0cef80e150a9800e"
+        "eab4730a5335f10e695864d6961d8e3497646035bde9b4a749905ad6c0a8b8f0"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -383,42 +386,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "ddf673c9d3764e3e9daee383c8dd4232a784a5f7d0e1f678d3463fd3e20638b1",
+            "7cbe01a7668e4c3aeccb8194e5eafe4d5ba0af82a34b3b9ada629eb614173429",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "a6c6a98562b8999b4ea2e7957810fa797baac3d893fcc08574f162e8a3a24a5e",
+            "290ab514e4eab7b2ebe98f51ec42af5dc582da6a38db5057942638e6b407dd83",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "d1c79e66a0c58211256854dfbe0a85356358c3d91c6f7af391858638789fb79f",
+            "1062b068eb44529092de99bcdbd12de940c7c4ec53e6917f45d606230f172d9c",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "9aab100c359b4a0925c9af870a2b97129570473d1be8e7101accab19f4b90708",
+            "e8201ac872d115dbcb3fd1a476bcff181fc1a1ab995fba652e879aacaa25c1ba",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "bf2457a333321a6a53f5e21c0fa43c5b7a99119df88bbdceee800e5a6cd15f28",
+            "1c46cd47bc284101ea88c8cd637820f19141420614101754d0bc870d48b114f2",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "e63f08f2d16795ca1fe19f1cfaedf52b911d186d6c7bd26bc63f59bc47a93c33",
+            "44cdc5eb9f4eeda44407ae77209cd5dbfd07bf8f21bc357aaae2bcb9ca491e5d",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "bf26990766a829db174470ed6ef67af34e3a58e0ad38f1e1ae90c22d79d89852",
+            "63dcfa9e3f5dd9bf73374b4d1306e960dd5e9e8a4e9c4361b23848bb7ec03e40",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "dabb9a17dc5839d0c527997a27fef01f871145bb18a395d18613070c69d69c96",
+            "7e7a7d5908264416278ee277cba877150bf410a72839d87537bf108fedae393b",
         ),
     ],
 )
@@ -432,8 +435,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     deliberately orphaned every vacuum-era checkpoint stem; they must stay
     bit-for-bit from here. They were re-minted again when unconditional EEDL
     characteristic radiation was introduced, for the EEDL bremsstrahlung
-    generation marker, for natural Lorentzian characteristic profiles, and for
-    issue #88's physical finite-window convention.
+    generation marker, for natural Lorentzian characteristic profiles, for
+    issue #88's physical finite-window convention, and for issue #91's
+    `l-shell-ck-lorentzian-v5` L-shell Coster--Kronig relaxation marker.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
@@ -580,10 +584,11 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Berger--Seltzer stopping splice did, and again when every crystal cut
     # moved to the surface_hkl spelling, and again for natural Lorentzian
     # characteristic profiles, and again for issue #88's physical finite-window
-    # convention, and again for issue #125's automatic bundled line grids) must
-    # stay bit-for-bit.
+    # convention, again for issue #125's automatic bundled line grids, and again
+    # for issue #91's L-shell Coster--Kronig relaxation marker) must stay
+    # bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "cbc3b0327eda612d7cd8eae0e71f26b472691c058b721b6f0cef80e150a9800e"
+        "eab4730a5335f10e695864d6961d8e3497646035bde9b4a749905ad6c0a8b8f0"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -594,7 +599,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
     # bandwidth request the resolver raises, so it was left alone.
     assert survey_incoherent["parameter_sha256"] == (
-        "19fa2a513d156308286a1986775fd8f855c55c560fb2797ee2ad8ddeac929588"
+        "4d171b29d80d152daf09151513e35e7ae85f83d893b759b037812dd898f8c2a1"
     )
 
 
