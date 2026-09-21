@@ -3,9 +3,9 @@
 Covers the store and the source configuration: what tables exist, where they
 came from, where they live, and which code trees PyRITE can currently reach.
 
-``generate`` is deliberately absent until the per-code deck writers and output
-parsers land. ``fetch`` installs SBETHE's pinned reference database without
-extracting the archive's prebuilt executable or documentation.
+``generate`` currently exposes ELSEPA's free-atom path. ``fetch`` installs
+SBETHE's pinned reference database without extracting the archive's prebuilt
+executable or documentation.
 """
 
 from __future__ import annotations
@@ -92,6 +92,7 @@ def command() -> None:
       pyrite tables path
       pyrite tables list
       pyrite tables show 4f3a9c
+      pyrite tables generate --code elsepa --element 79 --energy 1e3
       pyrite tables fetch sbethe
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
@@ -174,6 +175,79 @@ def show_command(key: str, json_output: bool) -> None:
         emit_json("pyrite.tables.show.v1", {"tier": table.tier, "manifest": manifest})
         return
     emit_result(json.dumps(manifest, indent=2, sort_keys=True))
+
+
+@command.command("generate")
+@click.option(
+    "--code",
+    type=click.Choice(["elsepa"], case_sensitive=False),
+    required=True,
+    help="External code to run; this release supports ELSEPA free atoms.",
+)
+@click.option(
+    "--element",
+    type=click.IntRange(1, 103),
+    required=True,
+    metavar="Z",
+    help="Atomic number of the free-atom target.",
+)
+@click.option(
+    "--energy",
+    "energies_ev",
+    type=click.FloatRange(min=4.999),
+    multiple=True,
+    required=True,
+    metavar="EV",
+    help="Kinetic energy in eV; repeat for a native-grid table.",
+)
+@click.option("--overwrite", is_flag=True, help="Regenerate and replace an existing key.")
+@click.option(
+    "--keep-on-failure",
+    is_flag=True,
+    help="Keep the scratch directory after an external-code failure.",
+)
+@output_option
+def generate_command(
+    code: str,
+    element: int,
+    energies_ev: tuple[float, ...],
+    overwrite: bool,
+    keep_on_failure: bool,
+    json_output: bool,
+) -> None:
+    """Generate or reuse one external-code table.
+
+    Each ``--energy`` is in eV. Generated files live in the user table store;
+    rerunning the same normalized request reuses its table without compiling
+    or running ELSEPA.
+    """
+    from ...xsgen import XsgenError
+    from ...xsgen.elsepa import generate_element
+
+    try:
+        result = generate_element(
+            element,
+            energies_ev,
+            overwrite=overwrite,
+            keep_on_failure=keep_on_failure,
+        )
+    except (XsgenError, ValueError, FileExistsError) as exc:
+        raise CLIError(str(exc)) from exc
+
+    table = result.table
+    payload = {
+        "code": code.lower(),
+        "key": table.key,
+        "path": str(table.path),
+        "tier": table.tier,
+        "generated": result.generated,
+        "manifest_sha256": table.manifest.get("manifest_sha256"),
+    }
+    if json_output:
+        emit_json("pyrite.tables.generate.v1", payload)
+        return
+    action = "generated" if result.generated else "reused"
+    emit_result(f"{action}: {table.key}\npath: {table.path}")
 
 
 @command.command("fetch")

@@ -2016,6 +2016,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables path
     pyrite tables list
     pyrite tables show 4f3a9c
+    pyrite tables generate --code elsepa --element 79 --energy 1e3
     pyrite tables fetch sbethe
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
@@ -2024,11 +2025,12 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  fetch    Fetch the pinned large reference database...
-  list     List stored tables, most-preferred tier...
-  path     Print the directory your generated tables...
-  show     Print the provenance manifest for the...
-  sources  Show and configure where the external code...
+  fetch     Fetch the pinned large reference database...
+  generate  Generate or reuse one external-code table.
+  list      List stored tables, most-preferred tier...
+  path      Print the directory your generated tables...
+  show      Print the provenance manifest for the...
+  sources   Show and configure where the external code...
 ```
 
 ## `pyrite tables fetch`
@@ -2044,6 +2046,31 @@ Usage: pyrite tables fetch [OPTIONS] {sbethe}
   successfully without network access.
 
 Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables generate`
+
+```text
+Usage: pyrite tables generate [OPTIONS]
+
+  Generate or reuse one external-code table.
+
+  Each ``--energy`` is in eV. Generated files live in the user table store; rerunning
+  the same normalized request reuses its table without compiling or running ELSEPA.
+
+Options:
+  --code [elsepa]                 External code to run; this release supports ELSEPA
+                                  free atoms.  [required]
+  --element Z                     Atomic number of the free-atom target.  [1<=x<=103;
+                                  required]
+  --energy EV                     Kinetic energy in eV; repeat for a native-grid table.
+                                  [x>=4.999; required]
+  --overwrite                     Regenerate and replace an existing key.
+  --keep-on-failure               Keep the scratch directory after an external-code
+                                  failure.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.

@@ -2,6 +2,16 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `elsepa-vendor-reference`
+
+- **Claim:** the shipped ELSEPA 2020 free-atom deck writer and parser preserve the vendor's native energy/angular grids, differential and integrated elastic cross sections, and construct a monotone normalized angular CDF before any later energy interpolation
+- **Code:** `xsgen/elsepa/deck.py`; `xsgen/elsepa/parse.py`; `xsgen/elsepa/generate.py`
+- **Source:** F. Salvat, ELSEPA 2020, Mendeley Data `10.17632/w4hm5vymym.1`; shipped vendor test deck and `test-run-output/dcs_1p000e03.dat`
+- **Status:** filtered
+- **Checks:** case-sensitive fixed-column deck fields; atomic-number and 4.999 eV program-floor guards; collision-free prediction of ELSEPA's fixed output names; six-column native output schema; monotone `theta` and `mu=(1-cos(theta))/2`; positive DCS and non-negative reported errors; vendor Hg 1 keV panel has 606 samples and reproduces the published total, first-transport, second-transport, and absorption cross sections; native-grid `4*pi*integral(DCS dmu)` closes to the published total within `2.34e-4` relative; CDF uses the same measure, is monotone, and has exact limits `F(0)=0`, `F(1)=1`; identical normalized requests reuse the content-addressed table without rerunning the code
+- **Anchor:** `tests/xsgen/test_elsepa.py`; opt-in real compiler comparison in `tests/xsgen/test_extern_codes.py::test_elsepa_reproduces_its_own_published_test_run`
+- **Notes:** Free atoms only (`MUFFIN 0`). Muffin-tin material inputs, low/high-energy validity boundaries, and transport consumption remain with #89/#94. The committed vendor output is parser evidence; the existing opt-in compiler anchor previously reproduced all 649 file lines with `rtol=1e-5` on the 606 numeric rows. Fresh-context source-to-code validation is pending; only a human may mark this signed off.
+
 ## `electron-transport`
 
 - **Claim:** Joy–Luo slowing-down (**low-energy branch only** since `relativistic-bethe-stopping` landed) + Mott/screened-Rutherford elastic scattering → radiating segments

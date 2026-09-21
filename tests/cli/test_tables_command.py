@@ -135,7 +135,7 @@ def test_show_of_an_unknown_key_fails_with_a_pointer(isolated):
     assert result.stdout == ""
 
 
-# --- fetch ---------------------------------------------------------------
+# --- generate and fetch --------------------------------------------------
 
 
 def test_fetch_reports_the_installed_sbethe_database(isolated, monkeypatch, tmp_path):
@@ -150,6 +150,76 @@ def test_fetch_reports_the_installed_sbethe_database(isolated, monkeypatch, tmp_
     result = invoke(tables_command.command, ["fetch", "sbethe"])
 
     assert_clean_result(result, stdout=f"installed: {destination} (599 files)\n")
+
+
+def test_generate_reports_a_new_elsepa_table(isolated, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    path = tmp_path / "data" / "xsgen" / "tables" / f"{'a' * 64}.npz"
+    table = SimpleNamespace(
+        key="a" * 64,
+        path=path,
+        tier="user",
+        manifest={"manifest_sha256": "b" * 64},
+    )
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.generate_element",
+        lambda *a, **k: SimpleNamespace(table=table, generated=True),
+    )
+
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "elsepa", "--element", "79", "--energy", "1000"],
+    )
+
+    assert_clean_result(result, stdout=f"generated: {'a' * 64}\npath: {path}\n")
+
+
+def test_generate_requires_an_explicit_energy(isolated):
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "elsepa", "--element", "79"],
+    )
+
+    assert result.exit_code == 2
+    assert "Missing option '--energy'" in result.stderr
+
+
+def test_generate_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    path = tmp_path / "table.npz"
+    table = SimpleNamespace(
+        key="a" * 64,
+        path=path,
+        tier="user",
+        manifest={"manifest_sha256": "b" * 64},
+    )
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.generate_element",
+        lambda *a, **k: SimpleNamespace(table=table, generated=False),
+    )
+
+    result = invoke(
+        tables_command.command,
+        [
+            "generate",
+            "--code",
+            "elsepa",
+            "--element",
+            "79",
+            "--energy",
+            "1000",
+            "-o",
+            "json",
+        ],
+    )
+
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "pyrite.tables.generate.v1"
+    assert envelope["payload"]["generated"] is False
+    assert envelope["payload"]["manifest_sha256"] == "b" * 64
+    assert result.stderr == ""
 
 
 def test_fetch_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_path):

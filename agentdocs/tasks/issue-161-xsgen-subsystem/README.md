@@ -4,7 +4,8 @@
 tables produced by external Fortran codes (ELSEPA, SBETHE, BremsLib).
 
 GitHub issue: #161. Branch: `issue-161-xsgen-subsystem`.
-Worktree: `/home/alexa/dev/pyrite.worktrees/issue-161-xsgen-subsystem`.
+Worktree: `/tmp/pyrite-issue-161-xsgen-subsystem` (reattached here because the
+standard worktree directory is read-only to the current editing sandbox).
 Design: `agentdocs/specs/2026-09-21-external-fortran-code-integration.md`.
 
 Prerequisite #162 (third-party notices, license metadata, import-linter
@@ -27,7 +28,7 @@ delegation.** Issue checkboxes stay unticked; this file is the local record.
 | M2 | `pyrite tables` group + `cli-reference.md` regeneration | complete |
 | M3 | manifest hash into run identity; stale checkpoints cannot be served | complete |
 | M4 | vendor ELSEPA + `sbethe.f`, `.gitattributes` `-text`, `tables fetch` | complete |
-| M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | next |
+| M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | in progress; ELSEPA free-atom slice complete |
 | M6 | shipped BremsLib-derived tables + maintainer refresh path | gated, see below |
 
 M6 is gated on a measurement the issue requires *before* committing tables:
@@ -35,12 +36,12 @@ derived-table size across the built-in catalogue.
 
 ## Local environment
 
-All three upstream trees are present beside the checkout, and gfortran is
-installed, so `extern_codes` tests are runnable here even though CI cannot run
-them:
+The vendored ELSEPA/SBETHE sources and a local BremsLib checkout are available:
 
-- `../elsepa-2020`, `../sbethe`, `../BremsLib_v2.0.8`
-- gfortran 15.2.0 (`/usr/bin/gfortran`)
+- `src/pyrite/data/xsgen/{elsepa,sbethe}` and `/home/alex/dev/BremsLib_v2.0.8`
+- The earlier M1/M4 session used gfortran 15.2.0. The current continuation
+  environment no longer exposes a Fortran compiler, so its end-to-end smoke is
+  recorded as unavailable rather than silently replaced.
 
 ## Findings against the spec
 
@@ -161,6 +162,10 @@ incorrect file-count constant. The CLI reports the observed count.
 - [x] M3 conditional identity marker on both surfaces + regression tests
 - [x] M4 vendored ELSEPA source/database/reference anchor and `sbethe.f`
 - [x] M4 pinned `tables fetch sbethe`, selective/atomic extraction, fetched-data overlay
+- [x] M5a ELSEPA free-atom deck writer, vendor-output parser, native-grid CDF,
+      cached generation path, `tables generate`, CLI reference, and regression anchors
+- [ ] M5b SBETHE deck/parser and material generation path
+- [ ] M5c BremsLib native-library reader/converter and sample anchors
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
 - [x] `pyrite-dev verify` for M1-M3 (4361 passed, 90 skipped)
 - [x] `pyrite-dev verify` after M4 (4369 passed, 90 skipped)
