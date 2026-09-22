@@ -28,17 +28,22 @@ delegation.** Issue checkboxes stay unticked; this file is the local record.
 | M2 | `pyrite tables` group + `cli-reference.md` regeneration | complete |
 | M3 | manifest hash into run identity; stale checkpoints cannot be served | complete |
 | M4 | vendor ELSEPA + `sbethe.f`, `.gitattributes` `-text`, `tables fetch` | complete |
-| M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | in progress; ELSEPA free-atom slice complete |
+| M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | complete |
 | M6 | shipped BremsLib-derived tables + maintainer refresh path | gated, see below |
 
 M6 is gated on a measurement the issue requires *before* committing tables:
-derived-table size across the built-in catalogue.
+derived-table size across the built-in catalogue. That measurement is now
+taken -- see F13 -- and it needs a human decision before any table is
+committed.
 
 ## Local environment
 
 The vendored ELSEPA/SBETHE sources and a local BremsLib checkout are available:
 
 - `src/pyrite/data/xsgen/{elsepa,sbethe}` and `/home/alex/dev/BremsLib_v2.0.8`
+  (the BremsLib anchors need no compiler, only the library; point at it with
+  `PYRITE_XSGEN_BREMSLIB_SOURCE` when running from this worktree, whose parent
+  is `/tmp`)
 - gfortran 15.2.0 was available again from the M5b session onward, so both
   codes were built and run for real; SBETHE's `sdbase/` was fetched through
   `pyrite tables fetch sbethe` against the re-pinned deposit.
@@ -264,6 +269,107 @@ reproduces ESTAR to well inside 2% at both 1 keV and 1 GeV. That is anchored
 as evidence the right column in the right units reached the caller; the
 physics comparison itself belongs to #90.
 
+### F11 - the BremsLib source marker never matched a real checkout
+
+`sources.py` accepted a BremsLib tree on `BremsLib_v2.0` existing inside it.
+The unpacked deposit holds `BremsLib_v2.0.8/` -- the patch version is part of
+the directory name, and the manual's own prose ("main library data folder
+BremsLib_v2.0") is what the marker was written from. So `resolve_source
+("bremslib")` failed on the real checkout at `../BremsLib_v2.0.8`, and the
+only test covering it built a directory named after the marker rather than
+after the deposit.
+
+Fixed by generalizing `CodeSpec.marker` to `markers: tuple[str, ...]`, with
+glob patterns allowed and any one match accepting the tree. BremsLib now takes
+`("BremsLib_v2.0*/SDCS/SDCS_*.txt", "SDCS/SDCS_*.txt")`: a data file rather
+than a source file, because a tree holding the GPL-3 codes but not the library
+cannot answer a single request, and two patterns because a user who kept only
+the data directory should not be told they have no BremsLib.
+
+Not found by review -- found by pointing the generator at the real checkout.
+
+### F12 - Simpson, not the trapezoid, reproduces the vendor's own integrals
+
+The shape function is the DDCS over its angular integral, so the integration
+rule is the whole of the derived physics. Upstream publishes its own integral
+of every node (`SDCS/DDCS_int/DDCS_int_<Z>.txt`, 10th-order Newton-Cotes),
+which makes the rule checkable rather than a matter of taste:
+
+| rule | agreement with the published integral |
+| --- | --- |
+| trapezoid on the native grid | 1.1e-4 relative |
+| composite Simpson on the native grid | 2.0e-5 worst, 3.4e-9 median |
+
+Measured over all 858 nodes of Z=79 below 30 MeV and at sampled nodes from
+Z=1 to Z=100. The native angular grids have 181, 221 or 441 points -- always
+an even number of intervals -- so composite Simpson applies across the whole
+range, and `scipy.integrate.simpson` handles their non-uniform spacing.
+Simpson it is, anchored at `rtol=1e-4`.
+
+Two smaller things the same comparison settled:
+
+- The vendor's `DDCS_int` file carries a *shorter* energy grid than the SDCS
+  file (integrals to 100 MeV, cross sections to 300 MeV). Reusing the SDCS row
+  index would read a different energy's integral, and nothing in the stored
+  numbers would show it. There is a regression for it.
+- Node file names are not sortable by photon energy: a two-digit exponent puts
+  `8.000E-01` after `2.000E+00`. The first anchor written did sort by name, and
+  compared Z=100's top node against a DDCS 2.5x away from it.
+
+### F13 - the M6 size measurement: 10 to 55 MB, not 4.8 MB
+
+The issue requires the derived-table size across the built-in catalogue to be
+measured before any table is committed. It is, with the converter that landed
+here.
+
+The catalogue holds 50 materials over **24 distinct elements**
+(Z = 5, 6, 7, 8, 13, 14, 15, 16, 22, 23, 26, 32, 34, 40, 41, 42, 46, 52, 72,
+73, 74, 75, 78, 83). Table size is essentially Z-independent, because the
+node and angular grids depend on `T1` alone -- Z=6 and Z=79 differ by 4%:
+
+| variant | per element | x24 elements |
+| --- | --- | --- |
+| stored schema, T1 <= 30 MeV | 2.3 MB | 55 MB |
+| float32 DDCS, uncertainty columns dropped | 0.75 MB | 18 MB |
+| stored schema, T1 <= 1 MeV | 1.3 MB | 32 MB |
+| float32, no uncertainties, T1 <= 1 MeV | 0.46 MB | 11 MB |
+| float32, no uncertainties, T1 <= 0.3 MeV | 0.41 MB | 10 MB |
+| SDCS only, no angular data | 8 kB | 0.2 MB |
+
+`.npz` deflate, measured. Bounding the energy range buys less than it looks
+like: 50 of the 66 grid energies below 30 MeV are below 1 MeV, so the
+low-energy nodes are most of the payload.
+
+So every variant that ships angular information costs 10 MB or more -- two to
+eleven times the spec's whole ~4.8 MB wheel-growth projection, which D4 (revised)
+already noted excluded these tables. Only the SDCS-only table fits that
+figure, and shipping the SDCS alone would leave emission isotropic for a user
+without a checkout, which is the thing D6 and #87 exist to fix.
+
+The decision belongs to a human. The options, as measured:
+
+1. Accept a 10-18 MB wheel for float32 angular tables over the catalogue.
+2. Ship the SDCS only, and require a checkout for the angular model.
+3. Fetch derived tables on demand into the user data directory, the way
+   SBETHE's `sdbase/` already is (`pyrite tables fetch`), so the wheel does
+   not carry them but a user without a BremsLib checkout still gets them.
+   The spec does not list this option; the machinery for it exists.
+
+M6 stays gated, and no table is committed.
+
+### F14 - a float32 payload is not free, and the store does not know about it
+
+Two of the three options above store the DDCS as float32. `store.arrays_digest`
+hashes dtype and bytes, so a dtype change re-keys every table -- which is
+correct, but it means the shipped-table dtype is a decision to take once,
+before tables exist, not after.
+
+The converter stores float64 DDCS today because that is what the library
+publishes (`%.8e`, which float32 does not hold) and because a locally
+generated table costs nothing to keep exact. If M6 ships float32, it should be
+a *shipped-table* transform in the maintainer path, not a change to what
+`build_table` produces.
+
 ## Checklist
 
 - [x] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
@@ -281,7 +387,14 @@ physics comparison itself belongs to #90.
 - [x] M5b SBETHE deck writer, three output parsers, `generate_material`,
       `tables generate --code sbethe`, CLI reference, and real-binary anchors
 - [x] M5b fixed two M5a defects that blocked `tables generate` entirely (F9)
-- [ ] M5c BremsLib native-library reader/converter and sample anchors
+- [x] M5c BremsLib library reader (`read.py`), converter (`convert.py`),
+      per-element generator, `tables generate --code bremslib`, CLI reference,
+      `bremslib-library-reference` ledger row, unit tests and real-library
+      anchors
+- [x] M5c fixed the BremsLib source marker, which never matched a real
+      checkout (F11)
+- [x] M6 gate measurement taken: 24 catalogue elements, 10-55 MB depending on
+      variant (F13). Decision is the human's; nothing committed.
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
 - [x] `pyrite-dev verify` for M1-M3 (4361 passed, 90 skipped)
 - [x] `pyrite-dev verify` after M4 (4369 passed, 90 skipped)
