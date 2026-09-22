@@ -104,6 +104,7 @@ Edges (importer -> imported):
   p16 -> p5
   p16 -> p6
   p16 -> p9
+  p17 -> p10
   p17 -> p5
   p17 -> p9
   p2 -> p10
@@ -498,6 +499,10 @@ re-exported from package** — `from pyrite.montecarlo import X` unchanged
   MF=23/527 totals and MF=26/527 photon spectra for the default
   `mc_brem_spectrum`, retains Bethe--Heitler as an optional/fallback backend,
   stages EEDL panels once per element/grid, and owns `load_external_brem`;
+  `brem_bremslib.py` stages and interpolates BremsLib SDCS/DDCS tables for the
+  direction-resolved `cross_section_model="bremslib"` (tables are resolved by
+  `xsgen/bremslib/tables.py` and passed in; the physics core never imports
+  `xsgen`);
   `brem_jit_kernel.py` owns the fused CUDA EEDL/Bethe--Heitler reduction;
   `characteristic.py` parses the
   packaged ENDF-6 EEDL File-23 tables, joins xraydb direct-vacancy relaxation

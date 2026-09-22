@@ -1,4 +1,4 @@
-"""CUDA JIT reductions for analytic and staged-EEDL bremsstrahlung.
+"""CUDA JIT reductions for analytic, staged-EEDL, and BremsLib bremsstrahlung.
 
 One CUDA block owns one or more photon-energy bins. Threads stride over
 transport segments, evaluate either staged EEDL interpolation or
@@ -36,6 +36,8 @@ U32_ONE = np.uint32(1)
 U32_TWO = np.uint32(2)
 U32_THREE = np.uint32(3)
 U32_FOUR = np.uint32(4)
+U32_ELEVEN = np.uint32(11)
+U32_THIRTEEN = np.uint32(13)
 
 
 @dataclass(frozen=True)
@@ -121,6 +123,87 @@ def _eedl_or_bh_weighted_scalar(
     return _dsigma_weighted_scalar(T_i, k_eV, Z, p_i, bethe_heitler_prefactor)
 
 
+@jit.rawkernel(device=True)
+def _bremslib_scaled_scalar(reduced, top, line, values, nominal_ratio):
+    """Interpolate one staged 13-node BremsLib row in ``k/T``.
+
+    Validation: bremslib-angular-model
+    """
+    lower = U32_ZERO
+    while lower < U32_ELEVEN and reduced >= nominal_ratio[lower + U32_ONE]:
+        lower += U32_ONE
+    x0 = nominal_ratio[lower]
+    if lower == U32_ELEVEN:
+        x1 = top
+    else:
+        x1 = nominal_ratio[lower + U32_ONE]
+    fraction = (reduced - x0) / (x1 - x0)
+    if fraction < F32_ZERO:
+        fraction = F32_ZERO
+    elif fraction > F32_ONE:
+        fraction = F32_ONE
+    offset = line * U32_THIRTEEN + lower
+    v0 = values[offset]
+    v1 = values[offset + U32_ONE]
+    return v0 + fraction * (v1 - v0)
+
+
+@jit.rawkernel(device=True)
+def _bremslib_or_fallback_weighted_scalar(
+    T_i,
+    k_eV,
+    k_index,
+    line,
+    p_i,
+    bethe_heitler_prefactor,
+    eedl_weight,
+    eedl_lower_panel,
+    eedl_panel_fraction,
+    eedl_available,
+    panel_probability,
+    bremslib_weight,
+    bremslib_lower_top,
+    bremslib_upper_top,
+    bremslib_energy_fraction,
+    bremslib_available,
+    bremslib_lower_values,
+    bremslib_upper_values,
+    nominal_ratio,
+    n_E,
+    Z,
+):
+    """Weighted directional BremsLib cell, with the normal EEDL/BH fallback.
+
+    Validation: bremslib-angular-model
+    """
+    if bremslib_available > F32_ZERO:
+        if k_eV <= F32_ZERO or k_eV > T_i * F32_1E3:
+            return F32_ZERO
+        reduced = k_eV / (T_i * F32_1E3)
+        lower = _bremslib_scaled_scalar(
+            reduced, bremslib_lower_top, line, bremslib_lower_values, nominal_ratio
+        )
+        upper = _bremslib_scaled_scalar(
+            reduced, bremslib_upper_top, line, bremslib_upper_values, nominal_ratio
+        )
+        scaled = lower + bremslib_energy_fraction * (upper - lower)
+        return bremslib_weight * scaled / k_eV
+    return _eedl_or_bh_weighted_scalar(
+        T_i,
+        k_eV,
+        k_index,
+        p_i,
+        bethe_heitler_prefactor,
+        eedl_weight,
+        eedl_lower_panel,
+        eedl_panel_fraction,
+        eedl_available,
+        panel_probability,
+        n_E,
+        Z,
+    )
+
+
 @jit.rawkernel()
 def _eedl_kernel_1e(
     T,
@@ -160,6 +243,85 @@ def _eedl_kernel_1e(
             panel_fraction[line],
             available[line],
             panel_probability,
+            n_E,
+            Z,
+        )
+        tau = _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
+        acc += weighted * xp.exp(-tau)
+        line += nthreads
+
+    shared = jit.shared_memory(xp.float32, None)
+    shared[tid] = acc
+    jit.syncthreads()
+    stride = nthreads // U32_TWO
+    while stride > U32_ZERO:
+        if tid < stride:
+            shared[tid] += shared[tid + stride]
+        jit.syncthreads()
+        stride //= U32_TWO
+    if tid == U32_ZERO:
+        spec[k] += shared[U32_ZERO]
+
+
+@jit.rawkernel()
+def _bremslib_kernel_1e(
+    T,
+    p_i_arr,
+    bethe_heitler_prefactor,
+    eedl_weight,
+    eedl_lower_panel,
+    eedl_panel_fraction,
+    eedl_available,
+    path_flat,
+    mu_flat,
+    E_grid,
+    panel_probability,
+    bremslib_weight,
+    bremslib_lower_top,
+    bremslib_upper_top,
+    bremslib_energy_fraction,
+    bremslib_available,
+    bremslib_lower_values,
+    bremslib_upper_values,
+    nominal_ratio,
+    spec,
+    Z,
+    n_seg,
+    n_E,
+    n_layers,
+):
+    """Fuse BremsLib interpolation, fallback, attenuation, and reduction.
+
+    Validation: bremslib-angular-model
+    """
+    k = jit.blockIdx.x
+    tid = jit.threadIdx.x
+    nthreads = jit.blockDim.x
+    photon_eV = E_grid[k]
+    acc = F32_ZERO
+
+    line = tid
+    while line < n_seg:
+        weighted = _bremslib_or_fallback_weighted_scalar(
+            T[line],
+            photon_eV,
+            k,
+            line,
+            p_i_arr[line],
+            bethe_heitler_prefactor[line],
+            eedl_weight[line],
+            eedl_lower_panel[line],
+            eedl_panel_fraction[line],
+            eedl_available[line],
+            panel_probability,
+            bremslib_weight[line],
+            bremslib_lower_top[line],
+            bremslib_upper_top[line],
+            bremslib_energy_fraction[line],
+            bremslib_available[line],
+            bremslib_lower_values,
+            bremslib_upper_values,
+            nominal_ratio,
             n_E,
             Z,
         )
@@ -555,3 +717,162 @@ def run_eedl_brem_reduction_kernel(
         shared_mem=nthreads * np.dtype(np.float32).itemsize,
     )
     return out
+
+
+def run_bremslib_brem_reduction_kernel(
+    T_keV,
+    p_i,
+    bethe_heitler_prefactor,
+    eedl_weight,
+    eedl_lower_panel,
+    eedl_panel_fraction,
+    eedl_available,
+    path_flat,
+    mu_flat,
+    E_grid,
+    panel_probability,
+    bremslib_weight,
+    bremslib_lower_top,
+    bremslib_upper_top,
+    bremslib_energy_fraction,
+    bremslib_available,
+    bremslib_lower_values,
+    bremslib_upper_values,
+    nominal_ratio,
+    *,
+    Z,
+    n_layers,
+    out=None,
+    config=DEFAULT_BREM_KERNEL_CONFIG,
+):
+    """Accumulate staged direction-resolved BremsLib bremsstrahlung.
+
+    The BremsLib arrays hold the two incident-energy rows already interpolated
+    to each segment's emission angle. The raw kernel performs the remaining
+    ``k/T`` and incident-energy interpolation, then falls back per segment to
+    the staged EEDL/Bethe--Heitler inputs when BremsLib has no coverage.
+    ``bremslib_weight`` includes density, path length, ``4*pi``, the mb-to-cm2
+    conversion, and ``Z**2`` so the caller can retain the common isotropic
+    ``1/(4*pi)`` normalization after reduction.
+
+    Validation: bremslib-angular-model
+    """
+    nthreads = int(config.nthreads)
+    if nthreads not in (32, 64, 128, 256, 512, 1024):
+        raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
+    n_E = int(E_grid.size)
+    if out is None:
+        out = xp.zeros(n_E, dtype=xp.float32)
+    if n_E == 0 or T_keV.size == 0:
+        return out
+
+    _bremslib_kernel_1e(
+        (n_E,),
+        (nthreads,),
+        (
+            T_keV,
+            p_i,
+            bethe_heitler_prefactor,
+            eedl_weight,
+            eedl_lower_panel,
+            eedl_panel_fraction,
+            eedl_available,
+            path_flat,
+            mu_flat,
+            E_grid,
+            panel_probability,
+            bremslib_weight,
+            bremslib_lower_top,
+            bremslib_upper_top,
+            bremslib_energy_fraction,
+            bremslib_available,
+            bremslib_lower_values,
+            bremslib_upper_values,
+            nominal_ratio,
+            out,
+            np.float32(Z),
+            np.uint32(T_keV.size),
+            np.uint32(n_E),
+            np.uint32(n_layers),
+        ),
+        shared_mem=nthreads * np.dtype(np.float32).itemsize,
+    )
+    return out
+
+
+def run_bremslib_element_reduction(
+    T_keV,
+    L_ang,
+    p_i,
+    bethe_heitler_prefactor,
+    path_flat,
+    mu_flat,
+    E_grid,
+    staged,
+    cos_theta,
+    eedl_context,
+    *,
+    Z,
+    number_density_ang3,
+    n_layers,
+    out,
+):
+    """Stage one element's segment state and launch the BremsLib reducer.
+
+    Validation: bremslib-angular-model
+    """
+    from .brem_bremslib import bremslib_segment_state
+
+    state = bremslib_segment_state(staged, T_keV, cos_theta)
+    if eedl_context is None:
+        eedl_weight = xp.zeros_like(T_keV)
+        eedl_lower_panel = xp.zeros(T_keV.size, dtype=np.uint32)
+        eedl_panel_fraction = xp.zeros_like(T_keV)
+        eedl_available = xp.zeros_like(T_keV)
+        panel_probability = xp.zeros(max(2 * int(E_grid.size), 1), dtype=xp.float32)
+    else:
+        eedl_state = eedl_context.state
+        eedl_weight = xp.ascontiguousarray(
+            np.float32(number_density_ang3 * 1.0e24)
+            * L_ang
+            * F32_1E_M8
+            * eedl_state.differential_scale_cm2,
+            dtype=xp.float32,
+        )
+        eedl_lower_panel = xp.ascontiguousarray(eedl_state.lower_panel, dtype=np.uint32)
+        eedl_panel_fraction = xp.ascontiguousarray(
+            eedl_state.panel_fraction, dtype=xp.float32
+        )
+        eedl_available = xp.ascontiguousarray(eedl_state.available, dtype=xp.float32)
+        panel_probability = xp.ascontiguousarray(
+            eedl_context.prepared.photon_probability_on_grid_per_eV.reshape(-1),
+            dtype=xp.float32,
+        )
+    weight = np.float32(
+        number_density_ang3 * 1.0e24 * 1.0e-8 * 4.0 * np.pi * 1.0e-27 * Z * Z
+    )
+    lower_row = state.lower_row
+    return run_bremslib_brem_reduction_kernel(
+        T_keV,
+        p_i,
+        bethe_heitler_prefactor,
+        eedl_weight,
+        eedl_lower_panel,
+        eedl_panel_fraction,
+        eedl_available,
+        path_flat,
+        mu_flat,
+        E_grid,
+        panel_probability,
+        xp.ascontiguousarray(L_ang * weight, dtype=xp.float32),
+        xp.ascontiguousarray(staged.top_reduced_energy[lower_row], dtype=xp.float32),
+        xp.ascontiguousarray(staged.top_reduced_energy[lower_row + 1], dtype=xp.float32),
+        xp.ascontiguousarray(state.energy_fraction, dtype=xp.float32),
+        xp.ascontiguousarray(state.available, dtype=xp.float32),
+        xp.ascontiguousarray(state.lower_values.reshape(-1), dtype=xp.float32),
+        xp.ascontiguousarray(state.upper_values.reshape(-1), dtype=xp.float32),
+        xp.asarray(staged.table.nominal_reduced_energy, dtype=xp.float32),
+        Z=Z,
+        n_layers=n_layers,
+        out=out,
+    )

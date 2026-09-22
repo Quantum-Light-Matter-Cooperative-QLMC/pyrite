@@ -15,7 +15,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -30,6 +30,7 @@ from .._numerics import (
 from ..detectors import EnergyBins
 from ..montecarlo.case import Case
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL
+from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
 from .sweep import (
@@ -372,6 +373,15 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
+def _bremsstrahlung_identity_marker(model: Literal["eedl", "bremslib"]) -> str:
+    """Return the selected continuum generation; reject unsupported run models."""
+    if model == "eedl":
+        return BREMSSTRAHLUNG_MODEL
+    if model == "bremslib":
+        return BREMSSTRAHLUNG_BREMSLIB_MODEL
+    raise ValueError(f"bremsstrahlung_model must be 'eedl' or 'bremslib'; got {model!r}")
+
+
 def _identity_v1(
     material: str,
     fidelity: str,
@@ -381,6 +391,7 @@ def _identity_v1(
     variant: str | None = None,
     catalog_profile: str = "standard",
     xsgen_tables: Mapping[str, str] | None = None,
+    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl",
 ) -> dict[str, Any]:
     """Return profile plus exact resolved parameters and stable SHA-256 digest."""
     assert sweep.target is not None
@@ -544,7 +555,7 @@ def _identity_v1(
     resolved["characteristic_model"] = CHARACTERISTIC_MODEL
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
-    resolved["bremsstrahlung_model"] = BREMSSTRAHLUNG_MODEL
+    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(bremsstrahlung_model)
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and
     # `transport_numerics` above and unlike the four model constants: a run
@@ -588,6 +599,7 @@ def dataset_identity(
     catalog_profile: str = "standard",
     identity_version: int = CURRENT_IDENTITY_VERSION,
     xsgen_tables: Mapping[str, str] | None = None,
+    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl",
 ) -> dict[str, Any]:
     """Resolve a dataset identity through its explicit versioned algorithm.
 
@@ -595,6 +607,9 @@ def dataset_identity(
     externally generated cross-section table this run reads, from
     :func:`pyrite.xsgen.store.identity_markers`. Omitted or empty leaves the
     digest exactly as it was before issue #161.
+
+    ``bremsstrahlung_model`` selects the physics-generation marker. The
+    default preserves existing EEDL checkpoint identities.
     """
     try:
         migration = IDENTITY_MIGRATIONS[identity_version]
@@ -608,6 +623,7 @@ def dataset_identity(
         variant=variant,
         catalog_profile=catalog_profile,
         xsgen_tables=xsgen_tables,
+        bremsstrahlung_model=bremsstrahlung_model,
     )
 
 
@@ -629,6 +645,7 @@ def case_content_key(
     case: Case | Mapping[str, Any],
     *,
     xsgen_tables: Mapping[str, str] | None = None,
+    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl",
 ) -> str:
     """Content-addressable key for one :func:`pyrite.campaign.sweep.build_cases` case.
 
@@ -647,10 +664,9 @@ def case_content_key(
     case whose seed differs simply gets a distinct key and recomputes; the store
     never serves a mismatched-seed result.
 
-    The stopping, characteristic-radiation, and bremsstrahlung models join the
-    payload as constants alongside the case. They are not case fields -- all are
-    unconditional -- but they determine the stored arrays, and without them a
-    blob from an earlier physics/data generation could be served silently.
+    The stopping and characteristic-radiation markers, plus the selected
+    bremsstrahlung model marker, join the payload alongside the case. Without
+    them a blob from an earlier physics/data generation could be served silently.
 
     ``xsgen_tables`` is the same thing for externally generated cross-section
     tables (issue #161), and has to be here as well as in
@@ -665,7 +681,7 @@ def case_content_key(
         "schema": CASE_CONTENT_KEY_SCHEMA,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
-        "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
+        "bremsstrahlung_model": _bremsstrahlung_identity_marker(bremsstrahlung_model),
         "case": _jsonable(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),

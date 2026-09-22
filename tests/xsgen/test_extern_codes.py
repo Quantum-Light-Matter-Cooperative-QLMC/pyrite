@@ -498,3 +498,70 @@ def test_the_float32_release_keeps_the_shape_function(tmp_path):
         got = panel_of(released, node)
         integral = exact["node_angular_integral_mb"][node]
         np.testing.assert_allclose(got.ddcs_mb_sr / integral, want.ddcs_mb_sr / integral, rtol=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("sample", "t1_MeV", "theta_deg", "max_rel", "median_rel"),
+    [
+        # On the library T1 grid: only k/T1 and theta are interpolated.
+        (
+            "Z=79_T1=2.500E+00MeV_theta=10.000deg_Rester_and_Dance_1967_Fig16.txt",
+            2.5,
+            10.0,
+            0.015,
+            0.005,
+        ),
+        # Between T1 nodes, on the forward peak: the hardest case the samples hold.
+        (
+            "Z=79_T1=9.660E+00MeV_theta=0.000deg_Starfelt_and_Koch_1956_Fig9a.txt",
+            9.66,
+            0.0,
+            0.07,
+            0.01,
+        ),
+    ],
+)
+def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
+    monkeypatch, tmp_path, sample, t1_MeV, theta_deg, max_rel, median_rel
+):
+    """Accuracy oracle for PyRITE's own BremsLib interpolation (D7).
+
+    ``Interpolate_DCS`` ships its outputs for two gold spectra. PyRITE does not
+    reproduce that program -- a weighted least-squares spline over selected
+    knots, fitted to the ratio to a Schiff reference -- so the two schemes
+    differ by their interpolation error. Observed: at most 0.8 % (median
+    0.13 %) on the T1 grid, and median 0.4 % with a 5.4 % worst point at the
+    last photon energy before the tip between T1 nodes on the 0-degree
+    forward peak, against a vendor-reported median relative uncertainty of
+    about 1 %. The tolerances sit just above those, so a unit error, a
+    mis-scaled angle, or a lost normalization fails by orders of magnitude.
+
+    Validation: bremslib-angular-model
+    """
+    from pyrite.montecarlo.spectrum.brem_bremslib import (
+        bremslib_segment_state,
+        evaluate_bremslib,
+        stage_bremslib_table,
+    )
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+    from tests.helpers import to_host
+
+    library = _bremslib()
+    samples = library.parent / "Interpolate_DCS" / "Samples"
+    if not (samples / sample).is_file():
+        pytest.skip(f"the BremsLib checkout carries no {sample}")
+    monkeypatch.setattr("pyrite.xsgen.store.user_table_dir", lambda: tmp_path / "user")
+    monkeypatch.setattr("pyrite.xsgen.store.packaged_table_dir", lambda: tmp_path / "packaged")
+    table = load_bremsstrahlung_tables(["Au"], source_path=library)["Au"]
+
+    rows = np.loadtxt(samples / sample, skiprows=1)
+    photon_MeV, vendor_cm2_sr_MeV = rows[:, 1], rows[:, 3]
+    staged = stage_bremslib_table(table)
+    state = bremslib_segment_state(
+        staged, np.array([t1_MeV * 1.0e3]), np.array([np.cos(np.radians(theta_deg))])
+    )
+    ours = to_host(evaluate_bremslib(staged, state, photon_MeV * 1.0e6))[0] * 1.0e6
+
+    relative = np.abs(ours / vendor_cm2_sr_MeV - 1.0)
+    assert relative.max() < max_rel
+    assert np.median(relative) < median_rel

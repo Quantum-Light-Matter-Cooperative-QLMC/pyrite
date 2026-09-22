@@ -479,6 +479,7 @@ def brem_endpoint_quadrature_error(
     warn_threshold=None,
     chunk=8192,
     cross_section_model: BremsstrahlungModel = "eedl",
+    bremslib_tables=None,
 ):
     """Per-flight bremsstrahlung left-endpoint versus midpoint quadrature error.
 
@@ -496,6 +497,8 @@ def brem_endpoint_quadrature_error(
     integrated error exceeds ``warn_threshold`` (default
     ``DEFAULT_BREM_QUADRATURE_WARN``, calibrated in
     ``docs/validation/beam-transport/radiation-error-estimators.md``).
+    ``bremslib_tables`` is forwarded for ``cross_section_model="bremslib"``,
+    whose angle-integrated SDCS is compared.
 
     Validation: radiation-error-estimators
     """
@@ -541,6 +544,7 @@ def brem_endpoint_quadrature_error(
                         T_start[mask],
                         E_grid,
                         cross_section_model=cross_section_model,
+                        bremslib_tables=bremslib_tables,
                     )
                 )
                 ym += n_i * _to_cpu(
@@ -549,6 +553,7 @@ def brem_endpoint_quadrature_error(
                         T_mid[mask],
                         E_grid,
                         cross_section_model=cross_section_model,
+                        bremslib_tables=bremslib_tables,
                     )
                 )
             y_start[mask] = ys

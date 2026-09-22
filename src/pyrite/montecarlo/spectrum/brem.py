@@ -21,6 +21,12 @@ from ...materials.attenuation import (
 from ...materials.crystal import ALPHA_FS
 from ..groove import escape_distance_ang
 from ..transport import TRANSPORT_ELEMENTS
+from .brem_bremslib import (
+    BremsLibBremsstrahlungTable,
+    bremslib_segment_state,
+    evaluate_bremslib,
+    stage_bremslib_table,
+)
 from .characteristic import CHARACTERISTIC_DATA_DIR as BREMSSTRAHLUNG_DATA_DIR
 from .characteristic import CHARACTERISTIC_EEDL_FILENAME as BREMSSTRAHLUNG_EEDL_FILENAME
 from .characteristic import CHARACTERISTIC_EEDL_SHA256 as BREMSSTRAHLUNG_EEDL_SHA256
@@ -37,8 +43,9 @@ from .lines import (
 )
 
 _USE_JIT_BREM_REDUCTION = True
+_BREMSLIB_CHUNK_CELLS = 1 << 21
 
-BremsstrahlungModel = Literal["eedl", "bethe-heitler"]
+BremsstrahlungModel = Literal["eedl", "bethe-heitler", "bremslib"]
 BREMSSTRAHLUNG_MODEL = (
     f"eedl-2025-{BREMSSTRAHLUNG_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v1"
@@ -685,11 +692,42 @@ def _eedl_brem_dsigma_dk(
 
 
 def _validate_bremsstrahlung_model(cross_section_model: str) -> BremsstrahlungModel:
-    if cross_section_model not in {"eedl", "bethe-heitler"}:
+    if cross_section_model not in {"eedl", "bethe-heitler", "bremslib"}:
         raise ValueError(
-            f"cross_section_model must be 'eedl' or 'bethe-heitler'; got {cross_section_model!r}"
+            "cross_section_model must be 'eedl', 'bethe-heitler', or 'bremslib'; "
+            f"got {cross_section_model!r}"
         )
     return cross_section_model
+
+
+def _require_bremslib_tables(
+    bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None,
+) -> Mapping[str, BremsLibBremsstrahlungTable]:
+    if bremslib_tables is None:
+        raise ValueError(
+            "cross_section_model='bremslib' needs bremslib_tables; resolve them with "
+            "pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables(elements)"
+        )
+    return bremslib_tables
+
+
+def _warn_bremslib_element_missing(element: str, stacklevel: int) -> None:
+    warnings.warn(
+        f"no BremsLib table supplied for {element}; its bremsstrahlung falls back to "
+        "isotropic EEDL emission",
+        RuntimeWarning,
+        stacklevel=stacklevel + 1,
+    )
+
+
+def _warn_bremslib_out_of_range(table: BremsLibBremsstrahlungTable, stacklevel: int) -> None:
+    warnings.warn(
+        f"Z={table.atomic_number} incident energy is outside the BremsLib range "
+        f"[{table.minimum_incident_energy_keV:g}, {table.maximum_incident_energy_keV:g}] keV; "
+        "falling back to isotropic EEDL emission for those segments",
+        RuntimeWarning,
+        stacklevel=stacklevel + 1,
+    )
 
 
 def _bremsstrahlung_dsigma_dk(
@@ -698,8 +736,14 @@ def _bremsstrahlung_dsigma_dk(
     k_eV,
     *,
     cross_section_model: BremsstrahlungModel = "eedl",
+    bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
 ):
-    """Select EEDL (default) or the legacy Bethe--Heitler cross section."""
+    """Select EEDL (default), BremsLib, or the legacy Bethe--Heitler ``dsigma/dk``.
+
+    ``"bremslib"`` evaluates the BremsLib SDCS; an element absent from
+    ``bremslib_tables``, or an incident energy outside its table, falls back to
+    EEDL with a ``RuntimeWarning``.
+    """
     model = _validate_bremsstrahlung_model(cross_section_model)
     try:
         atomic_number = Z_TABLE[element]
@@ -707,6 +751,19 @@ def _bremsstrahlung_dsigma_dk(
         raise ValueError(f"unknown element {element!r}") from exc
     if model == "bethe-heitler":
         return _brem_dsigma_dk(atomic_number, T_keV, k_eV)
+    if model == "bremslib":
+        table = _require_bremslib_tables(bremslib_tables).get(element)
+        if table is None:
+            _warn_bremslib_element_missing(element, stacklevel=2)
+        else:
+            staged = stage_bremslib_table(table)
+            state = bremslib_segment_state(staged, T_keV)
+            bremslib = evaluate_bremslib(staged, state, k_eV)
+            if bool(np.all(np.asarray(_to_cpu(state.available), dtype=bool))):
+                return bremslib
+            _warn_bremslib_out_of_range(table, stacklevel=2)
+            eedl = _bremsstrahlung_dsigma_dk(element, T_keV, k_eV, cross_section_model="eedl")
+            return xp.where(state.available[:, None], bremslib, eedl)
 
     try:
         table = load_bremsstrahlung_cross_sections(element)
@@ -791,13 +848,17 @@ def mc_brem_spectrum(
     electron_limit=None,
     E_cut_keV=None,
     cross_section_model: BremsstrahlungModel = "eedl",
+    bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
 ):
     """Return the incoherent bremsstrahlung density from transport segments.
 
-    The result is the isotropic, Beer--Lambert-attenuated track-length estimate
-    in photons per eV per sr per incident electron. EEDL MF=23/MT=527 totals
-    and MF=26/MT=527 photon distributions are the default; the retained
-    Bethe--Heitler backend is selectable and supplies missing-coverage fallback.
+    The result is the Beer--Lambert-attenuated track-length estimate in photons
+    per eV per sr per incident electron toward ``n_hat``. EEDL MF=23/MT=527
+    totals and MF=26/MT=527 photon distributions are the default and emit
+    isotropically; the retained Bethe--Heitler backend is selectable and
+    supplies missing-coverage fallback. ``"bremslib"`` weights each segment by
+    the BremsLib double differential cross section at its emission angle
+    ``arccos(v_hat . n_hat)``.
     Source equations, geometry assumptions, interpolation rules, and limiting
     cases are documented in ``docs/physics/radiation-physics/bremsstrahlung.md``.
 
@@ -827,9 +888,15 @@ def mc_brem_spectrum(
         Optional post-transport electron-energy cutoff in keV.
     cross_section_model
         ``"eedl"`` (default) for evaluated MF=23/527 totals and normalized
-        MF=26/527 photon spectra, or ``"bethe-heitler"`` for the retained
-        analytic Bethe--Heitler + Elwert backend. Missing EEDL coverage warns
-        and falls back to Bethe--Heitler for affected elements or segments.
+        MF=26/527 photon spectra, ``"bethe-heitler"`` for the retained
+        analytic Bethe--Heitler + Elwert backend, or ``"bremslib"`` for the
+        direction-resolved BremsLib model. Missing EEDL coverage warns and
+        falls back to Bethe--Heitler for affected elements or segments; an
+        element without a BremsLib table, or a segment energy outside it,
+        warns and falls back to isotropic EEDL.
+    bremslib_tables
+        Required with ``"bremslib"``: staged tables keyed by element symbol,
+        from :func:`pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables`.
 
     Returns
     -------
@@ -841,9 +908,13 @@ def mc_brem_spectrum(
     ValueError
         If composition or requested escape geometry is inconsistent.
 
-    Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry
+    Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry,
+    bremslib-angular-model
     """
     cross_section_model = _validate_bremsstrahlung_model(cross_section_model)
+    supplied_bremslib = (
+        _require_bremslib_tables(bremslib_tables) if cross_section_model == "bremslib" else {}
+    )
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     segments = _clip_segments_to_cutoff(segments, E_cut_keV, comp, layers)
     thickness = segments["thickness_ang"]
@@ -892,9 +963,33 @@ def mc_brem_spectrum(
     # Validation: substep-radiation-invariance
     E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     seg_E = xp.asarray(segments[E_field], dtype=REAL)[brem_idx]
+    # BremsLib keeps EEDL staged too: it is the isotropic fallback for an
+    # element without a table and for segments outside a table's energy range.
     eedl_contexts = (
-        _prepare_mc_eedl_contexts(comp, seg_E, E_grid) if cross_section_model == "eedl" else {}
+        _prepare_mc_eedl_contexts(comp, seg_E, E_grid)
+        if cross_section_model in {"eedl", "bremslib"}
+        else {}
     )
+    bremslib_staged = {}
+    bremslib_covers: dict[str, bool] = {}
+    if cross_section_model == "bremslib":
+        if segments.get("v_hat") is None:
+            raise ValueError("cross_section_model='bremslib' needs per-segment directions v_hat")
+        v_hat = xp.asarray(segments["v_hat"], dtype=REAL)[brem_idx]
+        seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=REAL)
+        for el_i, _ in comp:
+            table = supplied_bremslib.get(el_i)
+            if table is None:
+                _warn_bremslib_element_missing(el_i, stacklevel=2)
+                continue
+            covers = not seg_E.size or bool(
+                (float(_to_cpu(seg_E.min())) >= table.minimum_incident_energy_keV)
+                and (float(_to_cpu(seg_E.max())) <= table.maximum_incident_energy_keV)
+            )
+            if not covers:
+                _warn_bremslib_out_of_range(table, stacklevel=2)
+            bremslib_staged[el_i] = stage_bremslib_table(table)
+            bremslib_covers[el_i] = covers
 
     z_mid = seg_r[:, 2]
     finite_footprint = (
@@ -930,10 +1025,17 @@ def mc_brem_spectrum(
         and BACKEND.name == "cuda"
         and np.dtype(REAL) == np.dtype(np.float32)
     )
-    if _use_bethe_heitler_jit or _use_eedl_jit:
+    _use_bremslib_jit = (
+        _USE_JIT_BREM_REDUCTION
+        and cross_section_model == "bremslib"
+        and BACKEND.name == "cuda"
+        and np.dtype(REAL) == np.dtype(np.float32)
+    )
+    if _use_bethe_heitler_jit or _use_eedl_jit or _use_bremslib_jit:
         from .brem_jit_kernel import (
             DEFAULT_BREM_KERNEL_CONFIG,
             run_brem_reduction_kernel,
+            run_bremslib_element_reduction,
             run_eedl_brem_reduction_kernel,
         )
 
@@ -979,7 +1081,25 @@ def mc_brem_spectrum(
                 dtype=REAL,
             )
             context = eedl_contexts.get(el_i)
-            if cross_section_model == "eedl" and context is not None:
+            staged = bremslib_staged.get(el_i)
+            if cross_section_model == "bremslib" and staged is not None:
+                run_bremslib_element_reduction(
+                    T_jit,
+                    L_jit,
+                    p_i_jit,
+                    incident_prefactor,
+                    path_flat,
+                    mu_flat,
+                    E_jit,
+                    staged,
+                    seg_cos_theta,
+                    context,
+                    Z=Z_i,
+                    number_density_ang3=n_i,
+                    n_layers=n_abs_layers,
+                    out=spec,
+                )
+            elif cross_section_model in {"eedl", "bremslib"} and context is not None:
                 state = context.state
                 eedl_incident_weight = xp.ascontiguousarray(
                     n_i * REAL(1.0e24) * L_jit * REAL(1.0e-8) * state.differential_scale_cm2,
@@ -1019,6 +1139,10 @@ def mc_brem_spectrum(
         return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
     M = seg_E.size
+    if cross_section_model == "bremslib":
+        # The direction-resolved evaluation holds several (segment, energy)
+        # temporaries at once; bound them to a few million cells per chunk.
+        chunk = max(1, min(int(chunk), _BREMSLIB_CHUNK_CELLS // max(int(E_grid.size), 1)))
     for j0 in range(0, M, chunk):
         sl = slice(j0, min(j0 + chunk, M))
         if layers is None:
@@ -1040,7 +1164,18 @@ def mc_brem_spectrum(
         path_cm = seg_L[sl] * 1e-8
         for el_i, n_i in comp:
             context = eedl_contexts.get(el_i)
-            if cross_section_model == "eedl" and context is not None:
+            staged = bremslib_staged.get(el_i)
+            bremslib_state = None
+            if staged is not None:
+                bremslib_state = bremslib_segment_state(staged, seg_E[sl], seg_cos_theta[sl])
+                # 4 pi d2sigma/(dk dOmega): the common 1/(4 pi) below then
+                # leaves the direction-resolved density per steradian.
+                dsig = REAL(4.0 * np.pi) * evaluate_bremslib(staged, bremslib_state, E_grid)
+                if bremslib_covers[el_i]:
+                    spec += (n_i * 1e24 * path_cm) @ (dsig * T_abs)
+                    continue
+                directional = dsig
+            if context is not None:
                 state = _slice_eedl_state(context.state, sl)
                 dsig = _evaluate_prepared_eedl(context.prepared, state, E_grid)
                 if not context.all_available:
@@ -1056,6 +1191,8 @@ def mc_brem_spectrum(
                     seg_E[sl],
                     E_grid,
                 )
+            if bremslib_state is not None:
+                dsig = xp.where(bremslib_state.available[:, None], directional, dsig)
             spec += (n_i * 1e24 * path_cm) @ (dsig * T_abs)
     return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
