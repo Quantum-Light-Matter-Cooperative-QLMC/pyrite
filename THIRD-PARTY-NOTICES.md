@@ -86,13 +86,17 @@ require derived or adapted material to be marked as such.
   - PyRITE does **not** redistribute the precomputed data library itself,
     which is impractically large.
   - PyRITE **does** redistribute cross-section tables **derived** from that
-    library, for the materials in its built-in catalogue. These are
-    **adaptations** of a CC BY 4.0 work: they are resampled and interpolated
-    onto PyRITE's own grids and are not the upstream data. Andrius Poškus is
-    credited as the author of the source dataset, the CC BY 4.0 licence is
-    linked above, and each shipped table carries a provenance manifest
-    recording the upstream deposit version and the nature of the
-    modifications, as CC BY 4.0 requires.
+    library, for every element its built-in catalogue materials may contain.
+    They are not in the PyRITE package: they are published as one
+    SHA-256-pinned archive that `pyrite tables fetch bremslib` installs into
+    the user's own data directory. These are **adaptations** of a CC BY 4.0
+    work and are not the upstream data: they are parsed and restructured on
+    the library's own grids, per-node angular integrals are added, the
+    double-differential cross section is reduced to single precision, and the
+    per-point uncertainties are removed. Andrius Poškus is credited as the
+    author of the source dataset, the CC BY 4.0 licence is linked above, and
+    each table carries a provenance manifest recording the upstream deposit
+    version and the nature of the modifications, as CC BY 4.0 requires.
 - **Documentation**: the manuals `BremsLib_v2.0.pdf` and
   `Interpolate_DCS.pdf` are published alongside the library in the same
   deposit and are the basis for any clean-room reimplementation.

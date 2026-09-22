@@ -27,6 +27,7 @@ from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen._run import run_program
 from pyrite.xsgen.bremslib import (
     angular_integral,
+    build_table,
     ddcs_filename,
     iter_node_files,
     library_root,
@@ -37,6 +38,7 @@ from pyrite.xsgen.bremslib import (
 )
 from pyrite.xsgen.bremslib import generate_element as generate_bremslib
 from pyrite.xsgen.bremslib.read import ddcs_integral_path
+from pyrite.xsgen.bremslib.release import build_release, load_release_index, release_arrays
 from pyrite.xsgen.elsepa import generate_element
 from pyrite.xsgen.sbethe import (
     SbetheDeck,
@@ -450,3 +452,49 @@ def test_the_generate_path_reads_the_real_library_then_reuses_the_table(monkeypa
     panel = panel_of(arrays, 0)
     assert panel.theta_deg.size == 181
     assert first.table.manifest["compiler"] is None
+
+
+def test_the_pinned_release_matches_the_library_it_claims(tmp_path, monkeypatch):
+    """Stale-release anchor: the shipped index against a real checkout.
+
+    Rebuilding one released element from the local library must reproduce the
+    pinned key. The key covers a digest of every library file the table was
+    read from, so a mismatch means the checkout and the release come from
+    different deposits -- exactly the staleness the release manifest's
+    deposit record exists to expose -- or the release transform changed
+    without a new ``VARIANT``.
+
+    Bounded to Z=6, the lightest released element, which still reads its full
+    30 MeV table: that is what the release holds.
+    """
+    library = _bremslib()
+    index = load_release_index()
+    if index is None:
+        pytest.skip("this build pins no BremsLib table release")
+    entry = index.entry(6)
+    assert entry is not None, "the release must cover carbon, a catalogue element"
+    monkeypatch.setattr("pyrite.xsgen.store.user_table_dir", lambda: tmp_path / "user")
+
+    _, rebuilt = build_release(tmp_path / "out", source_path=library, elements=(6,))
+
+    assert rebuilt.tables[0].key == entry.key
+
+
+def test_the_float32_release_keeps_the_shape_function(tmp_path):
+    """The release transform against the exact table, node by node.
+
+    The shape function is what a consumer samples, so it is what the
+    precision reduction must preserve. Float32 carries about seven
+    significant digits; ``rtol=1e-6`` is an order of magnitude above its
+    rounding and far below any physical effect, and a wrong cast -- float16,
+    or the integral renormalized against the narrowed DDCS -- fails it.
+    """
+    library = _bremslib()
+    exact = build_table(library, 6, t1_max_MeV=1.0)
+    released = release_arrays(exact)
+
+    for node in range(0, exact["node_offset"].size - 1, 97):
+        want = panel_of(exact, node)
+        got = panel_of(released, node)
+        integral = exact["node_angular_integral_mb"][node]
+        np.testing.assert_allclose(got.ddcs_mb_sr / integral, want.ddcs_mb_sr / integral, rtol=1e-6)

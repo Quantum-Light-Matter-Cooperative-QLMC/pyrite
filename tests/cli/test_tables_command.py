@@ -142,12 +142,47 @@ def test_fetch_reports_the_installed_sbethe_database(isolated, monkeypatch, tmp_
     destination = tmp_path / "data" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
     monkeypatch.setattr(
         "pyrite.xsgen.fetch.fetch_sbethe",
-        lambda: FetchResult("sbethe", destination, "a" * 64, 599, True),
+        lambda archive=None: FetchResult("sbethe", destination, "a" * 64, 599, True),
     )
 
     result = invoke(tables_command.command, ["fetch", "sbethe"])
 
     assert_clean_result(result, stdout=f"installed: {destination} (599 files)\n")
+
+
+def test_fetch_reports_the_installed_bremslib_tables(isolated, monkeypatch, tmp_path):
+    from pyrite.xsgen.fetch import FetchResult
+
+    destination = tmp_path / "data" / "xsgen" / "tables"
+    archive = tmp_path / "bremslib-tables.zip"
+    archive.write_bytes(b"zip")
+    seen = []
+
+    def fetch(given=None):
+        seen.append(given)
+        return FetchResult("bremslib", destination, "c" * 64, 24, True)
+
+    monkeypatch.setattr("pyrite.xsgen.fetch.fetch_bremslib", fetch)
+
+    result = invoke(tables_command.command, ["fetch", "bremslib", "--archive", str(archive)])
+
+    assert_clean_result(result, stdout=f"installed: {destination} (24 tables)\n")
+    assert seen == [str(archive)]
+
+
+def test_fetch_reports_a_missing_release_as_a_cli_error(isolated, monkeypatch):
+    from pyrite.xsgen import DataFetchError
+
+    def fetch(given=None):
+        raise DataFetchError("this PyRITE build pins no BremsLib table release")
+
+    monkeypatch.setattr("pyrite.xsgen.fetch.fetch_bremslib", fetch)
+
+    result = invoke(tables_command.command, ["fetch", "bremslib"])
+
+    assert result.exit_code == 1
+    assert "pins no BremsLib table release" in result.stderr
+    assert result.stdout == ""
 
 
 def test_generate_reports_a_new_elsepa_table(isolated, monkeypatch, tmp_path):
@@ -396,7 +431,7 @@ def test_fetch_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_
     destination = tmp_path / "sdbase"
     monkeypatch.setattr(
         "pyrite.xsgen.fetch.fetch_sbethe",
-        lambda: FetchResult("sbethe", destination, "b" * 64, 599, False),
+        lambda archive=None: FetchResult("sbethe", destination, "b" * 64, 599, False),
     )
 
     result = invoke(tables_command.command, ["fetch", "sbethe", "-o", "json"])

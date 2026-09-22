@@ -7,7 +7,8 @@ came from, where they live, and which code trees PyRITE can currently reach.
 material path, whose options are largely disjoint: an option belonging to
 another code is rejected rather than silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
-executable or documentation.
+executable or documentation, and the pinned release of BremsLib-derived tables
+for the catalogue elements.
 """
 
 import json
@@ -193,6 +194,7 @@ def command() -> None:
       pyrite tables generate --code elsepa --element 79 --energy 1e3
       pyrite tables generate --code bremslib --element 79
       pyrite tables fetch sbethe
+      pyrite tables fetch bremslib
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
     """
@@ -464,21 +466,34 @@ def generate_command(
 
 
 @command.command("fetch")
-@click.argument("code", type=click.Choice(["sbethe"], case_sensitive=False))
+@click.argument("code", type=click.Choice(["sbethe", "bremslib"], case_sensitive=False))
+@click.option(
+    "--archive",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Install from a local copy of the pinned archive instead of downloading it.",
+)
 @output_option
-def fetch_command(code: str, json_output: bool) -> None:
-    """Fetch the pinned large reference database for CODE.
+def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
+    """Fetch pinned data for CODE into your user data directory.
 
-    SBETHE's source ships with PyRITE, but its 18 MB ``sdbase/`` directory is
-    installed on demand into your user data directory. The complete upstream
-    archive is SHA-256 verified; only ``sdbase/`` is extracted. A complete
-    existing install returns successfully without network access.
+    \b
+    sbethe    SBETHE's 18 MB sdbase/ reference database. Only sdbase/ is
+              extracted from the upstream archive.
+    bremslib  BremsLib-derived bremsstrahlung tables for every element a
+              catalogue material may contain, so no BremsLib checkout is
+              needed for them.
+
+    The archive is SHA-256 verified before anything is installed, whether it
+    was downloaded or given with --archive. A complete existing install
+    returns successfully without network access.
     """
     from ...xsgen import DataFetchError
-    from ...xsgen.fetch import fetch_sbethe
+    from ...xsgen.fetch import fetch_bremslib, fetch_sbethe
 
+    fetch = fetch_bremslib if code.lower() == "bremslib" else fetch_sbethe
     try:
-        result = fetch_sbethe()
+        result = fetch(archive)
     except DataFetchError as exc:
         raise CLIError(str(exc)) from exc
 
@@ -493,7 +508,8 @@ def fetch_command(code: str, json_output: bool) -> None:
         emit_json("pyrite.tables.fetch.v1", payload)
         return
     action = "installed" if result.installed else "already installed"
-    emit_result(f"{action}: {result.path} ({result.file_count} files)")
+    unit = "tables" if result.code == "bremslib" else "files"
+    emit_result(f"{action}: {result.path} ({result.file_count} {unit})")
 
 
 @command.group("sources", cls=LazyGroup)

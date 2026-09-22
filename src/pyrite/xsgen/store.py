@@ -44,11 +44,15 @@ MANIFEST_SCHEMA = "pyrite.xsgen.manifest.v1"
 
 #: Attribution text stamped into every manifest. ELSEPA, SBETHE, and BremsLib
 #: all carry a Creative Commons BY clause, which requires derived material to
-#: be marked as derived. A resampled or interpolated table is an adaptation,
-#: so this is a licensing obligation, not a courtesy.
+#: be marked as derived and its modifications indicated. A table parsed out of
+#: a code's output and restructured is an adaptation, so this is a licensing
+#: obligation, not a courtesy. It describes what every generator does; a table
+#: modified further -- a reduced-precision release -- says so through
+#: ``store(modifications=...)``.
 MODIFICATIONS_NOTE = (
-    "Derived from the named external code's output: parsed, and resampled or "
-    "interpolated onto PyRITE grids. Not the upstream data. See "
+    "Derived from the named external code's output: parsed from its output "
+    "files and stored on the code's own grids, with derived quantities such as "
+    "integrals or sampling CDFs added. Not the upstream data. See "
     "THIRD-PARTY-NOTICES.md for the upstream author, citation, and licence."
 )
 
@@ -443,6 +447,7 @@ def store(
     compiler: str | None = None,
     source_origin: str | None = None,
     upstream: str | None = None,
+    modifications: str = MODIFICATIONS_NOTE,
     root: Path | None = None,
     overwrite: bool = False,
 ) -> StoredTable:
@@ -459,6 +464,9 @@ def store(
         load.
     compiler, source_origin, upstream
         Provenance recorded in the manifest.
+    modifications
+        How the table differs from the upstream output, recorded for the
+        CC BY modifications term. Defaults to :data:`MODIFICATIONS_NOTE`.
     root
         Destination directory. Defaults to :func:`user_table_dir`; the
         packaged directory is written only by the maintainer-side release
@@ -508,6 +516,7 @@ def store(
         arrays_sha256=arrays_digest(prepared),
         source_origin=source_origin,
         upstream=upstream,
+        modifications=modifications,
     )
     body = manifest.record()
     # The digest is over the record *without* itself, then carried inside the
@@ -518,6 +527,16 @@ def store(
     np.savez_compressed(payload, **prepared)
     manifest_path.write_text(json.dumps(body, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return StoredTable(key=request.key, path=payload, manifest=body, tier="user")
+
+
+def manifest_digest(body: Mapping[str, Any]) -> str:
+    """Recompute the digest of a stored manifest document.
+
+    The stored document carries its own ``manifest_sha256``, computed over
+    everything else; this recomputes it, so a manifest arriving from outside
+    -- a fetched release -- can be checked rather than trusted.
+    """
+    return _digest({name: value for name, value in body.items() if name != "manifest_sha256"})
 
 
 def identity_markers(tables: Iterable[StoredTable]) -> dict[str, str]:
@@ -569,6 +588,7 @@ __all__ = [
     "arrays_digest",
     "identity_markers",
     "iter_stored",
+    "manifest_digest",
     "material_identity",
     "packaged_table_dir",
     "require",

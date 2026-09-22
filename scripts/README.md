@@ -7,7 +7,8 @@ Reusable Python implementations invoked by `pyrite-dev` live in
 - `generate_cli_reference.py`, `generate_cli_deprecations.py`, `smoke.py`, and
   `package_smoke.py` delegate to importable `pyrite.devtools` owners.
 - `freeze_cli_contract.py` and `refresh_external_cif.py` maintain checked-in
-  repository artifacts.
+  repository artifacts. `release_bremslib_tables.py` builds the BremsLib-derived
+  table release from a local BremsLib checkout and pins its index in the package.
 - `cuda_test_profiler.py` and `testing.py` are developer diagnostics, not test
   or validation owners. GPU profiling must run through the remote workflow.
 - `hooks/` contains setup hooks; `user_scripts/` contains example operator

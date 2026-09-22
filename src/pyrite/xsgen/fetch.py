@@ -1,9 +1,16 @@
-"""Fetch large, pinned external-code reference databases.
+"""Fetch large, pinned external-code data into the user data directory.
 
-Only SBETHE needs this path. Its source is small enough to ship with PyRITE,
-while its ``sdbase/`` directory is distributed inside a much larger upstream
-archive. The installer downloads that immutable archive, verifies its
-published SHA-256, and extracts only ``sdbase/`` into the user data directory.
+Two installs share this path. SBETHE's source ships with PyRITE, while its
+``sdbase/`` directory is distributed inside a much larger upstream archive:
+the installer downloads that immutable archive, verifies its published
+SHA-256, and extracts only ``sdbase/``. BremsLib-derived tables for the
+catalogue elements are too large for the wheel, so the wheel pins their
+release archive instead and the installer places each verified table into the
+user table directory, where :func:`pyrite.xsgen.store.resolve` finds it.
+
+Either archive may come from a local copy rather than the network, which is
+how a cluster without outbound access is provisioned; the pinned digest is
+checked the same way.
 """
 
 import hashlib
@@ -18,8 +25,18 @@ from pathlib import Path, PurePosixPath
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+import numpy as np
+
 from ._errors import DataFetchError
+from .bremslib.release import (
+    ReleaseEntry,
+    ReleaseIndex,
+    archive_member,
+    file_sha256,
+    load_release_index,
+)
 from .sources import fetched_data_dir
+from .store import arrays_digest, manifest_digest, resolve, user_table_dir
 
 SBETHE_ARCHIVE_URL = (
     "https://data.mendeley.com/public-files/datasets/7zw25f428t/files/"
@@ -66,10 +83,10 @@ def _data_file_count(path: Path) -> int:
     )
 
 
-def _download(destination: Path) -> str:
-    """Stream the pinned SBETHE archive to ``destination`` and return its digest."""
+def _download(url: str, destination: Path, label: str) -> str:
+    """Stream ``url`` to ``destination`` and return its SHA-256."""
     digest = hashlib.sha256()
-    request = Request(SBETHE_ARCHIVE_URL, headers={"User-Agent": _USER_AGENT})
+    request = Request(url, headers={"User-Agent": _USER_AGENT})
     try:
         with urlopen(request, timeout=60) as response:  # noqa: S310 - pinned HTTPS URL
             with destination.open("wb") as stream:
@@ -77,10 +94,33 @@ def _download(destination: Path) -> str:
                     stream.write(chunk)
                     digest.update(chunk)
     except (OSError, URLError) as exc:
-        raise DataFetchError(
-            f"could not download SBETHE data from {SBETHE_DEPOSIT}: {exc}"
-        ) from exc
+        raise DataFetchError(f"could not download {label}: {exc}") from exc
     return digest.hexdigest()
+
+
+def _obtain(archive: Path | None, url: str | None, work: Path, label: str, expected: str) -> Path:
+    """Return a verified archive: a local copy if given, else a download.
+
+    The digest is checked before anything is extracted, whichever the
+    source, so a local copy is exactly as trusted as the network.
+    """
+    if archive is not None:
+        path = Path(archive)
+        try:
+            actual = file_sha256(path)
+        except OSError as exc:
+            raise DataFetchError(f"could not read {label} archive {path}: {exc}") from exc
+    else:
+        if url is None:
+            raise DataFetchError(f"no download location is pinned for {label}")
+        path = work / "archive.zip"
+        actual = _download(url, path, label)
+    if actual != expected:
+        raise DataFetchError(
+            f"{label} archive SHA-256 mismatch: expected {expected}, received {actual}; "
+            "nothing was installed"
+        )
+    return path
 
 
 def _extract_sdbase(archive: Path, destination: Path) -> int:
@@ -115,13 +155,18 @@ def _extract_sdbase(archive: Path, destination: Path) -> int:
     return count
 
 
-def fetch_sbethe() -> FetchResult:
+def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
     """Install SBETHE's pinned ``sdbase/`` into the user data directory.
 
     Existing complete installs are returned without network access. An
     incomplete directory is never overwritten automatically; it may contain
     user data, and replacing it would turn a repair command into a destructive
     one.
+
+    Parameters
+    ----------
+    archive
+        A local copy of the pinned upstream zip, used instead of downloading.
     """
     destination = fetched_data_dir("sbethe", "sdbase")
     if _installed_sbethe(destination):
@@ -141,25 +186,24 @@ def fetch_sbethe() -> FetchResult:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".sbethe-fetch-", dir=destination.parent) as temp:
         work = Path(temp)
-        archive = work / "sbethe.zip"
-        actual_digest = _download(archive)
-        if actual_digest != SBETHE_ARCHIVE_SHA256:
-            raise DataFetchError(
-                "SBETHE archive SHA-256 mismatch: "
-                f"expected {SBETHE_ARCHIVE_SHA256}, received {actual_digest}; "
-                "nothing was installed"
-            )
+        bundle = _obtain(
+            None if archive is None else Path(archive),
+            SBETHE_ARCHIVE_URL,
+            work,
+            f"SBETHE data ({SBETHE_DEPOSIT})",
+            SBETHE_ARCHIVE_SHA256,
+        )
 
         staged = work / "sdbase"
         staged.mkdir()
-        file_count = _extract_sdbase(archive, staged)
+        file_count = _extract_sdbase(bundle, staged)
         missing = [name for name in _REQUIRED_SBETHE_FILES if not (staged / name).is_file()]
         if missing:
             raise DataFetchError(
                 "SBETHE archive is missing required sdbase files: " + ", ".join(missing)
             )
         marker = {
-            "archive_sha256": actual_digest,
+            "archive_sha256": SBETHE_ARCHIVE_SHA256,
             "deposit": SBETHE_DEPOSIT,
             "file_count": file_count,
             "source_url": SBETHE_ARCHIVE_URL,
@@ -181,9 +225,144 @@ def fetch_sbethe() -> FetchResult:
     )
 
 
+def _bremslib_installed(entry: ReleaseEntry) -> bool:
+    """Return whether ``entry`` already resolves as the pinned table.
+
+    A table resolving under the pinned key with a *different* manifest is
+    not treated as missing: replacing it could discard a table the user put
+    there, so it is reported instead.
+    """
+    table = resolve(entry.key)
+    if table is None:
+        return False
+    if table.digest != entry.manifest_sha256:
+        raise DataFetchError(
+            f"a different table is already stored under the released key for Z={entry.z} "
+            f"({table.path}); move or remove it, then run `pyrite tables fetch bremslib` again"
+        )
+    return True
+
+
+def _stage_bremslib_table(bundle: zipfile.ZipFile, entry: ReleaseEntry, staged: Path) -> None:
+    """Extract and verify one released table into ``staged``.
+
+    Three checks, each against something the table cannot vouch for itself:
+    the manifest digest against the pinned index, the recomputed manifest
+    digest against the stored one, and the loaded arrays against the digest
+    the manifest records. The archive digest already covers all of this for
+    an honest release; these catch a release index and archive that disagree.
+    """
+    try:
+        manifest_bytes = bundle.read(archive_member(entry.key, ".json"))
+        payload_bytes = bundle.read(archive_member(entry.key, ".npz"))
+    except KeyError as exc:
+        raise DataFetchError(f"BremsLib table archive lacks the Z={entry.z} table") from exc
+    body = json.loads(manifest_bytes)
+    if (
+        body.get("manifest_sha256") != entry.manifest_sha256
+        or manifest_digest(body) != entry.manifest_sha256
+    ):
+        raise DataFetchError(
+            f"BremsLib table manifest for Z={entry.z} does not match the pinned release"
+        )
+    payload = staged / f"{entry.key}.npz"
+    payload.write_bytes(payload_bytes)
+    with np.load(payload) as loaded:
+        stored = arrays_digest({name: loaded[name] for name in loaded.files})
+    if stored != body.get("arrays_sha256"):
+        raise DataFetchError(f"BremsLib table arrays for Z={entry.z} do not match their manifest")
+    (staged / f"{entry.key}.json").write_bytes(manifest_bytes)
+
+
+def fetch_bremslib(
+    archive: str | Path | None = None, *, index: ReleaseIndex | None = None
+) -> FetchResult:
+    """Install the pinned BremsLib-derived tables into the user table directory.
+
+    Tables already present are left alone and a complete install returns
+    without network access. Nothing is installed unless every missing table
+    verifies, so a failed fetch leaves no partial release behind.
+
+    Parameters
+    ----------
+    archive
+        A local copy of the release zip, used instead of downloading.
+    index
+        Release index to install. Defaults to the one shipped with PyRITE.
+
+    Raises
+    ------
+    DataFetchError
+        If this build pins no release, the archive cannot be obtained or does
+        not verify, or a different table already holds a released key.
+    """
+    pinned = load_release_index() if index is None else index
+    if pinned is None:
+        raise DataFetchError(
+            "this PyRITE build pins no BremsLib table release; generate tables from a "
+            "BremsLib checkout with `pyrite tables generate --code bremslib`"
+        )
+    destination = user_table_dir()
+    missing = [entry for entry in pinned.tables if not _bremslib_installed(entry)]
+    if not missing:
+        return FetchResult(
+            code="bremslib",
+            path=destination,
+            archive_sha256=pinned.archive_sha256,
+            file_count=len(pinned.tables),
+            installed=False,
+        )
+    if archive is None and pinned.url is None:
+        raise DataFetchError(
+            "the pinned BremsLib table release is not published for download yet; "
+            "install from a copy of the release archive with "
+            f"`pyrite tables fetch bremslib --archive PATH` (SHA-256 {pinned.archive_sha256})"
+        )
+
+    destination.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".bremslib-fetch-", dir=destination) as temp:
+        work = Path(temp)
+        label = f"BremsLib tables ({pinned.upstream})"
+        bundle_path = _obtain(
+            None if archive is None else Path(archive),
+            pinned.url,
+            work,
+            label,
+            pinned.archive_sha256,
+        )
+        staged = work / "staged"
+        staged.mkdir()
+        try:
+            with zipfile.ZipFile(bundle_path) as bundle:
+                for entry in missing:
+                    _stage_bremslib_table(bundle, entry, staged)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            raise DataFetchError(f"could not extract the BremsLib table archive: {exc}") from exc
+        try:
+            # Payload before manifest: :func:`resolve` requires both, so a
+            # table interrupted between the two moves is simply not found.
+            for entry in missing:
+                for suffix in (".npz", ".json"):
+                    name = f"{entry.key}{suffix}"
+                    os.replace(staged / name, destination / name)
+        except OSError as exc:
+            raise DataFetchError(
+                f"could not install BremsLib tables at {destination}: {exc}"
+            ) from exc
+
+    return FetchResult(
+        code="bremslib",
+        path=destination,
+        archive_sha256=pinned.archive_sha256,
+        file_count=len(pinned.tables),
+        installed=True,
+    )
+
+
 __all__ = [
     "FetchResult",
     "SBETHE_ARCHIVE_SHA256",
     "SBETHE_ARCHIVE_URL",
+    "fetch_bremslib",
     "fetch_sbethe",
 ]

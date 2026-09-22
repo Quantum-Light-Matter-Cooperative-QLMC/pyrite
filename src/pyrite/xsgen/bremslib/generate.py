@@ -7,9 +7,12 @@ one manifest, and a resolve that reuses an existing table instead of reading
 the library again.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+from .._errors import SourceUnavailableError
 from ..sources import resolve_source
 from ..store import ElementTarget, StoredTable, TableRequest, resolve, store
 from .convert import QUANTITY, build_table
@@ -22,6 +25,25 @@ class GenerationResult:
 
     table: StoredTable
     generated: bool
+
+
+def element_request(
+    library: Path, z: int, *, t1_max_MeV: float, model: Mapping[str, Any] | None = None
+) -> TableRequest:
+    """Return the keyed request for element ``z`` read from ``library``.
+
+    ``model`` adds parameters beyond the energy bound. The release step uses
+    it to key its reduced-precision variant apart from a locally generated
+    table, so the two never share a key while holding different arrays.
+    """
+    nodes = [node for node in iter_node_files(library, z) if node.t1_MeV <= t1_max_MeV]
+    return TableRequest(
+        code="bremslib",
+        code_version=library_version(library, int(z), nodes),
+        target=ElementTarget(int(z)),
+        quantity=QUANTITY,
+        model={"t1_max_MeV": float(t1_max_MeV), **dict(model or {})},
+    )
 
 
 def generate_element(
@@ -66,16 +88,20 @@ def generate_element(
     if not t1_max_MeV > 0.0:
         raise ValueError(f"t1_max_MeV must be positive, got {t1_max_MeV!r}")
 
-    source = resolve_source("bremslib", source_path)
+    try:
+        source = resolve_source("bremslib", source_path)
+    except SourceUnavailableError as exc:
+        # Deferred: ``release`` builds on this module.
+        from .release import catalogue_elements
+
+        if int(z) not in catalogue_elements():
+            raise
+        raise SourceUnavailableError(
+            f"{exc}\nZ={int(z)} is a catalogue element: its released table installs "
+            "without a checkout, with `pyrite tables fetch bremslib`"
+        ) from exc
     library = library_root(source.root)
-    nodes = [node for node in iter_node_files(library, z) if node.t1_MeV <= t1_max_MeV]
-    request = TableRequest(
-        code="bremslib",
-        code_version=library_version(library, int(z), nodes),
-        target=ElementTarget(int(z)),
-        quantity=QUANTITY,
-        model={"t1_max_MeV": float(t1_max_MeV)},
-    )
+    request = element_request(library, int(z), t1_max_MeV=t1_max_MeV)
     existing = resolve(request.key)
     if existing is not None and not overwrite:
         return GenerationResult(existing, generated=False)
@@ -97,4 +123,4 @@ def generate_element(
     return GenerationResult(table, generated=True)
 
 
-__all__ = ["GenerationResult", "generate_element"]
+__all__ = ["GenerationResult", "element_request", "generate_element"]

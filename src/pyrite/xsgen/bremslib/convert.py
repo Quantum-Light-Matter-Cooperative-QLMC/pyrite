@@ -247,13 +247,22 @@ def _reordered_offsets(offsets: list[int], order: np.ndarray) -> np.ndarray:
 
 
 def panel_of(arrays: Mapping[str, np.ndarray], node: int) -> DdcsPanel:
-    """Return one stored node as a :class:`~pyrite.xsgen.bremslib.read.DdcsPanel`."""
+    """Return one stored node as a :class:`~pyrite.xsgen.bremslib.read.DdcsPanel`.
+
+    A released table carries no per-point uncertainties; its panels report
+    them as NaN -- unknown, not zero.
+    """
     offsets = np.asarray(arrays["node_offset"])
     start, stop = int(offsets[node]), int(offsets[node + 1])
+    rel_err = arrays.get("ddcs_rel_err")
     return DdcsPanel(
         theta_deg=np.asarray(arrays["theta_deg"])[start:stop],
         ddcs_mb_sr=np.asarray(arrays["ddcs_mb_sr"])[start:stop],
-        rel_err=np.asarray(arrays["ddcs_rel_err"])[start:stop],
+        rel_err=(
+            np.full(stop - start, np.nan, dtype=np.float32)
+            if rel_err is None
+            else np.asarray(rel_err)[start:stop]
+        ),
         point_finite=np.asarray(arrays["ddcs_point_finite"])[start:stop],
         finite_nucleus=bool(np.asarray(arrays["node_finite_nucleus"])[node]),
     )
