@@ -420,7 +420,8 @@ a release asset there is not anonymously downloadable, and `urlopen` sends no
 credentials. Until a public location is chosen (a Zenodo or Mendeley
 deposit is the natural fit for a CC BY adaptation), `fetch bremslib` without
 `--archive` fails naming the `--archive` route. The pinned archive is
-`build/xsgen-release/bremslib-tables.zip` in this worktree (gitignored);
+`build/xsgen-release/bremslib-tables.zip` in this worktree (gitignored),
+with a durable copy at `/home/alex/dev/bremslib-tables.zip` (digest verified);
 upload that exact file, or rebuild with `--url ... --pin` and commit the new
 index -- manifests carry a timestamp, so a rebuild changes the digest.
 
