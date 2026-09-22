@@ -176,13 +176,94 @@ def test_generate_reports_a_new_elsepa_table(isolated, monkeypatch, tmp_path):
 
 
 def test_generate_requires_an_explicit_energy(isolated):
+    """ELSEPA and SBETHE need disjoint options, so the check moved into the body."""
     result = invoke(
         tables_command.command,
         ["generate", "--code", "elsepa", "--element", "79"],
     )
 
-    assert result.exit_code == 2
-    assert "Missing option '--energy'" in result.stderr
+    assert result.exit_code != 0
+    assert "--code elsepa requires --energy" in result.stderr
+
+
+def test_generate_rejects_options_belonging_to_the_other_code(isolated):
+    """Ignoring them would silently generate a table for a different target."""
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "elsepa", "--element", "79", "--energy", "1000", "--density", "1.0"],
+    )
+
+    assert result.exit_code != 0
+    assert "--code elsepa does not accept --density" in result.stderr
+
+
+def test_generate_reports_a_new_sbethe_table(isolated, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    path = tmp_path / "table.npz"
+    table = SimpleNamespace(
+        key="c" * 64,
+        path=path,
+        tier="user",
+        manifest={"manifest_sha256": "d" * 64},
+    )
+    seen = {}
+
+    def fake_generate(name, composition, **kwargs):
+        seen["name"] = name
+        seen["composition"] = composition
+        seen.update(kwargs)
+        return SimpleNamespace(table=table, generated=True)
+
+    monkeypatch.setattr("pyrite.xsgen.sbethe.generate_material", fake_generate)
+
+    result = invoke(
+        tables_command.command,
+        [
+            "generate",
+            "--code",
+            "sbethe",
+            "--name",
+            "water",
+            "--element-count",
+            "1:2",
+            "--element-count",
+            "8:1",
+            "--density",
+            "1.0",
+            "--mean-excitation",
+            "75.0",
+        ],
+    )
+
+    assert_clean_result(result, stdout=f"generated: {'c' * 64}\npath: {path}\n")
+    assert seen["name"] == "water"
+    assert seen["composition"] == {1: 2.0, 8: 1.0}
+    assert seen["density_g_cm3"] == 1.0
+    assert seen["mean_excitation_eV"] == 75.0
+    assert seen["band_gap_eV"] is None
+
+
+def test_generate_rejects_a_malformed_element_count(isolated):
+    result = invoke(
+        tables_command.command,
+        [
+            "generate",
+            "--code",
+            "sbethe",
+            "--name",
+            "water",
+            "--element-count",
+            "hydrogen",
+            "--density",
+            "1.0",
+            "--mean-excitation",
+            "75.0",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "--element-count expects Z:N" in result.stderr
 
 
 def test_generate_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_path):
@@ -320,3 +401,13 @@ def test_config_set_rejects_a_bad_xsgen_source_without_mentioning_profiles(isola
     # "profile.current" still appears in the usage line's key list, which is
     # correct; what must not appear is the profile *validator's* verdict.
     assert "unknown profile" not in result.stderr
+
+
+def test_the_cli_projectile_list_matches_the_deck():
+    """The CLI spells the list out to keep group construction free of xsgen imports.
+
+    That duplication is only safe if something pins the two together.
+    """
+    from pyrite.xsgen.sbethe.deck import PROJECTILES
+
+    assert tables_command._PROJECTILES == tuple(sorted(PROJECTILES))

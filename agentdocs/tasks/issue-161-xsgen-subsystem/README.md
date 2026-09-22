@@ -39,9 +39,9 @@ derived-table size across the built-in catalogue.
 The vendored ELSEPA/SBETHE sources and a local BremsLib checkout are available:
 
 - `src/pyrite/data/xsgen/{elsepa,sbethe}` and `/home/alex/dev/BremsLib_v2.0.8`
-- The earlier M1/M4 session used gfortran 15.2.0. The current continuation
-  environment no longer exposes a Fortran compiler, so its end-to-end smoke is
-  recorded as unavailable rather than silently replaced.
+- gfortran 15.2.0 was available again from the M5b session onward, so both
+  codes were built and run for real; SBETHE's `sdbase/` was fetched through
+  `pyrite tables fetch sbethe` against the re-pinned deposit.
 
 ## Findings against the spec
 
@@ -193,6 +193,77 @@ So the version bump is a correctness fix, not a refresh. Consequences:
 The issue body still records the v1 digest, `10.17632/7zw25f428t.1` and 498
 files. Correcting it needs issue-write authority this session does not hold.
 
+### F9 - two M5a defects sat behind the anchor's shape
+
+`pyrite tables generate --code elsepa` did not work on the committed branch,
+and neither did `generate_element`. The M5a anchors passed anyway because they
+drive `run_program` with a deck spelled out in the test, so nothing ever fed
+`ElsepaDeck.render()` to `elscata`.
+
+1. `elscata` reads every deck line as `(A6,1X,A12)`. The value field is
+   *twelve* characters and a longer one is truncated, not rejected, so
+   `EV     1.00000000E+03` arrived as `1.00000000E` and the program stopped
+   with "Bad real number in item 1 of list input". Energies now render at
+   `.5E` -- six significant digits, which fits, and which is the precision the
+   `dcs_*.dat` names already carry.
+2. `parse_dcs` required an `Absorption cross section` scalar. `elscata` writes
+   that line only for `MABS > 0`, and the deck's default is `MABS 0`, so the
+   common case has no such line. It now defaults to `0.0`: no absorption
+   potential means no absorption, not a missing field.
+
+Both are covered by unit regressions plus a new `extern_codes` anchor that
+drives the real binary from the generator's own rendered deck, for both codes.
+The issue's first acceptance bullet was therefore not met before this slice,
+despite M5a being recorded complete.
+
+### F10 - SBETHE's input is a prompt sequence, established by driving it
+
+SBETHE reads no deck file: it consumes the answers a user would type, and
+several prompts appear only given an earlier answer. The sequence was
+established by building the program and driving it, not by reading its source,
+because the conditional prompts are not obvious from the `READ` statements.
+
+The order, for the keyboard-composition branch `xsgen` always takes:
+
+| # | answer | note |
+| --- | --- | --- |
+| 1 | material name | `A15`, no blanks; also names the `<name>.mat` it writes |
+| 2 | `1` | composition from the keyboard, never a `pdcompos.pen` ID |
+| 3 | number of elements | |
+| 4 | `1` | stoichiometric formula; **omitted when there is one element** |
+| 5 | `Z N` per element | one line each; bare `Z` in the single-element branch |
+| 6 | mass density | |
+| 7 | `Y` | always override the proposed I |
+| 8 | mean excitation energy | must exceed 1 eV |
+| 9 | `Y`/`N` | insulator or semiconductor |
+| 10 | band gap | **only when 9 is `Y`** |
+| 11 | projectile number | |
+
+A wrong order does not fail loudly: the program reads the next answer for a
+different question and tabulates a material nobody asked for. The
+`extern_codes` anchor therefore asserts that the material SBETHE echoes into
+its output headers is the one the deck described.
+
+Outputs parsed: `stp.dat` (collision stopping), `asymptotic.dat` (the
+`sigma^0`/`sigma^1`/`sigma^2` moments #93 wants, on a grid reaching below
+`stp.dat`'s corrected-Bethe floor) and `OOS.dat`. `stp-low.dat` holds the
+sub-ECUT empirical extrapolation and is a different quantity, so it is not
+concatenated onto `stp.dat`.
+
+Two details found only by running it:
+
+- `OOS.dat` repeats an abscissa at each shell binding edge, carrying the step
+  in the oscillator-strength density there. Its grid is non-decreasing, not
+  strictly increasing; the other two are strict.
+- `sdbase/shparams.tab` is never opened by `sbethe.f`. It stays in the
+  completeness markers as a v2 marker only; `atparams.tab` and `exp-param.tab`
+  are the ones that matter (F8).
+
+Against published values, SBETHE's liquid-water collision stopping at I=75 eV
+reproduces ESTAR to well inside 2% at both 1 keV and 1 GeV. That is anchored
+as evidence the right column in the right units reached the caller; the
+physics comparison itself belongs to #90.
+
 ## Checklist
 
 - [x] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
@@ -207,8 +278,17 @@ files. Correcting it needs issue-write authority this session does not hold.
 - [x] M5a ELSEPA free-atom deck writer, vendor-output parser, native-grid CDF,
       cached generation path, `tables generate`, CLI reference, and regression anchors
 - [x] M4 SBETHE deposit re-pinned to version 2 after a two-version comparison (F8)
-- [ ] M5b SBETHE deck/parser and material generation path
+- [x] M5b SBETHE deck writer, three output parsers, `generate_material`,
+      `tables generate --code sbethe`, CLI reference, and real-binary anchors
+- [x] M5b fixed two M5a defects that blocked `tables generate` entirely (F9)
 - [ ] M5c BremsLib native-library reader/converter and sample anchors
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
 - [x] `pyrite-dev verify` for M1-M3 (4361 passed, 90 skipped)
 - [x] `pyrite-dev verify` after M4 (4369 passed, 90 skipped)
+- [x] After M5b: 4456 passed, 55 skipped; lint, typecheck and
+      `cli-reference --check` clean; import-linter 11 kept, 0 broken. The 6
+      failures are pre-existing and environmental -- `dpctl`/`cupy` absent
+      against this shell's `PYRITE_MC_BACKEND=sycl`, and `mp_api` absent for
+      the live materials-database comparisons.
+- [x] All 9 `extern_codes` anchors pass against real gfortran 15.2.0, the
+      vendored ELSEPA tree and the fetched SBETHE `sdbase/`

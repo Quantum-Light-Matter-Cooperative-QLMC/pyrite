@@ -2058,16 +2058,30 @@ Usage: pyrite tables generate [OPTIONS]
 
   Generate or reuse one external-code table.
 
-  Each ``--energy`` is in eV. Generated files live in the user table store; rerunning
-  the same normalized request reuses its table without compiling or running ELSEPA.
+  ELSEPA takes ``--element`` and one or more ``--energy`` values in eV. SBETHE takes
+  ``--name``, ``--density``, ``--mean-excitation`` and one ``--element-count Z:N`` per
+  element in the molecule.
+
+  Generated files live in the user table store; rerunning the same normalized request
+  reuses its table without compiling or running the external code.
 
 Options:
-  --code [elsepa]                 External code to run; this release supports ELSEPA
-                                  free atoms.  [required]
-  --element Z                     Atomic number of the free-atom target.  [1<=x<=103;
-                                  required]
+  --code [elsepa|sbethe]          External code to run: ELSEPA free atoms, or SBETHE
+                                  materials.  [required]
+  --element Z                     Atomic number of the free-atom target. ELSEPA only.
+                                  [1<=x<=103]
   --energy EV                     Kinetic energy in eV; repeat for a native-grid table.
-                                  [x>=4.999; required]
+                                  ELSEPA only.  [x>=4.999]
+  --name NAME                     Material name recorded in the SBETHE output headers.
+                                  SBETHE only.
+  --element-count Z:N             Stoichiometric index of one element, as Z:N; repeat
+                                  per element. SBETHE only.
+  --density G_CM3                 Mass density in g/cm^3. SBETHE only.  [x>0.0]
+  --mean-excitation EV            Mean excitation energy in eV. SBETHE only.  [x>1.0]
+  --band-gap EV                   Gap energy for an insulator or semiconductor; omit for
+                                  a conductor. SBETHE only.  [x>0.0]
+  --projectile [alpha|antimuon|antiproton|electron|muon|positron|proton]
+                                  Projectile particle. SBETHE only.  [default: electron]
   --overwrite                     Regenerate and replace an existing key.
   --keep-on-failure               Keep the scratch directory after an external-code
                                   failure.

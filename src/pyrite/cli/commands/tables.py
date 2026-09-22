@@ -3,7 +3,9 @@
 Covers the store and the source configuration: what tables exist, where they
 came from, where they live, and which code trees PyRITE can currently reach.
 
-``generate`` currently exposes ELSEPA's free-atom path. ``fetch`` installs
+``generate`` exposes ELSEPA's free-atom path and SBETHE's material path,
+whose options are disjoint: each is rejected for the other code rather than
+silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
 executable or documentation.
 """
@@ -17,6 +19,96 @@ import click
 
 from ...console.output import CLIError, emit_json, emit_result, output_option
 from .._groups import LazyGroup
+
+#: Projectile names accepted by ``--projectile``. Spelled here rather than
+#: imported so building the command group stays free of ``xsgen`` imports;
+#: a test pins the two lists together.
+_PROJECTILES = (
+    "alpha",
+    "antimuon",
+    "antiproton",
+    "electron",
+    "muon",
+    "positron",
+    "proton",
+)
+
+#: Option spellings, for the two messages below.
+_FLAGS = {
+    "element": "--element",
+    "energy": "--energy",
+    "name": "--name",
+    "element_count": "--element-count",
+    "density": "--density",
+    "mean_excitation": "--mean-excitation",
+    "band_gap": "--band-gap",
+}
+
+
+def _elsepa_args(
+    code: str, element: int | None, energies_ev: tuple[float, ...]
+) -> tuple[int, tuple[float, ...]]:
+    """Return ELSEPA's required options, or fail naming every missing one."""
+    if element is None or not energies_ev:
+        missing = [
+            flag
+            for flag, given in (("--element", element), ("--energy", energies_ev or None))
+            if given is None
+        ]
+        raise CLIError(f"--code {code} requires {', '.join(missing)}")
+    return element, energies_ev
+
+
+def _sbethe_args(
+    code: str,
+    name: str | None,
+    element_counts: tuple[str, ...],
+    density: float | None,
+    mean_excitation: float | None,
+) -> tuple[str, dict[int, float], float, float]:
+    """Return SBETHE's required options, or fail naming every missing one."""
+    if name is None or not element_counts or density is None or mean_excitation is None:
+        missing = [
+            flag
+            for flag, given in (
+                ("--name", name),
+                ("--element-count", element_counts or None),
+                ("--density", density),
+                ("--mean-excitation", mean_excitation),
+            )
+            if given is None
+        ]
+        raise CLIError(f"--code {code} requires {', '.join(missing)}")
+    return name, _composition(element_counts), density, mean_excitation
+
+
+def _reject_for(code: str, **given: object) -> None:
+    """Fail when an option belonging to the other code was supplied.
+
+    Ignoring it silently would generate a table for a target the caller did
+    not ask for, which is the failure this command exists to make impossible.
+    """
+    extra = [_FLAGS[key] for key, value in given.items() if value is not None]
+    if extra:
+        raise CLIError(f"--code {code} does not accept {', '.join(sorted(extra))}")
+
+
+def _composition(pairs: tuple[str, ...]) -> dict[int, float]:
+    """Parse repeated ``Z:N`` options into a composition mapping."""
+    composition: dict[int, float] = {}
+    for pair in pairs:
+        atomic_number, separator, count = pair.partition(":")
+        if not separator:
+            raise CLIError(f"--element-count expects Z:N, got {pair!r}")
+        try:
+            z = int(atomic_number)
+            n = float(count)
+        except ValueError as exc:
+            raise CLIError(f"--element-count expects Z:N with numeric parts, got {pair!r}") from exc
+        if z in composition:
+            raise CLIError(f"--element-count repeats Z={z}")
+        composition[z] = n
+    return composition
 
 
 @dataclass(frozen=True)
@@ -180,25 +272,60 @@ def show_command(key: str, json_output: bool) -> None:
 @command.command("generate")
 @click.option(
     "--code",
-    type=click.Choice(["elsepa"], case_sensitive=False),
+    type=click.Choice(["elsepa", "sbethe"], case_sensitive=False),
     required=True,
-    help="External code to run; this release supports ELSEPA free atoms.",
+    help="External code to run: ELSEPA free atoms, or SBETHE materials.",
 )
 @click.option(
     "--element",
     type=click.IntRange(1, 103),
-    required=True,
     metavar="Z",
-    help="Atomic number of the free-atom target.",
+    help="Atomic number of the free-atom target. ELSEPA only.",
 )
 @click.option(
     "--energy",
     "energies_ev",
     type=click.FloatRange(min=4.999),
     multiple=True,
-    required=True,
     metavar="EV",
-    help="Kinetic energy in eV; repeat for a native-grid table.",
+    help="Kinetic energy in eV; repeat for a native-grid table. ELSEPA only.",
+)
+@click.option(
+    "--name",
+    metavar="NAME",
+    help="Material name recorded in the SBETHE output headers. SBETHE only.",
+)
+@click.option(
+    "--element-count",
+    "element_counts",
+    multiple=True,
+    metavar="Z:N",
+    help="Stoichiometric index of one element, as Z:N; repeat per element. SBETHE only.",
+)
+@click.option(
+    "--density",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="G_CM3",
+    help="Mass density in g/cm^3. SBETHE only.",
+)
+@click.option(
+    "--mean-excitation",
+    type=click.FloatRange(min=1.0, min_open=True),
+    metavar="EV",
+    help="Mean excitation energy in eV. SBETHE only.",
+)
+@click.option(
+    "--band-gap",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="EV",
+    help="Gap energy for an insulator or semiconductor; omit for a conductor. SBETHE only.",
+)
+@click.option(
+    "--projectile",
+    type=click.Choice(sorted(_PROJECTILES), case_sensitive=False),
+    default="electron",
+    show_default=True,
+    help="Projectile particle. SBETHE only.",
 )
 @click.option("--overwrite", is_flag=True, help="Regenerate and replace an existing key.")
 @click.option(
@@ -209,34 +336,73 @@ def show_command(key: str, json_output: bool) -> None:
 @output_option
 def generate_command(
     code: str,
-    element: int,
+    element: int | None,
     energies_ev: tuple[float, ...],
+    name: str | None,
+    element_counts: tuple[str, ...],
+    density: float | None,
+    mean_excitation: float | None,
+    band_gap: float | None,
+    projectile: str,
     overwrite: bool,
     keep_on_failure: bool,
     json_output: bool,
 ) -> None:
     """Generate or reuse one external-code table.
 
-    Each ``--energy`` is in eV. Generated files live in the user table store;
-    rerunning the same normalized request reuses its table without compiling
-    or running ELSEPA.
+    ELSEPA takes ``--element`` and one or more ``--energy`` values in eV.
+    SBETHE takes ``--name``, ``--density``, ``--mean-excitation`` and one
+    ``--element-count Z:N`` per element in the molecule.
+
+    Generated files live in the user table store; rerunning the same
+    normalized request reuses its table without compiling or running the
+    external code.
     """
     from ...xsgen import XsgenError
-    from ...xsgen.elsepa import generate_element
 
+    selected = code.lower()
     try:
-        result = generate_element(
-            element,
-            energies_ev,
-            overwrite=overwrite,
-            keep_on_failure=keep_on_failure,
-        )
+        if selected == "elsepa":
+            from ...xsgen.elsepa import generate_element
+
+            _reject_for(
+                selected,
+                name=name,
+                element_count=element_counts or None,
+                density=density,
+                mean_excitation=mean_excitation,
+                band_gap=band_gap,
+            )
+            atomic_number, energies = _elsepa_args(selected, element, energies_ev)
+            result = generate_element(
+                atomic_number,
+                energies,
+                overwrite=overwrite,
+                keep_on_failure=keep_on_failure,
+            )
+        else:
+            from ...xsgen.sbethe import generate_material
+
+            _reject_for(selected, element=element, energy=energies_ev or None)
+            material, composition, density_value, excitation = _sbethe_args(
+                selected, name, element_counts, density, mean_excitation
+            )
+            result = generate_material(
+                material,
+                composition,
+                density_g_cm3=density_value,
+                mean_excitation_eV=excitation,
+                band_gap_eV=band_gap,
+                projectile=projectile.lower(),
+                overwrite=overwrite,
+                keep_on_failure=keep_on_failure,
+            )
     except (XsgenError, ValueError, FileExistsError) as exc:
         raise CLIError(str(exc)) from exc
 
     table = result.table
     payload = {
-        "code": code.lower(),
+        "code": selected,
         "key": table.key,
         "path": str(table.path),
         "tier": table.tier,
