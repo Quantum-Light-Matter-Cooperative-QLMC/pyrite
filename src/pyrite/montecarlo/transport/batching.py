@@ -700,7 +700,7 @@ def _run_per_electron_transport(
         d_top,
         d_bot,
     )
-    d_materials = d_layers[:11]
+    d_materials = d_layers[:11] + d_layers[12:]
     state = (d_alive, d_clock, d_pos, d_dirs, d_E, d_E_cut)
     straggling_args = (straggle_on, d_stragg)
 

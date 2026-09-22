@@ -443,19 +443,30 @@ def test_compound_sampler_is_bragg_additive_and_reproducible():
     assert int(counter_1) >= 2 * len(composition)
 
 
-def test_compound_sampled_mean_closes_on_the_stopping_power():
-    """The property the whole slice rests on, measured through the sampler."""
+def test_compound_sampled_mean_closes_on_a_scaled_stopping_power():
+    """A material-table scale changes the mean without changing RNG plumbing."""
     composition = COMPOUNDS["ws2"]
     Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr = urban_element_table(composition)
-    E_keV, s_ang, n_draws = 25.0, 3000.0, 20000
+    E_keV, s_ang, n_draws, stopping_scale = 25.0, 3000.0, 20000, 1.7
     losses = np.empty(n_draws)
     keys = stream_keys(777, n_draws)
     for i in range(n_draws):
         losses[i], _ = _urban_sample_compound_keV(
-            Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_keV, s_ang, keys[i], np.uint64(0)
+            Z_arr,
+            J_arr,
+            k_arr,
+            coeff_arr,
+            E_cross_arr,
+            0.0,
+            E_keV,
+            s_ang,
+            keys[i],
+            np.uint64(0),
+            stopping_scale,
         )
     expected = (
         -float(_dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_keV))
         * s_ang
+        * stopping_scale
     )
     assert losses.mean() == pytest.approx(expected, rel=0.05)

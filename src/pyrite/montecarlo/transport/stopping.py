@@ -30,6 +30,24 @@ def prepare_sbethe_stopping_table(arrays):
     return np.log(energy_keV), np.log(stopping_keV_per_ang)
 
 
+def pack_sbethe_stopping_tables(tables, n_layers):
+    """Pad prepared SBETHE tables for the exact CPU/device transport cores."""
+    if tables is None:
+        return False, np.zeros(n_layers, dtype=np.int32), np.zeros((n_layers, 1)), np.zeros(
+            (n_layers, 1)
+        )
+    if len(tables) != n_layers:
+        raise ValueError("one SBETHE stopping table is required per material layer")
+    counts = np.asarray([len(table[0]) for table in tables], dtype=np.int32)
+    width = int(np.max(counts))
+    log_energy = np.zeros((n_layers, width), dtype=np.float64)
+    log_stopping = np.zeros((n_layers, width), dtype=np.float64)
+    for layer, ((energy_row, stopping_row), count) in enumerate(zip(tables, counts, strict=True)):
+        log_energy[layer, :count] = energy_row
+        log_stopping[layer, :count] = stopping_row
+    return True, counts, log_energy, log_stopping
+
+
 @njit(cache=True)
 def _dEds_sbethe_scalar(log_energy_keV, log_stopping_keV_per_ang, E_keV):
     """Log-log interpolate SBETHE collision stopping [keV/angstrom], negative.
@@ -53,6 +71,14 @@ def _dEds_sbethe_scalar(log_energy_keV, log_stopping_keV_per_ang, E_keV):
         log_stopping_keV_per_ang[hi] - log_stopping_keV_per_ang[lo]
     )
     return -np.exp(log_stopping)
+
+
+@njit(cache=True)
+def _dEds_sbethe_packed_scalar(log_energy_keV, log_stopping_keV_per_ang, layer, count, E_keV):
+    """Evaluate one row of padded SBETHE tables inside an exact transport core."""
+    return _dEds_sbethe_scalar(
+        log_energy_keV[layer, :count], log_stopping_keV_per_ang[layer, :count], E_keV
+    )
 
 
 def sbethe_stopping_keV_per_ang(log_energy_keV, log_stopping_keV_per_ang, E_keV):

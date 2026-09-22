@@ -7,6 +7,8 @@ from scipy.constants import Avogadro
 
 from ...materials import CATALOG
 from ...materials._transport_data import TRANSPORT_ELEMENTS
+from .._errors import TableNotFoundError
+from ..store import StoredTable, resolve
 
 
 @dataclass(frozen=True)
@@ -102,4 +104,49 @@ def catalog_material(key: str) -> CatalogMaterial:
     return material_inputs_from_composition(str(key), composition)
 
 
-__all__ = ["CatalogMaterial", "catalog_material", "material_inputs_from_composition"]
+def resolve_composition_table(
+    key: str,
+    composition: tuple[tuple[str, float], ...] | list[tuple[str, float]],
+) -> StoredTable:
+    """Resolve the exact SBETHE table for one catalog-derived composition."""
+    from .generate import material_request
+
+    material = material_inputs_from_composition(key, composition)
+    request = material_request(
+        material.key,
+        material.composition,
+        density_g_cm3=material.density_g_cm3,
+        mean_excitation_eV=material.mean_excitation_eV,
+        band_gap_eV=material.band_gap_eV,
+    )
+    table = resolve(request.key)
+    if table is None:
+        raise TableNotFoundError(
+            f"no SBETHE table for material {key!r}; generate the catalog table with "
+            f"'pyrite tables generate --code sbethe --material {key}'"
+        )
+    return table
+
+
+def resolve_catalog_table(key: str) -> StoredTable:
+    """Resolve the stored SBETHE table matching a catalog key's current identity."""
+    resolved_key = str(key)
+    if resolved_key in CATALOG.materials:
+        resolved_key = CATALOG.material(resolved_key).crystal_key
+    if resolved_key in CATALOG.crystals:
+        composition = CATALOG.crystal(resolved_key).composition
+    elif resolved_key in CATALOG.media:
+        composition = CATALOG.media[resolved_key].composition
+    else:
+        choices = sorted(set(CATALOG.materials) | set(CATALOG.crystals) | set(CATALOG.media))
+        raise ValueError(f"unknown catalog material {key!r}; choose one of: {', '.join(choices)}")
+    return resolve_composition_table(str(key), composition)
+
+
+__all__ = [
+    "CatalogMaterial",
+    "catalog_material",
+    "material_inputs_from_composition",
+    "resolve_catalog_table",
+    "resolve_composition_table",
+]

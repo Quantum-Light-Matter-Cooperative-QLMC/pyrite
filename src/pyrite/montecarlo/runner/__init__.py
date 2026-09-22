@@ -469,6 +469,30 @@ def _case_transport_core(case, requested="auto"):
     )
 
 
+def _case_stopping_tables(case):
+    """Load the identity-matched SBETHE stopping table for each transport layer."""
+    from ...xsgen.sbethe import resolve_catalog_table, resolve_composition_table
+
+    layers = case.get("abs_layers")
+    if layers is None:
+        return [resolve_catalog_table(str(case["crystal"])).arrays()]
+
+    radiators = case.get("layer_radiators") or [None] * len(layers)
+    tables = []
+    for index, (_, _, composition) in enumerate(layers):
+        radiator = radiators[index] if index < len(radiators) else None
+        key = str(case["crystal"]) if index == 0 else None
+        if radiator is not None:
+            key = str(radiator["crystal"])
+        table = (
+            resolve_catalog_table(key)
+            if key is not None
+            else resolve_composition_table(f"{case['crystal']}:layer-{index}", composition)
+        )
+        tables.append(table.arrays())
+    return tables
+
+
 def _transport_case(
     case,
     record_timing=False,
@@ -545,6 +569,7 @@ def _transport_case(
     transport_lut_config = (
         TransportLUTConfig(enabled=False) if core == "cuda" and straggling else None
     )
+    stopping_tables = _case_stopping_tables(case)
 
     def _transport(keep):
         return simulate_trajectories(
@@ -567,6 +592,7 @@ def _transport_case(
             energy_model=case.get("energy_model", "frozen"),
             max_dE_frac=case.get("max_dE_frac", 0.0),
             straggling=straggling,
+            stopping_tables=stopping_tables,
             **(
                 {"transport_lut_config": transport_lut_config}
                 if transport_lut_config is not None
