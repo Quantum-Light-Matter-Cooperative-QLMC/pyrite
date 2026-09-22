@@ -871,7 +871,7 @@ def run_bremslib_element_reduction(
         xp.ascontiguousarray(state.available, dtype=xp.float32),
         xp.ascontiguousarray(state.lower_values.reshape(-1), dtype=xp.float32),
         xp.ascontiguousarray(state.upper_values.reshape(-1), dtype=xp.float32),
-        xp.ascontiguousarray(staged.table.nominal_reduced_energy, dtype=xp.float32),
+        xp.asarray(staged.table.nominal_reduced_energy, dtype=xp.float32),
         Z=Z,
         n_layers=n_layers,
         out=out,

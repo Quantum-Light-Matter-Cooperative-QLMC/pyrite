@@ -113,8 +113,9 @@ warned isotropic fallback for a missing element table or uncovered incident
 energy, applies attenuation, and divides by the incident-electron count. The
 portable path and the fused CUDA mirror use the same staged rows, interpolation
 fractions, tip rule, unit conversion, fallback state, and $4\pi$ cancellation.
-The CUDA comparison is hardware-gated; this derivation is a static
-source-to-code comparison, not evidence of device execution.
+This derivation is a static source-to-code comparison. Separately, the
+hardware-gated CUDA comparison passed on an RTX 5080 on 2026-09-22; the full
+neighboring CUDA spectrum regression file passed (7 tests, SLURM job 1796).
 
 No divergent factor, sign, exponent, unit, interpolation order, angle
 convention, limiting case, or fallback scope was found.
