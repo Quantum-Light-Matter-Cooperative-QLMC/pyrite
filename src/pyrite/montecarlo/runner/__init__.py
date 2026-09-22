@@ -471,11 +471,11 @@ def _case_transport_core(case, requested="auto"):
 
 def _case_stopping_table_records(case):
     """Resolve identity-matched SBETHE table records for all transport layers."""
-    from ...xsgen.sbethe import resolve_catalog_table, resolve_composition_table
+    from ...xsgen.sbethe import resolve_composition_table
 
     layers = case.get("abs_layers")
     if layers is None:
-        return [resolve_catalog_table(str(case["crystal"]))]
+        return [resolve_composition_table(str(case["crystal"]), case["composition"])]
 
     radiators = case.get("layer_radiators") or [None] * len(layers)
     tables = []
@@ -484,10 +484,8 @@ def _case_stopping_table_records(case):
         key = str(case["crystal"]) if index == 0 else None
         if radiator is not None:
             key = str(radiator["crystal"])
-        table = (
-            resolve_catalog_table(key)
-            if key is not None
-            else resolve_composition_table(f"{case['crystal']}:layer-{index}", composition)
+        table = resolve_composition_table(
+            key if key is not None else f"{case['crystal']}:layer-{index}", composition
         )
         tables.append(table)
     return tables

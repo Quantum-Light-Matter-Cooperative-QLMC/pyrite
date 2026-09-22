@@ -1,5 +1,4 @@
-"""Joy-Luo / Berger-Seltzer stopping power, the spliced compound model, and
-the Sternheimer density-effect correction."""
+"""SBETHE table stopping and Joy-Luo / Berger-Seltzer reference models."""
 
 import numpy as np
 from numba import njit
@@ -16,9 +15,7 @@ def prepare_sbethe_stopping_table(arrays):
     the host entry point rather than extrapolated.
     """
     energy_keV = np.asarray(arrays["stopping_energy_eV"], dtype=np.float64) * 1.0e-3
-    stopping_keV_per_ang = (
-        np.asarray(arrays["stopping_eV_per_angstrom"], dtype=np.float64) * 1.0e-3
-    )
+    stopping_keV_per_ang = np.asarray(arrays["stopping_eV_per_angstrom"], dtype=np.float64) * 1.0e-3
     if energy_keV.ndim != 1 or stopping_keV_per_ang.shape != energy_keV.shape:
         raise ValueError("SBETHE stopping energy and value arrays must be matching vectors")
     if energy_keV.size < 2 or not np.all(np.diff(energy_keV) > 0.0):
@@ -33,8 +30,11 @@ def prepare_sbethe_stopping_table(arrays):
 def pack_sbethe_stopping_tables(tables, n_layers):
     """Pad prepared SBETHE tables for the exact CPU/device transport cores."""
     if tables is None:
-        return False, np.zeros(n_layers, dtype=np.int32), np.zeros((n_layers, 1)), np.zeros(
-            (n_layers, 1)
+        return (
+            False,
+            np.zeros(n_layers, dtype=np.int32),
+            np.zeros((n_layers, 1)),
+            np.zeros((n_layers, 1)),
         )
     if len(tables) != n_layers:
         raise ValueError("one SBETHE stopping table is required per material layer")

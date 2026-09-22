@@ -81,9 +81,8 @@ def simulate_trajectories(
     radiate in the spectral window of interest anyway).
 
     Full derivations, sources, and limiting-case checks for the physics below
-    live in ``docs/physics/beam-transport/*.md`` and are independently verified
-    in ``docs/validation/beam-transport/*.md`` and
-    ``docs/validation/geometry/*.md``; this docstring states only the
+    live in ``docs/physics/beam-transport/*.md``; validation status is recorded
+    in ``docs/validation/``. This docstring states only the
     parameter contract and the BIT-FOR-BIT
     limiting case each one must preserve.
 
@@ -199,6 +198,14 @@ def simulate_trajectories(
     no-op -- BIT-FOR-BIT identical to the ungrooved slab. See
     docs/validation/geometry/blazed-groove-geometry.md.
     Validation: blazed-groove-geometry
+
+    stopping_tables: one stored SBETHE collision-stopping table per material
+      layer, with native ``stopping_energy_eV`` and
+      ``stopping_eV_per_angstrom`` arrays. Production case runners supply
+      identity-matched tables. ``None`` keeps the Joy-Luo/Berger-Seltzer
+      reference path for direct transport comparisons. Table energies must
+      include every incident energy and cutoff; extrapolation is rejected.
+      Validation: sbethe-corrected-stopping
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,

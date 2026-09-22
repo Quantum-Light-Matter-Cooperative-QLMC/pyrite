@@ -526,9 +526,7 @@ def test_cuda_stopping_carries_the_sbethe_table_and_straggling_scale():
     assert "xp.log(E_i)" in interpolation
     assert "xp.exp(log_stopping)" in interpolation
 
-    kernel = (
-        resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
-    )
+    kernel = resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
     assert "dEds = _dEds_sbethe(" in kernel
     assert "stopping_scale = dEds / reference_dEds" in kernel
     assert "* stopping_scale" in kernel

@@ -11,7 +11,8 @@ import numpy as np
 import pytest
 
 from pyrite.materials import CATALOG
-from pyrite.xsgen._errors import DataFetchError
+from pyrite.montecarlo.runner import _case_stopping_table_records
+from pyrite.xsgen._errors import DataFetchError, TableNotFoundError
 from pyrite.xsgen.sbethe import (
     SbetheDeck,
     catalog_material,
@@ -99,6 +100,12 @@ def test_catalog_material_alias_uses_the_runnable_materials_film_crystal():
 def test_catalog_material_rejects_an_unknown_key():
     with pytest.raises(ValueError, match="unknown catalog material"):
         catalog_material("unobtainium")
+
+
+def test_case_stopping_lookup_rejects_a_composition_that_does_not_match_its_table():
+    case = {"crystal": "mos2", "composition": [("Mo", 1.0), ("S", 2.0)]}
+    with pytest.raises(TableNotFoundError, match="no SBETHE table"):
+        _case_stopping_table_records(case)
 
 
 def test_every_runtime_catalog_target_has_a_pinned_full_domain_sbethe_table():

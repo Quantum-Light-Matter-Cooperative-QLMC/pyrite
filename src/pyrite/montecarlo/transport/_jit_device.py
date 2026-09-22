@@ -207,9 +207,7 @@ def _dEds_sbethe(L_logE, L_logS, row, count, E_i):
     lower = upper - I32_ONE
     log_e_lower = L_logE[row + lower]
     fraction = (log_e - log_e_lower) / (L_logE[row + upper] - log_e_lower)
-    log_stopping = L_logS[row + lower] + fraction * (
-        L_logS[row + upper] - L_logS[row + lower]
-    )
+    log_stopping = L_logS[row + lower] + fraction * (L_logS[row + upper] - L_logS[row + lower])
     return -xp.exp(log_stopping)
 
 
