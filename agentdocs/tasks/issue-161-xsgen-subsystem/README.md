@@ -412,7 +412,9 @@ Found while building it:
    transform. `THIRD-PARTY-NOTICES.md` corrected the same way, and now says
    the tables are fetched, not packaged.
 
-**Open: hosting.** The index pins archive SHA-256
+**Open: hosting -- deferred.** Decided 2026-09-21: no URL until the
+repository is public (Zenodo is the likely home); install with `--archive`
+meanwhile. No temporary URL is to be committed to the index. The index pins archive SHA-256
 `05a74ee9...9250e152` with `url: null`. The GitHub repository is private, so
 a release asset there is not anonymously downloadable, and `urlopen` sends no
 credentials. Until a public location is chosen (a Zenodo or Mendeley
@@ -449,7 +451,8 @@ index -- manifests carry a timestamp, so a rebuild changes the digest.
       variant (F13). Human chose fetch on demand.
 - [x] M6 release builder, pinned index, `tables fetch bremslib [--archive]`,
       `catalogue_table`, maintainer script, notices, CLI reference (F15)
-- [ ] M6 hosting: publish the archive and pin its URL (needs a human, F15)
+- [ ] M6 hosting: publish the archive and pin its URL. Deferred 2026-09-21
+      until the repository goes public; `--archive` is the interim route (F15)
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
 - [x] `pyrite-dev verify` for M1-M3 (4361 passed, 90 skipped)
 - [x] `pyrite-dev verify` after M4 (4369 passed, 90 skipped)
