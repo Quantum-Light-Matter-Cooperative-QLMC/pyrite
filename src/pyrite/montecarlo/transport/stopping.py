@@ -7,6 +7,65 @@ from numba import njit
 from ...materials._transport_data import STERNHEIMER_DENSITY_EFFECT, TRANSPORT_ELEMENTS
 
 
+def prepare_sbethe_stopping_table(arrays):
+    """Validate and log-transform one stored SBETHE collision-stopping table.
+
+    The returned arrays use keV and keV/angstrom and are ready for the scalar
+    CPU/device interpolation kernel.  SBETHE supplies strictly positive native
+    nodes from 1 keV through 1 GeV; values outside that domain are rejected by
+    the host entry point rather than extrapolated.
+    """
+    energy_keV = np.asarray(arrays["stopping_energy_eV"], dtype=np.float64) * 1.0e-3
+    stopping_keV_per_ang = (
+        np.asarray(arrays["stopping_eV_per_angstrom"], dtype=np.float64) * 1.0e-3
+    )
+    if energy_keV.ndim != 1 or stopping_keV_per_ang.shape != energy_keV.shape:
+        raise ValueError("SBETHE stopping energy and value arrays must be matching vectors")
+    if energy_keV.size < 2 or not np.all(np.diff(energy_keV) > 0.0):
+        raise ValueError("SBETHE stopping energy grid must be strictly increasing")
+    if not np.all(np.isfinite(energy_keV)) or not np.all(np.isfinite(stopping_keV_per_ang)):
+        raise ValueError("SBETHE stopping table contains non-finite values")
+    if np.any(energy_keV <= 0.0) or np.any(stopping_keV_per_ang <= 0.0):
+        raise ValueError("SBETHE stopping table values must be strictly positive")
+    return np.log(energy_keV), np.log(stopping_keV_per_ang)
+
+
+@njit(cache=True)
+def _dEds_sbethe_scalar(log_energy_keV, log_stopping_keV_per_ang, E_keV):
+    """Log-log interpolate SBETHE collision stopping [keV/angstrom], negative.
+
+    Log-log interpolation preserves positivity and exactly reproduces every
+    native SBETHE node.  The caller must enforce the table domain; endpoint
+    clamps only protect roundoff at an already-validated transport cutoff.
+
+    Validation: sbethe-stopping-interpolation
+    """
+    log_e = np.log(E_keV)
+    if log_e <= log_energy_keV[0]:
+        return -np.exp(log_stopping_keV_per_ang[0])
+    last = log_energy_keV.size - 1
+    if log_e >= log_energy_keV[last]:
+        return -np.exp(log_stopping_keV_per_ang[last])
+    hi = np.searchsorted(log_energy_keV, log_e)
+    lo = hi - 1
+    fraction = (log_e - log_energy_keV[lo]) / (log_energy_keV[hi] - log_energy_keV[lo])
+    log_stopping = log_stopping_keV_per_ang[lo] + fraction * (
+        log_stopping_keV_per_ang[hi] - log_stopping_keV_per_ang[lo]
+    )
+    return -np.exp(log_stopping)
+
+
+def sbethe_stopping_keV_per_ang(log_energy_keV, log_stopping_keV_per_ang, E_keV):
+    """Evaluate a prepared SBETHE table without extrapolation."""
+    energy = np.asarray(E_keV, dtype=float)
+    lower = float(np.nextafter(np.exp(log_energy_keV[0]), -np.inf))
+    upper = float(np.nextafter(np.exp(log_energy_keV[-1]), np.inf))
+    if np.any(~np.isfinite(energy)) or np.any(energy < lower) or np.any(energy > upper):
+        raise ValueError(f"SBETHE stopping energy must be within [{lower:g}, {upper:g}] keV")
+    values = np.interp(np.log(energy), log_energy_keV, log_stopping_keV_per_ang)
+    return -np.exp(values)
+
+
 def _dEds_keV_per_ang(Z, A, J_keV, rho_g_cm3, E_keV):
     """Joy-Luo modified Bethe stopping power [keV/Angstrom] (negative)."""
     k = 0.731 + 0.0688 * np.log10(Z)

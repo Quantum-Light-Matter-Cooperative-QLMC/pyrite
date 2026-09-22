@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from numba import njit
 
-from .stopping import _dEds_spliced_compound
+from .stopping import _dEds_spliced_compound, sbethe_stopping_keV_per_ang
 
 _LN10 = np.log(10.0)
 
@@ -285,6 +285,7 @@ def build_transport_energy_lut(
     L_sr_joy_numer,
     mott_tables,
     config=DEFAULT_TRANSPORT_LUT_CONFIG,
+    stopping_tables=None,
 ):
     """Precompute all energy-dependent scalar transport physics for one run.
 
@@ -358,6 +359,15 @@ def build_transport_energy_lut(
         max_el,
     )
     nodes = _evaluate_transport_nodes(E_grid, *physics)
+    if stopping_tables is not None:
+        if len(stopping_tables) != len(L_Zs):
+            raise ValueError("one SBETHE stopping table is required per material layer")
+        nodes = list(nodes)
+        nodes[1] = np.asarray(
+            [sbethe_stopping_keV_per_ang(log_e, log_s, E_grid) for log_e, log_s in stopping_tables],
+            dtype=np.float64,
+        )
+        nodes = tuple(nodes)
     total_rate, dEds, inv_beta, cdf, alpha = nodes
 
     achieved_ipd = (n_energy - 1) / decades if decades > 0.0 else float("inf")
@@ -369,6 +379,19 @@ def build_transport_energy_lut(
             np.exp((1.0 - w) * logE_grid[:-1] + w * logE_grid[1:]) for w in _AUDIT_WEIGHTS
         ]
         samples = [_evaluate_transport_nodes(E, *physics) for E in sample_energies]
+        if stopping_tables is not None:
+            replaced = []
+            for E, sample in zip(sample_energies, samples, strict=True):
+                sample = list(sample)
+                sample[1] = np.asarray(
+                    [
+                        sbethe_stopping_keV_per_ang(log_e, log_s, E)
+                        for log_e, log_s in stopping_tables
+                    ],
+                    dtype=np.float64,
+                )
+                replaced.append(tuple(sample))
+            samples = replaced
         max_rel_interp_error, worst_index, worst_weight = _interp_audit(nodes, samples, n_el)
         worst_energy_keV = float(sample_energies[_AUDIT_WEIGHTS.index(worst_weight)][worst_index])
         tolerance_met = max_rel_interp_error <= rel_tol

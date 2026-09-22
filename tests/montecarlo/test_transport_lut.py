@@ -94,6 +94,43 @@ def test_sr_transport_lut_matches_direct_scalar_physics():
     np.testing.assert_allclose(_interp_1d(lut.inv_beta, lut, energies), inv_beta_exact, rtol=1e-5)
 
 
+def test_transport_lut_uses_the_sbethe_material_table_for_stopping():
+    tables = _synthetic_layer()
+    L_Js, L_Zs, L_ks, L_coeffs, L_xc, L_sr, L_mn, L_d1, L_d2, L_sj = tables
+    log_energy, log_stopping = t.prepare_sbethe_stopping_table(
+        {
+            "stopping_energy_eV": np.array([5.0e3, 10.0e3, 30.0e3]),
+            "stopping_eV_per_angstrom": np.array([9.0, 6.0, 3.0]),
+        }
+    )
+    lut = t.build_transport_energy_lut(
+        5.0,
+        30.0,
+        0,
+        L_Js,
+        L_Zs,
+        L_ks,
+        L_coeffs,
+        L_xc,
+        L_sr,
+        L_mn,
+        L_d1,
+        L_d2,
+        L_sj,
+        [[None]],
+        config=t.TransportLUTConfig(min_points=32),
+        stopping_tables=[(log_energy, log_stopping)],
+    )
+    energies = np.exp(lut.log_E_min + np.arange(lut.n_energy) / lut.inv_dlogE)
+    energies[0], energies[-1] = 5.0, 30.0
+
+    np.testing.assert_allclose(
+        lut.dEds[0],
+        t.sbethe_stopping_keV_per_ang(log_energy, log_stopping, energies),
+        rtol=2e-15,
+    )
+
+
 def test_transport_lut_cdf_is_normalized_and_monotone():
     tables = _synthetic_layer(two_elements=True)
     L_Js, L_Zs, L_ks, L_coeffs, L_xc, L_sr, L_mn, L_d1, L_d2, L_sj = tables

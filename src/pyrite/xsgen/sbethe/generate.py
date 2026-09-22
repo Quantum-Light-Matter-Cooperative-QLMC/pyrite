@@ -33,6 +33,41 @@ class GenerationResult:
     generated: bool
 
 
+def material_request(
+    name: str,
+    composition: Mapping[int, float],
+    *,
+    density_g_cm3: float,
+    mean_excitation_eV: float,
+    band_gap_eV: float | None = None,
+    projectile: str = "electron",
+    source_path: str | Path | None = None,
+) -> TableRequest:
+    """Return the exact store request for one SBETHE material table."""
+    deck = SbetheDeck(
+        name=name,
+        composition=composition,
+        density_g_cm3=density_g_cm3,
+        mean_excitation_eV=mean_excitation_eV,
+        band_gap_eV=band_gap_eV,
+        projectile=projectile,
+    )
+    source = resolve_source("sbethe", source_path)
+    identity = material_identity(
+        composition=deck.composition,
+        density_g_cm3=deck.density_g_cm3,
+        mean_excitation_eV=deck.mean_excitation_eV,
+        extra={} if deck.band_gap_eV is None else {"band_gap_eV": deck.band_gap_eV},
+    )
+    return TableRequest(
+        code="sbethe",
+        code_version=source_digest(source),
+        target=MaterialTarget(key=deck.name, identity=identity),
+        quantity="collision_stopping",
+        model=deck.model_record(),
+    )
+
+
 def generate_material(
     name: str,
     composition: Mapping[int, float],
@@ -88,18 +123,14 @@ def generate_material(
         projectile=projectile,
     )
     source = resolve_source("sbethe", source_path)
-    identity = material_identity(
-        composition=deck.composition,
-        density_g_cm3=deck.density_g_cm3,
-        mean_excitation_eV=deck.mean_excitation_eV,
-        extra={} if deck.band_gap_eV is None else {"band_gap_eV": deck.band_gap_eV},
-    )
-    request = TableRequest(
-        code="sbethe",
-        code_version=source_digest(source),
-        target=MaterialTarget(key=deck.name, identity=identity),
-        quantity="collision_stopping",
-        model=deck.model_record(),
+    request = material_request(
+        name,
+        composition,
+        density_g_cm3=density_g_cm3,
+        mean_excitation_eV=mean_excitation_eV,
+        band_gap_eV=band_gap_eV,
+        projectile=projectile,
+        source_path=source_path,
     )
     existing = resolve(request.key)
     if existing is not None and not overwrite:

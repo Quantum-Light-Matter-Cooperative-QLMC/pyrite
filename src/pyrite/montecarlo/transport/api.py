@@ -27,7 +27,7 @@ from .cores import (
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
 from .scattering import _NO_MOTT, _mott_alpha_table
-from .stopping import _element_crossover_keV
+from .stopping import _element_crossover_keV, prepare_sbethe_stopping_table
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ def simulate_trajectories(
     energy_model="frozen",
     max_dE_frac=0.0,
     straggling=False,
+    stopping_tables=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -427,6 +428,22 @@ def simulate_trajectories(
     _nsys_push("cxr.transport.tables")
     z_total = float(layers[-1][1])
     n_layers = len(layers)
+    prepared_stopping_tables = None
+    if stopping_tables is not None:
+        if len(stopping_tables) != n_layers:
+            raise ValueError("stopping_tables must contain one SBETHE table per layer")
+        prepared_stopping_tables = []
+        for table in stopping_tables:
+            prepared = table if len(table) == 2 and np.asarray(table[0]).ndim == 1 else None
+            if prepared is None:
+                prepared = prepare_sbethe_stopping_table(table)
+            prepared_stopping_tables.append(prepared)
+            lower = float(np.nextafter(np.exp(prepared[0][0]), -np.inf))
+            upper = float(np.nextafter(np.exp(prepared[0][-1]), np.inf))
+            if float(np.min(E_cut_by_electrons)) < lower or float(np.max(E_keV)) > upper:
+                raise ValueError(
+                    f"transport energy range must be within SBETHE table [{lower:g}, {upper:g}] keV"
+                )
     L_Zs = []
     L_Js = []
     L_ncm3 = []
@@ -663,6 +680,11 @@ def simulate_trajectories(
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
     transport_lut = None
+    if prepared_stopping_tables is not None and (groove is not None or not transport_lut_config.enabled):
+        raise NotImplementedError(
+            "SBETHE stopping tables currently require ungrooved LUT transport; "
+            "exact CPU/CUDA propagation is the next issue #90 milestone"
+        )
     if groove is None and transport_lut_config.enabled:
         _nsys_push("cxr.transport.lut")
         transport_lut = build_transport_energy_lut(
@@ -681,6 +703,7 @@ def simulate_trajectories(
             L_sr_joy_numer,
             mott_tables,
             config=transport_lut_config,
+            stopping_tables=prepared_stopping_tables,
         )
         _nsys_pop()
 
