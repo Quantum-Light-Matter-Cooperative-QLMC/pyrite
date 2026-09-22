@@ -291,7 +291,8 @@ The intensity must already be in the detected units of the plot it joins.
   (5.4 % at the last point before the tip) between {math}`T_1` nodes on the
   0-degree forward peak;
 - the BremsLib portable path costs about four times the EEDL path on CPU;
-  there is no fused CUDA kernel for it yet;
+  a fused CUDA reducer is implemented, but its hardware-gated comparison
+  remains pending on a CUDA device;
 - EEDL is elemental atomic data; molecular bonding, density-dependent emission
   effects, and interactions below the configured transport cutoff are outside
   this model;

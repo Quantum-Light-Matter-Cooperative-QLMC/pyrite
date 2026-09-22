@@ -125,7 +125,10 @@ def _eedl_or_bh_weighted_scalar(
 
 @jit.rawkernel(device=True)
 def _bremslib_scaled_scalar(reduced, top, line, values, nominal_ratio):
-    """Interpolate one staged 13-node BremsLib row in ``k/T``."""
+    """Interpolate one staged 13-node BremsLib row in ``k/T``.
+
+    Validation: bremslib-angular-model
+    """
     lower = U32_ZERO
     while lower < U32_ELEVEN and reduced >= nominal_ratio[lower + U32_ONE]:
         lower += U32_ONE
@@ -169,7 +172,10 @@ def _bremslib_or_fallback_weighted_scalar(
     n_E,
     Z,
 ):
-    """Weighted directional BremsLib cell, with the normal EEDL/BH fallback."""
+    """Weighted directional BremsLib cell, with the normal EEDL/BH fallback.
+
+    Validation: bremslib-angular-model
+    """
     if bremslib_available > F32_ZERO:
         if k_eV <= F32_ZERO or k_eV > T_i * F32_1E3:
             return F32_ZERO
@@ -284,7 +290,10 @@ def _bremslib_kernel_1e(
     n_E,
     n_layers,
 ):
-    """Fuse BremsLib interpolation, fallback, attenuation, and reduction."""
+    """Fuse BremsLib interpolation, fallback, attenuation, and reduction.
+
+    Validation: bremslib-angular-model
+    """
     k = jit.blockIdx.x
     tid = jit.threadIdx.x
     nthreads = jit.blockDim.x
@@ -745,6 +754,8 @@ def run_bremslib_brem_reduction_kernel(
     ``bremslib_weight`` includes density, path length, ``4*pi``, the mb-to-cm2
     conversion, and ``Z**2`` so the caller can retain the common isotropic
     ``1/(4*pi)`` normalization after reduction.
+
+    Validation: bremslib-angular-model
     """
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
@@ -806,7 +817,10 @@ def run_bremslib_element_reduction(
     n_layers,
     out,
 ):
-    """Stage one element's segment state and launch the BremsLib reducer."""
+    """Stage one element's segment state and launch the BremsLib reducer.
+
+    Validation: bremslib-angular-model
+    """
     from .brem_bremslib import bremslib_segment_state
 
     state = bremslib_segment_state(staged, T_keV, cos_theta)
