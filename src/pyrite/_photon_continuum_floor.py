@@ -36,8 +36,6 @@ near absorption edges and kinematic endpoints -- is a separate concern and is
 deliberately not done here.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from .materials import MediumSpec, load_material_catalog

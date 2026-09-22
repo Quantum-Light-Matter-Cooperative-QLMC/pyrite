@@ -19,8 +19,6 @@ not affect runtime imports or production calculations.
 Validation: dans-diffraction-oracle
 """
 
-from __future__ import annotations
-
 import importlib
 from collections.abc import Sequence
 from dataclasses import dataclass

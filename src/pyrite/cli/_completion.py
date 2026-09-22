@@ -6,8 +6,6 @@ SSH with both connection and subprocess timeouts.  Every provider returns an
 empty list when its backing data is unavailable.
 """
 
-from __future__ import annotations
-
 import os
 import subprocess
 from collections.abc import Callable, Iterable, Sequence
@@ -263,7 +261,7 @@ def complete_job_id(ctx: object, param: object, incomplete: str) -> list[Complet
     del ctx, param
     try:
         values = _query_remote_job_ids()
-    except (OSError, subprocess.SubprocessError, SystemExit, ValueError):
+    except OSError, subprocess.SubprocessError, SystemExit, ValueError:
         return []
     return _items(values, incomplete)
 

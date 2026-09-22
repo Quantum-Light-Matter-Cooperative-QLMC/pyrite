@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.apps._design import static_altair_chart
 from pyrite.plots.altair.spectra import spectrum_chart
 from pyrite.results import records, select_results, sweep_values

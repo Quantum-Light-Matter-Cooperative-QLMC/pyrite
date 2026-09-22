@@ -18,8 +18,6 @@ segments, and a deviation table against spacing/ulp. It is one short job, not a
 chained ladder.
 """
 
-from __future__ import annotations
-
 import argparse
 import shlex
 from collections.abc import Sequence

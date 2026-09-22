@@ -11,8 +11,6 @@ See ``docs/guides/*.md``, ``pyrite.devtools.doc_blocks``, and
 ``tests/dev/test_doc_blocks.py``.
 """
 
-from __future__ import annotations
-
 import argparse
 import re
 import shlex

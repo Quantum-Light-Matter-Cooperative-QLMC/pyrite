@@ -1,7 +1,5 @@
 """Shared catalog-edit plumbing for profile CLI command modules."""
 
-from __future__ import annotations
-
 import difflib
 
 import click

@@ -12,8 +12,6 @@ valid TOML, and any named beam or detector reference under ``[profiles.*]``
 names a corresponding top-level object present in the same fragment.
 """
 
-from __future__ import annotations
-
 import tomlkit
 from tomlkit.exceptions import TOMLKitError
 

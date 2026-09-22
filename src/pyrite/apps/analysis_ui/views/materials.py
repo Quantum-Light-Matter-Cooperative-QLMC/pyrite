@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.apps.analyze import cached_analysis
 from pyrite.materials import CATALOG
 from pyrite.plots import (

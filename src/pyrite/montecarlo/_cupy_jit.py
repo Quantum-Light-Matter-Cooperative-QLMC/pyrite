@@ -1,7 +1,5 @@
 """CuPy JIT compatibility helpers."""
 
-from __future__ import annotations
-
 import warnings
 from typing import Any
 

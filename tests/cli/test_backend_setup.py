@@ -1,7 +1,5 @@
 """CLI checks for ``pyrite setup``: OS-level GPU detection and .env writes."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from pyrite import cli

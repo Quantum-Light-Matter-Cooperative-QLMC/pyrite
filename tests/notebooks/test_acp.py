@@ -1,7 +1,5 @@
 """Lifecycle tests for the optional local ACP bridges."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

@@ -183,7 +183,7 @@ class BeamSpec:
         return (resolved.x.sigma_slope_rad * 1e3, resolved.y.sigma_slope_rad * 1e3)
 
     @classmethod
-    def isotropic(cls, transverse_fwhm_mm: float | None = 1.0, **kw: Any) -> "BeamSpec":
+    def isotropic(cls, transverse_fwhm_mm: float | None = 1.0, **kw: Any) -> BeamSpec:
         """Convenience ctor for an azimuthally-symmetric spot (x == y)."""
         return cls(
             transverse_fwhm_x_mm=transverse_fwhm_mm,
@@ -192,7 +192,7 @@ class BeamSpec:
         )
 
     @classmethod
-    def with_transverse(cls, transverse: TransverseDistribution, **kw: Any) -> "BeamSpec":
+    def with_transverse(cls, transverse: TransverseDistribution, **kw: Any) -> BeamSpec:
         """Convenience ctor for a Courant-Snyder beam, clearing the legacy spot.
 
         The spot FWHMs default to 1 mm, and they are mutually exclusive with a

@@ -15,8 +15,6 @@ Offline tests diff against a committed reference
 COD/MP and is skipped unless ``PYRITE_ONLINE_TESTS=1``.
 """
 
-from __future__ import annotations
-
 import os
 
 import pytest

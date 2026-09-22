@@ -5,8 +5,6 @@ expressions rather than testing only end-to-end spectra. That makes rounding
 movement explicit and catches accidental changes to the physics formulas.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 import pyrite.montecarlo.spectrum.brem as brem_mod

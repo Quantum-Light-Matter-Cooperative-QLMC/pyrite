@@ -1,7 +1,5 @@
 """``pyrite completion install`` shell rc setup."""
 
-from __future__ import annotations
-
 import shutil
 import subprocess
 

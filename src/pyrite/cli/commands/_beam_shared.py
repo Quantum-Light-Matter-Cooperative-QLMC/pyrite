@@ -6,8 +6,6 @@ name (``--beam NAME``) and never writes distribution fields itself (issue #54).
 ``create`` and ``set`` share this module so the two verbs validate identically.
 """
 
-from __future__ import annotations
-
 import click
 import tomlkit
 

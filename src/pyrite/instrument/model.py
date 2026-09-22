@@ -4,8 +4,6 @@ These objects describe physical planes after photon emission. They are not
 target geometry and never enter the electron-transport navigator.
 """
 
-from __future__ import annotations
-
 import math
 from dataclasses import dataclass, field
 from numbers import Integral, Real

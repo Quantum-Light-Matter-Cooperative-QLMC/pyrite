@@ -1,7 +1,5 @@
 """Primary-beam attenuation through bounded downstream filter plates."""
 
-from __future__ import annotations
-
 import numpy as np
 
 

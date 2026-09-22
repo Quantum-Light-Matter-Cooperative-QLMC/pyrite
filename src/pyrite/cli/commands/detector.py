@@ -1,7 +1,5 @@
 """Manage named catalog detector-geometry objects."""
 
-from __future__ import annotations
-
 import difflib
 import re
 from pathlib import Path

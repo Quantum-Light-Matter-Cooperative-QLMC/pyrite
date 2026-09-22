@@ -1,7 +1,5 @@
 """Execution resource policies for host and accelerator admission."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from .._backend import ArrayBackend, BackendResourceError

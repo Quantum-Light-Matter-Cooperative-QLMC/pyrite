@@ -1,7 +1,5 @@
 """CUDA-gated regression tests for spectrum cheap-hoist kernels."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 

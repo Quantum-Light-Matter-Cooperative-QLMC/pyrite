@@ -7,8 +7,6 @@ smaller.  Every resolved run can be serialized into a deterministic identity,
 so differently resolved variants never silently resume into one dataset.
 """
 
-from __future__ import annotations
-
 import dataclasses
 import hashlib
 import json
@@ -577,7 +575,7 @@ def dataset_identity(
     """Resolve a dataset identity through its explicit versioned algorithm."""
     try:
         migration = IDENTITY_MIGRATIONS[identity_version]
-    except (KeyError, TypeError):
+    except KeyError, TypeError:
         raise ValueError(f"unsupported dataset identity version: {identity_version!r}") from None
     return migration(
         material,
@@ -795,7 +793,7 @@ def _sidecar_identity(stem: str, root: str | os.PathLike[str]) -> dict[str, Any]
     try:
         with manifest.open() as handle:
             identity = json.load(handle).get("dataset_identity")
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         return None
     return normalize_dataset_identity(identity) if isinstance(identity, dict) else None
 
@@ -833,7 +831,7 @@ def identity_from_stem(
                 identity = named_profile_identity(
                     groups["material"], fidelity, catalog_profile=catalog_profile
                 )
-            except (KeyError, ValueError):
+            except KeyError, ValueError:
                 continue
             if identity["parameter_sha256"].startswith(groups["digest"]):
                 return identity

@@ -101,7 +101,7 @@ def _chantler_bounds(element):
 # ~N_hkl times per case -- each hit is an xraydb FITPACK spline eval. Memoize on
 # the exact energy bytes so the repeats collapse to one spline pass per element.
 # Returns bit-identical arrays (frozen read-only so a hit can't be mutated).
-_HENKE_MEMO: "OrderedDict[tuple, tuple[np.ndarray, np.ndarray]]" = OrderedDict()
+_HENKE_MEMO: OrderedDict[tuple, tuple[np.ndarray, np.ndarray]] = OrderedDict()
 _HENKE_MEMO_MAX = 256
 
 
@@ -188,7 +188,7 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
 # element, same energy grid, re-requested once per reflection), but mu_elam is
 # ~20x costlier per call than f2_chantler because xraydb rebuilds the spline
 # each time. Memoize on the exact energy bytes, as above.
-_ELAM_MEMO: "OrderedDict[tuple, np.ndarray]" = OrderedDict()
+_ELAM_MEMO: OrderedDict[tuple, np.ndarray] = OrderedDict()
 _ELAM_MEMO_MAX = 256
 
 # xraydb warns outside this band; the Elam tables are not claimed to hold there.

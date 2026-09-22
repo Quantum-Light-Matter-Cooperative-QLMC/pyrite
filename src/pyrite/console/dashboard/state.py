@@ -70,7 +70,7 @@ def marked_sections(output):
             continue
         try:
             payload = base64.b64decode(encoded, validate=True).decode("utf-8", errors="replace")
-        except (ValueError, UnicodeError):
+        except ValueError, UnicodeError:
             continue
         sections[name] = payload.strip()
     return sections
@@ -164,7 +164,7 @@ def parse_progress_records(payload):
     for line in payload.splitlines():
         try:
             record = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             continue
         if not isinstance(record, dict):
             continue

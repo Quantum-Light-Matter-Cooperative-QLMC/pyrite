@@ -18,8 +18,6 @@ Pure geometry over plain dicts -- no Plotly import, no physics, so no
 validation-ledger marker is needed here.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 import numpy as np

@@ -157,7 +157,7 @@ def _dataset_identity(path, is_directory):
     try:
         with manifest.open() as handle:
             return json.load(handle).get("dataset_identity")
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         return None
 
 

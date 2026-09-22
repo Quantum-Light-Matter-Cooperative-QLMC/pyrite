@@ -1,7 +1,5 @@
 """Profile-aware defaults shared by line and bremsstrahlung recomputes."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path

@@ -1,7 +1,5 @@
 """Headless checkpoint-to-plot smoke test for PyRITE."""
 
-from __future__ import annotations
-
 import argparse
 import os
 from pathlib import Path

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 
 from pyrite import _energy_grid_artifacts as artifacts

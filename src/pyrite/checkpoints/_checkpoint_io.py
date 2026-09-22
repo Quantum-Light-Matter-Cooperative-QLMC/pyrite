@@ -19,13 +19,13 @@ import io
 import os
 import pickle
 import tempfile
+
+# stdlib since 3.14 (the version this project pins); ty's typeshed lags.
+from compression import zstd
 from typing import IO, Any, cast
 
 import h5py
 import numpy as np
-
-# stdlib since 3.14 (the version this project pins); ty's typeshed lags.
-from compression import zstd
 
 from pyrite._spectral_components import COMPONENTS_ATTR, SEPARATE_CONTRACT, separate_legacy
 

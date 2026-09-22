@@ -1,7 +1,5 @@
 """Shared presentation primitives for PyRITE Marimo applications."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable, Mapping
 from html import escape
 from importlib.resources import files
@@ -157,7 +155,7 @@ def apply_altair_theme(chart, theme: str):
     try:
         raw_config = chart.to_dict(validate=False).get("config", {})
         config = raw_config if isinstance(raw_config, dict) else {}
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         config = {}
 
     def config_section(name: str) -> dict:
@@ -211,7 +209,7 @@ def apply_altair_theme(chart, theme: str):
             title["color"] = palette["text"]
             title["subtitleColor"] = palette["muted"]
             chart = chart.properties(title=alt.TitleParams(**title))
-    except (ImportError, TypeError, ValueError):
+    except ImportError, TypeError, ValueError:
         # The configure_* rules above still cover charts without a serializable
         # top-level title (or environments where Altair is optional).
         pass
@@ -362,13 +360,13 @@ def apply_plotly_theme(fig, theme: str):
             # ``line``; marker-based plots are handled equivalently.
             try:
                 energy_owner.colorscale = _LIGHT_ENERGY_COLORSCALE
-            except (AttributeError, ValueError):
+            except AttributeError, ValueError:
                 pass
             if hasattr(energy_owner, "width"):
                 try:
                     width = energy_owner.width
                     energy_owner.width = max(4, float(width or 0))
-                except (TypeError, ValueError):
+                except TypeError, ValueError:
                     pass
 
     if getattr(fig.layout, "annotations", None):

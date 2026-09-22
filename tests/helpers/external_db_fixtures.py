@@ -18,8 +18,6 @@ databases do not carry a reliable isotropic B, so ``issue_notes.md`` item #1
 stays a separate concern.
 """
 
-from __future__ import annotations
-
 import json
 import os
 from collections.abc import Callable, Mapping

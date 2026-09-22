@@ -1,7 +1,5 @@
 """Smoke coverage for Python module entry shims."""
 
-from __future__ import annotations
-
 import importlib
 import runpy
 import sys

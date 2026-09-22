@@ -23,8 +23,6 @@ running them one at a time.
     python -m pyrite.energy_grid.derive --json-out /tmp/line_grid_bounds.json
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

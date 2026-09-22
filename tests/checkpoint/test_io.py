@@ -4,11 +4,11 @@ import gzip
 import io
 import pickle
 import time
+from compression import zstd
 from pathlib import Path
 
 import h5py
 import numpy as np
-from compression import zstd
 
 from pyrite.checkpoints import _checkpoint_io as ckio
 

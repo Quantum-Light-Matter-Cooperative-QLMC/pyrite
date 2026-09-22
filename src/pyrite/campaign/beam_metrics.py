@@ -6,8 +6,6 @@ beam centroid or steering.  Twiss parameters are undefined for a zero-emittance
 plane and are reported as ``nan``; the emittance itself remains exactly zero.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Protocol
 

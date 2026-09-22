@@ -19,8 +19,6 @@ The marker lives on the container, not the record, so key projections
 (slim, dataset merge, basket) cannot drop it.
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping, MutableMapping
 from typing import Any
 

@@ -1,7 +1,5 @@
 """Canonical lifecycle for every remote asynchronous job."""
 
-from __future__ import annotations
-
 import click
 
 from ...console.output import confirm_destructive, emit_result, output_option

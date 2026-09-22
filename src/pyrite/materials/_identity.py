@@ -23,8 +23,6 @@ spelling; a crystal that used it would re-split the notation, which
 ``tests/materials/test_material_catalog.py`` guards against.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass

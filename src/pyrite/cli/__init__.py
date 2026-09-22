@@ -1,7 +1,5 @@
 """PyRITE Click command-line entry point."""
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 import click

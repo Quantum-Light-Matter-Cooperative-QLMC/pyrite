@@ -5,8 +5,6 @@ prompt while they work; see :mod:`pyrite.console`. The lazy root group that bind
 these to the command tree stays in :mod:`pyrite.cli._groups`.
 """
 
-from __future__ import annotations
-
 import json
 import math
 import os
@@ -138,7 +136,7 @@ class FiniteRange(click.ParamType):
             label = "integer" if self.integer else "number"
             try:
                 converted = int(value) if self.integer else float(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 self.fail(f"{value!r} is not a valid {label}", param, ctx)
         if not math.isfinite(converted):
             self.fail(f"{value!r} must be finite", param, ctx)
@@ -157,7 +155,7 @@ class FiniteFloat(click.ParamType):
     def convert(self, value, param, ctx):
         try:
             converted = float(value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.fail(f"{value!r} is not a valid number", param, ctx)
         if not math.isfinite(converted):
             self.fail(f"{value!r} must be finite", param, ctx)
@@ -176,7 +174,7 @@ class BeamUVW(click.ParamType):
             self.fail(f"{value!r} must contain exactly three integers", param, ctx)
         try:
             beam = tuple(int(component) for component in value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.fail(f"{value!r} must contain exactly three integers", param, ctx)
         if beam == (0, 0, 0):
             self.fail("(0, 0, 0) is not a valid beam direction", param, ctx)
@@ -249,12 +247,12 @@ class _CSV(click.ParamType):
                 else:
                     try:
                         values.append(float(token))
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
         else:
             try:
                 values = _floats(value)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
         if not values:
             self.fail(f"{self.label} requires at least one value", param, ctx)
@@ -301,7 +299,7 @@ class _IntCSV(click.ParamType):
     def convert(self, value, param, ctx):
         try:
             counts = [int(token) for token in str(value).split(",")]
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             self.fail(f"{self.label} must be comma-separated positive integers", param, ctx)
         if not counts or any(count <= 0 for count in counts):
             self.fail(f"{self.label} must be comma-separated positive integers", param, ctx)

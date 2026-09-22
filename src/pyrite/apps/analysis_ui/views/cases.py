@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.plots.altair.spectra import multi_case_spectrum_chart
 
 from ..controls import axes_panel

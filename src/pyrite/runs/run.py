@@ -233,7 +233,7 @@ def run_sweep(
             key = content_key_fn(case)
             _checkpoint_store.cas_blob_path(material, key, cas_root)
             return key
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
 
     def _crystal_of(rec_map):
@@ -310,7 +310,7 @@ def run_sweep(
             try:
                 with open(manifest_path) as handle:
                     existing_identity = json.load(handle).get("dataset_identity")
-            except (OSError, ValueError, TypeError):
+            except OSError, ValueError, TypeError:
                 pass
         if isinstance(existing_identity, dict):
             from ..campaign.profiles import normalize_dataset_identity
@@ -411,7 +411,7 @@ def run_sweep(
                 continue
             try:
                 out = _checkpoint_store.cas_load(material, key, cas_root)
-            except (OSError, EOFError, pickle.UnpicklingError):
+            except OSError, EOFError, pickle.UnpicklingError:
                 continue
             if not _valid_cas_payload(out):
                 continue

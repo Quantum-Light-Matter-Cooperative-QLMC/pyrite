@@ -5,8 +5,6 @@ resolves through the config store -- so it lives in
 :mod:`pyrite.console.config`.
 """
 
-from __future__ import annotations
-
 import os
 import tempfile
 from pathlib import Path

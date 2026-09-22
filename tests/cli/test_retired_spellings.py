@@ -8,8 +8,6 @@ thing that matters to a user who typed one: it is refused, not silently
 ignored.
 """
 
-from __future__ import annotations
-
 import click
 import pytest
 

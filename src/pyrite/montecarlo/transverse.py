@@ -9,8 +9,6 @@ primary swept axis and geometric emittance is not invariant across it. See
 ``docs/physics/beam-transport/beam-phase-space.md``.
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any

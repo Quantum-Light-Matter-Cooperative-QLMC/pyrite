@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.apps.analyze import (
     apply_characteristic,
     apply_emission,

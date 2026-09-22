@@ -14,8 +14,6 @@ Requires network access. Run whenever a ``cod_id`` / ``mp_id`` is added or an
 external record is known to have changed; commit the refreshed JSON.
 """
 
-from __future__ import annotations
-
 import sys
 from pathlib import Path
 

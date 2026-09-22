@@ -1,7 +1,5 @@
 """Canonical grouped CLI for local checkpoint operations."""
 
-from __future__ import annotations
-
 import click
 
 from ...console.output import run

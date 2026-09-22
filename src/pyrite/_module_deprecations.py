@@ -12,8 +12,6 @@ so 0.3.0 is the release the two-minor window counts from -- an import path that
 never warned has not spent its window (issue #68).
 """
 
-from __future__ import annotations
-
 import warnings
 from dataclasses import dataclass
 

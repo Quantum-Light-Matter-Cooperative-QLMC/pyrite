@@ -6,8 +6,6 @@ lives here, in `cli/`, which is allowed to reach down into `remote`
 (issue #64, finding 2).
 """
 
-from __future__ import annotations
-
 import click
 
 from ..remote.config import validate_remote_target

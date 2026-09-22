@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.plots.altair.spectra import compare_spectrum_chart
 from pyrite.results import records, select_results, sweep_values
 

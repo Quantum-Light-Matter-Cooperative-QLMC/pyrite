@@ -10,8 +10,6 @@ This lives at the package root because the callers span `cli/`, `runs/` and
 packages import the CLI (issue #64, finding 2).
 """
 
-from __future__ import annotations
-
 import re
 import tomllib
 from functools import lru_cache
@@ -27,7 +25,7 @@ def _section_keys(section: str) -> tuple[str, ...]:
     try:
         with (data_dir() / "materials.toml").open("rb") as source:
             table = tomllib.load(source).get(section, {})
-    except (OSError, tomllib.TOMLDecodeError):
+    except OSError, tomllib.TOMLDecodeError:
         return ()
     if not isinstance(table, dict):
         return ()

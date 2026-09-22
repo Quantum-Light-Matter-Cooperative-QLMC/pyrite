@@ -1,7 +1,5 @@
 """Govern compatibility-module removal metadata against the live package tree."""
 
-from __future__ import annotations
-
 import ast
 import importlib
 import sys

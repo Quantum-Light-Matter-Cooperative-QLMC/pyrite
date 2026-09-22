@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.apps._design import apply_altair_theme
 from pyrite.plots.altair.sweeps import heatmap_select_chart
 from pyrite.plots.mpl.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES

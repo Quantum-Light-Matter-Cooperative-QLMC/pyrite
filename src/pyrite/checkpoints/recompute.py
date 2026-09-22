@@ -23,8 +23,6 @@ so the chunked remote queue self-resubmits.
 Click wiring for these lives in :mod:`pyrite.cli.commands.recompute`.
 """
 
-from __future__ import annotations
-
 import time
 from pathlib import Path
 
@@ -138,7 +136,7 @@ def rebrem_checkpoints(
                     context.fidelity,
                     catalog_profile=context.catalog_profile,
                 )
-            except (KeyError, TypeError, ValueError):
+            except KeyError, TypeError, ValueError:
                 # Derived stems (for example ``*_blazed``) have no catalog row.
                 # Keep their stored grid while still applying profile Ne/provenance.
                 pass
@@ -162,7 +160,7 @@ def rebrem_checkpoints(
                 else:
                     try:
                         profile_start, _profile_stop, profile_step = uniform_bounds(profile_grid)
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
                     else:
                         if resolved_start is None:

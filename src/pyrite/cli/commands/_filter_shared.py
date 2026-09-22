@@ -1,7 +1,5 @@
 """Filter/physical-detector CLI parsing and TOML resolution."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from typing import Any, NotRequired, TypedDict, cast
 

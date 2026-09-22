@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.devtools.cli_commands import performance_command
 from tests.helpers.cli import assert_clean_result, invoke
 

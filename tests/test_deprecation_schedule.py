@@ -14,8 +14,6 @@ removal target, so a new family cannot be added without either appearing here
 or being conspicuously absent.
 """
 
-from __future__ import annotations
-
 import pytest
 
 from pyrite import __version__

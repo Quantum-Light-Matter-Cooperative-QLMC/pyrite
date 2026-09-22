@@ -1,7 +1,5 @@
 """Low-level typed calculation-numerics policy and profile validation."""
 
-from __future__ import annotations
-
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, cast

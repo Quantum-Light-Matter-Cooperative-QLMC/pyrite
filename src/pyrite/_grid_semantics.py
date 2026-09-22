@@ -18,8 +18,6 @@ Nothing here changes a uniform-grid result: :func:`require_uniform_grid` returns
 exactly ``float(E[1] - E[0])``, the value its callers already used.
 """
 
-from __future__ import annotations
-
 import hashlib
 
 import numpy as np

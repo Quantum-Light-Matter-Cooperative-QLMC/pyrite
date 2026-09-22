@@ -17,8 +17,6 @@ Nothing here relaxes a CPU assertion: every tolerance helper reproduces the
 historical fp64 bound exactly when ``REAL`` is float64.
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import numpy as np

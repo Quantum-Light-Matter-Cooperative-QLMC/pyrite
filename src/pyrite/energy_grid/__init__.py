@@ -10,5 +10,3 @@ The ``pyrite energy-grid`` command group lives in
 sit here as ``_command`` and be re-exported lazily, which put this package and
 ``cli`` in an import cycle; nothing in this package reaches up to it now.
 """
-
-from __future__ import annotations

@@ -5,8 +5,6 @@ They are provenance records and artifact-GC roots; paused or failed runs must
 not claim a completed lock.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import tempfile

@@ -6,8 +6,6 @@ modules on demand -- and the deprecation machinery it extends -- stays in the
 package that owns the command tree.
 """
 
-from __future__ import annotations
-
 import importlib
 from collections.abc import Mapping, Sequence
 from copy import copy

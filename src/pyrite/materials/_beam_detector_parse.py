@@ -1,7 +1,5 @@
 """Beam and detector row parsing for material-catalog profiles."""
 
-from __future__ import annotations
-
 import math
 import warnings
 from collections.abc import Mapping

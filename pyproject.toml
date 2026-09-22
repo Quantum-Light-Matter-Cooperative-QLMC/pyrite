@@ -394,7 +394,6 @@ forbidden_modules = ["pyrite._dev"]
 allow_indirect_imports = true
 
 [tool.ruff]
-target-version = "py313"
 line-length = 100
 
 # keep this tight; avoid duplicate exclusion logic

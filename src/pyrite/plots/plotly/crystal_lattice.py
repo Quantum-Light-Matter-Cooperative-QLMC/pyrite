@@ -7,8 +7,6 @@ direct lattice vectors, and render atoms as element-colored spheres with the
 unit-cell edges and strongest reciprocal-lattice vectors overlaid.
 """
 
-from __future__ import annotations
-
 from collections.abc import Sequence
 
 import numpy as np

@@ -1,7 +1,5 @@
 """Canonical grouped checkpoint CLI paths."""
 
-from __future__ import annotations
-
 import click
 
 from pyrite.checkpoints import checkpoint_cleanup as cleanup

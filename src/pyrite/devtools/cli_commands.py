@@ -1,7 +1,5 @@
 """Click command trees relocated from the user CLI to ``pyrite-dev``."""
 
-from __future__ import annotations
-
 import click
 
 from pyrite.cli._groups import LazyGroup

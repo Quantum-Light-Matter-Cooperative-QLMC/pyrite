@@ -1,7 +1,5 @@
 """Public dispatch contract for the grouped interactive applications."""
 
-from __future__ import annotations
-
 import importlib
 
 from click.testing import CliRunner

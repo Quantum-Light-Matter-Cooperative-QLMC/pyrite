@@ -7,8 +7,6 @@ is intentionally imported directly rather than re-exported from
 :mod:`pyrite.plots`, whose legacy export set is frozen.
 """
 
-from __future__ import annotations
-
 import numpy as np
 import plotly.graph_objects as go
 

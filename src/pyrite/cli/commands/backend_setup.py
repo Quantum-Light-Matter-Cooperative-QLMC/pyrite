@@ -8,8 +8,6 @@ them first would defeat the point. See ``pyrite._backend.select_backend``
 for the runtime-side counterpart this command does not touch.
 """
 
-from __future__ import annotations
-
 import shutil
 import subprocess
 import sys
@@ -57,7 +55,7 @@ def _has_device_nodes(pattern: str) -> bool:
 def _run_text(cmd: list[str]) -> str | None:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, check=False)
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError, subprocess.TimeoutExpired:
         return None
     if result.returncode != 0:
         return None

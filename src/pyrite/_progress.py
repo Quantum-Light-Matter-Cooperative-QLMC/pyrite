@@ -1,7 +1,5 @@
 """Shared progress-record persistence for run and checkpoint drivers."""
 
-from __future__ import annotations
-
 import json
 import math
 import os
@@ -22,7 +20,7 @@ class _ProgressTimer:
             return
         try:
             previous = json.loads(Path(path).read_text(encoding="utf-8"))
-        except (OSError, ValueError, TypeError):
+        except OSError, ValueError, TypeError:
             return
         if not isinstance(previous, dict):
             return

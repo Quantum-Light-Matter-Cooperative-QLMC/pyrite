@@ -10,8 +10,6 @@ The one retiring thing in this area is the public door,
 `Sweep.from_legacy()`, which is scheduled in `campaign.model`.
 """
 
-from __future__ import annotations
-
 from dataclasses import replace
 from typing import Any
 

@@ -8,8 +8,6 @@ Only :func:`geometric_continuum_grid`, which nothing outside this package
 needs, is defined here.
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from .._photon_continuum_floor import (

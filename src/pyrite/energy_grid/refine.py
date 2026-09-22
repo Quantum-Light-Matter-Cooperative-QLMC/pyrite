@@ -30,8 +30,6 @@ on a different axis and are owned by issue #101
 (:mod:`pyrite._line_windows`); nothing here plans a line grid.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, overload

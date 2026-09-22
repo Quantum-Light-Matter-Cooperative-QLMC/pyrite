@@ -88,7 +88,7 @@ def _is_json_content(text: str) -> bool:
     try:
         json.loads(text)
         return True
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return False
 
 
@@ -134,7 +134,7 @@ def detect_file_type(filepath: Path) -> str:
     if not ext:
         try:
             text = filepath.read_text(errors="ignore")
-        except (OSError, PermissionError):
+        except OSError, PermissionError:
             return "unknown"
 
         lines = text.splitlines()[:50]

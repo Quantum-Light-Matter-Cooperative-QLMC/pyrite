@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite._formatting import fmt_thickness
 from pyrite.apps._design import apply_altair_theme
 

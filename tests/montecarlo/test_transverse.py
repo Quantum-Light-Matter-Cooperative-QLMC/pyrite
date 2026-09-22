@@ -4,8 +4,6 @@ Validation: beam-phase-space-injection
 Validation: beam-energy-spread-injection
 """
 
-from __future__ import annotations
-
 from dataclasses import asdict
 
 import numpy as np

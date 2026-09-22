@@ -10,8 +10,6 @@ reason: it is a config lookup that returns a path, so it belongs above the path
 constants, not beside them.
 """
 
-from __future__ import annotations
-
 import os
 import tempfile
 import tomllib

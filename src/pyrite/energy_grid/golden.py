@@ -13,8 +13,6 @@ import the ``CATALOG`` singleton -- forcing a fresh disk load, never a stale
 in-memory catalog.
 """
 
-from __future__ import annotations
-
 import difflib
 import hashlib
 import json

@@ -17,8 +17,6 @@ Both registries are empty at 0.3.0: the 0.1.0 cohort reached its target and was
 removed. What remains here is the substrate, not leftovers.
 """
 
-from __future__ import annotations
-
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass

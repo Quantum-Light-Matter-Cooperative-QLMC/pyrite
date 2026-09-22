@@ -1,7 +1,5 @@
 """Analyze ``cxr.performance.v1`` NDJSON logs into comparable artifacts."""
 
-from __future__ import annotations
-
 import csv
 import hashlib
 import json

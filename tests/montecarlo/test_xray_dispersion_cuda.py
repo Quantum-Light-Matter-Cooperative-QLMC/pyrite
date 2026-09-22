@@ -11,8 +11,6 @@ the pre-existing kernels.
 See ledger ``xray-in-medium-propagation-phase``.
 """
 
-from __future__ import annotations
-
 import os
 import pathlib
 import subprocess

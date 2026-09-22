@@ -48,8 +48,6 @@ Run:  uv run python checks/coherent_transverse_coherence.py
       uv run python checks/coherent_transverse_coherence.py --quick
 """
 
-from __future__ import annotations
-
 import argparse
 import time
 

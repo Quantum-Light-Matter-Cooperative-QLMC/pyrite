@@ -4,8 +4,6 @@ Split out of ``runner/__init__`` to keep that module inside the source-size
 budget; it is runner-internal and has no other consumer.
 """
 
-from __future__ import annotations
-
 import warnings
 
 import numpy as np
@@ -78,7 +76,7 @@ def _cached_grid(cached):
         return np.linspace(cached["start_eV"], cached["stop_eV"], int(cached["num"]))
     try:
         return window_plan_from_payload(plan_payload).coordinates()
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return None
 
 

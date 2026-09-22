@@ -82,7 +82,7 @@ def _remote_meta_json(stem):
     try:
         mtime = float(mtime_line)
         meta = json.loads(body)
-    except (ValueError, TypeError, json.JSONDecodeError):
+    except ValueError, TypeError, json.JSONDecodeError:
         return None
     return mtime, meta
 

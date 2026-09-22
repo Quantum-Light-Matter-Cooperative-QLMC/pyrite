@@ -1,7 +1,5 @@
 """Unit tests for ``remote run`` flag-compatibility resolution."""
 
-from __future__ import annotations
-
 import re
 
 import click

@@ -1,7 +1,5 @@
 """Regression checks for the marimo analysis app's static UI wiring."""
 
-from __future__ import annotations
-
 import ast
 from pathlib import Path
 

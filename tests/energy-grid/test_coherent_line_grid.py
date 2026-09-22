@@ -6,8 +6,6 @@ span of that quantity. These pin the derivation and the refusal, not the
 measured convergence ladder, which is heavy and lives in the validation doc.
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.plots import plot_best_spectra
 from pyrite.plots.altair.spectra import spectrum_chart
 from pyrite.plots.altair.sweeps import metric_vs_chart, scan_charts

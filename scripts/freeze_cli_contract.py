@@ -5,8 +5,6 @@ Usage:
     python scripts/freeze_cli_contract.py --check tests/data/cli_contract.json
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 from pathlib import Path

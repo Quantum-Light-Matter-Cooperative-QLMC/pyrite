@@ -1,7 +1,5 @@
 """Small environment helpers shared by PyRITE runtime entry points."""
 
-from __future__ import annotations
-
 import os
 from typing import overload
 

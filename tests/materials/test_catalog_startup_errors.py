@@ -1,7 +1,5 @@
 """Regression tests for catalog failures during ordinary CLI startup."""
 
-from __future__ import annotations
-
 import subprocess
 import sys
 

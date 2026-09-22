@@ -6,8 +6,6 @@ and ``tests/dev/test_doc_blocks.py``). No block is executed or checked here;
 this module only parses markdown structure.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from pathlib import Path

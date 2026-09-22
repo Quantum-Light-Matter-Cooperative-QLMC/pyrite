@@ -1,7 +1,5 @@
 """Parsing and validation for schema-version-1 material catalogs."""
 
-from __future__ import annotations
-
 import logging
 import re
 from collections import Counter

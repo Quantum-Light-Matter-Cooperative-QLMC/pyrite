@@ -1,7 +1,5 @@
 """Material-membership helpers shared by the catalog profile commands."""
 
-from __future__ import annotations
-
 from pyrite.campaign import profile_edit as _profile_edit
 
 

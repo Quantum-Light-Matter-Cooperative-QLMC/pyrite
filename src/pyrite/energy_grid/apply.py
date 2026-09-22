@@ -12,8 +12,6 @@ manual/derived tracking (brem bounds aren't governed by decision 3).
 Candidate catalogs are fully validated before replacement.
 """
 
-from __future__ import annotations
-
 import difflib
 import json
 import math

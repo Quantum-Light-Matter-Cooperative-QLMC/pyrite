@@ -335,7 +335,7 @@ def _compute_time_estimate(records, materials=(), *, use_cost=False, parallel_ma
         return {"elapsed": None, "remaining": None, "total": None}
     try:
         parallel = max(1, int(parallel_materials))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         parallel = 1
     seconds = []
     measured_fraction = 0.0
@@ -416,7 +416,7 @@ def _format_now_testing(current):
             f"azim {float(current['azimuth_deg']):g}° · "
             f"{float(current['thickness_um']):g} µm"
         )
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return ""
 
 
@@ -484,14 +484,14 @@ def _format_compute_usage(payload):
     for label, percent_key, absolute_keys, color in specs:
         try:
             percent = min(100.0, max(0.0, float(fields[percent_key])))
-        except (KeyError, ValueError):
+        except KeyError, ValueError:
             continue
         suffix = ""
         if absolute_keys is not None:
             try:
                 used = float(fields[absolute_keys[0]])
                 total = float(fields[absolute_keys[1]])
-            except (KeyError, ValueError):
+            except KeyError, ValueError:
                 pass
             else:
                 if percent_key == "memory_percent":
@@ -511,7 +511,7 @@ def _format_performance_profiles(payload):
     for line in payload.splitlines():
         try:
             record = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             continue
         if not isinstance(record, dict) or record.get("schema") != "cxr.performance.v1":
             continue

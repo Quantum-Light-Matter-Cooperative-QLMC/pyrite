@@ -28,8 +28,6 @@ Dominant-line FWHM and the line/background ratio come from
 half-maximum crossings (#110), not sample counts times one spacing.
 """
 
-from __future__ import annotations
-
 import hashlib
 import math
 import resource

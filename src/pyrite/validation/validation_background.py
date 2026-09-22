@@ -5,8 +5,6 @@ analysis-only operations used to compare a simulated or measured spectrum with
 an externally generated, already detector-normalized bremsstrahlung spectrum.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from os import PathLike
 

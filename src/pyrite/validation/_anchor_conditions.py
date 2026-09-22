@@ -5,8 +5,6 @@ cross-checks. Public compatibility imports remain in
 :mod:`pyrite.validation.anchor_figures`.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, replace
 
 import numpy as np

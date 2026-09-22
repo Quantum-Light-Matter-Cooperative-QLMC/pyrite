@@ -5,8 +5,6 @@ Usage:
     uv run pyrite-dev cli-reference --check
 """
 
-from __future__ import annotations
-
 import argparse
 import re
 from pathlib import Path

@@ -22,8 +22,6 @@ rung; a resumed configuration re-runs its fixed-seed transport and refuses to
 continue unless the segment fingerprint is identical to the stored one.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import math

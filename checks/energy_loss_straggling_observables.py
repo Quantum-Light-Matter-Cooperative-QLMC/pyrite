@@ -32,8 +32,6 @@ Run:
   uv run python checks/energy_loss_straggling_observables.py --output REPORT.json
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os

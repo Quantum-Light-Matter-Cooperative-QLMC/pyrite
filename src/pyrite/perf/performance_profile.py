@@ -1,7 +1,5 @@
 """Low-overhead NDJSON resource profiling for scan workloads."""
 
-from __future__ import annotations
-
 import json
 import math
 import os
@@ -24,7 +22,7 @@ DEFAULT_INTERVAL_SECONDS = 5.0
 def _optional_float(value: str) -> float | None:
     try:
         parsed = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     return parsed if math.isfinite(parsed) else None
 
@@ -61,7 +59,7 @@ def _gpu_metrics() -> dict[str, Any]:
             timeout=2,
             check=False,
         )
-    except (OSError, subprocess.SubprocessError):
+    except OSError, subprocess.SubprocessError:
         return empty
     if result.returncode != 0 or not result.stdout.strip():
         return empty
@@ -93,7 +91,7 @@ def _process_tree_metrics(
 ) -> dict[str, int | float]:
     try:
         processes = [root, *root.children(recursive=True)]
-    except (psutil.Error, OSError):
+    except psutil.Error, OSError:
         processes = [root]
     live_pids = {process.pid for process in processes}
     for pid in tuple(known_processes):
@@ -127,7 +125,7 @@ def _process_tree_metrics(
             switches = tracked.num_ctx_switches()
             context_switches += switches.voluntary + switches.involuntary
             alive += 1
-        except (psutil.Error, OSError):
+        except psutil.Error, OSError:
             continue
     return {
         "process_cpu_percent": round(cpu_percent, 2),
@@ -150,21 +148,21 @@ def _process_tree_metrics(
 def _optional_int_env(name: str) -> int | None:
     try:
         return int(os.environ[name])
-    except (KeyError, TypeError, ValueError):
+    except KeyError, TypeError, ValueError:
         return None
 
 
 def _cpu_affinity_count(process: psutil.Process) -> int | None:
     try:
         return len(process.cpu_affinity())
-    except (AttributeError, psutil.Error, OSError):
+    except AttributeError, psutil.Error, OSError:
         return None
 
 
 def _cpu_frequency_mhz() -> float | None:
     try:
         frequency = psutil.cpu_freq()
-    except (AttributeError, OSError, RuntimeError):
+    except AttributeError, OSError, RuntimeError:
         return None
     return frequency.current if frequency is not None and math.isfinite(frequency.current) else None
 
@@ -222,7 +220,7 @@ class PerformanceLogger:
         cpu_times = psutil.cpu_times_percent(interval=None)
         try:
             load1, load5, load15 = os.getloadavg()
-        except (AttributeError, OSError):
+        except AttributeError, OSError:
             load1 = load5 = load15 = None
         record = {
             "schema": PROFILE_SCHEMA,

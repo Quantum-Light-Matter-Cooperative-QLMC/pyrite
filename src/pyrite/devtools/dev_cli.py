@@ -34,8 +34,6 @@ Commands:
     validation-records run one standalone check and write its evidence records
 """
 
-from __future__ import annotations
-
 import argparse
 import fnmatch
 import os

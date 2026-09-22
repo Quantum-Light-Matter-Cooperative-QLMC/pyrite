@@ -1,7 +1,5 @@
 """Check literal ``docs/...`` references outside Sphinx's link graph."""
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 from pathlib import Path

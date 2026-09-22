@@ -6,8 +6,6 @@ script retains the useful analytic-versus-transport count comparison without a
 second set of geometry constants or Monte-Carlo calls.
 """
 
-from __future__ import annotations
-
 import argparse
 
 from tabulate import tabulate

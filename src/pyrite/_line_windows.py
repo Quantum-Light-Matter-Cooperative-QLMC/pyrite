@@ -19,8 +19,6 @@ A package-root leaf (``numpy`` and ``_grid_semantics`` only), importable from
 every layer that resolves a line grid, like ``_line_grid_policy``.
 """
 
-from __future__ import annotations
-
 import math
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
@@ -46,7 +44,7 @@ LINE_WINDOW_PLAN_SCHEMA = 1
 def _finite(value: Any, name: str) -> float:
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise ValueError(f"{name} must be a finite number, got {value!r}") from None
     if not math.isfinite(number):
         raise ValueError(f"{name} must be finite, got {value!r}")

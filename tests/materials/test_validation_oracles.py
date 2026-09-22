@@ -1,7 +1,5 @@
 """Optional validation-oracle backend tests."""
 
-from __future__ import annotations
-
 from types import SimpleNamespace
 
 import numpy as np

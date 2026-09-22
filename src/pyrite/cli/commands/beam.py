@@ -1,7 +1,5 @@
 """Manage named catalog beams (``[beams.*]`` objects, attachable to profiles)."""
 
-from __future__ import annotations
-
 import difflib
 import re
 from pathlib import Path

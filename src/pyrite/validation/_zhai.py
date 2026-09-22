@@ -1,7 +1,5 @@
 """Canonical detector and cache metadata for maintained Zhai validations."""
 
-from __future__ import annotations
-
 from dataclasses import asdict
 from math import radians
 from typing import Any

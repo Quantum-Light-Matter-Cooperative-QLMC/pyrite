@@ -6,8 +6,6 @@ and stop-sentinel contracts without pretending the diagnostic is a material
 checkpoint job.
 """
 
-from __future__ import annotations
-
 import argparse
 import math
 import re

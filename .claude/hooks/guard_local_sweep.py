@@ -119,7 +119,7 @@ def _override_active(command: str) -> bool:
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return 0
 
     command = (payload.get("tool_input") or {}).get("command") or ""

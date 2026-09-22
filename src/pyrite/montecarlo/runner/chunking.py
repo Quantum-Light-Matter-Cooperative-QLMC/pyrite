@@ -20,7 +20,7 @@ def _env_chunk(name, default):
     wins. Unset / blank / non-positive / non-integer -> the memory-safe default."""
     try:
         v = int(env_value(name, ""))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
     return v if v > 0 else default
 

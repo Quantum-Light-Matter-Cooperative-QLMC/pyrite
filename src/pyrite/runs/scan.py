@@ -686,7 +686,7 @@ def _run_material(args, material, max_seconds=None):
                     cached_cases=previous["cached_cases"],
                     completed_new_cases=previous["completed_new_cases"],
                 )
-        except (OSError, ValueError, TypeError):
+        except OSError, ValueError, TypeError:
             pass
     latest_case = {}
     last_completed_case = {}

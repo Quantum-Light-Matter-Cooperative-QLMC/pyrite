@@ -1,7 +1,5 @@
 """Terminal-color contract for human and machine CLI output."""
 
-from __future__ import annotations
-
 import json
 
 import pytest

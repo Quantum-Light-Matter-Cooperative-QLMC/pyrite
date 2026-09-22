@@ -17,8 +17,6 @@ physics sign-off.
 Validation: dans-diffraction-oracle
 """
 
-from __future__ import annotations
-
 import os
 import sys
 

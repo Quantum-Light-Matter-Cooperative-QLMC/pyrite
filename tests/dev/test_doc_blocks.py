@@ -21,8 +21,6 @@ checked, never run (they mutate workspaces, reach remotes, launch Monte Carlo
 runs). The Python blocks are the one tier that *is* executed, deliberately.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import numpy as np

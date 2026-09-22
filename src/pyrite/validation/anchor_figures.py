@@ -34,8 +34,6 @@ Run (CPU-force on a box with the cupy wheel but no CUDA device):
   uv run python -c "import sys;sys.modules['cupy']=None;from pyrite.validation.anchor_figures import main;main()"
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import os

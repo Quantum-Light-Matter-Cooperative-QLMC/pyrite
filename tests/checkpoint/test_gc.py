@@ -1,7 +1,5 @@
 """``checkpoint gc``: exact case identity, preview, and confirmed rewrite."""
 
-from __future__ import annotations
-
 import json
 
 from pyrite.checkpoints import _checkpoint_store

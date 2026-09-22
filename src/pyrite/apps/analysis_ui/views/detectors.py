@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.plots import (
     plot_eaglexo_charge_map,
     plot_eaglexo_efficiency,

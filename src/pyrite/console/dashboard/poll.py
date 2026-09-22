@@ -27,7 +27,7 @@ class KeyListener:
                 fd = sys.stdin.fileno()
                 old = termios.tcgetattr(fd)
                 tty.setcbreak(fd)
-            except (OSError, ValueError, termios.error):
+            except OSError, ValueError, termios.error:
                 return
             self._restore = lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
             self._thread = threading.Thread(target=self._poll_posix, args=(fd,), daemon=True)

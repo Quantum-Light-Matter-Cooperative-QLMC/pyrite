@@ -1,7 +1,5 @@
 """Public scene, numerics, analysis, and path-addressed sweep objects."""
 
-from __future__ import annotations
-
 import re
 import warnings
 from collections.abc import Mapping, Sequence

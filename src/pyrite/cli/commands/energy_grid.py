@@ -7,8 +7,6 @@ modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 ``pyrite`` startup stays cheap.
 """
 
-from __future__ import annotations
-
 import contextlib
 import tempfile
 from pathlib import Path

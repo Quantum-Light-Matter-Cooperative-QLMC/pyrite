@@ -41,8 +41,6 @@ evaluated in FP64 and cast to the working precision only as a finished bin mean.
 Validation: sinc-bin-integration
 """
 
-from __future__ import annotations
-
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp

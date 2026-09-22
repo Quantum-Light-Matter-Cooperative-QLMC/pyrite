@@ -1,7 +1,5 @@
 """User-facing energy-grid views below physical CLI nouns."""
 
-from __future__ import annotations
-
 import click
 
 from .._groups import LazyGroup

@@ -261,7 +261,7 @@ def _local_revision() -> tuple[str, bool]:
                 text=True,
                 timeout=30,
             )
-        except (OSError, subprocess.SubprocessError):
+        except OSError, subprocess.SubprocessError:
             return None
         return result.stdout.strip() if result.returncode == 0 else None
 

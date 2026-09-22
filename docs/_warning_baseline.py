@@ -1,7 +1,5 @@
 """Fail on documentation warnings outside the checked autodoc debt baseline."""
 
-from __future__ import annotations
-
 import hashlib
 import logging
 import os
@@ -50,13 +48,13 @@ class AutodocWarningBaseline(logging.Filter):
         try:
             relative_source = source.resolve().relative_to(self.source_root)
             source_name = f"src/{relative_source.as_posix()}"
-        except (OSError, ValueError):
+        except OSError, ValueError:
             if self.generated_root is None:
                 return True
             try:
                 relative_source = source.resolve().relative_to(self.generated_root)
                 source_name = f"docs/_autosummary/{relative_source.as_posix()}"
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 return True
 
         subtype = getattr(record, "subtype", "")

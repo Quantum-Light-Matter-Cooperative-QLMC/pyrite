@@ -1,7 +1,5 @@
 """Electron-impact characteristic x rays from EEDL and xraydb data."""
 
-from __future__ import annotations
-
 import hashlib
 import re
 import warnings
@@ -163,7 +161,7 @@ def _level_width_eV(core_widths: Mapping[str, object], level: str) -> float | No
         value = core_widths.get(label)
         try:
             width = float(str(value))
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             continue
         if np.isfinite(width) and width >= 0.0:
             widths.append(width)

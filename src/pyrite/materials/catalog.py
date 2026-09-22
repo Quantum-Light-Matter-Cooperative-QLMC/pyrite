@@ -4,8 +4,6 @@ The public module owns catalog loading, caching, and the default singleton. Sche
 records and parsing helpers live in private sibling modules.
 """
 
-from __future__ import annotations
-
 import functools
 import tomllib
 from collections.abc import Mapping

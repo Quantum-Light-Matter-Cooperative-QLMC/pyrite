@@ -6,8 +6,6 @@ package import `cli`, which `cli` imports back -- the same cycle the
 energy-grid group was moved out of (issue #64, finding 2).
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import click

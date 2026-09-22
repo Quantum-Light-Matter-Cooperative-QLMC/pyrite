@@ -1,7 +1,5 @@
 """Post-P0 argparse contract frozen for Click migration."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 

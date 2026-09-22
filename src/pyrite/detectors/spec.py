@@ -1,7 +1,5 @@
 """Detector acceptance, photon-energy binning, and read-time scoring."""
 
-from __future__ import annotations
-
 import math
 import warnings
 from collections.abc import Mapping

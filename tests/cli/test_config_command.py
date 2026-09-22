@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pyrite.cli.commands import config as config_command
 from pyrite.cli.commands import scan
 from pyrite.console import config as _config

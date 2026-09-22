@@ -6,8 +6,6 @@ explicitly selected datasets. The drivers live in
 tests can substitute them.
 """
 
-from __future__ import annotations
-
 import click
 
 from .. import _completion as _cli_completion

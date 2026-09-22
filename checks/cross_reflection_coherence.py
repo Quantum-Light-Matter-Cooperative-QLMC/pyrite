@@ -38,8 +38,6 @@ Run:  uv run python checks/cross_reflection_coherence.py
       uv run python checks/cross_reflection_coherence.py --quick
 """
 
-from __future__ import annotations
-
 import argparse
 import itertools
 import time

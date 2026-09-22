@@ -5,8 +5,6 @@ domain values into versioned envelopes, so callers can emit exactly one JSON
 value without capturing human-oriented stdout.
 """
 
-from __future__ import annotations
-
 import datetime as dt
 import json
 import math

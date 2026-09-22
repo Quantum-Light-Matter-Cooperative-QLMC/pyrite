@@ -5,8 +5,6 @@ separate explicit operation and fails closed whenever any reachability input
 changed after the plan was made.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import math

@@ -1,7 +1,5 @@
 """Lazy ``pyrite app`` hierarchy for interactive marimo applications."""
 
-from __future__ import annotations
-
 from copy import copy
 from importlib import import_module
 

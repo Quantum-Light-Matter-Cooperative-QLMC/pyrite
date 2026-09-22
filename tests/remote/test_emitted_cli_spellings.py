@@ -13,8 +13,6 @@ updated to match the scripts, not the CLI. These tests resolve what is emitted
 against `pyrite.cli.command` itself, so a future retirement fails here.
 """
 
-from __future__ import annotations
-
 import re
 from pathlib import Path
 

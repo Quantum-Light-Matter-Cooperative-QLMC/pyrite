@@ -1,7 +1,5 @@
 """Shared TOML helpers for catalog-editing CLI commands."""
 
-from __future__ import annotations
-
 import os
 import tempfile
 from pathlib import Path

@@ -202,7 +202,7 @@ def _stem_dataset_identity(stem: str, checkpoint_dir: Path | str) -> dict[str, o
     try:
         with manifest.open() as handle:
             return json.load(handle).get("dataset_identity")
-    except (OSError, ValueError, TypeError):
+    except OSError, ValueError, TypeError:
         return None
 
 

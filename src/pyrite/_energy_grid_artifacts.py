@@ -14,8 +14,6 @@ collect. It therefore sits at the package root, below both, rather than inside
 ``energy_grid/`` where it was the one leaf in an otherwise driver-level package.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import math

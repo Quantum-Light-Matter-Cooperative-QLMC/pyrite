@@ -1,7 +1,5 @@
 """Inspect effective material ranges and edit per-profile overrides."""
 
-from __future__ import annotations
-
 import difflib
 from collections.abc import Mapping
 from dataclasses import replace

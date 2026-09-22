@@ -91,8 +91,6 @@ Not a ledgered physics claim: slice A produces a measurement and a sequencing
 decision, not a new model.  No `Validation:` marker.
 """
 
-from __future__ import annotations
-
 import argparse
 from contextlib import contextmanager
 

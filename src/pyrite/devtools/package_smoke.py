@@ -1,7 +1,5 @@
 """Build and install pyrite-xray from wheel and editable source in clean uv venvs."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess

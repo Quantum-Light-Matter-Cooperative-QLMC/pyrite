@@ -1,7 +1,5 @@
 """Focused checks for the strict documentation warning boundary."""
 
-from __future__ import annotations
-
 import importlib.util
 import logging
 from pathlib import Path

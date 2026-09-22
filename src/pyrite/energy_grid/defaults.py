@@ -6,8 +6,6 @@ source of standing defaults that `--set-default` / `defaults --set` update. Empt
 today's behavior -- so a missing file reproduces current output exactly.
 """
 
-from __future__ import annotations
-
 import math
 import os
 import tempfile

@@ -7,8 +7,6 @@ Used for sticky-manual protection in `apply` and for `show`. Absent file == no
 provenance (everything "derived").
 """
 
-from __future__ import annotations
-
 import json
 import os
 import tempfile

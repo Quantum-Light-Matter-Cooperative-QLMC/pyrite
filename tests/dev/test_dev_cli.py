@@ -1,7 +1,5 @@
 """Tests for the repository developer command runner."""
 
-from __future__ import annotations
-
 from argparse import Namespace
 
 import pytest

@@ -1,7 +1,5 @@
 """EEDL bremsstrahlung parsing, interpolation, and backend selection."""
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 

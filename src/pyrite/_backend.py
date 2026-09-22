@@ -13,8 +13,6 @@ so callers that must stay cheap at import time reach for it inside the function
 that needs a device.
 """
 
-from __future__ import annotations
-
 import logging
 import warnings
 from dataclasses import dataclass

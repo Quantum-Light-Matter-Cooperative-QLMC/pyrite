@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from pathlib import Path
 
 from pyrite.cli.commands import recompute as recompute_cli

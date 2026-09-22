@@ -7,8 +7,6 @@ acp-up``/``acp-down``. Keeping it below both leaves ``cli`` free of ``apps``
 imports, so ``apps`` stays outside the driver import cycle.
 """
 
-from __future__ import annotations
-
 import json
 import os
 import subprocess

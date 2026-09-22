@@ -5,8 +5,6 @@ CLI parsing, prompts, rendering, and atomic persistence remain in
 ``pyrite.cli.commands.profile``.
 """
 
-from __future__ import annotations
-
 import difflib
 
 import tomlkit

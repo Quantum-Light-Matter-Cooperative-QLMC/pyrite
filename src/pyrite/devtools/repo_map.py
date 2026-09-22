@@ -1,7 +1,5 @@
 """Generate the static package-dependency region in ``docs/repo_map.md``."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from pathlib import Path
 

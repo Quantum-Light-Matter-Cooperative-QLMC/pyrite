@@ -1,7 +1,5 @@
 """Bremsstrahlung spectrum and external-background loading."""
 
-from __future__ import annotations
-
 import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass

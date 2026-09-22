@@ -1,7 +1,5 @@
 """Versioned JSONL evidence records emitted by standalone validation checks."""
 
-from __future__ import annotations
-
 import json
 import subprocess
 from dataclasses import asdict, dataclass

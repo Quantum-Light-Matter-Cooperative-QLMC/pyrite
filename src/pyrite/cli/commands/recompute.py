@@ -7,8 +7,6 @@ the command surface, per the command-home rule in
 registry in :mod:`pyrite.cli._deprecations`.
 """
 
-from __future__ import annotations
-
 import io
 import time
 from contextlib import redirect_stderr, redirect_stdout

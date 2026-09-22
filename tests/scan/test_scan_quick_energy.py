@@ -5,8 +5,6 @@ deterministic beam-energy subset. Automatic profiles keep the nominal energies;
 an opt-in partial stored mapping selects only its covered energies.
 """
 
-from __future__ import annotations
-
 from dataclasses import replace
 
 import numpy as np

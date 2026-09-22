@@ -1,7 +1,5 @@
 """Typed, validated input record for one Monte Carlo simulation case."""
 
-from __future__ import annotations
-
 import math
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -311,7 +309,7 @@ class Case(Mapping[str, Any]):
 def _finite(name: str, value: object) -> None:
     try:
         finite = math.isfinite(float(cast(Any, value)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         finite = False
     if not finite:
         raise ValueError(f"{name} must be finite")

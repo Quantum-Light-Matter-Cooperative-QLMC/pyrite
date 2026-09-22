@@ -69,12 +69,12 @@ def _cgroup_cpu_quota():
             quota, period = path.read_text().split()[:2]
             if quota != "max" and int(period) > 0:
                 return max(1, int(quota) // int(period))
-        except (OSError, ValueError):
+        except OSError, ValueError:
             continue
     try:
         quota = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
         period = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return None
     return max(1, quota // period) if quota > 0 and period > 0 else None
 
@@ -96,7 +96,7 @@ def _usable_cpus():
         pass
     try:
         limits.append(int(os.environ["SLURM_CPUS_PER_TASK"]))
-    except (KeyError, ValueError):
+    except KeyError, ValueError:
         pass
     known = [limit for limit in limits if limit]
     return min(known) if known else None

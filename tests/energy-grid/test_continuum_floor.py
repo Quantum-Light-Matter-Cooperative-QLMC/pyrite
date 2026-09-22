@@ -315,7 +315,7 @@ def test_built_cases_start_inside_the_modelled_band_in_every_profile(material):
     for profile_name in _catalog_profiles():
         try:
             sweep = material_sweep(material, catalog_profile=profile_name)
-        except (KeyError, ValueError):
+        except KeyError, ValueError:
             continue  # profile does not carry this material
         start, _, step = build_cases(sweep)[0]["E_grid_brem"]
         assert start == floored_lattice_start_eV(material, step)

@@ -1,7 +1,5 @@
 """Primitive decoders for the declarative material catalog schema."""
 
-from __future__ import annotations
-
 import math
 from collections.abc import Mapping
 from types import MappingProxyType

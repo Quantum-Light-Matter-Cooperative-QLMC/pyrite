@@ -8,8 +8,6 @@ under ``PYRITE_TEST_BACKEND=cuda`` through ``test_sinc_bin_integration.py``.
 Validation: sinc-bin-integration
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 

@@ -1,7 +1,5 @@
 """Detector-geometry CLI options, validation, and TOML writers."""
 
-from __future__ import annotations
-
 import math
 
 import click
