@@ -68,11 +68,15 @@ class CodeSpec:
         checkout.
     config_key
         Context-store key that overrides every other location.
-    marker
-        A file that must exist for a candidate directory to be accepted as
-        this code's tree. Guards against a configured path pointing at an
-        empty or wrong directory, which would otherwise fail much later with a
-        confusing compiler error.
+    markers
+        Paths, relative to a candidate directory, of which at least one must
+        exist for that directory to be accepted as this code's tree. Guards
+        against a configured path pointing at an empty or wrong directory,
+        which would otherwise fail much later with a confusing compiler
+        error. A pattern containing ``*`` is globbed, because BremsLib's
+        library directory carries its own version in its name; several
+        patterns are accepted because a deposit can be unpacked either as a
+        whole or as the one directory PyRITE reads.
     digest_sources
         Source files whose bytes define the code version. Data directories are
         excluded: they are large, and upstream pins them by deposit DOI.
@@ -90,7 +94,7 @@ class CodeSpec:
     name: str
     sibling: str
     config_key: str
-    marker: str
+    markers: tuple[str, ...]
     digest_sources: tuple[str, ...]
     data_dirs: tuple[str, ...]
     programs: Mapping[str, ProgramSpec]
@@ -106,7 +110,7 @@ _ELSEPA = CodeSpec(
     name="elsepa",
     sibling="elsepa-2020",
     config_key="xsgen.elsepa_source",
-    marker="elscata.f",
+    markers=("elscata.f",),
     digest_sources=("elscata.f", "elsepa2020.f", "radial.f"),
     data_dirs=("database",),
     # ``elscata.f`` opens with ``INCLUDE 'radial.f'`` and ``INCLUDE
@@ -124,7 +128,7 @@ _SBETHE = CodeSpec(
     name="sbethe",
     sibling="sbethe",
     config_key="xsgen.sbethe_source",
-    marker="sbethe.f",
+    markers=("sbethe.f",),
     digest_sources=("sbethe.f",),
     data_dirs=("sdbase",),
     programs={"sbethe": ProgramSpec(executable="sbethe", sources=("sbethe.f",))},
@@ -133,13 +137,18 @@ _SBETHE = CodeSpec(
 )
 
 #: No programs: PyRITE reads the precomputed library in place (D7). The
-#: ``BremsLib_v2.0`` marker is the library directory rather than a source file,
-#: because the GPL-3 sources are exactly what PyRITE does not need.
+#: markers name a library *data* file rather than a source file, because the
+#: GPL-3 sources are exactly what PyRITE does not need -- and because a tree
+#: holding the codes but not the 810 MB library cannot answer a single
+#: request. The deposit unpacks to a root holding ``BremsLib_v2.0.<patch>/``
+#: beside the two code folders, and the directory name carries the patch
+#: version, so the first pattern is globbed; the second accepts a checkout
+#: pointed straight at the library directory.
 _BREMSLIB = CodeSpec(
     name="bremslib",
     sibling="BremsLib_v2.0.8",
     config_key="xsgen.bremslib_source",
-    marker="BremsLib_v2.0",
+    markers=("BremsLib_v2.0*/SDCS/SDCS_*.txt", "SDCS/SDCS_*.txt"),
     digest_sources=(),
     data_dirs=(),
     programs={},
@@ -189,7 +198,20 @@ def fetched_data_dir(code: str, name: str) -> Path:
 
 
 def _accepts(spec: CodeSpec, candidate: Path) -> bool:
-    return (candidate / spec.marker).exists()
+    return any(_marker_path(candidate, pattern) is not None for pattern in spec.markers)
+
+
+def _marker_path(candidate: Path, pattern: str) -> Path | None:
+    """Return the path ``pattern`` names under ``candidate``, or ``None``.
+
+    Globbed only when the pattern needs it: ``Path.glob`` on a literal path
+    still scans the parent directory, which for BremsLib's 86300-file
+    ``DDCS/`` is the difference between one ``stat`` and a full listing.
+    """
+    if "*" not in pattern:
+        direct = candidate / pattern
+        return direct if direct.exists() else None
+    return next((match for match in candidate.glob(pattern)), None)
 
 
 @dataclass(frozen=True)
@@ -242,7 +264,7 @@ def resolve_source(code: str, override: str | Path | None = None) -> ResolvedSou
     Raises
     ------
     SourceUnavailableError
-        If no tier yields a directory holding the code's marker file.
+        If no tier yields a directory holding one of the code's markers.
     """
     spec = code_spec(code)
     tried: list[str] = []
@@ -277,12 +299,17 @@ def resolve_source(code: str, override: str | Path | None = None) -> ResolvedSou
 def _unavailable_message(spec: CodeSpec, tried: Sequence[str]) -> str:
     locations = "\n".join(f"  - {entry}" for entry in tried)
     return (
-        f"no {spec.name} source tree found (looked for {spec.marker!r} in):\n"
+        f"no {spec.name} source tree found (looked for {_markers_text(spec)} in):\n"
         f"{locations}\n"
         f"obtain it from {spec.upstream}, then point PyRITE at it with:\n"
         f"  pyrite tables sources set {spec.name} <path>\n"
         f"(equivalently: pyrite config set {spec.config_key} <path>)"
     )
+
+
+def _markers_text(spec: CodeSpec) -> str:
+    """Render a code's markers for an error message."""
+    return " or ".join(repr(pattern) for pattern in spec.markers)
 
 
 def validate_source_path(code: str, value: str | Path) -> Path:
@@ -299,15 +326,15 @@ def validate_source_path(code: str, value: str | Path) -> Path:
     Raises
     ------
     SourceUnavailableError
-        If the path does not hold the code's marker file.
+        If the path does not hold one of the code's markers.
     KeyError
         If ``code`` is unknown.
     """
     spec = code_spec(code)
     resolved = Path(value).expanduser().resolve()
-    if not (resolved / spec.marker).exists():
+    if not _accepts(spec, resolved):
         raise SourceUnavailableError(
-            f"{resolved} does not look like a {spec.name} tree: no {spec.marker!r} in it"
+            f"{resolved} does not look like a {spec.name} tree: no {_markers_text(spec)} in it"
         )
     return resolved
 

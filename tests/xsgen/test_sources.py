@@ -37,7 +37,7 @@ def test_every_code_declares_what_resolution_needs():
     assert set(code_names()) == {"elsepa", "sbethe", "bremslib"}
     for name in code_names():
         spec = code_spec(name)
-        assert spec.marker and spec.config_key.startswith("xsgen.")
+        assert spec.markers and spec.config_key.startswith("xsgen.")
         assert spec.upstream
 
 

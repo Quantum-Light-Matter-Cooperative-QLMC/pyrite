@@ -148,7 +148,9 @@ def test_a_failed_build_reports_the_command_and_leaves_no_binary(elsepa_tree, fa
 
 def test_a_code_with_no_programs_says_so(tmp_path):
     root = tmp_path / "BremsLib_v2.0.8"
-    (root / "BremsLib_v2.0").mkdir(parents=True)
+    library = root / "BremsLib_v2.0.8" / "SDCS"
+    library.mkdir(parents=True)
+    (library / "SDCS_1.txt").write_text("", encoding="utf-8")
     source = resolve_source("bremslib", root)
 
     with pytest.raises(KeyError, match="read, not run"):
