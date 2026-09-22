@@ -29,8 +29,6 @@ preserved here: it cancels in the shape function, and unscaling belongs to
 whichever consumer wants an absolute cross section.
 """
 
-from __future__ import annotations
-
 import hashlib
 import re
 from collections.abc import Iterable, Sequence

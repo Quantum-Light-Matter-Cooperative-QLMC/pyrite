@@ -1,7 +1,5 @@
 """Pinned SBETHE reference-data download and selective extraction."""
 
-from __future__ import annotations
-
 import hashlib
 import io
 import zipfile

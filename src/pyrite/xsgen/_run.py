@@ -20,8 +20,6 @@ runs; where the filesystem refuses a symlink the link degrades to a copy,
 which the codes cannot distinguish since they only ever open paths beneath it.
 """
 
-from __future__ import annotations
-
 import shutil
 import subprocess
 import tempfile
@@ -96,7 +94,7 @@ def _link_dir(source: Path, destination: Path) -> LinkMode:
     """
     try:
         destination.symlink_to(source, target_is_directory=True)
-    except (OSError, NotImplementedError):
+    except OSError, NotImplementedError:
         shutil.copytree(source, destination)
         return "copy"
     return "symlink"

@@ -6,8 +6,6 @@ contract: ``pyrite tables path`` is meant to be usable as
 with no prose mixed in.
 """
 
-from __future__ import annotations
-
 import json
 
 import numpy as np

@@ -7,8 +7,6 @@ one manifest, and a resolve that reuses an existing table instead of reading
 the library again.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 

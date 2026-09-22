@@ -10,8 +10,6 @@ SBETHE's pinned reference database without extracting the archive's prebuilt
 executable or documentation.
 """
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 

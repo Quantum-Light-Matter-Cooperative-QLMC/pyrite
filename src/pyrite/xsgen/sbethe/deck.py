@@ -12,8 +12,6 @@ both catalogues happen to contain, which is the second identity namespace D2
 exists to prevent.
 """
 
-from __future__ import annotations
-
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass

@@ -8,8 +8,6 @@ The build cache is keyed on the source digest, so a patched tree is rebuilt
 and an unchanged one is compiled once per machine.
 """
 
-from __future__ import annotations
-
 import stat
 import sys
 from pathlib import Path

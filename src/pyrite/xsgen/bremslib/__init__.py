@@ -1,7 +1,5 @@
 """BremsLib library reading, conversion, and table generation."""
 
-from __future__ import annotations
-
 from .convert import QUANTITY, angular_integral, build_table, panel_of, shape_function
 from .generate import GenerationResult, generate_element
 from .read import (

@@ -6,8 +6,6 @@ archive. The installer downloads that immutable archive, verifies its
 published SHA-256, and extracts only ``sdbase/`` into the user data directory.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import os

@@ -5,8 +5,6 @@ and store layers against a *fake* binary, because CI cannot compile or run the
 real codes -- tests that do are marked ``extern_codes``.
 """
 
-from __future__ import annotations
-
 import os
 import stat
 import sys

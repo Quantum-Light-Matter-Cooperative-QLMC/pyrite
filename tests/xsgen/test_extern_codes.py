@@ -17,13 +17,12 @@ digest, the build, scratch isolation, the symlinked database, and fixed-name
 output collection in one pass, against numbers PyRITE did not produce.
 """
 
-from __future__ import annotations
-
 import os
 import shutil
 
 import numpy as np
 import pytest
+
 from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen._run import run_program
 from pyrite.xsgen.bremslib import (

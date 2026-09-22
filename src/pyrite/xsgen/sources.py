@@ -22,8 +22,6 @@ a version string: upstream ships no version number in the source, users patch
 trees, and a table generated from patched sources is a different table.
 """
 
-from __future__ import annotations
-
 import hashlib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass

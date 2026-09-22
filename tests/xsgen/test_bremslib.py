@@ -7,12 +7,11 @@ four-column DDCS variants -- and the anchors against the real thing live in
 ``test_extern_codes.py``.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import numpy as np
 import pytest
+
 from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen.bremslib import (
     angular_integral,

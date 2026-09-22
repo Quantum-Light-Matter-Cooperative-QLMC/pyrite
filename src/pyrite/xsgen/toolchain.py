@@ -11,8 +11,6 @@ digest covers only the files a program compiles, so patching a source
 invalidates exactly the binaries built from it.
 """
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess

@@ -5,8 +5,6 @@ loud, actionable error rather than a degraded result. The precedence exists so
 a user testing a patched upstream is never silently served the vendored copy.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

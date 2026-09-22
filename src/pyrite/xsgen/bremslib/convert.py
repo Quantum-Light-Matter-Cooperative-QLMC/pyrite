@@ -16,8 +16,6 @@ third of the table's bytes to save one division. :func:`shape_function`
 performs that division for a consumer.
 """
 
-from __future__ import annotations
-
 from collections.abc import Mapping
 from pathlib import Path
 

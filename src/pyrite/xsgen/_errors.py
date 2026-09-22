@@ -7,8 +7,6 @@ what to install or configure -- a bare ``FileNotFoundError`` from deep inside
 :mod:`subprocess` does not.
 """
 
-from __future__ import annotations
-
 
 class XsgenError(RuntimeError):
     """Base for every external-code generation failure."""

@@ -10,8 +10,6 @@ sibling's stale ``.mat`` silently substitutes the wrong material and the run
 still exits 0.
 """
 
-from __future__ import annotations
-
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 

@@ -6,8 +6,6 @@ rather than silently served. These tests freeze that, and freeze that a
 shipped table and a user-generated one are indistinguishable to a consumer.
 """
 
-from __future__ import annotations
-
 import json
 
 import numpy as np

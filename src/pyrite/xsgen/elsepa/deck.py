@@ -1,7 +1,5 @@
 """Write explicit, reproducible ELSEPA ``elscata`` input decks."""
 
-from __future__ import annotations
-
 from collections.abc import Iterable
 from dataclasses import dataclass
 from math import isfinite

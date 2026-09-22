@@ -20,8 +20,6 @@ what feeds run identity, so regenerating a table with different deck
 parameters cannot resume a checkpoint computed from the old one.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 from collections.abc import Iterable, Iterator, Mapping

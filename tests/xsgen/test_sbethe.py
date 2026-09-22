@@ -4,8 +4,6 @@ No Fortran here: the generation test drives a fake binary. The anchor that
 compiles and runs the real program lives in ``test_extern_codes.py``.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from types import SimpleNamespace
 

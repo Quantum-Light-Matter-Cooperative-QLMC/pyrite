@@ -14,8 +14,6 @@ came from the wheel or from the user's own generated table.
 Design: ``agentdocs/specs/2026-09-21-external-fortran-code-integration.md``.
 """
 
-from __future__ import annotations
-
 from ._errors import (
     BuildError,
     DataFetchError,

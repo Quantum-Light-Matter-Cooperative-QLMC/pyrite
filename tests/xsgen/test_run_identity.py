@@ -15,8 +15,6 @@ Both identity surfaces are covered, because they gate different caches:
 content-addressable blob store.
 """
 
-from __future__ import annotations
-
 import numpy as np
 import pytest
 

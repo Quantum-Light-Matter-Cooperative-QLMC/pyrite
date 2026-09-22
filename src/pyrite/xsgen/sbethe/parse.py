@@ -7,8 +7,6 @@ at load. ``stp.dat`` begins at the corrected-Bethe validity floor (ECUT, about
 it. They are different quantities and are not concatenated here.
 """
 
-from __future__ import annotations
-
 import re
 from dataclasses import dataclass
 
