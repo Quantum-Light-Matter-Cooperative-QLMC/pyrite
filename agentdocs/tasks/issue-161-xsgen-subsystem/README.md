@@ -29,12 +29,11 @@ delegation.** Issue checkboxes stay unticked; this file is the local record.
 | M3 | manifest hash into run identity; stale checkpoints cannot be served | complete |
 | M4 | vendor ELSEPA + `sbethe.f`, `.gitattributes` `-text`, `tables fetch` | complete |
 | M5 | `elsepa/`, `sbethe/`, `bremslib/` deck+parse + vendor-reference parser tests | complete |
-| M6 | shipped BremsLib-derived tables + maintainer refresh path | gated, see below |
+| M6 | BremsLib-derived tables (fetched release) + maintainer refresh path | complete except hosting, see F15 |
 
-M6 is gated on a measurement the issue requires *before* committing tables:
-derived-table size across the built-in catalogue. That measurement is now
-taken -- see F13 -- and it needs a human decision before any table is
-committed.
+M6 was gated on the F13 size measurement. The human chose option 3 on
+2026-09-21: fetch on demand. Implemented; the one open item is where the
+release archive is hosted (F15).
 
 ## Local environment
 
@@ -370,6 +369,59 @@ generated table costs nothing to keep exact. If M6 ships float32, it should be
 a *shipped-table* transform in the maintainer path, not a change to what
 `build_table` produces.
 
+### F15 - M6: the release is fetched, and the index is the only key a user has
+
+Option 3 of F13, decided 2026-09-21. Shape:
+
+- `xsgen/bremslib/release.py`: `build_release` (maintainer) converts every
+  element in `TRANSPORT_ELEMENTS` -- the set the material parser admits, so
+  it bounds every runnable material, not just today's 50 -- applies the
+  release transform, and writes a deterministic zip plus an index.
+- The index (`src/pyrite/data/xsgen/bremslib-tables.json`, 5 kB) ships in the
+  wheel. It is necessary, not a convenience: a table key covers
+  `library_version`, a digest over the library files read, so a user without
+  a checkout cannot compute any key. `catalogue_table(z)` resolves through it
+  and refuses a table whose manifest digest is not the pinned one.
+- `pyrite tables fetch bremslib [--archive PATH]` verifies the archive
+  digest, then per table the pinned manifest digest, the recomputed manifest
+  digest, and the arrays digest, before installing anything into the user
+  table tier. A foreign table under a released key is reported, not
+  overwritten. `--archive` also works for `sbethe`: an offline cluster is
+  provisioned from a copy with the same checks.
+- Release transform `release-float32-v1`: float32 DDCS, both per-point
+  uncertainty arrays dropped. It is a `model` key parameter, so a released
+  table never shares a key with an exact local one (F14). Measured: 0.96 MB
+  per element, **23.1 MB** for 24 -- above F13's 18 MB estimate because
+  `theta_deg` stays float64 (Simpson on the forward-peaked grid) and
+  `ddcs_point_finite` is kept.
+- Maintainer path: `scripts/release_bremslib_tables.py [--url U] [--pin]`;
+  about one second per element from the real checkout (measured on Z=6).
+- Stale detection: an `extern_codes` anchor rebuilds Z=6 from the local
+  checkout and asserts the pinned key; a second checks the float32 shape
+  function against the exact one at `rtol=1e-6`.
+
+Found while building it:
+
+1. `panel_of` required `ddcs_rel_err`, so every consumer calling it on a
+   released table would have raised `KeyError`. Released panels now report
+   the uncertainty as NaN (unknown, not zero). Found writing the anchor.
+2. `MODIFICATIONS_NOTE` said every table was "resampled or interpolated onto
+   PyRITE grids". None is -- all are stored on the code's native grid -- and
+   the note is the CC BY modifications statement, so it has to be accurate.
+   Reworded; `store(modifications=...)` lets the release add its own
+   transform. `THIRD-PARTY-NOTICES.md` corrected the same way, and now says
+   the tables are fetched, not packaged.
+
+**Open: hosting.** The index pins archive SHA-256
+`05a74ee9...9250e152` with `url: null`. The GitHub repository is private, so
+a release asset there is not anonymously downloadable, and `urlopen` sends no
+credentials. Until a public location is chosen (a Zenodo or Mendeley
+deposit is the natural fit for a CC BY adaptation), `fetch bremslib` without
+`--archive` fails naming the `--archive` route. The pinned archive is
+`build/xsgen-release/bremslib-tables.zip` in this worktree (gitignored);
+upload that exact file, or rebuild with `--url ... --pin` and commit the new
+index -- manifests carry a timestamp, so a rebuild changes the digest.
+
 ## Checklist
 
 - [x] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
@@ -394,7 +446,10 @@ a *shipped-table* transform in the maintainer path, not a change to what
 - [x] M5c fixed the BremsLib source marker, which never matched a real
       checkout (F11)
 - [x] M6 gate measurement taken: 24 catalogue elements, 10-55 MB depending on
-      variant (F13). Decision is the human's; nothing committed.
+      variant (F13). Human chose fetch on demand.
+- [x] M6 release builder, pinned index, `tables fetch bremslib [--archive]`,
+      `catalogue_table`, maintainer script, notices, CLI reference (F15)
+- [ ] M6 hosting: publish the archive and pin its URL (needs a human, F15)
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
 - [x] `pyrite-dev verify` for M1-M3 (4361 passed, 90 skipped)
 - [x] `pyrite-dev verify` after M4 (4369 passed, 90 skipped)

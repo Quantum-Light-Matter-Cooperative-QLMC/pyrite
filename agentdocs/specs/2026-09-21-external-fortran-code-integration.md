@@ -147,12 +147,12 @@ Measured 2026-09-21:
 | BREMS `*.f90` sources | 1.7 MB | not redistributed (GPL, see above) |
 | BREMS `V/` + `CS_int/` | 24 MB | not redistributed |
 | BremsLib precomputed library | 810 MB payload (1.5 GB on disk) | not redistributed (size) |
-| BremsLib-*derived* tables | small, per material | **ship for the built-in catalogue** |
+| BremsLib-*derived* tables | 23.1 MB for 24 elements (float32 release) | **fetch on demand**, pinned release archive |
 
 Rule: always vendor the generator source where licensing permits; vendor a
-reference database only when small; ship derived tables for the built-in
-catalog; fetch large reference databases on demand into `user_data_dir()`,
-SHA-256 pinned.
+reference database only when small; fetch large reference databases -- and
+the BremsLib-derived catalogue tables, once measured (see Open items) -- on
+demand into `user_data_dir()`, SHA-256 pinned.
 
 **Revised 2026-09-21.** The three BremsLib artifacts are now treated
 separately, because they are under different terms and hit different limits:
@@ -585,7 +585,19 @@ marker, and ledger row; only a human marks `signed-off`.
   that are now confirmed CC BY 4.0. The GPL-3 sources and the 810 MB library
   remain non-redistributable, and D7's no-port rule is untouched.
 
-  Still to settle inside that decision:
+  **Settled 2026-09-21 (M6): fetched, not packaged.** Measured at 10-55 MB
+  across the 24 catalogue elements depending on variant, against a ~4.8 MB
+  budget, so the tables are published as one SHA-256-pinned release archive
+  (float32 DDCS, per-point uncertainties dropped: 23.1 MB) whose index ships
+  in the wheel. `pyrite tables fetch bremslib [--archive PATH]` installs it
+  into the user table directory, where the two-tier `resolve()` finds it;
+  `xsgen.bremslib.catalogue_table(z)` resolves through the index, since a
+  user without a checkout cannot compute a key that covers the library's
+  file digests. The maintainer path is `scripts/release_bremslib_tables.py`
+  (`xsgen.bremslib.release.build_release`), and an `extern_codes` anchor
+  rebuilds one pinned element from a real checkout to detect a stale release.
+
+  The two items below are what that settled:
 
   - **Unmeasured:** the on-disk size of the derived SDCS + shape-function
     tables across the built-in catalogue, and therefore the real wheel cost.
