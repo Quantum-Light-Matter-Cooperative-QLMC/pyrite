@@ -30,8 +30,10 @@ def material_inputs_from_composition(
 ) -> CatalogMaterial:
     """Derive SBETHE density and mean excitation energy from number density.
 
-    Mass density follows exactly from the catalog's elemental number densities
-    and standard atomic weights.  The material mean excitation energy uses the
+    Source: the mass-density definition and the Bragg logarithmic additivity
+    rule for compound mean excitation energies (ICRU Report 37). Mass density
+    follows exactly from the catalog's elemental number densities and standard
+    atomic weights. The material mean excitation energy uses the
     electron-fraction Bragg logarithmic mixture,
     ``ln(I) = sum(n_i Z_i ln(I_i)) / sum(n_i Z_i)``, with the same elemental
     ICRU/PDG values used by the legacy transport reference model.

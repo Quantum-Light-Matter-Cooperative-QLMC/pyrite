@@ -1,6 +1,5 @@
 """SBETHE input, output, and table-generation support."""
 
-from .deck import OUTPUTS, PROJECTILES, SbetheDeck, material_token
 from .catalog import (
     CatalogMaterial,
     catalog_material,
@@ -8,6 +7,7 @@ from .catalog import (
     resolve_catalog_table,
     resolve_composition_table,
 )
+from .deck import OUTPUTS, PROJECTILES, SbetheDeck, material_token
 from .generate import GenerationResult, generate_material, material_request
 from .parse import (
     SbetheIntegratedCS,

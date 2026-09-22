@@ -52,11 +52,19 @@ def pack_sbethe_stopping_tables(tables, n_layers):
 def _dEds_sbethe_scalar(log_energy_keV, log_stopping_keV_per_ang, E_keV):
     """Log-log interpolate SBETHE collision stopping [keV/angstrom], negative.
 
+    Source: SBETHE (Salvat, April 2024), vendored ``sbethe.f`` ``BETHE`` and
+    ``stp.dat`` output. SBETHE evaluates the corrected Bethe expression with
+    DHFS shell and Fano density-effect corrections; this function interpolates
+    those material-level output nodes rather than re-evaluating the formula.
+
     Log-log interpolation preserves positivity and exactly reproduces every
     native SBETHE node.  The caller must enforce the table domain; endpoint
     clamps only protect roundoff at an already-validated transport cutoff.
+    Assumptions: positive ordered nodes and power-law behavior between adjacent
+    nodes. Limiting cases: a native node is returned exactly; a constant table
+    remains constant; the signed transport rate is always non-positive.
 
-    Validation: sbethe-stopping-interpolation
+    Validation: sbethe-corrected-stopping
     """
     log_e = np.log(E_keV)
     if log_e <= log_energy_keV[0]:
@@ -466,4 +474,4 @@ def sternheimer_delta(element, E_keV):
 # than letting them resume into -- or be served from the CAS for -- a run that
 # computes different numbers. Bump it whenever the evaluated model changes:
 # adding the density-effect term delta, or moving a crossover, is such a change.
-STOPPING_MODEL = "joy-luo/berger-seltzer-splice"
+STOPPING_MODEL = "sbethe-corrected-v1"

@@ -543,11 +543,11 @@ def _identity_v1(
     # matching how the emission rename was handled) instead of letting them
     # resume into a run that computes different numbers.
     resolved["line_kinematics"] = "in-medium"
-    # Same rule for the electron collision-stopping model. Joy--Luo alone is the
-    # retired model; the per-element Joy--Luo/Berger--Seltzer splice is what the
-    # cores evaluate now, and it changes energy-versus-depth for every run above
-    # the crossover (2.66-10.46 keV by element). Hashing the marker keeps
-    # Joy--Luo-era and Berger--Seltzer-era records in disjoint identities.
+    # Same rule for the electron collision-stopping model. Production resolves
+    # one shell- and density-effect-corrected SBETHE table per material; the
+    # former Joy--Luo/Berger--Seltzer splice remains reference-only. The model
+    # marker separates every splice-era record, while ``xsgen_tables`` below
+    # separates different generated inputs and manifests within this model.
     resolved["stopping_model"] = STOPPING_MODEL
     # Characteristic line production is unconditional and changes the stored
     # line arrays, so the exact EEDL/xraydb model generation must separate
@@ -562,10 +562,7 @@ def _identity_v1(
     # that resolves no xsgen table omits it entirely and keeps its historical
     # digest bit-for-bit. The four constants each perturbed every digest once,
     # deliberately, because the physics they name changed for every run; no
-    # consumer resolves an xsgen table yet, so an unconditional marker here
-    # would orphan every checkpoint in exchange for no change in the numbers.
-    #
-    # Once a table does participate, its manifest digest covers the Fortran
+    # A participating table's manifest digest covers the Fortran
     # source, the compiler, the deck and the model parameters, so regenerating
     # a table under different settings re-keys the run rather than resuming
     # into checkpoints computed from the old one.

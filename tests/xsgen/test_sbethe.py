@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from pyrite.materials import CATALOG
 from pyrite.xsgen._errors import DataFetchError
 from pyrite.xsgen.sbethe import (
     SbetheDeck,
@@ -19,6 +20,7 @@ from pyrite.xsgen.sbethe import (
     parse_integrated,
     parse_oscillator,
     parse_stopping,
+    resolve_catalog_table,
     table_arrays,
 )
 from pyrite.xsgen.toolchain import Toolchain
@@ -97,6 +99,29 @@ def test_catalog_material_alias_uses_the_runnable_materials_film_crystal():
 def test_catalog_material_rejects_an_unknown_key():
     with pytest.raises(ValueError, match="unknown catalog material"):
         catalog_material("unobtainium")
+
+
+def test_every_runtime_catalog_target_has_a_pinned_full_domain_sbethe_table():
+    keys = sorted(set(CATALOG.materials) | set(CATALOG.media))
+    for key in keys:
+        table = resolve_catalog_table(key)
+        arrays = table.arrays()
+        energy = arrays["stopping_energy_eV"]
+        stopping = arrays["stopping_eV_per_angstrom"]
+
+        assert table.manifest["code"] == "sbethe"
+        assert table.manifest["quantity"] == "collision_stopping"
+        assert energy[0] == pytest.approx(1.0e3)
+        assert energy[-1] == pytest.approx(1.0e9)
+        assert np.all(np.diff(energy) > 0.0)
+        assert np.all(np.isfinite(stopping))
+        assert np.all(stopping > 0.0)
+
+    hopg = resolve_catalog_table("hopg").arrays()
+    assert not np.allclose(
+        hopg["stopping_eV_per_angstrom"],
+        hopg["stopping_no_shell_eV_per_angstrom"],
+    )
 
 
 def test_the_deck_renders_the_sequence_the_program_prompts_for():

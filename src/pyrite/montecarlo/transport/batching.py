@@ -681,7 +681,7 @@ def _run_per_electron_transport(
     d_bounds = to_dev(internal_bounds)
     d_top = to_dev(L_top)
     d_bot = to_dev(L_bot)
-    d_layers = tuple(to_dev(a) for a in layer_tables)
+    d_layers = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in layer_tables)
     d_mott = tuple(to_dev(a) for a in mott)
     d_stragg = to_dev(stragg_dE)
     _nsys_pop()

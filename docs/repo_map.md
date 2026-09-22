@@ -75,6 +75,7 @@ Edges (importer -> imported):
   p1 -> p3
   p1 -> p5
   p1 -> p9
+  p10 -> p17
   p10 -> p6
   p10 -> p9
   p12 -> p10
@@ -94,6 +95,7 @@ Edges (importer -> imported):
   p15 -> p10
   p15 -> p11
   p15 -> p14
+  p15 -> p17
   p15 -> p2
   p15 -> p3
   p15 -> p5

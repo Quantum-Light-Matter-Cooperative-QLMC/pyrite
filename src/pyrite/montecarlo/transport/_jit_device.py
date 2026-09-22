@@ -180,6 +180,40 @@ def _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_i):
 
 
 @jit.rawkernel(device=True)
+def _dEds_sbethe(L_logE, L_logS, row, count, E_i):
+    """Log-log interpolate one flattened SBETHE stopping-table row.
+
+    The host entry point has already checked the table domain. Endpoint clamps
+    therefore cover only roundoff at the validated 1 keV and 1 GeV bounds.
+
+    Validation: sbethe-corrected-stopping
+    """
+    log_e = xp.log(E_i)
+    if log_e <= L_logE[row]:
+        return -xp.exp(L_logS[row])
+    last = count - I32_ONE
+    if log_e >= L_logE[row + last]:
+        return -xp.exp(L_logS[row + last])
+
+    lo = I32_ZERO
+    hi = last
+    while lo < hi:
+        mid = (lo + hi) // I32_TWO
+        if L_logE[row + mid] < log_e:
+            lo = mid + I32_ONE
+        else:
+            hi = mid
+    upper = lo
+    lower = upper - I32_ONE
+    log_e_lower = L_logE[row + lower]
+    fraction = (log_e - log_e_lower) / (L_logE[row + upper] - log_e_lower)
+    log_stopping = L_logS[row + lower] + fraction * (
+        L_logS[row + upper] - L_logS[row + lower]
+    )
+    return -xp.exp(log_stopping)
+
+
+@jit.rawkernel(device=True)
 def _urban_stream_key(stream_key):
     """Per-electron straggling key. Mirrors transport._urban_stream_key_scalar."""
     return _splitmix64(stream_key ^ URBAN_STREAM_SALT)

@@ -87,24 +87,6 @@ def test_exact_cpu_cores_use_sbethe_stopping_for_cutoff(transport_core):
     assert result["n_cutoff_stopped"] == 1
 
 
-def test_sbethe_stopping_rejects_unported_cuda_straggling_path():
-    table = {
-        "stopping_energy_eV": np.array([5.0e3, 10.0e3]),
-        "stopping_eV_per_angstrom": np.array([100.0, 100.0]),
-    }
-    with pytest.raises(NotImplementedError, match="straggling is not implemented on CUDA"):
-        simulate_trajectories(
-            10.0,
-            1,
-            100.0,
-            composition=CARBON,
-            E_cut_keV=5.0,
-            straggling=True,
-            transport_core="cuda",
-            transport_lut_config=TransportLUTConfig(enabled=False),
-            stopping_tables=[table],
-        )
-
 @pytest.mark.parametrize("transport_core", ["lockstep", "per-electron"])
 def test_step_limited_histories_raise_with_incomplete_count(transport_core):
     with pytest.raises(

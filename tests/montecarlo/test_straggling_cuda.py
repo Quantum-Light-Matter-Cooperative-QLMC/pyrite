@@ -182,6 +182,33 @@ def test_cuda_first_row_agrees_with_the_cpu_reference_under_straggling():
 
 @pytest.mark.hardware
 @requires_cuda
+def test_cuda_sbethe_straggling_first_row_matches_host():
+    """Exact CUDA uses the same SBETHE mean and Urban rescaling as the host."""
+    table = {
+        "stopping_energy_eV": np.array([5.0e3, 10.0e3, 25.0e3]),
+        "stopping_eV_per_angstrom": np.array([1.0, 1.0, 1.0]),
+    }
+    common = dict(
+        straggling=True,
+        energy_model="midpoint",
+        stopping_tables=[table],
+    )
+    cpu = _run(**HOST, **common)
+    gpu = _run(**CUDA, **common)
+
+    cpu_first = np.flatnonzero(np.diff(cpu["elec_id"], prepend=-1))
+    gpu_first = np.flatnonzero(np.diff(gpu["elec_id"], prepend=-1))
+    assert np.array_equal(cpu["elec_id"][cpu_first], gpu["elec_id"][gpu_first])
+    np.testing.assert_allclose(cpu["L_ang"][cpu_first], gpu["L_ang"][gpu_first], rtol=1e-12)
+    np.testing.assert_allclose(
+        cpu["E_end_keV"][cpu_first],
+        gpu["E_end_keV"][gpu_first],
+        rtol=1e-12,
+    )
+
+
+@pytest.mark.hardware
+@requires_cuda
 def test_cuda_straggling_matches_the_host_in_distribution():
     """The ensemble statement, since the pathwise one only survives one row.
 

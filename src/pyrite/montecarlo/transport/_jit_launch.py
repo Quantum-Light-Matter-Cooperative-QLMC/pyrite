@@ -221,6 +221,10 @@ def run_transport_kernel(
         L_mott_denom1,
         L_mott_denom2,
         L_sr_joy_numer,
+        sbethe_on,
+        L_sbethe_n,
+        L_sbethe_logE,
+        L_sbethe_logS,
     ) = materials
     (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
     (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
@@ -248,6 +252,7 @@ def run_transport_kernel(
         return
 
     max_el = int(L_Zs.shape[1])
+    sbethe_width = int(L_sbethe_logE.shape[1])
     nblocks = (e_count + nthreads - 1) // nthreads
     _transport_kernel(
         (nblocks,),
@@ -283,6 +288,11 @@ def run_transport_kernel(
             L_mott_denom1.reshape(-1),
             L_mott_denom2.reshape(-1),
             L_sr_joy_numer.reshape(-1),
+            np.int32(1 if sbethe_on else 0),
+            L_sbethe_n.astype(xp.int32, copy=False),
+            L_sbethe_logE.reshape(-1),
+            L_sbethe_logS.reshape(-1),
+            np.int32(sbethe_width),
             L_nel.astype(xp.int32, copy=False),
             np.int32(max_el),
             L_top,

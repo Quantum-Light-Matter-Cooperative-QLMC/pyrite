@@ -693,18 +693,6 @@ def simulate_trajectories(
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
     transport_lut = None
-    if prepared_stopping_tables is not None and straggling and transport_core == "cuda":
-        raise NotImplementedError(
-            "SBETHE stopping with energy-loss straggling is not implemented on CUDA"
-        )
-    if (
-        prepared_stopping_tables is not None
-        and transport_core == "cuda"
-        and (groove is not None or not transport_lut_config.enabled)
-    ):
-        raise NotImplementedError(
-            "SBETHE stopping on the exact CUDA core is not implemented; enable the transport LUT"
-        )
     if groove is None and transport_lut_config.enabled:
         _nsys_push("cxr.transport.lut")
         transport_lut = build_transport_energy_lut(

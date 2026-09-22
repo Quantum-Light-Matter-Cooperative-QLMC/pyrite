@@ -69,6 +69,11 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
     assert seen["transport_core"] == "auto"
     assert result.provenance["scene"].target == target
     assert len(result.provenance["identity_digest"]) == 64
+    assert result.provenance["xsgen_tables"]
+    assert result.provenance["identity_digest"] == api.case_content_key(
+        result.case,
+        xsgen_tables=result.provenance["xsgen_tables"],
+    )
     # Which collision-stopping model produced the numbers is part of the record,
     # not just of the digest that separates the two models' checkpoints.
     assert result.provenance["stopping_model"] == STOPPING_MODEL
