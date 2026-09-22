@@ -123,7 +123,7 @@ def test_an_unresolvable_tree_names_every_tier_the_fix_and_the_upstream(monkeypa
     assert "sbethe.f" in message
     assert "vendored" in message and "sibling checkout" in message
     assert "pyrite tables sources set sbethe" in message
-    assert "10.17632/7zw25f428t.1" in message
+    assert "10.17632/7zw25f428t.2" in message
 
 
 def test_the_digest_changes_when_a_source_is_patched(elsepa_tree):

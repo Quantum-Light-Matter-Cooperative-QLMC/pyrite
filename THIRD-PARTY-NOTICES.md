@@ -42,8 +42,8 @@ require derived or adapted material to be marked as such.
 - **License**: CC BY-NC 3.0 (Creative Commons Attribution-NonCommercial 3.0
   Unported), <https://creativecommons.org/licenses/by-nc/3.0>, as recorded in
   the Mendeley Data deposit's own license metadata (verified 2026-09-21).
-- **Archive**: DOI [10.17632/7zw25f428t.1](https://doi.org/10.17632/7zw25f428t.1)
-  (version-pinned), <https://data.mendeley.com/datasets/7zw25f428t/1>.
+- **Archive**: DOI [10.17632/7zw25f428t.2](https://doi.org/10.17632/7zw25f428t.2)
+  (version-pinned), <https://data.mendeley.com/datasets/7zw25f428t/2>.
 - **Nature of PyRITE's use**: PyRITE **redistributes** the SBETHE Fortran
   source `sbethe.f` inside the PyRITE distribution, compiles it, and invokes
   the resulting program to generate material-scoped stopping-power and

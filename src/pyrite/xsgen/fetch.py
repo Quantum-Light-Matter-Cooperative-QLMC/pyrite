@@ -18,19 +18,30 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from ._errors import DataFetchError
 from .sources import fetched_data_dir
 
 SBETHE_ARCHIVE_URL = (
     "https://data.mendeley.com/public-files/datasets/7zw25f428t/files/"
-    "4fe30d66-1e6b-4de3-ac9c-a9f9cc9dae96/file_downloaded"
+    "a7d2eed6-9aab-4462-936d-b15adf0e7c16/file_downloaded"
 )
-SBETHE_ARCHIVE_SHA256 = "693d447d7189dff05045cf9288ba4a1704e06747c4502a3572b35ff30b70845d"
-SBETHE_DEPOSIT = "10.17632/7zw25f428t.1"
+SBETHE_ARCHIVE_SHA256 = "d5d4879c2073ada3bd799fe0727054549cd6ec65cc699acbd0ff25fd5c3c4144"
+SBETHE_DEPOSIT = "10.17632/7zw25f428t.2"
 _CHUNK = 1 << 20
-_REQUIRED_SBETHE_FILES = ("atparams.tab", "pdcompos.pen", "shparams.tab")
+_USER_AGENT = "PyRITE xsgen (+https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite)"
+# The shared (non per-element) sdbase files. `atparams.tab` and `exp-param.tab`
+# are the decisive ones: `sbethe.f` OPENs both, and neither exists in deposit
+# version 1, so an sdbase left over from that version is rejected rather than
+# failing later inside the Fortran run.
+_REQUIRED_SBETHE_FILES = (
+    "atparams.tab",
+    "exp-param.tab",
+    "pdatconf.p14",
+    "pdcompos.pen",
+    "shparams.tab",
+)
 
 
 @dataclass(frozen=True)
@@ -60,8 +71,9 @@ def _data_file_count(path: Path) -> int:
 def _download(destination: Path) -> str:
     """Stream the pinned SBETHE archive to ``destination`` and return its digest."""
     digest = hashlib.sha256()
+    request = Request(SBETHE_ARCHIVE_URL, headers={"User-Agent": _USER_AGENT})
     try:
-        with urlopen(SBETHE_ARCHIVE_URL, timeout=60) as response:  # noqa: S310 - pinned HTTPS URL
+        with urlopen(request, timeout=60) as response:  # noqa: S310 - pinned HTTPS URL
             with destination.open("wb") as stream:
                 while chunk := response.read(_CHUNK):
                     stream.write(chunk)

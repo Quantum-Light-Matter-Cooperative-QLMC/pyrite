@@ -128,7 +128,7 @@ _SBETHE = CodeSpec(
     digest_sources=("sbethe.f",),
     data_dirs=("sdbase",),
     programs={"sbethe": ProgramSpec(executable="sbethe", sources=("sbethe.f",))},
-    upstream="SBETHE, Mendeley Data doi:10.17632/7zw25f428t.1",
+    upstream="SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2",
     vendored=True,
 )
 

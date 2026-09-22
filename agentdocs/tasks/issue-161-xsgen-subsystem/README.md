@@ -151,6 +151,48 @@ contains 599: six 99-element families plus five shared files. Fetch validation
 therefore checks the archive digest and required shared markers rather than an
 incorrect file-count constant. The CLI reports the observed count.
 
+### F8 - the SBETHE deposit had to move from version 1 to version 2
+
+The issue, and this branch through M4, pinned deposit version 1
+(`10.17632/7zw25f428t.1`). That pin is wrong for the source we vendor.
+
+Both versions were downloaded and compared on 2026-09-21:
+
+| | v1 | v2 |
+| --- | --- | --- |
+| `sbethe.zip` | 12 046 759 B | 12 878 659 B |
+| SHA-256 | `693d447d...0b70845d` | `d5d4879c...5c3c4144` |
+| `sdbase/` files | 497 | 599 |
+| `atparams.tab`, `exp-param.tab`, `shparams.tab` | absent | present |
+
+The vendored `src/pyrite/data/xsgen/sbethe/sbethe.f` is byte-identical to v2's
+copy (`c2eda61b...cc1b12a7`), and it `OPEN`s `./sdbase/exp-param.tab`
+(line 424) and `./sdbase/atparams.tab` (line 2243). Neither file exists in v1.
+Fetching v1's `sdbase/` for the source we actually compile would therefore fail
+part-way through a Fortran run, not at install time.
+
+So the version bump is a correctness fix, not a refresh. Consequences:
+
+- `_REQUIRED_SBETHE_FILES` gained `atparams.tab`, `exp-param.tab` and
+  `shparams.tab`. The first two are the decisive markers -- they are the ones
+  `sbethe.f` opens and the ones v1 lacks -- so a leftover v1 directory is now
+  rejected by `_installed_sbethe` instead of being served as complete.
+  `shparams.tab` is shared and v2-only but never opened; it is a completeness
+  marker only.
+- `_download` now sends an explicit `User-Agent`. The deposit URL answers 302
+  to an S3 object; `urlopen` follows that by default, and the real fetch was
+  verified end to end against both the API-published digest and the bytes.
+- F7's 599-file count is a v2 figure. v1 holds 497, so the issue's "498" was
+  never right for either version.
+- Spec figures re-measured from the v2 archive rather than carried over:
+  `sdbase/` 18.8 MB, `docs/` 8.6 MB, `sbethe.exe` 1.16 MB, 28.7 MB extracted
+  from a 12.9 MB download. The sdbase inventory is five per-element families
+  plus `pdebr<Z>.p08` and five shared files, not "four families and two global
+  files".
+
+The issue body still records the v1 digest, `10.17632/7zw25f428t.1` and 498
+files. Correcting it needs issue-write authority this session does not hold.
+
 ## Checklist
 
 - [x] M1 `sources.py` / `toolchain.py` / `_run.py` / `store.py`
@@ -164,6 +206,7 @@ incorrect file-count constant. The CLI reports the observed count.
 - [x] M4 pinned `tables fetch sbethe`, selective/atomic extraction, fetched-data overlay
 - [x] M5a ELSEPA free-atom deck writer, vendor-output parser, native-grid CDF,
       cached generation path, `tables generate`, CLI reference, and regression anchors
+- [x] M4 SBETHE deposit re-pinned to version 2 after a two-version comparison (F8)
 - [ ] M5b SBETHE deck/parser and material generation path
 - [ ] M5c BremsLib native-library reader/converter and sample anchors
 - [x] import-linter contracts pass with `xsgen` populated (11 kept, 0 broken)
