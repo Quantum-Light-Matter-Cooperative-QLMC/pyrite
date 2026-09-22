@@ -60,6 +60,7 @@ Components (a + b denotes a static import cycle):
   p14: results
   p15: runs
   p16: validation
+  p17: xsgen
 Edges (importer -> imported):
   p0 -> p16
   p0 -> p4
@@ -103,6 +104,8 @@ Edges (importer -> imported):
   p16 -> p5
   p16 -> p6
   p16 -> p9
+  p17 -> p5
+  p17 -> p9
   p2 -> p10
   p2 -> p14
   p2 -> p6
@@ -116,6 +119,7 @@ Edges (importer -> imported):
   p4 -> p11
   p4 -> p13
   p4 -> p15
+  p4 -> p17
   p4 -> p2
   p4 -> p3
   p4 -> p5

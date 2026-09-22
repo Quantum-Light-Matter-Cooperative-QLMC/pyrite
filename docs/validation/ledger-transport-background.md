@@ -2,6 +2,29 @@
 
 Part of the [physics validation ledger](physics-validation-ledger.md). See the [validation methodology](methodology.md) for the status lifecycle and the [domain inventories](domain-inventories.md) for a claim-by-claim index.
 
+## `elsepa-vendor-reference`
+
+- **Claim:** the shipped ELSEPA 2020 free-atom deck writer and parser preserve the vendor's native energy/angular grids, differential and integrated elastic cross sections, and construct a monotone normalized angular CDF before any later energy interpolation
+- **Code:** `xsgen/elsepa/deck.py`; `xsgen/elsepa/parse.py`; `xsgen/elsepa/generate.py`
+- **Source:** F. Salvat, ELSEPA 2020, Mendeley Data `10.17632/w4hm5vymym.1`; shipped vendor test deck and `test-run-output/dcs_1p000e03.dat`
+- **Status:** filtered
+- **Checks:** case-sensitive fixed-column deck fields; atomic-number and 4.999 eV program-floor guards; collision-free prediction of ELSEPA's fixed output names; six-column native output schema; monotone `theta` and `mu=(1-cos(theta))/2`; positive DCS and non-negative reported errors; vendor Hg 1 keV panel has 606 samples and reproduces the published total, first-transport, second-transport, and absorption cross sections; native-grid `4*pi*integral(DCS dmu)` closes to the published total within `2.34e-4` relative; CDF uses the same measure, is monotone, and has exact limits `F(0)=0`, `F(1)=1`; identical normalized requests reuse the content-addressed table without rerunning the code
+- **Anchor:** `tests/xsgen/test_elsepa.py`; opt-in real compiler comparison in `tests/xsgen/test_extern_codes.py::test_elsepa_reproduces_its_own_published_test_run`
+- **Notes:** Free atoms only (`MUFFIN 0`). Muffin-tin material inputs, low/high-energy validity boundaries, and transport consumption remain with #89/#94. The committed vendor output is parser evidence; the existing opt-in compiler anchor previously reproduced all 649 file lines with `rtol=1e-5` on the 606 numeric rows. Fresh-context source-to-code validation is pending; only a human may mark this signed off.
+
+## `bremslib-library-reference`
+
+- **Claim:** the BremsLib v2.0.8 library reader preserves the vendor's native `(T1, k/T1)` and ragged angular grids, the `k/Z**2` scaling of both cross sections, and the finite- versus point-nucleus distinction, and reproduces the vendor's own published angular integral of each DDCS node, from which the normalized angular shape function follows with unit solid-angle integral
+- **Code:** `xsgen/bremslib/read.py`; `xsgen/bremslib/convert.py`; `xsgen/bremslib/generate.py`
+- **Source:** A. Poskus, "Double and single differential cross sections of electron-atom bremsstrahlung at electron energies up to 30 MeV for Z = 1-100", At. Data Nucl. Data Tables 166 (2025) 101734, `10.1016/j.adt.2025.101734`; library BremsLib v2.0.8, Mendeley Data `10.17632/6zfsc9xsz8.9`; the library's own `SDCS/DDCS_int/DDCS_int_<Z>.txt` angular integrals
+- **Equation:** `integral(DDCS dOmega) = 2*pi*integral_0^pi DDCS(theta)*sin(theta)*dtheta` for an azimuthally symmetric DDCS, and `shape(theta) = DDCS(theta)/integral(DDCS dOmega)`, so `integral(shape dOmega) = 1`
+- **Assumptions:** unpolarized beam on an unoriented target, so the DDCS is azimuth-independent; the vendor's angular grid resolves the forward peak, which is what its own refinement towards `theta = 0` provides; the upstream `k/Z**2` scaling cancels in the shape function and is therefore left in place on both stored cross sections
+- **Limiting cases:** the integrand vanishes at both endpoints; the shape function integrates to exactly 1 under the same rule that normalized it; the angular integral agrees with the SDCS at the same node to within the vendor's own published relative deviation
+- **Status:** filtered
+- **Checks:** 13 labelled `k/T1` columns and 40-number rows in both SDCS-shaped files; ascending energy grids; three- and four-column DDCS files, with an absent fourth column read as a point-to-finite ratio of 1 rather than a missing value; angular grid ascending from 0 to 180 degrees; nearest-grid mapping of the top node, whose ratio stands below its nominal 1 and whose file name rounds `k` to four digits; refusal of a hole in the `(T1, k/T1)` node grid, which interpolation could not distinguish from a vanishing cross section; the vendor angular integral read off its own shorter energy grid rather than the SDCS row index; composite Simpson on the native grid reproduces the vendor's 10th-order Newton-Cotes integral to 2.0e-5 relative at worst over sampled nodes spanning Z = 1 to 100 and T1 = 1 keV to 30 MeV, against 1.1e-4 for the trapezoid; `t1_max_MeV` is part of the table key; a changed library is a changed key
+- **Anchor:** `tests/xsgen/test_bremslib.py`; opt-in real-library comparison in `tests/xsgen/test_extern_codes.py::test_our_angular_integral_reproduces_the_published_one` and `::test_the_generate_path_reads_the_real_library_then_reuses_the_table`
+- **Notes:** Reading only: `Interpolate_DCS.f90` is not ported (D7), and interpolation onto PyRITE's configurable grids stays with the consumer (#86, #87, #95). Tables stop at 30 MeV by default because above it the library holds only `k = 0` and writes zeros elsewhere. The absolute cross section requires undoing the `k/Z**2` scaling, which no consumer does yet. Fresh-context source-to-code validation is pending; only a human may mark this signed off.
+
 ## `electron-transport`
 
 - **Claim:** Joy–Luo slowing-down (**low-energy branch only** since `relativistic-bethe-stopping` landed) + Mott/screened-Rutherford elastic scattering → radiating segments

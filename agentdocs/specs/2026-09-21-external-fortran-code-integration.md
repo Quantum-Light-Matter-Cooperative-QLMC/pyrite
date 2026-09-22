@@ -142,17 +142,17 @@ Measured 2026-09-21:
 | --- | --- | --- |
 | ELSEPA source + `database/` | 4.6 MB | vendor |
 | SBETHE `sbethe.f` | 0.13 MB | vendor |
-| SBETHE `sdbase/` | 18.4 MB, 498 files | fetch on demand |
-| SBETHE `docs/`, `sbethe.exe` | 9.0 MB | neither vendored nor extracted |
+| SBETHE `sdbase/` | 18.8 MB, 599 files | fetch on demand |
+| SBETHE `docs/`, `sbethe.exe` | 9.8 MB | neither vendored nor extracted |
 | BREMS `*.f90` sources | 1.7 MB | not redistributed (GPL, see above) |
 | BREMS `V/` + `CS_int/` | 24 MB | not redistributed |
 | BremsLib precomputed library | 810 MB payload (1.5 GB on disk) | not redistributed (size) |
-| BremsLib-*derived* tables | small, per material | **ship for the built-in catalogue** |
+| BremsLib-*derived* tables | 23.1 MB for 24 elements (float32 release) | **fetch on demand**, pinned release archive |
 
 Rule: always vendor the generator source where licensing permits; vendor a
-reference database only when small; ship derived tables for the built-in
-catalog; fetch large reference databases on demand into `user_data_dir()`,
-SHA-256 pinned.
+reference database only when small; fetch large reference databases -- and
+the BremsLib-derived catalogue tables, once measured (see Open items) -- on
+demand into `user_data_dir()`, SHA-256 pinned.
 
 **Revised 2026-09-21.** The three BremsLib artifacts are now treated
 separately, because they are under different terms and hit different limits:
@@ -430,16 +430,16 @@ extracts from it.
 
 | field | value |
 | --- | --- |
-| landing page | <https://data.mendeley.com/datasets/7zw25f428t/1> |
-| DOI | `10.17632/7zw25f428t.1` (version-pinned, immutable) |
-| file | `sbethe.zip`, 12 046 759 bytes |
-| SHA-256 | `693d447d7189dff05045cf9288ba4a1704e06747c4502a3572b35ff30b70845d` |
-| direct URL | `https://data.mendeley.com/public-files/datasets/7zw25f428t/files/4fe30d66-1e6b-4de3-ac9c-a9f9cc9dae96/file_downloaded` |
+| landing page | <https://data.mendeley.com/datasets/7zw25f428t/2> |
+| DOI | `10.17632/7zw25f428t.2` (version-pinned, immutable) |
+| file | `sbethe.zip`, 12 878 659 bytes |
+| SHA-256 | `d5d4879c2073ada3bd799fe0727054549cd6ec65cc699acbd0ff25fd5c3c4144` |
+| direct URL | `https://data.mendeley.com/public-files/datasets/7zw25f428t/files/a7d2eed6-9aab-4462-936d-b15adf0e7c16/file_downloaded` |
 | licence | CC BY-NC 3.0, confirmed from the deposit's own `data_licence` field |
 | authors | F. Salvat (U. Barcelona), P. Andreo (Karolinska) |
 
 Mendeley's public API publishes that SHA-256 *before* the download, at
-`https://data.mendeley.com/public-api/datasets/7zw25f428t/files?folder_id=root&version=1`,
+`https://data.mendeley.com/public-api/datasets/7zw25f428t/files?folder_id=root&version=2`,
 so the pin is verifiable against upstream rather than against whatever bytes we
 happened to receive first. Both the hash and the licence above were checked
 against a real download on 2026-09-21. Prefer the versioned API endpoint for
@@ -448,17 +448,19 @@ re-verification; treat the opaque file-id URL as a cache, not as the identity.
 Extraction rules:
 
 - Extract `sdbase/` only. **Do not extract or redistribute `sbethe.exe`** — a
-  1.29 MB prebuilt Windows binary of unverified provenance. `xsgen` builds from
+  1.16 MB prebuilt Windows binary of unverified provenance. `xsgen` builds from
   `sbethe.f` through `toolchain.py`.
-- Skip `docs/` (7.7 MB of PDFs). `rpwba.pdf` is the PWBA/GOS reference cited in
+- Skip `docs/` (8.6 MB of PDFs). `rpwba.pdf` is the PWBA/GOS reference cited in
   the ionization-scope section; cite it, do not ship it.
-- 27.6 MB extracted for a 12.0 MB download, of which 18.4 MB is the database we
+- 28.7 MB extracted for a 12.9 MB download, of which 18.8 MB is the database we
   actually want.
 
-`sdbase/` holds four per-element families for Z=1-99 — `oos<Z>.tab`,
-`shcor-<Z>.tab`, `pshcor-<Z>.tab`, `eshcor-<Z>.tab` — plus the Seltzer-Berger
-bremsstrahlung tables `pdebr<Z>.p08` that D8 and #86 want, and two global files,
-`pdatconf.p14` and `pdcompos.pen`.
+`sdbase/` holds five per-element families for Z=1-99 — `oos<Z>.tab`,
+`shcor-<Z>.tab`, `pshcor-<Z>.tab`, `eshcor-<Z>.tab`, `rmuon<Z>.tab` — plus the
+Seltzer-Berger bremsstrahlung tables `pdebr<Z>.p08` that D8 and #86 want, and
+five shared files: `atparams.tab`, `exp-param.tab`, `pdatconf.p14`,
+`pdcompos.pen` and `shparams.tab`. Six families of 99 plus five shared is the
+599-file total above.
 
 `pdcompos.pen` carries SBETHE's own catalogue of 280 predefined materials
 (indexed by `material-list.txt`).
@@ -583,7 +585,19 @@ marker, and ledger row; only a human marks `signed-off`.
   that are now confirmed CC BY 4.0. The GPL-3 sources and the 810 MB library
   remain non-redistributable, and D7's no-port rule is untouched.
 
-  Still to settle inside that decision:
+  **Settled 2026-09-21 (M6): fetched, not packaged.** Measured at 10-55 MB
+  across the 24 catalogue elements depending on variant, against a ~4.8 MB
+  budget, so the tables are published as one SHA-256-pinned release archive
+  (float32 DDCS, per-point uncertainties dropped: 23.1 MB) whose index ships
+  in the wheel. `pyrite tables fetch bremslib [--archive PATH]` installs it
+  into the user table directory, where the two-tier `resolve()` finds it;
+  `xsgen.bremslib.catalogue_table(z)` resolves through the index, since a
+  user without a checkout cannot compute a key that covers the library's
+  file digests. The maintainer path is `scripts/release_bremslib_tables.py`
+  (`xsgen.bremslib.release.build_release`), and an `extern_codes` anchor
+  rebuilds one pinned element from a real checkout to detect a stale release.
+
+  The two items below are what that settled:
 
   - **Unmeasured:** the on-disk size of the derived SDCS + shape-function
     tables across the built-in catalogue, and therefore the real wheel cost.

@@ -89,6 +89,7 @@ Commands:
   material    Inspect, validate, edit, and blaze individual materials.
   beam        Manage named beams, attachable to profiles by name.
   detector    Manage named detector geometries.
+  tables      Inspect generated cross-section tables and external code trees.
 ```
 
 ## `pyrite run`
@@ -583,7 +584,8 @@ Commands:
 ## `pyrite config get`
 
 ```text
-Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root}
+Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root|xsgen.b
+                         remslib_source|xsgen.elsepa_source|xsgen.sbethe_source}
 
   Print the effective value for KEY.
 
@@ -605,7 +607,8 @@ Options:
 ## `pyrite config set`
 
 ```text
-Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root} VALUE
+Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root|xsgen.b
+                         remslib_source|xsgen.elsepa_source|xsgen.sbethe_source} VALUE
 
   Persist VALUE for KEY.
 
@@ -1996,4 +1999,200 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables`
+
+```text
+Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
+
+  Inspect generated cross-section tables and external code trees.
+
+  Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib) and resolved
+  in two tiers: your own tables first, then the tables shipped with PyRITE. Consumers
+  cannot tell the two apart.
+
+  Examples:
+    pyrite tables path
+    pyrite tables list
+    pyrite tables show 4f3a9c
+    pyrite tables generate --code elsepa --element 79 --energy 1e3
+    pyrite tables generate --code bremslib --element 79
+    pyrite tables fetch sbethe
+    pyrite tables fetch bremslib
+    pyrite tables sources list
+    pyrite tables sources set elsepa ../elsepa-2020
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  fetch     Fetch pinned data for CODE into your user...
+  generate  Generate or reuse one external-code table.
+  list      List stored tables, most-preferred tier...
+  path      Print the directory your generated tables...
+  show      Print the provenance manifest for the...
+  sources   Show and configure where the external code...
+```
+
+## `pyrite tables fetch`
+
+```text
+Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib}
+
+  Fetch pinned data for CODE into your user data directory.
+
+  sbethe    SBETHE's 18 MB sdbase/ reference database. Only sdbase/ is
+            extracted from the upstream archive.
+  bremslib  BremsLib-derived bremsstrahlung tables for every element a
+            catalogue material may contain, so no BremsLib checkout is
+            needed for them.
+
+  The archive is SHA-256 verified before anything is installed, whether it was
+  downloaded or given with --archive. A complete existing install returns successfully
+  without network access.
+
+Options:
+  --archive FILE                  Install from a local copy of the pinned archive
+                                  instead of downloading it.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables generate`
+
+```text
+Usage: pyrite tables generate [OPTIONS]
+
+  Generate or reuse one external-code table.
+
+  ELSEPA takes ``--element`` and one or more ``--energy`` values in eV. SBETHE takes
+  ``--name``, ``--density``, ``--mean-excitation`` and one ``--element-count Z:N`` per
+  element in the molecule. BremsLib takes ``--element`` and optionally ``--t1-max``: its
+  energies are the library's own grid, so there is nothing to choose.
+
+  Generated files live in the user table store; rerunning the same normalized request
+  reuses its table without compiling, running, or rereading the external code.
+
+Options:
+  --code [elsepa|sbethe|bremslib]
+                                  Table source: ELSEPA free atoms, SBETHE materials, or
+                                  the precomputed BremsLib library.  [required]
+  --element Z                     Atomic number of the free-atom target. ELSEPA and
+                                  BremsLib only.  [1<=x<=103]
+  --energy EV                     Kinetic energy in eV; repeat for a native-grid table.
+                                  ELSEPA only.  [x>=4.999]
+  --name NAME                     Material name recorded in the SBETHE output headers.
+                                  SBETHE only.
+  --element-count Z:N             Stoichiometric index of one element, as Z:N; repeat
+                                  per element. SBETHE only.
+  --density G_CM3                 Mass density in g/cm^3. SBETHE only.  [x>0.0]
+  --mean-excitation EV            Mean excitation energy in eV. SBETHE only.  [x>1.0]
+  --band-gap EV                   Gap energy for an insulator or semiconductor; omit for
+                                  a conductor. SBETHE only.  [x>0.0]
+  --projectile [alpha|antimuon|antiproton|electron|muon|positron|proton]
+                                  Projectile particle. SBETHE only.  [default: electron]
+  --t1-max MEV                    Highest incident electron energy to include, in MeV;
+                                  bounds the table size. Defaults to the library's
+                                  complete range. BremsLib only.  [x>0.0]
+  --overwrite                     Regenerate and replace an existing key.
+  --keep-on-failure               Keep the scratch directory after an external-code
+                                  failure.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables list`
+
+```text
+Usage: pyrite tables list [OPTIONS]
+
+  List stored tables, most-preferred tier first.
+
+  A table present in both tiers is listed once, as the tier that would be served.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables path`
+
+```text
+Usage: pyrite tables path [OPTIONS]
+
+  Print the directory your generated tables are written to.
+
+  Tables live in your user data directory rather than the workspace: they are expensive
+  and target-scoped, not run-specific, so they are shared across every workspace.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables show`
+
+```text
+Usage: pyrite tables show [OPTIONS] KEY
+
+  Print the provenance manifest for the table named by KEY.
+
+  KEY may be an unambiguous prefix of a table key, the way a commit is named by its
+  short hash.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables sources`
+
+```text
+Usage: pyrite tables sources [OPTIONS] COMMAND [ARGS]...
+
+  Show and configure where the external code trees live.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  list  Report which external code trees PyRITE...
+  set   Persist PATH as the source tree for CODE.
+```
+
+## `pyrite tables sources list`
+
+```text
+Usage: pyrite tables sources list [OPTIONS]
+
+  Report which external code trees PyRITE can currently reach.
+
+  Reports every code even when one cannot be found, so a single missing tree does not
+  hide the state of the others. A missing tree is a reported status, not a command
+  failure.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite tables sources set`
+
+```text
+Usage: pyrite tables sources set [OPTIONS] CODE PATH
+
+  Persist PATH as the source tree for CODE.
+
+  Stored resolved, so the value keeps its meaning from any working directory, and
+  rejected up front if PATH does not hold that code.
+
+Options:
+  -h, --help  Show this message and exit.
 ```
