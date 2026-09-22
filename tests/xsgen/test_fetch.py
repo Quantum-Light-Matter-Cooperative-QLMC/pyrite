@@ -2,6 +2,7 @@
 
 import hashlib
 import io
+import json
 import zipfile
 
 import pytest
@@ -47,7 +48,24 @@ def test_fetch_verifies_then_extracts_only_sdbase(monkeypatch, tmp_path):
     assert (result.path / "oos01.tab").read_text() == "oscillators\n"
     assert not (result.path.parent / "docs").exists()
     assert not (result.path.parent / "sbethe.exe").exists()
-    assert (result.path / ".pyrite-fetch.json").is_file()
+    marker = json.loads((result.path / ".pyrite-fetch.json").read_text())
+    assert marker["source_url"] == fetch_module.SBETHE_ARCHIVE_URL
+    assert marker["source_archive"] is None
+
+
+def test_a_local_archive_is_recorded_as_the_source(monkeypatch, tmp_path):
+    payload = _archive()
+    archive = tmp_path / "sbethe.zip"
+    archive.write_bytes(payload)
+    monkeypatch.setattr(fetch_module, "SBETHE_ARCHIVE_SHA256", hashlib.sha256(payload).hexdigest())
+    monkeypatch.setattr(fetch_module, "urlopen", lambda *a, **k: pytest.fail("network used"))
+    monkeypatch.setattr(fetch_module, "fetched_data_dir", lambda code, name: tmp_path / code / name)
+
+    result = fetch_module.fetch_sbethe(archive)
+
+    marker = json.loads((result.path / ".pyrite-fetch.json").read_text())
+    assert marker["source_url"] is None
+    assert marker["source_archive"] == str(archive.resolve())
 
 
 def test_fetch_identifies_itself_to_the_upstream_host(monkeypatch, tmp_path):

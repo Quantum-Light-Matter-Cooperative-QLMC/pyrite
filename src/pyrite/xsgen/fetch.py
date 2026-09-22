@@ -206,7 +206,11 @@ def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
             "archive_sha256": SBETHE_ARCHIVE_SHA256,
             "deposit": SBETHE_DEPOSIT,
             "file_count": file_count,
-            "source_url": SBETHE_ARCHIVE_URL,
+            # Exactly one of these is set: where the verified bytes actually
+            # came from. The digest alone cannot say whether they were
+            # downloaded or copied in from a local archive.
+            "source_url": SBETHE_ARCHIVE_URL if archive is None else None,
+            "source_archive": None if archive is None else str(Path(archive).resolve()),
         }
         (staged / ".pyrite-fetch.json").write_text(
             json.dumps(marker, indent=2, sort_keys=True) + "\n", encoding="utf-8"
