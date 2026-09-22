@@ -60,6 +60,58 @@ def test_nonuniform_eedl_continuum_matches_chunked_cuda_fallback(monkeypatch):
     np.testing.assert_allclose(fused, fallback, rtol=3e-4, atol=1e-20)
 
 
+@pytest.mark.skipif(BACKEND.name != "cuda", reason="run with PYRITE_TEST_BACKEND=cuda")
+def test_directional_bremslib_kernel_matches_chunked_cuda_fallback(monkeypatch):
+    from pyrite.montecarlo.spectrum import brem
+    from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
+    from tests.helpers.bremslib import synthetic_bremslib_arrays
+
+    segments = {
+        "r_mid": np.array(
+            [[0.0, 0.0, 20.0], [0.0, 0.0, 35.0], [0.0, 0.0, 55.0], [0.0, 0.0, 80.0]],
+            dtype=np.float32,
+        ),
+        "v_hat": np.array(
+            [[0.0, 0.0, 1.0], [0.5, 0.0, np.sqrt(0.75)], [1.0, 0.0, 0.0], [0.0, 0.0, -1.0]],
+            dtype=np.float32,
+        ),
+        "L_ang": np.array([45.0, 130.0, 300.0, 90.0], dtype=np.float32),
+        # The final segment is above the synthetic table and exercises the
+        # per-segment isotropic EEDL fallback inside the fused reducer.
+        "E_keV": np.array([12.0, 31.0, 78.0, 220.0], dtype=np.float32),
+        "elec_id": np.arange(4),
+        "Ne": 4,
+        "thickness_ang": 100.0,
+    }
+    energy_eV = np.geomspace(80.0, 180_000.0, 257).astype(np.float32)
+    table = prepare_bremslib_table(
+        synthetic_bremslib_arrays(), atomic_number=6, key="synthetic", digest="fixture"
+    )
+    monkeypatch.setattr(
+        brem,
+        "_mu_total_inv_ang",
+        lambda _composition, energy: brem.xp.zeros_like(energy),
+    )
+    kwargs = {
+        "composition": [("C", 0.1)],
+        "cross_section_model": "bremslib",
+        "bremslib_tables": {"C": table},
+        "n_hat": np.array([0.0, 0.0, 1.0]),
+        "chunk": 2,
+    }
+
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", True)
+    with pytest.warns(RuntimeWarning, match="outside the BremsLib range"):
+        fused = brem.mc_brem_spectrum(segments, energy_eV, **kwargs)
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", False)
+    with pytest.warns(RuntimeWarning, match="outside the BremsLib range"):
+        fallback = brem.mc_brem_spectrum(segments, energy_eV, **kwargs)
+
+    assert np.all(np.isfinite(fused))
+    assert np.max(fused) > 0.0
+    np.testing.assert_allclose(fused, fallback, rtol=5e-4, atol=1e-20)
+
+
 def _old_weighted_brem_reference(T, L, paths, mu, E, *, Z, density_cm3):
     alpha = 7.2973525693e-3
     re2 = 7.9407877e-26

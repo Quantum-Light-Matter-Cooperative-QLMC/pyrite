@@ -104,6 +104,7 @@ Edges (importer -> imported):
   p16 -> p5
   p16 -> p6
   p16 -> p9
+  p17 -> p10
   p17 -> p5
   p17 -> p9
   p2 -> p10

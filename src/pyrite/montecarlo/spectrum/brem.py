@@ -1025,10 +1025,17 @@ def mc_brem_spectrum(
         and BACKEND.name == "cuda"
         and np.dtype(REAL) == np.dtype(np.float32)
     )
-    if _use_bethe_heitler_jit or _use_eedl_jit:
+    _use_bremslib_jit = (
+        _USE_JIT_BREM_REDUCTION
+        and cross_section_model == "bremslib"
+        and BACKEND.name == "cuda"
+        and np.dtype(REAL) == np.dtype(np.float32)
+    )
+    if _use_bethe_heitler_jit or _use_eedl_jit or _use_bremslib_jit:
         from .brem_jit_kernel import (
             DEFAULT_BREM_KERNEL_CONFIG,
             run_brem_reduction_kernel,
+            run_bremslib_element_reduction,
             run_eedl_brem_reduction_kernel,
         )
 
@@ -1074,7 +1081,25 @@ def mc_brem_spectrum(
                 dtype=REAL,
             )
             context = eedl_contexts.get(el_i)
-            if cross_section_model == "eedl" and context is not None:
+            staged = bremslib_staged.get(el_i)
+            if cross_section_model == "bremslib" and staged is not None:
+                run_bremslib_element_reduction(
+                    T_jit,
+                    L_jit,
+                    p_i_jit,
+                    incident_prefactor,
+                    path_flat,
+                    mu_flat,
+                    E_jit,
+                    staged,
+                    seg_cos_theta,
+                    context,
+                    Z=Z_i,
+                    number_density_ang3=n_i,
+                    n_layers=n_abs_layers,
+                    out=spec,
+                )
+            elif cross_section_model in {"eedl", "bremslib"} and context is not None:
                 state = context.state
                 eedl_incident_weight = xp.ascontiguousarray(
                     n_i * REAL(1.0e24) * L_jit * REAL(1.0e-8) * state.differential_scale_cm2,
