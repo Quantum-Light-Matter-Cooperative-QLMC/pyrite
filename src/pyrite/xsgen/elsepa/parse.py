@@ -34,9 +34,11 @@ class ElsepaResult:
     absorption_cm2: float
 
 
-def _scalar(text: str, name: str) -> float:
+def _scalar(text: str, name: str, *, default: float | None = None) -> float:
     match = re.search(_SCALARS[name], text)
     if match is None:
+        if default is not None:
+            return default
         raise ValueError(f"ELSEPA output is missing {name}")
     return float(match.group(1).replace("D", "E"))
 
@@ -78,7 +80,10 @@ def parse_dcs(data: str | bytes) -> ElsepaResult:
         total_elastic_cm2=_scalar(text, "total_elastic_cm2"),
         transport1_cm2=_scalar(text, "transport1_cm2"),
         transport2_cm2=_scalar(text, "transport2_cm2"),
-        absorption_cm2=_scalar(text, "absorption_cm2"),
+        # ``elscata`` writes this line only for MABS > 0. With no absorption
+        # potential selected there is no absorption, so its cross section is
+        # zero rather than missing.
+        absorption_cm2=_scalar(text, "absorption_cm2", default=0.0),
     )
 
 

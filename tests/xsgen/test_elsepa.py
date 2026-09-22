@@ -111,3 +111,36 @@ def test_generate_reuses_the_content_addressed_table(monkeypatch, tmp_path):
     assert second.table.key == first.table.key
     assert len(calls) == 1
     assert first.table.arrays()["dcs_cm2_sr"].shape == (1, 606)
+
+
+def test_every_deck_value_fits_the_fixed_width_field_elscata_reads():
+    """``elscata`` reads each line as ``(A6,1X,A12)``.
+
+    A value longer than twelve characters is truncated rather than rejected,
+    so ``1.00000000E+03`` arrived as ``1.00000000E`` and the program stopped
+    on a bad real number. Every energy that survives deck validation must fit.
+    """
+    deck = ElsepaDeck.free_atom(79, [4.999, 1.0e3, 9.87654e8, 1.0e9])
+
+    for line in deck.render().splitlines():
+        assert line[6] == " ", f"column 7 must be blank: {line!r}"
+        assert len(line[7:]) <= 12, f"value field overflows A12: {line!r}"
+
+
+def test_the_parser_accepts_output_written_without_an_absorption_potential():
+    """``elscata`` writes the absorption line only for MABS > 0.
+
+    The deck's default is MABS 0, so the common case has no such line, and no
+    absorption potential means no absorption rather than a missing field.
+    """
+    reference = _reference_output()
+    if isinstance(reference, bytes):
+        reference = reference.decode("ascii")
+    without = "\n".join(
+        line for line in reference.splitlines() if "Absorption cross section" not in line
+    )
+
+    result = parse_dcs(without)
+
+    assert result.absorption_cm2 == 0.0
+    assert result.total_elastic_cm2 == parse_dcs(reference).total_elastic_cm2

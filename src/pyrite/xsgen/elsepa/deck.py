@@ -96,7 +96,15 @@ class ElsepaDeck:
         return tuple(output_name(energy) for energy in self.energies_ev)
 
     def render(self) -> str:
-        """Render the case-sensitive fixed-column deck accepted by ``elscata``."""
+        """Render the case-sensitive fixed-column deck accepted by ``elscata``.
+
+        ``elscata`` reads every line as ``(A6,1X,A12)``: a six-character
+        keyword, one blank, then a *twelve*-character value field. A longer
+        value is silently truncated, so ``1.00000000E+03`` reaches the program
+        as ``1.00000000E`` and it stops on a bad real number. Six significant
+        digits fit, and match the precision of the ``dcs_*.dat`` names the
+        same energies produce.
+        """
         fields: list[tuple[str, int | str]] = [
             ("IZ", self.z),
             ("MNUCL", self.nuclear_model),
@@ -109,5 +117,5 @@ class ElsepaDeck:
             ("MABS", self.absorption_model),
             ("IHEF", self.high_energy_factorization),
         ]
-        fields.extend(("EV", f"{energy:.8E}") for energy in self.energies_ev)
+        fields.extend(("EV", f"{energy:.5E}") for energy in self.energies_ev)
         return "".join(f"{name:<6} {value}\n" for name, value in fields)
