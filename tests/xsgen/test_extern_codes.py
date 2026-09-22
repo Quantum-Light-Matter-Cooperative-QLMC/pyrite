@@ -6,6 +6,11 @@ so they carry the ``extern_codes``
 marker and are skipped unless ``PYRITE_EXTERN_CODES_TESTS=1``, following the
 ``online`` marker's convention. The ELSEPA anchor takes about 80 s.
 
+BremsLib is the exception that still belongs here: nothing is compiled,
+because PyRITE reads its precomputed library (D7), but that 810 MB library is
+not redistributed either, so CI cannot see it any more than it can see a
+Fortran compiler.
+
 The anchor is the vendor's own published test-run output, which is the
 cheapest strong check available: it exercises source resolution, the source
 digest, the build, scratch isolation, the symlinked database, and fixed-name
@@ -19,9 +24,20 @@ import shutil
 
 import numpy as np
 import pytest
-
 from pyrite.xsgen._errors import SourceUnavailableError
 from pyrite.xsgen._run import run_program
+from pyrite.xsgen.bremslib import (
+    angular_integral,
+    ddcs_filename,
+    iter_node_files,
+    library_root,
+    panel_of,
+    parse_ddcs,
+    parse_ratio_table,
+    shape_function,
+)
+from pyrite.xsgen.bremslib import generate_element as generate_bremslib
+from pyrite.xsgen.bremslib.read import ddcs_integral_path
 from pyrite.xsgen.elsepa import generate_element
 from pyrite.xsgen.sbethe import (
     SbetheDeck,
@@ -337,3 +353,101 @@ def test_the_generate_path_runs_sbethe_from_its_own_rendered_deck(monkeypatch, t
     assert result.generated is True
     assert float(arrays["mean_excitation_eV"]) == pytest.approx(75.0)
     assert arrays["stopping_MeV_cm2_per_g"].shape == arrays["stopping_energy_eV"].shape
+
+
+def _bremslib():
+    """Return the real BremsLib library directory, or skip.
+
+    Nothing is built here, so the compiler check the other two guards make
+    does not apply: what this anchor needs is the library itself.
+    """
+    if not _OPT_IN:
+        pytest.skip("set PYRITE_EXTERN_CODES_TESTS=1 to read the external code libraries")
+    try:
+        source = resolve_source("bremslib")
+    except SourceUnavailableError as exc:
+        pytest.skip(f"no BremsLib checkout: {exc}")
+    try:
+        return library_root(source.root)
+    except SourceUnavailableError as exc:
+        pytest.skip(f"no BremsLib library data: {exc}")
+
+
+@pytest.mark.parametrize(
+    ("z", "t1_MeV", "column"),
+    [(1, 1.0e-03, 0), (13, 1.0e-01, 5), (79, 1.0e01, 9), (79, 3.0e01, 0), (100, 2.0e00, 12)],
+)
+def test_our_angular_integral_reproduces_the_published_one(z, t1_MeV, column):
+    """Generator regression anchor for BremsLib.
+
+    Upstream publishes the angular integral of every DDCS node in
+    ``DDCS_int_<Z>.txt``, computed from the same tabulated grid with a
+    10th-order Newton-Cotes formula. Reproducing it is the strongest cheap
+    check available: it exercises source resolution, the library layout, both
+    file parsers, the ragged angular grid, and the integration rule against
+    numbers PyRITE did not produce.
+
+    Tolerance: the observed disagreement across these nodes is at most 2e-5
+    relative, and the rule difference -- Simpson against 10th-order
+    Newton-Cotes -- is its whole content. ``rtol=1e-4`` leaves room for a
+    node whose forward peak is less well resolved while still failing on a
+    mis-scaled column or a misread grid, both of which move the integral by
+    orders of magnitude.
+
+    Validation: bremslib-library-reference
+    """
+    library = _bremslib()
+    vendor = parse_ratio_table(ddcs_integral_path(library, z).read_text(encoding="ascii"))
+    ratio = float(vendor.k_over_t1[column])
+    # The top node stands slightly below its nominal unit ratio, and the file
+    # name rounds the photon energy to four digits, so it is found as the
+    # library's own highest node at this energy rather than by name. Sorting
+    # by the parsed energy matters: node names do not sort by photon energy,
+    # because a two-digit exponent puts ``8.000E-01`` after ``2.000E+00``.
+    at_energy = [
+        node
+        for node in iter_node_files(library, z)
+        if np.isclose(node.t1_MeV, t1_MeV, rtol=1e-6, atol=0.0)
+    ]
+    assert at_energy, f"no BremsLib DDCS nodes for Z={z} at T1={t1_MeV} MeV"
+    if ratio == 1.0:
+        node_path = max(at_energy, key=lambda node: node.k_MeV).path
+    else:
+        node_path = library / "DDCS" / ddcs_filename(z, t1_MeV, ratio * t1_MeV)
+    panel = parse_ddcs(node_path.read_text(encoding="ascii"))
+
+    ours = angular_integral(panel.theta_deg, panel.ddcs_mb_sr)
+
+    published = float(vendor.value[vendor.row(t1_MeV), column])
+    assert ours == pytest.approx(published, rel=1.0e-4)
+    # The shape function is the DDCS over exactly that integral, so it
+    # integrates to one under the same rule.
+    shape = shape_function(panel.theta_deg, panel.ddcs_mb_sr)
+    assert angular_integral(panel.theta_deg, shape) == pytest.approx(1.0, rel=1e-12)
+
+
+def test_the_generate_path_reads_the_real_library_then_reuses_the_table(monkeypatch, tmp_path):
+    """End-to-end cover for the read-only generator.
+
+    Bounded to 1 keV so the anchor reads a few hundred of the library's 86300
+    files rather than all 863 belonging to the element.
+    """
+    library = _bremslib()
+    monkeypatch.setattr("pyrite.xsgen.store.user_table_dir", lambda: tmp_path / "user")
+    monkeypatch.setattr("pyrite.xsgen.store.packaged_table_dir", lambda: tmp_path / "packaged")
+
+    first = generate_bremslib(79, t1_max_MeV=1.0e-03, source_path=library)
+    second = generate_bremslib(79, t1_max_MeV=1.0e-03, source_path=library)
+
+    assert first.generated and not second.generated
+    arrays = first.table.arrays()
+    energies = arrays["t1_MeV"]
+    assert energies.max() <= 1.0e-03
+    assert arrays["node_t1_index"].size == 13 * energies.size
+    # Every node's own integral, against the published one, across the table.
+    ours = arrays["node_angular_integral_mb"]
+    assert np.allclose(ours, arrays["node_vendor_integral_mb"], rtol=1.0e-4)
+    # And the flat angular index recovers a node whose grid is the library's.
+    panel = panel_of(arrays, 0)
+    assert panel.theta_deg.size == 181
+    assert first.table.manifest["compiler"] is None

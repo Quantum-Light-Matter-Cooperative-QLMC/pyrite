@@ -3,9 +3,9 @@
 Covers the store and the source configuration: what tables exist, where they
 came from, where they live, and which code trees PyRITE can currently reach.
 
-``generate`` exposes ELSEPA's free-atom path and SBETHE's material path,
-whose options are disjoint: each is rejected for the other code rather than
-silently ignored. ``fetch`` installs
+``generate`` exposes ELSEPA's and BremsLib's free-atom paths and SBETHE's
+material path, whose options are largely disjoint: an option belonging to
+another code is rejected rather than silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
 executable or documentation.
 """
@@ -42,6 +42,7 @@ _FLAGS = {
     "density": "--density",
     "mean_excitation": "--mean-excitation",
     "band_gap": "--band-gap",
+    "t1_max": "--t1-max",
 }
 
 
@@ -57,6 +58,13 @@ def _elsepa_args(
         ]
         raise CLIError(f"--code {code} requires {', '.join(missing)}")
     return element, energies_ev
+
+
+def _bremslib_args(code: str, element: int | None) -> int:
+    """Return BremsLib's one required option, or fail naming it."""
+    if element is None:
+        raise CLIError(f"--code {code} requires --element")
+    return element
 
 
 def _sbethe_args(
@@ -185,6 +193,7 @@ def command() -> None:
       pyrite tables list
       pyrite tables show 4f3a9c
       pyrite tables generate --code elsepa --element 79 --energy 1e3
+      pyrite tables generate --code bremslib --element 79
       pyrite tables fetch sbethe
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
@@ -272,15 +281,17 @@ def show_command(key: str, json_output: bool) -> None:
 @command.command("generate")
 @click.option(
     "--code",
-    type=click.Choice(["elsepa", "sbethe"], case_sensitive=False),
+    type=click.Choice(["elsepa", "sbethe", "bremslib"], case_sensitive=False),
     required=True,
-    help="External code to run: ELSEPA free atoms, or SBETHE materials.",
+    help=(
+        "Table source: ELSEPA free atoms, SBETHE materials, or the precomputed BremsLib library."
+    ),
 )
 @click.option(
     "--element",
     type=click.IntRange(1, 103),
     metavar="Z",
-    help="Atomic number of the free-atom target. ELSEPA only.",
+    help="Atomic number of the free-atom target. ELSEPA and BremsLib only.",
 )
 @click.option(
     "--energy",
@@ -327,6 +338,16 @@ def show_command(key: str, json_output: bool) -> None:
     show_default=True,
     help="Projectile particle. SBETHE only.",
 )
+@click.option(
+    "--t1-max",
+    "t1_max_MeV",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="MEV",
+    help=(
+        "Highest incident electron energy to include, in MeV; bounds the "
+        "table size. Defaults to the library's complete range. BremsLib only."
+    ),
+)
 @click.option("--overwrite", is_flag=True, help="Regenerate and replace an existing key.")
 @click.option(
     "--keep-on-failure",
@@ -344,6 +365,7 @@ def generate_command(
     mean_excitation: float | None,
     band_gap: float | None,
     projectile: str,
+    t1_max_MeV: float | None,
     overwrite: bool,
     keep_on_failure: bool,
     json_output: bool,
@@ -352,11 +374,13 @@ def generate_command(
 
     ELSEPA takes ``--element`` and one or more ``--energy`` values in eV.
     SBETHE takes ``--name``, ``--density``, ``--mean-excitation`` and one
-    ``--element-count Z:N`` per element in the molecule.
+    ``--element-count Z:N`` per element in the molecule. BremsLib takes
+    ``--element`` and optionally ``--t1-max``: its energies are the library's
+    own grid, so there is nothing to choose.
 
     Generated files live in the user table store; rerunning the same
-    normalized request reuses its table without compiling or running the
-    external code.
+    normalized request reuses its table without compiling, running, or
+    rereading the external code.
     """
     from ...xsgen import XsgenError
 
@@ -372,6 +396,7 @@ def generate_command(
                 density=density,
                 mean_excitation=mean_excitation,
                 band_gap=band_gap,
+                t1_max=t1_max_MeV,
             )
             atomic_number, energies = _elsepa_args(selected, element, energies_ev)
             result = generate_element(
@@ -380,10 +405,34 @@ def generate_command(
                 overwrite=overwrite,
                 keep_on_failure=keep_on_failure,
             )
+        elif selected == "bremslib":
+            from ...xsgen.bremslib import generate_element as generate_bremslib
+            from ...xsgen.bremslib import read as bremslib_read
+
+            if keep_on_failure:
+                # Nothing is compiled or run, so there is no scratch directory
+                # to keep. Accepting the flag silently would promise one.
+                raise CLIError(f"--code {selected} does not accept --keep-on-failure")
+            _reject_for(
+                selected,
+                energy=energies_ev or None,
+                name=name,
+                element_count=element_counts or None,
+                density=density,
+                mean_excitation=mean_excitation,
+                band_gap=band_gap,
+            )
+            result = generate_bremslib(
+                _bremslib_args(selected, element),
+                t1_max_MeV=(
+                    bremslib_read.COMPLETE_T1_MAX_MEV if t1_max_MeV is None else t1_max_MeV
+                ),
+                overwrite=overwrite,
+            )
         else:
             from ...xsgen.sbethe import generate_material
 
-            _reject_for(selected, element=element, energy=energies_ev or None)
+            _reject_for(selected, element=element, energy=energies_ev or None, t1_max=t1_max_MeV)
             material, composition, density_value, excitation = _sbethe_args(
                 selected, name, element_counts, density, mean_excitation
             )

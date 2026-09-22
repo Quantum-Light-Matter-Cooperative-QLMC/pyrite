@@ -266,6 +266,95 @@ def test_generate_rejects_a_malformed_element_count(isolated):
     assert "--element-count expects Z:N" in result.stderr
 
 
+def test_generate_reports_a_new_bremslib_table(isolated, monkeypatch, tmp_path):
+    """BremsLib is read, not run, so the only required option is the element."""
+    from types import SimpleNamespace
+
+    seen: dict[str, object] = {}
+    path = tmp_path / "data" / "xsgen" / "tables" / f"{'c' * 64}.npz"
+    table = SimpleNamespace(
+        key="c" * 64,
+        path=path,
+        tier="user",
+        manifest={"manifest_sha256": "d" * 64},
+    )
+
+    def fake(z, **kwargs):
+        seen["z"] = z
+        seen.update(kwargs)
+        return SimpleNamespace(table=table, generated=True)
+
+    monkeypatch.setattr("pyrite.xsgen.bremslib.generate_element", fake)
+
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "bremslib", "--element", "79", "--t1-max", "2.5"],
+    )
+
+    assert_clean_result(result, stdout=f"generated: {'c' * 64}\npath: {path}\n")
+    assert seen["z"] == 79
+    assert seen["t1_max_MeV"] == 2.5
+
+
+def test_generate_defaults_bremslib_to_the_complete_library_range(isolated, monkeypatch):
+    from types import SimpleNamespace
+
+    from pyrite.xsgen.bremslib.read import COMPLETE_T1_MAX_MEV
+
+    seen: dict[str, object] = {}
+
+    def fake(z, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(
+            table=SimpleNamespace(key="c" * 64, path="t.npz", tier="user", manifest={}),
+            generated=False,
+        )
+
+    monkeypatch.setattr("pyrite.xsgen.bremslib.generate_element", fake)
+    invoke(tables_command.command, ["generate", "--code", "bremslib", "--element", "79"])
+
+    assert seen["t1_max_MeV"] == COMPLETE_T1_MAX_MEV
+
+
+def test_generate_requires_an_element_for_bremslib(isolated):
+    result = invoke(tables_command.command, ["generate", "--code", "bremslib"])
+
+    assert result.exit_code != 0
+    assert "--code bremslib requires --element" in result.stderr
+
+
+def test_generate_rejects_an_energy_grid_for_bremslib(isolated):
+    """The library's energies are its own grid, so --energy chooses nothing."""
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "bremslib", "--element", "79", "--energy", "1000"],
+    )
+
+    assert result.exit_code != 0
+    assert "--code bremslib does not accept --energy" in result.stderr
+
+
+def test_generate_rejects_an_energy_bound_for_a_code_that_runs(isolated):
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "elsepa", "--element", "79", "--energy", "1000", "--t1-max", "2"],
+    )
+
+    assert result.exit_code != 0
+    assert "--code elsepa does not accept --t1-max" in result.stderr
+
+
+def test_generate_rejects_keep_on_failure_for_bremslib(isolated):
+    """Nothing is run, so there is no scratch directory the flag could keep."""
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "bremslib", "--element", "79", "--keep-on-failure"],
+    )
+
+    assert result.exit_code != 0
+    assert "--code bremslib does not accept --keep-on-failure" in result.stderr
+
+
 def test_generate_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_path):
     from types import SimpleNamespace
 

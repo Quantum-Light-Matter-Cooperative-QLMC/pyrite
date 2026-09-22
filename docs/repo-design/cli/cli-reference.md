@@ -2017,6 +2017,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables list
     pyrite tables show 4f3a9c
     pyrite tables generate --code elsepa --element 79 --energy 1e3
+    pyrite tables generate --code bremslib --element 79
     pyrite tables fetch sbethe
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
@@ -2060,16 +2061,18 @@ Usage: pyrite tables generate [OPTIONS]
 
   ELSEPA takes ``--element`` and one or more ``--energy`` values in eV. SBETHE takes
   ``--name``, ``--density``, ``--mean-excitation`` and one ``--element-count Z:N`` per
-  element in the molecule.
+  element in the molecule. BremsLib takes ``--element`` and optionally ``--t1-max``: its
+  energies are the library's own grid, so there is nothing to choose.
 
   Generated files live in the user table store; rerunning the same normalized request
-  reuses its table without compiling or running the external code.
+  reuses its table without compiling, running, or rereading the external code.
 
 Options:
-  --code [elsepa|sbethe]          External code to run: ELSEPA free atoms, or SBETHE
-                                  materials.  [required]
-  --element Z                     Atomic number of the free-atom target. ELSEPA only.
-                                  [1<=x<=103]
+  --code [elsepa|sbethe|bremslib]
+                                  Table source: ELSEPA free atoms, SBETHE materials, or
+                                  the precomputed BremsLib library.  [required]
+  --element Z                     Atomic number of the free-atom target. ELSEPA and
+                                  BremsLib only.  [1<=x<=103]
   --energy EV                     Kinetic energy in eV; repeat for a native-grid table.
                                   ELSEPA only.  [x>=4.999]
   --name NAME                     Material name recorded in the SBETHE output headers.
@@ -2082,6 +2085,9 @@ Options:
                                   a conductor. SBETHE only.  [x>0.0]
   --projectile [alpha|antimuon|antiproton|electron|muon|positron|proton]
                                   Projectile particle. SBETHE only.  [default: electron]
+  --t1-max MEV                    Highest incident electron energy to include, in MeV;
+                                  bounds the table size. Defaults to the library's
+                                  complete range. BremsLib only.  [x>0.0]
   --overwrite                     Regenerate and replace an existing key.
   --keep-on-failure               Keep the scratch directory after an external-code
                                   failure.
