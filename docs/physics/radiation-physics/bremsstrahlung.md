@@ -89,10 +89,83 @@ emits a `RuntimeWarning` that identifies the missing coverage. Malformed or
 checksum-mismatched EEDL data are not treated as missing coverage and remain
 hard errors.
 
+## BremsLib direction-resolved backend
+
+`cross_section_model="bremslib"` replaces isotropic emission with the BremsLib
+v2.0 double differential cross section {cite:p}`poskus2025bremslib`, taking the
+photon-energy spectrum from the same evaluation. BremsLib tabulates, per element,
+the scaled single differential cross section (SDCS)
+{math}`\chi(T_1,x)=(k/Z^2)\,d\sigma/dk` in mb and, at every grid node, the
+scaled double differential cross section (DDCS)
+{math}`(k/Z^2)\,d^2\sigma/(dk\,d\Omega)` in mb/sr over the photon emission angle
+{math}`\theta` measured from the incident electron direction, with
+{math}`x=k/T_1`. The grids are {math}`T_1` from 10 eV to 30 MeV (ratios up to
+1.33), 13 values of {math}`x` from 0 to just below 1, and 181--441 angles
+refined towards the forward peak. The cross sections PyRITE evaluates are
+
+```{math}
+\frac{d^2\sigma_Z}{dk\,d\Omega}(T,k,\theta)=\frac{Z^2}{k}\,\chi(T,x)\,S(T,x,\theta),
+\qquad
+\frac{d\sigma_Z}{dk}=\frac{Z^2}{k}\,\chi(T,x),
+\qquad
+\int_{4\pi}S\,d\Omega=1,
+
+```
+
+where the shape function {math}`S` is the DDCS divided by its own solid-angle
+integral, as the library defines it. Taking the shape and the spectrum from one
+evaluation keeps {math}`S` normalized against its own parent SDCS; PyRITE
+therefore never combines the BremsLib shape with the EEDL spectrum.
+
+The interpolation is PyRITE's own. It is not a port of the vendor's
+`Interpolate_DCS` (a GPL-3 weighted least-squares spline fit), and is built from
+the library's published grids:
+
+1. **Nodes.** Each node's DDCS is linear in {math}`\theta` between tabulated
+   angles. It is rescaled so that the exact solid-angle integral of that
+   linear interpolant,
+   {math}`2\pi\sum_i\int_{\theta_i}^{\theta_{i+1}}f(\theta)\sin\theta\,d\theta`,
+   equals the node's SDCS. All node grids are subsets of the finest one, so they
+   are resampled onto it without changing any interpolant.
+2. **Incident-energy refinement.** Backward emission falls steeply and
+   convexly with {math}`T_1`, so linear interpolation across a library interval
+   overshoots it. At load, each interval is split into four in
+   {math}`\ln T_1`. Each sub-node's shape is the weighted geometric mean of
+   its neighbours' shapes, renormalized to unit integral, and its SDCS is
+   interpolated log-log. Library nodes are kept bit for bit.
+3. **Evaluation.** The scaled DDCS is interpolated linearly in
+   {math}`\theta`, in {math}`x=k/T` and in {math}`\ln T` on the refined grid.
+   Each step is a convex combination of nodes whose angular integrals equal
+   their SDCS, so the {math}`4\pi` integral of the interpolated DDCS is
+   exactly the identically interpolated SDCS. The energy spectrum is recovered
+   by construction, not by a separate renormalization.
+
+Between the last node, {math}`x_{\rm top}` (0.99, {math}`1-50\,{\rm eV}/T_1`, or
+0.9999 depending on {math}`T_1`, per the library manual), and the kinematic tip,
+the top node's value is held. Above {math}`k=T` the cross section is zero.
+
+Tables come from `pyrite.xsgen`. The released catalogue tables install with
+`pyrite tables fetch bremslib`, and other elements are generated from a local
+BremsLib checkout. Because the physics core does not import `pyrite.xsgen`, a
+driver resolves them with
+`pyrite.xsgen.bremslib.tables.load_bremsstrahlung_tables(elements)` and passes
+them as `bremslib_tables`. Fallback coverage:
+
+- A released element whose table has not been fetched is an error that names
+  the fetch command.
+- An element with no table, or a segment energy outside the table's range,
+  warns and uses isotropic EEDL for only that element or those segments.
+
+The run path does not select this backend yet. `"eedl"` stays the packaged
+default until #86 establishes the BremsLib accuracy claim. The model marker
+`BREMSSTRAHLUNG_BREMSLIB_MODEL` and `table_identity(tables)` supply the run
+identity for when it is selected.
+
 ## Per-segment yield
 
-Emission is taken **isotropic**. For a segment of length {math}`L` traversed in an
-element of number density {math}`n_Z`, the contribution to the observed spectrum is
+For the EEDL and Bethe--Heitler backends emission is taken **isotropic**. For a
+segment of length {math}`L` traversed in an element of number density
+{math}`n_Z`, the contribution to the observed spectrum is
 
 ```{math}
 \frac{d^2N}{dE\,d\Omega}=\frac{1}{4\pi}\,n_Z\,L\,\frac{d\sigma}{dk}\,T_{\rm abs},
@@ -107,7 +180,11 @@ line spectrum.
 
 Isotropy approximates a scattering-randomized electron population in the
 intended weakly relativistic regime; it does not resolve directional emission
-from an individual electron. The small coherent fraction
+from an individual electron. The BremsLib backend does: each segment's
+{math}`\frac{1}{4\pi}\frac{d\sigma}{dk}` is replaced by
+{math}`\frac{d^2\sigma}{dk\,d\Omega}(T,k,\theta)` with
+{math}`\cos\theta=\hat v\cdot\hat n`, the straight-flight electron direction
+against the observation direction. The small coherent fraction
 of the continuum — which is what forms the CBS lines — is **not** subtracted
 here, so adding the line and continuum spectra slightly double counts that
 fraction.
@@ -202,8 +279,19 @@ The intensity must already be in the detected units of the plot it joins.
 
 ## Limits and assumptions
 
-- emission is isotropic, appropriate only to the intended weakly relativistic
-  regime, and carries no polarization;
+- EEDL and Bethe--Heitler emission is isotropic, appropriate only to the
+  intended weakly relativistic regime; no backend carries polarization;
+- the BremsLib backend takes the emission angle from each segment's
+  straight-flight direction and one fixed observation direction (a point
+  detector); the DDCS is azimuthally symmetric (unpolarized beam, unoriented
+  target). Interpolation error is under about 1.5 % in the DDCS and 0.4 % in
+  the SDCS at the library's own spacing, estimated from drop-one-node tests
+  over 20 keV--3 MeV for C, Si and W. Against the vendor's `Interpolate_DCS`
+  output for Au it is at most 0.8 % on the {math}`T_1` grid, and a 0.4 % median
+  (5.4 % at the last point before the tip) between {math}`T_1` nodes on the
+  0-degree forward peak;
+- the BremsLib portable path costs about four times the EEDL path on CPU;
+  there is no fused CUDA kernel for it yet;
 - EEDL is elemental atomic data; molecular bonding, density-dependent emission
   effects, and interactions below the configured transport cutoff are outside
   this model;
@@ -220,7 +308,8 @@ The intensity must already be in the detected units of the plot it joins.
 ## Validation
 
 Ledger rows: `brem-spectrum` for EEDL parsing, interpolation, normalization,
-fallback selection, and per-segment assembly,
+fallback selection, and per-segment assembly, `bremslib-angular-model` for the
+BremsLib direction-resolved backend,
 `external-brem-subtraction` for the weighted scale-only sideband fit that
 consumes a loaded external background, `substep-radiation-invariance` for the representative-energy evaluation,
 `radiation-error-estimators` for the opt-in quadrature estimator, and
