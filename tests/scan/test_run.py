@@ -15,6 +15,7 @@ import pytest
 from click.testing import CliRunner
 
 from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
+from pyrite.materials import CATALOG
 from pyrite.montecarlo import runner
 from pyrite.runs.run import (
     _checkpoint_save,
@@ -67,7 +68,7 @@ def _fake_case(
     return dict(
         name=name,
         crystal=crystal,
-        composition=[("C", 0.113)],
+        composition=CATALOG.crystal(crystal).composition,
         hkl_list=[],
         B_ang2=0.8,
         E0_keV=float(E0_keV),
@@ -1723,7 +1724,7 @@ def test_lines_for_case_matches_spectrum_case_single_slab():
         Ne=4,
         Ne_brem=2,
         thickness_ang=1.0e4,
-        composition=[("Mo", 1.0), ("S", 2.0)],
+        composition=CATALOG.crystal("mos2").composition,
         crystal="mos2",
         hkl_list=[(1, 0, 0)],
         B_ang2=0.5,

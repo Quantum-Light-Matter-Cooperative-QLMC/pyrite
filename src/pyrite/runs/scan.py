@@ -35,6 +35,7 @@ import threading
 import time
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -596,7 +597,19 @@ def _resolved_run(args, material):
         overrides["energy_keV"] = kept
         sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
 
+    from ..campaign.geometry import Stack
     from ..campaign.profiles import dataset_identity, variant_stem
+    from ..xsgen.sbethe import resolve_catalog_table
+    from ..xsgen.store import identity_markers
+
+    target = sweep.target
+    assert target is not None
+    table_keys = (
+        [layer.material for layer in target.layers]
+        if isinstance(target, Stack)
+        else [target.material]
+    )
+    xsgen_tables = identity_markers(resolve_catalog_table(key) for key in table_keys)
 
     identity = dataset_identity(
         material,
@@ -605,6 +618,7 @@ def _resolved_run(args, material):
         sweep,
         variant="quick" if getattr(args, "quick", False) else None,
         catalog_profile=catalog_profile,
+        xsgen_tables=xsgen_tables,
     )
     canonical_full = (
         fidelity == "full"
@@ -905,6 +919,7 @@ def _run_material(args, material, max_seconds=None):
 
     cache_read = getattr(args, "cache_read", True)
     cache_write = getattr(args, "cache_write", True)
+    xsgen_tables = identity["resolved_parameters"].get("xsgen_tables")
     try:
         if progress_timer is not None:
             progress_timer.start()
@@ -915,7 +930,7 @@ def _run_material(args, material, max_seconds=None):
             checkpoint_path=ckpt,
             max_workers=args.workers,
             resume=cache_read,
-            content_key_fn=case_content_key,
+            content_key_fn=partial(case_content_key, xsgen_tables=xsgen_tables),
             cache_read=cache_read,
             cache_write=cache_write,
             progress=not getattr(args, "no_progress", False),

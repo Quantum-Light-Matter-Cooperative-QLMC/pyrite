@@ -23,9 +23,12 @@ from pyrite.montecarlo.transport import (
     _dEds_bs_packed_scalar,
     _dEds_compound_scalar,
     _dEds_keV_per_ang,
+    _dEds_sbethe_scalar,
     _dEds_spliced_compound,
     _dEds_spliced_compound_scalar,
     _dEds_spliced_packed_scalar,
+    prepare_sbethe_stopping_table,
+    sbethe_stopping_keV_per_ang,
     spliced_stopping_keV_per_ang,
 )
 from tests.helpers import scaled_rtol, to_device, to_host
@@ -37,6 +40,34 @@ _RHO = _N_ANG3 * 1e24 * _A / 6.02214076e23
 _COEFF = (_N_ANG3 / 0.602214076) * _Z
 
 _SWEEP_KEV = np.array([1.0, 5.0, 10.0, 25.0, 50.0, 100.0, 200.0, 300.0])
+
+
+def test_sbethe_interpolation_is_exact_at_nodes_and_power_law_between_them():
+    arrays = {
+        "stopping_energy_eV": np.array([1.0e3, 4.0e3, 16.0e3]),
+        "stopping_eV_per_angstrom": np.array([8.0, 4.0, 2.0]),
+    }
+    log_energy, log_stopping = prepare_sbethe_stopping_table(arrays)
+
+    np.testing.assert_allclose(
+        sbethe_stopping_keV_per_ang(log_energy, log_stopping, np.array([1.0, 4.0, 16.0])),
+        -np.array([8.0, 4.0, 2.0]) * 1.0e-3,
+        rtol=1e-14,
+    )
+    assert _dEds_sbethe_scalar(log_energy, log_stopping, 2.0) == pytest.approx(
+        -np.sqrt(8.0 * 4.0) * 1.0e-3
+    )
+
+
+def test_sbethe_interpolation_rejects_extrapolation():
+    arrays = {
+        "stopping_energy_eV": np.array([1.0e3, 2.0e3]),
+        "stopping_eV_per_angstrom": np.array([8.0, 4.0]),
+    }
+    log_energy, log_stopping = prepare_sbethe_stopping_table(arrays)
+
+    with pytest.raises(ValueError, match="within"):
+        sbethe_stopping_keV_per_ang(log_energy, log_stopping, 0.5)
 
 
 def test_prefactor_reduces_to_the_joy_luo_constant():
@@ -483,3 +514,19 @@ def test_cuda_stopping_keeps_the_per_element_splice():
     assert "F64_BS_PREFACTOR / beta_sq * bs_total" in body
     # the Berger-Seltzer bracket, with tau^2 (tau + 2) / (2 (I/mc^2)^2)
     assert "tau * tau * (tau + F64_TWO) / (F64_TWO * I_rel * I_rel)" in body
+
+
+def test_cuda_stopping_carries_the_sbethe_table_and_straggling_scale():
+    """The exact device kernel must use SBETHE for mean loss and Urban's mean."""
+    from importlib import resources
+
+    device = _jit_device_source()
+    start = device.index("def _dEds_sbethe(")
+    interpolation = device[start : device.index("\n@", start)]
+    assert "xp.log(E_i)" in interpolation
+    assert "xp.exp(log_stopping)" in interpolation
+
+    kernel = resources.files("pyrite.montecarlo.transport").joinpath("_jit_kernel.py").read_text()
+    assert "dEds = _dEds_sbethe(" in kernel
+    assert "stopping_scale = dEds / reference_dEds" in kernel
+    assert "* stopping_scale" in kernel

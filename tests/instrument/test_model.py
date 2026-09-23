@@ -182,7 +182,10 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
         np.sum(pixel_spectra, axis=0) / np.sum(result.spatial.ray_map.solid_angle_sr),
         rtol=1.0e-15,
     )
-    assert result.provenance["identity_digest"] == api.case_content_key(result.case)
+    assert result.provenance["identity_digest"] == api.case_content_key(
+        result.case,
+        xsgen_tables=result.provenance["xsgen_tables"],
+    )
     assert len(result.provenance["observation_identity_digest"]) == 64
 
     moved = pr.FilterPlate(

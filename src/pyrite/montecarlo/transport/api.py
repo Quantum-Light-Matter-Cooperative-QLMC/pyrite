@@ -1,6 +1,7 @@
 """Public transport entry point: :func:`simulate_trajectories`."""
 
 import logging
+from collections.abc import Mapping
 
 import numpy as np
 
@@ -27,7 +28,11 @@ from .cores import (
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
 from .scattering import _NO_MOTT, _mott_alpha_table
-from .stopping import _element_crossover_keV
+from .stopping import (
+    _element_crossover_keV,
+    pack_sbethe_stopping_tables,
+    prepare_sbethe_stopping_table,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,7 @@ def simulate_trajectories(
     energy_model="frozen",
     max_dE_frac=0.0,
     straggling=False,
+    stopping_tables=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -75,9 +81,8 @@ def simulate_trajectories(
     radiate in the spectral window of interest anyway).
 
     Full derivations, sources, and limiting-case checks for the physics below
-    live in ``docs/physics/beam-transport/*.md`` and are independently verified
-    in ``docs/validation/beam-transport/*.md`` and
-    ``docs/validation/geometry/*.md``; this docstring states only the
+    live in ``docs/physics/beam-transport/*.md``; validation status is recorded
+    in ``docs/validation/``. This docstring states only the
     parameter contract and the BIT-FOR-BIT
     limiting case each one must preserve.
 
@@ -193,6 +198,17 @@ def simulate_trajectories(
     no-op -- BIT-FOR-BIT identical to the ungrooved slab. See
     docs/validation/geometry/blazed-groove-geometry.md.
     Validation: blazed-groove-geometry
+
+    stopping_tables: one stored SBETHE collision-stopping table per material
+      layer, with native ``stopping_energy_eV`` and
+      ``stopping_eV_per_angstrom`` arrays. Production case runners supply
+      identity-matched tables. ``None`` keeps the Joy-Luo/Berger-Seltzer
+      reference path for direct transport comparisons. Table energies must
+      include every incident energy and cutoff; extrapolation is rejected.
+      When supplied, the prepared tables are also carried on the returned
+      segment mapping as ``stopping_tables`` so post-transport cutoff solves
+      use the same model.
+      Validation: sbethe-corrected-stopping
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
@@ -427,6 +443,22 @@ def simulate_trajectories(
     _nsys_push("cxr.transport.tables")
     z_total = float(layers[-1][1])
     n_layers = len(layers)
+    prepared_stopping_tables = None
+    if stopping_tables is not None:
+        if len(stopping_tables) != n_layers:
+            raise ValueError("stopping_tables must contain one SBETHE table per layer")
+        prepared_stopping_tables = []
+        for table in stopping_tables:
+            prepared = (
+                table
+                if not isinstance(table, Mapping)
+                and len(table) == 2
+                and np.asarray(table[0]).ndim == 1
+                else None
+            )
+            if prepared is None:
+                prepared = prepare_sbethe_stopping_table(table)
+            prepared_stopping_tables.append(prepared)
     L_Zs = []
     L_Js = []
     L_ncm3 = []
@@ -627,6 +659,14 @@ def simulate_trajectories(
             )
     if not np.all(E_cut_by_electrons < E_keV):
         raise ValueError("each electron cutoff energy must be below its initial energy")
+    if prepared_stopping_tables is not None:
+        for prepared in prepared_stopping_tables:
+            lower = float(np.nextafter(np.exp(prepared[0][0]), -np.inf))
+            upper = float(np.nextafter(np.exp(prepared[0][-1]), np.inf))
+            if float(np.min(E_cut_by_electrons)) < lower or float(np.max(E_keV)) > upper:
+                raise ValueError(
+                    f"transport energy range must be within SBETHE table [{lower:g}, {upper:g}] keV"
+                )
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
@@ -681,8 +721,10 @@ def simulate_trajectories(
             L_sr_joy_numer,
             mott_tables,
             config=transport_lut_config,
+            stopping_tables=prepared_stopping_tables,
         )
         _nsys_pop()
+    sbethe_group = pack_sbethe_stopping_tables(prepared_stopping_tables, n_layers)
 
     _nsys_push("cxr.transport.alloc")
     # Preallocate fixed-capacity output buffers.  ``max_steps`` is already a
@@ -742,7 +784,7 @@ def simulate_trajectories(
             L_mott_denom2,
             L_sr_joy_numer,
         )
-        stragg_layer_tables = _stragg_packed[:5]
+        stragg_layer_tables = _stragg_packed[:5] + sbethe_group
     else:
         _stragg_dummy = np.zeros((1, 1), dtype=np.float64)
         stragg_layer_tables = (
@@ -751,7 +793,7 @@ def simulate_trajectories(
             _stragg_dummy,
             _stragg_dummy,
             _stragg_dummy,
-        )
+        ) + sbethe_group
 
     # Grouped kernel argument tuples (issue #66): the lockstep calls below pass
     # them straight through to the cores; the per-electron drivers in
@@ -787,6 +829,7 @@ def simulate_trajectories(
         L_mott_denom2,
         L_sr_joy_numer,
     )
+    materials_ragged += sbethe_group
     mott_group = (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat)
     straggling_lockstep = (straggle_on, stragg_stream_keys, stragg_dE)
     # The exact lockstep cores index ragged rows and never read L_nel; it rides
@@ -917,7 +960,7 @@ def simulate_trajectories(
                 transport_lut.cdf,
                 transport_lut.alpha,
             ),
-            (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross),
+            (L_Js, L_Zs, L_ks, L_coeffs, L_E_cross) + sbethe_group,
             state,
             segments,
             straggling_lockstep,
@@ -953,6 +996,7 @@ def simulate_trajectories(
             L_mott_denom2,
             L_sr_joy_numer,
         )
+        packed_per_layer_tables += sbethe_group
         nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs, stragg_dE = (
             _run_per_electron_transport(
                 core,
@@ -1137,6 +1181,12 @@ def simulate_trajectories(
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
+    if prepared_stopping_tables is not None:
+        # Prepared (log-transformed) per-layer SBETHE tables, so post-transport
+        # consumers that re-solve the cutoff (the spectrum cutoff clip) use the
+        # same stopping model the transport ran with instead of the reference
+        # splice. Metadata, not a per-row array: absent from _SEG_ARRAYS.
+        result["stopping_tables"] = tuple(prepared_stopping_tables)
     if straggle_on:
         # The summed per-electron Urban-SAMPLED loss. Every host core and the
         # exact CUDA core apply it; the CUDA LUT combination fails closed.

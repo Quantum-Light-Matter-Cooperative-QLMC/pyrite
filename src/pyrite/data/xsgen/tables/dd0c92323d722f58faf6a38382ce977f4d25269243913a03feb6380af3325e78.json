@@ -1,0 +1,140 @@
+{
+  "arrays": {
+    "density_g_cm3": {
+      "dtype": "float64",
+      "shape": []
+    },
+    "electrons_per_molecule": {
+      "dtype": "float64",
+      "shape": []
+    },
+    "integrated_energy_eV": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    },
+    "integrated_stopping_MeV_cm2_per_g": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    },
+    "mean_excitation_eV": {
+      "dtype": "float64",
+      "shape": []
+    },
+    "mean_free_path_g_cm2": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    },
+    "molecular_weight_g_mol": {
+      "dtype": "float64",
+      "shape": []
+    },
+    "oos_cumulative": {
+      "dtype": "float64",
+      "shape": [
+        750
+      ]
+    },
+    "oos_energy_eV": {
+      "dtype": "float64",
+      "shape": [
+        750
+      ]
+    },
+    "oos_per_eV": {
+      "dtype": "float64",
+      "shape": [
+        750
+      ]
+    },
+    "sigma0_cm2": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    },
+    "sigma1_eV_cm2": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    },
+    "sigma2_eV2_cm2": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    },
+    "stopping_MeV_cm2_per_g": {
+      "dtype": "float64",
+      "shape": [
+        391
+      ]
+    },
+    "stopping_cs_eV_cm2": {
+      "dtype": "float64",
+      "shape": [
+        391
+      ]
+    },
+    "stopping_eV_per_angstrom": {
+      "dtype": "float64",
+      "shape": [
+        391
+      ]
+    },
+    "stopping_energy_eV": {
+      "dtype": "float64",
+      "shape": [
+        391
+      ]
+    },
+    "stopping_no_shell_MeV_cm2_per_g": {
+      "dtype": "float64",
+      "shape": [
+        391
+      ]
+    },
+    "stopping_no_shell_eV_per_angstrom": {
+      "dtype": "float64",
+      "shape": [
+        391
+      ]
+    },
+    "straggling_MeV2_cm2_per_g": {
+      "dtype": "float64",
+      "shape": [
+        521
+      ]
+    }
+  },
+  "arrays_sha256": "dcd3457b06dd819ca831c9ad8254af8c0ff5727e03bf4d0b29193ea51529f9f1",
+  "code": "sbethe",
+  "code_version": "17f326d50c88590cf325e36159be780256767b304cf0ee757e4b0ce2cbc8da30",
+  "compiler": "GNU Fortran (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "created_utc": "2026-09-22T06:41:14+00:00",
+  "deck_hash": "fe041c106d83699a98a758386ec3a5f2c7258e974fa6d608ad090c3307e9c62c",
+  "key": "dd0c92323d722f58faf6a38382ce977f4d25269243913a03feb6380af3325e78",
+  "manifest_sha256": "655a92cb8f421ca9ecde3869c5b1cede865ea7a95430768881473816872dc96d",
+  "model": {
+    "band_gap_eV": null,
+    "mode": "keyboard_composition",
+    "projectile": "electron"
+  },
+  "modifications": "Derived from the named external code's output: parsed from its output files and stored on the code's own grids, with derived quantities such as integrals or sampling CDFs added. Not the upstream data. See THIRD-PARTY-NOTICES.md for the upstream author, citation, and licence.",
+  "pyrite_version": "0.3.0",
+  "quantity": "collision_stopping",
+  "schema": "pyrite.xsgen.manifest.v1",
+  "source_origin": "vendored",
+  "target": {
+    "identity": "18f76b496eaf80d8998790413f7700d80ad9f3326d0838abbebde0b8dfac915b",
+    "kind": "material"
+  },
+  "target_label": "pdse2",
+  "upstream": "SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2"
+}

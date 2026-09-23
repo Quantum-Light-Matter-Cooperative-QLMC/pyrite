@@ -24,7 +24,11 @@ from .scattering import (
     _scatter_rates_mott_scalar,
     _scatter_rates_sr_scalar,
 )
-from .stopping import _dEds_spliced_compound_scalar, _dEds_spliced_packed_scalar
+from .stopping import (
+    _dEds_sbethe_packed_scalar,
+    _dEds_spliced_compound_scalar,
+    _dEds_spliced_packed_scalar,
+)
 from .straggling import (
     _urban_flight_key_scalar,
     _urban_sample_compound_keV,
@@ -183,7 +187,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 L_mott_denom1,
                 L_mott_denom2,
                 L_sr_joy_numer,
-            ) = materials[5:]
+            ) = materials[5:11]
+            sbethe_on, L_sbethe_n, L_sbethe_logE, L_sbethe_logS = materials[11:]
             (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
         else:
             (
@@ -196,6 +201,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 lut_cdf,
                 lut_alpha,
             ) = lut_args
+            sbethe_on, L_sbethe_n, L_sbethe_logE, L_sbethe_logS = materials[5:]
         (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
         (
             seg_dir,
@@ -358,12 +364,27 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             if lut:
                 dEds = _lut_lerp_2d(lut_dEds, L, lut_i, lut_f)
                 inv_beta_j = _lut_lerp_1d(lut_inv_beta, lut_i, lut_f)
+            elif sbethe_on:
+                dEds = _dEds_sbethe_packed_scalar(
+                    L_sbethe_logE, L_sbethe_logS, L, L_sbethe_n[L], E_j
+                )
             elif per_electron:
                 dEds = _dEds_spliced_packed_scalar(
                     L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_j
                 )
             else:
                 dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
+            stopping_scale = 1.0
+            if sbethe_on:
+                if per_electron:
+                    reference_dEds = _dEds_spliced_packed_scalar(
+                        L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_j
+                    )
+                else:
+                    reference_dEds = _dEds_spliced_compound_scalar(
+                        J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j
+                    )
+                stopping_scale = dEds / reference_dEds
             cutoff_j = limited_j = False
             geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
             if straggle_on:
@@ -389,6 +410,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                         step_j,
                         flight_key,
                         _SM64_ZERO,
+                        stopping_scale,
                     )
                 else:
                     stragg_loss, _ = _urban_sample_compound_keV(
@@ -402,6 +424,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                         step_j,
                         flight_key,
                         _SM64_ZERO,
+                        stopping_scale,
                     )
                 stragg_dE[e] += stragg_loss
                 delta_cut = E_j - E_cut_e
@@ -433,6 +456,14 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                             0.5 * (E_j + E_cut_e), lut_log_E_min, lut_inv_dlogE, lut_n_energy
                         )
                         cutoff_rate = _lut_lerp_2d(lut_dEds, L, cut_i, cut_f)
+                    elif sbethe_on:
+                        cutoff_rate = _dEds_sbethe_packed_scalar(
+                            L_sbethe_logE,
+                            L_sbethe_logS,
+                            L,
+                            L_sbethe_n[L],
+                            0.5 * (E_j + E_cut_e),
+                        )
                     elif per_electron:
                         cutoff_rate = _dEds_spliced_packed_scalar(
                             L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_cut_e)
@@ -464,6 +495,14 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                                 0.5 * (E_j + E_pred), lut_log_E_min, lut_inv_dlogE, lut_n_energy
                             )
                             mid_rate = _lut_lerp_2d(lut_dEds, L, mid_i, mid_f)
+                        elif sbethe_on:
+                            mid_rate = _dEds_sbethe_packed_scalar(
+                                L_sbethe_logE,
+                                L_sbethe_logS,
+                                L,
+                                L_sbethe_n[L],
+                                0.5 * (E_j + E_pred),
+                            )
                         elif per_electron:
                             mid_rate = _dEds_spliced_packed_scalar(
                                 L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, 0.5 * (E_j + E_pred)

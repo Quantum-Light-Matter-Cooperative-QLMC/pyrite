@@ -72,6 +72,7 @@ from ._jit_device import (
     _alpha_sr_joy,
     _beta_from_keV,
     _dEds_packed,
+    _dEds_sbethe,
     _dEds_spliced_element,
     _interp_mott_log_alpha,
     _lut_lerp_at,
@@ -126,6 +127,11 @@ def _transport_kernel(
     L_mott_denom1,
     L_mott_denom2,
     L_sr_joy_numer,
+    sbethe_on,
+    L_sbethe_n,
+    L_sbethe_logE,
+    L_sbethe_logS,
+    sbethe_width,
     L_nel,
     max_el,
     L_top,
@@ -299,7 +305,19 @@ def _transport_kernel(
         # 3. Record the radiating material segment. An electron that overflows
         #    `cap` keeps transporting so `seg_count` reports the capacity the
         #    replay needs.
-        dEds = _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_j)
+        reference_dEds = _dEds_packed(L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, E_j)
+        dEds = reference_dEds
+        stopping_scale = F64_ONE
+        if sbethe_on == I32_ONE:
+            sbethe_row = L * sbethe_width
+            dEds = _dEds_sbethe(
+                L_sbethe_logE,
+                L_sbethe_logS,
+                sbethe_row,
+                L_sbethe_n[L],
+                E_j,
+            )
+            stopping_scale = dEds / reference_dEds
         cutoff_j = False
         # The numerical energy-loss cap is the only step limit that does not
         # close a physical flight: it emits a row and resumes with the same
@@ -356,7 +374,7 @@ def _transport_kernel(
                 kc = L_ks[row + i_el2]
                 coeffc = L_coeffs[row + i_el2]
                 E_crossc = L_E_cross[row + i_el2]
-                Cc = -_dEds_spliced_element(Jc, kc, coeffc, E_crossc, E_j)
+                Cc = -_dEds_spliced_element(Jc, kc, coeffc, E_crossc, E_j) * stopping_scale
 
                 tau_u = E_j / F64_MC2_KEV
                 gamma_u = F64_ONE + tau_u
@@ -538,9 +556,19 @@ def _transport_kernel(
                 # definition, so the truncation distance solves the scheme at
                 # E_mid = (E_start + E_cut)/2, not its left-endpoint
                 # linearization.
-                cutoff_distance = (E_cut_e - E_j) / _dEds_packed(
-                    L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_cut_e)
+                cutoff_energy = F64_HALF * (E_j + E_cut_e)
+                cutoff_rate = _dEds_packed(
+                    L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, cutoff_energy
                 )
+                if sbethe_on == I32_ONE:
+                    cutoff_rate = _dEds_sbethe(
+                        L_sbethe_logE,
+                        L_sbethe_logS,
+                        L * sbethe_width,
+                        L_sbethe_n[L],
+                        cutoff_energy,
+                    )
+                cutoff_distance = (E_cut_e - E_j) / cutoff_rate
             else:
                 cutoff_distance = (E_cut_e - E_j) / dEds
             if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
@@ -570,9 +598,19 @@ def _transport_kernel(
                     # Explicit midpoint RK2: predict with the start rate,
                     # then evaluate at (E_start + E_pred)/2.
                     E_pred = E_j + dEds * step_j
-                    E_end_j = E_j + step_j * _dEds_packed(
-                        L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, F64_HALF * (E_j + E_pred)
+                    midpoint_energy = F64_HALF * (E_j + E_pred)
+                    midpoint_rate = _dEds_packed(
+                        L_Js, L_ks, L_coeffs, L_E_cross, row, n_el, midpoint_energy
                     )
+                    if sbethe_on == I32_ONE:
+                        midpoint_rate = _dEds_sbethe(
+                            L_sbethe_logE,
+                            L_sbethe_logS,
+                            L * sbethe_width,
+                            L_sbethe_n[L],
+                            midpoint_energy,
+                        )
+                    E_end_j = E_j + step_j * midpoint_rate
                 beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
             else:
                 if cutoff_j:

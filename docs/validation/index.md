@@ -46,6 +46,8 @@ beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
 beam-transport/radiation-error-estimators
 beam-transport/relativistic-bethe-stopping
+beam-transport/sbethe-corrected-stopping
+beam-transport/sbethe-material-inputs
 beam-transport/substep-radiation-invariance
 beam-transport/transport-midpoint-stopping
 ```

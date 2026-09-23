@@ -681,7 +681,7 @@ def _run_per_electron_transport(
     d_bounds = to_dev(internal_bounds)
     d_top = to_dev(L_top)
     d_bot = to_dev(L_bot)
-    d_layers = tuple(to_dev(a) for a in layer_tables)
+    d_layers = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in layer_tables)
     d_mott = tuple(to_dev(a) for a in mott)
     d_stragg = to_dev(stragg_dE)
     _nsys_pop()
@@ -700,7 +700,7 @@ def _run_per_electron_transport(
         d_top,
         d_bot,
     )
-    d_materials = d_layers[:11]
+    d_materials = d_layers[:11] + d_layers[12:]
     state = (d_alive, d_clock, d_pos, d_dirs, d_E, d_E_cut)
     straggling_args = (straggle_on, d_stragg)
 

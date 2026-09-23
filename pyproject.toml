@@ -228,6 +228,10 @@ forbidden_modules = [
     "pyrite.validation",
     "pyrite.xsgen",
 ]
+# The Monte Carlo runner is the case driver within this package. It resolves
+# identity-matched, stored SBETHE tables before entering the transport core;
+# numerical kernels and materials must not import the table-generation layer.
+ignore_imports = ["pyrite.montecarlo.runner -> pyrite.xsgen.sbethe"]
 allow_indirect_imports = true
 
 # `materials` is the bottom of the physics core: it must not reach sideways into

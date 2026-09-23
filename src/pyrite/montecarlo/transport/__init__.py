@@ -63,6 +63,9 @@ from .scattering import (
 
 from .stopping import (
     TRANSPORT_ELEMENTS,
+    prepare_sbethe_stopping_table,
+    _dEds_sbethe_scalar,
+    sbethe_stopping_keV_per_ang,
     _dEds_keV_per_ang,
     _dEds_compound_scalar,
     _dEds_compound,

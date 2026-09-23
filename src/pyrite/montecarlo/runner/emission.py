@@ -169,6 +169,7 @@ def _brem_for_case(case, E_brem):
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
+        stopping_tables=runner._case_stopping_tables(case),
     )
     return runner._brem_wide_from_segments(
         segs_b,

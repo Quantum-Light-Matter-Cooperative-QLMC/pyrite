@@ -254,7 +254,7 @@ def test_a_table_without_its_manifest_is_not_served():
     store(request, _arrays())
     (user_table_dir() / f"{request.key}.json").unlink()
     assert resolve(request.key) is None
-    assert list(iter_stored()) == []
+    assert all(table.key != request.key for table in iter_stored())
 
 
 # --- the manifest covers the payload, not just the recipe -----------------

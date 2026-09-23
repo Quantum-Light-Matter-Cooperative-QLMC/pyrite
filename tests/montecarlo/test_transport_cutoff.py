@@ -10,7 +10,12 @@ from pyrite.montecarlo.spectrum import (
     mc_brem_spectrum,
 )
 from pyrite.montecarlo.spectrum.lines import _prepare_spectrum
-from pyrite.montecarlo.transport import simulate_trajectories, spliced_stopping_keV_per_ang
+from pyrite.montecarlo.transport import (
+    TransportLUTConfig,
+    prepare_sbethe_stopping_table,
+    simulate_trajectories,
+    spliced_stopping_keV_per_ang,
+)
 from tests.helpers import scaled_rtol, to_host
 
 CARBON = [("C", 0.1136)]
@@ -57,6 +62,30 @@ def test_cutoff_crossing_clips_terminal_flight_exactly(transport_core):
         + result["n_cutoff_stopped"]
         == result["Ne"]
     )
+
+
+@pytest.mark.parametrize("transport_core", ["lockstep", "per-electron"])
+def test_exact_cpu_cores_use_sbethe_stopping_for_cutoff(transport_core):
+    table = {
+        "stopping_energy_eV": np.array([5.0e3, 10.0e3]),
+        "stopping_eV_per_angstrom": np.array([100.0, 100.0]),
+    }
+    result = simulate_trajectories(
+        10.0,
+        1,
+        1.0e8,
+        composition=[("C", 1.0e-30)],
+        E_cut_keV=5.0,
+        elastic_model="sr",
+        seed=4,
+        max_steps=20,
+        transport_core=transport_core,
+        transport_lut_config=TransportLUTConfig(enabled=False),
+        stopping_tables=[table],
+    )
+
+    assert result["L_ang"][-1] == pytest.approx(50.0, rel=1e-12)
+    assert result["n_cutoff_stopped"] == 1
 
 
 @pytest.mark.parametrize("transport_core", ["lockstep", "per-electron"])
@@ -163,6 +192,45 @@ def test_population_cutoff_clips_length_and_midpoint_but_not_start_state():
     expected_call = "segments = _clip_segments_to_cutoff(segments, E_cut_keV"
     assert expected_call in inspect.getsource(_prepare_spectrum)
     assert expected_call in inspect.getsource(mc_brem_spectrum)
+
+
+def test_population_cutoff_clip_uses_attached_sbethe_tables_per_layer():
+    """Segments transported with SBETHE tables carry them; the clip must divide
+    by the table stopping, per layer, not by the Joy-Luo/Berger-Seltzer splice
+    (which would reconstruct a different truncation distance)."""
+    table_a = prepare_sbethe_stopping_table(
+        {
+            "stopping_energy_eV": np.array([1.0e3, 20.0e3]),
+            "stopping_eV_per_angstrom": np.array([100.0, 100.0]),  # 0.1 keV/Ang
+        }
+    )
+    table_b = prepare_sbethe_stopping_table(
+        {
+            "stopping_energy_eV": np.array([1.0e3, 20.0e3]),
+            "stopping_eV_per_angstrom": np.array([200.0, 200.0]),  # 0.2 keV/Ang
+        }
+    )
+    E0, cutoff, old_length = 10.0, 5.0, 1.0e5
+    segments = {
+        "r_mid": np.array([[0.0, 0.0, old_length / 2.0], [0.0, 0.0, old_length / 2.0]]),
+        "v_hat": np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]),
+        "L_ang": np.array([old_length, old_length]),
+        "E_keV": np.array([E0, E0]),
+        "t_ang": np.array([12.0, 12.0]),
+        "t0_ang": np.array([3.0, 3.0]),
+        "elec_id": np.array([0, 1]),
+        "layer": np.array([0, 1]),
+        "Ne": 2,
+        "stopping_tables": (table_a, table_b),
+    }
+
+    raw = _clip_segments_to_cutoff(segments, cutoff, CARBON)
+    clipped_L = to_host(raw["L_ang"])
+    assert clipped_L[0] == pytest.approx((E0 - cutoff) / 0.1, rel=1e-10)
+    assert clipped_L[1] == pytest.approx((E0 - cutoff) / 0.2, rel=1e-10)
+    # Sanity: the splice value for carbon would have been a different length.
+    splice_length = (E0 - cutoff) / _carbon_stopping_keV_per_ang(E0)
+    assert abs(clipped_L[0] - splice_length) > 0.01 * splice_length
 
 
 def test_cuda_source_uses_cpu_reference_cutoff_and_termination_rules():

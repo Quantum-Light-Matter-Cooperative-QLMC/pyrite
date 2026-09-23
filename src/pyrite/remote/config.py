@@ -57,6 +57,8 @@ SYNC_PATHS = [
     "pyproject.toml",
     "uv.lock",
     "README.md",
+    "LICENSE.txt",
+    "THIRD-PARTY-NOTICES.md",
 ]
 
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):

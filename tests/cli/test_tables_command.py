@@ -277,6 +277,46 @@ def test_generate_reports_a_new_sbethe_table(isolated, monkeypatch, tmp_path):
     assert seen["band_gap_eV"] is None
 
 
+def test_generate_resolves_a_catalog_sbethe_material(isolated, monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    table = SimpleNamespace(
+        key="c" * 64,
+        path=tmp_path / "table.npz",
+        tier="user",
+        manifest={"manifest_sha256": "d" * 64},
+    )
+    seen = {}
+
+    def fake_generate(name, composition, **kwargs):
+        seen.update(name=name, composition=composition, **kwargs)
+        return SimpleNamespace(table=table, generated=True)
+
+    monkeypatch.setattr("pyrite.xsgen.sbethe.generate_material", fake_generate)
+
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "sbethe", "--material", "silicon"],
+    )
+
+    assert_clean_result(result, stdout=f"generated: {'c' * 64}\npath: {table.path}\n")
+    assert seen["name"] == "silicon"
+    assert set(seen["composition"]) == {14}
+    assert seen["composition"][14] > 0.0
+    assert seen["density_g_cm3"] == pytest.approx(2.33, rel=0.02)
+    assert seen["mean_excitation_eV"] == pytest.approx(173.0)
+
+
+def test_generate_rejects_catalog_and_manual_sbethe_inputs_together(isolated):
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "sbethe", "--material", "silicon", "--density", "2.33"],
+    )
+
+    assert result.exit_code != 0
+    assert "--code sbethe does not accept --density" in result.stderr
+
+
 def test_generate_rejects_a_malformed_element_count(isolated):
     result = invoke(
         tables_command.command,

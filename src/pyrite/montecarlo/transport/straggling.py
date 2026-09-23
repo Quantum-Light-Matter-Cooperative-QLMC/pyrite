@@ -330,7 +330,17 @@ def _dEds_spliced_element_scalar(J, k, coeff, E_cross, delta, E_i):
 
 @njit(cache=True)
 def _urban_sample_compound_keV(
-    Z_arr, J_arr, k_arr, coeff_arr, E_cross_arr, delta, E_i, s_ang, key, counter
+    Z_arr,
+    J_arr,
+    k_arr,
+    coeff_arr,
+    E_cross_arr,
+    delta,
+    E_i,
+    s_ang,
+    key,
+    counter,
+    stopping_scale=1.0,
 ):
     """Sample the Urban loss of a compound over ``s_ang`` [keV], ``(dE, counter)``.
 
@@ -346,6 +356,7 @@ def _urban_sample_compound_keV(
         C_i = -_dEds_spliced_element_scalar(
             J_arr[i], k_arr[i], coeff_arr[i], E_cross_arr[i], delta, E_i
         )
+        C_i *= stopping_scale
         loss, counter = _urban_sample_element_keV(Z_arr[i], J_arr[i], C_i, E_i, s_ang, key, counter)
         dE += loss
     return dE, counter

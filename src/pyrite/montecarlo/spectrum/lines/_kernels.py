@@ -590,6 +590,26 @@ def _spliced_stopping_magnitude_xp(E_eval, layer_index, layer_compositions):
     return stopping
 
 
+def _sbethe_stopping_magnitude_xp(E_eval, layer_index, stopping_tables):
+    """Positive SBETHE stopping magnitude [keV/Ang] per segment layer.
+
+    Log-log interpolates the prepared per-layer tables the transport carried on
+    the segment mapping, so a post-transport cutoff re-solve divides by the same
+    stopping the transport core applied. ``xp.interp`` clamps out-of-domain
+    energies to the endpoint nodes, matching the kernel's endpoint clamp."""
+    stopping = xp.zeros_like(E_eval)
+    for index, (log_energy, log_stopping) in enumerate(stopping_tables):
+        layer_stopping = xp.exp(
+            xp.interp(
+                xp.log(E_eval),
+                xp.asarray(log_energy, dtype=REAL),
+                xp.asarray(log_stopping, dtype=REAL),
+            )
+        )
+        stopping = xp.where(layer_index == index, layer_stopping, stopping)
+    return stopping
+
+
 def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     """Clip terminal material flights to a population-specific energy floor.
 
@@ -604,7 +624,11 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     transport core does) and the shortened flight's end/representative state is
     reconstructed exactly rather than dropped. Frozen rows keep the historical
     left-endpoint solve bit-for-bit.
-    """
+
+    The solve uses the SBETHE tables the transport attached as
+    ``stopping_tables`` when they are present, and falls back to the
+    Joy-Luo/Berger-Seltzer reference splice only for segments transported
+    without tables (the explicit reference path)."""
     if E_cut_keV is None:
         return segments
 
@@ -644,7 +668,11 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     layer_index = xp.asarray(out["layer"])
     layer_compositions = [composition] if layers is None else [item[2] for item in layers]
 
+    stopping_tables = segments.get("stopping_tables")
+
     def _stopping_at(E_eval):
+        if stopping_tables is not None:
+            return _sbethe_stopping_magnitude_xp(E_eval, layer_index, stopping_tables)
         return _spliced_stopping_magnitude_xp(E_eval, layer_index, layer_compositions)
 
     midpoint_rows = "E_end_keV" in out and "E_repr_keV" in out

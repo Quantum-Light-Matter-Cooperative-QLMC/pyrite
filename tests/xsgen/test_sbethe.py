@@ -10,14 +10,18 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from pyrite.xsgen._errors import DataFetchError
+from pyrite.materials import CATALOG
+from pyrite.montecarlo.runner import _case_stopping_table_records
+from pyrite.xsgen._errors import DataFetchError, TableNotFoundError
 from pyrite.xsgen.sbethe import (
     SbetheDeck,
+    catalog_material,
     generate_material,
     material_token,
     parse_integrated,
     parse_oscillator,
     parse_stopping,
+    resolve_catalog_table,
     table_arrays,
 )
 from pyrite.xsgen.toolchain import Toolchain
@@ -77,6 +81,54 @@ OSCILLATOR = """\
   5.380000E+02  9.000000E-04  9.000000E+00
   2.600000E+06  1.447580E-15  1.000000E+01
 """
+
+
+def test_catalog_material_derives_density_and_mean_excitation_from_number_density():
+    silicon = catalog_material("silicon")
+
+    assert silicon.key == "silicon"
+    assert set(silicon.composition) == {14}
+    assert silicon.density_g_cm3 == pytest.approx(2.33, rel=0.02)
+    assert silicon.mean_excitation_eV == pytest.approx(173.0)
+    assert silicon.band_gap_eV is None
+
+
+def test_catalog_material_alias_uses_the_runnable_materials_film_crystal():
+    assert catalog_material("mos2-on-sapphire").composition == catalog_material("mos2").composition
+
+
+def test_catalog_material_rejects_an_unknown_key():
+    with pytest.raises(ValueError, match="unknown catalog material"):
+        catalog_material("unobtainium")
+
+
+def test_case_stopping_lookup_rejects_a_composition_that_does_not_match_its_table():
+    case = {"crystal": "mos2", "composition": [("Mo", 1.0), ("S", 2.0)]}
+    with pytest.raises(TableNotFoundError, match="no SBETHE table"):
+        _case_stopping_table_records(case)
+
+
+def test_every_runtime_catalog_target_has_a_pinned_full_domain_sbethe_table():
+    keys = sorted(set(CATALOG.materials) | set(CATALOG.media))
+    for key in keys:
+        table = resolve_catalog_table(key)
+        arrays = table.arrays()
+        energy = arrays["stopping_energy_eV"]
+        stopping = arrays["stopping_eV_per_angstrom"]
+
+        assert table.manifest["code"] == "sbethe"
+        assert table.manifest["quantity"] == "collision_stopping"
+        assert energy[0] == pytest.approx(1.0e3)
+        assert energy[-1] == pytest.approx(1.0e9)
+        assert np.all(np.diff(energy) > 0.0)
+        assert np.all(np.isfinite(stopping))
+        assert np.all(stopping > 0.0)
+
+    hopg = resolve_catalog_table("hopg").arrays()
+    assert not np.allclose(
+        hopg["stopping_eV_per_angstrom"],
+        hopg["stopping_no_shell_eV_per_angstrom"],
+    )
 
 
 def test_the_deck_renders_the_sequence_the_program_prompts_for():

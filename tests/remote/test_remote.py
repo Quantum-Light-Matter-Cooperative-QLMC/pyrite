@@ -5327,11 +5327,15 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
     assert "--pull and --detached are mutually exclusive" in capsys.readouterr().err
 
 
-def test_sync_paths_ship_checks_and_entry_shims():
+def test_sync_paths_ship_checks_entry_shims_and_build_metadata():
     # The entry shims live under src/pyrite/_entry/ now, so they travel via "src";
     # checks/ still ships the real reproduce_all logic.
     assert "checks" in remote.SYNC_PATHS
     assert "src" in remote.SYNC_PATHS
+    assert "pyproject.toml" in remote.SYNC_PATHS
+    assert "README.md" in remote.SYNC_PATHS
+    assert "LICENSE.txt" in remote.SYNC_PATHS
+    assert "THIRD-PARTY-NOTICES.md" in remote.SYNC_PATHS
     assert "scan.py" not in remote.SYNC_PATHS
     assert "reproduce_zhai.py" not in remote.SYNC_PATHS
 

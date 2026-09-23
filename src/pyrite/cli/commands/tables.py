@@ -36,6 +36,7 @@ _PROJECTILES = (
 _FLAGS = {
     "element": "--element",
     "energy": "--energy",
+    "material": "--material",
     "name": "--name",
     "element_count": "--element-count",
     "density": "--density",
@@ -302,6 +303,14 @@ def show_command(key: str, json_output: bool) -> None:
     help="Kinetic energy in eV; repeat for a native-grid table. ELSEPA only.",
 )
 @click.option(
+    "--material",
+    metavar="NAME",
+    help=(
+        "Catalog material, crystal, or medium whose composition and density "
+        "define the SBETHE table. SBETHE only; incompatible with manual material options."
+    ),
+)
+@click.option(
     "--name",
     metavar="NAME",
     help="Material name recorded in the SBETHE output headers. SBETHE only.",
@@ -359,6 +368,7 @@ def generate_command(
     code: str,
     element: int | None,
     energies_ev: tuple[float, ...],
+    material: str | None,
     name: str | None,
     element_counts: tuple[str, ...],
     density: float | None,
@@ -373,8 +383,9 @@ def generate_command(
     """Generate or reuse one external-code table.
 
     ELSEPA takes ``--element`` and one or more ``--energy`` values in eV.
-    SBETHE takes ``--name``, ``--density``, ``--mean-excitation`` and one
-    ``--element-count Z:N`` per element in the molecule. BremsLib takes
+    SBETHE takes either one catalog ``--material`` or the manual ``--name``,
+    ``--density``, ``--mean-excitation`` and one ``--element-count Z:N`` per
+    element in the molecule. BremsLib takes
     ``--element`` and optionally ``--t1-max``: its energies are the library's
     own grid, so there is nothing to choose.
 
@@ -391,6 +402,7 @@ def generate_command(
 
             _reject_for(
                 selected,
+                material=material,
                 name=name,
                 element_count=element_counts or None,
                 density=density,
@@ -416,6 +428,7 @@ def generate_command(
             _reject_for(
                 selected,
                 energy=energies_ev or None,
+                material=material,
                 name=name,
                 element_count=element_counts or None,
                 density=density,
@@ -430,18 +443,35 @@ def generate_command(
                 overwrite=overwrite,
             )
         else:
-            from ...xsgen.sbethe import generate_material
+            from ...xsgen.sbethe import catalog_material, generate_material
 
             _reject_for(selected, element=element, energy=energies_ev or None, t1_max=t1_max_MeV)
-            material, composition, density_value, excitation = _sbethe_args(
-                selected, name, element_counts, density, mean_excitation
-            )
+            if material is not None:
+                _reject_for(
+                    selected,
+                    name=name,
+                    element_count=element_counts or None,
+                    density=density,
+                    mean_excitation=mean_excitation,
+                    band_gap=band_gap,
+                )
+                catalog_input = catalog_material(material)
+                table_name = catalog_input.key
+                composition = catalog_input.composition
+                density_value = catalog_input.density_g_cm3
+                excitation = catalog_input.mean_excitation_eV
+                gap = catalog_input.band_gap_eV
+            else:
+                table_name, composition, density_value, excitation = _sbethe_args(
+                    selected, name, element_counts, density, mean_excitation
+                )
+                gap = band_gap
             result = generate_material(
-                material,
+                table_name,
                 composition,
                 density_g_cm3=density_value,
                 mean_excitation_eV=excitation,
-                band_gap_eV=band_gap,
+                band_gap_eV=gap,
                 projectile=projectile.lower(),
                 overwrite=overwrite,
                 keep_on_failure=keep_on_failure,

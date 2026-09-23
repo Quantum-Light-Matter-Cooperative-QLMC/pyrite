@@ -30,7 +30,7 @@ from .materials import CATALOG, MediumSpec
 from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
 from .montecarlo.geometry import directions_to_sample_frame
-from .montecarlo.runner import run_case_directions
+from .montecarlo.runner import _case_stopping_table_records, run_case_directions
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
     BREMSSTRAHLUNG_MODEL,
@@ -38,6 +38,7 @@ from .montecarlo.spectrum import (
 )
 from .montecarlo.transport import STOPPING_MODEL
 from .results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
+from .xsgen.store import identity_markers
 
 
 def _canonical_value(value: Any) -> Any:
@@ -226,8 +227,9 @@ def simulate(
             f"backend {BACKEND.name!r}; select the backend before importing pyrite"
         )
     case = build_case(scene, resolved_numerics)
+    xsgen_tables = identity_markers(_case_stopping_table_records(case))
     if isinstance(scene.detector, PlanarDetector):
-        return _simulate_planar(scene, resolved_numerics, case)
+        return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
     output = run_case(case, transport_core=resolved_numerics.transport_core)
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
@@ -245,7 +247,8 @@ def simulate(
         provenance={
             "scene": scene,
             "numerics": resolved_numerics,
-            "identity_digest": case_content_key(case),
+            "identity_digest": case_content_key(case, xsgen_tables=xsgen_tables),
+            "xsgen_tables": xsgen_tables,
             # Automatic case-local line grids (issue #101): the policy is what
             # identity hashes, the resolved record is what the run actually
             # sampled. Both absent for an explicit or stored grid.
@@ -286,7 +289,12 @@ def _line_grid_provenance(case, output) -> dict[str, object]:
     return provenance
 
 
-def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
+def _simulate_planar(
+    scene: Scene,
+    numerics: Numerics,
+    case: Case,
+    xsgen_tables: Mapping[str, str],
+) -> Result:
     detector = scene.detector
     assert isinstance(detector, PlanarDetector)
     scorer = PixelScorer() if scene.pixel_scorer is None else scene.pixel_scorer
@@ -340,7 +348,7 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
     )
     selected_line = coherent if scene.emission == "coherent" else line
     selected_name = "coherent" if selected_line is coherent else "line"
-    source_digest = case_content_key(case)
+    source_digest = case_content_key(case, xsgen_tables=xsgen_tables)
     observation_digest, observation = _observation_provenance(
         source_digest,
         scene,
@@ -359,6 +367,7 @@ def _simulate_planar(scene: Scene, numerics: Numerics, case: Case) -> Result:
             "scene": scene,
             "numerics": numerics,
             "identity_digest": source_digest,
+            "xsgen_tables": xsgen_tables,
             **_line_grid_provenance(case, output),
             "observation_identity_digest": observation_digest,
             "observation": observation,

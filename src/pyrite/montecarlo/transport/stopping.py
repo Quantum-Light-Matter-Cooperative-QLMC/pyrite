@@ -1,10 +1,103 @@
-"""Joy-Luo / Berger-Seltzer stopping power, the spliced compound model, and
-the Sternheimer density-effect correction."""
+"""SBETHE table stopping and Joy-Luo / Berger-Seltzer reference models."""
 
 import numpy as np
 from numba import njit
 
 from ...materials._transport_data import STERNHEIMER_DENSITY_EFFECT, TRANSPORT_ELEMENTS
+
+
+def prepare_sbethe_stopping_table(arrays):
+    """Validate and log-transform one stored SBETHE collision-stopping table.
+
+    The returned arrays use keV and keV/angstrom and are ready for the scalar
+    CPU/device interpolation kernel.  SBETHE supplies strictly positive native
+    nodes from 1 keV through 1 GeV; values outside that domain are rejected by
+    the host entry point rather than extrapolated.
+    """
+    energy_keV = np.asarray(arrays["stopping_energy_eV"], dtype=np.float64) * 1.0e-3
+    stopping_keV_per_ang = np.asarray(arrays["stopping_eV_per_angstrom"], dtype=np.float64) * 1.0e-3
+    if energy_keV.ndim != 1 or stopping_keV_per_ang.shape != energy_keV.shape:
+        raise ValueError("SBETHE stopping energy and value arrays must be matching vectors")
+    if energy_keV.size < 2 or not np.all(np.diff(energy_keV) > 0.0):
+        raise ValueError("SBETHE stopping energy grid must be strictly increasing")
+    if not np.all(np.isfinite(energy_keV)) or not np.all(np.isfinite(stopping_keV_per_ang)):
+        raise ValueError("SBETHE stopping table contains non-finite values")
+    if np.any(energy_keV <= 0.0) or np.any(stopping_keV_per_ang <= 0.0):
+        raise ValueError("SBETHE stopping table values must be strictly positive")
+    return np.log(energy_keV), np.log(stopping_keV_per_ang)
+
+
+def pack_sbethe_stopping_tables(tables, n_layers):
+    """Pad prepared SBETHE tables for the exact CPU/device transport cores."""
+    if tables is None:
+        return (
+            False,
+            np.zeros(n_layers, dtype=np.int32),
+            np.zeros((n_layers, 1)),
+            np.zeros((n_layers, 1)),
+        )
+    if len(tables) != n_layers:
+        raise ValueError("one SBETHE stopping table is required per material layer")
+    counts = np.asarray([len(table[0]) for table in tables], dtype=np.int32)
+    width = int(np.max(counts))
+    log_energy = np.zeros((n_layers, width), dtype=np.float64)
+    log_stopping = np.zeros((n_layers, width), dtype=np.float64)
+    for layer, ((energy_row, stopping_row), count) in enumerate(zip(tables, counts, strict=True)):
+        log_energy[layer, :count] = energy_row
+        log_stopping[layer, :count] = stopping_row
+    return True, counts, log_energy, log_stopping
+
+
+@njit(cache=True)
+def _dEds_sbethe_scalar(log_energy_keV, log_stopping_keV_per_ang, E_keV):
+    """Log-log interpolate SBETHE collision stopping [keV/angstrom], negative.
+
+    Source: SBETHE (Salvat, April 2024), vendored ``sbethe.f`` ``BETHE`` and
+    ``stp.dat`` output. SBETHE evaluates the corrected Bethe expression with
+    DHFS shell and Fano density-effect corrections; this function interpolates
+    those material-level output nodes rather than re-evaluating the formula.
+
+    Log-log interpolation preserves positivity and exactly reproduces every
+    native SBETHE node.  The caller must enforce the table domain; endpoint
+    clamps only protect roundoff at an already-validated transport cutoff.
+    Assumptions: positive ordered nodes and power-law behavior between adjacent
+    nodes. Limiting cases: a native node is returned exactly; a constant table
+    remains constant; the signed transport rate is always non-positive.
+
+    Validation: sbethe-corrected-stopping
+    """
+    log_e = np.log(E_keV)
+    if log_e <= log_energy_keV[0]:
+        return -np.exp(log_stopping_keV_per_ang[0])
+    last = log_energy_keV.size - 1
+    if log_e >= log_energy_keV[last]:
+        return -np.exp(log_stopping_keV_per_ang[last])
+    hi = np.searchsorted(log_energy_keV, log_e)
+    lo = hi - 1
+    fraction = (log_e - log_energy_keV[lo]) / (log_energy_keV[hi] - log_energy_keV[lo])
+    log_stopping = log_stopping_keV_per_ang[lo] + fraction * (
+        log_stopping_keV_per_ang[hi] - log_stopping_keV_per_ang[lo]
+    )
+    return -np.exp(log_stopping)
+
+
+@njit(cache=True)
+def _dEds_sbethe_packed_scalar(log_energy_keV, log_stopping_keV_per_ang, layer, count, E_keV):
+    """Evaluate one row of padded SBETHE tables inside an exact transport core."""
+    return _dEds_sbethe_scalar(
+        log_energy_keV[layer, :count], log_stopping_keV_per_ang[layer, :count], E_keV
+    )
+
+
+def sbethe_stopping_keV_per_ang(log_energy_keV, log_stopping_keV_per_ang, E_keV):
+    """Evaluate a prepared SBETHE table without extrapolation."""
+    energy = np.asarray(E_keV, dtype=float)
+    lower = float(np.nextafter(np.exp(log_energy_keV[0]), -np.inf))
+    upper = float(np.nextafter(np.exp(log_energy_keV[-1]), np.inf))
+    if np.any(~np.isfinite(energy)) or np.any(energy < lower) or np.any(energy > upper):
+        raise ValueError(f"SBETHE stopping energy must be within [{lower:g}, {upper:g}] keV")
+    values = np.interp(np.log(energy), log_energy_keV, log_stopping_keV_per_ang)
+    return -np.exp(values)
 
 
 def _dEds_keV_per_ang(Z, A, J_keV, rho_g_cm3, E_keV):
@@ -381,4 +474,4 @@ def sternheimer_delta(element, E_keV):
 # than letting them resume into -- or be served from the CAS for -- a run that
 # computes different numbers. Bump it whenever the evaluated model changes:
 # adding the density-effect term delta, or moving a crossover, is such a change.
-STOPPING_MODEL = "joy-luo/berger-seltzer-splice"
+STOPPING_MODEL = "sbethe-corrected-v1"

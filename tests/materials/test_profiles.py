@@ -73,7 +73,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # redistribution changes the L line yields themselves, so v4 records are not
     # the same spectrum.
     assert case_content_key(case) == (
-        "2e2e319d8fa3806acd27d815f7487444e40793c38c2321ad770e012aec6fd090"
+        "cea62a07a0ec02e1b50c14ebcee8e7379df5d9deb592a1ca9e53e4dc74cb141e"
     )
 
 
@@ -84,7 +84,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "eab4730a5335f10e695864d6961d8e3497646035bde9b4a749905ad6c0a8b8f0"
+        "4823405a8f2876bcd14ba6b55f5576d75574f6b172196ad0d07d460bf73b6c1b"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -308,16 +308,12 @@ def test_line_kinematics_marker_is_a_constant_that_orphans_vacuum_era_digests():
     assert "xray_dispersion" not in identity["resolved_parameters"]["settings"]
 
 
-def test_stopping_model_marker_is_a_constant_that_orphans_joy_luo_era_digests():
-    """The Joy--Luo/Berger--Seltzer splice is unconditional physics, so it is a
-    CONSTANT generation marker rather than a selector -- but every digest minted
-    before it landed described pure Joy--Luo transport, which under-stops above
-    each element's crossover. Hashing the marker moves every digest exactly once
-    so those checkpoints cannot be resumed into (rev-and-re-run)."""
+def test_stopping_model_marker_is_a_constant_that_orphans_splice_era_digests():
+    """SBETHE is unconditional production physics and moves every old digest."""
     identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["stopping_model"] == STOPPING_MODEL
-    assert STOPPING_MODEL == "joy-luo/berger-seltzer-splice"
+    assert STOPPING_MODEL == "sbethe-corrected-v1"
 
 
 def test_case_content_key_separates_stopping_models():
@@ -372,7 +368,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "eab4730a5335f10e695864d6961d8e3497646035bde9b4a749905ad6c0a8b8f0"
+        "4823405a8f2876bcd14ba6b55f5576d75574f6b172196ad0d07d460bf73b6c1b"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -386,42 +382,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "7cbe01a7668e4c3aeccb8194e5eafe4d5ba0af82a34b3b9ada629eb614173429",
+            "6a35a449070d5e3706863d1bc7dbcafdbe2698e3bce19cc95aa69c99e9f5d7d7",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "290ab514e4eab7b2ebe98f51ec42af5dc582da6a38db5057942638e6b407dd83",
+            "9acfd9a4386356e81ee7f43ef49101fd211be01b7e45e9e467fb31a56cb50383",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "1062b068eb44529092de99bcdbd12de940c7c4ec53e6917f45d606230f172d9c",
+            "c2290df525d6d9374dd97b7341f657ff7a450646cd30085d5887fe777dd05f6f",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "e8201ac872d115dbcb3fd1a476bcff181fc1a1ab995fba652e879aacaa25c1ba",
+            "d7633db18d5b5f23b51901007b7dfc9aca2d872d6d61ac168ad45505f42c50e4",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "1c46cd47bc284101ea88c8cd637820f19141420614101754d0bc870d48b114f2",
+            "74e1b6291a3010ace09e982931d24e6009ea26cfbbcf36b212506f626ef2762a",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "44cdc5eb9f4eeda44407ae77209cd5dbfd07bf8f21bc357aaae2bcb9ca491e5d",
+            "eb7294bf0d57cd805b61f3076881efd046da9f683b08d9785b2e13842452256e",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "63dcfa9e3f5dd9bf73374b4d1306e960dd5e9e8a4e9c4361b23848bb7ec03e40",
+            "75f03f0591a8a5728a4183c9aa4f18f224df1e5e1822fbc24fc421d023e34273",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "7e7a7d5908264416278ee277cba877150bf410a72839d87537bf108fedae393b",
+            "d2373ba5b2368e192a2fe18231c383ca2fc89eaa22f39d4a811159d2d71bcd16",
         ),
     ],
 )
@@ -588,7 +584,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # for issue #91's L-shell Coster--Kronig relaxation marker) must stay
     # bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "eab4730a5335f10e695864d6961d8e3497646035bde9b4a749905ad6c0a8b8f0"
+        "4823405a8f2876bcd14ba6b55f5576d75574f6b172196ad0d07d460bf73b6c1b"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -599,7 +595,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
     # bandwidth request the resolver raises, so it was left alone.
     assert survey_incoherent["parameter_sha256"] == (
-        "4d171b29d80d152daf09151513e35e7ae85f83d893b759b037812dd898f8c2a1"
+        "082695b50cfb91d0ce8c30e984b34a5536b7a2984869332803ab25d365b40dd1"
     )
 
 

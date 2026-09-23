@@ -512,6 +512,10 @@ def _run_grooved(
                 L_mott_denom1,
                 L_mott_denom2,
                 L_sr_joy_numer,
+                False,  # This geometry-only fixture exercises reference stopping.
+                np.zeros(n_layers, dtype=np.int32),
+                np.zeros((n_layers, 1)),
+                np.zeros((n_layers, 1)),
             ),
             (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
             (alive, clock, pos, dirs, E_keV, E_cut_by_electrons),
