@@ -78,6 +78,94 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_stopping_berger_seltzer.py`; `tests/montecarlo/test_transport_lut.py`; `tests/montecarlo/test_transport_cutoff.py`; `tests/montecarlo/test_sbethe_cuda.py`; `tests/montecarlo/test_energy_loss_straggling.py`; `tests/montecarlo/test_straggling_cuda.py`; `tests/xsgen/test_sbethe.py`; `tests/xsgen/test_run_identity.py`; `tests/scan/test_public_api.py`
 - **Notes:** The host rejects extrapolation; production cutoffs therefore cannot fall below 1 keV. SBETHE itself uses an empirical extrapolation below its material-dependent `ECUT` (about 1 keV for electrons), so the lowest table nodes are not guaranteed to come from the corrected Bethe formula. Log-log interpolation is continuous and positivity-preserving but does not claim derivative continuity at native nodes. Urban fluctuations retain their existing elemental allocation and are scaled uniformly so their compound mean equals the SBETHE table rate. The CUDA LUT consumes the same precomputed SBETHE values; exact CUDA interpolates the same nodes. Every packaged table carries the SBETHE source digest, compiler, deck, material identity, output hash, attribution, and manifest digest. Fresh-context source-to-code verification found no divergent term; [validation write-up](beam-transport/sbethe-corrected-stopping.md). Hardware execution on NVIDIA GeForce RTX 5080 (driver 610.47) passed the SBETHE/Urban first-row CPU comparison and both exact and LUT CUDA cutoff anchors at 50 Å. Only a human may mark this row `signed-off`.
 
+## `gos-optical-quadrature`
+
+- **Claim:** each positive-width interval of the SBETHE optical oscillator-strength density contributes its integrated strength and first-moment centroid as one resonance; duplicate-energy shell edges have zero weight
+- **Code:** `montecarlo/transport/inelastic.py::_oscillator_quadrature`
+- **Source:** Salvat, SBETHE, `OOS.dat` density and cumulative column definitions; exact integration of a linear interpolant
+- **Equation:** $f_i=(W_{i+1}-W_i)(g_i+g_{i+1})/2$ and $\bar W_i=\int_{W_i}^{W_{i+1}}Wg(W)dW/f_i$
+- **Assumptions:** optical density is linear within each native interval; an interval's strength is represented by one resonance
+- **Limiting cases:** constant density places the resonance at the interval midpoint; zero-width shell-edge intervals contribute zero strength
+- **Status:** rederived
+- **Checks:** packaged Si, MoS2 and SiO2 OOS integrals recover the electron f-sum and logarithmic mean excitation energy to 0.1%; fresh-context check pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-optical-quadrature.md)
+- **Notes:** Host-side input preparation only. Fresh-context verification and production transport integration are pending.
+
+## `gos-core-edge`
+
+- **Claim:** the first positive Si SBETHE OOS shell-edge jump separates valence and core optical oscillator strengths without overlap; selecting only above-edge oscillators gives an uncalibrated positive GOS core candidate whose raw moments stay fixed as the hard cutoff changes
+- **Code:** `montecarlo/transport/inelastic.py::build_gos_partition` (`core_edge_ev`)
+- **Source:** Salvat, SBETHE, `OOS.dat`; Vos and Grande, *Journal of Physics and Chemistry of Solids* 124 (2019) 242–249, `10.1016/j.jpcs.2018.09.020`; NIST X-ray transition tables for Si L₂/L₃ edges
+- **Equation:** $g_{\mathrm{core}}(W;E)=\sum_{\bar W_i\geq W_{\mathrm{edge}}}g_i(W;E)$ and $M_{n,\mathrm{core}}=\int W^n g_{\mathrm{core}}\,dW$; the core-only calibration factor is unity
+- **Assumptions:** the repeated OOS energy with a positive density jump identifies a shell onset; OOS intervals are represented by centroids; atomic GOS is a candidate for core response, not validated microscopic transport
+- **Limiting cases:** the native zero-width edge interval contributes no oscillator; no core event lies below its edge; $W_c\geq E$ gives zero hard rate; soft and hard first moments sum to the raw core first moment
+- **Status:** filtered
+- **Checks:** the shipped Si edge at 102.2154 eV separates 3.769 valence and 10.237 core electron strengths, summing to 14.006; four cutoffs preserve raw core moments and first-moment closure; fixed-seed hard samples stay above the edge and emit no free-secondary proxy; arbitrary non-edge cutoffs are rejected
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-core-edge.md)
+- **Notes:** Host-only diagnostic. Absolute core rate, L/K spectral shape, overlap with the dielectric valence fit, corrected-stopping closure, and fresh-context validation remain open. Only a human may mark this row `signed-off`.
+
+## `dielectric-bulk-loss`
+
+- **Claim:** an isotropic bulk Drude–Lindhard ELF with finite-momentum oscillator dispersion gives a nonnegative valence DIIMFP by logarithmic recoil-energy quadrature; conditional recoil sampling follows that same ELF and the nonrelativistic primary momentum triangle; one fixed piecewise-linear loss grid can be partitioned at a transfer cutoff without changing its valence moments
+- **Code:** `montecarlo/transport/dielectric.py::bulk_dielectric_diimfp`, `::sample_bulk_dielectric_recoil`, `::build_bulk_valence_partition`, `::sample_bulk_valence_loss`
+- **Source:** Tougaard and Yubero, *Surface and Interface Analysis* 54 (2022), Eqs. 9–12; Pauly, Yubero and Tougaard, Zenodo 6024064, `ELF_Si.txt` (Yubero et al., 1993)
+- **Equation:** $L(Q,W)=\Theta(W-E_g)\sum_i A_i\gamma_iW/\{([W_i(0)+\alpha_iQ]^2-W^2)^2+(\gamma_iW)^2\}$; $K_E(W)=(\pi Ea_0)^{-1}\int_{k_-}^{k_+}L\,dk/k$, with $Q=\hbar^2k^2/(2m_e)$ and $dk/k=dQ/(2Q)$; $P(Q\mid E,W)\propto\int_{Q_-}^{Q}L(q,W)\,d\log q$ and $\cos\theta=[E+(E-W)-Q]/[2\sqrt{E(E-W)}]$; on the fixed linear loss grid $S_{\mathrm{soft}}+S_{\mathrm{hard}}=\int_0^{W_{\max}}WK_E(W)\,dW$ and $\lambda_{\mathrm{hard}}^{-1}=\int_{W_c}^{W_{\max}}K_E(W)\,dW$
+- **Assumptions:** homogeneous isotropic bulk; nonrelativistic projectile with $W\ll E$; fitted valence response only
+- **Limiting cases:** zero rate below the band gap and at $W=E$; positive rate for positive oscillator strengths; $W_c\geq W_{\max}$ gives zero hard valence rate
+- **Status:** filtered
+- **Checks:** 64- and 96-point quadratures agree within $10^{-4}$ relative at selected Si losses; independent direct $\log k$ integration agrees with the $\log Q$ implementation within $10^{-7}$ relative at 1 keV and 16 eV; four conditional recoil quantiles agree with direct $\log k$ integration within $3\times10^{-4}$ absolute CDF probability and the primary angle follows the momentum triangle; fixed-seed median sampling; 1 and 3 keV Si 14–20 eV fractions and peak heights exceed conservative Werner REELS figure bounds after 0–50 eV normalization; fixed-grid partition preserves total valence rate and first moment across four cutoffs, and five sampled loss quantiles invert the stored-bin CDF within $10^{-12}$; 0.5/0.25/0.125 eV loss-grid refinement on 0–100 eV Si gives monotonically falling zeroth- and first-moment errors against adaptive integration at 1 and 3 keV, with a worst finest-grid relative error of $4.7\times10^{-6}$; full IMFP and stopping closure cannot be claimed without core losses
+- **Anchor:** `tests/montecarlo/test_dielectric_loss.py`; [implementation derivation](beam-transport/dielectric-bulk-loss.md)
+- **Notes:** Host-only candidate. Fresh-context source-to-code validation, core-tail composition, absolute-rate validation, and transport integration are pending. Only human sign-off can change the final status.
+
+## `gos-distant-response`
+
+- **Claim:** the optical resonances produce positive distant longitudinal and transverse cross sections through the PENELOPE-like GOS expressions, with the minimum recoil energy evaluated without subtracting nearly equal momenta
+- **Code:** `montecarlo/transport/inelastic.py::_qmin_ev`, `::build_gos_partition`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, Eqs. 127–128 and 131–132
+- **Assumptions:** each OOS interval acts as one shell oscillator; no finite-momentum material response or explicit transverse Fano density correction in the raw spectrum
+- **Limiting cases:** $Q_{\min}\to0$ quadratically for $W\to0$; longitudinal contribution vanishes at $W=E$; transverse recoil is zero
+- **Status:** rederived
+- **Checks:** positive cross sections and finite sampled angles in Si at 100 keV; independent IMFP comparison and fresh-context derivation pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-distant-response.md)
+- **Notes:** The raw transverse shape omits the density effect; corrected stopping calibrates the whole distribution. This does not prove the microscopic differential response. Fresh-context verification is pending.
+
+## `gos-moller-close`
+
+- **Claim:** the close branch uses the relativistic Møller differential energy-transfer factor and the cumulative oscillator strength active below each transfer, with the indistinguishable-electron ceiling $W\leq E/2$
+- **Code:** `montecarlo/transport/inelastic.py::_moller_factor`, `::build_gos_partition`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, Eqs. 129 and 133
+- **Assumptions:** OOS-bin resonance energies approximate shell thresholds; no shell binding energy is inferred from the optical distribution
+- **Limiting cases:** Møller factor tends to one at $W/E\to0$; no close branch exists below the lowest active oscillator
+- **Status:** rederived
+- **Checks:** positive rate and hard samples bounded by $E/2$; independent transfer-spectrum comparison and fresh-context derivation pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-moller-close.md)
+- **Notes:** The resonance-bin approximation needs independent IMFP and transfer-spectrum checks before use in transport. Fresh-context verification is pending.
+
+## `gos-soft-hard-partition`
+
+- **Claim:** one OOS-derived transfer distribution is divided at $W_c$; the same positive scale aligns its total first moment with the corrected production SBETHE stopping cross section, so soft continuous loss plus explicit hard-event mean has no energy gap or double count
+- **Code:** `montecarlo/transport/inelastic.py::_linear_moments`, `::build_gos_partition`, `::hard_transfer_cdf`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, Eqs. 130 and soft/hard integral definitions; Salvat SBETHE `stp.dat` and `asymptotic.dat` source blocks; KESS Si Penn/Bethe–Fano Fig. 4.5(a); Werner, Phys. Rev. B 74, 075421 (2006), Si REELS Fig. 3(b)
+- **Equation:** $S_{\mathrm{target}}=a\int_0^E W\,d\sigma_{\mathrm{GOS}}/dW\,dW$; $S_{\mathrm{soft}}=a\int_0^{W_c}W\,d\sigma_{\mathrm{GOS}}/dW\,dW$; $\sigma_{\mathrm{hard}}=a\int_{W_c}^E d\sigma_{\mathrm{GOS}}/dW\,dW$
+- **Assumptions:** a common positive scale changes the absolute cross section but preserves the raw transfer shape; `asymptotic.dat` is an uncorrected free-atom comparison, not the production stopping target
+- **Limiting cases:** $W_c\to0$ sends the first moment to hard events; $W_c\geq E$ makes the hard rate zero; soft and hard first moments sum to corrected stopping
+- **Status:** rederived
+- **Checks:** partition closure for five thresholds in packaged Si, including $W_c\geq E$; fixed raw moments, calibration, and total rate across interior $W_c$ values in Si, MoS2, and SiO2; clipped close-bin samples remain above $W_c$; seeded hard-event samples agree with exact CDF to 0.015 absolute probability; KESS Penn/Bethe–Fano Si loss-mode comparison places the model's 15 eV peak within the broad 17 ± 10 eV plasmon region at 1, 5, and 50 keV; Werner Si REELS Fig. 3(b) instead exposes a peak-height discrepancy: model 0.045–0.046 eV$^{-1}$ in 1 eV bins at 1 and 3 keV (0.055–0.056 eV$^{-1}$ after 0–50 eV renormalization) versus plot-read peak near 0.10 eV$^{-1}$, conservatively above 0.08 eV$^{-1}$; NIST SRD 71 TPP-2M IMFP comparison at 1 and 2 keV: Si within 5%, SiO2 22–23% lower, within a 25% bound reflecting NIST's 20.5% absolute standard uncertainty and model approximation. Raw GOS/`CS0A` is only 0.39–0.63 at 100 keV in Si/MoS2/SiO2. Higher-energy IMFP and full quantitative transfer spectra remain unvalidated
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-soft-hard-partition.md)
+- **Notes:** Host-side model only; no transport core consumes these rates yet. Strict expected-failure tests record both the conservative REELS peak bound and the 14–20 eV probability bound: the model gives 0.292–0.294 in that window after 0–50 eV normalization versus a conservative lower bound of 0.35. Figure reading is approximate, but the substantial shape deficit blocks activation despite mean-stopping and IMFP agreement. The issue text's assertion that `CS1A` shares the corrected production stopping is contradicted by SBETHE's `asymptotic.dat` source block. Fresh-context verification is pending.
+
+## `gos-hard-recoil`
+
+- **Claim:** branch selection samples the hard cross sections; close events sample transfer within a nonnegative linear bin and use Møller primary/secondary polar recoil, while distant longitudinal events sample recoil $Q$ and distant transverse events leave direction unchanged
+- **Code:** `montecarlo/transport/inelastic.py::sample_hard_collision`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, hard-event sampling and recoil equations following Eq. 133
+- **Assumptions:** full-OOS close-collision secondary energy equals transfer for an outer-shell proxy; core-only diagnostics suppress that proxy because inner-shell binding is absent; vacancy metadata, azimuth and transport are not yet represented
+- **Limiting cases:** no hard rate cannot be sampled; a production threshold above $E$ suppresses the secondary; all polar cosines remain in $[-1,1]$
+- **Status:** rederived
+- **Checks:** 71 hard quantiles at 100 keV Si respect threshold, transfer ceiling, and angular bounds; fresh-context derivation and transport-state test pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-hard-recoil.md)
+- **Notes:** No trajectory rotation, azimuth, secondary state buffer, or secondary transport is connected yet. Fresh-context verification is pending.
+
 ## `energy-loss-straggling`
 
 - **Claim:** optional unrestricted Urban energy-loss fluctuations applied per element as a compound-Poisson sum of two excitation levels and a $1/\epsilon^2$ continuum up to the Moller ceiling $T_{\max}=E/2$. The analytic channel model uses the supplied stopping magnitude $C=\lvert dE/dx\rvert$ (SBETHE in production, the splice for reference calls), so $\langle\Delta E\rangle=Cs$ exactly and $\operatorname{Var}(\Delta E)=s(\Sigma_1E_1^2+\Sigma_2E_2^2+\Sigma_3E_0T_{\max})$. Counts are exact Poisson at every supported mean: means above 64 are split into independent bounded-rate chunks whose counts sum by Poisson additivity. It is applied on every host core and exact CUDA; the default-off path is bit-for-bit historical

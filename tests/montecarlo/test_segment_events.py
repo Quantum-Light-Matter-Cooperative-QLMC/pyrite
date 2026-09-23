@@ -185,7 +185,8 @@ def test_a_flight_continuing_event_must_keep_the_direction():
 def test_reserved_hard_events_are_physical_boundaries():
     """The contract the hard-event slices (#93/#95) must meet, pinned on
     synthetic rows: a hard radiative event opens a new flight, keeps the
-    direction, and may only lower the energy; a delta event is a substep."""
+    direction, and may only lower the energy; a hard inelastic event also
+    allows recoil; a delta event is a substep."""
     v = np.array([[0.0, 0.0, 1.0]] * 3)
     rows = {
         "r_mid": np.array([[0.0, 0.0, 5.0], [0.0, 0.0, 15.0], [0.0, 0.0, 25.0]]),
@@ -212,6 +213,11 @@ def test_reserved_hard_events_are_physical_boundaries():
     turned["r_mid"][2] = [0.0, 3.0, 24.0]
     with pytest.raises(ValueError, match="direction"):
         check_segment_event_contract(turned)
+
+    inelastic = dict(turned, event_kind=rows["event_kind"].copy())
+    inelastic["event_kind"][1] = SegmentEvent.HARD_INELASTIC
+    check_segment_event_contract(inelastic)
+    assert closes_flight(inelastic["event_kind"]).tolist() == [False, True, True]
 
     gained = dict(rows, E_start_keV=np.array([30.0, 29.0, 29.0]))
     with pytest.raises(ValueError, match="rises"):

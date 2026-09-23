@@ -79,6 +79,20 @@ def test_packaged_carbon_eedl_values_and_relaxation_join():
     assert not table.line_fwhm_eV.flags.writeable
 
 
+def test_host_shell_ionization_rates_do_not_require_relaxation(monkeypatch):
+    def unexpected_relaxation(*_args, **_kwargs):
+        raise AssertionError("host shell rates must not consult xraydb")
+
+    monkeypatch.setattr(characteristic.xraydb, "xray_edge", unexpected_relaxation)
+    shells = characteristic.load_eedl_shell_ionization("C")
+
+    assert [shell.shell_designator for shell in shells[:4]] == [1, 2, 3, 4]
+    assert shells[0].binding_energy_eV == 288.0
+    sigma_k = np.interp(30_000.0, shells[0].projectile_energy_eV, shells[0].cross_section_cm2)
+    assert np.isclose(sigma_k, 5.4137330932220697e-20, rtol=1e-13, atol=0.0)
+    assert not shells[0].cross_section_cm2.flags.writeable
+
+
 def test_characteristic_single_track_matches_n_l_sigma_omega_over_four_pi(monkeypatch):
     monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
     energy = np.arange(250.0, 291.0, 1.0)

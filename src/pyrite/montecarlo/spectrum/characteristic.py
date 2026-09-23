@@ -121,7 +121,7 @@ class CharacteristicCrossSectionTable:
 
 
 @dataclass(frozen=True, slots=True)
-class _EEDLSubshellTable:
+class EEDLSubshellTable:
     """One validated EEDL MF=23 subshell-ionization TAB1 table."""
 
     shell_designator: int
@@ -222,7 +222,7 @@ def _extract_eedl_subshell(
     path: Path,
     mt: int,
     section: Mapping[str, object],
-) -> _EEDLSubshellTable:
+) -> EEDLSubshellTable:
     """Validate one MF=23 section already decoded by endf-parserpy."""
     try:
         binding = _require_finite(
@@ -266,7 +266,7 @@ def _extract_eedl_subshell(
     if np.count_nonzero(cross_section_barn > 0.0) < 2:
         raise ValueError(f"{path}: EEDL MF=23/MT={mt} needs at least two positive samples")
 
-    return _EEDLSubshellTable(
+    return EEDLSubshellTable(
         shell_designator=mt - 533,
         binding_energy_eV=binding,
         projectile_energy_eV=_readonly(projectile),
@@ -281,7 +281,7 @@ def _load_eedl_subshell_tables(
     modified_time_ns: int,
     atomic_number: int,
     element: str,
-) -> tuple[_EEDLSubshellTable, ...]:
+) -> tuple[EEDLSubshellTable, ...]:
     """Use endf-parserpy to load one element's EEDL subshell sections.
 
     ``file_size`` and ``modified_time_ns`` are cache-key sentinels. They ensure
@@ -566,6 +566,41 @@ def _verify_packaged_eedl() -> None:
             f"packaged EEDL database checksum mismatch: expected "
             f"{CHARACTERISTIC_EEDL_SHA256}, got {actual}"
         )
+
+
+def load_eedl_shell_ionization(
+    element: str,
+    *,
+    data_dir: str | Path | None = None,
+) -> tuple[EEDLSubshellTable, ...]:
+    """Load EEDL electron-impact subshell rates without relaxation data.
+
+    The packaged EPICS2025 tape is checksum-pinned; ``data_dir`` may instead
+    name an explicit ENDF-6 file or directory. Each shell keeps its native
+    projectile-energy grid, EEDL binding energy, and cross section in cm².
+    This supplies total ionization rates, not a differential transfer law.
+    """
+    if not isinstance(element, str) or re.fullmatch(r"[A-Z][a-z]?", element) is None:
+        raise ValueError("element must be a chemical symbol such as 'C' or 'Si'")
+    try:
+        atomic_number = Z_TABLE[element]
+    except KeyError as exc:
+        raise ValueError(f"unknown element {element!r}") from exc
+    candidate = CHARACTERISTIC_DATA_DIR if data_dir is None else Path(data_dir)
+    path = candidate if candidate.is_file() else candidate / CHARACTERISTIC_EEDL_FILENAME
+    if not path.is_file():
+        raise FileNotFoundError(f"no EEDL shell-ionization database for {element}: expected {path}")
+    if data_dir is None:
+        _verify_packaged_eedl()
+    resolved_path = path.resolve()
+    stat = resolved_path.stat()
+    return _load_eedl_subshell_tables(
+        resolved_path,
+        stat.st_size,
+        stat.st_mtime_ns,
+        atomic_number,
+        element,
+    )
 
 
 def load_characteristic_cross_sections(

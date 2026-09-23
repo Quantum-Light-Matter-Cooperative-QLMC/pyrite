@@ -33,10 +33,17 @@ beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
 beam-transport/coherent-line-grid-fringe-spacing
+beam-transport/dielectric-bulk-loss
+beam-transport/gos-core-edge
 beam-transport/electron-transport
 beam-transport/energy-controlled-propagation
 beam-transport/energy-loss-straggling
 beam-transport/energy-step-convergence
+beam-transport/gos-distant-response
+beam-transport/gos-hard-recoil
+beam-transport/gos-moller-close
+beam-transport/gos-optical-quadrature
+beam-transport/gos-soft-hard-partition
 beam-transport/line-grid-sinc-convergence
 beam-transport/line-spectrum-error-budget
 beam-transport/line-window-seeding
