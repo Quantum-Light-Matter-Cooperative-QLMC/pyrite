@@ -57,8 +57,8 @@ be continuous at a node. Packaged tables span 1 keV to 1 GeV. The host rejects
 energies outside that range, so a transport cutoff below 1 keV is unsupported.
 The optional Urban fluctuations use the same SBETHE mean through a shared
 scale factor. `Validation: sbethe-material-inputs` and
-`Validation: sbethe-corrected-stopping` remain at `filtered` pending independent
-verification and CUDA hardware execution.
+`Validation: sbethe-corrected-stopping` are `rederived`; CUDA stopping anchors
+have run on hardware. Human sign-off remains pending.
 
 The Joy–Luo/Berger–Seltzer calculations below remain as reference models and
 historical comparisons. Their range and yield tables describe the earlier
