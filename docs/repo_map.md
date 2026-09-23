@@ -53,14 +53,13 @@ Components (a + b denotes a static import cycle):
   p7: devtools
   p8: energy_grid
   p9: materials
-  p10: montecarlo
+  p10: montecarlo + xsgen
   p11: perf
   p12: plots
   p13: remote
   p14: results
   p15: runs
   p16: validation
-  p17: xsgen
 Edges (importer -> imported):
   p0 -> p16
   p0 -> p4
@@ -75,7 +74,7 @@ Edges (importer -> imported):
   p1 -> p3
   p1 -> p5
   p1 -> p9
-  p10 -> p17
+  p10 -> p5
   p10 -> p6
   p10 -> p9
   p12 -> p10
@@ -95,7 +94,6 @@ Edges (importer -> imported):
   p15 -> p10
   p15 -> p11
   p15 -> p14
-  p15 -> p17
   p15 -> p2
   p15 -> p3
   p15 -> p5
@@ -106,9 +104,6 @@ Edges (importer -> imported):
   p16 -> p5
   p16 -> p6
   p16 -> p9
-  p17 -> p10
-  p17 -> p5
-  p17 -> p9
   p2 -> p10
   p2 -> p14
   p2 -> p6
@@ -122,7 +117,6 @@ Edges (importer -> imported):
   p4 -> p11
   p4 -> p13
   p4 -> p15
-  p4 -> p17
   p4 -> p2
   p4 -> p3
   p4 -> p5
