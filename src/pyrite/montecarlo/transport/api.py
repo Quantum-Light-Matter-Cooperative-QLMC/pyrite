@@ -205,6 +205,9 @@ def simulate_trajectories(
       identity-matched tables. ``None`` keeps the Joy-Luo/Berger-Seltzer
       reference path for direct transport comparisons. Table energies must
       include every incident energy and cutoff; extrapolation is rejected.
+      When supplied, the prepared tables are also carried on the returned
+      segment mapping as ``stopping_tables`` so post-transport cutoff solves
+      use the same model.
       Validation: sbethe-corrected-stopping
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
@@ -1178,6 +1181,12 @@ def simulate_trajectories(
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
+    if prepared_stopping_tables is not None:
+        # Prepared (log-transformed) per-layer SBETHE tables, so post-transport
+        # consumers that re-solve the cutoff (the spectrum cutoff clip) use the
+        # same stopping model the transport ran with instead of the reference
+        # splice. Metadata, not a per-row array: absent from _SEG_ARRAYS.
+        result["stopping_tables"] = tuple(prepared_stopping_tables)
     if straggle_on:
         # The summed per-electron Urban-SAMPLED loss. Every host core and the
         # exact CUDA core apply it; the CUDA LUT combination fails closed.
