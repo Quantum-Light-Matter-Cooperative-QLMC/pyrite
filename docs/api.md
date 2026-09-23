@@ -1,27 +1,14 @@
 # Supported Python API
 
-The objects explicitly listed on this page are PyRITE's supported library
-surface. They follow semantic-versioning compatibility: removal or an
-incompatible signature/meaning change requires a documented deprecation or a
-major release. Public objects not listed here are usable but provisional.
+The objects explicitly listed on this page are PyRITE's supported library surface. They follow semantic-versioning compatibility: removal or an incompatible signature/meaning change requires a documented deprecation or a major release. Public objects not listed here are usable but provisional.
 
-Names beginning with `_`, CLI command callbacks, app launchers, remote-job
-orchestration, developer tools, and package-facade re-exports retained only for
-old imports are internal or compatibility surfaces. They may change without a
-library deprecation. The command-line contract is documented separately in the
-[CLI reference](repo-design/cli/cli-reference.md).
+Names beginning with `_`, CLI command callbacks, app launchers, remote-job orchestration, developer tools, and package-facade re-exports retained only for old imports are internal or compatibility surfaces. They may change without a library deprecation. The command-line contract is documented separately in the [CLI reference](repo-design/cli/cli-reference.md).
 
-For a task-oriented walkthrough, including detector scoring and the boundary
-between in-memory results and checkpoint campaigns, see the
-[Python API workflow](guides/python-api-workflow.md).
+For a task-oriented walkthrough, including detector scoring and the boundary between in-memory results and checkpoint campaigns, see the [Python API workflow](guides/python-api-workflow.md).
 
 ## Scene simulation
 
-The root package exposes the preferred high-level API. A `Scene` contains one
-scalar `Beam`, target, and either the compatibility scalar `Detector` or a
-physical `PlanarDetector`; `Numerics` contains sampling and execution controls.
-`simulate` lowers those objects to the established typed `Case` and calls the
-existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
+The root package exposes the preferred high-level API. A `Scene` contains one scalar `Beam`, target, and either the compatibility scalar `Detector` or a physical `PlanarDetector`; `Numerics` contains sampling and execution controls. `simulate` lowers those objects to the established typed `Case` and calls the existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.
 
 ```python
 import pyrite as pr
@@ -39,28 +26,9 @@ result.spectrum
 result.provenance["identity_digest"]
 ```
 
-For a scalar `Detector`, `Result.spectrum` and `Result.background` are
-response-free source photon-density arrays per incident electron per eV per sr:
-they exclude acceptance scaling, source current, quantum efficiency, and
-measured-energy redistribution. For a `PlanarDetector`, the scalar arrays are
-instead filter-attenuated, solid-angle-weighted observation averages in the same
-per-sr units; they still exclude the configured detector response. Their
-coordinates are `energy_eV` and `background_energy_eV`. `Result.provenance`
-records the resolved scene, numerics, content identity, backend/device, and
-library versions. Coherent or
-`both` emission also exposes `coherent_spectrum`; coherent-only simulation
-selects that array as `spectrum`. `spectrum` and `coherent_spectrum` are
-PXR/CBS only; characteristic radiation is the separate
-`characteristic_spectrum`, and `Result.line_total()` returns their sum
-(`coherent=True` for the coherent line, `characteristic=False` to omit it).
-Before issue #123 `spectrum` already included characteristic radiation. The
-high-level API does not currently accept
-an external background array, so both `none` and `external` return a zero
-background on the resolved continuum grid.
+For a scalar `Detector`, `Result.spectrum` and `Result.background` are response-free source photon-density arrays per incident electron per eV per sr: they exclude acceptance scaling, source current, quantum efficiency, and measured-energy redistribution. For a `PlanarDetector`, the scalar arrays are instead filter-attenuated, solid-angle-weighted observation averages in the same per-sr units; they still exclude the configured detector response. Their coordinates are `energy_eV` and `background_energy_eV`. `Result.provenance` records the resolved scene, numerics, content identity, backend/device, and library versions. Coherent or `both` emission also exposes `coherent_spectrum`; coherent-only simulation selects that array as `spectrum`. `spectrum` and `coherent_spectrum` are PXR/CBS only; characteristic radiation is the separate `characteristic_spectrum`, and `Result.line_total()` returns their sum (`coherent=True` for the coherent line, `characteristic=False` to omit it). Before issue #123 `spectrum` already included characteristic radiation. The high-level API does not currently accept an external background array, so both `none` and `external` return a zero background on the resolved continuum grid.
 
-`Sweep` expresses a Cartesian product as ordered paths into a scalar base
-scene. Paths are checked when the sweep is constructed, including indexed
-segments:
+`Sweep` expresses a Cartesian product as ordered paths into a scalar base scene. Paths are checked when the sweep is constructed, including indexed segments:
 
 ```python
 sweep = pr.Sweep(
@@ -73,15 +41,9 @@ sweep = pr.Sweep(
 cases = sweep.cases(pr.Numerics())
 ```
 
-For a `Stack`, paths such as `target.layers[1].thickness_ang` address a
-particular layer. A misspelled field or out-of-range index raises at `Sweep`
-construction.
+For a `Stack`, paths such as `target.layers[1].thickness_ang` address a particular layer. A misspelled field or out-of-range index raises at `Sweep` construction.
 
-`Sweep.expand()` returns ordered `(label, Scene)` pairs; `Sweep.cases()` lowers
-them to typed cases but does not execute or persist them. `simulate` accepts
-the separate beam, target, and detector components, not a `Scene` argument.
-Helpers exported from `pyrite.api` but not listed on this page are provisional
-lowering or compatibility seams.
+`Sweep.expand()` returns ordered `(label, Scene)` pairs; `Sweep.cases()` lowers them to typed cases but does not execute or persist them. `simulate` accepts the separate beam, target, and detector components, not a `Scene` argument. Helpers exported from `pyrite.api` but not listed on this page are provisional lowering or compatibility seams.
 
 ```{eval-rst}
 .. autosummary::
@@ -112,16 +74,9 @@ lowering or compatibility seams.
 
 ## Materials and crystallography
 
-`pyrite.materials.CATALOG` is the immutable bundled `MaterialCatalog`.
-`CRYSTALS`, `MATERIALS`, and `MATERIAL_LABELS` are compatibility projections,
-not independent registries and not part of the supported API.
+`pyrite.materials.CATALOG` is the immutable bundled `MaterialCatalog`. `CRYSTALS`, `MATERIALS`, and `MATERIAL_LABELS` are compatibility projections, not independent registries and not part of the supported API.
 
-Each `MaterialSpec` carries a `MaterialIdentity` — `formula`, `phase`,
-`full_name`, `cut`, `cut_frame` — and its `label` is derived from those fields
-rather than authored, so a display string cannot drift from the record it
-describes. The cut is the crystal's declared slab normal, reduced to its
-primitive representative; it is unrelated to the pinned `hkl_families`
-reflections.
+Each `MaterialSpec` carries a `MaterialIdentity` — `formula`, `phase`, `full_name`, `cut`, `cut_frame` — and its `label` is derived from those fields rather than authored, so a display string cannot drift from the record it describes. The cut is the crystal's declared slab normal, reduced to its primitive representative; it is unrelated to the pinned `hkl_families` reflections.
 
 ```{eval-rst}
 .. autosummary::
@@ -152,10 +107,7 @@ reflections.
 
 ## Simulation kernels
 
-These are the supported low-level simulation entry points. Inputs and outputs
-use the units stated in their docstrings; prefer keyword arguments for optional
-model controls. `Case` is the frozen, validated input record; its `to_dict()`
-method preserves the legacy mapping representation for serialization.
+These are the supported low-level simulation entry points. Inputs and outputs use the units stated in their docstrings; prefer keyword arguments for optional model controls. `Case` is the frozen, validated input record; its `to_dict()` method preserves the legacy mapping representation for serialization.
 
 ```{eval-rst}
 .. autosummary::
@@ -195,13 +147,7 @@ method preserves the legacy mapping representation for serialization.
 
 ## Result analysis
 
-Single-shot simulations return `pyrite.Result`. Resumable campaign checkpoints
-continue to use result dictionaries; their storage identity and lifecycle are
-documented in [dataset identity and
-storage](repo-design/storage/dataset-identity-and-storage.md). `Settings` is the
-D7 compatibility surface for those checkpoint-analysis functions. `Analysis`
-is the corresponding presentation-control value object and legacy-conversion
-target; it is not currently consumed by `simulate`.
+Single-shot simulations return `pyrite.Result`. Resumable campaign checkpoints continue to use result dictionaries; their storage identity and lifecycle are documented in [dataset identity and storage](repo-design/storage/dataset-identity-and-storage.md). `Settings` is the D7 compatibility surface for those checkpoint-analysis functions. `Analysis` is the corresponding presentation-control value object and legacy-conversion target; it is not currently consumed by `simulate`.
 
 ```{eval-rst}
 .. autosummary::

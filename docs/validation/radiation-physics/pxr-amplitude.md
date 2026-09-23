@@ -2,12 +2,9 @@
 
 ## Claim and source
 
-- Claim: `materials/crystal.py::chi_g` returns the dimensionless Fourier
-  component of the X-ray electric susceptibility.
-- Source: Feranchuk--Spence (2000), Eq. (3), as cited by the ledger and
-  derivation docstring.
-- Signature: `chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0,
-  use_henke=False)`.
+- Claim: `materials/crystal.py::chi_g` returns the dimensionless Fourier component of the X-ray electric susceptibility.
+- Source: Feranchuk--Spence (2000), Eq. (3), as cited by the ledger and derivation docstring.
+- Signature: `chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False)`.
 
 ## Independent derivation
 
@@ -18,9 +15,7 @@ S_{\mathbf g}=\sum_j f_j(\mathbf g,E)
   \exp(i\mathbf g\cdot\mathbf r_j)\exp(-W_j),
 $$
 
-the Fourier component of the electron number density is
-$S_{\mathbf g} / V_{\rm cell}$. In Gaussian units the driven-electron
-response gives
+the Fourier component of the electron number density is $S_{\mathbf g} / V_{\rm cell}$. In Gaussian units the driven-electron response gives
 
 $$
 \chi_{\mathbf g}
@@ -35,43 +30,25 @@ $$
 =-\frac{r_e\lambda^2}{\pi V_{\rm cell}}S_{\mathbf g}.
 $$
 
-No extra factor of $2$, $\pi$, or unit-cell multiplicity remains when
-$S_{\mathbf g}$ is the full unit-cell sum. A complex anomalous structure
-factor is allowed; the overall minus sign maps a positive electron-density
-amplitude to the usual X-ray susceptibility convention.
+No extra factor of $2$, $\pi$, or unit-cell multiplicity remains when $S_{\mathbf g}$ is the full unit-cell sum. A complex anomalous structure factor is allowed; the overall minus sign maps a positive electron-density amplitude to the usual X-ray susceptibility convention.
 
 ## Cheap filters
 
-- Units: $r_e\lambda^2 / V_{\rm cell}$ is Å³/Å³; $S_{\mathbf g}$ is in
-  electrons, treated as a dimensionless scattering amplitude. `chi_g` is
-  dimensionless.
-- Limits: $S_{\mathbf g}\to0$ for an extinct reflection gives
-  `chi_g` $\to0$; $\lambda\to0$ gives `chi_g` $\to0$ as $\lambda^2$;
-  doubling identical unit-cell contents and volume leaves `chi_g` unchanged.
-- Sign/convention: the leading minus sign follows the negative-electron
-  plasma response. With $F=f_0+f'+if''$ and the repository's wave
-  convention, the same minus sign produces the passive-medium susceptibility
-  sign used by its absorption model.
+- Units: $r_e\lambda^2 / V_{\rm cell}$ is Å³/Å³; $S_{\mathbf g}$ is in electrons, treated as a dimensionless scattering amplitude. `chi_g` is dimensionless.
+- Limits: $S_{\mathbf g}\to0$ for an extinct reflection gives `chi_g` $\to0$; $\lambda\to0$ gives `chi_g` $\to0$ as $\lambda^2$; doubling identical unit-cell contents and volume leaves `chi_g` unchanged.
+- Sign/convention: the leading minus sign follows the negative-electron plasma response. With $F=f_0+f'+if''$ and the repository's wave convention, the same minus sign produces the passive-medium susceptibility sign used by its absorption model.
 
 ## Implementation comparison
 
-Production computes `S` through `structure_factor`, sets
-`lambda = HC_EV_ANG / photon_E_eV`, and returns
+Production computes `S` through `structure_factor`, sets `lambda = HC_EV_ANG / photon_E_eV`, and returns
 
 ```text
 -R_E_ANG * lambda**2 / (pi * V_cell) * S
 ```
 
-This matches the independent expression term-for-term. `structure_factor`
-applies the Debye--Waller factor once inside the site sum; production does not
-apply a second factor. The docstring's first displayed form writes both `S(g)`
-and `exp(-W)`, while its second form and implementation treat `S(g)` as already
-Debye--Waller-weighted. This is notation ambiguity, not an implementation
-factor error.
+This matches the independent expression term-for-term. `structure_factor` applies the Debye--Waller factor once inside the site sum; production does not apply a second factor. The docstring's first displayed form writes both `S(g)` and `exp(-W)`, while its second form and implementation treat `S(g)` as already Debye--Waller-weighted. This is notation ambiguity, not an implementation factor error.
 
-Independent LiF (200), 3890 eV spot check: the unit-cell sum was rebuilt from
-the eight catalog sites with direct xraydb calls and `g=4 pi/a`, without using
-`structure_factor`. It gives
+Independent LiF (200), 3890 eV spot check: the unit-cell sum was rebuilt from the eight catalog sites with direct xraydb calls and `g=4 pi/a`, without using `structure_factor`. It gives
 
 ```text
 reference chi_g = -4.304121622460900e-05 - 1.259695312646876e-06 i
@@ -79,15 +56,10 @@ production chi_g = -4.304121622460899e-05 - 1.259695312646876e-06 i
 absolute difference = 6.78e-21
 ```
 
-The magnitude, about `4.306e-5`, also reproduces the recorded Feranchuk LiF
-anchor.
+The magnitude, about `4.306e-5`, also reproduces the recorded Feranchuk LiF anchor.
 
-Follow-up applied after independent verification: the function docstring now
-contains `Validation: pxr-amplitude`, and its Debye--Waller wording now makes
-the single application explicit.
+Follow-up applied after independent verification: the function docstring now contains `Validation: pxr-amplitude`, and its Debye--Waller wording now makes the single application explicit.
 
 ## Verdict
 
-`rederived`. Units, limits, sign, every prefactor, and an independent numeric
-point match. Ledger status advanced from `unverified` to `rederived` after
-verification.
+`rederived`. Units, limits, sign, every prefactor, and an independent numeric point match. Ledger status advanced from `unverified` to `rederived` after verification.

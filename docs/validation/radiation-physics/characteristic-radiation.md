@@ -2,20 +2,9 @@
 
 ## Source model
 
-PyRITE reads electron-impact subshell-ionization cross sections from the
-packaged 2025 Livermore Evaluated Electron Data Library (EEDL), distributed in
-ENDF-6 form as NDS-IAEA-226. The parser accepts ENDF File 23, MT 534--572 TAB1
-sections and converts their tabulated cross sections from barns to cm$^2$.
-Each section declares interpolation law 2, so the incident-energy dependence
-is evaluated piecewise linearly and set to zero outside the tabulated range.
+PyRITE reads electron-impact subshell-ionization cross sections from the packaged 2025 Livermore Evaluated Electron Data Library (EEDL), distributed in ENDF-6 form as NDS-IAEA-226. The parser accepts ENDF File 23, MT 534--572 TAB1 sections and converts their tabulated cross sections from barns to cm$^2$. Each section declares interpolation law 2, so the incident-energy dependence is evaluated piecewise linearly and set to zero outside the tabulated range.
 
-EEDL supplies vacancy-production cross sections, but not the relaxation data
-used here. Line energy $E_{ai\ell}$, fluorescence yield $\omega_{ai}$,
-conditional radiative intensity $I_{ai\ell}$, and L-shell Coster--Kronig
-probabilities $f_{ij}$ come from the Elam tables exposed by xraydb. Natural
-initial- and final-hole widths come from xraydb's compiled Krause--Oliver and
-Keski-Rahkonen--Krause tables. For segment $j$ in an emitting material, the
-bin-averaged track-length estimator is
+EEDL supplies vacancy-production cross sections, but not the relaxation data used here. Line energy $E_{ai\ell}$, fluorescence yield $\omega_{ai}$, conditional radiative intensity $I_{ai\ell}$, and L-shell Coster--Kronig probabilities $f_{ij}$ come from the Elam tables exposed by xraydb. Natural initial- and final-hole widths come from xraydb's compiled Krause--Oliver and Keski-Rahkonen--Krause tables. For segment $j$ in an emitting material, the bin-averaged track-length estimator is
 
 ```{math}
 :label: eq-characteristic-track-length
@@ -28,10 +17,7 @@ n_a L_j\,\sigma_{ai}(T_j)
 \exp[-\tau_j(E_{ai\ell})]\,q_{ai\ell b}.
 ```
 
-Here $a$ is an element, $i$ the subshell the incident electron ionized, $i'$ the
-subshell the photon was emitted from, $\ell$ a line from that vacancy, $T_j$ the
-representative electron energy, and $b$ an energy bin. $T^a$ is the L-shell
-Coster--Kronig vacancy transfer
+Here $a$ is an element, $i$ the subshell the incident electron ionized, $i'$ the subshell the photon was emitted from, $\ell$ a line from that vacancy, $T_j$ the representative electron energy, and $b$ an energy bin. $T^a$ is the L-shell Coster--Kronig vacancy transfer
 
 ```{math}
 :label: eq-characteristic-ck-transfer
@@ -40,15 +26,7 @@ T^a_{L_1L_1}&=1-f_{12}-f_{13}, & T^a_{L_1L_2}&=f_{12}, & T^a_{L_1L_3}&=f_{13},\\
 T^a_{L_2L_2}&=1-f_{23}, & T^a_{L_2L_3}&=f_{23}, & T^a_{ii}&=1\ \text{otherwise},
 ```
 
-all other entries zero. Every row sums to one: Coster--Kronig moves one L hole
-outward without creating a second L hole. xraydb's $f_{13}$ is a *total*
-probability that already contains the $L_1\to L_2\to L_3$ route, so it acts on
-the primary $L_1$ population while $f_{23}$ acts only on the primary $L_2$
-population; feeding the transferred $f_{12}N_{L_1}$ through $f_{23}$ as well
-would count that route twice. With $T^a=\mathbb{1}$ the estimator reduces to the
-direct-vacancy form $\omega_{ai}I_{ai\ell}$ exactly.
-The factor $q_{ai\ell b}$ is the unconditioned natural Lorentzian mass in bin
-$b$:
+all other entries zero. Every row sums to one: Coster--Kronig moves one L hole outward without creating a second L hole. xraydb's $f_{13}$ is a *total* probability that already contains the $L_1\to L_2\to L_3$ route, so it acts on the primary $L_1$ population while $f_{23}$ acts only on the primary $L_2$ population; feeding the transferred $f_{12}N_{L_1}$ through $f_{23}$ as well would count that route twice. With $T^a=\mathbb{1}$ the estimator reduces to the direct-vacancy form $\omega_{ai}I_{ai\ell}$ exactly. The factor $q_{ai\ell b}$ is the unconditioned natural Lorentzian mass in bin $b$:
 
 ```{math}
 q_{\ell b}=\frac{1}{\pi}\left[
@@ -59,226 +37,82 @@ P_{\ell,W}=\sum_{b\in W}q_{\ell b}\leq1,\qquad
 \Gamma_\ell=\Gamma_{\rm initial}+\Gamma_{\rm final}.
 ```
 
-The result is photons eV$^{-1}$ sr$^{-1}$ per incident electron. The factor
-$1/(4\pi)$ is isotropic emission; $\tau_j$ is the existing PyRITE
-Beer--Lambert optical depth along slab, finite-prism, groove, or multilayer
-escape geometry. Exact CDF differences avoid point-sampling line shapes much
-narrower than a bin. A finite requested window retains only the physical
-probability $P_{\ell,W}$, while an off-grid line centre retains its nonzero
-in-window tail. The infinite-window limit gives $P_{\ell,W}\to1$.
+The result is photons eV$^{-1}$ sr$^{-1}$ per incident electron. The factor $1/(4\pi)$ is isotropic emission; $\tau_j$ is the existing PyRITE Beer--Lambert optical depth along slab, finite-prism, groove, or multilayer escape geometry. Exact CDF differences avoid point-sampling line shapes much narrower than a bin. A finite requested window retains only the physical probability $P_{\ell,W}$, while an off-grid line centre retains its nonzero in-window tail. The infinite-window limit gives $P_{\ell,W}\to1$.
 
 ## Units and numerical conventions
 
-- $n_a$ is stored in $\AA^{-3}$ and multiplied by $10^{24}$ to obtain
-  cm$^{-3}$; $L_j$ is stored in $\AA$ and multiplied by $10^{-8}$ to obtain cm.
-  Thus $n_aL_j\sigma_{ai}$ is a dimensionless expected vacancy count.
-- Dividing the analytically integrated Lorentzian mass by $\Delta E_b$
-  produces the spectral density represented on PyRITE's line-grid centres.
-  Detector broadening remains a separate downstream operation.
-- Every line above the relaxation-data cutoff contributes its physical mass in
-  the requested line grid, including tails from an off-grid centre. No
-  finite-window renormalization is applied.
-- The transition FWHM is the sum of the pertinent initial- and final-hole
-  widths. Combined final labels such as `M4,5` use the mean available
-  component width. A missing final width contributes zero; a missing initial
-  width fails closed.
-- Packaged EEDL bytes are verified before first use against SHA-256
-  `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`.
-  The resolved xraydb package version is included in the characteristic-model
-  checkpoint marker.
+- $n_a$ is stored in $\AA^{-3}$ and multiplied by $10^{24}$ to obtain cm$^{-3}$; $L_j$ is stored in $\AA$ and multiplied by $10^{-8}$ to obtain cm. Thus $n_aL_j\sigma_{ai}$ is a dimensionless expected vacancy count.
+- Dividing the analytically integrated Lorentzian mass by $\Delta E_b$ produces the spectral density represented on PyRITE's line-grid centres. Detector broadening remains a separate downstream operation.
+- Every line above the relaxation-data cutoff contributes its physical mass in the requested line grid, including tails from an off-grid centre. No finite-window renormalization is applied.
+- The transition FWHM is the sum of the pertinent initial- and final-hole widths. Combined final labels such as `M4,5` use the mean available component width. A missing final width contributes zero; a missing initial width fails closed.
+- Packaged EEDL bytes are verified before first use against SHA-256 `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`. The resolved xraydb package version is included in the characteristic-model checkpoint marker.
 
 ## Assumptions and scope
 
-The estimator treats independent atoms. A primary L vacancy is redistributed
-across the L subshells by {eq}`eq-characteristic-ck-transfer` before the
-radiative yields are applied; every other vacancy radiates from the subshell it
-was created in.
+The estimator treats independent atoms. A primary L vacancy is redistributed across the L subshells by {eq}`eq-characteristic-ck-transfer` before the radiative yields are applied; every other vacancy radiates from the subshell it was created in.
 
 Excluded, because xraydb's tables do not specify them:
 
-- Auger-fed daughter vacancies, including the outer-shell spectator vacancy the
-  Coster--Kronig electron leaves behind. Bound where it can be bounded: whenever
-  the K shell is open the K-fed L population is under 2% of the direct L
-  population, since $\sigma_L\gg\sigma_K$. The M and N population fed by L Auger
-  decay is larger and is not bounded here.
-- M-shell Coster--Kronig. xraydb's M-shell values are not a probability
-  distribution -- the finals of Cr M1 sum to 3.82, and 134 (Z, initial) pairs
-  exceed one -- so they are excluded rather than renormalized. L-shell values sum
-  to at most one for every $3\leq Z\leq98$, which is what makes $T^a$
-  row-stochastic.
-- Radiative branching outside the Elam line list. $\omega_{ai}$ is distributed
-  over only the lines xraydb tabulates for that subshell, whose intensities sum
-  to one by construction; that conserves the subshell's radiative total but
-  over-assigns intensity to tabulated lines wherever the source table omits weak
-  ones. An EEDL shell with a nonzero fluorescence yield and no xraydb line list
-  at all is retained, emits zero photons, and raises a `RuntimeWarning` rather
-  than being silently approximated.
-- Secondary fluorescence: $\exp(-\tau_j)$ is a pure sink, so an absorbed
-  characteristic photon does not re-emit.
+- Auger-fed daughter vacancies, including the outer-shell spectator vacancy the Coster--Kronig electron leaves behind. Bound where it can be bounded: whenever the K shell is open the K-fed L population is under 2% of the direct L population, since $\sigma_L\gg\sigma_K$. The M and N population fed by L Auger decay is larger and is not bounded here.
+- M-shell Coster--Kronig. xraydb's M-shell values are not a probability distribution -- the finals of Cr M1 sum to 3.82, and 134 (Z, initial) pairs exceed one -- so they are excluded rather than renormalized. L-shell values sum to at most one for every $3\leq Z\leq98$, which is what makes $T^a$ row-stochastic.
+- Radiative branching outside the Elam line list. $\omega_{ai}$ is distributed over only the lines xraydb tabulates for that subshell, whose intensities sum to one by construction; that conserves the subshell's radiative total but over-assigns intensity to tabulated lines wherever the source table omits weak ones. An EEDL shell with a nonzero fluorescence yield and no xraydb line list at all is retained, emits zero photons, and raises a `RuntimeWarning` rather than being silently approximated.
+- Secondary fluorescence: $\exp(-\tau_j)$ is a pure sink, so an absorbed characteristic photon does not re-emit.
 - Auger-electron transport, multiple-vacancy shifts, satellite structure.
 
-Characteristic emission uses the bremsstrahlung electron population and its
-default 1 keV transport cutoff, rather than the PXR/CBS population's default
-5 keV cutoff. This preserves more low-energy ionization path while sharing the
-same trajectories as the rest of a case. The stopping/scattering model is not
-validated below 1 keV, so characteristic scoring resolves an omitted cutoff to
-1 keV and rejects `E_cut_brem_keV < 1`. Low-binding-energy vacancy production
-below that floor is omitted. The 50 eV relaxation cutoff is a photon-line data
-cutoff and does not override the electron transport-validity boundary.
+Characteristic emission uses the bremsstrahlung electron population and its default 1 keV transport cutoff, rather than the PXR/CBS population's default 5 keV cutoff. This preserves more low-energy ionization path while sharing the same trajectories as the rest of a case. The stopping/scattering model is not validated below 1 keV, so characteristic scoring resolves an omitted cutoff to 1 keV and rejects `E_cut_brem_keV < 1`. Low-binding-energy vacancy production below that floor is omitted. The 50 eV relaxation cutoff is a photon-line data cutoff and does not override the electron transport-validity boundary.
 
-For multilayers, each layer emits using its own elemental composition and all
-layers attenuate the escaping photon. Passive absorber elements are not loaded
-as EEDL emitters for another layer. Atomic relaxation is incoherent, so the
-same characteristic component is added once to whichever of PyRITE's
-incoherent or optional coherent PXR/CBS spectra a consumer selects. It is kept
-as its own array, `spec_characteristic`, persisted in its own
-`characteristic.h5` component, and can be hidden in the analysis app without
-modifying stored results. The control defaults to showing the component.
+For multilayers, each layer emits using its own elemental composition and all layers attenuate the escaping photon. Passive absorber elements are not loaded as EEDL emitters for another layer. Atomic relaxation is incoherent, so the same characteristic component is added once to whichever of PyRITE's incoherent or optional coherent PXR/CBS spectra a consumer selects. It is kept as its own array, `spec_characteristic`, persisted in its own `characteristic.h5` component, and can be hidden in the analysis app without modifying stored results. The control defaults to showing the component.
 
-A single natural-width Lorentzian is used per xraydb transition. The empirical
-multi-Lorentzian fits of Hölzer et al. demonstrate satellite and asymmetric
-structure in 3d-transition-metal lines, but do not supply a universal
-parameterization for the full EEDL element/shell domain. That finer structure,
-chemical shifts, and multiple-vacancy broadening are intentionally excluded.
+A single natural-width Lorentzian is used per xraydb transition. The empirical multi-Lorentzian fits of Hölzer et al. demonstrate satellite and asymmetric structure in 3d-transition-metal lines, but do not supply a universal parameterization for the full EEDL element/shell domain. That finer structure, chemical shifts, and multiple-vacancy broadening are intentionally excluded.
 
 ## Limits and regression evidence
 
-- If density, segment length, cross section, fluorescence yield, or line
-  intensity tends to zero, {eq}`eq-characteristic-track-length` tends to zero.
-- With zero attenuation and one line, summing $\Delta E_b$ times the returned
-  density gives $P_{\ell,W}nL\sigma\omega I/(4\pi N_e)$; it approaches the
-  complete yield monotonically as the window tends to the whole energy axis.
-- Narrowing a window cannot increase integrated yield and does not change the
-  density in bins whose edges are unchanged. A line centred outside the
-  window has a positive in-window tail.
-- Splitting a constant-energy segment preserves total yield when its
-  attenuation weight is also fixed (in particular, with zero attenuation).
-  Changing midpoint escape depth changes attenuation quadrature.
-- Increasing optical depth suppresses the line monotonically through
-  $\exp(-\tau)$.
+- If density, segment length, cross section, fluorescence yield, or line intensity tends to zero, {eq}`eq-characteristic-track-length` tends to zero.
+- With zero attenuation and one line, summing $\Delta E_b$ times the returned density gives $P_{\ell,W}nL\sigma\omega I/(4\pi N_e)$; it approaches the complete yield monotonically as the window tends to the whole energy axis.
+- Narrowing a window cannot increase integrated yield and does not change the density in bins whose edges are unchanged. A line centred outside the window has a positive in-window tail.
+- Splitting a constant-energy segment preserves total yield when its attenuation weight is also fixed (in particular, with zero attenuation). Changing midpoint escape depth changes attenuation quadrature.
+- Increasing optical depth suppresses the line monotonically through $\exp(-\tau)$.
 
-`tests/montecarlo/test_characteristic.py` anchors the packaged carbon K-shell
-EEDL value and natural carbon K-alpha width, exact Lorentzian bin integration,
-finite-window mass, off-grid tails, the 1 keV floor, segment-subdivision
-invariance, absorber/emitter
-separation, and runner composition into both emission modes. Checkpoint/reline
-tests cover independent `characteristic.h5` persistence, missing-component
-compatibility, and identity boundaries. A small end-to-end HOPG simulation
-also exercises ENDF parsing, electron transport, self-absorption, line
-profiles, and result assembly.
+`tests/montecarlo/test_characteristic.py` anchors the packaged carbon K-shell EEDL value and natural carbon K-alpha width, exact Lorentzian bin integration, finite-window mass, off-grid tails, the 1 keV floor, segment-subdivision invariance, absorber/emitter separation, and runner composition into both emission modes. Checkpoint/reline tests cover independent `characteristic.h5` persistence, missing-component compatibility, and identity boundaries. A small end-to-end HOPG simulation also exercises ENDF parsing, electron transport, self-absorption, line profiles, and result assembly.
 
 ## Issue #88 implementation-context review, 2026-09-14
 
-The v3 line-window change removes the historical conditioning factor
-$1/P_{\ell,W}$. This follows directly from the whole-line normalization
-$\int_{-\infty}^{\infty}L_\ell(E)\,dE=1$: integrating over a proper subset
-$W$ must give $P_{\ell,W}\leq1$. Positivity follows from monotonicity of the
-arctangent CDF. Expanding either window boundary can only add nonnegative
-mass, while bins common to two windows retain identical CDF differences.
-When the line centre lies outside $W$, strict CDF monotonicity leaves a
-positive tail for every finite-width line. These limits and the symmetric
-half-mass example $W=[E_\ell-\Gamma_\ell/2,E_\ell+\Gamma_\ell/2]$ are anchored
-without using the implementation to construct the expected values.
+The v3 line-window change removes the historical conditioning factor $1/P_{\ell,W}$. This follows directly from the whole-line normalization $\int_{-\infty}^{\infty}L_\ell(E)\,dE=1$: integrating over a proper subset $W$ must give $P_{\ell,W}\leq1$. Positivity follows from monotonicity of the arctangent CDF. Expanding either window boundary can only add nonnegative mass, while bins common to two windows retain identical CDF differences. When the line centre lies outside $W$, strict CDF monotonicity leaves a positive tail for every finite-width line. These limits and the symmetric half-mass example $W=[E_\ell-\Gamma_\ell/2,E_\ell+\Gamma_\ell/2]$ are anchored without using the implementation to construct the expected values.
 
-The low-energy choice is an enforced model boundary, not a new transport
-equation. A universal 1 keV cutoff omits some physically possible ionization
-for shells whose thresholds are lower, but evaluating those paths would exceed
-the currently validated stopping/scattering range. `E_cut_keV=None` therefore
-means 1 keV for this estimator and a lower explicit value fails closed. A
-future transport model validated below 1 keV may replace this conservative
-boundary with the lowest scored shell threshold, but that is outside issue
-#88.
+The low-energy choice is an enforced model boundary, not a new transport equation. A universal 1 keV cutoff omits some physically possible ionization for shells whose thresholds are lower, but evaluating those paths would exceed the currently validated stopping/scattering range. `E_cut_keV=None` therefore means 1 keV for this estimator and a lower explicit value fails closed. A future transport model validated below 1 keV may replace this conservative boundary with the lowest scored shell threshold, but that is outside issue #88.
 
-The model marker changes from `lorentzian-v2` to `lorentzian-v3`, so checkpoint
-dataset identities and case-content hashes cannot reuse spectra calculated
-under conditional window renormalization. No separate grid-independent
-integrated-yield field is introduced; the stored `spec_characteristic` remains
-the spectrum restricted to its recorded line grid.
+The model marker changes from `lorentzian-v2` to `lorentzian-v3`, so checkpoint dataset identities and case-content hashes cannot reuse spectra calculated under conditional window renormalization. No separate grid-independent integrated-yield field is introduced; the stored `spec_characteristic` remains the spectrum restricted to its recorded line grid.
 
-This is an implementation-context review only. The new v3 convention has
-units, signs, normalization, narrow/wide/off-grid limits, and a regression
-anchor, but still requires fresh-context source-to-code validation. The ledger
-status is therefore `filtered`; no human sign-off is claimed.
+This is an implementation-context review only. The new v3 convention has units, signs, normalization, narrow/wide/off-grid limits, and a regression anchor, but still requires fresh-context source-to-code validation. The ledger status is therefore `filtered`; no human sign-off is claimed.
 
 ## Issue #101 implementation-context note, 2026-09-14
 
 Two `v3` to `v4` changes, both grid bookkeeping rather than new source physics:
 
-1. **Low bin-edge clamp.** `_energy_bin_edges_and_widths`'s outer edges mirror
-   the adjacent spacing, {math}`E_0^-=E_0-\tfrac12(E_1-E_0)`. That reflection
-   can go negative when the first spacing exceeds the first node -- an
-   unphysical photon energy. `v4` clamps
-   {math}`E_0^-=\max(0,E_0-\tfrac12(E_1-E_0))`; the high edge is never
-   clamped since photon energy has no analogous upper bound here. This changes
-   {math}`\Delta E_0` (and therefore the first bin's reported density) only
-   for grids that hit the negative-edge case; an ordinary evenly- or
-   slowly-varying grid is unaffected because its first edge is already
-   non-negative. Limiting case: a grid whose first spacing does not exceed its
-   first node reduces to the unclamped `v3` formula exactly, since the
-   reflected edge is then never negative.
-2. **Explicit truncation query.** `characteristic_line_window_mass` returns
-   {math}`(P_{\ell,W},\,1-P_{\ell,W})` per line -- the same $P_{\ell,W}$
-   already in {eq}`eq-characteristic-track-length`, just returned as data
-   instead of only implicitly shaping the density. `captured+truncated=1`
-   follows directly from `_lorentzian_bin_weights` being the unconditioned CDF
-   difference (same argument as the v3 review above). `mc_characteristic_spectrum`
-   additionally warns when a line's centre is inside the requested grid but
-   the grid still captures under `CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION`
-   (50%) of that line's mass, so a window that truncates a line at its own
-   edges is reported rather than left for the caller to notice only as a
-   smaller-than-expected peak. A line centred outside the grid does not warn:
-   its small in-window tail is the documented off-grid-line behaviour, not a
-   misconfigured window.
+1. **Low bin-edge clamp.** `_energy_bin_edges_and_widths`'s outer edges mirror the adjacent spacing, {math}`E_0^-=E_0-\tfrac12(E_1-E_0)`. That reflection can go negative when the first spacing exceeds the first node -- an unphysical photon energy. `v4` clamps {math}`E_0^-=\max(0,E_0-\tfrac12(E_1-E_0))`; the high edge is never clamped since photon energy has no analogous upper bound here. This changes {math}`\Delta E_0` (and therefore the first bin's reported density) only for grids that hit the negative-edge case; an ordinary evenly- or slowly-varying grid is unaffected because its first edge is already non-negative. Limiting case: a grid whose first spacing does not exceed its first node reduces to the unclamped `v3` formula exactly, since the reflected edge is then never negative.
+2. **Explicit truncation query.** `characteristic_line_window_mass` returns {math}`(P_{\ell,W},\,1-P_{\ell,W})` per line -- the same $P_{\ell,W}$ already in {eq}`eq-characteristic-track-length`, just returned as data instead of only implicitly shaping the density. `captured+truncated=1` follows directly from `_lorentzian_bin_weights` being the unconditioned CDF difference (same argument as the v3 review above). `mc_characteristic_spectrum` additionally warns when a line's centre is inside the requested grid but the grid still captures under `CHARACTERISTIC_SEVERE_TRUNCATION_FRACTION` (50%) of that line's mass, so a window that truncates a line at its own edges is reported rather than left for the caller to notice only as a smaller-than-expected peak. A line centred outside the grid does not warn: its small in-window tail is the documented off-grid-line behaviour, not a misconfigured window.
 
-Neither change alters the analytic Lorentzian CDF itself, the vacancy-yield
-estimator, or the transport-validity floor. The model marker moves to
-`lorentzian-v4` because the low-edge clamp can change a stored spectrum's
-first-bin value; checkpoints identity-fork accordingly. This is an
-implementation-context review only, covering units, the clamp's limiting
-case, and the truncation identity above; it does not independently verify the
-change. The ledger status remains `filtered`; no human sign-off is claimed.
+Neither change alters the analytic Lorentzian CDF itself, the vacancy-yield estimator, or the transport-validity floor. The model marker moves to `lorentzian-v4` because the low-edge clamp can change a stored spectrum's first-bin value; checkpoints identity-fork accordingly. This is an implementation-context review only, covering units, the clamp's limiting case, and the truncation identity above; it does not independently verify the change. The ledger status remains `filtered`; no human sign-off is claimed.
 
 ## Historical v2 validation status
 
-The independent review below records the v2 implementation verified on
-2026-09-13. Its direct-vacancy, linewidth, attenuation, unit, and normalization
-work remains evidence for unchanged parts of v3. Its conditional-window verdict
-is historical and does not independently verify the issue #88 change. Human
-sign-off remains pending.
+The independent review below records the v2 implementation verified on 2026-09-13. Its direct-vacancy, linewidth, attenuation, unit, and normalization work remains evidence for unchanged parts of v3. Its conditional-window verdict is historical and does not independently verify the issue #88 change. Human sign-off remains pending.
 
 ## Independent verification of v2, 2026-09-13
 
 ### Derivation frozen before implementation inspection
 
-This verifier did not implement this claim. The ledger entry, signatures and
-AST-extracted docstrings were read first; implementation bodies and the prior
-review above were withheld until the following derivation was written.
+This verifier did not implement this claim. The ledger entry, signatures and AST-extracted docstrings were read first; implementation bodies and the prior review above were withheld until the following derivation was written.
 
-Let $n_a$ be the number density of element $a$, $\sigma_{ai}(T)$ its
-shell-ionization cross section per atom, and $\Delta s_j$ a path increment of
-one incident electron at kinetic energy $T_j$. The expected number of initial
-vacancies is $n_a\sigma_{ai}(T_j)\Delta s_j$. A direct transition $i\to f$
-produces $\omega_{ai}b_{aif}$ photons per vacancy, where $\omega$ is the
-fluorescence yield and $b$ is conditional on radiative decay of that initial
-shell. Thus the thin-path photon expectation is
+Let $n_a$ be the number density of element $a$, $\sigma_{ai}(T)$ its shell-ionization cross section per atom, and $\Delta s_j$ a path increment of one incident electron at kinetic energy $T_j$. The expected number of initial vacancies is $n_a\sigma_{ai}(T_j)\Delta s_j$. A direct transition $i\to f$ produces $\omega_{ai}b_{aif}$ photons per vacancy, where $\omega$ is the fluorescence yield and $b$ is conditional on radiative decay of that initial shell. Thus the thin-path photon expectation is
 
 $$
 \Delta N_{jaif}=n_a\sigma_{ai}(T_j)\Delta s_j\omega_{ai}b_{aif}.
 $$
 
-The conditional branch probabilities sum to one before any line-energy
-selection. Selected branches must not be renormalized: omitting a transition
-reduces the emitted photon count. No shell occupancy multiplier belongs here
-because the EEDL quantity is already a subshell cross section. The direct model
-does not propagate daughter vacancies; a full cascade would require a vacancy
-transfer matrix and its repeated action on the initial vacancy vector.
+The conditional branch probabilities sum to one before any line-energy selection. Selected branches must not be renormalized: omitting a transition reduces the emitted photon count. No shell occupancy multiplier belongs here because the EEDL quantity is already a subshell cross section. The direct model does not propagate daughter vacancies; a full cascade would require a vacancy transfer matrix and its repeated action on the initial vacancy vector.
 
-[The EEDL survey, IAEA-NDS-226](https://www-nds.iaea.org/epics/DOCUMENTS/EEDL.pdf)
-describes shell-resolved electron data and binding-energy updates. The
-[ENDF-6 manual](https://www.oecd-nea.org/dbdata/data/endf102.htm) specifies the
-File 23 representation. The source-data year and report year are distinct:
-NDS-226 is dated December 2017. With cross sections in barns, lengths in
-angstroms and densities in atoms per cubic angstrom,
+[The EEDL survey, IAEA-NDS-226](https://www-nds.iaea.org/epics/DOCUMENTS/EEDL.pdf) describes shell-resolved electron data and binding-energy updates. The [ENDF-6 manual](https://www.oecd-nea.org/dbdata/data/endf102.htm) specifies the File 23 representation. The source-data year and report year are distinct: NDS-226 is dated December 2017. With cross sections in barns, lengths in angstroms and densities in atoms per cubic angstrom,
 
 $$
 n_a\,[\mathrm{\mathring A}^{-3}]\,
@@ -286,18 +120,9 @@ n_a\,[\mathrm{\mathring A}^{-3}]\,
 \times10^{-8}
 $$
 
-is a dimensionless vacancy expectation. Equivalently, convert density by
-$10^{24}$ and path length by $10^{-8}$ to centimetre units, and convert barns
-by $10^{-24}$. Incident energy conversion is $T_{\rm eV}=10^3T_{\rm keV}$.
-Linear interpolation is valid only for an ENDF region declaring that law;
-zero outside the table is a model boundary rather than a high-energy
-extrapolation.
+is a dimensionless vacancy expectation. Equivalently, convert density by $10^{24}$ and path length by $10^{-8}$ to centimetre units, and convert barns by $10^{-24}$. Incident energy conversion is $T_{\rm eV}=10^3T_{\rm keV}$. Linear interpolation is valid only for an ENDF region declaring that law; zero outside the table is a model boundary rather than a high-energy extrapolation.
 
-The [XrayDB API](https://xraypy.github.io/XrayDB/python.html) documents the
-Elam-derived edge fluorescence yields and transition intensities, plus
-core-hole widths in eV from Krause--Oliver and Keski-Rahkonen--Krause.
-For independent exponentially decaying initial and final holes, convolution
-of their Cauchy spectral densities adds their half widths. Consequently
+The [XrayDB API](https://xraypy.github.io/XrayDB/python.html) documents the Elam-derived edge fluorescence yields and transition intensities, plus core-hole widths in eV from Krause--Oliver and Keski-Rahkonen--Krause. For independent exponentially decaying initial and final holes, convolution of their Cauchy spectral densities adds their half widths. Consequently
 
 $$
 \Gamma_{aif}=\Gamma_{ai}+\Gamma_{af},\qquad
@@ -306,16 +131,7 @@ L_{aif}(E)=\frac{\gamma_{aif}}
  {\pi[(E-E_{aif})^2+\gamma_{aif}^2]}.
 $$
 
-This agrees with the line-width addition rule in
-[Krause and Oliver (1979), Eq. (2)](https://srd.nist.gov/jpcrdreprint/1.555595.pdf).
-The profile has unit integral over the real axis, half its maximum at
-$E-E_{aif}=\pm\gamma_{aif}$, and units of inverse eV. Averaging unresolved
-final-level widths and assigning zero to a missing final width are explicit
-approximations, not consequences of the lifetime convolution. A grouped
-transition is generally a weighted sum of profiles rather than one profile
-with an arithmetic-mean width. The single-line model does not reproduce the
-empirical multi-Lorentzian fits of
-[Hölzer et al. (1997)](https://journals.aps.org/pra/abstract/10.1103/PhysRevA.56.4554).
+This agrees with the line-width addition rule in [Krause and Oliver (1979), Eq. (2)](https://srd.nist.gov/jpcrdreprint/1.555595.pdf). The profile has unit integral over the real axis, half its maximum at $E-E_{aif}=\pm\gamma_{aif}$, and units of inverse eV. Averaging unresolved final-level widths and assigning zero to a missing final width are explicit approximations, not consequences of the lifetime convolution. A grouped transition is generally a weighted sum of profiles rather than one profile with an arithmetic-mean width. The single-line model does not reproduce the empirical multi-Lorentzian fits of [Hölzer et al. (1997)](https://journals.aps.org/pra/abstract/10.1103/PhysRevA.56.4554).
 
 For bin edges $e_k,e_{k+1}$, the exact unconditioned bin probability is
 
@@ -333,29 +149,15 @@ w_{aif,k}=\frac{p_{aif,k}}{P_{aif,W}},\qquad
 \sum_k w_{aif,k}=1,
 $$
 
-and includes a transition only if its centre lies in the admitted window.
-This is a conditional, truncated Lorentzian. It preserves the complete line
-yield on a chosen grid but differs from physically cropping an unconditioned
-spectrum by the exact factor $1/P_{aif,W}$. Changing the window can therefore
-change the density in overlapping bins. At a window edge $P_W$ approaches
-one half for a distant opposite boundary, doubling the retained half-line.
-This accepted numerical convention must not be called conservation under
-physical aperture selection. The infinite-window limit removes the factor.
+and includes a transition only if its centre lies in the admitted window. This is a conditional, truncated Lorentzian. It preserves the complete line yield on a chosen grid but differs from physically cropping an unconditioned spectrum by the exact factor $1/P_{aif,W}$. Changing the window can therefore change the density in overlapping bins. At a window edge $P_W$ approaches one half for a distant opposite boundary, doubling the retained half-line. This accepted numerical convention must not be called conservation under physical aperture selection. The infinite-window limit removes the factor.
 
-For isotropic photons the probability per solid angle is $1/(4\pi)$.
-The escape probability from source position $\mathbf r_j$ along
-$\hat{\mathbf n}$ is
+For isotropic photons the probability per solid angle is $1/(4\pi)$. The escape probability from source position $\mathbf r_j$ along $\hat{\mathbf n}$ is
 
 $$
 A_j(E)=\exp\left[-\sum_m\mu_m(E)\ell_{jm}(\hat{\mathbf n})\right],
 $$
 
-where each material path $\ell_{jm}$ is nonnegative. Passive absorbers
-contribute to this exponent but not to $n_a$ in the source term. A
-line-centre attenuation approximation takes $A_j(E)\simeq A_j(E_{aif})$;
-it is accurate when attenuation varies little across the admitted profile.
-The exact absorbed bin would integrate $L(E)A_j(E)$ instead. The estimator
-expected under the stated discretization is
+where each material path $\ell_{jm}$ is nonnegative. Passive absorbers contribute to this exponent but not to $n_a$ in the source term. A line-centre attenuation approximation takes $A_j(E)\simeq A_j(E_{aif})$; it is accurate when attenuation varies little across the admitted profile. The exact absorbed bin would integrate $L(E)A_j(E)$ instead. The estimator expected under the stated discretization is
 
 $$
 \boxed{S_k=\frac{1}{4\pi N_e\Delta E_k}
@@ -363,27 +165,11 @@ $$
 \omega_{ai}b_{aif}A_j(E_{aif})w_{aif,k}.}
 $$
 
-$N_e$ counts all incident macro-electrons in the selected cohort, including
-those producing no retained segment. This is a photon-number density per eV,
-per sr and per incident electron; there is no photon-energy factor and no
-extra speed factor. A track-length estimator integrates path length, not
-residence time.
+$N_e$ counts all incident macro-electrons in the selected cohort, including those producing no retained segment. This is a photon-number density per eV, per sr and per incident electron; there is no photon-energy factor and no extra speed factor. A track-length estimator integrates path length, not residence time.
 
-Cheap filters pass under those assumptions: zero density, path length, cross
-section or fluorescence yield gives zero; absorption is positive and at most
-one; an opaque path gives zero and zero optical depth gives unity. Splitting
-a segment while holding energy, escape geometry and source composition fixed
-preserves its yield. A zero-width line inside one bin tends to a delta mass;
-on a bin boundary its symmetric limit divides between adjacent bins.
-Unattenuated integration over bins and solid angle recovers the direct photon
-expectation per incident electron. Real transport subdivision changes energy
-and position quadrature and is not required to be exactly invariant.
+Cheap filters pass under those assumptions: zero density, path length, cross section or fluorescence yield gives zero; absorption is positive and at most one; an opaque path gives zero and zero optical depth gives unity. Splitting a segment while holding energy, escape geometry and source composition fixed preserves its yield. A zero-width line inside one bin tends to a delta mass; on a bin boundary its symmetric limit divides between adjacent bins. Unattenuated integration over bins and solid angle recovers the direct photon expectation per incident electron. Real transport subdivision changes energy and position quadrature and is not required to be exactly invariant.
 
-Characteristic emission is statistically incoherent with PXR/CBS amplitudes.
-If the two total-spectrum choices differ only in coherent versus incoherent
-PXR/CBS treatment, the same characteristic intensity must be added once to
-each. It must not be added to amplitudes or multiplied by an interference
-factor.
+Characteristic emission is statistically incoherent with PXR/CBS amplitudes. If the two total-spectrum choices differ only in coherent versus incoherent PXR/CBS treatment, the same characteristic intensity must be added once to each. It must not be added to amplitudes or multiplied by an interference factor.
 
 ### Comparison after the derivation was frozen
 
@@ -399,199 +185,58 @@ factor.
 | Each layer emits from its own composition | `_characteristic_from_segments` selects segments by layer and retains the complete absorber stack | Matches |
 | One common additive intensity | `runner/__init__.py` keeps `spec_characteristic` separate from `spec`/`spec_coherent`; `_spectral_components.line_spectrum` adds it once to the selected line spectrum | Matches |
 
-The EEDL threshold and xraydb line/edge energies originate in different
-compilations. They are joined by element and shell; this review verifies that
-join and the direct-emission estimator, not a self-consistent energy-conserving
-relaxation cascade or the physical accuracy of every atomic datum.
+The EEDL threshold and xraydb line/edge energies originate in different compilations. They are joined by element and shell; this review verifies that join and the direct-emission estimator, not a self-consistent energy-conserving relaxation cascade or the physical accuracy of every atomic datum.
 
 ### Independent numerical evidence
 
-All computations below used the project runner with `PYRITE_MC_BACKEND=cpu`.
-No transport sweep or GPU calculation was performed.
+All computations below used the project runner with `PYRITE_MC_BACKEND=cpu`. No transport sweep or GPU calculation was performed.
 
-- A small fixed-column reader, independent of `endf-parserpy` and the PyRITE
-  parser, read packaged carbon MAT 600, MF 23, MT 534. Its raw header gives
-  binding energy 288 eV and 25 samples with interpolation law 2. The bracketing
-  records are 25118.9 eV / 59832.9 barns and 39810.7 eV / 42689.6 barns.
-  Direct scalar linear interpolation at 30000 eV gives
-  $5.4137330932220685\times10^{-20}\,\mathrm{cm}^2$; the implementation gives
-  $5.4137330932220697\times10^{-20}\,\mathrm{cm}^2$ (relative difference
-  $2.22\times10^{-16}$). An assertion with relative tolerance $10^{-13}$
-  and **zero absolute tolerance** passes.
-- For a 1000 eV line, FWHM 2 eV and bin edges 998 through 1002 eV, direct
-  analytic integration captures 0.7048327646991335 of the full Lorentzian.
-  The implementation sums to 1, exactly as the declared conditional model
-  requires; its retained-bin density is larger by 1.4187762687605225.
-  The independently computed conditional bin vector matches at relative
-  tolerance $10^{-14}$ with zero absolute tolerance.
-- For carbon at 30 keV, density $0.1\,\mathrm{\mathring A}^{-3}$, one
-  100 angstrom track, two incident electrons and zero attenuation, direct
-  multiplication of the raw EEDL cross section and XrayDB API yields predicts
-  $3.0156786314065755\times10^{-7}$ photons per sr per incident electron.
-  The integrated output is $3.0156786314065765\times10^{-7}$, agreeing to
-  $4.44\times10^{-16}$ relatively. This also checks that the electron with
-  no segment remains in the normalization.
-- Carbon's API branch intensities sum to 1.0000000972. Using the idealized
-  sum of exactly one initially produced a relative difference of
-  $9.72\times10^{-8}$; retaining the rounded source intensities resolves it.
-  The implementation accepts source sums within 0.99 to 1.01 and does not
-  renormalize them. Thus photon-yield preservation is exact relative to the
-  supplied branch sum, and only approximate relative to $\omega_i$ alone.
-  Carbon K-alpha-1 has API widths $0.0868+0.0045=0.0913$ eV, matching
-  the constructed transition width.
-- The focused command
-  `PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_characteristic.py`
-  passed **7 tests**. These cover parsing/provenance, relaxation joining,
-  line integration, transparent-track subdivision, absorber separation and
-  addition to both emission modes.
+- A small fixed-column reader, independent of `endf-parserpy` and the PyRITE parser, read packaged carbon MAT 600, MF 23, MT 534. Its raw header gives binding energy 288 eV and 25 samples with interpolation law 2. The bracketing records are 25118.9 eV / 59832.9 barns and 39810.7 eV / 42689.6 barns. Direct scalar linear interpolation at 30000 eV gives $5.4137330932220685\times10^{-20}\,\mathrm{cm}^2$; the implementation gives $5.4137330932220697\times10^{-20}\,\mathrm{cm}^2$ (relative difference $2.22\times10^{-16}$). An assertion with relative tolerance $10^{-13}$ and **zero absolute tolerance** passes.
+- For a 1000 eV line, FWHM 2 eV and bin edges 998 through 1002 eV, direct analytic integration captures 0.7048327646991335 of the full Lorentzian. The implementation sums to 1, exactly as the declared conditional model requires; its retained-bin density is larger by 1.4187762687605225. The independently computed conditional bin vector matches at relative tolerance $10^{-14}$ with zero absolute tolerance.
+- For carbon at 30 keV, density $0.1\,\mathrm{\mathring A}^{-3}$, one 100 angstrom track, two incident electrons and zero attenuation, direct multiplication of the raw EEDL cross section and XrayDB API yields predicts $3.0156786314065755\times10^{-7}$ photons per sr per incident electron. The integrated output is $3.0156786314065765\times10^{-7}$, agreeing to $4.44\times10^{-16}$ relatively. This also checks that the electron with no segment remains in the normalization.
+- Carbon's API branch intensities sum to 1.0000000972. Using the idealized sum of exactly one initially produced a relative difference of $9.72\times10^{-8}$; retaining the rounded source intensities resolves it. The implementation accepts source sums within 0.99 to 1.01 and does not renormalize them. Thus photon-yield preservation is exact relative to the supplied branch sum, and only approximate relative to $\omega_i$ alone. Carbon K-alpha-1 has API widths $0.0868+0.0045=0.0913$ eV, matching the constructed transition width.
+- The focused command `PYRITE_MC_BACKEND=cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/test_characteristic.py` passed **7 tests**. These cover parsing/provenance, relaxation joining, line integration, transparent-track subdivision, absorber separation and addition to both emission modes.
 
-The existing carbon cross-section assertion uses `np.isclose` with its
-default absolute tolerance $10^{-8}\,\mathrm{cm}^2$. That tolerance is much
-larger than the reference value: even zero passes this particular assertion.
-It is therefore a weak regression anchor for the numerical cross section.
-The independent zero-absolute-tolerance check above verifies today's value;
-it does not repair the persistent test. A separate test improvement is
-recommended before treating that reference as a strong CI anchor.
+The existing carbon cross-section assertion uses `np.isclose` with its default absolute tolerance $10^{-8}\,\mathrm{cm}^2$. That tolerance is much larger than the reference value: even zero passes this particular assertion. It is therefore a weak regression anchor for the numerical cross section. The independent zero-absolute-tolerance check above verifies today's value; it does not repair the persistent test. A separate test improvement is recommended before treating that reference as a strong CI anchor.
 
 ### Scope corrections and evidence limits
 
-Constant energy alone does **not** guarantee subdivision invariance when
-self-absorption varies along the track. For a uniform path with total optical
-depth 2, one midpoint gives attenuation 0.36787944117144233, two equal
-subsegment midpoints give 0.4148304099305316, and exact path integration gives
-0.43233235838169365. This is ordinary midpoint-quadrature error, not a missing
-normalization factor. The invariant limit holds with identical attenuation
-weights or zero attenuation; the existing regression test explicitly sets
-attenuation to zero.
+Constant energy alone does **not** guarantee subdivision invariance when self-absorption varies along the track. For a uniform path with total optical depth 2, one midpoint gives attenuation 0.36787944117144233, two equal subsegment midpoints give 0.4148304099305316, and exact path integration gives 0.43233235838169365. This is ordinary midpoint-quadrature error, not a missing normalization factor. The invariant limit holds with identical attenuation weights or zero attenuation; the existing regression test explicitly sets attenuation to zero.
 
-At the time of this review, the maintained physics page
-[Characteristic radiation](../../physics/radiation-physics/characteristic-radiation.md)
-needs two exact documentation corrections: its density formula uses
-$Yq_b/\Delta E_b$ after defining the unnormalized $q_b$, while the
-implementation requires $Yq_b/(\Delta E_b\sum_cq_c)$; its subdivision bullet
-needs the fixed-attenuation condition above. This verifier only edits the
-ledgered validation document and leaves those corrections to the owning
-context.
+At the time of this review, the maintained physics page [Characteristic radiation](../../physics/radiation-physics/characteristic-radiation.md) needs two exact documentation corrections: its density formula uses $Yq_b/\Delta E_b$ after defining the unnormalized $q_b$, while the implementation requires $Yq_b/(\Delta E_b\sum_cq_c)$; its subdivision bullet needs the fixed-attenuation condition above. This verifier only edits the ledgered validation document and leaves those corrections to the owning context.
 
-The positive-opacity checks assume finite nonnegative attenuation
-coefficients. The implementation replaces nonfinite coefficients, including
-positive infinity, by zero. Therefore a directly supplied infinite
-coefficient becomes transparent instead of opaque; this behavior is outside
-the finite-coefficient verdict. The physical opaque limit means increasing
-finite optical depth, for which the exponential tends to zero. This review
-did not establish reachability of nonfinite coefficients from valid bundled
-atomic data.
+The positive-opacity checks assume finite nonnegative attenuation coefficients. The implementation replaces nonfinite coefficients, including positive infinity, by zero. Therefore a directly supplied infinite coefficient becomes transparent instead of opaque; this behavior is outside the finite-coefficient verdict. The physical opaque limit means increasing finite optical depth, for which the exponential tends to zero. This review did not establish reachability of nonfinite coefficients from valid bundled atomic data.
 
-Source access was bounded explicitly. The ENDF-6 manual, EEDL survey and
-XrayDB API documentation were inspected online. The EEDL report is dated
-2017; the packaged tape records evaluation in August 2023 and distribution in
-January 2025. Its packaged-byte hash test passes, but this review did not
-independently redownload the complete 2025 upstream tape. The Krause--Oliver
-paper text, including section 2's Eq. (2) linewidth-sum rule, was retrieved
-from an [Argonne-hosted copy of the primary paper](https://millenia.cars.aps.anl.gov/archives/list/ifeffit%40millenia.cars.aps.anl.gov/message/W3G725L4WFZ7M3ZUYX543D73VGSXICYR/attachment/7/Krause1979.pdf)
-after the direct NIST PDF endpoint failed. Elam and Keski-Rahkonen--Krause
-numerical data were checked through the primary XrayDB API documentation and
-installed database, not by independently digitizing those original papers.
-Hölzer's publisher abstract supports the stated multi-Lorentzian model
-limitation; no reproduction of its measured spectra is claimed.
+Source access was bounded explicitly. The ENDF-6 manual, EEDL survey and XrayDB API documentation were inspected online. The EEDL report is dated 2017; the packaged tape records evaluation in August 2023 and distribution in January 2025. Its packaged-byte hash test passes, but this review did not independently redownload the complete 2025 upstream tape. The Krause--Oliver paper text, including section 2's Eq. (2) linewidth-sum rule, was retrieved from an [Argonne-hosted copy of the primary paper](https://millenia.cars.aps.anl.gov/archives/list/ifeffit%40millenia.cars.aps.anl.gov/message/W3G725L4WFZ7M3ZUYX543D73VGSXICYR/attachment/7/Krause1979.pdf) after the direct NIST PDF endpoint failed. Elam and Keski-Rahkonen--Krause numerical data were checked through the primary XrayDB API documentation and installed database, not by independently digitizing those original papers. Hölzer's publisher abstract supports the stated multi-Lorentzian model limitation; no reproduction of its measured spectra is claimed.
 
 ### Independent verdict and suggested ledger edit
 
-**Re-derived:** the code matches the direct-vacancy, conditional-window,
-line-centre-attenuation track-length estimator with finite nonnegative
-attenuation coefficients. Units, signs and the scoped limiting cases pass.
-This does not certify a physically cropped full Lorentzian spectrum, a
-complete atomic relaxation cascade, empirical line-profile accuracy, or
-subdivision invariance under changing attenuation weights. Human sign-off
-remains pending.
+**Re-derived:** the code matches the direct-vacancy, conditional-window, line-centre-attenuation track-length estimator with finite nonnegative attenuation coefficients. Units, signs and the scoped limiting cases pass. This does not certify a physically cropped full Lorentzian spectrum, a complete atomic relaxation cascade, empirical line-profile accuracy, or subdivision invariance under changing attenuation weights. Human sign-off remains pending.
 
-Suggested human-applied ledger update: change `characteristic-radiation`
-from `filtered` to `rederived`; replace the pending independent-review note
-with this dated result and its conditional-window, midpoint-quadrature and
-finite-attenuation scope; record the independent raw carbon interpolation
-and incident-electron normalization checks; flag the overly permissive
-cross-section test absolute tolerance. Do not apply `signed-off`.
+Suggested human-applied ledger update: change `characteristic-radiation` from `filtered` to `rederived`; replace the pending independent-review note with this dated result and its conditional-window, midpoint-quadrature and finite-attenuation scope; record the independent raw carbon interpolation and incident-electron normalization checks; flag the overly permissive cross-section test absolute tolerance. Do not apply `signed-off`.
 
 ### Coordinated documentation checks, 2026-09-13
 
-Supplied by the coordinating context after this verification was written.
-`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs` builds this page
-with no new Sphinx warning. `uv run pyrite-dev test tests/dev/test_docs.py
-tests/dev/test_validation_ledger.py tests/dev/test_doc_blocks.py` passed
-**68 tests**, covering documentation structure, ledger schema/anchor
-resolution and doc code blocks. The rendered page carries 63 parsed math
-nodes, with no unparsed dollar-delimited or backslash-parenthesis math left
-as literal text in the HTML, so the display and inline math above render.
+Supplied by the coordinating context after this verification was written. `UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev docs` builds this page with no new Sphinx warning. `uv run pyrite-dev test tests/dev/test_docs.py tests/dev/test_validation_ledger.py tests/dev/test_doc_blocks.py` passed **68 tests**, covering documentation structure, ledger schema/anchor resolution and doc code blocks. The rendered page carries 63 parsed math nodes, with no unparsed dollar-delimited or backslash-parenthesis math left as literal text in the HTML, so the display and inline math above render.
 
-The two documentation corrections requested above were applied to the
-maintained physics page by the coordinating context: its bin density now reads
-$Y\widehat q_b/\Delta E_b$ with $\widehat q_b=q_b/\sum_cq_c$ stated explicitly,
-and its subdivision bullet now carries the fixed-attenuation condition and the
-optical-depth-2 midpoint-quadrature numbers. No code was changed. The weak
-`np.isclose` absolute tolerance on the carbon cross-section assertion is left
-as a recorded ledger finding for a separate test-improvement task.
+The two documentation corrections requested above were applied to the maintained physics page by the coordinating context: its bin density now reads $Y\widehat q_b/\Delta E_b$ with $\widehat q_b=q_b/\sum_cq_c$ stated explicitly, and its subdivision bullet now carries the fixed-attenuation condition and the optical-depth-2 midpoint-quadrature numbers. No code was changed. The weak `np.isclose` absolute tolerance on the carbon cross-section assertion is left as a recorded ledger finding for a separate test-improvement task.
 
 ## Issue #91 implementation-context note, 2026-09-21
 
-`v4` to `v5` adds one physical process: L-shell Coster--Kronig redistribution of
-primary vacancies, {eq}`eq-characteristic-ck-transfer`, applied in
-`_l_shell_vacancy_transfer` and folded into `line_yield_per_vacancy` at table
-construction. Nothing in the Lorentzian convention, the window treatment, the
-bin-edge clamp, the escape geometry, or the transport floor changes, and the
-hot loop is untouched — `line_yield_per_vacancy` was already
-`(n_shell, n_line)` and simply becomes dense, so the change costs nothing per
-segment.
+`v4` to `v5` adds one physical process: L-shell Coster--Kronig redistribution of primary vacancies, {eq}`eq-characteristic-ck-transfer`, applied in `_l_shell_vacancy_transfer` and folded into `line_yield_per_vacancy` at table construction. Nothing in the Lorentzian convention, the window treatment, the bin-edge clamp, the escape geometry, or the transport floor changes, and the hot loop is untouched — `line_yield_per_vacancy` was already `(n_shell, n_line)` and simply becomes dense, so the change costs nothing per segment.
 
-Why it is a correction rather than a refinement: the Elam $\omega_i$ are Krause
-pure subshell radiative yields — Au's 0.107 / 0.334 / 0.320 reproduce Krause &
-Oliver (1979) exactly — so Coster--Kronig transfer is by construction *absent*
-from them. Applying $\omega_i$ to the primary population therefore leaves the L
-holes in the subshell that created them, which is not where they radiate from.
+Why it is a correction rather than a refinement: the Elam $\omega_i$ are Krause pure subshell radiative yields — Au's 0.107 / 0.334 / 0.320 reproduce Krause & Oliver (1979) exactly — so Coster--Kronig transfer is by construction *absent* from them. Applying $\omega_i$ to the primary population therefore leaves the L holes in the subshell that created them, which is not where they radiate from.
 
 Checks that do not use the implementation to construct their expected values:
 
-- **Row normalization.** Each row of $T^a$ sums to one by inspection of
-  {eq}`eq-characteristic-ck-transfer`. Sampled across $3\leq Z\leq98$, the
-  L-shell outflow $f_{12}+f_{13}$ never exceeds one — the tightest case is Mn at
-  0.997, leaving $T^a_{L_1L_1}=0.003$ — so the diagonal never goes negative and
-  the matrix is a vacancy distribution, not a rescale. A source table that
-  violated this fails closed with a `ValueError`.
-- **Triangularity.** Decay fills a hole from a less-bound subshell, so vacancies
-  only move to higher indices and $T^a$ is upper triangular. This is the
-  property that will let the full EADL cascade of #91 be solved exactly by a
-  finite Neumann series rather than an iteration with a cutoff.
-- **Limiting case.** xraydb tabulates no L Coster--Kronig for $Z\leq11$, so
-  $T^a=\mathbb{1}$ there and the estimator reduces to the pre-cascade product
-  exactly. The carbon anchors in `tests/montecarlo/test_characteristic.py` are
-  unchanged, which is the regression evidence for that limit.
-- **Magnitude, computed from the source tables alone.** With
-  $n=T^{a\mathsf T}N$ from the Elam $f_{ij}$ and the EEDL primary populations,
-  total L emission $\sum_i n_i\omega_i$ over $\sum_i N_i\omega_i$ is 1.235 (Cu,
-  30 keV), 1.232 (Cu, 15 keV), 1.114 (Mo, 60 keV), 1.079 (Au, 100 keV), 1.064
-  (Au, 30 keV) and 1.033 (Ta, 30 keV). The sign is forced:
-  $\omega_{L_3}>\omega_{L_2}>\omega_{L_1}$ for every element with tabulated CK,
-  and transfer only moves holes outward, so redistribution can only raise total
-  L emission. Per-line ratios move much further than totals — Cu's L1-origin
-  share of L photons falls from 0.031 to 0.0005, so Lβ3,4/Lα was previously
-  wrong by more than 10x.
-- **No double counting.** $T^a_{L_1L_3}=f_{13}$ is asserted to differ from
-  $f_{13}+f_{12}f_{23}$, which is what the total-vs-direct confusion would
-  produce.
+- **Row normalization.** Each row of $T^a$ sums to one by inspection of {eq}`eq-characteristic-ck-transfer`. Sampled across $3\leq Z\leq98$, the L-shell outflow $f_{12}+f_{13}$ never exceeds one — the tightest case is Mn at 0.997, leaving $T^a_{L_1L_1}=0.003$ — so the diagonal never goes negative and the matrix is a vacancy distribution, not a rescale. A source table that violated this fails closed with a `ValueError`.
+- **Triangularity.** Decay fills a hole from a less-bound subshell, so vacancies only move to higher indices and $T^a$ is upper triangular. This is the property that will let the full EADL cascade of #91 be solved exactly by a finite Neumann series rather than an iteration with a cutoff.
+- **Limiting case.** xraydb tabulates no L Coster--Kronig for $Z\leq11$, so $T^a=\mathbb{1}$ there and the estimator reduces to the pre-cascade product exactly. The carbon anchors in `tests/montecarlo/test_characteristic.py` are unchanged, which is the regression evidence for that limit.
+- **Magnitude, computed from the source tables alone.** With $n=T^{a\mathsf T}N$ from the Elam $f_{ij}$ and the EEDL primary populations, total L emission $\sum_i n_i\omega_i$ over $\sum_i N_i\omega_i$ is 1.235 (Cu, 30 keV), 1.232 (Cu, 15 keV), 1.114 (Mo, 60 keV), 1.079 (Au, 100 keV), 1.064 (Au, 30 keV) and 1.033 (Ta, 30 keV). The sign is forced: $\omega_{L_3}>\omega_{L_2}>\omega_{L_1}$ for every element with tabulated CK, and transfer only moves holes outward, so redistribution can only raise total L emission. Per-line ratios move much further than totals — Cu's L1-origin share of L photons falls from 0.031 to 0.0005, so Lβ3,4/Lα was previously wrong by more than 10x.
+- **No double counting.** $T^a_{L_1L_3}=f_{13}$ is asserted to differ from $f_{13}+f_{12}f_{23}$, which is what the total-vs-direct confusion would produce.
 
-This supersedes the "Direct branching $\omega_i b_{if}$" row of the frozen
-2026-09-13 comparison table above: the stored product is now
-$\sum_{i'}T^a_{ii'}\omega_{ai'}I_{ai'\ell}$. The cutoff-zeroing behaviour of
-`_xraydb_line_yields` is unchanged.
+This supersedes the "Direct branching $\omega_i b_{if}$" row of the frozen 2026-09-13 comparison table above: the stored product is now $\sum_{i'}T^a_{ii'}\omega_{ai'}I_{ai'\ell}$. The cutoff-zeroing behaviour of `_xraydb_line_yields` is unchanged.
 
-The model marker moves to `l-shell-ck-lorentzian-v5`, so dataset identities and
-case-content keys fork from `v4`; `v4` records hold un-redistributed L line
-yields and are not the same spectrum. The shipped profile digest pins in
-`tests/materials/test_profiles.py` were re-minted accordingly.
+The model marker moves to `l-shell-ck-lorentzian-v5`, so dataset identities and case-content keys fork from `v4`; `v4` records hold un-redistributed L line yields and are not the same spectrum. The shipped profile digest pins in `tests/materials/test_profiles.py` were re-minted accordingly.
 
-This is an implementation-context review only. Units, row normalization, the
-$T^a=\mathbb{1}$ limit, the forced sign, and the double-counting guard all have
-anchors, but fresh-context source-to-code validation of the Coster--Kronig
-claim — in particular whether Elam's tabulated $f_{ij}$ are the total
-probabilities this derivation assumes, checked against Krause (1979) or Campbell
-(2003) directly rather than through xraydb — is still pending. The ledger status
-therefore stays `filtered`; no human sign-off is claimed.
+This is an implementation-context review only. Units, row normalization, the $T^a=\mathbb{1}$ limit, the forced sign, and the double-counting guard all have anchors, but fresh-context source-to-code validation of the Coster--Kronig claim — in particular whether Elam's tabulated $f_{ij}$ are the total probabilities this derivation assumes, checked against Krause (1979) or Campbell (2003) directly rather than through xraydb — is still pending. The ledger status therefore stays `filtered`; no human sign-off is claimed.

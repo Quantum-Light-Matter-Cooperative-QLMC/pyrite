@@ -2,10 +2,7 @@
 
 ## Scope
 
-This document summarizes recommended upgrades to PyRITE's electron-transport and
-incoherent-radiation physics for bulk and crystalline materials while
-**excluding explicit channeling physics**. The intended eventual energy range is
-approximately
+This document summarizes recommended upgrades to PyRITE's electron-transport and incoherent-radiation physics for bulk and crystalline materials while **excluding explicit channeling physics**. The intended eventual energy range is approximately
 
 $$
 1\text{–}2~\mathrm{keV}
@@ -14,9 +11,7 @@ $$
 100~\mathrm{MeV},
 $$
 
-with particular emphasis on preserving the detailed electron trajectories
-required by coherent radiation calculations such as parametric X-ray radiation
-(PXR) and coherent bremsstrahlung (CBS).
+with particular emphasis on preserving the detailed electron trajectories required by coherent radiation calculations such as parametric X-ray radiation (PXR) and coherent bremsstrahlung (CBS).
 
 ```{important}
 The central design constraint is that PyRITE is not interested only in endpoint
@@ -30,11 +25,7 @@ distribution, projected range, or mean energy loss is therefore likely
 not sufficient.
 ```
 
-This document incorporates the newer EEDL-based bremsstrahlung and
-characteristic-radiation work. Those additions materially change the previous
-recommendations: the bremsstrahlung **energy-spectrum** model is no longer a
-major gap, and EEDL shell-ionization data are now a defensible production
-baseline for characteristic X-ray generation.
+This document incorporates the newer EEDL-based bremsstrahlung and characteristic-radiation work. Those additions materially change the previous recommendations: the bremsstrahlung **energy-spectrum** model is no longer a major gap, and EEDL shell-ionization data are now a defensible production baseline for characteristic X-ray generation.
 
 ---
 
@@ -52,15 +43,9 @@ $$
 \cdots,
 $$
 
-with collisional energy loss applied continuously or stochastically along the
-segments rather than represented as explicit microscopic inelastic events.
-Numerical energy-control substeps may subdivide a physical flight without
-introducing a new physical deflection.
+with collisional energy loss applied continuously or stochastically along the segments rather than represented as explicit microscopic inelastic events. Numerical energy-control substeps may subdivide a physical flight without introducing a new physical deflection.
 
-Radiation is then scored from those transported segments. The newer EEDL work
-adds substantially more microscopic atomic data to the radiation estimators,
-but it does **not** yet turn shell ionization or bremsstrahlung into discrete
-transport events.
+Radiation is then scored from those transported segments. The newer EEDL work adds substantially more microscopic atomic data to the radiation estimators, but it does **not** yet turn shell ionization or bremsstrahlung into discrete transport events.
 
 The implemented physics is broadly:
 
@@ -83,11 +68,7 @@ The implemented physics is broadly:
 | Bremsstrahlung feedback on electron | None; radiation is scored from the pre-existing trajectory |
 | Photon escape | Beer–Lambert attenuation through the implemented sample geometry |
 
-For the current thin-target, tens-to-hundreds-of-keV regime, this is a
-substantially stronger model than the previous baseline. In particular, the
-EEDL bremsstrahlung spectrum is already descended from the Seltzer–Berger
-bremsstrahlung calculations and should not be replaced merely to obtain
-Seltzer–Berger physics under another interface.
+For the current thin-target, tens-to-hundreds-of-keV regime, this is a substantially stronger model than the previous baseline. In particular, the EEDL bremsstrahlung spectrum is already descended from the Seltzer–Berger bremsstrahlung calculations and should not be replaced merely to obtain Seltzer–Berger physics under another interface.
 
 The most important remaining gaps are now:
 
@@ -146,9 +127,7 @@ $$
 }
 $$
 
-The crucial architectural recommendation remains to **adopt improved interaction
-physics without automatically adopting conventional condensed-history
-trajectory generation**.
+The crucial architectural recommendation remains to **adopt improved interaction physics without automatically adopting conventional condensed-history trajectory generation**.
 
 ---
 
@@ -156,12 +135,9 @@ trajectory generation**.
 
 ### Coherent-radiation reason for explicit trajectories
 
-A generic condensed-history transport scheme replaces many small physical
-interactions with one statistically equivalent effective step. For ordinary
-electron transport this can be an excellent approximation.
+A generic condensed-history transport scheme replaces many small physical interactions with one statistically equivalent effective step. For ordinary electron transport this can be an excellent approximation.
 
-For PXR and CBS, however, the radiation amplitude depends on the intermediate
-trajectory:
+For PXR and CBS, however, the radiation amplitude depends on the intermediate trajectory:
 
 $$
 \mathcal A(\omega,\mathbf n)
@@ -187,9 +163,7 @@ E_j
 \right).
 $$
 
-Two histories may have the same entry state, exit state, and total angular
-variance while producing different coherent radiation amplitudes. For example,
-the physical path
+Two histories may have the same entry state, exit state, and total angular variance while producing different coherent radiation amplitudes. For example, the physical path
 
 $$
 \mathbf v_1
@@ -201,8 +175,7 @@ $$
 \mathbf v_4
 $$
 
-is not generally equivalent, for coherent radiation, to a condensed-history
-replacement
+is not generally equivalent, for coherent radiation, to a condensed-history replacement
 
 $$
 \mathbf v_1
@@ -214,8 +187,7 @@ at one effective hinge.
 
 ### Trajectory-preservation recommendation
 
-Retain an explicit event-by-event trajectory mode in which every sufficiently
-important direction-changing interaction creates a new physical segment.
+Retain an explicit event-by-event trajectory mode in which every sufficiently important direction-changing interaction creates a new physical segment.
 
 The canonical physical segment boundaries should eventually include
 
@@ -237,9 +209,7 @@ adopt PENELOPE-quality interaction models while retaining its own event-by-event
 trajectory representation.
 ```
 
-Numerical substeps used to integrate energy loss should continue to be treated
-as quadrature nodes inside a physical flight, not as independent collisions or
-sources of decoherence.
+Numerical substeps used to integrate energy loss should continue to be treated as quadrature nodes inside a physical flight, not as independent collisions or sources of decoherence.
 
 ---
 
@@ -247,8 +217,7 @@ sources of decoherence.
 
 ### Existing elastic approximation
 
-The present angular treatment is effectively a screened-Rutherford distribution
-of the form
+The present angular treatment is effectively a screened-Rutherford distribution of the form
 
 $$
 \frac{d\sigma}{d\Omega}
@@ -260,27 +229,21 @@ $$
 },
 $$
 
-with the screening parameter chosen, where suitable tabulated data exist, so
-that a low-order Mott transport moment is reproduced.
+with the screening parameter chosen, where suitable tabulated data exist, so that a low-order Mott transport moment is reproduced.
 
-This approximately preserves the mean angular diffusion but does not preserve
-the complete physical differential cross section
+This approximately preserves the mean angular diffusion but does not preserve the complete physical differential cross section
 
 $$
 \frac{d\sigma_{\mathrm{Mott}}}{d\Omega},
 $$
 
-including its large-angle tail, diffraction structure of the atomic potential,
-and higher angular moments. Elements without the required transport tables fall
-back to the approximate screening model entirely.
+including its large-angle tail, diffraction structure of the atomic potential, and higher angular moments. Elements without the required transport tables fall back to the approximate screening model entirely.
 
-For a code that explicitly resolves individual elastic collisions, this is an
-unnecessary loss of information.
+For a code that explicitly resolves individual elastic collisions, this is an unnecessary loss of information.
 
 ### ELSEPA replacement strategy
 
-For the current $1\text{–}300~\mathrm{keV}$ domain, use the full NIST/ELSEPA
-elastic data:
+For the current $1\text{–}300~\mathrm{keV}$ domain, use the full NIST/ELSEPA elastic data:
 
 $$
 \boxed{
@@ -302,20 +265,15 @@ s
 \frac{1}{n\sigma_{\mathrm{el}}}.
 $$
 
-The polar scattering angle should be sampled directly from the cumulative
-ELSEPA differential cross section, with a uniform azimuth for the present
-orientation-averaged, non-channeling transport model.
+The polar scattering angle should be sampled directly from the cumulative ELSEPA differential cross section, with a uniform azimuth for the present orientation-averaged, non-channeling transport model.
 
-For $E>300~\mathrm{keV}$, generate or tabulate the equivalent extended ELSEPA
-data rather than reverting to a screened-Rutherford approximation.
+For $E>300~\mathrm{keV}$, generate or tabulate the equivalent extended ELSEPA data rather than reverting to a screened-Rutherford approximation.
 
 ### Elastic-scattering priority
 
 **Highest priority for improving the present trajectory physics.**
 
-This change directly improves the trajectory consumed by PXR and CBS and is
-more important to the present coherent-radiation use case than adding a fully
-microscopic treatment of every soft inelastic collision.
+This change directly improves the trajectory consumed by PXR and CBS and is more important to the present coherent-radiation use case than adding a fully microscopic treatment of every soft inelastic collision.
 
 ---
 
@@ -323,8 +281,7 @@ microscopic treatment of every soft inelastic collision.
 
 ### Existing stopping model
 
-The present collisional stopping treatment uses a material- or element-dependent
-crossover:
+The present collisional stopping treatment uses a material- or element-dependent crossover:
 
 $$
 S_{\mathrm{col}}
@@ -336,19 +293,13 @@ S_{\mathrm{ICRU37}}, & E>E_{\mathrm{cross}}.
 \end{cases}
 $$
 
-This is a reasonable practical solution in the current energy range. Joy–Luo
-regularizes the low-energy failure of an uncorrected Bethe expression, while the
-higher-energy branch uses a relativistic Berger–Seltzer/ICRU-style collision
-stopping law.
+This is a reasonable practical solution in the current energy range. Joy–Luo regularizes the low-energy failure of an uncorrected Bethe expression, while the higher-energy branch uses a relativistic Berger–Seltzer/ICRU-style collision stopping law.
 
-The present documentation also explicitly quantifies the cost of omitting the
-density-effect correction over the current production range, rather than
-assuming it is negligible.
+The present documentation also explicitly quantifies the cost of omitting the density-effect correction over the current production range, rather than assuming it is negligible.
 
 ### SBETHE replacement strategy
 
-Use SBETHE, or an equivalent modern corrected-Bethe implementation, as the
-primary mean collisional stopping model:
+Use SBETHE, or an equivalent modern corrected-Bethe implementation, as the primary mean collisional stopping model:
 
 $$
 \boxed{
@@ -358,32 +309,25 @@ S_{\mathrm{SBETHE}}.
 }
 $$
 
-This would remove the empirical low-energy splice while adding a systematic
-shell correction and density-effect treatment.
+This would remove the empirical low-energy splice while adding a systematic shell correction and density-effect treatment.
 
 Benefits include:
 
 - smoother physics from the low-keV regime into relativistic energies;
-- explicit shell corrections rather than relying on Joy–Luo as the low-energy
-  surrogate;
+- explicit shell corrections rather than relying on Joy–Luo as the low-energy surrogate;
 - explicit density-effect corrections;
 - a single stopping model from approximately $1~\mathrm{keV}$ upward;
 - better suitability for eventual multi-MeV transport.
 
 ### ESTAR as an independent stopping reference
 
-NIST ESTAR should remain an important independent validation reference,
-especially above roughly tens of keV. It should not be treated as the low-keV
-gold standard because its traditional collision-stopping formulation is less
-complete there than a modern shell-corrected treatment.
+NIST ESTAR should remain an important independent validation reference, especially above roughly tens of keV. It should not be treated as the low-keV gold standard because its traditional collision-stopping formulation is less complete there than a modern shell-corrected treatment.
 
 ### Stopping-power priority
 
-**Medium priority in the present thin-target regime; high priority before a
-multi-MeV validity claim.**
+**Medium priority in the present thin-target regime; high priority before a multi-MeV validity claim.**
 
-The existing stopping treatment is not currently the dominant physics weakness
-for thin PXR/CBS targets.
+The existing stopping treatment is not currently the dominant physics weakness for thin PXR/CBS targets.
 
 ---
 
@@ -400,17 +344,11 @@ $$
 P_Z^{26,527}(k\mid T),
 $$
 
-where `MF=23/MT=527` supplies the total electro-atomic bremsstrahlung cross
-section and `MF=26/MT=527` supplies the normalized secondary-photon energy
-distribution.
+where `MF=23/MT=527` supplies the total electro-atomic bremsstrahlung cross section and `MF=26/MT=527` supplies the normalized secondary-photon energy distribution.
 
-This is the correct decomposition for a track-length estimator: the total
-cross section fixes the event probability per unit path, and the normalized
-secondary distribution fixes the conditional photon-energy spectrum.
+This is the correct decomposition for a track-length estimator: the total cross section fixes the event probability per unit path, and the normalized secondary distribution fixes the conditional photon-energy spectrum.
 
-The EEDL bremsstrahlung data were derived from Seltzer–Berger photon-yield
-spectra. Therefore the new production backend is already, in practical terms,
-a Seltzer–Berger-lineage bremsstrahlung energy model.
+The EEDL bremsstrahlung data were derived from Seltzer–Berger photon-yield spectra. Therefore the new production backend is already, in practical terms, a Seltzer–Berger-lineage bremsstrahlung energy model.
 
 ```{important}
 Do **not** replace the new EEDL bremsstrahlung spectrum merely to obtain
@@ -418,9 +356,7 @@ Do **not** replace the new EEDL bremsstrahlung spectrum merely to obtain
 present in EEDL.
 ```
 
-The legacy analytic Born/Elwert backend remains useful for reproducibility,
-fallback outside EEDL coverage, and regression testing, but it should not be
-the preferred production spectrum when evaluated data are available.
+The legacy analytic Born/Elwert backend remains useful for reproducibility, fallback outside EEDL coverage, and regression testing, but it should not be the preferred production spectrum when evaluated data are available.
 
 ### Bremsstrahlung spectrum validation
 
@@ -430,19 +366,15 @@ $$
 \frac{d\sigma}{dk},
 $$
 
-the integrated total cross section, and the radiative stopping moment against a
-direct Seltzer–Berger/PENELOPE implementation at representative values of
-$Z$, $T$, and $k/T$.
+the integrated total cross section, and the radiative stopping moment against a direct Seltzer–Berger/PENELOPE implementation at representative values of $Z$, $T$, and $k/T$.
 
-This is primarily a **software/data-validation task**, not a recommendation to
-change the production model.
+This is primarily a **software/data-validation task**, not a recommendation to change the production model.
 
 ### Bremsstrahlung-spectrum priority
 
 **No major production-model replacement required.**
 
-The new EEDL work closes most of the previously identified bremsstrahlung
-energy-spectrum gap.
+The new EEDL work closes most of the previously identified bremsstrahlung energy-spectrum gap.
 
 ---
 
@@ -450,9 +382,7 @@ energy-spectrum gap.
 
 ### Limitation of the EEDL angular representation
 
-The EEDL/ENDF photon subsection used by the current code supplies the photon
-energy distribution without a detailed physical angular distribution. PyRITE
-therefore retains an isotropic factor
+The EEDL/ENDF photon subsection used by the current code supplies the photon energy distribution without a detailed physical angular distribution. PyRITE therefore retains an isotropic factor
 
 $$
 \frac{dP}{d\Omega}
@@ -460,23 +390,19 @@ $$
 \frac{1}{4\pi}.
 $$
 
-This is an ENDF representation choice, not a statement that physical
-electron bremsstrahlung is isotropic.
+This is an ENDF representation choice, not a statement that physical electron bremsstrahlung is isotropic.
 
-That distinction matters because PyRITE predicts detector-direction-resolved
-quantities such as
+That distinction matters because PyRITE predicts detector-direction-resolved quantities such as
 
 $$
 \frac{d^2N}{dE\,d\Omega}.
 $$
 
-The energy spectrum can therefore be accurate while the observed directional
-background remains biased.
+The energy spectrum can therefore be accurate while the observed directional background remains biased.
 
 ### Recommended bremsstrahlung angular model
 
-Retain the EEDL energy spectrum and replace only the angular factor with a
-validated distribution depending on at least
+Retain the EEDL energy spectrum and replace only the angular factor with a validated distribution depending on at least
 
 $$
 Z,
@@ -490,8 +416,7 @@ $$
 
 Strong candidates are:
 
-- the modern PENELOPE analytical shape function fitted to partial-wave
-  bremsstrahlung calculations;
+- the modern PENELOPE analytical shape function fitted to partial-wave bremsstrahlung calculations;
 - a Koch–Motz 2BN/2BS-type angular model where appropriate.
 
 The spectrum estimator then becomes schematically
@@ -505,16 +430,13 @@ P_\Omega(\theta_\gamma;Z,E,k/E)
 T_{\mathrm{abs}}.
 $$
 
-For the existing GPU architecture, this can remain a track-length estimator:
-the main change is replacing the constant $1/(4\pi)$ by an angle-dependent
-weight for each segment, detector direction, and photon energy.
+For the existing GPU architecture, this can remain a track-length estimator: the main change is replacing the constant $1/(4\pi)$ by an angle-dependent weight for each segment, detector direction, and photon energy.
 
 ### Bremsstrahlung-angle priority
 
 **Very high priority for detector-resolved background accuracy.**
 
-With the EEDL energy spectrum now in place, this is the clearest remaining
-bremsstrahlung-model deficiency in the current energy range.
+With the EEDL energy spectrum now in place, this is the clearest remaining bremsstrahlung-model deficiency in the current energy range.
 
 ---
 
@@ -522,12 +444,9 @@ bremsstrahlung-model deficiency in the current energy range.
 
 ### Current characteristic-radiation model
 
-The new characteristic-radiation estimator uses EEDL shell-resolved
-ionization cross sections for direct vacancy production and xraydb atomic data
-for radiative relaxation.
+The new characteristic-radiation estimator uses EEDL shell-resolved ionization cross sections for direct vacancy production and xraydb atomic data for radiative relaxation.
 
-For a segment $j$, element $a$, initially ionized subshell $i$, and line
-$\ell$, the expected direct line yield is
+For a segment $j$, element $a$, initially ionized subshell $i$, and line $\ell$, the expected direct line yield is
 
 $$
 Y_{jai\ell}
@@ -541,20 +460,13 @@ Y_{jai\ell}
 \exp[-\tau_j(E_{ai\ell})].
 $$
 
-This is a sound track-length estimator for **directly produced vacancies
-followed by direct radiative relaxation**.
+This is a sound track-length estimator for **directly produced vacancies followed by direct radiative relaxation**.
 
 ### EEDL versus Bote–Salvat for vacancy production
 
-The earlier recommendation to replace EEDL shell-ionization cross sections
-unconditionally with Bote–Salvat was too strong.
+The earlier recommendation to replace EEDL shell-ionization cross sections unconditionally with Bote–Salvat was too strong.
 
-Bote–Salvat has a cleaner modern theoretical basis, using relativistic DWBA
-near threshold and PWBA at larger overvoltage, and is an excellent reference or
-optional production backend. However, EEDL shell-ionization cross sections are
-still a defensible baseline, particularly for K-shell work, and existing
-experimental comparisons do not establish a universal large accuracy advantage
-for Bote–Salvat over EEDL in every shell and element.
+Bote–Salvat has a cleaner modern theoretical basis, using relativistic DWBA near threshold and PWBA at larger overvoltage, and is an excellent reference or optional production backend. However, EEDL shell-ionization cross sections are still a defensible baseline, particularly for K-shell work, and existing experimental comparisons do not establish a universal large accuracy advantage for Bote–Salvat over EEDL in every shell and element.
 
 The recommended architecture is therefore
 
@@ -566,16 +478,13 @@ $$
 }
 $$
 
-Model disagreement can itself be reported as a useful systematic-uncertainty
-indicator.
+Model disagreement can itself be reported as a useful systematic-uncertainty indicator.
 
 ### Shell-ionization priority
 
 **Do not block current characteristic-radiation work on replacing EEDL.**
 
-Adding Bote–Salvat remains worthwhile, especially for extending the model to
-higher energies and for independent validation, but it is no longer a
-first-order correctness fix.
+Adding Bote–Salvat remains worthwhile, especially for extending the model to higher energies and for independent validation, but it is no longer a first-order correctness fix.
 
 ---
 
@@ -583,9 +492,7 @@ first-order correctness fix.
 
 ### Present relaxation scope
 
-The current model applies xraydb fluorescence yields and conditional line
-intensities to a directly created shell vacancy. It deliberately does not
-propagate the subsequent vacancy cascade.
+The current model applies xraydb fluorescence yields and conditional line intensities to a directly created shell vacancy. It deliberately does not propagate the subsequent vacancy cascade.
 
 Missing processes include:
 
@@ -596,14 +503,11 @@ Missing processes include:
 - Auger-electron transport;
 - multiple-vacancy shifts and broadening.
 
-The current model is therefore best described as a **direct-vacancy
-characteristic-X-ray estimator**, not a complete atomic-relaxation model.
+The current model is therefore best described as a **direct-vacancy characteristic-X-ray estimator**, not a complete atomic-relaxation model.
 
 ### Recommended cascade model
 
-After creating a vacancy in shell $i$, sample or expectation-propagate all
-allowed radiative and nonradiative transitions until the vacancy population has
-migrated to shells below the configured relaxation cutoff:
+After creating a vacancy in shell $i$, sample or expectation-propagate all allowed radiative and nonradiative transitions until the vacancy population has migrated to shells below the configured relaxation cutoff:
 
 $$
 \text{primary shell vacancy}
@@ -614,22 +518,15 @@ $$
 \end{cases}
 $$
 
-EADL-style transition probabilities are the natural reference source. xraydb
-can remain useful for line energies, natural widths, and spectroscopy-facing
-line metadata even if the cascade topology and probabilities come from another
-source.
+EADL-style transition probabilities are the natural reference source. xraydb can remain useful for line energies, natural widths, and spectroscopy-facing line metadata even if the cascade topology and probabilities come from another source.
 
-A deterministic expectation-value cascade may be preferable to stochastic
-sampling when characteristic radiation is being scored as a low-noise spectrum
-rather than coupled back into transport.
+A deterministic expectation-value cascade may be preferable to stochastic sampling when characteristic radiation is being scored as a low-noise spectrum rather than coupled back into transport.
 
 ### Relaxation-cascade priority
 
-**Medium-to-high priority if characteristic X-ray spectroscopy is a first-class
-observable.**
+**Medium-to-high priority if characteristic X-ray spectroscopy is a first-class observable.**
 
-The omission matters more for L/M-shell spectra and high-$Z$ materials than for
-first-generation K-line yields.
+The omission matters more for L/M-shell spectra and high-$Z$ materials than for first-generation K-line yields.
 
 ---
 
@@ -637,8 +534,7 @@ first-generation K-line yields.
 
 ### Finite-grid Lorentzian normalization
 
-The current implementation correctly integrates each natural Lorentzian across
-energy-bin boundaries:
+The current implementation correctly integrates each natural Lorentzian across energy-bin boundaries:
 
 $$
 q_{\ell b}
@@ -657,11 +553,7 @@ $$
 
 This is preferable to point-sampling narrow lines at bin centres.
 
-The current code then renormalizes the bin weights over the requested grid when
-the line centre lies inside that grid. That preserves the historical integrated
-line yield, but it is not the most literal representation of a physical
-$dN/dE$: Lorentzian probability lying outside the requested energy window is
-artificially redistributed inside the window.
+The current code then renormalizes the bin weights over the requested grid when the line centre lies inside that grid. That preserves the historical integrated line yield, but it is not the most literal representation of a physical $dN/dE$: Lorentzian probability lying outside the requested energy window is artificially redistributed inside the window.
 
 For a physically normalized spectrum, prefer
 
@@ -670,31 +562,19 @@ $$
 \le 1
 $$
 
-when the spectral window truncates the line tails. A line centred outside the
-grid can likewise contribute a small physical tail inside the grid.
+when the spectral window truncates the line tails. A line centred outside the grid can likewise contribute a small physical tail inside the grid.
 
-If exact grid-independent line-yield conservation is required for a separate
-diagnostic, store that integrated yield separately rather than enforcing it by
-renormalizing the displayed spectral window.
+If exact grid-independent line-yield conservation is required for a separate diagnostic, store that integrated yield separately rather than enforcing it by renormalizing the displayed spectral window.
 
 ### Characteristic transport cutoff
 
-The current characteristic estimator uses the low-background electron
-population with a nominal $\sim1~\mathrm{keV}$ transport cutoff. That is
-reasonable for the present tens-to-hundreds-of-keV use case but becomes a
-limitation if PyRITE claims accurate characteristic production down to the
-bottom of the proposed $1\text{–}2~\mathrm{keV}$ incident-energy range.
+The current characteristic estimator uses the low-background electron population with a nominal $\sim1~\mathrm{keV}$ transport cutoff. That is reasonable for the present tens-to-hundreds-of-keV use case but becomes a limitation if PyRITE claims accurate characteristic production down to the bottom of the proposed $1\text{–}2~\mathrm{keV}$ incident-energy range.
 
-For low-binding-energy shells, an electron can continue producing vacancies
-below $1~\mathrm{keV}$. The eventual characteristic-radiation cutoff should
-therefore be tied to the lowest ionization threshold being scored, plus the
-validity limit of the transport model, rather than being treated as a universal
-$1~\mathrm{keV}$ physics boundary.
+For low-binding-energy shells, an electron can continue producing vacancies below $1~\mathrm{keV}$. The eventual characteristic-radiation cutoff should therefore be tied to the lowest ionization threshold being scored, plus the validity limit of the transport model, rather than being treated as a universal $1~\mathrm{keV}$ physics boundary.
 
 ### Characteristic-spectrum numerical priority
 
-**Low-to-medium priority for present hard-X-ray applications; important before
-claiming precision low-keV characteristic spectra.**
+**Low-to-medium priority for present hard-X-ray applications; important before claiming precision low-keV characteristic spectra.**
 
 ---
 
@@ -718,13 +598,9 @@ $$
 
 Those are distinct levels of modeling.
 
-The new EEDL shell-ionization estimator does **not** change this fact. PyRITE can
-now calculate the expected number of shell vacancies created along a segment,
-but it does not yet sample those vacancies as transport events, transfer their
-energy and momentum to the primary electron, or launch the ejected electron.
+The new EEDL shell-ionization estimator does **not** change this fact. PyRITE can now calculate the expected number of shell vacancies created along a segment, but it does not yet sample those vacancies as transport events, transfer their energy and momentum to the primary electron, or launch the ejected electron.
 
-Likewise, the EEDL bremsstrahlung estimator scores photons from an existing
-trajectory without changing that trajectory.
+Likewise, the EEDL bremsstrahlung estimator scores photons from an existing trajectory without changing that trajectory.
 
 ### Recommended soft/hard inelastic partition
 
@@ -763,12 +639,9 @@ Use a generalized oscillator strength (GOS) or dielectric-response model for
 - soft ionization;
 - material-dependent electronic response.
 
-A PENELOPE-like GOS model is a strong general default. It describes the target
-through an energy- and momentum-transfer response rather than through a single
-mean loss rate.
+A PENELOPE-like GOS model is a strong general default. It describes the target through an energy- and momentum-transfer response rather than through a single mean loss rate.
 
-For high-accuracy low-energy solid-state work, an optional material-specific
-dielectric backend based on
+For high-accuracy low-energy solid-state work, an optional material-specific dielectric backend based on
 
 $$
 L(q,\omega)
@@ -783,23 +656,19 @@ would be a meaningful additional model.
 
 ### Hard inelastic collision model
 
-Generate explicit Møller-like electron–electron collisions above $W_c$,
-producing
+Generate explicit Møller-like electron–electron collisions above $W_c$, producing
 
 - a discrete primary-electron energy decrement;
 - a physical recoil angle;
-- a secondary electron when the transferred energy exceeds the tracking
-  threshold.
+- a secondary electron when the transferred energy exceeds the tracking threshold.
 
 These events should break the PXR/CBS trajectory into new physical segments.
 
 ### Microscopic-inelastic priority
 
-**High priority once secondary electrons, ionization cascades, thick targets,
-or multi-MeV transport become first-class goals.**
+**High priority once secondary electrons, ionization cascades, thick targets, or multi-MeV transport become first-class goals.**
 
-For present thin-film primary-electron PXR/CBS calculations, this remains less
-urgent than full elastic differential scattering.
+For present thin-film primary-electron PXR/CBS calculations, this remains less urgent than full elastic differential scattering.
 
 ---
 
@@ -807,8 +676,7 @@ urgent than full elastic differential scattering.
 
 The current architecture does not generate explicit $\delta$ electrons.
 
-A mixed inelastic model should eventually create secondary electrons above a
-configurable production threshold. For a hard electron–electron collision,
+A mixed inelastic model should eventually create secondary electrons above a configurable production threshold. For a hard electron–electron collision,
 
 $$
 e^-(E)
@@ -818,8 +686,7 @@ e^-(E-W)
 e^-(W),
 $$
 
-both outgoing particles can be transported if their kinetic energy exceeds the
-configured cutoff.
+both outgoing particles can be transported if their kinetic energy exceeds the configured cutoff.
 
 This becomes necessary for quantitatively reliable modeling of
 
@@ -829,18 +696,15 @@ This becomes necessary for quantitatively reliable modeling of
 - thick-target response;
 - secondary-induced characteristic radiation and bremsstrahlung.
 
-It remains less important if PyRITE is intentionally restricted to primary
-trajectories through sufficiently thin foils.
+It remains less important if PyRITE is intentionally restricted to primary trajectories through sufficiently thin foils.
 
 ---
 
 ## 11. Couple hard bremsstrahlung events back into transport at high energy
 
-The new EEDL spectrum substantially improves the **radiation yield model**, but
-it does not change the electron state when a photon is scored.
+The new EEDL spectrum substantially improves the **radiation yield model**, but it does not change the electron state when a photon is scored.
 
-At sufficiently high energy, that approximation fails. A hard emitted photon
-must change the electron state:
+At sufficiently high energy, that approximation fails. A hard emitted photon must change the electron state:
 
 $$
 e^-(E,\mathbf p)
@@ -858,9 +722,7 @@ This changes
 - subsequent elastic scattering;
 - the trajectory seen by the PXR/CBS solver.
 
-At tens of MeV in high-$Z$ materials, and certainly before a general
-$100~\mathrm{MeV}$ validity claim, radiative losses can rival or dominate
-collisional stopping.
+At tens of MeV in high-$Z$ materials, and certainly before a general $100~\mathrm{MeV}$ validity claim, radiative losses can rival or dominate collisional stopping.
 
 ```{warning}
 The current "transport first, score bremsstrahlung afterward" architecture
@@ -891,34 +753,23 @@ Hard events should create a photon and a new electron trajectory segment.
 
 ## 12. Make the density effect mandatory for relativistic extension
 
-The present omission of the density-effect correction is explicitly quantified
-and small enough to be acceptable over much of the current
-$\lesssim300~\mathrm{keV}$ domain.
+The present omission of the density-effect correction is explicitly quantified and small enough to be acceptable over much of the current $\lesssim300~\mathrm{keV}$ domain.
 
-That result should not be extrapolated to much higher energy. At relativistic
-energies, dielectric polarization suppresses long-range contributions to
-collisional stopping, and the density-effect correction becomes an essential
-part of the model.
+That result should not be extrapolated to much higher energy. At relativistic energies, dielectric polarization suppresses long-range contributions to collisional stopping, and the density-effect correction becomes an essential part of the model.
 
-Using SBETHE or an equivalent modern material-aware stopping treatment resolves
-this systematically.
+Using SBETHE or an equivalent modern material-aware stopping treatment resolves this systematically.
 
 ---
 
 ## 13. Retain event-by-event scattering as the high-accuracy reference mode
 
-At high energies or in thick materials, explicitly simulating every tiny
-elastic deflection may eventually become computationally expensive.
+At high energies or in thick materials, explicitly simulating every tiny elastic deflection may eventually become computationally expensive.
 
-Do not solve this by replacing the canonical detailed model outright. Maintain
-a detailed reference mode and, only when needed, introduce a radiation-aware
-mixed mode.
+Do not solve this by replacing the canonical detailed model outright. Maintain a detailed reference mode and, only when needed, introduce a radiation-aware mixed mode.
 
 ### Fully detailed reference mode
 
-Every physical elastic collision is sampled from the full differential cross
-section. Explicit hard inelastic and hard bremsstrahlung events also create
-segment boundaries.
+Every physical elastic collision is sampled from the full differential cross section. Explicit hard inelastic and hard bremsstrahlung events also create segment boundaries.
 
 The trajectory remains
 
@@ -930,13 +781,11 @@ $$
 \text{physical event}.
 $$
 
-This may be expensive, but it provides the reference against which faster
-approximations can be judged.
+This may be expensive, but it provides the reference against which faster approximations can be judged.
 
 ### Radiation-aware mixed elastic mode
 
-If performance eventually demands condensation, divide the elastic cross
-section at an angular threshold $\theta_c$:
+If performance eventually demands condensation, divide the elastic cross section at an angular threshold $\theta_c$:
 
 $$
 \frac{d\sigma}{d\Omega}
@@ -966,8 +815,7 @@ $$
 \text{stochastic angular diffusion}.
 $$
 
-The soft-scattering trajectory must still be sampled finely enough for
-coherent-radiation convergence.
+The soft-scattering trajectory must still be sampled finely enough for coherent-radiation convergence.
 
 ### Radiation-aware convergence criterion
 
@@ -985,8 +833,7 @@ $$
 \ll 1,
 $$
 
-and keep the trajectory substep shorter than the relevant formation or
-coherence scale,
+and keep the trajectory substep shorter than the relevant formation or coherence scale,
 
 $$
 L_{\mathrm{step}}
@@ -996,15 +843,13 @@ $$
 
 where applicable.
 
-The correct validation observable is therefore not only the electron exit
-distribution but also the converged PXR/CBS spectrum.
+The correct validation observable is therefore not only the electron exit distribution but also the converged PXR/CBS spectrum.
 
 ---
 
 ## 14. Validation strategy
 
-Each physics component should be validated against an independent reference
-appropriate to that layer.
+Each physics component should be validated against an independent reference appropriate to that layer.
 
 | Quantity | Primary validation reference |
 | --- | --- |
@@ -1049,9 +894,7 @@ P(\theta),
 \sigma_L.
 $$
 
-Likewise, matching the integrated bremsstrahlung yield does not validate the
-photon angular distribution, and matching direct K-line production does not
-validate an L/M relaxation cascade.
+Likewise, matching the integrated bremsstrahlung yield does not validate the photon angular distribution, and matching direct K-line production does not validate an L/M relaxation cascade.
 
 Validation should therefore remain process-specific.
 
@@ -1061,29 +904,19 @@ Validation should therefore remain process-specific.
 
 ### Phase A — validate and finish the new EEDL radiation work
 
-1. **Keep the EEDL `MF=23/26` bremsstrahlung energy spectrum as the production
-   default.**
-2. Compare its $d\sigma/dk$, integrated cross section, and radiative stopping
-   moment directly against Seltzer–Berger/PENELOPE reference data.
-3. **Replace the isotropic $1/(4\pi)$ bremsstrahlung factor with a validated
-   angular model.**
-4. Keep EEDL shell-ionization cross sections as the current characteristic
-   vacancy-production baseline.
-5. Compare characteristic X-ray production cross sections against independent
-   experimental/evaluated references, not only parser and unit tests.
-6. Decide whether finite-grid Lorentzian renormalization should remain a
-   compatibility behavior or be replaced by physically truncated line tails.
-7. Document the $\sim1~\mathrm{keV}$ characteristic-electron cutoff as a model
-   limit for low-binding-energy shells.
+1. **Keep the EEDL `MF=23/26` bremsstrahlung energy spectrum as the production default.**
+2. Compare its $d\sigma/dk$, integrated cross section, and radiative stopping moment directly against Seltzer–Berger/PENELOPE reference data.
+3. **Replace the isotropic $1/(4\pi)$ bremsstrahlung factor with a validated angular model.**
+4. Keep EEDL shell-ionization cross sections as the current characteristic vacancy-production baseline.
+5. Compare characteristic X-ray production cross sections against independent experimental/evaluated references, not only parser and unit tests.
+6. Decide whether finite-grid Lorentzian renormalization should remain a compatibility behavior or be replaced by physically truncated line tails.
+7. Document the $\sim1~\mathrm{keV}$ characteristic-electron cutoff as a model limit for low-binding-energy shells.
 
 ### Phase B — improve the current trajectory physics
 
-1. **Replace the screened-Rutherford/Mott-moment surrogate with full ELSEPA
-   differential elastic scattering for every supported element.**
-2. **Replace the Joy–Luo/ICRU stopping splice with SBETHE or an equivalent
-   corrected-Bethe implementation.**
-3. Revalidate PXR, CBS, continuum background, and characteristic spectra after
-   the trajectory changes.
+1. **Replace the screened-Rutherford/Mott-moment surrogate with full ELSEPA differential elastic scattering for every supported element.**
+2. **Replace the Joy–Luo/ICRU stopping splice with SBETHE or an equivalent corrected-Bethe implementation.**
+3. Revalidate PXR, CBS, continuum background, and characteristic spectra after the trajectory changes.
 
 ### Phase C — complete atomic relaxation and microscopic inelastic transport
 
@@ -1094,16 +927,14 @@ Validation should therefore remain process-specific.
 5. Generate explicit Møller/GOS hard collisions.
 6. Transport secondary electrons above a configurable threshold.
 
-At this point, physical trajectory segments should be bounded by elastic,
-hard-inelastic, and hard-radiative direction-changing events.
+At this point, physical trajectory segments should be bounded by elastic, hard-inelastic, and hard-radiative direction-changing events.
 
 ### Phase D — extend safely into the multi-MeV regime
 
 Before declaring general multi-MeV or $100~\mathrm{MeV}$ validity:
 
 1. include the material density-effect correction in production stopping;
-2. extend elastic scattering beyond the NIST $300~\mathrm{keV}$ tables using
-   ELSEPA or another vetted source;
+2. extend elastic scattering beyond the NIST $300~\mathrm{keV}$ tables using ELSEPA or another vetted source;
 3. make hard bremsstrahlung an explicit transport event;
 4. include radiative energy loss and recoil;
 5. transport emitted photons when downstream photon interactions matter;
@@ -1114,8 +945,7 @@ Before declaring general multi-MeV or $100~\mathrm{MeV}$ validity:
 
 ## 16. Recommended production and reference stack
 
-The resulting long-term stack should separate production physics from
-independent validation data:
+The resulting long-term stack should separate production physics from independent validation data:
 
 | Physics role | Recommended production model | Important independent reference |
 | --- | --- | --- |
@@ -1130,24 +960,15 @@ independent validation data:
 | Bremsstrahlung angle | partial-wave-fitted / 2BN/2BS-type model | independent angular benchmarks |
 | High-energy radiative transport | explicit hard-photon events + soft radiative loss | PENELOPE / Geant4 |
 
-EEDL should therefore **not** be demoted to validation-only status. It now has a
-legitimate production role in PyRITE for bremsstrahlung energy spectra and
-shell-resolved vacancy production. The parts of the transport stack where EEDL
-is not sufficient should be identified process by process rather than by a
-general rule that evaluated atomic data are inferior to PENELOPE-style models.
+EEDL should therefore **not** be demoted to validation-only status. It now has a legitimate production role in PyRITE for bremsstrahlung energy spectra and shell-resolved vacancy production. The parts of the transport stack where EEDL is not sufficient should be identified process by process rather than by a general rule that evaluated atomic data are inferior to PENELOPE-style models.
 
 ---
 
 ## Final recommendation after the EEDL upgrade
 
-PyRITE's present event-by-event trajectory architecture should be preserved.
-The design is unusually well suited to PXR/CBS because the radiation solver
-depends on the intermediate trajectory rather than only on macroscopic
-transport observables.
+PyRITE's present event-by-event trajectory architecture should be preserved. The design is unusually well suited to PXR/CBS because the radiation solver depends on the intermediate trajectory rather than only on macroscopic transport observables.
 
-The new EEDL work should also be preserved. It has already solved most of the
-previously identified **bremsstrahlung energy-spectrum** problem and introduced
-a credible direct-vacancy characteristic-X-ray estimator.
+The new EEDL work should also be preserved. It has already solved most of the previously identified **bremsstrahlung energy-spectrum** problem and introduced a credible direct-vacancy characteristic-X-ray estimator.
 
 The near-term strategy is therefore
 
@@ -1164,17 +985,10 @@ $$
 The most important immediate improvements are now:
 
 1. full ELSEPA differential elastic scattering;
-2. a physical bremsstrahlung angular distribution while retaining the EEDL
-   energy spectrum;
+2. a physical bremsstrahlung angular distribution while retaining the EEDL energy spectrum;
 3. SBETHE-quality stopping;
-4. a full atomic-relaxation cascade if characteristic spectroscopy is a primary
-   goal.
+4. a full atomic-relaxation cascade if characteristic spectroscopy is a primary goal.
 
-Microscopic GOS/Møller inelastic transport, explicit secondaries, and coupled
-hard-bremsstrahlung recoil become the next structural layer when PyRITE expands
-from accurate thin-target primary trajectories and radiation scoring toward a
-general-purpose electron–photon transport code.
+Microscopic GOS/Møller inelastic transport, explicit secondaries, and coupled hard-bremsstrahlung recoil become the next structural layer when PyRITE expands from accurate thin-target primary trajectories and radiation scoring toward a general-purpose electron–photon transport code.
 
-For any later mixed/condensed implementation, the acceptance criterion should
-remain **convergence of the calculated PXR/CBS radiation**, not merely agreement
-in electron range, exit angle, or stopping power.
+For any later mixed/condensed implementation, the acceptance criterion should remain **convergence of the calculated PXR/CBS radiation**, not merely agreement in electron range, exit angle, or stopping power.

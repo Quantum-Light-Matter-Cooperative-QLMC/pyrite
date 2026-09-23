@@ -1,14 +1,10 @@
 # Debye-Waller provenance and anisotropy validation audit
 
-This audit owns provenance and model-scope decisions for catalog
-`B_ang2` values. It does not treat a plausible numerical value, a database
-default, or an uncited composition average as validated thermal-displacement
-data.
+This audit owns provenance and model-scope decisions for catalog `B_ang2` values. It does not treat a plausible numerical value, a database default, or an uncited composition average as validated thermal-displacement data.
 
 ## Baseline
 
-Snapshot: 2026-07-25, 48 crystal entries in
-`src/pyrite/data/materials.toml`.
+Snapshot: 2026-07-25, 48 crystal entries in `src/pyrite/data/materials.toml`.
 
 | state | count | crystals |
 |---|---:|---|
@@ -17,31 +13,22 @@ Snapshot: 2026-07-25, 48 crystal entries in
 | distinct value without value-level provenance | 4 | diamond, silicon, LiF, HOPG |
 | shared `B_ang2 = 0.6 Å²` requiring source recovery or replacement | 37 | all remaining entries |
 
-The 37 repeated values span different elements, phases, bonding, and source
-temperatures. Several bundled CIF comments explicitly call `0.6 Å²` a
-modeling placeholder. Until each entry is checked, the repeated value is an
-unverified catalog default, not a material property.
+The 37 repeated values span different elements, phases, bonding, and source temperatures. Several bundled CIF comments explicitly call `0.6 Å²` a modeling placeholder. Until each entry is checked, the repeated value is an unverified catalog default, not a material property.
 
 Existing recoverable records:
 
-- h-BN: Pease room-temperature basal-reflection fit, `B33 = 3.45 Å²`;
-  direction-specific approximation for pinned `(002)/(004)`, not `Biso`.
+- h-BN: Pease room-temperature basal-reflection fit, `B33 = 3.45 Å²`; direction-specific approximation for pinned `(002)/(004)`, not `Biso`.
 - GeP: composition-average `B = 0.35 Å²` from a 90 K refinement.
 - GeS: `B = 1.07 Å²` derived from reported Ge/S isotropic values.
-- GeSe: `B = 1.10 Å²` derived from Ueq values in the selected 250.72 K
-  refinement.
-- PdTe2: `B33 = 0.61 Å²` from the multiplicity-weighted mean of Pd
-  `U33 = 0.0074(4) Å²` and Te `U33 = 0.0079(3) Å²` at 113(2) K.
-- 2H-TaS2: `B33 = 0.53 Å²` from the multiplicity-weighted mean of Ta
-  `U33 = 0.0065(2) Å²` and S `U33 = 0.0068(8) Å²` at 295 K.
+- GeSe: `B = 1.10 Å²` derived from Ueq values in the selected 250.72 K refinement.
+- PdTe2: `B33 = 0.61 Å²` from the multiplicity-weighted mean of Pd `U33 = 0.0074(4) Å²` and Te `U33 = 0.0079(3) Å²` at 113(2) K.
+- 2H-TaS2: `B33 = 0.53 Å²` from the multiplicity-weighted mean of Ta `U33 = 0.0065(2) Å²` and S `U33 = 0.0068(8) Å²` at 295 K.
 
 These remain `unverified` ledger evidence until independently reproduced.
 
 ## Standard-profile production subset
 
-This pass is restricted to the 21 materials explicitly listed by
-`[profiles.standard]` in the packaged catalog. Materials in the separate
-`high_energy` profile and materials outside `standard` are excluded.
+This pass is restricted to the 21 materials explicitly listed by `[profiles.standard]` in the packaged catalog. Materials in the separate `high_energy` profile and materials outside `standard` are excluded.
 
 ### Scalar replacements
 
@@ -50,10 +37,7 @@ This pass is restricted to the 21 materials explicitly listed by
 | PdTe2, 1T `P-3m1` | Pell, Mironov & Ibers, *Acta Cryst. C* **52**, 1331–1332 (1996), 113(2) K, [doi:10.1107/S0108270195016246](https://doi.org/10.1107/S0108270195016246), [COD 2004955](https://www.crystallography.net/cod/2004955.html) | Pd `U33=0.0074(4)`, Te `U33=0.0079(3) Å²`; full anisotropic tensors; unit occupancies | values agree within combined uncertainty; multiplicity-weighted `U33=(0.0074+2×0.0079)/3=0.00773 Å²`, hence `B33=8π²U33=0.6106 Å²`, stored as `0.61 Å²`; basal `(001)` only | at 10 keV, new common scalar changes `|F001|²` by −0.019% from `B=0.6`; it differs by −0.071% from the site-specific tensor result |
 | 2H-TaS2, `P63/mmc` | Meetsma *et al.*, *Acta Cryst. C* **46**, 1598–1599 (1990), 295 K, [doi:10.1107/S0108270190000014](https://doi.org/10.1107/S0108270190000014), [COD 9007815](https://www.crystallography.net/cod/9007815.html) | Ta `U11=0.0034(1)`, `U33=0.0065(2)`; S `U11=0.0048(5)`, `U33=0.0068(8) Å²`; unit occupancies | multiplicity-weighted `U33=(0.0065+2×0.0068)/3=0.00670 Å²`, hence `B33=0.5290 Å²`, stored as `0.53 Å²`; basal `(002)` only | at 10 keV, new common scalar changes `|F002|²` by +0.096% from `B=0.6`; it differs by −0.024% from the site-specific tensor result |
 
-Both reductions are direction-specific compatibility values, not `Biso`.
-They are valid only because each catalog entry pins a basal `00l` family and
-the refined site projections are close. Do not reuse them for non-basal
-reflections.
+Both reductions are direction-specific compatibility values, not `Biso`. They are valid only because each catalog entry pins a basal `00l` family and the refined site projections are close. Do not reuse them for non-basal reflections.
 
 ### Recovered ADPs requiring richer representation
 
@@ -67,9 +51,7 @@ reflections.
 
 ### Source recovery without usable ADPs
 
-Literal `Uiso=0` in legacy COD conversions below means the source record did
-not carry a refined displacement parameter; it is not evidence for zero atomic
-motion.
+Literal `Uiso=0` in legacy COD conversions below means the source record did not carry a refined displacement parameter; it is not evidence for zero atomic motion.
 
 | materials | recovered primary/deposited record | result |
 |---|---|---|
@@ -82,8 +64,7 @@ motion.
 
 ## 2026-09-13 pass: five production-critical entries
 
-Scope requested: HOPG, h-BN, MoS2, MoSe2, MoTe2 only. The rest of the catalog
-is out of scope for this pass and its placeholders are unchanged.
+Scope requested: HOPG, h-BN, MoS2, MoSe2, MoTe2 only. The rest of the catalog is out of scope for this pass and its placeholders are unchanged.
 
 | material | before | after | source status |
 |---|---:|---:|---|
@@ -95,8 +76,7 @@ is out of scope for this pass and its placeholders are unchanged.
 
 ### Why the two unresolved entries cost little
 
-Pinned-reflection sensitivity at 10 keV, `|F|²` relative to the current
-catalog `B`, computed with `structure_factor` over the pinned basal families:
+Pinned-reflection sensitivity at 10 keV, `|F|²` relative to the current catalog `B`, computed with `structure_factor` over the pinned basal families:
 
 | material | `|g(002)|` [1/Å] | `(002)` span, `B = 0 … 3.45` | `(004)` span, `B = 0 … 3.45` | `(002)` over `B = 0.3 … 1.5` | `(004)` over `B = 0.3 … 1.5` |
 |---|---:|---:|---:|---:|---:|
@@ -106,23 +86,13 @@ catalog `B`, computed with `structure_factor` over the pinned basal families:
 | MoSe2 | 0.9721 | 4.0% | 15.2% | 1.4% | 5.6% |
 | MoTe2 | 0.9002 | 3.5% | 13.2% | 1.2% | 4.8% |
 
-The last two columns are the honest error bar on a placeholder: `B = 0.3–1.5 Å²`
-brackets any physically plausible room-temperature value for these materials.
+The last two columns are the honest error bar on a placeholder: `B = 0.3–1.5 Å²` brackets any physically plausible room-temperature value for these materials.
 
-The Mo dichalcogenides have long `c` axes (12.3–14.0 Å), so their pinned
-`(00l)` reflections sit at small `|g|` where the Debye–Waller factor is nearly
-flat. Within that realistic band the placeholder costs at most 1.6% on `(002)`
-and 6.2% on `(004)` — and those are full-band spans, so the error from `0.6 Å²`
-specifically is smaller still.
+The Mo dichalcogenides have long `c` axes (12.3–14.0 Å), so their pinned `(00l)` reflections sit at small `|g|` where the Debye–Waller factor is nearly flat. Within that realistic band the placeholder costs at most 1.6% on `(002)` and 6.2% on `(004)` — and those are full-band spans, so the error from `0.6 Å²` specifically is smaller still.
 
-HOPG and h-BN are the opposite case: short `c` axes put `(004)` near
-`|g| = 3.8 1/Å`, where `|F|²` varies by 46% over the full range and ~19% over
-the realistic band. That is why HOPG was the high-value entry in this set, and
-why h-BN was already fixed.
+HOPG and h-BN are the opposite case: short `c` axes put `(004)` near `|g| = 3.8 1/Å`, where `|F|²` varies by 46% over the full range and ~19% over the realistic band. That is why HOPG was the high-value entry in this set, and why h-BN was already fixed.
 
-Remaining work for MoSe2 and MoTe2 is source retrieval, not analysis: obtain
-the Bronsema 1986 ADP table for MoSe2, and a modern single-crystal refinement
-for 2H-MoTe2. Neither is on the critical path for present accuracy.
+Remaining work for MoSe2 and MoTe2 is source retrieval, not analysis: obtain the Bronsema 1986 ADP table for MoSe2, and a modern single-crystal refinement for 2H-MoTe2. Neither is on the critical path for present accuracy.
 
 ## Acceptance record
 
@@ -130,61 +100,37 @@ Every replacement must record:
 
 1. material, phase or polytype, specimen state, and measurement temperature;
 2. primary diffraction refinement, DOI, table or deposited-record locator;
-3. reported convention (`Biso`, `Uiso`/`Ueq`, anisotropic `Uij`, or a
-   reflection-direction fit);
+3. reported convention (`Biso`, `Uiso`/`Ueq`, anisotropic `Uij`, or a reflection-direction fit);
 4. atom/site association, occupancies, uncertainties, and coordinate frame;
 5. exact conversion to catalog value and any averaging rule;
 6. reflections for which a scalar approximation is valid;
 7. intensity sensitivity at catalog-pinned reflections.
 
-Use `B = 8π² Uiso`. For a Cartesian displacement tensor `U` and reciprocal
-vector `g` in Å⁻¹, amplitude attenuation is
+Use `B = 8π² Uiso`. For a Cartesian displacement tensor `U` and reciprocal vector `g` in Å⁻¹, amplitude attenuation is
 
 ```text
 D_j(g) = exp[-0.5 gᵀ U_j g].
 ```
 
-Current scalar implementation is the special case
-`U_j = B I / (8π²)`, producing
-`exp[-B |g|² / (16π²)]`.
+Current scalar implementation is the special case `U_j = B I / (8π²)`, producing `exp[-B |g|² / (16π²)]`.
 
 ## Model decision
 
 Single crystal-wide scalar is defensible only when:
 
 - source reports one isotropic parameter for all contributing sites; or
-- source reports an effective displacement along the only modeled reflection
-  direction, all catalog reflections are parallel to that direction, and the
-  directional limitation is explicit.
+- source reports an effective displacement along the only modeled reflection direction, all catalog reflections are parallel to that direction, and the directional limitation is explicit.
 
-Atom-specific isotropic parameters are required when refined sites or species
-have materially different `Uiso`/`Ueq`; a composition average changes relative
-site amplitudes and can change interference, not only overall attenuation.
+Atom-specific isotropic parameters are required when refined sites or species have materially different `Uiso`/`Ueq`; a composition average changes relative site amplitudes and can change interference, not only overall attenuation.
 
-Per-site tensors are required for non-basal reflections in anisotropic
-materials, multiple nonparallel reflection families, or sources whose
-directional ADPs cannot be reduced to one common projection. h-BN already
-demonstrates strong anisotropy, but its pinned basal-only use permits the
-documented `B33` approximation.
+Per-site tensors are required for non-basal reflections in anisotropic materials, multiple nonparallel reflection families, or sources whose directional ADPs cannot be reduced to one common projection. h-BN already demonstrates strong anisotropy, but its pinned basal-only use permits the documented `B33` approximation.
 
-Do not extend schema yet. Evidence must first establish which catalog entries
-need richer data and whether primary sources provide compatible site labels and
-tensor frames. A future implementation should normalize source ADPs to
-per-expanded-site Cartesian `U` tensors in Å², evaluate `D_j(g)` inside each
-site sum in both `structure_factor` and `U_g`, and preserve scalar `B_ang2` as
-an explicit compatibility mode. This also affects sweep/checkpoint identity,
-golden catalog serialization, and validation-oracle comparisons.
+Do not extend schema yet. Evidence must first establish which catalog entries need richer data and whether primary sources provide compatible site labels and tensor frames. A future implementation should normalize source ADPs to per-expanded-site Cartesian `U` tensors in Å², evaluate `D_j(g)` inside each site sum in both `structure_factor` and `U_g`, and preserve scalar `B_ang2` as an explicit compatibility mode. This also affects sweep/checkpoint identity, golden catalog serialization, and validation-oracle comparisons.
 
 ## Work order
 
-1. Reproduce four existing primary-source conversions and repair incomplete
-   temperature/table locators.
-2. Resolve high-impact anchors: HOPG, WSe2, MoSe2, MoTe2, TiS2, PtSe2, HfS2,
-   HfSe2, and HfTe2. The first scoped pass found no acceptable replacement for
-   these anchors; HOPG has a natural-graphite tensor candidate, while matching
-   WSe2/MoSe2/MoTe2 records omit ADPs and Hf/PtSe2 sources remain incomplete.
-3. Recover ADPs from primary refinements already cited for the 37 shared-value
-   entries; record “not reported” rather than substituting another compound.
+1. Reproduce four existing primary-source conversions and repair incomplete temperature/table locators.
+2. Resolve high-impact anchors: HOPG, WSe2, MoSe2, MoTe2, TiS2, PtSe2, HfS2, HfSe2, and HfTe2. The first scoped pass found no acceptable replacement for these anchors; HOPG has a natural-graphite tensor candidate, while matching WSe2/MoSe2/MoTe2 records omit ADPs and Hf/PtSe2 sources remain incomplete.
+3. Recover ADPs from primary refinements already cited for the 37 shared-value entries; record “not reported” rather than substituting another compound.
 4. Audit diamond, silicon, LiF, and sapphire legacy values.
-5. Run pinned-reflection sensitivity calculations before changing production
-   values or schema.
+5. Run pinned-reflection sensitivity calculations before changing production values or schema.

@@ -1,30 +1,14 @@
 # Stopping power and the energy cutoff
 
-Between elastic collisions PyRITE removes energy continuously rather than
-sampling individual inelastic events. This is the condensed-history
-(continuous-slowing-down) approximation: discrete excitation and ionization
-losses are replaced by their mean rate $dE/ds$, evaluated along the
-flight{cite:p}`nistestar,akkerman1978`.
+Between elastic collisions PyRITE removes energy continuously rather than sampling individual inelastic events. This is the condensed-history (continuous-slowing-down) approximation: discrete excitation and ionization losses are replaced by their mean rate $dE/ds$, evaluated along the flight{cite:p}`nistestar,akkerman1978`.
 
-The local scale-separation check is the fractional mean loss over an elastic
-free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves slowly
-compared with the explicitly sampled directional changes. The inelastic and
-elastic mean free paths are distinct, material- and energy-dependent
-scales{cite:p}`akkerman1978,shinotsuka2015`. Optional straggling restores
-fluctuations around that mean without changing it.
+The local scale-separation check is the fractional mean loss over an elastic free path, $|dE/ds|\lambda_{\rm el}/E$: when it is small, energy evolves slowly compared with the explicitly sampled directional changes. The inelastic and elastic mean free paths are distinct, material- and energy-dependent scales{cite:p}`akkerman1978,shinotsuka2015`. Optional straggling restores fluctuations around that mean without changing it.
 
 ## Current production model: SBETHE
 
-Production transport resolves a material-level SBETHE collision-stopping
-table{cite:p}`salvat2024sbethe` for each layer. SBETHE evaluates the corrected
-Bethe expression with DHFS shell and Fano density-effect corrections. Its
-source states that the corrected expression applies above a
-material-dependent `ECUT` of about 1 keV for electrons; below `ECUT`, SBETHE
-uses an empirical extrapolation. PyRITE consumes the tabulated result rather
-than reproducing the Fortran expression in the transport kernel.
+Production transport resolves a material-level SBETHE collision-stopping table{cite:p}`salvat2024sbethe` for each layer. SBETHE evaluates the corrected Bethe expression with DHFS shell and Fano density-effect corrections. Its source states that the corrected expression applies above a material-dependent `ECUT` of about 1 keV for electrons; below `ECUT`, SBETHE uses an empirical extrapolation. PyRITE consumes the tabulated result rather than reproducing the Fortran expression in the transport kernel.
 
-The catalog's atomic number densities $n_i$ (in Å$^{-3}$) set the bulk mass
-density and the compound mean excitation energy supplied to SBETHE:
+The catalog's atomic number densities $n_i$ (in Å$^{-3}$) set the bulk mass density and the compound mean excitation energy supplied to SBETHE:
 
 ```{math}
 :label: eq-sbethe-material-inputs
@@ -34,14 +18,9 @@ density and the compound mean excitation energy supplied to SBETHE:
 \ln I = \frac{\sum_i n_i Z_i\ln I_i}{\sum_i n_i Z_i}.
 ```
 
-Here $A_i$ is in g mol$^{-1}$, $I_i$ is the elemental mean excitation energy,
-and the resulting $\rho$ is in g cm$^{-3}$. The logarithmic rule assumes
-independent-atom Bragg additivity; a one-element composition returns its
-elemental $I_i$. Table identity includes the composition, density, $I$,
-optional band gap, source digest, and generation inputs.
+Here $A_i$ is in g mol$^{-1}$, $I_i$ is the elemental mean excitation energy, and the resulting $\rho$ is in g cm$^{-3}$. The logarithmic rule assumes independent-atom Bragg additivity; a one-element composition returns its elemental $I_i$. Table identity includes the composition, density, $I$, optional band gap, source digest, and generation inputs.
 
-For positive table nodes $(E_i,S_i)$, transport interpolates in log energy
-and log stopping magnitude:
+For positive table nodes $(E_i,S_i)$, transport interpolates in log energy and log stopping magnitude:
 
 ```{math}
 :label: eq-sbethe-interpolation
@@ -51,24 +30,13 @@ f = \frac{\ln E-\ln E_i}{\ln E_{i+1}-\ln E_i},
 \frac{dE}{ds} = -\exp\!\left[(1-f)\ln S_i+f\ln S_{i+1}\right].
 ```
 
-$E$ is in keV and $S$ in keV Å$^{-1}$. This rule recovers each native node,
-keeps the rate negative, and is continuous between nodes; its slope need not
-be continuous at a node. Packaged tables span 1 keV to 1 GeV. The host rejects
-energies outside that range, so a transport cutoff below 1 keV is unsupported.
-The optional Urban fluctuations use the same SBETHE mean through a shared
-scale factor. `Validation: sbethe-material-inputs` and
-`Validation: sbethe-corrected-stopping` are `rederived`; CUDA stopping anchors
-have run on hardware. Human sign-off remains pending.
+$E$ is in keV and $S$ in keV Å$^{-1}$. This rule recovers each native node, keeps the rate negative, and is continuous between nodes; its slope need not be continuous at a node. Packaged tables span 1 keV to 1 GeV. The host rejects energies outside that range, so a transport cutoff below 1 keV is unsupported. The optional Urban fluctuations use the same SBETHE mean through a shared scale factor. `Validation: sbethe-material-inputs` and `Validation: sbethe-corrected-stopping` are `rederived`; CUDA stopping anchors have run on hardware. Human sign-off remains pending.
 
-The Joy–Luo/Berger–Seltzer calculations below remain as reference models and
-historical comparisons. Their range and yield tables describe the earlier
-splice, not production results with SBETHE.
+The Joy–Luo/Berger–Seltzer calculations below remain as reference models and historical comparisons. Their range and yield tables describe the earlier splice, not production results with SBETHE.
 
 ## Reference Joy–Luo modified Bethe law
 
-Below each element's Joy–Luo/Berger–Seltzer crossover in the reference model
-(see Per-element splice, below), stopping is the Joy–Luo modification of the Bethe
-expression{cite:p}`joyluo1989`
+Below each element's Joy–Luo/Berger–Seltzer crossover in the reference model (see Per-element splice, below), stopping is the Joy–Luo modification of the Bethe expression{cite:p}`joyluo1989`
 
 ```{math}
 :label: eq-stopping-joy-luo
@@ -88,20 +56,13 @@ with
 k = 0.731 + 0.0688\,\log_{10} Z,
 ```
 
-$E$ and $J$ in keV, $\rho$ in $\mathrm{g\,cm^{-3}}$, and $A$ the standard atomic
-weight. The prefactor is the conventional $7.85\times10^{4}\ \mathrm{keV\,cm^{-1}}$
-coefficient converted to keV per ångström.
+$E$ and $J$ in keV, $\rho$ in $\mathrm{g\,cm^{-3}}$, and $A$ the standard atomic weight. The prefactor is the conventional $7.85\times10^{4}\ \mathrm{keV\,cm^{-1}}$ coefficient converted to keV per ångström.
 
-Unmodified Bethe stopping has $\ln(1.166\,E/J)$, which passes through zero at
-$E = J/1.166$ and turns *negative* below it, so the electron would gain energy.
-The $kJ$ term keeps the logarithm's argument above unity down to zero kinetic
-energy, and $k$ is fitted so the modified curve tracks measured low-energy
-stopping.
+Unmodified Bethe stopping has $\ln(1.166\,E/J)$, which passes through zero at $E = J/1.166$ and turns *negative* below it, so the electron would gain energy. The $kJ$ term keeps the logarithm's argument above unity down to zero kinetic energy, and $k$ is fitted so the modified curve tracks measured low-energy stopping.
 
 ## Compounds
 
-Stopping is additive over elements (Bragg's rule). The implementation stores a
-per-element coefficient
+Stopping is additive over elements (Bragg's rule). The implementation stores a per-element coefficient
 
 ```{math}
 :label: eq-stopping-compound-coefficient
@@ -120,34 +81,19 @@ so that
 \sum_i c_i \ln\!\left[\frac{1.166\,(E + k_i J_i)}{J_i}\right].
 ```
 
-{eq}`eq-stopping-compound-coefficient` is an exact rewrite of $\rho Z/A$, not an
-approximation: $\rho/A = n/N_{\rm A}$, and $10^{24}/N_{\rm A} = 1/0.602214076$
-carries $\text{Å}^{-3}$ to $\mathrm{cm^{-3}}$ at the same time. Working from
-number densities means the catalog never has to keep a separate mass density
-consistent with its lattice.
+{eq}`eq-stopping-compound-coefficient` is an exact rewrite of $\rho Z/A$, not an approximation: $\rho/A = n/N_{\rm A}$, and $10^{24}/N_{\rm A} = 1/0.602214076$ carries $\text{Å}^{-3}$ to $\mathrm{cm^{-3}}$ at the same time. Working from number densities means the catalog never has to keep a separate mass density consistent with its lattice.
 
-Each element keeps its own $k_i$ from {eq}`eq-stopping-joy-luo-k` and its own
-mean excitation energy $J_i$; there is no single effective $Z$ or $J$ for the
-compound.
+Each element keeps its own $k_i$ from {eq}`eq-stopping-joy-luo-k` and its own mean excitation energy $J_i$; there is no single effective $Z$ or $J$ for the compound.
 
 ## Mean excitation energies
 
-$J$ comes from the PDG *Atomic and Nuclear Properties* elemental tables, which
-follow the ICRU stopping-power compilation, alongside CIAAW 2024 standard atomic
-weights for $A$ (`materials/_transport_data.py`); see
-[Elemental transport data](../atomic-physics/elemental-transport-data.md).
+$J$ comes from the PDG *Atomic and Nuclear Properties* elemental tables, which follow the ICRU stopping-power compilation, alongside CIAAW 2024 standard atomic weights for $A$ (`materials/_transport_data.py`); see [Elemental transport data](../atomic-physics/elemental-transport-data.md).
 
-This is **not** the source Joy and Luo fitted $k$ against, which used
-Berger–Seltzer values. The two disagree for light elements: carbon is 78 eV here
-against 100 eV in the fit, worth roughly 4% in stopping power at 25 keV. Silicon
-agrees to 0.3%. The discrepancy is recorded in the ledger rather than tuned
-away.
+This is **not** the source Joy and Luo fitted $k$ against, which used Berger–Seltzer values. The two disagree for light elements: carbon is 78 eV here against 100 eV in the fit, worth roughly 4% in stopping power at 25 keV. Silicon agrees to 0.3%. The discrepancy is recorded in the ledger rather than tuned away.
 
 ## Berger–Seltzer relativistic branch
 
-Above each element's crossover (Per-element splice, below), the low-energy $kJ$
-modification is dropped for the closed-form relativistic collision-stopping
-expression of ICRU Report 37{cite:p}`icru37,bergerseltzer1982`:
+Above each element's crossover (Per-element splice, below), the low-energy $kJ$ modification is dropped for the closed-form relativistic collision-stopping expression of ICRU Report 37{cite:p}`icru37,bergerseltzer1982`:
 
 ```{math}
 :label: eq-stopping-bs
@@ -170,13 +116,9 @@ F^-(T) = 1 - \beta^2 +
 \frac{T^2/8 - (2T+1)\ln 2}{(T+1)^2},
 ```
 
-where $T = E/mc^2$ is the kinetic energy in electron rest-mass units, $\beta^2 = 1 -
-(T+1)^{-2}$, and $2\pi r_e^2 m c^2 N_{\rm A}$ is a constant with the value $0.1535\ \mathrm{MeV\,cm^2\,mol^{-1}}$.
+where $T = E/mc^2$ is the kinetic energy in electron rest-mass units, $\beta^2 = 1 - (T+1)^{-2}$, and $2\pi r_e^2 m c^2 N_{\rm A}$ is a constant with the value $0.1535\ \mathrm{MeV\,cm^2\,mol^{-1}}$.
 
-Converting that constant to per-$\AA$ units ($10^{3}$ keV/MeV times
-$10^{-8}$ cm/Å) gives the prefactor $1.535\times10^{-6}\ \mathrm{keV\,Å^{-1}}$
-used in the code, in place of the $7.85\times10^{-4}$ of
-{eq}`eq-stopping-joy-luo`.
+Converting that constant to per-$\AA$ units ($10^{3}$ keV/MeV times $10^{-8}$ cm/Å) gives the prefactor $1.535\times10^{-6}\ \mathrm{keV\,Å^{-1}}$ used in the code, in place of the $7.85\times10^{-4}$ of {eq}`eq-stopping-joy-luo`.
 
 As a check, the non-relativistic limit
 
@@ -194,14 +136,9 @@ reduces {eq}`eq-stopping-bs` to:
 -1.535\times10^{-6}\,\frac{mc^2}{E}\frac{\rho Z}{A}\,[2\ln(E/I) + 1 - \ln2]
 ```
 
-and
-$1.535\times10^{-6}\times mc^2 = 7.844\times10^{-4}$ against the conventional
-$7.85\times10^{-4}$ — 0.08%, the rounding in that constant.
+and $1.535\times10^{-6}\times mc^2 = 7.844\times10^{-4}$ against the conventional $7.85\times10^{-4}$ — 0.08%, the rounding in that constant.
 
-$\delta$ is the density-effect correction. It is a bulk property of the medium
-rather than of an element, so unlike $I$ it factors out of the Bragg sum and
-enters as one scalar per layer rather than per element. It is **omitted**:
-every call site passes $\delta = 0$.
+$\delta$ is the density-effect correction. It is a bulk property of the medium rather than of an element, so unlike $I$ it factors out of the Bragg sum and enters as one scalar per layer rather than per element. It is **omitted**: every call site passes $\delta = 0$.
 
 With $x = \log_{10}\beta\gamma$, the Sternheimer parameterization is
 

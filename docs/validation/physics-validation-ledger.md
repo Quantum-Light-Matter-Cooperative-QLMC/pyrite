@@ -7,18 +7,9 @@ The single source of truth for **what physics PyRITE claims and whether it has b
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-For current totals, use the generated [status summary](status-summary.md). For a
-short claim-by-claim view, use the generated [domain inventories](domain-inventories.md).
-The detailed records in the ledger parts below remain authoritative. Each
-validation ID is a stable heading followed by the seven fields `Claim`, `Code`,
-`Source`, `Status`, `Checks`, `Anchor`, and `Notes`. Anchor on `file::symbol`,
-never a line number.
+For current totals, use the generated [status summary](status-summary.md). For a short claim-by-claim view, use the generated [domain inventories](domain-inventories.md). The detailed records in the ledger parts below remain authoritative. Each validation ID is a stable heading followed by the seven fields `Claim`, `Code`, `Source`, `Status`, `Checks`, `Anchor`, and `Notes`. Anchor on `file::symbol`, never a line number.
 
-Each part file is one domain: its `H1` is the domain name and every `H2` is one
-validation ID. Add a record by editing the matching part, then run
-`pyrite-dev validation-ledger --write` to refresh the generated views. Adding a
-part means adding its file to the toctree below, which is the order the
-generated views follow.
+Each part file is one domain: its `H1` is the domain name and every `H2` is one validation ID. Add a record by editing the matching part, then run `pyrite-dev validation-ledger --write` to refresh the generated views. Adding a part means adding its file to the toctree below, which is the order the generated views follow.
 
 ## Ledger parts
 

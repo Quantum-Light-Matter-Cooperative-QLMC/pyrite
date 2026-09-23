@@ -2,15 +2,9 @@
 
 ## Purpose
 
-The coherent batched path already removes the old per-hkl setup loop, but after
-its rebase onto the newer line machinery it still constructs and retains eight
-mask-compacted arrays for every accepted `(segment, g)` pair, transfers per-row
-counts to the host, and concatenates/slices those arrays before launching the
-existing per-g coherent reduction.
+The coherent batched path already removes the old per-hkl setup loop, but after its rebase onto the newer line machinery it still constructs and retains eight mask-compacted arrays for every accepted `(segment, g)` pair, transfers per-row counts to the host, and concatenates/slices those arrays before launching the existing per-g coherent reduction.
 
-This change replaces that CUDA-fp32 path with a bounded streaming pipeline.
-CPU, fp64, layered, grooved, and explicitly disabled paths retain the prior
-implementations. CUDA-fp32 `sinc_cutoff` requests use this streaming path.
+This change replaces that CUDA-fp32 path with a bounded streaming pipeline. CPU, fp64, layered, grooved, and explicitly disabled paths retain the prior implementations. CUDA-fp32 `sinc_cutoff` requests use this streaming path.
 
 ## Algebra
 
@@ -33,10 +27,7 @@ The key streaming identity is
 F[g,p,E] = sum_blocks F_block[g,p,E].
 ```
 
-Intensity is *not* reduced per block. Four persistent field planes are updated
-across segment blocks and are squared only after the final block. Different `g`
-rows are never added as fields, so reflection and mosaic-orientation coherence
-semantics are unchanged.
+Intensity is *not* reduced per block. Four persistent field planes are updated across segment blocks and are squared only after the final block. Different `g` rows are never added as fields, so reflection and mosaic-orientation coherence semantics are unchanged.
 
 ## CUDA stages
 
@@ -51,53 +42,35 @@ semantics are unchanged.
 - finite-time width;
 - propagation phase slope and `g.r` phase.
 
-Output is fixed-order **g-major** scratch. Rejected pairs have zero field
-coefficients; no compaction is required.
+Output is fixed-order **g-major** scratch. Rejected pairs have zero field coefficients; no compaction is required.
 
 ### 2. Field accumulation
 
-`run_coherent_field_accumulation_kernel` owns one `(g, energy-group)` CUDA
-block. Threads stride over the current segment block, reduce sigma/pi real and
-imaginary fields in shared memory, and add one partial field to each persistent
-`(g,E)` cell. There is exactly one writer to a field cell per launch, so no
-atomics are needed. When `sinc_cutoff` is set, each segment field is zeroed when
-the magnitude of its unscaled sinc argument exceeds the cutoff; the grouped
-decoherence-floor kernel applies the identical test before squaring each group.
+`run_coherent_field_accumulation_kernel` owns one `(g, energy-group)` CUDA block. Threads stride over the current segment block, reduce sigma/pi real and imaginary fields in shared memory, and add one partial field to each persistent `(g,E)` cell. There is exactly one writer to a field cell per launch, so no atomics are needed. When `sinc_cutoff` is set, each segment field is zeroed when the magnitude of its unscaled sinc argument exceeds the cutoff; the grouped decoherence-floor kernel applies the identical test before squaring each group.
 
 ### 3. Finalize
 
-`finalize_coherent_fields` owns photon-energy bins, squares each completed `g`
-row, applies its mosaic weight, and adds the incoherent row sum to `spec`.
+`finalize_coherent_fields` owns photon-energy bins, squares each completed `g` row, applies its mosaic weight, and adds the incoherent row sum to `spec`.
 
 ## Memory behavior
 
-The former batched coherent path retained approximately eight REAL values for
-all kept `(segment,g)` pairs until the end of the case. The streaming path holds
-approximately
+The former batched coherent path retained approximately eight REAL values for all kept `(segment,g)` pairs until the end of the case. The streaming path holds approximately
 
 ```text
 8 * pair_target * sizeof(float32)
 + 4 * N_g * N_E * sizeof(float32)
 ```
 
-plus ordinary input/table storage. `_JIT_COHERENT_PAIR_TARGET` defaults to
-1,000,000 pair slots, so prologue scratch is about 32 MB. Scratch is explicitly
-released after each field-accumulation launch so the memory pool can reuse it
-for the next block.
+plus ordinary input/table storage. `_JIT_COHERENT_PAIR_TARGET` defaults to 1,000,000 pair slots, so prologue scratch is about 32 MB. Scratch is explicitly released after each field-accumulation launch so the memory pool can reuse it for the next block.
 
 ## Numerical behavior
 
-The physics equations are unchanged, but two float32 reassociations remain
-validation debt:
+The physics equations are unchanged, but two float32 reassociations remain validation debt:
 
-1. the RawKernel interpolation/compiler expression tree may round differently
-   from the previous CuPy elementwise path;
-2. cases larger than one internal segment block reduce each block's field first
-   and then add block partials, rather than performing one monolithic reduction.
+1. the RawKernel interpolation/compiler expression tree may round differently from the previous CuPy elementwise path;
+2. cases larger than one internal segment block reduce each block's field first and then add block partials, rather than performing one monolithic reduction.
 
-These should stay at float-rounding scale and are covered by the existing
-`coherent-line-hkl-batch` tolerance philosophy, but require CUDA goldens and
-A/B validation before human sign-off.
+These should stay at float-rounding scale and are covered by the existing `coherent-line-hkl-batch` tolerance philosophy, but require CUDA goldens and A/B validation before human sign-off.
 
 ## Required CUDA validation
 
@@ -118,7 +91,4 @@ The updated coherent tests include:
 - streaming RawKernel vs pre-existing batched coherent fallback;
 - one internal streaming block vs forced multiple segment blocks.
 
-Then benchmark `hopg_coherent` with NVTX ranges
-`cxr.lines.coherent_prologue`, `cxr.lines.coherent_field`, and
-`cxr.lines.coherent_finalize`. Tune `CoherentStreamKernelConfig` and
-`_JIT_COHERENT_PAIR_TARGET` from measurements rather than assumptions.
+Then benchmark `hopg_coherent` with NVTX ranges `cxr.lines.coherent_prologue`, `cxr.lines.coherent_field`, and `cxr.lines.coherent_finalize`. Tune `CoherentStreamKernelConfig` and `_JIT_COHERENT_PAIR_TARGET` from measurements rather than assumptions.

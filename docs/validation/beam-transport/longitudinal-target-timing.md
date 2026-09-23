@@ -8,34 +8,17 @@
 
 ## Claim and scope
 
-For the task-approved positive reciprocal-harmonic branch, a catalog-pinned
-basal reflection sets the photon energy used to derive the microbunch period
-and Gaussian RMS duration. The validated campaign geometry is
-`theta_obs_deg=90`, `tilt_deg=45`; materials are HOPG and h-BN; electron
-kinetic energies are 30 and 100 keV; the selected reflection is positive
-`(0, 0, 2)`; retained longitudinal coherence is `eta=0.9`.
+For the task-approved positive reciprocal-harmonic branch, a catalog-pinned basal reflection sets the photon energy used to derive the microbunch period and Gaussian RMS duration. The validated campaign geometry is `theta_obs_deg=90`, `tilt_deg=45`; materials are HOPG and h-BN; electron kinetic energies are 30 and 100 keV; the selected reflection is positive `(0, 0, 2)`; retained longitudinal coherence is `eta=0.9`.
 
-This result is conditional on the positive-harmonic convention. It does not
-resolve the separate `line-energy-dispersion` discrepancy concerning the
-mapping between reciprocal-harmonic sign and the spatial Fourier convention.
+This result is conditional on the positive-harmonic convention. It does not resolve the separate `line-energy-dispersion` discrepancy concerning the mapping between reciprocal-harmonic sign and the spatial Fourier convention.
 
 ## Sources and provenance
 
-- Line dispersion: Zhai 2025 Eq. (10),
-  $E_\gamma=\hbar\,\mathbf v\cdot\mathbf g/
-  (1-\mathbf v\cdot\hat{\mathbf n}/c)$, using the task-approved positive
-  branch.
-- Longitudinal form factor: Fourier transform of a centered Gaussian time
-  distribution.
-- Electron speed: relativistic kinetic-energy relation
-  $\gamma=1+K/(m_ec^2)$, $\beta=\sqrt{1-\gamma^{-2}}$.
-- Lattice constants: bundled catalog CIFs, HOPG $c=6.711$ Å and h-BN
-  $c=6.661$ Å. Therefore $d_{002}=c/2$.
-- Independent numerical evaluation used SciPy CODATA constants:
-  $hc=12398.419843320025$ eV Å,
-  $h=4.135667696923859$ eV fs,
-  $\hbar=0.6582119569509067$ eV fs, and
-  $m_ec^2=510998.9506917532$ eV.
+- Line dispersion: Zhai 2025 Eq. (10), $E_\gamma=\hbar\,\mathbf v\cdot\mathbf g/ (1-\mathbf v\cdot\hat{\mathbf n}/c)$, using the task-approved positive branch.
+- Longitudinal form factor: Fourier transform of a centered Gaussian time distribution.
+- Electron speed: relativistic kinetic-energy relation $\gamma=1+K/(m_ec^2)$, $\beta=\sqrt{1-\gamma^{-2}}$.
+- Lattice constants: bundled catalog CIFs, HOPG $c=6.711$ Å and h-BN $c=6.661$ Å. Therefore $d_{002}=c/2$.
+- Independent numerical evaluation used SciPy CODATA constants: $hc=12398.419843320025$ eV Å, $h=4.135667696923859$ eV fs, $\hbar=0.6582119569509067$ eV fs, and $m_ec^2=510998.9506917532$ eV.
 
 ## Independent derivation
 
@@ -47,9 +30,7 @@ d_{002}=\frac{c_{\rm lattice}}{2},
 g_{002}=\frac{2\pi}{d_{002}}.
 $$
 
-At observation angle $90^\circ$, the Doppler denominator is unity. At
-crystal tilt $45^\circ$, the positive basal reciprocal vector has projection
-$g_{002}\cos45^\circ$ along the electron velocity. Thus
+At observation angle $90^\circ$, the Doppler denominator is unity. At crystal tilt $45^\circ$, the positive basal reciprocal vector has projection $g_{002}\cos45^\circ$ along the electron velocity. Thus
 
 $$
 k_\gamma
@@ -64,8 +45,7 @@ E_\gamma=\hbar c k_\gamma
 =\frac{hc\,\beta}{\sqrt{2}\,d_{002}}.
 $$
 
-Here $k_\gamma$ is the photon angular wavenumber in inverse angstroms. It is
-not the temporal angular frequency. The latter is
+Here $k_\gamma$ is the photon angular wavenumber in inverse angstroms. It is not the temporal angular frequency. The latter is
 
 $$
 \Omega=\frac{E_\gamma}{\hbar}=c k_\gamma
@@ -103,8 +83,7 @@ $$
 
 ## Implementation comparison
 
-The implementation independently selects positive catalog-pinned `(002)` for
-both materials and evaluates the same expressions:
+The implementation independently selects positive catalog-pinned `(002)` for both materials and evaluates the same expressions:
 
 | Material | $K$ (keV) | Implemented $E_\gamma$ (eV) | Implemented $T$ (fs) | Implemented $\Omega$ (rad/fs) | Implemented $\sigma_t$ (as) |
 |---|---:|---:|---:|---:|---:|
@@ -113,38 +92,21 @@ both materials and evaluates the same expressions:
 | h-BN | 30 | 864.3975838187 | 0.004784450767 | 1313.251115709 | 0.247167386 |
 | h-BN | 100 | 1443.1034361966 | 0.002865815144 | 2192.460082196 | 0.148049604 |
 
-The differences from the independent table are at most a few parts in
-$10^9$, caused by rounded implementation constants:
-`HC_EV_ANG=12398.4198`, `HBARC_EV_ANG=1973.269804`, and
-`M_E_EV=510998.95`. Because `HC_EV_ANG` and `HBARC_EV_ANG` are rounded
-independently, $2\pi/\lambda$ reconstructed from the stored wavelength
-differs from the directly evaluated $k_\gamma$ by
-$3.19347\times10^{-9}$ relative. This is numerically negligible but is an
-exact internal-constants inconsistency.
+The differences from the independent table are at most a few parts in $10^9$, caused by rounded implementation constants: `HC_EV_ANG=12398.4198`, `HBARC_EV_ANG=1973.269804`, and `M_E_EV=510998.95`. Because `HC_EV_ANG` and `HBARC_EV_ANG` are rounded independently, $2\pi/\lambda$ reconstructed from the stored wavelength differs from the directly evaluated $k_\gamma$ by $3.19347\times10^{-9}$ relative. This is numerically negligible but is an exact internal-constants inconsistency.
 
-The implementation now names the inverse-angstrom quantity
-`k_gamma_inv_ang` and reserves $\Omega$ for temporal angular frequency.
+The implementation now names the inverse-angstrom quantity `k_gamma_inv_ang` and reserves $\Omega$ for temporal angular frequency.
 
 ## Filters and limiting cases
 
-- Units pass: $\hbar c\,k_\gamma$ is energy; $h/E_\gamma$ is time;
-  $\sqrt{-\ln\eta}/\Omega$ is time.
+- Units pass: $\hbar c\,k_\gamma$ is energy; $h/E_\gamma$ is time; $\sqrt{-\ln\eta}/\Omega$ is time.
 - $\eta\to1$ gives $\sigma_t\to0$.
 - $\eta\to0^+$ gives $\sigma_t\to\infty$.
 - $\beta\to0$ gives $E_\gamma\to0$ and $T\to\infty$.
 - One spacing period gives $\Omega T=2\pi$.
-- The positive `(002)` sign and $45^\circ$ projection give positive energy;
-  the implementation rejects the negative basal family member.
+- The positive `(002)` sign and $45^\circ$ projection give positive energy; the implementation rejects the negative basal family member.
 
 ## Anchor and verdict
 
-Anchor:
-`tests/montecarlo/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`.
-Its four parameterized cases pass. The test pins reflection selection,
-independent absolute-energy values, $T=h/E_\gamma$, the `eta=0.9` form
-factor, and one-period spacing.
+Anchor: `tests/montecarlo/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`. Its four parameterized cases pass. The test pins reflection selection, independent absolute-energy values, $T=h/E_\gamma$, the `eta=0.9` form factor, and one-period spacing.
 
-**Verdict:** `rederived`. The implementation matches the independent
-derivation and four numeric campaign points, conditional on the approved
-positive reciprocal-harmonic branch. This verdict does not clear the upstream
-`line-energy-dispersion` sign discrepancy.
+**Verdict:** `rederived`. The implementation matches the independent derivation and four numeric campaign points, conditional on the approved positive reciprocal-harmonic branch. This verdict does not clear the upstream `line-energy-dispersion` sign discrepancy.

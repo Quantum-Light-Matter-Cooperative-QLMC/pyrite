@@ -7,7 +7,16 @@ from pathlib import Path
 _DOC_PATH = re.compile(r"(?<![A-Za-z0-9_])docs/[A-Za-z0-9_./-]+\.(?:md|rst)")
 _TEXT_SUFFIXES = frozenset({".md", ".py", ".rst", ".sh", ".toml", ".yaml", ".yml"})
 _SKIP_PARTS = frozenset(
-    {".git", ".serena", ".venv", "_autosummary", "_build", "__pycache__", "agentdocs"}
+    {
+        ".git",
+        ".remember",
+        ".serena",
+        ".venv",
+        "_autosummary",
+        "_build",
+        "__pycache__",
+        "agentdocs",
+    }
 )
 
 

@@ -2,9 +2,7 @@
 
 # Validation status summary
 
-Compact generated view of the [detailed validation ledger]
-(physics-validation-ledger.md). Regenerate with
-`pyrite-dev validation-ledger --write` after editing detailed records.
+Compact generated view of the [detailed validation ledger] (physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.
 
 **Publication gate:** 0 / 133 claims signed off.
 
@@ -30,5 +28,4 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 | `discrepancy` | 5 |
 | **Total** | **133** |
 
-Status meanings and promotion rules are defined in the
-[validation methodology](methodology.md).
+Status meanings and promotion rules are defined in the [validation methodology](methodology.md).

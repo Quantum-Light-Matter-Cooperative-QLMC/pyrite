@@ -93,6 +93,14 @@ def test_literal_documentation_path_check_ignores_agentdocs_substring(tmp_path: 
     check_doc_paths(tmp_path)
 
 
+def test_literal_documentation_path_check_ignores_remember_notes(tmp_path: Path) -> None:
+    source = tmp_path / ".remember" / "today.done.md"
+    source.parent.mkdir()
+    source.write_text("See " + "docs/" + "retired-note.md.\n", encoding="utf-8")
+
+    check_doc_paths(tmp_path)
+
+
 def test_validation_writeups_use_rendering_math_delimiters() -> None:
     """`\\(...\\)` and `\\[...\\]` reach the HTML build as literal text, with no warning."""
     root = Path(__file__).parents[2] / "docs" / "validation"

@@ -2,8 +2,7 @@
 
 # Validation domain inventories
 
-Generated browsing views of every claim in the [detailed validation ledger]
-(physics-validation-ledger.md). The detailed record remains authoritative.
+Generated browsing views of every claim in the [detailed validation ledger] (physics-validation-ledger.md). The detailed record remains authoritative.
 
 ## Core coherent physics (highest risk — verify first)
 

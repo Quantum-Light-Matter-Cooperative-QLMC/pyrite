@@ -24,8 +24,7 @@ which follows from $\mathbf b_i \cdot \mathbf a_i = 2\pi$ and bounds the search 
 M(\mathbf g) = \frac{|S(\mathbf g)|}{g^2},
 ```
 
-with the Debye–Waller factor already inside $S$. The $1/g^2$ is not a heuristic weight — it makes {eq}`eq-reflection-selection-metric` proportional to $|\chi_{\mathbf g}|$ evaluated at *each reflection's own* line energy. The argument: $\chi_{\mathbf g} \propto \lambda^2 S \propto S/\omega^2$, and the resonance energy of a reflection scales as $\omega_{\rm res} \propto g$ at fixed geometry, so $\chi_{\mathbf g} \propto S/g^2$. Ranking by
-{eq}`eq-reflection-selection-metric` therefore ranks reflections by the coupling strength they will actually radiate with, not by their structure factor at some fixed reference energy.
+with the Debye–Waller factor already inside $S$. The $1/g^2$ is not a heuristic weight — it makes {eq}`eq-reflection-selection-metric` proportional to $|\chi_{\mathbf g}|$ evaluated at *each reflection's own* line energy. The argument: $\chi_{\mathbf g} \propto \lambda^2 S \propto S/\omega^2$, and the resonance energy of a reflection scales as $\omega_{\rm res} \propto g$ at fixed geometry, so $\chi_{\mathbf g} \propto S/g^2$. Ranking by {eq}`eq-reflection-selection-metric` therefore ranks reflections by the coupling strength they will actually radiate with, not by their structure factor at some fixed reference energy.
 
 **Family grouping.** Symmetry-equivalent reflections are grouped by identical $(|\mathbf g|, M)$ to rounding. This recovers symmetry mates without any space-group machinery: two reflections related by a symmetry operation of the crystal necessarily share both quantities exactly, up to floating-point noise. All members of the top $n$ families are returned, Friedel mates $\pm(hkl)$ included, since $+\mathbf g$ and $-\mathbf g$ radiate into different directions and both must be summed. A representatives-only mode returns one deterministic member per family, for visualizations that should show each family once.
 
@@ -58,12 +57,10 @@ This is the general caveat about the automatic ranking, stated as a rule: {eq}`e
 
 ## Validation
 
-The ranking metric is a **selection policy**, not a physical claim, and carries no validation-ledger row of its own. What is pinned is its *output*: the catalog golden snapshot serializes, for **every** catalog crystal, the top two ranked families at a 1 keV reference energy together with $|\mathbf g|$ and the complex structure factor of the leading reflection
-(`tests/materials/test_material_catalog.py::test_catalog_matches_serialized_physics_for_every_crystal`). A change in selection therefore fails the golden comparison rather than passing silently. The snapshot is regenerated deliberately, never repaired in place — see the `regen-golden` workflow.
+The ranking metric is a **selection policy**, not a physical claim, and carries no validation-ledger row of its own. What is pinned is its *output*: the catalog golden snapshot serializes, for **every** catalog crystal, the top two ranked families at a 1 keV reference energy together with $|\mathbf g|$ and the complex structure factor of the leading reflection (`tests/materials/test_material_catalog.py::test_catalog_matches_serialized_physics_for_every_crystal`). A change in selection therefore fails the golden comparison rather than passing silently. The snapshot is regenerated deliberately, never repaired in place — see the `regen-golden` workflow.
 
 The physics the metric is built from is separately covered — `structure-factor` (`anchored`) for $S$ and its Debye–Waller factor, and the per-crystal rows in the [crystal structure provenance ledger](../../validation/ledger-crystal-structure-provenance.md) for pinned family choices such as the HOPG basal restriction.
 
 See the [validation ledger](../../validation/physics-validation-ledger.md).
 
-Implementation owners: `pyrite.materials.crystal.dominant_reflections`; pinned families in `pyrite.materials.catalog` (`CrystalSpec.hkl_families`, `CrystalSpec.hkl_list`); resolution at
-`pyrite.campaign.geometry.crystal_params`.
+Implementation owners: `pyrite.materials.crystal.dominant_reflections`; pinned families in `pyrite.materials.catalog` (`CrystalSpec.hkl_families`, `CrystalSpec.hkl_list`); resolution at `pyrite.campaign.geometry.crystal_params`.

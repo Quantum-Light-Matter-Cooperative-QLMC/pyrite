@@ -12,8 +12,7 @@ Two implementations are shipped: **analytic detector broadening** and an explici
 
 ### What it does
 
-A mosaic tilt rotates **g**, and only the numerator `v·g` of the
-resonance `E_res = ħc·(v·g)/(1 − v·n̂)` depends on g. To first order a tilt δ shifts the line by `dE/E = −tan(ψ)·δ`, ψ = ∠(v, g). A Gaussian mosaic of rocking-curve FWHM η therefore broadens the line by a Gaussian of energy width
+A mosaic tilt rotates **g**, and only the numerator `v·g` of the resonance `E_res = ħc·(v·g)/(1 − v·n̂)` depends on g. To first order a tilt δ shifts the line by `dE/E = −tan(ψ)·δ`, ψ = ∠(v, g). A Gaussian mosaic of rocking-curve FWHM η therefore broadens the line by a Gaussian of energy width
 
 ```{math}
 \mathrm{FWHM}_\mathrm{mosaic} = E \cdot |\tan \psi| \cdot \eta

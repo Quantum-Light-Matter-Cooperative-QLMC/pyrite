@@ -6,17 +6,11 @@
 
 ## Context
 
-Derived grids/materials are mutable and stored in two places at once;
-`energy-grid apply` mutates the `standard` profile; there is no dedup or cheap
-staleness check.
+Derived grids/materials are mutable and stored in two places at once; `energy-grid apply` mutates the `standard` profile; there is no dedup or cheap staleness check.
 
 ## Decision
 
-Adopt DVC's split: derived data is immutable and content-addressed; the profile
-is the sole mutable, git-ref-like pointer. Uniform lifecycle verbs (`add`,
-`verify`, `gc`) with a git-reflog-style grace window; a completed run emits a
-campaign lockfile from the first cut. Land behind the stabilized CLI surface
-(RFC §4 phase 5).
+Adopt DVC's split: derived data is immutable and content-addressed; the profile is the sole mutable, git-ref-like pointer. Uniform lifecycle verbs (`add`, `verify`, `gc`) with a git-reflog-style grace window; a completed run emits a campaign lockfile from the first cut. Land behind the stabilized CLI surface (RFC §4 phase 5).
 
 ## Consequences
 

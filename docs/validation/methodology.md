@@ -25,12 +25,7 @@ Run the pinned, validation-only `Dans_Diffraction` backend with:
 uv run --group oracle python checks/dans_diffraction_oracle.py
 ```
 
-The program returns nonzero for a missing backend, non-finite result, or
-threshold violation. It tightly compares shared Waasmaier–Kirfel
-non-resonant factors and separately bounds Chantler/FFAST versus independent
-Henke/CXRO dispersive factors at 1, 2, 3, and 8 keV. This external comparison
-is implementation evidence; it does not replace fresh-context re-derivation
-or human sign-off.
+The program returns nonzero for a missing backend, non-finite result, or threshold violation. It tightly compares shared Waasmaier–Kirfel non-resonant factors and separately bounds Chantler/FFAST versus independent Henke/CXRO dispersive factors at 1, 2, 3, and 8 keV. This external comparison is implementation evidence; it does not replace fresh-context re-derivation or human sign-off.
 
 ## Status lifecycle
 
@@ -64,30 +59,17 @@ unverified → filtered → rederived → anchored → signed-off
 
 ## Independent-verifier contract
 
-The verifier receives a validation `id`, `file::symbol`, and/or diff. Use the
-ledger to resolve any missing identifiers. Independence is mandatory: the
-verifier must be a fresh context that did not write the implementation.
+The verifier receives a validation `id`, `file::symbol`, and/or diff. Use the ledger to resolve any missing identifiers. Independence is mandatory: the verifier must be a fresh context that did not write the implementation.
 
 Follow this order:
 
-1. Read only the ledger row and derivation docstring. Record the cited source
-   and equation, intended quantity, signature, units, assumptions, and stated
-   limiting case. Do not read the implementation body yet.
-2. Apply cheap filters: dimensional consistency, limiting cases, and
-   sign/symmetry/convention checks. A failure is immediately a `discrepancy`.
-3. Starting from the source and signature, derive the expression independently
-   in the ledgered `docs/validation/<domain>/<id>.md`, formatted per the
-   [LaTeX/MyST style rules](formatting-style.md). The derivation must precede
-   inspection of the implementation body so the code cannot anchor the result.
-4. Read the implementation and compare it symbolically and dimensionally;
-   compare at one or more numeric points when feasible. Use independent
-   reference data or `checks/` anchors rather than implementation helpers.
-5. Report the verdict and a suggested ledger edit. Never apply `signed-off`;
-   that transition belongs to a human.
+1. Read only the ledger row and derivation docstring. Record the cited source and equation, intended quantity, signature, units, assumptions, and stated limiting case. Do not read the implementation body yet.
+2. Apply cheap filters: dimensional consistency, limiting cases, and sign/symmetry/convention checks. A failure is immediately a `discrepancy`.
+3. Starting from the source and signature, derive the expression independently in the ledgered `docs/validation/<domain>/<id>.md`, formatted per the [LaTeX/MyST style rules](formatting-style.md). The derivation must precede inspection of the implementation body so the code cannot anchor the result.
+4. Read the implementation and compare it symbolically and dimensionally; compare at one or more numeric points when feasible. Use independent reference data or `checks/` anchors rather than implementation helpers.
+5. Report the verdict and a suggested ledger edit. Never apply `signed-off`; that transition belongs to a human.
 
-The verifier may write only the ledgered validation document. It must not modify the
-code under review. Missing `Validation:` markers or ledger rows are findings,
-not invitations to repair the implementation in the verification context.
+The verifier may write only the ledgered validation document. It must not modify the code under review. Missing `Validation:` markers or ledger rows are findings, not invitations to repair the implementation in the verification context.
 
 ## Verifier output
 
@@ -102,8 +84,7 @@ Return this concise structure:
 - **Suggested ledger change**: `<proposed row edit or none; human applies it>`
 ```
 
-For a discrepancy, identify the first exact factor, sign, exponent, unit, or
-convention that diverges. Do not substitute a general narrative for that diff.
+For a discrepancy, identify the first exact factor, sign, exponent, unit, or convention that diverges. Do not substitute a general narrative for that diff.
 
 ## Rules for contributors (human or agent)
 

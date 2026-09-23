@@ -1,30 +1,16 @@
 # Multilayer film-on-substrate materials
 
-Real lab samples are not free-standing single crystals: they are a thin vdW **film**
-(MoSe₂ / MoS₂ / WS₂ / MoTe₂, tens of nm) grown or transferred onto a **substrate**
-(amorphous SiO₂, crystalline Si, or sapphire Al₂O₃, hundreds of µm). To predict the
-**measurable** line flux for the Timepix3 / Eagle XO setup — the project's active goal —
-the model must represent that stack: each crystalline layer radiates its own lines, and
-every photon is attenuated by the **whole stack** on its way to the detector.
+Real lab samples are not free-standing single crystals: they are a thin vdW **film** (MoSe₂ / MoS₂ / WS₂ / MoTe₂, tens of nm) grown or transferred onto a **substrate** (amorphous SiO₂, crystalline Si, or sapphire Al₂O₃, hundreds of µm). To predict the **measurable** line flux for the Timepix3 / Eagle XO setup — the project's active goal — the model must represent that stack: each crystalline layer radiates its own lines, and every photon is attenuated by the **whole stack** on its way to the detector.
 
-The pipeline models an ordered stack of layers; a single-crystal slab is the
-one-layer compatibility path.
+The pipeline models an ordered stack of layers; a single-crystal slab is the one-layer compatibility path.
 
 ---
 
 ## What a stack changes (three coupled effects)
 
-1. **Cross-stack self-absorption** — *first-order, do this first.* A line born in the film
-   travels out through the rest of the film **and the substrate** (or the substrate then
-   the film, depending on exit face). For soft lines (≤4.5 keV) the substrate is optically
-   thick, so its attenuation is often the dominant correction to the measured film flux.
-2. **Per-layer radiation** — each **crystalline** layer is its own PXR/CBS source with its
-   own structure factor, reflections, and B-factor; the spectra add **incoherently** (they
-   are physically separate crystals). An **amorphous** layer (fused-silica SiO₂) radiates
-   no coherent lines — it only absorbs and produces bremsstrahlung.
-3. **Multilayer electron transport** — free path, stopping power, and the scattering element
-   all change at a layer boundary. Matters when the film is not thin vs the electron range
-   (or for the substrate's own emission); a refinement, not the first slice.
+1. **Cross-stack self-absorption** — *first-order, do this first.* A line born in the film travels out through the rest of the film **and the substrate** (or the substrate then the film, depending on exit face). For soft lines (≤4.5 keV) the substrate is optically thick, so its attenuation is often the dominant correction to the measured film flux.
+2. **Per-layer radiation** — each **crystalline** layer is its own PXR/CBS source with its own structure factor, reflections, and B-factor; the spectra add **incoherently** (they are physically separate crystals). An **amorphous** layer (fused-silica SiO₂) radiates no coherent lines — it only absorbs and produces bremsstrahlung.
+3. **Multilayer electron transport** — free path, stopping power, and the scattering element all change at a layer boundary. Matters when the film is not thin vs the electron range (or for the substrate's own emission); a refinement, not the first slice.
 
 ---
 
@@ -44,18 +30,13 @@ The single-material path remains a clean special case of the stack-aware pipelin
 | Compound µ | `composition=[(el,n),…]` | `_normalize_composition`, `_mu_total_inv_ang` |
 | Crystalline Si/sapphire | bundled phase-specific CIFs + catalog crystal rows | `data/cifs/`, `data/materials.toml` |
 
-Two things the recent **xraydb migration** already unblocked: substrate elements (O, Al for
-SiO₂ / sapphire) need **no** hand-added atomic data — `henke_dispersion`/`load_henke` resolve
-any element — and `composition`-based compound absorption already works for amorphous layers.
-Sapphire itself is now represented as crystalline corundum, so it also carries its own
-PXR/CBS radiator.
+Two things the recent **xraydb migration** already unblocked: substrate elements (O, Al for SiO₂ / sapphire) need **no** hand-added atomic data — `henke_dispersion`/`load_henke` resolve any element — and `composition`-based compound absorption already works for amorphous layers. Sapphire itself is now represented as crystalline corundum, so it also carries its own PXR/CBS radiator.
 
 ---
 
 ## Data model
 
-A **Stack** is an ordered list of **Layers**, top (beam-entrance) first. The
-film is the catalog material's crystal; `stack` lists the layers behind it:
+A **Stack** is an ordered list of **Layers**, top (beam-entrance) first. The film is the catalog material's crystal; `stack` lists the layers behind it:
 
 ```toml
 [materials.mos2-on-sio2-si]
@@ -69,42 +50,24 @@ stack = [
 ]
 ```
 
-- A layer referencing `[media.<key>]` is **amorphous**: it absorbs and produces
-  bremsstrahlung but has no coherent radiator.
-- A layer referencing `[crystals.<key>]` receives that crystal's composition,
-  default cut (`surface_hkl` for every packaged crystal), and reflection policy;
-  an inline `beam_uvw` replaces the layer orientation, clearing the inherited
-  `surface_hkl` rather than merging with it.
-- A **single-layer** stack must reproduce today's result **bit-for-bit** (the regression
-  anchor) — so the scalar `crystal`/`thickness_ang`/… path stays valid and is internally
-  promoted to a one-layer stack.
+- A layer referencing `[media.<key>]` is **amorphous**: it absorbs and produces bremsstrahlung but has no coherent radiator.
+- A layer referencing `[crystals.<key>]` receives that crystal's composition, default cut (`surface_hkl` for every packaged crystal), and reflection policy; an inline `beam_uvw` replaces the layer orientation, clearing the inherited `surface_hkl` rather than merging with it.
+- A **single-layer** stack must reproduce today's result **bit-for-bit** (the regression anchor) — so the scalar `crystal`/`thickness_ang`/… path stays valid and is internally promoted to a one-layer stack.
 
 **Flow through the pipeline:**
 
-- `MaterialCatalog.resolve_stack` resolves catalog references to immutable,
-  ordered physical layers with cumulative boundaries and number densities.
-- `sweep.build_cases` keeps the film's scalar
-  `crystal`/`composition`/`hkl_list`/`B_ang2` fields for compatibility and adds
-  `abs_layers` plus aligned `layer_radiators` when a stack is present.
-- `montecarlo._transport_case` → pass the layer stack to a stack-aware
-  `simulate_trajectories` (see transport options below).
-- `montecarlo._spectrum_case` → loop crystalline layers, accumulate `mc_spectrum` per
-  layer (cross-stack `T_abs`), sum; `mc_brem_spectrum` summed per layer likewise.
-- `results.store_result` / `plots` → label by stack name; the per-record metrics are
-  unchanged (they consume `spec`/`brem`, which stay one array per case).
-- **Checkpoints**: stacked case dictionaries gain `abs_layers` and aligned
-  `layer_radiators`; old single-material checkpoints still load when those fields
-  are absent. No format break.
+- `MaterialCatalog.resolve_stack` resolves catalog references to immutable, ordered physical layers with cumulative boundaries and number densities.
+- `sweep.build_cases` keeps the film's scalar `crystal`/`composition`/`hkl_list`/`B_ang2` fields for compatibility and adds `abs_layers` plus aligned `layer_radiators` when a stack is present.
+- `montecarlo._transport_case` → pass the layer stack to a stack-aware `simulate_trajectories` (see transport options below).
+- `montecarlo._spectrum_case` → loop crystalline layers, accumulate `mc_spectrum` per layer (cross-stack `T_abs`), sum; `mc_brem_spectrum` summed per layer likewise.
+- `results.store_result` / `plots` → label by stack name; the per-record metrics are unchanged (they consume `spec`/`brem`, which stay one array per case).
+- **Checkpoints**: stacked case dictionaries gain `abs_layers` and aligned `layer_radiators`; old single-material checkpoints still load when those fields are absent. No format break.
 
 ---
 
 ## Geometry & conventions
 
-Beam enters at `z=0` along `+z` (unchanged). Layer boundaries
-`0 = z₀ < z₁ < … < z_N = Σ tᵢ`; layer *i* occupies `[z_{i-1}, z_i]`, layer 0 is the
-entrance film, the substrate is the deepest. A point at depth `z` is in the layer whose
-interval contains it. The **whole stack shares one normal and tilt** (`tilted_geometry`
-is unchanged) — vdW films are conformal/parallel to the substrate.
+Beam enters at `z=0` along `+z` (unchanged). Layer boundaries `0 = z₀ < z₁ < … < z_N = Σ tᵢ`; layer *i* occupies `[z_{i-1}, z_i]`, layer 0 is the entrance film, the substrate is the deepest. A point at depth `z` is in the layer whose interval contains it. The **whole stack shares one normal and tilt** (`tilted_geometry` is unchanged) — vdW films are conformal/parallel to the substrate.
 
 ---
 
@@ -117,131 +80,63 @@ L_esc = z_mid / (-n_hat[2]) if n_hat[2] < 0 else (thickness - z_mid) / n_hat[2]
 T_abs = exp(-L_esc * mu(E))
 ```
 
-is generalized to a **piecewise optical depth** along the same straight ray
-`r(s)=r_mid + s·n̂`. The ray
-runs in `z` from `z_mid` to the exit face (`z=0` if `n̂_z<0`, else `z=z_N`); within each
-crossed layer *i* it travels `ℓ_i = Δz_i / |n̂_z|`, where `Δz_i` is the overlap of
-`[z_mid → z_exit]` with `[z_{i-1}, z_i]`. Then
+is generalized to a **piecewise optical depth** along the same straight ray `r(s)=r_mid + s·n̂`. The ray runs in `z` from `z_mid` to the exit face (`z=0` if `n̂_z<0`, else `z=z_N`); within each crossed layer *i* it travels `ℓ_i = Δz_i / |n̂_z|`, where `Δz_i` is the overlap of `[z_mid → z_exit]` with `[z_{i-1}, z_i]`. Then
 
 ```
 T_abs(E) = exp( − (1/|n̂_z|) · Σ_i  μ_i(E) · Δz_i )
 ```
 
-`μ_i(E)` is `_mu_total_inv_ang(layer_i.composition, E)` — already vectorized over `E_res`.
-`N≤~3` layers, so the per-segment cost is a tiny fixed loop over layers (cheap vs the sinc²
-matmul). `N=1` collapses to today's formula exactly. **This single change** lets the film
-spectrum see the substrate, and is the highest-value, lowest-risk slice.
+`μ_i(E)` is `_mu_total_inv_ang(layer_i.composition, E)` — already vectorized over `E_res`. `N≤~3` layers, so the per-segment cost is a tiny fixed loop over layers (cheap vs the sinc² matmul). `N=1` collapses to today's formula exactly. **This single change** lets the film spectrum see the substrate, and is the highest-value, lowest-risk slice.
 
 ---
 
 ## (2) Per-layer radiation — IMPLEMENTED
 
-`_spectrum_case` loops over the stack's **crystalline** layers and sums their spectra
-**incoherently** (separate crystals ⇒ no cross-layer coherence). Each layer:
+`_spectrum_case` loops over the stack's **crystalline** layers and sums their spectra **incoherently** (separate crystals ⇒ no cross-layer coherence). Each layer:
 
-- is assigned its segments by midpoint depth `z_mid` via `montecarlo._segments_in_layer`
-  (consistent with the existing midpoint approximation; segments are short vs layer
-  thickness, so boundary-straddling is negligible — a caveat, not a correction);
-- radiates with **its own** `crystal`/`hkl_list`/`B_ang2`/`beam_uvw` through `mc_spectrum`,
-  applying the **cross-stack** `T_abs` (`layers=abs_layers` — the optical depth through every
-  layer on the escape path, not just L);
-- is described by `case["layer_radiators"]`, a per-layer list aligned with `abs_layers` and
-  built in `sweep.build_cases`: a `{crystal, hkl_list, B_ang2, beam_uvw}` dict for a
-  crystalline layer (the film, and a crystalline substrate via `sweep.substrate_radiator`),
-  or `None` for an amorphous one. `layer_radiators=None` (no substrate) is the single-slab
-  path, **bit-for-bit**.
+- is assigned its segments by midpoint depth `z_mid` via `montecarlo._segments_in_layer` (consistent with the existing midpoint approximation; segments are short vs layer thickness, so boundary-straddling is negligible — a caveat, not a correction);
+- radiates with **its own** `crystal`/`hkl_list`/`B_ang2`/`beam_uvw` through `mc_spectrum`, applying the **cross-stack** `T_abs` (`layers=abs_layers` — the optical depth through every layer on the escape path, not just L);
+- is described by `case["layer_radiators"]`, a per-layer list aligned with `abs_layers` and built in `sweep.build_cases`: a `{crystal, hkl_list, B_ang2, beam_uvw}` dict for a crystalline layer (the film, and a crystalline substrate via `sweep.substrate_radiator`), or `None` for an amorphous one. `layer_radiators=None` (no substrate) is the single-slab path, **bit-for-bit**.
 
-Amorphous layers (fused-silica SiO₂) are skipped for lines — their segments still feed brem
-and they still absorb. Brem (`mc_brem_spectrum`) is summed per layer with the same
-cross-stack `T_abs` (slice 2).
+Amorphous layers (fused-silica SiO₂) are skipped for lines — their segments still feed brem and they still absorb. Brem (`mc_brem_spectrum`) is summed per layer with the same cross-stack `T_abs` (slice 2).
 
-A crystalline substrate is just another material key:
-`Stack.on_substrate(film, thickness_ang, "silicon")` makes the substrate radiate its own
-(hkl) lines. **Caveats:** the substrate radiates on the *film's*
-line bins (set `detector.energy_bins.line` wide enough to bracket both materials' lines) with the substrate
-crystal's default `beam_uvw`; deep substrate emission is strongly self-absorbed in a thick
-substrate, so the visible substrate lines come from near the interface.
+A crystalline substrate is just another material key: `Stack.on_substrate(film, thickness_ang, "silicon")` makes the substrate radiate its own (hkl) lines. **Caveats:** the substrate radiates on the *film's* line bins (set `detector.energy_bins.line` wide enough to bracket both materials' lines) with the substrate crystal's default `beam_uvw`; deep substrate emission is strongly self-absorbed in a thick substrate, so the visible substrate lines come from near the interface.
 
-**Validated** (`checks/multilayer_slice3_check.py`, MoSe₂-on-Si): the substrate radiates
-nonzero lines, the pipeline spectrum equals the per-layer incoherent sum *exactly*, an
-amorphous substrate adds no lines (film-only bit-for-bit), and a crystalline substrate
-raises the total coherent flux.
+**Validated** (`checks/multilayer_slice3_check.py`, MoSe₂-on-Si): the substrate radiates nonzero lines, the pipeline spectrum equals the per-layer incoherent sum *exactly*, an amorphous substrate adds no lines (film-only bit-for-bit), and a crystalline substrate raises the total coherent flux.
 
 ---
 
 ## (3) Multilayer electron transport — IMPLEMENTED (option A)
 
-Slice 2 shipped **option (A)** below: `simulate_trajectories(layers=…)` does full per-layer
-transport — free path / stopping / scattering switch by the electron's current layer, flights
-truncate at internal boundaries (no collision there, the electron continues into the
-neighbor), and each segment carries its emitting `layer`. A single layer is bit-for-bit the
-old single-material transport. The three escalating options it chose among were:
+Slice 2 shipped **option (A)** below: `simulate_trajectories(layers=…)` does full per-layer transport — free path / stopping / scattering switch by the electron's current layer, flights truncate at internal boundaries (no collision there, the electron continues into the neighbor), and each segment carries its emitting `layer`. A single layer is bit-for-bit the old single-material transport. The three escalating options it chose among were:
 
-- **(C) Single-material transport (first slice).** Transport in the **film** material
-  throughout; only the *radiation/absorption* is stack-aware. Exact when the substrate
-  barely perturbs the electrons in the film region, or when only the film's (substrate-
-  attenuated) emission is wanted. Zero transport-code change.
-- **(B) Thin-film approximation.** Switch the transport `composition` to the substrate's
-  once an electron passes `z = t_film`. Good when the film ≪ electron range (the usual vdW
-  case): the film is a thin entrance skin, the bulk of the cascade is in the substrate.
-- **(A) Full per-layer transport.** At each step pick the layer from the electron's `z`,
-  use that layer's rates/stopping/scattering element, and **truncate flights at internal
-  boundaries** so material is constant within a flight (CASINO-style multilayer). Exact;
-  the most code. Needed for thick films and for the substrate's own line emission to be
-  quantitatively right.
+- **(C) Single-material transport (first slice).** Transport in the **film** material throughout; only the *radiation/absorption* is stack-aware. Exact when the substrate barely perturbs the electrons in the film region, or when only the film's (substrate- attenuated) emission is wanted. Zero transport-code change.
+- **(B) Thin-film approximation.** Switch the transport `composition` to the substrate's once an electron passes `z = t_film`. Good when the film ≪ electron range (the usual vdW case): the film is a thin entrance skin, the bulk of the cascade is in the substrate.
+- **(A) Full per-layer transport.** At each step pick the layer from the electron's `z`, use that layer's rates/stopping/scattering element, and **truncate flights at internal boundaries** so material is constant within a flight (CASINO-style multilayer). Exact; the most code. Needed for thick films and for the substrate's own line emission to be quantitatively right.
 
-The implementation selected (A). Options (B) and (C) are retained here only as
-the rejected intermediate designs that motivated the full boundary-aware path.
+The implementation selected (A). Options (B) and (C) are retained here only as the rejected intermediate designs that motivated the full boundary-aware path.
 
 ---
 
 ## Catalog / "adding a stack" checklist
 
-N-layer stacks are live in `data/materials.toml`; `substrate = "key"` remains
-two-layer sugar. To add a named stack runnable as `pyrite run standard -m <key>`:
+N-layer stacks are live in `data/materials.toml`; `substrate = "key"` remains two-layer sugar. To add a named stack runnable as `pyrite run standard -m <key>`:
 
-1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and
-   a `[crystals.<key>]` row. Add amorphous number densities under `[media.<key>]`.
-2. Add one `[materials.<run-key>]` row with the film `crystal`, a profile or scan
-   overrides, and either `substrate` or an ordered inline `stack` (never both).
-3. Run `uv run pyrite material validate`. Transport support errors are fatal; missing
-   Mott CSVs warn and use the analytic fallback.
+1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and a `[crystals.<key>]` row. Add amorphous number densities under `[media.<key>]`.
+2. Add one `[materials.<run-key>]` row with the film `crystal`, a profile or scan overrides, and either `substrate` or an ordered inline `stack` (never both).
+3. Run `uv run pyrite material validate`. Transport support errors are fatal; missing Mott CSVs warn and use the analytic fallback.
 
-The material run key is the CLI/checkpoint name; the film crystal key drives
-crystallography. No transport, radiation, absorption, or plotting registry edit
-is required.
+The material run key is the CLI/checkpoint name; the film crystal key drives crystallography. No transport, radiation, absorption, or plotting registry edit is required.
 
 ---
 
 ## Validation plan
 
-All the analytic (data-free) checks below are **done**; only the measured-data comparison
-remains.
+All the analytic (data-free) checks below are **done**; only the measured-data comparison remains.
 
-- **Regression — DONE:** a one-layer stack reproduces the current `spec`/`brem`
-  **bit-for-bit** (the hard anchor); `mosaic`/`tilt`/checkpoint paths unchanged.
-  `checks/multilayer_check.py` (check 1) + `tests/montecarlo/test_multilayer.py`.
-- **Film-on-vacuum == film-only — DONE:** an amorphous substrate adds no lines and, on a
-  front (high-flux) exit, does not attenuate the film segments, so the result is the
-  film-only spectrum **bit-for-bit**. `checks/multilayer_slice3_check.py` (check 3) +
-  `checks/multilayer_check.py` (front-exit transparency).
-- **Cross-stack absorption vs analytic — DONE:** the integrated film-line flux ratio (with
-  vs without substrate) equals `exp(−μ_sub(E)·t_sub/|n̂_z|)` at the line energy. The escape
-  factor is applied at each line's resonance energy `E_res`, so the closed form is cleanest
-  at a hard, isolated line (MoSe₂ (-1,0,3) ≈ 1438 eV → ~0.2 %).
-  `checks/multilayer_validation_check.py` (A); the per-segment identity
-  `τ_stack − τ_film = μ_sub·t_sub/|n̂_z|` is pinned in
-  `tests/montecarlo/test_multilayer.py::test_stack_tau_back_exit_substrate_closed_form`.
-- **Depth-dose vs Kanaya-Okayama (phase A) — DONE:** the dose centroid is a sane fraction of
-  R_KO and the maximum penetration `z_max ≈ R_KO`, following K-O's `E^1.67` energy scaling
-  (carbon, 20→30 keV) and its `A/(Z^0.889 ρ)` material scaling (C vs Al), each to ~2 %.
-  `checks/multilayer_validation_check.py` (B).
-- **Geometry sign — DONE:** positive tilt points the entrance-face normal toward
-  the detector (front exit) and leaves film lines unattenuated by the substrate;
-  negative tilt is the back-exit geometry and attenuates them more as the exit
-  path lengthens. This geometric sign statement does not claim a universally
-  higher full-model intensity for either branch.
-  `checks/multilayer_check.py`.
-- **Measured-data — REMAINING:** quantitative comparison of the predicted broadened /
-  substrate-attenuated line ratios against a real film-on-substrate spectrum (EDS / Timepix /
-  Eagle XO). Data-dependent — no in-repo dataset yet.
+- **Regression — DONE:** a one-layer stack reproduces the current `spec`/`brem` **bit-for-bit** (the hard anchor); `mosaic`/`tilt`/checkpoint paths unchanged. `checks/multilayer_check.py` (check 1) + `tests/montecarlo/test_multilayer.py`.
+- **Film-on-vacuum == film-only — DONE:** an amorphous substrate adds no lines and, on a front (high-flux) exit, does not attenuate the film segments, so the result is the film-only spectrum **bit-for-bit**. `checks/multilayer_slice3_check.py` (check 3) + `checks/multilayer_check.py` (front-exit transparency).
+- **Cross-stack absorption vs analytic — DONE:** the integrated film-line flux ratio (with vs without substrate) equals `exp(−μ_sub(E)·t_sub/|n̂_z|)` at the line energy. The escape factor is applied at each line's resonance energy `E_res`, so the closed form is cleanest at a hard, isolated line (MoSe₂ (-1,0,3) ≈ 1438 eV → ~0.2 %). `checks/multilayer_validation_check.py` (A); the per-segment identity `τ_stack − τ_film = μ_sub·t_sub/|n̂_z|` is pinned in `tests/montecarlo/test_multilayer.py::test_stack_tau_back_exit_substrate_closed_form`.
+- **Depth-dose vs Kanaya-Okayama (phase A) — DONE:** the dose centroid is a sane fraction of R_KO and the maximum penetration `z_max ≈ R_KO`, following K-O's `E^1.67` energy scaling (carbon, 20→30 keV) and its `A/(Z^0.889 ρ)` material scaling (C vs Al), each to ~2 %. `checks/multilayer_validation_check.py` (B).
+- **Geometry sign — DONE:** positive tilt points the entrance-face normal toward the detector (front exit) and leaves film lines unattenuated by the substrate; negative tilt is the back-exit geometry and attenuates them more as the exit path lengthens. This geometric sign statement does not claim a universally higher full-model intensity for either branch. `checks/multilayer_check.py`.
+- **Measured-data — REMAINING:** quantitative comparison of the predicted broadened / substrate-attenuated line ratios against a real film-on-substrate spectrum (EDS / Timepix / Eagle XO). Data-dependent — no in-repo dataset yet.
