@@ -10,18 +10,6 @@ every photon is attenuated by the **whole stack** on its way to the detector.
 The pipeline models an ordered stack of layers; a single-crystal slab is the
 one-layer compatibility path.
 
-> **Implementation status. Slices 1–3 are implemented.** Slice 1 (cross-stack
-> self-absorption, §1) is opt-in — a bare `Slab` target is bit-for-bit the old
-> single-material path. Slice 2 (multilayer electron transport — substrate backscatter + material-aware
-> bremsstrahlung, §3 option A) and slice 3 (per-layer coherent radiation — a *crystalline*
-> substrate emits its own lines, §2) live in `montecarlo.simulate_trajectories` /
-> `_spectrum_case` and `sweep.build_cases`. Validated in `checks/multilayer_check.py`
-> (slices 1–2) and `checks/multilayer_slice3_check.py` (slice 3); single-layer stays
-> bit-for-bit (Feranchuk/Zhai 29 nm A/B = 1.00). The analytic validation plan below is
-> also complete (`checks/multilayer_validation_check.py`: closed-form cross-stack
-> absorption + depth-dose vs the Kanaya-Okayama range). **Remaining:** quantitative
-> validation against a *measured* film-on-substrate dataset.
-
 ---
 
 ## What a stack changes (three coupled effects)
