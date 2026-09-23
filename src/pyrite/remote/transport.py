@@ -396,7 +396,7 @@ def sync_code(*, force: bool = False):
     local_artifacts = _local_energy_grid_artifacts()
     remote_artifacts = _remote_energy_grid_artifacts() if local_artifacts else frozenset()
     with tempfile.TemporaryDirectory() as td:
-        tarpath = os.path.join(td, "cxr_code.tgz")
+        tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
             for arc, f in entries:
                 artifact_digest = (
@@ -406,7 +406,7 @@ def sync_code(*, force: bool = False):
                     continue
                 _add_to_tar(t, f, arc)
         _run(
-            ["scp", tarpath, config.scp_remote_path("/tmp/cxr_code.tgz")],
+            ["scp", tarpath, config.scp_remote_path("/tmp/pyrite_code.tgz")],
             label="Syncing code to remote box...",
         )
     # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
@@ -425,7 +425,7 @@ def sync_code(*, force: bool = False):
             f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} "
             '&& for p in src/pyrite checks; do if [ -d "$p" ]; then '
             "find \"$p\" -type f -name '*.py' -delete; fi; done "
-            "&& tar xzf /tmp/cxr_code.tgz && rm -f /tmp/cxr_code.tgz "
+            "&& tar xzf /tmp/pyrite_code.tgz && rm -f /tmp/pyrite_code.tgz "
             f"&& printf %s {config.shell_arg(stamp.render())} "
             f"> {config.shell_single_word(config.remote_sync_stamp_path())}",
         ]

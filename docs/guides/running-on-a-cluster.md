@@ -23,7 +23,7 @@ Set `PYRITE_MC_BACKEND` explicitly in production jobs when silently changing har
 
 ## 2. One material per job
 
-Submit with `sbatch run_cxr.sh mose2`:
+Submit with `sbatch run_pyrite.sh mose2`:
 
 ```bash
 #!/usr/bin/env bash
@@ -39,7 +39,7 @@ set -euo pipefail
 module load cuda/13.x            # <-- match the cupy-cuda13x wheel (omit for CPU)
 cd "$SLURM_SUBMIT_DIR"
 
-MATERIAL="${1:?usage: sbatch run_cxr.sh <material>}"
+MATERIAL="${1:?usage: sbatch run_pyrite.sh <material>}"
 uv run pyrite run standard -m "$MATERIAL"
 uv run pyrite run standard -m "$MATERIAL" --fidelity survey
 ```

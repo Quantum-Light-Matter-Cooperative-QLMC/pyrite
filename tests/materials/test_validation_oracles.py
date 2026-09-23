@@ -12,7 +12,7 @@ from pyrite.validation import validation_oracles as vo
 class FakeCell:
     def __init__(self, crystal: str):
         lattice = CRYSTALS[crystal]["lattice"]
-        self._lp = vo._cxr_lattice_tuple(crystal)
+        self._lp = vo._pyrite_lattice_tuple(crystal)
         self._volume = CRYSTALS[crystal]["V_cell"]
         self._lattice = lattice
 
@@ -82,7 +82,7 @@ def test_compare_structure_factor_magnitudes_uses_intensity_safe_quantity():
     )
 
     assert [comparison.relative_delta for comparison in comparisons] == pytest.approx([0.0, 0.0])
-    assert comparisons[0].cxr_abs_f_sq > 0.0
+    assert comparisons[0].pyrite_abs_f_sq > 0.0
     assert oracle.Scatter.setup_kwargs == {
         "scattering_type": "xray",
         "energy_kev": 8.0,
@@ -92,7 +92,7 @@ def test_compare_structure_factor_magnitudes_uses_intensity_safe_quantity():
     }
 
 
-def test_build_dans_crystal_from_cxr_transfers_full_basis(monkeypatch):
+def test_build_dans_crystal_from_pyrite_transfers_full_basis(monkeypatch):
     created = []
 
     class ModuleCrystal(FakeCrystal):
@@ -107,11 +107,11 @@ def test_build_dans_crystal_from_cxr_transfers_full_basis(monkeypatch):
         lambda name: SimpleNamespace(Crystal=ModuleCrystal),
     )
 
-    crystal = vo.build_dans_crystal_from_cxr("silicon")
+    crystal = vo.build_dans_crystal_from_pyrite("silicon")
 
     assert crystal is created[0]
     assert crystal.filename is None
-    assert crystal.cell_args == pytest.approx(vo._cxr_lattice_tuple("silicon"))
+    assert crystal.cell_args == pytest.approx(vo._pyrite_lattice_tuple("silicon"))
     assert crystal.atom_kwargs["type"] == [element for element, _ in CRYSTALS["silicon"]["basis"]]
     assert crystal.atom_kwargs["occupancy"] == [1.0] * len(CRYSTALS["silicon"]["basis"])
     assert crystal.atom_kwargs["uiso"] == [0.0] * len(CRYSTALS["silicon"]["basis"])
@@ -128,7 +128,7 @@ def test_missing_dans_diffraction_raises_clear_optional_dependency_error(monkeyp
 
 
 def test_validate_dans_crystal_fails_closed_on_out_of_tolerance_geometry(monkeypatch):
-    monkeypatch.setattr(vo, "build_dans_crystal_from_cxr", lambda _crystal: OffsetGeometryCrystal())
+    monkeypatch.setattr(vo, "build_dans_crystal_from_pyrite", lambda _crystal: OffsetGeometryCrystal())
 
     report = vo.validate_dans_crystal(
         "silicon",

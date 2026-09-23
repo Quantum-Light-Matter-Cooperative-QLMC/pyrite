@@ -60,10 +60,10 @@ class LatticeComparison:
     """Cell-parameter and volume deltas between pyrite and a validation oracle."""
 
     crystal: str
-    cxr_lattice: _Lattice6
+    pyrite_lattice: _Lattice6
     oracle_lattice: _Lattice6
     lattice_delta: _Lattice6
-    cxr_volume_ang3: float
+    pyrite_volume_ang3: float
     oracle_volume_ang3: float
     volume_delta_ang3: float
 
@@ -74,7 +74,7 @@ class ReflectionGeometryComparison:
 
     crystal: str
     hkl: tuple[int, int, int]
-    cxr_g_inv_ang: float
+    pyrite_g_inv_ang: float
     oracle_q_inv_ang: float
     absolute_delta_inv_ang: float
     relative_delta: float
@@ -87,7 +87,7 @@ class StructureFactorMagnitudeComparison:
     crystal: str
     hkl: tuple[int, int, int]
     photon_E_eV: float
-    cxr_abs_f_sq: float
+    pyrite_abs_f_sq: float
     oracle_abs_f_sq: float
     absolute_delta: float
     relative_delta: float
@@ -142,7 +142,7 @@ def load_dans_crystal_from_cif(cif_path: str | Path) -> _DansCrystalLike:
     return _dans_crystal_class()(str(cif_path))
 
 
-def build_dans_crystal_from_cxr(crystal: str, *, uiso: float = 0.0) -> _DansCrystalLike:
+def build_dans_crystal_from_pyrite(crystal: str, *, uiso: float = 0.0) -> _DansCrystalLike:
     """Build a P1 ``Dans_Diffraction`` crystal from an internal ``CRYSTALS`` entry.
 
     This is for validation only. It transfers the already-expanded pyrite basis
@@ -152,7 +152,7 @@ def build_dans_crystal_from_cxr(crystal: str, *, uiso: float = 0.0) -> _DansCrys
 
     xtl = _dans_crystal_class()()
     info = CRYSTALS[crystal]
-    lattice = _cxr_lattice_tuple(crystal)
+    lattice = _pyrite_lattice_tuple(crystal)
     _set_dans_cell(xtl, lattice)
 
     basis = info["basis"]
@@ -172,22 +172,22 @@ def build_dans_crystal_from_cxr(crystal: str, *, uiso: float = 0.0) -> _DansCrys
 def compare_lattice(crystal: str, oracle_crystal: _DansCrystalLike) -> LatticeComparison:
     """Compare lattice lengths, angles, and unit-cell volume."""
 
-    cxr_lattice = _cxr_lattice_tuple(crystal)
+    pyrite_lattice = _pyrite_lattice_tuple(crystal)
     oracle_lattice = _float_tuple(oracle_crystal.Cell.lp(), "oracle Cell.lp()", size=6)
-    cxr_volume = float(CRYSTALS[crystal]["V_cell"])
+    pyrite_volume = float(CRYSTALS[crystal]["V_cell"])
     oracle_volume = float(oracle_crystal.Cell.volume())
     return LatticeComparison(
         crystal=crystal,
-        cxr_lattice=cxr_lattice,
+        pyrite_lattice=pyrite_lattice,
         oracle_lattice=oracle_lattice,
         lattice_delta=_float_tuple(
-            [o - c for c, o in zip(cxr_lattice, oracle_lattice, strict=True)],
+            [o - c for c, o in zip(pyrite_lattice, oracle_lattice, strict=True)],
             "lattice delta",
             size=6,
         ),
-        cxr_volume_ang3=cxr_volume,
+        pyrite_volume_ang3=pyrite_volume,
         oracle_volume_ang3=oracle_volume,
-        volume_delta_ang3=oracle_volume - cxr_volume,
+        volume_delta_ang3=oracle_volume - pyrite_volume,
     )
 
 
@@ -208,16 +208,16 @@ def compare_reflection_geometry(
     results: list[ReflectionGeometryComparison] = []
     lattice = CRYSTALS[crystal]["lattice"]
     for hkl, q_oracle in zip(hkl_array, oracle_q, strict=True):
-        _, g_cxr = reciprocal_g_vector(hkl, lattice)
-        delta = float(q_oracle - g_cxr)
+        _, g_pyrite = reciprocal_g_vector(hkl, lattice)
+        delta = float(q_oracle - g_pyrite)
         results.append(
             ReflectionGeometryComparison(
                 crystal=crystal,
                 hkl=_hkl_tuple(hkl),
-                cxr_g_inv_ang=float(g_cxr),
+                pyrite_g_inv_ang=float(g_pyrite),
                 oracle_q_inv_ang=float(q_oracle),
                 absolute_delta_inv_ang=abs(delta),
-                relative_delta=_relative_delta(float(g_cxr), float(q_oracle)),
+                relative_delta=_relative_delta(float(g_pyrite), float(q_oracle)),
             )
         )
     return results
@@ -261,24 +261,24 @@ def compare_structure_factor_magnitudes(
 
     results: list[StructureFactorMagnitudeComparison] = []
     for hkl, oracle_value in zip(hkl_array, oracle_sf, strict=True):
-        cxr_value, _ = structure_factor(
+        pyrite_value, _ = structure_factor(
             crystal,
             hkl,
             float(photon_E_eV),
             B_ang2=B_ang2,
             use_henke=use_henke,
         )
-        cxr_abs_sq = float(abs(cxr_value) ** 2)
+        pyrite_abs_sq = float(abs(pyrite_value) ** 2)
         oracle_abs_sq = float(abs(oracle_value) ** 2)
         results.append(
             StructureFactorMagnitudeComparison(
                 crystal=crystal,
                 hkl=_hkl_tuple(hkl),
                 photon_E_eV=float(photon_E_eV),
-                cxr_abs_f_sq=cxr_abs_sq,
+                pyrite_abs_f_sq=pyrite_abs_sq,
                 oracle_abs_f_sq=oracle_abs_sq,
-                absolute_delta=abs(oracle_abs_sq - cxr_abs_sq),
-                relative_delta=_relative_delta(cxr_abs_sq, oracle_abs_sq),
+                absolute_delta=abs(oracle_abs_sq - pyrite_abs_sq),
+                relative_delta=_relative_delta(pyrite_abs_sq, oracle_abs_sq),
             )
         )
     return results
@@ -307,7 +307,7 @@ def validate_dans_crystal(
     """
 
     limits = tolerances or DEFAULT_DANS_TOLERANCES
-    oracle = build_dans_crystal_from_cxr(crystal)
+    oracle = build_dans_crystal_from_pyrite(crystal)
     lattice = compare_lattice(crystal, oracle)
     geometry = tuple(compare_reflection_geometry(crystal, oracle, hkls))
     structure_factors = tuple(
@@ -395,7 +395,7 @@ def _set_dans_cell(xtl: Any, lattice: _Lattice6) -> None:
         setter(*lattice)
 
 
-def _cxr_lattice_tuple(crystal: str) -> _Lattice6:
+def _pyrite_lattice_tuple(crystal: str) -> _Lattice6:
     lattice = CRYSTALS[crystal]["lattice"]
     system = lattice["system"]
     if system == "cubic":

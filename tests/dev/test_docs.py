@@ -13,7 +13,7 @@ from pyrite.devtools.docs_paths import StaleDocPath, check_doc_paths, find_stale
 @pytest.fixture(scope="module")
 def warning_baseline_module():
     path = Path(__file__).parents[2] / "docs" / "_warning_baseline.py"
-    spec = importlib.util.spec_from_file_location("cxr_docs_warning_baseline", path)
+    spec = importlib.util.spec_from_file_location("pyrite_docs_warning_baseline", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

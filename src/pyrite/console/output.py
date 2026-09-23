@@ -17,7 +17,7 @@ from typing import Any
 
 import click
 
-_COLOR_MODE: ContextVar[str] = ContextVar("cxr_cli_color_mode", default="auto")
+_COLOR_MODE: ContextVar[str] = ContextVar("pyrite_cli_color_mode", default="auto")
 
 COLORS = {
     "active": (92, 207, 230),

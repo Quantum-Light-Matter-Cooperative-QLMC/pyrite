@@ -85,7 +85,7 @@ def _smoke_command(material, output):
 def _export(stem: str | None, material: str | None) -> None:
     """Export viewer HTML without starting a marimo server or browser."""
     resolved = material or get_viewer_default() or "hopg"
-    stem = stem or f"cxr_viewer_{resolved}"
+    stem = stem or f"pyrite_viewer_{resolved}"
     output = Path("results") / f"{stem}.html"
     click.echo(f"exporting {NOTEBOOK} -> {output}")
     subprocess.run(_smoke_command(resolved, output), check=True)

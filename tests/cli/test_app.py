@@ -69,6 +69,17 @@ def test_viewer_export_never_launches(monkeypatch):
     assert launched[0][0][0] == viewer._smoke_command("mose2", "results/trace.html")
 
 
+def test_viewer_export_defaults_to_pyrite_stem(monkeypatch):
+    launched = []
+    monkeypatch.setattr(
+        viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+    )
+
+    viewer._export(None, "mose2")
+
+    assert launched[0][0][0] == viewer._smoke_command("mose2", "results/pyrite_viewer_mose2.html")
+
+
 def test_validation_leaf_and_export_dispatch_without_cross_mode_flags(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kwargs: calls.append(("launch", kwargs)))

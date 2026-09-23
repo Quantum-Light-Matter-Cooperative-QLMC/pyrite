@@ -2,7 +2,7 @@ data_diamond
 # Phase identity: PyRITE crystal catalog entry [diamond].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
-# Crystal structure database for cxr_feranchuk_spence.py
+# Crystal structure database for pyrite.validation.feranchuk_spence
 #
 # Each table is one crystal:
 #   system        : "cubic" | "hexagonal" | "tetragonal" | "orthorhombic" | "general"

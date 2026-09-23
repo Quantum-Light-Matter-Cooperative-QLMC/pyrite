@@ -27,7 +27,7 @@ NOTEBOOK = str(app_dir() / "analysis_app.py")
 
 
 def _default_stem():
-    return f"cxr_analysis_{datetime.date.today():%Y-%m-%d}"
+    return f"pyrite_analysis_{datetime.date.today():%Y-%m-%d}"
 
 
 def _command(stem):

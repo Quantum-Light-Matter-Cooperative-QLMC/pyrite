@@ -25,4 +25,4 @@ def test_command_invokes_marimo_html_export():
 
 
 def test_default_stem_is_dated():
-    assert export._default_stem() == f"cxr_analysis_{datetime.date.today():%Y-%m-%d}"
+    assert export._default_stem() == f"pyrite_analysis_{datetime.date.today():%Y-%m-%d}"
