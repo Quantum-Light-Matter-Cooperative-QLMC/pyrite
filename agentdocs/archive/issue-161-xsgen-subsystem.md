@@ -1,5 +1,9 @@
 # issue-161-xsgen-subsystem
 
+Archived after implementation landed in PR #164. The regression-anchor
+substitutes were accepted on 2026-09-23; public BremsLib archive hosting is
+tracked separately in #167.
+
 `pyrite.xsgen`: generate, store, and resolve cross-section and stopping-power
 tables produced by external Fortran codes (ELSEPA, SBETHE, BremsLib).
 
