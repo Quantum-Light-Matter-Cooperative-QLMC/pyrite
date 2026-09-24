@@ -78,6 +78,45 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_stopping_berger_seltzer.py`; `tests/montecarlo/test_transport_lut.py`; `tests/montecarlo/test_transport_cutoff.py`; `tests/montecarlo/test_sbethe_cuda.py`; `tests/montecarlo/test_energy_loss_straggling.py`; `tests/montecarlo/test_straggling_cuda.py`; `tests/xsgen/test_sbethe.py`; `tests/xsgen/test_run_identity.py`; `tests/scan/test_public_api.py`
 - **Notes:** The host rejects extrapolation; production cutoffs therefore cannot fall below 1 keV. SBETHE itself uses an empirical extrapolation below its material-dependent `ECUT` (about 1 keV for electrons), so the lowest table nodes are not guaranteed to come from the corrected Bethe formula. Log-log interpolation is continuous and positivity-preserving but does not claim derivative continuity at native nodes. Urban fluctuations retain their existing elemental allocation and are scaled uniformly so their compound mean equals the SBETHE table rate. The CUDA LUT consumes the same precomputed SBETHE values; exact CUDA interpolates the same nodes. Every packaged table carries the SBETHE source digest, compiler, deck, material identity, output hash, attribution, and manifest digest. Fresh-context source-to-code verification found no divergent term; [validation write-up](beam-transport/sbethe-corrected-stopping.md). Hardware execution on NVIDIA GeForce RTX 5080 (driver 610.47) passed the SBETHE/Urban first-row CPU comparison and both exact and LUT CUDA cutoff anchors at 50 Å. Only a human may mark this row `signed-off`.
 
+## `eedl-material-shell-rates`
+
+- **Claim:** packaged EEDL MF=23 subshell cross sections combined with homogeneous catalog element number densities give a nonnegative macroscopic vacancy-channel rate, with element and shell identity preserved
+- **Code:** `montecarlo/shell_ionization.py::material_shell_ionization_rates`; shared EEDL parser in `montecarlo/eedl_ionization.py::load_eedl_shell_ionization`
+- **Source:** EPICS2025 EEDL ENDF-6 MF=23/MT=534–572, checksum pinned in `montecarlo/eedl_ionization.py`; catalog number densities
+- **Equation:** $\lambda^{-1}_{i,s}(E)=n_i\sigma_{i,s}(E)10^{16}\,{\rm \AA}^{-1}$ for $n_i$ in atoms/Å$^3$ and $\sigma_{i,s}$ in cm$^2$; total rate is the sum over elements and subshells
+- **Assumptions:** independent-atom mixture in a homogeneous medium; linear-linear interpolation as declared by the accepted ENDF sections; rates only, with no inferred transfer or recoil distribution
+- **Limiting cases:** a closed shell contributes zero; below every binding energy the material rate is zero; an accessible shell outside its tabulated projectile-energy range is rejected
+- **Status:** unverified
+- **Checks:** source parser validates monotone grids, nonnegative values, and ENDF interpolation law; independent material-rate and Bote–Salvat comparisons remain pending
+- **Anchor:** [implementation derivation](beam-transport/eedl-material-shell-rates.md)
+- **Notes:** Host-side input preparation only. No production event scheduler consumes these rates; differential spectrum, stopping closure, and fresh-context verification remain open. Only a human may mark this row `signed-off`.
+
+## `sbethe-atomic-shell-inputs`
+
+- **Claim:** the checksum-pinned SBETHE free-atom shell table yields positive shell energies and occupations summing to each atomic number; EEDL joins use ENDF x-ray labels, attach a spin-orbit partner unoccupied in SBETHE to its filled SBETHE $n,l$ shell, reject an absent $n,l$, and preserve binding-energy differences
+- **Code:** `montecarlo/shell_configuration.py::{load_atomic_shells,match_eedl_shells}`
+- **Source:** public SBETHE v2 Mendeley deposit `sdbase/pdatconf.p14`, fetched through the pinned SBETHE reference-data archive; its header cites Carlson ionization energies and Salvat MCDF profiles; byte identity with the separately licensed NEA PENELOPE distribution has not been established
+- **Equation:** $\sum_s f_{Z,s}=Z$
+- **Assumptions:** free-atom shell occupations; EEDL designators follow ENDF-6 MF=23 order (`MT - 533`, including O8/O9), not PENELOPE shell codes; spin-orbit partners of one $n,l$ shell share a vacancy when SBETHE fills only one $j$; no material conduction-band assignment is inferred
+- **Limiting cases:** missing or incomplete source and an EEDL shell with no SBETHE $n,l$ raise; an SBETHE shell absent from EEDL receives no rate; no vacancy event is emitted
+- **Status:** rederived
+- **Checks:** source checksum, numeric bounds, unique designators and labels, label–orbital agreement, occupation sum, fixture binding difference, spin-orbit partner and ENDF-P1 label fixtures, and a fetched-source join for all 99 elements
+- **Anchor:** `tests/montecarlo/test_shell_configuration.py`; [implementation derivation](beam-transport/sbethe-atomic-shell-inputs.md); [verification](beam-transport/sbethe-atomic-shell-inputs-verification.md)
+- **Notes:** Si EEDL M3 joins the SBETHE 3p (M2) shell. Configuration differences leave some SBETHE shells without EEDL rates (e.g. Pd 5s, lanthanide 5d). Material conduction assignment and independent verification remain open. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-oscillators`
+
+- **Claim:** a material's conduction-band and bound-shell oscillators satisfy the dipole sum and PENELOPE-2024 Eqs. 3.62–3.64, with measured plasmon parameters where sourced and the manual's 15 eV free-electron default otherwise
+- **Code:** `montecarlo/transport/shell_oscillators.py::{load_conduction_bands,build_shell_oscillators}`; `data/conduction_band.toml`
+- **Source:** PENELOPE-2024 §3.2.1, NEA/MBDAV/R(2024)1; Si ELF (Yang et al., PRB 100, 245209, 2019); amorphous SiO₂ AR-EELS (Saito et al., Microscopy 74, 117, 2025); MoS₂ EELS (Moynihan et al., J. Microsc. 279, 256, 2020)
+- **Equation:** $W_{cb}=\sqrt{f_{cb}/Z}\,\Omega_p$ by default; $W_k=\sqrt{(aU_k)^2+2f_k\Omega_p^2/3Z}$; $Z\ln I=f_{cb}\ln W_{cb}+\sum_k f_k\ln W_k$
+- **Assumptions:** free-atom `pdatconf.p14` shells; Bragg-additive $I$; all-electron $\Omega_p$; measured band consumes whole outermost shells up to the chemical-valence count; optical plasmon energy without dispersion
+- **Limiting cases:** one bound shell with $f=Z$ gives $W=I$; split-shell or equal-$U$ boundaries, formula mismatch, and unreachable $I$ raise
+- **Status:** rederived
+- **Checks:** dipole sum and Eq. 3.64 closure to $10^{-12}$; manual $W=I$ limit; Si, SiO₂ and MoS₂ shell assignments; Si default $W_{cb}=16.60$ eV, $a=2.208$; measured $W_{cb}$ within 6.5% of Eq. 3.62; pinned $a$ = 2.2024/3.4701/1.7797; non-finite inputs, $W_{cb}\ge I$, and bound $W_k\le U_k$ raise
+- **Anchor:** `tests/montecarlo/test_shell_oscillators.py`; [implementation derivation](beam-transport/penelope-shell-oscillators.md); [verification](beam-transport/penelope-shell-oscillators-verification.md)
+- **Notes:** Host-side input only; no GOS cross section, rate, or transport mode consumes it. $W_{cb}$ strongly affects IMFP, so spectrum/IMFP validation belongs to the shell GOS slice. The SiO₂ $W_{cb}$ is Saito's amorphous 22 eV, chosen by the owner to match catalog density; REELS on 2.65 g/cm³ gives 23.6 eV (input spread 21.5–23.6 eV). Only a human may mark this row `signed-off`.
+
 ## `gos-optical-quadrature`
 
 - **Claim:** each positive-width interval of the SBETHE optical oscillator-strength density contributes its integrated strength and first-moment centroid as one resonance; duplicate-energy shell edges have zero weight
@@ -139,7 +178,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Status:** rederived
 - **Checks:** positive rate and hard samples bounded by $E/2$; independent transfer-spectrum comparison and fresh-context derivation pending
 - **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-moller-close.md)
-- **Notes:** The resonance-bin approximation needs independent IMFP and transfer-spectrum checks before use in transport. Fresh-context verification is pending.
+- **Notes:** The resonance-bin approximation needs independent IMFP and transfer-spectrum checks before use in transport. PENELOPE-2024 §§3.2.1–3.2.2 use a distinct bound-shell threshold $Q_k=U_k$ with $W_k$ determined separately; this optical-bin candidate does not implement that shell construction. Fresh-context verification is pending.
 
 ## `gos-soft-hard-partition`
 

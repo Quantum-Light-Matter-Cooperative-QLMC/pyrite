@@ -34,6 +34,11 @@ beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
 beam-transport/coherent-line-grid-fringe-spacing
 beam-transport/dielectric-bulk-loss
+beam-transport/eedl-material-shell-rates
+beam-transport/penelope-shell-oscillators
+beam-transport/penelope-shell-oscillators-verification
+beam-transport/sbethe-atomic-shell-inputs
+beam-transport/sbethe-atomic-shell-inputs-verification
 beam-transport/gos-core-edge
 beam-transport/electron-transport
 beam-transport/energy-controlled-propagation

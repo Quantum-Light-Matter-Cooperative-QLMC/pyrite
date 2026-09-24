@@ -1,0 +1,30 @@
+# Measured valence-plasmon parameters for PENELOPE-2024 conduction-band
+# oscillators (Sec. 3.2.1): f_cb is the number of electrons per formula unit
+# that take part in plasmon excitation, W_cb the plasmon energy. Keys are
+# catalog crystal or medium keys; `formula` must equal the SBETHE formula
+# counts. f_cb is the chemical valence count and must consume whole outermost
+# pdatconf.p14 shells. Validation: penelope-shell-oscillators
+
+[silicon]
+formula = { Si = 1 }
+electrons_per_formula = 4
+resonance_eV = 16.7
+basis = "maximum of the REELS-derived optical energy-loss function (0.1 eV grid)"
+source = "L. H. Yang et al., Phys. Rev. B 100, 245209 (2019)"
+doi = "10.1103/PhysRevB.100.245209"
+
+[sio2]
+formula = { Si = 1, O = 2 }
+electrons_per_formula = 16
+resonance_eV = 22.0
+basis = "broad q=0 volume-plasmon peak in AR-EELS of amorphous SiO2, matching the catalog's amorphous density (2.20 g/cm3); REELS ELF maximum 23.6 eV for a 2.65 g/cm3 sample (Da et al., J. Appl. Phys. 113, 214303 (2013), doi:10.1063/1.4809544)"
+source = "T. Saito, Y. K. Sato and M. Terauchi, Microscopy 74, 117 (2025)"
+doi = "10.1093/jmicro/dfae056"
+
+[mos2]
+formula = { Mo = 1, S = 2 }
+electrons_per_formula = 18
+resonance_eV = 23.0
+basis = "pi+sigma bulk plasmon peak in thick-terrace STEM-EELS, reported as around 23 eV; the separate 8.6 eV pi plasmon is not represented"
+source = "E. Moynihan et al., J. Microsc. 279, 256 (2020)"
+doi = "10.1111/jmi.12900"

@@ -139,11 +139,13 @@ def build_gos_partition(
     """Partition an OOS-derived GOS spectrum at one transfer threshold.
 
     Distant longitudinal/transverse resonances and the close Møller continuum
-    follow Geant4's PENELOPE-like GOS model (Eqs. 127–133). Optical intervals
-    stand in for shell oscillators; binding energies and a finite-q material
-    response are unavailable. The transverse density correction is omitted in
-    the raw shape. One common positive multiplier matches the corrected
-    ``stp.dat`` first moment; the same multiplier applies to soft and hard
+    follow Geant4's simplified PENELOPE-like GOS model (Eqs. 127–133). This is
+    not the PENELOPE-2024 shell model: there, bound-shell close collisions begin
+    at binding energy U, while resonances are W >= U (Secs. 3.2.1–3.2.2).
+    Optical intervals stand in for shell oscillators; binding energies and a
+    finite-q material response are unavailable. The transverse density
+    correction is omitted in the raw shape. One common positive multiplier
+    matches the corrected ``stp.dat`` first moment for both soft and hard
     pieces. ``asymptotic.dat`` moments are uncorrected comparison data only.
 
     ``core_edge_ev`` selects only oscillators at or above a duplicated OOS

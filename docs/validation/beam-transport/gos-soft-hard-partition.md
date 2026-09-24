@@ -12,6 +12,16 @@ provides corrected mean collision stopping. Its `asymptotic.dat` is explicitly
 **uncorrected free-atom asymptotic output** in the vendored source, and cannot
 be substituted for the production mean.
 
+The host candidate follows that Geant4 description. The
+[PENELOPE-2024 manual](https://doi.org/10.82155/1vk5-0513), §§3.2.1–3.2.2,
+defines bound-shell close collisions above the binding energy $U_k$, while
+the resonance energy $W_k$ is a separate quantity fixed with shell population,
+mean excitation energy, and the material plasma energy. Its distant inner-shell
+loss is broadened above $U_k$, and its transverse term includes the Fermi
+density correction. The present OOS-bin candidate has none of those shell
+inputs; its close threshold is the optical-bin resonance. Mean closure here
+does not make it a PENELOPE-2024 shell spectrum.
+
 The raw optical GOS spectrum $g_E(W)=d\sigma_{\mathrm{GOS}}/dW$ has moment
 $M_1=\int_0^E Wg_E(W)\,dW$. At each incident energy, one positive scale
 $a=S_{\mathrm{SBETHE}}/M_1$ gives

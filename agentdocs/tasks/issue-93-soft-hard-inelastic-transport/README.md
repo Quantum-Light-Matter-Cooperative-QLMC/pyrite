@@ -206,3 +206,160 @@ secondary kinematics; those still need a consistent construction and
 validation before CPU/CUDA transport integration. The Si dielectric branch
 is a material-specific optional study, not a gate for the material-general
 EEDL baseline.
+
+## Follow-up, 2026-09-24: material shell-rate preparation
+
+The host can now combine packaged EEDL shell cross sections with a crystal or
+medium's catalog element number densities. It retains each element and shell
+designator, returns rates in inverse angstroms, and rejects extrapolation for
+an accessible shell outside its EEDL projectile grid. The adapter lives beside
+the existing EEDL parser in `montecarlo/spectrum/` to preserve the package
+dependency graph. Its source, mixture rule, units, and limits are recorded at
+`docs/validation/beam-transport/eedl-material-shell-rates.md`. Independent
+shell-rate comparisons and fresh-context physics validation remain open.
+Transport still has no EEDL hard-event mode; before integration, the shared
+data access needs an acyclic owner usable by the flight scheduler.
+
+## Follow-up, 2026-09-24: shared EEDL data owner
+
+The checksum-pinned EEDL subshell parser now lives in
+`montecarlo/eedl_ionization.py`. Characteristic X-ray scoring retains its
+existing imports as compatibility aliases, while material shell-rate
+preparation reads the shared owner directly. The data dependency no longer
+requires transport to import spectrum. This refactor changes no transfer
+physics and does not enable hard-event scheduling.
+
+## Follow-up, 2026-09-24: PENELOPE-2024 source audit
+
+The local PENELOPE-2024 manual, §§3.2.1–3.2.2, defines a shell oscillator by
+population $f_k$, binding energy $U_k$, resonance energy $W_k$, and a
+close-collision threshold $Q_k$. For a bound shell $Q_k=U_k$, **not** $W_k$
+(Eq. 3.56). The populations sum to $Z$ (Eq. 3.60); their log-weighted
+resonances reproduce material mean excitation energy $I$ (Eq. 3.61). Bound
+$W_k$ additionally depends on the material plasma energy and a material
+parameter (Eqs. 3.63–3.65). A conduction band has $U=0$ and a distinct
+plasmon prescription (Eq. 3.62). Inner-shell distant losses have a broadened
+distribution above $U_k$ (Eqs. 3.76–3.80). The density correction and close
+Møller kinematics follow §§3.2.2–3.2.3; the bound-shell close limit uses
+$(E+U_k)/2$ (Eq. 3.88). Hard-event energy accounting gives an inner-shell
+secondary $E_s=W-U_k$ (Eq. 3.124 and following text).
+
+PENELOPE replaces inner-shell GOS rates with Bote–Salvat tables, retains the
+conditional GOS loss/recoil distributions, and rescales outer-shell rates to
+keep stopping (Eqs. 3.141–3.142). Its reference shell configurations and
+ionization energies come from `pdatconf.p14` (§7.1.1). That file is not in
+this checkout. Packaged EEDL supplies $U_k$ and total rates, but not $f_k$,
+$W_k$, or the conduction-band partition. SBETHE OOS supplies optical strength
+without reliable vacancy labels. The current OOS-bin candidate uses its
+resonance as the close threshold, so it is a simplified Geant4-style
+approximation, not the PENELOPE-2024 bound-shell construction. Do not use it
+to attach EEDL vacancies or enable transport. Next shell-model input needs a
+documented, legally distributable source for shell populations, mean
+excitation energy, and conduction-band/plasma parameters, plus an explicit
+element/shell mapping to EEDL designators.
+
+The already supported SBETHE v2 reference-data fetch includes `pdatconf.p14` in
+the user data directory. The local fetched copy has SHA-256
+`cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c62d2`.
+The public SBETHE deposit lists CC BY-NC 3.0; it is not the separately
+licensed NEA PENELOPE distribution, and byte identity with that distribution
+has not been checked.
+Its nine-column records contain $Z$, shell designator/label, occupation,
+ionization energy, Compton profile, and widths. All 99 elements have occupation
+sums equal to $Z$ in a read-only format audit. This supplies an accessible
+atomic population source for host-side study without bundling its data; any
+broader redistribution or use must respect the source terms. It does not supply the material
+conduction-band partition or establish that its binding energies equal the
+EEDL values. A typed loader and explicit EEDL shell mapping can use the
+fetched source after recording those differences and a material input rule.
+The existing `plasma_energy_eV` computes the all-electron material plasma
+energy, and SBETHE's material input records the chosen mean excitation energy.
+Neither determines which outer electrons belong to a conduction band.
+
+## Follow-up, 2026-09-24: atomic shell input loader
+
+The host now reads the fetched, checksum-pinned `pdatconf.p14` into typed
+free-atom shells and checks that each element's occupations sum to $Z$. An
+exact-designator EEDL diagnostic retains both binding energies and rejects
+unmatched vacancy channels. The real Si records expose a gap: EEDL has
+designator 7, absent from the SBETHE Si configuration. No one-to-one
+vacancy mapping or material conduction-band rule is established, so the shell
+GOS event construction remains gated. See
+`docs/validation/beam-transport/sbethe-atomic-shell-inputs.md`.
+
+## Follow-up, 2026-09-24: EEDL label join
+
+The Si "designator 7" gap came from numbering, not physics. EEDL designators
+are ENDF-6 MF=23 codes (`MT - 533`, with O8/O9 slots). `pdatconf.p14` uses
+PENELOPE codes that diverge after O7, so the integer join would mislabel Cs
+and heavier elements. The join now uses x-ray labels, sharing the ENDF label
+map with characteristic scoring through `eedl_ionization.EEDL_SUBSHELL_LABELS`.
+EEDL spin-orbit partners that SBETHE leaves empty (Si M3, Mo N5, …) join the
+filled SBETHE $n,l$ shell. All 99 elements now join, with 41 merges, and
+partner binding differences stay within 3.4 eV. Remaining shell-GOS input gate: a material
+conduction-band / outer-shell rule, including resonance energies (PENELOPE
+Eqs. 3.61–3.65) from $I$ and plasma energy.
+
+## Follow-up, 2026-09-24: conduction-band rule audit
+
+PENELOPE-2024 §3.2.1 (p. 117–118): $f_{cb}$ and $W_{cb}$ "should be
+identified with" the effective plasmon electron count and plasmon energy,
+estimated from EELS or optical data. When unavailable, it uses a fallback
+default: $f_{cb}$ counts electrons with ionisation energy below "say, 15
+eV", and $W_{cb}=\sqrt{f_{cb}/Z}\,\Omega_p$ (Eq. 3.62). Bound shells use
+$W_k=\sqrt{(aU_k)^2+2f_k\Omega_p^2/3Z}$ (Eq. 3.63), with one $a$ solved from
+$Z\ln I=f_{cb}\ln W_{cb}+\sum_k f_k\ln W_k$ (Eq. 3.64). Compounds follow
+Bragg additivity (Eq. 3.65). The manual's own examples override the default
+with measured plasmons (Al $W_{cb}=15$ eV) and show that $W_{cb}$ strongly
+changes IMFP, while stopping stays insensitive. §7.1.1 says `material`
+prompts the user for plasmon energy and strength. `material.f` is not
+available locally, so its coded default is unchecked.
+
+Vendored SBETHE instead replaces all atomic OOS below `WTH = 50` eV with
+one damped oscillator (`sbethe.f` ~1575–1720). Its strength is the atomic
+OOS strength below 50 eV, its initial resonance is the Eq. 3.62 form, and a
+bisected width fits $I$ (lowering $W_R$ if needed). An optional band gap
+zeroes it below $W_g$. This width is fit to $I$, not to loss data, which
+likely explains the broad Si OOS plasmon measured earlier.
+
+Our SBETHE catalog decks pass no band gap for any material checked
+(silicon, mos2, sio2, ws2, hbn, diamond), so all are run as conductors.
+Stopping is insensitive, but this matters for the OOS spectral shape.
+Out of #93 scope; flag separately.
+
+Eq. 3.62–3.64 with fetched `pdatconf` shells, catalog $I$ and all-electron
+$\Omega_p$ (per formula unit):
+
+| material | $U<15$ eV: $f_{cb}$, $W_{cb}$, $a$ | $U<50$ eV: $f_{cb}$, $W_{cb}$, $a$ |
+| --- | --- | --- |
+| silicon | 4, 16.60, 2.208 | 4, 16.60, 2.208 |
+| mos2 | 14, 19.06, 1.802 | 24, 24.95, 1.978 |
+| sio2 | 12, 19.10, 2.726 | 16, 22.06, 3.460 |
+| ws2 | 14, 19.08, 2.014 | 36, 30.59, 2.363 |
+| hbn | 6, 21.39, 2.521 | 8, 24.70, 2.955 |
+| diamond | 2, 22.05, 1.988 | 4, 31.18, 1.693 |
+
+Si is threshold-independent and matches the ~16.7 eV bulk plasmon. The 15 eV
+rule drops 2s/3s valence electrons (C 2s 16.6 eV, O 2s 28.5 eV, S 3s
+20.2 eV). It therefore gives low diamond/oxide/sulfide $W_{cb}$ against
+commonly quoted bulk plasmons (diamond ~33, SiO₂ ~22, MoS₂ ~23, hBN
+~26 eV; unsourced recollection, not yet checked). A rule choice is needed
+before the shell-set slice.
+
+## Follow-up, 2026-09-24: shell oscillators with measured conduction bands
+
+Owner decision: use measured plasmon data per material, falling back to the
+manual's 15 eV default. `montecarlo/transport/shell_oscillators.py` builds
+PENELOPE Eqs. 3.62–3.64 oscillators from `pdatconf` shells, catalog $I$,
+all-electron $\Omega_p$, and `data/conduction_band.toml`. Sourced entries:
+Si 4 e / 16.7 eV (Yang 2019 ELF max), SiO₂ 16 e / 23.6 eV (Da 2013 ELF max;
+Saito 2025 22 eV corroborates), MoS₂ 18 e / 23.0 eV (Moynihan 2020). Each
+measured band consumes whole outermost shells with a clear gap. Each
+measured value lies within 7% of Eq. 3.62, and $a$ = 2.20 / 3.20 / 1.78.
+Ledger row `penelope-shell-oscillators` is unverified. Next: shell GOS DCS
+(distant longitudinal/transverse + close Møller, $Q_k=U_k$), raw stopping vs
+`stp.dat`, then EEDL inner-shell rate substitution and outer-shell rescaling.
+
+Owner decision, 2026-09-24: the SiO₂ $W_{cb}$ is Saito et al.'s amorphous
+22 eV, matching the catalog's amorphous density, instead of Da et al.'s 23.6 eV
+(2.65 g/cm³). $a$ becomes 3.4701. `penelope-shell-oscillators` is rederived.
