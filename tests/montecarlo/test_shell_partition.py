@@ -142,21 +142,38 @@ def test_window_rejects_invalid_bounds(window):
 
 @pytest.mark.parametrize("energy", [2e3, 3e4])
 @pytest.mark.parametrize("cutoff", [0.0, 10.0, 50.0, 200.0, 1e3, 1e9])
-def test_fixture_partition_closes_stopping_and_keeps_inner_shells_hard(energy, cutoff):
+def test_fixture_partition_closes_stopping_across_inner_shell_thresholds(energy, cutoff):
     material, closure = _fixture_closure(energy)
     partition = sp.partition_shell_rates(material, closure, cutoff)
+    expected_soft = sg.windowed_shell_gos_moments(material, energy, 0.0, cutoff)
     for name in CHANNELS:
         total = getattr(partition.soft, name) + getattr(partition.hard, name)
         assert np.allclose(total, getattr(closure.moments, name), rtol=1e-12, atol=0.0)
+        assert np.allclose(
+            getattr(partition.soft, name),
+            getattr(expected_soft, name) * closure.scale[:, None],
+            rtol=1e-12,
+            atol=0.0,
+        )
     stopping = partition.soft_stopping_eV_cm2 + partition.hard_stopping_eV_cm2
     assert stopping == pytest.approx(closure.stopping_eV_cm2, rel=1e-12, abs=0.0)
-    assert not np.any(partition.soft.per_shell[closure.inner])
     assert np.allclose(
-        partition.vacancy_cross_sections_cm2, closure.adopted_inner_cm2, rtol=1e-14, atol=0.0
+        partition.vacancy_cross_sections_cm2 + partition.soft.per_shell[:, 0] * closure.inner,
+        closure.adopted_inner_cm2,
+        rtol=1e-12,
+        atol=0.0,
     )
+    first_inner_binding = min(
+        o.ionization_energy_eV
+        for o, inner in zip(material.oscillators, closure.inner, strict=True)
+        if inner
+    )
+    if cutoff <= first_inner_binding:
+        assert not np.any(partition.soft.per_shell[closure.inner])
     probabilities = partition.hard_channel_probabilities
     assert np.all(probabilities >= 0.0)
-    assert probabilities.sum() == pytest.approx(1.0, rel=1e-14, abs=0.0)
+    expected_sum = 1.0 if partition.hard_cross_section_cm2 > 0.0 else 0.0
+    assert probabilities.sum() == pytest.approx(expected_sum, rel=1e-14, abs=0.0)
 
 
 def test_partition_limits():
@@ -165,10 +182,9 @@ def test_partition_limits():
     assert not np.any(zero.soft.per_shell)
     assert zero.hard_cross_section_cm2 == pytest.approx(closure.moments.total[0], rel=1e-12)
     top = sp.partition_shell_rates(material, closure, 1e9)
-    assert not np.any(top.hard.per_shell[~closure.inner])
-    assert top.hard_cross_section_cm2 == pytest.approx(
-        closure.adopted_inner_cm2.sum(), rel=1e-14, abs=0.0
-    )
+    assert not np.any(top.hard.per_shell)
+    assert top.hard_cross_section_cm2 == 0.0
+    assert not np.any(top.vacancy_cross_sections_cm2)
 
 
 def test_hard_rate_falls_and_soft_moments_rise_with_the_cutoff():
@@ -196,17 +212,20 @@ def test_partition_rejects_bad_cutoff_and_foreign_closure():
 @pytest.mark.parametrize("key", KEYS)
 @pytest.mark.parametrize("energy", [1e3, 1e4, 1e5])
 @pytest.mark.parametrize("cutoff", [10.0, 50.0, 1e3])
-def test_catalog_partition_reproduces_stp_and_eedl_vacancies(key, energy, cutoff):
+def test_catalog_partition_reproduces_stp_and_splits_eedl_vacancies(key, energy, cutoff):
     _require_pdatconf()
     partition = sp.catalog_shell_partition(key, energy, cutoff)
     closure = partition.closure
     total = partition.soft_stopping_eV_cm2 + partition.hard_stopping_eV_cm2
     assert total == pytest.approx(sr.adopted_stopping_cs(key, energy), rel=1e-12, abs=0.0)
     assert np.allclose(
-        partition.vacancy_cross_sections_cm2, closure.adopted_inner_cm2, rtol=1e-14, atol=0.0
+        partition.vacancy_cross_sections_cm2 + partition.soft.per_shell[:, 0] * closure.inner,
+        closure.adopted_inner_cm2,
+        rtol=1e-12,
+        atol=0.0,
     )
     assert np.all(partition.soft.per_shell >= 0.0) and np.all(partition.hard.per_shell >= 0.0)
-    assert 0.0 < partition.hard_cross_section_cm2 <= closure.moments.total[0]
+    assert 0.0 <= partition.hard_cross_section_cm2 <= closure.moments.total[0]
 
 
 def test_hard_loss_sampler_quantiles_and_energy_accounting():
@@ -241,11 +260,32 @@ def test_hard_loss_sampler_quantiles_and_energy_accounting():
             if branch != 2 and osc.ionization_energy_eV == 0.0:
                 assert event.transfer_eV == osc.resonance_energy_eV
             else:
-                lower = 0.0 if closure.inner[index] else partition.cutoff_eV
+                lower = partition.cutoff_eV
                 selected = sg.windowed_shell_gos_moments(material, 1e4, lower, event.transfer_eV)
                 window = getattr(selected, ss.BRANCHES[branch])[index, 0]
                 full = getattr(partition.hard, ss.BRANCHES[branch])[index, 0]
                 assert window * closure.scale[index] / full == pytest.approx(quantile, abs=1e-9)
+
+
+def test_hard_loss_sampler_respects_cutoff_above_inner_binding():
+    material, closure = _fixture_closure(1e4)
+    partition = sp.partition_shell_rates(material, closure, 200.0)
+    probabilities = partition.hard_channel_probabilities.ravel()
+    cumulative = np.cumsum(probabilities)
+    inner_indices = np.flatnonzero(closure.inner)
+    assert np.any(partition.soft.per_shell[inner_indices, 0] > 0.0)
+    sampled = 0
+    for index in inner_indices:
+        for branch in range(3):
+            flat_index = 3 * index + branch
+            if probabilities[flat_index] == 0.0:
+                continue
+            channel_u = cumulative[flat_index] - probabilities[flat_index] / 2.0
+            event = ss.sample_shell_hard_loss(material, partition, channel_u, 0.5)
+            assert event.transfer_eV > partition.cutoff_eV
+            assert event.vacancy is not None
+            sampled += 1
+    assert sampled > 0
 
 
 def test_hard_loss_sampler_threshold_and_invalid_inputs():

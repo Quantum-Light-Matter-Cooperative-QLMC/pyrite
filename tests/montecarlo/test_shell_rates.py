@@ -4,6 +4,7 @@ import dataclasses
 
 import numpy as np
 import pytest
+from scipy.constants import N_A
 
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.eedl_ionization import EEDL_SUBSHELL_LABELS, load_eedl_shell_ionization
@@ -11,6 +12,7 @@ from pyrite.montecarlo.spectrum import characteristic
 from pyrite.montecarlo.transport import shell_gos as sg
 from pyrite.montecarlo.transport import shell_oscillators as so
 from pyrite.montecarlo.transport import shell_rates as sr
+from pyrite.montecarlo.transport.shell_partition import partition_shell_rates
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 
 KEYS = ("silicon", "sio2", "mos2")
@@ -75,6 +77,59 @@ def test_catalog_closure_reproduces_stp_exactly_with_positive_scale(key, energy)
     assert np.isfinite(closure.outer_scale) and closure.outer_scale > 0.0
     assert closure.moments.total[1] == pytest.approx(_stp(key, energy), rel=1e-12, abs=0.0)
     assert np.all(closure.moments.per_shell >= 0.0)
+
+
+# Documented note, not a gate (owner decision, 2026-09-24): the closed model's
+# total IMFP is 26-35% below independent full Penn calculations. The recorded
+# ratios pin that note so a model change cannot silently move it; see
+# docs/validation/beam-transport/penelope-shell-rate-closure.md.
+@pytest.mark.parametrize(
+    ("key", "energy_eV", "penn_imfp_nm", "offset_eV", "recorded_ratio"),
+    [
+        ("silicon", 1998.2, 4.25, 0.0, 0.745),
+        ("silicon", 9897.1, 16.04, 0.0, 0.714),
+        ("silicon", 19930.4, 28.77, 0.0, 0.734),
+        ("sio2", 1998.2, 5.09, 10.0, 0.674),
+        ("sio2", 9897.1, 19.0, 10.0, 0.645),
+        ("sio2", 19930.4, 33.9, 10.0, 0.660),
+    ],
+)
+def test_closed_imfp_to_full_penn_ratio_matches_recorded_note(
+    key, energy_eV, penn_imfp_nm, offset_eV, recorded_ratio
+):
+    """Shinotsuka et al. (2015) Table 2 (Si); (2019) Tables 1/5 (SiO2)."""
+    _require_pdatconf()
+    arrays = resolve_catalog_table(key).arrays()
+    formula_density_cm3 = (
+        float(arrays["density_g_cm3"]) * N_A / float(arrays["molecular_weight_g_mol"])
+    )
+    # Si: energy above Fermi level. SiO2: Table 5 gives E = T - Eg - Ev;
+    # Eq. 7 uses T-prime = T - Eg and Table 1 gives Ev = 10 eV.
+    sigma_cm2 = sr.catalog_shell_rate_closure(key, energy_eV + offset_eV).moments.total[0]
+    model_imfp_nm = 1e7 / (formula_density_cm3 * sigma_cm2)
+    assert model_imfp_nm / penn_imfp_nm == pytest.approx(recorded_ratio, abs=5e-4)
+
+
+@pytest.mark.parametrize("key", ("silicon", "sio2", "mos2"))
+@pytest.mark.parametrize("energy", (1998.2, 9897.1, 19930.4))
+def test_imfp_excess_channel_is_condensed_above_conduction_resonance(key, energy):
+    """The IMFP note is benign only for ``W_c > W_cb``: the conduction-band
+    distant loss (76-85% of the total rate) is then entirely soft, so hard
+    events never sample it and its rate enters transport only through the
+    stopping-closed soft first moment."""
+    _require_pdatconf()
+    closure = sr.catalog_shell_rate_closure(key, energy)
+    band = [k for k, o in enumerate(closure.raw.oscillators) if o.atomic_number == 0]
+    assert len(band) == 1
+    k = band[0]
+    w_cb = closure.raw.oscillators[k].resonance_energy_eV
+    distant = closure.moments.distant_longitudinal[k, 0] + closure.moments.distant_transverse[k, 0]
+    assert 0.75 < distant / closure.moments.total[0] < 0.86
+    material = sr.catalog_shell_oscillators(key)
+    for cutoff in (np.nextafter(w_cb, np.inf), 50.0, 100.0):
+        part = partition_shell_rates(material, closure, cutoff)
+        assert part.hard.distant_longitudinal[k, 0] == 0.0
+        assert part.hard.distant_transverse[k, 0] == 0.0
 
 
 @pytest.mark.parametrize("key", KEYS)

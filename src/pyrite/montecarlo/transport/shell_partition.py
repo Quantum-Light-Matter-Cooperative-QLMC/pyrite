@@ -25,8 +25,9 @@ class ShellSoftHardPartition:
     """Soft (``W <= W_c``) and hard moments of one closed shell GOS.
 
     ``soft`` and ``hard`` have the layout of ``closure.moments`` and sum to it.
-    Inner shells (``closure.inner``) are hard at every ``W_c``. Units per
-    formula unit, as in :class:`~.shell_gos.ShellGOSMoments`.
+    Inner shells (``closure.inner``) are cut at ``W_c`` like outer shells;
+    their soft losses create no explicit vacancy. Units per formula unit, as
+    in :class:`~.shell_gos.ShellGOSMoments`.
     """
 
     closure: ShellRateClosure
@@ -73,7 +74,9 @@ class ShellSoftHardPartition:
     def vacancy_cross_sections_cm2(self) -> np.ndarray:
         """Hard ``sigma^(0)`` of each oscillator, zero for outer shells.
 
-        Equals ``closure.adopted_inner_cm2``: every inner-shell event is hard.
+        Equals ``closure.adopted_inner_cm2`` when the cutoff is below every
+        accessible inner-shell binding energy. Higher cutoffs condense some
+        inner-shell losses without creating explicit vacancies.
         """
         return np.where(self.closure.inner, self.hard.per_shell[:, 0], 0.0)
 
@@ -85,20 +88,16 @@ def partition_shell_rates(
 
     Source: PENELOPE-2024 Eqs. 3.124 and 4.44–4.47. Soft moments integrate
     the closed DCS over ``W <= W_c`` and hard moments over ``W > W_c``; for
-    outer shells and the conduction band each window of
-    :func:`~.shell_gos.windowed_shell_gos_moments` is multiplied by the
-    closure factor ``N(E)``. Every inner shell stays hard with its full
-    closed moments, so its hard rate is the substituted EEDL rate
-    ``sigma_si,i rho_i`` for every ``W_c``.
+    each window of :func:`~.shell_gos.windowed_shell_gos_moments` is
+    multiplied by its oscillator's closure factor. Inner hard rates equal
+    the substituted EEDL rates when ``W_c`` is below their binding energies.
 
-    Deviation: PENELOPE's soft DCS (Eq. 4.113) includes inner shells with
-    ``U_i < W_cc``, whose ionisations then create no vacancy. Keeping inner
-    shells hard preserves the EEDL vacancy count; the two agree whenever
-    ``W_c <= min U_i`` (above 50 eV for the catalog materials).
+    PENELOPE's soft DCS (Eq. 4.113) includes inner shells with ``U_i < W_cc``;
+    those condensed losses create no explicit vacancy.
     Assumptions: a delta loss at exactly ``W_c`` is soft (``W > W_c`` is
     hard), matching the OOS-bin partition. Limits: ``W_c = 0`` leaves no
-    soft moment; ``W_c >= (E + U_k)/2`` for every outer oscillator leaves
-    only inner-shell hard events; soft plus hard first moments equal the
+    soft moment; ``W_c`` above every channel endpoint leaves no hard events;
+    soft plus hard first moments equal the
     adopted stopping for every ``W_c``.
 
     Units: ``W_c`` in eV; moments per formula unit as in
@@ -113,12 +112,11 @@ def partition_shell_rates(
     energy = raw.energy_eV
     below = windowed_shell_gos_moments(material, energy, 0.0, cutoff_eV)
     above = windowed_shell_gos_moments(material, energy, cutoff_eV, np.inf)
-    inner = closure.inner[:, None]
-    outer_scale = np.where(inner, 0.0, closure.scale[:, None])
+    scale = closure.scale[:, None]
 
     def split(name: str) -> tuple[np.ndarray, np.ndarray]:
-        soft = getattr(below, name) * outer_scale
-        hard = np.where(inner, getattr(closure.moments, name), getattr(above, name) * outer_scale)
+        soft = getattr(below, name) * scale
+        hard = getattr(above, name) * scale
         return soft, hard
 
     channels = ("distant_longitudinal", "distant_transverse", "close")

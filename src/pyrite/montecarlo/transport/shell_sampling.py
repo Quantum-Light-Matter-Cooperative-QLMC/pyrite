@@ -95,7 +95,7 @@ def _loss_bounds(
     osc = material.oscillators[index]
     energy = partition.closure.raw.energy_eV
     u, w = osc.ionization_energy_eV, osc.resonance_energy_eV
-    lower = 0.0 if partition.closure.inner[index] else partition.cutoff_eV
+    lower = partition.cutoff_eV
     if branch == 2:
         return max(u if u > 0.0 else w, lower), (energy + u) / 2.0, 0.0
     if u == 0.0:
@@ -119,8 +119,8 @@ def sample_shell_hard_loss(
     Source: PENELOPE-2024 Eqs. 3.76, 3.87, 3.94, 3.96, 3.104 and 3.124. The
     bound-shell distant conditional density is ``p_dis(W)/W``; the close
     conditional density is ``F^(-)(E+U,W)/W^2``. A conduction-band distant
-    loss is a delta at its resonance. Inner shells use the full interval even
-    above ``W_c``, matching the partition's always-hard vacancy rule.
+    loss is a delta at its resonance. All shells use the hard interval
+    ``W > W_c`` used by the partition.
     The manual's Eq. 3.125 instead samples ``p_dis(W)`` without ``1/W``;
     this sampler follows Eq. 3.104 so its samples and partition moments
     describe one differential cross section.

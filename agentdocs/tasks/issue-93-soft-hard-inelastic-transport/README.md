@@ -523,3 +523,73 @@ invalid input, and absent subthreshold secondary directions. This does not
 schedule a collision or enqueue a secondary. The distant-loss source
 discrepancy, independent rate/spectrum evidence, and CPU/GPU integration
 remain open.
+
+## Follow-up, 2026-09-24: independent SiO₂ IMFP gate
+
+The closed material-general shell model was compared with Shinotsuka et al.'s
+relativistic full Penn calculation for SiO₂ (2019, Table 5). At 2, 10, and
+20 keV, its IMFP is 0.674, 0.645, and 0.660 times the published value after
+matching the source's energy origin.
+Reference density (2.19 g/cm³) nearly matches the catalog (2.19993 g/cm³).
+This is a 33–35% IMFP deficit, equivalent to about a 48–55% collision-rate
+excess, even though the first moment closes exactly to corrected `stp.dat`.
+A strict expected-failure benchmark records the discrepancy. The raw GOS
+IMFP is shorter still; the conduction-band oscillator supplies 95.7–96.8% of
+the closed total rate, with its distant-longitudinal channel alone supplying
+83.5–85.3%. Investigate that valence-rate construction first. Do not
+enable the CPU flight scheduler until its cause and broader material/energy
+behavior are assessed. The source's Table 5 energy is measured from the
+conduction-band bottom; Eq. 7 and Table 1 give a 10 eV SiO₂ valence-band
+offset, now applied in the benchmark.
+
+Fresh-context review confirmed a genuine PENELOPE-2024 source conflict for
+bound distant losses: Eqs. 3.94/3.104 imply $p_{\rm dis}(W)/W$ while
+Eqs. 3.81/3.125 imply $p_{\rm dis}(W)/W_k$. The sampler uses the former,
+matching its moments and hard rates. Keep that internally consistent choice
+for the PENELOPE-like model and retain the sampling ledger's `discrepancy`
+status; reproducing Eq. 3.125 would require changing moments, rates, and
+sampler together.
+
+## Follow-up, 2026-09-24: elemental Si total-rate gate
+
+Shinotsuka et al. (2015, Table 2) independently calculate elemental Si IMFPs
+with the relativistic full Penn algorithm. At 2, 10, and 20 keV, the closed
+shell model gives 0.745, 0.714, and 0.734 of their values: a 26–29% IMFP
+deficit or 34–40% collision-rate excess. Its conduction-band oscillator
+supplies 91–94% of the model rate. The Si and SiO₂ discrepancies have the
+same sign. Both are tracked in the strict expected-failure benchmark; the
+material-general scheduler remains gated. See
+`docs/validation/beam-transport/penelope-shell-rate-closure.md`.
+
+## Follow-up, 2026-09-24: conduction-band rate diagnosis
+
+The conduction-band distant-longitudinal term is 81–85% of the closed total
+rate in Si and SiO₂ at the independent 2/10/20 keV benchmark points. A
+reconstructed, stopping-closed sensitivity sweep shows that shifting the
+point-loss resonance by about 20% (Si) or 40% (SiO₂) is needed for all three
+IMFP comparisons to enter the 20% band. Those shifts contradict the sourced
+16.7 and 22 eV loss peaks, so a scalar resonance retune is rejected. The
+bound-shell $p_{\rm dis}/W$ versus $p_{\rm dis}/W_k$ source conflict does not
+affect the conduction-band delta.
+
+As a diagnostic only, replacing Si's closed GOS band moments with the existing
+finite-momentum Si valence fit over 1.12–100 eV puts a naive combined rate
+inside the IMFP band at all three energies, but leaves corrected stopping
+18–22% low and has no proven valence/core overlap rule. The full calculation
+and limits are in `docs/validation/beam-transport/penelope-shell-rate-closure.md`.
+Keep the strict expected-failure gate and the scheduler disabled. Next physics
+slice needs a sourced positive finite-momentum valence/core spectrum for both
+materials, then simultaneous stopping, IMFP, and loss-shape checks.
+
+## Follow-up, 2026-09-24: one cutoff for every shell
+
+The host partition now applies $W_c$ to substituted inner shells as well as
+outer shells. Its sampler uses the same hard loss interval. Soft and hard
+moments still sum to the closed GOS moments, including across an inner-shell
+binding edge. At $W_c\le\min U_i$, explicit vacancy rates retain the full
+EEDL substitution. Above an inner-shell binding energy, part of that shell's
+rate is condensed and creates no explicit vacancy, following PENELOPE
+Eq. 4.113. Above every loss endpoint, the hard event rate is zero. This
+supersedes the always-hard inner-shell choice recorded earlier in this task
+record; existing $W_c=50$ eV diagnostics are unchanged. The independent IMFP
+and differential-spectrum gates still block transport activation.

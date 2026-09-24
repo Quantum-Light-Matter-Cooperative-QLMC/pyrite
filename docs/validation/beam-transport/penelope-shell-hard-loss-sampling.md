@@ -6,7 +6,7 @@ Validation: `penelope-shell-hard-loss-sampling`. Verdict: **discrepancy in the c
 
 The [PENELOPE-2024 manual](https://www.oecd-nea.org/upload/docs/application/pdf/2025-07/nea_mbdav_r_2024_1_penelope-2024_2025-07-10_15-48-34_125.pdf), §§3.2.2–3.2.5, Eqs. 3.76, 3.87, 3.94–3.96, 3.124–3.125, supplies the shell differential cross sections and hard-event procedure. The [Geant4 Penelope reference](https://geant4.web.cern.ch/documentation/pipelines/master/prm_html/PhysicsReferenceManual/electromagnetic/electron_incident/ionisation/penelope_ionisation.html) independently states the inner- and outer-shell secondary convention. The code anchor is `src/pyrite/montecarlo/transport/shell_sampling.py::sample_shell_hard_loss`.
 
-Inputs are a material oscillator set, its closed soft/hard partition, two uniforms in $[0,1)$, and a separate secondary production threshold in eV. The result has oscillator and branch labels, energy transfer $W$ in eV, optional emitted secondary kinetic energy, local deposited energy, optional binding reserve, and an inner-shell vacancy identifier. The partition's substituted inner shells are always hard even when $W$ is below the outer-shell loss cutoff $W_c$. A bound-shell transfer is assumed to ionize its oscillator. Recoil and azimuth are outside this claim.
+Inputs are a material oscillator set, its closed soft/hard partition, two uniforms in $[0,1)$, and a separate secondary production threshold in eV. The result has oscillator and branch labels, energy transfer $W$ in eV, optional emitted secondary kinetic energy, local deposited energy, optional binding reserve, and an inner-shell vacancy identifier. Every sampled hard loss has $W>W_c$, including substituted inner shells. A bound-shell hard transfer is assumed to ionize its oscillator. Recoil and azimuth are outside this claim.
 
 ## Independent derivation and cheap filters
 
@@ -29,9 +29,9 @@ A_{\rm dis}(W)=D\ln W-W,\qquad
 \xi=\frac{D\ln(W/L)-(W-L)}{D\ln(R/L)-(R-L)}.
 $$
 
-For an outer shell, $L=\max(U,W_c)$; for a substituted inner shell, $L=U$. The upper bound is $R=\min(D,(E+U)/2)$; the last term is the electron-exchange limit of Eq. 3.88. The conduction-band distant branch is instead a point mass at its resonance $W_k$.
+For every bound shell, $L=\max(U,W_c)$. The upper bound is $R=\min(D,(E+U)/2)$; the last term is the electron-exchange limit of Eq. 3.88. The conduction-band distant branch is instead a point mass at its resonance $W_k$.
 
-For the close branch, Eqs. 3.87 and 3.96 give $g_{\rm clo}(W)\propto F^{(-)}(E+U,W)/W^2$. Its physical interval is $L=\max(Q_k,W_c)$ and $R=(E+U)/2$, with $Q_k=U$ for a bound shell and $Q_k=W_k$ for the conduction band. The inner-shell always-hard rule removes $W_c$ from $L$. An exact inverse CDF is the unique root of the integral equation above; an analytic antiderivative or converged root solve implements the same distribution. Every continuous sample must remain in $[L,R]$. Positivity of the DCS makes the CDF monotone.
+For the close branch, Eqs. 3.87 and 3.96 give $g_{\rm clo}(W)\propto F^{(-)}(E+U,W)/W^2$. Its physical interval is $L=\max(Q_k,W_c)$ and $R=(E+U)/2$, with $Q_k=U$ for a bound shell and $Q_k=W_k$ for the conduction band. An exact inverse CDF is the unique root of the integral equation above; an analytic antiderivative or converged root solve implements the same distribution. Every continuous sample must remain in $[L,R]$. Positivity of the DCS makes the CDF monotone.
 
 For a substituted inner shell, the secondary has kinetic energy $T_s=W-U$ and the vacancy reserves $U$; for an outer shell or conduction band, the Geant4 Penelope convention uses the proxy $T_s=W$ and no vacancy. If $T_s$ is below the production threshold it is deposited locally. Thus, in both cases,
 

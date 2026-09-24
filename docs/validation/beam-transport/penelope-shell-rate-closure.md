@@ -177,6 +177,139 @@ IMFP at 1/10/100 keV, raw → closed (Å): Si 18.6→19.6, 128.7→115.5,
 810.7→750.4; SiO₂ 15.4→19.8, 107.0→122.9, 674.8→807.4; MoS₂ 15.0→14.9,
 101.1→88.4, 629.8→510.5.
 
+### Independent SiO₂ total-rate gate
+
+[Shinotsuka et al., *Surface and Interface Analysis* 51 (2019),
+Table 5](https://pmc.ncbi.nlm.nih.gov/articles/PMC7047655/) calculate SiO₂
+IMFPs from an optical loss function with the relativistic full Penn algorithm.
+Their Table 1 uses 2.19 g/cm³, near this catalog's 2.19993 g/cm³. Table 5
+reports $E=T-E_g-E_v$, while their Eq. 7 uses $T'=T-E_g$; for SiO₂,
+$E_v=10$ eV. The benchmark evaluates this model at $E+10$ eV to match
+$T'$. The tabulated model values below use that offset; it changes the model
+rate by 0.04–0.40% at these energies. The published
+values are calculated reference data, not direct measurements.
+
+| Energy (eV) | Full Penn (nm) | Raw GOS (nm) | Closed GOS (nm) | Closed/reference |
+| ---: | ---: | ---: | ---: | ---: |
+| 1998.2 | 5.09 | 2.741 | 3.430 | 0.674 |
+| 9897.1 | 19.0 | 10.615 | 12.257 | 0.645 |
+| 19930.4 | 33.9 | 19.191 | 22.389 | 0.660 |
+
+The model IMFP is $10^7/[N\sigma^{(0)}]$ nm for molecular number density
+$N=\rho N_A/M$ in cm⁻³ and cross section in cm² per formula unit. The
+33–35% IMFP deficit means the closed model predicts 48–55% more
+inelastic collisions per path than this independent calculation. The
+recorded ratios are pinned by a non-failing characterization test; see
+[IMFP note](#total-imfp-note-not-a-transport-gate). This is a total-rate
+discrepancy, separate from the
+exact corrected-stopping closure. The raw GOS already has a shorter IMFP;
+the correction moves it toward the reference. The conduction-band oscillator
+accounts for 95.7–96.8% of the closed total rate at these energies. Its
+distant-longitudinal channel alone contributes 83.5–85.3% of the total;
+its close channel contributes 10.4–13.3%, and its transverse channel is
+negligible. The 22 eV point-loss conduction response therefore dominates
+the model's total rate, though the aggregate IMFP cannot identify whether the
+oscillator response, finite-momentum construction, or reference method causes
+it. A differential loss-spectrum comparison is needed before changing the
+rate.
+
+### Independent Si total-rate gate
+
+[Shinotsuka et al., *Surface and Interface Analysis* 47 (2015),
+Table 2](https://mdr.nims.go.jp/datasets/faa3fcd0-cc22-4955-bbb3-0b686504eea4?locale=en)
+calculate elemental Si IMFPs from measured optical energy-loss functions
+with the relativistic full Penn algorithm. The table's kinetic energy is
+measured above the Fermi level; no SiO₂-style valence-band offset applies.
+The same catalog-density conversion gives:
+
+| Energy (eV) | Full Penn (nm) | Raw GOS (nm) | Closed GOS (nm) | Closed/reference |
+| ---: | ---: | ---: | ---: | ---: |
+| 1998.2 | 4.25 | 3.288 | 3.166 | 0.745 |
+| 9897.1 | 16.04 | 12.760 | 11.459 | 0.714 |
+| 19930.4 | 28.77 | 23.076 | 21.124 | 0.734 |
+
+The closed Si IMFP is 26–29% shorter, corresponding to a 34–40% collision-rate
+excess. Its conduction-band oscillator supplies 91–94% of the closed total
+rate. Both Si and SiO₂ therefore fail this independent total-rate check;
+the sign is shared, while the material-specific oscillator and reference
+responses differ. These are calculated reference IMFPs, not direct
+measurements, and neither table resolves the differential loss spectrum.
+
+### Conduction-band rate diagnosis
+
+The closed Si conduction-band *distant-longitudinal* channel supplies
+81.1–81.9% of the total zeroth moment at the three benchmark energies;
+SiO₂'s supplies 83.5–85.3%. This is the PENELOPE point-loss oscillator at
+the sourced $W_{cb}$, not a measured differential rate. To test whether its
+resonance alone could explain the deficit, rebuild the oscillator set and
+stopping closure with $W_{cb}$ changed, leaving $f_{cb}$, catalog $I$,
+$\Omega_p$, EEDL inner rates, and corrected stopping fixed. This also
+re-solves the Sternheimer factor, so it is a self-consistent sensitivity
+calculation, **not** an endorsed material-parameter change:
+
+| Material | $W_{cb}$ (eV) | Closed IMFP / full Penn at 2, 10, 20 keV |
+| --- | ---: | --- |
+| Si | 16.70 (sourced) | 0.745, 0.714, 0.734 |
+| Si | 20.04 (1.2×) | 0.854, 0.811, 0.827 |
+| SiO₂ | 22.00 (sourced) | 0.674, 0.645, 0.660 |
+| SiO₂ | 26.40 (1.2×) | 0.780, 0.731, 0.740 |
+| SiO₂ | 30.80 (1.4×) | 0.880, 0.812, 0.814 |
+
+All three Si comparisons enter the 20% band only after a shift of roughly
+20% from its sourced 16.7 eV optical peak. SiO₂ needs roughly a 40% shift
+from the 22 eV amorphous plasmon peak; even the cited 23.6 eV fit from a
+denser sample is insufficient. Since these shifts conflict with the measured
+peak positions, retuning $W_{cb}$ to the IMFP would damage the loss spectrum.
+The alternative bound-shell $p_{\rm dis}(W)/W_k$ convention cannot change the
+conduction-band delta contribution: $W=W_k$ there. The rate discrepancy is
+therefore insensitive to that source conflict in its dominant channel.
+
+The existing Si finite-momentum valence fit in
+[`dielectric-bulk-loss.md`](dielectric-bulk-loss.md) gives another diagnostic.
+Integrating its 1.12–100 eV partial spectrum on a 0.25 eV grid gives the
+following path moments; GOS non-band is the closed total minus the
+conduction-band oscillator. Units are Å$^{-1}$ and eV Å$^{-1}$:
+
+| Si energy (eV) | Full Penn total rate | Dielectric valence rate | Closed GOS band rate | Dielectric valence + GOS non-band rate | Dielectric valence + GOS non-band stopping / corrected stopping |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1998.2 | 0.023529 | 0.022936 | 0.029568 | 0.024958 | 0.820 |
+| 9897.1 | 0.006234 | 0.005732 | 0.008060 | 0.006399 | 0.781 |
+| 19930.4 | 0.003476 | 0.003069 | 0.004331 | 0.003472 | 0.784 |
+
+The partial finite-momentum valence rate is below the point-oscillator rate,
+and the naive hybrid total falls inside the IMFP band. But its first moment
+misses corrected stopping by about 18–22%; the valence fit is incomplete at
+high losses, and the GOS non-band component has no validated non-overlap rule
+with it. This hybrid is **not** a replacement model or a transport mode.
+A justified material-general change still needs a finite-momentum response
+or equivalent sourced differential construction for both materials, positive
+core composition, corrected first-moment closure, and independent rate and
+loss-spectrum checks.
+
+### Total IMFP note (not a transport gate)
+
+Owner decision, 2026-09-24: the 26–35% total-IMFP deficit above is a
+documented note, not a blocker for the soft/hard transport mode. The
+conduction-band distant channel carries 76–85% of the closed total rate
+(Si 81–82%, SiO₂ 84–85%, MoS₂ 76–77% at the benchmark energies), and all of
+it is a point loss at exactly $W_{cb}$ (16.7, 22 and 23 eV). For any cutoff
+$W_c>W_{cb}$ that loss is soft: it enters transport only through the soft
+first and second moments, whose sum with the hard first moment is closed to
+corrected `stp.dat` exactly. PENELOPE's mixed scheme targets stopping,
+straggling and hard events, not the total IMFP; the hard rate at
+$W_c=50$ eV is only 9–16% of the total model rate. The note is therefore
+benign **only** when $W_c>W_{cb}$; a transport mode built on this model must
+reject a cutoff at or below any layer's $W_{cb}$.
+
+`test_closed_imfp_to_full_penn_ratio_matches_recorded_note` pins the six
+recorded closed/full-Penn ratios (Si 0.745, 0.714, 0.734; SiO₂ 0.674,
+0.645, 0.660) to ±5×10⁻⁴, so a model change cannot move them silently.
+`test_imfp_excess_channel_is_condensed_above_conduction_resonance` checks
+that the conduction-band distant hard rate is zero at $W_c$ just above
+$W_{cb}$, 50 eV and 100 eV. A full-Penn dielectric valence alternative was
+prototyped and is not implemented. Hard-event spectra and any claim about
+total inelastic mean free paths remain unvalidated by this model.
+
 Total $\sigma^{(2)}$ (straggling), closed/raw:
 
 | material | 1 keV | 2 keV | 5 keV | 10 keV | 20 keV | 50 keV | 100 keV | 1 MeV |
