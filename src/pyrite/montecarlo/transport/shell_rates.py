@@ -234,6 +234,24 @@ def adopted_stopping_cs(key: str, energy_eV: float) -> float:
     return float(np.exp(np.interp(np.log(energy_eV), np.log(grid), np.log(stopping))))
 
 
+def catalog_shell_oscillators(key: str) -> MaterialShellOscillators:
+    """Measured-conduction-band shell oscillators of a catalog material.
+
+    Catalog composition and ``I``, all-electron ``Omega_p`` and the packaged
+    conduction band, as :func:`~.shell_oscillators.build_shell_oscillators`.
+
+    Validation: penelope-shell-oscillators
+    """
+    inputs = catalog_material(key)
+    return build_shell_oscillators(
+        inputs.composition,
+        inputs.mean_excitation_eV,
+        plasma_energy_eV(key),
+        load_atomic_shells(),
+        load_conduction_bands()[key],
+    )
+
+
 def catalog_shell_rate_closure(
     key: str,
     energy_eV: float,
@@ -249,13 +267,7 @@ def catalog_shell_rate_closure(
     """
     inputs = catalog_material(key)
     shells = load_atomic_shells()
-    material = build_shell_oscillators(
-        inputs.composition,
-        inputs.mean_excitation_eV,
-        plasma_energy_eV(key),
-        shells,
-        load_conduction_bands()[key],
-    )
+    material = catalog_shell_oscillators(key)
     stopping = adopted_stopping_cs(key, energy_eV)
     cutoff = inner_shell_cutoff_eV(inputs.composition, shells, inner_threshold_eV)
     sigma = eedl_inner_cross_sections(inputs.composition, shells, material, energy_eV, cutoff)

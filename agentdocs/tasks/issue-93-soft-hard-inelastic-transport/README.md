@@ -446,3 +446,80 @@ Next slice: fresh-context validation of `penelope-shell-rate-closure`
 (together with `penelope-shell-gos-moments`). Then add the $W_c$ soft/hard
 partition on the closed moments: soft $\sigma^{(1)},\sigma^{(2)}$ below $W_c$
 and hard inner-shell rates that preserve EEDL vacancy counts.
+
+Merge note, 2026-09-24: `issue-93-shell-rate-closure` was merged after the
+Eq. 3.96 close-cutoff change. The diagnostics above predate that change. The
+current values are in `docs/validation/beam-transport/penelope-shell-rate-closure.md`:
+$\mathcal N$ ranges 0.76–1.28. Near threshold, EEDL/GOS K-shell ratios are now about 1
+(Si K at 2 keV: 0.958, previously 0.014), and straggling changes by −34% to +13%.
+
+## Follow-up, 2026-09-24: rate closure rederived; soft/hard partition
+
+Fresh-context validation rederived `penelope-shell-rate-closure` and
+re-checked the Eq. 3.96 close cutoff in `penelope-shell-gos-moments` (both
+`rederived`). It found only stale $Q'_k$ close-integral text and a missing
+`is_inner_shell` marker, both fixed.
+
+`montecarlo/transport/shell_partition.py` splits the closed moments at
+$W_c$ (PENELOPE Eqs. 3.124, 4.44–4.47): soft $\sigma^{(1)},\sigma^{(2)}$
+for $W\le W_c$, hard $\sigma^{(0..2)}$ and (oscillator, branch) point
+probabilities for $W>W_c$. `shell_gos.windowed_shell_gos_moments` restricts
+each channel's loss integral; the unrestricted moments are its $(0,\infty)$
+window and are bitwise unchanged. Inner shells are hard at every $W_c$, so
+hard inner rates equal the EEDL×$\rho$ vacancy rates. This deviates from
+PENELOPE's Eq. 4.113 only for $W_c>\min U_i$ (104 eV Si/SiO₂, 68 eV MoS₂).
+At $W_c=50$ eV, the soft share of stopping is 0.27–0.61 at 1–100 keV. Ledger
+row `penelope-shell-soft-hard-partition` is unverified. Next: hard-event
+sampling ($W$ from Eq. 3.125 and the Møller branch, recoil, secondary state),
+then IMFP comparison with measurements before transport integration.
+
+## Follow-up, 2026-09-24: host hard-loss sampling
+
+`montecarlo/transport/shell_sampling.py` now selects an oscillator/branch from
+the closed hard rates and inverts that branch's restricted loss CDF. A sampled
+bound-shell event records $W$, $U$, optional secondary kinetic energy $W-U$,
+local deposit, and a vacancy only for EEDL-substituted inner shells. This
+remains host-side and returns no recoil or azimuth. Quantile, fixed-seed
+channel-frequency, and energy-accounting tests pass. Ledger row
+`penelope-shell-hard-loss-sampling` is unverified. Next: sample momentum
+transfer and angles from the branch model, then independent IMFP/transfer
+spectrum checks before scheduler and CUDA integration.
+
+## Follow-up, 2026-09-24: primary hard-event recoil
+
+The host sampler now adds longitudinal $Q$ from PENELOPE Eqs. 3.126–3.129,
+the modified-resonance primary angle, transverse no-deflection, close Møller
+$Q=W$ and primary angle (Eq. 3.134), and uniform azimuth. Direct quadrature
+checks the longitudinal recoil quantiles; every active Si fixture branch is
+covered. Ledger row `penelope-shell-hard-recoil` is unverified. The result is
+relative to the incoming flight; it is not yet a segment boundary or world
+direction. Secondary direction, independent recoil/spectrum evidence, and
+CPU/GPU integration remain.
+
+## Follow-up, 2026-09-24: secondary emission direction
+
+The host collision sampler now returns a polar cosine and opposite azimuth
+for each emitted secondary. Longitudinal events use the sampled $Q$ and
+modified resonance in PENELOPE Eq. 3.137; close events use Eq. 3.138.
+Distant transverse events use the fixed cosine 0.5 of the Geant4 Penelope
+implementation because that branch has no sampled $Q$. Subthreshold
+secondaries have no direction. Every active fixture channel is checked at
+three recoil quantiles. The `penelope-shell-secondary-direction` ledger row
+is unverified. World-frame rotation, secondary track scheduling, independent
+angular evidence, and CPU/GPU parity remain open.
+
+The independent loss-sampler validator identified a source conflict:
+PENELOPE-2024 Eq. 3.125 samples triangular $p_{\rm dis}(W)$, whereas
+Eqs. 3.94/3.104 and the adopted moments use $p_{\rm dis}(W)/W$. The sampler
+matches the adopted DCS and moments; its ledger row is `discrepancy` pending
+source adjudication. This also gates production activation.
+
+## Follow-up, 2026-09-24: world-frame collision directions
+
+The host collision now rotates both primary and emitted-secondary angles
+through the transport core's common incoming-flight frame. On-axis and tilted
+flight checks cover unit norms, polar cosines, opposite transverse components,
+invalid input, and absent subthreshold secondary directions. This does not
+schedule a collision or enqueue a secondary. The distant-loss source
+discrepancy, independent rate/spectrum evidence, and CPU/GPU integration
+remain open.

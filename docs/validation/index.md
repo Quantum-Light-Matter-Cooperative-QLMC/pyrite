@@ -41,6 +41,10 @@ beam-transport/penelope-shell-gos-moments
 beam-transport/penelope-shell-gos-moments-verification
 beam-transport/penelope-shell-rate-closure
 beam-transport/penelope-shell-rate-closure-verification
+beam-transport/penelope-shell-soft-hard-partition
+beam-transport/penelope-shell-hard-loss-sampling
+beam-transport/penelope-shell-hard-recoil
+beam-transport/penelope-shell-secondary-direction
 beam-transport/sbethe-atomic-shell-inputs
 beam-transport/sbethe-atomic-shell-inputs-verification
 beam-transport/gos-core-edge

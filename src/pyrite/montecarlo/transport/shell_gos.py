@@ -95,16 +95,19 @@ def density_effect_correction(material: MaterialShellOscillators, energy_eV: flo
     return float(delta - l2 * target / material.plasma_energy_eV**2)
 
 
-def _triangle_moments(lower: float, peak_end: float, upper: float) -> np.ndarray:
-    """``int W^(n-1) p_dis dW`` for n = 0, 1, 2 over ``[U, min(W_dis, W_max)]``.
+def _triangle_moments(lower: float, peak_end: float, a: float, b: float) -> np.ndarray:
+    """``int W^(n-1) p_dis dW`` for n = 0, 1, 2 over ``[a, b]`` within ``[U, W_dis]``.
 
-    ``p_dis = 2 (W_dis - W)/(W_dis - U)^2`` on ``[U, W_dis]`` (Eq. 3.76).
+    ``p_dis = 2 (W_dis - W)/(W_dis - U)^2`` on ``[U, W_dis]`` (Eq. 3.76), with
+    ``lower = U`` and ``peak_end = W_dis``.
     """
-    b = min(peak_end, upper)
+    a, b = max(a, lower), min(b, peak_end)
+    if b <= a:
+        return np.zeros(3)
     norm = 2.0 / (peak_end - lower) ** 2
-    m0 = norm * (peak_end * np.log(b / lower) - (b - lower))
-    m1 = norm * (peak_end * (b - lower) - 0.5 * (b * b - lower * lower))
-    m2 = norm * (0.5 * peak_end * (b * b - lower * lower) - (b**3 - lower**3) / 3.0)
+    m0 = norm * (peak_end * np.log(b / a) - (b - a))
+    m1 = norm * (peak_end * (b - a) - 0.5 * (b * b - a * a))
+    m2 = norm * (0.5 * peak_end * (b * b - a * a) - (b**3 - a**3) / 3.0)
     return np.array([m0, m1, m2])
 
 
@@ -161,6 +164,36 @@ def shell_gos_moments(material: MaterialShellOscillators, energy_eV: float) -> S
     Units: E in eV; per formula unit in cm^2, eV cm^2, eV^2 cm^2.
     Validation: penelope-shell-gos-moments
     """
+    return _windowed_moments(material, energy_eV, 0.0, np.inf)
+
+
+def windowed_shell_gos_moments(
+    material: MaterialShellOscillators, energy_eV: float, lower_eV: float, upper_eV: float
+) -> ShellGOSMoments:
+    """Moments of :func:`shell_gos_moments` restricted to losses ``lower < W <= upper``.
+
+    Source: PENELOPE-2024 Eqs. 3.124 and 4.44–4.47: the restricted cross
+    sections integrate the same distant and close energy-loss DCSs over a
+    sub-interval of ``W``. The ``Q``-integrated factors of the distant terms do
+    not depend on ``W``, so each channel restricts only its loss integral: the
+    triangle ``p_dis`` over ``[max(U, lower), min(W_dis, W_max, upper)]``, the
+    conduction-band ``delta(W - W_cb)`` when ``lower < W_cb <= upper``, and
+    the Møller integral over ``[max(Q_k, lower), min(W_max, upper)]``.
+
+    Limits: ``(0, inf)`` reproduces :func:`shell_gos_moments` exactly; the
+    windows ``(0, W_c]`` and ``(W_c, inf)`` sum to it for any ``W_c >= 0``.
+
+    Units: as :func:`shell_gos_moments`.
+    Validation: penelope-shell-soft-hard-partition
+    """
+    if not (0.0 <= lower_eV <= upper_eV) or np.isnan(upper_eV) or np.isinf(lower_eV):
+        raise ValueError("loss window needs 0 <= lower <= upper with a finite lower bound")
+    return _windowed_moments(material, energy_eV, float(lower_eV), float(upper_eV))
+
+
+def _windowed_moments(
+    material: MaterialShellOscillators, energy_eV: float, lower_eV: float, upper_eV: float
+) -> ShellGOSMoments:
     if not np.isfinite(energy_eV) or energy_eV <= 0.0:
         raise ValueError("electron kinetic energy must be finite and positive")
     gamma, beta2 = _kinematics(energy_eV)
@@ -181,10 +214,13 @@ def shell_gos_moments(material: MaterialShellOscillators, energy_eV: float) -> S
                 w_mod, q_mod = w, u
             else:
                 w_mod, q_mod = (energy_eV + 2.0 * u) / 3.0, u * energy_eV / w_dis_full
-            loss = _triangle_moments(u, 3.0 * w_mod - 2.0 * u, w_max)
+            loss = _triangle_moments(
+                u, 3.0 * w_mod - 2.0 * u, max(u, lower_eV), min(w_max, upper_eV)
+            )
         else:
             w_mod, q_mod = w, w
-            loss = np.array([1.0 / w, 1.0, w]) if w < w_max else np.zeros(3)
+            inside = w < w_max and lower_eV < w <= upper_eV
+            loss = np.array([1.0 / w, 1.0, w]) if inside else np.zeros(3)
         if w_mod < energy_eV and loss[1] > 0.0:
             q_minus = float(_qmin_ev(energy_eV, w_mod))
             if q_minus < q_mod:
@@ -195,10 +231,11 @@ def shell_gos_moments(material: MaterialShellOscillators, energy_eV: float) -> S
                 dis_t[i] = pref * f * transverse * loss
         # Eq. 3.96: close losses start at Q_k = U_k (Eq. 3.56), not Q'_k, so a
         # knock-on energy W - U_k is never negative; the band keeps Q_cb = W_cb.
-        q_close = u if u > 0.0 else q_mod
-        if q_close < w_max:
+        q_close = max(u if u > 0.0 else q_mod, lower_eV)
+        w_top = min(w_max, upper_eV)
+        if q_close < w_top:
             prime = energy_eV + u
-            j = _moller_integrals(energy_eV, prime, w_max) - _moller_integrals(
+            j = _moller_integrals(energy_eV, prime, w_top) - _moller_integrals(
                 energy_eV, prime, q_close
             )
             close[i] = pref * f * j

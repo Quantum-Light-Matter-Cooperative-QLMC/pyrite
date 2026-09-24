@@ -1,6 +1,6 @@
 # PENELOPE inner-shell rate substitution and stopping closure
 
-Validation: `penelope-shell-rate-closure`. Status: unverified. The rescaled
+Validation: `penelope-shell-rate-closure`. Status: rederived. The rescaled
 moments are host-side only. Nothing samples them, and no transport mode
 uses them.
 

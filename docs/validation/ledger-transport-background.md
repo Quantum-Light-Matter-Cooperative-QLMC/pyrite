@@ -143,6 +143,58 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_shell_rates.py`; [implementation derivation](beam-transport/penelope-shell-rate-closure.md); [verification](beam-transport/penelope-shell-rate-closure-verification.md)
 - **Notes:** Host-side only; no sampling or transport consumes it. $\mathcal N$ spans 0.76–1.28 (SiO₂ 0.76 at 1 keV, MoS₂ 1.28 at 100 keV) with the Eq. 3.96 close cutoff. The closure moves $\sigma^{(0)}$ by −23% to +23% and straggling by −34% to +13%. The manual's Ba $E_c=92$ eV equals the Ba N5 energy, not the stated O-shell rule; the code follows the stated rule. It depends on `penelope-shell-gos-moments` (rederived; Eq. 3.96 close cutoff applied after verification). Only a human may mark this row `signed-off`.
 
+## `penelope-shell-soft-hard-partition`
+
+- **Claim:** the stopping-closed shell GOS moments split at an energy-loss cutoff $W_c$ into soft $\sigma^{(1)},\sigma^{(2)}$ ($W\le W_c$) and hard $\sigma^{(0..2)}$ ($W>W_c$) that sum to the closed moments, so soft plus hard stopping equals `stp.dat`; inner shells are hard at every $W_c$, so hard inner rates equal the substituted EEDL vacancy rates
+- **Code:** `montecarlo/transport/shell_gos.py::windowed_shell_gos_moments`; `montecarlo/transport/shell_partition.py::{partition_shell_rates,catalog_shell_partition,ShellSoftHardPartition}`
+- **Source:** PENELOPE-2024 §3.2.5 and Chapter 4, NEA/MBDAV/R(2024)1, Eqs. 3.76, 3.87, 3.96, 3.106–3.110, 3.124, 4.44–4.47, 4.113; §3.2.6.1 (vacancies from hard inner-shell collisions)
+- **Equation:** outer $k$: soft $=\mathcal N\sigma^{(n)}_k|_{(0,W_c]}$, hard $=\mathcal N\sigma^{(n)}_k|_{(W_c,\infty)}$; inner $i$: soft $=0$, hard $=s_i\sigma^{(n)}_i$; windows restrict only the loss integral (triangle $p_{\rm dis}$ over $[\max(U,W_a),\min(W_{\rm dis},W_{\max},W_b)]$, $\delta(W-W_{cb})$ if $W_a<W_{cb}\le W_b$, Møller over $[\max(Q_k,W_a),\min((E+U_k)/2,W_b)]$)
+- **Assumptions:** distant $Q$-integrated factors are independent of $W$; inner shells always hard (deviation from Eq. 4.113 when $W_c>\min U_i$: 104 eV Si/SiO₂, 68 eV MoS₂); a loss exactly at $W_c$ is soft; branch probabilities from restricted channel cross sections
+- **Limiting cases:** window $(0,\infty)$ is bitwise the unrestricted moments; $W_c=0$ gives no soft moment; $W_c\to\infty$ leaves only inner-shell hard events at $\sum_i\rho_i\sigma_{{\rm si},i}$; hard rate non-increasing and soft moments non-decreasing in $W_c$
+- **Status:** unverified
+- **Checks:** window sums ($10^{-12}$); windowed triangle/Møller vs direct quadrature ($10^{-10}$/$10^{-9}$); fixture and catalog stopping closure ($10^{-12}$, abs 0); vacancy rates equal `adopted_inner_cm2`; limits; monotonicity; invalid windows and cutoffs rejected
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-soft-hard-partition.md)
+- **Notes:** Host-side only; no sampling or transport consumes it. At $W_c=50$ eV the soft share of stopping is 0.27–0.61 and the hard mean free path 105–9148 Å over Si/SiO₂/MoS₂ at 1–100 keV. Depends on `penelope-shell-rate-closure` and `penelope-shell-gos-moments` (both rederived). Only a human may mark this row `signed-off`.
+
+## `penelope-shell-hard-loss-sampling`
+
+- **Claim:** a hard event selects (oscillator, branch) with its closed hard rate, then draws $W$ from that branch's restricted DCS; local deposit plus emitted secondary kinetic energy plus reserved inner-shell binding equals the primary loss, and only substituted inner shells carry a vacancy label
+- **Code:** `montecarlo/transport/shell_sampling.py::sample_shell_hard_loss`
+- **Source:** PENELOPE-2024 §§3.2.3–3.2.5, Eqs. 3.76, 3.87, 3.94, 3.96, 3.104 and 3.124, NEA/MBDAV/R(2024)1; Eq. 3.125 gives a conflicting triangular sampling law
+- **Equation:** $p_{kb}=\sigma_{kb}^{(0)}/\sigma_h^{(0)}$; bound distant $g(W)\propto(W_{\rm dis}-W)/W$; close $g(W)\propto F^{(-)}(E+U_k,W)/W^2$; inner emitted $E_s=W-U_k$ with reserve $U_k$; outer emitted proxy $E_s=W$ with no vacancy; a subthreshold secondary is deposited locally
+- **Assumptions:** inner shells remain hard at every cutoff as in the partition; a bound-shell sampled loss ionizes its oscillator; the outer-shell secondary is PENELOPE's free-electron proxy without a residual vacancy; the reserved inner binding must be consumed exactly once by #94's relaxation handoff
+- **Limiting cases:** conduction-band distant loss is exactly $W_{cb}$; continuous sampled $W$ lies in its branch's hard interval; local plus emitted plus reserved energy equals $W$
+- **Status:** discrepancy
+- **Checks:** each nonzero fixture channel's 10th, 50th and 90th loss quantiles versus the windowed DCS integral ($10^{-9}$); seed-93 channel frequencies (1200 events); energy accounting, inner vacancy labels, threshold and invalid inputs
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-hard-loss-sampling.md)
+- **Notes:** The sampler follows the Eq. 3.94/3.104 distant DCS $p_{\rm dis}(W)/W$ used by its moments. Eq. 3.125 instead samples $p_{\rm dis}(W)$; the first divergent factor is $1/W$ versus a constant. This source conflict needs adjudication before transport activation. Host-side loss sampling only; event scheduling, independent rate/spectrum evidence and CPU/GPU checks remain open. Depends on `penelope-shell-soft-hard-partition` (unverified). Only a human may mark this row `signed-off`.
+
+## `penelope-shell-hard-recoil`
+
+- **Claim:** a hard longitudinal shell event draws recoil energy from the PENELOPE $Q$ law and gives the primary polar angle from the modified resonance; transverse events leave the primary direction unchanged; close events use Møller recoil $Q=W$; azimuth is uniform
+- **Code:** `montecarlo/transport/shell_sampling.py::sample_shell_hard_collision`
+- **Source:** PENELOPE-2024 §3.2.5.1–3.2.5.2, NEA/MBDAV/R(2024)1, Eqs. 3.126–3.129 and 3.134
+- **Equation:** $g(Q)\propto[Q(1+Q/(2m_ec^2))]^{-1}$ on $(Q_-,Q'_k)$, $L(Q)=\ln[Q/(Q+2m_ec^2)]$; longitudinal $\cos\theta=[p(E)^2+p(E-W'_k)^2-p(Q)^2]/[2p(E)p(E-W'_k)]$ with $p(T)^2=T(T+2m_ec^2)$; close $Q=W$, $\cos^2\theta=(E-W)(E+2m_ec^2)/[E(E-W+2m_ec^2)]$; $\phi=2\pi\xi$
+- **Assumptions:** bound-shell angular distribution uses $W'_k$ even when its sampled loss differs; the incoming flight is the polar axis; transverse deflection is neglected; the returned azimuth needs caller rotation to world coordinates
+- **Limiting cases:** longitudinal $Q=Q_-$ gives $\cos\theta=1$; transverse $\cos\theta=1$; close $W/E\to0$ gives $\cos\theta\to1$
+- **Status:** unverified
+- **Checks:** every nonzero fixture branch at 10 keV; four longitudinal recoil quantiles versus direct $Q$ quadrature ($10^{-9}$); close and longitudinal polar angles versus source equations; transverse and invalid-uniform limits; every active catalog branch for Si/SiO₂/MoS₂ at 1, 10 and 100 keV
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-hard-recoil.md)
+- **Notes:** Host-side primary recoil; segment scheduling, independent measured recoil comparison, and CPU/GPU reproducibility remain open. Secondary direction has its own ledger row. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-secondary-direction`
+
+- **Claim:** an emitted shell secondary follows the momentum-transfer polar angle for longitudinal and close collisions, opposite the primary azimuth; distant transverse emission uses a fixed polar cosine of 0.5; both returned angles rotate through the same incoming-flight frame; subthreshold secondaries have no returned direction
+- **Code:** `montecarlo/transport/shell_sampling.py::sample_shell_hard_collision`, `::shell_collision_world_directions`
+- **Source:** PENELOPE-2024 §3.2.5.4, NEA/MBDAV/R(2024)1, Eqs. 3.137–3.138; Geant4 `G4PenelopeIonisationModel::SampleFinalStateElectron` distant-transverse convention
+- **Equation:** longitudinal $\cos\theta_s=[p(E)^2+p(Q)^2-p(E-W'_k)^2]/[2p(E)p(Q)]$, $p(T)^2=T(T+2m_ec^2)$; close $\cos\theta_s=\sqrt{W(E+2m_ec^2)/[E(W+2m_ec^2)]}$; $\phi_s=(\phi+\pi)\bmod 2\pi$; world direction $\mathbf d'=\cos\theta\,\mathbf d+\sin\theta(\cos\phi\,\mathbf u+\sin\phi\,\mathbf v)$ with a common orthonormal frame $(\mathbf u,\mathbf v,\mathbf d)$
+- **Assumptions:** target electron initially at rest for the angular approximation; bound-shell longitudinal angle uses modified resonance even when sampled loss differs; transverse cosine 0.5 is an explicit implementation convention; both returned directions use the incoming flight frame
+- **Limiting cases:** longitudinal $Q=Q_-$ gives forward emission; close $W/E\to0$ gives transverse emission; forward primary retains the incoming unit direction; subthreshold energy has no direction
+- **Status:** unverified
+- **Checks:** every nonzero fixture branch at three recoil quantiles; momentum-triangle and close formulas; opposite azimuth and transverse convention; on-axis and tilted shared-frame rotation, unit norms and polar cosines; suppressed secondary direction absent; invalid incoming directions rejected
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-secondary-direction.md)
+- **Notes:** Host-side only; independent angular validation, track scheduling, and CPU/GPU comparison remain open. Depends on the hard-loss sampler's unresolved distant-triangle source discrepancy. Only a human may mark this row `signed-off`.
+
 ## `gos-optical-quadrature`
 
 - **Claim:** each positive-width interval of the SBETHE optical oscillator-strength density contributes its integrated strength and first-moment centroid as one resonance; duplicate-energy shell edges have zero weight
