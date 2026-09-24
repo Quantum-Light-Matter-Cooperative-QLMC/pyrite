@@ -47,10 +47,14 @@ def test_silicon_oos_core_edge_preserves_strength_and_raw_transfer_spectrum():
     assert np.min(reference.lower_ev) >= edge_ev
     assert hard_transfer_cdf(reference, np.asarray([edge_ev]))[0] == 0.0
     for partition in partitions:
-        assert partition.raw_sigma0_cm2 == pytest.approx(reference.raw_sigma0_cm2, rel=1e-13)
-        assert partition.raw_sigma1_ev_cm2 == pytest.approx(reference.raw_sigma1_ev_cm2, rel=1e-13)
+        assert partition.raw_sigma0_cm2 == pytest.approx(
+            reference.raw_sigma0_cm2, rel=1e-13, abs=0.0
+        )
+        assert partition.raw_sigma1_ev_cm2 == pytest.approx(
+            reference.raw_sigma1_ev_cm2, rel=1e-13, abs=0.0
+        )
         assert partition.soft_stopping_ev_cm2 + partition.hard_stopping_ev_cm2 == pytest.approx(
-            partition.raw_sigma1_ev_cm2, rel=1e-13
+            partition.raw_sigma1_ev_cm2, rel=1e-13, abs=0.0
         )
     assert partitions[-1].hard_sigma_cm2 == 0.0
 
@@ -82,7 +86,7 @@ def test_partition_keeps_corrected_mean_without_a_loss_gap(threshold_ev):
     assert partition.soft_stopping_ev_cm2 >= 0.0
     assert partition.hard_stopping_ev_cm2 >= 0.0
     assert partition.soft_stopping_ev_cm2 + partition.hard_stopping_ev_cm2 == pytest.approx(
-        expected, rel=5e-12
+        expected, rel=5e-12, abs=0.0
     )
     assert partition.hard_sigma_cm2 >= 0.0
     if threshold_ev >= energy_ev:
@@ -97,13 +101,19 @@ def test_cutoff_partitions_one_fixed_transfer_spectrum(material):
     reference = partitions[0]
 
     for partition in partitions[1:]:
-        assert partition.raw_sigma0_cm2 == pytest.approx(reference.raw_sigma0_cm2, rel=1e-14)
-        assert partition.raw_sigma1_ev_cm2 == pytest.approx(reference.raw_sigma1_ev_cm2, rel=1e-14)
-        assert partition.raw_sigma2_ev2_cm2 == pytest.approx(
-            reference.raw_sigma2_ev2_cm2, rel=1e-14
+        assert partition.raw_sigma0_cm2 == pytest.approx(
+            reference.raw_sigma0_cm2, rel=1e-14, abs=0.0
         )
-        assert partition.calibration == pytest.approx(reference.calibration, rel=1e-14)
-        assert partition.total_sigma_cm2 == pytest.approx(reference.total_sigma_cm2, rel=1e-14)
+        assert partition.raw_sigma1_ev_cm2 == pytest.approx(
+            reference.raw_sigma1_ev_cm2, rel=1e-14, abs=0.0
+        )
+        assert partition.raw_sigma2_ev2_cm2 == pytest.approx(
+            reference.raw_sigma2_ev2_cm2, rel=1e-14, abs=0.0
+        )
+        assert partition.calibration == pytest.approx(reference.calibration, rel=1e-14, abs=0.0)
+        assert partition.total_sigma_cm2 == pytest.approx(
+            reference.total_sigma_cm2, rel=1e-14, abs=0.0
+        )
     assert [p.hard_sigma_cm2 for p in partitions] == sorted(
         (p.hard_sigma_cm2 for p in partitions), reverse=True
     )
@@ -235,7 +245,7 @@ def test_equal_to_incident_energy_is_soft_even_for_a_delta_resonance():
     partition = build_gos_partition(arrays, 1000.0, 1000.0)
     assert partition.hard_sigma_cm2 == 0.0
     assert partition.hard_stopping_ev_cm2 == 0.0
-    assert partition.soft_stopping_ev_cm2 == pytest.approx(1e-16)
+    assert partition.soft_stopping_ev_cm2 == pytest.approx(1e-16, rel=1e-12, abs=0.0)
 
 
 @pytest.mark.parametrize(

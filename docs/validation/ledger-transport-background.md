@@ -117,6 +117,32 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_shell_oscillators.py`; [implementation derivation](beam-transport/penelope-shell-oscillators.md); [verification](beam-transport/penelope-shell-oscillators-verification.md)
 - **Notes:** Host-side input only; no GOS cross section, rate, or transport mode consumes it. $W_{cb}$ strongly affects IMFP, so spectrum/IMFP validation belongs to the shell GOS slice. The SiO₂ $W_{cb}$ is Saito's amorphous 22 eV, chosen by the owner to match catalog density; REELS on 2.65 g/cm³ gives 23.6 eV (input spread 21.5–23.6 eV). Only a human may mark this row `signed-off`.
 
+## `penelope-shell-gos-moments`
+
+- **Claim:** the PENELOPE-2024 shell GOS gives electron distant longitudinal, distant transverse and close Møller energy-loss moments $\sigma^{(0,1,2)}$ per oscillator; the total stopping reaches the Bethe formula with the same $I$ and oscillator $\delta_F$ at high energy
+- **Code:** `montecarlo/transport/shell_gos.py::{shell_gos_moments,density_effect_correction,bethe_stopping_cs,formula_units_per_angstrom3,path_moments}`
+- **Source:** PENELOPE-2024 §§3.2.2–3.2.4, NEA/MBDAV/R(2024)1, Eqs. 3.51, 3.56, 3.70–3.80, 3.83, 3.85–3.88, 3.94–3.110, 3.115–3.121
+- **Equation:** $\sigma^{(n)}_{\rm dis}=\mathcal P\sum_kf_k\{\ln[Q'_k(Q_-+2mc^2)/(Q_-(Q'_k+2mc^2))]+\ln\gamma^2-\beta^2-\delta_F\}\int_0^{W_{\max}}W^{n-1}p_{\rm dis}dW$; $\sigma^{(n)}_{\rm clo}=\mathcal P\sum_kf_k\int_{Q_k}^{(E+U_k)/2}W^{n-2}F^{(-)}(E+U_k,W)dW$, $Q_k=U_k$ (Eqs. 3.56, 3.96; $W_{cb}$ for the band)
+- **Assumptions:** first-Born δ-oscillator GOS; triangle broadening for every $U_k>0$ shell and δ resonance with $Q_{cb}=W_{cb}$ for the conduction band; Eq. 3.104 $W^{n-1}p_{\rm dis}$ form, not Eq. 3.81 $p_{\rm dis}/W_k$; $W_{\max}$ truncates $p_{\rm dis}$; $a$ evaluated at $E$; transverse bracket clipped at zero; $N$ from $\Omega_p$ (Eq. 3.51)
+- **Limiting cases:** $E\gg U_k$ gives Eq. 3.120; $\beta\to1$ gives Eq. 3.73; an untruncated triangle gives $\langle W\rangle=W_k$; $E\le U_k$ gives zero and the close moments vanish continuously as $E\to U_k^+$; moments are continuous at $E=3W_k-2U_k$
+- **Status:** rederived
+- **Checks:** close moments versus direct Eq. 3.87 quadrature ($10^{-9}$); one-shell closed form ($10^{-6}$); triangle mean ($10^{-12}$); Bethe limit ($2\times10^{-4}$ fixture, $10^{-3}$ catalog); Eq. 3.73 ($10^{-3}$); $W_{cb}$ moves $\sigma^{(0)}$ by more than 5% but $\sigma^{(1)}$ by less than 1%; catalog stopping within 2% of `stp.dat` at 0.1–1000 MeV; 1–10 keV recorded as a strict expected failure
+- **Anchor:** `tests/montecarlo/test_shell_gos.py`; [implementation derivation](beam-transport/penelope-shell-gos-moments.md); [verification](beam-transport/penelope-shell-gos-moments-verification.md)
+- **Notes:** Raw, uncalibrated host-side moments; no sampling or transport consumes them. Raw stopping exceeds corrected `stp.dat` by 13% (Si), 21% (SiO₂) and 15% (MoS₂) at 1 keV, and by 1.4%, 3.2% and 6.8% at 10 keV. The derivation separates this into model versus Bethe, $\delta_F$ and SBETHE shell-correction factors. Eq. 3.104 was kept by owner decision; the Eq. 3.81 alternative would change $\sigma^{(0)}$ by up to 1.4% and $\sigma^{(2)}$ by up to 6.1%. Owner decision: close collisions start at $Q_k=U_k$ (Eq. 3.96), not Eq. 3.106's $Q'_k$; distant terms keep $Q'_k$. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-rate-closure`
+
+- **Claim:** inner-shell (K–N, $U>E_c$) GOS oscillators take EEDL ionization cross sections reduced by the GOS $\delta_F$ ratio, keeping their GOS energy-loss PDF; one outer-shell factor $\mathcal N(E)>0$ makes the total $\sigma^{(1)}$ equal corrected SBETHE `stp.dat` exactly
+- **Code:** `montecarlo/transport/shell_rates.py::{close_shell_rates,inner_shell_cutoff_eV,is_inner_shell,eedl_inner_cross_sections,adopted_stopping_cs,catalog_shell_rate_closure}`
+- **Source:** PENELOPE-2024 §3.2.6.1, NEA/MBDAV/R(2024)1, Eqs. 3.140–3.142 and Eq. 2.112 (§2.6, §7.1 footnote); EPICS2025 EEDL MF=23; corrected SBETHE `stp.dat`
+- **Equation:** $s_i=\rho_i\sigma_{{\rm si},i}/\sigma^{(0)}_i$, $\rho_i=\sigma^{(0)}_i(\delta_F)/\sigma^{(0)}_i(0)$; $\mathcal N=(S_{\rm stp}-\sum_is_i\sigma^{(1)}_i)/\sum_j\sigma^{(1)}_j$; all three moments of oscillator $k$ scale by $s_k$ or $\mathcal N$
+- **Assumptions:** EEDL replaces DWBA (owner baseline; Bote–Salvat is #92); `stp.dat` replaces PENELOPE's own GOS stopping (owner deviation); $E_c=\max\{50\ {\rm eV},U_{\max,O/P/Q}(Z_m)\}$ with SBETHE $U_k$, the 50 eV floor tied to the characteristic relaxation cutoff; §3.2.6.1 "less than $E_c$" read as a misprint; EABS restriction not applied; spin-orbit partners summed; additive compounds; $\delta_F=0$ evaluated by $\Omega_p=0$ with a runtime check that only the transverse term changes
+- **Limiting cases:** no inner shells gives $\mathcal N=S_{\rm stp}/\sigma^{(1)}_{\rm GOS}$; $\delta_F=0$ gives $\rho_i=1$; GOS-consistent inputs return raw moments; $E\le U_i$ closes the shell
+- **Status:** rederived
+- **Checks:** stopping closure ($10^{-12}$, abs 0) and $\mathcal N>0$ for Si/SiO₂/MoS₂ at 1 keV–1 MeV; inner PDF moment ratios ($10^{-12}$); EEDL×$\rho$ vs independent interpolation; $\rho$ vs transverse-bracket recomputation; spin-orbit merge; $E_c$ selection; fail-closed stopping/EEDL grids and $\mathcal N\le0$
+- **Anchor:** `tests/montecarlo/test_shell_rates.py`; [implementation derivation](beam-transport/penelope-shell-rate-closure.md); [verification](beam-transport/penelope-shell-rate-closure-verification.md)
+- **Notes:** Host-side only; no sampling or transport consumes it. $\mathcal N$ spans 0.76–1.28 (SiO₂ 0.76 at 1 keV, MoS₂ 1.28 at 100 keV) with the Eq. 3.96 close cutoff. The closure moves $\sigma^{(0)}$ by −23% to +23% and straggling by −34% to +13%. The manual's Ba $E_c=92$ eV equals the Ba N5 energy, not the stated O-shell rule; the code follows the stated rule. It depends on `penelope-shell-gos-moments` (rederived; Eq. 3.96 close cutoff applied after verification). Only a human may mark this row `signed-off`.
+
 ## `gos-optical-quadrature`
 
 - **Claim:** each positive-width interval of the SBETHE optical oscillator-strength density contributes its integrated strength and first-moment centroid as one resonance; duplicate-energy shell edges have zero weight

@@ -4,7 +4,7 @@
 
 Compact generated view of the [detailed validation ledger] (physics-validation-ledger.md). Regenerate with `pyrite-dev validation-ledger --write` after editing detailed records.
 
-**Publication gate:** 0 / 143 claims signed off.
+**Publication gate:** 0 / 145 claims signed off.
 
 ## Latest automated evidence
 
@@ -13,7 +13,7 @@ Compact generated view of the [detailed validation ledger] (physics-validation-l
 | `pass` | 19 |
 | `fail` | 0 |
 | `skip` | 0 |
-| `missing` | 124 |
+| `missing` | 126 |
 
 Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC timestamp; use it to assess evidence age).
 
@@ -21,11 +21,11 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 10 |
-| `rederived` | 54 |
+| `rederived` | 56 |
 | `filtered` | 13 |
 | `unverified` | 60 |
 | `blocked` | 1 |
 | `discrepancy` | 5 |
-| **Total** | **143** |
+| **Total** | **145** |
 
 Status meanings and promotion rules are defined in the [validation methodology](methodology.md).

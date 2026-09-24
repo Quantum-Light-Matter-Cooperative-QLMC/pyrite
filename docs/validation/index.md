@@ -37,6 +37,10 @@ beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
 beam-transport/penelope-shell-oscillators
 beam-transport/penelope-shell-oscillators-verification
+beam-transport/penelope-shell-gos-moments
+beam-transport/penelope-shell-gos-moments-verification
+beam-transport/penelope-shell-rate-closure
+beam-transport/penelope-shell-rate-closure-verification
 beam-transport/sbethe-atomic-shell-inputs
 beam-transport/sbethe-atomic-shell-inputs-verification
 beam-transport/gos-core-edge

@@ -363,3 +363,86 @@ Ledger row `penelope-shell-oscillators` is unverified. Next: shell GOS DCS
 Owner decision, 2026-09-24: the SiO₂ $W_{cb}$ is Saito et al.'s amorphous
 22 eV, matching the catalog's amorphous density, instead of Da et al.'s 23.6 eV
 (2.65 g/cm³). $a$ becomes 3.4701. `penelope-shell-oscillators` is rederived.
+
+## Follow-up, 2026-09-24: raw shell GOS moments vs `stp.dat`
+
+`montecarlo/transport/shell_gos.py` evaluates the PENELOPE-2024 electron
+shell GOS moments from `build_shell_oscillators`. Distant longitudinal and
+transverse use Eqs. 3.104–3.105, with the δ_F of Eqs. 3.70–3.72. Inner-shell
+triangle broadening and near-threshold $W'_k$, $Q'_k$ follow Eqs. 3.76–3.80
+and 3.83. Close collisions use the Møller moments of Eqs. 3.86–3.88 and
+3.106–3.110, with $E'=E+U_k$ and $W_{\max}=(E+U_k)/2$. Nothing was tuned.
+Ledger row: `penelope-shell-gos-moments` (unverified). Derivation and full
+table: `docs/validation/beam-transport/penelope-shell-gos-moments.md`.
+
+Raw GOS $\sigma^{(1)}$ / corrected `stp.dat`:
+
+| material | 1 keV | 2 keV | 5 keV | 10 keV | 20 keV | 50 keV | 100 keV | 1 MeV | 1 GeV |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| silicon | 1.133 | 1.106 | 1.040 | 1.014 | 1.009 | 1.003 | 1.000 | 0.992 | 1.001 |
+| sio2 | 1.261 | 1.191 | 1.072 | 1.035 | 1.013 | 1.004 | 1.000 | 0.983 | 1.002 |
+| mos2 | 1.163 | 1.174 | 1.127 | 1.068 | 1.038 | 1.014 | 1.005 | 0.996 | 1.007 |
+
+Above 1 MeV, GOS reaches Eq. 3.120 with the same $I$ and oscillator δ_F
+within $4\times10^{-5}$. The disagreement factors exactly into three parts:
+the model's low-energy excess over Bethe (up to 25% at 1 keV), the oscillator
+versus continuous-OOS δ_F (up to 1.8% at 1 MeV), and SBETHE's DHFS shell
+correction (up to 12% at 1 keV). Each follows from a documented model
+difference. At 10 keV, IMFPs are 129/107/101 Å for Si/SiO₂/MoS₂; they are
+untested against measurements and strongly depend on $W_{cb}$. Open
+interpretation: Eq. 3.81 prints $p_{\rm dis}/W_k$, while Eqs. 3.94/3.104 use
+$p_{\rm dis}/W$. The code follows 3.104; the alternative moves $\sigma^{(0)}$
+by up to 1.2% and $\sigma^{(2)}$ by up to 5.5%. The fresh-context validator
+should adjudicate it.
+
+Next slice: fresh-context validation of `penelope-shell-gos-moments`. Then
+apply EEDL inner-shell rate substitution and outer-shell stopping-preserving
+rescaling (Eqs. 3.141–3.142), which should also remove the 1–10 keV stopping
+excess against `stp.dat`. After that, add the $W_c$ soft/hard partition.
+
+## Follow-up, 2026-09-24: shell GOS moments rederived; Eq. 3.96 close cutoff
+
+Fresh-context validation re-derived `penelope-shell-gos-moments` (≤1.3e-15
+relative). It found that Eq. 3.96 ($Q_k=U_k$) conflicts with
+Eqs. 3.86/3.92/3.106 ($Q'_k$) for the close-collision lower limit. Owner
+decision: follow Eq. 3.96. Bound-shell close losses start at $U_k$, so the
+knock-on energy $W-U_k\ge0$ and the moments are continuous at threshold.
+Distant terms keep $Q'_k$. Updated raw GOS/stp.dat at 1/5/10/100 keV:
+Si 1.1333/1.0309/1.0139/1.0003; SiO₂ 1.2142/1.0635/1.0320/0.9996;
+MoS₂ 1.1525/1.1150/1.0675/1.0052. IMFPs are unchanged at printed precision.
+The table above predates this change.
+
+## Follow-up, 2026-09-24: inner-shell rate substitution and stopping closure
+
+`montecarlo/transport/shell_rates.py` applies PENELOPE-2024 Eqs. 3.141–3.142
+on top of the raw shell GOS moments. Inner shells are K–N oscillators with
+$U>E_c=\max\{50\ {\rm eV},U_{\max,O/P/Q}(Z_m)\}$ (Eq. 2.112). The 50 eV floor
+equals the characteristic relaxation cutoff. The §3.2.6.1 "less than $E_c$"
+wording is read as a misprint, and $E_c=50$ eV for Si/SiO₂/MoS₂. These shells
+take EEDL σ (label-joined, spin-orbit partners summed) times the GOS
+$\delta_F$ ratio, and all three of their moments share one factor, so the GOS
+loss PDF is unchanged. Outer shells and the conduction band share one
+$\mathcal N(E)$ that closes $\sigma^{(1)}$ to corrected `stp.dat` exactly
+(owner deviation from PENELOPE's own GOS stopping). Ledger row:
+`penelope-shell-rate-closure` (unverified). Derivation and per-shell EEDL/GOS
+tables: `docs/validation/beam-transport/penelope-shell-rate-closure.md`.
+
+$\mathcal N(E)$:
+
+| material | 1 keV | 2 keV | 5 keV | 10 keV | 20 keV | 50 keV | 100 keV | 1 MeV |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| silicon | 0.965 | 1.061 | 1.125 | 1.141 | 1.112 | 1.108 | 1.095 | 1.056 |
+| sio2 | 0.770 | 0.803 | 0.836 | 0.860 | 0.844 | 0.832 | 0.819 | 0.791 |
+| mos2 | 1.038 | 1.032 | 1.110 | 1.187 | 1.227 | 1.270 | 1.281 | 1.269 |
+
+The closure moves IMFP by −23% to +23%. At 10 keV, Si goes from 129 to 116 Å,
+SiO₂ from 107 to 123 Å, and MoS₂ from 101 to 88 Å. Straggling $\sigma^{(2)}$
+moves by −35% (MoS₂, 1 keV) to +13% (SiO₂, 20 keV). EEDL/GOS inner ratios
+span 0.006 (Si K near threshold) to 1.77 (O K, 5 keV). Mo N1 stays at about
+0.3 at all energies. The manual's Ba $E_c$ example (92 eV) is the Ba N5
+energy, which conflicts with its stated O-shell rule.
+
+Next slice: fresh-context validation of `penelope-shell-rate-closure`
+(together with `penelope-shell-gos-moments`). Then add the $W_c$ soft/hard
+partition on the closed moments: soft $\sigma^{(1)},\sigma^{(2)}$ below $W_c$
+and hard inner-shell rates that preserve EEDL vacancy counts.
