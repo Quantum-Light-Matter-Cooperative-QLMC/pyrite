@@ -1,8 +1,8 @@
 # External Fortran code integration (ELSEPA, SBETHE, BremsLib)
 
 Date: 2026-09-21
-Status: accepted 2026-09-21; implementation tracked by #161
-Issues: #161 (subsystem), #84 (roadmap parent), #86, #87, #89, #90, #93, #94, #95
+Status: accepted 2026-09-21; subsystem implemented in #161 (PR #164)
+Issues: #161 (subsystem), #167 (public BremsLib release hosting), #84 (roadmap parent), #86, #87, #89, #90, #93, #94, #95
 
 Source paths below are relative to `src/pyrite/` unless stated otherwise.
 
