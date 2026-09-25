@@ -141,3 +141,49 @@ def test_cutoff_node_rounding_keeps_scalar_sampler_on_the_hard_cells(table):
             sampled = sample_hard_photon_energy_scalar(*arrays, energy, cutoff, uniform)
             assert sampled >= cutoff
             np.testing.assert_allclose(sampled, host.sample_photon_energy(uniform), rtol=2e-12)
+
+
+# ESTAR radiative stopping powers, MeV cm^2/g (NIST SRD 124, Seltzer-Berger;
+# retrieved 2026-09-25) at 0.01, 0.03, 0.1, 0.3, 1, 3, 10 and 30 MeV.
+_ESTAR_ENERGIES_MEV = (0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0)
+_ESTAR_RADIATIVE_MEV_CM2_G = {
+    "C": (0.00315, 0.003194, 0.003414, 0.004489, 0.01053, 0.03561, 0.1513, 0.5435),
+    "Al": (0.006559, 0.007059, 0.007476, 0.009487, 0.02119, 0.06924, 0.2858, 1.003),
+    "Ge": (0.01267, 0.01575, 0.01837, 0.02344, 0.04926, 0.1512, 0.5926, 2.029),
+    "W": (0.01977, 0.02908, 0.04084, 0.05797, 0.1159, 0.3158, 1.132, 3.735),
+    "Bi": (0.02064, 0.03125, 0.04524, 0.06579, 0.1313, 0.3478, 1.222, 4.01),
+}
+
+
+@pytest.mark.parametrize("element", sorted(_ESTAR_RADIATIVE_MEV_CM2_G))
+def test_released_bremslib_total_moment_matches_seltzer_berger_nuclear_share(element):
+    # Independent benchmark of the integrated first moment. BremsLib is
+    # electron-atom (screened-nucleus) partial-wave bremsstrahlung; ESTAR adds
+    # electron-electron bremsstrahlung, which approaches 1/Z of the nuclear
+    # term at high energy. BremsLib may therefore fall short by at most that
+    # share, plus the 3 % that also bounds the high-Z agreement.
+    from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
+    from pyrite.xsgen._errors import TableNotFoundError
+    from pyrite.xsgen.bremslib import tables as bremslib_tables
+
+    try:
+        table = bremslib_tables.load_bremsstrahlung_tables([element])[element]
+    except TableNotFoundError as exc:
+        pytest.skip(f"released BremsLib tables are not installed: {exc}")
+    Z = TRANSPORT_ELEMENTS[element]["Z"]
+    grams_per_atom = TRANSPORT_ELEMENTS[element]["A"] / 6.02214076e23
+    ratio = np.array(
+        [
+            build_radiative_partition(table, energy * 1e6, 1.0).total_stopping_cs_eV_cm2
+            * 1e-6
+            / grams_per_atom
+            / estar
+            for energy, estar in zip(
+                _ESTAR_ENERGIES_MEV, _ESTAR_RADIATIVE_MEV_CM2_G[element], strict=True
+            )
+        ]
+    )
+    assert np.all(ratio <= 1.03)
+    assert np.all(ratio >= 1.0 / (1.0 + 1.0 / Z) - 0.03)
+    if Z >= 30:
+        np.testing.assert_allclose(ratio, 1.0, atol=0.03)
