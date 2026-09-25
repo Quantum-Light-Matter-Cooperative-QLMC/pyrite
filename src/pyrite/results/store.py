@@ -18,7 +18,7 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 
 import numpy as np
 
-from .._numerics import validate_inelastic_numerics
+from .._numerics import validate_elastic_model, validate_inelastic_numerics
 from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
@@ -93,6 +93,8 @@ class Settings:
         Flight integration rule and optional fractional-loss substep cap.
     inelastic_model, inelastic_cutoff_eV
         Collision-loss scheme and the opt-in shell mode's cutoff in eV.
+    elastic_model
+        ``"mott"`` (default) or the opt-in tabulated ``"elsepa"`` model.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -113,6 +115,7 @@ class Settings:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
+    elastic_model: Literal["mott", "elsepa"] = "mott"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -133,6 +136,7 @@ class Settings:
         validate_inelastic_numerics(
             self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
         )
+        validate_elastic_model(self.elastic_model)
 
     @property
     def coherent_emission(self) -> bool:

@@ -372,6 +372,18 @@ def pack_elsepa_tables(elastic_tables, L_ncm3):
     )
 
 
+def check_elsepa_coverage(elastic_tables, E_min_keV, E_max_keV):
+    """Reject a transport energy range outside any ELSEPA table; never extrapolate."""
+    for layer_tables in elastic_tables or ():
+        for table in layer_tables:
+            energy_eV = np.asarray(table["energy_eV"], dtype=float)
+            lower, upper = float(energy_eV[0]) / 1e3, float(energy_eV[-1]) / 1e3
+            if E_min_keV < lower or E_max_keV > upper:
+                raise ValueError(
+                    f"transport energy range must be within ELSEPA table [{lower:g}, {upper:g}] keV"
+                )
+
+
 @njit(cache=True)
 def _elsepa_bracket(logE, logE_flat, start, length):
     """Grid interval and fraction for ``logE``, clamped to the table's ends."""

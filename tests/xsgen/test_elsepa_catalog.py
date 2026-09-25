@@ -11,6 +11,7 @@ from pyrite.xsgen.elsepa.catalog import (
     MUFFIN_TIN_CEILING_EV,
     PRODUCTION_ENERGIES_EV,
     elemental_solid,
+    elemental_solid_for_composition,
     joined_arrays,
     nearest_neighbour_distance_ang,
     resolve_layer_tables,
@@ -116,13 +117,12 @@ def test_compounds_media_and_unnamed_layers_have_no_muffin_tin_table(key):
 
 def _table(energies, total, mu):
     energies = np.asarray(energies, dtype=float)
-    cdf = np.tile(mu, (energies.size, 1))
     return {
         "mu": mu,
         "energy_eV": energies,
         "total_elastic_cm2": np.asarray(total, dtype=float),
         "transport1_cm2": np.asarray(total, dtype=float) / 10.0,
-        "angular_cdf": cdf,
+        "dcs_cm2_sr": np.ones((energies.size, mu.size)),
     }
 
 
@@ -135,7 +135,7 @@ def test_join_takes_muffin_tin_rows_to_the_crossover_and_free_atom_rows_above():
 
     assert joined["energy_eV"].tolist() == [1e5, 1e6, 1e7]
     assert joined["total_elastic_cm2"].tolist() == [2.1, 1.4, 1.0]
-    assert joined["angular_cdf"].shape == (3, 5)
+    assert joined["dcs_cm2_sr"].shape == (3, 5)
 
 
 def test_join_refuses_tables_on_different_angular_grids():
@@ -146,10 +146,37 @@ def test_join_refuses_tables_on_different_angular_grids():
         joined_arrays(free, muffin)
 
 
+def test_one_element_layers_match_their_crystal_by_number_density():
+    from pyrite.materials import CATALOG
+
+    for key in ("silicon", "diamond", "hopg"):
+        composition = CATALOG.crystal(key).info.composition
+        solid = elemental_solid_for_composition(composition)
+        assert solid is not None and solid.key == key
+    assert elemental_solid_for_composition([("Si", 0.03)]) is None
+    assert elemental_solid_for_composition(CATALOG.crystal("mos2").info.composition) is None
+
+
 def test_missing_tables_fail_with_the_generation_command(monkeypatch):
+    from pyrite.materials import CATALOG
+
     monkeypatch.setattr("pyrite.xsgen.elsepa.catalog.resolve", lambda key: None)
 
+    with pytest.raises(TableNotFoundError, match="--code elsepa --material <catalog material"):
+        resolve_layer_tables([("Si", 0.03)])
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.catalog.resolve",
+        lambda key: None if "muffin" in str(key) else _FakeTable(),
+    )
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.catalog.muffin_tin_request",
+        lambda *a, **k: (type("R", (), {"key": "muffin"})(), None),
+    )
     with pytest.raises(TableNotFoundError, match="--code elsepa --material silicon"):
-        resolve_layer_tables("silicon", [("Si", 0.05)])
-    with pytest.raises(TableNotFoundError, match="--code elsepa --element 14"):
-        resolve_layer_tables(None, [("Si", 0.05)])
+        resolve_layer_tables(CATALOG.crystal("silicon").info.composition)
+
+
+class _FakeTable:
+    def arrays(self):
+        mu = np.linspace(0.0, 1.0, 5)
+        return _table([1e5, 1e7], [2.0, 1.0], mu)

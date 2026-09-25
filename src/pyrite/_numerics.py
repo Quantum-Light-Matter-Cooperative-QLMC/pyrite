@@ -16,11 +16,15 @@ TRANSPORT_KEYS = (
     "max_dE_frac",
     "inelastic_model",
     "inelastic_cutoff_eV",
+    "elastic_model",
 )
 #: ``simulate_trajectories`` collision-loss schemes; mirrors
 #: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
 #: two in step) without importing the transport package here.
 INELASTIC_MODELS = ("continuous", "shell-soft-hard")
+#: Elastic models a case may select. ``"mott"`` is the historical default;
+#: ``"elsepa"`` samples resolved ELSEPA tables (issue #89).
+ELASTIC_MODELS = ("mott", "elsepa")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -87,6 +91,10 @@ class Numerics:
         scheme with its energy-loss cutoff ``W_c`` in eV (required by, and
         only valid with, that mode, which also requires
         ``energy_model="midpoint"``).
+    elastic_model
+        ``"mott"`` (default) screened-Rutherford angles calibrated to NIST
+        Mott transport cross sections, or the opt-in ``"elsepa"`` sampling of
+        full ELSEPA differential cross sections from generated tables.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -102,6 +110,7 @@ class Numerics:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
+    elastic_model: Literal["mott", "elsepa"] = "mott"
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -129,6 +138,13 @@ class Numerics:
         validate_inelastic_numerics(
             self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
         )
+        validate_elastic_model(self.elastic_model)
+
+
+def validate_elastic_model(model: object) -> None:
+    """Validate a case-level elastic scattering model name."""
+    if model not in ELASTIC_MODELS:
+        raise ValueError(f"elastic_model must be one of {', '.join(ELASTIC_MODELS)}")
 
 
 def validate_inelastic_numerics(model: object, cutoff_eV: object, energy_model: object) -> None:

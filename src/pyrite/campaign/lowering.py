@@ -40,6 +40,7 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         max_dE_frac=numerics.max_dE_frac,
         inelastic_model=numerics.inelastic_model,
         inelastic_cutoff_eV=numerics.inelastic_cutoff_eV,
+        elastic_model=numerics.elastic_model,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -60,6 +61,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
             inelastic_model=getattr(settings, "inelastic_model", "continuous"),
             inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
+            elastic_model=getattr(settings, "elastic_model", "mott"),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

@@ -720,3 +720,26 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     assert shell_case["inelastic_model"] == "shell-soft-hard"
     assert shell_case["inelastic_cutoff_eV"] == 50.0
     assert profiles.case_content_key(shell_case) != profiles.case_content_key(legacy_case)
+
+
+def test_elsepa_elastic_model_forks_identity_and_case_payload_only_when_on():
+    settings = default_settings()
+    sweep = material_sweep("silicon")
+    base = dataset_identity("silicon", "full", settings, sweep)
+    explicit_default = dataset_identity(
+        "silicon", "full", replace(settings, elastic_model="mott"), sweep
+    )
+    active = dataset_identity("silicon", "full", replace(settings, elastic_model="elsepa"), sweep)
+
+    assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
+    assert "elastic_model" not in base["resolved_parameters"].get("transport_numerics", {})
+    assert active["resolved_parameters"]["transport_numerics"] == {"elastic_model": "elsepa"}
+    assert active["parameter_sha256"] != base["parameter_sha256"]
+
+    legacy_case = build_cases(sweep, 4, 4)[0]
+    elsepa_case = build_cases(sweep, 4, 4, elastic_model="elsepa")[0]
+    assert "elastic_model" not in legacy_case
+    assert elsepa_case["elastic_model"] == "elsepa"
+    assert profiles.case_content_key(elsepa_case) != profiles.case_content_key(legacy_case)
+    with pytest.raises(ValueError, match="elastic_model"):
+        build_cases(sweep, 4, 4, elastic_model="nope")

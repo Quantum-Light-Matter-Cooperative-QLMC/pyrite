@@ -1,4 +1,4 @@
-"""Per-case transport-layer material resolution: SBETHE tables and shell-mode keys."""
+"""Per-case transport-layer material resolution: SBETHE and ELSEPA tables, shell keys."""
 
 
 def _case_inelastic_kwargs(case):
@@ -61,3 +61,38 @@ def _case_stopping_table_records(case):
 def _case_stopping_tables(case):
     """Load SBETHE stopping arrays for all transport layers."""
     return [table.arrays() for table in _case_stopping_table_records(case)]
+
+
+def _case_layer_compositions(case):
+    layers = case.get("abs_layers")
+    if layers is None:
+        return [case["composition"]]
+    return [composition for _, _, composition in layers]
+
+
+def _case_elastic_entries(case):
+    """Per-layer ELSEPA table entries, or ``None`` for the default elastic model."""
+    if case.get("elastic_model") != "elsepa":
+        return None
+    from ...xsgen.elsepa.catalog import resolve_layer_tables
+
+    return [resolve_layer_tables(composition) for composition in _case_layer_compositions(case)]
+
+
+def _case_elastic_kwargs(case):
+    """``simulate_trajectories`` kwargs of a case's opt-in elastic model; empty by default."""
+    entries = _case_elastic_entries(case)
+    if entries is None:
+        return {}
+    return dict(
+        elastic_model="elsepa",
+        elastic_tables=[[entry.arrays for entry in layer] for layer in entries],
+    )
+
+
+def _case_elastic_table_records(case):
+    """Stored ELSEPA tables a case reads, for run identity; empty by default."""
+    entries = _case_elastic_entries(case)
+    if entries is None:
+        return []
+    return [table for layer in entries for entry in layer for table in entry.tables]

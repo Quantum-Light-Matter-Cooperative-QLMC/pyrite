@@ -1248,7 +1248,8 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlu
                                      electrons|reflection-families|maximum-
                                      reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
-                                     energy-loss|inelastic-model|inelastic-cutoff-ev]...
+                                     energy-loss|inelastic-model|inelastic-cutoff-
+                                     ev|elastic-model]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -1287,6 +1288,11 @@ Options:
   --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV for shell-soft-
                                   hard; must exceed each material's conduction-band
                                   resonance (Si 16.7, SiO2 22, MoS2 23 eV).  [x>0.0]
+  --elastic-model [mott|elsepa]   Elastic scattering: mott (default) screened-Rutherford
+                                  angles, or the opt-in elsepa full differential cross
+                                  sections (needs 'pyrite tables generate --code elsepa
+                                  --material NAME' for each material; bypasses the
+                                  transport LUT).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

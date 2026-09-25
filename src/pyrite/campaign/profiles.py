@@ -72,6 +72,7 @@ NUMERICS_GROUPS = (
             ("straggling", "straggling"),
             ("inelastic_model", "inelastic model"),
             ("inelastic_cutoff_eV", "inelastic cutoff (eV)"),
+            ("elastic_model", "elastic model"),
         ),
     ),
 )
@@ -316,6 +317,7 @@ def resolve_numerics(
         "max_dE_frac": numerics.max_dE_frac,
         "inelastic_model": numerics.inelastic_model,
         "inelastic_cutoff_eV": numerics.inelastic_cutoff_eV,
+        "elastic_model": numerics.elastic_model,
     }
     sources = {
         key: (
@@ -524,6 +526,7 @@ def _identity_v1(
         max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
         inelastic_model = str(settings_payload.pop("inelastic_model", "continuous"))
         inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
+        elastic_model = str(settings_payload.pop("elastic_model", "mott"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         straggling = bool(getattr(settings, "straggling", False))
@@ -531,6 +534,7 @@ def _identity_v1(
         max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
         inelastic_model = str(getattr(settings, "inelastic_model", "continuous"))
         inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
+        elastic_model = str(getattr(settings, "elastic_model", "mott"))
     if emission != "incoherent":
         resolved["emission"] = emission
     transport_numerics = {}
@@ -545,6 +549,8 @@ def _identity_v1(
     if inelastic_model != "continuous":
         transport_numerics["inelastic_model"] = inelastic_model
         transport_numerics["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
+    if elastic_model != "mott":
+        transport_numerics["elastic_model"] = elastic_model
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
     # The in-medium photon dispersion is unconditional physics now, not an opt-in

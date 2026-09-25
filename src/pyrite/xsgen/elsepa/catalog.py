@@ -62,7 +62,7 @@ PRODUCTION_ENERGIES_EV = tuple(
 )
 
 #: Arrays a transport consumer needs from a joined table.
-_SAMPLER_FIELDS = ("mu", "energy_eV", "total_elastic_cm2", "transport1_cm2", "angular_cdf")
+_SAMPLER_FIELDS = ("mu", "energy_eV", "total_elastic_cm2", "transport1_cm2", "dcs_cm2_sr")
 
 
 def nearest_neighbour_distance_ang(lattice, basis) -> float:
@@ -131,6 +131,28 @@ def elemental_solid(key: str | None) -> ElementalSolid | None:
     )
 
 
+def elemental_solid_for_composition(
+    composition: tuple[tuple[str, float], ...] | list[tuple[str, float]],
+) -> ElementalSolid | None:
+    """Return the elementary catalog crystal a one-element layer is made of.
+
+    Matching is by element *and* number density (relative tolerance 1e-6), so
+    a layer is identified by what it contains rather than by what a caller
+    named it, and diamond and graphite stay distinct. Compounds, and
+    one-element layers matching no catalog crystal, return ``None``.
+    """
+    if len(composition) != 1:
+        return None
+    element, number_density = composition[0]
+    for key, crystal in CATALOG.crystals.items():
+        crystal_composition = crystal.info.composition
+        if len(crystal_composition) != 1 or crystal_composition[0][0] != element:
+            continue
+        if np.isclose(float(crystal_composition[0][1]), float(number_density), rtol=1e-6, atol=0.0):
+            return elemental_solid(key)
+    return None
+
+
 def _muffin_tin_energies() -> tuple[float, ...]:
     return tuple(e for e in PRODUCTION_ENERGIES_EV if e <= MUFFIN_TIN_CEILING_EV)
 
@@ -180,16 +202,15 @@ def _require(table: StoredTable | None, what: str, command: str) -> StoredTable:
 
 
 def resolve_layer_tables(
-    key: str | None, composition: tuple[tuple[str, float], ...] | list[tuple[str, float]]
+    composition: tuple[tuple[str, float], ...] | list[tuple[str, float]],
 ) -> tuple[ElementElastic, ...]:
     """Resolve the production elastic table of every element in one layer.
 
-    ``key`` names the layer's catalog material when it has one; only an
-    elementary catalog crystal uses a muffin-tin table. Returned entries follow
-    ``composition`` order.
+    Only a layer matching an elementary catalog crystal
+    (:func:`elemental_solid_for_composition`) uses a muffin-tin table.
+    Returned entries follow ``composition`` order.
     """
-    solid = elemental_solid(key)
-    hint = f"pyrite tables generate --code elsepa --material {key}" if key else None
+    solid = elemental_solid_for_composition(composition)
     out = []
     for element, _ in composition:
         z = int(TRANSPORT_ELEMENTS[element]["Z"])
@@ -197,7 +218,8 @@ def resolve_layer_tables(
         free = _require(
             resolve(request.key),
             f"free atom {element} (Z={z})",
-            hint or f"pyrite tables generate --code elsepa --element {z}",
+            "pyrite tables generate --code elsepa --material <catalog material "
+            f"containing {element}>",
         )
         tables = [free]
         muffin_arrays = None
@@ -225,6 +247,13 @@ def resolve_layer_tables(
             )
         )
     return tuple(out)
+
+
+def resolve_catalog_tables(key: str) -> tuple[StoredTable, ...]:
+    """Every stored table a catalog material's elastic model reads, for identity."""
+    return tuple(
+        table for entry in resolve_layer_tables(catalog_composition(key)) for table in entry.tables
+    )
 
 
 def catalog_composition(key: str) -> tuple[tuple[str, float], ...]:
@@ -275,8 +304,10 @@ __all__ = [
     "ElementalSolid",
     "catalog_composition",
     "elemental_solid",
+    "elemental_solid_for_composition",
     "generate_catalog",
     "joined_arrays",
     "nearest_neighbour_distance_ang",
+    "resolve_catalog_tables",
     "resolve_layer_tables",
 ]

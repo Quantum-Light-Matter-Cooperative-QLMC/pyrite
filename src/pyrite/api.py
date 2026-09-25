@@ -30,7 +30,11 @@ from .materials import CATALOG, MediumSpec
 from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
 from .montecarlo.geometry import directions_to_sample_frame
-from .montecarlo.runner import _case_stopping_table_records, run_case_directions
+from .montecarlo.runner import (
+    _case_elastic_table_records,
+    _case_stopping_table_records,
+    run_case_directions,
+)
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
     BREMSSTRAHLUNG_MODEL,
@@ -227,7 +231,9 @@ def simulate(
             f"backend {BACKEND.name!r}; select the backend before importing pyrite"
         )
     case = build_case(scene, resolved_numerics)
-    xsgen_tables = identity_markers(_case_stopping_table_records(case))
+    xsgen_tables = identity_markers(
+        [*_case_stopping_table_records(case), *_case_elastic_table_records(case)]
+    )
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
     output = run_case(case, transport_core=resolved_numerics.transport_core)

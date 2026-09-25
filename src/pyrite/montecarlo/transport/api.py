@@ -4,7 +4,6 @@ import logging
 
 import numpy as np
 
-from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ...materials.attenuation import _normalize_composition
 from ..geometry import beam_frame_basis, project_beam_entry, validate_transverse_dimensions
 from ..groove import entry_points
@@ -30,15 +29,10 @@ from .cores import (
 )
 from .hard_inelastic import hard_stream_keys, validate_inelastic_args
 from .kinematics import _sample_bunch_offsets, stream_keys
+from .layer_tables import build_layer_tables
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
-from .scattering import (
-    _NO_MOTT,
-    _flatten_mott_tables,
-    _mott_alpha_table,
-    pack_elsepa_tables,
-)
+from .scattering import check_elsepa_coverage
 from .stopping import (
-    _element_crossover_keV,
     pack_sbethe_stopping_tables,
     prepare_sbethe_stopping_tables,
 )
@@ -492,85 +486,24 @@ def simulate_trajectories(
     z_total = float(layers[-1][1])
     n_layers = len(layers)
     prepared_stopping_tables = prepare_sbethe_stopping_tables(stopping_tables, n_layers)
-    L_Zs = []
-    L_Js = []
-    L_ncm3 = []
-    L_ks = []
-    L_coeffs = []
-    L_E_cross = []
-    mott_tables = []
-
-    for _, _, lc in layers:
-        elements = []
-        ncm3_arr = []
-        Z_arr = []
-        J_arr = []
-        k_arr = []
-        coeff_arr = []
-        E_cross_arr = []
-        layer_mott_tables = []
-
-        for el, n_i in lc:
-            elements.append(el)
-            params = TRANSPORT_ELEMENTS[el]
-            Z_i = float(params["Z"])
-            A_i = float(params["A"])
-            J_i = float(params["J_keV"])
-            k_i = 0.731 + 0.0688 * np.log10(Z_i)
-            coeff_i = (n_i / 0.602214076) * Z_i
-
-            ncm3_arr.append(n_i * 1e24)
-            Z_arr.append(Z_i)
-            J_arr.append(J_i)
-            k_arr.append(k_i)
-            coeff_arr.append(coeff_i)
-            E_cross_arr.append(_element_crossover_keV(el, Z_i, A_i, J_i))
-
-            table = None
-            if elastic_model == "mott" and el not in _NO_MOTT:
-                try:
-                    table = _mott_alpha_table(el, Z_i)
-                except FileNotFoundError:
-                    logger.debug("No NIST Mott table for %s; using analytic SR angles", el)
-                    _NO_MOTT.add(el)
-            layer_mott_tables.append(table)
-
-        L_Zs.append(np.asarray(Z_arr, dtype=float))
-        L_Js.append(np.asarray(J_arr, dtype=float))
-        L_ncm3.append(np.asarray(ncm3_arr, dtype=float))
-        L_ks.append(np.asarray(k_arr, dtype=float))
-        L_coeffs.append(np.asarray(coeff_arr, dtype=float))
-        L_E_cross.append(np.asarray(E_cross_arr, dtype=float))
-        mott_tables.append(layer_mott_tables)
-
-    L_sr_rate_numer = []
-    L_mott_numer = []
-    L_mott_denom1 = []
-    L_mott_denom2 = []
-    L_sr_joy_numer = []
-
-    for i, Z_i in enumerate(L_Zs):
-        n_cm3_i = L_ncm3[i]
-        # Rutherford Scattering coefficient hoisted out of hot loop
-        L_sr_rate_numer.append(5.21e-21 * Z_i * Z_i * np.float64(4.0) * np.float64(np.pi) * n_cm3_i)
-
-        # Browning fit coefficients to Mott scattering hoisted out of hot loop
-        z17 = Z_i ** np.float64(1.7)
-        L_mott_numer.append(np.float64(3.0e-18) * z17 * n_cm3_i)
-        L_mott_denom1.append(np.float64(0.005) * z17)
-        L_mott_denom2.append(np.float64(0.0007) * Z_i * Z_i)
-
-        # Joy-Luo
-        L_sr_joy_numer.append(np.float64(3.4e-3) * Z_i ** np.float64(0.67))
-
+    (
+        L_Zs,
+        L_Js,
+        L_ncm3,
+        L_ks,
+        L_coeffs,
+        L_E_cross,
+        mott_tables,
+        L_sr_rate_numer,
+        L_mott_numer,
+        L_mott_denom1,
+        L_mott_denom2,
+        L_sr_joy_numer,
+        mott_group,
+    ) = build_layer_tables(layers, elastic_model, elastic_tables)
     L_top = np.asarray([float(a) for (a, _, _) in layers], dtype=float)
     L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
     internal_bounds = L_bot[:-1].copy()
-
-    elsepa_group = pack_elsepa_tables(elastic_tables, L_ncm3)
-    # One grouped argument carries both tabulated elastic models; the cores
-    # read the ELSEPA half only when elastic_model_code == 2.
-    mott_group = _flatten_mott_tables(mott_tables) + elsepa_group
     _nsys_pop()
 
     _nsys_push("cxr.transport.sample")
@@ -673,16 +606,7 @@ def simulate_trajectories(
                 raise ValueError(
                     f"transport energy range must be within SBETHE table [{lower:g}, {upper:g}] keV"
                 )
-    if elastic_tables is not None:
-        for layer_tables in elastic_tables:
-            for table in layer_tables:
-                energy_eV = np.asarray(table["energy_eV"], dtype=float)
-                lower, upper = float(energy_eV[0]) / 1e3, float(energy_eV[-1]) / 1e3
-                if float(np.min(E_cut_by_electrons)) < lower or float(np.max(E_keV)) > upper:
-                    raise ValueError(
-                        f"transport energy range must be within ELSEPA table "
-                        f"[{lower:g}, {upper:g}] keV"
-                    )
+    check_elsepa_coverage(elastic_tables, float(np.min(E_cut_by_electrons)), float(np.max(E_keV)))
     shell_tables = None
     if shell_mode:
         # Lazy: the host shell model pulls in catalog and EEDL data.
@@ -1281,6 +1205,6 @@ def simulate_trajectories(
             L_E_cross,
             L_ncm3,
             elastic_model,
-            elsepa_group,
+            mott_group[5:],
         )
     return result

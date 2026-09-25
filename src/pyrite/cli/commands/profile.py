@@ -55,6 +55,7 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
 _INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
+_ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -68,6 +69,7 @@ _NUMERICS_FIELD_NAMES = {
     "maximum-fractional-energy-loss": "max_dE_frac",
     "inelastic-model": "inelastic_model",
     "inelastic-cutoff-ev": "inelastic_cutoff_eV",
+    "elastic-model": "elastic_model",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -260,6 +262,8 @@ def _emit_show(payload):
             f"  inelastic model: {numerics['inelastic_model']}"
             f" (W_c {numerics.get('inelastic_cutoff_eV', 0.0):g} eV)"
         )
+    if "elastic_model" in numerics:
+        emit_result(f"  elastic model: {numerics['elastic_model']}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -441,6 +445,15 @@ def numerics_show_command(name, fidelity, json_output):
     help=(
         "Soft/hard energy-loss cutoff W_c in eV for shell-soft-hard; must exceed each "
         "material's conduction-band resonance (Si 16.7, SiO2 22, MoS2 23 eV)."
+    ),
+)
+@click.option(
+    "--elastic-model",
+    type=click.Choice(_ELASTIC_MODEL_VALUES),
+    help=(
+        "Elastic scattering: mott (default) screened-Rutherford angles, or the opt-in "
+        "elsepa full differential cross sections (needs 'pyrite tables generate --code "
+        "elsepa --material NAME' for each material; bypasses the transport LUT)."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
