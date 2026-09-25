@@ -252,7 +252,7 @@ tilt_azim_deg = {values = [95.0, 105.0, 115.0, 125.0, 135.0, 145.0, 155.0, 165.0
 E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 beam = "gaussian_200fs"
 materials = ["hopg", "hbn"]
-emission = "both"
+emission = "incoherent"
 n_electrons = {values = [10000]}
 
 [profiles.hopg_hbn.overrides.hopg]
