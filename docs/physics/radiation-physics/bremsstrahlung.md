@@ -83,6 +83,17 @@ The sampled electron is assigned energy {math}`T-k` and keeps its incoming direc
 
 The post-transport scoring functions in `spectrum.brem_events` define that separation for a planar slab. `mc_soft_brem_spectrum` retains track-length density only below {math}`k_c`; `mc_hard_brem_event_spectrum` bins the discrete `HARD_RADIATIVE` photons above it, including one emitted by a terminal `CUTOFF` row. The cutoff must coincide with an energy-bin edge and match the transport cutoff. The full-track `mc_brem_spectrum` rejects coupled transport rows to prevent double counting. For a sampled event at energy {math}`k`, the directional weight is the **conditional** density {math}`(d^2\sigma/dk\,d\Omega)/(d\sigma/dk)` from the same BremsLib table, multiplied by photon escape transmission. The event frequency was already sampled in transport, so no extra number-density, path-length, or cross-section factor belongs in this score. A hard event is located at its row endpoint and carries photon energy and atomic number. The scorer supports one planar slab; layered and finite-footprint escape remain outside its current contract. Validation: `bremslib-radiative-event-spectrum`.
 
+**Photon boundary.** Emitted photons are scored, not transported. A hard photon's only effect on the electron is the energy debit above, so its later fate cannot change the electron track. Each photon reaches the detector through the narrow-beam escape factor {math}`\exp(-\mu(k)L_{\rm escape})` of [photon escape](photon-escape-and-dispersion.md), where {math}`\mu` includes photoabsorption and Rayleigh and Compton scattering. A photon that interacts is removed; nothing is returned to the ray. The mode therefore omits:
+
+- scattered photons that still reach the detector (no build-up factor);
+- fluorescence and photoelectrons from photoabsorption, including characteristic lines excited by bremsstrahlung rather than by the beam;
+- pair production above {math}`2m_ec^2 = 1.022` MeV, both as a secondary process and as a term in {math}`\mu`;
+- photon energy deposited in the target.
+
+These omissions scale with the probability that a photon interacts before escaping. For normal escape through the full thickness, `materials.attenuation` gives at most {math}`4.3\times10^{-6}` for silicon and HOPG and {math}`2.5\times10^{-4}` for WSe₂ through 1000 Å between 100 and 790 keV. Through 100 µm it is at most {math}`4.3\times10^{-3}` for silicon and HOPG, but 0.22 for WSe₂ at 100 keV. The scored-only treatment is therefore accurate for thin targets and becomes an explicit error term for thick, high-{math}`Z` ones.
+
+The attenuation tables also end: the Elam scattering data at `ELAM_E_MAX_EV` = 800 keV and Chantler photoabsorption near 966 keV. Above 800 keV {math}`\mu` is NaN. `mc_hard_brem_event_spectrum`, like the wide soft grid, treats an unavailable {math}`\mu` as zero, so photons above 800 keV currently escape with unit transmission. No catalogue grid reaches that energy (the widest `E_grid_brem` stops at 262.4 keV). A coupled run with MeV photons nevertheless has an undefined escape factor. Multi-MeV use of this mode needs an extended attenuation table that includes pair production, not only the coupled electron treatment.
+
 ## Per-segment yield
 
 For the EEDL and Bethe--Heitler backends emission is taken **isotropic**. For a segment of length {math}`L` traversed in an element of number density {math}`n_Z`, the contribution to the observed spectrum is
