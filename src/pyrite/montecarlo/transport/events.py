@@ -181,7 +181,9 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
                 raise ValueError("hard-radiative vectors must align with segment rows")
             if np.any(~np.isfinite(photon_direction)) or np.any(~np.isfinite(target_momentum)):
                 raise ValueError("hard-radiative vectors must be finite")
-            if np.any(photon_direction[~payload] != 0.0) or np.any(target_momentum[~payload] != 0.0):
+            if np.any(photon_direction[~payload] != 0.0) or np.any(
+                target_momentum[~payload] != 0.0
+            ):
                 raise ValueError("only hard-radiative rows may carry photon vectors")
             if np.any(np.abs(np.linalg.norm(photon_direction[payload], axis=1) - 1.0) > 1e-10):
                 raise ValueError("hard-radiative photon directions must have unit length")

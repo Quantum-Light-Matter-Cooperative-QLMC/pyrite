@@ -36,10 +36,9 @@ def _check_transport_partition(segments, cutoff_eV, bremslib_tables):
     radiative = segments.get("radiative")
     if radiative is None:
         return
-    if (
-        radiative.get("model") != "bremslib-soft-hard"
-        or float(radiative.get("cutoff_eV", -1.0)) != float(cutoff_eV)
-    ):
+    if radiative.get("model") != "bremslib-soft-hard" or float(
+        radiative.get("cutoff_eV", -1.0)
+    ) != float(cutoff_eV):
         raise ValueError("spectrum cutoff must match the coupled transport cutoff")
     identity = tuple(
         sorted(
