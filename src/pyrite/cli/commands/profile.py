@@ -451,9 +451,9 @@ def numerics_show_command(name, fidelity, json_output):
     "--elastic-model",
     type=click.Choice(_ELASTIC_MODEL_VALUES),
     help=(
-        "Elastic scattering: mott (default) screened-Rutherford angles, or the opt-in "
-        "elsepa full differential cross sections (needs 'pyrite tables generate --code "
-        "elsepa --material NAME' for each material; bypasses the transport LUT)."
+        "Elastic scattering: elsepa (default) full differential cross sections (needs "
+        "'pyrite tables fetch elsepa'; bypasses the transport LUT), or the historical "
+        "mott screened-Rutherford angles."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

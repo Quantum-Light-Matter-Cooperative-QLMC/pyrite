@@ -29,12 +29,13 @@ import numpy as np
 
 from ._errors import DataFetchError
 from .bremslib.release import (
-    ReleaseEntry,
     ReleaseIndex,
     archive_member,
     file_sha256,
     load_release_index,
 )
+from .elsepa.release import ElsepaReleaseIndex
+from .elsepa.release import load_release_index as load_elsepa_release_index
 from .sources import fetched_data_dir
 from .store import arrays_digest, manifest_digest, resolve, user_table_dir
 
@@ -229,25 +230,26 @@ def fetch_sbethe(archive: str | Path | None = None) -> FetchResult:
     )
 
 
-def _bremslib_installed(entry: ReleaseEntry) -> bool:
+def _release_installed(entry, name: str, code: str, *, exact: bool) -> bool:
     """Return whether ``entry`` already resolves as the pinned table.
 
-    A table resolving under the pinned key with a *different* manifest is
-    not treated as missing: replacing it could discard a table the user put
-    there, so it is reported instead.
+    With ``exact``, a table resolving under the pinned key with a *different*
+    manifest is not treated as missing: replacing it could discard a table the
+    user put there, so it is reported instead. Without it, any table under the
+    key counts, for codes whose key already fixes the numbers.
     """
     table = resolve(entry.key)
     if table is None:
         return False
-    if table.digest != entry.manifest_sha256:
+    if exact and table.digest != entry.manifest_sha256:
         raise DataFetchError(
-            f"a different table is already stored under the released key for Z={entry.z} "
-            f"({table.path}); move or remove it, then run `pyrite tables fetch bremslib` again"
+            f"a different table is already stored under the released key for {entry.label} "
+            f"({table.path}); move or remove it, then run `pyrite tables fetch {code}` again"
         )
     return True
 
 
-def _stage_bremslib_table(bundle: zipfile.ZipFile, entry: ReleaseEntry, staged: Path) -> None:
+def _stage_release_table(bundle: zipfile.ZipFile, entry, name: str, staged: Path) -> None:
     """Extract and verify one released table into ``staged``.
 
     Three checks, each against something the table cannot vouch for itself:
@@ -260,22 +262,89 @@ def _stage_bremslib_table(bundle: zipfile.ZipFile, entry: ReleaseEntry, staged: 
         manifest_bytes = bundle.read(archive_member(entry.key, ".json"))
         payload_bytes = bundle.read(archive_member(entry.key, ".npz"))
     except KeyError as exc:
-        raise DataFetchError(f"BremsLib table archive lacks the Z={entry.z} table") from exc
+        raise DataFetchError(f"{name} table archive lacks the {entry.label} table") from exc
     body = json.loads(manifest_bytes)
     if (
         body.get("manifest_sha256") != entry.manifest_sha256
         or manifest_digest(body) != entry.manifest_sha256
     ):
         raise DataFetchError(
-            f"BremsLib table manifest for Z={entry.z} does not match the pinned release"
+            f"{name} table manifest for {entry.label} does not match the pinned release"
         )
     payload = staged / f"{entry.key}.npz"
     payload.write_bytes(payload_bytes)
     with np.load(payload) as loaded:
         stored = arrays_digest({name: loaded[name] for name in loaded.files})
     if stored != body.get("arrays_sha256"):
-        raise DataFetchError(f"BremsLib table arrays for Z={entry.z} do not match their manifest")
+        raise DataFetchError(f"{name} table arrays for {entry.label} do not match their manifest")
     (staged / f"{entry.key}.json").write_bytes(manifest_bytes)
+
+
+def _install_release(
+    code: str, name: str, pinned, archive: str | Path | None, *, exact: bool
+) -> FetchResult:
+    """Install every missing table of a pinned release into the user table directory.
+
+    Nothing is installed unless every missing table verifies, so a failed
+    fetch leaves no partial release behind.
+    """
+    destination = user_table_dir()
+    missing = [
+        entry for entry in pinned.tables if not _release_installed(entry, name, code, exact=exact)
+    ]
+    if not missing:
+        return FetchResult(
+            code=code,
+            path=destination,
+            archive_sha256=pinned.archive_sha256,
+            file_count=len(pinned.tables),
+            installed=False,
+        )
+    if archive is None and pinned.url is None:
+        raise DataFetchError(
+            f"the pinned {name} table release is not published for download yet; "
+            "install from a copy of the release archive with "
+            f"`pyrite tables fetch {code} --archive PATH` (SHA-256 {pinned.archive_sha256})"
+        )
+
+    destination.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f".{code}-fetch-", dir=destination) as temp:
+        work = Path(temp)
+        label = f"{name} tables ({pinned.upstream})"
+        bundle_path = _obtain(
+            None if archive is None else Path(archive),
+            pinned.url,
+            work,
+            label,
+            pinned.archive_sha256,
+        )
+        staged = work / "staged"
+        staged.mkdir()
+        try:
+            with zipfile.ZipFile(bundle_path) as bundle:
+                for entry in missing:
+                    _stage_release_table(bundle, entry, name, staged)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            raise DataFetchError(f"could not extract the {name} table archive: {exc}") from exc
+        try:
+            # Payload before manifest: :func:`resolve` requires both, so a
+            # table interrupted between the two moves is simply not found.
+            for entry in missing:
+                for suffix in (".npz", ".json"):
+                    file_name = f"{entry.key}{suffix}"
+                    os.replace(staged / file_name, destination / file_name)
+        except OSError as exc:
+            raise DataFetchError(
+                f"could not install {name} tables at {destination}: {exc}"
+            ) from exc
+
+    return FetchResult(
+        code=code,
+        path=destination,
+        archive_sha256=pinned.archive_sha256,
+        file_count=len(pinned.tables),
+        installed=True,
+    )
 
 
 def fetch_bremslib(
@@ -306,61 +375,33 @@ def fetch_bremslib(
             "this PyRITE build pins no BremsLib table release; generate tables from a "
             "BremsLib checkout with `pyrite tables generate --code bremslib`"
         )
-    destination = user_table_dir()
-    missing = [entry for entry in pinned.tables if not _bremslib_installed(entry)]
-    if not missing:
-        return FetchResult(
-            code="bremslib",
-            path=destination,
-            archive_sha256=pinned.archive_sha256,
-            file_count=len(pinned.tables),
-            installed=False,
-        )
-    if archive is None and pinned.url is None:
+    return _install_release("bremslib", "BremsLib", pinned, archive, exact=True)
+
+
+def fetch_elsepa(
+    archive: str | Path | None = None, *, index: ElsepaReleaseIndex | None = None
+) -> FetchResult:
+    """Install the pinned ELSEPA elastic tables into the user table directory.
+
+    As :func:`fetch_bremslib`, except that a table already stored under a
+    released key counts as installed even when its manifest differs: an ELSEPA
+    key fixes the vendored source and the deck, so a locally generated table
+    under it is an equally valid copy (it differs only in timestamp and
+    compiler).
+
+    Raises
+    ------
+    DataFetchError
+        If this build pins no release, or the archive cannot be obtained or
+        does not verify.
+    """
+    pinned = load_elsepa_release_index() if index is None else index
+    if pinned is None:
         raise DataFetchError(
-            "the pinned BremsLib table release is not published for download yet; "
-            "install from a copy of the release archive with "
-            f"`pyrite tables fetch bremslib --archive PATH` (SHA-256 {pinned.archive_sha256})"
+            "this PyRITE build pins no ELSEPA table release; generate tables with "
+            "`pyrite tables generate --code elsepa --material NAME`"
         )
-
-    destination.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".bremslib-fetch-", dir=destination) as temp:
-        work = Path(temp)
-        label = f"BremsLib tables ({pinned.upstream})"
-        bundle_path = _obtain(
-            None if archive is None else Path(archive),
-            pinned.url,
-            work,
-            label,
-            pinned.archive_sha256,
-        )
-        staged = work / "staged"
-        staged.mkdir()
-        try:
-            with zipfile.ZipFile(bundle_path) as bundle:
-                for entry in missing:
-                    _stage_bremslib_table(bundle, entry, staged)
-        except (OSError, ValueError, zipfile.BadZipFile) as exc:
-            raise DataFetchError(f"could not extract the BremsLib table archive: {exc}") from exc
-        try:
-            # Payload before manifest: :func:`resolve` requires both, so a
-            # table interrupted between the two moves is simply not found.
-            for entry in missing:
-                for suffix in (".npz", ".json"):
-                    name = f"{entry.key}{suffix}"
-                    os.replace(staged / name, destination / name)
-        except OSError as exc:
-            raise DataFetchError(
-                f"could not install BremsLib tables at {destination}: {exc}"
-            ) from exc
-
-    return FetchResult(
-        code="bremslib",
-        path=destination,
-        archive_sha256=pinned.archive_sha256,
-        file_count=len(pinned.tables),
-        installed=True,
-    )
+    return _install_release("elsepa", "ELSEPA", pinned, archive, exact=False)
 
 
 __all__ = [
@@ -368,5 +409,6 @@ __all__ = [
     "SBETHE_ARCHIVE_SHA256",
     "SBETHE_ARCHIVE_URL",
     "fetch_bremslib",
+    "fetch_elsepa",
     "fetch_sbethe",
 ]

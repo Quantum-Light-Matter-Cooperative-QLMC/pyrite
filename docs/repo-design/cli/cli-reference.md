@@ -1288,11 +1288,10 @@ Options:
   --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV for shell-soft-
                                   hard; must exceed each material's conduction-band
                                   resonance (Si 16.7, SiO2 22, MoS2 23 eV).  [x>0.0]
-  --elastic-model [mott|elsepa]   Elastic scattering: mott (default) screened-Rutherford
-                                  angles, or the opt-in elsepa full differential cross
-                                  sections (needs 'pyrite tables generate --code elsepa
-                                  --material NAME' for each material; bypasses the
-                                  transport LUT).
+  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
+                                  cross sections (needs 'pyrite tables fetch elsepa';
+                                  bypasses the transport LUT), or the historical mott
+                                  screened-Rutherford angles.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -2034,6 +2033,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables generate --code bremslib --element 79
     pyrite tables fetch sbethe
     pyrite tables fetch bremslib
+    pyrite tables fetch elsepa
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
 
@@ -2052,7 +2052,7 @@ Commands:
 ## `pyrite tables fetch`
 
 ```text
-Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib}
+Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa}
 
   Fetch pinned data for CODE into your user data directory.
 
@@ -2061,6 +2061,9 @@ Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib}
   bremslib  BremsLib-derived bremsstrahlung tables for every element a
             catalogue material may contain, so no BremsLib checkout is
             needed for them.
+  elsepa    ELSEPA elastic tables (free atoms for every transport element,
+            muffin-tin tables for elementary crystals) that the default
+            elastic model reads, so no Fortran run is needed for them.
 
   The archive is SHA-256 verified before anything is installed, whether it was
   downloaded or given with --archive. A complete existing install returns successfully

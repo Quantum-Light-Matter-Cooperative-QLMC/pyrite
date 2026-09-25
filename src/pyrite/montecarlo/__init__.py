@@ -12,7 +12,9 @@ following Zhai et al., Nat. Commun. 16, 11218 (2025), SI Sections S1-S5:
      SRD 64 relativistic Mott TRANSPORT cross sections
      (mott_transport_cross_sections/) -- so both the collision rate and the
      momentum-transfer rate match Mott data. Same architecture as CASINO.
-     A purely analytic screened-Rutherford fallback is kept ("sr").
+     A purely analytic screened-Rutherford fallback is kept ("sr"). Runs
+     built from the default Numerics instead select "elsepa": full ELSEPA
+     differential cross sections from the released tables (issue #89).
   2. Radiation (SI S1): each straight trajectory segment between elastic
      collisions radiates independently (incoherent across segments, coherent
      across reciprocal vectors within a segment) with the finite-interaction-

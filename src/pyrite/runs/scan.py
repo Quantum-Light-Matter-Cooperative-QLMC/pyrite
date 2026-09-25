@@ -635,7 +635,7 @@ def _resolved_run(args, material):
         and settings.energy_model == "frozen"
         and settings.max_dE_frac == 0.0
         and settings.inelastic_model == "continuous"
-        and settings.elastic_model == "mott"
+        and settings.elastic_model == "elsepa"
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem

@@ -102,8 +102,8 @@ def simulate_trajectories(
       Validation: electron-transport
       Validation: elsepa-elastic-sampling
 
-    elastic_tables: required by, and only accepted with, ``elastic_model=
-      "elsepa"``. One entry per layer, each a sequence of one mapping per
+    elastic_tables: required by, and only accepted with,
+      ``elastic_model="elsepa"``. One entry per layer, each a sequence of one mapping per
       element in composition order holding ``energy_eV``,
       ``total_elastic_cm2``, ``mu`` and ``dcs_cm2_sr`` on ELSEPA's shared
       angular grid. Every incident energy and cutoff must lie inside every

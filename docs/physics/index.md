@@ -10,7 +10,7 @@ These pages describe **how the simulated physical system is represented**. For e
 
 - Electron position, direction, energy, and arrival time are sampled at the target entrance. Upstream beamline transport and space charge are excluded; see [Beam phase space](beam-transport/beam-phase-space.md).
 - Independent electrons follow piecewise-linear flights through slabs or layer stacks. Elastic collisions are explicit, while inelastic loss is condensed between them and is deterministic by default, with optional Urban straggling. Knock-on electrons are not transported; see [Electron transport](beam-transport/electron-transport.md).
-- The default elastic model combines Browning total cross sections with NIST Mott-calibrated angular transport. Stopping uses a per-element Joy--Luo/Berger--Seltzer splice; see [Elastic scattering](beam-transport/elastic-scattering.md) and [Stopping power](beam-transport/stopping-power.md).
+- The default elastic model samples ELSEPA Dirac partial-wave total and differential cross sections (muffin-tin tables for single-element crystals); the Browning/NIST Mott-calibrated model remains selectable. Stopping uses a per-element Joy--Luo/Berger--Seltzer splice; see [Elastic scattering](beam-transport/elastic-scattering.md) and [Stopping power](beam-transport/stopping-power.md).
 
 ### Crystal and coherent emission
 

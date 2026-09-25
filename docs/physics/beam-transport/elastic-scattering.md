@@ -6,7 +6,7 @@ PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is
 
 ## Selecting a model
 
-`elastic_model` chooses between two internally consistent parameterizations.
+`elastic_model` chooses between three internally consistent models. Runs built from `pyrite.Numerics` (and every profile) default to `"elsepa"`; `"mott"` remains selectable and is still the default of the low-level `simulate_trajectories`, which cannot sample ELSEPA without tables passed in.
 
 ```{list-table} Elastic model options.
 :name: tbl-elastic-model-options
@@ -16,7 +16,11 @@ PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is
   - Total cross section
   - Screening parameter
   - External data
-* - `"mott"` (default)
+* - `"elsepa"` (default for runs)
+  - ELSEPA 2020 partial-wave total, log-log in energy
+  - none: angles sampled from the full tabulated differential cross section
+  - released tables, `pyrite tables fetch elsepa`
+* - `"mott"`
   - Browning fit to tabulated Mott totals
   - calibrated per element against NIST SRD 64 Mott transport cross sections
   - `mott_transport_cross_sections/DisplayCalcTCSTableFor<El>.csv`
@@ -26,7 +30,7 @@ PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is
   - none
 ```
 
-The two differ in both the collision *rate* and the momentum-transfer rate, and are separate physical models; the ledger records backscatter coefficients for both.
+The models differ in both the collision *rate* and the momentum-transfer rate, and are separate physical models; the ledger records backscatter coefficients for each.
 
 ## Free path
 
@@ -134,6 +138,25 @@ for $\alpha(E)$. The left side is monotonic in $\alpha$, so the inversion is a b
 
 The result is a model whose collision rate matches Mott totals and whose momentum-transfer rate matches Mott transport cross sections, while retaining the analytically invertible angular law. It does **not** reproduce the full Mott differential cross section: structure beyond the first moment (diffraction minima, large-angle detail) is absorbed into a single effective screening parameter.
 
+## ELSEPA tabulated cross sections
+
+`elastic_model="elsepa"` replaces both the total-cross-section fit and the screened-Rutherford angular law with Dirac partial-wave results from ELSEPA 2020{cite:p}`salvat2005`. Each element has one table on a fixed grid of 61 energies from 100 eV to 100 MeV (ten per decade): the total elastic cross section $\sigma_i(E_k)$ and the differential cross section on ELSEPA's own angular grid in $\mu = (1-\cos\theta)/2$. A single-element catalog crystal (silicon, diamond, HOPG, black phosphorus) replaces its rows up to 1 MeV with a muffin-tin table whose sphere radius is half the crystal's nearest-neighbour distance; compounds use free atoms.
+
+The flight rate of {eq}`eq-elastic-mean-free-path` interpolates the macroscopic cross section log-log between energy nodes,
+
+```{math}
+:label: eq-elastic-elsepa-rate
+
+\ln\Sigma_i(E) = (1-f)\ln\Sigma_i(E_k) + f\ln\Sigma_i(E_{k+1}),
+\qquad f = \frac{\ln E - \ln E_k}{\ln E_{k+1} - \ln E_k}.
+```
+
+At each node the angular density is the tabulated DCS normalized on its native grid, $p(\mu) = \mathrm{DCS}(\mu)/\int_0^1 \mathrm{DCS}\,d\mu$, treated as piecewise linear in $\mu$ (so $d\Omega = 4\pi\,d\mu$ for an azimuthally symmetric DCS). Its cumulative distribution is quadratic within each $\mu$ panel and is inverted exactly. Between nodes one uniform draw is inverted on both bracketing nodes and the two quantiles are interpolated linearly in $\ln E$, which keeps the sample monotone in the draw and reproduces each node's distribution exactly.
+
+Energies outside a table are refused, never extrapolated. A layer whose tables are not installed fails with the command that installs them.
+
+**Stated tolerance.** Sampled first and second transport moments, $\langle 1 - P_\ell(\cos\theta)\rangle$, reproduce ELSEPA's own $\sigma_\ell/\sigma$ within 0.9 % across every released table and energy. Above about 10 MeV the forward peak outruns ELSEPA's native angular grid, so the trapezoid integral of the DCS falls up to 1.4 % short of ELSEPA's total. The flight rate uses ELSEPA's total directly, so only the angular shape carries this error.
+
 ### Missing tables
 
 Elements without a NIST transport table (tungsten among them) fall back to {eq}`eq-elastic-screening-joy` for the angular draw while keeping the Browning total. The miss is cached per element per process and logged once at `DEBUG` (`PYRITE_MC_DEBUG=1` to see it); a worker pool logs once per worker.
@@ -160,4 +183,6 @@ which is the same partial-rate decomposition that produced $\lambda$. Layer swit
 
 ## Validation
 
-`Validation: electron-transport` — see the row in the [physics validation ledger](../../validation/physics-validation-ledger.md) and the [write-up](../../validation/beam-transport/electron-transport.md), which records measured backscatter coefficients for both models against Hunger–Küchler and states the extrapolation ceiling above.
+`Validation: electron-transport` — see the row in the [physics validation ledger](../../validation/physics-validation-ledger.md) and the [write-up](../../validation/beam-transport/electron-transport.md), which records measured backscatter coefficients for the Mott and screened-Rutherford models against Hunger–Küchler and states the extrapolation ceiling above.
+
+`Validation: elsepa-elastic-sampling` and `Validation: elsepa-muffin-tin-inputs` cover the ELSEPA model: see the [transport and background ledger](../../validation/ledger-transport-background.md#elsepa-elastic-sampling).

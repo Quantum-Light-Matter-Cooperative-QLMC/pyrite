@@ -71,9 +71,10 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # must be orphaned rather than served for a different band. Re-minted again
     # for issue #91's `l-shell-ck-lorentzian-v5` marker: L-shell Coster--Kronig
     # redistribution changes the L line yields themselves, so v4 records are not
-    # the same spectrum.
+    # the same spectrum. Re-minted again for issue #89: default cases now select
+    # the ELSEPA elastic model, which changes every trajectory.
     assert case_content_key(case) == (
-        "cea62a07a0ec02e1b50c14ebcee8e7379df5d9deb592a1ca9e53e4dc74cb141e"
+        "7edf048cd4a329377db46f72d97adee2ce07c427aaf38e653d8b74b7a7d3985d"
     )
 
 
@@ -84,7 +85,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "4823405a8f2876bcd14ba6b55f5576d75574f6b172196ad0d07d460bf73b6c1b"
+        "9186f29caf429c136e7a2e17c7157a39d323df1bc3016bad0981ee5f9b6b8849"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -176,12 +177,15 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
     )
 
     assert explicit_defaults["parameter_sha256"] == base["parameter_sha256"]
-    assert "transport_numerics" not in base["resolved_parameters"]
+    # The default ELSEPA elastic model is the one transport numeric that diverges
+    # from the historical payload, so it is the only one the default records.
+    assert base["resolved_parameters"]["transport_numerics"] == {"elastic_model": "elsepa"}
     assert active["parameter_sha256"] != base["parameter_sha256"]
     assert active["resolved_parameters"]["transport_numerics"] == {
         "straggling": True,
         "energy_model": "midpoint",
         "max_dE_frac": 0.02,
+        "elastic_model": "elsepa",
     }
 
 
@@ -368,7 +372,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "4823405a8f2876bcd14ba6b55f5576d75574f6b172196ad0d07d460bf73b6c1b"
+        "9186f29caf429c136e7a2e17c7157a39d323df1bc3016bad0981ee5f9b6b8849"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -382,42 +386,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "6a35a449070d5e3706863d1bc7dbcafdbe2698e3bce19cc95aa69c99e9f5d7d7",
+            "e5cc87acb0beb487f3b2ef6945b655d8590fb162a906979b0062add28854eb55",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "9acfd9a4386356e81ee7f43ef49101fd211be01b7e45e9e467fb31a56cb50383",
+            "0b31256eda8cbb9b6d797b5c5393d77908718d2788587bbf8f6afa1fe044e10d",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "c2290df525d6d9374dd97b7341f657ff7a450646cd30085d5887fe777dd05f6f",
+            "c1334593380d955d69be20f01d558699b38000fd53688f9123529e389f7b395e",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "d7633db18d5b5f23b51901007b7dfc9aca2d872d6d61ac168ad45505f42c50e4",
+            "a75ef33494842c6002332d85a3da3e43e61590a731350fa798723577d49e04e8",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "74e1b6291a3010ace09e982931d24e6009ea26cfbbcf36b212506f626ef2762a",
+            "b33158964d798439132190b890613e1a059e4d1502b4f69366cecb332f47032a",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "eb7294bf0d57cd805b61f3076881efd046da9f683b08d9785b2e13842452256e",
+            "960d236f37f46a4372119583b5ebfae858d4fbf280cc388a4e1bee2cdfee0e78",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "75f03f0591a8a5728a4183c9aa4f18f224df1e5e1822fbc24fc421d023e34273",
+            "393fc64b0eadf5bcf2a6fe22d998b3d79b47382d5721bf164d4cc6f9c9b07713",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "d2373ba5b2368e192a2fe18231c383ca2fc89eaa22f39d4a811159d2d71bcd16",
+            "82bc585dae67c424b863bff958e30344a4b29a88ea66efcb48c882112ae3c66b",
         ),
     ],
 )
@@ -432,8 +436,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     bit-for-bit from here. They were re-minted again when unconditional EEDL
     characteristic radiation was introduced, for the EEDL bremsstrahlung
     generation marker, for natural Lorentzian characteristic profiles, for
-    issue #88's physical finite-window convention, and for issue #91's
-    `l-shell-ck-lorentzian-v5` L-shell Coster--Kronig relaxation marker.
+    issue #88's physical finite-window convention, for issue #91's
+    `l-shell-ck-lorentzian-v5` L-shell Coster--Kronig relaxation marker, and
+    for issue #89's ELSEPA elastic model becoming the default.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
@@ -580,11 +585,11 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # Berger--Seltzer stopping splice did, and again when every crystal cut
     # moved to the surface_hkl spelling, and again for natural Lorentzian
     # characteristic profiles, and again for issue #88's physical finite-window
-    # convention, again for issue #125's automatic bundled line grids, and again
-    # for issue #91's L-shell Coster--Kronig relaxation marker) must stay
-    # bit-for-bit.
+    # convention, again for issue #125's automatic bundled line grids, again
+    # for issue #91's L-shell Coster--Kronig relaxation marker, and again for
+    # issue #89's default ELSEPA elastic model) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "4823405a8f2876bcd14ba6b55f5576d75574f6b172196ad0d07d460bf73b6c1b"
+        "9186f29caf429c136e7a2e17c7157a39d323df1bc3016bad0981ee5f9b6b8849"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -593,9 +598,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # that row's `start` now records the medium's derived photon-continuum floor
     # instead of 0 eV, so the declared sweep payload this digest hashes moved.
     # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
-    # bandwidth request the resolver raises, so it was left alone.
+    # bandwidth request the resolver raises, so it was left alone. Re-minted
+    # again for issue #89's default ELSEPA elastic model.
     assert survey_incoherent["parameter_sha256"] == (
-        "082695b50cfb91d0ce8c30e984b34a5536b7a2984869332803ab25d365b40dd1"
+        "de65c05cffb5ea139ee4c921c6856c61275376a8258262ddc070c929dd68e644"
     )
 
 
@@ -699,6 +705,7 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
         "energy_model": "midpoint",
         "inelastic_model": "shell-soft-hard",
         "inelastic_cutoff_eV": 50.0,
+        "elastic_model": "elsepa",
     }
     assert (
         len(
@@ -722,24 +729,26 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     assert profiles.case_content_key(shell_case) != profiles.case_content_key(legacy_case)
 
 
-def test_elsepa_elastic_model_forks_identity_and_case_payload_only_when_on():
+def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
+    """ELSEPA is the default; the historical Mott model keeps its old payload."""
     settings = default_settings()
     sweep = material_sweep("silicon")
     base = dataset_identity("silicon", "full", settings, sweep)
     explicit_default = dataset_identity(
-        "silicon", "full", replace(settings, elastic_model="mott"), sweep
+        "silicon", "full", replace(settings, elastic_model="elsepa"), sweep
     )
-    active = dataset_identity("silicon", "full", replace(settings, elastic_model="elsepa"), sweep)
+    mott = dataset_identity("silicon", "full", replace(settings, elastic_model="mott"), sweep)
 
+    assert settings.elastic_model == "elsepa"
     assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
-    assert "elastic_model" not in base["resolved_parameters"].get("transport_numerics", {})
-    assert active["resolved_parameters"]["transport_numerics"] == {"elastic_model": "elsepa"}
-    assert active["parameter_sha256"] != base["parameter_sha256"]
+    assert base["resolved_parameters"]["transport_numerics"] == {"elastic_model": "elsepa"}
+    assert "transport_numerics" not in mott["resolved_parameters"]
+    assert mott["parameter_sha256"] != base["parameter_sha256"]
 
-    legacy_case = build_cases(sweep, 4, 4)[0]
-    elsepa_case = build_cases(sweep, 4, 4, elastic_model="elsepa")[0]
-    assert "elastic_model" not in legacy_case
-    assert elsepa_case["elastic_model"] == "elsepa"
-    assert profiles.case_content_key(elsepa_case) != profiles.case_content_key(legacy_case)
+    default_case = build_cases(sweep, 4, 4)[0]
+    mott_case = build_cases(sweep, 4, 4, elastic_model="mott")[0]
+    assert default_case["elastic_model"] == "elsepa"
+    assert "elastic_model" not in mott_case
+    assert profiles.case_content_key(default_case) != profiles.case_content_key(mott_case)
     with pytest.raises(ValueError, match="elastic_model"):
         build_cases(sweep, 4, 4, elastic_model="nope")

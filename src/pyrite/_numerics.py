@@ -22,8 +22,8 @@ TRANSPORT_KEYS = (
 #: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
 #: two in step) without importing the transport package here.
 INELASTIC_MODELS = ("continuous", "shell-soft-hard")
-#: Elastic models a case may select. ``"mott"`` is the historical default;
-#: ``"elsepa"`` samples resolved ELSEPA tables (issue #89).
+#: Elastic models a case may select. ``"elsepa"`` (the default, issue #89)
+#: samples resolved ELSEPA tables; ``"mott"`` is the historical model.
 ELASTIC_MODELS = ("mott", "elsepa")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
@@ -92,9 +92,10 @@ class Numerics:
         only valid with, that mode, which also requires
         ``energy_model="midpoint"``).
     elastic_model
-        ``"mott"`` (default) screened-Rutherford angles calibrated to NIST
-        Mott transport cross sections, or the opt-in ``"elsepa"`` sampling of
-        full ELSEPA differential cross sections from generated tables.
+        ``"elsepa"`` (default) samples full ELSEPA differential cross
+        sections from the released tables (``pyrite tables fetch elsepa``);
+        ``"mott"`` keeps the historical screened-Rutherford angles calibrated
+        to NIST Mott transport cross sections.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -110,7 +111,7 @@ class Numerics:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
-    elastic_model: Literal["mott", "elsepa"] = "mott"
+    elastic_model: Literal["mott", "elsepa"] = "elsepa"
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -123,7 +124,7 @@ class Numerics:
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
         if not isinstance(self.straggling, bool):
-            raise ValueError("straggling must be a bool")
+            raise TypeError("straggling must be a bool")
         if self.energy_model not in {"frozen", "midpoint"}:
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         if (

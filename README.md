@@ -26,6 +26,7 @@ Requires Python ≥3.14 and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync
+uv run pyrite tables fetch elsepa   # elastic cross sections the default transport reads
 uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
@@ -125,8 +126,8 @@ scoring.
 
 - **[Electron transport](docs/physics/beam-transport/electron-transport.md):**
   independent piecewise-linear flights use explicit
-  elastic collisions and condensed energy loss. The default combines
-  Mott-calibrated Browning scattering with Joy-Luo/Berger-Seltzer stopping;
+  elastic collisions and condensed energy loss. The default samples ELSEPA
+  partial-wave elastic cross sections, with Joy-Luo/Berger-Seltzer stopping;
   beamline space charge and secondary electrons are not modeled.
 - **[Crystal source](docs/physics/materials/structure-factor.md):** phase-specific
   structures, complex atomic form factors, Debye--Waller factors, selected

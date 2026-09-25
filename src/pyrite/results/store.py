@@ -94,7 +94,7 @@ class Settings:
     inelastic_model, inelastic_cutoff_eV
         Collision-loss scheme and the opt-in shell mode's cutoff in eV.
     elastic_model
-        ``"mott"`` (default) or the opt-in tabulated ``"elsepa"`` model.
+        ``"elsepa"`` (default) tabulated model, or the historical ``"mott"``.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -115,7 +115,7 @@ class Settings:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
-    elastic_model: Literal["mott", "elsepa"] = "mott"
+    elastic_model: Literal["mott", "elsepa"] = "elsepa"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -126,7 +126,7 @@ class Settings:
 
     def __post_init__(self) -> None:
         if not isinstance(self.straggling, bool):
-            raise ValueError("straggling must be a bool")
+            raise TypeError("straggling must be a bool")
         if self.energy_model not in {"frozen", "midpoint"}:
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         if not np.isfinite(self.max_dE_frac) or self.max_dE_frac < 0.0:
@@ -176,24 +176,24 @@ def store_result(results, case, out):
     # linearization diverges as psi -> 90 deg, so cap the term at E_pk -- beyond
     # FWHM ~ E the line is washed out and the model is meaningless anyway.
     fwhm = line_fwhm_eV(case, E_pk, case.get("mosaic_fwhm_rad"))
-    results.setdefault(name, {})[E0] = dict(
-        E_grid=E_grid,
-        spec=out["spec"],
-        brem=out["brem"],
-        E_grid_brem=out.get("E_grid_brem"),  # wide coarse grid (full range)
-        brem_wide=out.get("brem_wide"),  # bremsstrahlung out to the beam energy
-        E_pk=E_pk,
-        fwhm=fwhm,
-        eta=out["eta"],
+    results.setdefault(name, {})[E0] = {
+        "E_grid": E_grid,
+        "spec": out["spec"],
+        "brem": out["brem"],
+        "E_grid_brem": out.get("E_grid_brem"),  # wide coarse grid (full range)
+        "brem_wide": out.get("brem_wide"),  # bremsstrahlung out to the beam energy
+        "E_pk": E_pk,
+        "fwhm": fwhm,
+        "eta": out["eta"],
         # finite-crystal footprint-hit fraction (NaN on pre-feature checkpoints
         # that never recorded it); surfaced as the "hit_frac" heatmap quantity.
-        hit_frac=out.get("hit_frac", float("nan")),
-        scale=case["domega_sr"] * PER_NA,  # (per e per sr) -> (per s per nA)
+        "hit_frac": out.get("hit_frac", float("nan")),
+        "scale": case["domega_sr"] * PER_NA,  # (per e per sr) -> (per s per nA)
         # Stored outside ``case``: current is reporting metadata, while the
         # legacy-shaped case remains stable for checkpoint matching/identity.
-        source_current_na=_pulse_current_na(case),
-        case=case,
-    )
+        "source_current_na": _pulse_current_na(case),
+        "case": case,
+    }
     # Coherent-kernel companion spectrum, present only for an emission
     # "coherent"/"both" transport (runner attaches out["spec_coherent"] from the
     # SAME segments as ``spec``). Conditional so an incoherent record grows no

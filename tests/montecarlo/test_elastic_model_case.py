@@ -15,8 +15,8 @@ from pyrite.montecarlo.runner.case_tables import (
 
 
 def test_numerics_accepts_only_known_elastic_models():
-    assert Numerics().elastic_model == "mott"
-    assert Numerics(elastic_model="elsepa").elastic_model == "elsepa"
+    assert Numerics().elastic_model == "elsepa"
+    assert Numerics(elastic_model="mott").elastic_model == "mott"
     with pytest.raises(ValueError, match="elastic_model"):
         Numerics(elastic_model="sr")  # type: ignore[arg-type]
 

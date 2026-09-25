@@ -551,7 +551,7 @@ def test_fetch_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_
 
 
 def test_fetch_rejects_a_code_without_downloadable_data(isolated):
-    result = invoke(tables_command.command, ["fetch", "elsepa"])
+    result = invoke(tables_command.command, ["fetch", "penelope"])
 
     assert result.exit_code == 2
     assert "sbethe" in result.stderr

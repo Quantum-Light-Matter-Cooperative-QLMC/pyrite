@@ -61,7 +61,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
             inelastic_model=getattr(settings, "inelastic_model", "continuous"),
             inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
-            elastic_model=getattr(settings, "elastic_model", "mott"),
+            elastic_model=getattr(settings, "elastic_model", "elsepa"),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

@@ -7,8 +7,8 @@ came from, where they live, and which code trees PyRITE can currently reach.
 material path, whose options are largely disjoint: an option belonging to
 another code is rejected rather than silently ignored. ``fetch`` installs
 SBETHE's pinned reference database without extracting the archive's prebuilt
-executable or documentation, and the pinned release of BremsLib-derived tables
-for the catalogue elements.
+executable or documentation, and the pinned releases of BremsLib-derived and
+ELSEPA elastic tables for the catalogue elements.
 """
 
 import json
@@ -196,6 +196,7 @@ def command() -> None:
       pyrite tables generate --code bremslib --element 79
       pyrite tables fetch sbethe
       pyrite tables fetch bremslib
+      pyrite tables fetch elsepa
       pyrite tables sources list
       pyrite tables sources set elsepa ../elsepa-2020
     """
@@ -547,7 +548,7 @@ def _emit_table(selected: str, result, *, json_output: bool) -> None:
 
 
 @command.command("fetch")
-@click.argument("code", type=click.Choice(["sbethe", "bremslib"], case_sensitive=False))
+@click.argument("code", type=click.Choice(["sbethe", "bremslib", "elsepa"], case_sensitive=False))
 @click.option(
     "--archive",
     type=click.Path(exists=True, dir_okay=False),
@@ -564,15 +565,18 @@ def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
     bremslib  BremsLib-derived bremsstrahlung tables for every element a
               catalogue material may contain, so no BremsLib checkout is
               needed for them.
+    elsepa    ELSEPA elastic tables (free atoms for every transport element,
+              muffin-tin tables for elementary crystals) that the default
+              elastic model reads, so no Fortran run is needed for them.
 
     The archive is SHA-256 verified before anything is installed, whether it
     was downloaded or given with --archive. A complete existing install
     returns successfully without network access.
     """
     from ...xsgen import DataFetchError
-    from ...xsgen.fetch import fetch_bremslib, fetch_sbethe
+    from ...xsgen.fetch import fetch_bremslib, fetch_elsepa, fetch_sbethe
 
-    fetch = fetch_bremslib if code.lower() == "bremslib" else fetch_sbethe
+    fetch = {"bremslib": fetch_bremslib, "elsepa": fetch_elsepa}.get(code.lower(), fetch_sbethe)
     try:
         result = fetch(archive)
     except DataFetchError as exc:
@@ -589,7 +593,7 @@ def fetch_command(code: str, archive: str | None, json_output: bool) -> None:
         emit_json("pyrite.tables.fetch.v1", payload)
         return
     action = "installed" if result.installed else "already installed"
-    unit = "tables" if result.code == "bremslib" else "files"
+    unit = "files" if result.code == "sbethe" else "tables"
     emit_result(f"{action}: {result.path} ({result.file_count} {unit})")
 
 

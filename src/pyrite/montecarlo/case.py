@@ -153,8 +153,9 @@ class Case(Mapping[str, Any]):
         Opt-in ``"shell-soft-hard"`` collision-loss scheme and its cutoff in
         eV; both absent is continuous stopping. Requires ``energy_model``.
     elastic_model
-        Opt-in ``"elsepa"`` tabulated elastic scattering; absent is the
-        historical ``"mott"`` model.
+        ``"elsepa"`` tabulated elastic scattering, which the default
+        :class:`~pyrite.Numerics` lowers to explicitly; absent is the
+        historical ``"mott"`` model, so pre-ELSEPA case keys stay valid.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     """

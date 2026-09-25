@@ -157,12 +157,12 @@ def test_one_element_layers_match_their_crystal_by_number_density():
     assert elemental_solid_for_composition(CATALOG.crystal("mos2").info.composition) is None
 
 
-def test_missing_tables_fail_with_the_generation_command(monkeypatch):
+def test_missing_tables_fail_with_the_fetch_command(monkeypatch):
     from pyrite.materials import CATALOG
 
     monkeypatch.setattr("pyrite.xsgen.elsepa.catalog.resolve", lambda key: None)
 
-    with pytest.raises(TableNotFoundError, match="--code elsepa --material <catalog material"):
+    with pytest.raises(TableNotFoundError, match=r"free atom Si .*pyrite tables fetch elsepa"):
         resolve_layer_tables([("Si", 0.03)])
     monkeypatch.setattr(
         "pyrite.xsgen.elsepa.catalog.resolve",
@@ -172,7 +172,7 @@ def test_missing_tables_fail_with_the_generation_command(monkeypatch):
         "pyrite.xsgen.elsepa.catalog.muffin_tin_request",
         lambda *a, **k: (type("R", (), {"key": "muffin"})(), None),
     )
-    with pytest.raises(TableNotFoundError, match="--code elsepa --material silicon"):
+    with pytest.raises(TableNotFoundError, match="elementary solid 'silicon'.*fetch elsepa"):
         resolve_layer_tables(CATALOG.crystal("silicon").info.composition)
 
 

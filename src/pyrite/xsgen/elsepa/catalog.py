@@ -208,9 +208,13 @@ def joined_arrays(
     return joined
 
 
-def _require(table: StoredTable | None, what: str, command: str) -> StoredTable:
+def _require(table: StoredTable | None, what: str) -> StoredTable:
     if table is None:
-        raise TableNotFoundError(f"no ELSEPA table for {what}; generate it with '{command}'")
+        raise TableNotFoundError(
+            f"no ELSEPA table for {what}; install the released tables with "
+            "'pyrite tables fetch elsepa', "
+            "or generate them with 'pyrite tables generate --code elsepa --material NAME'"
+        )
     return table
 
 
@@ -231,8 +235,6 @@ def resolve_layer_tables(
         free = _require(
             resolve(request.key),
             f"free atom {element} (Z={z})",
-            "pyrite tables generate --code elsepa --material <catalog material "
-            f"containing {element}>",
         )
         tables = [free]
         muffin_arrays = None
@@ -247,7 +249,6 @@ def resolve_layer_tables(
             muffin = _require(
                 resolve(mt_request.key),
                 f"elementary solid {solid.key!r}",
-                f"pyrite tables generate --code elsepa --material {solid.key}",
             )
             tables.append(muffin)
             muffin_arrays = muffin.arrays()

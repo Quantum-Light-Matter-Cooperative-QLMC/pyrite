@@ -616,7 +616,7 @@ def build_cases(
     max_dE_frac=0.0,
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
-    elastic_model="mott",
+    elastic_model="elsepa",
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -890,7 +890,8 @@ def build_cases(
                             if inelastic_model != "continuous"
                             else {}
                         ),
-                        # Opt-in ELSEPA elastic model: divergence-only as well.
+                        # ELSEPA elastic model (the default): divergence-only, so
+                        # an explicit "mott" case keeps its historical payload.
                         **({"elastic_model": "elsepa"} if elastic_model == "elsepa" else {}),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
