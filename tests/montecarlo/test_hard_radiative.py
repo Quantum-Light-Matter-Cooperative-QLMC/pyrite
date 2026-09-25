@@ -119,3 +119,25 @@ def test_numba_scalar_partition_and_sampler_match_host(table, energy):
         for uniform in (0.0, 0.01, 0.5, 0.99, np.nextafter(1.0, 0.0)):
             sampled = sample_hard_photon_energy_scalar(*arrays, energy, cutoff, uniform)
             np.testing.assert_allclose(sampled, host.sample_photon_energy(uniform), rtol=2e-12)
+
+
+def test_cutoff_node_rounding_keeps_scalar_sampler_on_the_hard_cells(table):
+    # (kc / T) * T rounds below kc at these energies. The moment kernel and
+    # sampler must still agree on which cell is the first hard one.
+    arrays = (
+        table.incident_energy_keV,
+        table.nominal_reduced_energy,
+        table.top_reduced_energy,
+        table.scaled_sdcs_mb,
+        table.atomic_number,
+    )
+    cutoff = 1_000.0
+    energies = [e for e in np.linspace(20_000.0, 60_000.0, 401) if (cutoff / e) * e < cutoff]
+    assert energies
+    for energy in energies[:20]:
+        host = build_radiative_partition(table, energy, cutoff)
+        assert cutoff in host.photon_grid_eV
+        for uniform in (0.0, 0.01, 0.5):
+            sampled = sample_hard_photon_energy_scalar(*arrays, energy, cutoff, uniform)
+            assert sampled >= cutoff
+            np.testing.assert_allclose(sampled, host.sample_photon_energy(uniform), rtol=2e-12)

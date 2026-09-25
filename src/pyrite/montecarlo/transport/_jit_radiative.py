@@ -79,7 +79,13 @@ def _photon_nodes(energy_eV, cutoff_eV, row, nominal, top):
         if nodes[i] > nodes[unique - 1]:
             nodes[unique] = nodes[i]
             unique += 1
-    return nodes[:unique] * energy_eV
+    photon = nodes[:unique] * energy_eV
+    # (kc / T) * T can round below kc. Restore the exact cutoff so the moment
+    # and sampler classify the first hard cell identically.
+    for i in range(unique):
+        if nodes[i] == cutoff_eV / energy_eV:
+            photon[i] = cutoff_eV
+    return photon
 
 
 @njit(cache=True)
@@ -142,7 +148,7 @@ def sample_hard_photon_energy_scalar(
     for i in range(nodes.size - 1):
         left, right = nodes[i], nodes[i + 1]
         chi_right = _scaled_sdcs_at(right / energy_eV, row, fraction, nominal, top, scaled_sdcs)
-        if left >= cutoff_eV:
+        if right > cutoff_eV:
             mass, _ = _linear_cell(left, right, chi_left, chi_right)
             cell_mass = scale * mass
             if cumulative + cell_mass >= target or i == nodes.size - 2:

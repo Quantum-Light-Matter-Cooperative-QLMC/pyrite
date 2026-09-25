@@ -22,6 +22,8 @@ from pyrite.montecarlo.transport import (
     simulate_trajectories,
 )
 from pyrite.montecarlo.transport.events import EVENT_CUTOFF, EVENT_HARD_RADIATIVE
+from pyrite.montecarlo.transport.hard_radiative import build_radiative_partition
+from pyrite.montecarlo.transport.stopping import spliced_stopping_keV_per_ang
 from tests.helpers.bremslib import synthetic_bremslib_arrays
 
 
@@ -178,3 +180,47 @@ def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract():
     check_segment_event_contract(result)
     assert result["inelastic"]["model"] == "shell-soft-hard"
     assert result["radiative"]["model"] == "bremslib-soft-hard"
+
+
+@pytest.mark.parametrize("cutoff_eV", [100.0, 10_000.0])
+def test_soft_and_hard_radiative_loss_reproduce_the_full_moment(cutoff_eV):
+    # Radiative loss dominates the synthetic table. Continuous row loss must be
+    # collision plus the soft first moment only; hard events must supply the
+    # rest at the partition's rate, so the sum does not depend on kc.
+    table = _table(3e4)
+    composition = [("C", 0.1)]
+    result = simulate_trajectories(
+        E0_keV=60.0,
+        Ne=2_000,
+        thickness_ang=3_000.0,
+        composition=composition,
+        E_cut_keV=10.0,
+        seed=7,
+        energy_model="midpoint",
+        transport_core="lockstep",
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=cutoff_eV,
+        bremslib_tables={"C": table},
+    )
+    E_start, E_end, L = result["E_start_keV"], result["E_end_keV"], result["L_ang"]
+    k_keV = result["hard_radiative_k_eV"] * 1e-3
+    per_ang = 0.1e24 * 1e-8  # atoms/cm^3 x cm/Angstrom
+
+    midpoint = 0.5 * (E_start + E_end)
+    collision = -np.asarray(spliced_stopping_keV_per_ang(composition, midpoint))
+    mid_parts = [build_radiative_partition(table, e * 1e3, cutoff_eV) for e in midpoint]
+    soft = np.array([p.soft_stopping_cs_eV_cm2 for p in mid_parts]) * per_ang * 1e-3
+    total = np.array([p.total_stopping_cs_eV_cm2 for p in mid_parts]) * per_ang * 1e-3
+    np.testing.assert_allclose((E_start - E_end).sum(), (L * (collision + soft)).sum(), rtol=1e-4)
+
+    # The flight hazard is frozen at row-start energy.
+    start_parts = [build_radiative_partition(table, e * 1e3, cutoff_eV) for e in E_start]
+    rate = np.array([p.hard_rate_cs_cm2 for p in start_parts]) * per_ang
+    expected_count = (L * rate).sum()
+    count = np.count_nonzero(k_keV)
+    assert abs(count - expected_count) < 4.0 * np.sqrt(expected_count)
+
+    radiative = (L * total).sum()
+    observed = (L * soft).sum() + k_keV.sum()
+    assert (L * total).sum() > 4.0 * (L * collision).sum()
+    assert abs(observed - radiative) < 4.0 * np.sqrt((k_keV**2).sum())

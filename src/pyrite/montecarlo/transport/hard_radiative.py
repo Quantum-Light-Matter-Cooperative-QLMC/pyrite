@@ -125,6 +125,8 @@ def build_radiative_partition(
     reduced = np.unique(np.r_[0.0, nodes, tops[row], tops[row + 1], cutoff / energy, 1.0])
     reduced = reduced[(reduced >= 0.0) & (reduced <= 1.0)]
     photon_grid = energy * reduced
+    # (kc / T) * T can round below kc; keep the partition boundary exact.
+    photon_grid[reduced == cutoff / energy] = cutoff
     positive = photon_grid > 0.0
     sdcs = np.zeros_like(photon_grid)
     sdcs[positive] = BACKEND.to_cpu(evaluate_bremslib(staged, state, photon_grid[positive]))[0]
