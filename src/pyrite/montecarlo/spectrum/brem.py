@@ -911,6 +911,10 @@ def mc_brem_spectrum(
     Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry,
     bremslib-angular-model
     """
+    if segments.get("radiative", {}).get("model") == "bremslib-soft-hard":
+        raise ValueError(
+            "coupled radiative tracks require mc_soft_brem_spectrum and mc_hard_brem_event_spectrum"
+        )
     cross_section_model = _validate_bremsstrahlung_model(cross_section_model)
     supplied_bremslib = (
         _require_bremslib_tables(bremslib_tables) if cross_section_model == "bremslib" else {}

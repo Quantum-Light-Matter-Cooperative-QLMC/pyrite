@@ -5,6 +5,10 @@ from numba import njit
 
 from ..geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
+from ._jit_radiative import (
+    radiative_layer_moments_scalar,
+    sample_hard_photon_energy_scalar,
+)
 from .events import (
     EVENT_CUTOFF,
     EVENT_ELASTIC,
@@ -13,6 +17,7 @@ from .events import (
     EVENT_EXIT_TOP,
     EVENT_GROOVE_SURFACE,
     EVENT_HARD_INELASTIC,
+    EVENT_HARD_RADIATIVE,
     EVENT_LAYER_BOUNDARY,
     EVENT_SUBSTEP,
 )
@@ -22,7 +27,12 @@ from .hard_inelastic import (
     _sample_hard_transfer_eV,
     _soft_loss_sample_keV,
 )
-from .kinematics import _SM64_ONE, _SM64_ZERO, _stream_uniform_scalar, beta_from_keV_scalar
+from .kinematics import (
+    _SM64_ONE,
+    _SM64_ZERO,
+    _stream_uniform_scalar,
+    beta_from_keV_scalar,
+)
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
 from .scattering import (
     _alpha_sr_joy_scalar,
@@ -126,7 +136,9 @@ def _searchsorted_right_scalar(bounds, x, n):
     return lo
 
 
-def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, inelastic=False):
+def make_cpu_transport_core(
+    *, grooved=False, per_electron=False, lut=False, inelastic=False, radiative=False
+):
     """Generate one CPU specialization with compile-time-frozen axis flags.
 
     The shared row body preserves the transport invariants derived in
@@ -155,6 +167,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
         raise ValueError("grooved transport has only an exact lockstep specialization")
     if grooved and inelastic:
         raise ValueError("shell soft/hard inelastic transport has no grooved specialization")
+    if radiative and (grooved or lut):
+        raise ValueError("coupled radiative transport has only exact ungrooved specializations")
 
     @njit(cache=True)
     def body(
@@ -171,6 +185,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
         pe_out,
         straggling,
         inelastic_args,
+        radiative_args=None,
     ):
         (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
         (
@@ -252,6 +267,22 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 il_ch_branch,
                 il_ch_code,
             ) = inelastic_args
+        if radiative:
+            assert radiative_args is not None
+            seg_rad_k = segments[14] if inelastic else segments[12]
+            seg_rad_Z = segments[15] if inelastic else segments[13]
+            (
+                rad_keys,
+                rad_cutoff_eV,
+                rad_nel,
+                rad_nT,
+                rad_Z,
+                rad_ncm3,
+                rad_incident,
+                rad_nominal,
+                rad_top,
+                rad_chi,
+            ) = radiative_args
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
             (seg_count, exit_code) = pe_out
@@ -274,6 +305,11 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
             # elastic one, and the per-electron hard-stream counter.
             tau_h = np.full(Ne, -1.0)
             hard_draws = np.zeros(Ne, dtype=np.uint64)
+        if radiative:
+            tau_rad = np.full(Ne, -1.0)
+            rad_draws = np.zeros(Ne, dtype=np.uint64)
+            rad_element_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
+            rad_scratch_rates = np.empty(rad_Z.shape[1], dtype=np.float64)
         nseg = nvac = n_back = n_trans = n_side = n_cutoff = 0
         n_alive = int(alive.sum())
         n_eligible = n_alive
@@ -377,6 +413,27 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                     hard_draws[e] += _SM64_ONE
                 if mu_hard > 0.0 and tau_h[e] / mu_hard < step_j:
                     step_j, hard_j = tau_h[e] / mu_hard, True
+            rad_j = False
+            if radiative:
+                rad_soft, mu_rad = radiative_layer_moments_scalar(
+                    rad_nel,
+                    rad_nT,
+                    rad_Z,
+                    rad_ncm3,
+                    rad_incident,
+                    rad_nominal,
+                    rad_top,
+                    rad_chi,
+                    L,
+                    E_j * 1e3,
+                    rad_cutoff_eV,
+                    rad_element_rates,
+                )
+                if tau_rad[e] < 0.0:
+                    tau_rad[e] = -np.log(_stream_uniform_scalar(rad_keys[e], rad_draws[e]))
+                    rad_draws[e] += _SM64_ONE
+                if mu_rad > 0.0 and tau_rad[e] / mu_rad < step_j:
+                    step_j, rad_j, hard_j = tau_rad[e] / mu_rad, True, False
 
             dx, dy, dz = dirs[e, 0], dirs[e, 1], dirs[e, 2]
             px, py, pz = pos[e, 0], pos[e, 1], pos[e, 2]
@@ -423,6 +480,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 )
             else:
                 dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
+            if radiative:
+                dEds -= rad_soft * 1e-3
             stopping_scale = 1.0
             # Only the Urban sampler reads the scale. Without straggling the
             # LUT cores carry zero dummy element tables, so the reference
@@ -562,6 +621,22 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                         cutoff_rate = _dEds_spliced_compound_scalar(
                             J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_cut_e)
                         )
+                    if radiative:
+                        rad_cut_soft, _ = radiative_layer_moments_scalar(
+                            rad_nel,
+                            rad_nT,
+                            rad_Z,
+                            rad_ncm3,
+                            rad_incident,
+                            rad_nominal,
+                            rad_top,
+                            rad_chi,
+                            L,
+                            0.5 * (E_j + E_cut_e) * 1e3,
+                            rad_cutoff_eV,
+                            rad_scratch_rates,
+                        )
+                        cutoff_rate -= rad_cut_soft * 1e-3
                     cutoff_distance = (E_cut_e - E_j) / cutoff_rate
                 else:
                     cutoff_distance = (E_cut_e - E_j) / dEds
@@ -601,6 +676,22 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                             mid_rate = _dEds_spliced_compound_scalar(
                                 J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, 0.5 * (E_j + E_pred)
                             )
+                        if radiative:
+                            rad_mid_soft, _ = radiative_layer_moments_scalar(
+                                rad_nel,
+                                rad_nT,
+                                rad_Z,
+                                rad_ncm3,
+                                rad_incident,
+                                rad_nominal,
+                                rad_top,
+                                rad_chi,
+                                L,
+                                0.5 * (E_j + E_pred) * 1e3,
+                                rad_cutoff_eV,
+                                rad_scratch_rates,
+                            )
+                            mid_rate -= rad_mid_soft * 1e-3
                         E_end_j = E_j + step_j * mid_rate
                     if lut:
                         clk_i, clk_f = _lut_index_frac_scalar(
@@ -635,6 +726,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 event_j = EVENT_LAYER_BOUNDARY
             elif inelastic and hard_j:
                 event_j = EVENT_HARD_INELASTIC
+            elif radiative and rad_j:
+                event_j = EVENT_HARD_RADIATIVE
             else:
                 event_j = EVENT_ELASTIC
             if inelastic:
@@ -683,6 +776,51 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                             u_q,
                         )
                         hard_phi = 2.0 * np.pi * u_phi
+            if radiative:
+                rad_k_eV, rad_event_Z = 0.0, 0
+                if event_j == EVENT_HARD_RADIATIVE:
+                    # The optical depth used the row-start hazard, like elastic
+                    # scattering. The photon and its element are conditional on
+                    # the electron's actual pre-event energy at this row end.
+                    _, mu_event = radiative_layer_moments_scalar(
+                        rad_nel,
+                        rad_nT,
+                        rad_Z,
+                        rad_ncm3,
+                        rad_incident,
+                        rad_nominal,
+                        rad_top,
+                        rad_chi,
+                        L,
+                        E_end_j * 1e3,
+                        rad_cutoff_eV,
+                        rad_scratch_rates,
+                    )
+                    u_el = _stream_uniform_scalar(rad_keys[e], rad_draws[e])
+                    u_k = _stream_uniform_scalar(rad_keys[e], rad_draws[e] + _SM64_ONE)
+                    rad_draws[e] += np.uint64(2)
+                    target = u_el * mu_event
+                    element_index = rad_nel[L] - 1
+                    cumulative = 0.0
+                    for k_el in range(rad_nel[L]):
+                        cumulative += rad_scratch_rates[k_el]
+                        if cumulative > target:
+                            element_index = k_el
+                            break
+                    nT = rad_nT[L, element_index]
+                    rad_k_eV = sample_hard_photon_energy_scalar(
+                        rad_incident[L, element_index, :nT],
+                        rad_nominal[L, element_index],
+                        rad_top[L, element_index, :nT],
+                        rad_chi[L, element_index, :nT],
+                        rad_Z[L, element_index],
+                        E_end_j * 1e3,
+                        rad_cutoff_eV,
+                        u_k,
+                    )
+                    rad_event_Z = rad_Z[L, element_index]
+                    if E_end_j - rad_k_eV * 1e-3 <= E_cut_e:
+                        event_j, cutoff_j = EVENT_CUTOFF, True
             if per_electron:
                 i = e - e_start
                 slot, record = i * cap + local_nseg[e], local_nseg[e] < cap
@@ -703,6 +841,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                     seg_event[slot] = event_j
                     if inelastic:
                         seg_hard_W[slot], seg_hard_ch[slot] = hard_W_keV, hard_code
+                    if radiative:
+                        seg_rad_k[slot], seg_rad_Z[slot] = rad_k_eV, rad_event_Z
             if per_electron:
                 local_nseg[e] += 1
             else:
@@ -716,6 +856,10 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 tau_h[e] -= step_j * mu_hard
                 if tau_h[e] < 0.0:
                     tau_h[e] = 0.0
+            if radiative:
+                tau_rad[e] -= step_j * mu_rad
+                if tau_rad[e] < 0.0:
+                    tau_rad[e] = 0.0
 
             if grooved:
                 if limited_j:
@@ -810,6 +954,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 substep_id[e], tau_left[e] = 0, -1.0
                 if inelastic:
                     tau_h[e] = -1.0
+                if radiative:
+                    tau_rad[e] = -1.0
                 if cross_up_j or cross_dn_j:
                     pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
                     if per_electron:
@@ -822,6 +968,9 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                     dirs[e, 0], dirs[e, 1], dirs[e, 2] = _rotate_direction_scalar(
                         dirs[e, 0], dirs[e, 1], dirs[e, 2], hard_cos, hard_phi
                     )
+                if radiative and event_j == EVENT_HARD_RADIATIVE:
+                    full_j = False
+                    E_keV[e] -= rad_k_eV * 1e-3
 
             if full_j:
                 if n_el == 1:
@@ -949,6 +1098,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
             pe_out,
             straggling,
             inelastic_args=(),
+            radiative_args=None,
         ):
             return body(
                 run,
@@ -964,6 +1114,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 pe_out,
                 straggling,
                 inelastic_args,
+                radiative_args,
             )
     elif grooved:
 
@@ -1028,6 +1179,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
             segments,
             straggling,
             inelastic_args=(),
+            radiative_args=None,
         ):
             return body(
                 Ne,
@@ -1043,6 +1195,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 (),
                 straggling,
                 inelastic_args,
+                radiative_args,
             )
 
     return core
@@ -1062,3 +1215,29 @@ _transport_core_ungrooved_perelectron_inelastic = make_cpu_transport_core(
 _transport_core_ungrooved_perelectron_lut_inelastic = make_cpu_transport_core(
     per_electron=True, lut=True, inelastic=True
 )
+# Opt-in coupled-radiative specializations: exact lockstep, and the exact
+# per-electron reference of the CUDA kernel, each with either collision mode.
+_transport_core_ungrooved_radiative = make_cpu_transport_core(radiative=True)
+_transport_core_ungrooved_inelastic_radiative = make_cpu_transport_core(
+    inelastic=True, radiative=True
+)
+_transport_core_ungrooved_perelectron_radiative = make_cpu_transport_core(
+    per_electron=True, radiative=True
+)
+_transport_core_ungrooved_perelectron_inelastic_radiative = make_cpu_transport_core(
+    per_electron=True, inelastic=True, radiative=True
+)
+
+
+def exact_ungrooved_core(*, per_electron, inelastic, radiative):
+    """The exact (non-LUT) ungrooved CPU core for a collision/radiative mode."""
+    return {
+        (False, False, False): _transport_core_ungrooved,
+        (False, True, False): _transport_core_ungrooved_inelastic,
+        (False, False, True): _transport_core_ungrooved_radiative,
+        (False, True, True): _transport_core_ungrooved_inelastic_radiative,
+        (True, False, False): _transport_core_ungrooved_perelectron,
+        (True, True, False): _transport_core_ungrooved_perelectron_inelastic,
+        (True, False, True): _transport_core_ungrooved_perelectron_radiative,
+        (True, True, True): _transport_core_ungrooved_perelectron_inelastic_radiative,
+    }[(bool(per_electron), bool(inelastic), bool(radiative))]
