@@ -1,5 +1,9 @@
 # Validation: `brem-spectrum`
 
+```{note}
+**2026-09-25 (#174):** The Cartesian incident-panel interpolation derived below has been replaced by unit-base refinement with a $\ln T$ shape weight. See [Bremsstrahlung](../../physics/radiation-physics/bremsstrahlung.md). The ledger status is back to `filtered` until a fresh-context re-derivation covers the new interpolation. The derivation below remains valid for native panels, the MF=23 total and the isotropic estimator.
+```
+
 ## Scope and independence
 
 Validation: `brem-spectrum`. Fresh-context validation on 2026-09-13. The independent expression below was written before implementation bodies or the previous implementation-context report were read. Inputs were the target ledger row, function signatures/docstrings, and primary ENDF documentation. This checks the stated isotropic track-length model, not its accuracy against experiment.

@@ -74,7 +74,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # the same spectrum. Re-minted again for issue #89: default cases now select
     # the ELSEPA elastic model, which changes every trajectory.
     assert case_content_key(case) == (
-        "7edf048cd4a329377db46f72d97adee2ce07c427aaf38e653d8b74b7a7d3985d"
+        "f45ba77f7c48c301aa595c8625245931692941099cf9008a5f057eb23bb02ba3"
     )
 
 
@@ -85,7 +85,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "9186f29caf429c136e7a2e17c7157a39d323df1bc3016bad0981ee5f9b6b8849"
+        "ea920f47592dc816edeebcc03cbe41ae29ab63c417eb8738044d21b5795ffe41"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -372,7 +372,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "9186f29caf429c136e7a2e17c7157a39d323df1bc3016bad0981ee5f9b6b8849"
+        "ea920f47592dc816edeebcc03cbe41ae29ab63c417eb8738044d21b5795ffe41"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -386,42 +386,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "e5cc87acb0beb487f3b2ef6945b655d8590fb162a906979b0062add28854eb55",
+            "0656ff4d2c2263f79818bb666f5daea592d269965dce3d79c6a71a8c3230322d",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "0b31256eda8cbb9b6d797b5c5393d77908718d2788587bbf8f6afa1fe044e10d",
+            "cffcd1d052794c78c94365e3f18fdf3aa20a0b0a42fc4918afe5ee96e39256cd",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "c1334593380d955d69be20f01d558699b38000fd53688f9123529e389f7b395e",
+            "fa577363bf5de45af65917ca88e227eb92a804facd9cef7ddef68c0d3b8934e1",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "a75ef33494842c6002332d85a3da3e43e61590a731350fa798723577d49e04e8",
+            "d88c1cdb7bc09df13721be3a869b99b446e1f0a75e535861028c73211cb1971d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "b33158964d798439132190b890613e1a059e4d1502b4f69366cecb332f47032a",
+            "8ce0e4a1b61d91be60be74fa48d0b765775baa6aa454360bdadd123a8065bd62",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "960d236f37f46a4372119583b5ebfae858d4fbf280cc388a4e1bee2cdfee0e78",
+            "ac525e5ed5eda712d833c289e5506db048223c77c616b40f0cc4a05209fc36be",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "393fc64b0eadf5bcf2a6fe22d998b3d79b47382d5721bf164d4cc6f9c9b07713",
+            "a0f9a54cb6716819a7f492caf41a0460086bb15617298874f072f004e90c8fc6",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "82bc585dae67c424b863bff958e30344a4b29a88ea66efcb48c882112ae3c66b",
+            "5462cdb65b22b0f0712cce434e83eb898d58e0e940a046b57b69c8df51f2f9d8",
         ),
     ],
 )
@@ -589,7 +589,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # for issue #91's L-shell Coster--Kronig relaxation marker, and again for
     # issue #89's default ELSEPA elastic model) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "9186f29caf429c136e7a2e17c7157a39d323df1bc3016bad0981ee5f9b6b8849"
+        "ea920f47592dc816edeebcc03cbe41ae29ab63c417eb8738044d21b5795ffe41"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -601,7 +601,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # bandwidth request the resolver raises, so it was left alone. Re-minted
     # again for issue #89's default ELSEPA elastic model.
     assert survey_incoherent["parameter_sha256"] == (
-        "de65c05cffb5ea139ee4c921c6856c61275376a8258262ddc070c929dd68e644"
+        "8524a1ba52e3ebf9d9a6936695ebe6db290c337faf09d7ca6b51eee668e8980d"
     )
 
 

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pyrite._backend import REAL, xp
-from pyrite.montecarlo.spectrum import brem
+from pyrite.montecarlo.spectrum import brem, brem_unit_base
 from tests.helpers import scaled_rtol, to_host
 
 
@@ -208,3 +208,55 @@ def test_mc_brem_stages_eedl_grid_once_across_reduction_chunks(monkeypatch):
     )
 
     assert calls == 1
+
+
+def test_unit_base_panels_keep_native_panels_and_unit_area():
+    table = brem.load_bremsstrahlung_cross_sections("C")
+    panels = brem_unit_base._unit_base_panels(table)
+    native = np.searchsorted(panels.incident_energy_eV, table.distribution_incident_energy_eV)
+    np.testing.assert_array_equal(
+        panels.incident_energy_eV[native], table.distribution_incident_energy_eV
+    )
+    for row, energy, density in zip(
+        native,
+        table.photon_energy_eV_by_incident,
+        table.photon_probability_density_per_eV_by_incident,
+        strict=True,
+    ):
+        low, high = panels.photon_min_eV[row], panels.photon_max_eV[row]
+        x = (energy - low) / (high - low)
+        np.testing.assert_allclose(
+            np.interp(x, panels.x, panels.scaled_density[row]) / (high - low),
+            density,
+            rtol=1e-12,
+        )
+    # Every sub-panel is a unit-area density that ends at its incident energy.
+    np.testing.assert_allclose(panels.scaled_cumulative[:, -1], 1.0, rtol=1e-9)
+    np.testing.assert_allclose(panels.photon_max_eV, panels.incident_energy_eV, rtol=1e-12)
+    ratio = np.diff(np.log10(panels.incident_energy_eV))
+    assert ratio.max() <= 1.0 / brem_unit_base._EEDL_PANELS_PER_DECADE + 1e-12
+
+
+# Seltzer-Berger scaled chi = (beta^2/Z^2) k dsigma/dk [mb] (Seltzer, NBS
+# BREME.DAT via EGSnrc nist_brems.data), at kappa = 0.05, 0.2, 0.5, 0.8, 0.95.
+_SB_KAPPA = np.array([0.05, 0.2, 0.5, 0.8, 0.95])
+_SB_CHI_MB = {
+    ("C", 6, 0.1): (11.2376, 8.40044, 5.04543, 2.97132, 1.96669),
+    ("C", 6, 1.0): (13.119, 8.24269, 4.13455, 1.76867, 0.81444),
+    ("W", 74, 0.1): (8.8157, 7.9943, 6.57379, 5.71472, 5.40287),
+    ("W", 74, 1.0): (10.8209, 8.22606, 5.09054, 3.19541, 2.43377),
+}
+
+
+@pytest.mark.parametrize(("element", "Z", "T_MeV"), sorted(_SB_CHI_MB))
+def test_eedl_between_panels_tracks_seltzer_berger(element, Z, T_MeV):
+    # C and W at 0.1 and 1 MeV lie between decade-spaced EEDL panels, where
+    # fixed-photon-energy interpolation collapsed the spectrum to 0.3-0.9 of
+    # Seltzer-Berger above k/T = 0.5 (#174). The remaining error is panel
+    # sparsity, not interpolation.
+    photon_eV = _SB_KAPPA * T_MeV * 1e6
+    dsigma_dk = to_host(brem._eedl_brem_dsigma_dk(element, np.array([T_MeV * 1e3]), photon_eV))[0]
+    gamma = 1.0 + T_MeV / 0.51099895
+    chi_mb = (1.0 - 1.0 / gamma**2) / Z**2 * photon_eV * dsigma_dk * 1e27
+    ratio = chi_mb / np.array(_SB_CHI_MB[(element, Z, T_MeV)])
+    assert np.all((ratio > 0.95) & (ratio < 1.40)), ratio
