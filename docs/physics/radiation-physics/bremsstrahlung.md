@@ -71,6 +71,14 @@ Tables come from `pyrite.xsgen`. The released catalogue tables install with `pyr
 
 The run path does not select this backend yet. `"eedl"` stays the packaged default until #86 establishes the BremsLib accuracy claim. The model marker `BREMSSTRAHLUNG_BREMSLIB_MODEL` and `table_identity(tables)` supply the run identity for when it is selected.
 
+### Host-side soft/hard radiative partition
+
+`transport.hard_radiative` now constructs a fixed-energy partition of the same BremsLib SDCS. SBETHE `stp.dat` and the shell soft/hard mode cover collision stopping (excitation and ionization) only; they do not include this radiative loss. For a positive photon cutoff {math}`k_c`, its hard event cross section is {math}`\sigma_h(T;k_c)=\int_{k_c}^{T}(d\sigma/dk)\,dk`; the soft radiative stopping cross section is {math}`S_s(T;k_c)=\int_0^{k_c}k(d\sigma/dk)\,dk`. The hard first moment {math}`S_h=\int_{k_c}^{T}k(d\sigma/dk)\,dk` satisfies {math}`S_s+S_h=\int_0^T k(d\sigma/dk)\,dk`. Multiply by atomic number density for a loss rate per length or a hard event rate per length, and sum element contributions for compounds. An unrestricted radiative stopping term must not be applied alongside these moments.
+
+BremsLib interpolates {math}`\chi=k(d\sigma/dk)/Z^2` linearly in reduced energy at fixed {math}`T`. The partition uses the union of both bracketing incident-energy grids and {math}`k_c` as breakpoints, then integrates each resulting linear {math}`\chi(k)` cell analytically. Its zeroth moment starts only at positive {math}`k_c`, avoiding the {math}`1/k` infrared divergence; the first moment remains finite at zero. The hard photon energy is drawn from the exact cell CDF. Its polar angle is drawn from the same interpolated DDCS under {math}`2\pi\sin\theta\,d\theta`, with uniform azimuth. Thus the sampled energy and angle share the parent BremsLib evaluation. At {math}`k_c=T` the hard rate is zero and the soft first moment is the full moment; moving the cutoff changes the split without changing their sum. Validation: `bremslib-radiative-partition`.
+
+This is a host-side event model, not a transport mode. The sampled electron is assigned energy {math}`T-k` and keeps its incoming direction, consistent with the existing hard-radiative segment contract and PENELOPE convention. The residual momentum is assigned to an infinitely heavy target, with its recoil energy neglected. BremsLib has no joint photon/electron angular distribution, so electron deflection cannot be derived from this DDCS alone. The event is not yet scheduled into a flight, represented in the segment rows, or excluded from the track-length spectrum estimator. It therefore does not establish a coupled high-energy validity claim.
+
 ## Per-segment yield
 
 For the EEDL and Bethe--Heitler backends emission is taken **isotropic**. For a segment of length {math}`L` traversed in an element of number density {math}`n_Z`, the contribution to the observed spectrum is
