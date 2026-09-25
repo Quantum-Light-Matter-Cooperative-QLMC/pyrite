@@ -14,7 +14,8 @@ from dataclasses import dataclass
 import cupy as xp
 import numpy as np
 
-from ._jit_kernel import _transport_kernel, _transport_lut_kernel
+from ._jit_kernel import _transport_kernel
+from ._jit_lut_kernel import _transport_lut_kernel
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,7 @@ def run_transport_kernel(
     segments,
     pe_out,
     straggling,
+    inelastic_args=None,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.
@@ -195,6 +197,10 @@ def run_transport_kernel(
     replay, energy bookkeeping, first-row entering state, and ensemble
     agreement. Direct parity of the first applied loss remains an anchor gap:
     the current first-row test compares row-start ``E_keV``, not ``E_end_keV``.
+
+    ``inelastic_args`` is the shell soft/hard ``ShellInelasticTables.core_args``
+    tuple the CPU inelastic cores unpack; ``segments`` then carries the two
+    hard row columns after its twelve midpoint fields.
     """
     (e_start, e_count, cap, stream_key) = run
     (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
@@ -241,9 +247,10 @@ def run_transport_kernel(
         seg_flight,
         seg_substep,
         seg_event,
-    ) = segments
+    ) = segments[:12]
     (seg_count, exit_code) = pe_out
     (straggle_on, stragg_dE) = straggling
+    shell = _shell_kernel_args(inelastic_args, segments[12:])
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
@@ -319,7 +326,57 @@ def run_transport_kernel(
             exit_code,
             np.int32(1 if straggle_on else 0),
             stragg_dE,
+            *shell,
         ),
+    )
+
+
+def _shell_kernel_args(inelastic_args, hard_segments):
+    """Flattened shell soft/hard kernel arguments, or inert placeholders."""
+    if inelastic_args is None:
+        f64 = xp.zeros(1, dtype=xp.float64)
+        i32 = xp.zeros(1, dtype=xp.int32)
+        return (
+            np.int32(0),
+            xp.zeros(1, dtype=xp.uint64),
+            np.float64(0.0),
+            i32,
+            f64,
+            f64,
+            f64,
+            np.int32(1),
+            i32,
+            np.int32(1),
+            f64,
+            f64,
+            f64,
+            i32,
+            xp.zeros(1, dtype=xp.int16),
+            f64,
+            xp.zeros(1, dtype=xp.int16),
+        )
+    (keys, cutoff_eV, n, log_e, rate, omega2, nch, ch_rate, ch_u, ch_w, ch_branch, ch_code) = (
+        inelastic_args
+    )
+    seg_hard_W, seg_hard_ch = hard_segments
+    return (
+        np.int32(1),
+        keys,
+        np.float64(cutoff_eV),
+        n.astype(xp.int32, copy=False),
+        log_e.reshape(-1),
+        rate.reshape(-1),
+        omega2.reshape(-1),
+        np.int32(log_e.shape[1]),
+        nch.astype(xp.int32, copy=False),
+        np.int32(ch_rate.shape[1]),
+        ch_rate.reshape(-1),
+        ch_u.reshape(-1),
+        ch_w.reshape(-1),
+        ch_branch.reshape(-1).astype(xp.int32, copy=False),
+        ch_code.reshape(-1).astype(xp.int16, copy=False),
+        seg_hard_W,
+        seg_hard_ch,
     )
 
 

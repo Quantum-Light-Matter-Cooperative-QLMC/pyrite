@@ -1,6 +1,6 @@
 # Shell soft/hard inelastic transport (opt-in)
 
-The default transport removes the whole corrected collision stopping continuously (see [Stopping power](stopping-power.md)). `simulate_trajectories(inelastic_model="shell-soft-hard")` instead follows PENELOPE's mixed scheme{cite:p}`salvat2024penelope`: energy losses $W\le W_c$ stay continuous, and losses $W>W_c$ become discrete hard collisions that lower the primary energy by $W$ and deflect it by the sampled recoil. Both parts come from one stopping-closed shell generalized-oscillator-strength (GOS) model, so neither is added on top of the other. The mode is opt-in, CPU-only, and requires `energy_model="midpoint"`. With the default `inelastic_model="continuous"`, transport is bit-for-bit unchanged.
+The default transport removes the whole corrected collision stopping continuously (see [Stopping power](stopping-power.md)). `simulate_trajectories(inelastic_model="shell-soft-hard")` instead follows PENELOPE's mixed scheme{cite:p}`salvat2024penelope`: energy losses $W\le W_c$ stay continuous, and losses $W>W_c$ become discrete hard collisions that lower the primary energy by $W$ and deflect it by the sampled recoil. Both parts come from one stopping-closed shell generalized-oscillator-strength (GOS) model, so neither is added on top of the other. The mode is opt-in and requires `energy_model="midpoint"`. With the default `inelastic_model="continuous"`, transport is bit-for-bit unchanged.
 
 ## Model
 
@@ -31,7 +31,7 @@ $S_s$ (keV Å$^{-1}$) is interpolated log-log like the full table; the hard rate
 - The hard and soft DCS are frozen at the row's start energy; PENELOPE's Eq. 4.65 energy-dependence correction is not applied. `max_dE_frac` bounds the resulting error.
 - Soft-fraction tables inherit the kinks that EEDL node interpolation leaves in $\mathcal N(E)$. $S_s/S$ has a 1–3% sawtooth between those nodes, so the transport LUT may report a stopping interpolation error of about $2\times10^{-4}$.
 - Secondaries and vacancies are not transported (#94). Each hard row records its transfer `hard_W_keV` and channel `hard_channel` ($3\times$oscillator + branch). `shell_transport.hard_event_energy_accounting` splits $W$ into local deposit, emitted secondary energy and reserved inner-shell binding, following the host sampler's rules. The primary's energy balance closes exactly; the secondary's energy leaves the primary without being deposited or radiated further.
-- Grooved and CUDA transport raise. `transport_core="auto"` stays on the CPU.
+- It runs on the lockstep and per-electron CPU cores (exact and LUT) and on the exact CUDA core. The CUDA LUT core and grooved transport raise; production runs on CUDA disable the LUT to reach the exact kernel.
 
 ## Outputs
 

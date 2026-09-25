@@ -1,9 +1,9 @@
 # Transport JIT-kernel walkthrough
 
-This reference follows the arithmetic and control flow of the two CUDA transport kernels in [`transport/_jit_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_kernel.py), whose device-side constants and helpers live in [`transport/_jit_device.py`](../../../src/pyrite/montecarlo/transport/_jit_device.py) and whose host launchers live in [`transport/_jit_launch.py`](../../../src/pyrite/montecarlo/transport/_jit_launch.py):
+This reference follows the arithmetic and control flow of the two CUDA transport kernels in [`transport/_jit_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_kernel.py) and [`transport/_jit_lut_kernel.py`](../../../src/pyrite/montecarlo/transport/_jit_lut_kernel.py), whose device-side constants and helpers live in [`transport/_jit_device.py`](../../../src/pyrite/montecarlo/transport/_jit_device.py) and whose host launchers live in [`transport/_jit_launch.py`](../../../src/pyrite/montecarlo/transport/_jit_launch.py):
 
-- `_transport_kernel` evaluates elastic rates, stopping power, and optional Urban energy-loss straggling directly;
-- `_transport_lut_kernel` linearly interpolates precomputed energy tables and does not support straggling.
+- `_transport_kernel` evaluates elastic rates, stopping power, and optional Urban energy-loss straggling directly, and carries the opt-in shell soft/hard inelastic mode (helpers in `_jit_shell_device.py`; see [shell soft/hard transport](../../physics/beam-transport/shell-soft-hard-transport.md));
+- `_transport_lut_kernel` linearly interpolates precomputed energy tables and supports neither straggling nor the shell mode.
 
 Both are `cupyx.jit.rawkernel` implementations of the same ungrooved, per-electron transport algorithm. The examples below use artificial inputs so that every operation can be followed by hand. They explain implementation of existing claims; they do not independently revalidate the physical models. Validation status remains owned by the [`gpu-transport-core`](../../validation/ledger-transport-background.md#gpu-transport-core), [`electron-transport`](../../validation/ledger-transport-background.md#electron-transport), [`relativistic-bethe-stopping`](../../validation/ledger-transport-background.md#relativistic-bethe-stopping), [`transport-midpoint-stopping`](../../validation/ledger-transport-background.md#transport-midpoint-stopping), [`energy-controlled-propagation`](../../validation/ledger-transport-background.md#energy-controlled-propagation), and [`energy-loss-straggling`](../../validation/ledger-transport-background.md#energy-loss-straggling) records.
 
@@ -281,7 +281,7 @@ i=\lfloor x\rfloor,
 f=x-i,
 $$
 
-clamped to the first or last interval -- one logarithm, one multiply, one integer conversion, no search. The clamp tests the *upper* bound first, so a non-finite coordinate ($E=0$ gives $-\infty$, $E<0$ gives NaN) fails both comparisons and lands on the lower clamp rather than reaching $\lfloor x\rfloor$. `_lut_index_frac_scalar`, `_jit_device.py::_lut_lerp_at`, and the two inline forms in `_jit_kernel.py` all spell out this same branch order; they must stay identical or the CPU and CUDA cores would clamp differently.
+clamped to the first or last interval -- one logarithm, one multiply, one integer conversion, no search. The clamp tests the *upper* bound first, so a non-finite coordinate ($E=0$ gives $-\infty$, $E<0$ gives NaN) fails both comparisons and lands on the lower clamp rather than reaching $\lfloor x\rfloor$. `_lut_index_frac_scalar`, `_jit_device.py::_lut_lerp_at`, and the two inline forms in `_jit_lut_kernel.py` all spell out this same branch order; they must stay identical or the CPU and CUDA cores would clamp differently.
 
 Any table $T$ is then read as
 

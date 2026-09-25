@@ -615,6 +615,7 @@ Eq. 3.125 triangular sampler; switching later would change all three
 together. `penelope-shell-hard-loss-sampling` moves from `discrepancy` to
 `rederived`; dependent rows now cite the adjudicated law. This no longer
 gates activation.
+
 ## Follow-up, 2026-09-25: import-contract exception
 
 `pyrite-dev verify` exposed two branch imports of `pyrite.xsgen.sbethe.catalog`
@@ -623,3 +624,27 @@ from `montecarlo.transport` (`shell_rates` catalog helpers and the
 runner's existing `case_tables` exception (host-side table resolution only; no
 kernel imports `xsgen`). Follow-up: inject the catalog SBETHE tables and
 composition into the shell builders from the runner, then drop both entries.
+
+## Follow-up, 2026-09-25: exact CUDA kernel
+
+The exact CUDA kernel (`_transport_kernel`) now carries the shell mode as a
+runtime flag, transcribing the per-electron CPU core draw for draw: hard
+optical depth on the `il_keys` stream, the two-moment soft sampler on the
+Urban key domain, channel/transfer/recoil/azimuth draws, and the hard row
+columns. Device twins of the `hard_inelastic` kernels live in
+`_jit_shell_device.py`, sharing constants by import. The LUT kernel moved
+unchanged to `_jit_lut_kernel.py` to stay inside the module line budget; it
+rejects the mode, and the runner disables the LUT for shell cases on CUDA
+(the straggling precedent). The branch-added `cpu_only` gate in
+`resolve_transport_core` is gone. Both kernels transpile and NVRTC-compile
+offline (no device on the authoring machine).
+On the remote box (NVIDIA GeForce RTX 5080, CuPy 14.2.0, SLURM `gpu` partition, a
+separate `~/dev/pyrite-issue93-cuda-76d41af0` checkout so the shared tree was
+untouched) `tests/montecarlo/test_shell_soft_hard_cuda.py` passes 7/7: replay,
+first-row CPU parity at `rtol=1e-12` for Si and MoS₂ with and without soft
+straggling, bookkeeping, and five-sigma ensemble agreement at 4000 electrons.
+The full `-m hardware` suite is 69 passed, 2 skipped (Intel SYCL opt-in and
+the NumPy-pinned segment-staging test); its first run caught a launcher
+parameter named `inelastic` instead of the reference core's `inelastic_args`,
+fixed before the rerun. The IMFP expected-failure gate still blocks
+production use.

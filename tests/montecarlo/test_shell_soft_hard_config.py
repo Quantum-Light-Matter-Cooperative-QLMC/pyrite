@@ -80,12 +80,28 @@ def legacy_absent(case):
     return type(case).__dataclass_fields__["inelastic_cutoff_eV"].default
 
 
-def test_shell_case_stays_on_the_cpu(monkeypatch):
+def test_shell_case_runs_on_the_exact_cuda_core(monkeypatch):
     from pyrite.montecarlo.transport import batching
 
     monkeypatch.setattr(batching, "_cuda_transport_available", lambda: True)
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
     shell = dict(_case(inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0))
     shell["Ne"] = 10**5
-    assert runner._case_transport_core(shell) == "lockstep"
-    assert runner._case_transport_core({**shell, "inelastic_model": None}) == "cuda"
+    assert runner._case_transport_core(shell) == "cuda"
+
+    class Launched(Exception):
+        pass
+
+    seen = {}
+
+    def launch(*args, **kwargs):
+        seen.update(kwargs)
+        raise Launched
+
+    monkeypatch.setattr(runner, "simulate_trajectories", launch)
+    with pytest.raises(Launched):
+        runner._transport_case(shell)
+    # The CUDA LUT kernel has no shell mode, so the runner takes the exact one.
+    assert seen["transport_core"] == "cuda"
+    assert seen["transport_lut_config"].enabled is False
+    assert seen["inelastic_model"] == "shell-soft-hard"

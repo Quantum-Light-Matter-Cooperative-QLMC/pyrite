@@ -10,7 +10,6 @@ from pyrite.materials import CATALOG
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.transport import (
     TransportLUTConfig,
-    resolve_transport_core,
     simulate_trajectories,
 )
 from pyrite.montecarlo.transport.events import SegmentEvent, check_segment_event_contract
@@ -243,7 +242,9 @@ def test_mode_rejects_invalid_configuration():
         _run("sio2", cutoff=20.0)
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
         _run(energy_model="frozen")
-    with pytest.raises(NotImplementedError, match="CUDA"):
+    # Device-free: an explicit "cuda" core resolves unchanged, and the CUDA
+    # LUT guard fires before any device import.
+    with pytest.raises(NotImplementedError, match="CUDA LUT core"):
         _run(transport_core="cuda")
     with pytest.raises(ValueError, match="stopping_tables"):
         simulate_trajectories(
@@ -264,15 +265,3 @@ def test_mode_rejects_invalid_configuration():
         simulate_trajectories(
             20.0, 4, 2.0e4, element="Si", n_atoms_per_ang3=0.05, inelastic_model="x"
         )
-
-
-def test_auto_core_stays_on_the_cpu(monkeypatch):
-    from pyrite.montecarlo.transport import batching
-
-    monkeypatch.setattr(batching, "_cuda_transport_available", lambda: True)
-    monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
-    assert resolve_transport_core("auto", 10**6) == "cuda"
-    assert resolve_transport_core("auto", 10**6, cpu_only=True) == "lockstep"
-    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "cuda")
-    with pytest.raises(NotImplementedError, match="CUDA"):
-        resolve_transport_core("auto", 10**6, cpu_only=True)

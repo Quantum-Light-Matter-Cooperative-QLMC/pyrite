@@ -37,10 +37,16 @@ recoil and closure rows it builds on keep their own records.
   $E_0$ for every electron in a thick slab.
 - **Reproducibility.** A fixed seed reproduces every row, and the hard keys
   are disjoint from the transport keys.
-- **Rejection.** $W_c\le W_{cb}$ (Si, SiO₂), `energy_model="frozen"`, CUDA,
-  missing stopping tables, stray cutoff/material arguments and unknown models
-  all raise. `resolve_transport_core(..., cpu_only=True)` keeps `"auto"` on
-  the CPU and rejects a pinned `cuda`.
+- **Rejection.** $W_c\le W_{cb}$ (Si, SiO₂), `energy_model="frozen"`, the
+  CUDA LUT core, missing stopping tables, stray cutoff/material arguments and
+  unknown models all raise. On CUDA the runner disables the LUT so shell
+  cases reach the exact kernel.
+- **CUDA (hardware-gated).** `tests/montecarlo/test_shell_soft_hard_cuda.py`
+  checks replay determinism, first-row agreement with the per-electron CPU
+  core (`rtol=1e-12`, with and without soft straggling, Si and MoS₂), the event
+  contract and energy bookkeeping, and ensemble agreement of backscatter,
+  cutoff, hard-event count and mean transfer at five sigma. Offline, both
+  CUDA kernels transpile and NVRTC-compile.
 
 The unchanged default path was also checked outside the test suite. Ninety
 configurations were run before and after the change: lockstep and
@@ -210,6 +216,9 @@ should fall as $W_c$ decreases, and it is below this study's resolution for
   distant losses follow the adjudicated Eq. 3.94 law of
   `penelope-shell-hard-loss-sampling`, not Eq. 3.125. Every
   admissible cutoff is above $W_{cb}$.
-- CUDA parity is not implemented; CUDA cores reject the mode.
+- The exact CUDA kernel transcribes the per-electron CPU core. Its hardware
+  tests pass 7/7 on an NVIDIA GeForce RTX 5080, CuPy 14.2.0; parity is
+  per first row and in aggregate, not bit-for-bit along whole histories. The
+  CUDA LUT core rejects the mode.
 - Needs fresh-context verification. Only a human may mark the row
   `signed-off`.

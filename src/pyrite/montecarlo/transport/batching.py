@@ -274,7 +274,7 @@ def _cuda_transport_available():
     return True
 
 
-def resolve_transport_core(requested, Ne, groove=None, *, cpu_only=False):
+def resolve_transport_core(requested, Ne, groove=None):
     """Resolve ``transport_core`` for a run of ``Ne`` electrons.
 
     ``"auto"`` is the default and the only value that resolves: it takes the CUDA
@@ -287,11 +287,6 @@ def resolve_transport_core(requested, Ne, groove=None, *, cpu_only=False):
     process, which is how a run pins the historical CPU core (``=lockstep``)
     without touching call sites -- reproducing a pre-existing result, or
     bisecting a device/host difference.
-
-    ``cpu_only`` marks a run whose physics has no device core (the opt-in
-    shell soft/hard inelastic mode): ``"auto"`` then resolves to the lockstep
-    CPU core, and an explicit or pinned ``"cuda"`` raises rather than running
-    different physics.
     """
 
     pinned = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
@@ -303,14 +298,9 @@ def resolve_transport_core(requested, Ne, groove=None, *, cpu_only=False):
         requested = pinned
     if requested not in TRANSPORT_CORES:
         raise ValueError(f"transport_core must be one of {', '.join(TRANSPORT_CORES)}")
-    if cpu_only and requested == "cuda":
-        raise NotImplementedError(
-            "inelastic_model='shell-soft-hard' has no CUDA core yet; use "
-            "transport_core='auto', 'lockstep' or 'per-electron'"
-        )
     if requested != "auto":
         return requested
-    if cpu_only or groove is not None or int(Ne) <= CUDA_TRANSPORT_MIN_ELECTRONS:
+    if groove is not None or int(Ne) <= CUDA_TRANSPORT_MIN_ELECTRONS:
         return "lockstep"
     return "cuda" if _cuda_transport_available() else "lockstep"
 

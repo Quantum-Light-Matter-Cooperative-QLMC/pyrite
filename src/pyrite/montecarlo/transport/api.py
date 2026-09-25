@@ -223,7 +223,7 @@ def simulate_trajectories(
       "shell-soft-hard" -- opt-in PENELOPE-like mixed scheme: losses
           W <= inelastic_cutoff_eV stay continuous, larger ones are discrete
           hard events. Needs ``stopping_tables``, midpoint, and one catalog
-          key per layer in ``inelastic_materials``; CPU only. Adds
+          key per layer in ``inelastic_materials``; no CUDA LUT core. Adds
           ``hard_W_keV``/``hard_channel``/``inelastic`` to the result. See
           docs/physics/beam-transport/shell-soft-hard-transport.md.
           Validation: shell-soft-hard-transport
@@ -422,7 +422,7 @@ def simulate_trajectories(
     )
 
     requested_core = transport_core
-    transport_core = resolve_transport_core(transport_core, Ne, groove, cpu_only=shell_mode)
+    transport_core = resolve_transport_core(transport_core, Ne, groove)
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if keep_segments_on_device and transport_core != "cuda":
@@ -877,6 +877,11 @@ def simulate_trajectories(
                     "to reach the CUDA exact per-electron core, or run off CUDA "
                     "with transport_core='per-electron' or 'lockstep'"
                 )
+            if shell_mode:
+                raise NotImplementedError(
+                    "inelastic_model='shell-soft-hard' is not implemented on the CUDA "
+                    "LUT core; disable the LUT to reach the exact CUDA core"
+                )
             from ._jit_launch import make_cuda_transport_lut_core
 
             core, core_xp = make_cuda_transport_lut_core()
@@ -1142,7 +1147,9 @@ def simulate_trajectories(
         # Already sized to `nseg` by the join, in the scratch's field order.
         v_hat, r_mid, L_ang, E_seg, t_ang, elec_id, layer = dev_segs[:7]
         if energy_model == "midpoint":
-            seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event = dev_segs[7:]
+            seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event = dev_segs[7:12]
+        if shell_mode:
+            seg_hard_W, seg_hard_ch = dev_segs[12:]
 
     vacuum_start_ang = vac_start
     vacuum_end_ang = vac_end

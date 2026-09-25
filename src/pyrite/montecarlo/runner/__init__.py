@@ -473,7 +473,6 @@ def _case_transport_core(case, requested="auto"):
         requested,
         max(case.get("Ne") or 0, case.get("Ne_brem") or 0),
         groove=case.get("groove_spacing_ang"),
-        cpu_only=case.get("inelastic_model") is not None,
     )
 
 
@@ -546,12 +545,14 @@ def _transport_case(
     core = _case_transport_core(case, transport_core)
     resident = keep_segments_on_device and core == "cuda"
     straggling = bool(case.get("straggling", False))
-    # The CUDA LUT kernel has no Urban sampler. Production straggling therefore
-    # selects the already-implemented exact CUDA kernel rather than failing or
-    # silently computing deterministic loss. Direct simulate_trajectories calls
-    # retain the fail-closed CUDA-LUT guard as a lower-level contract.
+    # The CUDA LUT kernel has no Urban sampler and no shell soft/hard mode.
+    # Production straggling or shell runs therefore select the exact CUDA
+    # kernel rather than failing or silently computing other physics. Direct
+    # simulate_trajectories calls retain the fail-closed CUDA-LUT guards as a
+    # lower-level contract.
+    exact_only = straggling or case.get("inelastic_model") is not None
     transport_lut_config = (
-        TransportLUTConfig(enabled=False) if core == "cuda" and straggling else None
+        TransportLUTConfig(enabled=False) if core == "cuda" and exact_only else None
     )
     stopping_tables = _case_stopping_tables(case)
 
