@@ -136,6 +136,34 @@ def test_first_moment_matches_the_analytic_screened_rutherford_value(reference):
     assert one_minus_cos == pytest.approx(expected, rel=5e-3)
 
 
+def test_sampled_moments_reproduce_elsepas_own_transport_cross_sections(reference):
+    """Real DCS: ``<1 - P_l(cos theta)> = sigma_l / sigma`` for l = 1, 2.
+
+    ELSEPA reports ``sigma_l = 2 pi int [1 - P_l(cos theta)] DCS sin(theta) dtheta``;
+    with ``mu = (1 - cos theta)/2`` the weights are ``2 mu`` and
+    ``6 mu (1 - mu)``. Stratified draws make this a deterministic quadrature;
+    the Hg 1 keV panel agrees to about 2e-5, the native-grid trapezoid floor.
+    """
+    _, start, length, logE, _, cdf, pdf, mu = _group(_two_node_table(reference))
+    xi = (np.arange(100_000) + 0.5) / 100_000
+    sampled_mu = np.array(
+        [
+            0.5
+            * (
+                1.0
+                - _sample_cos_theta_elsepa(1.0, x, logE, cdf, pdf, mu, start[0, 0], length[0, 0])
+            )
+            for x in xi
+        ]
+    )
+
+    sigma = reference.total_elastic_cm2
+    assert (2.0 * sampled_mu).mean() == pytest.approx(reference.transport1_cm2 / sigma, rel=1e-4)
+    assert (6.0 * sampled_mu * (1.0 - sampled_mu)).mean() == pytest.approx(
+        reference.transport2_cm2 / sigma, rel=1e-4
+    )
+
+
 def test_packing_rejects_mismatched_grids_and_layers(reference):
     table = _two_node_table(reference)
     other = dict(table, mu=reference.mu * 0.5, dcs_cm2_sr=table["dcs_cm2_sr"])
