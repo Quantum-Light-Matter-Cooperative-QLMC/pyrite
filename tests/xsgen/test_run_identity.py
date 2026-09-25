@@ -74,19 +74,24 @@ def test_bremslib_selection_and_manifest_fork_both_cache_identities():
     second = _identity(bremsstrahlung_model="bremslib", xsgen_tables=second_tables)
 
     assert first["resolved_parameters"]["bremsstrahlung_model"].startswith("bremslib-")
-    assert len({eedl["parameter_sha256"], first["parameter_sha256"], second["parameter_sha256"]}) == 3
+    assert (
+        len({eedl["parameter_sha256"], first["parameter_sha256"], second["parameter_sha256"]}) == 3
+    )
     assert len({variant_stem(eedl), variant_stem(first), variant_stem(second)}) == 3
-    assert len(
-        {
-            case_content_key(_case()),
-            case_content_key(
-                _case(), bremsstrahlung_model="bremslib", xsgen_tables=first_tables
-            ),
-            case_content_key(
-                _case(), bremsstrahlung_model="bremslib", xsgen_tables=second_tables
-            ),
-        }
-    ) == 3
+    assert (
+        len(
+            {
+                case_content_key(_case()),
+                case_content_key(
+                    _case(), bremsstrahlung_model="bremslib", xsgen_tables=first_tables
+                ),
+                case_content_key(
+                    _case(), bremsstrahlung_model="bremslib", xsgen_tables=second_tables
+                ),
+            }
+        )
+        == 3
+    )
 
 
 def test_run_identity_rejects_unsupported_bremsstrahlung_model():
