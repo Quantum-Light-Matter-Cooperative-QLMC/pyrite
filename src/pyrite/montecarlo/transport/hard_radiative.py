@@ -3,11 +3,13 @@
 Validation: bremslib-radiative-partition
 """
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
 
 from ..._backend import BACKEND
+from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ..spectrum.brem_bremslib import (
     BremsLibBremsstrahlungTable,
     bremslib_segment_state,
@@ -103,7 +105,14 @@ def build_radiative_partition(
     cutoff = float(cutoff_eV)
     if not np.isfinite(energy) or not np.isfinite(cutoff) or energy <= 0.0 or cutoff <= 0.0:
         raise ValueError("incident energy and radiative cutoff must be positive and finite")
-    if not table.minimum_incident_energy_keV <= energy / 1.0e3 <= table.maximum_incident_energy_keV:
+    T_keV = energy / 1.0e3
+    if (
+        T_keV < table.minimum_incident_energy_keV
+        and not np.isclose(T_keV, table.minimum_incident_energy_keV, rtol=1e-12, atol=0.0)
+    ) or (
+        T_keV > table.maximum_incident_energy_keV
+        and not np.isclose(T_keV, table.maximum_incident_energy_keV, rtol=1e-12, atol=0.0)
+    ):
         raise ValueError("incident energy is outside the BremsLib table")
     if cutoff > energy:
         raise ValueError("radiative cutoff cannot exceed incident energy")
@@ -239,3 +248,71 @@ def sample_hard_radiative_photon(
     electron_out = incoming.copy()
     target_momentum = p_in * incoming - energy * photon_direction - p_out * electron_out
     return HardRadiativePhoton(energy, photon_direction, remaining, electron_out, target_momentum)
+
+
+def pack_radiative_layer_tables(
+    compositions: Sequence[Sequence[tuple[str, float]]],
+    tables: Mapping[str, BremsLibBremsstrahlungTable],
+    min_energy_eV: float,
+    max_energy_eV: float,
+) -> tuple:
+    """Pad the BremsLib SDCS and number densities for the CPU scalar kernel.
+
+    Every requested element must have a table covering the complete electron
+    range. There is no EEDL fallback inside a coupled transport mode.
+    """
+    if not compositions or any(not comp for comp in compositions):
+        raise ValueError("radiative transport needs a nonempty composition in every layer")
+    n_layers = len(compositions)
+    max_elements = max(len(comp) for comp in compositions)
+    selected = []
+    for comp in compositions:
+        layer = []
+        for element, density in comp:
+            table = tables.get(element)
+            if table is None:
+                raise ValueError(
+                    f"coupled radiative transport needs a BremsLib table for {element}"
+                )
+            if table.atomic_number != TRANSPORT_ELEMENTS[element]["Z"]:
+                raise ValueError(f"BremsLib atomic number does not match {element}")
+            if min_energy_eV / 1e3 < table.minimum_incident_energy_keV * (
+                1.0 - 1e-12
+            ) or max_energy_eV / 1e3 > table.maximum_incident_energy_keV * (1.0 + 1e-12):
+                raise ValueError(
+                    f"electron energy range is outside the BremsLib table for {element}"
+                )
+            layer.append((table, float(density) * 1e24))
+        selected.append(layer)
+    max_incident = max(table.incident_energy_keV.size for layer in selected for table, _ in layer)
+    n_reduced = selected[0][0][0].nominal_reduced_energy.size
+    n_elements = np.array([len(layer) for layer in selected], dtype=np.int32)
+    n_incident = np.zeros((n_layers, max_elements), dtype=np.int32)
+    atomic_number = np.zeros((n_layers, max_elements), dtype=np.int32)
+    density_cm3 = np.zeros((n_layers, max_elements), dtype=float)
+    incident_keV = np.zeros((n_layers, max_elements, max_incident), dtype=float)
+    nominal = np.zeros((n_layers, max_elements, n_reduced), dtype=float)
+    top = np.zeros_like(incident_keV)
+    scaled_sdcs = np.zeros((n_layers, max_elements, max_incident, n_reduced), dtype=float)
+    for layer_index, layer in enumerate(selected):
+        for element_index, (table, density) in enumerate(layer):
+            nT = table.incident_energy_keV.size
+            if table.nominal_reduced_energy.size != n_reduced:
+                raise ValueError("BremsLib tables have inconsistent reduced-energy grids")
+            n_incident[layer_index, element_index] = nT
+            atomic_number[layer_index, element_index] = table.atomic_number
+            density_cm3[layer_index, element_index] = density
+            incident_keV[layer_index, element_index, :nT] = table.incident_energy_keV
+            nominal[layer_index, element_index] = table.nominal_reduced_energy
+            top[layer_index, element_index, :nT] = table.top_reduced_energy
+            scaled_sdcs[layer_index, element_index, :nT] = table.scaled_sdcs_mb
+    return (
+        n_elements,
+        n_incident,
+        atomic_number,
+        density_cm3,
+        incident_keV,
+        nominal,
+        top,
+        scaled_sdcs,
+    )

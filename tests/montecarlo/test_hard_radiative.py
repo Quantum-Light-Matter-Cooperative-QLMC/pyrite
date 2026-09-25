@@ -12,6 +12,10 @@ from pyrite.montecarlo.spectrum.brem_bremslib import (
     prepare_bremslib_table,
     stage_bremslib_table,
 )
+from pyrite.montecarlo.transport._jit_radiative import (
+    radiative_moments_scalar,
+    sample_hard_photon_energy_scalar,
+)
 from pyrite.montecarlo.transport.hard_radiative import (
     build_radiative_partition,
     sample_hard_radiative_photon,
@@ -90,3 +94,28 @@ def test_invalid_partition_and_empty_hard_range(table):
         build_radiative_partition(table, 1_000.0, 100.0)
     with pytest.raises(ValueError, match="no hard"):
         build_radiative_partition(table, 60_000.0, 60_000.0).sample_photon_energy(0.5)
+
+
+@pytest.mark.parametrize("energy", [10_000.0, 13_700.0, 50_000.0, 71_000.0, 200_000.0])
+def test_numba_scalar_partition_and_sampler_match_host(table, energy):
+    arrays = (
+        table.incident_energy_keV,
+        table.nominal_reduced_energy,
+        table.top_reduced_energy,
+        table.scaled_sdcs_mb,
+        table.atomic_number,
+    )
+    for cutoff in (100.0, 3_330.0, 0.5 * energy, energy):
+        host = build_radiative_partition(table, energy, cutoff)
+        got = radiative_moments_scalar(*arrays, energy, cutoff)
+        np.testing.assert_allclose(
+            got,
+            (host.soft_stopping_cs_eV_cm2, host.hard_rate_cs_cm2, host.hard_stopping_cs_eV_cm2),
+            rtol=2e-12,
+            atol=1e-30,
+        )
+        if cutoff == energy:
+            continue
+        for uniform in (0.0, 0.01, 0.5, 0.99, np.nextafter(1.0, 0.0)):
+            sampled = sample_hard_photon_energy_scalar(*arrays, energy, cutoff, uniform)
+            np.testing.assert_allclose(sampled, host.sample_photon_energy(uniform), rtol=2e-12)

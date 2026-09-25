@@ -23,9 +23,8 @@ EVENT_EXIT_TOP = np.int8(4)
 EVENT_EXIT_BOTTOM = np.int8(5)
 EVENT_EXIT_SIDE = np.int8(6)
 EVENT_CUTOFF = np.int8(7)
-# Reserved: no current core emits these. They fix the codes, and the contract
-# below, that hard inelastic (#93), hard radiative (#95), and fictitious
-# (delta) interactions must honour when they are added.
+# Hard radiative and fictitious events are reserved for future cores. The
+# shell soft/hard mode emits HARD_INELASTIC.
 EVENT_HARD_INELASTIC = np.int8(8)
 EVENT_HARD_RADIATIVE = np.int8(9)
 EVENT_DELTA = np.int8(10)
@@ -151,6 +150,25 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
     if unknown.any():
         raise ValueError(f"unknown event_kind codes: {sorted(set(kind[unknown].tolist()))}")
 
+    photon_eV = segments.get("hard_radiative_k_eV")
+    photon_Z = segments.get("hard_radiative_Z")
+    if (photon_eV is None) != (photon_Z is None):
+        raise ValueError("hard-radiative energy and atomic-number fields must appear together")
+    if photon_eV is not None:
+        photon_eV = _host(photon_eV).astype(float, copy=False)
+        photon_Z = _host(photon_Z).astype(int, copy=False)
+        if photon_eV.shape != (n,) or photon_Z.shape != (n,):
+            raise ValueError("hard-radiative fields must align with segment rows")
+        payload = photon_eV > 0.0
+        if np.any(~np.isfinite(photon_eV)) or np.any(photon_eV < 0.0):
+            raise ValueError("hard-radiative photon energy must be finite and nonnegative")
+        if np.any(photon_Z < 0) or np.any((photon_Z > 0) != payload):
+            raise ValueError("hard-radiative photon energy and atomic number must appear together")
+        if np.any(payload & ~np.isin(kind, (EVENT_HARD_RADIATIVE, EVENT_CUTOFF))):
+            raise ValueError("only hard-radiative or terminal cutoff rows may carry a photon")
+        if np.any((kind == EVENT_HARD_RADIATIVE) & ~payload):
+            raise ValueError("HARD_RADIATIVE rows require a photon payload")
+
     eid = _host(segments["electron_id"]).astype(np.int64, copy=False)
     fid = _host(segments["flight_id"]).astype(np.int64, copy=False)
     sid = _host(segments["substep_id"]).astype(np.int64, copy=False)
@@ -161,6 +179,9 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
     mid = _host(segments["r_mid"]).astype(float, copy=False)[order]
     E0 = _host(segments["E_start_keV"]).astype(float, copy=False)[order]
     E1 = _host(segments["E_end_keV"]).astype(float, copy=False)[order]
+    if photon_eV is not None:
+        photon_eV = photon_eV[order]
+        photon_Z = photon_Z[order]
     t0 = _host(segments["t_start_ang"]).astype(float, copy=False)[order]
     t1 = _host(segments["t_end_ang"]).astype(float, copy=False)[order]
     entry = mid - 0.5 * L[:, None] * v
@@ -220,6 +241,16 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
     E_scale = np.abs(E1[a])
     fail(at(~jumps & ~close(E0[b], E1[a], E_scale)), "energy is discontinuous across the event")
     fail(at(jumps & (E0[b] > E1[a] * (1.0 + rtol))), "energy rises across a hard event")
+    if photon_eV is not None:
+        radiative = ka == EVENT_HARD_RADIATIVE
+        fail(
+            at(radiative & ~close(E1[a] - E0[b], photon_eV[a] * 1e-3, E1[a])),
+            "hard-radiative photon energy disagrees with the electron jump",
+        )
+        fail(
+            (kind == EVENT_CUTOFF) & (photon_eV > E1 * 1e3 * (1.0 + rtol)),
+            "terminal hard-radiative photon exceeds pre-event electron energy",
+        )
 
     surface = ka == SegmentEvent.GROOVE_SURFACE
     t_scale = np.abs(t1[a])

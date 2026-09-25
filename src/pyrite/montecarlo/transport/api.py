@@ -9,6 +9,7 @@ from ...materials.attenuation import _normalize_composition
 from ..geometry import beam_frame_basis, project_beam_entry, validate_transverse_dimensions
 from ..groove import entry_points
 from ..transverse import resolved_from_mapping, sample_transverse
+from ._jit_radiative import radiative_stream_keys
 from .batching import (
     DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     _flight_diagnostic_summary,
@@ -21,12 +22,14 @@ from .cores import (
     _transport_core_grooved,
     _transport_core_ungrooved,
     _transport_core_ungrooved_inelastic,
+    _transport_core_ungrooved_inelastic_radiative,
     _transport_core_ungrooved_lut,
     _transport_core_ungrooved_lut_inelastic,
     _transport_core_ungrooved_perelectron,
     _transport_core_ungrooved_perelectron_inelastic,
     _transport_core_ungrooved_perelectron_lut,
     _transport_core_ungrooved_perelectron_lut_inelastic,
+    _transport_core_ungrooved_radiative,
 )
 from .hard_inelastic import hard_stream_keys, validate_inelastic_args
 from .kinematics import _sample_bunch_offsets, stream_keys
@@ -80,6 +83,9 @@ def simulate_trajectories(
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
     inelastic_materials=None,
+    radiative_model="uncoupled",
+    radiative_cutoff_eV=None,
+    bremslib_tables=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -227,6 +233,17 @@ def simulate_trajectories(
           ``hard_W_keV``/``hard_channel``/``inelastic`` to the result. See
           docs/physics/beam-transport/shell-soft-hard-transport.md.
           Validation: shell-soft-hard-transport
+
+    radiative_model: "uncoupled" (default) preserves post-hoc full-spectrum
+      scoring and the existing electron tracks. "bremslib-soft-hard" is an
+      experimental exact CPU lockstep mode: continuous radiative loss below
+      ``radiative_cutoff_eV`` and explicit BremsLib photons above it. It needs
+      midpoint transport, BremsLib tables for every layer element, a photon
+      cutoff no higher than the electron cutoff, and straggling disabled.
+      The result adds per-row ``hard_radiative_k_eV`` and
+      ``hard_radiative_Z``. Score the soft and hard ranges separately with
+      ``spectrum.brem_events``. Validation: bremslib-radiative-partition,
+      bremslib-radiative-event-spectrum.
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
@@ -420,6 +437,26 @@ def simulate_trajectories(
         groove=groove,
         stopping_tables=stopping_tables,
     )
+    if radiative_model not in ("uncoupled", "bremslib-soft-hard"):
+        raise ValueError("radiative_model must be 'uncoupled' or 'bremslib-soft-hard'")
+    radiative_mode = radiative_model == "bremslib-soft-hard"
+    if radiative_mode:
+        if radiative_cutoff_eV is None or bremslib_tables is None:
+            raise ValueError("bremslib-soft-hard requires radiative_cutoff_eV and bremslib_tables")
+        if not np.isfinite(radiative_cutoff_eV) or radiative_cutoff_eV <= 0.0:
+            raise ValueError("radiative_cutoff_eV must be positive and finite")
+        if energy_model != "midpoint" or groove is not None or straggling:
+            raise ValueError(
+                "bremslib-soft-hard requires midpoint, ungrooved, unstraggled transport"
+            )
+        if transport_core not in ("auto", "lockstep"):
+            raise NotImplementedError("bremslib-soft-hard currently needs the CPU lockstep core")
+        if transport_core == "auto":
+            transport_core = "lockstep"
+    elif radiative_cutoff_eV is not None or bremslib_tables is not None:
+        raise ValueError(
+            "radiative_cutoff_eV and bremslib_tables require radiative_model='bremslib-soft-hard'"
+        )
 
     requested_core = transport_core
     transport_core = resolve_transport_core(transport_core, Ne, groove)
@@ -458,6 +495,10 @@ def simulate_trajectories(
 
     if not np.all(np.isfinite(E_cut_by_electrons)) or not np.all(E_cut_by_electrons > 0.0):
         raise ValueError("electron cutoff energies must be finite and strictly positive")
+    if radiative_mode:
+        assert radiative_cutoff_eV is not None
+        if radiative_cutoff_eV > float(np.min(E_cut_by_electrons)) * 1e3:
+            raise ValueError("radiative_cutoff_eV must not exceed the electron cutoff")
 
     # NVTX ranges for the transport phase. Everything here is host-side, but a
     # CUDA run's wall clock is not: Round 4 left a 38-52% unattributed remainder
@@ -664,6 +705,21 @@ def simulate_trajectories(
         _nsys_pop()
         # The cores' continuous stopping is the soft share from here on.
         prepared_stopping_tables = list(shell_tables.soft_stopping_tables)
+    radiative_args = None
+    if radiative_mode:
+        from .hard_radiative import pack_radiative_layer_tables
+
+        assert bremslib_tables is not None and radiative_cutoff_eV is not None
+        packed_radiative = pack_radiative_layer_tables(
+            [layer[2] for layer in layers],
+            bremslib_tables,
+            float(np.min(E_cut_by_electrons)) * 1e3,
+            float(np.max(E_keV)) * 1e3,
+        )
+        radiative_args = (
+            radiative_stream_keys(seed, Ne),
+            float(radiative_cutoff_eV),
+        ) + packed_radiative
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
@@ -700,7 +756,7 @@ def simulate_trajectories(
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
     transport_lut = None
-    if groove is None and transport_lut_config.enabled:
+    if groove is None and transport_lut_config.enabled and not radiative_mode:
         _nsys_push("cxr.transport.lut")
         transport_lut = build_transport_energy_lut(
             float(np.min(E_cut_by_electrons)),
@@ -748,6 +804,8 @@ def simulate_trajectories(
     seg_event = np.empty(n_end_rows, dtype=np.int8)
     seg_hard_W = np.empty(n_end_rows if shell_mode else 0, dtype=float)
     seg_hard_ch = np.empty(seg_hard_W.size, dtype=np.int16)
+    seg_rad_k = np.empty(n_end_rows if radiative_mode else 0, dtype=float)
+    seg_rad_Z = np.empty(seg_rad_k.size, dtype=np.int16)
     inelastic_args = None
     if shell_tables is not None:
         inelastic_args = shell_tables.core_args(hard_stream_keys(seed, Ne))
@@ -820,6 +878,8 @@ def simulate_trajectories(
     )
     if shell_mode:
         segments += (seg_hard_W, seg_hard_ch)
+    if radiative_mode:
+        segments += (seg_rad_k, seg_rad_Z)
     materials_ragged = (
         L_Js,
         L_Zs,
@@ -1067,9 +1127,19 @@ def simulate_trajectories(
         vac_t0 = np.empty(0, dtype=float)
         vac_id = np.empty(0, dtype=np.int64)
     elif groove is None:
-        exact_core = (
-            _transport_core_ungrooved_inelastic if shell_mode else _transport_core_ungrooved
-        )
+        if radiative_mode:
+            exact_core = (
+                _transport_core_ungrooved_inelastic_radiative
+                if shell_mode
+                else _transport_core_ungrooved_radiative
+            )
+            assert radiative_args is not None
+            extra_args = (inelastic_args if shell_mode else (), radiative_args)
+        else:
+            exact_core = (
+                _transport_core_ungrooved_inelastic if shell_mode else _transport_core_ungrooved
+            )
+            extra_args = (inelastic_args,) if shell_mode else ()
         nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = exact_core(
             Ne,
             rng,
@@ -1080,7 +1150,7 @@ def simulate_trajectories(
             state,
             segments,
             straggling_lockstep,
-            *((inelastic_args,) if shell_mode else ()),
+            *extra_args,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -1230,6 +1300,20 @@ def simulate_trajectories(
         result["event_kind"] = seg_event[:nseg]
     if shell_tables is not None:
         result.update(shell_tables.result_fields(seg_hard_W[:nseg], seg_hard_ch[:nseg]))
+    if radiative_mode:
+        assert bremslib_tables is not None and radiative_cutoff_eV is not None
+        result["hard_radiative_k_eV"] = seg_rad_k[:nseg]
+        result["hard_radiative_Z"] = seg_rad_Z[:nseg]
+        result["radiative"] = {
+            "model": radiative_model,
+            "cutoff_eV": float(radiative_cutoff_eV),
+            "bremslib_tables": tuple(
+                sorted(
+                    (element, table.atomic_number, table.key, table.digest)
+                    for element, table in bremslib_tables.items()
+                )
+            ),
+        }
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

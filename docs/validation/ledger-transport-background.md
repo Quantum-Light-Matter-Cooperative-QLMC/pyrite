@@ -41,15 +41,28 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `bremslib-radiative-partition`
 
 - **Claim:** A positive photon threshold partitions one interpolated BremsLib SDCS into a continuous soft first moment and an explicit hard zeroth/first moment; their first moments sum without cutoff dependence. Hard photons are sampled from the matching SDCS and DDCS.
-- **Code:** `montecarlo/transport/hard_radiative.py::build_radiative_partition`, `::RadiativePartition.sample_photon_energy`, `::sample_hard_radiative_photon`
-- **Source:** BremsLib v2.0.8 SDCS/DDCS scaling and angular convention, as recorded in `bremslib-angular-model`; derivation in [Bremsstrahlung](../physics/radiation-physics/bremsstrahlung.md#host-side-softhard-radiative-partition)
+- **Code:** `montecarlo/transport/hard_radiative.py::build_radiative_partition`, `::RadiativePartition.sample_photon_energy`, `::sample_hard_radiative_photon`; `montecarlo/transport/_jit_radiative.py::radiative_moments_scalar`, `::sample_hard_photon_energy_scalar`
+- **Source:** BremsLib v2.0.8 SDCS/DDCS scaling and angular convention, as recorded in `bremslib-angular-model`; derivation in [Bremsstrahlung](../physics/radiation-physics/bremsstrahlung.md#softhard-radiative-partition-and-cpu-transport)
 - **Equation:** `dσ/dk = 10^-27 Z² χ(T,k/T)/k` cm²/eV; `σ_h=∫[kc,T] dσ/dk dk`, `S_s=∫[0,kc] k dσ/dk dk`, `S_h=∫[kc,T] k dσ/dk dk`; `S_s+S_h=S_total`. For linear `χ(k)` each cell is integrated analytically. The conditional polar density is proportional to `2π sinθ d²σ/(dk dΩ)`.
 - **Assumptions:** `kc>0`; one fixed incident energy within the table; azimuthally symmetric DDCS; unchanged electron direction, as in the segment contract. An infinitely heavy target takes residual momentum, with recoil energy neglected; BremsLib supplies no joint photon/electron angular law.
 - **Limiting cases:** `kc=T` has zero hard rate and full soft first moment; reducing `kc` raises the hard rate while preserving total first moment; no finite total zeroth moment is claimed at `kc=0`.
 - **Status:** unverified
-- **Checks:** fixed-grid cutoff invariance, seeded hard-energy sample mean, unit directions, event energy and vector-momentum accounting with explicit target residual, invalid-domain guards
+- **Checks:** fixed-grid cutoff invariance, seeded hard-energy sample mean, unit directions, event energy and vector-momentum accounting with explicit target residual, invalid-domain guards; scalar Numba/host moment and CDF parity at table nodes, between nodes, and at cutoff endpoints
 - **Anchor:** `tests/montecarlo/test_hard_radiative.py`
-- **Notes:** Host-side sampler only. No flight scheduling, physical segment boundary, photon scorer, CPU/GPU parity, SBETHE radiative-stopping comparison, or independent PENELOPE/Geant4 benchmark yet. The track-length estimator still scores uncoupled emission; this claim must not be read as coupled multi-MeV transport validity. Fresh-context physics verification and human sign-off remain pending.
+- **Notes:** The opt-in CPU lockstep core now schedules hard events, debits energy, and records photons; CPU/GPU parity, SBETHE radiative-stopping comparison, and independent PENELOPE/Geant4 benchmark remain pending. The default transport and spectrum remain uncoupled; this claim must not be read as general multi-MeV validity. Fresh-context physics verification and human sign-off remain pending.
+
+## `bremslib-radiative-event-spectrum`
+
+- **Claim:** Post-transport scoring separates sampled hard photons from soft track-length emission at a photon-bin edge. Each hard event contributes the conditional BremsLib `DDCS/SDCS` angular density and escape transmission, without multiplying its already-sampled event by rate or path length again.
+- **Code:** `montecarlo/spectrum/brem_events.py::mc_soft_brem_spectrum`, `::mc_hard_brem_event_spectrum`; `montecarlo/transport/events.py::check_segment_event_contract`
+- **Source:** BremsLib SDCS/DDCS relation in `bremslib-angular-model`; node-bin midpoint-edge convention in `energy-grid-semantics`; derivation in [Bremsstrahlung](../physics/radiation-physics/bremsstrahlung.md#softhard-radiative-partition-and-cpu-transport)
+- **Equation:** `p(Omega|T,k) = [d²σ/(dk dOmega)]/[dσ/dk]`; a hard event of energy `k` contributes `p(Omega|T,k) exp(-mu(k)L_escape)/(Ne Δk_bin)` to its photon-energy bin. Track-length scoring is zero above the same bin edge `kc`.
+- **Assumptions:** hard event frequency and photon energy have already been sampled from the parent BremsLib SDCS; one planar slab, Beer–Lambert escape, azimuthally symmetric DDCS, and bin-aligned positive `kc`.
+- **Limiting cases:** an unattenuated event has weight `p(Omega|T,k)/(Ne Δk_bin)`; soft and hard arrays have disjoint nonzero bin ranges; a missing table or out-of-range event fails closed.
+- **Status:** unverified
+- **Checks:** synthetic-table DDCS/SDCS ratio at a known event, no extra density/path factor, disjoint soft/hard bins, terminal cutoff photon preservation, event energy-jump and row-field contract, missing-table and cutoff-edge errors
+- **Anchor:** `tests/montecarlo/test_brem_events.py`
+- **Notes:** The opt-in CPU lockstep core emits `hard_radiative_k_eV` and `hard_radiative_Z` row fields. No layered or finite-footprint escape, CUDA parity, detector propagation, or independent full-track comparison yet. Fresh-context physics verification and human sign-off remain pending.
 
 ## `electron-transport`
 
