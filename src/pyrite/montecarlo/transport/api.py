@@ -1304,6 +1304,9 @@ def simulate_trajectories(
         assert bremslib_tables is not None and radiative_cutoff_eV is not None
         result["hard_radiative_k_eV"] = seg_rad_k[:nseg]
         result["hard_radiative_Z"] = seg_rad_Z[:nseg]
+        from .hard_radiative import complete_hard_radiative_events
+
+        complete_hard_radiative_events(result, bremslib_tables, seed)
         result["radiative"] = {
             "model": radiative_model,
             "cutoff_eV": float(radiative_cutoff_eV),

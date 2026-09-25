@@ -63,6 +63,26 @@ def test_hard_radiative_events_debit_energy_and_close_cpu_flights():
     assert np.all(result["hard_radiative_Z"][events | terminal] == 6)
     assert np.all(photons[~(events | terminal)] == 0.0)
     assert result["radiative"]["model"] == "bremslib-soft-hard"
+    direction = result["hard_radiative_direction"]
+    target = result["hard_radiative_target_momentum_eV_c"]
+    assert np.all(direction[~(events | terminal)] == 0.0)
+    assert np.all(target[~(events | terminal)] == 0.0)
+    np.testing.assert_allclose(np.linalg.norm(direction[events | terminal], axis=1), 1.0)
+    incident_eV = result["E_end_keV"][events | terminal] * 1e3
+    photon_eV = photons[events | terminal]
+    electron = result["v_hat"][events | terminal]
+    rest_eV = 510_998.95
+    p_in = np.sqrt(incident_eV * (incident_eV + 2.0 * rest_eV))
+    remaining = incident_eV - photon_eV
+    p_out = np.sqrt(remaining * (remaining + 2.0 * rest_eV))
+    np.testing.assert_allclose(
+        p_in[:, None] * electron,
+        photon_eV[:, None] * direction[events | terminal]
+        + p_out[:, None] * electron
+        + target[events | terminal],
+        rtol=1e-12,
+        atol=1e-9,
+    )
 
     grid = np.arange(500.0, 60_500.0, 1_000.0)
     scoring = dict(
@@ -105,6 +125,8 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks()
         "v_hat",
         "hard_radiative_k_eV",
         "hard_radiative_Z",
+        "hard_radiative_direction",
+        "hard_radiative_target_momentum_eV_c",
     ):
         np.testing.assert_array_equal(first[field], replay[field])
 

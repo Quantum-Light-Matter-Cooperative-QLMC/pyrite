@@ -182,8 +182,37 @@ def sample_hard_radiative_photon(
 
     Validation: bremslib-radiative-partition
     """
+    energy = partition.sample_photon_energy(energy_uniform)
+    return hard_radiative_photon_at_energy(
+        partition.table,
+        partition.incident_energy_eV,
+        energy,
+        electron_direction,
+        angle_uniform,
+        azimuth_uniform,
+    )
+
+
+def hard_radiative_photon_at_energy(
+    table: BremsLibBremsstrahlungTable,
+    incident_energy_eV: float,
+    photon_energy_eV: float,
+    electron_direction: np.ndarray,
+    angle_uniform: float,
+    azimuth_uniform: float,
+) -> HardRadiativePhoton:
+    """Complete a sampled transport photon with its conditional BremsLib angle.
+
+    The energy has already been drawn from the same table's hard SDCS. The
+    angular CDF integrates its DDCS at that energy, and an independent uniform
+    azimuth completes the photon direction. Validation: bremslib-radiative-partition.
+    """
     if not 0.0 <= angle_uniform < 1.0 or not 0.0 <= azimuth_uniform < 1.0:
         raise ValueError("angle uniforms must be in [0, 1)")
+    energy = float(photon_energy_eV)
+    incident = float(incident_energy_eV)
+    if not np.isfinite(incident) or not np.isfinite(energy) or not 0.0 < energy <= incident:
+        raise ValueError("photon energy must be positive and at most the incident energy")
     incoming = np.asarray(electron_direction, dtype=float)
     if (
         incoming.shape != (3,)
@@ -191,13 +220,9 @@ def sample_hard_radiative_photon(
         or not np.isclose(np.linalg.norm(incoming), 1.0, atol=1e-10)
     ):
         raise ValueError("electron_direction must be a finite unit vector")
-    energy = partition.sample_photon_energy(energy_uniform)
-    table = partition.table
     theta = np.asarray(table.theta_rad, dtype=float)
     staged = stage_bremslib_table(table)
-    state = bremslib_segment_state(
-        staged, np.full(theta.size, partition.incident_energy_eV / 1e3), np.cos(theta)
-    )
+    state = bremslib_segment_state(staged, np.full(theta.size, incident / 1e3), np.cos(theta))
     ddcs = BACKEND.to_cpu(evaluate_bremslib(staged, state, [energy]))[:, 0]
     # Exact integral of each linear-in-theta cell; the same rule normalizes DDCS.
     widths = np.diff(theta)
@@ -211,6 +236,8 @@ def sample_hard_radiative_photon(
         )
     )
     cumulative = np.cumsum(cell_mass)
+    if not np.isfinite(cumulative[-1]) or cumulative[-1] <= 0.0:
+        raise ValueError("BremsLib DDCS has no positive angular integral")
     target = angle_uniform * float(cumulative[-1])
     cell = min(int(np.searchsorted(cumulative, target, side="right")), cell_mass.size - 1)
     target -= float(cumulative[cell - 1]) if cell else 0.0
@@ -240,14 +267,40 @@ def sample_hard_radiative_photon(
     photon_direction = np.cos(polar) * incoming + np.sin(polar) * (
         np.cos(phi) * transverse + np.sin(phi) * other
     )
-    remaining = partition.incident_energy_eV - energy
-    p_in = np.sqrt(
-        partition.incident_energy_eV * (partition.incident_energy_eV + 2.0 * _ELECTRON_REST_EV)
-    )
+    remaining = incident - energy
+    p_in = np.sqrt(incident * (incident + 2.0 * _ELECTRON_REST_EV))
     p_out = np.sqrt(remaining * (remaining + 2.0 * _ELECTRON_REST_EV))
     electron_out = incoming.copy()
     target_momentum = p_in * incoming - energy * photon_direction - p_out * electron_out
     return HardRadiativePhoton(energy, photon_direction, remaining, electron_out, target_momentum)
+
+
+def complete_hard_radiative_events(segments, tables, seed: int) -> None:
+    """Attach sampled photon directions and residual target momenta to event rows.
+
+    This uses a stream separate from electron transport, so adding photon
+    directions cannot perturb the electron tracks or their sampled energies.
+    Both vector fields are zero on rows without a hard photon.
+    """
+    energies = np.asarray(segments["hard_radiative_k_eV"])
+    directions = np.zeros((energies.size, 3), dtype=float)
+    momenta = np.zeros_like(directions)
+    by_Z = {table.atomic_number: table for table in tables.values()}
+    rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
+    for index in np.flatnonzero(energies > 0.0):
+        atomic_number = int(segments["hard_radiative_Z"][index])
+        photon = hard_radiative_photon_at_energy(
+            by_Z[atomic_number],
+            float(segments["E_end_keV"][index]) * 1e3,
+            float(energies[index]),
+            segments["v_hat"][index],
+            float(rng.random()),
+            float(rng.random()),
+        )
+        directions[index] = photon.direction
+        momenta[index] = photon.target_momentum_eV_c
+    segments["hard_radiative_direction"] = directions
+    segments["hard_radiative_target_momentum_eV_c"] = momenta
 
 
 def pack_radiative_layer_tables(

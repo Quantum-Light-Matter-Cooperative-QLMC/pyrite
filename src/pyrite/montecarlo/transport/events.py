@@ -152,8 +152,14 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
 
     photon_eV = segments.get("hard_radiative_k_eV")
     photon_Z = segments.get("hard_radiative_Z")
+    photon_direction = segments.get("hard_radiative_direction")
+    target_momentum = segments.get("hard_radiative_target_momentum_eV_c")
     if (photon_eV is None) != (photon_Z is None):
         raise ValueError("hard-radiative energy and atomic-number fields must appear together")
+    if (photon_direction is None) != (target_momentum is None):
+        raise ValueError("hard-radiative direction and target momentum must appear together")
+    if photon_direction is not None and photon_eV is None:
+        raise ValueError("hard-radiative vectors require photon energy")
     if photon_eV is not None:
         photon_eV = _host(photon_eV).astype(float, copy=False)
         photon_Z = _host(photon_Z).astype(int, copy=False)
@@ -168,6 +174,17 @@ def check_segment_event_contract(segments, *, rtol=1e-12, atol_ang=1e-5):
             raise ValueError("only hard-radiative or terminal cutoff rows may carry a photon")
         if np.any((kind == EVENT_HARD_RADIATIVE) & ~payload):
             raise ValueError("HARD_RADIATIVE rows require a photon payload")
+        if photon_direction is not None:
+            photon_direction = _host(photon_direction).astype(float, copy=False)
+            target_momentum = _host(target_momentum).astype(float, copy=False)
+            if photon_direction.shape != (n, 3) or target_momentum.shape != (n, 3):
+                raise ValueError("hard-radiative vectors must align with segment rows")
+            if np.any(~np.isfinite(photon_direction)) or np.any(~np.isfinite(target_momentum)):
+                raise ValueError("hard-radiative vectors must be finite")
+            if np.any(photon_direction[~payload] != 0.0) or np.any(target_momentum[~payload] != 0.0):
+                raise ValueError("only hard-radiative rows may carry photon vectors")
+            if np.any(np.abs(np.linalg.norm(photon_direction[payload], axis=1) - 1.0) > 1e-10):
+                raise ValueError("hard-radiative photon directions must have unit length")
 
     eid = _host(segments["electron_id"]).astype(np.int64, copy=False)
     fid = _host(segments["flight_id"]).astype(np.int64, copy=False)

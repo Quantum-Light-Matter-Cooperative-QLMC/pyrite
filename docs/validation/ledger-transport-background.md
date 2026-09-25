@@ -41,13 +41,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `bremslib-radiative-partition`
 
 - **Claim:** A positive photon threshold partitions one interpolated BremsLib SDCS into a continuous soft first moment and an explicit hard zeroth/first moment; their first moments sum without cutoff dependence. Hard photons are sampled from the matching SDCS and DDCS.
-- **Code:** `montecarlo/transport/hard_radiative.py::build_radiative_partition`, `::RadiativePartition.sample_photon_energy`, `::sample_hard_radiative_photon`; `montecarlo/transport/_jit_radiative.py::radiative_moments_scalar`, `::sample_hard_photon_energy_scalar`
+- **Code:** `montecarlo/transport/hard_radiative.py::build_radiative_partition`, `::RadiativePartition.sample_photon_energy`, `::sample_hard_radiative_photon`, `::hard_radiative_photon_at_energy`, `::complete_hard_radiative_events`; `montecarlo/transport/_jit_radiative.py::radiative_moments_scalar`, `::sample_hard_photon_energy_scalar`
 - **Source:** BremsLib v2.0.8 SDCS/DDCS scaling and angular convention, as recorded in `bremslib-angular-model`; derivation in [Bremsstrahlung](../physics/radiation-physics/bremsstrahlung.md#softhard-radiative-partition-and-cpu-transport)
 - **Equation:** `dσ/dk = 10^-27 Z² χ(T,k/T)/k` cm²/eV; `σ_h=∫[kc,T] dσ/dk dk`, `S_s=∫[0,kc] k dσ/dk dk`, `S_h=∫[kc,T] k dσ/dk dk`; `S_s+S_h=S_total`. For linear `χ(k)` each cell is integrated analytically. The conditional polar density is proportional to `2π sinθ d²σ/(dk dΩ)`.
 - **Assumptions:** `kc>0`; one fixed incident energy within the table; azimuthally symmetric DDCS; unchanged electron direction, as in the segment contract. An infinitely heavy target takes residual momentum, with recoil energy neglected; BremsLib supplies no joint photon/electron angular law.
 - **Limiting cases:** `kc=T` has zero hard rate and full soft first moment; reducing `kc` raises the hard rate while preserving total first moment; no finite total zeroth moment is claimed at `kc=0`.
 - **Status:** unverified
-- **Checks:** fixed-grid cutoff invariance, seeded hard-energy sample mean, unit directions, event energy and vector-momentum accounting with explicit target residual, invalid-domain guards; scalar Numba/host moment and CDF parity at table nodes, between nodes, and at cutoff endpoints
+- **Checks:** fixed-grid cutoff invariance, seeded hard-energy sample mean, unit directions, per-event energy and vector-momentum accounting with explicit target residual, deterministic direction replay, invalid-domain guards; scalar Numba/host moment and CDF parity at table nodes, between nodes, and at cutoff endpoints
 - **Anchor:** `tests/montecarlo/test_hard_radiative.py`
 - **Notes:** The opt-in CPU lockstep core now schedules hard events, debits energy, and records photons; CPU/GPU parity, SBETHE radiative-stopping comparison, and independent PENELOPE/Geant4 benchmark remain pending. The default transport and spectrum remain uncoupled; this claim must not be read as general multi-MeV validity. Fresh-context physics verification and human sign-off remain pending.
 
@@ -62,7 +62,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Status:** unverified
 - **Checks:** synthetic-table DDCS/SDCS ratio at a known event, no extra density/path factor, disjoint soft/hard bins, terminal cutoff photon preservation, event energy-jump and row-field contract, missing-table and cutoff-edge errors
 - **Anchor:** `tests/montecarlo/test_brem_events.py`
-- **Notes:** The opt-in CPU lockstep core emits `hard_radiative_k_eV` and `hard_radiative_Z` row fields. No layered or finite-footprint escape, CUDA parity, detector propagation, or independent full-track comparison yet. Fresh-context physics verification and human sign-off remain pending.
+- **Notes:** The opt-in CPU lockstep core emits photon energy and atomic number; a separate deterministic stream completes the photon direction and target recoil momentum after transport. The directional point-detector scorer uses the conditional density for variance reduction rather than sampling photon hits. No layered or finite-footprint escape, CUDA parity, detector propagation, or independent full-track comparison yet. Fresh-context physics verification and human sign-off remain pending.
 
 ## `electron-transport`
 
