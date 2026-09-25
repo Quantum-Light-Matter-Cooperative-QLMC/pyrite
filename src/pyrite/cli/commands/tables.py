@@ -56,7 +56,7 @@ def _elsepa_args(
             for flag, given in (("--element", element), ("--energy", energies_ev or None))
             if given is None
         ]
-        raise CLIError(f"--code {code} requires {', '.join(missing)}")
+        raise CLIError(f"--code {code} requires {', '.join(missing)}, or --material")
     return element, energies_ev
 
 
@@ -306,8 +306,11 @@ def show_command(key: str, json_output: bool) -> None:
     "--material",
     metavar="NAME",
     help=(
-        "Catalog material, crystal, or medium whose composition and density "
-        "define the SBETHE table. SBETHE only; incompatible with manual material options."
+        "Catalog material, crystal, or medium. SBETHE: its composition and density "
+        "define the table; incompatible with manual material options. ELSEPA: "
+        "generate every production elastic table the material uses (free atoms, "
+        "plus a muffin-tin table for an elementary crystal); incompatible with "
+        "--element and --energy."
     ),
 )
 @click.option(
@@ -382,7 +385,9 @@ def generate_command(
 ) -> None:
     """Generate or reuse one external-code table.
 
-    ELSEPA takes ``--element`` and one or more ``--energy`` values in eV.
+    ELSEPA takes ``--element`` and one or more ``--energy`` values in eV, or
+    one catalog ``--material`` to generate every production elastic table that
+    material uses on the fixed 100 eV-100 MeV grid.
     SBETHE takes either one catalog ``--material`` or the manual ``--name``,
     ``--density``, ``--mean-excitation`` and one ``--element-count Z:N`` per
     element in the molecule. BremsLib takes
@@ -397,12 +402,30 @@ def generate_command(
 
     selected = code.lower()
     try:
+        if selected == "elsepa" and material is not None:
+            from ...xsgen.elsepa.catalog import generate_catalog
+
+            _reject_for(
+                selected,
+                element=element,
+                energy=energies_ev or None,
+                name=name,
+                element_count=element_counts or None,
+                density=density,
+                mean_excitation=mean_excitation,
+                band_gap=band_gap,
+                t1_max=t1_max_MeV,
+            )
+            results = generate_catalog(
+                material, overwrite=overwrite, keep_on_failure=keep_on_failure
+            )
+            _emit_material_tables(selected, material, results, json_output=json_output)
+            return
         if selected == "elsepa":
             from ...xsgen.elsepa import generate_element
 
             _reject_for(
                 selected,
-                material=material,
                 name=name,
                 element_count=element_counts or None,
                 density=density,
@@ -479,17 +502,45 @@ def generate_command(
     except (XsgenError, ValueError, FileExistsError) as exc:
         raise CLIError(str(exc)) from exc
 
+    _emit_table(selected, result, json_output=json_output)
+
+
+def _table_payload(result) -> dict[str, object]:
     table = result.table
-    payload = {
-        "code": selected,
+    return {
         "key": table.key,
         "path": str(table.path),
         "tier": table.tier,
         "generated": result.generated,
         "manifest_sha256": table.manifest.get("manifest_sha256"),
     }
+
+
+def _emit_material_tables(code: str, material: str, results, *, json_output: bool) -> None:
+    """Report every table one catalog material resolves, in generation order."""
     if json_output:
-        emit_json("pyrite.tables.generate.v1", payload)
+        emit_json(
+            "pyrite.tables.generate-material.v1",
+            {
+                "code": code,
+                "material": material,
+                "tables": [_table_payload(result) for result in results],
+            },
+        )
+        return
+    emit_result(
+        "\n".join(
+            f"{'generated' if result.generated else 'reused'}: {result.table.key}\n"
+            f"path: {result.table.path}"
+            for result in results
+        )
+    )
+
+
+def _emit_table(selected: str, result, *, json_output: bool) -> None:
+    table = result.table
+    if json_output:
+        emit_json("pyrite.tables.generate.v1", {"code": selected, **_table_payload(result)})
         return
     action = "generated" if result.generated else "reused"
     emit_result(f"{action}: {table.key}\npath: {table.path}")

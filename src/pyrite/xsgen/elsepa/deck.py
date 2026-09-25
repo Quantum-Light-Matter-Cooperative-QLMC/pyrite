@@ -27,12 +27,20 @@ def output_name(energy_ev: float) -> str:
     return f"dcs_{lead}p{fraction[:3]}e{exponent_value:02d}.dat"
 
 
+#: ELSEPA's default LDA-II absorption-potential strength (``VABSA``), stated
+#: explicitly so the rendered deck and the table key say what was run.
+DEFAULT_ABSORPTION_STRENGTH = 0.75
+
+
 @dataclass(frozen=True)
 class ElsepaDeck:
-    """A free-atom ELSEPA request.
+    """An ELSEPA ``elscata`` request for a free atom or a muffin-tin atom.
 
-    Muffin-tin solids require material-derived ``RMUF`` and absorption inputs;
-    those belong with their material consumer rather than being guessed here.
+    A muffin-tin deck describes an atom in an elementary solid. Its radius
+    comes from the material's nearest-neighbour distance, supplied by the
+    material consumer rather than guessed here; ``elscata`` itself turns the
+    high-energy factorization off in this mode, so the deck records
+    ``high_energy_factorization=0`` for it.
     """
 
     z: int
@@ -43,6 +51,9 @@ class ElsepaDeck:
     polarization_model: int = 0
     absorption_model: int = 0
     high_energy_factorization: int = 2
+    muffin_tin_radius_cm: float | None = None
+    absorption_strength: float | None = None
+    absorption_gap_eV: float | None = None
 
     def __post_init__(self) -> None:
         atomic_number = int(self.z)
@@ -67,6 +78,23 @@ class ElsepaDeck:
             if value not in allowed:
                 choices = ", ".join(str(item) for item in allowed)
                 raise ValueError(f"ELSEPA {label} must be one of: {choices}")
+        if self.muffin_tin_radius_cm is not None:
+            radius = float(self.muffin_tin_radius_cm)
+            if not isfinite(radius) or radius < 1.0e-9:
+                raise ValueError("ELSEPA muffin-tin radius must be finite and >= 1e-9 cm")
+            if self.high_energy_factorization != 0:
+                raise ValueError("ELSEPA muffin-tin decks run without high-energy factorization")
+            object.__setattr__(self, "muffin_tin_radius_cm", radius)
+        for label, value in (
+            ("absorption_strength", self.absorption_strength),
+            ("absorption_gap_eV", self.absorption_gap_eV),
+        ):
+            if value is None:
+                continue
+            if self.absorption_model == 0:
+                raise ValueError(f"ELSEPA {label} requires an absorption model")
+            if not isfinite(float(value)) or float(value) < 0.0:
+                raise ValueError(f"ELSEPA {label} must be finite and non-negative")
         object.__setattr__(self, "z", atomic_number)
         object.__setattr__(self, "energies_ev", energies)
 
@@ -75,10 +103,40 @@ class ElsepaDeck:
         """Construct a free-atom electron deck from any energy iterable."""
         return cls(z=z, energies_ev=tuple(energies_ev), **options)
 
+    @classmethod
+    def muffin_tin(
+        cls,
+        z: int,
+        energies_ev: Iterable[float],
+        *,
+        radius_cm: float,
+        absorption_strength: float = DEFAULT_ABSORPTION_STRENGTH,
+        absorption_gap_eV: float | None = None,
+    ) -> ElsepaDeck:
+        """Construct an elementary-solid deck with LDA-II absorption.
+
+        ``absorption_gap_eV=None`` keeps ELSEPA's tabulated experimental
+        first-excitation energy for ``z`` as the gap.
+        """
+        return cls(
+            z=z,
+            energies_ev=tuple(energies_ev),
+            absorption_model=2,
+            high_energy_factorization=0,
+            muffin_tin_radius_cm=radius_cm,
+            absorption_strength=absorption_strength,
+            absorption_gap_eV=absorption_gap_eV,
+        )
+
+    @property
+    def is_muffin_tin(self) -> bool:
+        """Whether this deck describes an atom in an elementary solid."""
+        return self.muffin_tin_radius_cm is not None
+
     def model_record(self) -> dict[str, object]:
         """Return every deck input that can change the generated numbers."""
-        return {
-            "mode": "free_atom",
+        record: dict[str, object] = {
+            "mode": "muffin_tin" if self.is_muffin_tin else "free_atom",
             "energies_eV": list(self.energies_ev),
             "nuclear_model": self.nuclear_model,
             "electron_density_model": self.electron_density_model,
@@ -87,6 +145,14 @@ class ElsepaDeck:
             "absorption_model": self.absorption_model,
             "high_energy_factorization": self.high_energy_factorization,
         }
+        # Free-atom records keep their historical spelling, and so their keys.
+        if self.is_muffin_tin:
+            record["muffin_tin_radius_cm"] = self.muffin_tin_radius_cm
+        if self.absorption_strength is not None:
+            record["absorption_strength"] = self.absorption_strength
+        if self.absorption_gap_eV is not None:
+            record["absorption_gap_eV"] = self.absorption_gap_eV
+        return record
 
     @property
     def output_names(self) -> tuple[str, ...]:
@@ -108,12 +174,22 @@ class ElsepaDeck:
             ("MNUCL", self.nuclear_model),
             ("NELEC", self.z),
             ("MELEC", self.electron_density_model),
-            ("MUFFIN", 0),
-            ("IELEC", -1),
-            ("MEXCH", self.exchange_model),
-            ("MCPOL", self.polarization_model),
-            ("MABS", self.absorption_model),
-            ("IHEF", self.high_energy_factorization),
+            ("MUFFIN", 1 if self.is_muffin_tin else 0),
         ]
+        if self.muffin_tin_radius_cm is not None:
+            fields.append(("RMUF", f"{self.muffin_tin_radius_cm:.5E}"))
+        fields.extend(
+            [
+                ("IELEC", -1),
+                ("MEXCH", self.exchange_model),
+                ("MCPOL", self.polarization_model),
+                ("MABS", self.absorption_model),
+            ]
+        )
+        if self.absorption_strength is not None:
+            fields.append(("VABSA", f"{self.absorption_strength:.5E}"))
+        if self.absorption_gap_eV is not None:
+            fields.append(("VABSD", f"{self.absorption_gap_eV:.5E}"))
+        fields.append(("IHEF", self.high_energy_factorization))
         fields.extend(("EV", f"{energy:.5E}") for energy in self.energies_ev)
         return "".join(f"{name:<6} {value}\n" for name, value in fields)

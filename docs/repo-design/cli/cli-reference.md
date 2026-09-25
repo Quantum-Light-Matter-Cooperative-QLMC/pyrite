@@ -2075,11 +2075,12 @@ Usage: pyrite tables generate [OPTIONS]
 
   Generate or reuse one external-code table.
 
-  ELSEPA takes ``--element`` and one or more ``--energy`` values in eV. SBETHE takes
-  either one catalog ``--material`` or the manual ``--name``, ``--density``, ``--mean-
-  excitation`` and one ``--element-count Z:N`` per element in the molecule. BremsLib
-  takes ``--element`` and optionally ``--t1-max``: its energies are the library's own
-  grid, so there is nothing to choose.
+  ELSEPA takes ``--element`` and one or more ``--energy`` values in eV, or one catalog
+  ``--material`` to generate every production elastic table that material uses on the
+  fixed 100 eV-100 MeV grid. SBETHE takes either one catalog ``--material`` or the
+  manual ``--name``, ``--density``, ``--mean-excitation`` and one ``--element-count
+  Z:N`` per element in the molecule. BremsLib takes ``--element`` and optionally
+  ``--t1-max``: its energies are the library's own grid, so there is nothing to choose.
 
   Generated files live in the user table store; rerunning the same normalized request
   reuses its table without compiling, running, or rereading the external code.
@@ -2092,9 +2093,12 @@ Options:
                                   BremsLib only.  [1<=x<=103]
   --energy EV                     Kinetic energy in eV; repeat for a native-grid table.
                                   ELSEPA only.  [x>=4.999]
-  --material NAME                 Catalog material, crystal, or medium whose composition
-                                  and density define the SBETHE table. SBETHE only;
-                                  incompatible with manual material options.
+  --material NAME                 Catalog material, crystal, or medium. SBETHE: its
+                                  composition and density define the table; incompatible
+                                  with manual material options. ELSEPA: generate every
+                                  production elastic table the material uses (free
+                                  atoms, plus a muffin-tin table for an elementary
+                                  crystal); incompatible with --element and --energy.
   --name NAME                     Material name recorded in the SBETHE output headers.
                                   SBETHE only.
   --element-count Z:N             Stoichiometric index of one element, as Z:N; repeat
