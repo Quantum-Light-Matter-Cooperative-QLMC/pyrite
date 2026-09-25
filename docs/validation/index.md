@@ -85,6 +85,7 @@ radiation-physics/bremslib-radiative-event-spectrum
 radiation-physics/bremslib-radiative-partition
 radiation-physics/cbs-amplitude
 radiation-physics/characteristic-radiation
+radiation-physics/eedl-shell-ionization-comparison
 radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
 radiation-physics/coherent-inter-electron-decoherence

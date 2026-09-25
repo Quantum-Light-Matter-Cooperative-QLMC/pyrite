@@ -26,13 +26,11 @@ directory, never packaged.
 Validation: brem-source-comparison
 """
 
-import hashlib
 import os
 import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.request import urlopen
 
 import numpy as np
 
@@ -40,6 +38,8 @@ from pyrite._backend import _to_cpu
 from pyrite.montecarlo.spectrum.brem import BremsstrahlungModel, _bremsstrahlung_dsigma_dk
 from pyrite.montecarlo.spectrum.brem_bremslib import BremsLibBremsstrahlungTable
 from pyrite.paths import user_data_dir
+
+from ._pinned import read_pinned
 
 SELTZER_BERGER_URL = (
     "https://raw.githubusercontent.com/nrc-cnrc/EGSnrc/"
@@ -68,9 +68,7 @@ class SeltzerBergerTable:
         """``chi`` on the table's ``kappa`` nodes, log-log in ``T`` between nodes."""
         log_T = np.log(self.incident_energy_MeV)
         panel = self.chi_mb[atomic_number - 1]
-        return np.exp(
-            [np.interp(np.log(incident_energy_MeV), log_T, np.log(row)) for row in panel]
-        )
+        return np.exp([np.interp(np.log(incident_energy_MeV), log_T, np.log(row)) for row in panel])
 
 
 def parse_seltzer_berger(text: str) -> SeltzerBergerTable:
@@ -106,28 +104,19 @@ def default_table_path() -> Path:
     return user_data_dir() / "validation" / "seltzer-berger" / "nist_brems.data"
 
 
-def _verified(data: bytes, origin: object) -> bytes:
-    digest = hashlib.sha256(data).hexdigest()
-    if digest != SELTZER_BERGER_SHA256:
-        raise ValueError(f"{origin} has SHA-256 {digest}; expected {SELTZER_BERGER_SHA256}")
-    return data
-
-
 def load_seltzer_berger(path: Path | None = None, *, download: bool = False) -> SeltzerBergerTable:
     """Load the pinned table, fetching it first when ``download`` is set."""
-    path = default_table_path() if path is None else path
-    if not path.exists():
-        if not download:
-            raise SeltzerBergerUnavailableError(
-                f"Seltzer-Berger table not found at {path}; fetch it with "
-                "`uv run python checks/brem_source_comparison.py --download` "
-                f"or set {SELTZER_BERGER_ENV}"
-            )
-        with urlopen(SELTZER_BERGER_URL, timeout=60) as response:
-            data = _verified(response.read(), SELTZER_BERGER_URL)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(data)
-    return parse_seltzer_berger(_verified(path.read_bytes(), path).decode("ascii"))
+    data = read_pinned(
+        default_table_path() if path is None else path,
+        SELTZER_BERGER_URL,
+        SELTZER_BERGER_SHA256,
+        download=download,
+        missing=SeltzerBergerUnavailableError,
+        hint="fetch the Seltzer-Berger table with "
+        "`uv run python checks/brem_source_comparison.py --download` "
+        f"or set {SELTZER_BERGER_ENV}",
+    )
+    return parse_seltzer_berger(data.decode("ascii"))
 
 
 def beta_squared(incident_energy_MeV: float) -> float:
@@ -219,8 +208,7 @@ def compare_sources(
                             table.kappa, chi, hard_kappa_cut
                         )
                         / reference_hard,
-                        first_moment_ratio=float(np.trapezoid(chi, table.kappa))
-                        / reference_moment,
+                        first_moment_ratio=float(np.trapezoid(chi, table.kappa)) / reference_moment,
                     )
                 )
     return results

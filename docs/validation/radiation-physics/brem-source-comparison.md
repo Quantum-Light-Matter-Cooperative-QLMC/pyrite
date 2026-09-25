@@ -42,18 +42,18 @@ BremsLib first-moment ratios lie within 0.97–1.02 for Z ≥ 22 from 10 keV to 
 - **Tip region.** $\kappa>0.95$ spans 0.69–1.12. It is not gated because the two grids resolve the tip differently.
 - **Low energy.** 1–8 keV at high Z reaches 1.17 pointwise and 1.08 in moment. The gate starts at 10 keV.
 
-EEDL, at its own incident panels (no interpolation): the first moment is 0.979–0.991 of Seltzer–Berger over 106 panels, so the packaged data agree and include electron–electron bremsstrahlung. Between panels, PyRITE's evaluation is not usable:
+EEDL, at its own incident panels (no interpolation): the first moment is 0.979–0.991 of Seltzer–Berger over 106 panels, so the packaged data agree and include electron–electron bremsstrahlung. Before #174, PyRITE's between-panel evaluation was not usable:
 
 - pointwise ratios span 0.000–2.35, and moments 0.31–1.01;
 - the File-26 spectra exist at only 8–10 decade-spaced incident energies per element (carbon: 14.1 keV, 251 keV, 1.19 MeV, 12.2 MeV between 10 keV and 30 MeV);
 - the declared ENDF lin-lin (Cartesian) interpolation at fixed photon energy gives every $k$ above the lower panel's endpoint only the upper panel's share.
 
-For carbon at 30 keV, $\chi$ is 0.09–0.15 of Seltzer–Berger for $\kappa\ge0.5$. This is an interpolation defect, not a data disagreement, and #174 owns the fix. A scratch unit-base ($\kappa$) interpolation brought the same nodes to within about 35 %, with the remaining error set by panel sparsity.
+For carbon at 30 keV, the former $\chi$ was 0.09–0.15 of Seltzer–Berger for $\kappa\ge0.5$. This was an interpolation defect, not a data disagreement. #174 subsequently replaced fixed-photon-energy interpolation with unit-base refinement; the post-fix catalogue comparison is 0.96–1.34 pointwise for $0.05\le\kappa\le0.95$ from 10 keV to 1 MeV, with 0.99–1.07 in first moment. The remaining spread reflects sparse EEDL panels.
 
 ## Verdict
 
 - **Claim:** `brem-source-comparison`. BremsLib reproduces Seltzer–Berger within the gated bands from 10 keV to 30 MeV. The lower band edge $1/(1+1/Z)$ is the omitted electron–electron share.
 - **Filters:** units pass (ESTAR moment); limits pass (high-Z band closes to ±5 % pointwise and ±3 % in moment); conventions pass (same quadrature and node set on both sides).
-- **Recommendation for #86/#84:** BremsLib is the more accurate production spectrum source throughout 10 keV–30 MeV, for all catalogue elements. At 30–300 keV, which covers the catalogue's beam energies, it agrees within 0.96–1.02 pointwise for every catalogue Z, and within 0.97–1.01 in moment for Z ≥ 14. Its only systematic deficit is electron–electron bremsstrahlung at low Z and MeV energies: 8–14 % of the moment at 30 MeV for Z ≤ 8. EEDL's accuracy is limited by its interpolation until #174 lands, and afterwards by panel sparsity.
+- **Recommendation for #86/#84:** BremsLib is the more accurate production spectrum source throughout 10 keV–30 MeV, for all catalogue elements. At 30–300 keV, which covers the catalogue's beam energies, it agrees within 0.96–1.02 pointwise for every catalogue Z, and within 0.97–1.01 in moment for Z ≥ 14. Its only systematic deficit is electron–electron bremsstrahlung at low Z and MeV energies: 8–14 % of the moment at 30 MeV for Z ≤ 8. #174 removed EEDL's interpolation collapse; its remaining accuracy limit is panel sparsity.
 - **Not covered:** the BremsLib angular shape; energies above 30 MeV; any full-track observable (#172).
 - **Status:** `filtered`. Fresh-context verification is pending, and only a human may mark this signed off.
