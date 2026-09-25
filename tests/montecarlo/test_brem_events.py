@@ -96,6 +96,13 @@ def test_hard_event_requires_matching_bremslib_coverage(monkeypatch, table):
             cutoff_eV=16_000.0,
             bremslib_tables={"C": table},
         )
+    with pytest.raises(ValueError, match="bin edge"):
+        brem_events.mc_soft_brem_spectrum(
+            {},
+            [10_000.0, 20_000.0, 30_000.0],
+            cutoff_eV=np.nextafter(15_000.0, 16_000.0),
+            bremslib_tables={"C": table},
+        )
 
 
 def test_radiative_event_payload_closes_flight_and_matches_energy_jump():

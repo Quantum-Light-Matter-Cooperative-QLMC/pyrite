@@ -26,7 +26,7 @@ def _cutoff_edge(E_grid_eV, cutoff_eV):
     cutoff = float(cutoff_eV)
     if not np.isfinite(cutoff) or cutoff <= 0.0:
         raise ValueError("hard photon cutoff must be positive and finite")
-    match = np.flatnonzero(np.isclose(edges, cutoff, rtol=1e-12, atol=0.0))
+    match = np.flatnonzero(edges == cutoff)
     if match.size != 1 or match[0] == 0 or match[0] == edges.size - 1:
         raise ValueError("hard photon cutoff must equal an interior energy-bin edge")
     return edges, widths, int(match[0])

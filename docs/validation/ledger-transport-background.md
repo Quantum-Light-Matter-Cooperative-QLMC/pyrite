@@ -46,10 +46,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** `dσ/dk = 10^-27 Z² χ(T,k/T)/k` cm²/eV; `σ_h=∫[kc,T] dσ/dk dk`, `S_s=∫[0,kc] k dσ/dk dk`, `S_h=∫[kc,T] k dσ/dk dk`; `S_s+S_h=S_total`. For linear `χ(k)` each cell is integrated analytically. The conditional polar density is proportional to `2π sinθ d²σ/(dk dΩ)`.
 - **Assumptions:** `kc>0`; one fixed incident energy within the table; azimuthally symmetric DDCS; unchanged electron direction, as in the segment contract. An infinitely heavy target takes residual momentum, with recoil energy neglected; BremsLib supplies no joint photon/electron angular law.
 - **Limiting cases:** `kc=T` has zero hard rate and full soft first moment; reducing `kc` raises the hard rate while preserving total first moment; no finite total zeroth moment is claimed at `kc=0`.
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** fixed-grid cutoff invariance, seeded hard-energy sample mean, unit directions, per-event energy and vector-momentum accounting with explicit target residual, deterministic direction replay, invalid-domain guards; scalar Numba/host moment and CDF parity at table nodes, between nodes, and at cutoff endpoints
 - **Anchor:** `tests/montecarlo/test_hard_radiative.py`
-- **Notes:** The opt-in CPU lockstep core now schedules hard events, debits energy, and records photons; CPU/GPU parity, SBETHE radiative-stopping comparison, and independent PENELOPE/Geant4 benchmark remain pending. The default transport and spectrum remain uncoupled; this claim must not be read as general multi-MeV validity. Fresh-context physics verification and human sign-off remain pending.
+- **Notes:** The opt-in CPU lockstep core now schedules hard events, debits energy, and records photons; CPU/GPU parity, SBETHE radiative-stopping comparison, and independent PENELOPE/Geant4 benchmark remain pending. The default transport and spectrum remain uncoupled; this claim must not be read as general multi-MeV validity. Fresh-context physics verification found no divergent moment, factor, unit, angular measure, or momentum sign. [Validation write-up](radiation-physics/bremslib-radiative-partition.md). Human sign-off remains pending.
 
 ## `bremslib-radiative-event-spectrum`
 
@@ -59,10 +59,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** `p(Omega|T,k) = [d²σ/(dk dOmega)]/[dσ/dk]`; a hard event of energy `k` contributes `p(Omega|T,k) exp(-mu(k)L_escape)/(Ne Δk_bin)` to its photon-energy bin. Track-length scoring is zero above the same bin edge `kc`.
 - **Assumptions:** hard event frequency and photon energy have already been sampled from the parent BremsLib SDCS; one planar slab, Beer–Lambert escape, azimuthally symmetric DDCS, and bin-aligned positive `kc`.
 - **Limiting cases:** an unattenuated event has weight `p(Omega|T,k)/(Ne Δk_bin)`; soft and hard arrays have disjoint nonzero bin ranges; a missing table or out-of-range event fails closed.
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** synthetic-table DDCS/SDCS ratio at a known event, no extra density/path factor, disjoint soft/hard bins, terminal cutoff photon preservation, event energy-jump and row-field contract, missing-table and cutoff-edge errors
 - **Anchor:** `tests/montecarlo/test_brem_events.py`
-- **Notes:** The opt-in CPU lockstep core emits photon energy and atomic number; a separate deterministic stream completes the photon direction and target recoil momentum after transport. The directional point-detector scorer uses the conditional density for variance reduction rather than sampling photon hits. No layered or finite-footprint escape, CUDA parity, detector propagation, or independent full-track comparison yet. Fresh-context physics verification and human sign-off remain pending.
+- **Notes:** The opt-in CPU lockstep core emits photon energy and atomic number; a separate deterministic stream completes the photon direction and target recoil momentum after transport. The directional point-detector scorer uses the conditional density for variance reduction rather than sampling photon hits. No layered or finite-footprint escape, CUDA parity, detector propagation, or independent full-track comparison yet. Fresh-context verification matched the conditional event weight and bin normalization; the identified cutoff-edge tolerance gap was closed with an exact-edge check. [Validation write-up](radiation-physics/bremslib-radiative-event-spectrum.md). Human sign-off remains pending.
 
 ## `electron-transport`
 
