@@ -67,6 +67,7 @@ _CASE_KEY_ORDER = (
     "max_dE_frac",
     "inelastic_model",
     "inelastic_cutoff_eV",
+    "elastic_model",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -151,6 +152,10 @@ class Case(Mapping[str, Any]):
     inelastic_model, inelastic_cutoff_eV
         Opt-in ``"shell-soft-hard"`` collision-loss scheme and its cutoff in
         eV; both absent is continuous stopping. Requires ``energy_model``.
+    elastic_model
+        ``"elsepa"`` tabulated elastic scattering, which the default
+        :class:`~pyrite.Numerics` lowers to explicitly; absent is the
+        historical ``"mott"`` model, so pre-ELSEPA case keys stay valid.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     """
@@ -218,6 +223,7 @@ class Case(Mapping[str, Any]):
     max_dE_frac: float | _Absent = _ABSENT
     inelastic_model: Literal["shell-soft-hard"] | _Absent = _ABSENT
     inelastic_cutoff_eV: float | _Absent = _ABSENT
+    elastic_model: Literal["elsepa"] | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -277,6 +283,8 @@ class Case(Mapping[str, Any]):
             _positive("inelastic_cutoff_eV", self.inelastic_cutoff_eV)
             if self.energy_model != "midpoint":
                 raise ValueError("inelastic_model requires energy_model='midpoint'")
+        if self.elastic_model is not _ABSENT and self.elastic_model != "elsepa":
+            raise ValueError("elastic_model must be absent or 'elsepa'")
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")

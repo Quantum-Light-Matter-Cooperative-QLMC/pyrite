@@ -21,6 +21,7 @@ from pyrite.montecarlo.transport import (
     simulate_trajectories,
     spliced_stopping_keV_per_ang,
 )
+from pyrite.montecarlo.transport.scattering import pack_elsepa_tables
 from tests.helpers import scaled_rtol
 
 TP = np.deg2rad(45.0)
@@ -517,7 +518,8 @@ def _run_grooved(
                 np.zeros((n_layers, 1)),
                 np.zeros((n_layers, 1)),
             ),
-            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat)
+            + pack_elsepa_tables(None, None),
             (alive, clock, pos, dirs, E_keV, E_cut_by_electrons),
             (
                 seg_dir,

@@ -43,7 +43,7 @@ from .._line_grid_policy import (
     line_start_eV,
     resolve_line_grid_policy,
 )
-from .._numerics import validate_inelastic_numerics
+from .._numerics import validate_elastic_model, validate_inelastic_numerics
 from .._photon_continuum_floor import floored_lattice_start_eV
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
@@ -616,6 +616,7 @@ def build_cases(
     max_dE_frac=0.0,
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
+    elastic_model="elsepa",
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -636,6 +637,7 @@ def build_cases(
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     validate_inelastic_numerics(inelastic_model, inelastic_cutoff_eV, energy_model)
+    validate_elastic_model(elastic_model)
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
@@ -888,6 +890,9 @@ def build_cases(
                             if inelastic_model != "continuous"
                             else {}
                         ),
+                        # ELSEPA elastic model (the default): divergence-only, so
+                        # an explicit "mott" case keeps its historical payload.
+                        **({"elastic_model": "elsepa"} if elastic_model == "elsepa" else {}),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

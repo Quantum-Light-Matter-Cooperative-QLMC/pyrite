@@ -208,6 +208,73 @@ def test_generate_reports_a_new_elsepa_table(isolated, monkeypatch, tmp_path):
     assert_clean_result(result, stdout=f"generated: {'a' * 64}\npath: {path}\n")
 
 
+def _fake_elsepa_material_tables(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    results = tuple(
+        SimpleNamespace(
+            table=SimpleNamespace(
+                key=char * 64,
+                path=tmp_path / f"{char * 64}.npz",
+                tier="user",
+                manifest={"manifest_sha256": "f" * 64},
+            ),
+            generated=generated,
+        )
+        for char, generated in (("a", True), ("b", False))
+    )
+    calls = []
+
+    def fake(material, **kwargs):
+        calls.append((material, kwargs))
+        return results
+
+    monkeypatch.setattr("pyrite.xsgen.elsepa.catalog.generate_catalog", fake)
+    return results, calls
+
+
+def test_generate_elsepa_material_reports_every_table(isolated, monkeypatch, tmp_path):
+    results, calls = _fake_elsepa_material_tables(monkeypatch, tmp_path)
+
+    result = invoke(
+        tables_command.command, ["generate", "--code", "elsepa", "--material", "silicon"]
+    )
+
+    assert_clean_result(
+        result,
+        stdout=(
+            f"generated: {'a' * 64}\npath: {results[0].table.path}\n"
+            f"reused: {'b' * 64}\npath: {results[1].table.path}\n"
+        ),
+    )
+    assert calls == [("silicon", {"overwrite": False, "keep_on_failure": False})]
+
+
+def test_generate_elsepa_material_json_is_one_envelope(isolated, monkeypatch, tmp_path):
+    _fake_elsepa_material_tables(monkeypatch, tmp_path)
+
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "elsepa", "--material", "silicon", "-o", "json"],
+    )
+
+    assert result.exit_code == 0, result.stderr
+    envelope = json.loads(result.stdout)
+    assert envelope["schema"] == "pyrite.tables.generate-material.v1"
+    assert envelope["payload"]["material"] == "silicon"
+    assert [row["generated"] for row in envelope["payload"]["tables"]] == [True, False]
+
+
+def test_generate_elsepa_material_rejects_element_and_energy(isolated):
+    result = invoke(
+        tables_command.command,
+        ["generate", "--code", "elsepa", "--material", "silicon", "--element", "14"],
+    )
+
+    assert result.exit_code != 0
+    assert "--code elsepa does not accept --element" in result.stderr
+
+
 def test_generate_requires_an_explicit_energy(isolated):
     """ELSEPA and SBETHE need disjoint options, so the check moved into the body."""
     result = invoke(
@@ -484,7 +551,7 @@ def test_fetch_json_is_one_machine_readable_envelope(isolated, monkeypatch, tmp_
 
 
 def test_fetch_rejects_a_code_without_downloadable_data(isolated):
-    result = invoke(tables_command.command, ["fetch", "elsepa"])
+    result = invoke(tables_command.command, ["fetch", "penelope"])
 
     assert result.exit_code == 2
     assert "sbethe" in result.stderr

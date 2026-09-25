@@ -239,7 +239,8 @@ def run_transport_kernel(
         L_sbethe_logE,
         L_sbethe_logS,
     ) = materials
-    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott[:5]
+    (_, el_start, el_len, el_logE, el_log_rate, el_cdf, el_pdf, el_mu) = mott[5:]
     (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
     (
         seg_dir,
@@ -319,6 +320,14 @@ def run_transport_kernel(
             mott_len.reshape(-1).astype(xp.int32, copy=False),
             mott_logE_flat,
             mott_logA_flat,
+            el_start.reshape(-1).astype(xp.int32, copy=False),
+            el_len.reshape(-1).astype(xp.int32, copy=False),
+            el_logE,
+            el_log_rate,
+            el_cdf.reshape(-1),
+            el_pdf.reshape(-1),
+            el_mu,
+            np.int32(el_mu.size),
             E_keV,
             seg_dir.reshape(-1),
             seg_mid.reshape(-1),

@@ -1,4 +1,4 @@
-"""Generate and cache free-atom ELSEPA tables."""
+"""Generate and cache free-atom and muffin-tin ELSEPA tables."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -6,9 +6,17 @@ from pathlib import Path
 
 from .._run import run_program
 from ..sources import resolve_source, source_digest
-from ..store import ElementTarget, StoredTable, TableRequest, resolve, store
+from ..store import (
+    ElementTarget,
+    MaterialTarget,
+    StoredTable,
+    TableRequest,
+    material_identity,
+    resolve,
+    store,
+)
 from ..toolchain import build, find_toolchain
-from .deck import ElsepaDeck
+from .deck import DEFAULT_ABSORPTION_STRENGTH, ElsepaDeck
 from .parse import parse_dcs, table_arrays
 
 
@@ -20,15 +28,10 @@ class GenerationResult:
     generated: bool
 
 
-def generate_element(
-    z: int,
-    energies_ev: Iterable[float],
-    *,
-    source_path: str | Path | None = None,
-    overwrite: bool = False,
-    keep_on_failure: bool = False,
-) -> GenerationResult:
-    """Generate or resolve a free-atom ELSEPA differential-cross-section table."""
+def element_request(
+    z: int, energies_ev: Iterable[float], *, source_path: str | Path | None = None
+) -> tuple[TableRequest, ElsepaDeck]:
+    """Return the store request and deck for one free-atom table."""
     deck = ElsepaDeck.free_atom(z, energies_ev)
     source = resolve_source("elsepa", source_path)
     request = TableRequest(
@@ -38,10 +41,63 @@ def generate_element(
         quantity="elastic_dcs",
         model=deck.model_record(),
     )
+    return request, deck
+
+
+def muffin_tin_request(
+    name: str,
+    z: int,
+    energies_ev: Iterable[float],
+    *,
+    radius_cm: float,
+    density_g_cm3: float,
+    absorption_strength: float = DEFAULT_ABSORPTION_STRENGTH,
+    absorption_gap_eV: float | None = None,
+    source_path: str | Path | None = None,
+) -> tuple[TableRequest, ElsepaDeck]:
+    """Return the store request and deck for one elementary-solid table.
+
+    The target is the material, not the element: the muffin-tin radius and
+    absorption gap are properties of the solid, so they enter the material
+    identity and a changed lattice re-keys the table.
+    """
+    deck = ElsepaDeck.muffin_tin(
+        z,
+        energies_ev,
+        radius_cm=radius_cm,
+        absorption_strength=absorption_strength,
+        absorption_gap_eV=absorption_gap_eV,
+    )
+    source = resolve_source("elsepa", source_path)
+    extra: dict[str, float] = {"muffin_tin_radius_cm": float(radius_cm)}
+    if absorption_gap_eV is not None:
+        extra["absorption_gap_eV"] = float(absorption_gap_eV)
+    identity = material_identity(
+        composition={deck.z: 1.0}, density_g_cm3=density_g_cm3, extra=extra
+    )
+    request = TableRequest(
+        code="elsepa",
+        code_version=source_digest(source),
+        target=MaterialTarget(key=str(name), identity=identity),
+        quantity="elastic_dcs",
+        model=deck.model_record(),
+    )
+    return request, deck
+
+
+def _generate(
+    request: TableRequest,
+    deck: ElsepaDeck,
+    *,
+    source_path: str | Path | None,
+    overwrite: bool,
+    keep_on_failure: bool,
+) -> GenerationResult:
     existing = resolve(request.key)
     if existing is not None and not overwrite:
         return GenerationResult(existing, generated=False)
 
+    source = resolve_source("elsepa", source_path)
     toolchain = find_toolchain()
     binary = build(source, "elscata", toolchain=toolchain)
     run = run_program(
@@ -61,3 +117,53 @@ def generate_element(
         overwrite=overwrite,
     )
     return GenerationResult(table, generated=True)
+
+
+def generate_element(
+    z: int,
+    energies_ev: Iterable[float],
+    *,
+    source_path: str | Path | None = None,
+    overwrite: bool = False,
+    keep_on_failure: bool = False,
+) -> GenerationResult:
+    """Generate or resolve a free-atom ELSEPA differential-cross-section table."""
+    request, deck = element_request(z, energies_ev, source_path=source_path)
+    return _generate(
+        request,
+        deck,
+        source_path=source_path,
+        overwrite=overwrite,
+        keep_on_failure=keep_on_failure,
+    )
+
+
+def generate_muffin_tin(
+    name: str,
+    z: int,
+    energies_ev: Iterable[float],
+    *,
+    radius_cm: float,
+    density_g_cm3: float,
+    absorption_gap_eV: float | None = None,
+    source_path: str | Path | None = None,
+    overwrite: bool = False,
+    keep_on_failure: bool = False,
+) -> GenerationResult:
+    """Generate or resolve an elementary-solid (muffin-tin) ELSEPA table."""
+    request, deck = muffin_tin_request(
+        name,
+        z,
+        energies_ev,
+        radius_cm=radius_cm,
+        density_g_cm3=density_g_cm3,
+        absorption_gap_eV=absorption_gap_eV,
+        source_path=source_path,
+    )
+    return _generate(
+        request,
+        deck,
+        source_path=source_path,
+        overwrite=overwrite,
+        keep_on_failure=keep_on_failure,
+    )

@@ -103,8 +103,12 @@ def _usable_cpus():
 
 
 from .case_tables import (
+    _case_elastic_kwargs,
     _case_inelastic_kwargs,
     _case_stopping_tables,
+)
+from .case_tables import (
+    _case_elastic_table_records as _case_elastic_table_records,
 )
 from .case_tables import (
     _case_stopping_table_records as _case_stopping_table_records,
@@ -579,6 +583,7 @@ def _transport_case(
             straggling=straggling,
             stopping_tables=stopping_tables,
             **_case_inelastic_kwargs(case),
+            **_case_elastic_kwargs(case),
             **(
                 {"transport_lut_config": transport_lut_config}
                 if transport_lut_config is not None

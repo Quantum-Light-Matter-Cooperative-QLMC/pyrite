@@ -1248,7 +1248,8 @@ Usage: pyrite profile numerics reset [OPTIONS] NAME [line-electrons|bremsstrahlu
                                      electrons|reflection-families|maximum-
                                      reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
-                                     energy-loss|inelastic-model|inelastic-cutoff-ev]...
+                                     energy-loss|inelastic-model|inelastic-cutoff-
+                                     ev|elastic-model]...
 
   Reset selected FIELDs, or every explicit numeric when none are named.
 
@@ -1287,6 +1288,10 @@ Options:
   --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV for shell-soft-
                                   hard; must exceed each material's conduction-band
                                   resonance (Si 16.7, SiO2 22, MoS2 23 eV).  [x>0.0]
+  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
+                                  cross sections (needs 'pyrite tables fetch elsepa';
+                                  bypasses the transport LUT), or the historical mott
+                                  screened-Rutherford angles.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -2028,6 +2033,7 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
     pyrite tables generate --code bremslib --element 79
     pyrite tables fetch sbethe
     pyrite tables fetch bremslib
+    pyrite tables fetch elsepa
     pyrite tables sources list
     pyrite tables sources set elsepa ../elsepa-2020
 
@@ -2046,7 +2052,7 @@ Commands:
 ## `pyrite tables fetch`
 
 ```text
-Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib}
+Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib|elsepa}
 
   Fetch pinned data for CODE into your user data directory.
 
@@ -2055,6 +2061,9 @@ Usage: pyrite tables fetch [OPTIONS] {sbethe|bremslib}
   bremslib  BremsLib-derived bremsstrahlung tables for every element a
             catalogue material may contain, so no BremsLib checkout is
             needed for them.
+  elsepa    ELSEPA elastic tables (free atoms for every transport element,
+            muffin-tin tables for elementary crystals) that the default
+            elastic model reads, so no Fortran run is needed for them.
 
   The archive is SHA-256 verified before anything is installed, whether it was
   downloaded or given with --archive. A complete existing install returns successfully
@@ -2075,11 +2084,12 @@ Usage: pyrite tables generate [OPTIONS]
 
   Generate or reuse one external-code table.
 
-  ELSEPA takes ``--element`` and one or more ``--energy`` values in eV. SBETHE takes
-  either one catalog ``--material`` or the manual ``--name``, ``--density``, ``--mean-
-  excitation`` and one ``--element-count Z:N`` per element in the molecule. BremsLib
-  takes ``--element`` and optionally ``--t1-max``: its energies are the library's own
-  grid, so there is nothing to choose.
+  ELSEPA takes ``--element`` and one or more ``--energy`` values in eV, or one catalog
+  ``--material`` to generate every production elastic table that material uses on the
+  fixed 100 eV-100 MeV grid. SBETHE takes either one catalog ``--material`` or the
+  manual ``--name``, ``--density``, ``--mean-excitation`` and one ``--element-count
+  Z:N`` per element in the molecule. BremsLib takes ``--element`` and optionally
+  ``--t1-max``: its energies are the library's own grid, so there is nothing to choose.
 
   Generated files live in the user table store; rerunning the same normalized request
   reuses its table without compiling, running, or rereading the external code.
@@ -2092,9 +2102,12 @@ Options:
                                   BremsLib only.  [1<=x<=103]
   --energy EV                     Kinetic energy in eV; repeat for a native-grid table.
                                   ELSEPA only.  [x>=4.999]
-  --material NAME                 Catalog material, crystal, or medium whose composition
-                                  and density define the SBETHE table. SBETHE only;
-                                  incompatible with manual material options.
+  --material NAME                 Catalog material, crystal, or medium. SBETHE: its
+                                  composition and density define the table; incompatible
+                                  with manual material options. ELSEPA: generate every
+                                  production elastic table the material uses (free
+                                  atoms, plus a muffin-tin table for an elementary
+                                  crystal); incompatible with --element and --energy.
   --name NAME                     Material name recorded in the SBETHE output headers.
                                   SBETHE only.
   --element-count Z:N             Stoichiometric index of one element, as Z:N; repeat

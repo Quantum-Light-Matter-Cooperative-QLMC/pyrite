@@ -16,11 +16,15 @@ TRANSPORT_KEYS = (
     "max_dE_frac",
     "inelastic_model",
     "inelastic_cutoff_eV",
+    "elastic_model",
 )
 #: ``simulate_trajectories`` collision-loss schemes; mirrors
 #: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
 #: two in step) without importing the transport package here.
 INELASTIC_MODELS = ("continuous", "shell-soft-hard")
+#: Elastic models a case may select. ``"elsepa"`` (the default, issue #89)
+#: samples resolved ELSEPA tables; ``"mott"`` is the historical model.
+ELASTIC_MODELS = ("mott", "elsepa")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -87,6 +91,11 @@ class Numerics:
         scheme with its energy-loss cutoff ``W_c`` in eV (required by, and
         only valid with, that mode, which also requires
         ``energy_model="midpoint"``).
+    elastic_model
+        ``"elsepa"`` (default) samples full ELSEPA differential cross
+        sections from the released tables (``pyrite tables fetch elsepa``);
+        ``"mott"`` keeps the historical screened-Rutherford angles calibrated
+        to NIST Mott transport cross sections.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -102,6 +111,7 @@ class Numerics:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
+    elastic_model: Literal["mott", "elsepa"] = "elsepa"
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -114,7 +124,7 @@ class Numerics:
             if value is not None and (type(value) is not int or value <= 0):
                 raise ValueError(f"{name} must be a positive integer or None")
         if not isinstance(self.straggling, bool):
-            raise ValueError("straggling must be a bool")
+            raise TypeError("straggling must be a bool")
         if self.energy_model not in {"frozen", "midpoint"}:
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         if (
@@ -129,6 +139,13 @@ class Numerics:
         validate_inelastic_numerics(
             self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
         )
+        validate_elastic_model(self.elastic_model)
+
+
+def validate_elastic_model(model: object) -> None:
+    """Validate a case-level elastic scattering model name."""
+    if model not in ELASTIC_MODELS:
+        raise ValueError(f"elastic_model must be one of {', '.join(ELASTIC_MODELS)}")
 
 
 def validate_inelastic_numerics(model: object, cutoff_eV: object, energy_model: object) -> None:

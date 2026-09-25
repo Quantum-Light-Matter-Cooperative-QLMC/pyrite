@@ -609,7 +609,12 @@ def _resolved_run(args, material):
         if isinstance(target, Stack)
         else [target.material]
     )
-    xsgen_tables = identity_markers(resolve_catalog_table(key) for key in table_keys)
+    tables = [resolve_catalog_table(key) for key in table_keys]
+    if settings.elastic_model == "elsepa":
+        from ..xsgen.elsepa.catalog import resolve_catalog_tables
+
+        tables.extend(table for key in table_keys for table in resolve_catalog_tables(key))
+    xsgen_tables = identity_markers(tables)
 
     identity = dataset_identity(
         material,
@@ -630,6 +635,7 @@ def _resolved_run(args, material):
         and settings.energy_model == "frozen"
         and settings.max_dE_frac == 0.0
         and settings.inelastic_model == "continuous"
+        and settings.elastic_model == "elsepa"
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem

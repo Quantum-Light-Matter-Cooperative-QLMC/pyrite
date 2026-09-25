@@ -3,11 +3,16 @@
 import numpy as np
 from numba import njit
 
-from ..geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
+from ..geometry import X_MIN, Y_MAX, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
 from ._jit_radiative import (
     radiative_layer_moments_scalar,
     sample_hard_photon_energy_scalar,
+)
+from .core_geometry import (
+    _first_prism_exit_scalar,
+    _rotate_direction_scalar,
+    _searchsorted_right_scalar,
 )
 from .events import (
     EVENT_CUTOFF,
@@ -36,7 +41,9 @@ from .kinematics import (
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
 from .scattering import (
     _alpha_sr_joy_scalar,
+    _elsepa_rate_scalar,
     _interp_mott_log_alpha_scalar,
+    _sample_cos_theta_elsepa,
     _sample_cos_theta_from_alpha,
     _scatter_rates_mott_scalar,
     _scatter_rates_sr_scalar,
@@ -52,88 +59,12 @@ from .straggling import (
     _urban_stream_key_scalar,
 )
 
-
-@njit(cache=True)
-def _rotate_direction_scalar(dx, dy, dz, cos_t, phi):
-    sin_t = np.sqrt(max(0.0, 1.0 - cos_t * cos_t))
-    cos_phi, sin_phi = np.cos(phi), np.sin(phi)
-    if abs(dx) < 0.9:
-        refx, refy = 1.0, 0.0
-    else:
-        refx, refy = 0.0, 1.0
-    ux, uy, uz = -dz * refy, dz * refx, dx * refy - dy * refx
-    u_mag = np.sqrt(ux * ux + uy * uy + uz * uz)
-    ux, uy, uz = ux / u_mag, uy / u_mag, uz / u_mag
-    wx, wy, wz = dy * uz - dz * uy, dz * ux - dx * uz, dx * uy - dy * ux
-    a, b = sin_t * cos_phi, sin_t * sin_phi
-    outx, outy, outz = (
-        cos_t * dx + a * ux + b * wx,
-        cos_t * dy + a * uy + b * wy,
-        cos_t * dz + a * uz + b * wz,
-    )
-    mag = np.sqrt(outx * outx + outy * outy + outz * outz)
-    return outx / mag, outy / mag, outz / mag
-
-
-@njit(cache=True)
-def _rotate_directions(d, cos_t, phi):
-    """Rotate unit vectors by polar angle ``cos_t`` and azimuth ``phi``."""
-    out = np.empty_like(d)
-    for i in range(d.shape[0]):
-        out[i] = _rotate_direction_scalar(d[i, 0], d[i, 1], d[i, 2], cos_t[i], phi[i])
-    return out
-
-
-@njit(cache=True)
-def _first_prism_exit_scalar(px, py, pz, dx, dy, dz, z_min, z_max, width, height):
-    """Nearest positive ray/prism intersection, matching face-order ties."""
-    best_t, best_face = np.inf, -1
-    half_w, half_h = 0.5 * width, 0.5 * height
-    if dx < 0.0:
-        t = (-half_w - px) / dx
-        if 0.0 < t < best_t:
-            best_t, best_face = t, X_MIN
-    if dx > 0.0:
-        t = (half_w - px) / dx
-        if 0.0 < t < best_t:
-            best_t, best_face = t, X_MAX
-    if dy < 0.0:
-        t = (-half_h - py) / dy
-        if 0.0 < t < best_t:
-            best_t, best_face = t, Y_MIN
-    if dy > 0.0:
-        t = (half_h - py) / dy
-        if 0.0 < t < best_t:
-            best_t, best_face = t, Y_MAX
-    if dz < 0.0:
-        t = (z_min - pz) / dz
-        if 0.0 < t < best_t:
-            best_t, best_face = t, Z_MIN
-    if dz > 0.0:
-        t = (z_max - pz) / dz
-        if 0.0 < t < best_t:
-            best_t, best_face = t, Z_MAX
-    return best_t, best_face
-
-
 EXIT_CUTOFF_STOPPED = np.int8(0)
 EXIT_BACKSCATTERED = np.int8(1)
 EXIT_TRANSMITTED = np.int8(2)
 EXIT_SIDE = np.int8(3)
 EXIT_STEP_LIMITED = np.int8(4)
 EXIT_NOT_ENTERED = np.int8(5)
-
-
-@njit(cache=True)
-def _searchsorted_right_scalar(bounds, x, n):
-    lo, hi = 0, n
-    while lo < hi:
-        mid = (lo + hi) // 2
-        if bounds[mid] <= x:
-            lo = mid + 1
-        else:
-            hi = mid
-    return lo
 
 
 def make_cpu_transport_core(
@@ -223,7 +154,8 @@ def make_cpu_transport_core(
                 L_sr_joy_numer,
             ) = materials[5:11]
             sbethe_on, L_sbethe_n, L_sbethe_logE, L_sbethe_logS = materials[11:]
-            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott[:5]
+            (el_has, el_start, el_len, el_logE, el_log_rate, el_cdf, el_pdf, el_mu) = mott[5:]
         else:
             (
                 lut_log_E_min,
@@ -383,7 +315,11 @@ def make_cpu_transport_core(
                 sr_joy_numer = L_sr_joy_numer[L]
                 total_rate = 0.0
                 for i_el in range(n_el):
-                    if elastic_model_code == 1:
+                    if elastic_model_code == 2:
+                        rate = _elsepa_rate_scalar(
+                            E_j, el_logE, el_log_rate, el_start[L, i_el], el_len[L, i_el]
+                        )
+                    elif elastic_model_code == 1:
                         rate = _scatter_rates_mott_scalar(
                             E_j, mott_numer[i_el], mott_denom1[i_el], mott_denom2[i_el]
                         )
@@ -999,7 +935,11 @@ def make_cpu_transport_core(
                     cumulative, i_el = 0.0, n_el - 1
                     for k_el in range(n_el):
                         if per_electron:
-                            if elastic_model_code == 1:
+                            if elastic_model_code == 2:
+                                rate = _elsepa_rate_scalar(
+                                    E_j, el_logE, el_log_rate, el_start[L, k_el], el_len[L, k_el]
+                                )
+                            elif elastic_model_code == 1:
                                 rate = _scatter_rates_mott_scalar(
                                     E_j, mott_numer[k_el], mott_denom1[k_el], mott_denom2[k_el]
                                 )
@@ -1013,11 +953,14 @@ def make_cpu_transport_core(
                         if cumulative > u:
                             i_el = k_el
                             break
+                alpha = 0.0
                 if lut:
                     alpha_i, alpha_f = _lut_index_frac_scalar(
                         E_keV[e], lut_log_E_min, lut_inv_dlogE, lut_n_energy
                     )
                     alpha = _lut_lerp_3d(lut_alpha, L, i_el, alpha_i, alpha_f)
+                elif elastic_model_code == 2:
+                    pass  # tabulated angular distribution, sampled below
                 elif elastic_model_code == 1 and mott_has_table[L, i_el]:
                     log_alpha = _interp_mott_log_alpha_scalar(
                         np.log10(E_keV[e] * 1e3),
@@ -1036,7 +979,21 @@ def make_cpu_transport_core(
                     draws[e] += _SM64_ONE
                 else:
                     cos_u, phi_u = rng.random(), rng.random()
-                cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
+                if lut:
+                    cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
+                elif elastic_model_code == 2:
+                    cos_t = _sample_cos_theta_elsepa(
+                        E_keV[e],
+                        cos_u,
+                        el_logE,
+                        el_cdf,
+                        el_pdf,
+                        el_mu,
+                        el_start[L, i_el],
+                        el_len[L, i_el],
+                    )
+                else:
+                    cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
                 dirs[e, 0], dirs[e, 1], dirs[e, 2] = _rotate_direction_scalar(
                     dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, 2.0 * np.pi * phi_u
                 )

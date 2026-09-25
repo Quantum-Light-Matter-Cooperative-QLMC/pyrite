@@ -1,0 +1,151 @@
+{
+  "schema": "pyrite.xsgen.elsepa-release.v1",
+  "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
+  "archive": {
+    "sha256": "5f588621dc35216aac4ecfa17fa7fe986e0c309fee06245d08ba5c4465b2840a",
+    "bytes": 25178906,
+    "url": null
+  },
+  "tables": [
+    {
+      "label": "Z=5",
+      "key": "e06485e536740c14949fc6de2b45a3ce2915c478ccc53f868d4b00268896059f",
+      "manifest_sha256": "9d9712d3102fc58edcd43f7333a42a5669999e3ee6fac4865e734ba955a1cfea"
+    },
+    {
+      "label": "Z=6",
+      "key": "ea7657ec94db1acf9f16cb260a5b107c3d2a4ecc71e43facee0e6a845487cbeb",
+      "manifest_sha256": "beed169ba64a48fd11dc8c5a7bb81471abaa21806bde7943dba6da43e5b01b6f"
+    },
+    {
+      "label": "Z=7",
+      "key": "7d8fb15fb5790fad7e79f757aa8e9696d1be237f85ffbf8fc5dcf2396cb26d9d",
+      "manifest_sha256": "281f8e886c74bb06df25a530c7978aa344894f835a6a52008d4082cedbd17c78"
+    },
+    {
+      "label": "Z=8",
+      "key": "eedc1d3152023c9334cee631afa07d17140ab9de34d5fd9bb91bcb9f302c6a34",
+      "manifest_sha256": "02071070694bb65afdb73f98dfa0b2c56454ea2b338fb44e671614bdb7fd424b"
+    },
+    {
+      "label": "Z=13",
+      "key": "8eedad2ffe67f8cc2fe2cf5709e82e49a161f627c8e1df7c38632dda365cebc0",
+      "manifest_sha256": "682089a3c5814909d088de39b0aec547fba8ee794dc2dc7c15103feb0f904f9a"
+    },
+    {
+      "label": "Z=14",
+      "key": "240a6150bdcf027eac2d9c13171f33776cc96556c258ab8277342d9b83dad860",
+      "manifest_sha256": "9efa28ecaf839767de6b369eb87ff89694049c16dbb1988fbfd2a2293bc343ae"
+    },
+    {
+      "label": "Z=15",
+      "key": "7b4582804e7b8e7d6067c8a9f05988f06e5ad4746eeae54d32b940e288e64a07",
+      "manifest_sha256": "e3788370fc4dc920a5f8da7ebb6fc082bedc846ae711e345b9a7bf2a37509d64"
+    },
+    {
+      "label": "Z=16",
+      "key": "7789220c0ba0cc3534c1cd44a85e9682227df258af9d40ce59a76543954082b4",
+      "manifest_sha256": "5f23d982237545934fa993bef8b8320bc19d0ac6b2a1028dcf4fe0e7f880ab51"
+    },
+    {
+      "label": "Z=22",
+      "key": "40f85ed110599ca7b193839be25148749990ddaa790490c7fb3dda8e522e4885",
+      "manifest_sha256": "da4a7a5e35fd34e6b6af2e2709d775c55639753d0cb63cd32068b4d8e5445342"
+    },
+    {
+      "label": "Z=23",
+      "key": "601d3a6869df6a30986b40d07880f0ee891f4cb1b329cc15b6c2e5eed87b3572",
+      "manifest_sha256": "173d4cc0b373759ad8b652cdac25b4c4a7d836994dd0f7eaa9f6cab23afcdff5"
+    },
+    {
+      "label": "Z=26",
+      "key": "9b62405eee55d36bfc8e443f22d9bd17d131e70ce9e9603c383c686510238870",
+      "manifest_sha256": "7da43cce12d9aeca6ea1d8cc32561676b08727c2179336d6488c5559e3cf1cfa"
+    },
+    {
+      "label": "Z=32",
+      "key": "36fc6b050364dd95d53896de2fe15b72fc13236cc38453783c5a525688b6ce19",
+      "manifest_sha256": "dfc28136a8312ea536f01033901f8f51477176cc09fb10080d124446591b051a"
+    },
+    {
+      "label": "Z=34",
+      "key": "aed29ddd44aa6632011d5864fea7c67740878fbd814fdc10a6c584d6cb1f8b5d",
+      "manifest_sha256": "5d536c1ca8c3e2cd17550fec49048a88742fb3c057ed4cff62e16f5c03df6c4a"
+    },
+    {
+      "label": "Z=40",
+      "key": "faa2d86ffa792260be9de93de83405ee3f52893268aeb9fdd4997e3a764fb4d1",
+      "manifest_sha256": "b66f8b834569fedbc670c3b6adec40121784480c394292319d91e5cff9214ef2"
+    },
+    {
+      "label": "Z=41",
+      "key": "ebc0d36457c2f5b9a4f5aff5e23b4b582ad965b135b2aaa30b97432267df9134",
+      "manifest_sha256": "ff034c3cbd37a0fe24a66041d003c9a730cc0ecde019b1a087257a97d86de5ed"
+    },
+    {
+      "label": "Z=42",
+      "key": "cb6df6100f1bf690d28cfb92a0e42d8c58f60c3a8866bb8d250f804143cfaac1",
+      "manifest_sha256": "110043d96078ce6628e8bcc73c2e9eb7b2c9704d2a61891d654c75afa8d9d8ec"
+    },
+    {
+      "label": "Z=46",
+      "key": "c7cf5aa8ad043fbfaf449a573f64057b812c912d88d79d1b1bbb193257c7937e",
+      "manifest_sha256": "8d6739f4d59c3d854f3d4f42515e9b7a57d9578d9fba2deeb6beb740cc44dd49"
+    },
+    {
+      "label": "Z=52",
+      "key": "159a5a172d45c3f78f2d7d80ba8936a185e7f8dcd34022f46d254dbcd0e41f07",
+      "manifest_sha256": "593c2633ce81f6efc96ba34613ecb31df752e959867226c7eb956f2d4b096d9a"
+    },
+    {
+      "label": "Z=72",
+      "key": "db2f082489d7d2343f843035effcc50430ffe9a7a1907054da6c2196e58ee062",
+      "manifest_sha256": "c131db9cd458b08837ac33bd56fd8ae06946cd9c439a2b78e121b6efb8d8b23a"
+    },
+    {
+      "label": "Z=73",
+      "key": "7a5cee0408f2bb441f4494fc8f27550920c34fc08512c9113534a44a35a7a274",
+      "manifest_sha256": "5af51473897d403f0506f6057c4642c8e50cdc30303b5c75c58ffdcc7106a806"
+    },
+    {
+      "label": "Z=74",
+      "key": "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63",
+      "manifest_sha256": "eb6d7b04ae7ae3d427b59212204e7732f176a405b1b779ae4cc0707938354168"
+    },
+    {
+      "label": "Z=75",
+      "key": "8b1b521cf8fa9dc68e8312508f91355131c9e9f732112d764524b5cb128f1237",
+      "manifest_sha256": "9208a9b73b6e05dfeb1b0a35eb000caf2fee61af7d575d47acc5f7d392213e7d"
+    },
+    {
+      "label": "Z=78",
+      "key": "509cb9a6d1ee8f171a87a9be5ef32e739cff3d3347c61719a177d9ff9b54da07",
+      "manifest_sha256": "8f0467006825e6c38f6e5b6e06a803af82b6d4c8c9da04cada4d12fe94a367ea"
+    },
+    {
+      "label": "Z=83",
+      "key": "d4f74d1608f347863a0fdd4811b7a1aa09f9bf268b5d2437d4a6106b34c10244",
+      "manifest_sha256": "29a9c41c59548b2e5c0d566e528a0ea811b0a4e3308fd46b794d68579f164b28"
+    },
+    {
+      "label": "black_phosphorus",
+      "key": "57af60116072996d69b99fdf050b9187b57820faef70ac390cb43ac646597baf",
+      "manifest_sha256": "522c36eae9bdc40c7431b829318a01f00f61f7461649a53ab6416fb543007f34"
+    },
+    {
+      "label": "diamond",
+      "key": "94aba5aa79d0fa95f2493ea660bb9307cc1f862614e63f3635da3b7cdb14532e",
+      "manifest_sha256": "935b83b0decc2f568437bffd4979681966a421dc6cc4fd307ef502e1f9197fc2"
+    },
+    {
+      "label": "hopg",
+      "key": "36629eae3be742a48e5ab45fb18797b2fe38a117925c065d34d20a609d03e579",
+      "manifest_sha256": "78ee505e5149114f870dca9e1368fe768fea119a9ef01f2169acc498ee79a7a8"
+    },
+    {
+      "label": "silicon",
+      "key": "47fa2c31dd413cb42b6569105e85862d1a141b35be26d54d8e5a679b8765d1be",
+      "manifest_sha256": "42a70d18f3f1a622cf7fdb98747199b9a8c1ee4eb29bfae32027a1d835cc166f"
+    }
+  ]
+}

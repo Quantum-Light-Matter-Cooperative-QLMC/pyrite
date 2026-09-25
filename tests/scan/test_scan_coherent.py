@@ -90,6 +90,7 @@ def test_catalog_profile_transport_numerics_reach_run_identity(monkeypatch):
         "straggling": True,
         "energy_model": "midpoint",
         "max_dE_frac": 0.02,
+        "elastic_model": "elsepa",
     }
     assert stem.startswith("hopg@full-")
     assert identity["parameter_sha256"] != id_default["parameter_sha256"]

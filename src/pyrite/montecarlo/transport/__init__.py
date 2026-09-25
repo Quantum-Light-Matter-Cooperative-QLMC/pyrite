@@ -120,10 +120,13 @@ from .lut import (
     build_transport_energy_lut,
 )
 
-from .cores import (
+from .core_geometry import (
+    _first_prism_exit_scalar,
     _rotate_direction_scalar,
     _rotate_directions,
-    _first_prism_exit_scalar,
+    _searchsorted_right_scalar,
+)
+from .cores import (
     _transport_core_ungrooved,
     _transport_core_ungrooved_lut,
     _transport_core_grooved,
@@ -133,7 +136,6 @@ from .cores import (
     EXIT_SIDE,
     EXIT_STEP_LIMITED,
     EXIT_NOT_ENTERED,
-    _searchsorted_right_scalar,
     _transport_core_ungrooved_perelectron,
     _transport_core_ungrooved_perelectron_lut,
 )

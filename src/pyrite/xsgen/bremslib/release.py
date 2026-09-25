@@ -116,6 +116,11 @@ class ReleaseEntry:
     key: str
     manifest_sha256: str
 
+    @property
+    def label(self) -> str:
+        """Name of the table in fetch messages."""
+        return f"Z={self.z}"
+
 
 @dataclass(frozen=True)
 class ReleaseIndex:
@@ -218,7 +223,7 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _write_archive(archive: Path, tables: Iterable[StoredTable]) -> None:
+def write_archive(archive: Path, tables: Iterable[StoredTable]) -> None:
     """Write ``tables`` into a zip whose bytes depend on their contents only."""
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_STORED) as bundle:
         # The payloads are already deflated ``.npz`` files, so storing them
@@ -293,7 +298,7 @@ def build_release(
                 )
             )
         partial = staging / archive.name
-        _write_archive(partial, tables)
+        write_archive(partial, tables)
         shutil.move(partial, archive)
 
     index = ReleaseIndex(
@@ -363,4 +368,5 @@ __all__ = [
     "load_release_index",
     "release_arrays",
     "release_index_path",
+    "write_archive",
 ]

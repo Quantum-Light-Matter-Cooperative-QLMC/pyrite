@@ -565,3 +565,44 @@ def test_direction_resolved_ddcs_reproduces_the_vendor_interpolation(
     relative = np.abs(ours / vendor_cm2_sr_MeV - 1.0)
     assert relative.max() < max_rel
     assert np.median(relative) < median_rel
+
+
+def test_elsepa_muffin_tin_silicon_keeps_transport_and_cuts_the_total(monkeypatch, tmp_path):
+    """Muffin-tin anchor for the elementary-solid tables of issue #89.
+
+    Truncating the atomic potential at the muffin-tin radius removes the
+    long-range tail that produces the smallest-angle scattering. The total
+    elastic cross section therefore drops well below the free atom's while the
+    first transport cross section, weighted by ``1 - cos(theta)``, barely
+    moves. Observed for Si: total -32% at 100 keV, transport -1.5%. The
+    bounds below are the physics claim (a material total reduction, a small
+    transport change), not a fit to those numbers. The run also checks that
+    the stored CDF integrates the DCS to ELSEPA's own total.
+    """
+    from pyrite.xsgen.elsepa import generate_muffin_tin
+    from pyrite.xsgen.elsepa.catalog import elemental_solid
+
+    source = _elsepa()
+    monkeypatch.setattr("pyrite.paths.user_data_path", lambda *a, **k: tmp_path / "data")
+    monkeypatch.setattr("pyrite.xsgen.store.data_dir", lambda: tmp_path / "packaged")
+    solid = elemental_solid("silicon")
+    assert solid is not None
+    energies = [1.0e3, 1.0e5]
+
+    muffin = generate_muffin_tin(
+        solid.key,
+        solid.z,
+        energies,
+        radius_cm=solid.radius_cm,
+        density_g_cm3=solid.density_g_cm3,
+        source_path=source.root,
+    ).table.arrays()
+    free = generate_element(solid.z, energies, source_path=source.root).table.arrays()
+
+    total_ratio = muffin["total_elastic_cm2"] / free["total_elastic_cm2"]
+    transport_ratio = muffin["transport1_cm2"] / free["transport1_cm2"]
+    assert np.all(total_ratio < 0.9)
+    assert abs(transport_ratio[1] - 1.0) < 0.05
+    assert np.all(muffin["absorption_cm2"] > 0.0)
+    integral = 4.0 * np.pi * np.trapezoid(muffin["dcs_cm2_sr"], muffin["mu"], axis=1)
+    np.testing.assert_allclose(integral, muffin["total_elastic_cm2"], rtol=2e-3)

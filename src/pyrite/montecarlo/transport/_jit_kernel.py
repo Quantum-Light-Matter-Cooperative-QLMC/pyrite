@@ -76,6 +76,7 @@ from ._jit_device import (
     _dEds_packed,
     _dEds_sbethe,
     _dEds_spliced_element,
+    _elsepa_invert_row,
     _interp_mott_log_alpha,
     _rate_mott,
     _rate_sr,
@@ -162,6 +163,14 @@ def _transport_kernel(
     mott_len,
     mott_logE_flat,
     mott_logA_flat,
+    el_start,
+    el_len,
+    el_logE,
+    el_log_rate,
+    el_cdf,
+    el_pdf,
+    el_mu,
+    el_n_mu,
     E_keV,
     seg_dir,
     seg_mid,
@@ -298,8 +307,16 @@ def _transport_kernel(
         # 1. Sample the next elastic-collision distance.
         total_rate = F64_ZERO
         i_el = I32_ZERO
+        log_E_eV = xp.log(E_j * np.float64(1e3))
         while i_el < n_el:
-            if elastic_model_code == I32_ONE:
+            if elastic_model_code == I32_TWO:
+                el_row = el_start[row + i_el]
+                el_n = el_len[row + i_el]
+                el_lo = _log_grid_lower(el_logE, el_row, el_n, log_E_eV)
+                el_f = _log_grid_fraction(el_logE, el_row, el_n, log_E_eV, el_lo)
+                el_lr = el_log_rate[el_row + el_lo]
+                total_rate += xp.exp(el_lr + el_f * (el_log_rate[el_row + el_lo + I32_ONE] - el_lr))
+            elif elastic_model_code == I32_ONE:
                 total_rate += _rate_mott(
                     E_j,
                     L_mott_numer[row + i_el],
@@ -1093,7 +1110,19 @@ def _transport_kernel(
                             k_el = I32_ZERO
                             picked = False
                             while k_el < n_el:
-                                if elastic_model_code == I32_ONE:
+                                if elastic_model_code == I32_TWO:
+                                    el_row = el_start[row + k_el]
+                                    el_n = el_len[row + k_el]
+                                    el_lo = _log_grid_lower(el_logE, el_row, el_n, log_E_eV)
+                                    el_f = _log_grid_fraction(
+                                        el_logE, el_row, el_n, log_E_eV, el_lo
+                                    )
+                                    el_lr = el_log_rate[el_row + el_lo]
+                                    cumulative += xp.exp(
+                                        el_lr
+                                        + el_f * (el_log_rate[el_row + el_lo + I32_ONE] - el_lr)
+                                    )
+                                elif elastic_model_code == I32_ONE:
                                     cumulative += _rate_mott(
                                         E_j,
                                         L_mott_numer[row + k_el],
@@ -1109,9 +1138,12 @@ def _transport_kernel(
                                     picked = True
                                 k_el += I32_ONE
 
-                        if elastic_model_code == I32_ONE and mott_has_table[row + sel] == np.uint8(
-                            1
-                        ):
+                        alpha = F64_ZERO
+                        if elastic_model_code == I32_TWO:
+                            alpha = F64_ZERO  # tabulated angular distribution below
+                        elif elastic_model_code == I32_ONE and mott_has_table[
+                            row + sel
+                        ] == np.uint8(1):
                             log_alpha = _interp_mott_log_alpha(
                                 xp.log10(E_keV[e] * np.float64(1e3)),
                                 mott_logE_flat,
@@ -1125,7 +1157,23 @@ def _transport_kernel(
 
                         R_ang = _stream_uniform(key, draw)
                         draw = draw + U64_ONE
-                        cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
+                        if elastic_model_code == I32_TWO:
+                            # Quantile interpolation in ln E, as the host
+                            # `_sample_cos_theta_elsepa`.
+                            el_row = el_start[row + sel]
+                            el_n = el_len[row + sel]
+                            log_E_sel = xp.log(E_keV[e] * np.float64(1e3))
+                            el_lo = _log_grid_lower(el_logE, el_row, el_n, log_E_sel)
+                            el_f = _log_grid_fraction(el_logE, el_row, el_n, log_E_sel, el_lo)
+                            mu0 = _elsepa_invert_row(
+                                el_cdf, el_pdf, el_mu, el_n_mu, el_row + el_lo, R_ang
+                            )
+                            mu1 = _elsepa_invert_row(
+                                el_cdf, el_pdf, el_mu, el_n_mu, el_row + el_lo + I32_ONE, R_ang
+                            )
+                            cos_t = F64_ONE - F64_TWO * ((F64_ONE - el_f) * mu0 + el_f * mu1)
+                        else:
+                            cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
                         phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
                         draw = draw + U64_ONE
 

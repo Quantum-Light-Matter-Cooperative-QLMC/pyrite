@@ -6,7 +6,7 @@ import numpy as np
 from scipy.constants import c, e, m_e
 from scipy.optimize import brentq
 
-from .cores import _rotate_direction_scalar
+from .core_geometry import _rotate_direction_scalar
 from .inelastic import _qmin_ev
 from .shell_gos import _moller_integrals, _triangle_moments
 from .shell_oscillators import MaterialShellOscillators
@@ -64,7 +64,7 @@ def shell_collision_world_directions(
     """Rotate both collision directions about one incoming-flight basis.
 
     Source: PENELOPE-2024 §3.2.5.4 uses opposite primary/secondary azimuths;
-    ``cores._rotate_direction_scalar`` defines the transport frame. The same
+    ``core_geometry._rotate_direction_scalar`` defines the transport frame. The same
     frame is used for both particles, preserving their relative azimuth.
     Assumption: ``incoming`` is a laboratory-frame unit direction.
     Limit: a forward primary retains ``incoming``; a suppressed secondary has
