@@ -254,6 +254,65 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 @remote_option
 @click.option("--wait", is_flag=True, help="Wait for remote completion and pull results.")
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
+@click.option(
+    "--source",
+    type=click.Choice(("analytic", "gpt_gdf")),
+    default=None,
+    help="Override beam source; gpt_gdf replaces analytic phase space (local runs).",
+)
+@click.option(
+    "--gdf-shape-only/--no-gdf-shape-only",
+    default=None,
+    help="Use profile sweep energies with GDF positions/directions/weights; discard crossing times. Default: import energies.",
+)
+@click.option(
+    "--gdf-path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="GPT time-output file; relative to current directory.",
+)
+@click.option(
+    "--gdf-time-s",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    help="Select time in seconds; required for multiple time blocks.",
+)
+@click.option(
+    "--gdf-time-tolerance-s",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    help="Absolute time tolerance in seconds [default: 1e-15].",
+)
+@click.option(
+    "--gdf-normalization",
+    type=click.Choice(("pyrite_current", "gdf_charge")),
+    default=None,
+    help="Configured current or GDF bunch charge times repetition rate.",
+)
+@click.option(
+    "--gdf-repetition-rate-hz",
+    type=_cli_core.POSITIVE_FLOAT,
+    default=None,
+    help="Required positive repetition rate for gdf_charge normalization.",
+)
+@click.option(
+    "--gdf-z-origin-m",
+    type=_cli_core.FINITE_FLOAT,
+    default=None,
+    help="Explicit target origin along GPT lab z in meters; required for GDF.",
+)
+@click.option(
+    "--gdf-screen-position-m",
+    type=_cli_core.FINITE_FLOAT,
+    default=None,
+    help="Select GPT screen coordinate in meters; excludes --gdf-time-s.",
+)
+@click.option(
+    "--gdf-screen-tolerance-m",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    help="Absolute screen-coordinate tolerance in meters [default: 1e-9].",
+)
 @click.pass_context
 @_cli_core.fidelity_option()
 @_cli_core.output_option
@@ -294,8 +353,38 @@ def _command(
     remote_target,
     wait,
     detach,
+    source,
+    gdf_shape_only,
+    gdf_path,
+    gdf_time_s,
+    gdf_time_tolerance_s,
+    gdf_normalization,
+    gdf_repetition_rate_hz,
+    gdf_z_origin_m,
+    gdf_screen_position_m,
+    gdf_screen_tolerance_m,
 ):
     """Click entry point for the staged root migration."""
+    gdf_overrides = {
+        key: value
+        for key, value in {
+            "source": source,
+            "gdf_path": str(gdf_path.resolve()) if gdf_path is not None else None,
+            "gdf_shape_only": gdf_shape_only,
+            "gdf_time_s": gdf_time_s,
+            "gdf_time_tolerance_s": gdf_time_tolerance_s,
+            "gdf_normalization": gdf_normalization,
+            "gdf_repetition_rate_hz": gdf_repetition_rate_hz,
+            "gdf_z_origin_m": gdf_z_origin_m,
+            "gdf_screen_position_m": gdf_screen_position_m,
+            "gdf_screen_tolerance_m": gdf_screen_tolerance_m,
+        }.items()
+        if value is not None
+    }
+    if gdf_overrides and (remote_target is not None or preset is not None or nsys):
+        raise click.UsageError("GDF overrides require a local normal run without --nsys")
+    if gdf_time_s is not None and gdf_screen_position_m is not None:
+        raise click.UsageError("--gdf-time-s and --gdf-screen-position-m are mutually exclusive")
     raw_catalog_profile = catalog_profile
     if preset is None:
         try:
@@ -491,6 +580,7 @@ def _command(
             quick=quick,
             n_families=n_families,
             beam_uvw=None,
+            **({"gdf_overrides": gdf_overrides} if gdf_overrides else {}),
             checkpoint_dir=checkpoint_dir,
             max_minutes=max_minutes,
             performance_profile=performance_profile,
@@ -514,6 +604,7 @@ def _command(
         quick=quick,
         n_families=n_families,
         beam_uvw=None,
+        **({"gdf_overrides": gdf_overrides} if gdf_overrides else {}),
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,
         performance_profile=performance_profile,

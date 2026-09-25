@@ -28,7 +28,7 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, asdict, dataclass, field, replace
 from itertools import product
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -103,6 +103,9 @@ C_ANG_PER_FS = 2997.924580
 # Validation: relativistic-ceiling (placeholder)
 BEAM_ENERGY_CEILING_KEV = 300.0
 
+if TYPE_CHECKING:
+    from ..montecarlo.gdf import GDFBeam
+
 _UNSET = object()
 
 
@@ -174,6 +177,73 @@ class BeamSpec:
     bunch_charge_pc: float = 1.0
     divergence_mrad: float | None = None
     energy_spread_frac: float | None = None
+    source: str = "analytic"
+    gdf_shape_only: bool = False
+    gdf_path: str | None = None
+    gdf_time_s: float | None = None
+    gdf_time_tolerance_s: float = 1e-15
+    gdf_screen_position_m: float | None = None
+    gdf_screen_tolerance_m: float = 1e-9
+    gdf_normalization: str = "pyrite_current"
+    gdf_repetition_rate_hz: float | None = None
+    gdf_z_origin_m: float | None = None
+
+    def gdf_beam(self) -> GDFBeam | None:
+        """Validate source settings and load a GPT snapshot when selected."""
+        if not isinstance(self.gdf_shape_only, bool):
+            raise ValueError("gdf_shape_only must be a boolean")
+        if self.source not in {"analytic", "gpt_gdf"}:
+            raise ValueError("beam source must be analytic or gpt_gdf")
+        if self.source == "analytic":
+            if (
+                self.gdf_shape_only
+                or self.gdf_path is not None
+                or self.gdf_time_s is not None
+                or self.gdf_screen_position_m is not None
+                or self.gdf_screen_tolerance_m != 1e-9
+                or self.gdf_z_origin_m is not None
+                or self.gdf_repetition_rate_hz is not None
+                or self.gdf_normalization != "pyrite_current"
+                or self.gdf_time_tolerance_s != 1e-15
+            ):
+                raise ValueError("GDF settings require source='gpt_gdf'")
+            return None
+        if not self.gdf_path:
+            raise ValueError("gpt_gdf requires gdf_path")
+        if self.gdf_z_origin_m is None or not np.isfinite(self.gdf_z_origin_m):
+            raise ValueError(
+                "gpt_gdf requires explicit finite gdf_z_origin_m (target origin in GPT lab coordinates)"
+            )
+        if (
+            self.transverse is not None
+            or self.longitudinal is not None
+            or self.bunch_length_fs is not None
+            or self.long_offsets_fs is not None
+            or self.energy_spread_frac is not None
+            or self.divergence_mrad is not None
+            or self.long_shape != "gaussian"
+            or self.transverse_fwhm_x_mm is not None
+            or self.transverse_fwhm_y_mm is not None
+        ):
+            raise ValueError(
+                "gpt_gdf is incompatible with analytic phase-space fields; clear both spot FWHMs"
+            )
+        rate = self.gdf_repetition_rate_hz
+        if self.gdf_normalization == "gdf_charge":
+            if rate is None or not np.isfinite(rate) or rate <= 0:
+                raise ValueError("gdf_charge requires finite positive gdf_repetition_rate_hz")
+        elif rate is not None:
+            raise ValueError("gdf_repetition_rate_hz requires gdf_normalization='gdf_charge'")
+        from ..montecarlo.gdf import load_gdf_beam
+
+        return load_gdf_beam(
+            self.gdf_path,
+            self.gdf_time_s,
+            self.gdf_time_tolerance_s,
+            self.gdf_normalization,
+            screen_position_m=self.gdf_screen_position_m,
+            screen_tolerance_m=self.gdf_screen_tolerance_m,
+        )
 
     def derived_divergence_mrad(self, energy_keV: float) -> tuple[float, float] | None:
         """Per-plane RMS slope [mrad] at ``energy_keV``, or ``None`` if collimated.
@@ -682,7 +752,14 @@ def build_cases(
     # the particle energy.
     # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
     # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
-    energies = _seq(sweep.beam.energy_keV)
+    gdf = sweep.beam.gdf_beam()
+    if gdf is not None and coherent_emission:
+        raise ValueError("gpt_gdf currently supports incoherent emission only")
+    energies = (
+        _seq(sweep.beam.energy_keV)
+        if gdf is None or sweep.beam.gdf_shape_only
+        else np.array([gdf.energy_keV.max()])
+    )
     _reject_relativistic_energies(energies)
     resolved_line = tuple(_line_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
     line_grids = tuple(grid for grid, _ in resolved_line)
@@ -728,9 +805,31 @@ def build_cases(
     fwhm_x = None if b.transverse_fwhm_x_mm is None else float(b.transverse_fwhm_x_mm)
     fwhm_y = None if b.transverse_fwhm_y_mm is None else float(b.transverse_fwhm_y_mm)
     beam_case: dict[str, Any] = {"beam_fwhm_mm": fwhm_x}
+    if gdf is not None:
+        beam_case["gdf_source"] = {
+            "path": str(b.gdf_path),
+            "time_s": gdf.time_s,
+            "tolerance_s": b.gdf_time_tolerance_s,
+            "normalization": b.gdf_normalization,
+            "z_origin_m": b.gdf_z_origin_m,
+            "sha256": gdf.sha256,
+            **({"shape_only": True} if b.gdf_shape_only else {}),
+            **(
+                {
+                    "screen_position_m": gdf.screen_position_m,
+                    "screen_tolerance_m": b.gdf_screen_tolerance_m,
+                }
+                if gdf.screen_position_m is not None
+                else {}
+            ),
+        }
     if b.bunch_charge_pc != 1.0 or b.rep_rate_hz != 5000.0:
         beam_case["bunch_charge_pc"] = float(b.bunch_charge_pc)
         beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
+    if gdf is not None and b.gdf_normalization == "gdf_charge":
+        assert gdf.absolute_charge_c is not None
+        beam_case["bunch_charge_pc"] = gdf.absolute_charge_c * 1e12
+        beam_case["rep_rate_hz"] = b.gdf_repetition_rate_hz
     if fwhm_y != fwhm_x:
         beam_case["beam_fwhm_y_mm"] = fwhm_y
     if b.energy_spread_frac is not None:
@@ -832,6 +931,10 @@ def build_cases(
         cp, name_stem=name_stem, beam_uvw=beam_uvw, n_families=sweep.n_families
     )
 
+    if gdf is not None and any(
+        g.case_keys().get("groove_spacing_ang") is not None for g in geometries
+    ):
+        raise ValueError("gpt_gdf currently requires a flat entrance face")
     cases = []
     for i_c, geometry in enumerate(geometries):
         name = geometry.name

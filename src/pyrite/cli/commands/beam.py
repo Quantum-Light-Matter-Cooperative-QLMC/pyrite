@@ -17,6 +17,8 @@ from pyrite.cli.commands._beam_shared import (
 )
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
+    FINITE_FLOAT,
+    NONNEGATIVE_FLOAT,
     CLIError,
     confirm_destructive,
     emit_json_result,
@@ -387,4 +389,90 @@ def delete_command(name, yes, dry_run, json_output):
         emit_json_result(cli_json.JsonResult("cxr.beam.delete", {"deleted": name}))
         return 0
     emit_result(f"deleted beam {name}")
+    return 0
+
+
+@command.command("gdf-times")
+@click.argument("path", type=click.Path(path_type=Path))
+def gdf_times(path):
+    """List GPT time-output times in seconds and particle counts (CPU only)."""
+    from pyrite.montecarlo.gdf import list_gdf_times
+
+    try:
+        rows = list_gdf_times(path)
+    except ValueError as exc:
+        raise CLIError(str(exc)) from None
+    for time, count in rows:
+        emit_result(f"{time:.17g} s  {count} particles")
+
+
+@command.command("gdf-inspect")
+@click.argument("path", type=click.Path(path_type=Path))
+@click.option(
+    "--time-s", type=NONNEGATIVE_FLOAT, default=None, help="Select time output in seconds."
+)
+@click.option("--time-tolerance-s", type=NONNEGATIVE_FLOAT, default=1e-15, show_default=True)
+@click.option(
+    "--screen-position-m",
+    type=FINITE_FLOAT,
+    default=None,
+    help="Select screen coordinate in meters; excludes --time-s.",
+)
+@click.option("--screen-tolerance-m", type=NONNEGATIVE_FLOAT, default=1e-9, show_default=True)
+@output_option
+def gdf_inspect(path, time_s, time_tolerance_s, screen_position_m, screen_tolerance_m, json_output):
+    """List GPT outputs and inspect lab coordinates to choose a target z origin.
+
+    A sole time output is inspected automatically. Otherwise choose --time-s
+    or --screen-position-m. The centroid is a placement choice; the file cannot
+    infer the physical target location. Screen labels need not equal lab z.
+    """
+    from pyrite.montecarlo.gdf import inspect_gdf
+
+    if time_s is not None and screen_position_m is not None:
+        raise click.UsageError("--time-s and --screen-position-m are mutually exclusive")
+    try:
+        payload = inspect_gdf(
+            path,
+            time_s,
+            time_tolerance_s,
+            screen_position_m=screen_position_m,
+            screen_tolerance_m=screen_tolerance_m,
+        )
+    except ValueError as exc:
+        if json_output:
+            emit_json_result(cli_json.failure("cxr.beam.gdf-inspect", {}, str(exc)))
+            return 1
+        raise CLIError(str(exc)) from None
+    if json_output:
+        emit_json_result(cli_json.JsonResult("cxr.beam.gdf-inspect", payload))
+        return 0
+    for row in payload["outputs"]:
+        emit_result(
+            f"{row['kind']}: {row['coordinate']:.17g} {row['unit']}  {row['particles']} particles"
+        )
+    selected = payload["selected"]
+    if selected is None:
+        emit_result("Choose --time-s or --screen-position-m to inspect coordinates.")
+        return 0
+    selector = (
+        f"--gdf-time-s {selected['time_s']:.17g}"
+        if selected["time_s"] is not None
+        else f"--gdf-screen-position-m {selected['screen_position_m']:.17g}"
+    )
+    emit_result(f"Selected: {selector}; {selected['particles']} particles")
+    for axis, values in selected["coordinates"].items():
+        emit_result(
+            f"{axis} [m]: min={values['min_m']:.17g} max={values['max_m']:.17g} "
+            f"weighted mean={values['weighted_mean_m']:.17g}"
+        )
+    emit_result(
+        f"Energy [keV]: {selected['energy_min_keV']:.9g} to {selected['energy_max_keV']:.9g}"
+    )
+    emit_result(selected["origin_guidance"])
+    emit_result(
+        f"To place the target origin at the bunch centroid: {selector} "
+        f"--gdf-z-origin-m {selected['centroid_z_origin_m']:.17g}"
+    )
+    emit_result("GPT x/y offsets are preserved; check them against the target footprint.")
     return 0

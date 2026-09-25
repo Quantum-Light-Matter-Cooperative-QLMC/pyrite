@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from pyrite._spectral_components import line_spectrum
 
 from pyrite.campaign.sweep import (
     BeamSpec,
@@ -523,7 +524,7 @@ def test_cuda_multilayer_spectrum_case_matches_per_layer_sum():
     assert int(transport["segs"]["n_layers"]) == 2
     assert _segments_in_layer(transport["segs"], 1)["L_ang"].size > 0
 
-    actual = _spectrum_case(case, transport)["spec"]
+    actual = line_spectrum(_spectrum_case(case, transport))
     expected = _manual_cuda_layer_sum(case, transport)
     peak = float(np.max(np.abs(expected)))
     assert peak > 0.0

@@ -32,6 +32,7 @@ atomic-physics/structure-factor
 beam-transport/beam-energy-spread-injection
 beam-transport/beam-phase-space-injection
 beam-transport/beam-phase-space-metrics
+beam-transport/gpt-gdf-injection
 beam-transport/coherent-line-grid-fringe-spacing
 beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates

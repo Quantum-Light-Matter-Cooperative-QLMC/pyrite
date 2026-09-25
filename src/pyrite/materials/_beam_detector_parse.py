@@ -28,12 +28,28 @@ _BEAM_POSITIVE_KEYS = frozenset(
     }
 )
 _BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
-_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {
-    "long_shape",
-    "long_offsets_fs",
-    "longitudinal",
-    "transverse",
+_GDF_KEYS = {
+    "source",
+    "gdf_path",
+    "gdf_shape_only",
+    "gdf_time_s",
+    "gdf_time_tolerance_s",
+    "gdf_screen_position_m",
+    "gdf_screen_tolerance_m",
+    "gdf_normalization",
+    "gdf_repetition_rate_hz",
+    "gdf_z_origin_m",
 }
+_BEAM_KEYS = (
+    _BEAM_POSITIVE_KEYS
+    | _GDF_KEYS
+    | {
+        "long_shape",
+        "long_offsets_fs",
+        "longitudinal",
+        "transverse",
+    }
+)
 _DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
 #: Accepted range per acceptance field, as ``(minimum, maximum, strictly_positive)``.
 #: These mirror ``detectors.spec.Detector.__post_init__`` exactly, including its
@@ -232,8 +248,54 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
         return None
     errors.keys(table, path, set(_BEAM_KEYS))
     out: dict[str, object] = {}
+    source = table.get("source", "analytic")
+    if not isinstance(source, str) or source not in {"analytic", "gpt_gdf"}:
+        errors.add(path, "source must be analytic or gpt_gdf")
+    if source == "analytic" and table.keys() & (_GDF_KEYS - {"source"}):
+        errors.add(path, "GDF settings require source='gpt_gdf'")
+    if "gdf_time_s" in table and "gdf_screen_position_m" in table:
+        errors.add(path, "gdf_time_s and gdf_screen_position_m are mutually exclusive")
+    if source == "gpt_gdf":
+        analytic = table.keys() & (_BEAM_KEYS - _GDF_KEYS - {"rep_rate_hz", "bunch_charge_pc"})
+        if analytic:
+            errors.add(
+                path, f"gpt_gdf is incompatible with analytic fields: {', '.join(sorted(analytic))}"
+            )
+        for required in ("gdf_path", "gdf_z_origin_m"):
+            if required not in table:
+                errors.add(path, f"gpt_gdf requires {required}")
+        if table.get("gdf_normalization", "pyrite_current") == "gdf_charge":
+            if "gdf_repetition_rate_hz" not in table:
+                errors.add(path, "gdf_charge requires gdf_repetition_rate_hz")
+        elif "gdf_repetition_rate_hz" in table:
+            errors.add(path, "gdf_repetition_rate_hz requires gdf_charge")
     for key, value in table.items():
-        if key == "long_shape":
+        if key in {"source", "gdf_path", "gdf_normalization"}:
+            if not isinstance(value, str) or not value.strip():
+                errors.add(f"{path}.{key}", "must be a nonempty string")
+            elif key == "gdf_normalization" and value not in {"pyrite_current", "gdf_charge"}:
+                errors.add(f"{path}.{key}", "must be pyrite_current or gdf_charge")
+            else:
+                out[key] = value
+        elif key == "gdf_shape_only":
+            if not isinstance(value, bool):
+                errors.add(f"{path}.{key}", "must be a boolean")
+            else:
+                out[key] = value
+        elif key in _GDF_KEYS:
+            number = _number(value)
+            if (
+                number is None
+                or (key not in {"gdf_z_origin_m", "gdf_screen_position_m"} and number < 0)
+                or (key == "gdf_repetition_rate_hz" and number == 0)
+            ):
+                errors.add(
+                    f"{path}.{key}",
+                    "must be finite, non-negative (repetition rate strictly positive)",
+                )
+            else:
+                out[key] = number
+        elif key == "long_shape":
             if not isinstance(value, str) or value not in _BEAM_LONG_SHAPES:
                 errors.add(f"{path}.long_shape", f"must be one of {sorted(_BEAM_LONG_SHAPES)}")
             else:

@@ -81,6 +81,7 @@ def simulate_trajectories(
     radiative_model="uncoupled",
     radiative_cutoff_eV=None,
     bremslib_tables=None,
+    gdf_source=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -388,6 +389,11 @@ def simulate_trajectories(
     straggling
         Enable stochastic Urban per-flight energy loss.
 
+    gdf_source
+        Internal validated GPT source descriptor produced by case construction;
+        CPU-loaded records replace analytic initial phase space before numeric
+        arrays enter the existing CPU/CUDA transport boundary.
+
     Returns
     -------
     dict
@@ -613,6 +619,41 @@ def simulate_trajectories(
                 f"energy_spread_frac={energy_spread_frac} drew a non-finite or non-positive "
                 "electron energy; the Gaussian spread model needs spread << 1"
             )
+    gdf_t0 = None
+    if gdf_source is not None:
+        from ..gdf import load_gdf_beam
+
+        if (
+            groove is not None
+            or beam_fwhm_mm
+            or beam_fwhm_y_mm
+            or transverse_distribution is not None
+            or energy_spread_frac
+            or bunch_length_fs is not None
+            or long_offsets_fs is not None
+            or longitudinal_distribution is not None
+        ):
+            raise ValueError(
+                "gpt_gdf requires a flat entrance and no analytic phase-space settings"
+            )
+        gdf = load_gdf_beam(
+            gdf_source["path"],
+            gdf_source["time_s"],
+            gdf_source["tolerance_s"],
+            gdf_source["normalization"],
+            screen_position_m=gdf_source.get("screen_position_m"),
+            screen_tolerance_m=gdf_source.get("screen_tolerance_m", 1e-9),
+        )
+        if gdf.sha256 != gdf_source["sha256"]:
+            raise ValueError("GDF file changed after case construction; rebuild the run")
+        pos, dirs, E_keV, gdf_t0 = gdf.sample(
+            Ne,
+            seed,
+            gdf_source["z_origin_m"],
+            tilt_polar_rad,
+            tilt_azim_rad,
+            energy_keV=float(E0_keV) if gdf_source.get("shape_only", False) else None,
+        )
     if not np.all(E_cut_by_electrons < E_keV):
         raise ValueError("each electron cutoff energy must be below its initial energy")
     if prepared_stopping_tables is not None:
@@ -679,6 +720,8 @@ def simulate_trajectories(
         seed,
         longitudinal_distribution,
     )
+    if gdf_t0 is not None:
+        t0_electron = gdf_t0
     # Snapshot before transport mutates ``pos``, ``dirs``, and ``E``. These
     # arrays describe incident phase space, including particles that miss a
     # finite footprint.

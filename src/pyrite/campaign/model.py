@@ -66,6 +66,22 @@ class Beam(BeamSpec):
     energy_spread_frac
         RMS fractional kinetic-energy spread; ``None`` is monoenergetic.
 
+    source, gdf_path, gdf_time_s, gdf_time_tolerance_s
+        ``source="gpt_gdf"`` loads a native GPT time-output snapshot or selected screen. Its
+        correlated energies replace ``energy_keV`` during case construction.
+        Default absolute time tolerance is 1e-15 seconds.
+    gdf_shape_only
+        Preserve imported positions/directions/weights, assign each sweep energy,
+        and discard imported crossing times. Default False imports energies.
+    gdf_normalization, gdf_repetition_rate_hz
+        ``pyrite_current`` retains configured source normalization;
+        ``gdf_charge`` derives current from absolute bunch charge and the
+        required positive repetition rate in Hz.
+    gdf_z_origin_m
+        Required explicit target-origin lab z coordinate in meters. GPT axes
+        are PyRITE lab axes; individual rays project onto the tilted entrance.
+        Clear both transverse FWHMs and omit analytic phase-space policies.
+
     Notes
     -----
     Sampling counts and execution controls belong to :class:`Numerics`.

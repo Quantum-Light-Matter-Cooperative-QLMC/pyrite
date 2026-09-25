@@ -137,3 +137,7 @@ Space charge, source-to-crystal beamline transport, the coherent form factor, `<
 ## Validation
 
 `Validation: beam-phase-space-injection` — see the row in [physics validation ledger](../../validation/physics-validation-ledger.md).
+
+## Native GPT snapshots
+
+`source="gpt_gdf"` replaces analytic sampling with correlated time-output or screen records.See [GDF beam import](../../guides/gpt-gdf-beams.md) for units, explicit ray-plane projection, normalization, and limitations, and the [independent derivation](../../validation/beam-transport/gpt-gdf-injection.md).

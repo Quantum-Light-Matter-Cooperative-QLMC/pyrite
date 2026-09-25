@@ -52,6 +52,7 @@ _CASE_KEY_ORDER = (
     "long_offsets_fs",
     "longitudinal_distribution",
     "transverse_distribution",
+    "gdf_source",
     "E_grid",
     "E_grid_line",
     "E_grid_brem",
@@ -143,6 +144,9 @@ class Case(Mapping[str, Any]):
         Legacy beam energy and longitudinal-distribution fields.
     longitudinal_distribution, transverse_distribution
         Resolved declarative phase-space policies.
+    gdf_source
+        Optional GPT file path, content hash, selected time, normalization mode,
+        and explicit lab-z origin. Absent for analytic beams.
     groove_spacing_ang
         Optional blazed-groove period in angstroms.
     line_quadrature
@@ -209,6 +213,7 @@ class Case(Mapping[str, Any]):
     long_offsets_fs: tuple[float, ...] | _Absent = _ABSENT
     longitudinal_distribution: dict[str, object] | _Absent = _ABSENT
     transverse_distribution: dict[str, object] | _Absent = _ABSENT
+    gdf_source: dict[str, object] | _Absent = _ABSENT
     # Automatic case-local line-grid policy (issue #101). Absent means the
     # coordinates in ``E_grid_line`` are final -- an explicit user grid or a
     # stored catalog row. Present means ``E_grid_line`` is the coarsest

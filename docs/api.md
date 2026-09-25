@@ -6,6 +6,8 @@ Names beginning with `_`, CLI command callbacks, app launchers, remote-job orche
 
 For a task-oriented walkthrough, including detector scoring and the boundary between in-memory results and checkpoint campaigns, see the [Python API workflow](guides/python-api-workflow.md).
 
+For native GPT time-output and screen beams, see [GDF beam import](guides/gpt-gdf-beams.md).
+
 ## Scene simulation
 
 The root package exposes the preferred high-level API. A `Scene` contains one scalar `Beam`, target, and either the compatibility scalar `Detector` or a physical `PlanarDetector`; `Numerics` contains sampling and execution controls. `simulate` lowers those objects to the established typed `Case` and calls the existing Monte Carlo runner directly. It neither reads nor writes a checkpoint.

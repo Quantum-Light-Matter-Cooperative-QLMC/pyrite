@@ -487,6 +487,12 @@ def _identity_v1(
     # when they diverge from their inert defaults -- the same compatibility rule
     # already used for ``n_electrons`` and ``catalog_profile`` below.
     beam_payload = sweep_payload.pop("beam")
+    gdf = sweep.beam.gdf_beam()
+    if gdf is not None:
+        from ..montecarlo.gdf import GDF_FIELDS
+
+        sweep_payload["gdf_source"] = {key: beam_payload[key] for key in GDF_FIELDS}
+        sweep_payload["gdf_source"]["sha256"] = gdf.sha256
     sweep_payload["energy_keV"] = beam_payload["energy_keV"]
     fwhm_x = beam_payload["transverse_fwhm_x_mm"]
     fwhm_y = beam_payload["transverse_fwhm_y_mm"]

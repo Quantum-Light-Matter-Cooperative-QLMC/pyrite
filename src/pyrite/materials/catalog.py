@@ -153,6 +153,12 @@ def _load_material_catalog_cached(
             )
         elif isinstance(beam_value, Mapping):
             profile_beams[name] = MappingProxyType(dict(cast("Mapping[str, object]", beam_value)))
+    for name, fields in profile_beams.items():
+        if "gdf_path" in fields:
+            beam_path = Path(str(fields["gdf_path"])).expanduser()
+            if not beam_path.is_absolute():
+                beam_path = source.parent / beam_path
+            profile_beams[name] = MappingProxyType({**fields, "gdf_path": str(beam_path.resolve())})
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
     profile_detectors: dict[str, Mapping[str, object]] = {}
