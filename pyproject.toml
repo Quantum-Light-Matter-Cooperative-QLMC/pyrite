@@ -24,7 +24,6 @@ dependencies = [
     "tqdm>=4.68.2",
     "h5py>=3.16.0",
     "endf-parserpy>=0.17.0",
-    "marimo>=0.25.0",
 ]
 
 [project.optional-dependencies]
