@@ -28,6 +28,7 @@ from .brem_bremslib import (
     evaluate_bremslib,
     stage_bremslib_table,
 )
+from .brem_unit_base import _unit_base_panels
 from .characteristic import CHARACTERISTIC_DATA_DIR as BREMSSTRAHLUNG_DATA_DIR
 from .characteristic import CHARACTERISTIC_EEDL_FILENAME as BREMSSTRAHLUNG_EEDL_FILENAME
 from .characteristic import CHARACTERISTIC_EEDL_SHA256 as BREMSSTRAHLUNG_EEDL_SHA256
@@ -48,7 +49,7 @@ _BREMSLIB_CHUNK_CELLS = 1 << 21
 BremsstrahlungModel = Literal["eedl", "bethe-heitler", "bremslib"]
 BREMSSTRAHLUNG_MODEL = (
     f"eedl-2025-{BREMSSTRAHLUNG_EEDL_SHA256[:12]}/"
-    f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v1"
+    f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v2-unit-base"
 )
 
 R_E_CM2 = 7.9407877e-26  # classical electron radius squared [cm^2]
@@ -88,9 +89,12 @@ class _PreparedEEDLGrid:
     total_cross_section_cm2: Any
     incident_panel_energy_eV: Any
     photon_probability_on_grid_per_eV: Any
-    photon_energy_eV_by_incident: tuple[Any, ...]
-    photon_probability_density_per_eV_by_incident: tuple[Any, ...]
-    photon_cumulative_probability_by_incident: tuple[Any, ...]
+    unit_base_x: Any
+    panel_photon_min_eV: Any
+    panel_photon_max_eV: Any
+    panel_scaled_density: Any
+    panel_scaled_cumulative: Any
+    panel_tip_density_per_eV: Any
     minimum_incident_energy_eV: float
     maximum_incident_energy_eV: float
 
@@ -501,19 +505,35 @@ def _prepare_eedl_grid(
     table: BremsstrahlungCrossSectionTable,
     photon_energy_eV,
 ) -> _PreparedEEDLGrid:
-    """Stage an EEDL table and evaluate its native panels on one output grid.
+    """Stage an EEDL table and evaluate its unit-base panels on one output grid.
 
     The photon grid is invariant across every segment chunk. Evaluating and
-    transferring these small panel rows here avoids repeating that work inside
+    transferring these panel rows here avoids repeating that work inside
     ``_eedl_brem_dsigma_dk`` for every chunk.
     """
     photon_energy_host = np.asarray(_to_cpu(photon_energy_eV), dtype=float)
+    panels = _unit_base_panels(table)
+    width = panels.photon_max_eV - panels.photon_min_eV
+    tip_density = panels.scaled_density[:, -1] / width
+    # Runtime interpolation between adjacent sub-panels is Cartesian. Holding
+    # each sub-panel at its endpoint density up to the next endpoint keeps the
+    # mixture continuous for lower-endpoint < k <= T instead of dropping the
+    # lower share there; the segment normalization adds that probability.
+    extension_end = np.append(panels.photon_max_eV[1:], panels.photon_max_eV[-1])
     panel_probability_host = np.stack(
         [
-            np.interp(photon_energy_host, energy, density, left=0.0, right=0.0)
-            for energy, density in zip(
-                table.photon_energy_eV_by_incident,
-                table.photon_probability_density_per_eV_by_incident,
+            np.where(
+                (photon_energy_host > low + span) & (photon_energy_host <= end),
+                tip,
+                np.interp((photon_energy_host - low) / span, panels.x, scaled, left=0.0, right=0.0)
+                / span,
+            )
+            for low, span, end, tip, scaled in zip(
+                panels.photon_min_eV,
+                width,
+                extension_end,
+                tip_density,
+                panels.scaled_density,
                 strict=True,
             )
         ],
@@ -527,17 +547,14 @@ def _prepare_eedl_grid(
         table=table,
         total_energy_eV=staged(table.incident_energy_eV),
         total_cross_section_cm2=staged(table.total_cross_section_cm2),
-        incident_panel_energy_eV=staged(table.distribution_incident_energy_eV),
+        incident_panel_energy_eV=staged(panels.incident_energy_eV),
         photon_probability_on_grid_per_eV=staged(panel_probability_host),
-        photon_energy_eV_by_incident=tuple(
-            staged(values) for values in table.photon_energy_eV_by_incident
-        ),
-        photon_probability_density_per_eV_by_incident=tuple(
-            staged(values) for values in table.photon_probability_density_per_eV_by_incident
-        ),
-        photon_cumulative_probability_by_incident=tuple(
-            staged(values) for values in table.photon_cumulative_probability_by_incident
-        ),
+        unit_base_x=staged(panels.x),
+        panel_photon_min_eV=staged(panels.photon_min_eV),
+        panel_photon_max_eV=staged(panels.photon_max_eV),
+        panel_scaled_density=staged(panels.scaled_density),
+        panel_scaled_cumulative=staged(panels.scaled_cumulative),
+        panel_tip_density_per_eV=staged(tip_density),
         minimum_incident_energy_eV=max(
             float(table.incident_energy_eV[0]),
             float(table.distribution_incident_energy_eV[0]),
@@ -549,17 +566,22 @@ def _prepare_eedl_grid(
     )
 
 
-def _piecewise_linear_cdf_at(energy, density, cumulative, query):
-    """Integrate one staged piecewise-linear photon PDF through ``query``."""
-    index = xp.clip(xp.searchsorted(energy, query), 1, energy.size - 1)
-    x0 = energy[index - 1]
-    x1 = energy[index]
-    y0 = density[index - 1]
-    y1 = density[index]
-    dx = xp.minimum(xp.maximum(query, x0), x1) - x0
-    partial = cumulative[index - 1] + y0 * dx + 0.5 * (y1 - y0) * dx * dx / (x1 - x0)
-    partial = xp.where(query <= energy[0], REAL(0.0), partial)
-    return xp.where(query >= energy[-1], cumulative[-1], partial)
+def _panel_cdf_at(prepared: _PreparedEEDLGrid, panel, photon_eV):
+    """Probability below ``photon_eV`` in each selected unit-base panel."""
+    low = prepared.panel_photon_min_eV[panel]
+    high = prepared.panel_photon_max_eV[panel]
+    query = xp.clip((photon_eV - low) / (high - low), REAL(0.0), REAL(1.0))
+    x = prepared.unit_base_x
+    index = xp.clip(xp.searchsorted(x, query), 1, x.size - 1)
+    x0 = x[index - 1]
+    y0 = prepared.panel_scaled_density[panel, index - 1]
+    y1 = prepared.panel_scaled_density[panel, index]
+    dx = query - x0
+    return (
+        prepared.panel_scaled_cumulative[panel, index - 1]
+        + y0 * dx
+        + REAL(0.5) * (y1 - y0) * dx * dx / (x[index] - x0)
+    )
 
 
 def _prepare_eedl_segment_state(
@@ -588,24 +610,12 @@ def _prepare_eedl_segment_state(
     upper_energy = panel_energy[panel_index]
     fraction = (safe_incident_eV - lower_energy) / (upper_energy - lower_energy)
 
-    lower_cdf = xp.zeros_like(safe_incident_eV, dtype=REAL)
-    upper_cdf = xp.zeros_like(safe_incident_eV, dtype=REAL)
-    for panel, (energy, density, cumulative) in enumerate(
-        zip(
-            prepared.photon_energy_eV_by_incident,
-            prepared.photon_probability_density_per_eV_by_incident,
-            prepared.photon_cumulative_probability_by_incident,
-            strict=True,
-        )
-    ):
-        panel_cdf = _piecewise_linear_cdf_at(
-            energy,
-            density,
-            cumulative,
-            safe_incident_eV,
-        )
-        lower_cdf = xp.where(lower_panel == panel, panel_cdf, lower_cdf)
-        upper_cdf = xp.where(panel_index == panel, panel_cdf, upper_cdf)
+    lower_cdf = _panel_cdf_at(
+        prepared, lower_panel, safe_incident_eV
+    ) + prepared.panel_tip_density_per_eV[lower_panel] * xp.maximum(
+        safe_incident_eV - prepared.panel_photon_max_eV[lower_panel], REAL(0.0)
+    )
+    upper_cdf = _panel_cdf_at(prepared, panel_index, safe_incident_eV)
     normalization = lower_cdf + fraction * (upper_cdf - lower_cdf)
 
     total_energy = prepared.total_energy_eV
@@ -674,11 +684,11 @@ def _eedl_brem_dsigma_dk(
 ):
     """EEDL differential cross section ``sigma(T) P(k|T)`` [cm²/eV].
 
-    MF=23 and both MF=26 interpolation axes declare ENDF law 2 (lin-lin).
-    Interpolation between incident panels is therefore performed at fixed
-    outgoing photon energy. The mixed density is cut off at ``k <= T`` and
-    renormalized analytically because fixed-energy interpolation can otherwise
-    retain a small tail beyond the requested incident energy.
+    MF=23 and the MF=26 photon axis are interpolated lin-lin as declared.
+    Between the decade-spaced incident panels the declared fixed-photon-energy
+    law is replaced by unit-base refinement (``_unit_base_panels``); runtime
+    interpolation between the refined sub-panels is at fixed photon energy.
+    The mixed density is cut off at ``k <= T`` and renormalized analytically.
 
     Validation: brem-spectrum
     """

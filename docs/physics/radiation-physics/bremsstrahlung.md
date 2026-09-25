@@ -23,7 +23,28 @@ For element {math}`Z`, incident electron kinetic energy {math}`T`, and photon en
 
 `endf-parserpy` reads both sections from the checksum-pinned packaged `EEDL.endf`. PyRITE accepts the tape only when the total and photon tables are finite, ordered, non-negative, and declare the supported ENDF lin-lin laws. The MF=23 values are converted from barns to cm². Each native MF=26 photon density is normalized after parsing to remove only source-record rounding error.
 
-The tape declares lin-lin interpolation for the total cross section, the secondary photon-energy axis (`LEP=2`), and the incident-energy panels (`INT=2`). PyRITE follows those laws: it interpolates adjacent photon spectra at fixed absolute photon energy. That interpolation can retain a small tail above an intermediate incident energy because adjacent panels have different upper endpoints, so the implementation imposes {math}`0<k\le T` and analytically renormalizes the surviving piecewise-linear density. Consequently, integrating the differential cross section over the full physical photon range recovers the interpolated MF=23 total.
+The tape declares lin-lin interpolation for the total cross section, the secondary photon-energy axis (`LEP=2`), and the incident-energy panels (`INT=2`). PyRITE follows the first two, but not the declared Cartesian law between incident-energy panels. EEDL gives photon spectra at only 8–10 decade-spaced incident energies per element (carbon: 14.1 keV, 251 keV, 1.19 MeV and 12.2 MeV between 10 keV and 100 GeV). Interpolating adjacent panels at a fixed absolute photon energy leaves every {math}`k` above the lower panel's endpoint with only the upper panel's share, so the spectrum collapses towards {math}`k\to T`. At 30 keV in carbon it fell to 0.09–0.15 of Seltzer–Berger for {math}`k/T\ge0.5` (#174, `brem-source-comparison`).
+
+PyRITE instead uses ENDF unit-base interpolation {cite:p}`trkov2018endf6`. Panel {math}`i`, with photon range {math}`[a_i,b_i]`, maps onto the reduced variable {math}`x=(k-a_i)/(b_i-a_i)\in[0,1]`, where its density becomes the unit-area {math}`q_i(x)=(b_i-a_i)P_i(k)`. Sub-panels are inserted at 32 geometrically spaced incident energies per decade:
+
+```{math}
+q(x\mid T) = (1-w)\,q_i(x) + w\,q_{i+1}(x),\qquad
+w=\frac{\ln(T/T_i)}{\ln(T_{i+1}/T_i)},\qquad
+[a,b](T) = [a_i,b_i] + \frac{T-T_i}{T_{i+1}-T_i}\bigl([a_{i+1},b_{i+1}]-[a_i,b_i]\bigr).
+
+```
+
+The photon range is interpolated linearly in {math}`T`, so {math}`b=T` because every EEDL panel ends at its incident energy. The shape weight is linear in {math}`\ln T`, the spacing of the native panels. Against Seltzer–Berger this weight is several times more accurate between panels than one linear in {math}`T`. All panels share the union of the native {math}`x` nodes, which represents each native panel exactly and keeps every mixture piecewise linear with unit area. Native panels are reproduced unchanged.
+
+Between adjacent sub-panels the runtime interpolation stays Cartesian at fixed photon energy. Each sub-panel is held at its endpoint density up to the next sub-panel's endpoint, so the mixture stays continuous for {math}`k` between them. The implementation then imposes {math}`0<k\le T` and renormalizes the surviving piecewise-linear density exactly, so integrating the differential cross section over the physical photon range recovers the interpolated MF=23 total.
+
+Against Seltzer–Berger, for the 24 catalogue elements from 10 keV to 1 MeV, the result is:
+
+- within 0.96–1.34 pointwise for {math}`0.05\le k/T\le0.95`;
+- within 0.98–1.81 for {math}`k/T>0.95`;
+- within 0.99–1.07 in the radiative first moment.
+
+The remaining error is panel sparsity, not interpolation.
 
 The ENDF-6 electro-atomic format describes the bremsstrahlung photon subsection as an isotropic, angle-independent tabulated spectrum (`LAW=1`, `LANG=1`, `NA=0`) {cite:p}`trkov2018endf6`. PyRITE uses this isotropic angular model.
 
