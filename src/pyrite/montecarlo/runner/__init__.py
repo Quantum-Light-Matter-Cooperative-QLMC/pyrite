@@ -102,6 +102,13 @@ def _usable_cpus():
     return min(known) if known else None
 
 
+from .case_tables import (
+    _case_inelastic_kwargs,
+    _case_stopping_tables,
+)
+from .case_tables import (
+    _case_stopping_table_records as _case_stopping_table_records,
+)
 from .chunking import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
@@ -466,34 +473,8 @@ def _case_transport_core(case, requested="auto"):
         requested,
         max(case.get("Ne") or 0, case.get("Ne_brem") or 0),
         groove=case.get("groove_spacing_ang"),
+        cpu_only=case.get("inelastic_model") is not None,
     )
-
-
-def _case_stopping_table_records(case):
-    """Resolve identity-matched SBETHE table records for all transport layers."""
-    from ...xsgen.sbethe import resolve_composition_table
-
-    layers = case.get("abs_layers")
-    if layers is None:
-        return [resolve_composition_table(str(case["crystal"]), case["composition"])]
-
-    radiators = case.get("layer_radiators") or [None] * len(layers)
-    tables = []
-    for index, (_, _, composition) in enumerate(layers):
-        radiator = radiators[index] if index < len(radiators) else None
-        key = str(case["crystal"]) if index == 0 else None
-        if radiator is not None:
-            key = str(radiator["crystal"])
-        table = resolve_composition_table(
-            key if key is not None else f"{case['crystal']}:layer-{index}", composition
-        )
-        tables.append(table)
-    return tables
-
-
-def _case_stopping_tables(case):
-    """Load SBETHE stopping arrays for all transport layers."""
-    return [table.arrays() for table in _case_stopping_table_records(case)]
 
 
 def _transport_case(
@@ -596,6 +577,7 @@ def _transport_case(
             max_dE_frac=case.get("max_dE_frac", 0.0),
             straggling=straggling,
             stopping_tables=stopping_tables,
+            **_case_inelastic_kwargs(case),
             **(
                 {"transport_lut_config": transport_lut_config}
                 if transport_lut_config is not None

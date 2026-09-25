@@ -675,3 +675,48 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
     # A stem with no sidecar under the given root still falls back to recompute
     # (which returns None for this fabricated digest).
     assert identity_from_stem(stem, tmp_path / "no-such-checkpoint") is None
+
+
+def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
+    settings = replace(default_settings(), energy_model="midpoint")
+    sweep = material_sweep("silicon")
+    base = dataset_identity("silicon", "full", settings, sweep)
+    explicit_default = dataset_identity(
+        "silicon",
+        "full",
+        replace(settings, inelastic_model="continuous", inelastic_cutoff_eV=None),
+        sweep,
+    )
+    shell = replace(settings, inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
+    active = dataset_identity("silicon", "full", shell, sweep)
+    other_cutoff = dataset_identity(
+        "silicon", "full", replace(shell, inelastic_cutoff_eV=100.0), sweep
+    )
+
+    assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
+    assert "inelastic_model" not in base["resolved_parameters"]["transport_numerics"]
+    assert active["resolved_parameters"]["transport_numerics"] == {
+        "energy_model": "midpoint",
+        "inelastic_model": "shell-soft-hard",
+        "inelastic_cutoff_eV": 50.0,
+    }
+    assert (
+        len(
+            {base["parameter_sha256"], active["parameter_sha256"], other_cutoff["parameter_sha256"]}
+        )
+        == 3
+    )
+
+    legacy_case = build_cases(sweep, 4, 4, energy_model="midpoint")[0]
+    shell_case = build_cases(
+        sweep,
+        4,
+        4,
+        energy_model="midpoint",
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+    )[0]
+    assert "inelastic_model" not in legacy_case
+    assert shell_case["inelastic_model"] == "shell-soft-hard"
+    assert shell_case["inelastic_cutoff_eV"] == 50.0
+    assert profiles.case_content_key(shell_case) != profiles.case_content_key(legacy_case)

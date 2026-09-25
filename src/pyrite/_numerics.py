@@ -10,7 +10,17 @@ MosaicRoute = Literal["analytic", "mc"]
 
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 CONVERGENCE_KEYS = ("n_families", "max_reflections", "mosaic_nodes", "mosaic_route")
-TRANSPORT_KEYS = ("straggling", "energy_model", "max_dE_frac")
+TRANSPORT_KEYS = (
+    "straggling",
+    "energy_model",
+    "max_dE_frac",
+    "inelastic_model",
+    "inelastic_cutoff_eV",
+)
+#: ``simulate_trajectories`` collision-loss schemes; mirrors
+#: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
+#: two in step) without importing the transport package here.
+INELASTIC_MODELS = ("continuous", "shell-soft-hard")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -72,6 +82,11 @@ class Numerics:
     max_dE_frac
         Maximum predicted fractional mean loss per row. Zero disables
         substepping; a positive value requires ``energy_model="midpoint"``.
+    inelastic_model, inelastic_cutoff_eV
+        ``"continuous"`` stopping, or the opt-in ``"shell-soft-hard"`` mixed
+        scheme with its energy-loss cutoff ``W_c`` in eV (required by, and
+        only valid with, that mode, which also requires
+        ``energy_model="midpoint"``).
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -85,6 +100,8 @@ class Numerics:
     straggling: bool = False
     energy_model: Literal["frozen", "midpoint"] = "frozen"
     max_dE_frac: float = 0.0
+    inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
+    inelastic_cutoff_eV: float | None = None
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -109,6 +126,34 @@ class Numerics:
             raise ValueError("max_dE_frac must be finite and non-negative")
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
+        validate_inelastic_numerics(
+            self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
+        )
+
+
+def validate_inelastic_numerics(model: object, cutoff_eV: object, energy_model: object) -> None:
+    """Validate the opt-in inelastic mode's settings (not its per-material W_cb).
+
+    The per-material ``W_c > W_cb`` requirement is checked where the layer
+    materials are known, by the transport entry point.
+    """
+    if model not in INELASTIC_MODELS:
+        raise ValueError(f"inelastic_model must be one of {', '.join(INELASTIC_MODELS)}")
+    if model == "continuous":
+        if cutoff_eV is not None:
+            raise ValueError("inelastic_cutoff_eV requires inelastic_model='shell-soft-hard'")
+        return
+    if (
+        isinstance(cutoff_eV, bool)
+        or not isinstance(cutoff_eV, (int, float))
+        or not np.isfinite(cutoff_eV)
+        or cutoff_eV <= 0.0
+    ):
+        raise ValueError(
+            "inelastic_model='shell-soft-hard' requires a finite positive inelastic_cutoff_eV"
+        )
+    if energy_model != "midpoint":
+        raise ValueError("inelastic_model='shell-soft-hard' requires energy_model='midpoint'")
 
 
 def electron_counts(value: object) -> tuple[int, ...]:

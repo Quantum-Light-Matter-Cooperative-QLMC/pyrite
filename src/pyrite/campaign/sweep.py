@@ -28,7 +28,7 @@ import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, asdict, dataclass, field, replace
 from itertools import product
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -43,6 +43,7 @@ from .._line_grid_policy import (
     line_start_eV,
     resolve_line_grid_policy,
 )
+from .._numerics import validate_inelastic_numerics
 from .._photon_continuum_floor import floored_lattice_start_eV
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
@@ -613,6 +614,8 @@ def build_cases(
     straggling=False,
     energy_model="frozen",
     max_dE_frac=0.0,
+    inelastic_model="continuous",
+    inelastic_cutoff_eV=None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -632,6 +635,7 @@ def build_cases(
     ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
+    validate_inelastic_numerics(inelastic_model, inelastic_cutoff_eV, energy_model)
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
@@ -873,6 +877,17 @@ def build_cases(
                         **({"straggling": True} if straggling else {}),
                         **({"energy_model": "midpoint"} if energy_model == "midpoint" else {}),
                         **({"max_dE_frac": float(max_dE_frac)} if max_dE_frac > 0.0 else {}),
+                        # Opt-in shell soft/hard inelastic mode: divergence-only
+                        # keys, so continuous-stopping case payloads (and their
+                        # content keys) stay bit-for-bit.
+                        **(
+                            {
+                                "inelastic_model": inelastic_model,
+                                "inelastic_cutoff_eV": float(cast(float, inelastic_cutoff_eV)),
+                            }
+                            if inelastic_model != "continuous"
+                            else {}
+                        ),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

@@ -259,6 +259,10 @@ def subdivide_flights(segments, composition=None, layers=None, max_dE_frac=0.0, 
         raise ValueError("max_dE_frac must be >= 0")
     if max_substeps < 1:
         raise ValueError("max_substeps must be >= 1")
+    if segments.get("hard_W_keV") is not None:
+        # Its substep chain integrates the full reference stopping, not the
+        # soft share the shell soft/hard mode transported with.
+        raise NotImplementedError("subdivide_flights does not support shell soft/hard rows")
     compositions = [composition] if layers is None else [item[2] for item in layers]
     if compositions[0] is None:
         raise ValueError("pass composition (or layers) so the substep chain can be integrated")

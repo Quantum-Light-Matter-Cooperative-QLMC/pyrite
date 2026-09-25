@@ -240,3 +240,40 @@ def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
             _NO_MOTT.add(element)
 
     return _sample_cos_theta_sr_numba(Z, E_keV, R)
+
+
+def _flatten_mott_tables(mott_tables):
+    """Flatten per-layer, per-element Mott tables into the cores' mott_group arrays."""
+    n_layers = len(mott_tables)
+    max_elements = max(len(layer_tables) for layer_tables in mott_tables)
+    # Numba only sees numeric Mott data. Tables are flattened because different
+    # elements may have different grid lengths; start/length locate each table.
+    mott_has_table = np.zeros((n_layers, max_elements), dtype=np.bool_)
+    mott_start = np.zeros((n_layers, max_elements), dtype=np.int64)
+    mott_len = np.zeros((n_layers, max_elements), dtype=np.int64)
+    mott_logE_chunks = []
+    mott_logA_chunks = []
+    offset = 0
+    for L, layer_tables in enumerate(mott_tables):
+        for i_el, table in enumerate(layer_tables):
+            if table is None:
+                continue
+            logE, logA = table
+            logE = np.asarray(logE, dtype=float)
+            logA = np.asarray(logA, dtype=float)
+            if logE.size != logA.size or logE.size == 0:
+                raise ValueError("invalid Mott interpolation table")
+            mott_has_table[L, i_el] = True
+            mott_start[L, i_el] = offset
+            mott_len[L, i_el] = logE.size
+            mott_logE_chunks.append(logE)
+            mott_logA_chunks.append(logA)
+            offset += logE.size
+
+    if mott_logE_chunks:
+        mott_logE_flat = np.concatenate(mott_logE_chunks)
+        mott_logA_flat = np.concatenate(mott_logA_chunks)
+    else:
+        mott_logE_flat = np.empty(0, dtype=float)
+        mott_logA_flat = np.empty(0, dtype=float)
+    return mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat

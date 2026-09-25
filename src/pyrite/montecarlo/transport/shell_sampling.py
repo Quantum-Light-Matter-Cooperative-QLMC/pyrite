@@ -77,14 +77,14 @@ def shell_collision_world_directions(
         or not np.isclose(np.linalg.norm(direction), 1.0, rtol=0.0, atol=1e-10)
     ):
         raise ValueError("incoming flight direction must be a finite unit vector")
-    d = tuple(float(x) for x in direction)
-    primary = _rotate_direction_scalar(*d, collision.cos_primary, collision.azimuth_rad)
+    dx, dy, dz = (float(x) for x in direction)
+    primary = _rotate_direction_scalar(dx, dy, dz, collision.cos_primary, collision.azimuth_rad)
     secondary = None
     if collision.cos_secondary is not None:
         if collision.secondary_azimuth_rad is None:
             raise ValueError("secondary polar angle needs an azimuth")
         secondary = _rotate_direction_scalar(
-            *d, collision.cos_secondary, collision.secondary_azimuth_rad
+            dx, dy, dz, collision.cos_secondary, collision.secondary_azimuth_rad
         )
     return ShellWorldDirections(primary, secondary)
 

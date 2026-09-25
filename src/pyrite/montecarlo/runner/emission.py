@@ -170,6 +170,18 @@ def _brem_for_case(case, E_brem):
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
         stopping_tables=runner._case_stopping_tables(case),
+        # The shell soft/hard mode changes the transport physics, so a repair
+        # of such a case must replay it; continuous cases are unchanged.
+        **(
+            dict(
+                energy_model=case.get("energy_model", "frozen"),
+                max_dE_frac=case.get("max_dE_frac", 0.0),
+                straggling=bool(case.get("straggling", False)),
+                **runner._case_inelastic_kwargs(case),
+            )
+            if case.get("inelastic_model") is not None
+            else {}
+        ),
     )
     return runner._brem_wide_from_segments(
         segs_b,

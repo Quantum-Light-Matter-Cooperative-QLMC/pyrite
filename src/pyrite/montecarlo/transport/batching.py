@@ -274,7 +274,7 @@ def _cuda_transport_available():
     return True
 
 
-def resolve_transport_core(requested, Ne, groove=None):
+def resolve_transport_core(requested, Ne, groove=None, *, cpu_only=False):
     """Resolve ``transport_core`` for a run of ``Ne`` electrons.
 
     ``"auto"`` is the default and the only value that resolves: it takes the CUDA
@@ -287,6 +287,11 @@ def resolve_transport_core(requested, Ne, groove=None):
     process, which is how a run pins the historical CPU core (``=lockstep``)
     without touching call sites -- reproducing a pre-existing result, or
     bisecting a device/host difference.
+
+    ``cpu_only`` marks a run whose physics has no device core (the opt-in
+    shell soft/hard inelastic mode): ``"auto"`` then resolves to the lockstep
+    CPU core, and an explicit or pinned ``"cuda"`` raises rather than running
+    different physics.
     """
 
     pinned = env_value("PYRITE_MC_TRANSPORT_CORE", "").strip().lower()
@@ -298,9 +303,14 @@ def resolve_transport_core(requested, Ne, groove=None):
         requested = pinned
     if requested not in TRANSPORT_CORES:
         raise ValueError(f"transport_core must be one of {', '.join(TRANSPORT_CORES)}")
+    if cpu_only and requested == "cuda":
+        raise NotImplementedError(
+            "inelastic_model='shell-soft-hard' has no CUDA core yet; use "
+            "transport_core='auto', 'lockstep' or 'per-electron'"
+        )
     if requested != "auto":
         return requested
-    if groove is not None or int(Ne) <= CUDA_TRANSPORT_MIN_ELECTRONS:
+    if cpu_only or groove is not None or int(Ne) <= CUDA_TRANSPORT_MIN_ELECTRONS:
         return "lockstep"
     return "cuda" if _cuda_transport_available() else "lockstep"
 
@@ -354,11 +364,18 @@ def _drive_per_electron_batches(
     to_host,
     config,
     keep_on_device,
+    inelastic_args=None,
 ):
-    """Run capacity-replayed batches for either exact or LUT transport."""
+    """Run capacity-replayed batches for either exact or LUT transport.
+
+    ``inelastic_args`` (shell soft/hard mode only) is appended to every core
+    call, and each batch then also carries the two hard-event row columns.
+    """
     from ..runner import _nsys_pop, _nsys_push
 
     midpoint = energy_model_code == 1
+    inelastic = inelastic_args is not None
+    extra_args = (inelastic_args,) if inelastic else ()
     batches = []
     cap = max(1, int(config.seg_capacity))
     seen_max = 0
@@ -375,6 +392,8 @@ def _drive_per_electron_batches(
         while True:
             _nsys_push("cxr.transport.scratch")
             scratch = _alloc_scratch(xp, m, cap, midpoint)
+            if inelastic:
+                scratch += _alloc_hard_scratch(xp, m, cap)
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
             _nsys_pop()
@@ -385,6 +404,7 @@ def _drive_per_electron_batches(
                 scratch,
                 (seg_count, exit_code),
                 straggling_args,
+                *extra_args,
             )
             _nsys_pop()
 
@@ -442,6 +462,8 @@ def _drive_per_electron_batches(
     if keep_on_device:
         _nsys_push("cxr.transport.join")
         empty = _alloc_scratch(xp, 0, 1, midpoint)
+        if inelastic:
+            empty += _alloc_hard_scratch(xp, 0, 1)
         joined = tuple(
             xp.concatenate([b[i] for b in batches]) if batches else empty[i]
             for i in range(len(out_bufs))
@@ -494,6 +516,7 @@ def _run_per_electron_transport_lut(
     stragg_dE,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
+    inelastic=None,
 ):
     """Drive the CPU/CUDA LUT per-electron core with capacity replay.
 
@@ -561,6 +584,11 @@ def _run_per_electron_transport_lut(
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     if energy_model_code == 1:
         out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event)
+    inelastic_args = None
+    if inelastic is not None:
+        # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel)``.
+        inelastic_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in inelastic[0])
+        out_bufs += inelastic[1:]
     core_args = (control, geometry, lut_args, d_stragg_layers, state)
     return _drive_per_electron_batches(
         core,
@@ -580,6 +608,7 @@ def _run_per_electron_transport_lut(
         to_host,
         config,
         keep_on_device,
+        inelastic_args,
     )
 
 
@@ -625,6 +654,7 @@ def _run_per_electron_transport(
     stragg_dE,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
+    inelastic=None,
 ):
     """Drive ``core`` over electron batches and compact the result.
 
@@ -707,6 +737,11 @@ def _run_per_electron_transport(
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     if energy_model_code == 1:
         out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event)
+    inelastic_args = None
+    if inelastic is not None:
+        # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel)``.
+        inelastic_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in inelastic[0])
+        out_bufs += inelastic[1:]
     core_args = (control, geometry, d_materials, d_mott, state)
     return _drive_per_electron_batches(
         core,
@@ -726,7 +761,18 @@ def _run_per_electron_transport(
         to_host,
         config,
         keep_on_device,
+        inelastic_args,
     )
+
+
+def _alloc_hard_scratch(xp, m, cap):
+    """The shell soft/hard mode's two hard-event row columns for one batch.
+
+    The mode requires the midpoint schema, so both are full-width slot
+    buffers appended after :func:`_alloc_scratch`'s twelve.
+    """
+    n = m * cap
+    return (xp.empty(n, dtype=xp.float64), xp.empty(n, dtype=xp.int16))
 
 
 def _alloc_scratch(xp, m, cap, midpoint=False):

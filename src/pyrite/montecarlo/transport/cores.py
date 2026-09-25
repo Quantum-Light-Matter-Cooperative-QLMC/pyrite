@@ -12,8 +12,15 @@ from .events import (
     EVENT_EXIT_SIDE,
     EVENT_EXIT_TOP,
     EVENT_GROOVE_SURFACE,
+    EVENT_HARD_INELASTIC,
     EVENT_LAYER_BOUNDARY,
     EVENT_SUBSTEP,
+)
+from .hard_inelastic import (
+    _hard_primary_cosine,
+    _log_grid_frac,
+    _sample_hard_transfer_eV,
+    _soft_loss_sample_keV,
 )
 from .kinematics import _SM64_ONE, _SM64_ZERO, _stream_uniform_scalar, beta_from_keV_scalar
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
@@ -119,7 +126,7 @@ def _searchsorted_right_scalar(bounds, x, n):
     return lo
 
 
-def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
+def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, inelastic=False):
     """Generate one CPU specialization with compile-time-frozen axis flags.
 
     The shared row body preserves the transport invariants derived in
@@ -134,9 +141,20 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
     Lockstep specializations retain their shared step-major RNG stream. The
     per-electron specializations retain counter-addressed electron-major draws
     and output slots, keeping the CPU body readable against the CUDA port.
+
+    ``inelastic=True`` compiles the opt-in shell soft/hard mode
+    (``docs/physics/beam-transport/shell-soft-hard-transport.md``): the
+    stopping tables it receives are the soft tables, a second optical depth
+    schedules hard events on its own counter stream, and soft fluctuations
+    use PENELOPE's two-moment sampler instead of Urban's. It is a separate
+    specialization, so the ``inelastic=False`` cores are the unchanged
+    historical ones; it requires the midpoint row schema and is not
+    available for grooved transport.
     """
     if grooved and (per_electron or lut):
         raise ValueError("grooved transport has only an exact lockstep specialization")
+    if grooved and inelastic:
+        raise ValueError("shell soft/hard inelastic transport has no grooved specialization")
 
     @njit(cache=True)
     def body(
@@ -152,6 +170,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
         segments,
         pe_out,
         straggling,
+        inelastic_args,
     ):
         (max_steps, max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
         (
@@ -216,7 +235,23 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             seg_flight,
             seg_substep,
             seg_event,
-        ) = segments
+        ) = segments[:12]
+        if inelastic:
+            seg_hard_W, seg_hard_ch = segments[12], segments[13]
+            (
+                il_keys,
+                il_cutoff_eV,
+                il_n,
+                il_logE,
+                il_rate,
+                il_omega2,
+                il_nch,
+                il_ch_rate,
+                il_ch_U,
+                il_ch_W,
+                il_ch_branch,
+                il_ch_code,
+            ) = inelastic_args
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
             (seg_count, exit_code) = pe_out
@@ -234,6 +269,11 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
         material_steps = np.zeros(Ne, dtype=np.int32)
         draws = np.zeros(Ne, dtype=np.uint64)
         local_nseg = np.zeros(Ne, dtype=np.int64)
+        if inelastic:
+            # Hard optical depth, drawn once per physical flight like the
+            # elastic one, and the per-electron hard-stream counter.
+            tau_h = np.full(Ne, -1.0)
+            hard_draws = np.zeros(Ne, dtype=np.uint64)
         nseg = nvac = n_back = n_trans = n_side = n_cutoff = 0
         n_alive = int(alive.sum())
         n_eligible = n_alive
@@ -328,6 +368,15 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             step_j = tau_left[e] * lam_ang
             if not per_electron and nseg >= max_segments:
                 raise RuntimeError("segment buffer exhausted")
+            hard_j = False
+            if inelastic:
+                il_lo, il_f = _log_grid_frac(il_logE[L], il_n[L], np.log(E_j))
+                mu_hard = il_rate[L, il_lo] + il_f * (il_rate[L, il_lo + 1] - il_rate[L, il_lo])
+                if tau_h[e] < 0.0:
+                    tau_h[e] = -np.log(_stream_uniform_scalar(il_keys[e], hard_draws[e]))
+                    hard_draws[e] += _SM64_ONE
+                if mu_hard > 0.0 and tau_h[e] / mu_hard < step_j:
+                    step_j, hard_j = tau_h[e] / mu_hard, True
 
             dx, dy, dz = dirs[e, 0], dirs[e, 1], dirs[e, 2]
             px, py, pz = pos[e, 0], pos[e, 1], pos[e, 2]
@@ -375,7 +424,10 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             else:
                 dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
             stopping_scale = 1.0
-            if sbethe_on:
+            # Only the Urban sampler reads the scale. Without straggling the
+            # LUT cores carry zero dummy element tables, so the reference
+            # splice would divide by zero.
+            if sbethe_on and straggle_on and not inelastic:
                 if per_electron:
                     reference_dEds = _dEds_spliced_packed_scalar(
                         L_Js, L_ks, L_coeffs, L_E_cross, 0.0, L, n_el, E_j
@@ -387,7 +439,45 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 stopping_scale = dEds / reference_dEds
             cutoff_j = limited_j = False
             geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
-            if straggle_on:
+            if inelastic and straggle_on:
+                # Soft losses only: dEds is the soft stopping, and the hard
+                # tail is explicit, so Urban's unrestricted spectrum would
+                # double count it. PENELOPE's two-moment soft sampler takes
+                # its place on the same per-(flight, substep) key domain.
+                if energy_controlled:
+                    step_energy = max_dE_frac * E_j / (-dEds)
+                    if step_energy < step_j:
+                        step_j, limited_j = step_energy, True
+                        cross_up_j = cross_dn_j = exit_top_j = exit_bot_j = exit_side_j = False
+                        surface_first = geometry_event = False
+                urban_key = _urban_stream_key_scalar(
+                    stream_key[e] if per_electron else stream_keys_arr[e]
+                )
+                flight_key = _urban_flight_key_scalar(urban_key, flight_id[e], substep_id[e])
+                omega2 = il_omega2[L, il_lo] + il_f * (
+                    il_omega2[L, il_lo + 1] - il_omega2[L, il_lo]
+                )
+                stragg_loss, _ = _soft_loss_sample_keV(
+                    -dEds * step_j, omega2 * step_j, flight_key, _SM64_ZERO
+                )
+                stragg_dE[e] += stragg_loss
+                delta_cut = E_j - E_cut_e
+                if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
+                    step_j = step_j * (delta_cut / stragg_loss) if stragg_loss > 0.0 else 0.0
+                    cutoff_j, limited_j = True, False
+                    cross_up_j = cross_dn_j = exit_top_j = exit_bot_j = exit_side_j = False
+                    surface_first = False
+                    E_end_j = E_cut_e
+                else:
+                    E_end_j = E_j - stragg_loss
+                if lut:
+                    clk_i, clk_f = _lut_index_frac_scalar(
+                        0.5 * (E_j + E_end_j), lut_log_E_min, lut_inv_dlogE, lut_n_energy
+                    )
+                    t_end_j = clock[e] + step_j * _lut_lerp_1d(lut_inv_beta, clk_i, clk_f)
+                else:
+                    t_end_j = clock[e] + step_j / beta_from_keV_scalar(0.5 * (E_j + E_end_j))
+            elif straggle_on:
                 if energy_controlled:
                     step_energy = max_dE_frac * E_j / (-dEds)
                     if step_energy < step_j:
@@ -543,8 +633,56 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 event_j = EVENT_GROOVE_SURFACE
             elif cross_up_j or cross_dn_j:
                 event_j = EVENT_LAYER_BOUNDARY
+            elif inelastic and hard_j:
+                event_j = EVENT_HARD_INELASTIC
             else:
                 event_j = EVENT_ELASTIC
+            if inelastic:
+                hard_W_keV, hard_code = 0.0, -1
+                hard_cos, hard_phi = 1.0, 0.0
+                if event_j == EVENT_HARD_INELASTIC:
+                    # Channel, transfer, recoil, azimuth: four hard-stream
+                    # draws, all evaluated at the row's start energy, where
+                    # its hazard was.
+                    u_ch = _stream_uniform_scalar(il_keys[e], hard_draws[e])
+                    u_w = _stream_uniform_scalar(il_keys[e], hard_draws[e] + _SM64_ONE)
+                    u_q = _stream_uniform_scalar(il_keys[e], hard_draws[e] + np.uint64(2))
+                    u_phi = _stream_uniform_scalar(il_keys[e], hard_draws[e] + np.uint64(3))
+                    hard_draws[e] += np.uint64(4)
+                    target = u_ch * mu_hard
+                    ch = il_nch[L] - 1
+                    cumulative = 0.0
+                    for k_ch in range(il_nch[L]):
+                        cumulative += il_ch_rate[L, k_ch, il_lo] + il_f * (
+                            il_ch_rate[L, k_ch, il_lo + 1] - il_ch_rate[L, k_ch, il_lo]
+                        )
+                        if cumulative > target:
+                            ch = k_ch
+                            break
+                    E_eV = E_j * 1.0e3
+                    W_eV = _sample_hard_transfer_eV(
+                        E_eV,
+                        il_ch_U[L, ch],
+                        il_ch_W[L, ch],
+                        il_ch_branch[L, ch],
+                        il_cutoff_eV,
+                        u_w,
+                    )
+                    hard_W_keV, hard_code = W_eV * 1.0e-3, il_ch_code[L, ch]
+                    if E_end_j - hard_W_keV <= E_cut_e:
+                        # The collision leaves the primary below its cutoff:
+                        # absorbed at the collision point, a terminal row.
+                        event_j, cutoff_j = EVENT_CUTOFF, True
+                    else:
+                        hard_cos = _hard_primary_cosine(
+                            E_eV,
+                            il_ch_U[L, ch],
+                            il_ch_W[L, ch],
+                            il_ch_branch[L, ch],
+                            W_eV,
+                            u_q,
+                        )
+                        hard_phi = 2.0 * np.pi * u_phi
             if per_electron:
                 i = e - e_start
                 slot, record = i * cap + local_nseg[e], local_nseg[e] < cap
@@ -563,6 +701,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                     seg_E_end[slot], seg_t_end[slot] = E_end_j, t_end_j
                     seg_flight[slot], seg_substep[slot] = flight_id[e], substep_id[e]
                     seg_event[slot] = event_j
+                    if inelastic:
+                        seg_hard_W[slot], seg_hard_ch[slot] = hard_W_keV, hard_code
             if per_electron:
                 local_nseg[e] += 1
             else:
@@ -572,6 +712,10 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
             tau_left[e] -= step_j / lam_ang
             if tau_left[e] < 0.0:
                 tau_left[e] = 0.0
+            if inelastic:
+                tau_h[e] -= step_j * mu_hard
+                if tau_h[e] < 0.0:
+                    tau_h[e] = 0.0
 
             if grooved:
                 if limited_j:
@@ -664,12 +808,20 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                     continue
                 flight_id[e] += 1
                 substep_id[e], tau_left[e] = 0, -1.0
+                if inelastic:
+                    tau_h[e] = -1.0
                 if cross_up_j or cross_dn_j:
                     pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
                     if per_electron:
                         material_steps[e] += 1
                     continue
                 full_j = True
+                if inelastic and event_j == EVENT_HARD_INELASTIC:
+                    full_j = False
+                    E_keV[e] -= hard_W_keV
+                    dirs[e, 0], dirs[e, 1], dirs[e, 2] = _rotate_direction_scalar(
+                        dirs[e, 0], dirs[e, 1], dirs[e, 2], hard_cos, hard_phi
+                    )
 
             if full_j:
                 if n_el == 1:
@@ -756,7 +908,18 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
     if per_electron and lut:
 
         @njit(cache=True)
-        def core(run, control, geometry, lut_args, materials, state, segments, pe_out, straggling):
+        def core(
+            run,
+            control,
+            geometry,
+            lut_args,
+            materials,
+            state,
+            segments,
+            pe_out,
+            straggling,
+            inelastic_args=(),
+        ):
             return body(
                 run,
                 0,
@@ -770,11 +933,23 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 segments,
                 pe_out,
                 straggling,
+                inelastic_args,
             )
     elif per_electron:
 
         @njit(cache=True)
-        def core(run, control, geometry, materials, mott, state, segments, pe_out, straggling):
+        def core(
+            run,
+            control,
+            geometry,
+            materials,
+            mott,
+            state,
+            segments,
+            pe_out,
+            straggling,
+            inelastic_args=(),
+        ):
             return body(
                 run,
                 0,
@@ -788,6 +963,7 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 segments,
                 pe_out,
                 straggling,
+                inelastic_args,
             )
     elif grooved:
 
@@ -806,11 +982,23 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 segments,
                 (),
                 straggling,
+                (),
             )
     elif lut:
 
         @njit(cache=True)
-        def core(Ne, rng, control, geometry, lut_args, materials, state, segments, straggling):
+        def core(
+            Ne,
+            rng,
+            control,
+            geometry,
+            lut_args,
+            materials,
+            state,
+            segments,
+            straggling,
+            inelastic_args=(),
+        ):
             return body(
                 Ne,
                 rng,
@@ -824,13 +1012,37 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False):
                 segments,
                 (),
                 straggling,
+                inelastic_args,
             )
     else:
 
         @njit(cache=True)
-        def core(Ne, rng, control, geometry, materials, mott, state, segments, straggling):
+        def core(
+            Ne,
+            rng,
+            control,
+            geometry,
+            materials,
+            mott,
+            state,
+            segments,
+            straggling,
+            inelastic_args=(),
+        ):
             return body(
-                Ne, rng, control, geometry, (), materials, mott, (), state, segments, (), straggling
+                Ne,
+                rng,
+                control,
+                geometry,
+                (),
+                materials,
+                mott,
+                (),
+                state,
+                segments,
+                (),
+                straggling,
+                inelastic_args,
             )
 
     return core
@@ -841,3 +1053,12 @@ _transport_core_ungrooved_lut = make_cpu_transport_core(lut=True)
 _transport_core_grooved = make_cpu_transport_core(grooved=True)
 _transport_core_ungrooved_perelectron = make_cpu_transport_core(per_electron=True)
 _transport_core_ungrooved_perelectron_lut = make_cpu_transport_core(per_electron=True, lut=True)
+# Opt-in shell soft/hard inelastic specializations (never selected by default).
+_transport_core_ungrooved_inelastic = make_cpu_transport_core(inelastic=True)
+_transport_core_ungrooved_lut_inelastic = make_cpu_transport_core(lut=True, inelastic=True)
+_transport_core_ungrooved_perelectron_inelastic = make_cpu_transport_core(
+    per_electron=True, inelastic=True
+)
+_transport_core_ungrooved_perelectron_lut_inelastic = make_cpu_transport_core(
+    per_electron=True, lut=True, inelastic=True
+)

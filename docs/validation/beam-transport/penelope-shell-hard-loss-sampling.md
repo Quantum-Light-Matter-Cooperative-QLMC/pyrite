@@ -58,3 +58,7 @@ The code's distant and close bounds implement the intervals above. Its `binding_
 ## Verdict and suggested ledger edit
 
 Units, support limits, branch normalization, and energy signs **pass** against the ledgered DCS. The distant source convention **fails to reconcile**: PENELOPE Eq. 3.125 and Eqs. 3.81–3.82 imply a triangular conditional law, whereas Eqs. 3.94–3.95 and this code use the triangle divided by $W$. Suggested ledger status: `discrepancy`, with this precise source conflict in Notes. A human should adjudicate the intended reference law before advancing the status; only a human can mark `signed-off`.
+
+## Adjudication
+
+On 2026-09-25 the owner chose $p_{\rm dis}(W)/W$ (Eqs. 3.94–3.95 and 3.104) as the reference distant law for this PENELOPE-like model. It keeps sampling, moments and closed hard rates on one DCS. The model therefore intentionally differs from PENELOPE's Eq. 3.125 sampler. Adopting Eq. 3.125 later would require changing the moments, rates and sampler together. Under this choice, the checks above pass. The ledger status is `rederived`; only a human can mark it `signed-off`.

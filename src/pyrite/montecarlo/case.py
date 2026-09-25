@@ -65,6 +65,8 @@ _CASE_KEY_ORDER = (
     "straggling",
     "energy_model",
     "max_dE_frac",
+    "inelastic_model",
+    "inelastic_cutoff_eV",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -146,6 +148,9 @@ class Case(Mapping[str, Any]):
         ``sinc^2`` lines; absent samples nodes.
     coherent_emission, straggling, energy_model, max_dE_frac
         Result-affecting opt-in transport and radiation policies.
+    inelastic_model, inelastic_cutoff_eV
+        Opt-in ``"shell-soft-hard"`` collision-loss scheme and its cutoff in
+        eV; both absent is continuous stopping. Requires ``energy_model``.
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     """
@@ -211,6 +216,8 @@ class Case(Mapping[str, Any]):
     straggling: Literal[True] | _Absent = _ABSENT
     energy_model: Literal["midpoint"] | _Absent = _ABSENT
     max_dE_frac: float | _Absent = _ABSENT
+    inelastic_model: Literal["shell-soft-hard"] | _Absent = _ABSENT
+    inelastic_cutoff_eV: float | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -262,6 +269,14 @@ class Case(Mapping[str, Any]):
             _positive("max_dE_frac", self.max_dE_frac)
             if self.energy_model != "midpoint":
                 raise ValueError("max_dE_frac requires energy_model='midpoint'")
+        if (self.inelastic_model is _ABSENT) != (self.inelastic_cutoff_eV is _ABSENT):
+            raise ValueError("inelastic_model and inelastic_cutoff_eV are set together")
+        if self.inelastic_model is not _ABSENT:
+            if self.inelastic_model != "shell-soft-hard":
+                raise ValueError("inelastic_model must be absent or 'shell-soft-hard'")
+            _positive("inelastic_cutoff_eV", self.inelastic_cutoff_eV)
+            if self.energy_model != "midpoint":
+                raise ValueError("inelastic_model requires energy_model='midpoint'")
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")

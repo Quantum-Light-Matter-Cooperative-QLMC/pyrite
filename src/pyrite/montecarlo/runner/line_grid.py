@@ -47,6 +47,8 @@ _RESOLUTION_INPUT_KEYS = (
     "straggling",
     "energy_model",
     "max_dE_frac",
+    "inelastic_model",
+    "inelastic_cutoff_eV",
     "abs_layers",
     "Ne",
     "Ne_brem",

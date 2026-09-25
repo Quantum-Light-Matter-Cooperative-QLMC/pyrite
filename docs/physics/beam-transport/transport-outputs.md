@@ -62,6 +62,10 @@ the `flight_id` / `substep_id` identifiers, and the row-end `event_kind`. {eq}`e
 
 New fields appear **only** under the rule that produces them, so a consumer that finds `E_repr_keV` can rely on the rest of the midpoint fields being present, and one that does not can rely on every row being a whole physical flight.
 
+### Fields added by the shell soft/hard mode
+
+`inelastic_model="shell-soft-hard"` (midpoint only) adds per-row `hard_W_keV` and `hard_channel` and an `inelastic` metadata dict. A row ending in `HARD_INELASTIC` carries the transfer $W$, and the next row of that electron starts exactly $W$ lower. A `CUTOFF` row whose collision absorbed the primary also carries its $W$. Every other row has $W=0$ and channel $-1$. The result's `stopping_tables` are then the soft tables. See [Shell soft/hard inelastic transport](shell-soft-hard-transport.md).
+
 ## Row events and physical segments
 
 Every midpoint row records, in `event_kind` (`int8`), the event that ended it. The event sits at the row's far end, so the row itself carries the pre-event state — `v_hat` is the incoming direction, `E_end_keV` and `t_end_ang` the incoming energy and age — and the next row of the same electron carries the post-event state. An event's position is `r_mid + L_ang v_hat / 2`.

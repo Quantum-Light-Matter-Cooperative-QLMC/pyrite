@@ -1,7 +1,6 @@
 """Public transport entry point: :func:`simulate_trajectories`."""
 
 import logging
-from collections.abc import Mapping
 
 import numpy as np
 
@@ -21,17 +20,22 @@ from .batching import (
 from .cores import (
     _transport_core_grooved,
     _transport_core_ungrooved,
+    _transport_core_ungrooved_inelastic,
     _transport_core_ungrooved_lut,
+    _transport_core_ungrooved_lut_inelastic,
     _transport_core_ungrooved_perelectron,
+    _transport_core_ungrooved_perelectron_inelastic,
     _transport_core_ungrooved_perelectron_lut,
+    _transport_core_ungrooved_perelectron_lut_inelastic,
 )
+from .hard_inelastic import hard_stream_keys, validate_inelastic_args
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
-from .scattering import _NO_MOTT, _mott_alpha_table
+from .scattering import _NO_MOTT, _flatten_mott_tables, _mott_alpha_table
 from .stopping import (
     _element_crossover_keV,
     pack_sbethe_stopping_tables,
-    prepare_sbethe_stopping_table,
+    prepare_sbethe_stopping_tables,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,6 +77,9 @@ def simulate_trajectories(
     max_dE_frac=0.0,
     straggling=False,
     stopping_tables=None,
+    inelastic_model="continuous",
+    inelastic_cutoff_eV=None,
+    inelastic_materials=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -209,6 +216,17 @@ def simulate_trajectories(
       segment mapping as ``stopping_tables`` so post-transport cutoff solves
       use the same model.
       Validation: sbethe-corrected-stopping
+
+    inelastic_model: collision energy-loss scheme.
+      "continuous" (default) -- the whole corrected stopping is a continuous
+          loss (plus optional Urban straggling). BIT-FOR-BIT unchanged.
+      "shell-soft-hard" -- opt-in PENELOPE-like mixed scheme: losses
+          W <= inelastic_cutoff_eV stay continuous, larger ones are discrete
+          hard events. Needs ``stopping_tables``, midpoint, and one catalog
+          key per layer in ``inelastic_materials``; CPU only. Adds
+          ``hard_W_keV``/``hard_channel``/``inelastic`` to the result. See
+          docs/physics/beam-transport/shell-soft-hard-transport.md.
+          Validation: shell-soft-hard-transport
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
@@ -394,9 +412,17 @@ def simulate_trajectories(
         raise ValueError("elastic_model must be 'mott' or 'sr'")
     if energy_model not in ("frozen", "midpoint"):
         raise ValueError("energy_model must be 'frozen' or 'midpoint'")
+    shell_mode = validate_inelastic_args(
+        inelastic_model,
+        inelastic_cutoff_eV,
+        inelastic_materials,
+        energy_model=energy_model,
+        groove=groove,
+        stopping_tables=stopping_tables,
+    )
 
     requested_core = transport_core
-    transport_core = resolve_transport_core(transport_core, Ne, groove)
+    transport_core = resolve_transport_core(transport_core, Ne, groove, cpu_only=shell_mode)
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if keep_segments_on_device and transport_core != "cuda":
@@ -443,22 +469,7 @@ def simulate_trajectories(
     _nsys_push("cxr.transport.tables")
     z_total = float(layers[-1][1])
     n_layers = len(layers)
-    prepared_stopping_tables = None
-    if stopping_tables is not None:
-        if len(stopping_tables) != n_layers:
-            raise ValueError("stopping_tables must contain one SBETHE table per layer")
-        prepared_stopping_tables = []
-        for table in stopping_tables:
-            prepared = (
-                table
-                if not isinstance(table, Mapping)
-                and len(table) == 2
-                and np.asarray(table[0]).ndim == 1
-                else None
-            )
-            if prepared is None:
-                prepared = prepare_sbethe_stopping_table(table)
-            prepared_stopping_tables.append(prepared)
+    prepared_stopping_tables = prepare_sbethe_stopping_tables(stopping_tables, n_layers)
     L_Zs = []
     L_Js = []
     L_ncm3 = []
@@ -534,37 +545,7 @@ def simulate_trajectories(
     L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
     internal_bounds = L_bot[:-1].copy()
 
-    # Numba only sees numeric Mott data. Tables are flattened because different
-    # elements may have different grid lengths; start/length locate each table.
-    max_elements = max(arr.size for arr in L_Zs)
-    mott_has_table = np.zeros((n_layers, max_elements), dtype=np.bool_)
-    mott_start = np.zeros((n_layers, max_elements), dtype=np.int64)
-    mott_len = np.zeros((n_layers, max_elements), dtype=np.int64)
-    mott_logE_chunks = []
-    mott_logA_chunks = []
-    offset = 0
-    for L, layer_tables in enumerate(mott_tables):
-        for i_el, table in enumerate(layer_tables):
-            if table is None:
-                continue
-            logE, logA = table
-            logE = np.asarray(logE, dtype=float)
-            logA = np.asarray(logA, dtype=float)
-            if logE.size != logA.size or logE.size == 0:
-                raise ValueError("invalid Mott interpolation table")
-            mott_has_table[L, i_el] = True
-            mott_start[L, i_el] = offset
-            mott_len[L, i_el] = logE.size
-            mott_logE_chunks.append(logE)
-            mott_logA_chunks.append(logA)
-            offset += logE.size
-
-    if mott_logE_chunks:
-        mott_logE_flat = np.concatenate(mott_logE_chunks)
-        mott_logA_flat = np.concatenate(mott_logA_chunks)
-    else:
-        mott_logE_flat = np.empty(0, dtype=float)
-        mott_logA_flat = np.empty(0, dtype=float)
+    mott_group = _flatten_mott_tables(mott_tables)
     _nsys_pop()
 
     _nsys_push("cxr.transport.sample")
@@ -667,6 +648,22 @@ def simulate_trajectories(
                 raise ValueError(
                     f"transport energy range must be within SBETHE table [{lower:g}, {upper:g}] keV"
                 )
+    shell_tables = None
+    if shell_mode:
+        # Lazy: the host shell model pulls in catalog and EEDL data.
+        from .shell_transport import build_shell_inelastic_tables
+
+        # Checked by validate_inelastic_args, which also requires stopping_tables.
+        assert inelastic_materials is not None and inelastic_cutoff_eV is not None
+        assert prepared_stopping_tables is not None
+        _nsys_push("cxr.transport.inelastic")
+        E_range_keV = (float(np.min(E_cut_by_electrons)), float(np.max(E_keV)))
+        shell_tables = build_shell_inelastic_tables(
+            inelastic_materials, float(inelastic_cutoff_eV), prepared_stopping_tables, *E_range_keV
+        )
+        _nsys_pop()
+        # The cores' continuous stopping is the soft share from here on.
+        prepared_stopping_tables = list(shell_tables.soft_stopping_tables)
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
@@ -749,6 +746,11 @@ def simulate_trajectories(
     seg_flight = np.empty(n_end_rows, dtype=np.int64)
     seg_substep = np.empty(n_end_rows, dtype=np.int64)
     seg_event = np.empty(n_end_rows, dtype=np.int8)
+    seg_hard_W = np.empty(n_end_rows if shell_mode else 0, dtype=float)
+    seg_hard_ch = np.empty(seg_hard_W.size, dtype=np.int16)
+    inelastic_args = None
+    if shell_tables is not None:
+        inelastic_args = shell_tables.core_args(hard_stream_keys(seed, Ne))
     _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
@@ -816,6 +818,8 @@ def simulate_trajectories(
         seg_substep,
         seg_event,
     )
+    if shell_mode:
+        segments += (seg_hard_W, seg_hard_ch)
     materials_ragged = (
         L_Js,
         L_Zs,
@@ -830,7 +834,6 @@ def simulate_trajectories(
         L_sr_joy_numer,
     )
     materials_ragged += sbethe_group
-    mott_group = (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat)
     straggling_lockstep = (straggle_on, stragg_stream_keys, stragg_dE)
     # The exact lockstep cores index ragged rows and never read L_nel; it rides
     # in the geometry tuple only so every core shares one layout.
@@ -877,6 +880,8 @@ def simulate_trajectories(
             from ._jit_launch import make_cuda_transport_lut_core
 
             core, core_xp = make_cuda_transport_lut_core()
+        elif shell_mode:
+            core, core_xp = _transport_core_ungrooved_perelectron_lut_inelastic, np
         else:
             core, core_xp = _transport_core_ungrooved_perelectron_lut, np
         if keep_segments_on_device:
@@ -926,6 +931,7 @@ def simulate_trajectories(
                 stragg_dE,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
+                inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
             )
         )
         nvac = 0
@@ -935,7 +941,10 @@ def simulate_trajectories(
         vac_t0 = np.empty(0, dtype=float)
         vac_id = np.empty(0, dtype=np.int64)
     elif groove is None and transport_lut is not None:
-        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = _transport_core_ungrooved_lut(
+        lut_core = (
+            _transport_core_ungrooved_lut_inelastic if shell_mode else _transport_core_ungrooved_lut
+        )
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = lut_core(
             Ne,
             rng,
             control,
@@ -964,6 +973,7 @@ def simulate_trajectories(
             state,
             segments,
             straggling_lockstep,
+            *((inelastic_args,) if shell_mode else ()),
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -978,6 +988,8 @@ def simulate_trajectories(
             from ._jit_launch import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()
+        elif shell_mode:
+            core, core_xp = _transport_core_ungrooved_perelectron_inelastic, np
         else:
             core, core_xp = _transport_core_ungrooved_perelectron, np
         if keep_segments_on_device:
@@ -1022,7 +1034,7 @@ def simulate_trajectories(
                 packed_per_layer_tables,
                 L_top,
                 L_bot,
-                (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
+                mott_group,
                 E_keV,
                 seg_dir,
                 seg_mid,
@@ -1040,6 +1052,7 @@ def simulate_trajectories(
                 stragg_dE,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
+                inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
             )
         )
         nvac = 0
@@ -1049,7 +1062,10 @@ def simulate_trajectories(
         vac_t0 = np.empty(0, dtype=float)
         vac_id = np.empty(0, dtype=np.int64)
     elif groove is None:
-        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = _transport_core_ungrooved(
+        exact_core = (
+            _transport_core_ungrooved_inelastic if shell_mode else _transport_core_ungrooved
+        )
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = exact_core(
             Ne,
             rng,
             control,
@@ -1059,6 +1075,7 @@ def simulate_trajectories(
             state,
             segments,
             straggling_lockstep,
+            *((inelastic_args,) if shell_mode else ()),
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -1204,6 +1221,8 @@ def simulate_trajectories(
         # What ended each row; `transport.events` holds the codes and the
         # contract (`check_segment_event_contract`).
         result["event_kind"] = seg_event[:nseg]
+    if shell_tables is not None:
+        result.update(shell_tables.result_fields(seg_hard_W[:nseg], seg_hard_ch[:nseg]))
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

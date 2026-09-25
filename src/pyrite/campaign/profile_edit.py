@@ -12,6 +12,7 @@ import tomlkit
 from pyrite._numerics import (
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
+    TRANSPORT_KEYS,
     validate_profile_numerics,
 )
 from pyrite.detectors.spec import Detector
@@ -224,11 +225,7 @@ def profile_payload(document, name):
             else dict(physical.unwrap() if hasattr(physical, "unwrap") else physical)
         ),
         "emission": profile.get("emission"),
-        "transport_numerics": {
-            key: profile[key]
-            for key in ("straggling", "energy_model", "max_dE_frac")
-            if key in profile
-        },
+        "transport_numerics": {key: profile[key] for key in TRANSPORT_KEYS if key in profile},
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()

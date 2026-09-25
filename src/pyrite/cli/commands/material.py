@@ -143,6 +143,11 @@ def _simulation_scene(document, material, profile_name):
             straggling=straggling,
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
+            inelastic_model=cast(
+                Literal["continuous", "shell-soft-hard"],
+                transport.get("inelastic_model", "continuous"),
+            ),
+            inelastic_cutoff_eV=cast(float | None, transport.get("inelastic_cutoff_eV")),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
     )

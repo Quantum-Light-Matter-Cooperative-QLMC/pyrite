@@ -593,3 +593,33 @@ Eq. 4.113. Above every loss endpoint, the hard event rate is zero. This
 supersedes the always-hard inner-shell choice recorded earlier in this task
 record; existing $W_c=50$ eV diagnostics are unchanged. The independent IMFP
 and differential-spectrum gates still block transport activation.
+
+## Follow-up, 2026-09-25: opt-in CPU mode and run configuration
+
+`simulate_trajectories(inelastic_model="shell-soft-hard")` schedules hard
+collisions in the CPU lockstep and per-electron cores (`e3c26b49`); grooved
+and CUDA cores reject it. `inelastic_model` and `inelastic_cutoff_eV` now thread
+through `Numerics`, `Settings`, `Case`, sweep/scene lowering, profile TOML and
+`pyrite profile numerics set`, and the brem repair path. Both keys are
+divergence-only in case payloads and run identity, so continuous-stopping
+digests are unchanged; shell cases resolve to a CPU core. A 200-electron Si
+case runs end to end in both modes. The mode stays opt-in: the IMFP
+expected-failure gate and CUDA parity still block production use.
+
+## Decision, 2026-09-25: bound distant-loss law
+
+The owner adjudicated the PENELOPE-2024 distant-loss conflict: keep
+$p_{\rm dis}(W)/W$ (Eqs. 3.94/3.104), which keeps the sampler, moments and
+closed rates on one DCS. The model intentionally does not reproduce the
+Eq. 3.125 triangular sampler; switching later would change all three
+together. `penelope-shell-hard-loss-sampling` moves from `discrepancy` to
+`rederived`; dependent rows now cite the adjudicated law. This no longer
+gates activation.
+## Follow-up, 2026-09-25: import-contract exception
+
+`pyrite-dev verify` exposed two branch imports of `pyrite.xsgen.sbethe.catalog`
+from `montecarlo.transport` (`shell_rates` catalog helpers and the
+`shell_transport` node check). The owner chose a narrow allowlist beside the
+runner's existing `case_tables` exception (host-side table resolution only; no
+kernel imports `xsgen`). Follow-up: inject the catalog SBETHE tables and
+composition into the shell builders from the runner, then drop both entries.

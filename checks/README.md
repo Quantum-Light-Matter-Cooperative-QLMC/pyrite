@@ -46,6 +46,7 @@ run through the collector.
 | `multilayer_slice3_check.py` | Per-layer crystalline-radiation and incoherent-sum checks. |
 | `multilayer_validation_check.py` | Closed-form stack attenuation and depth-range scaling anchors. |
 | `radiation_error_estimator_calibration.py` | Calibrates warning thresholds for the radiation error estimator. |
+| `shell_soft_hard_transport_observables.py` | Opt-in shell soft/hard inelastic transport against continuous stopping on Si/SiO2/MoS2 at 5/20/100 keV: stopping closure along trajectories, straggling, transmission, backscatter, range, `W_c` convergence, energy conservation, event contract. |
 | `sinc_bin_integration.py` | Bin-mean line quadrature on one transport: yield against an exact node reference, and CPU/CuPy/fused-CUDA agreement (remote only at 300 keV). |
 | `substep_invariance.py` | Measures emitted-radiation invariance under numerical transport substepping. |
 | `transport_core_goldens.py` | Verifies bit-for-bit CPU transport-core golden outputs. |
