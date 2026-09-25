@@ -253,3 +253,55 @@ Supplied by the coordinating context after both independent verifications above.
 - **CUDA equivalence anchor executed on hardware.** The gap recorded in the 2026-09-03 report and repeated above is closed: `PYRITE_TEST_BACKEND=cuda UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run --extra nvidia pyrite-dev test tests/montecarlo/test_spectrum_cuda_cheap_hoists.py` passed **5 tests** on an NVIDIA GeForce RTX 3060 Ti, including `test_eedl_brem_raw_kernel_matches_staged_numpy_reference` and `test_brem_raw_kernel_incident_hoist_matches_old_formula` for one and two layers. The fused float32 CUDA reduction therefore matches the independent staged NumPy reference on a real device, not only algebraically.
 - **Unrelated failure observed in the same GPU run.** `tests/montecarlo/test_gpu_oom_retry.py::test_brem_oom_halves_only_brem_and_preserves_original_case` fails when a CUDA device is actually present: it asserts `_attempted_brem_chunk == 100000`, but device-memory chunk admission clamps the attempt to 67104. That is a test/environment coupling in the OOM-retry anchor, not a physics discrepancy in this claim, and it is left for a separate task.
 - **Composite verdict.** `rederived`. Both halves of the row -- the EEDL track-length estimator and the analytic 3BN(a)+Elwert fallback -- now have independent fresh-context re-derivations that match, with the qualifications each section records: cutoff renormalization is a declared processing choice, self-absorption validation covers finite supported attenuation only (nonfinite coefficients read as transparent), the Koch and Motz original could not be retrieved, relativistic momenta are substituted into a non-relativistic formula, and the $T_i-k>10^{-6}$ keV guard zeroes a band where the limit is finite. Human sign-off remains pending and was not assigned.
+
+## Fresh-context verification of #174 unit-base interpolation, 2026-09-25
+
+### Independent derivation before implementation inspection
+
+This section was derived from the ledger row, the `_unit_base_panels`, `_prepare_eedl_grid`, `_eedl_brem_dsigma_dk` and `mc_brem_spectrum` docstrings, and the [ENDF-6 Formats Manual](https://nds.iaea.org/public/endf/endf-manual.pdf), section 0.5.2.2, equations (7)–(14), before reading the implementation bodies. ENDF's unit-base transform supplies the normalized coordinate and its Jacobian. The logarithmic incident-energy shape weight, geometric sub-panel spacing, endpoint holding, cutoff and final renormalization are PyRITE processing choices, not the EEDL file's declared `INT=2` law.
+
+Let native incident panels be $T_i<T_{i+1}$, with photon supports $[a_j,b_j]$, widths $h_j=b_j-a_j>0$, and piecewise-linear unit-area densities $p_j(k)$ in eV$^{-1}$. Define
+
+$$
+x=\frac{k-a_j}{h_j},\qquad q_j(x)=h_jp_j(a_j+h_jx),\qquad \int_0^1q_j(x)\,dx=1.
+$$
+
+At a sub-panel energy $T\in[T_i,T_{i+1}]$, the stated refinement requires distinct weights:
+
+$$
+u=\frac{T-T_i}{T_{i+1}-T_i},\qquad
+w=\frac{\ln(T/T_i)}{\ln(T_{i+1}/T_i)},\qquad
+a(T)=(1-u)a_i+ua_{i+1},\quad b(T)=(1-u)b_i+ub_{i+1}.
+$$
+
+The independent unit-base expression is
+
+$$
+q_T(x)=(1-w)q_i(x)+wq_{i+1}(x),\qquad
+p_T(k)=\frac{q_T((k-a(T))/(b(T)-a(T)))}{b(T)-a(T)}.
+$$
+
+The Jacobian is essential: $q_T$ is dimensionless and $p_T$ has units eV$^{-1}$. Positivity and unit area follow from $0\le w\le1$. At $T=T_i$ or $T_{i+1}$, both weights recover the corresponding native panel. If $b_i=T_i$ and $b_{i+1}=T_{i+1}$, linear endpoint interpolation gives $b(T)=T$ exactly. The union of native $x$ knots represents both piecewise-linear curves without approximation, so its linear mixture also integrates to one. Geometric spacing with at most 32 intervals per incident-energy decade controls refinement density; it changes neither this expression nor the native limits. The ENDF manual's lin-lin unit-base scheme would use $u$ for the shape as well; $w$ is the declared empirical departure for the sparse EEDL panels.
+
+Runtime interpolation between adjacent refined energies $R_m\le T\le R_{m+1}$ is specified as Cartesian at fixed $k$, with $v=(T-R_m)/(R_{m+1}-R_m)$ and density $\widetilde p(k\mid T)=(1-v)\bar p_m(k)+v\bar p_{m+1}(k)$, where $\bar p_m$ holds the endpoint value of panel $m$ through the next panel's endpoint. The physical density is $\mathbf 1_{0<k\le T}\widetilde p/C(T)$ with $C(T)=\int_0^T\widetilde p(k\mid T)\,dk$. For each linear segment with left density $y$ and slope $s$, the partial integral of width $d$ is $yd+sd^2/2$; this gives exact normalization for the represented piecewise-linear curve, independent of output energy bins. The extension can add nonzero probability above $R_m$, so the $k\le T$ cut and normalization remain necessary. Nonnegative native panels and convex weights preserve signs; the cutoff cannot create negative density. The total MF=23 cross section still multiplies the normalized MF=26 density, giving cm$^2$/eV after barn conversion, and the established $1/(4\pi)$ track-length factor supplies per steradian.
+
+### Code comparison and anchors
+
+`_unit_base_panels` constructs the union $x$ mesh, multiplies each native density by its own width, and combines adjacent rows with the geometric sub-panel fraction. Because $T=T_i(T_{i+1}/T_i)^{j/n}$, that fraction is exactly the independently derived $w=j/n$. It separately computes the linear-in-$T$ range fraction $u$ for both photon endpoints. The final native row is appended explicitly. The cumulative table trapezoids the piecewise-linear $q_T$ and therefore has unit area up to source floating-point normalization. These are term-by-term matches. The docstring cites section 0.5.2.3; the consulted ENDF manual puts the two-dimensional unit-base transform in section **0.5.2.2**. This is a citation correction, not a formula difference.
+
+`_prepare_eedl_grid` divides by each refined width, stages the resulting per-eV rows once on the output grid, and extends the lower row at its tip density through the next endpoint. `_prepare_eedl_segment_state` forms the runtime Cartesian fraction $v$, evaluates each refined panel's exact piecewise-linear CDF at $T$, adds the lower panel's constant-density extension up to $T$, mixes those surviving areas, and divides the separately interpolated MF=23 total by that area. `_evaluate_prepared_eedl` multiplies the staged-row mixture by this scale only at $0<k\le T$. Thus the output-grid interpolation and normalization agree with the derivation. The extension is zero for the final row and the last incident interval uses its preceding row at $v=1$.
+
+The CUDA path flattens the same staged $(\text{panel},k)$ array in row-major order, passes the same lower row, fraction, availability and normalized cross-section scale, and evaluates the same two-row mixture with the $0<k\le T$ guard. Its scalar path has no separate interpolation formula or CDF. This is a static source-to-code comparison; this verifier did not run CUDA hardware. The existing CUDA test uses hand-staged rows and checks the fused mixture, guard, weighting and attenuation, but does not independently construct the new unit-base panels.
+
+On CPU, `tests/montecarlo/test_bremsstrahlung_eedl.py` passed **14 tests** with `NUMBA_DISABLE_JIT=1`. Its direct anchors verify native-row reconstruction, unit-area sub-panels, $b(T)=T$, spacing, cutoff-normalized totals, and between-panel C/W agreement with Seltzer–Berger at 0.1 and 1 MeV. Those source comparisons support the empirical $\ln T$ choice at sampled points; they do not prove a global error bound or make it the ENDF-declared interpolation law. Initial collection without `NUMBA_DISABLE_JIT=1` failed because this read-only worktree prevented Numba from locating a writable cache; no physics assertion failed.
+
+The required `tests/dev/test_docs.py` passed **6 tests**. `pyrite-dev docs` could not delete its existing `docs/_autosummary` directory in this read-only worktree. An isolated Sphinx build of this unchanged page in `/tmp`, using the repository's MyST `dollarmath` and `amsmath` extensions, succeeded. Inspection of the rendered #174 section found every physics expression in `class="math notranslate"` elements and no unrendered math delimiters. The isolated build emitted one expected unresolved relative-link warning because the rest of the documentation tree was not copied.
+
+### Verdict for #174
+
+- **Claim**: `brem-spectrum` — `src/pyrite/montecarlo/spectrum/brem_unit_base.py::_unit_base_panels` and the ledgered EEDL/CUDA helpers — ENDF-6 Formats Manual section 0.5.2.2, equations (7)–(14), with PyRITE's declared $\ln T$ shape weight and endpoint processing.
+- **Filters**: units `pass`; limits `pass` for native panels, unit area, $b(T)=T$ and $k>T$ cutoff; signs/conventions `pass` for nonnegative convex mixtures and isotropic $1/(4\pi)$ factor.
+- **Re-derivation**: `matches` — unit-base Jacobian, distinct $\ln T$ shape and linear-$T$ endpoint weights, staged Cartesian mixture and exact surviving-area normalization agree with the code. The source-section number in the `_unit_base_panels` docstring differs from the consulted manual (0.5.2.3 versus 0.5.2.2).
+- **Verdict**: `rederived` for the #174 interpolation claim. CUDA comparison here is static; the existing hardware anchor in the prior record remains separate evidence. Human sign-off remains pending.
+- **Write-up**: `docs/validation/radiation-physics/brem-spectrum.md`.
+- **Suggested ledger change**: change `brem-spectrum` status from `filtered` to `rederived`; replace the sentence that says #174 needs fresh-context re-derivation with: “#174 unit-base refinement independently re-derived 2026-09-25: Jacobian, $\ln T$ shape and linear-$T$ endpoints, native limits, staged Cartesian interpolation, cutoff normalization and CUDA argument flow match. CPU EEDL anchors pass; CUDA path was reviewed statically in this verification. The $\ln T$ weight and endpoint processing are PyRITE choices beyond EEDL's declared `INT=2` law; human sign-off remains pending.” Correct the docstring's ENDF section citation to 0.5.2.2 in a separate implementation edit. Human applies ledger changes.

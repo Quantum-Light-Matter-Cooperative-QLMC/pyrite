@@ -32,7 +32,7 @@ def _unit_base_panels(table: BremsstrahlungCrossSectionTable) -> _UnitBasePanels
     incident energies. Interpolating those panels at fixed photon energy (the
     declared Cartesian law) gives every ``k`` above the lower panel's endpoint
     only the upper panel's share, collapsing the spectrum towards ``k -> T``.
-    Unit-base interpolation (ENDF-6 Formats Manual, section 0.5.2.3) instead
+    Unit-base interpolation (ENDF-6 Formats Manual, section 0.5.2.2) instead
     maps panel ``i`` onto ``x = (k - a_i)/(b_i - a_i)`` in ``[0, 1]``, where
     ``[a_i, b_i]`` is its photon range and its density becomes the unit-area
     ``q_i(x) = (b_i - a_i) p_i(k)``. Sub-panels at geometrically spaced ``T``

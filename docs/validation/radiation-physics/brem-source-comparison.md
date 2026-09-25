@@ -14,7 +14,48 @@ $$
 
 for $Z=1$–100, $T=1$ keV–10 GeV (57 nodes) and 30 $\kappa$ nodes from 0 to 1. It includes electron–nucleus and electron–electron bremsstrahlung and underlies ESTAR's radiative stopping. PyRITE reads Seltzer's original `BREME.DAT` (NBS, 1984) from EGSnrc's copy, `HEN_HOUSE/data/nist_brems.data`, pinned by commit and SHA-256 and fetched on demand into the user data directory. It is not packaged.
 
-Limiting check. With $\phi=\int_0^1\chi\,d\kappa$, radiative stopping is $S_\mathrm{rad}/\rho=(N_A/A)(Z^2/\beta^2)\,T\,\phi$. The table's trapezoid moment on its own nodes reproduces ESTAR within 0.5 % for C and W from 10 keV to 30 MeV. This confirms the layout (`kappa`-major blocks of `T` values per element), the units, and that electron–electron bremsstrahlung is included.
+Limiting check. With $\phi=\int_0^1\chi\,d\kappa$, radiative stopping is $S_\mathrm{rad}/\rho=(N_A/A)(10^{-27}\,\mathrm{cm^2/mb})(Z^2/\beta^2)\,T\,\phi$ in MeV cm²/g. The table's trapezoid moment on its own nodes reproduces ESTAR within 0.5 % for C and W from 10 keV to 30 MeV. This confirms the layout (`kappa`-major blocks of `T` values per element), the units, and that electron–electron bremsstrahlung is included.
+
+## Fresh-context independent derivation (2026-09-25)
+
+I derived the reduction from the cited Seltzer–Berger scaled table definition and the intended cross-section units before inspecting `brem_sources.py` or the production evaluator. The [Geant4 physics reference](https://geant4.web.cern.ch/documentation/pipelines/master/prm_html/PhysicsReferenceManual/electromagnetic/electron_incident/bremsstrahlung/ebrem.html) independently identifies the screened-nucleus and orbital-electron components of that reference cross section. [NIST ESTAR](https://pml.nist.gov/PhysRefData/Star/Text/method.html) reports mass radiative stopping in MeV cm²/g and uses the Seltzer–Berger cross sections. Neither source establishes the comparison's empirical tolerance bands; those remain measured gate criteria.
+
+Let $T$ and $k$ be kinetic and photon energies in MeV, $m_ec^2=0.51099895$ MeV, and $\kappa=k/T$. Then $\beta^2=1-(1+T/(m_ec^2))^{-2}$. The table defines $\chi=(\beta^2/Z^2)k\,d\sigma/dk$ in millibarns. Solving for the differential cross section and changing variables with $dk=T\,d\kappa$ gives
+
+$$
+\frac{d\sigma}{dk}=\frac{Z^2}{\beta^2}\frac{\chi(Z,T,\kappa)}{k}
+\quad[\mathrm{mb}/\mathrm{MeV}],
+\qquad
+\sigma_{>\kappa_c}=\frac{Z^2}{\beta^2}
+\int_{\kappa_c}^{1}\frac{\chi(Z,T,\kappa)}{\kappa}\,d\kappa
+\quad[\mathrm{mb}].
+$$
+
+The photon-energy-weighted first moment and mass radiative stopping are
+
+$$
+M_1=\int_0^T k\frac{d\sigma}{dk}\,dk
+=\frac{Z^2}{\beta^2}T\phi,
+\qquad
+\phi=\int_0^1\chi(Z,T,\kappa)\,d\kappa,
+$$
+
+$$
+\boxed{\frac{S_{\mathrm{rad}}}{\rho}
+=\frac{N_A}{A}\,(10^{-27}\,\mathrm{cm^2/mb})
+\frac{Z^2}{\beta^2}T\phi}
+\quad[\mathrm{MeV}\,\mathrm{cm^2/g}].
+$$
+
+Here $A$ is the molar mass in g/mol. The $10^{-27}$ conversion is required because $\chi$ and $\phi$ are in mb. The equation in the ledger row omits this factor when it labels $S_{\mathrm{rad}}/\rho$ with ESTAR units; the corrected equation appears above. That is an exact dimensional discrepancy in the written equation, even though the implementation and its ESTAR test apply the factor.
+
+At fixed positive $\kappa_c$, $\sigma_{>\kappa_c}$ is finite and nonnegative. A finite soft-photon limit of $\chi$ gives $d\sigma/dk\propto1/k$, so the cutoff-free zeroth moment diverges while $M_1$ remains finite. The photon endpoint is $k=T$; $\beta^2\simeq2T/(m_ec^2)$ for $T\ll m_ec^2$. The nuclear contribution scales roughly as $Z^2$ and the orbital-electron contribution roughly as $Z$. Consequently $1/(1+1/Z)$ is a useful nominal high-energy comparison floor, not a source identity or a universal bound: screening and $\kappa$ change its coefficient.
+
+### Source-to-code comparison
+
+Only after the derivation, I inspected `parse_seltzer_berger`, `beta_squared`, `model_chi`, `_hard_cross_section`, `compare_sources`, and the ESTAR anchor. The parser reshapes the table as element, $\kappa$, $T$; the comparison evaluates at the same table nodes. `model_chi` multiplies production $d\sigma/dk$ in cm²/eV by photon energy in eV and $10^{27}$ mb/cm², matching the table definition without an energy-unit factor. `beta_squared` matches the relativistic expression above. `compare_sources` uses the same trapezoid on both spectra for $\phi$ and for the hard $\chi/\kappa$ integral. Ratios cancel the common $Z^2/\beta^2$ factors and mb-to-cm² conversion; this makes the ratios valid but unable to catch the omitted factor in the written stopping-power equation.
+
+The committed independent table excerpt pins six C/W incident-energy panels. Its ESTAR test explicitly multiplies the table moment by $10^{-27}$ and compares C at 0.1 MeV with 0.003414 MeV cm²/g and W at 10 MeV with 1.132 MeV cm²/g, among four other anchors. The historical full-catalogue ratio results below are preserved; this fresh-context audit did not reproduce that full sweep. The focused ESTAR test passed all six anchors when run with a writable Numba cache.
 
 ## Method
 
@@ -50,10 +91,25 @@ EEDL, at its own incident panels (no interpolation): the first moment is 0.979�
 
 For carbon at 30 keV, the former $\chi$ was 0.09–0.15 of Seltzer–Berger for $\kappa\ge0.5$. This was an interpolation defect, not a data disagreement. #174 subsequently replaced fixed-photon-energy interpolation with unit-base refinement; the post-fix catalogue comparison is 0.96–1.34 pointwise for $0.05\le\kappa\le0.95$ from 10 keV to 1 MeV, with 0.99–1.07 in first moment. The remaining spread reflects sparse EEDL panels.
 
-## Verdict
+## Implementation-context verdict before independent review
 
-- **Claim:** `brem-source-comparison`. BremsLib reproduces Seltzer–Berger within the gated bands from 10 keV to 30 MeV. The lower band edge $1/(1+1/Z)$ is the omitted electron–electron share.
+- **Claim:** `brem-source-comparison`. BremsLib reproduces Seltzer–Berger within the gated bands from 10 keV to 30 MeV. The lower band edge $1/(1+1/Z)$ is a nominal allowance for the omitted electron–electron contribution, not an exact universal share.
 - **Filters:** units pass (ESTAR moment); limits pass (high-Z band closes to ±5 % pointwise and ±3 % in moment); conventions pass (same quadrature and node set on both sides).
 - **Recommendation for #86/#84:** BremsLib is the more accurate production spectrum source throughout 10 keV–30 MeV, for all catalogue elements. At 30–300 keV, which covers the catalogue's beam energies, it agrees within 0.96–1.02 pointwise for every catalogue Z, and within 0.97–1.01 in moment for Z ≥ 14. Its only systematic deficit is electron–electron bremsstrahlung at low Z and MeV energies: 8–14 % of the moment at 30 MeV for Z ≤ 8. #174 removed EEDL's interpolation collapse; its remaining accuracy limit is panel sparsity.
 - **Not covered:** the BremsLib angular shape; energies above 30 MeV; any full-track observable (#172).
-- **Status:** `filtered`. Fresh-context verification is pending, and only a human may mark this signed off.
+- **Status at the original comparison:** `filtered`. The later independent verification and corrected ledger status are recorded below; only a human may mark this signed off.
+
+## Fresh-context adjudication (2026-09-25)
+
+- **Re-derivation:** The scaled cross-section reduction, hard zeroth moment, radiative first moment, and production comparison algebra match. The written mass-stopping equation differs by the exact factor $10^{-27}\,\mathrm{cm^2/mb}$.
+- **Verdict:** `discrepancy` for the units filter of the ledgered stopping-power limiting check. This is a documentation equation error; the implementation and ESTAR anchor include the conversion. The historical `filtered` result above records the earlier comparison and remains unchanged here.
+- **Suggested ledger edit:** Insert $10^{-27}\,\mathrm{cm^2/mb}$ in the row's $S_{\mathrm{rad}}/\rho$ equation and note that $1/(1+1/Z)$ is a nominal, $\kappa$-dependent electron–electron allowance rather than an exact physical share. A human should apply the ledger edit and reconsider status; only a human may mark `signed-off`.
+
+## Post-correction recheck (2026-09-25)
+
+The ledger now states $S_{\mathrm{rad}}/\rho=(N_A/A)(10^{-27}\,\mathrm{cm^2/mb})(Z^2/\beta^2)T\phi$ in MeV cm²/g and calls $1/(1+1/Z)$ a nominal allowance rather than an exact electron–electron share. With $\phi=\int_0^1\chi\,d\kappa$ in mb, $T$ in MeV, and $N_A/A$ in atoms/g, the units reduce to MeV cm²/g. This matches the independent derivation above and the six ESTAR anchors. The earlier missing-factor discrepancy remains recorded in the preceding section as history; the corrected row has no remaining unit discrepancy.
+
+- **Filters:** units pass; limits pass for the stated gated domain and the finite first moment; signs/conventions pass. The $\kappa\to0$ hard-cross-section divergence and the non-universal electron–electron coefficient remain outside the gate or are described as allowances.
+- **Re-derivation:** `matches` — the corrected ledger equation, hard zeroth moment, first moment, and production $d\sigma/dk$ reduction agree with the independent expressions and the inspected implementation.
+- **Final verifier verdict:** `rederived` for `brem-source-comparison`. The historical full-catalogue numerical envelope is retained as implementation-context evidence; the focused ESTAR anchor passed six cases. The independent derivation does not extend to angular shape, energies above 30 MeV, or full-track observables.
+- **Ledger status:** `rederived` after the corrected equation was independently rechecked. Only a human may mark `signed-off`.
