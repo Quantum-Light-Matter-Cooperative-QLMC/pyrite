@@ -78,6 +78,7 @@ beam-transport/transport-midpoint-stopping
 :caption: Radiation physics
 
 radiation-physics/absorption-length
+radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model
 radiation-physics/bremslib-radiative-event-spectrum
