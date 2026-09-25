@@ -21,8 +21,8 @@ These pages describe **how the simulated physical system is represented**. For e
 
 ### Incoherent emission
 
-- The continuum is isotropic, unscreened Born Bethe--Heitler bremsstrahlung, evaluated with relativistic momenta and an Elwert Coulomb correction along the electron tracks; see [Bremsstrahlung](radiation-physics/bremsstrahlung.md).
-- Characteristic radiation, fluorescence, and secondary-photon production are not modeled.
+- The continuum defaults to isotropic EEDL bremsstrahlung — the ENDF-6 MF=23/MT=527 total cross section multiplied by the normalized MF=26/MT=527 photon-energy density. Unscreened Born Bethe--Heitler with an Elwert correction remains an optional/fallback backend, and a direction-resolved BremsLib backend is implemented but not yet run-selected; see [Bremsstrahlung](radiation-physics/bremsstrahlung.md).
+- Characteristic radiation is modeled: electron-impact vacancies from EEDL subshell ionization cross sections relax through xraydb fluorescence yields with L-shell Coster--Kronig redistribution, and each line carries its natural-width Lorentzian as a separate incoherent component; see [Characteristic radiation](radiation-physics/characteristic-radiation.md). Secondary fluorescence and Auger-fed daughter vacancies are not modeled.
 
 ### Photon and detector transport
 
