@@ -203,6 +203,24 @@ $$
 
 Soft energy loss can remain condensed along those segments.
 
+```{important}
+**Amended 2026-09-25 (#93 evidence).** Condensed soft *energy loss* along a
+segment is supported by the evidence; condensed soft *direction change* is
+not assumed to be. Soft inelastic collisions ($W\le W_c$) also deflect the
+primary (PENELOPE-2024 Eqs. 4.101–4.118). For Si, SiO₂ and MoS₂ at 5–100 keV,
+that deflection is only 0.3–1.6% of the elastic angular diffusion rate at
+$W_c=50$ eV. Accumulated at collision vertices, it moves Si PXR/CBS lines by
+at most 0.35%. The within-segment direction wander it produces, emulated as a
+per-segment tilt, changes line widths by up to 2.7% and a low-energy line by
+3.4%, at 2–8 Monte Carlo standard deviations (RTX 5080, 20000 electrons,
+6 seeds; `checks/soft_deflection_line_sensitivity.py`). Folding the soft
+deflection into existing vertices therefore does not preserve the coherent
+spectrum. Its high-accuracy form is discrete soft angular events that split
+segments, at the rate of the soft distant channel. For solids that is the
+conduction-band loss, so its rate needs independent validation first; see
+`docs/validation/beam-transport/shell-soft-hard-transport.md`.
+```
+
 ```{note}
 This does not require reproducing the PENELOPE transport algorithm. PyRITE can
 adopt PENELOPE-quality interaction models while retaining its own event-by-event

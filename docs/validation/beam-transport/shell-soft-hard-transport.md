@@ -199,6 +199,99 @@ soft collision changes energy but not direction. Its effect on backscatter
 should fall as $W_c$ decreases, and it is below this study's resolution for
 30–200 eV.
 
+## Soft inelastic angular deflection (sizing)
+
+PENELOPE folds soft inelastic deflection into its random hinge through the
+transport mean free paths of the soft angular DCS (Eqs. 4.101–4.118). PyRITE
+has no hinge: it simulates every elastic collision, and PXR/CBS read each
+segment's direction. `checks/soft_inelastic_deflection.py` sizes the
+omission from the same closed shell model and stopping normalization the
+transport uses. It evaluates $1/\lambda_{\rm in,1}^{(s)}$ from the soft
+distant longitudinal DCS (recoil density $1/[Q(Q+2m_ec^2)]$ on
+$[Q_-,Q'_k]$, $\mu(Q)$ from Eq. 4.101) and the soft close DCS ($Q=W$,
+Eq. 3.134); distant transverse losses do not deflect. It compares that rate
+with the elastic $1/\lambda_{\rm el,1}$ of the default `mott` model (NIST
+SRD 64 transport cross sections; screened Rutherford with the Joy $\alpha$
+for O, as transport does). The close-collision quadrature reproduces
+`shell_gos`'s $\sigma^{(0)}$ to $6\times10^{-15}$.
+
+Soft/el and hard/el are the soft and hard inelastic shares of the angular
+diffusion rate ($\langle\theta^2\rangle$ per path), relative to elastic.
+$\theta_{\rm row}=\sqrt{2\lambda_{\rm el}/\lambda^{(s)}_{\rm in,1}}$ is the
+rms soft deflection over one elastic mean free path.
+
+| material, E₀ | λ_el (Å) | λ_el,1 (Å) | soft/el, W_c=50 | hard/el, W_c=50 | soft/el, W_c=200 | band share of soft, 50 eV | θ_row rms, 50 eV (mrad) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| silicon 5 keV | 46 | 1.96e+03 | 1.20% | 5.12% | 2.69% | 100% | 23.6 |
+| silicon 20 keV | 165 | 2.21e+04 | 0.87% | 5.62% | 2.02% | 100% | 11.4 |
+| silicon 100 keV | 785 | 3.78e+05 | 0.67% | 6.13% | 1.58% | 100% | 5.3 |
+| sio2 5 keV | 55 | 2.21e+03 | 1.55% | 5.93% | 3.13% | 100% | 27.8 |
+| sio2 20 keV | 206 | 2.58e+04 | 1.18% | 6.64% | 2.43% | 100% | 13.7 |
+| sio2 100 keV | 992 | 4.69e+05 | 0.95% | 7.64% | 1.98% | 100% | 6.3 |
+| mos2 5 keV | 21 | 558 | 0.51% | 2.31% | 1.11% | 95% | 19.7 |
+| mos2 20 keV | 65 | 5.28e+03 | 0.35% | 2.30% | 0.76% | 95% | 9.2 |
+| mos2 100 keV | 270 | 8.22e+04 | 0.26% | 2.40% | 0.56% | 95% | 4.1 |
+
+Soft plus hard is independent of $W_c$ (Si 6.3–6.9%, SiO₂ 7.5–8.6%,
+MoS₂ 2.6–2.8% of the elastic rate), as the partition requires, and near
+Fano's $\sim1/Z$ estimate of atomic-electron scattering.
+
+- Continuous transport has no inelastic deflection. It therefore
+  under-diffuses directions by the whole 2.6–8.6%. The shell mode at
+  $W_c=50$ eV restores 81–90% of that through explicit hard recoil.
+- The remaining soft omission is 0.3–1.6% of the angular diffusion rate at
+  $W_c=50$ eV, and 0.6–3.1% at 200 eV. Its effect on the depth-accumulated
+  angular spread is half that, 0.1–0.8% in rms angle.
+- The conduction-band loss at $W_{cb}$ carries 95–100% of the soft angular
+  rate at $W_c\le50$ eV. The same channel carries the total-IMFP deficit of
+  `penelope-shell-rate-closure`, so the soft share is uncertain by up to
+  that deficit's 34–40% rate excess. That shifts the table's soft column,
+  not its conclusion.
+- Per segment the picture differs. $\theta_{\rm row}$ is 4–28 mrad, about
+  10% of a typical elastic kink. Coherent resonances move by
+  $\delta\omega/\omega\sim\delta\theta$, and a segment's own sinc width
+  $\sim c/(\omega L)$ narrows as rows lengthen at high energy. At 100 keV a
+  row's soft wander can therefore approach or exceed the per-segment line
+  width, even though the ensemble spread barely moves. Whether that matters
+  for PXR/CBS line shapes needs an emission-level comparison. It can't be
+  settled from transport moments.
+
+### Line-spectrum response (emulated)
+
+`checks/soft_deflection_line_sensitivity.py` ran on an RTX 5080 (job 19,
+2026-09-25). It used Si catalog cases at 30 and 100 keV, 1000 Å and 1 µm,
+tilt 30°, with 20000 electrons and six seeds per case, at $W_c=50$ eV. Each
+seed was transported once. The incoherent line spectrum was then evaluated on
+the same segments with the transported directions and with two emulations of
+the omitted soft deflection:
+
+- **vertex:** a cumulative per-electron random walk at the soft rate, i.e.
+  the extra angular diffusion;
+- **row:** each segment tilted by the mean deviation that a within-row soft
+  random walk produces. Folding the deflection into existing vertices would
+  miss this.
+
+Paired differences are compared with the seed-to-seed SD at 20000 electrons.
+
+- **vertex, $k=1$:** every line's yield, centroid and rms width moves by at
+  most 0.35%. The largest shifts are about 3 SD (100 keV, 1 µm width,
+  +0.22%). The extra diffusion is negligible.
+- **row, $k=1$:** the lowest-energy feature (~42 eV) at 30 keV widens 2.5–3.4%
+  and loses 1.4% of its yield, 6–8 SD. PXR lines move by 0.1–1.3% in width
+  and up to 0.9 eV in centroid, up to about 7 SD. The largest is a 2.7% width
+  change at 100 keV, 1 µm (2.4 SD).
+- **$k=4$** (a bound on the conduction-band rate uncertainty): row effects
+  grow to about 10% on the ~42 eV feature and 1–2% on PXR lines. Vertex
+  effects stay below 1%.
+
+The row emulation is crude. It tilts the whole segment rather than bending
+it, and substep rows of one flight are tilted independently. It still shows
+that the within-segment direction wander, not the added diffusion, is the
+part that reaches line shapes at the percent level. Folding the soft
+deflection into vertices would therefore not capture it. Settling it needs
+discrete soft angular events that split rows, whose rate is the
+conduction-band rate carrying the total-IMFP deficit.
+
 ## Findings and limits
 
 - Stopping closes to corrected `stp.dat` along trajectories within 0.6% at
@@ -208,7 +301,8 @@ should fall as $W_c$ decreases, and it is below this study's resolution for
   substitution, which kinks $\mathcal N(E)$. The transport LUT then reports a
   stopping interpolation error of about $2\times10^{-4}$
   (`TransportLUTToleranceWarning`).
-- Omitted: soft inelastic angular deflection, PENELOPE's Eq. 4.65
+- Omitted: soft inelastic angular deflection (sized above: 0.3–1.6% of the
+  angular diffusion rate at $W_c=50$ eV), PENELOPE's Eq. 4.65
   energy-dependence correction of the soft DCS, and secondary and vacancy
   transport (#94). The primary's balance closes exactly; secondary energy is
   recorded per hard row, not deposited.

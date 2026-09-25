@@ -603,8 +603,9 @@ through `Numerics`, `Settings`, `Case`, sweep/scene lowering, profile TOML and
 `pyrite profile numerics set`, and the brem repair path. Both keys are
 divergence-only in case payloads and run identity, so continuous-stopping
 digests are unchanged; shell cases resolve to a CPU core. A 200-electron Si
-case runs end to end in both modes. The mode stays opt-in: the IMFP
-expected-failure gate and CUDA parity still block production use.
+case runs end to end in both modes. The mode stays opt-in. CUDA support is
+recorded below. The total-IMFP deficit is not a gate (owner decision
+2026-09-24, `penelope-shell-rate-closure.md`, "Total IMFP note").
 
 ## Decision, 2026-09-25: bound distant-loss law
 
@@ -646,5 +647,13 @@ straggling, bookkeeping, and five-sigma ensemble agreement at 4000 electrons.
 The full `-m hardware` suite is 69 passed, 2 skipped (Intel SYCL opt-in and
 the NumPy-pinned segment-staging test); its first run caught a launcher
 parameter named `inelastic` instead of the reference core's `inelastic_args`,
-fixed before the rerun. The IMFP expected-failure gate still blocks
-production use.
+fixed before the rerun.
+
+Remaining before the mode leaves opt-in: independent validation of the
+hard-event transfer spectrum; independent backscatter or angular data for
+the explicit inelastic deflection; secondary and vacancy transport (#94);
+fresh-context verification of the `unverified` shell ledger rows. The
+total-IMFP deficit is not among them: it sits in the conduction-band loss at
+$W_{cb}$, which is always soft for an admissible $W_c$, so it enters only the
+stopping-closed soft moments; the $W_c=30$–200 eV convergence study shows no
+trend in any transport observable.
