@@ -16,7 +16,7 @@ from .cores import (
     EXIT_TRANSMITTED,
 )
 from .kinematics import _beta_array, stream_keys
-from .scattering import _sigma_browning_cm2
+from .scattering import _elsepa_rate_scalar, _sigma_browning_cm2
 from .stopping import _dEds_spliced_compound
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,7 @@ def _flight_diagnostic_summary(
     L_E_cross,
     L_ncm3,
     elastic_model,
+    elsepa_group=None,
 ):
     """Estimate frozen-state transport error per physical flight, then reduce it.
 
@@ -154,8 +155,16 @@ def _flight_diagnostic_summary(
             continue
         start_total = np.zeros(start.size, dtype=float)
         end_total = np.zeros(end.size, dtype=float)
-        for Z, ncm3 in zip(Z_arr, ncm3_arr, strict=True):
-            if elastic_model == "mott":
+        for i_el, (Z, ncm3) in enumerate(zip(Z_arr, ncm3_arr, strict=True)):
+            if elastic_model == "elsepa":
+                assert elsepa_group is not None
+                _, el_start, el_len, el_logE, el_log_rate = elsepa_group[:5]
+                for values, total in ((start, start_total), (end, end_total)):
+                    for j, E in enumerate(values):
+                        total[j] += _elsepa_rate_scalar(
+                            E, el_logE, el_log_rate, el_start[L, i_el], el_len[L, i_el]
+                        )
+            elif elastic_model == "mott":
                 start_total += _sigma_browning_cm2(Z, start) * ncm3
                 end_total += _sigma_browning_cm2(Z, end) * ncm3
             else:

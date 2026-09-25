@@ -26,7 +26,9 @@ from .kinematics import _SM64_ONE, _SM64_ZERO, _stream_uniform_scalar, beta_from
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
 from .scattering import (
     _alpha_sr_joy_scalar,
+    _elsepa_rate_scalar,
     _interp_mott_log_alpha_scalar,
+    _sample_cos_theta_elsepa,
     _sample_cos_theta_from_alpha,
     _scatter_rates_mott_scalar,
     _scatter_rates_sr_scalar,
@@ -208,7 +210,8 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 L_sr_joy_numer,
             ) = materials[5:11]
             sbethe_on, L_sbethe_n, L_sbethe_logE, L_sbethe_logS = materials[11:]
-            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott[:5]
+            (el_has, el_start, el_len, el_logE, el_log_rate, el_cdf, el_pdf, el_mu) = mott[5:]
         else:
             (
                 lut_log_E_min,
@@ -347,7 +350,11 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                 sr_joy_numer = L_sr_joy_numer[L]
                 total_rate = 0.0
                 for i_el in range(n_el):
-                    if elastic_model_code == 1:
+                    if elastic_model_code == 2:
+                        rate = _elsepa_rate_scalar(
+                            E_j, el_logE, el_log_rate, el_start[L, i_el], el_len[L, i_el]
+                        )
+                    elif elastic_model_code == 1:
                         rate = _scatter_rates_mott_scalar(
                             E_j, mott_numer[i_el], mott_denom1[i_el], mott_denom2[i_el]
                         )
@@ -850,7 +857,11 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                     cumulative, i_el = 0.0, n_el - 1
                     for k_el in range(n_el):
                         if per_electron:
-                            if elastic_model_code == 1:
+                            if elastic_model_code == 2:
+                                rate = _elsepa_rate_scalar(
+                                    E_j, el_logE, el_log_rate, el_start[L, k_el], el_len[L, k_el]
+                                )
+                            elif elastic_model_code == 1:
                                 rate = _scatter_rates_mott_scalar(
                                     E_j, mott_numer[k_el], mott_denom1[k_el], mott_denom2[k_el]
                                 )
@@ -864,11 +875,14 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                         if cumulative > u:
                             i_el = k_el
                             break
+                alpha = 0.0
                 if lut:
                     alpha_i, alpha_f = _lut_index_frac_scalar(
                         E_keV[e], lut_log_E_min, lut_inv_dlogE, lut_n_energy
                     )
                     alpha = _lut_lerp_3d(lut_alpha, L, i_el, alpha_i, alpha_f)
+                elif elastic_model_code == 2:
+                    pass  # tabulated angular distribution, sampled below
                 elif elastic_model_code == 1 and mott_has_table[L, i_el]:
                     log_alpha = _interp_mott_log_alpha_scalar(
                         np.log10(E_keV[e] * 1e3),
@@ -887,7 +901,21 @@ def make_cpu_transport_core(*, grooved=False, per_electron=False, lut=False, ine
                     draws[e] += _SM64_ONE
                 else:
                     cos_u, phi_u = rng.random(), rng.random()
-                cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
+                if lut:
+                    cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
+                elif elastic_model_code == 2:
+                    cos_t = _sample_cos_theta_elsepa(
+                        E_keV[e],
+                        cos_u,
+                        el_logE,
+                        el_cdf,
+                        el_pdf,
+                        el_mu,
+                        el_start[L, i_el],
+                        el_len[L, i_el],
+                    )
+                else:
+                    cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
                 dirs[e, 0], dirs[e, 1], dirs[e, 2] = _rotate_direction_scalar(
                     dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, 2.0 * np.pi * phi_u
                 )

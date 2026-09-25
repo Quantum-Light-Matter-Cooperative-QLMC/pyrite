@@ -232,7 +232,7 @@ def run_transport_kernel(
         L_sbethe_logE,
         L_sbethe_logS,
     ) = materials
-    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott
+    (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat) = mott[:5]
     (alive, clock, pos, dirs, E_keV, E_cut_by_electrons) = state
     (
         seg_dir,

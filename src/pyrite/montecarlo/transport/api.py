@@ -31,7 +31,12 @@ from .cores import (
 from .hard_inelastic import hard_stream_keys, validate_inelastic_args
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
-from .scattering import _NO_MOTT, _flatten_mott_tables, _mott_alpha_table
+from .scattering import (
+    _NO_MOTT,
+    _flatten_mott_tables,
+    _mott_alpha_table,
+    pack_elsepa_tables,
+)
 from .stopping import (
     _element_crossover_keV,
     pack_sbethe_stopping_tables,
@@ -80,6 +85,7 @@ def simulate_trajectories(
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
     inelastic_materials=None,
+    elastic_tables=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -94,9 +100,20 @@ def simulate_trajectories(
     limiting case each one must preserve.
 
     elastic_model: "mott" (default, NIST SRD 64 Mott transport cross section
-      via a Browning fit) or "sr" (analytic screened-Rutherford, no data
-      files). See docs/physics/beam-transport/elastic-scattering.md.
+      via a Browning fit), "sr" (analytic screened-Rutherford, no data
+      files), or "elsepa" (tabulated ELSEPA total cross sections and full
+      angular distributions from ``elastic_tables``; exact CPU cores only --
+      no transport LUT, no CUDA core yet). See
+      docs/physics/beam-transport/elastic-scattering.md.
       Validation: electron-transport
+      Validation: elsepa-elastic-sampling
+
+    elastic_tables: required by, and only accepted with, ``elastic_model=
+      "elsepa"``. One entry per layer, each a sequence of one mapping per
+      element in composition order holding ``energy_eV``,
+      ``total_elastic_cm2``, ``mu`` and ``dcs_cm2_sr`` on ELSEPA's shared
+      angular grid. Every incident energy and cutoff must lie inside every
+      table; extrapolation is rejected.
 
     beam_dir: initial electron direction in the SLAB frame (default +z,
     i.e. normal incidence). For a tilted sample use tilted_geometry().
@@ -332,7 +349,8 @@ def simulate_trajectories(
     seed, max_steps
         Random seed and maximum transport steps per electron.
     elastic_model
-        ``"mott"`` tabulated scattering or analytic ``"sr"`` scattering.
+        ``"mott"`` tabulated scattering, analytic ``"sr"`` scattering, or
+        ``"elsepa"`` sampling from ``elastic_tables``.
     beam_dir
         Mean incident direction in the slab frame; defaults to ``+z``.
     composition
@@ -408,8 +426,12 @@ def simulate_trajectories(
             )
         ]
 
-    if elastic_model not in ("mott", "sr"):
-        raise ValueError("elastic_model must be 'mott' or 'sr'")
+    if elastic_model not in ("mott", "sr", "elsepa"):
+        raise ValueError("elastic_model must be 'mott', 'sr', or 'elsepa'")
+    if (elastic_model == "elsepa") != (elastic_tables is not None):
+        raise ValueError(
+            "elastic_tables is required by, and only valid with, elastic_model='elsepa'"
+        )
     if energy_model not in ("frozen", "midpoint"):
         raise ValueError("energy_model must be 'frozen' or 'midpoint'")
     shell_mode = validate_inelastic_args(
@@ -545,7 +567,10 @@ def simulate_trajectories(
     L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
     internal_bounds = L_bot[:-1].copy()
 
-    mott_group = _flatten_mott_tables(mott_tables)
+    elsepa_group = pack_elsepa_tables(elastic_tables, L_ncm3)
+    # One grouped argument carries both tabulated elastic models; the cores
+    # read the ELSEPA half only when elastic_model_code == 2.
+    mott_group = _flatten_mott_tables(mott_tables) + elsepa_group
     _nsys_pop()
 
     _nsys_push("cxr.transport.sample")
@@ -648,6 +673,16 @@ def simulate_trajectories(
                 raise ValueError(
                     f"transport energy range must be within SBETHE table [{lower:g}, {upper:g}] keV"
                 )
+    if elastic_tables is not None:
+        for layer_tables in elastic_tables:
+            for table in layer_tables:
+                energy_eV = np.asarray(table["energy_eV"], dtype=float)
+                lower, upper = float(energy_eV[0]) / 1e3, float(energy_eV[-1]) / 1e3
+                if float(np.min(E_cut_by_electrons)) < lower or float(np.max(E_keV)) > upper:
+                    raise ValueError(
+                        f"transport energy range must be within ELSEPA table "
+                        f"[{lower:g}, {upper:g}] keV"
+                    )
     shell_tables = None
     if shell_mode:
         # Lazy: the host shell model pulls in catalog and EEDL data.
@@ -698,9 +733,11 @@ def simulate_trajectories(
     initial_E_keV = E_keV.copy()
     _nsys_pop()
 
-    elastic_model_code = 1 if elastic_model == "mott" else 0
+    elastic_model_code = {"sr": 0, "mott": 1, "elsepa": 2}[elastic_model]
     transport_lut = None
-    if groove is None and transport_lut_config.enabled:
+    # The LUT stores a screened-Rutherford screening parameter per energy,
+    # which has no ELSEPA counterpart, so ELSEPA runs the exact cores.
+    if groove is None and transport_lut_config.enabled and elastic_model != "elsepa":
         _nsys_push("cxr.transport.lut")
         transport_lut = build_transport_energy_lut(
             float(np.min(E_cut_by_electrons)),
@@ -990,6 +1027,11 @@ def simulate_trajectories(
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
         if transport_core == "cuda":
+            if elastic_model == "elsepa":
+                raise NotImplementedError(
+                    "elastic_model='elsepa' is not implemented on the CUDA core yet; "
+                    "run with transport_core='per-electron' or 'lockstep'"
+                )
             from ._jit_launch import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()
@@ -1244,5 +1286,6 @@ def simulate_trajectories(
             L_E_cross,
             L_ncm3,
             elastic_model,
+            elsepa_group,
         )
     return result
