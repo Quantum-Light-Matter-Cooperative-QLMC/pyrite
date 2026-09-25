@@ -371,3 +371,66 @@ def pack_radiative_layer_tables(
         top,
         scaled_sdcs,
     )
+
+
+def validate_radiative_args(
+    radiative_model,
+    radiative_cutoff_eV,
+    bremslib_tables,
+    *,
+    energy_model,
+    groove,
+    straggling,
+    keep_segments_on_device,
+) -> bool:
+    """Check ``simulate_trajectories``' radiative arguments; True in coupled mode."""
+    if radiative_model not in ("uncoupled", "bremslib-soft-hard"):
+        raise ValueError("radiative_model must be 'uncoupled' or 'bremslib-soft-hard'")
+    if radiative_model == "uncoupled":
+        if radiative_cutoff_eV is not None or bremslib_tables is not None:
+            raise ValueError(
+                "radiative_cutoff_eV and bremslib_tables require "
+                "radiative_model='bremslib-soft-hard'"
+            )
+        return False
+    if radiative_cutoff_eV is None or bremslib_tables is None:
+        raise ValueError("bremslib-soft-hard requires radiative_cutoff_eV and bremslib_tables")
+    if not np.isfinite(radiative_cutoff_eV) or radiative_cutoff_eV <= 0.0:
+        raise ValueError("radiative_cutoff_eV must be positive and finite")
+    if energy_model != "midpoint" or groove is not None or straggling:
+        raise ValueError("bremslib-soft-hard requires midpoint, ungrooved, unstraggled transport")
+    if keep_segments_on_device:
+        raise ValueError("bremslib-soft-hard completes photon rows on the host")
+    return True
+
+
+def radiative_core_args(
+    compositions, tables, cutoff_eV, electron_cutoffs_keV, energies_keV, seed, n_electrons
+) -> tuple:
+    """The exact cores' ``radiative_args``: stream keys, cutoff, packed tables."""
+    from ._jit_radiative import radiative_stream_keys
+
+    min_cutoff_eV = float(np.min(electron_cutoffs_keV)) * 1e3
+    if cutoff_eV > min_cutoff_eV:
+        raise ValueError("radiative_cutoff_eV must not exceed the electron cutoff")
+    packed = pack_radiative_layer_tables(
+        compositions, tables, min_cutoff_eV, float(np.max(energies_keV)) * 1e3
+    )
+    return (radiative_stream_keys(seed, n_electrons), float(cutoff_eV)) + packed
+
+
+def add_radiative_result_fields(result, photon_k_eV, photon_Z, tables, cutoff_eV, seed) -> None:
+    """Attach photon rows, their completed kinematics, and the mode's identity."""
+    result["hard_radiative_k_eV"] = photon_k_eV
+    result["hard_radiative_Z"] = photon_Z
+    complete_hard_radiative_events(result, tables, seed)
+    result["radiative"] = {
+        "model": "bremslib-soft-hard",
+        "cutoff_eV": float(cutoff_eV),
+        "bremslib_tables": tuple(
+            sorted(
+                (element, table.atomic_number, table.key, table.digest)
+                for element, table in tables.items()
+            )
+        ),
+    }

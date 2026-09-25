@@ -5,7 +5,10 @@ from numba import njit
 
 from ..geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
 from ..groove import _first_surface_event_scalar_numba
-from ._jit_radiative import radiative_layer_moments_scalar, sample_hard_photon_energy_scalar
+from ._jit_radiative import (
+    radiative_layer_moments_scalar,
+    sample_hard_photon_energy_scalar,
+)
 from .events import (
     EVENT_CUTOFF,
     EVENT_ELASTIC,
@@ -24,7 +27,12 @@ from .hard_inelastic import (
     _sample_hard_transfer_eV,
     _soft_loss_sample_keV,
 )
-from .kinematics import _SM64_ONE, _SM64_ZERO, _stream_uniform_scalar, beta_from_keV_scalar
+from .kinematics import (
+    _SM64_ONE,
+    _SM64_ZERO,
+    _stream_uniform_scalar,
+    beta_from_keV_scalar,
+)
 from .lut import _lut_index_frac_scalar, _lut_lerp_1d, _lut_lerp_2d, _lut_lerp_3d
 from .scattering import (
     _alpha_sr_joy_scalar,
@@ -1219,3 +1227,17 @@ _transport_core_ungrooved_perelectron_radiative = make_cpu_transport_core(
 _transport_core_ungrooved_perelectron_inelastic_radiative = make_cpu_transport_core(
     per_electron=True, inelastic=True, radiative=True
 )
+
+
+def exact_ungrooved_core(*, per_electron, inelastic, radiative):
+    """The exact (non-LUT) ungrooved CPU core for a collision/radiative mode."""
+    return {
+        (False, False, False): _transport_core_ungrooved,
+        (False, True, False): _transport_core_ungrooved_inelastic,
+        (False, False, True): _transport_core_ungrooved_radiative,
+        (False, True, True): _transport_core_ungrooved_inelastic_radiative,
+        (True, False, False): _transport_core_ungrooved_perelectron,
+        (True, True, False): _transport_core_ungrooved_perelectron_inelastic,
+        (True, False, True): _transport_core_ungrooved_perelectron_radiative,
+        (True, True, True): _transport_core_ungrooved_perelectron_inelastic_radiative,
+    }[(bool(per_electron), bool(inelastic), bool(radiative))]
