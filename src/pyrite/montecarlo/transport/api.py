@@ -18,16 +18,14 @@ from .batching import (
 )
 from .cores import (
     _transport_core_grooved,
-    _transport_core_ungrooved,
-    _transport_core_ungrooved_inelastic,
     _transport_core_ungrooved_lut,
     _transport_core_ungrooved_lut_inelastic,
-    _transport_core_ungrooved_perelectron,
-    _transport_core_ungrooved_perelectron_inelastic,
     _transport_core_ungrooved_perelectron_lut,
     _transport_core_ungrooved_perelectron_lut_inelastic,
+    exact_ungrooved_core,
 )
 from .hard_inelastic import hard_stream_keys, validate_inelastic_args
+from .hard_radiative import validate_radiative_args
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import DEFAULT_TRANSPORT_LUT_CONFIG, build_transport_energy_lut
@@ -80,6 +78,9 @@ def simulate_trajectories(
     inelastic_cutoff_eV=None,
     inelastic_materials=None,
     elastic_tables=None,
+    radiative_model="uncoupled",
+    radiative_cutoff_eV=None,
+    bremslib_tables=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -238,6 +239,13 @@ def simulate_trajectories(
           ``hard_W_keV``/``hard_channel``/``inelastic`` to the result. See
           docs/physics/beam-transport/shell-soft-hard-transport.md.
           Validation: shell-soft-hard-transport
+
+    radiative_model: "uncoupled" (default) keeps post-hoc brem scoring and the
+      existing tracks. "bremslib-soft-hard" (exact cores only, no LUT) adds
+      soft BremsLib loss below ``radiative_cutoff_eV`` and explicit photons
+      above it; see ``hard_radiative.validate_radiative_args`` for its
+      requirements and ``spectrum.brem_events`` for scoring. Validation:
+      bremslib-radiative-partition, bremslib-radiative-event-spectrum.
 
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
@@ -436,6 +444,15 @@ def simulate_trajectories(
         groove=groove,
         stopping_tables=stopping_tables,
     )
+    radiative_mode = validate_radiative_args(
+        radiative_model,
+        radiative_cutoff_eV,
+        bremslib_tables,
+        energy_model=energy_model,
+        groove=groove,
+        straggling=straggling,
+        keep_segments_on_device=keep_segments_on_device,
+    )
 
     requested_core = transport_core
     transport_core = resolve_transport_core(transport_core, Ne, groove)
@@ -623,6 +640,19 @@ def simulate_trajectories(
         _nsys_pop()
         # The cores' continuous stopping is the soft share from here on.
         prepared_stopping_tables = list(shell_tables.soft_stopping_tables)
+    radiative_args = None
+    if radiative_mode:
+        from .hard_radiative import radiative_core_args
+
+        radiative_args = radiative_core_args(
+            [layer[2] for layer in layers],
+            bremslib_tables,
+            radiative_cutoff_eV,
+            E_cut_by_electrons,
+            E_keV,
+            seed,
+            Ne,
+        )
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
@@ -660,8 +690,14 @@ def simulate_trajectories(
     elastic_model_code = {"sr": 0, "mott": 1, "elsepa": 2}[elastic_model]
     transport_lut = None
     # The LUT stores a screened-Rutherford screening parameter per energy,
-    # which has no ELSEPA counterpart, so ELSEPA runs the exact cores.
-    if groove is None and transport_lut_config.enabled and elastic_model != "elsepa":
+    # which has no ELSEPA counterpart, so ELSEPA runs the exact cores; it
+    # does not run the coupled radiative mode either.
+    if (
+        groove is None
+        and transport_lut_config.enabled
+        and not radiative_mode
+        and elastic_model != "elsepa"
+    ):
         _nsys_push("cxr.transport.lut")
         transport_lut = build_transport_energy_lut(
             float(np.min(E_cut_by_electrons)),
@@ -709,6 +745,8 @@ def simulate_trajectories(
     seg_event = np.empty(n_end_rows, dtype=np.int8)
     seg_hard_W = np.empty(n_end_rows if shell_mode else 0, dtype=float)
     seg_hard_ch = np.empty(seg_hard_W.size, dtype=np.int16)
+    seg_rad_k = np.empty(n_end_rows if radiative_mode else 0, dtype=float)
+    seg_rad_Z = np.empty(seg_rad_k.size, dtype=np.int16)
     inelastic_args = None
     if shell_tables is not None:
         inelastic_args = shell_tables.core_args(hard_stream_keys(seed, Ne))
@@ -730,33 +768,28 @@ def simulate_trajectories(
     # their own ``stream_key``/``d_keys`` directly. ``stragg_layer_tables``
     # supplies the per-electron LUT core with the per-element split the LUT
     # itself does not carry (see `_transport_core_ungrooved_perelectron_lut`).
+    layer_arrays = (
+        L_Js,
+        L_Zs,
+        L_ks,
+        L_coeffs,
+        L_E_cross,
+        L_ncm3,
+        L_sr_rate_numer,
+        L_mott_numer,
+        L_mott_denom1,
+        L_mott_denom2,
+        L_sr_joy_numer,
+    )
     straggle_on = bool(straggling)
     stragg_dE = np.zeros(Ne) if straggle_on else np.zeros(0)
     stragg_stream_keys = stream_keys(seed, Ne) if straggle_on else np.zeros(1, dtype=np.uint64)
     if straggle_on:
-        _stragg_packed = pack_layer_tables(
-            L_Js,
-            L_Zs,
-            L_ks,
-            L_coeffs,
-            L_E_cross,
-            L_ncm3,
-            L_sr_rate_numer,
-            L_mott_numer,
-            L_mott_denom1,
-            L_mott_denom2,
-            L_sr_joy_numer,
-        )
+        _stragg_packed = pack_layer_tables(*layer_arrays)
         stragg_layer_tables = _stragg_packed[:5] + sbethe_group
     else:
         _stragg_dummy = np.zeros((1, 1), dtype=np.float64)
-        stragg_layer_tables = (
-            _stragg_dummy,
-            _stragg_dummy,
-            _stragg_dummy,
-            _stragg_dummy,
-            _stragg_dummy,
-        ) + sbethe_group
+        stragg_layer_tables = (_stragg_dummy,) * 5 + sbethe_group
 
     # Grouped kernel argument tuples (issue #66): the lockstep calls below pass
     # them straight through to the cores; the per-electron drivers in
@@ -781,20 +814,9 @@ def simulate_trajectories(
     )
     if shell_mode:
         segments += (seg_hard_W, seg_hard_ch)
-    materials_ragged = (
-        L_Js,
-        L_Zs,
-        L_ks,
-        L_coeffs,
-        L_E_cross,
-        L_ncm3,
-        L_sr_rate_numer,
-        L_mott_numer,
-        L_mott_denom1,
-        L_mott_denom2,
-        L_sr_joy_numer,
-    )
-    materials_ragged += sbethe_group
+    if radiative_mode:
+        segments += (seg_rad_k, seg_rad_Z)
+    materials_ragged = layer_arrays + sbethe_group
     straggling_lockstep = (straggle_on, stragg_stream_keys, stragg_dE)
     # The exact lockstep cores index ragged rows and never read L_nel; it rides
     # in the geometry tuple only so every core shares one layout.
@@ -812,6 +834,13 @@ def simulate_trajectories(
     )
 
     _nsys_push("cxr.transport.core")
+    # Only the grooved core records vacuum crossings; it replaces these.
+    nvac = 0
+    vac_start = np.empty((0, 3), dtype=float)
+    vac_end = np.empty((0, 3), dtype=float)
+    vac_E = np.empty(0, dtype=float)
+    vac_t0 = np.empty(0, dtype=float)
+    vac_id = np.empty(0, dtype=np.int64)
     if groove is None and transport_lut is not None and transport_core != "lockstep":
         if transport_core == "cuda":
             if straggle_on:
@@ -900,12 +929,6 @@ def simulate_trajectories(
                 inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
             )
         )
-        nvac = 0
-        vac_start = np.empty((0, 3), dtype=float)
-        vac_end = np.empty((0, 3), dtype=float)
-        vac_E = np.empty(0, dtype=float)
-        vac_t0 = np.empty(0, dtype=float)
-        vac_id = np.empty(0, dtype=np.int64)
     elif groove is None and transport_lut is not None:
         lut_core = (
             _transport_core_ungrooved_lut_inelastic if shell_mode else _transport_core_ungrooved_lut
@@ -941,12 +964,6 @@ def simulate_trajectories(
             straggling_lockstep,
             *((inelastic_args,) if shell_mode else ()),
         )
-        nvac = 0
-        vac_start = np.empty((0, 3), dtype=float)
-        vac_end = np.empty((0, 3), dtype=float)
-        vac_E = np.empty(0, dtype=float)
-        vac_t0 = np.empty(0, dtype=float)
-        vac_id = np.empty(0, dtype=np.int64)
     elif groove is None and transport_core != "lockstep":
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
@@ -954,26 +971,15 @@ def simulate_trajectories(
             from ._jit_launch import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()
-        elif shell_mode:
-            core, core_xp = _transport_core_ungrooved_perelectron_inelastic, np
         else:
-            core, core_xp = _transport_core_ungrooved_perelectron, np
+            core = exact_ungrooved_core(
+                per_electron=True, inelastic=shell_mode, radiative=radiative_mode
+            )
+            core_xp = np
         if keep_segments_on_device:
             seg_xp = core_xp
 
-        packed_per_layer_tables = pack_layer_tables(
-            L_Js,
-            L_Zs,
-            L_ks,
-            L_coeffs,
-            L_E_cross,
-            L_ncm3,
-            L_sr_rate_numer,
-            L_mott_numer,
-            L_mott_denom1,
-            L_mott_denom2,
-            L_sr_joy_numer,
-        )
+        packed_per_layer_tables = pack_layer_tables(*layer_arrays)
         packed_per_layer_tables += sbethe_group
         nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs, stragg_dE = (
             _run_per_electron_transport(
@@ -1019,18 +1025,16 @@ def simulate_trajectories(
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
                 inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
+                radiative=((radiative_args, seg_rad_k, seg_rad_Z) if radiative_mode else None),
             )
         )
-        nvac = 0
-        vac_start = np.empty((0, 3), dtype=float)
-        vac_end = np.empty((0, 3), dtype=float)
-        vac_E = np.empty(0, dtype=float)
-        vac_t0 = np.empty(0, dtype=float)
-        vac_id = np.empty(0, dtype=np.int64)
     elif groove is None:
-        exact_core = (
-            _transport_core_ungrooved_inelastic if shell_mode else _transport_core_ungrooved
+        exact_core = exact_ungrooved_core(
+            per_electron=False, inelastic=shell_mode, radiative=radiative_mode
         )
+        extra_args = (inelastic_args,) if shell_mode else ()
+        if radiative_mode:
+            extra_args = (inelastic_args if shell_mode else (), radiative_args)
         nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = exact_core(
             Ne,
             rng,
@@ -1041,14 +1045,8 @@ def simulate_trajectories(
             state,
             segments,
             straggling_lockstep,
-            *((inelastic_args,) if shell_mode else ()),
+            *extra_args,
         )
-        nvac = 0
-        vac_start = np.empty((0, 3), dtype=float)
-        vac_end = np.empty((0, 3), dtype=float)
-        vac_E = np.empty(0, dtype=float)
-        vac_t0 = np.empty(0, dtype=float)
-        vac_id = np.empty(0, dtype=np.int64)
     else:
         vac_start_buf = np.empty((max_vac, 3), dtype=float)
         vac_end_buf = np.empty((max_vac, 3), dtype=float)
@@ -1191,6 +1189,12 @@ def simulate_trajectories(
         result["event_kind"] = seg_event[:nseg]
     if shell_tables is not None:
         result.update(shell_tables.result_fields(seg_hard_W[:nseg], seg_hard_ch[:nseg]))
+    if radiative_mode:
+        from .hard_radiative import add_radiative_result_fields
+
+        add_radiative_result_fields(
+            result, seg_rad_k[:nseg], seg_rad_Z[:nseg], bremslib_tables, radiative_cutoff_eV, seed
+        )
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             E_seg,

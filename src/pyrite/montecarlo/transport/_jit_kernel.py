@@ -86,6 +86,14 @@ from ._jit_device import (
     _urban_ionisation,
     _urban_stream_key,
 )
+from ._jit_radiative_device import (
+    F64_KEV_PER_EV,
+    RAD_HARD_RATE,
+    RAD_SOFT,
+    _rad_layer_moment,
+    _rad_moment,
+    _rad_sample_photon_eV,
+)
 from ._jit_shell_device import (
     I16_NO_CHANNEL,
     _hard_primary_cosine,
@@ -101,9 +109,12 @@ from .events import (
     EVENT_EXIT_SIDE,
     EVENT_EXIT_TOP,
     EVENT_HARD_INELASTIC,
+    EVENT_HARD_RADIATIVE,
     EVENT_LAYER_BOUNDARY,
     EVENT_SUBSTEP,
 )
+
+F64_EV_PER_KEV = np.float64(1e3)
 
 
 @jit.rawkernel()
@@ -194,6 +205,22 @@ def _transport_kernel(
     il_ch_code,
     seg_hard_W,
     seg_hard_ch,
+    rad_on,
+    rad_keys,
+    rad_cutoff_eV,
+    rad_nel,
+    rad_nt,
+    rad_z,
+    rad_ncm3,
+    rad_incident,
+    rad_nominal,
+    rad_top,
+    rad_chi,
+    rad_max_el,
+    rad_max_t,
+    rad_n_red,
+    seg_rad_k,
+    seg_rad_Z,
 ):
     """One electron per thread, run to completion.
 
@@ -210,6 +237,14 @@ def _transport_kernel(
     Urban's. ``il_*`` are its tables flattened C-order (rows of ``il_width``
     energy nodes, ``il_max_ch`` channels per layer); off, they and the two
     hard row columns are never read.
+
+    ``rad_on`` selects the opt-in coupled radiative mode of
+    ``make_cpu_transport_core(per_electron=True, radiative=True)``: soft
+    BremsLib loss joins the continuous stopping, and a radiative optical depth
+    on the ``rad_keys`` stream schedules hard photons, which debit energy
+    without deflecting the electron. ``rad_*`` are the packed radiative tables
+    flattened C-order (see ``_jit_radiative_device``); off, they and the two
+    photon row columns are never read. The mode excludes straggling.
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
@@ -246,6 +281,12 @@ def _transport_kernel(
     hard_draw = U64_ZERO
     if inelastic_on == I32_ONE:
         hard_key = il_keys[e]
+    # Radiative mode: the same per-flight optical depth on its own stream.
+    tau_rad = -F64_ONE
+    rad_key = U64_ZERO
+    rad_draw = U64_ZERO
+    if rad_on == I32_ONE:
+        rad_key = rad_keys[e]
 
     step = I32_ZERO
     running = True
@@ -310,6 +351,51 @@ def _transport_kernel(
             if mu_hard > F64_ZERO and tau_h / mu_hard < step_j:
                 step_j = tau_h / mu_hard
                 hard_j = True
+        rad_j = False
+        rad_soft = F64_ZERO
+        mu_rad = F64_ZERO
+        if rad_on == I32_ONE:
+            rad_soft = _rad_layer_moment(
+                RAD_SOFT,
+                L,
+                rad_nel,
+                rad_nt,
+                rad_z,
+                rad_ncm3,
+                rad_incident,
+                rad_nominal,
+                rad_top,
+                rad_chi,
+                rad_max_el,
+                rad_max_t,
+                rad_n_red,
+                E_j * F64_EV_PER_KEV,
+                rad_cutoff_eV,
+            )
+            mu_rad = _rad_layer_moment(
+                RAD_HARD_RATE,
+                L,
+                rad_nel,
+                rad_nt,
+                rad_z,
+                rad_ncm3,
+                rad_incident,
+                rad_nominal,
+                rad_top,
+                rad_chi,
+                rad_max_el,
+                rad_max_t,
+                rad_n_red,
+                E_j * F64_EV_PER_KEV,
+                rad_cutoff_eV,
+            )
+            if tau_rad < F64_ZERO:
+                tau_rad = -xp.log(_stream_uniform(rad_key, rad_draw))
+                rad_draw = rad_draw + U64_ONE
+            if mu_rad > F64_ZERO and tau_rad / mu_rad < step_j:
+                step_j = tau_rad / mu_rad
+                rad_j = True
+                hard_j = False
 
         # 2. Truncate the flight at this layer's z boundaries.
         dx = dirs[e3]
@@ -396,6 +482,8 @@ def _transport_kernel(
                 E_j,
             )
             stopping_scale = dEds / reference_dEds
+        if rad_on == I32_ONE:
+            dEds -= rad_soft * F64_KEV_PER_EV
         cutoff_j = False
         # The numerical energy-loss cap is the only step limit that does not
         # close a physical flight: it emits a row and resumes with the same
@@ -685,6 +773,27 @@ def _transport_kernel(
                         L_sbethe_n[L],
                         cutoff_energy,
                     )
+                if rad_on == I32_ONE:
+                    cutoff_rate -= (
+                        _rad_layer_moment(
+                            RAD_SOFT,
+                            L,
+                            rad_nel,
+                            rad_nt,
+                            rad_z,
+                            rad_ncm3,
+                            rad_incident,
+                            rad_nominal,
+                            rad_top,
+                            rad_chi,
+                            rad_max_el,
+                            rad_max_t,
+                            rad_n_red,
+                            cutoff_energy * F64_EV_PER_KEV,
+                            rad_cutoff_eV,
+                        )
+                        * F64_KEV_PER_EV
+                    )
                 cutoff_distance = (E_cut_e - E_j) / cutoff_rate
             else:
                 cutoff_distance = (E_cut_e - E_j) / dEds
@@ -727,6 +836,27 @@ def _transport_kernel(
                             L_sbethe_n[L],
                             midpoint_energy,
                         )
+                    if rad_on == I32_ONE:
+                        midpoint_rate -= (
+                            _rad_layer_moment(
+                                RAD_SOFT,
+                                L,
+                                rad_nel,
+                                rad_nt,
+                                rad_z,
+                                rad_ncm3,
+                                rad_incident,
+                                rad_nominal,
+                                rad_top,
+                                rad_chi,
+                                rad_max_el,
+                                rad_max_t,
+                                rad_n_red,
+                                midpoint_energy * F64_EV_PER_KEV,
+                                rad_cutoff_eV,
+                            )
+                            * F64_KEV_PER_EV
+                        )
                     E_end_j = E_j + step_j * midpoint_rate
                 beta_j = _beta_from_keV(F64_HALF * (E_j + E_end_j))
             else:
@@ -754,6 +884,8 @@ def _transport_kernel(
             event_j = EVENT_LAYER_BOUNDARY
         elif hard_j:
             event_j = EVENT_HARD_INELASTIC
+        elif rad_j:
+            event_j = EVENT_HARD_RADIATIVE
         hard_W_keV = F64_ZERO
         hard_code = I16_NO_CHANNEL
         hard_cos = F64_ONE
@@ -798,6 +930,82 @@ def _transport_kernel(
                     E_eV, il_ch_U[c_row], il_ch_W[c_row], il_ch_branch[c_row], W_eV, u_q
                 )
                 hard_phi = F64_TWO * F64_PI * u_phi
+        rad_k_eV = F64_ZERO
+        rad_event_Z = np.int16(0)
+        if event_j == EVENT_HARD_RADIATIVE:
+            # The hazard used the row-start energy; the element and photon are
+            # conditional on the pre-event energy at the row end. Element rates
+            # are recomputed rather than buffered, like the elastic selection.
+            E_end_eV = E_end_j * F64_EV_PER_KEV
+            mu_event = _rad_layer_moment(
+                RAD_HARD_RATE,
+                L,
+                rad_nel,
+                rad_nt,
+                rad_z,
+                rad_ncm3,
+                rad_incident,
+                rad_nominal,
+                rad_top,
+                rad_chi,
+                rad_max_el,
+                rad_max_t,
+                rad_n_red,
+                E_end_eV,
+                rad_cutoff_eV,
+            )
+            u_el = _stream_uniform(rad_key, rad_draw)
+            u_k = _stream_uniform(rad_key, rad_draw + U64_ONE)
+            rad_draw = rad_draw + np.uint64(2)
+            target = u_el * mu_event
+            n_rad = rad_nel[L]
+            rad_sel = n_rad - I32_ONE
+            cumulative = F64_ZERO
+            k_rad = I32_ZERO
+            picked_rad = False
+            while k_rad < n_rad and not picked_rad:
+                rad_slot = L * rad_max_el + k_rad
+                cumulative += (
+                    rad_ncm3[rad_slot]
+                    * np.float64(1e-8)
+                    * _rad_moment(
+                        RAD_HARD_RATE,
+                        rad_incident,
+                        rad_nominal,
+                        rad_top,
+                        rad_chi,
+                        rad_slot,
+                        rad_max_t,
+                        rad_n_red,
+                        rad_nt[rad_slot],
+                        np.float64(rad_z[rad_slot]),
+                        E_end_eV,
+                        rad_cutoff_eV,
+                    )
+                )
+                if cumulative > target:
+                    rad_sel = k_rad
+                    picked_rad = True
+                k_rad += I32_ONE
+            rad_slot = L * rad_max_el + rad_sel
+            rad_k_eV = _rad_sample_photon_eV(
+                rad_incident,
+                rad_nominal,
+                rad_top,
+                rad_chi,
+                rad_slot,
+                rad_max_t,
+                rad_n_red,
+                rad_nt[rad_slot],
+                np.float64(rad_z[rad_slot]),
+                E_end_eV,
+                rad_cutoff_eV,
+                u_k,
+            )
+            rad_event_Z = np.int16(rad_z[rad_slot])
+            if E_end_j - rad_k_eV * F64_KEV_PER_EV <= E_cut_e:
+                event_j = EVENT_CUTOFF
+                cutoff_j = True
 
         if local_nseg < cap:
             slot = i * cap + local_nseg
@@ -822,6 +1030,9 @@ def _transport_kernel(
                 if inelastic_on == I32_ONE:
                     seg_hard_W[slot] = hard_W_keV
                     seg_hard_ch[slot] = hard_code
+                if rad_on == I32_ONE:
+                    seg_rad_k[slot] = rad_k_eV
+                    seg_rad_Z[slot] = rad_event_Z
         local_nseg += I32_ONE
 
         # 4. Advance position, energy, transport clock, and optical depth.
@@ -837,6 +1048,10 @@ def _transport_kernel(
             tau_h -= step_j * mu_hard
             if tau_h < F64_ZERO:
                 tau_h = F64_ZERO
+        if rad_on == I32_ONE:
+            tau_rad -= step_j * mu_rad
+            if tau_rad < F64_ZERO:
+                tau_rad = F64_ZERO
 
         # 5. Exit, internal-boundary, or collision handling. A numerical
         #    substep skips all of it and resumes the same physical flight.
@@ -861,11 +1076,16 @@ def _transport_kernel(
                 substep_id = I32_ZERO
                 tau_left = -F64_ONE
                 tau_h = -F64_ONE
+                tau_rad = -F64_ONE
                 if cross_up_j or cross_dn_j:
                     if dirs[e3 + I32_TWO] > F64_ZERO:
                         pos[e3 + I32_TWO] += F64_EPS
                     else:
                         pos[e3 + I32_TWO] -= F64_EPS
+                elif event_j == EVENT_HARD_RADIATIVE:
+                    # A hard photon: debit its energy; the electron keeps its
+                    # direction and no elastic collision is drawn.
+                    E_keV[e] -= rad_k_eV * F64_KEV_PER_EV
                 else:
                     if event_j == EVENT_HARD_INELASTIC:
                         # A hard collision: the sampled loss and recoil

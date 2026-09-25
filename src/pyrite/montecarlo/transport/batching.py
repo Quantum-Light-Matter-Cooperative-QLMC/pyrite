@@ -364,17 +364,24 @@ def _drive_per_electron_batches(
     config,
     keep_on_device,
     inelastic_args=None,
+    radiative_args=None,
 ):
     """Run capacity-replayed batches for either exact or LUT transport.
 
     ``inelastic_args`` (shell soft/hard mode only) is appended to every core
     call, and each batch then also carries the two hard-event row columns.
+    ``radiative_args`` (coupled radiative mode, exact cores only) follows it,
+    with ``()`` standing in for an absent shell mode, and adds the two
+    hard-photon row columns after any hard-inelastic ones.
     """
     from ..runner import _nsys_pop, _nsys_push
 
     midpoint = energy_model_code == 1
     inelastic = inelastic_args is not None
+    radiative = radiative_args is not None
     extra_args = (inelastic_args,) if inelastic else ()
+    if radiative:
+        extra_args = (inelastic_args if inelastic else (), radiative_args)
     batches = []
     cap = max(1, int(config.seg_capacity))
     seen_max = 0
@@ -392,6 +399,8 @@ def _drive_per_electron_batches(
             _nsys_push("cxr.transport.scratch")
             scratch = _alloc_scratch(xp, m, cap, midpoint)
             if inelastic:
+                scratch += _alloc_hard_scratch(xp, m, cap)
+            if radiative:
                 scratch += _alloc_hard_scratch(xp, m, cap)
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
@@ -462,6 +471,8 @@ def _drive_per_electron_batches(
         _nsys_push("cxr.transport.join")
         empty = _alloc_scratch(xp, 0, 1, midpoint)
         if inelastic:
+            empty += _alloc_hard_scratch(xp, 0, 1)
+        if radiative:
             empty += _alloc_hard_scratch(xp, 0, 1)
         joined = tuple(
             xp.concatenate([b[i] for b in batches]) if batches else empty[i]
@@ -654,6 +665,7 @@ def _run_per_electron_transport(
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
     inelastic=None,
+    radiative=None,
 ):
     """Drive ``core`` over electron batches and compact the result.
 
@@ -741,6 +753,11 @@ def _run_per_electron_transport(
         # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel)``.
         inelastic_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in inelastic[0])
         out_bufs += inelastic[1:]
+    radiative_args = None
+    if radiative is not None:
+        # ``radiative`` is ``(core_args, seg_rad_k_eV, seg_rad_Z)``.
+        radiative_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in radiative[0])
+        out_bufs += radiative[1:]
     core_args = (control, geometry, d_materials, d_mott, state)
     return _drive_per_electron_batches(
         core,
@@ -761,14 +778,16 @@ def _run_per_electron_transport(
         config,
         keep_on_device,
         inelastic_args,
+        radiative_args,
     )
 
 
 def _alloc_hard_scratch(xp, m, cap):
-    """The shell soft/hard mode's two hard-event row columns for one batch.
+    """Two hard-event row columns (float64 value, int16 code) for one batch.
 
-    The mode requires the midpoint schema, so both are full-width slot
-    buffers appended after :func:`_alloc_scratch`'s twelve.
+    The shell soft/hard and coupled radiative modes each append one pair. Both
+    modes require the midpoint schema, so these are full-width slot buffers
+    after :func:`_alloc_scratch`'s twelve.
     """
     n = m * cap
     return (xp.empty(n, dtype=xp.float64), xp.empty(n, dtype=xp.int16))

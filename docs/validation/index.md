@@ -78,6 +78,8 @@ beam-transport/transport-midpoint-stopping
 radiation-physics/absorption-length
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model
+radiation-physics/bremslib-radiative-event-spectrum
+radiation-physics/bremslib-radiative-partition
 radiation-physics/cbs-amplitude
 radiation-physics/characteristic-radiation
 radiation-physics/closed-form-flux

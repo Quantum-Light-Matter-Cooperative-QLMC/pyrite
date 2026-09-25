@@ -171,6 +171,7 @@ def run_transport_kernel(
     pe_out,
     straggling,
     inelastic_args=None,
+    radiative_args=None,
     config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
 ):
     """Launch one thread per electron over ``[e_start, e_start + e_count)``.
@@ -200,7 +201,13 @@ def run_transport_kernel(
 
     ``inelastic_args`` is the shell soft/hard ``ShellInelasticTables.core_args``
     tuple the CPU inelastic cores unpack; ``segments`` then carries the two
-    hard row columns after its twelve midpoint fields.
+    hard row columns after its twelve midpoint fields. An empty tuple, which
+    the batch driver passes ahead of ``radiative_args``, also means off.
+
+    ``radiative_args`` is the coupled radiative ``(keys, cutoff_eV, *packed)``
+    tuple the CPU radiative cores unpack, ``packed`` being
+    :func:`.hard_radiative.pack_radiative_layer_tables`; its two photon row
+    columns follow any hard-inelastic ones in ``segments``.
     """
     (e_start, e_count, cap, stream_key) = run
     (max_steps, _max_segments, elastic_model_code, energy_model_code, max_dE_frac) = control
@@ -251,7 +258,10 @@ def run_transport_kernel(
     ) = segments[:12]
     (seg_count, exit_code) = pe_out
     (straggle_on, stragg_dE) = straggling
-    shell = _shell_kernel_args(inelastic_args, segments[12:])
+    inelastic_on = bool(inelastic_args)
+    shell = _shell_kernel_args(inelastic_args if inelastic_on else None, segments[12:14])
+    rad_segments = segments[14:16] if inelastic_on else segments[12:14]
+    radiative = _radiative_kernel_args(radiative_args, rad_segments)
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
@@ -336,6 +346,7 @@ def run_transport_kernel(
             np.int32(1 if straggle_on else 0),
             stragg_dE,
             *shell,
+            *radiative,
         ),
     )
 
@@ -386,6 +397,51 @@ def _shell_kernel_args(inelastic_args, hard_segments):
         ch_code.reshape(-1).astype(xp.int16, copy=False),
         seg_hard_W,
         seg_hard_ch,
+    )
+
+
+def _radiative_kernel_args(radiative_args, photon_segments):
+    """Flattened coupled radiative kernel arguments, or inert placeholders."""
+    if radiative_args is None:
+        f64 = xp.zeros(1, dtype=xp.float64)
+        i32 = xp.zeros(1, dtype=xp.int32)
+        return (
+            np.int32(0),
+            xp.zeros(1, dtype=xp.uint64),
+            np.float64(0.0),
+            i32,
+            i32,
+            i32,
+            f64,
+            f64,
+            f64,
+            f64,
+            f64,
+            np.int32(1),
+            np.int32(1),
+            np.int32(1),
+            f64,
+            xp.zeros(1, dtype=xp.int16),
+        )
+    (keys, cutoff_eV, nel, n_t, z, ncm3, incident, nominal, top, chi) = radiative_args
+    seg_rad_k, seg_rad_Z = photon_segments
+    return (
+        np.int32(1),
+        keys,
+        np.float64(cutoff_eV),
+        nel.astype(xp.int32, copy=False),
+        n_t.reshape(-1).astype(xp.int32, copy=False),
+        z.reshape(-1).astype(xp.int32, copy=False),
+        ncm3.reshape(-1),
+        incident.reshape(-1),
+        nominal.reshape(-1),
+        top.reshape(-1),
+        chi.reshape(-1),
+        np.int32(z.shape[1]),
+        np.int32(incident.shape[2]),
+        np.int32(nominal.shape[2]),
+        seg_rad_k,
+        seg_rad_Z,
     )
 
 

@@ -2,21 +2,23 @@
 
 a **Py**thon toolkit for **R**adiation from **I**nteractions and **T**ransport of **E**lectrons
 
-PyRITE is primarily a simulation tool which implements a Monte Carlo electron transport model
-to simulate the expected x-ray emission of coherent tunable X-ray lines from ~30–60 keV electrons
-interacting with crystalline materials.
+PyRITE is a simulation tool which implements a Monte Carlo electron transport model in solid
+rystalline/amorphous materials. The transport model used is largely derived from that used in
+the well-validated PENELOPE toolkit. The primary intention is to simulate the expected x-ray
+emission of tunable X-ray lines from coherent interactions of electrons in crystalline materials,
+though it is on the path towards a general-purpose Monte Carlo transport toolkit.
 
+```{important}
 PyRITE is currently unvalidated research code under active development; absolute predictions
 remain bounded by [validation status](docs/validation/physics-validation-ledger.md).
+```
 
 PyRITE is intended to eventually become a more general-purpose electron transport and radiation
 simulation toolkit for electron transport in the 1 keV - 100 MeV range, with native support for
-low-level GPU acceleration, arbitrary source, target, and detector geometries, and extensible physics,
-making PyRITE Python-based, fast, and an accessible alternative to the more traditional, well-validated,
-but higher barrier-to-entry toolkits such as the FORTRAN-based PENELOPE or the C++-based Geant4,
-while also implementing physics engines not natively supported by those tools, including
+low-level GPU acceleration, arbitrary source, target, and detector geometries, and extensible physics. Thus, PyRITE is Python-based, fast, and an accessible alternative to the more traditional, well-validated,
+but higher barrier-to-entry toolkits such as the FORTRAN-based PENELOPE or the C++-based Geant4. Critically, it also implements physics engines not natively supported by those tools; in particular,
 Parametric X-ray radiation (PXR), coherent bremsstrahlung (CBS), and support for electron-channeling
-effects in crystals below 100 MeV.
+effects in crystals below 100 MeV is under active investigation.
 
 ## Install
 
@@ -121,16 +123,17 @@ SLURM templates documented there.
 ## Core physics
 
 Pipeline: sampled electron beam → single-scattering electron transport →
-segment-wise PXR+CBS and incoherent bremsstrahlung → photon escape → detector
-scoring.
+segment-wise PXR+CBS, incoherent bremsstrahlung, and characteristic lines →
+photon escape → detector scoring.
 
 - **[Electron transport](docs/physics/beam-transport/electron-transport.md):**
   independent piecewise-linear flights use explicit
-  elastic collisions and condensed energy loss. The default samples ELSEPA
-  partial-wave elastic cross sections, with Joy-Luo/Berger-Seltzer stopping;
+  elastic collisions and condensed energy loss, deterministic by default with
+  optional Urban straggling. The default samples ELSEPA partial-wave elastic
+  cross sections, with Joy-Luo/Berger-Seltzer stopping;
   beamline space charge and secondary electrons are not modeled.
 - **[Crystal source](docs/physics/materials/structure-factor.md):** phase-specific
-  structures, complex atomic form factors, Debye--Waller factors, selected
+  structures, complex atomic form factors, Debye-Waller factors, selected
   reflections, and optional mosaicity define the reciprocal-space coupling.
 - **[Coherent lines](docs/physics/radiation-physics/coherent-radiation.md):**
   first-order kinematic Born PXR and CBS amplitudes are coherently summed within
@@ -141,12 +144,22 @@ scoring.
   Bragg resonance is $\omega=(\mathbf v\cdot\mathbf g)/[1-
   \mathrm{Re}\lbrace n (\omega) \rbrace \ \hat{\mathbf n}\cdot\mathbf v]$. Dynamical
   diffraction is not modeled, and electron channeling in crystals is currently unsupported.
-- **[Incoherent background](docs/physics/radiation-physics/bremsstrahlung.md):**
-  isotropic, unscreened Born Bethe-Heitler bremsstrahlung uses relativistic
-  momenta and an Elwert correction; characteristic radiation is not modeled.
+- **[Incoherent continuum](docs/physics/radiation-physics/bremsstrahlung.md):**
+  the default is isotropic EEDL bremsstrahlung — the ENDF-6 MF=23/MT=527
+  total cross section multiplied by the normalized MF=26/MT=527 photon-energy
+  density. Unscreened Born Bethe-Heitler with an Elwert correction remains an
+  optional/fallback backend, and a direction-resolved BremsLib backend is
+  implemented but not yet selected by the run path.
+- **[Characteristic lines](docs/physics/radiation-physics/characteristic-radiation.md):**
+  electron-impact vacancies from EEDL subshell ionization cross sections relax
+  through xraydb fluorescence yields with L-shell Coster-Kronig redistribution;
+  each line carries its natural-width Lorentzian and is scored as a separate
+  incoherent component added to the line spectrum.
 - **[Photon transport](docs/physics/radiation-physics/photon-escape-and-dispersion.md):**
-  straight-ray Beer-Lambert attenuation and bulk refractive dispersion are
-  passive; interface optics, photon scattering, and re-emission are omitted.
+  straight-ray Beer-Lambert escape uses the total narrow-beam coefficient
+  (photoabsorption plus Rayleigh/Compton removal); scattered photons leave the
+  ray with no build-up, redirection, or re-emission, and bulk refractive
+  dispersion is passive. Interface optics are omitted.
 - **[Detector treatment](docs/physics/detectors/detector-response.md):** source
   spectra are evaluated in a fixed far-field direction; solid-angle acceptance,
   aperture broadening, efficiency, and measured-energy redistribution are
@@ -182,8 +195,8 @@ before scientific use.
 
 ## Documentation
 
-- [published documentation](docs/index.md)
-- [physics models](docs/physics/index.md)
+- [Published Documentation](docs/index.md)
+- [Physics Models](docs/physics/index.md)
 - [Python API](docs/api.md)
 
 ## References
