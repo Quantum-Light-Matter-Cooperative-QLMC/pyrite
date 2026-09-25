@@ -35,6 +35,8 @@ beam-transport/beam-phase-space-metrics
 beam-transport/coherent-line-grid-fringe-spacing
 beam-transport/dielectric-bulk-loss
 beam-transport/eedl-material-shell-rates
+beam-transport/elsepa-elastic-sampling
+beam-transport/elsepa-muffin-tin-inputs
 beam-transport/penelope-shell-oscillators
 beam-transport/penelope-shell-oscillators-verification
 beam-transport/penelope-shell-gos-moments

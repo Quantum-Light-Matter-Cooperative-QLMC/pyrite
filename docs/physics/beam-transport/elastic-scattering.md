@@ -155,7 +155,7 @@ At each node the angular density is the tabulated DCS normalized on its native g
 
 Energies outside a table are refused, never extrapolated. A layer whose tables are not installed fails with the command that installs them.
 
-**Stated tolerance.** Sampled first and second transport moments, $\langle 1 - P_\ell(\cos\theta)\rangle$, reproduce ELSEPA's own $\sigma_\ell/\sigma$ within 0.9 % across every released table and energy. Above about 10 MeV the forward peak outruns ELSEPA's native angular grid, so the trapezoid integral of the DCS falls up to 1.4 % short of ELSEPA's total. The flight rate uses ELSEPA's total directly, so only the angular shape carries this error.
+**Stated tolerance.** Sampled first and second transport moments, $\langle 1 - P_\ell(\cos\theta)\rangle$, reproduce ELSEPA's own $\sigma_\ell/\sigma$ within 0.9 % across every released table and energy. Above about 10 MeV the forward peak outruns ELSEPA's native angular grid, so the trapezoid integral of the DCS exceeds ELSEPA's total by up to 1.4 %. The flight rate uses ELSEPA's total directly, so only the angular shape carries this error.
 
 ### Missing tables
 

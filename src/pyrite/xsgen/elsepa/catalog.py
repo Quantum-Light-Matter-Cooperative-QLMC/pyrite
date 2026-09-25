@@ -15,14 +15,15 @@ Coverage policy (issue #89):
   is defined for elementary solids only (one Z, ``NELEC = IZ``).
 
 The muffin-tin model removes the long-range tail of the atomic potential, so
-the *total* elastic cross section drops by about 30% relative to the free
-atom (Si, 0.1-10 MeV) while the first transport cross section agrees to 1-2%.
+the *total* elastic cross section drops relative to the free atom -- by about
+30% for Si and black phosphorus and about a factor of two for diamond and
+HOPG at 1 MeV -- while the first transport cross section agrees to 1-3%.
 The joined table therefore steps in total cross section between the last
 muffin-tin node (1 MeV) and the first free-atom node above it; energy
 interpolation turns the step into a ramp over that one grid interval. This is
 an accepted, documented discontinuity, not a fitted blend.
 
-Below :data:`ELASTIC_FLOOR_EV` the DHFS/muffin-tin treatment is not a
+Below :data:`ELASTIC_FLOOR_EV` the Dirac-Fock/muffin-tin treatment is not a
 supported physical model, so tables start there and the sampler refuses
 energies outside ``[ELASTIC_FLOOR_EV, ELASTIC_CEILING_EV]`` rather than
 extrapolating.
@@ -47,7 +48,7 @@ from .generate import (
     muffin_tin_request,
 )
 
-#: Lowest tabulated energy: the documented floor of the DHFS/muffin-tin model.
+#: Lowest tabulated energy: the documented floor of the Dirac-Fock/muffin-tin model.
 ELASTIC_FLOOR_EV = 100.0
 #: Highest energy served by a muffin-tin table.
 MUFFIN_TIN_CEILING_EV = 1.0e6
@@ -69,9 +70,9 @@ def nearest_neighbour_distance_ang(lattice, basis) -> float:
     """Return the shortest interatomic distance in a periodic crystal.
 
     Searches every pair of basis sites over the 5x5x5 block of neighbouring
-    cells, which bounds the nearest neighbour for any cell whose shortest
-    lattice vector is not shorter than half its longest -- true of every
-    catalog crystal.
+    cells. That is exact whenever the nearest-neighbour distance is at most
+    twice the smallest lattice-plane spacing, which holds with at least a
+    threefold margin for every elementary catalog crystal it is applied to.
     """
     a1, a2, a3 = _direct_lattice_vectors(lattice)
     cell = np.vstack([a1, a2, a3])
@@ -112,7 +113,8 @@ def elemental_solid(key: str | None) -> ElementalSolid | None:
     crystal's own CIF, the touching-sphere muffin-tin construction ELSEPA's
     ``Al.in`` example uses (Salvat, Jablonski & Powell, Comput. Phys. Commun.
     165 (2005) 157). The mass density is ``rho = n A / N_A`` with ``n`` in
-    atoms/A^3 scaled to cm^-3.
+    atoms/A^3 scaled to cm^-3; ``elscata`` takes no density input, so it only
+    keys the table.
 
     Assumes touching spheres of equal radius on every site, which holds for a
     one-element crystal. Limiting case: diamond-cubic Si and C reproduce
