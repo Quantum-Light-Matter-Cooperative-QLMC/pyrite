@@ -110,7 +110,15 @@ def elemental_solid(key: str | None) -> ElementalSolid | None:
 
     The radius is half the nearest-neighbour distance derived from the
     crystal's own CIF, the touching-sphere muffin-tin construction ELSEPA's
-    ``Al.in`` example uses.
+    ``Al.in`` example uses (Salvat, Jablonski & Powell, Comput. Phys. Commun.
+    165 (2005) 157). The mass density is ``rho = n A / N_A`` with ``n`` in
+    atoms/A^3 scaled to cm^-3.
+
+    Assumes touching spheres of equal radius on every site, which holds for a
+    one-element crystal. Limiting case: diamond-cubic Si and C reproduce
+    ELSEPA's own tabulated nearest-neighbour distances (2.350, 1.540 A).
+
+    Validation: elsepa-muffin-tin-inputs
     """
     crystal_key = None if key is None else _crystal_key(str(key))
     if crystal_key is None:
@@ -176,7 +184,12 @@ def joined_arrays(
     """Join muffin-tin rows below the crossover to free-atom rows above it.
 
     Without a muffin-tin table this is the free-atom table restricted to the
-    sampler's fields.
+    sampler's fields. Rows are taken verbatim, never blended: the muffin-tin
+    rows at or below :data:`MUFFIN_TIN_CEILING_EV`, then the free-atom rows
+    above the last of them, on one shared angular grid (the module docstring
+    documents the resulting step in the total cross section).
+
+    Validation: elsepa-muffin-tin-inputs
     """
     if muffin_tin is None:
         return {name: np.asarray(free_atom[name]) for name in _SAMPLER_FIELDS}
