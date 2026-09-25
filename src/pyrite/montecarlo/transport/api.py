@@ -102,8 +102,8 @@ def simulate_trajectories(
     elastic_model: "mott" (default, NIST SRD 64 Mott transport cross section
       via a Browning fit), "sr" (analytic screened-Rutherford, no data
       files), or "elsepa" (tabulated ELSEPA total cross sections and full
-      angular distributions from ``elastic_tables``; exact CPU cores only --
-      no transport LUT, no CUDA core yet). See
+      angular distributions from ``elastic_tables``; exact cores only, the
+      transport LUT is bypassed). See
       docs/physics/beam-transport/elastic-scattering.md.
       Validation: electron-transport
       Validation: elsepa-elastic-sampling
@@ -1027,11 +1027,6 @@ def simulate_trajectories(
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
         if transport_core == "cuda":
-            if elastic_model == "elsepa":
-                raise NotImplementedError(
-                    "elastic_model='elsepa' is not implemented on the CUDA core yet; "
-                    "run with transport_core='per-electron' or 'lockstep'"
-                )
             from ._jit_launch import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()

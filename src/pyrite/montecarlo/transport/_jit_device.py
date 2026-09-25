@@ -323,6 +323,41 @@ def _interp_mott_log_alpha(logE_eV, logE_flat, logA_flat, start, length):
 
 
 @jit.rawkernel(device=True)
+def _elsepa_invert_row(cdf, pdf, mu, n_mu, row, xi):
+    """Exact inversion of one piecewise-linear angular density.
+
+    Device port of :func:`pyrite.montecarlo.transport.scattering._elsepa_invert_row`
+    on ``(rows, n_mu)`` tables flattened C-order.
+    """
+    base = row * n_mu
+    lo = I32_ZERO
+    hi = n_mu - I32_ONE
+    while hi - lo > I32_ONE:
+        mid = (lo + hi) // I32_TWO
+        if cdf[base + mid] <= xi:
+            lo = mid
+        else:
+            hi = mid
+    dmu = mu[lo + I32_ONE] - mu[lo]
+    p0 = pdf[base + lo]
+    p1 = pdf[base + lo + I32_ONE]
+    r = xi - cdf[base + lo]
+    b = dmu * p0
+    disc = b * b + F64_TWO * dmu * (p1 - p0) * r
+    if disc < F64_ZERO:
+        disc = F64_ZERO
+    denom = b + xp.sqrt(disc)
+    t = F64_ZERO
+    if denom > F64_ZERO:
+        t = F64_TWO * r / denom
+    if t < F64_ZERO:
+        t = F64_ZERO
+    if t > F64_ONE:
+        t = F64_ONE
+    return mu[lo] + t * dmu
+
+
+@jit.rawkernel(device=True)
 def _searchsorted_right(bounds, x, n):
     lo = I32_ZERO
     hi = n

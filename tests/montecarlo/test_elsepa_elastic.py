@@ -201,3 +201,49 @@ def test_flight_diagnostics_use_the_elsepa_hazard(reference):
     summary = out["transport_diagnostics"]
     assert summary["n_flights"] == out["L_ang"].size
     assert np.isfinite(summary["relative_hazard_change"]["max"])
+
+
+def _require_cuda():
+    cupy = pytest.importorskip("cupy")
+    try:
+        has_cuda = cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        has_cuda = False
+    if not has_cuda:
+        pytest.skip("no CUDA device")
+
+
+@pytest.mark.hardware
+def test_cuda_elsepa_first_step_matches_the_cpu_reference(reference):
+    """Same stream, same draw order: the first row agrees to a few ulp."""
+    _require_cuda()
+    table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
+    kwargs = dict(elastic_model="elsepa", elastic_tables=[[table]])
+
+    cpu = _run("per-electron", **kwargs)
+    gpu = _run("cuda", **kwargs)
+
+    first_cpu = np.flatnonzero(np.r_[True, np.diff(cpu["electron_id"]) != 0])
+    first_gpu = np.flatnonzero(np.r_[True, np.diff(gpu["electron_id"]) != 0])
+    np.testing.assert_allclose(
+        gpu["L_ang"][first_gpu], cpu["L_ang"][first_cpu], rtol=1e-12, atol=0.0
+    )
+    np.testing.assert_allclose(
+        gpu["v_hat"][first_gpu[1:] - 1], cpu["v_hat"][first_cpu[1:] - 1], rtol=0.0, atol=1e-9
+    )
+
+
+@pytest.mark.hardware
+def test_cuda_elsepa_agrees_statistically_with_the_cpu_core(reference):
+    _require_cuda()
+    table = _sr_table(14.0, np.geomspace(4.0, 40.0, 41), reference.mu)
+    kwargs = dict(elastic_model="elsepa", elastic_tables=[[table]])
+
+    cpu = _run("per-electron", **kwargs)
+    gpu = _run("cuda", **kwargs)
+
+    n = cpu["Ne"]
+    p_cpu, p_gpu = cpu["n_backscattered"] / n, gpu["n_backscattered"] / n
+    sigma = np.sqrt(p_cpu * (1 - p_cpu) / n + p_gpu * (1 - p_gpu) / n)
+    assert abs(p_cpu - p_gpu) < 4.0 * sigma
+    assert gpu["L_ang"].sum() / n == pytest.approx(cpu["L_ang"].sum() / n, rel=0.03)
