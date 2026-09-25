@@ -840,17 +840,13 @@ def run_bremslib_element_reduction(
             dtype=xp.float32,
         )
         eedl_lower_panel = xp.ascontiguousarray(eedl_state.lower_panel, dtype=np.uint32)
-        eedl_panel_fraction = xp.ascontiguousarray(
-            eedl_state.panel_fraction, dtype=xp.float32
-        )
+        eedl_panel_fraction = xp.ascontiguousarray(eedl_state.panel_fraction, dtype=xp.float32)
         eedl_available = xp.ascontiguousarray(eedl_state.available, dtype=xp.float32)
         panel_probability = xp.ascontiguousarray(
             eedl_context.prepared.photon_probability_on_grid_per_eV.reshape(-1),
             dtype=xp.float32,
         )
-    weight = np.float32(
-        number_density_ang3 * 1.0e24 * 1.0e-8 * 4.0 * np.pi * 1.0e-27 * Z * Z
-    )
+    weight = np.float32(number_density_ang3 * 1.0e24 * 1.0e-8 * 4.0 * np.pi * 1.0e-27 * Z * Z)
     lower_row = state.lower_row
     return run_bremslib_brem_reduction_kernel(
         T_keV,

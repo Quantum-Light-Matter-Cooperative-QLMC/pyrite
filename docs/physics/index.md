@@ -49,6 +49,7 @@ beam-transport/longitudinal-structure
 beam-transport/electron-transport
 beam-transport/elastic-scattering
 beam-transport/stopping-power
+beam-transport/shell-soft-hard-transport
 beam-transport/transport-outputs
 ```
 

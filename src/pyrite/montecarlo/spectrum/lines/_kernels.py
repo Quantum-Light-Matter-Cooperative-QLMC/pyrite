@@ -47,6 +47,9 @@ _SEG_ARRAYS = (
     "substep_id",
     "event_kind",
     "layer",
+    # Shell soft/hard inelastic mode only (absent from legacy rows).
+    "hard_W_keV",
+    "hard_channel",
 )
 
 
@@ -697,6 +700,13 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
             # The consumer's floor is now the end event of every row it
             # shortened or whose successor it dropped (E_end below the floor).
             floored = shortened | (xp.asarray(out["E_end_keV"], dtype=REAL) < E_cut)
+            if "hard_W_keV" in out:
+                # A hard collision that drops the primary below this
+                # consumer's floor ends its last surviving row as well.
+                post = xp.asarray(out["E_end_keV"], dtype=REAL) - xp.asarray(
+                    out["hard_W_keV"], dtype=REAL
+                )
+                floored = floored | (post < E_cut)
             out["event_kind"] = xp.where(
                 floored, np.int8(SegmentEvent.CUTOFF), xp.asarray(out["event_kind"])
             ).astype(xp.int8)

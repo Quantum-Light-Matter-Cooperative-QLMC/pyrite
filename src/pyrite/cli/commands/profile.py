@@ -54,6 +54,7 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: to avoid coupling this CLI module to that private catalog constant).
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
+_INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -65,6 +66,8 @@ _NUMERICS_FIELD_NAMES = {
     "straggling": "straggling",
     "energy-model": "energy_model",
     "maximum-fractional-energy-loss": "max_dE_frac",
+    "inelastic-model": "inelastic_model",
+    "inelastic-cutoff-ev": "inelastic_cutoff_eV",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -252,6 +255,11 @@ def _emit_show(payload):
     emit_result(f"  straggling: {numerics.get('straggling', False)}")
     emit_result(f"  energy model: {numerics.get('energy_model', 'frozen')}")
     emit_result(f"  max dE fraction: {numerics.get('max_dE_frac', 0.0):g}")
+    if "inelastic_model" in numerics:
+        emit_result(
+            f"  inelastic model: {numerics['inelastic_model']}"
+            f" (W_c {numerics.get('inelastic_cutoff_eV', 0.0):g} eV)"
+        )
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -417,6 +425,23 @@ def numerics_show_command(name, fidelity, json_output):
     type=click.FloatRange(min=0.0),
     metavar="FRACTION",
     help="Cap one row's fractional mean energy loss; positive values require midpoint.",
+)
+@click.option(
+    "--inelastic-model",
+    type=click.Choice(_INELASTIC_MODEL_VALUES),
+    help=(
+        "Collision energy-loss scheme: continuous stopping, or the opt-in shell-soft-hard "
+        "mixed scheme (requires midpoint and --inelastic-cutoff-ev; CPU transport only)."
+    ),
+)
+@click.option(
+    "--inelastic-cutoff-ev",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="EV",
+    help=(
+        "Soft/hard energy-loss cutoff W_c in eV for shell-soft-hard; must exceed each "
+        "material's conduction-band resonance (Si 16.7, SiO2 22, MoS2 23 eV)."
+    ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")

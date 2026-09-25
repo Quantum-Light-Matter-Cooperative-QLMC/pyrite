@@ -15,7 +15,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -70,6 +70,8 @@ NUMERICS_GROUPS = (
             ("energy_model", "energy model"),
             ("max_dE_frac", "maximum fractional energy loss"),
             ("straggling", "straggling"),
+            ("inelastic_model", "inelastic model"),
+            ("inelastic_cutoff_eV", "inelastic cutoff (eV)"),
         ),
     ),
 )
@@ -312,6 +314,8 @@ def resolve_numerics(
         "straggling": numerics.straggling,
         "energy_model": numerics.energy_model,
         "max_dE_frac": numerics.max_dE_frac,
+        "inelastic_model": numerics.inelastic_model,
+        "inelastic_cutoff_eV": numerics.inelastic_cutoff_eV,
     }
     sources = {
         key: (
@@ -518,11 +522,15 @@ def _identity_v1(
         straggling = bool(settings_payload.pop("straggling", False))
         energy_model = str(settings_payload.pop("energy_model", "frozen"))
         max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
+        inelastic_model = str(settings_payload.pop("inelastic_model", "continuous"))
+        inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         straggling = bool(getattr(settings, "straggling", False))
         energy_model = str(getattr(settings, "energy_model", "frozen"))
         max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
+        inelastic_model = str(getattr(settings, "inelastic_model", "continuous"))
+        inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
     if emission != "incoherent":
         resolved["emission"] = emission
     transport_numerics = {}
@@ -532,6 +540,11 @@ def _identity_v1(
         transport_numerics["energy_model"] = energy_model
     if max_dE_frac != 0.0:
         transport_numerics["max_dE_frac"] = max_dE_frac
+    # Divergence-only like the three keys above: continuous stopping (the
+    # default) leaves every existing digest unchanged.
+    if inelastic_model != "continuous":
+        transport_numerics["inelastic_model"] = inelastic_model
+        transport_numerics["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
     # The in-medium photon dispersion is unconditional physics now, not an opt-in

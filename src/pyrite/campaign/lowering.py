@@ -38,6 +38,8 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         straggling=numerics.straggling,
         energy_model=numerics.energy_model,
         max_dE_frac=numerics.max_dE_frac,
+        inelastic_model=numerics.inelastic_model,
+        inelastic_cutoff_eV=numerics.inelastic_cutoff_eV,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -56,6 +58,8 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             straggling=getattr(settings, "straggling", False),
             energy_model=getattr(settings, "energy_model", "frozen"),
             max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
+            inelastic_model=getattr(settings, "inelastic_model", "continuous"),
+            inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

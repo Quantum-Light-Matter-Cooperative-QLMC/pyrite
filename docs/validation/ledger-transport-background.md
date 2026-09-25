@@ -78,6 +78,224 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_stopping_berger_seltzer.py`; `tests/montecarlo/test_transport_lut.py`; `tests/montecarlo/test_transport_cutoff.py`; `tests/montecarlo/test_sbethe_cuda.py`; `tests/montecarlo/test_energy_loss_straggling.py`; `tests/montecarlo/test_straggling_cuda.py`; `tests/xsgen/test_sbethe.py`; `tests/xsgen/test_run_identity.py`; `tests/scan/test_public_api.py`
 - **Notes:** The host rejects extrapolation; production cutoffs therefore cannot fall below 1 keV. SBETHE itself uses an empirical extrapolation below its material-dependent `ECUT` (about 1 keV for electrons), so the lowest table nodes are not guaranteed to come from the corrected Bethe formula. Log-log interpolation is continuous and positivity-preserving but does not claim derivative continuity at native nodes. Urban fluctuations retain their existing elemental allocation and are scaled uniformly so their compound mean equals the SBETHE table rate. The CUDA LUT consumes the same precomputed SBETHE values; exact CUDA interpolates the same nodes. Every packaged table carries the SBETHE source digest, compiler, deck, material identity, output hash, attribution, and manifest digest. Fresh-context source-to-code verification found no divergent term; [validation write-up](beam-transport/sbethe-corrected-stopping.md). Hardware execution on NVIDIA GeForce RTX 5080 (driver 610.47) passed the SBETHE/Urban first-row CPU comparison and both exact and LUT CUDA cutoff anchors at 50 Å. Only a human may mark this row `signed-off`.
 
+## `eedl-material-shell-rates`
+
+- **Claim:** packaged EEDL MF=23 subshell cross sections combined with homogeneous catalog element number densities give a nonnegative macroscopic vacancy-channel rate, with element and shell identity preserved
+- **Code:** `montecarlo/shell_ionization.py::material_shell_ionization_rates`; shared EEDL parser in `montecarlo/eedl_ionization.py::load_eedl_shell_ionization`
+- **Source:** EPICS2025 EEDL ENDF-6 MF=23/MT=534–572, checksum pinned in `montecarlo/eedl_ionization.py`; catalog number densities
+- **Equation:** $\lambda^{-1}_{i,s}(E)=n_i\sigma_{i,s}(E)10^{16}\,{\rm \AA}^{-1}$ for $n_i$ in atoms/Å$^3$ and $\sigma_{i,s}$ in cm$^2$; total rate is the sum over elements and subshells
+- **Assumptions:** independent-atom mixture in a homogeneous medium; linear-linear interpolation as declared by the accepted ENDF sections; rates only, with no inferred transfer or recoil distribution
+- **Limiting cases:** a closed shell contributes zero; below every binding energy the material rate is zero; an accessible shell outside its tabulated projectile-energy range is rejected
+- **Status:** unverified
+- **Checks:** source parser validates monotone grids, nonnegative values, and ENDF interpolation law; independent material-rate and Bote–Salvat comparisons remain pending
+- **Anchor:** [implementation derivation](beam-transport/eedl-material-shell-rates.md)
+- **Notes:** Host-side input preparation only. No production event scheduler consumes these rates; differential spectrum, stopping closure, and fresh-context verification remain open. Only a human may mark this row `signed-off`.
+
+## `sbethe-atomic-shell-inputs`
+
+- **Claim:** the checksum-pinned SBETHE free-atom shell table yields positive shell energies and occupations summing to each atomic number; EEDL joins use ENDF x-ray labels, attach a spin-orbit partner unoccupied in SBETHE to its filled SBETHE $n,l$ shell, reject an absent $n,l$, and preserve binding-energy differences
+- **Code:** `montecarlo/shell_configuration.py::{load_atomic_shells,match_eedl_shells}`
+- **Source:** public SBETHE v2 Mendeley deposit `sdbase/pdatconf.p14`, fetched through the pinned SBETHE reference-data archive; its header cites Carlson ionization energies and Salvat MCDF profiles; byte identity with the separately licensed NEA PENELOPE distribution has not been established
+- **Equation:** $\sum_s f_{Z,s}=Z$
+- **Assumptions:** free-atom shell occupations; EEDL designators follow ENDF-6 MF=23 order (`MT - 533`, including O8/O9), not PENELOPE shell codes; spin-orbit partners of one $n,l$ shell share a vacancy when SBETHE fills only one $j$; no material conduction-band assignment is inferred
+- **Limiting cases:** missing or incomplete source and an EEDL shell with no SBETHE $n,l$ raise; an SBETHE shell absent from EEDL receives no rate; no vacancy event is emitted
+- **Status:** rederived
+- **Checks:** source checksum, numeric bounds, unique designators and labels, label–orbital agreement, occupation sum, fixture binding difference, spin-orbit partner and ENDF-P1 label fixtures, and a fetched-source join for all 99 elements
+- **Anchor:** `tests/montecarlo/test_shell_configuration.py`; [implementation derivation](beam-transport/sbethe-atomic-shell-inputs.md); [verification](beam-transport/sbethe-atomic-shell-inputs-verification.md)
+- **Notes:** Si EEDL M3 joins the SBETHE 3p (M2) shell. Configuration differences leave some SBETHE shells without EEDL rates (e.g. Pd 5s, lanthanide 5d). Material conduction assignment and independent verification remain open. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-oscillators`
+
+- **Claim:** a material's conduction-band and bound-shell oscillators satisfy the dipole sum and PENELOPE-2024 Eqs. 3.62–3.64, with measured plasmon parameters where sourced and the manual's 15 eV free-electron default otherwise
+- **Code:** `montecarlo/transport/shell_oscillators.py::{load_conduction_bands,build_shell_oscillators}`; `data/conduction_band.toml`
+- **Source:** PENELOPE-2024 §3.2.1, NEA/MBDAV/R(2024)1; Si ELF (Yang et al., PRB 100, 245209, 2019); amorphous SiO₂ AR-EELS (Saito et al., Microscopy 74, 117, 2025); MoS₂ EELS (Moynihan et al., J. Microsc. 279, 256, 2020)
+- **Equation:** $W_{cb}=\sqrt{f_{cb}/Z}\,\Omega_p$ by default; $W_k=\sqrt{(aU_k)^2+2f_k\Omega_p^2/3Z}$; $Z\ln I=f_{cb}\ln W_{cb}+\sum_k f_k\ln W_k$
+- **Assumptions:** free-atom `pdatconf.p14` shells; Bragg-additive $I$; all-electron $\Omega_p$; measured band consumes whole outermost shells up to the chemical-valence count; optical plasmon energy without dispersion
+- **Limiting cases:** one bound shell with $f=Z$ gives $W=I$; split-shell or equal-$U$ boundaries, formula mismatch, and unreachable $I$ raise
+- **Status:** rederived
+- **Checks:** dipole sum and Eq. 3.64 closure to $10^{-12}$; manual $W=I$ limit; Si, SiO₂ and MoS₂ shell assignments; Si default $W_{cb}=16.60$ eV, $a=2.208$; measured $W_{cb}$ within 6.5% of Eq. 3.62; pinned $a$ = 2.2024/3.4701/1.7797; non-finite inputs, $W_{cb}\ge I$, and bound $W_k\le U_k$ raise
+- **Anchor:** `tests/montecarlo/test_shell_oscillators.py`; [implementation derivation](beam-transport/penelope-shell-oscillators.md); [verification](beam-transport/penelope-shell-oscillators-verification.md)
+- **Notes:** Host-side input only; no GOS cross section, rate, or transport mode consumes it. $W_{cb}$ strongly affects IMFP, so spectrum/IMFP validation belongs to the shell GOS slice. The SiO₂ $W_{cb}$ is Saito's amorphous 22 eV, chosen by the owner to match catalog density; REELS on 2.65 g/cm³ gives 23.6 eV (input spread 21.5–23.6 eV). Only a human may mark this row `signed-off`.
+
+## `penelope-shell-gos-moments`
+
+- **Claim:** the PENELOPE-2024 shell GOS gives electron distant longitudinal, distant transverse and close Møller energy-loss moments $\sigma^{(0,1,2)}$ per oscillator; the total stopping reaches the Bethe formula with the same $I$ and oscillator $\delta_F$ at high energy
+- **Code:** `montecarlo/transport/shell_gos.py::{shell_gos_moments,density_effect_correction,bethe_stopping_cs,formula_units_per_angstrom3,path_moments}`
+- **Source:** PENELOPE-2024 §§3.2.2–3.2.4, NEA/MBDAV/R(2024)1, Eqs. 3.51, 3.56, 3.70–3.80, 3.83, 3.85–3.88, 3.94–3.110, 3.115–3.121
+- **Equation:** $\sigma^{(n)}_{\rm dis}=\mathcal P\sum_kf_k\{\ln[Q'_k(Q_-+2mc^2)/(Q_-(Q'_k+2mc^2))]+\ln\gamma^2-\beta^2-\delta_F\}\int_0^{W_{\max}}W^{n-1}p_{\rm dis}dW$; $\sigma^{(n)}_{\rm clo}=\mathcal P\sum_kf_k\int_{Q_k}^{(E+U_k)/2}W^{n-2}F^{(-)}(E+U_k,W)dW$, $Q_k=U_k$ (Eqs. 3.56, 3.96; $W_{cb}$ for the band)
+- **Assumptions:** first-Born δ-oscillator GOS; triangle broadening for every $U_k>0$ shell and δ resonance with $Q_{cb}=W_{cb}$ for the conduction band; Eq. 3.104 $W^{n-1}p_{\rm dis}$ form, not Eq. 3.81 $p_{\rm dis}/W_k$; $W_{\max}$ truncates $p_{\rm dis}$; $a$ evaluated at $E$; transverse bracket clipped at zero; $N$ from $\Omega_p$ (Eq. 3.51)
+- **Limiting cases:** $E\gg U_k$ gives Eq. 3.120; $\beta\to1$ gives Eq. 3.73; an untruncated triangle gives $\langle W\rangle=W_k$; $E\le U_k$ gives zero and the close moments vanish continuously as $E\to U_k^+$; moments are continuous at $E=3W_k-2U_k$
+- **Status:** rederived
+- **Checks:** close moments versus direct Eq. 3.87 quadrature ($10^{-9}$); one-shell closed form ($10^{-6}$); triangle mean ($10^{-12}$); Bethe limit ($2\times10^{-4}$ fixture, $10^{-3}$ catalog); Eq. 3.73 ($10^{-3}$); $W_{cb}$ moves $\sigma^{(0)}$ by more than 5% but $\sigma^{(1)}$ by less than 1%; catalog stopping within 2% of `stp.dat` at 0.1–1000 MeV; 1–10 keV recorded as a strict expected failure
+- **Anchor:** `tests/montecarlo/test_shell_gos.py`; [implementation derivation](beam-transport/penelope-shell-gos-moments.md); [verification](beam-transport/penelope-shell-gos-moments-verification.md)
+- **Notes:** Raw, uncalibrated host-side moments; no sampling or transport consumes them. Raw stopping exceeds corrected `stp.dat` by 13% (Si), 21% (SiO₂) and 15% (MoS₂) at 1 keV, and by 1.4%, 3.2% and 6.8% at 10 keV. The derivation separates this into model versus Bethe, $\delta_F$ and SBETHE shell-correction factors. Eq. 3.104 was kept by owner decision; the Eq. 3.81 alternative would change $\sigma^{(0)}$ by up to 1.4% and $\sigma^{(2)}$ by up to 6.1%. Owner decision: close collisions start at $Q_k=U_k$ (Eq. 3.96), not Eq. 3.106's $Q'_k$; distant terms keep $Q'_k$. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-rate-closure`
+
+- **Claim:** inner-shell (K–N, $U>E_c$) GOS oscillators take EEDL ionization cross sections reduced by the GOS $\delta_F$ ratio, keeping their GOS energy-loss PDF; one outer-shell factor $\mathcal N(E)>0$ makes the total $\sigma^{(1)}$ equal corrected SBETHE `stp.dat` exactly
+- **Code:** `montecarlo/transport/shell_rates.py::{close_shell_rates,inner_shell_cutoff_eV,is_inner_shell,eedl_inner_cross_sections,adopted_stopping_cs,catalog_shell_rate_closure}`
+- **Source:** PENELOPE-2024 §3.2.6.1, NEA/MBDAV/R(2024)1, Eqs. 3.140–3.142 and Eq. 2.112 (§2.6, §7.1 footnote); EPICS2025 EEDL MF=23; corrected SBETHE `stp.dat`
+- **Equation:** $s_i=\rho_i\sigma_{{\rm si},i}/\sigma^{(0)}_i$, $\rho_i=\sigma^{(0)}_i(\delta_F)/\sigma^{(0)}_i(0)$; $\mathcal N=(S_{\rm stp}-\sum_is_i\sigma^{(1)}_i)/\sum_j\sigma^{(1)}_j$; all three moments of oscillator $k$ scale by $s_k$ or $\mathcal N$
+- **Assumptions:** EEDL replaces DWBA (owner baseline; Bote–Salvat is #92); `stp.dat` replaces PENELOPE's own GOS stopping (owner deviation); $E_c=\max\{50\ {\rm eV},U_{\max,O/P/Q}(Z_m)\}$ with SBETHE $U_k$, the 50 eV floor tied to the characteristic relaxation cutoff; §3.2.6.1 "less than $E_c$" read as a misprint; EABS restriction not applied; spin-orbit partners summed; additive compounds; $\delta_F=0$ evaluated by $\Omega_p=0$ with a runtime check that only the transverse term changes
+- **Limiting cases:** no inner shells gives $\mathcal N=S_{\rm stp}/\sigma^{(1)}_{\rm GOS}$; $\delta_F=0$ gives $\rho_i=1$; GOS-consistent inputs return raw moments; $E\le U_i$ closes the shell
+- **Status:** rederived
+- **Checks:** stopping closure ($10^{-12}$, abs 0) and $\mathcal N>0$ for Si/SiO₂/MoS₂ at 1 keV–1 MeV; inner PDF moment ratios ($10^{-12}$); EEDL×$\rho$ vs independent interpolation; $\rho$ vs transverse-bracket recomputation; spin-orbit merge; $E_c$ selection; fail-closed stopping/EEDL grids and $\mathcal N\le0$
+- **Anchor:** `tests/montecarlo/test_shell_rates.py`; [implementation derivation](beam-transport/penelope-shell-rate-closure.md); [verification](beam-transport/penelope-shell-rate-closure-verification.md)
+- **Notes:** Host-side only; no production transport consumes it. $\mathcal N$ spans 0.76–1.28 (SiO₂ 0.76 at 1 keV, MoS₂ 1.28 at 100 keV) with the Eq. 3.96 close cutoff. The closure moves $\sigma^{(0)}$ by −23% to +23% and straggling by −34% to +13%. Independent full Penn Si and SiO₂ calculations give closed-model IMFP deficits of 26–29% and 33–35% at 2–20 keV, respectively; with the source's 10 eV SiO₂ valence-band energy offset. By owner decision this is a documented note, not a transport gate: the deficit sits in the conduction-band distant loss at $W_{cb}$, which is soft for every admissible $W_c>W_{cb}$; a characterization test pins the recorded ratios. The manual's Ba $E_c=92$ eV equals the Ba N5 energy, not the stated O-shell rule; the code follows the stated rule. It depends on `penelope-shell-gos-moments` (rederived; Eq. 3.96 close cutoff applied after verification). Only a human may mark this row `signed-off`.
+
+## `penelope-shell-soft-hard-partition`
+
+- **Claim:** the stopping-closed shell GOS moments split at an energy-loss cutoff $W_c$ into soft $\sigma^{(1)},\sigma^{(2)}$ ($W\le W_c$) and hard $\sigma^{(0..2)}$ ($W>W_c$) that sum to the closed moments, so soft plus hard stopping equals `stp.dat`; hard inner rates equal the substituted EEDL vacancy rates when $W_c\le U_i$
+- **Code:** `montecarlo/transport/shell_gos.py::windowed_shell_gos_moments`; `montecarlo/transport/shell_partition.py::{partition_shell_rates,catalog_shell_partition,ShellSoftHardPartition}`
+- **Source:** PENELOPE-2024 §3.2.5 and Chapter 4, NEA/MBDAV/R(2024)1, Eqs. 3.76, 3.87, 3.96, 3.106–3.110, 3.124, 4.44–4.47, 4.113; §3.2.6.1 (vacancies from hard inner-shell collisions)
+- **Equation:** every oscillator $k$: soft $=s_k\sigma^{(n)}_k|_{(0,W_c]}$, hard $=s_k\sigma^{(n)}_k|_{(W_c,\infty)}$, with $s_k=\mathcal N$ for outer shells and the substituted EEDL/GOS factor for inner shells; windows restrict only the loss integral (triangle $p_{\rm dis}$ over $[\max(U,W_a),\min(W_{\rm dis},W_{\max},W_b)]$, $\delta(W-W_{cb})$ if $W_a<W_{cb}\le W_b$, Møller over $[\max(Q_k,W_a),\min((E+U_k)/2,W_b)]$)
+- **Assumptions:** distant $Q$-integrated factors are independent of $W$; condensed inner-shell losses above $U_i$ create no explicit vacancy (Eq. 4.113); a loss exactly at $W_c$ is soft; branch probabilities from restricted channel cross sections
+- **Limiting cases:** window $(0,\infty)$ is bitwise the unrestricted moments; $W_c=0$ gives no soft moment; $W_c\to\infty$ leaves no hard events or explicit vacancies; hard rate non-increasing and soft moments non-decreasing in $W_c$
+- **Status:** rederived
+- **Checks:** window sums ($10^{-12}$); windowed triangle/Møller vs direct quadrature ($10^{-10}$/$10^{-9}$); fixture and catalog stopping closure ($10^{-12}$, abs 0); explicit plus condensed inner rates equal `adopted_inner_cm2`; limits; monotonicity; invalid windows and cutoffs rejected
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-soft-hard-partition.md); [independent verification](beam-transport/penelope-shell-soft-hard-partition.md#independent-verification-fresh-context-2026-09-24)
+- **Notes:** Host-side sampler consumes it; no production transport uses it. At $W_c=50$ eV the soft share of stopping is 0.27–0.61 and the hard mean free path 105–9148 Å over Si/SiO₂/MoS₂ at 1–100 keV. Depends on `penelope-shell-rate-closure` and `penelope-shell-gos-moments` (both rederived). A δ-loss exactly at $W_c$ is soft, whereas PENELOPE Eqs. 4.49/4.113 use $W<W_{cc}$; this matters only when $W_c=W_{cb}$ exactly. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-hard-loss-sampling`
+
+- **Claim:** a hard event selects (oscillator, branch) with its closed hard rate, then draws $W$ from that branch's restricted DCS; local deposit plus emitted secondary kinetic energy plus reserved inner-shell binding equals the primary loss, and only substituted inner shells carry a vacancy label
+- **Code:** `montecarlo/transport/shell_sampling.py::sample_shell_hard_loss`
+- **Source:** PENELOPE-2024 §§3.2.3–3.2.5, Eqs. 3.76, 3.87, 3.94, 3.96, 3.104 and 3.124, NEA/MBDAV/R(2024)1; Eq. 3.125 gives a conflicting triangular sampling law
+- **Equation:** $p_{kb}=\sigma_{kb}^{(0)}/\sigma_h^{(0)}$; bound distant $g(W)\propto(W_{\rm dis}-W)/W$; close $g(W)\propto F^{(-)}(E+U_k,W)/W^2$; inner emitted $E_s=W-U_k$ with reserve $U_k$; outer emitted proxy $E_s=W$ with no vacancy; a subthreshold secondary is deposited locally
+- **Assumptions:** every sampled hard loss exceeds the cutoff; a bound-shell sampled loss ionizes its oscillator; the outer-shell secondary is PENELOPE's free-electron proxy without a residual vacancy; the reserved inner binding must be consumed exactly once by #94's relaxation handoff
+- **Limiting cases:** conduction-band distant loss is exactly $W_{cb}$; continuous sampled $W$ lies in its branch's hard interval; local plus emitted plus reserved energy equals $W$
+- **Status:** rederived
+- **Checks:** each nonzero fixture channel's 10th, 50th and 90th loss quantiles versus the windowed DCS integral ($10^{-9}$); seed-93 channel frequencies (1200 events); energy accounting, inner vacancy labels, threshold and invalid inputs
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-hard-loss-sampling.md)
+- **Notes:** Fresh-context source review confirmed that the sampler follows the Eq. 3.94/3.104 distant DCS $p_{\rm dis}(W)/W$ used by its moments, while Eqs. 3.81/3.125 imply the triangular $p_{\rm dis}(W)$ law. Owner adjudication (2026-09-25): keep $p_{\rm dis}(W)/W$ as this PENELOPE-like model's reference law, consistent with its moments and closed rates; the sampler deliberately does not reproduce Eq. 3.125. With that source choice, the independent re-derivation's remaining checks pass. Host-side loss sampling only; event scheduling, independent rate/spectrum evidence and CPU/GPU checks remain open. Depends on `penelope-shell-soft-hard-partition` (unverified). Only a human may mark this row `signed-off`.
+
+## `penelope-shell-hard-recoil`
+
+- **Claim:** a hard longitudinal shell event draws recoil energy from the PENELOPE $Q$ law and gives the primary polar angle from the modified resonance; transverse events leave the primary direction unchanged; close events use Møller recoil $Q=W$; azimuth is uniform
+- **Code:** `montecarlo/transport/shell_sampling.py::sample_shell_hard_collision`
+- **Source:** PENELOPE-2024 §3.2.5.1–3.2.5.2, NEA/MBDAV/R(2024)1, Eqs. 3.126–3.129 and 3.134
+- **Equation:** $g(Q)\propto[Q(1+Q/(2m_ec^2))]^{-1}$ on $(Q_-,Q'_k)$, $L(Q)=\ln[Q/(Q+2m_ec^2)]$; longitudinal $\cos\theta=[p(E)^2+p(E-W'_k)^2-p(Q)^2]/[2p(E)p(E-W'_k)]$ with $p(T)^2=T(T+2m_ec^2)$; close $Q=W$, $\cos^2\theta=(E-W)(E+2m_ec^2)/[E(E-W+2m_ec^2)]$; $\phi=2\pi\xi$
+- **Assumptions:** bound-shell angular distribution uses $W'_k$ even when its sampled loss differs; the incoming flight is the polar axis; transverse deflection is neglected; the returned azimuth needs caller rotation to world coordinates
+- **Limiting cases:** longitudinal $Q=Q_-$ gives $\cos\theta=1$; transverse $\cos\theta=1$; close $W/E\to0$ gives $\cos\theta\to1$
+- **Status:** unverified
+- **Checks:** every nonzero fixture branch at 10 keV; four longitudinal recoil quantiles versus direct $Q$ quadrature ($10^{-9}$); close and longitudinal polar angles versus source equations; transverse and invalid-uniform limits; every active catalog branch for Si/SiO₂/MoS₂ at 1, 10 and 100 keV
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-hard-recoil.md)
+- **Notes:** Host-side primary recoil; segment scheduling, independent measured recoil comparison, and CPU/GPU reproducibility remain open. Secondary direction has its own ledger row. Only a human may mark this row `signed-off`.
+
+## `penelope-shell-secondary-direction`
+
+- **Claim:** an emitted shell secondary follows the momentum-transfer polar angle for longitudinal and close collisions, opposite the primary azimuth; distant transverse emission uses a fixed polar cosine of 0.5; both returned angles rotate through the same incoming-flight frame; subthreshold secondaries have no returned direction
+- **Code:** `montecarlo/transport/shell_sampling.py::sample_shell_hard_collision`, `::shell_collision_world_directions`
+- **Source:** PENELOPE-2024 §3.2.5.4, NEA/MBDAV/R(2024)1, Eqs. 3.137–3.138; Geant4 `G4PenelopeIonisationModel::SampleFinalStateElectron` distant-transverse convention
+- **Equation:** longitudinal $\cos\theta_s=[p(E)^2+p(Q)^2-p(E-W'_k)^2]/[2p(E)p(Q)]$, $p(T)^2=T(T+2m_ec^2)$; close $\cos\theta_s=\sqrt{W(E+2m_ec^2)/[E(W+2m_ec^2)]}$; $\phi_s=(\phi+\pi)\bmod 2\pi$; world direction $\mathbf d'=\cos\theta\,\mathbf d+\sin\theta(\cos\phi\,\mathbf u+\sin\phi\,\mathbf v)$ with a common orthonormal frame $(\mathbf u,\mathbf v,\mathbf d)$
+- **Assumptions:** target electron initially at rest for the angular approximation; bound-shell longitudinal angle uses modified resonance even when sampled loss differs; transverse cosine 0.5 is an explicit implementation convention; both returned directions use the incoming flight frame
+- **Limiting cases:** longitudinal $Q=Q_-$ gives forward emission; close $W/E\to0$ gives transverse emission; forward primary retains the incoming unit direction; subthreshold energy has no direction
+- **Status:** unverified
+- **Checks:** every nonzero fixture branch at three recoil quantiles; momentum-triangle and close formulas; opposite azimuth and transverse convention; on-axis and tilted shared-frame rotation, unit norms and polar cosines; suppressed secondary direction absent; invalid incoming directions rejected
+- **Anchor:** `tests/montecarlo/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-secondary-direction.md)
+- **Notes:** Host-side only; independent angular validation, track scheduling, and CPU/GPU comparison remain open. Uses the hard-loss sampler's adjudicated $p_{\rm dis}(W)/W$ distant law (not Eq. 3.125). Only a human may mark this row `signed-off`.
+
+## `shell-soft-hard-transport`
+
+- **Claim:** the opt-in `inelastic_model="shell-soft-hard"` CPU transport removes the soft share $S_s=S\,\sigma_s^{(1)}/\sigma^{(1)}$ of each layer's corrected SBETHE stopping continuously and schedules hard collisions at rates $\mu_k=S\,\sigma_{h,k}^{(0)}/\sigma^{(1)}$ from the closed shell partition, so soft plus mean hard loss per path equals the table $S$ at its nodes; a hard event lowers the primary energy by the sampled $W$, deflects it by the sampled recoil, and ends its row with `EVENT_HARD_INELASTIC`; optional soft fluctuations have mean $S_s s$ and variance $\Omega_s^2 s$; with $W_c$ above every channel endpoint the transport is bitwise the continuous one
+- **Code:** `montecarlo/transport/shell_transport.py::{build_shell_inelastic_tables,validate_shell_cutoff,hard_event_energy_accounting}`; `montecarlo/transport/hard_inelastic.py::{_sample_hard_transfer_eV,_hard_primary_cosine,_soft_loss_sample_keV}`; `montecarlo/transport/cores.py::make_cpu_transport_core` (`inelastic=True`); exact CUDA transcription in `montecarlo/transport/{_jit_shell_device.py,_jit_kernel.py,_jit_launch.py}`; `montecarlo/transport/api.py::simulate_trajectories`
+- **Source:** PENELOPE-2024, NEA/MBDAV/R(2024)1, §4.2 and Eqs. 3.124–3.134, 4.44–4.47, 4.54–4.63; the partition and sampler rows above
+- **Equation:** $S_s(E_i)=S(E_i)\sigma_s^{(1)}/(\sigma_s^{(1)}+\sigma_h^{(1)})$, $\mu_k(E_i)=S(E_i)\sigma_{h,k}^{(0)}/(\sigma_s^{(1)}+\sigma_h^{(1)})$, $\Omega_s^2(E_i)=S(E_i)\sigma_s^{(2)}/(\sigma_s^{(1)}+\sigma_h^{(1)})$ at the SBETHE nodes; step $=\min(\tau_{\rm el}\lambda_{\rm el},\tau_h/\mu_h,\text{geometry},\text{cutoff},\text{cap})$ with independent exponential optical depths; channel $k$ with probability $\mu_k/\mu_h$; $E\to E_{\rm end}-W$; soft loss sampled from PENELOPE's truncated-Gaussian/uniform/delta-plus-uniform law
+- **Assumptions:** hazards and hard DCS frozen at the row's start energy (Eq. 4.65 correction not applied; `max_dE_frac` bounds it); rates linear and soft stopping log-log in $\ln E$ between nodes; $W_c>W_{cb}$ for every layer so the conduction-band loss that carries the unvalidated total-IMFP excess is soft; secondaries and vacancies recorded per hard row, not transported (#94); a collision leaving $E\le E_{\rm cut}$ ends the history
+- **Limiting cases:** $W_c$ above every channel endpoint reproduces continuous midpoint transport bit for bit; zero soft variance returns the mean loss; each soft-sampler case keeps mean and variance; $W_c\to W_{cb}^{+}$ is the smallest admissible cutoff
+- **Status:** unverified
+- **Checks:** Numba transfer/recoil vs host sampler ($10^{-10}$/$10^{-9}$) on every active Si and MoS₂ channel; soft-sampler moments in all three cases; table closure at every node ($10^{-12}$); bitwise continuous limit on three cores; event contract, $E_{\rm end}-E_{\rm next}=W$ and accounting identity on four core/LUT/straggling combinations; per-electron energy conservation; invalid $W_c$, frozen, CUDA-LUT and missing-table rejection; hardware-gated CUDA determinism, first-row CPU parity, bookkeeping and ensemble agreement (`tests/montecarlo/test_shell_soft_hard_cuda.py`, 7/7 on NVIDIA GeForce RTX 5080, CuPy 14.2.0); macroscopic closure, straggling, transmission, backscatter, range and $W_c$ convergence for Si/SiO₂/MoS₂ at 5/20/100 keV (`checks/shell_soft_hard_transport_observables.py`); soft/hard inelastic angular transport rates against elastic Mott, 5–100 keV (`checks/soft_inelastic_deflection.py`): the omitted soft deflection is 0.3–1.6% of the angular diffusion rate at $W_c=50$ eV, and per-segment coherent-emission impact is open
+- **Anchor:** `tests/montecarlo/test_shell_soft_hard_transport.py`; [physics](../physics/beam-transport/shell-soft-hard-transport.md); [validation](beam-transport/shell-soft-hard-transport.md)
+- **Notes:** Lockstep and per-electron CPU cores (exact and LUT) and the exact CUDA core; grooved and CUDA-LUT raise, and production CUDA runs disable the LUT. Uses the adjudicated Eq. 3.94 distant law of `penelope-shell-hard-loss-sampling` (not Eq. 3.125) and inherits the documented total-IMFP note of `penelope-shell-rate-closure`. Hard-event spectra, inelastic angular deflection and secondary transport lack independent evidence. Needs fresh-context verification. Only a human may mark this row `signed-off`.
+
+## `gos-optical-quadrature`
+
+- **Claim:** each positive-width interval of the SBETHE optical oscillator-strength density contributes its integrated strength and first-moment centroid as one resonance; duplicate-energy shell edges have zero weight
+- **Code:** `montecarlo/transport/inelastic.py::_oscillator_quadrature`
+- **Source:** Salvat, SBETHE, `OOS.dat` density and cumulative column definitions; exact integration of a linear interpolant
+- **Equation:** $f_i=(W_{i+1}-W_i)(g_i+g_{i+1})/2$ and $\bar W_i=\int_{W_i}^{W_{i+1}}Wg(W)dW/f_i$
+- **Assumptions:** optical density is linear within each native interval; an interval's strength is represented by one resonance
+- **Limiting cases:** constant density places the resonance at the interval midpoint; zero-width shell-edge intervals contribute zero strength
+- **Status:** rederived
+- **Checks:** packaged Si, MoS2 and SiO2 OOS integrals recover the electron f-sum and logarithmic mean excitation energy to 0.1%; fresh-context check pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-optical-quadrature.md)
+- **Notes:** Host-side input preparation only. Fresh-context verification and production transport integration are pending.
+
+## `gos-core-edge`
+
+- **Claim:** the first positive Si SBETHE OOS shell-edge jump separates valence and core optical oscillator strengths without overlap; selecting only above-edge oscillators gives an uncalibrated positive GOS core candidate whose raw moments stay fixed as the hard cutoff changes
+- **Code:** `montecarlo/transport/inelastic.py::build_gos_partition` (`core_edge_ev`)
+- **Source:** Salvat, SBETHE, `OOS.dat`; Vos and Grande, *Journal of Physics and Chemistry of Solids* 124 (2019) 242–249, `10.1016/j.jpcs.2018.09.020`; NIST X-ray transition tables for Si L₂/L₃ edges
+- **Equation:** $g_{\mathrm{core}}(W;E)=\sum_{\bar W_i\geq W_{\mathrm{edge}}}g_i(W;E)$ and $M_{n,\mathrm{core}}=\int W^n g_{\mathrm{core}}\,dW$; the core-only calibration factor is unity
+- **Assumptions:** the repeated OOS energy with a positive density jump identifies a shell onset; OOS intervals are represented by centroids; atomic GOS is a candidate for core response, not validated microscopic transport
+- **Limiting cases:** the native zero-width edge interval contributes no oscillator; no core event lies below its edge; $W_c\geq E$ gives zero hard rate; soft and hard first moments sum to the raw core first moment
+- **Status:** filtered
+- **Checks:** the shipped Si edge at 102.2154 eV separates 3.769 valence and 10.237 core electron strengths, summing to 14.006; four cutoffs preserve raw core moments and first-moment closure; fixed-seed hard samples stay above the edge and emit no free-secondary proxy; arbitrary non-edge cutoffs are rejected
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-core-edge.md)
+- **Notes:** Host-only diagnostic. Absolute core rate, L/K spectral shape, overlap with the dielectric valence fit, corrected-stopping closure, and fresh-context validation remain open. Only a human may mark this row `signed-off`.
+
+## `dielectric-bulk-loss`
+
+- **Claim:** an isotropic bulk Drude–Lindhard ELF with finite-momentum oscillator dispersion gives a nonnegative valence DIIMFP by logarithmic recoil-energy quadrature; conditional recoil sampling follows that same ELF and the nonrelativistic primary momentum triangle; one fixed piecewise-linear loss grid can be partitioned at a transfer cutoff without changing its valence moments
+- **Code:** `montecarlo/transport/dielectric.py::bulk_dielectric_diimfp`, `::sample_bulk_dielectric_recoil`, `::build_bulk_valence_partition`, `::sample_bulk_valence_loss`
+- **Source:** Tougaard and Yubero, *Surface and Interface Analysis* 54 (2022), Eqs. 9–12; Pauly, Yubero and Tougaard, Zenodo 6024064, `ELF_Si.txt` (Yubero et al., 1993)
+- **Equation:** $L(Q,W)=\Theta(W-E_g)\sum_i A_i\gamma_iW/\{([W_i(0)+\alpha_iQ]^2-W^2)^2+(\gamma_iW)^2\}$; $K_E(W)=(\pi Ea_0)^{-1}\int_{k_-}^{k_+}L\,dk/k$, with $Q=\hbar^2k^2/(2m_e)$ and $dk/k=dQ/(2Q)$; $P(Q\mid E,W)\propto\int_{Q_-}^{Q}L(q,W)\,d\log q$ and $\cos\theta=[E+(E-W)-Q]/[2\sqrt{E(E-W)}]$; on the fixed linear loss grid $S_{\mathrm{soft}}+S_{\mathrm{hard}}=\int_0^{W_{\max}}WK_E(W)\,dW$ and $\lambda_{\mathrm{hard}}^{-1}=\int_{W_c}^{W_{\max}}K_E(W)\,dW$
+- **Assumptions:** homogeneous isotropic bulk; nonrelativistic projectile with $W\ll E$; fitted valence response only
+- **Limiting cases:** zero rate below the band gap and at $W=E$; positive rate for positive oscillator strengths; $W_c\geq W_{\max}$ gives zero hard valence rate
+- **Status:** filtered
+- **Checks:** 64- and 96-point quadratures agree within $10^{-4}$ relative at selected Si losses; independent direct $\log k$ integration agrees with the $\log Q$ implementation within $10^{-7}$ relative at 1 keV and 16 eV; four conditional recoil quantiles agree with direct $\log k$ integration within $3\times10^{-4}$ absolute CDF probability and the primary angle follows the momentum triangle; fixed-seed median sampling; 1 and 3 keV Si 14–20 eV fractions and peak heights exceed conservative Werner REELS figure bounds after 0–50 eV normalization; fixed-grid partition preserves total valence rate and first moment across four cutoffs, and five sampled loss quantiles invert the stored-bin CDF within $10^{-12}$; 0.5/0.25/0.125 eV loss-grid refinement on 0–100 eV Si gives monotonically falling zeroth- and first-moment errors against adaptive integration at 1 and 3 keV, with a worst finest-grid relative error of $4.7\times10^{-6}$; full IMFP and stopping closure cannot be claimed without core losses
+- **Anchor:** `tests/montecarlo/test_dielectric_loss.py`; [implementation derivation](beam-transport/dielectric-bulk-loss.md)
+- **Notes:** Host-only candidate. Fresh-context source-to-code validation, core-tail composition, absolute-rate validation, and transport integration are pending. Only human sign-off can change the final status.
+
+## `gos-distant-response`
+
+- **Claim:** the optical resonances produce positive distant longitudinal and transverse cross sections through the PENELOPE-like GOS expressions, with the minimum recoil energy evaluated without subtracting nearly equal momenta
+- **Code:** `montecarlo/transport/inelastic.py::_qmin_ev`, `::build_gos_partition`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, Eqs. 127–128 and 131–132
+- **Assumptions:** each OOS interval acts as one shell oscillator; no finite-momentum material response or explicit transverse Fano density correction in the raw spectrum
+- **Limiting cases:** $Q_{\min}\to0$ quadratically for $W\to0$; longitudinal contribution vanishes at $W=E$; transverse recoil is zero
+- **Status:** rederived
+- **Checks:** positive cross sections and finite sampled angles in Si at 100 keV; independent IMFP comparison and fresh-context derivation pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-distant-response.md)
+- **Notes:** The raw transverse shape omits the density effect; corrected stopping calibrates the whole distribution. This does not prove the microscopic differential response. Fresh-context verification is pending.
+
+## `gos-moller-close`
+
+- **Claim:** the close branch uses the relativistic Møller differential energy-transfer factor and the cumulative oscillator strength active below each transfer, with the indistinguishable-electron ceiling $W\leq E/2$
+- **Code:** `montecarlo/transport/inelastic.py::_moller_factor`, `::build_gos_partition`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, Eqs. 129 and 133
+- **Assumptions:** OOS-bin resonance energies approximate shell thresholds; no shell binding energy is inferred from the optical distribution
+- **Limiting cases:** Møller factor tends to one at $W/E\to0$; no close branch exists below the lowest active oscillator
+- **Status:** rederived
+- **Checks:** positive rate and hard samples bounded by $E/2$; independent transfer-spectrum comparison and fresh-context derivation pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-moller-close.md)
+- **Notes:** The resonance-bin approximation needs independent IMFP and transfer-spectrum checks before use in transport. PENELOPE-2024 §§3.2.1–3.2.2 use a distinct bound-shell threshold $Q_k=U_k$ with $W_k$ determined separately; this optical-bin candidate does not implement that shell construction. Fresh-context verification is pending.
+
+## `gos-soft-hard-partition`
+
+- **Claim:** one OOS-derived transfer distribution is divided at $W_c$; the same positive scale aligns its total first moment with the corrected production SBETHE stopping cross section, so soft continuous loss plus explicit hard-event mean has no energy gap or double count
+- **Code:** `montecarlo/transport/inelastic.py::_linear_moments`, `::build_gos_partition`, `::hard_transfer_cdf`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, Eqs. 130 and soft/hard integral definitions; Salvat SBETHE `stp.dat` and `asymptotic.dat` source blocks; KESS Si Penn/Bethe–Fano Fig. 4.5(a); Werner, Phys. Rev. B 74, 075421 (2006), Si REELS Fig. 3(b)
+- **Equation:** $S_{\mathrm{target}}=a\int_0^E W\,d\sigma_{\mathrm{GOS}}/dW\,dW$; $S_{\mathrm{soft}}=a\int_0^{W_c}W\,d\sigma_{\mathrm{GOS}}/dW\,dW$; $\sigma_{\mathrm{hard}}=a\int_{W_c}^E d\sigma_{\mathrm{GOS}}/dW\,dW$
+- **Assumptions:** a common positive scale changes the absolute cross section but preserves the raw transfer shape; `asymptotic.dat` is an uncorrected free-atom comparison, not the production stopping target
+- **Limiting cases:** $W_c\to0$ sends the first moment to hard events; $W_c\geq E$ makes the hard rate zero; soft and hard first moments sum to corrected stopping
+- **Status:** rederived
+- **Checks:** partition closure for five thresholds in packaged Si, including $W_c\geq E$; fixed raw moments, calibration, and total rate across interior $W_c$ values in Si, MoS2, and SiO2; clipped close-bin samples remain above $W_c$; seeded hard-event samples agree with exact CDF to 0.015 absolute probability; KESS Penn/Bethe–Fano Si loss-mode comparison places the model's 15 eV peak within the broad 17 ± 10 eV plasmon region at 1, 5, and 50 keV; Werner Si REELS Fig. 3(b) instead exposes a peak-height discrepancy: model 0.045–0.046 eV$^{-1}$ in 1 eV bins at 1 and 3 keV (0.055–0.056 eV$^{-1}$ after 0–50 eV renormalization) versus plot-read peak near 0.10 eV$^{-1}$, conservatively above 0.08 eV$^{-1}$; NIST SRD 71 TPP-2M IMFP comparison at 1 and 2 keV: Si within 5%, SiO2 22–23% lower, within a 25% bound reflecting NIST's 20.5% absolute standard uncertainty and model approximation. Raw GOS/`CS0A` is only 0.39–0.63 at 100 keV in Si/MoS2/SiO2. Higher-energy IMFP and full quantitative transfer spectra remain unvalidated
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-soft-hard-partition.md)
+- **Notes:** Host-side model only; no transport core consumes these rates yet. Strict expected-failure tests record both the conservative REELS peak bound and the 14–20 eV probability bound: the model gives 0.292–0.294 in that window after 0–50 eV normalization versus a conservative lower bound of 0.35. Figure reading is approximate, but the substantial shape deficit blocks activation despite mean-stopping and IMFP agreement. The issue text's assertion that `CS1A` shares the corrected production stopping is contradicted by SBETHE's `asymptotic.dat` source block. Fresh-context verification is pending.
+
+## `gos-hard-recoil`
+
+- **Claim:** branch selection samples the hard cross sections; close events sample transfer within a nonnegative linear bin and use Møller primary/secondary polar recoil, while distant longitudinal events sample recoil $Q$ and distant transverse events leave direction unchanged
+- **Code:** `montecarlo/transport/inelastic.py::sample_hard_collision`
+- **Source:** Geant4 Physics Reference Manual, Penelope ionisation, hard-event sampling and recoil equations following Eq. 133
+- **Assumptions:** full-OOS close-collision secondary energy equals transfer for an outer-shell proxy; core-only diagnostics suppress that proxy because inner-shell binding is absent; vacancy metadata, azimuth and transport are not yet represented
+- **Limiting cases:** no hard rate cannot be sampled; a production threshold above $E$ suppresses the secondary; all polar cosines remain in $[-1,1]$
+- **Status:** rederived
+- **Checks:** 71 hard quantiles at 100 keV Si respect threshold, transfer ceiling, and angular bounds; fresh-context derivation and transport-state test pending
+- **Anchor:** `tests/montecarlo/test_inelastic_partition.py`; [implementation derivation](beam-transport/gos-hard-recoil.md)
+- **Notes:** No trajectory rotation, azimuth, secondary state buffer, or secondary transport is connected yet. Fresh-context verification is pending.
+
 ## `energy-loss-straggling`
 
 - **Claim:** optional unrestricted Urban energy-loss fluctuations applied per element as a compound-Poisson sum of two excitation levels and a $1/\epsilon^2$ continuum up to the Moller ceiling $T_{\max}=E/2$. The analytic channel model uses the supplied stopping magnitude $C=\lvert dE/dx\rvert$ (SBETHE in production, the splice for reference calls), so $\langle\Delta E\rangle=Cs$ exactly and $\operatorname{Var}(\Delta E)=s(\Sigma_1E_1^2+\Sigma_2E_2^2+\Sigma_3E_0T_{\max})$. Counts are exact Poisson at every supported mean: means above 64 are split into independent bounded-rate chunks whose counts sum by Poisson additivity. It is applied on every host core and exact CUDA; the default-off path is bit-for-bit historical

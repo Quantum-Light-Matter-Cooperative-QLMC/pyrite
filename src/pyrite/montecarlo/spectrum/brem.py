@@ -19,6 +19,7 @@ from ...materials.attenuation import (
     _normalize_composition,
 )
 from ...materials.crystal import ALPHA_FS
+from ..eedl_ionization import _verify_packaged_eedl
 from ..groove import escape_distance_ang
 from ..transport import TRANSPORT_ELEMENTS
 from .brem_bremslib import (
@@ -33,7 +34,6 @@ from .characteristic import CHARACTERISTIC_EEDL_SHA256 as BREMSSTRAHLUNG_EEDL_SH
 from .characteristic import (
     CHARACTERISTIC_ENDF_PARSERPY_VERSION as BREM_ENDF_PARSERPY_VERSION,
 )
-from .characteristic import _verify_packaged_eedl
 from .lines import (
     _clip_segments_to_cutoff,
     _escape_length,

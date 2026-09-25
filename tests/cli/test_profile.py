@@ -1379,3 +1379,67 @@ def test_remove_bare_no_op_error_mentions_beam(tmp_path, monkeypatch):
 
     assert result.exit_code == 2
     assert "provide a range, membership, beam, or emission option" in result.stderr
+
+
+def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    missing_cutoff = invoke(
+        profile.command,
+        [
+            "numerics",
+            "set",
+            "sub_100keV",
+            "--energy-model",
+            "midpoint",
+            "--inelastic-model",
+            "shell-soft-hard",
+        ],
+    )
+    assert missing_cutoff.exit_code == 1
+    assert "requires a finite positive inelastic_cutoff_eV" in missing_cutoff.stderr
+
+    frozen = invoke(
+        profile.command,
+        [
+            "numerics",
+            "set",
+            "sub_100keV",
+            "--inelastic-model",
+            "shell-soft-hard",
+            "--inelastic-cutoff-ev",
+            "50",
+        ],
+    )
+    assert frozen.exit_code == 1
+    assert "requires energy_model='midpoint'" in frozen.stderr
+
+    written = invoke(
+        profile.command,
+        [
+            "numerics",
+            "set",
+            "sub_100keV",
+            "--energy-model",
+            "midpoint",
+            "--inelastic-model",
+            "shell-soft-hard",
+            "--inelastic-cutoff-ev",
+            "50",
+        ],
+    )
+    assert_clean_result(written, stdout="updated numerics for profile sub_100keV\n")
+    assert 'inelastic_model = "shell-soft-hard"' in catalog.read_text()
+    assert "inelastic_cutoff_eV = 50.0" in catalog.read_text()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "inelastic model: shell-soft-hard (W_c 50 eV)" in shown.stdout
+
+    zero = invoke(profile.command, ["numerics", "set", "sub_100keV", "--inelastic-cutoff-ev", "0"])
+    assert zero.exit_code == 2
+
+    reset = invoke(
+        profile.command,
+        ["numerics", "reset", "sub_100keV", "inelastic-model", "inelastic-cutoff-ev"],
+    )
+    assert_clean_result(reset, stdout="reset numerics for profile sub_100keV\n")
+    assert "inelastic_model" not in catalog.read_text()

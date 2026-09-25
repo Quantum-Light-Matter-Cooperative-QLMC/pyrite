@@ -180,6 +180,8 @@ include = [
     "src/pyrite/montecarlo/transport/_jit_device.py",
     "src/pyrite/montecarlo/transport/_jit_kernel.py",
     "src/pyrite/montecarlo/transport/_jit_launch.py",
+    "src/pyrite/montecarlo/transport/_jit_lut_kernel.py",
+    "src/pyrite/montecarlo/transport/_jit_shell_device.py",
     "src/pyrite/montecarlo/runner/__init__.py",
     "src/pyrite/montecarlo/spectrum/*_jit_kernel.py",
 ]
@@ -228,10 +230,17 @@ forbidden_modules = [
     "pyrite.validation",
     "pyrite.xsgen",
 ]
-# The Monte Carlo runner is the case driver within this package. It resolves
-# identity-matched, stored SBETHE tables before entering the transport core;
-# numerical kernels and materials must not import the table-generation layer.
-ignore_imports = ["pyrite.montecarlo.runner -> pyrite.xsgen.sbethe"]
+# The Monte Carlo runner is the case driver within this package. Its
+# `case_tables` module resolves identity-matched, stored SBETHE tables before
+# entering the transport core. The opt-in shell soft/hard mode's host-side
+# table builders (`shell_rates` catalog helpers, `shell_transport` node check)
+# resolve the same stored catalog tables; no Numba/CUDA kernel imports them.
+# Numerical kernels and materials must not import the table-generation layer.
+ignore_imports = [
+    "pyrite.montecarlo.runner.case_tables -> pyrite.xsgen.sbethe",
+    "pyrite.montecarlo.transport.shell_rates -> pyrite.xsgen.sbethe.catalog",
+    "pyrite.montecarlo.transport.shell_transport -> pyrite.xsgen.sbethe.catalog",
+]
 allow_indirect_imports = true
 
 # `materials` is the bottom of the physics core: it must not reach sideways into

@@ -1,5 +1,7 @@
 """SBETHE table stopping and Joy-Luo / Berger-Seltzer reference models."""
 
+from collections.abc import Mapping
+
 import numpy as np
 from numba import njit
 
@@ -25,6 +27,25 @@ def prepare_sbethe_stopping_table(arrays):
     if np.any(energy_keV <= 0.0) or np.any(stopping_keV_per_ang <= 0.0):
         raise ValueError("SBETHE stopping table values must be strictly positive")
     return np.log(energy_keV), np.log(stopping_keV_per_ang)
+
+
+def prepare_sbethe_stopping_tables(stopping_tables, n_layers):
+    """Prepare one SBETHE table per layer; already-prepared ``(logE, logS)`` pass through."""
+    if stopping_tables is None:
+        return None
+    if len(stopping_tables) != n_layers:
+        raise ValueError("stopping_tables must contain one SBETHE table per layer")
+    prepared_tables = []
+    for table in stopping_tables:
+        prepared = (
+            table
+            if not isinstance(table, Mapping) and len(table) == 2 and np.asarray(table[0]).ndim == 1
+            else None
+        )
+        if prepared is None:
+            prepared = prepare_sbethe_stopping_table(table)
+        prepared_tables.append(prepared)
+    return prepared_tables
 
 
 def pack_sbethe_stopping_tables(tables, n_layers):

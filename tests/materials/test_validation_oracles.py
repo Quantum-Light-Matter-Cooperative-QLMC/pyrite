@@ -128,7 +128,9 @@ def test_missing_dans_diffraction_raises_clear_optional_dependency_error(monkeyp
 
 
 def test_validate_dans_crystal_fails_closed_on_out_of_tolerance_geometry(monkeypatch):
-    monkeypatch.setattr(vo, "build_dans_crystal_from_pyrite", lambda _crystal: OffsetGeometryCrystal())
+    monkeypatch.setattr(
+        vo, "build_dans_crystal_from_pyrite", lambda _crystal: OffsetGeometryCrystal()
+    )
 
     report = vo.validate_dans_crystal(
         "silicon",

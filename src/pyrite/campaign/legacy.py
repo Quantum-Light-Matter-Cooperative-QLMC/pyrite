@@ -117,6 +117,8 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         straggling=getattr(settings, "straggling", False),
         energy_model=getattr(settings, "energy_model", "frozen"),
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
+        inelastic_model=getattr(settings, "inelastic_model", "continuous"),
+        inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
         convergence=Convergence(
             n_families=old_sweep.n_families,
             max_reflections=old_sweep.max_reflections,
