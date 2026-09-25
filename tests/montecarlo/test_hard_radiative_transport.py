@@ -1,5 +1,8 @@
 """Opt-in CPU hard-radiative flights and photon row payloads.
 
+Both exact CPU cores run the mode: lockstep, and the per-electron reference
+of the CUDA kernel (whose device half is ``test_hard_radiative_cuda.py``).
+
 Validation: bremslib-radiative-partition, bremslib-radiative-event-spectrum
 """
 
@@ -36,7 +39,10 @@ def _table(scale):
     )
 
 
-def _run(table, **kwargs):
+CPU_CORES = ["lockstep", "per-electron"]
+
+
+def _run(table, core="lockstep", **kwargs):
     return simulate_trajectories(
         E0_keV=60.0,
         Ne=80,
@@ -45,7 +51,7 @@ def _run(table, **kwargs):
         E_cut_keV=10.0,
         seed=42,
         energy_model="midpoint",
-        transport_core="lockstep",
+        transport_core=core,
         radiative_model="bremslib-soft-hard",
         radiative_cutoff_eV=1_000.0,
         bremslib_tables={"C": table},
@@ -53,9 +59,10 @@ def _run(table, **kwargs):
     )
 
 
-def test_hard_radiative_events_debit_energy_and_close_cpu_flights():
+@pytest.mark.parametrize("core", CPU_CORES)
+def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core):
     table = _table(1e5)
-    result = _run(table)
+    result = _run(table, core)
     check_segment_event_contract(result)
     photons = result["hard_radiative_k_eV"]
     events = result["event_kind"] == EVENT_HARD_RADIATIVE
@@ -115,10 +122,11 @@ def test_hard_radiative_events_debit_energy_and_close_cpu_flights():
         )
 
 
-def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks():
+@pytest.mark.parametrize("core", CPU_CORES)
+def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(core):
     table = _table(1e5)
-    first = _run(table)
-    replay = _run(table)
+    first = _run(table, core)
+    replay = _run(table, core)
     for field in (
         "event_kind",
         "L_ang",
@@ -133,7 +141,7 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks()
         np.testing.assert_array_equal(first[field], replay[field])
 
     zero = _table(0.0)
-    coupled = _run(zero)
+    coupled = _run(zero, core)
     legacy = simulate_trajectories(
         E0_keV=60.0,
         Ne=80,
@@ -142,14 +150,15 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks()
         E_cut_keV=10.0,
         seed=42,
         energy_model="midpoint",
-        transport_core="lockstep",
+        transport_core=core,
         transport_lut_config=TransportLUTConfig(enabled=False),
     )
     for field in ("event_kind", "L_ang", "E_start_keV", "E_end_keV", "v_hat"):
         np.testing.assert_array_equal(coupled[field], legacy[field])
 
 
-def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract():
+@pytest.mark.parametrize("core", CPU_CORES)
+def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core):
     if not shell_configuration._default_path().is_file():
         pytest.skip("pinned SBETHE reference data have not been fetched")
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
@@ -168,7 +177,7 @@ def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract():
         E_cut_keV=10.0,
         seed=17,
         energy_model="midpoint",
-        transport_core="lockstep",
+        transport_core=core,
         stopping_tables=[resolve_catalog_table("silicon").arrays()],
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,
@@ -182,8 +191,9 @@ def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract():
     assert result["radiative"]["model"] == "bremslib-soft-hard"
 
 
+@pytest.mark.parametrize("core", CPU_CORES)
 @pytest.mark.parametrize("cutoff_eV", [100.0, 10_000.0])
-def test_soft_and_hard_radiative_loss_reproduce_the_full_moment(cutoff_eV):
+def test_soft_and_hard_radiative_loss_reproduce_the_full_moment(cutoff_eV, core):
     # Radiative loss dominates the synthetic table. Continuous row loss must be
     # collision plus the soft first moment only; hard events must supply the
     # rest at the partition's rate, so the sum does not depend on kc.
@@ -197,7 +207,7 @@ def test_soft_and_hard_radiative_loss_reproduce_the_full_moment(cutoff_eV):
         E_cut_keV=10.0,
         seed=7,
         energy_model="midpoint",
-        transport_core="lockstep",
+        transport_core=core,
         radiative_model="bremslib-soft-hard",
         radiative_cutoff_eV=cutoff_eV,
         bremslib_tables={"C": table},

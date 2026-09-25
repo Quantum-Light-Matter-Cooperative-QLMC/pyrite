@@ -159,10 +159,8 @@ def make_cpu_transport_core(
         raise ValueError("grooved transport has only an exact lockstep specialization")
     if grooved and inelastic:
         raise ValueError("shell soft/hard inelastic transport has no grooved specialization")
-    if radiative and (grooved or per_electron or lut):
-        raise ValueError(
-            "coupled radiative transport currently has only an exact lockstep specialization"
-        )
+    if radiative and (grooved or lut):
+        raise ValueError("coupled radiative transport has only exact ungrooved specializations")
 
     @njit(cache=True)
     def body(
@@ -1092,6 +1090,7 @@ def make_cpu_transport_core(
             pe_out,
             straggling,
             inelastic_args=(),
+            radiative_args=None,
         ):
             return body(
                 run,
@@ -1107,6 +1106,7 @@ def make_cpu_transport_core(
                 pe_out,
                 straggling,
                 inelastic_args,
+                radiative_args,
             )
     elif grooved:
 
@@ -1207,8 +1207,15 @@ _transport_core_ungrooved_perelectron_inelastic = make_cpu_transport_core(
 _transport_core_ungrooved_perelectron_lut_inelastic = make_cpu_transport_core(
     per_electron=True, lut=True, inelastic=True
 )
-# First coupled-radiative mode: exact CPU lockstep, with either collision mode.
+# Opt-in coupled-radiative specializations: exact lockstep, and the exact
+# per-electron reference of the CUDA kernel, each with either collision mode.
 _transport_core_ungrooved_radiative = make_cpu_transport_core(radiative=True)
 _transport_core_ungrooved_inelastic_radiative = make_cpu_transport_core(
     inelastic=True, radiative=True
+)
+_transport_core_ungrooved_perelectron_radiative = make_cpu_transport_core(
+    per_electron=True, radiative=True
+)
+_transport_core_ungrooved_perelectron_inelastic_radiative = make_cpu_transport_core(
+    per_electron=True, inelastic=True, radiative=True
 )

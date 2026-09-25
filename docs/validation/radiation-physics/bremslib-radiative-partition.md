@@ -52,11 +52,11 @@ The target is treated as infinitely heavy: its recoil energy is neglected. This 
 
 ## Source-to-code comparison
 
-`hard_radiative.py::_cell_moments` evaluates the logarithmic zeroth moment and trapezoidal first moment of each linear cell. `build_radiative_partition` includes both incident-grid tip locations and the cutoff in its breakpoint union, integrates the zero-start cell only for its first moment, and partitions all positive cells at the cutoff. Its `sample_photon_energy` inverts the same cell masses. `_jit_radiative.py::radiative_moments_scalar` and `::sample_hard_photon_energy_scalar` use the same formulas in the CPU scheduler. The host/scalar tests compare moments and fixed-quantile samples at grid nodes, between nodes, and at cutoff endpoints.
+`hard_radiative.py::_cell_moments` evaluates the logarithmic zeroth moment and trapezoidal first moment of each linear cell. `build_radiative_partition` includes both incident-grid tip locations and the cutoff in its breakpoint union, integrates the zero-start cell only for its first moment, and partitions all positive cells at the cutoff. Its `sample_photon_energy` inverts the same cell masses. `_jit_radiative.py::radiative_moments_scalar` and `::sample_hard_photon_energy_scalar` use the same formulas in both exact CPU schedulers, and `_jit_radiative_device.py::_rad_moment` and `::_rad_sample_photon_eV` transcribe them for the CUDA kernel. The host/scalar tests compare moments and fixed-quantile samples at grid nodes, between nodes, and at cutoff endpoints.
 
 `hard_radiative_photon_at_energy` integrates the piecewise-linear DDCS against $2\pi\sin\theta$, draws uniform azimuth, keeps the outgoing electron direction, and assigns the vector residual above to the target. `complete_hard_radiative_events` uses a separate random stream for the post-transport direction. The test checks photon plus outgoing-electron energy, unit directions, and the full three-vector momentum sum.
 
-The focused `test_hard_radiative.py` and `test_brem_events.py` run passed together (14 tests, 2026-09-25). These synthetic-table and internal-parity anchors do not compare a full transport history with an independent transport code. CPU/GPU parity and an independent radiative-stopping benchmark remain pending.
+The focused `test_hard_radiative.py` and `test_brem_events.py` run passed together (14 tests, 2026-09-25). These synthetic-table and internal-parity anchors do not compare a full transport history with an independent transport code. `test_hard_radiative_cuda.py` passes 4/4 on an NVIDIA GeForce RTX 5080 (CuPy 14.2.0, 2026-09-25), including first-row parity with the per-electron CPU core at `rtol=1e-12`. An independent full-track benchmark remains pending.
 
 ## Verdict
 

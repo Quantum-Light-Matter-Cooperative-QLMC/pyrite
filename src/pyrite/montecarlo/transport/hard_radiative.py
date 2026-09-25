@@ -311,7 +311,7 @@ def pack_radiative_layer_tables(
     min_energy_eV: float,
     max_energy_eV: float,
 ) -> tuple:
-    """Pad the BremsLib SDCS and number densities for the CPU scalar kernel.
+    """Pad the BremsLib SDCS and number densities for the exact scalar kernels.
 
     Every requested element must have a table covering the complete electron
     range. There is no EEDL fallback inside a coupled transport mode.

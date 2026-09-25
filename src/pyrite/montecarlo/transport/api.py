@@ -27,8 +27,10 @@ from .cores import (
     _transport_core_ungrooved_lut_inelastic,
     _transport_core_ungrooved_perelectron,
     _transport_core_ungrooved_perelectron_inelastic,
+    _transport_core_ungrooved_perelectron_inelastic_radiative,
     _transport_core_ungrooved_perelectron_lut,
     _transport_core_ungrooved_perelectron_lut_inelastic,
+    _transport_core_ungrooved_perelectron_radiative,
     _transport_core_ungrooved_radiative,
 )
 from .hard_inelastic import hard_stream_keys, validate_inelastic_args
@@ -236,7 +238,8 @@ def simulate_trajectories(
 
     radiative_model: "uncoupled" (default) preserves post-hoc full-spectrum
       scoring and the existing electron tracks. "bremslib-soft-hard" is an
-      experimental exact CPU lockstep mode: continuous radiative loss below
+      experimental exact mode (lockstep, per-electron, or CUDA; no LUT):
+      continuous radiative loss below
       ``radiative_cutoff_eV`` and explicit BremsLib photons above it. It needs
       midpoint transport, BremsLib tables for every layer element, a photon
       cutoff no higher than the electron cutoff, and straggling disabled.
@@ -449,10 +452,8 @@ def simulate_trajectories(
             raise ValueError(
                 "bremslib-soft-hard requires midpoint, ungrooved, unstraggled transport"
             )
-        if transport_core not in ("auto", "lockstep"):
-            raise NotImplementedError("bremslib-soft-hard currently needs the CPU lockstep core")
-        if transport_core == "auto":
-            transport_core = "lockstep"
+        if keep_segments_on_device:
+            raise ValueError("bremslib-soft-hard completes photon rows on the host")
     elif radiative_cutoff_eV is not None or bremslib_tables is not None:
         raise ValueError(
             "radiative_cutoff_eV and bremslib_tables require radiative_model='bremslib-soft-hard'"
@@ -1053,6 +1054,15 @@ def simulate_trajectories(
             from ._jit_launch import make_cuda_transport_core
 
             core, core_xp = make_cuda_transport_core()
+        elif radiative_mode:
+            core, core_xp = (
+                (
+                    _transport_core_ungrooved_perelectron_inelastic_radiative
+                    if shell_mode
+                    else _transport_core_ungrooved_perelectron_radiative
+                ),
+                np,
+            )
         elif shell_mode:
             core, core_xp = _transport_core_ungrooved_perelectron_inelastic, np
         else:
@@ -1118,6 +1128,7 @@ def simulate_trajectories(
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
                 inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
+                radiative=((radiative_args, seg_rad_k, seg_rad_Z) if radiative_mode else None),
             )
         )
         nvac = 0
