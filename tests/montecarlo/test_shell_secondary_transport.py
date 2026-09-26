@@ -410,3 +410,16 @@ def test_case_threshold_reaches_runner_transport():
     segments = _transport_case(case, transport_core="per-electron")["segs"]
     assert segments["secondaries"]["threshold_eV"] == 1000.0
     assert segments["generation"].size == segments["L_ang"].size
+
+
+def test_threshold_above_every_secondary_launches_nothing():
+    """Limit: T_s above E0 launches no track and leaves the primary rows unchanged."""
+    off = _run(threshold=None, Ne=20)
+    high = _run(threshold=30_000.0, Ne=20)
+    assert high["secondaries"]["n_generations"] == 1
+    assert np.all(high["generation"] == 0) and np.all(high["parent_id"] == -1)
+    np.testing.assert_array_equal(high["track_id"], high["electron_id"])
+    for field in ROW_KEYS:
+        np.testing.assert_array_equal(high[field], off[field])
+    terms = secondary_energy_balance(high)
+    assert abs(terms["residual_keV"]) <= 1e-9 * terms["incident_keV"]
