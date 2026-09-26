@@ -225,6 +225,10 @@ Optional validation-only adapters for external crystallography/scattering compar
 Shared on-demand SHA-256-verified download of external validation-only reference files; neither the files nor their fetch are part of production runs.
 - Public: `read_pinned`. Deps: stdlib only.
 
+### `validation/brem_angular.py`
+Validation-only Schiff (Koch–Motz 2BS) photon angular density and enclosed-flux-angle comparison with the BremsLib double-differential tables. Driven by `checks/brem_angular_comparison.py`; ledger `bremslib-angular-schiff`.
+- Public: `schiff_density`, `enclosed_angle`, `compare_angular_shape`. Deps: `montecarlo.spectrum.brem_bremslib`.
+
 ### `validation/shell_ionization.py`
 Validation-only Bote–Salvat K/L/M fit parameter parser and cross-section transcription, compared with packaged EEDL subshell rates and PyRITE characteristic-production yields. Pinned NIST `xione.jl` is fetched on demand, never packaged. Driven by `checks/shell_ionization_comparison.py`; ledger `eedl-shell-ionization-comparison`.
 - Public: `BoteSalvatElement`, `parse_bote_salvat`, `load_bote_salvat`, `compare_shells`, `compare_production`.
