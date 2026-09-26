@@ -28,6 +28,7 @@ from .events import (
 )
 from .hard_inelastic import (
     _hard_primary_cosine,
+    _hard_secondary_direction,
     _log_grid_frac,
     _sample_hard_transfer_eV,
     _soft_loss_sample_keV,
@@ -184,7 +185,10 @@ def make_cpu_transport_core(
             seg_event,
         ) = segments[:12]
         if inelastic:
-            seg_hard_W, seg_hard_ch = segments[12], segments[13]
+            seg_hard_W, seg_hard_ch, seg_hard_dir = segments[12], segments[13], segments[14]
+            # Secondary launch directions exist only when secondaries are
+            # transported (#94); otherwise the buffer is empty and nothing runs.
+            sec_on = seg_hard_dir.shape[0] > 0
             (
                 il_keys,
                 il_cutoff_eV,
@@ -201,8 +205,8 @@ def make_cpu_transport_core(
             ) = inelastic_args
         if radiative:
             assert radiative_args is not None
-            seg_rad_k = segments[14] if inelastic else segments[12]
-            seg_rad_Z = segments[15] if inelastic else segments[13]
+            seg_rad_k = segments[15] if inelastic else segments[12]
+            seg_rad_Z = segments[16] if inelastic else segments[13]
             (
                 rad_keys,
                 rad_cutoff_eV,
@@ -669,6 +673,7 @@ def make_cpu_transport_core(
             if inelastic:
                 hard_W_keV, hard_code = 0.0, -1
                 hard_cos, hard_phi = 1.0, 0.0
+                sec_x = sec_y = sec_z = 0.0
                 if event_j == EVENT_HARD_INELASTIC:
                     # Channel, transfer, recoil, azimuth: four hard-stream
                     # draws, all evaluated at the row's start energy, where
@@ -698,6 +703,11 @@ def make_cpu_transport_core(
                         u_w,
                     )
                     hard_W_keV, hard_code = W_eV * 1.0e-3, il_ch_code[L, ch]
+                    if sec_on:
+                        sec_x, sec_y, sec_z = _hard_secondary_direction(
+                            dx, dy, dz, E_eV, il_ch_U[L, ch], il_ch_W[L, ch],
+                            il_ch_branch[L, ch], W_eV, u_q, u_phi,
+                        )  # fmt: skip
                     if E_end_j - hard_W_keV <= E_cut_e:
                         # The collision leaves the primary below its cutoff:
                         # absorbed at the collision point, a terminal row.
@@ -777,6 +787,9 @@ def make_cpu_transport_core(
                     seg_event[slot] = event_j
                     if inelastic:
                         seg_hard_W[slot], seg_hard_ch[slot] = hard_W_keV, hard_code
+                        if sec_on:
+                            seg_hard_dir[slot, 0], seg_hard_dir[slot, 1] = sec_x, sec_y
+                            seg_hard_dir[slot, 2] = sec_z
                     if radiative:
                         seg_rad_k[slot], seg_rad_Z[slot] = rad_k_eV, rad_event_Z
             if per_electron:

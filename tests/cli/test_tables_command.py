@@ -24,6 +24,11 @@ def isolated(monkeypatch, tmp_path):
     monkeypatch.setattr("pyrite.paths.user_data_path", lambda *a, **k: tmp_path / "data")
     monkeypatch.setattr("pyrite.paths.user_cache_path", lambda *a, **k: tmp_path / "cache")
     monkeypatch.setattr("pyrite.xsgen.store.data_dir", lambda: tmp_path / "packaged")
+    # Default sources are ``../<tree>`` relative to the cwd; a real sibling
+    # checkout beside the developer's repo must not leak in.
+    workdir = tmp_path / "work"
+    workdir.mkdir()
+    monkeypatch.chdir(workdir)
     for code in ("ELSEPA", "SBETHE", "BREMSLIB"):
         monkeypatch.delenv(f"PYRITE_XSGEN_{code}_SOURCE", raising=False)
     return tmp_path

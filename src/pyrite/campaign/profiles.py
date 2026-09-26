@@ -74,6 +74,7 @@ NUMERICS_GROUPS = (
             ("straggling", "straggling"),
             ("inelastic_model", "inelastic model"),
             ("inelastic_cutoff_eV", "inelastic cutoff (eV)"),
+            ("secondary_threshold_eV", "secondary threshold (eV)"),
             ("elastic_model", "elastic model"),
             ("bremsstrahlung_model", "bremsstrahlung model"),
         ),
@@ -320,6 +321,7 @@ def resolve_numerics(
         "max_dE_frac": numerics.max_dE_frac,
         "inelastic_model": numerics.inelastic_model,
         "inelastic_cutoff_eV": numerics.inelastic_cutoff_eV,
+        "secondary_threshold_eV": numerics.secondary_threshold_eV,
         "elastic_model": numerics.elastic_model,
         "bremsstrahlung_model": numerics.bremsstrahlung_model,
     }
@@ -383,7 +385,7 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _bremsstrahlung_identity_marker(model: Literal["eedl", "bremslib"]) -> str:
+def _bremsstrahlung_identity_marker(model: str) -> str:
     """Return the selected continuum generation; reject unsupported run models."""
     if model == "eedl":
         return BREMSSTRAHLUNG_MODEL
@@ -555,6 +557,7 @@ def _identity_v1(
         max_dE_frac = float(settings_payload.pop("max_dE_frac", 0.0))
         inelastic_model = str(settings_payload.pop("inelastic_model", "continuous"))
         inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
+        secondary_threshold_eV = settings_payload.pop("secondary_threshold_eV", None)
         elastic_model = str(settings_payload.pop("elastic_model", "mott"))
         settings_brem_model = str(settings_payload.pop("bremsstrahlung_model", "auto"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
@@ -564,6 +567,7 @@ def _identity_v1(
         max_dE_frac = float(getattr(settings, "max_dE_frac", 0.0))
         inelastic_model = str(getattr(settings, "inelastic_model", "continuous"))
         inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
+        secondary_threshold_eV = getattr(settings, "secondary_threshold_eV", None)
         elastic_model = str(getattr(settings, "elastic_model", "mott"))
         settings_brem_model = str(getattr(settings, "bremsstrahlung_model", "auto"))
     if emission != "incoherent":
@@ -580,6 +584,8 @@ def _identity_v1(
     if inelastic_model != "continuous":
         transport_numerics["inelastic_model"] = inelastic_model
         transport_numerics["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
+    if secondary_threshold_eV is not None:  # divergence-only (#94)
+        transport_numerics["secondary_threshold_eV"] = float(secondary_threshold_eV)
     if elastic_model != "mott":
         transport_numerics["elastic_model"] = elastic_model
     if transport_numerics:

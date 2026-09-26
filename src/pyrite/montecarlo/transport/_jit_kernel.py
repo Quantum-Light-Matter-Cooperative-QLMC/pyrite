@@ -97,10 +97,12 @@ from ._jit_radiative_device import (
 from ._jit_shell_device import (
     I16_NO_CHANNEL,
     _hard_primary_cosine,
+    _hard_secondary_cosine,
     _log_grid_fraction,
     _log_grid_lower,
     _sample_hard_transfer_eV,
     _soft_loss_sample_keV,
+    _store_rotated,
 )
 from .events import (
     EVENT_CUTOFF,
@@ -205,6 +207,8 @@ def _transport_kernel(
     il_ch_code,
     seg_hard_W,
     seg_hard_ch,
+    sec_on,
+    seg_hard_dir,
     rad_on,
     rad_keys,
     rad_cutoff_eV,
@@ -890,6 +894,8 @@ def _transport_kernel(
         hard_code = I16_NO_CHANNEL
         hard_cos = F64_ONE
         hard_phi = F64_ZERO
+        sec_cos = F64_ONE
+        sec_phi = F64_ZERO
         if event_j == EVENT_HARD_INELASTIC:
             # Channel, transfer, recoil, azimuth: four hard-stream draws, all
             # at the row's start energy, where its hazard was.
@@ -920,6 +926,12 @@ def _transport_kernel(
             )
             hard_W_keV = W_eV * np.float64(1.0e-3)
             hard_code = il_ch_code[c_row]
+            if sec_on == I32_ONE:
+                # Secondary launch direction (#94) from the same four draws.
+                sec_cos = _hard_secondary_cosine(
+                    E_eV, il_ch_U[c_row], il_ch_W[c_row], il_ch_branch[c_row], W_eV, u_q
+                )
+                sec_phi = F64_TWO * F64_PI * u_phi + F64_PI
             if E_end_j - hard_W_keV <= E_cut_e:
                 # The collision leaves the primary below its cutoff: absorbed
                 # at the collision point, a terminal row.
@@ -1030,6 +1042,13 @@ def _transport_kernel(
                 if inelastic_on == I32_ONE:
                     seg_hard_W[slot] = hard_W_keV
                     seg_hard_ch[slot] = hard_code
+                    if sec_on == I32_ONE:
+                        if hard_code != I16_NO_CHANNEL:
+                            _store_rotated(seg_hard_dir, s3, dx, dy, dz, sec_cos, sec_phi)
+                        else:
+                            seg_hard_dir[s3] = F64_ZERO
+                            seg_hard_dir[s3 + I32_ONE] = F64_ZERO
+                            seg_hard_dir[s3 + I32_TWO] = F64_ZERO
                 if rad_on == I32_ONE:
                     seg_rad_k[slot] = rad_k_eV
                     seg_rad_Z[slot] = rad_event_Z

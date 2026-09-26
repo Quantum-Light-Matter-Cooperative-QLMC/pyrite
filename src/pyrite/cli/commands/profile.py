@@ -70,6 +70,7 @@ _NUMERICS_FIELD_NAMES = {
     "maximum-fractional-energy-loss": "max_dE_frac",
     "inelastic-model": "inelastic_model",
     "inelastic-cutoff-ev": "inelastic_cutoff_eV",
+    "secondary-threshold-ev": "secondary_threshold_eV",
     "elastic-model": "elastic_model",
     "bremsstrahlung-model": "bremsstrahlung_model",
 }
@@ -264,6 +265,8 @@ def _emit_show(payload):
             f"  inelastic model: {numerics['inelastic_model']}"
             f" (W_c {numerics.get('inelastic_cutoff_eV', 0.0):g} eV)"
         )
+    if "secondary_threshold_eV" in numerics:
+        emit_result(f"  secondary threshold: {numerics['secondary_threshold_eV']:g} eV")
     if "elastic_model" in numerics:
         emit_result(f"  elastic model: {numerics['elastic_model']}")
     if "bremsstrahlung_model" in numerics:
@@ -449,6 +452,15 @@ def numerics_show_command(name, fidelity, json_output):
     help=(
         "Soft/hard energy-loss cutoff W_c in eV for shell-soft-hard; must exceed each "
         "material's conduction-band resonance (Si 16.7, SiO2 22, MoS2 23 eV)."
+    ),
+)
+@click.option(
+    "--secondary-threshold-ev",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="EV",
+    help=(
+        "Transport hard-collision secondaries above this energy in eV (production cut and "
+        "tracking cutoff; requires shell-soft-hard and SBETHE coverage, >= 1000 eV)."
     ),
 )
 @click.option(

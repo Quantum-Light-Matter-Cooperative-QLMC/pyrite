@@ -20,6 +20,7 @@ import numpy as np
 from numba import njit, uint64
 from scipy.constants import c, e, m_e
 
+from .core_geometry import _rotate_direction_scalar
 from .kinematics import (
     _SM64_MIX1,
     _SM64_MIX2,
@@ -83,7 +84,12 @@ def _hard_stream_key_scalar(stream_key):
 
 def hard_stream_keys(seed, Ne):
     """Host twin of :func:`_hard_stream_key_scalar` over electrons ``[0, Ne)``."""
-    x = stream_keys(seed, Ne) ^ _HARD_STREAM_SALT
+    return hard_keys_from_stream_keys(stream_keys(seed, Ne))
+
+
+def hard_keys_from_stream_keys(keys):
+    """Host twin of :func:`_hard_stream_key_scalar` over explicit stream keys."""
+    x = np.asarray(keys, dtype=np.uint64) ^ _HARD_STREAM_SALT
     x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
     x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
     return x ^ (x >> _SM64_S31)
@@ -247,6 +253,71 @@ def _hard_primary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfe
     p1_sq = remaining * (remaining + two_mc2)
     cosine = (p0_sq + p1_sq - recoil * (recoil + two_mc2)) / (2.0 * np.sqrt(p0_sq * p1_sq))
     return min(1.0, max(-1.0, cosine))
+
+
+@njit(cache=True)
+def _hard_secondary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfer_eV, u):
+    """Secondary polar cosine of a hard collision, relative to the flight.
+
+    Source: PENELOPE-2024 §3.2.5.4, Eqs. 3.137-3.138: the emitted electron
+    follows the momentum transfer. Longitudinal events use the recoil ``Q``
+    that :func:`_hard_primary_cosine` samples from the same uniform ``u`` and
+    ``cos = [p(E)^2 + p(Q)^2 - p(E - W'_k)^2] / [2 p(E) p(Q)]``; close events
+    ``Q = W``; transverse events the fixed cosine 0.5 of the Geant4 Penelope
+    implementation. Scalar twin of ``shell_sampling.sample_shell_hard_collision``.
+
+    Limit: an empty recoil interval (interpolation-edge only) returns 1, as the
+    primary twin does. Validation: penelope-shell-secondary-direction,
+    shell-secondary-transport
+    """
+    two_mc2 = 2.0 * _MC2_EV
+    if branch == 1:
+        return 0.5
+    if branch == 2:
+        return np.sqrt(transfer_eV / energy_eV * (energy_eV + two_mc2) / (transfer_eV + two_mc2))
+    if ionization_eV > 0.0:
+        full_width = 3.0 * resonance_eV - 2.0 * ionization_eV
+        if energy_eV > full_width:
+            resonance, q_upper = resonance_eV, ionization_eV
+        else:
+            resonance = (energy_eV + 2.0 * ionization_eV) / 3.0
+            q_upper = ionization_eV * energy_eV / full_width
+    else:
+        resonance, q_upper = resonance_eV, resonance_eV
+    if not resonance < energy_eV:
+        return 1.0
+    q_lower = _qmin_ev_scalar(energy_eV, resonance)
+    if not 0.0 < q_lower < q_upper:
+        return 1.0
+    log_lower = np.log(q_lower / (q_lower + two_mc2))
+    log_upper = np.log(q_upper / (q_upper + two_mc2))
+    log_ratio = (1.0 - u) * log_lower + u * log_upper
+    recoil = two_mc2 / np.expm1(-log_ratio)
+    p0_sq = energy_eV * (energy_eV + two_mc2)
+    remaining = energy_eV - resonance
+    p1_sq = remaining * (remaining + two_mc2)
+    q_sq = recoil * (recoil + two_mc2)
+    cosine = (p0_sq + q_sq - p1_sq) / (2.0 * np.sqrt(p0_sq * q_sq))
+    return min(1.0, max(-1.0, cosine))
+
+
+@njit(cache=True)
+def _hard_secondary_direction(
+    dx, dy, dz, energy_eV, ionization_eV, resonance_eV, branch, transfer_eV, u_q, u_phi
+):
+    """Laboratory direction of a hard collision's secondary; no extra draw.
+
+    Rotates :func:`_hard_secondary_cosine` about the pre-collision flight
+    ``(dx, dy, dz)`` at azimuth ``(2 pi u_phi + pi) mod 2 pi``, opposite the
+    primary's, in the frame the primary recoil uses
+    (``shell_sampling.shell_collision_world_directions``).
+    Validation: penelope-shell-secondary-direction, shell-secondary-transport
+    """
+    cosine = _hard_secondary_cosine(
+        energy_eV, ionization_eV, resonance_eV, branch, transfer_eV, u_q
+    )
+    phi = (2.0 * np.pi * u_phi + np.pi) % (2.0 * np.pi)
+    return _rotate_direction_scalar(dx, dy, dz, cosine, phi)
 
 
 @njit(cache=True)

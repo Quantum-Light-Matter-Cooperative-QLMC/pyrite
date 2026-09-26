@@ -722,6 +722,7 @@ def build_cases(
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
     bremsstrahlung_model="auto",
+    secondary_threshold_eV=None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -741,7 +742,9 @@ def build_cases(
     ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
     Returns the ``cases`` list; preview it with :func:`geometry_table`."""
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
-    validate_inelastic_numerics(inelastic_model, inelastic_cutoff_eV, energy_model)
+    validate_inelastic_numerics(
+        inelastic_model, inelastic_cutoff_eV, energy_model, secondary_threshold_eV
+    )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
     target = sweep.target
@@ -1027,6 +1030,12 @@ def build_cases(
                                 "inelastic_cutoff_eV": float(cast(float, inelastic_cutoff_eV)),
                             }
                             if inelastic_model != "continuous"
+                            else {}
+                        ),
+                        # Opt-in secondary transport (#94): divergence-only.
+                        **(
+                            {"secondary_threshold_eV": float(secondary_threshold_eV)}
+                            if secondary_threshold_eV is not None
                             else {}
                         ),
                         # ELSEPA elastic model (the default): divergence-only, so

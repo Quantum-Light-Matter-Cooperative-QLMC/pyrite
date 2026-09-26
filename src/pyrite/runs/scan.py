@@ -621,9 +621,11 @@ def _resolved_run(args, material):
         settings,
         bremsstrahlung_model=resolve_bremsstrahlung_model(settings.bremsstrahlung_model, elements),
     )
-    if settings.bremsstrahlung_model == "bremslib":
-        tables.extend(load_bremsstrahlung_tables(elements).values())
     xsgen_tables = identity_markers(tables)
+    if settings.bremsstrahlung_model == "bremslib":
+        xsgen_tables |= {
+            table.key: table.digest for table in load_bremsstrahlung_tables(elements).values()
+        }
 
     identity = dataset_identity(
         material,

@@ -40,6 +40,7 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         max_dE_frac=numerics.max_dE_frac,
         inelastic_model=numerics.inelastic_model,
         inelastic_cutoff_eV=numerics.inelastic_cutoff_eV,
+        secondary_threshold_eV=numerics.secondary_threshold_eV,
         elastic_model=numerics.elastic_model,
         bremsstrahlung_model=numerics.bremsstrahlung_model,
     )
@@ -62,6 +63,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
             inelastic_model=getattr(settings, "inelastic_model", "continuous"),
             inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
+            secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
             elastic_model=getattr(settings, "elastic_model", "elsepa"),
             bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
         )

@@ -32,6 +32,12 @@ def _case_inelastic_kwargs(case):
     return dict(
         inelastic_model=model,
         inelastic_cutoff_eV=float(case["inelastic_cutoff_eV"]),
+        # Opt-in secondary transport (#94); absent keeps primary-only rows.
+        **(
+            {"secondary_threshold_eV": float(case["secondary_threshold_eV"])}
+            if case.get("secondary_threshold_eV") is not None
+            else {}
+        ),
         inelastic_materials=materials,
     )
 

@@ -759,6 +759,40 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     assert profiles.case_content_key(shell_case) != profiles.case_content_key(legacy_case)
 
 
+def test_secondary_threshold_forks_identity_and_case_payload_only_when_set():
+    """Secondary transport (#94) is a divergence-only transport key."""
+    settings = replace(
+        default_settings(),
+        energy_model="midpoint",
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+    )
+    sweep = material_sweep("silicon")
+    base = dataset_identity("silicon", "full", settings, sweep)
+    on = dataset_identity(
+        "silicon", "full", replace(settings, secondary_threshold_eV=1000.0), sweep
+    )
+    other = dataset_identity(
+        "silicon", "full", replace(settings, secondary_threshold_eV=2000.0), sweep
+    )
+    assert "secondary_threshold_eV" not in base["resolved_parameters"]["transport_numerics"]
+    assert on["resolved_parameters"]["transport_numerics"]["secondary_threshold_eV"] == 1000.0
+    assert len({base["parameter_sha256"], on["parameter_sha256"], other["parameter_sha256"]}) == 3
+
+    shell = {"energy_model": "midpoint", "inelastic_model": "shell-soft-hard"}
+    plain = build_cases(sweep, 4, 4, inelastic_cutoff_eV=50.0, **shell)[0]
+    secondary = build_cases(
+        sweep, 4, 4, inelastic_cutoff_eV=50.0, secondary_threshold_eV=1000.0, **shell
+    )[0]
+    assert "secondary_threshold_eV" not in plain
+    assert secondary["secondary_threshold_eV"] == 1000.0
+    assert profiles.case_content_key(secondary) != profiles.case_content_key(plain)
+    with pytest.raises(ValueError, match="requires inelastic_model='shell-soft-hard'"):
+        build_cases(sweep, 4, 4, secondary_threshold_eV=1000.0)
+    with pytest.raises(ValueError, match="requires inelastic_model='shell-soft-hard'"):
+        replace(default_settings(), secondary_threshold_eV=1000.0)
+
+
 def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     """ELSEPA is the default; the historical Mott model keeps its old payload."""
     settings = default_settings()

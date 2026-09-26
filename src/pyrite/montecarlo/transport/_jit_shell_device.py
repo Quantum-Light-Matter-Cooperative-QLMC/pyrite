@@ -191,6 +191,87 @@ def _hard_primary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfe
 
 
 @jit.rawkernel(device=True)
+def _hard_secondary_cosine(energy_eV, ionization_eV, resonance_eV, branch, transfer_eV, u):
+    """Secondary polar cosine of a hard collision; host ``_hard_secondary_cosine``.
+
+    Validation: penelope-shell-secondary-direction, shell-secondary-transport
+    """
+    two_mc2 = F64_TWO_MC2_EV
+    if branch == I32_ONE:
+        return F64_HALF
+    if branch == I32_TWO:
+        return xp.sqrt(transfer_eV / energy_eV * (energy_eV + two_mc2) / (transfer_eV + two_mc2))
+    if ionization_eV > F64_ZERO:
+        full_width = F64_THREE * resonance_eV - F64_TWO * ionization_eV
+        if energy_eV > full_width:
+            resonance = resonance_eV
+            q_upper = ionization_eV
+        else:
+            resonance = (energy_eV + F64_TWO * ionization_eV) / F64_THREE
+            q_upper = ionization_eV * energy_eV / full_width
+    else:
+        resonance = resonance_eV
+        q_upper = resonance_eV
+    if not resonance < energy_eV:
+        return F64_ONE
+    q_lower = _qmin_ev(energy_eV, resonance)
+    if not (q_lower > F64_ZERO and q_lower < q_upper):
+        return F64_ONE
+    log_lower = xp.log(q_lower / (q_lower + two_mc2))
+    log_upper = xp.log(q_upper / (q_upper + two_mc2))
+    log_ratio = (F64_ONE - u) * log_lower + u * log_upper
+    recoil = two_mc2 / xp.expm1(-log_ratio)
+    p0_sq = energy_eV * (energy_eV + two_mc2)
+    remaining = energy_eV - resonance
+    p1_sq = remaining * (remaining + two_mc2)
+    q_sq = recoil * (recoil + two_mc2)
+    cosine = (p0_sq + q_sq - p1_sq) / (F64_TWO * xp.sqrt(p0_sq * q_sq))
+    return xp.minimum(F64_ONE, xp.maximum(-F64_ONE, cosine))
+
+
+@jit.rawkernel(device=True)
+def _store_rotated(out, at, dx, dy, dz, cos_t, phi):
+    """Write ``(dx, dy, dz)`` rotated by ``(cos_t, phi)`` to ``out[at:at+3]``.
+
+    The host ``core_geometry._rotate_direction_scalar`` arithmetic, as the
+    kernel inlines it for the primary. Returns 0 (device functions return one
+    value). Validation: shell-secondary-transport
+    """
+    sin2 = F64_ONE - cos_t * cos_t
+    if sin2 < F64_ZERO:
+        sin2 = F64_ZERO
+    sin_t = xp.sqrt(sin2)
+    cos_phi = xp.cos(phi)
+    sin_phi = xp.sin(phi)
+    if xp.abs(dx) < np.float64(0.9):
+        refx = F64_ONE
+        refy = F64_ZERO
+    else:
+        refx = F64_ZERO
+        refy = F64_ONE
+    ux = -dz * refy
+    uy = dz * refx
+    uz = dx * refy - dy * refx
+    u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
+    ux /= u_mag
+    uy /= u_mag
+    uz /= u_mag
+    wx = dy * uz - dz * uy
+    wy = dz * ux - dx * uz
+    wz = dx * uy - dy * ux
+    a_rot = sin_t * cos_phi
+    b_rot = sin_t * sin_phi
+    outx = cos_t * dx + a_rot * ux + b_rot * wx
+    outy = cos_t * dy + a_rot * uy + b_rot * wy
+    outz = cos_t * dz + a_rot * uz + b_rot * wz
+    mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
+    out[at] = outx / mag
+    out[at + I32_ONE] = outy / mag
+    out[at + I32_TWO] = outz / mag
+    return F64_ZERO
+
+
+@jit.rawkernel(device=True)
 def _soft_loss_sample_keV(mean, variance, key):
     """Two-moment soft energy loss [keV]; host ``_soft_loss_sample_keV``.
 

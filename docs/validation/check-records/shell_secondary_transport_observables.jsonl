@@ -1,0 +1,1 @@
+{"check": "checks/shell_secondary_transport_observables.py", "ledger_id": "shell-secondary-transport", "measured_value": null, "recorded_at": "2026-09-26T15:12:56.358222+00:00", "reference_value": null, "revision": "454d1d46abda4966ae5fee421b5d8eacc3a600d8", "schema_revision": 1, "tolerance": null, "verdict": "pass"}

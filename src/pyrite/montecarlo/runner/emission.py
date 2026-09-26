@@ -3,6 +3,8 @@
 Resolve runner dependencies at call time to preserve the facade test seams.
 """
 
+from typing import Any
+
 import numpy as np
 
 
@@ -38,7 +40,7 @@ def _brem_wide_from_segments(
     # anything else is pinned to EEDL so mc_brem_spectrum's "auto" never
     # re-resolves what identity already recorded.
     bremslib_tables = runner._case_bremslib_tables(case)
-    model_kwargs = (
+    model_kwargs: dict[str, Any] = (
         dict(cross_section_model="eedl")
         if bremslib_tables is None
         else dict(cross_section_model="bremslib", bremslib_tables=bremslib_tables)
