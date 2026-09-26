@@ -1,7 +1,7 @@
 """Threshold convergence and cascade checks of shell secondary transport (#94).
 
 Runs ``simulate_trajectories(secondary_threshold_eV=T_s)`` on Si and MoS2
-slabs 0.6 and 1.2 CSDA ranges thick at 20 and 100 keV (primary cutoff 1 keV, the
+slabs 0.2 and 1.2 CSDA ranges thick at 20 and 100 keV (primary cutoff 1 keV, the
 SBETHE floor), for ``T_s`` = off, 10, 5, 2 and 1 keV, with soft straggling,
 ``max_dE_frac=0.02``, screened-Rutherford elastic scattering and the
 per-electron CPU core. Seeds are the replicates
@@ -56,7 +56,7 @@ from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 
 MATERIALS = ("silicon", "mos2")
 BEAMS_KEV = (20.0, 100.0)
-RANGE_MULTIPLIERS = (0.6, 1.2)
+RANGE_MULTIPLIERS = (0.2, 1.2)
 E_CUT_KEV = 1.0
 THRESHOLDS_EV = (None, 10_000.0, 5_000.0, 2_000.0, 1_000.0)
 LINE_GRIDS_EV = {"silicon": (1600.0, 1900.0), "mos2": (2000.0, 2700.0)}
