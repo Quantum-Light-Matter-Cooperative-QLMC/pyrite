@@ -261,6 +261,19 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/test_shell_soft_hard_transport.py`; [physics](../physics/beam-transport/shell-soft-hard-transport.md); [validation](beam-transport/shell-soft-hard-transport.md)
 - **Notes:** Lockstep and per-electron CPU cores (exact and LUT) and the exact CUDA core; grooved and CUDA-LUT raise, and production CUDA runs disable the LUT. Uses the adjudicated Eq. 3.94 distant law of `penelope-shell-hard-loss-sampling` (not Eq. 3.125) and inherits the documented total-IMFP note of `penelope-shell-rate-closure`. Hard-event spectra, inelastic angular deflection and secondary transport lack independent evidence. Needs fresh-context verification. Only a human may mark this row `signed-off`.
 
+## `shell-secondary-transport`
+
+- **Claim:** with `secondary_threshold_eV` $=T_s$ in the shell soft/hard mode, every hard-collision secondary with kinetic energy $T>T_s$ ($T=W-U_k$ for a substituted inner shell, $W$ otherwise) is launched from its collision point with the PENELOPE emission direction and transported with the primary's configuration and cutoff $T_s$, generation by generation until none is launched; smaller $T$ is deposited; the run's energy balance $\sum E_0=E_{\rm escaped}+E_{\rm deposited}+E_{\rm binding}+E_{\rm radiated}$ closes over all tracks; secondary streams are keyed on (seed, parent track, parent hard ordinal); `None` is bit-for-bit the primary-only transport
+- **Code:** `montecarlo/transport/secondaries.py`; `montecarlo/transport/hard_inelastic.py::_hard_secondary_cosine`; `montecarlo/transport/cores.py::make_cpu_transport_core` (`inelastic=True`); exact CUDA transcription in `montecarlo/transport/{_jit_shell_device.py,_jit_kernel.py,_jit_launch.py}`; `montecarlo/transport/api.py::simulate_trajectories`
+- **Source:** PENELOPE-2024, NEA/MBDAV/R(2024)1, §3.2.5.4 (Eqs. 3.137–3.138) and §4.2 (production cutoffs and secondary tracking); the `penelope-shell-secondary-direction` and `penelope-shell-hard-loss-sampling` rows
+- **Equation:** $T=W-U_k$ (inner) or $W$; launch iff $T>T_s$; launch point $\mathbf r_{\rm mid}+\tfrac12L\hat{\mathbf v}$, clock $t_{\rm end}$; direction $\cos\theta_s$ from the momentum transfer, $\phi_s=\phi+\pi$ in the parent flight frame; $\sum E_0=E_{\rm escaped}+E_{\rm deposited}+E_{\rm binding}+E_{\rm radiated}$
+- **Assumptions:** one threshold is both production cut and tracking cutoff; explicit vacancies are bookkeeping-only (binding reserved, no relaxation, #91); characteristic emission stays a track-length estimator on every track; target electron initially at rest for the emission angle; secondaries run on per-electron cores; coherent spectra are rejected
+- **Limiting cases:** $T_s=$ `None` reproduces primary-only transport bit for bit; $T_s$ above every secondary energy launches nothing and leaves the primary rows unchanged; per-shell characteristic yield of the primaries is unchanged by the vacancy bookkeeping
+- **Status:** unverified
+- **Checks:** pending; see the validation record
+- **Anchor:** `tests/montecarlo/test_shell_secondary_transport.py`; [physics](../physics/beam-transport/shell-soft-hard-transport.md#secondary-electron-transport); [validation](beam-transport/shell-secondary-transport.md)
+- **Notes:** Issue #94. Needs fresh-context verification. Only a human may mark this row `signed-off`.
+
 ## `gos-optical-quadrature`
 
 - **Claim:** each positive-width interval of the SBETHE optical oscillator-strength density contributes its integrated strength and first-moment centroid as one resonance; duplicate-energy shell edges have zero weight
