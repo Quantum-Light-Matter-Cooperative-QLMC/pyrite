@@ -366,7 +366,11 @@ def test_incoherent_lines_add_tracks_and_coherent_rejects_showers():
 
     def part(mask):
         return {
-            k: (np.asarray(v)[mask] if isinstance(v, np.ndarray) and v.shape[:1] == mask.shape else v)
+            k: (
+                np.asarray(v)[mask]
+                if isinstance(v, np.ndarray) and v.shape[:1] == mask.shape
+                else v
+            )
             for k, v in result.items()
         }
 
@@ -377,3 +381,32 @@ def test_incoherent_lines_add_tracks_and_coherent_rejects_showers():
     np.testing.assert_allclose(whole, split, rtol=1e-9, atol=1e-12 * whole.max())
     with pytest.raises(NotImplementedError, match="secondary transport"):
         mc_spectrum(result, grid, coherent=True, **kwargs)
+
+
+def test_case_threshold_reaches_runner_transport():
+    """A case's secondary_threshold_eV drives the production transport call."""
+    import pyrite as pr
+    from pyrite import api
+    from pyrite.detectors import EnergyBins
+    from pyrite.montecarlo.runner import _transport_case
+
+    detector = pr.Detector(
+        energy_bins=EnergyBins(line=np.linspace(1500, 2000, 20), brem=np.linspace(1500, 9000, 20))
+    )
+    numerics = pr.Numerics(
+        n_electrons=8,
+        n_electrons_brem=8,
+        energy_model="midpoint",
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+        secondary_threshold_eV=1000.0,
+        elastic_model="mott",
+    )
+    scene = pr.Scene(
+        pr.Beam(energy_keV=20.0), pr.Slab("silicon", thickness_ang=5.0e4, tilt_deg=30.0), detector
+    )
+    case = api.build_case(scene, numerics)
+    assert case["secondary_threshold_eV"] == 1000.0
+    segments = _transport_case(case, transport_core="per-electron")["segs"]
+    assert segments["secondaries"]["threshold_eV"] == 1000.0
+    assert segments["generation"].size == segments["L_ang"].size

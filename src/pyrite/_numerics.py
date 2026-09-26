@@ -16,6 +16,7 @@ TRANSPORT_KEYS = (
     "max_dE_frac",
     "inelastic_model",
     "inelastic_cutoff_eV",
+    "secondary_threshold_eV",
     "elastic_model",
     "bremsstrahlung_model",
 )
@@ -97,6 +98,10 @@ class Numerics:
         scheme with its energy-loss cutoff ``W_c`` in eV (required by, and
         only valid with, that mode, which also requires
         ``energy_model="midpoint"``).
+    secondary_threshold_eV
+        Opt-in transport of hard-collision secondaries (shell-soft-hard only):
+        one threshold in eV is both production cut and secondary tracking
+        cutoff. ``None`` (default) transports no secondaries.
     elastic_model
         ``"elsepa"`` (default) samples full ELSEPA differential cross
         sections from the released tables (``pyrite tables fetch elsepa``);
@@ -123,6 +128,7 @@ class Numerics:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
+    secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     convergence: Convergence = field(default_factory=Convergence)
@@ -150,7 +156,10 @@ class Numerics:
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
         validate_inelastic_numerics(
-            self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
+            self.inelastic_model,
+            self.inelastic_cutoff_eV,
+            self.energy_model,
+            self.secondary_threshold_eV,
         )
         validate_elastic_model(self.elastic_model)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)
@@ -168,14 +177,27 @@ def validate_bremsstrahlung_model(model: object) -> None:
         raise ValueError(f"bremsstrahlung_model must be one of {', '.join(BREMSSTRAHLUNG_MODELS)}")
 
 
-def validate_inelastic_numerics(model: object, cutoff_eV: object, energy_model: object) -> None:
+def validate_inelastic_numerics(
+    model: object, cutoff_eV: object, energy_model: object, secondary_threshold_eV: object = None
+) -> None:
     """Validate the opt-in inelastic mode's settings (not its per-material W_cb).
 
-    The per-material ``W_c > W_cb`` requirement is checked where the layer
-    materials are known, by the transport entry point.
+    The per-material ``W_c > W_cb`` requirement and the secondary threshold's
+    table coverage are checked where the layer materials are known, by the
+    transport entry point.
     """
     if model not in INELASTIC_MODELS:
         raise ValueError(f"inelastic_model must be one of {', '.join(INELASTIC_MODELS)}")
+    if secondary_threshold_eV is not None:
+        if model != "shell-soft-hard":
+            raise ValueError("secondary_threshold_eV requires inelastic_model='shell-soft-hard'")
+        if (
+            isinstance(secondary_threshold_eV, bool)
+            or not isinstance(secondary_threshold_eV, (int, float))
+            or not np.isfinite(secondary_threshold_eV)
+            or secondary_threshold_eV <= 0.0
+        ):
+            raise ValueError("secondary_threshold_eV must be finite and positive")
     if model == "continuous":
         if cutoff_eV is not None:
             raise ValueError("inelastic_cutoff_eV requires inelastic_model='shell-soft-hard'")

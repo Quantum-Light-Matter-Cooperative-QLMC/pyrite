@@ -119,6 +119,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
         max_dE_frac=getattr(settings, "max_dE_frac", 0.0),
         inelastic_model=getattr(settings, "inelastic_model", "continuous"),
         inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
+        secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
         elastic_model=getattr(settings, "elastic_model", "elsepa"),
         bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
         convergence=Convergence(
