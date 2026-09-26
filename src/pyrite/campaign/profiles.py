@@ -385,7 +385,7 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _bremsstrahlung_identity_marker(model: Literal["eedl", "bremslib"]) -> str:
+def _bremsstrahlung_identity_marker(model: str) -> str:
     """Return the selected continuum generation; reject unsupported run models."""
     if model == "eedl":
         return BREMSSTRAHLUNG_MODEL

@@ -342,7 +342,7 @@ def flatten_option_values(values: Sequence[Sequence[float]]) -> list[float] | No
 
 
 def _stdin_is_tty() -> bool:
-    stream = click.get_text_stream("stdin")
+    stream = sys.stdin
     isatty = getattr(stream, "isatty", None)
     return callable(isatty) and isatty()
 
@@ -464,7 +464,7 @@ def run(command: click.Command, argv: Sequence[str] | None = None, *, prog_name:
         )
         return 130
     except click.ClickException as exc:
-        stream = click.get_text_stream("stderr")
+        stream = sys.stderr
         context = getattr(exc, "ctx", None)
         color = (
             context.color

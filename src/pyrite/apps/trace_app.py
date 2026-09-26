@@ -164,7 +164,7 @@ def _(CATALOG, MaterialSelect, mo):
             {"value": key, "label": CATALOG.material(key).label, "disabled": False}
             for key in CATALOG.material_keys
         ),
-        key=lambda row: row["label"].casefold(),
+        key=lambda row: str(row["label"]).casefold(),
     )
     _requested = initial_material(mo.cli_args(), get_default_material())
     _values = [row["value"] for row in _options]
