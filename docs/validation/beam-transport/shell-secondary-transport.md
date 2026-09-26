@@ -159,10 +159,14 @@ The MoS₂ deficit is the binding shift: 14 of its 74 electrons per formula unit
 have $U\ge2.5$ keV, so an inner-shell secondary with $T$ in a 2–8 keV bin needs
 $W=T+U$. The bound reference keeps Møller in $W$ for each catalogue shell and
 shifts each explicit inner shell to $T=W-U$. It gives 0.88–1.09 for MoS₂ and
-1.03–1.18 for Si. The remaining difference is the reference's approximation:
-the transport uses EEDL-substituted inner-shell rates and the stopping closure,
-not Møller. The ratio is flat across bins within about 10% in every case, so
-the launch spectrum follows the $1/T^2$ Møller shape.
+1.03–1.18 for Si. The reference covers close collisions only. It omits
+distant hard collisions on deep inner shells (Si K, S K, Mo L, Mo K), which
+also launch secondaries in these bins. It evaluates the Møller DCS at $E$ with
+cap $E/2$ rather than $E+U$ and $(E+U)/2$, and it ignores the transport's
+EEDL-substituted inner-shell rates and stopping closure. The residual ratio is
+therefore consistent with the reference's approximations, not a test of the
+launch spectrum to better than about 20%. Across bins the ratio varies by less
+than about 15% in every case.
 
 The threshold sweep is limited below by the 1 keV SBETHE table floor, which is
 also the primary cutoff here; convergence is shown down to that floor, not
