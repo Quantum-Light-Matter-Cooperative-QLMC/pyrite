@@ -100,7 +100,8 @@ class Settings:
     elastic_model
         ``"elsepa"`` (default) tabulated model, or the historical ``"mott"``.
     bremsstrahlung_model
-        ``"eedl"`` (default) or the opt-in ``"bremslib"`` continuum source.
+        ``"auto"`` (default: BremsLib when installed, else EEDL), ``"eedl"`` or
+        ``"bremslib"`` continuum source.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -122,7 +123,7 @@ class Settings:
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
-    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl"
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so

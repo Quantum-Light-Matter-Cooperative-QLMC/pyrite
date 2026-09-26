@@ -15,15 +15,16 @@ from pyrite.montecarlo.spectrum import BREMSSTRAHLUNG_MODEL
 from pyrite.montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 
 
-def _any_case():
+def _any_case(model="eedl"):
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.sweep import build_cases
 
-    return build_cases(material_sweep("silicon"), 4, 4)[0]
+    return build_cases(material_sweep("silicon"), 4, 4, bremsstrahlung_model=model)[0]
 
 
 def test_numerics_accepts_only_known_bremsstrahlung_models():
-    assert Numerics().bremsstrahlung_model == "eedl"
+    assert Numerics().bremsstrahlung_model == "auto"
+    assert Numerics(bremsstrahlung_model="eedl").bremsstrahlung_model == "eedl"
     assert Numerics(bremsstrahlung_model="bremslib").bremsstrahlung_model == "bremslib"
     with pytest.raises(ValueError, match="bremsstrahlung_model"):
         Numerics(bremsstrahlung_model="bethe-heitler")  # type: ignore[arg-type]
@@ -63,7 +64,7 @@ def test_bremslib_cases_load_tables_for_every_layer_element(monkeypatch):
 
 def test_case_carries_only_the_opt_in_bremsstrahlung_model():
     """Absent is EEDL, so a case never spells ``"eedl"`` explicitly."""
-    case = _any_case()
+    case = _any_case("eedl")
 
     assert replace(case, bremsstrahlung_model="bremslib")["bremsstrahlung_model"] == "bremslib"
     with pytest.raises(ValueError, match="bremsstrahlung_model"):
@@ -71,9 +72,52 @@ def test_case_carries_only_the_opt_in_bremsstrahlung_model():
 
 
 def test_bremslib_forks_the_case_content_key_only_when_selected():
-    case = _any_case()
+    case = _any_case("eedl")
     forked = replace(case, bremsstrahlung_model="bremslib")
 
     assert case_bremsstrahlung_marker(case) == BREMSSTRAHLUNG_MODEL
     assert case_bremsstrahlung_marker(forked) == BREMSSTRAHLUNG_BREMSLIB_MODEL
     assert case_content_key(case) != case_content_key(forked)
+
+
+def test_auto_resolves_to_bremslib_only_when_every_table_is_installed(monkeypatch):
+    from pyrite.xsgen import _errors
+    from pyrite.xsgen.bremslib import tables
+
+    monkeypatch.setattr(
+        tables, "load_bremsstrahlung_tables", lambda elements: {e: object() for e in elements}
+    )
+    assert tables.resolve_bremsstrahlung_model("auto", ["C", "Si"]) == "bremslib"
+
+    monkeypatch.setattr(tables, "load_bremsstrahlung_tables", lambda elements: {"C": object()})
+    with pytest.warns(RuntimeWarning, match="pyrite tables fetch bremslib"):
+        assert tables.resolve_bremsstrahlung_model("auto", ["C", "Si"]) == "eedl"
+
+    def missing(elements):
+        raise _errors.TableNotFoundError("not fetched")
+
+    monkeypatch.setattr(tables, "load_bremsstrahlung_tables", missing)
+    with pytest.warns(RuntimeWarning):
+        assert tables.resolve_bremsstrahlung_model("auto", ["C"]) == "eedl"
+    # Explicit choices pass through untouched, so "bremslib" stays strict.
+    assert tables.resolve_bremsstrahlung_model("bremslib", ["C"]) == "bremslib"
+    assert tables.resolve_bremsstrahlung_model("eedl", ["C"]) == "eedl"
+
+
+def test_build_cases_records_the_resolved_continuum(monkeypatch):
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import build_cases
+
+    monkeypatch.setattr(
+        "pyrite.xsgen.bremslib.tables.resolve_bremsstrahlung_model",
+        lambda model, elements: "bremslib",
+    )
+    resolved = build_cases(material_sweep("silicon"), 4, 4)[0]
+    monkeypatch.setattr(
+        "pyrite.xsgen.bremslib.tables.resolve_bremsstrahlung_model",
+        lambda model, elements: "eedl",
+    )
+    fallback = build_cases(material_sweep("silicon"), 4, 4)[0]
+
+    assert resolved["bremsstrahlung_model"] == "bremslib"
+    assert "bremsstrahlung_model" not in fallback

@@ -29,6 +29,7 @@ git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync
 uv run pyrite tables fetch elsepa   # elastic cross sections the default transport reads
+uv run pyrite tables fetch bremslib # default bremsstrahlung source; without it runs warn and use EEDL
 uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```

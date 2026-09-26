@@ -26,9 +26,11 @@ INELASTIC_MODELS = ("continuous", "shell-soft-hard")
 #: Elastic models a case may select. ``"elsepa"`` (the default, issue #89)
 #: samples resolved ELSEPA tables; ``"mott"`` is the historical model.
 ELASTIC_MODELS = ("mott", "elsepa")
-#: Continuum bremsstrahlung sources a case may select: the packaged EEDL
-#: evaluation or the released BremsLib tables (issue #86).
-BREMSSTRAHLUNG_MODELS = ("eedl", "bremslib")
+#: Continuum bremsstrahlung sources a run may select (issue #86): the packaged
+#: EEDL evaluation, the released BremsLib tables, or ``"auto"`` (the default),
+#: which is BremsLib when every layer element's table is installed and EEDL,
+#: with a warning, otherwise. A case records only the resolved choice.
+BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -101,9 +103,11 @@ class Numerics:
         ``"mott"`` keeps the historical screened-Rutherford angles calibrated
         to NIST Mott transport cross sections.
     bremsstrahlung_model
-        ``"eedl"`` (default) packaged EEDL continuum with an isotropic photon
-        angle, or ``"bremslib"``, the released BremsLib tables with their
-        angular model (``pyrite tables fetch bremslib``).
+        ``"auto"`` (default) uses the released BremsLib tables with their
+        angular model (``pyrite tables fetch bremslib``) when every layer
+        element's table is installed, and otherwise warns and falls back to
+        EEDL. ``"bremslib"`` requires the tables; ``"eedl"`` selects the
+        packaged EEDL continuum with an isotropic photon angle.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -120,7 +124,7 @@ class Numerics:
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
-    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl"
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:

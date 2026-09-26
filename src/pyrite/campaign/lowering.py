@@ -63,7 +63,7 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             inelastic_model=getattr(settings, "inelastic_model", "continuous"),
             inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),
             elastic_model=getattr(settings, "elastic_model", "elsepa"),
-            bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "eedl"),
+            bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

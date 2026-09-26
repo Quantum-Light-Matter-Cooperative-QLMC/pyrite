@@ -1292,11 +1292,13 @@ Options:
                                   cross sections (needs 'pyrite tables fetch elsepa';
                                   bypasses the transport LUT), or the historical mott
                                   screened-Rutherford angles.
-  --bremsstrahlung-model [eedl|bremslib]
-                                  Continuum bremsstrahlung: eedl (default) packaged EEDL
-                                  with an isotropic photon angle, or bremslib, the
-                                  released BremsLib tables with their angular model
-                                  (needs 'pyrite tables fetch bremslib').
+  --bremsstrahlung-model [auto|eedl|bremslib]
+                                  Continuum bremsstrahlung: auto (default) uses the
+                                  released BremsLib tables with their angular model when
+                                  installed ('pyrite tables fetch bremslib') and warns
+                                  and falls back to EEDL otherwise; bremslib requires
+                                  them; eedl is the packaged EEDL continuum with an
+                                  isotropic photon angle.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

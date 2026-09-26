@@ -56,7 +56,7 @@ _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
 _INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
 _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
-_BREMSSTRAHLUNG_MODEL_VALUES = ("eedl", "bremslib")
+_BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -464,9 +464,10 @@ def numerics_show_command(name, fidelity, json_output):
     "--bremsstrahlung-model",
     type=click.Choice(_BREMSSTRAHLUNG_MODEL_VALUES),
     help=(
-        "Continuum bremsstrahlung: eedl (default) packaged EEDL with an isotropic photon "
-        "angle, or bremslib, the released BremsLib tables with their angular model (needs "
-        "'pyrite tables fetch bremslib')."
+        "Continuum bremsstrahlung: auto (default) uses the released BremsLib tables with "
+        "their angular model when installed ('pyrite tables fetch bremslib') and warns and "
+        "falls back to EEDL otherwise; bremslib requires them; eedl is the packaged EEDL "
+        "continuum with an isotropic photon angle."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
