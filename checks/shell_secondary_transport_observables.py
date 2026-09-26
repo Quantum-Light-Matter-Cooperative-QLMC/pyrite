@@ -42,6 +42,7 @@ Run (remote CPU; never locally at full size):
 
 import argparse
 import json
+import sys
 import time
 import warnings
 from itertools import product
@@ -66,6 +67,14 @@ E_CUT_KEV = 1.0
 THRESHOLDS_EV = (None, 10_000.0, 5_000.0, 2_000.0, 1_000.0)
 LINE_GRIDS_EV = {"silicon": (1600.0, 1900.0), "mos2": (2000.0, 2700.0)}
 N_DEPTH = 40
+# Gates (full size). Balance closes to float64 summation error; the two
+# lowest thresholds must agree within CONVERGENCE_TOLERANCE; launches must
+# follow the bound Moller reference within CASCADE_TOLERANCE plus three
+# Poisson errors (the reference omits the EEDL inner-shell and closure rates).
+BALANCE_TOLERANCE = 1e-9
+CONVERGENCE_TOLERANCE = 0.01
+DOSE_L1_TOLERANCE = 0.005
+CASCADE_TOLERANCE = 0.2
 FULL = {"Ne": {20.0: 2000, 100.0: 600}, "seeds": (11, 23, 37, 41, 53)}
 QUICK = {"Ne": {20.0: 40, 100.0: 12}, "seeds": (11, 23)}
 R_E_ANG = 2.8179403262e-5
@@ -202,6 +211,31 @@ def _cascade(result, key):
     return counts, np.array(free), np.array(bound)
 
 
+def _gate(case, rows):
+    """Failures of one (material, beam, thickness) case against the gates."""
+    failures = []
+    lowest, next_lowest = rows["1"], rows["2"]
+    if len({entry["eta"][0] for entry in rows.values()}) != 1:
+        failures.append([case, "primary eta depends on T_s"])
+    for label, entry in rows.items():
+        for name in ("max_abs_residual", "max_abs_history_residual"):
+            if entry[name] > BALANCE_TOLERANCE:
+                failures.append([case, label, name, entry[name]])
+    for name in ("back", "trans", "char", "brem"):
+        ref = lowest[name][0]
+        change = abs(next_lowest[name][0] - ref)
+        if change > CONVERGENCE_TOLERANCE * abs(ref):
+            failures.append([case, f"{name} T_s 2->1 keV", change / abs(ref)])
+    if next_lowest["dose_L1_to_lowest"] > DOSE_L1_TOLERANCE:
+        failures.append([case, "dose L1 T_s 2->1 keV", next_lowest["dose_L1_to_lowest"]])
+    counts = np.asarray(lowest["cascade_counts"])
+    ratio = counts / np.asarray(lowest["cascade_moller_bound"])
+    bound = CASCADE_TOLERANCE + 3.0 / np.sqrt(np.maximum(counts, 1.0))
+    if np.any(np.abs(ratio - 1.0) > bound):
+        failures.append([case, "cascade/bound Moller", ratio.tolist()])
+    return failures
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--quick", action="store_true")
@@ -210,6 +244,7 @@ def main():
     cfg = QUICK if args.quick else FULL
     warnings.simplefilter("ignore")
     report = {}
+    failures = []
     t_start = time.time()
     for key in MATERIALS:
         table = resolve_catalog_table(key).arrays()
@@ -319,10 +354,17 @@ def main():
                     f" bound {np.round(bound, 3).tolist()}"
                     f" Poisson {np.round(1 / np.sqrt(counts), 3).tolist()} counts={ref['cascade_counts']}"
                 )
-            report[f"{key}@{E0:g}/{range_multiplier:g}R"] = rows
+            case = f"{key}@{E0:g}/{range_multiplier:g}R"
+            report[case] = rows
+            failures += _gate(case, rows)
     if args.output:
+        report["failures"] = failures
         args.output.write_text(json.dumps(report, indent=1))
+    for failure in failures:
+        print("FAIL", failure)
+    print("PASS" if not failures else f"FAIL: {len(failures)} gate violations")
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
