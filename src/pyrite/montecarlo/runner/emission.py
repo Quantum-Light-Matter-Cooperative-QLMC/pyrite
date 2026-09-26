@@ -33,6 +33,14 @@ def _brem_wide_from_segments(
         intermediates=runner._EEDL_BREM_DENSE_INTERMEDIATES,
     )
     n_lay = int(segs_b.get("n_layers", 1))
+    # Opt-in BremsLib continuum: one table set for the whole stack, angular
+    # weighting per segment from ``v_hat``. Empty for the default EEDL model.
+    bremslib_tables = runner._case_bremslib_tables(case)
+    model_kwargs = (
+        {}
+        if bremslib_tables is None
+        else dict(cross_section_model="bremslib", bremslib_tables=bremslib_tables)
+    )
 
     if n_lay == 1:
         return runner.mc_brem_spectrum(
@@ -45,6 +53,7 @@ def _brem_wide_from_segments(
             groove=groove,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+            **model_kwargs,
         )
     brem_wide = np.zeros(E_brem.shape, dtype=float)
     for L in range(n_lay):
@@ -61,6 +70,7 @@ def _brem_wide_from_segments(
             groove=groove,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+            **model_kwargs,
         )
     return brem_wide
 

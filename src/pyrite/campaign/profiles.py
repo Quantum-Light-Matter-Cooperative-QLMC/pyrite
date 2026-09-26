@@ -25,6 +25,7 @@ from .._numerics import (
     Convergence,
     Numerics,
     electron_counts,
+    validate_bremsstrahlung_model,
     validate_profile_numerics,
 )
 from ..detectors import EnergyBins
@@ -73,6 +74,7 @@ NUMERICS_GROUPS = (
             ("inelastic_model", "inelastic model"),
             ("inelastic_cutoff_eV", "inelastic cutoff (eV)"),
             ("elastic_model", "elastic model"),
+            ("bremsstrahlung_model", "bremsstrahlung model"),
         ),
     ),
 )
@@ -318,6 +320,7 @@ def resolve_numerics(
         "inelastic_model": numerics.inelastic_model,
         "inelastic_cutoff_eV": numerics.inelastic_cutoff_eV,
         "elastic_model": numerics.elastic_model,
+        "bremsstrahlung_model": numerics.bremsstrahlung_model,
     }
     sources = {
         key: (
@@ -386,6 +389,13 @@ def _bremsstrahlung_identity_marker(model: Literal["eedl", "bremslib"]) -> str:
     if model == "bremslib":
         return BREMSSTRAHLUNG_BREMSLIB_MODEL
     raise ValueError(f"bremsstrahlung_model must be 'eedl' or 'bremslib'; got {model!r}")
+
+
+def case_bremsstrahlung_marker(case: Case | Mapping[str, Any]) -> str:
+    """Physics-generation marker of the continuum source a case selects."""
+    return _bremsstrahlung_identity_marker(
+        "bremslib" if case.get("bremsstrahlung_model") == "bremslib" else "eedl"
+    )
 
 
 def _identity_v1(
@@ -527,6 +537,7 @@ def _identity_v1(
         inelastic_model = str(settings_payload.pop("inelastic_model", "continuous"))
         inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
         elastic_model = str(settings_payload.pop("elastic_model", "mott"))
+        settings_brem_model = str(settings_payload.pop("bremsstrahlung_model", "eedl"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         straggling = bool(getattr(settings, "straggling", False))
@@ -535,6 +546,7 @@ def _identity_v1(
         inelastic_model = str(getattr(settings, "inelastic_model", "continuous"))
         inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
         elastic_model = str(getattr(settings, "elastic_model", "mott"))
+        settings_brem_model = str(getattr(settings, "bremsstrahlung_model", "eedl"))
     if emission != "incoherent":
         resolved["emission"] = emission
     transport_numerics = {}
@@ -574,7 +586,10 @@ def _identity_v1(
     resolved["characteristic_model"] = CHARACTERISTIC_MODEL
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
-    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(bremsstrahlung_model)
+    validate_bremsstrahlung_model(bremsstrahlung_model)
+    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(
+        "bremslib" if "bremslib" in (bremsstrahlung_model, settings_brem_model) else "eedl"
+    )
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and
     # `transport_numerics` above and unlike the four model constants: a run
@@ -697,7 +712,11 @@ def case_content_key(
         "schema": CASE_CONTENT_KEY_SCHEMA,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
-        "bremsstrahlung_model": _bremsstrahlung_identity_marker(bremsstrahlung_model),
+        "bremsstrahlung_model": (
+            _bremsstrahlung_identity_marker(bremsstrahlung_model)
+            if bremsstrahlung_model != "eedl"
+            else case_bremsstrahlung_marker(case)
+        ),
         "case": _jsonable(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),

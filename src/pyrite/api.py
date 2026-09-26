@@ -18,7 +18,7 @@ from .campaign.model import (
     Numerics,
     Scene,
 )
-from .campaign.profiles import case_content_key
+from .campaign.profiles import case_bremsstrahlung_marker, case_content_key
 from .detectors import Detector
 from .instrument import FilterPlate, PixelScorer, PlanarDetector
 from .instrument.geometry import (
@@ -31,13 +31,13 @@ from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
 from .montecarlo.geometry import directions_to_sample_frame
 from .montecarlo.runner import (
+    _case_bremslib_table_records,
     _case_elastic_table_records,
     _case_stopping_table_records,
     run_case_directions,
 )
 from .montecarlo.spectrum import (
     BREM_ENDF_PARSERPY_VERSION,
-    BREMSSTRAHLUNG_MODEL,
     CHARACTERISTIC_MODEL,
 )
 from .montecarlo.transport import STOPPING_MODEL
@@ -232,7 +232,11 @@ def simulate(
         )
     case = build_case(scene, resolved_numerics)
     xsgen_tables = identity_markers(
-        [*_case_stopping_table_records(case), *_case_elastic_table_records(case)]
+        [
+            *_case_stopping_table_records(case),
+            *_case_elastic_table_records(case),
+            *_case_bremslib_table_records(case),
+        ]
     )
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
@@ -261,7 +265,7 @@ def simulate(
             **_line_grid_provenance(case, output),
             "stopping_model": STOPPING_MODEL,
             "characteristic_model": CHARACTERISTIC_MODEL,
-            "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
+            "bremsstrahlung_model": case_bremsstrahlung_marker(case),
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {
@@ -379,7 +383,7 @@ def _simulate_planar(
             "observation": observation,
             "stopping_model": STOPPING_MODEL,
             "characteristic_model": CHARACTERISTIC_MODEL,
-            "bremsstrahlung_model": BREMSSTRAHLUNG_MODEL,
+            "bremsstrahlung_model": case_bremsstrahlung_marker(case),
             "backend": BACKEND.name,
             "device": BACKEND.device,
             "versions": {

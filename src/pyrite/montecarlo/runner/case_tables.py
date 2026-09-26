@@ -1,4 +1,4 @@
-"""Per-case transport-layer material resolution: SBETHE and ELSEPA tables, shell keys."""
+"""Per-case transport-layer material resolution: SBETHE, ELSEPA and BremsLib tables, shell keys."""
 
 
 def _case_inelastic_kwargs(case):
@@ -96,3 +96,32 @@ def _case_elastic_table_records(case):
     if entries is None:
         return []
     return [table for layer in entries for entry in layer for table in entry.tables]
+
+
+def _case_bremslib_tables(case):
+    """Staged BremsLib tables for every element of a case's layers, keyed by symbol.
+
+    ``None`` for the default EEDL continuum. Elements outside the catalogue
+    (or whose table is not fetched) are absent from the mapping, so their
+    emission falls back to isotropic EEDL with a warning.
+    """
+    if case.get("bremsstrahlung_model") != "bremslib":
+        return None
+    from ...xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    elements = [
+        str(element)
+        for composition in _case_layer_compositions(case)
+        for element in _composition_elements(composition)
+    ]
+    return load_bremsstrahlung_tables(elements)
+
+
+def _composition_elements(composition):
+    return [row[0] for row in composition]
+
+
+def _case_bremslib_table_records(case):
+    """BremsLib tables a case reads, for run identity; empty by default."""
+    tables = _case_bremslib_tables(case)
+    return [] if tables is None else list(tables.values())

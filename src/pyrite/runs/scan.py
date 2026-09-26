@@ -614,6 +614,12 @@ def _resolved_run(args, material):
         from ..xsgen.elsepa.catalog import resolve_catalog_tables
 
         tables.extend(table for key in table_keys for table in resolve_catalog_tables(key))
+    if settings.bremsstrahlung_model == "bremslib":
+        from ..xsgen.bremslib.tables import load_bremsstrahlung_tables
+        from ..xsgen.elsepa.catalog import catalog_composition
+
+        elements = [element for key in table_keys for element, _ in catalog_composition(key)]
+        tables.extend(load_bremsstrahlung_tables(elements).values())
     xsgen_tables = identity_markers(tables)
 
     identity = dataset_identity(
@@ -636,6 +642,7 @@ def _resolved_run(args, material):
         and settings.max_dE_frac == 0.0
         and settings.inelastic_model == "continuous"
         and settings.elastic_model == "elsepa"
+        and settings.bremsstrahlung_model == "eedl"
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem

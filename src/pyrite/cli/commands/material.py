@@ -149,6 +149,9 @@ def _simulation_scene(document, material, profile_name):
             ),
             inelastic_cutoff_eV=cast(float | None, transport.get("inelastic_cutoff_eV")),
             elastic_model=cast(Literal["mott", "elsepa"], transport.get("elastic_model", "elsepa")),
+            bremsstrahlung_model=cast(
+                Literal["eedl", "bremslib"], transport.get("bremsstrahlung_model", "eedl")
+            ),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
     )
