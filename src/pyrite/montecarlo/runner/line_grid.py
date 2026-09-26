@@ -49,6 +49,7 @@ _RESOLUTION_INPUT_KEYS = (
     "max_dE_frac",
     "inelastic_model",
     "inelastic_cutoff_eV",
+    "secondary_threshold_eV",
     "elastic_model",
     "abs_layers",
     "Ne",

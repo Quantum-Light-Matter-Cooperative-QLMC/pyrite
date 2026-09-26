@@ -200,8 +200,9 @@ def run_transport_kernel(
     the current first-row test compares row-start ``E_keV``, not ``E_end_keV``.
 
     ``inelastic_args`` is the shell soft/hard ``ShellInelasticTables.core_args``
-    tuple the CPU inelastic cores unpack; ``segments`` then carries the two
-    hard row columns after its twelve midpoint fields. An empty tuple, which
+    tuple the CPU inelastic cores unpack; ``segments`` then carries the three
+    hard row columns (the last, secondary directions, empty when off) after
+    its twelve midpoint fields. An empty tuple, which
     the batch driver passes ahead of ``radiative_args``, also means off.
 
     ``radiative_args`` is the coupled radiative ``(keys, cutoff_eV, *packed)``
@@ -259,8 +260,8 @@ def run_transport_kernel(
     (seg_count, exit_code) = pe_out
     (straggle_on, stragg_dE) = straggling
     inelastic_on = bool(inelastic_args)
-    shell = _shell_kernel_args(inelastic_args if inelastic_on else None, segments[12:14])
-    rad_segments = segments[14:16] if inelastic_on else segments[12:14]
+    shell = _shell_kernel_args(inelastic_args if inelastic_on else None, segments[12:15])
+    rad_segments = segments[15:17] if inelastic_on else segments[12:14]
     radiative = _radiative_kernel_args(radiative_args, rad_segments)
     nthreads = int(config.nthreads)
     if nthreads not in (32, 64, 128, 256, 512, 1024):
@@ -374,11 +375,15 @@ def _shell_kernel_args(inelastic_args, hard_segments):
             xp.zeros(1, dtype=xp.int16),
             f64,
             xp.zeros(1, dtype=xp.int16),
+            np.int32(0),
+            f64,
         )
     (keys, cutoff_eV, n, log_e, rate, omega2, nch, ch_rate, ch_u, ch_w, ch_branch, ch_code) = (
         inelastic_args
     )
-    seg_hard_W, seg_hard_ch = hard_segments
+    seg_hard_W, seg_hard_ch, seg_hard_dir = hard_segments
+    # Secondary launch directions (#94): an empty column means off.
+    sec_on = seg_hard_dir.shape[0] > 0
     return (
         np.int32(1),
         keys,
@@ -397,6 +402,8 @@ def _shell_kernel_args(inelastic_args, hard_segments):
         ch_code.reshape(-1).astype(xp.int16, copy=False),
         seg_hard_W,
         seg_hard_ch,
+        np.int32(1 if sec_on else 0),
+        seg_hard_dir.reshape(-1) if sec_on else xp.zeros(1, dtype=xp.float64),
     )
 
 

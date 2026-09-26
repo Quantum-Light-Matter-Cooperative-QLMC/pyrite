@@ -50,6 +50,11 @@ _SEG_ARRAYS = (
     # Shell soft/hard inelastic mode only (absent from legacy rows).
     "hard_W_keV",
     "hard_channel",
+    # Secondary transport only (#94).
+    "hard_secondary_v_hat",
+    "track_id",
+    "parent_id",
+    "generation",
 )
 
 

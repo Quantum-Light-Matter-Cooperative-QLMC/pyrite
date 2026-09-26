@@ -97,6 +97,8 @@ class Settings:
         Flight integration rule and optional fractional-loss substep cap.
     inelastic_model, inelastic_cutoff_eV
         Collision-loss scheme and the opt-in shell mode's cutoff in eV.
+    secondary_threshold_eV
+        Opt-in secondary transport threshold in eV (shell mode only).
     elastic_model
         ``"elsepa"`` (default) tabulated model, or the historical ``"mott"``.
     bremsstrahlung_model
@@ -122,6 +124,7 @@ class Settings:
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
+    secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
@@ -142,7 +145,10 @@ class Settings:
         if self.max_dE_frac > 0.0 and self.energy_model != "midpoint":
             raise ValueError("max_dE_frac > 0 requires energy_model='midpoint'")
         validate_inelastic_numerics(
-            self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
+            self.inelastic_model,
+            self.inelastic_cutoff_eV,
+            self.energy_model,
+            self.secondary_threshold_eV,
         )
         validate_elastic_model(self.elastic_model)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)

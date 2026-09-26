@@ -183,6 +183,12 @@ def _prepare_spectrum(request):
             "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
             "pass the material's value (no silent default)."
         )
+    if coherent and segments.get("track_id") is not None:
+        raise NotImplementedError(
+            "coherent spectra are not supported with secondary transport: the "
+            "coherent sum runs within one electron_id, which would make a whole "
+            "shower one emitter (see shell-soft-hard-transport.md)"
+        )
     if coherent and layers is not None:
         raise NotImplementedError(
             "the in-medium dispersion does not cover the coherent path through "
@@ -282,7 +288,10 @@ def _prepare_spectrum(request):
     grouped = False
     if not coherent and segments.get("flight_id") is not None and seg_E.size:
         flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
-        electron_key = _to_cpu(xp.asarray(segments["elec_id"]))
+        # A secondary-transport shower shares one electron_id; its flights
+        # belong to separate tracks (#94).
+        track = segments.get("track_id")
+        electron_key = _to_cpu(xp.asarray(segments["elec_id"] if track is None else track))
         order = np.lexsort((flight_key, electron_key))
         new_group = np.empty(flight_key.size, dtype=bool)
         new_group[0] = True

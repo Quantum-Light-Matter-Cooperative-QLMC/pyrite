@@ -67,6 +67,7 @@ _CASE_KEY_ORDER = (
     "max_dE_frac",
     "inelastic_model",
     "inelastic_cutoff_eV",
+    "secondary_threshold_eV",
     "elastic_model",
     "bremsstrahlung_model",
     "beam_uvw",
@@ -153,6 +154,9 @@ class Case(Mapping[str, Any]):
     inelastic_model, inelastic_cutoff_eV
         Opt-in ``"shell-soft-hard"`` collision-loss scheme and its cutoff in
         eV; both absent is continuous stopping. Requires ``energy_model``.
+    secondary_threshold_eV
+        Opt-in secondary transport threshold in eV (shell mode only); absent
+        transports no secondaries.
     elastic_model
         ``"elsepa"`` tabulated elastic scattering, which the default
         :class:`~pyrite.Numerics` lowers to explicitly; absent is the
@@ -227,6 +231,7 @@ class Case(Mapping[str, Any]):
     max_dE_frac: float | _Absent = _ABSENT
     inelastic_model: Literal["shell-soft-hard"] | _Absent = _ABSENT
     inelastic_cutoff_eV: float | _Absent = _ABSENT
+    secondary_threshold_eV: float | _Absent = _ABSENT
     elastic_model: Literal["elsepa"] | _Absent = _ABSENT
     bremsstrahlung_model: Literal["bremslib"] | _Absent = _ABSENT
 
@@ -288,6 +293,10 @@ class Case(Mapping[str, Any]):
             _positive("inelastic_cutoff_eV", self.inelastic_cutoff_eV)
             if self.energy_model != "midpoint":
                 raise ValueError("inelastic_model requires energy_model='midpoint'")
+        if self.secondary_threshold_eV is not _ABSENT:
+            if self.inelastic_model is _ABSENT:
+                raise ValueError("secondary_threshold_eV requires inelastic_model")
+            _positive("secondary_threshold_eV", self.secondary_threshold_eV)
         if self.elastic_model is not _ABSENT and self.elastic_model != "elsepa":
             raise ValueError("elastic_model must be absent or 'elsepa'")
         if self.bremsstrahlung_model is not _ABSENT and self.bremsstrahlung_model != "bremslib":

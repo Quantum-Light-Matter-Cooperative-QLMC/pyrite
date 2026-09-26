@@ -365,6 +365,7 @@ def _drive_per_electron_batches(
     keep_on_device,
     inelastic_args=None,
     radiative_args=None,
+    secondaries=False,
 ):
     """Run capacity-replayed batches for either exact or LUT transport.
 
@@ -372,7 +373,9 @@ def _drive_per_electron_batches(
     call, and each batch then also carries the two hard-event row columns.
     ``radiative_args`` (coupled radiative mode, exact cores only) follows it,
     with ``()`` standing in for an absent shell mode, and adds the two
-    hard-photon row columns after any hard-inelastic ones.
+    hard-photon row columns after any hard-inelastic ones. ``secondaries``
+    gives the shell mode's secondary-direction column rows (#94); off, that
+    column is allocated empty and the core never writes it.
     """
     from ..runner import _nsys_pop, _nsys_push
 
@@ -399,7 +402,7 @@ def _drive_per_electron_batches(
             _nsys_push("cxr.transport.scratch")
             scratch = _alloc_scratch(xp, m, cap, midpoint)
             if inelastic:
-                scratch += _alloc_hard_scratch(xp, m, cap)
+                scratch += _alloc_hard_scratch(xp, m, cap, secondaries)
             if radiative:
                 scratch += _alloc_hard_scratch(xp, m, cap)
             seg_count = xp.zeros(m, dtype=xp.int64)
@@ -445,13 +448,19 @@ def _drive_per_electron_batches(
             s_lay.reshape(m, cap),
         )
         if midpoint:
-            slots += tuple(a.reshape(m, cap) for a in scratch[7:])
+            # An empty column (secondary directions when off) stays empty.
+            slots += tuple(
+                a.reshape((m, cap) + a.shape[1:]) if a.shape[0] else None for a in scratch[7:]
+            )
         if keep_on_device:
-            batches.append(tuple(a[keep] for a in slots))
+            batches.append(
+                tuple(a[keep] if a is not None else b for a, b in zip(slots, scratch, strict=False))
+            )
         else:
             dst = slice(nseg, nseg + total)
             for buf, a in zip(out_bufs, slots, strict=True):
-                buf[dst] = to_host(a[keep])
+                if a is not None:
+                    buf[dst] = to_host(a[keep])
         nseg += total
         _nsys_pop()
 
@@ -471,7 +480,7 @@ def _drive_per_electron_batches(
         _nsys_push("cxr.transport.join")
         empty = _alloc_scratch(xp, 0, 1, midpoint)
         if inelastic:
-            empty += _alloc_hard_scratch(xp, 0, 1)
+            empty += _alloc_hard_scratch(xp, 0, 1, secondaries)
         if radiative:
             empty += _alloc_hard_scratch(xp, 0, 1)
         joined = tuple(
@@ -527,6 +536,7 @@ def _run_per_electron_transport_lut(
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_on_device=False,
     inelastic=None,
+    keys=None,
 ):
     """Drive the CPU/CUDA LUT per-electron core with capacity replay.
 
@@ -544,7 +554,7 @@ def _run_per_electron_transport_lut(
     from ..runner import _nsys_pop, _nsys_push
 
     _nsys_push("cxr.transport.upload")
-    d_keys = to_dev(stream_keys(seed, Ne))
+    d_keys = to_dev(stream_keys(seed, Ne) if keys is None else keys)
     d_alive = to_dev(alive)
     d_clock = to_dev(clock)
     d_pos = to_dev(pos)
@@ -596,9 +606,10 @@ def _run_per_electron_transport_lut(
         out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event)
     inelastic_args = None
     if inelastic is not None:
-        # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel)``.
+        # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel,
+        # seg_hard_secondary_dir, secondaries_on)``.
         inelastic_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in inelastic[0])
-        out_bufs += inelastic[1:]
+        out_bufs += inelastic[1:4]
     core_args = (control, geometry, lut_args, d_stragg_layers, state)
     return _drive_per_electron_batches(
         core,
@@ -619,6 +630,7 @@ def _run_per_electron_transport_lut(
         config,
         keep_on_device,
         inelastic_args,
+        secondaries=None if inelastic is None else bool(inelastic[4]),
     )
 
 
@@ -666,6 +678,7 @@ def _run_per_electron_transport(
     keep_on_device=False,
     inelastic=None,
     radiative=None,
+    keys=None,
 ):
     """Drive ``core`` over electron batches and compact the result.
 
@@ -712,7 +725,7 @@ def _run_per_electron_transport(
     from ..runner import _nsys_pop, _nsys_push
 
     _nsys_push("cxr.transport.upload")
-    d_keys = to_dev(stream_keys(seed, Ne))
+    d_keys = to_dev(stream_keys(seed, Ne) if keys is None else keys)
     d_alive = to_dev(alive)
     d_clock = to_dev(clock)
     d_pos = to_dev(pos)
@@ -750,9 +763,10 @@ def _run_per_electron_transport(
         out_bufs += (seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event)
     inelastic_args = None
     if inelastic is not None:
-        # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel)``.
+        # ``inelastic`` is ``(core_args, seg_hard_W, seg_hard_channel,
+        # seg_hard_secondary_dir, secondaries_on)``.
         inelastic_args = tuple(to_dev(a) if isinstance(a, np.ndarray) else a for a in inelastic[0])
-        out_bufs += inelastic[1:]
+        out_bufs += inelastic[1:4]
     radiative_args = None
     if radiative is not None:
         # ``radiative`` is ``(core_args, seg_rad_k_eV, seg_rad_Z)``.
@@ -779,18 +793,24 @@ def _run_per_electron_transport(
         keep_on_device,
         inelastic_args,
         radiative_args,
+        secondaries=None if inelastic is None else bool(inelastic[4]),
     )
 
 
-def _alloc_hard_scratch(xp, m, cap):
-    """Two hard-event row columns (float64 value, int16 code) for one batch.
+def _alloc_hard_scratch(xp, m, cap, secondaries=None):
+    """Hard-event row columns (float64 value, int16 code) for one batch.
 
     The shell soft/hard and coupled radiative modes each append one pair. Both
     modes require the midpoint schema, so these are full-width slot buffers
-    after :func:`_alloc_scratch`'s twelve.
+    after :func:`_alloc_scratch`'s twelve. The shell mode (``secondaries`` not
+    None) adds the ``(n, 3)`` secondary-direction column, with zero rows unless
+    secondaries are transported.
     """
     n = m * cap
-    return (xp.empty(n, dtype=xp.float64), xp.empty(n, dtype=xp.int16))
+    out = (xp.empty(n, dtype=xp.float64), xp.empty(n, dtype=xp.int16))
+    if secondaries is not None:
+        out += (xp.empty((n if secondaries else 0, 3), dtype=xp.float64),)
+    return out
 
 
 def _alloc_scratch(xp, m, cap, midpoint=False):

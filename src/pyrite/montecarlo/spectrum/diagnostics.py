@@ -355,6 +355,9 @@ def subdivide_flights(segments, composition=None, layers=None, max_dE_frac=0.0, 
             "layer": layer_index[parent],
         }
     )
+    for key in ("track_id", "parent_id", "generation"):  # secondary transport
+        if segments.get(key) is not None:
+            out[key] = _host(segments[key])[parent]
     if segments.get("event_kind") is not None:
         # Inserted nodes are substeps; the parent's own end event stays on its
         # last piece.
