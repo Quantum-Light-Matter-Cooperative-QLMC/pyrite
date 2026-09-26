@@ -24,7 +24,7 @@ from .cores import (
     _transport_core_ungrooved_perelectron_lut_inelastic,
     exact_ungrooved_core,
 )
-from .hard_inelastic import hard_stream_keys, validate_inelastic_args
+from .hard_inelastic import hard_keys_from_stream_keys, hard_stream_keys, validate_inelastic_args
 from .hard_radiative import validate_radiative_args
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
@@ -81,6 +81,11 @@ def simulate_trajectories(
     radiative_model="uncoupled",
     radiative_cutoff_eV=None,
     bremslib_tables=None,
+    secondary_threshold_eV=None,
+    max_secondary_generations=64,
+    max_secondary_tracks=None,
+    *,
+    _secondary=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -247,6 +252,14 @@ def simulate_trajectories(
       requirements and ``spectrum.brem_events`` for scoring. Validation:
       bremslib-radiative-partition, bremslib-radiative-event-spectrum.
 
+    secondary_threshold_eV: opt-in transport of hard-collision secondaries
+      (shell-soft-hard only); one threshold [eV] is production cut and
+      tracking cutoff. Generations are capped by ``max_secondary_generations``
+      and ``max_secondary_tracks`` (default ``1000 * Ne``), which raise. Rows
+      gain ``track_id``/``parent_id``/``generation``; ``electron_id`` stays the
+      primary history. None (default) is BIT-FOR-BIT primary-only transport.
+      See shell-soft-hard-transport.md. Validation: shell-secondary-transport
+
     transport_core: which ungrooved core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
     and Ne > CUDA_TRANSPORT_MIN_ELECTRONS; the lockstep core otherwise (see
@@ -405,6 +418,13 @@ def simulate_trajectories(
     Validation: electron-transport, energy-loss-straggling, finite-beam-size,
     finite-transverse-crystal, grazing-beam-projection, multilayer-stack
     """
+    if secondary_threshold_eV is not None:
+        arguments = dict(locals())
+        from .secondaries import transport_secondary_cascade
+
+        return transport_secondary_cascade(simulate_trajectories, arguments)
+    # ``_secondary`` is the cascade's per-generation pass (secondaries.py).
+    launch = None if _secondary is None else _secondary.launch
     if not np.isfinite(E0_keV) or E0_keV <= 0.0:
         raise ValueError("E0_keV must be finite and strictly positive")
 
@@ -455,7 +475,8 @@ def simulate_trajectories(
     )
 
     requested_core = transport_core
-    transport_core = resolve_transport_core(transport_core, Ne, groove)
+    if launch is None:  # a launched generation names its per-electron core
+        transport_core = resolve_transport_core(transport_core, Ne, groove)
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if keep_segments_on_device and transport_core != "cuda":
@@ -492,11 +513,8 @@ def simulate_trajectories(
     if not np.all(np.isfinite(E_cut_by_electrons)) or not np.all(E_cut_by_electrons > 0.0):
         raise ValueError("electron cutoff energies must be finite and strictly positive")
 
-    # NVTX ranges for the transport phase. Everything here is host-side, but a
-    # CUDA run's wall clock is not: Round 4 left a 38-52% unattributed remainder
-    # around the transport driver, and these are what a capture needs to split it
-    # into table build / beam sampling / buffer reservation / core / output.
-    # No-op off the profiled GPU path. Lazy import: runner imports this module.
+    # NVTX ranges split the host transport phase in a GPU capture; no-op off
+    # the profiled path. Lazy import: runner imports this module.
     from ..runner import _nsys_pop, _nsys_push
 
     _nsys_push("cxr.transport.tables")
@@ -613,6 +631,8 @@ def simulate_trajectories(
                 f"energy_spread_frac={energy_spread_frac} drew a non-finite or non-positive "
                 "electron energy; the Gaussian spread model needs spread << 1"
             )
+    if launch is not None:
+        pos, dirs, E_keV = launch.r_ang.copy(), launch.v_hat.copy(), launch.E_keV.copy()
     if not np.all(E_cut_by_electrons < E_keV):
         raise ValueError("each electron cutoff energy must be below its initial energy")
     if prepared_stopping_tables is not None:
@@ -634,6 +654,9 @@ def simulate_trajectories(
         assert prepared_stopping_tables is not None
         _nsys_push("cxr.transport.inelastic")
         E_range_keV = (float(np.min(E_cut_by_electrons)), float(np.max(E_keV)))
+        if _secondary is not None:  # one table set for every generation
+            lo, hi = _secondary.table_range_keV
+            E_range_keV = (min(lo, E_range_keV[0]), max(hi, E_range_keV[1]))
         shell_tables = build_shell_inelastic_tables(
             inelastic_materials, float(inelastic_cutoff_eV), prepared_stopping_tables, *E_range_keV
         )
@@ -653,6 +676,8 @@ def simulate_trajectories(
             seed,
             Ne,
         )
+        if launch is not None:
+            radiative_args = (launch.radiative_keys,) + radiative_args[1:]
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
@@ -679,6 +704,8 @@ def simulate_trajectories(
         seed,
         longitudinal_distribution,
     )
+    if launch is not None:
+        clock, t0_electron = launch.t_ang.copy(), launch.t0_ang.copy()
     # Snapshot before transport mutates ``pos``, ``dirs``, and ``E``. These
     # arrays describe incident phase space, including particles that miss a
     # finite footprint.
@@ -745,11 +772,18 @@ def simulate_trajectories(
     seg_event = np.empty(n_end_rows, dtype=np.int8)
     seg_hard_W = np.empty(n_end_rows if shell_mode else 0, dtype=float)
     seg_hard_ch = np.empty(seg_hard_W.size, dtype=np.int16)
+    # Secondary launch directions (#94): rows only while a cascade runs.
+    sec_on = shell_mode and _secondary is not None
+    seg_hard_dir = np.empty((seg_hard_W.size if sec_on else 0, 3), dtype=float)
     seg_rad_k = np.empty(n_end_rows if radiative_mode else 0, dtype=float)
     seg_rad_Z = np.empty(seg_rad_k.size, dtype=np.int16)
     inelastic_args = None
     if shell_tables is not None:
-        inelastic_args = shell_tables.core_args(hard_stream_keys(seed, Ne))
+        inelastic_args = shell_tables.core_args(
+            hard_stream_keys(seed, Ne)
+            if launch is None
+            else hard_keys_from_stream_keys(launch.stream_keys)
+        )
     _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
@@ -758,16 +792,10 @@ def simulate_trajectories(
     dev_segs = None
     energy_model_code = 1 if energy_model == "midpoint" else 0
 
-    # Straggling (slice D). ``straggle_on`` is a plain bool -- every core
-    # branches on it before touching the Urban sampler's own stream, so False
-    # (the default) costs nothing beyond the Ne-sized zero allocations below
-    # and is BIT-FOR-BIT with a run compiled before this parameter existed.
-    # ``stragg_stream_keys`` feeds the lockstep/grooved cores, which have no
-    # per-electron counter stream of their own (see the module-level "counter-
-    # based per-electron RNG" comment); the per-electron cores instead reuse
-    # their own ``stream_key``/``d_keys`` directly. ``stragg_layer_tables``
-    # supplies the per-electron LUT core with the per-element split the LUT
-    # itself does not carry (see `_transport_core_ungrooved_perelectron_lut`).
+    # Straggling (slice D): False skips the Urban sampler on every core,
+    # BIT-FOR-BIT. Lockstep/grooved cores key it by ``stragg_stream_keys``;
+    # per-electron cores reuse their own stream keys. ``stragg_layer_tables``
+    # gives the per-electron LUT core the per-element split the LUT lacks.
     layer_arrays = (
         L_Js,
         L_Zs,
@@ -813,7 +841,7 @@ def simulate_trajectories(
         seg_event,
     )
     if shell_mode:
-        segments += (seg_hard_W, seg_hard_ch)
+        segments += (seg_hard_W, seg_hard_ch, seg_hard_dir)
     if radiative_mode:
         segments += (seg_rad_k, seg_rad_Z)
     materials_ragged = layer_arrays + sbethe_group
@@ -844,22 +872,9 @@ def simulate_trajectories(
     if groove is None and transport_lut is not None and transport_core != "lockstep":
         if transport_core == "cuda":
             if straggle_on:
-                # Straggling is wired into the CUDA per-electron *exact* kernel
-                # (_transport_kernel/run_transport_kernel) only: slice D
-                # duplicated the sampler there and slice F applied the loss.
-                # The LUT CUDA kernel (_transport_lut_kernel) has no
-                # per-element split to sample from (see
-                # _transport_core_ungrooved_perelectron_lut's docstring), no
-                # duplicated sampler, and `run_transport_lut_kernel` does not
-                # even accept the straggling parameters. Slice F deliberately
-                # left it that way rather than adding a second ~150-line
-                # transcription of the sampler to a kernel that cannot be
-                # compiled or run on the machine writing it -- see the slice F
-                # checklist entry. Raise rather than silently returning an
-                # unstraggled result or an opaque TypeError. Use
-                # transport_lut_config=TransportLUTConfig(enabled=False) to
-                # reach the exact CUDA kernel instead, or transport_core=
-                # "per-electron"/"lockstep" off CUDA.
+                # Only the exact CUDA kernel carries the Urban sampler; the LUT
+                # kernel has no per-element split to sample from. Raise rather
+                # than return an unstraggled result.
                 raise NotImplementedError(
                     "straggling=True is not implemented on the CUDA LUT core "
                     "(transport_core='cuda' with the LUT enabled); disable the "
@@ -926,7 +941,12 @@ def simulate_trajectories(
                 stragg_dE,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
-                inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
+                inelastic=(
+                    (inelastic_args, seg_hard_W, seg_hard_ch, seg_hard_dir, sec_on)
+                    if shell_mode
+                    else None
+                ),
+                keys=None if launch is None else launch.stream_keys,
             )
         )
     elif groove is None and transport_lut is not None:
@@ -1024,7 +1044,12 @@ def simulate_trajectories(
                 stragg_dE,
                 config=per_electron_config,
                 keep_on_device=keep_segments_on_device,
-                inelastic=((inelastic_args, seg_hard_W, seg_hard_ch) if shell_mode else None),
+                inelastic=(
+                    (inelastic_args, seg_hard_W, seg_hard_ch, seg_hard_dir, sec_on)
+                    if shell_mode
+                    else None
+                ),
+                keys=None if launch is None else launch.stream_keys,
                 radiative=((radiative_args, seg_rad_k, seg_rad_Z) if radiative_mode else None),
             )
         )
@@ -1108,7 +1133,7 @@ def simulate_trajectories(
         if energy_model == "midpoint":
             seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event = dev_segs[7:12]
         if shell_mode:
-            seg_hard_W, seg_hard_ch = dev_segs[12:]
+            seg_hard_W, seg_hard_ch, seg_hard_dir = dev_segs[12:15]
 
     vacuum_start_ang = vac_start
     vacuum_end_ang = vac_end
@@ -1189,11 +1214,18 @@ def simulate_trajectories(
         result["event_kind"] = seg_event[:nseg]
     if shell_tables is not None:
         result.update(shell_tables.result_fields(seg_hard_W[:nseg], seg_hard_ch[:nseg]))
+        if sec_on:
+            result["hard_secondary_v_hat"] = seg_hard_dir[:nseg]
     if radiative_mode:
         from .hard_radiative import add_radiative_result_fields
 
         add_radiative_result_fields(
-            result, seg_rad_k[:nseg], seg_rad_Z[:nseg], bremslib_tables, radiative_cutoff_eV, seed
+            result,
+            seg_rad_k[:nseg],
+            seg_rad_Z[:nseg],
+            bremslib_tables,
+            radiative_cutoff_eV,
+            seed if _secondary is None else _secondary.photon_seed,
         )
     if collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
