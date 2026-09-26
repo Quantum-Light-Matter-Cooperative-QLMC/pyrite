@@ -1,0 +1,22 @@
+diff --git a/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc b/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc
+index f55281c..225f87a 100644
+--- a/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc
++++ b/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc
+@@ -52 +52 @@ void HistoManager::Book()
+-  const G4int kMaxHisto = 62;
++  const G4int kMaxHisto = 63;
+@@ -57 +57 @@ void HistoManager::Book()
+-    "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61"};
++    "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62"};
+@@ -121 +121,2 @@ void HistoManager::Book()
+-    "energy of DNA gamma at creation (log scale)"  // 61
++    "energy of DNA gamma at creation (log scale)",  // 61
++    "energy of eBrem gamma at creation"  // 62
+diff --git a/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc b/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc
+index 9cecf86..9975961 100644
+--- a/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc
++++ b/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc
+@@ -102,0 +103,3 @@ G4ClassificationOfNewTrack StackingAction::ClassifyNewTrack(const G4Track* aTrac
++    if (aTrack->GetCreatorProcess()->GetProcessName() == "eBrem") {
++      analysisManager->FillH1(62, energy);
++    }
