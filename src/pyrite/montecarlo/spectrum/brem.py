@@ -895,9 +895,10 @@ def mc_brem_spectrum(
         Optional post-transport electron-energy cutoff in keV.
     cross_section_model
         ``"auto"`` (default) uses the direction-resolved BremsLib model when
-        the segments carry directions ``v_hat`` and a table resolves for every
-        composition element (the supplied ``bremslib_tables``, else the
-        installed release), and otherwise warns and uses ``"eedl"``.
+        a table resolves for every composition element (the supplied
+        ``bremslib_tables``, else the installed release), and otherwise warns
+        and uses ``"eedl"``. Every model needs segment directions ``v_hat``
+        for the segment escape integral and raises ``ValueError`` without them.
         ``"eedl"`` selects evaluated MF=23/527 totals and normalized
         MF=26/527 photon spectra, ``"bethe-heitler"`` the retained
         analytic Bethe--Heitler + Elwert backend, and ``"bremslib"`` the

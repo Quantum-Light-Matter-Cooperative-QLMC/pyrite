@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from pyrite._backend import REAL, xp
-from pyrite.montecarlo.spectrum import brem, brem_unit_base
+from pyrite.montecarlo.spectrum import brem, brem_bremslib, brem_unit_base
 from tests.helpers import scaled_rtol, to_host
 
 
@@ -270,10 +270,10 @@ def test_mc_brem_auto_uses_eedl_without_segment_directions_or_tables(monkeypatch
     directionless = {key: value for key, value in segments.items() if key != "v_hat"}
     kwargs = dict(composition=[("C", 0.1)])
 
-    np.testing.assert_array_equal(
-        brem.mc_brem_spectrum(directionless, photon_eV, **kwargs),
-        brem.mc_brem_spectrum(directionless, photon_eV, cross_section_model="eedl", **kwargs),
-    )
+    assert brem_bremslib.resolve_auto_model(directionless, [("C", 0.1)], None) == ("eedl", None)
+    # Segment escape integration needs the endpoints, so no model accepts them.
+    with pytest.raises(ValueError, match="requires per-segment directions v_hat"):
+        brem.mc_brem_spectrum(directionless, photon_eV, **kwargs)
     # Supplied tables that miss an element cannot serve "auto": warn, use EEDL.
     with pytest.warns(RuntimeWarning, match="do not cover C"):
         got = brem.mc_brem_spectrum(segments, photon_eV, bremslib_tables={}, **kwargs)
