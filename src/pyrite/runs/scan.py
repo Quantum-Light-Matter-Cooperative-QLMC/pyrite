@@ -942,6 +942,23 @@ def _run_material(args, material, max_seconds=None):
     cache_read = getattr(args, "cache_read", True)
     cache_write = getattr(args, "cache_write", True)
     xsgen_tables = identity["resolved_parameters"].get("xsgen_tables")
+    # Opt-in transport artifacts (issue #159): absent unless --trajectories.
+    capture_kw = {}
+    trajectory_dir = getattr(args, "trajectories", None)
+    if trajectory_dir is not None:
+        from ..montecarlo.trajectories import TrajectoryCapture
+
+        capture_kw["trajectory_capture"] = TrajectoryCapture(
+            root=os.path.join(os.fspath(trajectory_dir), stem),
+            overwrite=bool(getattr(args, "overwrite_trajectories", False)),
+            provenance={
+                "material": material,
+                "checkpoint_stem": stem,
+                "catalog_profile": identity.get("catalog_profile", "standard"),
+                "fidelity": fidelity,
+                "parameter_sha256": identity["parameter_sha256"],
+            },
+        )
     try:
         if progress_timer is not None:
             progress_timer.start()
@@ -987,6 +1004,7 @@ def _run_material(args, material, max_seconds=None):
                 else None
             ),
             metadata_only_complete=True,
+            **capture_kw,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --

@@ -36,6 +36,7 @@ from ..spectrum import (
 from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
+from ..trajectories import TrajectoryCapture
 from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
@@ -354,6 +355,7 @@ def run_case(
     record_timing: bool = False,
     keep_segments_on_device: bool = False,
     transport_core: str = "auto",
+    trajectory_capture: TrajectoryCapture | None = None,
 ) -> dict[str, Any]:
     """Run transport, line emission, and bremsstrahlung for one case.
 
@@ -377,6 +379,9 @@ def run_case(
         Keep CUDA transport segments on-device for same-process spectra.
     transport_core
         ``"auto"``, ``"lockstep"``, ``"per-electron"``, or ``"cuda"``.
+    trajectory_capture
+        Opt-in writer of this case's transport result; ``None`` (default)
+        writes nothing. Capture never changes transport draws or spectra.
 
     Returns
     -------
@@ -391,6 +396,7 @@ def run_case(
             record_timing,
             transport_core=transport_core,
             keep_segments_on_device=keep_segments_on_device,
+            trajectory_capture=trajectory_capture,
         ),
         record_timing,
     )
@@ -491,6 +497,7 @@ def _transport_case(
     record_timing=False,
     transport_core="auto",
     keep_segments_on_device=False,
+    trajectory_capture=None,
 ):
     """Transport phase of run_case: the line + brem trajectories. Returns the
     segments + geometry + grids the spectrum phase consumes.
@@ -503,7 +510,10 @@ def _transport_case(
     this process is already driving.
 
     keep_segments_on_device: see :func:`run_case`. Requested only where transport
-    and spectrum share a process."""
+    and spectrum share a process.
+
+    trajectory_capture: optional ``TrajectoryCapture``; writes the result here,
+    in whichever process transported it, before the spectrum phase sees it."""
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     if "E_grid_line" in case:
@@ -609,6 +619,23 @@ def _transport_case(
             segs_all = _transport(False)
     else:
         segs_all = _transport(False)
+
+    if trajectory_capture is not None:
+        # Read-only snapshot of what the spectrum phase consumes; the case JSON
+        # the artifact stores already holds every unresolved setting.
+        trajectory_capture.write(
+            case,
+            segs_all,
+            settings={
+                "transport_core": core,
+                "segments_on_device": not isinstance(segs_all["L_ang"], np.ndarray),
+                "Ne_transport": Ne_transport,
+                "E_cut_by_electrons": E_cut_by_electrons,
+                "beam_dir": beam,
+                "n_hat": n_hat,
+                "stopping_tables": stopping_tables is not None,
+            },
+        )
 
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second

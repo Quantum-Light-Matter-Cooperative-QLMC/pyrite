@@ -22,6 +22,7 @@ def test_checkpoint_group_exposes_resource_oriented_tree():
         "merge",
         "gc",
         "rm",
+        "export-trajectories",
     ]
 
 

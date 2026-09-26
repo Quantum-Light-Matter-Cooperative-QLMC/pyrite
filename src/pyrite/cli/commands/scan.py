@@ -204,6 +204,22 @@ def _reproduce_zhai(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
         "per-case cache with the results."
     ),
 )
+@click.option(
+    "--trajectories",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    metavar="DIR",
+    help=(
+        "Opt in to saving each transported case's full electron-transport result "
+        "as HDF5 under DIR/<stem>/. Files can be much larger than checkpoints; "
+        "cached cases are not re-transported (use --recompute to capture them)."
+    ),
+)
+@click.option(
+    "--overwrite-trajectories",
+    is_flag=True,
+    help="Replace existing trajectory files for cases this run transports; requires --trajectories.",
+)
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option(
     "--progress-phase",
@@ -278,6 +294,8 @@ def _command(
     cpu_only,
     no_cache,
     recompute,
+    trajectories,
+    overwrite_trajectories,
     progress_file,
     progress_phase,
     no_progress,
@@ -312,6 +330,8 @@ def _command(
         raise click.UsageError("--cpu/--cpu-only require -R/--remote")
     if no_cache and recompute:
         raise click.UsageError("--no-cache and --recompute are mutually exclusive")
+    if overwrite_trajectories and trajectories is None:
+        raise click.UsageError("--overwrite-trajectories requires --trajectories")
     zhai_parameters = {
         "ne": "--ne",
         "ne_brem": "--ne-brem",
@@ -347,6 +367,8 @@ def _command(
             "cpu_only": "--cpu-only",
             "no_cache": "--no-cache",
             "recompute": "--recompute",
+            "trajectories": "--trajectories",
+            "overwrite_trajectories": "--overwrite-trajectories",
             "progress_file": "--progress-file",
             "progress_phase": "--progress-phase",
             "no_progress": "--no-progress",
@@ -388,6 +410,8 @@ def _command(
             "n_families": "--n-families",
             "checkpoint_dir": "--checkpoint-dir",
             "max_minutes": "--max-minutes",
+            "trajectories": "--trajectories",
+            "overwrite_trajectories": "--overwrite-trajectories",
             "performance_profile": "--performance-profile",
             "performance_dir": "--performance-dir",
             "progress_file": "--progress-file",
@@ -477,6 +501,12 @@ def _command(
             recompute=recompute,
         )
         return None  # os.execvp already replaced the process; defensive.
+    # Trajectory capture is opt-in; ordinary runs keep their exact arguments.
+    capture = (
+        {}
+        if trajectories is None
+        else {"trajectories": trajectories, "overwrite_trajectories": overwrite_trajectories}
+    )
     resolved_profile = _scan._resolve_catalog_profile(catalog_profile, performance_profile)
     _scan.resolve_profile_materials(resolved_profile, material)
     if not json_output:
@@ -502,6 +532,7 @@ def _command(
             no_progress=no_progress,
             verbose=verbose,
             **({"progress_phase": progress_phase} if progress_phase is not None else {}),
+            **capture,
         )
     return _cli_core.invoke_legacy(
         _scan._run_json,
@@ -524,6 +555,7 @@ def _command(
         progress_file=progress_file,
         no_progress=no_progress,
         **({"progress_phase": progress_phase} if progress_phase is not None else {}),
+        **capture,
     )
 
 
@@ -613,9 +645,17 @@ command = _derived_command(
 
 performance_command = _derived_command(
     "perf",
-    excluded={"perf", "performance_profile", *_PRESET_PARAMETER_NAMES},
+    excluded={
+        "perf",
+        "performance_profile",
+        "trajectories",
+        "overwrite_trajectories",
+        *_PRESET_PARAMETER_NAMES,
+    },
     implied={
         "perf": True,
+        "trajectories": None,
+        "overwrite_trajectories": False,
         "performance_profile": None,
         "preset": None,
         "ne": 20_000,

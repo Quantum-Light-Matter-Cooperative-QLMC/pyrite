@@ -36,6 +36,49 @@ In memory, every record keeps `spec`, `spec_coherent`, `spec_characteristic`, an
 
 Legacy `.pkl` component paths and plain, gzip, and zstd monoliths remain readable and migrate to HDF5 on the next normal save. Artifacts written before the separate-component contract stored `spec`/`spec_coherent` as totals including `spec_characteristic`; they are separated once on load. Use the [result schema](../repo-design/storage/result-schema.md) for independent inspection.
 
+## Save electron trajectories
+
+Checkpoints keep spectra, not the electron histories behind them. To keep the complete transport result of a run for later analysis, opt in per run:
+
+```bash
+uv run pyrite run standard -m hopg --trajectories trajectories/
+```
+
+Each case the run transports writes one HDF5 file, `trajectories/<stem>/<config>-<digest>/E0_<energy>keV.h5`, where `<stem>` is the checkpoint stem and the digest keeps configuration names that sanitize alike apart. The file holds the exact mapping the case's spectrum phase consumed: every per-segment array, grooved runs' vacuum legs, the sampled incident phase space, the exit tallies, and whichever optional midpoint, shell, secondary, radiative, straggling, or diagnostic fields the run produced, with dtype, shape, and row order preserved. It also records the resolved case, the seed, the run identity, the resolved transport settings (core, per-electron cutoffs, `n_hat`), and each field's unit. Field meanings are in [transport outputs](../physics/beam-transport/transport-outputs.md).
+
+Capture never changes a result. The file is written after transport and before the spectrum phase, from the arrays that phase then reads, so spectra and checkpoints are identical to the same seeded run without `--trajectories`. Without the option no trajectory file is written.
+
+Things to know before enabling it:
+
+- **Size.** A file holds every segment of every electron: roughly 100 bytes per segment for the default frozen fields, more with midpoint or shell fields. That is usually far larger than the spectra; start with `-m` and `--quick` to gauge it.
+- **Cached cases are not captured.** Only cases this run transports get a file. Cases resumed from a checkpoint or replayed from the shared cache are never re-transported just to write one; the run reports how many and `--recompute` transports them again.
+- **Existing files.** Before any transport the run checks the directory. A case that already has a file stops the run unless `--overwrite-trajectories` is given. A cached case whose file records different physics also stops the run: remove the file or pick another directory.
+- **Interrupted runs.** Files are written as `<name>.partial` and renamed only once complete, so a crash or budget stop cannot leave a truncated file under the final name. A resumed run discards stale `.partial` files of the cases it transports.
+- **Local runs only.** `--trajectories` is rejected with `-R/--remote`.
+
+Reopen a file from Python:
+
+```python
+from pyrite.montecarlo.trajectories import read_trajectory_artifact
+
+artifact = read_trajectory_artifact("trajectories/hopg/.../E0_30keV.h5")
+segs = artifact.transport  # same keys and arrays as simulate_trajectories
+artifact.units["r_mid"]  # "angstrom"
+artifact.case["seed"], artifact.settings["transport_core"]
+```
+
+The HDF5 layout is self-describing and readable with any HDF5 tool: `/transport` holds one node per field (aliases such as `E_keV` are hard links to their canonical field), and `/case`, `/settings`, and `/provenance` hold JSON attributes. Readers reject files whose `complete` flag is unset or whose `schema_version` is newer than they support.
+
+### Export segments for visualization
+
+```bash
+uv run pyrite checkpoint export-trajectories trajectories/hopg/
+```
+
+Every artifact becomes a VTK XML PolyData (`.vtp`) file beside it, readable by ParaView, VisIt, and PyVista/VTK. Each segment is a two-point line cell from `r_mid - L_ang v_hat / 2` to `r_mid + L_ang v_hat / 2` in the slab frame, in angstrom. All per-segment fields ride along as cell data, so thresholding on `electron_id` (or `track_id` with secondaries) isolates one history. Grooved vacuum legs are extra cells with `is_vacuum = 1`, where only `electron_id`, `E_start_keV`, `t_start_ang`, `t0_ang`, `L_ang`, and `v_hat` are defined and other fields are NaN or -1; `--no-vacuum` drops them.
+
+VTK PolyData was chosen because it represents disconnected straight segments with arbitrary per-segment attributes and opens in the common scientific viewers without a plugin. It cannot carry the rest of the artifact, so the export omits the compatibility aliases, per-electron arrays (`initial_*`, `straggle_dE_keV`), tallies, nested metadata (`inelastic`, `radiative`, `secondaries`, `secondary_tracks`, `stopping_tables`, `transport_diagnostics`), the case, settings, provenance, and units. The HDF5 artifact stays the authoritative record.
+
 ## Preserve or reduce data
 
 Use checkpoint commands instead of manually editing checkpoint directories:
