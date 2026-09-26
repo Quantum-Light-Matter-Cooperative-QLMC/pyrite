@@ -61,7 +61,7 @@ Summing {eq}`eq-segment-escape-mean` over the pieces, each weighted by its lengt
 - Photons travel in a straight line with no refraction and no re-entry. The groove's no-re-entry proof is in `blazed-groove-geometry`.
 - Attenuation is constant inside each layer.
 - **Out of scope:**
-  - The coherent PXR/CBS line routes (`spectrum/lines/`) keep the midpoint escape amplitude. An along-segment absorption factor on a coherent amplitude would be an absorption-limited coherence treatment, not a plain average, and needs a separate physics decision (issue #176).
+  - The PXR/CBS line routes (`spectrum/lines/`, incoherent and coherent) keep the midpoint escape. A coherent emitter needs absorption inside the formation integral, a complex exponent per linear piece, not a plain average of the intensity. Its integrated yield takes the same segment mean by Parseval. That treatment is issue #181.
   - Hard radiative events (`brem_events.py`) emit at a point, the segment endpoint, so they need no average.
 
 ## Evidence
@@ -138,4 +138,3 @@ The stack's outer boundaries are $z=0$ and $z=T$. On a piece where the $z$ face 
 
 - CUDA hardware execution of the parity tests;
 - re-measurement of the #176 hopg C K split ladder;
-- quantification of the line-route effect.
