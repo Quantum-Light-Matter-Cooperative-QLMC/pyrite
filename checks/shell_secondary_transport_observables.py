@@ -19,15 +19,19 @@ Per (material, beam, thickness, T_s):
 * characteristic line yield (``mc_characteristic_spectrum``, 1 keV floor) and
   continuum bremsstrahlung yield (``mc_brem_spectrum``, EEDL continuum), the
   existing scorers unchanged;
-* the energy-balance residual (``secondary_energy_balance``), the event
-  contract per track, and tracks per generation.
+* the energy-balance residual (``secondary_energy_balance``) in aggregate and
+  per primary history, the event contract per track, and tracks per generation.
 
 Cascade spectrum: at the lowest threshold, generation-1 launches per unit
 primary path in energy bins between 2 and 8 keV against the free-electron
 relativistic Moller DCS integrated along every generation-0 row with the
-material's total electron density. Binding shifts inner-shell ``T = W - U``
-and the stopping closure rescales outer-shell rates by a few percent, so
-agreement to about 10% is the expectation, not an exact identity.
+material's total electron density, and against a bound reference that shifts
+each explicitly ionized inner shell to ``T = W - U`` with its catalogue
+occupancy. The free reference overestimates wherever a shell's binding is
+comparable to the bin energies (MoS2 has 14 of 74 electrons with U >= 2.5 keV).
+The stopping closure still rescales outer-shell rates by a few percent, so
+agreement with the bound reference to about 10%, beyond Poisson error, is the
+expectation, not an exact identity.
 
 Validation: shell-secondary-transport
 
@@ -51,6 +55,7 @@ from pyrite.montecarlo.spectrum.characteristic import mc_characteristic_spectrum
 from pyrite.montecarlo.transport import simulate_trajectories
 from pyrite.montecarlo.transport.events import check_segment_event_contract
 from pyrite.montecarlo.transport.secondaries import secondary_energy_balance
+from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators
 from pyrite.montecarlo.transport.shell_transport import hard_event_energy_accounting
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 
@@ -61,7 +66,7 @@ E_CUT_KEV = 1.0
 THRESHOLDS_EV = (None, 10_000.0, 5_000.0, 2_000.0, 1_000.0)
 LINE_GRIDS_EV = {"silicon": (1600.0, 1900.0), "mos2": (2000.0, 2700.0)}
 N_DEPTH = 40
-FULL = {"Ne": {20.0: 400, 100.0: 120}, "seeds": (11, 23, 37, 41, 53)}
+FULL = {"Ne": {20.0: 2000, 100.0: 600}, "seeds": (11, 23, 37, 41, 53)}
 QUICK = {"Ne": {20.0: 40, 100.0: 12}, "seeds": (11, 23)}
 R_E_ANG = 2.8179403262e-5
 MC2_KEV = 510.99895
@@ -159,9 +164,21 @@ def _moller_window(E, lo, hi):
 
 
 def _cascade(result, key):
+    """Generation-1 launches per energy bin, and their free and bound Moller expectations.
+
+    The free reference puts every electron at rest and unbound (``T = W``).
+    The bound reference keeps Moller in ``W`` per shell but shifts each
+    explicitly ionized inner shell to ``T = W - U``, using the catalogue
+    shell occupancies; it isolates the binding shift, not the closure.
+    """
     import xraydb
 
     n_e = sum(xraydb.atomic_number(el) * n for el, n in _composition(key))
+    shells = catalog_shell_oscillators(key)
+    per_electron = n_e / shells.electrons_per_formula
+    inner = {
+        (c["atomic_number"], c["shell"]): c["inner"] for c in result["inelastic"]["channels"][0]
+    }
     tracks = result["secondary_tracks"]
     launched = tracks["launch_E_keV"][tracks["generation"] == 1]
     primary = result["generation"] == 0
@@ -169,13 +186,20 @@ def _cascade(result, key):
     counts = np.histogram(launched, edges)[0]
     E = result["E_start_keV"][primary]
     L = result["L_ang"][primary]
-    expected = np.array(
-        [
-            float(np.sum(L * n_e * _moller_window(E, lo, hi)))
-            for lo, hi in zip(edges[:-1], edges[1:], strict=True)
-        ]
-    )
-    return counts, expected
+    free, bound = [], []
+    for lo, hi in zip(edges[:-1], edges[1:], strict=True):
+        free.append(float(np.sum(L * n_e * _moller_window(E, lo, hi))))
+        total = 0.0
+        for osc in shells.oscillators:
+            shift = (
+                osc.ionization_energy_eV * 1e-3
+                if inner.get((osc.atomic_number, osc.label), False)
+                else 0.0
+            )
+            density = osc.strength * per_electron
+            total += float(np.sum(L * density * _moller_window(E, lo + shift, hi + shift)))
+        bound.append(total)
+    return counts, np.array(free), np.array(bound)
 
 
 def main():
@@ -199,9 +223,21 @@ def main():
                 if threshold is not None and threshold * 1e-3 >= E0 / 2:
                     continue
                 label = "off" if threshold is None else f"{threshold * 1e-3:g}"
-                acc = {k: [] for k in ("eta", "back", "trans", "dose", "char", "brem", "resid")}
+                acc = {
+                    k: []
+                    for k in (
+                        "eta",
+                        "back",
+                        "trans",
+                        "dose",
+                        "char",
+                        "brem",
+                        "resid",
+                        "history_resid",
+                    )
+                }
                 gens = []
-                cascade = [np.zeros(3), np.zeros(3)]
+                cascade = [np.zeros(3), np.zeros(3), np.zeros(3)]
                 for seed in cfg["seeds"]:
                     r = _run(key, E0, thickness, threshold, seed, cfg["Ne"][E0])
                     incident = float(r["initial_E_keV"].sum())
@@ -209,11 +245,12 @@ def main():
                     if threshold is not None:
                         check_segment_event_contract(dict(r, electron_id=r["track_id"]))
                         acc["resid"].append(secondary_energy_balance(r)["residual_keV"] / incident)
+                        history = secondary_energy_balance(r, per_history=True)["residual_keV"]
+                        acc["history_resid"].append(float(np.max(np.abs(history))) / E0)
                         gens.append(r["secondaries"]["tracks_per_generation"])
                         if threshold == THRESHOLDS_EV[-1]:
-                            c, e = _cascade(r, key)
-                            cascade[0] += c
-                            cascade[1] += e
+                            for total, part in zip(cascade, _cascade(r, key), strict=True):
+                                total += part
                     back, trans = _escaped(r)
                     acc["eta"].append(r["n_backscattered"] / cfg["Ne"][E0])
                     acc["back"].append(back / incident)
@@ -245,24 +282,27 @@ def main():
                 entry = {
                     k: (float(np.mean(v)), float(np.std(v, ddof=1) / np.sqrt(n)))
                     for k, v in acc.items()
-                    if k not in ("dose", "resid") and v
+                    if k not in ("dose", "resid", "history_resid") and v
                 }
                 entry["dose"] = np.mean(acc["dose"], axis=0).tolist()
                 entry["dose_se"] = (np.std(acc["dose"], axis=0, ddof=1) / np.sqrt(n)).tolist()
                 entry["max_abs_residual"] = (
                     float(np.max(np.abs(acc["resid"]))) if acc["resid"] else 0.0
                 )
+                entry["max_abs_history_residual"] = max(acc["history_resid"], default=0.0)
                 entry["tracks_per_generation"] = gens
                 if cascade[1].sum():
                     entry["cascade_counts"] = cascade[0].tolist()
                     entry["cascade_moller"] = cascade[1].tolist()
+                    entry["cascade_moller_bound"] = cascade[2].tolist()
                 rows[label] = entry
                 print(
                     f"{key} {E0:g} keV {range_multiplier:g}R T_s={label}: eta={entry['eta'][0]:.4f} "
                     f"back={entry['back'][0]:.4f}±{entry['back'][1]:.4f} "
                     f"trans={entry['trans'][0]:.4f} char={entry['char'][0]:.4e}±{entry['char'][1]:.1e} "
                     f"brem={entry['brem'][0]:.4e}±{entry['brem'][1]:.1e} "
-                    f"resid={entry['max_abs_residual']:.1e} [{time.time() - t_start:.0f}s]",
+                    f"resid={entry['max_abs_residual']:.1e} "
+                    f"history={entry['max_abs_history_residual']:.1e} [{time.time() - t_start:.0f}s]",
                     flush=True,
                 )
             ref = rows[f"{THRESHOLDS_EV[-1] * 1e-3:g}"]
@@ -271,10 +311,13 @@ def main():
                 entry["dose_L1_to_lowest"] = float(np.abs(d).sum())
                 print(f"  dose L1({label} - lowest) = {entry['dose_L1_to_lowest']:.4f}")
             if "cascade_counts" in ref:
-                ratio = np.asarray(ref["cascade_counts"]) / np.asarray(ref["cascade_moller"])
+                counts = np.asarray(ref["cascade_counts"])
+                free = counts / np.asarray(ref["cascade_moller"])
+                bound = counts / np.asarray(ref["cascade_moller_bound"])
                 print(
-                    f"  cascade counts/Moller per bin [2,3,5,8] keV: {np.round(ratio, 3).tolist()}"
-                    f" counts={ref['cascade_counts']}"
+                    f"  cascade counts/Moller per bin [2,3,5,8] keV: free {np.round(free, 3).tolist()}"
+                    f" bound {np.round(bound, 3).tolist()}"
+                    f" Poisson {np.round(1 / np.sqrt(counts), 3).tolist()} counts={ref['cascade_counts']}"
                 )
             report[f"{key}@{E0:g}/{range_multiplier:g}R"] = rows
     if args.output:

@@ -432,14 +432,16 @@ def _join(generations, offsets, track_table, counts, threshold_keV):
     return out
 
 
-def secondary_energy_balance(result):
+def secondary_energy_balance(result, *, per_history=False):
     """All-generation energy balance of a secondary-transport result [keV].
 
     ``incident = escaped + deposited + binding_reserved + radiated`` where
     deposited is the continuous row loss, every cutoff residual and every
     secondary at or below the threshold; ``residual`` is the difference.
     In the coupled radiative mode the continuous loss includes the soft
-    radiative share. Validation: shell-secondary-transport
+    radiative share. With ``per_history`` every term is an array over the
+    primary histories (``electron_id``), each closing on its own.
+    Validation: shell-secondary-transport
     """
     from .shell_transport import hard_event_energy_accounting
 
@@ -447,6 +449,7 @@ def secondary_energy_balance(result):
     host["inelastic"] = result["inelastic"]
     threshold_keV = result["secondaries"]["threshold_eV"] * 1e-3
     track = _host(result["track_id"])
+    history = host["electron_id"].astype(np.int64)
     kind = host["event_kind"]
     E0, E1 = host["E_start_keV"], host["E_end_keV"]
     acc = hard_event_energy_accounting(host)
@@ -457,20 +460,31 @@ def secondary_energy_balance(result):
     last = np.ones(order.size, dtype=bool)
     last[:-1] = track[order][1:] != track[order][:-1]
     end = order[last]
-    exits = np.isin(kind[end], _EXITS)
-    cut = kind[end] == int(EVENT_CUTOFF)
+    exits = end[np.isin(kind[end], _EXITS)]
+    cut = end[kind[end] == int(EVENT_CUTOFF)]
     tracks = result["secondary_tracks"]
     entered = np.zeros(tracks["track_id"].size, dtype=bool)
     entered[np.unique(track)] = True
     primary = tracks["generation"] == 0
+    below = kinetic <= threshold_keV
+    n_history = int(np.count_nonzero(primary))
+
+    def total(where, values):
+        if per_history:
+            return np.bincount(where, weights=values, minlength=n_history)
+        return float(np.sum(values))
+
     terms = {
-        "incident_keV": float(np.sum(tracks["launch_E_keV"][primary & entered])),
-        "escaped_keV": float(np.sum(E1[end][exits])),
-        "continuous_keV": float(np.sum(E0 - E1)),
-        "cutoff_residual_keV": float(np.sum((E1 - W - photon)[end][cut])),
-        "subthreshold_keV": float(np.sum(kinetic[kinetic <= threshold_keV])),
-        "binding_reserved_keV": float(np.sum(acc["binding_keV"])),
-        "radiated_keV": float(np.sum(photon)),
+        "incident_keV": total(
+            tracks["electron_id"][primary & entered].astype(np.int64),
+            tracks["launch_E_keV"][primary & entered],
+        ),
+        "escaped_keV": total(history[exits], E1[exits]),
+        "continuous_keV": total(history, E0 - E1),
+        "cutoff_residual_keV": total(history[cut], (E1 - W - photon)[cut]),
+        "subthreshold_keV": total(history[acc["row"][below]], kinetic[below]),
+        "binding_reserved_keV": total(history[acc["row"]], acc["binding_keV"]),
+        "radiated_keV": total(history, photon),
     }
     terms["deposited_keV"] = (
         terms["continuous_keV"] + terms["cutoff_residual_keV"] + terms["subthreshold_keV"]

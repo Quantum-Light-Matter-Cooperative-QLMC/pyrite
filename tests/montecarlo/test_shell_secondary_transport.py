@@ -149,6 +149,13 @@ def test_energy_and_particle_balance_close_over_all_generations(key, straggling)
     assert terms["binding_reserved_keV"] > 0.0 and terms["subthreshold_keV"] > 0.0
     # Sums of ~1e4 float64 row differences of O(10 keV) values.
     assert abs(terms["residual_keV"]) <= 1e-9 * terms["incident_keV"]
+    # The identity closes for each primary history, not only in aggregate.
+    by_history = secondary_energy_balance(result, per_history=True)
+    for name, value in terms.items():
+        assert by_history[name].shape == (30,)
+        np.testing.assert_allclose(by_history[name].sum(), value, rtol=1e-12, atol=1e-9)
+    assert np.all(np.abs(by_history["residual_keV"]) <= 1e-9 * 30.0)
+    assert np.count_nonzero(by_history["subthreshold_keV"]) > 1
 
     info = result["secondaries"]
     tracks = result["secondary_tracks"]
