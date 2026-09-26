@@ -84,7 +84,7 @@ The identity also holds per primary history. Launched secondary energy appears i
 
 **Supported paths.** The lockstep, per-electron (exact and LUT) CPU cores and the exact CUDA core. Grooved transport and the CUDA LUT core already reject the shell mode. `collect_diagnostics` is rejected with secondaries, because its per-electron summaries assume one track per electron.
 
-`Validation: shell-secondary-transport` (unverified). See [secondary transport validation](../../validation/beam-transport/shell-secondary-transport.md).
+`Validation: shell-secondary-transport` (rederived). See [secondary transport validation](../../validation/beam-transport/shell-secondary-transport.md).
 
 ## Outputs
 

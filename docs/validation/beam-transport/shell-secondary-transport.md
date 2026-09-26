@@ -131,7 +131,9 @@ or energy term found. The ledger may advance from `unverified` to
 
 `checks/shell_secondary_transport_observables.py` ran at full size on the
 lab box CPU partition at revision `454d1d46` (collector record in
-`docs/validation/check-records/shell_secondary_transport_observables.jsonl`).
+`docs/validation/check-records/shell_secondary_transport_observables.jsonl`;
+full per-case report, the source of the table below, in
+[`shell-secondary-transport-454d1d46.json`](shell-secondary-transport-454d1d46.json)).
 Si and MoS₂ slabs of 0.2 and 1.2 CSDA ranges at 20 and 100 keV;
 $T_s$ = off, 10 (100 keV only), 5, 2 and 1 keV with the primary cutoff at the
 1 keV SBETHE floor; 2000 (20 keV) or 600 (100 keV) primaries per seed, five

@@ -269,10 +269,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** $T=W-U_k$ (inner) or $W$; launch iff $T>T_s$; launch point $\mathbf r_{\rm mid}+\tfrac12L\hat{\mathbf v}$, clock $t_{\rm end}$; direction $\cos\theta_s$ from the momentum transfer, $\phi_s=\phi+\pi$ in the parent flight frame; $\sum E_0=E_{\rm escaped}+E_{\rm deposited}+E_{\rm binding}+E_{\rm radiated}$
 - **Assumptions:** one threshold is both production cut and tracking cutoff; explicit vacancies are bookkeeping-only (binding reserved, no relaxation, #91); characteristic emission stays a track-length estimator on every track; target electron initially at rest for the emission angle; secondaries run on per-electron cores; coherent spectra are rejected
 - **Limiting cases:** $T_s=$ `None` reproduces primary-only transport bit for bit; $T_s$ above every secondary energy launches nothing and leaves the primary rows unchanged; per-shell characteristic yield of the primaries is unchanged by the vacancy bookkeeping
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** `checks/shell_secondary_transport_observables.py` full size, pass at `454d1d46` (energy balance aggregate and per history, threshold convergence, bound Møller launch spectrum); CUDA anchors pending; see the validation record
 - **Anchor:** `tests/montecarlo/test_shell_secondary_transport.py`; [physics](../physics/beam-transport/shell-soft-hard-transport.md#secondary-electron-transport); [validation](beam-transport/shell-secondary-transport.md)
-- **Notes:** Issue #94. Needs fresh-context verification. Only a human may mark this row `signed-off`.
+- **Notes:** Issue #94. Fresh-context re-validation 2026-09-26 at `d74b210f`: Eqs. 3.137/3.138 and the all-generation telescoping identity independently rederived; host and CUDA cosines match an independent Eq. 3.137 to $10^{-11}$; 25/25 CPU tests pass. Caveats: kinematics use the row-start energy (inherited from `shell-soft-hard-transport`); secondary stream keys from generation 2 on depend on `Ne` through global track numbering (still independent of batch size and order); the bound-Møller cascade reference omits distant inner-shell launches and bounds the launch spectrum only to about 20%; CUDA does not reduce the secondary azimuth mod $2\pi$; CUDA anchors not yet executed. Only a human may mark this row `signed-off`.
 
 ## `gos-optical-quadrature`
 
