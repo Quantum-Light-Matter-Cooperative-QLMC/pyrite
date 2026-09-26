@@ -102,6 +102,7 @@ radiation-physics/line-energy-dispersion
 radiation-physics/narrow-beam-total-attenuation
 radiation-physics/pxr-amplitude
 radiation-physics/self-absorption
+radiation-physics/segment-escape-average
 radiation-physics/sinc-bin-integration
 radiation-physics/transverse-bunch-form-factor
 radiation-physics/xray-chi-zero

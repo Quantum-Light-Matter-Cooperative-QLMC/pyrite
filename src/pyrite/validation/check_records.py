@@ -35,6 +35,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/brem_angular_comparison.py": ("bremslib-angular-schiff",),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),
     "checks/shell_secondary_transport_observables.py": ("shell-secondary-transport",),
+    "checks/segment_escape_split_ladder.py": ("segment-escape-average",),
     "checks/shell_soft_hard_transport_observables.py": ("shell-soft-hard-transport",),
     "checks/soft_deflection_line_sensitivity.py": ("shell-soft-hard-transport",),
     "checks/soft_inelastic_deflection.py": ("shell-soft-hard-transport",),

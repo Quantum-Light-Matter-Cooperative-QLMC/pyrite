@@ -819,6 +819,9 @@ def _brem_segments():
             ]
         ),
         "L_ang": np.array([800.0, 1200.0, 600.0]),
+        # Along the groove-invariant axis the escape path is constant over each
+        # segment, so its segment mean equals the midpoint value exactly.
+        "v_hat": np.tile([0.0, 1.0, 0.0], (3, 1)),
         "E_keV": np.array([30.0, 24.0, 18.0]),
         "Ne": 3,
         "elec_id": np.array([0, 1, 2]),

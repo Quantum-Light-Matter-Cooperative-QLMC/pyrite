@@ -25,6 +25,7 @@ F32_1E_M8 = np.float32(1.0e-8)
 F32_1E_M30 = np.float32(1.0e-30)
 F32_1E3 = np.float32(1.0e3)
 F32_TWO = np.float32(2.0)
+F32_ONE_SIXTH = np.float32(1.0 / 6.0)
 F32_16_OVER_3 = np.float32(16.0 / 3.0)
 F32_MC2_KEV = np.float32(510.99895)
 F32_ALPHA = np.float32(7.2973525693e-3)
@@ -83,16 +84,30 @@ def _dsigma_weighted_scalar(T_i, k_eV, Z, p_i, incident_prefactor):
 
 
 @jit.rawkernel(device=True)
-def _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
-    # Dominant single-slab case: avoid the tiny layer loop and its index math.
-    if n_layers == U32_ONE:
-        return path_flat[line] * mu_flat[k]
-    tau = F32_ZERO
+def _transmission_scalar(path_flat, mu_flat, line, k, n_layers, n_E):
+    """Segment mean of ``exp(-tau)`` at photon bin ``k`` (issue #176).
+
+    ``path_flat`` holds the escape path per layer from both segment ends,
+    C-order ``(n_seg, 2, n_layers)``; ``tau`` is linear between them, so the
+    mean is ``exp(-min tau) * (1 - exp(-d)) / d`` with ``d = |tau_1 - tau_0|``,
+    as :func:`pyrite.montecarlo.spectrum.segment_escape.mean_transmission`.
+    Validation: segment-escape-average
+    """
+    base = line * U32_TWO * n_layers
+    tau0 = F32_ZERO
+    tau1 = F32_ZERO
     layer = U32_ZERO
     while layer < n_layers:
-        tau += path_flat[line * n_layers + layer] * mu_flat[layer * n_E + k]
+        mu = mu_flat[layer * n_E + k]
+        tau0 += path_flat[base + layer] * mu
+        tau1 += path_flat[base + n_layers + layer] * mu
         layer += U32_ONE
-    return tau
+    lo = tau0 if tau0 < tau1 else tau1
+    d = tau1 - tau0 if tau1 > tau0 else tau0 - tau1
+    ratio = F32_ONE - F32_ONE / F32_TWO * d + F32_ONE_SIXTH * d * d
+    if d > F32_1E_M3:
+        ratio = -xp.expm1(-d) / d
+    return xp.exp(-lo) * ratio
 
 
 @jit.rawkernel(device=True)
@@ -246,8 +261,8 @@ def _eedl_kernel_1e(
             n_E,
             Z,
         )
-        tau = _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
-        acc += weighted * xp.exp(-tau)
+        trans = _transmission_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
+        acc += weighted * trans
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -325,8 +340,8 @@ def _bremslib_kernel_1e(
             n_E,
             Z,
         )
-        tau = _tau_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
-        acc += weighted * xp.exp(-tau)
+        trans = _transmission_scalar(path_flat, mu_flat, line, k, n_layers, n_E)
+        acc += weighted * trans
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -358,9 +373,9 @@ def _kernel_1e(
         p_i = p_i_arr[line]
         pref_i = incident_prefactor[line]
 
-        tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
+        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
         ds0 = _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i)
-        acc0 += ds0 * xp.exp(-tau0)
+        acc0 += ds0 * trans0
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -399,11 +414,11 @@ def _kernel_2e(
         p_i = p_i_arr[line]
         pref_i = incident_prefactor[line]
 
-        tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * xp.exp(-tau0)
+        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
+        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * trans0
         if has1:
-            tau1 = _tau_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * xp.exp(-tau1)
+            trans1 = _transmission_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
+            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * trans1
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -454,14 +469,14 @@ def _kernel_3e(
         p_i = p_i_arr[line]
         pref_i = incident_prefactor[line]
 
-        tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * xp.exp(-tau0)
+        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
+        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * trans0
         if has1:
-            tau1 = _tau_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * xp.exp(-tau1)
+            trans1 = _transmission_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
+            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * trans1
         if has2:
-            tau2 = _tau_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
-            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * xp.exp(-tau2)
+            trans2 = _transmission_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
+            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * trans2
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -523,17 +538,17 @@ def _kernel_4e(
         p_i = p_i_arr[line]
         pref_i = incident_prefactor[line]
 
-        tau0 = _tau_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
-        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * xp.exp(-tau0)
+        trans0 = _transmission_scalar(path_flat, mu_flat, line, k0, n_layers, n_E)
+        acc0 += _dsigma_weighted_scalar(Ti, E0, Z, p_i, pref_i) * trans0
         if has1:
-            tau1 = _tau_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
-            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * xp.exp(-tau1)
+            trans1 = _transmission_scalar(path_flat, mu_flat, line, k1, n_layers, n_E)
+            acc1 += _dsigma_weighted_scalar(Ti, E1, Z, p_i, pref_i) * trans1
         if has2:
-            tau2 = _tau_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
-            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * xp.exp(-tau2)
+            trans2 = _transmission_scalar(path_flat, mu_flat, line, k2, n_layers, n_E)
+            acc2 += _dsigma_weighted_scalar(Ti, E2, Z, p_i, pref_i) * trans2
         if has3:
-            tau3 = _tau_scalar(path_flat, mu_flat, line, k3, n_layers, n_E)
-            acc3 += _dsigma_weighted_scalar(Ti, E3, Z, p_i, pref_i) * xp.exp(-tau3)
+            trans3 = _transmission_scalar(path_flat, mu_flat, line, k3, n_layers, n_E)
+            acc3 += _dsigma_weighted_scalar(Ti, E3, Z, p_i, pref_i) * trans3
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -591,7 +606,8 @@ def run_brem_reduction_kernel(
     of the photon-energy block loop.
 
     All array arguments must be contiguous float32 CuPy arrays. ``path_flat`` is
-    C-order ``(n_seg, n_layers)`` and ``mu_flat`` is C-order
+    C-order ``(n_seg, 2, n_layers)``: each segment's escape path per layer from
+    its start and end point and ``mu_flat`` is C-order
     ``(n_layers, n_E)``. If ``out`` is supplied it is incremented in place;
     otherwise a zeroed float32 output is allocated.
     """

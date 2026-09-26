@@ -13,14 +13,11 @@ from endf_parserpy import EndfFile
 from ..._backend import BACKEND, REAL, _to_cpu, xp
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
-    _layer_dz,
-    _layer_path_length,
     _mu_total_inv_ang,
     _normalize_composition,
 )
 from ...materials.crystal import ALPHA_FS
 from ..eedl_ionization import _verify_packaged_eedl
-from ..groove import escape_distance_ang
 from ..transport import TRANSPORT_ELEMENTS
 from .brem_bremslib import (
     BremsLibBremsstrahlungTable,
@@ -38,11 +35,10 @@ from .characteristic import (
 )
 from .lines import (
     _clip_segments_to_cutoff,
-    _escape_length,
     _observation_direction,
-    _segment_escape_distance,
     _validate_groove_escape_direction,
 )
+from .segment_escape import mean_transmission, segment_escape_paths
 
 _USE_JIT_BREM_REDUCTION = True
 _BREMSLIB_CHUNK_CELLS = 1 << 21
@@ -50,7 +46,7 @@ _BREMSLIB_CHUNK_CELLS = 1 << 21
 BremsstrahlungModel = Literal["eedl", "bethe-heitler", "bremslib"]
 BREMSSTRAHLUNG_MODEL = (
     f"eedl-2025-{BREMSSTRAHLUNG_EEDL_SHA256[:12]}/"
-    f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v2-unit-base"
+    f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v3-unit-base-segment-escape"
 )
 
 R_E_CM2 = 7.9407877e-26  # classical electron radius squared [cm^2]
@@ -938,7 +934,6 @@ def mc_brem_spectrum(
         _require_bremslib_tables(bremslib_tables) if cross_section_model == "bremslib" else {}
     )
     segments = _clip_segments_to_cutoff(segments, E_cut_keV, comp, layers)
-    thickness = segments["thickness_ang"]
     if electron_limit is None:
         Ne = segments["Ne"]
     else:
@@ -960,7 +955,6 @@ def mc_brem_spectrum(
     # layered (film-on-substrate) absorber: precompute each layer's mu(E_grid);
     # the per-segment z-path dz folds in inside the chunk loop. None -> single slab.
     if layers is not None:
-        inv_nz = 1.0 / max(abs(float(n_hat[2])), 1e-12)
         layer_mu = [
             xp.nan_to_num(_mu_total_inv_ang(c, E_grid), nan=0.0, posinf=0.0, neginf=0.0)
             for (_, _, c) in layers
@@ -972,7 +966,6 @@ def mc_brem_spectrum(
     # arrays (including the finite-footprint escape distance below).
     brem_idx = xp.flatnonzero(seg_elec_id < Ne)
 
-    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_idx]
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_idx]
     # The row's path integral is a one-point quadrature of n * dsigma/dk(E(s))
     # over its length, so evaluate it at the propagator's representative energy
@@ -984,6 +977,11 @@ def mc_brem_spectrum(
     # Validation: substep-radiation-invariance
     E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     seg_E = xp.asarray(segments[E_field], dtype=REAL)[brem_idx]
+    owner, fraction, path_start, path_end = segment_escape_paths(
+        segments, brem_idx, n_hat, layers=layers, groove=groove, xp=xp
+    )
+    seg_L = seg_L[owner] * fraction
+    seg_E = seg_E[owner]
     # BremsLib keeps EEDL staged too: it is the isotropic fallback for an
     # element without a table and for segments outside a table's energy range.
     eedl_contexts = (
@@ -994,9 +992,7 @@ def mc_brem_spectrum(
     bremslib_staged = {}
     bremslib_covers: dict[str, bool] = {}
     if cross_section_model == "bremslib":
-        if segments.get("v_hat") is None:
-            raise ValueError("cross_section_model='bremslib' needs per-segment directions v_hat")
-        v_hat = xp.asarray(segments["v_hat"], dtype=REAL)[brem_idx]
+        v_hat = xp.asarray(segments["v_hat"], dtype=REAL)[brem_idx][owner]
         seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=REAL)
         for el_i, _ in comp:
             table = supplied_bremslib.get(el_i)
@@ -1011,21 +1007,6 @@ def mc_brem_spectrum(
                 _warn_bremslib_out_of_range(table, stacklevel=2)
             bremslib_staged[el_i] = stage_bremslib_table(table)
             bremslib_covers[el_i] = covers
-
-    z_mid = seg_r[:, 2]
-    finite_footprint = (
-        segments.get("crystal_width_ang") is not None
-        and segments.get("crystal_height_ang") is not None
-    )
-    if groove is not None:
-        L_esc = xp.asarray(
-            escape_distance_ang(seg_r[:, 0], z_mid, groove),
-            dtype=REAL,
-        )
-    elif finite_footprint:
-        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[brem_idx]
-    else:
-        L_esc = _escape_length(z_mid, thickness, n_hat[2])
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
 
@@ -1060,24 +1041,8 @@ def mc_brem_spectrum(
             run_eedl_brem_reduction_kernel,
         )
 
-        if layers is None:
-            path_by_layer = L_esc[:, None]
-            mu_by_layer = mu[None, :]
-        else:
-            path_cols = []
-            if finite_footprint:
-                for z_top, z_bot, _ in layers:
-                    path_cols.append(
-                        _layer_path_length(z_mid, n_hat[2], L_esc, float(z_top), float(z_bot))
-                    )
-            else:
-                for z_top, z_bot, _ in layers:
-                    dz = _layer_dz(z_mid, n_hat[2], float(z_top), float(z_bot))
-                    path_cols.append(dz * inv_nz)
-            path_by_layer = xp.stack(path_cols, axis=1)
-            mu_by_layer = xp.stack(layer_mu, axis=0)
-
-        path_by_layer = xp.ascontiguousarray(path_by_layer, dtype=REAL)
+        mu_by_layer = mu[None, :] if layers is None else xp.stack(layer_mu, axis=0)
+        path_by_layer = xp.ascontiguousarray(xp.stack((path_start, path_end), axis=1), dtype=REAL)
         mu_by_layer = xp.ascontiguousarray(mu_by_layer, dtype=REAL)
         path_flat = path_by_layer.reshape(-1)
         mu_flat = mu_by_layer.reshape(-1)
@@ -1087,7 +1052,7 @@ def mc_brem_spectrum(
         p_i_jit, beta_i_jit = _brem_incident_state(T_jit)
         p_i_jit = xp.ascontiguousarray(p_i_jit, dtype=REAL)
         beta_i_jit = xp.ascontiguousarray(beta_i_jit, dtype=REAL)
-        n_abs_layers = int(path_by_layer.shape[1])
+        n_abs_layers = int(path_by_layer.shape[2])
 
         for el_i, n_i in comp:
             Z_i = TRANSPORT_ELEMENTS[el_i]["Z"]
@@ -1166,22 +1131,8 @@ def mc_brem_spectrum(
         chunk = max(1, min(int(chunk), _BREMSLIB_CHUNK_CELLS // max(int(E_grid.size), 1)))
     for j0 in range(0, M, chunk):
         sl = slice(j0, min(j0 + chunk, M))
-        if layers is None:
-            T_abs = xp.exp(-L_esc[sl][:, None] * mu[None, :])
-        elif finite_footprint:
-            tau = 0.0
-            for (z_top, z_bot, _), mu_i in zip(layers, layer_mu, strict=False):
-                path = _layer_path_length(
-                    z_mid[sl], n_hat[2], L_esc[sl], float(z_top), float(z_bot)
-                )
-                tau = tau + path[:, None] * mu_i[None, :]
-            T_abs = xp.exp(-tau)
-        else:
-            tau = 0.0
-            for (z_top, z_bot, _), mu_i in zip(layers, layer_mu, strict=False):
-                dz = _layer_dz(z_mid[sl], n_hat[2], float(z_top), float(z_bot))
-                tau = tau + (dz * inv_nz)[:, None] * mu_i[None, :]
-            T_abs = xp.exp(-tau)
+        mu_by_layer = mu[None, :] if layers is None else xp.stack(layer_mu, axis=0)
+        T_abs = mean_transmission(path_start[sl] @ mu_by_layer, path_end[sl] @ mu_by_layer, xp=xp)
         path_cm = seg_L[sl] * 1e-8
         for el_i, n_i in comp:
             context = eedl_contexts.get(el_i)
