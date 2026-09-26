@@ -270,7 +270,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Assumptions:** one threshold is both production cut and tracking cutoff; explicit vacancies are bookkeeping-only (binding reserved, no relaxation, #91); characteristic emission stays a track-length estimator on every track; target electron initially at rest for the emission angle; secondaries run on per-electron cores; coherent spectra are rejected
 - **Limiting cases:** $T_s=$ `None` reproduces primary-only transport bit for bit; $T_s$ above every secondary energy launches nothing and leaves the primary rows unchanged; per-shell characteristic yield of the primaries is unchanged by the vacancy bookkeeping
 - **Status:** unverified
-- **Checks:** pending; see the validation record
+- **Checks:** `checks/shell_secondary_transport_observables.py` full size, pass at `454d1d46` (energy balance aggregate and per history, threshold convergence, bound Møller launch spectrum); CUDA anchors pending; see the validation record
 - **Anchor:** `tests/montecarlo/test_shell_secondary_transport.py`; [physics](../physics/beam-transport/shell-soft-hard-transport.md#secondary-electron-transport); [validation](beam-transport/shell-secondary-transport.md)
 - **Notes:** Issue #94. Needs fresh-context verification. Only a human may mark this row `signed-off`.
 

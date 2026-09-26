@@ -127,13 +127,49 @@ or energy term found. The ledger may advance from `unverified` to
 `rederived` after review of this record; only a human may set
 `signed-off`.
 
+## Empirical checks
+
+`checks/shell_secondary_transport_observables.py` ran at full size on the
+lab box CPU partition at revision `454d1d46` (collector record in
+`docs/validation/check-records/shell_secondary_transport_observables.jsonl`).
+Si and MoS₂ slabs of 0.2 and 1.2 CSDA ranges at 20 and 100 keV;
+$T_s$ = off, 10 (100 keV only), 5, 2 and 1 keV with the primary cutoff at the
+1 keV SBETHE floor; 2000 (20 keV) or 600 (100 keV) primaries per seed, five
+seeds. All gates pass.
+
+| Quantity | Gate | Observed |
+|---|---|---|
+| Aggregate energy residual / incident | $\le10^{-9}$ | $\le2.4\times10^{-16}$ |
+| Worst per-history residual / $E_0$ | $\le10^{-9}$ | $\le2.7\times10^{-15}$ |
+| Primary backscatter fraction vs $T_s$ | identical | identical in every case |
+| Energy backscatter, transmission, characteristic yield, $T_s$ 2→1 keV | $\le1\%$ | $\le0.1\%$ |
+| Bremsstrahlung yield, $T_s$ 2→1 keV | $\le1\%$ | $\le0.63\%$ (Si, 20 keV) |
+| Depth-dose L1 distance, $T_s$ 2→1 keV | $\le0.005$ | $\le0.0023$ |
+| Generation-1 launches / bound Møller, 2–8 keV | $1\pm(0.2+3\sigma_{\rm Poisson})$ | 0.88–1.18 |
+
+Every observable approaches its lowest-threshold value monotonically. Turning
+secondary transport on raises characteristic yield by up to 7% (Si, 100 keV)
+and bremsstrahlung by up to 4%, and it moves energy backscatter and
+transmission by at most 0.2% of the incident energy.
+
+The cascade reference integrates the relativistic Møller DCS along every
+generation-0 row. A free-electron reference puts every electron at rest and
+unbound, $T=W$; it gives ratios of 0.85–1.03 for Si and 0.71–0.89 for MoS₂.
+The MoS₂ deficit is the binding shift: 14 of its 74 electrons per formula unit
+have $U\ge2.5$ keV, so an inner-shell secondary with $T$ in a 2–8 keV bin needs
+$W=T+U$. The bound reference keeps Møller in $W$ for each catalogue shell and
+shifts each explicit inner shell to $T=W-U$. It gives 0.88–1.09 for MoS₂ and
+1.03–1.18 for Si. The remaining difference is the reference's approximation:
+the transport uses EEDL-substituted inner-shell rates and the stopping closure,
+not Møller. The ratio is flat across bins within about 10% in every case, so
+the launch spectrum follows the $1/T^2$ Møller shape.
+
+The threshold sweep is limited below by the 1 keV SBETHE table floor, which is
+also the primary cutoff here; convergence is shown down to that floor, not
+beyond it.
+
 ## Outstanding empirical checks
 
-- Run `checks/shell_secondary_transport_observables.py` remotely at full size
-  and assess threshold convergence of backscatter, transmission, depth dose,
-  characteristic line yields, and bremsstrahlung. The same run compares the
-  cascade launch spectrum with the Møller prediction.
-- Check energy balance separately for each primary history; the current fast
-  anchor tests the aggregate identity.
-- Run the CUDA anchors on a device and compare CPU/CUDA aggregate observables.
-  The CUDA implementation was inspected here, but not executed by the verifier.
+- Run the CUDA anchors (`tests/montecarlo/test_shell_secondary_cuda.py`) on a
+  device and compare CPU/CUDA aggregate observables. The CUDA implementation
+  was inspected here, but not executed by the verifier.
