@@ -18,7 +18,11 @@ EmissionMode = Literal["incoherent", "coherent", "both"]
 
 import numpy as np
 
-from .._numerics import validate_elastic_model, validate_inelastic_numerics
+from .._numerics import (
+    validate_bremsstrahlung_model,
+    validate_elastic_model,
+    validate_inelastic_numerics,
+)
 from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
 from ..montecarlo import (
@@ -95,6 +99,9 @@ class Settings:
         Collision-loss scheme and the opt-in shell mode's cutoff in eV.
     elastic_model
         ``"elsepa"`` (default) tabulated model, or the historical ``"mott"``.
+    bremsstrahlung_model
+        ``"auto"`` (default: BremsLib when installed, else EEDL), ``"eedl"`` or
+        ``"bremslib"`` continuum source.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -116,6 +123,7 @@ class Settings:
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -137,6 +145,7 @@ class Settings:
             self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
         )
         validate_elastic_model(self.elastic_model)
+        validate_bremsstrahlung_model(self.bremsstrahlung_model)
 
     @property
     def coherent_emission(self) -> bool:

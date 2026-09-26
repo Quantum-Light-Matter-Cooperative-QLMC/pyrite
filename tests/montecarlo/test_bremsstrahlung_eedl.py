@@ -94,7 +94,7 @@ def test_eedl_interpolated_distribution_is_normalized_after_physical_cutoff():
     assert differential[photon_eV > incident_eV].size == 0
 
 
-def test_mc_brem_defaults_to_eedl_and_retains_isotropic_angular_model(monkeypatch):
+def test_mc_brem_eedl_retains_isotropic_angular_model(monkeypatch):
     table = brem.load_bremsstrahlung_cross_sections("C")
     panel = 4
     incident_eV = table.distribution_incident_energy_eV[panel]
@@ -107,6 +107,7 @@ def test_mc_brem_defaults_to_eedl_and_retains_isotropic_angular_model(monkeypatc
         _single_carbon_segment(incident_eV / 1.0e3, length_ang),
         photon_eV,
         composition=[("C", density_ang3)],
+        cross_section_model="eedl",
     )
     sigma = np.interp(
         incident_eV,
@@ -260,3 +261,22 @@ def test_eedl_between_panels_tracks_seltzer_berger(element, Z, T_MeV):
     chi_mb = (1.0 - 1.0 / gamma**2) / Z**2 * photon_eV * dsigma_dk * 1e27
     ratio = chi_mb / np.array(_SB_CHI_MB[(element, Z, T_MeV)])
     assert np.all((ratio > 0.95) & (ratio < 1.40)), ratio
+
+
+def test_mc_brem_auto_uses_eedl_without_segment_directions_or_tables(monkeypatch):
+    monkeypatch.setattr(brem, "_mu_total_inv_ang", _zero_mu)
+    photon_eV = np.array([2.0e3, 20.0e3])
+    segments = _single_carbon_segment(60.0, 100.0)
+    directionless = {key: value for key, value in segments.items() if key != "v_hat"}
+    kwargs = dict(composition=[("C", 0.1)])
+
+    np.testing.assert_array_equal(
+        brem.mc_brem_spectrum(directionless, photon_eV, **kwargs),
+        brem.mc_brem_spectrum(directionless, photon_eV, cross_section_model="eedl", **kwargs),
+    )
+    # Supplied tables that miss an element cannot serve "auto": warn, use EEDL.
+    with pytest.warns(RuntimeWarning, match="do not cover C"):
+        got = brem.mc_brem_spectrum(segments, photon_eV, bremslib_tables={}, **kwargs)
+    np.testing.assert_array_equal(
+        got, brem.mc_brem_spectrum(segments, photon_eV, cross_section_model="eedl", **kwargs)
+    )

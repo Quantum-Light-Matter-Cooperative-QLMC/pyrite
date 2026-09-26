@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 
 import pyrite as pr
@@ -59,6 +61,8 @@ def test_simulate_returns_intrinsic_result_and_provenance_without_store(monkeypa
         }
 
     monkeypatch.setattr(api, "run_case", fake_run_case)
+
+    numerics = replace(numerics, bremsstrahlung_model="eedl")
 
     result = pr.simulate(beam, target, detector, numerics=numerics)
 

@@ -43,7 +43,11 @@ from .._line_grid_policy import (
     line_start_eV,
     resolve_line_grid_policy,
 )
-from .._numerics import validate_elastic_model, validate_inelastic_numerics
+from .._numerics import (
+    validate_bremsstrahlung_model,
+    validate_elastic_model,
+    validate_inelastic_numerics,
+)
 from .._photon_continuum_floor import floored_lattice_start_eV
 from ..detectors import Detector
 from ..materials import CATALOG, LayerSpec
@@ -606,6 +610,36 @@ def _line_grid_for_energy(
     return grid, policy.payload()
 
 
+def _case_elements(case: Case) -> tuple[str, ...]:
+    """Every element the case's crystal and absorber layers radiate from."""
+    compositions = [case["composition"]]
+    if case.get("abs_layers"):
+        compositions.extend(comp for _, _, comp in case["abs_layers"])
+    return tuple(dict.fromkeys(str(row[0]) for comp in compositions for row in comp))
+
+
+def _resolve_auto_bremsstrahlung(cases: list[Case]) -> list[Case]:
+    """Replace ``bremsstrahlung_model="auto"`` by the source each case will use.
+
+    A case records only the resolved choice, so identity and content keys
+    never depend on what happened to be installed unless BremsLib really ran.
+    """
+    from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+
+    resolved: dict[tuple[str, ...], str] = {}
+    out = []
+    for case in cases:
+        elements = _case_elements(case)
+        if elements not in resolved:
+            resolved[elements] = resolve_bremsstrahlung_model("auto", elements)
+        out.append(
+            replace(case, bremsstrahlung_model="bremslib")
+            if resolved[elements] == "bremslib"
+            else case
+        )
+    return out
+
+
 def build_cases(
     sweep: Sweep,
     n_electrons=450,
@@ -617,6 +651,7 @@ def build_cases(
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
+    bremsstrahlung_model="auto",
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -638,6 +673,7 @@ def build_cases(
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     validate_inelastic_numerics(inelastic_model, inelastic_cutoff_eV, energy_model)
     validate_elastic_model(elastic_model)
+    validate_bremsstrahlung_model(bremsstrahlung_model)
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
@@ -893,6 +929,12 @@ def build_cases(
                         # ELSEPA elastic model (the default): divergence-only, so
                         # an explicit "mott" case keeps its historical payload.
                         **({"elastic_model": "elsepa"} if elastic_model == "elsepa" else {}),
+                        # Opt-in BremsLib continuum: divergence-only, like the above.
+                        **(
+                            {"bremsstrahlung_model": "bremslib"}
+                            if bremsstrahlung_model == "bremslib"
+                            else {}
+                        ),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
@@ -909,6 +951,8 @@ def build_cases(
                         domega_sr=domega,
                     )
                 )
+    if bremsstrahlung_model == "auto":
+        cases = _resolve_auto_bremsstrahlung(cases)
     return cases
 
 

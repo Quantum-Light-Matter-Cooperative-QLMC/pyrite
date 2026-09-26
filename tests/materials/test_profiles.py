@@ -30,6 +30,22 @@ from pyrite.montecarlo.spectrum import (
     CHARACTERISTIC_MODEL,
     CHARACTERISTIC_XRAYDB_VERSION,
 )
+from pyrite.montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
+
+
+def _resolve_auto_as_installed(model, _elements):
+    return "bremslib" if model == "auto" else model
+
+
+@pytest.fixture(autouse=True)
+def _pin_default_continuum_to_bremslib(monkeypatch):
+    """The default ``"auto"`` continuum is BremsLib only where its tables are
+    installed. Pin that outcome so the digests below do not depend on the
+    machine; the EEDL-fallback identity is covered by an explicit test."""
+    monkeypatch.setattr(profiles, "resolve_bremsstrahlung_model", _resolve_auto_as_installed)
+    monkeypatch.setattr(
+        "pyrite.xsgen.bremslib.tables.resolve_bremsstrahlung_model", _resolve_auto_as_installed
+    )
 
 
 def _cases_by_key(material, catalog_profile):
@@ -74,7 +90,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # the same spectrum. Re-minted again for issue #89: default cases now select
     # the ELSEPA elastic model, which changes every trajectory.
     assert case_content_key(case) == (
-        "f45ba77f7c48c301aa595c8625245931692941099cf9008a5f057eb23bb02ba3"
+        "bbf8fc733b547801feb88ea9059c173141f996439a9ee31b5c91babf936422d0"
     )
 
 
@@ -85,7 +101,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "ea920f47592dc816edeebcc03cbe41ae29ab63c417eb8738044d21b5795ffe41"
+        "7f10cdd0936b4e7aed25c8ee884d3fd59e03beadac8a40c68f3a5683df903515"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -352,14 +368,27 @@ def test_case_content_key_separates_characteristic_models():
 
 
 def test_bremsstrahlung_model_marker_orphans_bethe_heitler_era_digests():
-    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    settings = replace(default_settings(), bremsstrahlung_model="eedl")
+    identity = dataset_identity("hopg", "full", settings, material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
     assert "mf23-527-mf26-527" in BREMSSTRAHLUNG_MODEL
 
 
+def test_default_continuum_is_bremslib_when_installed_and_eedl_otherwise(monkeypatch):
+    installed = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    monkeypatch.setattr(profiles, "resolve_bremsstrahlung_model", lambda model, _e: "eedl")
+    fallback = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+
+    assert installed["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_BREMSLIB_MODEL
+    assert fallback["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
+    assert installed["parameter_sha256"] != fallback["parameter_sha256"]
+
+
 def test_case_content_key_separates_bremsstrahlung_models():
-    case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
+    case = build_cases(
+        material_sweep("hopg"), n_electrons=300, n_electrons_brem=150, bremsstrahlung_model="eedl"
+    )[0]
     current = case_content_key(case)
     with mock.patch.object(profiles, "BREMSSTRAHLUNG_MODEL", "bethe-heitler-only"):
         bethe_heitler_era = case_content_key(case)
@@ -372,7 +401,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "ea920f47592dc816edeebcc03cbe41ae29ab63c417eb8738044d21b5795ffe41"
+        "7f10cdd0936b4e7aed25c8ee884d3fd59e03beadac8a40c68f3a5683df903515"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -386,42 +415,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "0656ff4d2c2263f79818bb666f5daea592d269965dce3d79c6a71a8c3230322d",
+            "5e4972b4f321df024483e58a43bd8b3f4a564fa675577a077b9645fff4c8dccc",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "cffcd1d052794c78c94365e3f18fdf3aa20a0b0a42fc4918afe5ee96e39256cd",
+            "fd160ab1bf936f22e4c18e57dbbc84d92e07d28e5925cfc2d8fbaec7bcf5d6ad",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "fa577363bf5de45af65917ca88e227eb92a804facd9cef7ddef68c0d3b8934e1",
+            "9eda4fb43437437ce5c9d0fbee4ae9769bb7b8f0a2b9d3bd75b8e57fa0202057",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "d88c1cdb7bc09df13721be3a869b99b446e1f0a75e535861028c73211cb1971d",
+            "444f5c65ff185e2ac09757d8757e16f308a9575c76ba2b2e6ee806ef5f2eefea",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "8ce0e4a1b61d91be60be74fa48d0b765775baa6aa454360bdadd123a8065bd62",
+            "f3d21d541696c998003738b16ce60184f77ce3e9fa18326b5d639cc79ffcd89d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "ac525e5ed5eda712d833c289e5506db048223c77c616b40f0cc4a05209fc36be",
+            "cab3e43ebd5fa6779b085a33f0924bb9fdba83a37cfc28b90fcfd276dccbbcb2",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "a0f9a54cb6716819a7f492caf41a0460086bb15617298874f072f004e90c8fc6",
+            "cc2d553fae79ad71f92461277555e0e2467dc09891ffdc48c9438c3c0920d01d",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "5462cdb65b22b0f0712cce434e83eb898d58e0e940a046b57b69c8df51f2f9d8",
+            "1f8684f32d140bb941da991c0f67d204d9e175a92b452e20414b05206fe8677e",
         ),
     ],
 )
@@ -587,9 +616,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # characteristic profiles, and again for issue #88's physical finite-window
     # convention, again for issue #125's automatic bundled line grids, again
     # for issue #91's L-shell Coster--Kronig relaxation marker, and again for
-    # issue #89's default ELSEPA elastic model) must stay bit-for-bit.
+    # issue #89's default ELSEPA elastic model, and again for the BremsLib
+    # default continuum of issue #86) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "ea920f47592dc816edeebcc03cbe41ae29ab63c417eb8738044d21b5795ffe41"
+        "7f10cdd0936b4e7aed25c8ee884d3fd59e03beadac8a40c68f3a5683df903515"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -601,7 +631,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # bandwidth request the resolver raises, so it was left alone. Re-minted
     # again for issue #89's default ELSEPA elastic model.
     assert survey_incoherent["parameter_sha256"] == (
-        "8524a1ba52e3ebf9d9a6936695ebe6db290c337faf09d7ca6b51eee668e8980d"
+        "f12d19ced8d4226e4dce277eb3ed53b95458e5937faad962e0b01f1b9e50c100"
     )
 
 

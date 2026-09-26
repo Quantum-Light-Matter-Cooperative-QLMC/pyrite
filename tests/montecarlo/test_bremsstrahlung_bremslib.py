@@ -239,7 +239,9 @@ def test_element_without_table_warns_and_emits_isotropic_eedl(monkeypatch):
             cross_section_model="bremslib",
             bremslib_tables={},
         )
-    expected = brem.mc_brem_spectrum(segments, photon_eV, composition=[("C", 0.1)])
+    expected = brem.mc_brem_spectrum(
+        segments, photon_eV, composition=[("C", 0.1)], cross_section_model="eedl"
+    )
     np.testing.assert_allclose(got, expected, rtol=scaled_rtol(1.0e-12, eps_multiple=8.0))
 
 
@@ -261,7 +263,9 @@ def test_segments_outside_the_table_warn_and_emit_isotropic_eedl(monkeypatch, ca
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         directional = brem.mc_brem_spectrum(inside, photon_eV, bremslib_tables=tables, **kwargs)
-    isotropic = brem.mc_brem_spectrum(outside, photon_eV, composition=[("C", 0.1)])
+    isotropic = brem.mc_brem_spectrum(
+        outside, photon_eV, composition=[("C", 0.1)], cross_section_model="eedl"
+    )
     np.testing.assert_allclose(
         got, directional + isotropic, rtol=scaled_rtol(1.0e-12, eps_multiple=16.0)
     )

@@ -103,6 +103,12 @@ def _usable_cpus():
 
 
 from .case_tables import (
+    _case_bremslib_table_records as _case_bremslib_table_records,
+)
+from .case_tables import (
+    _case_bremslib_tables as _case_bremslib_tables,
+)
+from .case_tables import (
     _case_elastic_kwargs,
     _case_inelastic_kwargs,
     _case_stopping_tables,

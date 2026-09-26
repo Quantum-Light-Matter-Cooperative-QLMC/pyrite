@@ -614,6 +614,18 @@ def _resolved_run(args, material):
         from ..xsgen.elsepa.catalog import resolve_catalog_tables
 
         tables.extend(table for key in table_keys for table in resolve_catalog_tables(key))
+    from ..xsgen.bremslib.tables import load_bremsstrahlung_tables, resolve_bremsstrahlung_model
+    from ..xsgen.elsepa.catalog import catalog_composition
+
+    elements = [element for key in table_keys for element, _ in catalog_composition(key)]
+    # Resolve "auto" once, here, so the settings a run executes with, its
+    # dataset identity, and its table markers all name the same source.
+    settings = replace(
+        settings,
+        bremsstrahlung_model=resolve_bremsstrahlung_model(settings.bremsstrahlung_model, elements),
+    )
+    if settings.bremsstrahlung_model == "bremslib":
+        tables.extend(load_bremsstrahlung_tables(elements).values())
     xsgen_tables = identity_markers(tables)
 
     identity = dataset_identity(
@@ -636,6 +648,7 @@ def _resolved_run(args, material):
         and settings.max_dE_frac == 0.0
         and settings.inelastic_model == "continuous"
         and settings.elastic_model == "elsepa"
+        and settings.bremsstrahlung_model == "bremslib"
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem

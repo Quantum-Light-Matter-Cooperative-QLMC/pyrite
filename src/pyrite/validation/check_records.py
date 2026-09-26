@@ -11,6 +11,7 @@ SCHEMA_REVISION = 1
 Verdict = Literal["pass", "fail", "skip"]
 
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
+    "checks/brem_source_comparison.py": ("brem-source-comparison",),
     "checks/coherent_transverse_coherence.py": ("transverse-bunch-form-factor",),
     "checks/collision_statistics_refinement.py": ("energy-controlled-propagation",),
     "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),
@@ -30,6 +31,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/multilayer_check.py": ("multilayer-stack", "self-absorption"),
     "checks/multilayer_slice3_check.py": ("multilayer-stack", "self-absorption"),
     "checks/multilayer_validation_check.py": ("multilayer-stack", "self-absorption"),
+    "checks/shell_ionization_comparison.py": ("eedl-shell-ionization-comparison",),
+    "checks/brem_angular_comparison.py": ("bremslib-angular-schiff",),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),
     "checks/shell_soft_hard_transport_observables.py": ("shell-soft-hard-transport",),
     "checks/soft_deflection_line_sensitivity.py": ("shell-soft-hard-transport",),

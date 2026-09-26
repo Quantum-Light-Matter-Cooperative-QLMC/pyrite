@@ -25,6 +25,7 @@ from .._numerics import (
     Convergence,
     Numerics,
     electron_counts,
+    validate_bremsstrahlung_model,
     validate_profile_numerics,
 )
 from ..detectors import EnergyBins
@@ -33,6 +34,7 @@ from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..results import EmissionMode, Settings
+from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
 from .sweep import (
     Sweep,
     beam_replace,
@@ -73,6 +75,7 @@ NUMERICS_GROUPS = (
             ("inelastic_model", "inelastic model"),
             ("inelastic_cutoff_eV", "inelastic cutoff (eV)"),
             ("elastic_model", "elastic model"),
+            ("bremsstrahlung_model", "bremsstrahlung model"),
         ),
     ),
 )
@@ -318,6 +321,7 @@ def resolve_numerics(
         "inelastic_model": numerics.inelastic_model,
         "inelastic_cutoff_eV": numerics.inelastic_cutoff_eV,
         "elastic_model": numerics.elastic_model,
+        "bremsstrahlung_model": numerics.bremsstrahlung_model,
     }
     sources = {
         key: (
@@ -388,6 +392,25 @@ def _bremsstrahlung_identity_marker(model: Literal["eedl", "bremslib"]) -> str:
     raise ValueError(f"bremsstrahlung_model must be 'eedl' or 'bremslib'; got {model!r}")
 
 
+def _target_elements(target: Any) -> list[str]:
+    """Element symbols of every catalog layer of a sweep target."""
+    from ..xsgen.elsepa.catalog import catalog_composition
+
+    keys = (
+        [layer.material for layer in target.layers]
+        if hasattr(target, "layers")
+        else [target.material]
+    )
+    return [element for key in keys for element, _ in catalog_composition(key)]
+
+
+def case_bremsstrahlung_marker(case: Case | Mapping[str, Any]) -> str:
+    """Physics-generation marker of the continuum source a case selects."""
+    return _bremsstrahlung_identity_marker(
+        "bremslib" if case.get("bremsstrahlung_model") == "bremslib" else "eedl"
+    )
+
+
 def _identity_v1(
     material: str,
     fidelity: str,
@@ -397,7 +420,7 @@ def _identity_v1(
     variant: str | None = None,
     catalog_profile: str = "standard",
     xsgen_tables: Mapping[str, str] | None = None,
-    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl",
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] | None = None,
 ) -> dict[str, Any]:
     """Return profile plus exact resolved parameters and stable SHA-256 digest."""
     assert sweep.target is not None
@@ -527,6 +550,7 @@ def _identity_v1(
         inelastic_model = str(settings_payload.pop("inelastic_model", "continuous"))
         inelastic_cutoff_eV = settings_payload.pop("inelastic_cutoff_eV", None)
         elastic_model = str(settings_payload.pop("elastic_model", "mott"))
+        settings_brem_model = str(settings_payload.pop("bremsstrahlung_model", "auto"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         straggling = bool(getattr(settings, "straggling", False))
@@ -535,6 +559,7 @@ def _identity_v1(
         inelastic_model = str(getattr(settings, "inelastic_model", "continuous"))
         inelastic_cutoff_eV = getattr(settings, "inelastic_cutoff_eV", None)
         elastic_model = str(getattr(settings, "elastic_model", "mott"))
+        settings_brem_model = str(getattr(settings, "bremsstrahlung_model", "auto"))
     if emission != "incoherent":
         resolved["emission"] = emission
     transport_numerics = {}
@@ -574,7 +599,11 @@ def _identity_v1(
     resolved["characteristic_model"] = CHARACTERISTIC_MODEL
     # The continuum now defaults to evaluated EEDL MF=23/527 + MF=26/527
     # instead of the historical analytic Bethe--Heitler approximation.
-    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(bremsstrahlung_model)
+    requested = settings_brem_model if bremsstrahlung_model is None else bremsstrahlung_model
+    validate_bremsstrahlung_model(requested)
+    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(
+        resolve_bremsstrahlung_model(requested, _target_elements(sweep.target))
+    )
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and
     # `transport_numerics` above and unlike the four model constants: a run
@@ -615,7 +644,7 @@ def dataset_identity(
     catalog_profile: str = "standard",
     identity_version: int = CURRENT_IDENTITY_VERSION,
     xsgen_tables: Mapping[str, str] | None = None,
-    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl",
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] | None = None,
 ) -> dict[str, Any]:
     """Resolve a dataset identity through its explicit versioned algorithm.
 
@@ -661,7 +690,7 @@ def case_content_key(
     case: Case | Mapping[str, Any],
     *,
     xsgen_tables: Mapping[str, str] | None = None,
-    bremsstrahlung_model: Literal["eedl", "bremslib"] = "eedl",
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] | None = None,
 ) -> str:
     """Content-addressable key for one :func:`pyrite.campaign.sweep.build_cases` case.
 
@@ -697,7 +726,11 @@ def case_content_key(
         "schema": CASE_CONTENT_KEY_SCHEMA,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": CHARACTERISTIC_MODEL,
-        "bremsstrahlung_model": _bremsstrahlung_identity_marker(bremsstrahlung_model),
+        "bremsstrahlung_model": (
+            case_bremsstrahlung_marker(case)
+            if bremsstrahlung_model is None
+            else _bremsstrahlung_identity_marker(bremsstrahlung_model)
+        ),
         "case": _jsonable(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),

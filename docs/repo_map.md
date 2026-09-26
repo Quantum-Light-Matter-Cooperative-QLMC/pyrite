@@ -221,6 +221,24 @@ Optional validation-only adapters for external crystallography/scattering compar
 - Public: `build_dans_crystal_from_pyrite`, `load_dans_crystal_from_cif`, `compare_lattice`, `compare_reflection_geometry`, `compare_structure_factor_magnitudes`, `validate_dans_crystal`; comparison, tolerance, and report dataclasses.
 - Deps: `materials.crystal`; imports `Dans_Diffraction` lazy, only when check ask.
 
+### `validation/_pinned.py`
+Shared on-demand SHA-256-verified download of external validation-only reference files; neither the files nor their fetch are part of production runs.
+- Public: `read_pinned`. Deps: stdlib only.
+
+### `validation/brem_angular.py`
+Validation-only Schiff (Koch–Motz 2BS) photon angular density and enclosed-flux-angle comparison with the BremsLib double-differential tables. Driven by `checks/brem_angular_comparison.py`; ledger `bremslib-angular-schiff`.
+- Public: `schiff_density`, `enclosed_angle`, `compare_angular_shape`. Deps: `montecarlo.spectrum.brem_bremslib`.
+
+### `validation/shell_ionization.py`
+Validation-only Bote–Salvat K/L/M fit parameter parser and cross-section transcription, compared with packaged EEDL subshell rates and PyRITE characteristic-production yields. Pinned NIST `xione.jl` is fetched on demand, never packaged. Driven by `checks/shell_ionization_comparison.py`; ledger `eedl-shell-ionization-comparison`.
+- Public: `BoteSalvatElement`, `parse_bote_salvat`, `load_bote_salvat`, `compare_shells`, `compare_production`.
+- Deps: `validation._pinned`, `montecarlo.eedl_ionization`, `montecarlo.spectrum.characteristic`, `paths`.
+
+### `validation/brem_sources.py`
+Validation-only comparison of EEDL and BremsLib bremsstrahlung `dsigma/dk` with the Seltzer–Berger scaled tables (EGSnrc `nist_brems.data`, pinned SHA-256, fetched on demand into the user data directory, never packaged). Driven by `checks/brem_source_comparison.py`; ledger `brem-source-comparison`.
+- Public: `SeltzerBergerTable`, `parse_seltzer_berger`, `load_seltzer_berger`, `model_chi`, `compare_sources`, `SourceComparison`.
+- Deps: `validation._pinned`, `montecarlo.spectrum.brem` (production evaluation), `paths`.
+
 ### `validation/validation_background.py`
 Analysis-only external bremsstrahlung comparison, weighted sideband normalization, and experimental subtraction. External spectra stay in detected units and enter through `montecarlo.load_external_brem`.
 - Public: `BackgroundFit`, `BackgroundComparison`, `fit_external_background`, `subtract_external_background`, `compare_external_background`.

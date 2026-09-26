@@ -29,6 +29,7 @@ git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite.git
 cd pyrite
 uv sync
 uv run pyrite tables fetch elsepa   # elastic cross sections the default transport reads
+uv run pyrite tables fetch bremslib # default bremsstrahlung source; without it runs warn and use EEDL
 uv run pyrite config setup   # optional first-run backend detection
 uv run pyrite --help
 ```
@@ -145,11 +146,12 @@ photon escape → detector scoring.
   \mathrm{Re}\lbrace n (\omega) \rbrace \ \hat{\mathbf n}\cdot\mathbf v]$. Dynamical
   diffraction is not modeled, and electron channeling in crystals is currently unsupported.
 - **[Incoherent continuum](docs/physics/radiation-physics/bremsstrahlung.md):**
-  the default is isotropic EEDL bremsstrahlung — the ENDF-6 MF=23/MT=527
-  total cross section multiplied by the normalized MF=26/MT=527 photon-energy
-  density. Unscreened Born Bethe-Heitler with an Elwert correction remains an
-  optional/fallback backend, and a direction-resolved BremsLib backend is
-  implemented but not yet selected by the run path.
+  the default is the direction-resolved BremsLib v2.0 double differential
+  cross section (`pyrite tables fetch bremslib`); without its tables a run
+  warns and uses isotropic EEDL bremsstrahlung — the ENDF-6 MF=23/MT=527 total
+  cross section multiplied by the normalized MF=26/MT=527 photon-energy
+  density, also selectable as `bremsstrahlung_model="eedl"`. Unscreened Born
+  Bethe-Heitler with an Elwert correction remains an optional/fallback backend.
 - **[Characteristic lines](docs/physics/radiation-physics/characteristic-radiation.md):**
   electron-impact vacancies from EEDL subshell ionization cross sections relax
   through xraydb fluorescence yields with L-shell Coster-Kronig redistribution;

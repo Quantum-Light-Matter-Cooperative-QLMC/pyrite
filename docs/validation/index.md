@@ -78,12 +78,15 @@ beam-transport/transport-midpoint-stopping
 :caption: Radiation physics
 
 radiation-physics/absorption-length
+radiation-physics/brem-source-comparison
 radiation-physics/brem-spectrum
 radiation-physics/bremslib-angular-model
 radiation-physics/bremslib-radiative-event-spectrum
 radiation-physics/bremslib-radiative-partition
 radiation-physics/cbs-amplitude
 radiation-physics/characteristic-radiation
+radiation-physics/eedl-shell-ionization-comparison
+radiation-physics/bremslib-angular-schiff
 radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
 radiation-physics/coherent-inter-electron-decoherence

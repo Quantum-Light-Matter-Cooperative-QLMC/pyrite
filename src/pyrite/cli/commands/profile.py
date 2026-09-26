@@ -56,6 +56,7 @@ _EMISSION_VALUES = ("incoherent", "coherent", "both")
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
 _INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
 _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
+_BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -70,6 +71,7 @@ _NUMERICS_FIELD_NAMES = {
     "inelastic-model": "inelastic_model",
     "inelastic-cutoff-ev": "inelastic_cutoff_eV",
     "elastic-model": "elastic_model",
+    "bremsstrahlung-model": "bremsstrahlung_model",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -264,6 +266,8 @@ def _emit_show(payload):
         )
     if "elastic_model" in numerics:
         emit_result(f"  elastic model: {numerics['elastic_model']}")
+    if "bremsstrahlung_model" in numerics:
+        emit_result(f"  bremsstrahlung model: {numerics['bremsstrahlung_model']}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -454,6 +458,16 @@ def numerics_show_command(name, fidelity, json_output):
         "Elastic scattering: elsepa (default) full differential cross sections (needs "
         "'pyrite tables fetch elsepa'; bypasses the transport LUT), or the historical "
         "mott screened-Rutherford angles."
+    ),
+)
+@click.option(
+    "--bremsstrahlung-model",
+    type=click.Choice(_BREMSSTRAHLUNG_MODEL_VALUES),
+    help=(
+        "Continuum bremsstrahlung: auto (default) uses the released BremsLib tables with "
+        "their angular model when installed ('pyrite tables fetch bremslib') and warns and "
+        "falls back to EEDL otherwise; bremslib requires them; eedl is the packaged EEDL "
+        "continuum with an isotropic photon angle."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

@@ -17,6 +17,7 @@ TRANSPORT_KEYS = (
     "inelastic_model",
     "inelastic_cutoff_eV",
     "elastic_model",
+    "bremsstrahlung_model",
 )
 #: ``simulate_trajectories`` collision-loss schemes; mirrors
 #: ``montecarlo.transport.hard_inelastic.INELASTIC_MODELS`` (a test keeps the
@@ -25,6 +26,11 @@ INELASTIC_MODELS = ("continuous", "shell-soft-hard")
 #: Elastic models a case may select. ``"elsepa"`` (the default, issue #89)
 #: samples resolved ELSEPA tables; ``"mott"`` is the historical model.
 ELASTIC_MODELS = ("mott", "elsepa")
+#: Continuum bremsstrahlung sources a run may select (issue #86): the packaged
+#: EEDL evaluation, the released BremsLib tables, or ``"auto"`` (the default),
+#: which is BremsLib when every layer element's table is installed and EEDL,
+#: with a warning, otherwise. A case records only the resolved choice.
+BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -96,6 +102,12 @@ class Numerics:
         sections from the released tables (``pyrite tables fetch elsepa``);
         ``"mott"`` keeps the historical screened-Rutherford angles calibrated
         to NIST Mott transport cross sections.
+    bremsstrahlung_model
+        ``"auto"`` (default) uses the released BremsLib tables with their
+        angular model (``pyrite tables fetch bremslib``) when every layer
+        element's table is installed, and otherwise warns and falls back to
+        EEDL. ``"bremslib"`` requires the tables; ``"eedl"`` selects the
+        packaged EEDL continuum with an isotropic photon angle.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -112,6 +124,7 @@ class Numerics:
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
+    bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
     convergence: Convergence = field(default_factory=Convergence)
 
     def __post_init__(self) -> None:
@@ -140,12 +153,19 @@ class Numerics:
             self.inelastic_model, self.inelastic_cutoff_eV, self.energy_model
         )
         validate_elastic_model(self.elastic_model)
+        validate_bremsstrahlung_model(self.bremsstrahlung_model)
 
 
 def validate_elastic_model(model: object) -> None:
     """Validate a case-level elastic scattering model name."""
     if model not in ELASTIC_MODELS:
         raise ValueError(f"elastic_model must be one of {', '.join(ELASTIC_MODELS)}")
+
+
+def validate_bremsstrahlung_model(model: object) -> None:
+    """Validate a case-level continuum bremsstrahlung source name."""
+    if model not in BREMSSTRAHLUNG_MODELS:
+        raise ValueError(f"bremsstrahlung_model must be one of {', '.join(BREMSSTRAHLUNG_MODELS)}")
 
 
 def validate_inelastic_numerics(model: object, cutoff_eV: object, energy_model: object) -> None:

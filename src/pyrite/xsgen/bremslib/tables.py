@@ -21,6 +21,7 @@ import warnings
 from collections.abc import Iterable, Mapping
 from functools import cache
 from pathlib import Path
+from typing import Literal, cast
 
 import numpy as np
 
@@ -29,7 +30,7 @@ from ...montecarlo.spectrum.brem_bremslib import (
     BremsLibBremsstrahlungTable,
     prepare_bremslib_table,
 )
-from .._errors import SourceUnavailableError
+from .._errors import SourceUnavailableError, TableNotFoundError
 from ..store import StoredTable
 from .generate import generate_element
 from .release import catalogue_table, load_release_index
@@ -114,4 +115,41 @@ def table_identity(tables: Mapping[str, BremsLibBremsstrahlungTable]) -> dict[st
     return {table.key: table.digest for table in tables.values()}
 
 
-__all__ = ["load_bremsstrahlung_tables", "resolve_element_table", "table_identity"]
+def resolve_bremsstrahlung_model(
+    model: str, elements: Iterable[str]
+) -> Literal["eedl", "bremslib"]:
+    """Resolve a run's ``bremsstrahlung_model`` to the source it will actually use.
+
+    ``"eedl"`` and ``"bremslib"`` pass through (an explicit ``"bremslib"``
+    keeps its strict behaviour: a missing released table raises when the
+    tables load). ``"auto"`` is BremsLib when a table resolves for every
+    element and EEDL, with a ``RuntimeWarning`` naming the fix, otherwise, so
+    the case and run identity record what the run really used.
+    """
+    if model != "auto":
+        return cast(Literal["eedl", "bremslib"], model)
+    unique = tuple(dict.fromkeys(elements))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        try:
+            available = len(load_bremsstrahlung_tables(unique)) == len(unique)
+        except TableNotFoundError:
+            available = False
+    if available:
+        return "bremslib"
+    warnings.warn(
+        f"BremsLib tables for {', '.join(unique)} are not all installed; bremsstrahlung falls "
+        "back to EEDL with an isotropic photon angle. Install them with "
+        "`pyrite tables fetch bremslib` or select bremsstrahlung_model='eedl' to silence this.",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+    return "eedl"
+
+
+__all__ = [
+    "load_bremsstrahlung_tables",
+    "resolve_bremsstrahlung_model",
+    "resolve_element_table",
+    "table_identity",
+]
