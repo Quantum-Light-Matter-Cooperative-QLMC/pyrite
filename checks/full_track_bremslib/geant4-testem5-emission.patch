@@ -1,0 +1,97 @@
+diff --git a/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc b/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc
+index f55281c7..41b76a78 100644
+--- a/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc
++++ b/examples/extended/electromagnetic/TestEm5/src/HistoManager.cc
+@@ -49,12 +49,12 @@ void HistoManager::Book()
+   analysisManager->SetActivation(true);  // enable inactivation of histograms
+ 
+   // Define histograms start values
+-  const G4int kMaxHisto = 62;
++  const G4int kMaxHisto = 64;
+   const G4String id[] = {
+     "0",  "1",  "2",  "3",  "4",  "5",  "6",  "7",  "8",  "9",  "10", "11", "12", "13", "14", "15",
+     "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31",
+     "32", "33", "34", "35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45", "46", "47",
+-    "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61"};
++    "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61", "62", "63"};
+ 
+   const G4String title[] = {
+     "dummy",  // 0
+@@ -118,7 +118,9 @@ void HistoManager::Book()
+     "energy of DNA Auger e- at creation",  // 58
+     "energy of DNA gamma at creation",  // 59
+     "energy of DNA Auger e- at creation (log scale)",  // 60
+-    "energy of DNA gamma at creation (log scale)"  // 61
++    "energy of DNA gamma at creation (log scale)",  // 61
++    "energy of eBrem gamma at creation",  // 62
++    "primary track length (um) by mean step energy"  // 63
+   };
+ 
+   // Default values (to be reset via /analysis/h1/set command)
+diff --git a/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc b/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc
+index 9cecf86c..99759614 100644
+--- a/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc
++++ b/examples/extended/electromagnetic/TestEm5/src/StackingAction.cc
+@@ -100,6 +100,9 @@ G4ClassificationOfNewTrack StackingAction::ClassifyNewTrack(const G4Track* aTrac
+   if (aTrack->GetDefinition() == G4Gamma::Gamma()) {
+     analysisManager->FillH1(3, energy);
+     analysisManager->FillH1(5, energy);
++    if (aTrack->GetCreatorProcess()->GetProcessName() == "eBrem") {
++      analysisManager->FillH1(62, energy);
++    }
+     if (procID >= 51 && procID <= 65) {
+       analysisManager->FillH1(59, energy);
+       analysisManager->FillH1(61, energy);
+diff --git a/examples/extended/electromagnetic/TestEm5/src/SteppingAction.cc b/examples/extended/electromagnetic/TestEm5/src/SteppingAction.cc
+index 809645e2..aa9149ef 100644
+--- a/examples/extended/electromagnetic/TestEm5/src/SteppingAction.cc
++++ b/examples/extended/electromagnetic/TestEm5/src/SteppingAction.cc
+@@ -33,7 +33,13 @@
+ #include "HistoManager.hh"
+ #include "RunAction.hh"
+ 
++#include "G4Event.hh"
++#include "G4EventManager.hh"
+ #include "G4Step.hh"
++#include "G4SystemOfUnits.hh"
++#include "G4VProcess.hh"
++
++#include <iomanip>
+ 
+ //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
+ 
+@@ -59,6 +65,34 @@ void SteppingAction::UserSteppingAction(const G4Step* aStep)
+     fEventAction->AddTrakLenNeutr(aStep->GetStepLength());
+     fEventAction->CountStepsNeutr(aStep->GetPostStepPoint()->GetProcessDefinedStep());
+   }
++
++  // Issue #182: score the primary track-length spectrum and log each primary
++  // eBrem emission with the post-step primary state; the pre-emission
++  // direction is reconstructed offline.
++  if (aStep->GetTrack()->GetTrackID() != 1) return;
++  const G4VProcess* process = aStep->GetPostStepPoint()->GetProcessDefinedStep();
++  const G4bool brem = process != nullptr && process->GetProcessName() == "eBrem";
++  const G4double after = aStep->GetPostStepPoint()->GetKineticEnergy();
++  G4double discrete = 0.;
++  if (brem) {
++    for (const G4Track* secondary : *aStep->GetSecondaryInCurrentStep()) {
++      if (secondary->GetCreatorProcess() == process) discrete += secondary->GetKineticEnergy();
++    }
++  }
++  const G4double before = aStep->GetPreStepPoint()->GetKineticEnergy();
++  G4AnalysisManager::Instance()->FillH1(
++    63, 0.5 * (before + after + discrete), aStep->GetStepLength() / um);
++  if (!brem) return;
++  const G4int event = G4EventManager::GetEventManager()->GetConstCurrentEvent()->GetEventID();
++  const G4ThreeVector u = aStep->GetPostStepPoint()->GetMomentumDirection();
++  for (const G4Track* secondary : *aStep->GetSecondaryInCurrentStep()) {
++    if (secondary->GetCreatorProcess() != process) continue;
++    const G4ThreeVector n = secondary->GetMomentumDirection();
++    G4cout << std::setprecision(17) << "EBREM " << event << ' ' << after / eV << ' '
++           << secondary->GetKineticEnergy() / eV << ' ' << u.x() << ' ' << u.y() << ' '
++           << u.z() << ' ' << n.x() << ' ' << n.y() << ' ' << n.z() << std::setprecision(6)
++           << G4endl;
++  }
+ }
+ 
+ //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......

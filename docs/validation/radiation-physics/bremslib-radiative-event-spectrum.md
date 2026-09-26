@@ -31,7 +31,19 @@ Evaluation nodes $E_i$ imply midpoint bin edges $\epsilon_i=(E_{i-1}+E_i)/2$ int
 
 `mc_soft_brem_spectrum` evaluates BremsLib track-length density and zeros bins on and above the split. `events.py::check_segment_event_contract` checks that nonterminal hard-event energy equals the subsequent electron energy jump and that only hard-radiative or terminal-cutoff rows carry a photon. The synthetic-table test anchors the exact DDCS/SDCS ratio, absence of an extra rate factor, disjoint support, and terminal cutoff scoring. The focused `test_hard_radiative.py` and `test_brem_events.py` run passed together (14 tests, 2026-09-25).
 
-The verifier found that `brem_events.py::_cutoff_edge` accepted an edge within relative tolerance $10^{-12}$ of $k_c$, although the stated contract requires exact equality. The implementation was then changed to require exact equality, with a regression for the next representable value above an edge. The scorer does not model layered or finite-footprint escape or downstream photon transport; no independent full-track comparison is available yet.
+The verifier found that `brem_events.py::_cutoff_edge` accepted an edge within relative tolerance $10^{-12}$ of $k_c$, although the stated contract requires exact equality. The implementation was then changed to require exact equality, with a regression for the next representable value above an edge. The scorer does not model layered or finite-footprint escape or downstream photon transport; no independent full-track comparison of the directional scorer is available yet.
+
+## Full-track cross-check (issue #182)
+
+The Geant4 comparison (`checks/full_track_bremslib/README.md`) scores photons
+at creation in W and Si at 300 and 800 keV. The sampled hard-photon energy
+yield agrees with Geant4 on matched electron paths within counting error.
+For photons of at least 10 keV, the sampled photon polar angle about the
+parent electron agrees in mean cosine within 0.039 (at most 2.18 standard
+errors). That angle is drawn from the same conditional DDCS this scorer
+weights, so the result supports the shared angular law. It does not test the
+point-detector weighting, escape factor or detected yield. Independent
+full-track validation of those observables remains open.
 
 ## Verdict
 

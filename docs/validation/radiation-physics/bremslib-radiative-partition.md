@@ -56,7 +56,51 @@ The target is treated as infinitely heavy: its recoil energy is neglected. This 
 
 `hard_radiative_photon_at_energy` integrates the piecewise-linear DDCS against $2\pi\sin\theta$, draws uniform azimuth, keeps the outgoing electron direction, and assigns the vector residual above to the target. `complete_hard_radiative_events` uses a separate random stream for the post-transport direction. The test checks photon plus outgoing-electron energy, unit directions, and the full three-vector momentum sum.
 
-The focused `test_hard_radiative.py` and `test_brem_events.py` run passed together (14 tests, 2026-09-25). These synthetic-table and internal-parity anchors do not compare a full transport history with an independent transport code. `test_hard_radiative_cuda.py` passes 4/4 on an NVIDIA GeForce RTX 5080 (CuPy 14.2.0, 2026-09-25), including first-row parity with the per-electron CPU core at `rtol=1e-12`. An independent full-track benchmark remains pending.
+The focused `test_hard_radiative.py` and `test_brem_events.py` run passed together (14 tests, 2026-09-25). These synthetic-table and internal-parity anchors do not compare a full transport history with an independent transport code; the Geant4 comparison below does. `test_hard_radiative_cuda.py` passes 4/4 on an NVIDIA GeForce RTX 5080 (CuPy 14.2.0, 2026-09-25), including first-row parity with the per-electron CPU core at `rtol=1e-12`.
+
+## Full-track cross-check against Geant4 (issue #182)
+
+The pinned Geant4 11.4.2 TestEm5 comparison is in
+`checks/full_track_bremslib/README.md`. It covers 300 and 800 keV primaries in
+10 µm W and 100 µm Si, with a 10 keV electron stop and PenBrem photons
+above 990 eV.
+
+*Terminal fractions (10,000 primaries).* Source photon yields above 10 keV
+agree within 1.91 standard errors in all seven runs, for both elastic
+options. Electron transmission and backscatter depend on the elastic model:
+Mott differs from Geant4 by up to 14 standard errors for W 300 keV and Si
+800 keV. This is an elastic-transport discrepancy outside this claim; the Si
+Mott excess is tracked in #183.
+
+*Isolated radiative loss (100,000 primaries).* Each code's primary
+track-length spectrum is scored in 1 keV energy bins. Evaluating this
+partition's hard moments on Geant4's spectrum reproduces Geant4's realized
+photon energy and count above 1 and 10 keV within 1.94 standard errors in
+every case. The largest relative difference is −6.7 % for Si, where the
+1σ resolution is about 5–7 %. On PyRITE's own spectrum, realized hard
+counts and energies at `kc` = 1, 5 and 10 keV match the partition within 1.48
+standard errors (W within 2.4 %). Hard energy plus the re-evaluated soft
+first moment is independent of `kc` within 4.1 % and 0.66 standard errors.
+This isolates the radiative moments from the elastic mismatch. Direct
+full-track W 300 keV photon energy is 10 % above Geant4 because PyRITE's
+Mott primary path is 11 % longer.
+
+*Photon angle and recoil.* The mean cosine of the photon angle to the
+parent electron, for photons of at least 10 keV, agrees within 0.039 (at most
+2.18 standard errors) with PENELOPE's independent angular shape functions.
+Target recoil computed in this claim's convention from both codes' joint
+`(T, k, θ)` samples agrees within 6 % (at most 1.01 standard errors).
+Geant4's PenBrem uses a different convention. The electron leaves along
+`p_in u − k n`, a mean 2.6–4.6° deflection, and the target takes a collinear
+remainder 14–32 % smaller. Both neglect recoil energy and debit exactly `k`.
+The unchanged-direction convention is therefore a documented modelling choice,
+not a defect. Neither code derives the electron deflection from BremsLib.
+
+All 76 pre-registered checks pass (tolerances: 5 % model, 1 % implementation,
+0.5 % cutoff estimator, 0.03 mean cosine, each plus 3σ). This does not cover
+electron–electron bremsstrahlung, photon transport or detected yield (#171),
+Mott elastic transport (#183), or energies and materials outside the four
+cases.
 
 ## Verdict
 

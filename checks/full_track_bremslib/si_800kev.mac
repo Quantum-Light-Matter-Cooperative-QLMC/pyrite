@@ -1,0 +1,25 @@
+# Geant4 TestEm5, v11.4.2 (commit 8cc04f65977807f1848da7b958c421cd5e162f26).
+# A 800 keV electron pencil beam in 100 um Si, 2.329 g/cm3.
+/control/verbose 0
+/run/verbose 0
+/run/numberOfThreads 1
+/random/setSeeds 12345 67890
+/testem/det/setAbsMat Silicon
+/testem/det/setAbsThick 100 um
+/testem/det/setAbsYZ 1 cm
+/testem/phys/addPhysics empenelope
+/process/eLoss/fluct false
+/process/em/fluo false
+/process/em/lowestElectronEnergy 10 keV
+/run/setCut 1 nm
+/run/setCutForAGivenParticle e- 1 mm
+/run/initialize
+/testem/gun/setDefault
+/gun/particle e-
+/gun/energy 800 keV
+/analysis/setFileName si_800kev.csv
+/analysis/h1/set 3 80 0 800 keV
+/analysis/h1/setAscii 3
+/analysis/h1/set 62 80 0 800 keV
+/analysis/h1/setAscii 62
+/run/beamOn 10000
