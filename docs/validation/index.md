@@ -90,6 +90,7 @@ radiation-physics/eedl-shell-ionization-comparison
 radiation-physics/bremslib-angular-schiff
 radiation-physics/closed-form-flux
 radiation-physics/coherent-emission
+radiation-physics/coherent-formation-absorption
 radiation-physics/coherent-inter-electron-decoherence
 radiation-physics/coherent-line-spectrum
 radiation-physics/coherent-segment-midpoint-time

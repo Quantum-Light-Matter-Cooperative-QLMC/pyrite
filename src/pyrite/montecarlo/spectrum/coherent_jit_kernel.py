@@ -5,6 +5,10 @@ segments for both orthogonal polarizations, then accumulates
 ``(|F_s|^2 + |F_p|^2) * mosaic_weight`` directly into the caller's spectrum.
 This replaces construction of the dense complex ``SP[segment, energy]`` matrix
 and the two complex GEMV reductions used by the CuPy fallback.
+
+Under absorption each line's finite-time factor is the complex formation factor
+of ``spectrum.lines._formation`` (the NumPy reference) instead of the real sinc.
+Validation: coherent-formation-absorption
 """
 
 from dataclasses import dataclass
@@ -16,6 +20,13 @@ from .._cupy_jit import jit
 
 F32_ZERO = np.float32(0.0)
 F32_TINY = np.float32(1.0e-20)
+F32_ONE = np.float32(1.0)
+F32_TWO = np.float32(2.0)
+F32_HALF = np.float32(0.5)
+F32_THIRD = np.float32(1.0 / 3.0)
+F32_SIXTH = np.float32(1.0 / 6.0)
+# ``_formation.FORMATION_SERIES_W2``: |w|^2 below which F takes its series.
+F32_FORMATION_SERIES_W2 = np.float32(1.0e-6)
 U32_ZERO = np.uint32(0)
 U32_ONE = np.uint32(1)
 U32_TWO = np.uint32(2)
@@ -69,6 +80,24 @@ def _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff):
     return _sinc_unscaled(x)
 
 
+@jit.rawkernel(device=True)
+def _formation_re(v, sv, cv, apb, bma, q):
+    # Re F of ``_formation.formation_factor``; ``sv``/``cv`` are sin/cos(v).
+    w2 = q * q + v * v
+    if w2 < F32_FORMATION_SERIES_W2:
+        return F32_HALF * apb * (F32_ONE - q * q * F32_THIRD - v * v * F32_SIXTH)
+    return (v * apb * sv - q * bma * cv) / (F32_TWO * w2)
+
+
+@jit.rawkernel(device=True)
+def _formation_im(v, sv, cv, apb, bma, q):
+    # Im F of ``_formation.formation_factor``; ``sv``/``cv`` are sin/cos(v).
+    w2 = q * q + v * v
+    if w2 < F32_FORMATION_SERIES_W2:
+        return -F32_HALF * apb * q * v * F32_THIRD
+    return -(v * bma * cv + q * apb * sv) / (F32_TWO * w2)
+
+
 @jit.rawkernel()
 def _kernel_1e(
     E_r,
@@ -82,9 +111,14 @@ def _kernel_1e(
     E_grid,
     L_esc,
     delta_omega,
+    half_dL,
+    apb,
+    bma,
+    q,
     spec,
     wm,
     use_medium,
+    use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
     n_lines,
@@ -112,21 +146,49 @@ def _kernel_1e(
         Lj = F32_ZERO
         if use_medium:
             Lj = L_esc[line]
+        hd = F32_ZERO
+        ab = F32_ZERO
+        bm = F32_ZERO
+        qq = F32_ZERO
+        if use_formation:
+            hd = half_dL[line]
+            ab = apb[line]
+            bm = bma[line]
+            qq = q[line]
         csr = cs_re[line]
         csi = cs_im[line]
         cpr = cp_re[line]
         cpi = cp_im[line]
-        x = aa * (E0 - Er)
-        s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-        phase = ps * E0 - gp
-        if use_medium:
-            phase = phase - Lj * dw0
-        cph = xp.cos(phase)
-        sph = xp.sin(phase)
-        sr0 += s * (csr * cph - csi * sph)
-        si0 += s * (csr * sph + csi * cph)
-        pr0 += s * (cpr * cph - cpi * sph)
-        pi0 += s * (cpr * sph + cpi * cph)
+        if use_formation:
+            v = aa * (E0 - Er) - hd * dw0
+            fr = F32_ZERO
+            fi = F32_ZERO
+            if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                sv = xp.sin(v)
+                cv = xp.cos(v)
+                fr = _formation_re(v, sv, cv, ab, bm, qq)
+                fi = _formation_im(v, sv, cv, ab, bm, qq)
+            phase = ps * E0 - gp - Lj * dw0
+            cph = xp.cos(phase)
+            sph = xp.sin(phase)
+            er = fr * cph - fi * sph
+            ei = fr * sph + fi * cph
+            sr0 += csr * er - csi * ei
+            si0 += csr * ei + csi * er
+            pr0 += cpr * er - cpi * ei
+            pi0 += cpr * ei + cpi * er
+        else:
+            x = aa * (E0 - Er)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+            phase = ps * E0 - gp
+            if use_medium:
+                phase = phase - Lj * dw0
+            cph = xp.cos(phase)
+            sph = xp.sin(phase)
+            sr0 += s * (csr * cph - csi * sph)
+            si0 += s * (csr * sph + csi * cph)
+            pr0 += s * (cpr * cph - cpi * sph)
+            pi0 += s * (cpr * sph + cpi * cph)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -169,9 +231,14 @@ def _kernel_2e(
     E_grid,
     L_esc,
     delta_omega,
+    half_dL,
+    apb,
+    bma,
+    q,
     spec,
     wm,
     use_medium,
+    use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
     n_lines,
@@ -211,33 +278,80 @@ def _kernel_2e(
         Lj = F32_ZERO
         if use_medium:
             Lj = L_esc[line]
+        hd = F32_ZERO
+        ab = F32_ZERO
+        bm = F32_ZERO
+        qq = F32_ZERO
+        if use_formation:
+            hd = half_dL[line]
+            ab = apb[line]
+            bm = bma[line]
+            qq = q[line]
         csr = cs_re[line]
         csi = cs_im[line]
         cpr = cp_re[line]
         cpi = cp_im[line]
-        x = aa * (E0 - Er)
-        s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-        phase = ps * E0 - gp
-        if use_medium:
-            phase = phase - Lj * dw0
-        cph = xp.cos(phase)
-        sph = xp.sin(phase)
-        sr0 += s * (csr * cph - csi * sph)
-        si0 += s * (csr * sph + csi * cph)
-        pr0 += s * (cpr * cph - cpi * sph)
-        pi0 += s * (cpr * sph + cpi * cph)
-        if has1:
-            x = aa * (E1 - Er)
-            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-            phase = ps * E1 - gp
-            if use_medium:
-                phase = phase - Lj * dw1
+        if use_formation:
+            v = aa * (E0 - Er) - hd * dw0
+            fr = F32_ZERO
+            fi = F32_ZERO
+            if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                sv = xp.sin(v)
+                cv = xp.cos(v)
+                fr = _formation_re(v, sv, cv, ab, bm, qq)
+                fi = _formation_im(v, sv, cv, ab, bm, qq)
+            phase = ps * E0 - gp - Lj * dw0
             cph = xp.cos(phase)
             sph = xp.sin(phase)
-            sr1 += s * (csr * cph - csi * sph)
-            si1 += s * (csr * sph + csi * cph)
-            pr1 += s * (cpr * cph - cpi * sph)
-            pi1 += s * (cpr * sph + cpi * cph)
+            er = fr * cph - fi * sph
+            ei = fr * sph + fi * cph
+            sr0 += csr * er - csi * ei
+            si0 += csr * ei + csi * er
+            pr0 += cpr * er - cpi * ei
+            pi0 += cpr * ei + cpi * er
+        else:
+            x = aa * (E0 - Er)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+            phase = ps * E0 - gp
+            if use_medium:
+                phase = phase - Lj * dw0
+            cph = xp.cos(phase)
+            sph = xp.sin(phase)
+            sr0 += s * (csr * cph - csi * sph)
+            si0 += s * (csr * sph + csi * cph)
+            pr0 += s * (cpr * cph - cpi * sph)
+            pi0 += s * (cpr * sph + cpi * cph)
+        if has1:
+            if use_formation:
+                v = aa * (E1 - Er) - hd * dw1
+                fr = F32_ZERO
+                fi = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                    sv = xp.sin(v)
+                    cv = xp.cos(v)
+                    fr = _formation_re(v, sv, cv, ab, bm, qq)
+                    fi = _formation_im(v, sv, cv, ab, bm, qq)
+                phase = ps * E1 - gp - Lj * dw1
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                er = fr * cph - fi * sph
+                ei = fr * sph + fi * cph
+                sr1 += csr * er - csi * ei
+                si1 += csr * ei + csi * er
+                pr1 += cpr * er - cpi * ei
+                pi1 += cpr * ei + cpi * er
+            else:
+                x = aa * (E1 - Er)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+                phase = ps * E1 - gp
+                if use_medium:
+                    phase = phase - Lj * dw1
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                sr1 += s * (csr * cph - csi * sph)
+                si1 += s * (csr * sph + csi * cph)
+                pr1 += s * (cpr * cph - cpi * sph)
+                pi1 += s * (cpr * sph + cpi * cph)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -298,9 +412,14 @@ def _kernel_3e(
     E_grid,
     L_esc,
     delta_omega,
+    half_dL,
+    apb,
+    bma,
+    q,
     spec,
     wm,
     use_medium,
+    use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
     n_lines,
@@ -352,45 +471,111 @@ def _kernel_3e(
         Lj = F32_ZERO
         if use_medium:
             Lj = L_esc[line]
+        hd = F32_ZERO
+        ab = F32_ZERO
+        bm = F32_ZERO
+        qq = F32_ZERO
+        if use_formation:
+            hd = half_dL[line]
+            ab = apb[line]
+            bm = bma[line]
+            qq = q[line]
         csr = cs_re[line]
         csi = cs_im[line]
         cpr = cp_re[line]
         cpi = cp_im[line]
-        x = aa * (E0 - Er)
-        s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-        phase = ps * E0 - gp
-        if use_medium:
-            phase = phase - Lj * dw0
-        cph = xp.cos(phase)
-        sph = xp.sin(phase)
-        sr0 += s * (csr * cph - csi * sph)
-        si0 += s * (csr * sph + csi * cph)
-        pr0 += s * (cpr * cph - cpi * sph)
-        pi0 += s * (cpr * sph + cpi * cph)
+        if use_formation:
+            v = aa * (E0 - Er) - hd * dw0
+            fr = F32_ZERO
+            fi = F32_ZERO
+            if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                sv = xp.sin(v)
+                cv = xp.cos(v)
+                fr = _formation_re(v, sv, cv, ab, bm, qq)
+                fi = _formation_im(v, sv, cv, ab, bm, qq)
+            phase = ps * E0 - gp - Lj * dw0
+            cph = xp.cos(phase)
+            sph = xp.sin(phase)
+            er = fr * cph - fi * sph
+            ei = fr * sph + fi * cph
+            sr0 += csr * er - csi * ei
+            si0 += csr * ei + csi * er
+            pr0 += cpr * er - cpi * ei
+            pi0 += cpr * ei + cpi * er
+        else:
+            x = aa * (E0 - Er)
+            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+            phase = ps * E0 - gp
+            if use_medium:
+                phase = phase - Lj * dw0
+            cph = xp.cos(phase)
+            sph = xp.sin(phase)
+            sr0 += s * (csr * cph - csi * sph)
+            si0 += s * (csr * sph + csi * cph)
+            pr0 += s * (cpr * cph - cpi * sph)
+            pi0 += s * (cpr * sph + cpi * cph)
         if has1:
-            x = aa * (E1 - Er)
-            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-            phase = ps * E1 - gp
-            if use_medium:
-                phase = phase - Lj * dw1
-            cph = xp.cos(phase)
-            sph = xp.sin(phase)
-            sr1 += s * (csr * cph - csi * sph)
-            si1 += s * (csr * sph + csi * cph)
-            pr1 += s * (cpr * cph - cpi * sph)
-            pi1 += s * (cpr * sph + cpi * cph)
+            if use_formation:
+                v = aa * (E1 - Er) - hd * dw1
+                fr = F32_ZERO
+                fi = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                    sv = xp.sin(v)
+                    cv = xp.cos(v)
+                    fr = _formation_re(v, sv, cv, ab, bm, qq)
+                    fi = _formation_im(v, sv, cv, ab, bm, qq)
+                phase = ps * E1 - gp - Lj * dw1
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                er = fr * cph - fi * sph
+                ei = fr * sph + fi * cph
+                sr1 += csr * er - csi * ei
+                si1 += csr * ei + csi * er
+                pr1 += cpr * er - cpi * ei
+                pi1 += cpr * ei + cpi * er
+            else:
+                x = aa * (E1 - Er)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+                phase = ps * E1 - gp
+                if use_medium:
+                    phase = phase - Lj * dw1
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                sr1 += s * (csr * cph - csi * sph)
+                si1 += s * (csr * sph + csi * cph)
+                pr1 += s * (cpr * cph - cpi * sph)
+                pi1 += s * (cpr * sph + cpi * cph)
         if has2:
-            x = aa * (E2 - Er)
-            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-            phase = ps * E2 - gp
-            if use_medium:
-                phase = phase - Lj * dw2
-            cph = xp.cos(phase)
-            sph = xp.sin(phase)
-            sr2 += s * (csr * cph - csi * sph)
-            si2 += s * (csr * sph + csi * cph)
-            pr2 += s * (cpr * cph - cpi * sph)
-            pi2 += s * (cpr * sph + cpi * cph)
+            if use_formation:
+                v = aa * (E2 - Er) - hd * dw2
+                fr = F32_ZERO
+                fi = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                    sv = xp.sin(v)
+                    cv = xp.cos(v)
+                    fr = _formation_re(v, sv, cv, ab, bm, qq)
+                    fi = _formation_im(v, sv, cv, ab, bm, qq)
+                phase = ps * E2 - gp - Lj * dw2
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                er = fr * cph - fi * sph
+                ei = fr * sph + fi * cph
+                sr2 += csr * er - csi * ei
+                si2 += csr * ei + csi * er
+                pr2 += cpr * er - cpi * ei
+                pi2 += cpr * ei + cpi * er
+            else:
+                x = aa * (E2 - Er)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+                phase = ps * E2 - gp
+                if use_medium:
+                    phase = phase - Lj * dw2
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                sr2 += s * (csr * cph - csi * sph)
+                si2 += s * (csr * sph + csi * cph)
+                pr2 += s * (cpr * cph - cpi * sph)
+                pi2 += s * (cpr * sph + cpi * cph)
         line += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -474,6 +659,10 @@ def run_coherent_reduction_kernel(
     mosaic_weight=1.0,
     L_esc=None,
     delta_omega=None,
+    half_dL=None,
+    apb=None,
+    bma=None,
+    q=None,
     sinc_cutoff=None,
     config=DEFAULT_COHERENT_KERNEL_CONFIG,
 ):
@@ -493,6 +682,16 @@ def run_coherent_reduction_kernel(
     term sits behind a launch-uniform branch, so vacuum stays bit-for-bit).
     When ``sinc_cutoff`` is given, line contributions whose unscaled sinc
     argument exceeds it in magnitude are omitted.
+
+    Formation mode (issue #181) takes the per-line ``half_dL`` (half the escape
+    distance change along the piece) and the ``(apb, bma, q)`` of
+    ``_formation.formation_coefficients``, all four together and only with the
+    in-medium pair. ``E_r``/``aw`` are then the VACUUM sinc centre and width,
+    and each line contributes ``F(v) exp(i phase)`` with
+    ``v = aw (E - E_r) - half_dL delta_omega``; the sinc cutoff bounds ``|v|``.
+    The attenuation lives in ``F``, so ``c_s``/``c_p`` carry none. Omitted, the
+    kernel evaluates the legacy real-sinc expression unchanged.
+    Validation: coherent-formation-absorption
     """
     nthreads = int(config.nthreads)
     epb = int(config.energies_per_block)
@@ -517,6 +716,17 @@ def run_coherent_reduction_kernel(
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
+    formation = (half_dL, apb, bma, q)
+    use_formation = half_dL is not None
+    if any((f is None) != (not use_formation) for f in formation):
+        raise ValueError("half_dL, apb, bma and q must be given together")
+    if use_formation:
+        if not use_medium:
+            raise ValueError("the formation factor needs L_esc and delta_omega")
+        if any(int(f.size) != int(E_r.size) for f in formation):
+            raise ValueError("half_dL, apb, bma and q must have one entry per line")
+    else:
+        half_dL = apb = bma = q = _dummy()
     use_sinc_cutoff = sinc_cutoff is not None
     cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
     nblocks = (n_E + epb - 1) // epb
@@ -536,9 +746,14 @@ def run_coherent_reduction_kernel(
             E_grid,
             L_esc,
             delta_omega,
+            half_dL,
+            apb,
+            bma,
+            q,
             out,
             np.float32(mosaic_weight),
             np.uint32(1 if use_medium else 0),
+            np.uint32(1 if use_formation else 0),
             cutoff,
             np.uint32(1 if use_sinc_cutoff else 0),
             np.uint32(E_r.size),

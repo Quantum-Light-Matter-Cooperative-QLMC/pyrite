@@ -269,10 +269,10 @@ def test_stream_field_kernel_vacuum_is_bit_for_bit_without_the_new_arguments(epb
 @pytest.mark.parametrize("epb", [1, 2])
 @pytest.mark.parametrize("sinc_cutoff", [None, 0.35], ids=["exact", "windowed"])
 def test_stream_grouped_decoherence_kernel_matches_independent_reference(epb, sinc_cutoff):
-    from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
-        CoherentStreamKernelConfig,
+    from pyrite.montecarlo.spectrum.coherent_grouped_jit_kernel import (
         run_coherent_grouped_intensity_kernel,
     )
+    from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import CoherentStreamKernelConfig
 
     d = _stream_inputs()
     starts = np.array([0, 2, 3], dtype=np.uint32)
@@ -825,7 +825,7 @@ def test_coherent_decoherence_gaussian_bunch_finite_footprint_uses_jit_blend(
     calls = _count_kernel_calls(monkeypatch, route)
     grouped_calls = None
     if route == "stream":
-        from pyrite.montecarlo.spectrum import coherent_stream_jit_kernel as stream_mod
+        from pyrite.montecarlo.spectrum import coherent_grouped_jit_kernel as stream_mod
 
         grouped_calls = [0]
         original_grouped = stream_mod.run_coherent_grouped_intensity_kernel

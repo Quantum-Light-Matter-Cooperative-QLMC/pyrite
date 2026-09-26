@@ -61,7 +61,7 @@ Summing {eq}`eq-segment-escape-mean` over the pieces, each weighted by its lengt
 - Photons travel in a straight line with no refraction and no re-entry. The groove's no-re-entry proof is in `blazed-groove-geometry`.
 - Attenuation is constant inside each layer.
 - **Out of scope:**
-  - The coherent PXR/CBS route and the flight-grouped incoherent reduction (a coherent sum per physical flight) keep the midpoint escape on the amplitude. A coherent emitter needs absorption inside the formation integral, a complex exponent per linear piece, not a plain average of the intensity. That treatment is the remaining part of issue #181.
+  - The coherent PXR/CBS route and the flight-grouped incoherent reduction (a coherent sum per physical flight). A coherent emitter needs absorption inside the formation integral, a complex exponent per linear piece, not a plain average of the intensity; that treatment is `coherent-formation-absorption` (issue #181, second slice). Its Parseval integral is this mean.
   - Hard radiative events (`brem_events.py`) emit at a point, the segment endpoint, so they need no average.
 
 ## Incoherent PXR/CBS line route (issue #181)
@@ -81,7 +81,7 @@ by Parseval. The route's lineshape $t_L^2\,\mathrm{sinc}^2(\cdot)\,T$ integrates
 
 **Line-shape decision.** The route keeps the undamped $\mathrm{sinc}^2$ shape at $E_\text{res}$. The exact single-segment shape, $|(e^{zt_L}-1)/z|^2$ with $z=iq-\kappa$, is a damped, $\kappa$-broadened sinc; relative to the kept shape its pointwise error is $O(\Delta)$ within one segment while its integral is unchanged. The ensemble line width is set by the resonance spread across segments, mosaic and detector response, far above a single segment's $1/t_L$, so carrying the damped shape through the incoherent lineshape kernels (node, bin-mean, fused CUDA) is not worth its cost.
 
-**Consequence.** One segment's coherent (midpoint amplitude) and incoherent (segment mean) spectra now differ by the constant $e^{-\bar\tau}/\langle e^{-\tau}\rangle\le1$. The two identity tests that compared them pointwise assert that proportionality instead. The dataset and case-content identities hash the constant `line_escape_model` marker (`segment-mean-incoherent-v1`), orphaning midpoint-era line spectra once.
+**Consequence.** The dataset and case-content identities hash the constant `line_escape_model` marker, orphaning midpoint-era line spectra once (`segment-mean-incoherent-v1`, then `segment-mean-v2-coherent-formation` with the coherent slice). Since that slice one segment's coherent self-term integrates to exactly this yield too, so single-segment coherent and incoherent spectra agree in integral and differ only in shape and in the $O(\delta)$ line-centre offset described under `coherent-formation-absorption`.
 
 ## Evidence
 

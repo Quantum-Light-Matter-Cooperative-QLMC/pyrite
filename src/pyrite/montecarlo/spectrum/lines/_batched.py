@@ -17,6 +17,7 @@ from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
+from ._formation import formation_coefficients, formation_profile
 from ._kernels import (
     _PREF_C1,
     _RESONANCE_ROOT_RTOL,
@@ -38,6 +39,7 @@ from ._kernels import (
 from ._per_hkl import (
     _coherent_electron_grouped_row,
     _coherent_jit_grouped_row,
+    _FormationLines,
     _row_decoherence_factor,
 )
 
@@ -346,8 +348,12 @@ def _batched_tables(st):
     gamma_full = gamma_all[:, None]
     t_L_full = t_L_all[:, None]
     # escape distance is g-independent (straight ray along n_hat): a finite
-    # footprint picks the nearest prism face, else the plain slab path.
-    if finite_footprint:
+    # footprint picks the nearest prism face, else the plain slab path. The
+    # coherent route's rows are linear escape pieces with known end values
+    # (``_setup``), whose mean is the exact piece-midpoint distance.
+    if st.escape_ends is not None:
+        L_esc_full = (0.5 * (st.escape_ends[0] + st.escape_ends[1]))[:, None]
+    elif finite_footprint:
         L_esc_full = _segment_escape_distance(segments, n_hat, xp=xp)[:, None]
     else:
         L_esc_full = _escape_length(seg_r[:, 2], thickness, nz)[:, None]
@@ -513,7 +519,6 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     vx = blk.vx
     vy = blk.vy
     vz = blk.vz
-    denom = blk.denom
     gamma = blk.gamma
     t_L = blk.t_L
     L_esc = blk.L_esc
@@ -524,7 +529,6 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     k_dot_v = blk.k_dot_v
     vdg = blk.vdg
     k_mag = blk.k_mag
-    E_res = blk.E_res
     keep = blk.keep
     chi_re = blk.chi_re
     chi_im = blk.chi_im
@@ -553,14 +557,31 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
         A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
         pol_A.append(A_PXR + A_CBS)
 
-    # -- 6c. Beer-Lambert escape + field coefficients ---------------
-    # amp = sqrt(alpha omega / (4 pi^2 hbar c) * T_abs) is the
-    # UN-squared prefactor (its square is the incoherent ``pref``
-    # without t_L^2); the finite-time factor t_L sinc(.) and the
+    # -- 6c. escape + field coefficients ---------------------------
+    # amp = sqrt(alpha omega / (4 pi^2 hbar c)) is the UN-squared
+    # prefactor (its square is the incoherent ``pref`` without t_L^2 and
+    # T_abs). The attenuation and the finite-time factor t_L F(.) -- F the
+    # complex formation factor of each linear escape piece, on the vacuum
+    # sinc centre/width with the escape-path refractive slope -- and the
     # phase exp[i(omega d_j - g.r_j)] are applied by the reduction.
-    amp = xp.sqrt(ALPHA_FS * omega_res / _PREF_C1 * xp.exp(-(L_esc * mu)))
-    a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
-    good = keep & xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+    # Validation: coherent-formation-absorption
+    L_start = st.escape_ends[0][sb][:, None]
+    L_end = st.escape_ends[1][sb][:, None]
+    apb, bma, q = formation_coefficients(L_start * mu, L_end * mu, xp=xp)
+    half_dL = 0.5 * (L_end - L_start)
+    denom_vac = bt.denom_full[sb]
+    E_vac = HBARC_EV_ANG * vdg / denom_vac
+    a_vac = denom_vac * t_L / (2.0 * HBARC_EV_ANG)
+    amp = xp.sqrt(ALPHA_FS * omega_res / _PREF_C1)
+    good = (
+        keep
+        & xp.isfinite(amp)
+        & (amp > 0)
+        & (t_L > 0)
+        & xp.isfinite(apb)
+        & (apb > 0)
+        & xp.isfinite(bma)
+    )
     shape = omega_res.shape
     # Flatten g-MAJOR so each row's kept lines land contiguously:
     # one masked copy serves all N_g rows, and the per-row split is
@@ -581,8 +602,8 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
         seg_r_geom[sb, 2][:, None],
     )
     per_line = (
-        E_res,
-        a_width,
+        E_vac,
+        a_vac,
         (d_all_geom[sb] / HBARC_EV_ANG)[:, None],  # phase slope vs E
         gxr * gx + gyr * gy + gzr * gz,  # g.r_j
         c_s.real,
@@ -593,8 +614,9 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     # Escape distance rides along as the second phase slope, the one
     # that multiplies delta(E) omega(E) instead of E. The emitting
     # electron id rides along too, needed only when
-    # decoherence_active blends in the electron-grouped floor.
-    per_line = (*per_line, L_esc, seg_elec_id[sb][:, None])
+    # decoherence_active blends in the electron-grouped floor. The last
+    # four are the formation factor's refractive slope and attenuation.
+    per_line = (*per_line, L_esc, seg_elec_id[sb][:, None], half_dL, apb, bma, q)
     coh_blocks.append(
         [xp.ascontiguousarray(xp.broadcast_to(f, shape).T).reshape(-1)[gm] for f in per_line]
     )
@@ -827,8 +849,9 @@ def _batched_coherent_finalize(
         # orientations stay INCOHERENT (docs/physics/materials/crystal-mosaicity.md route 2)
         # while the segment sum inside a row keeps its phase -- the defining
         # property the per-hkl coherent path had, preserved verbatim.
-        # Limiting case: one row, one segment collapses to the incoherent
-        # self-term |A|^2 t_L^2 sinc^2 (test_coherent_emission.py).
+        # Limiting case: one row, one piece collapses to |A|^2 t_L^2 |F|^2,
+        # whose energy integral is the incoherent self-term's
+        # (test_coherent_emission.py, test_coherent_formation_absorption.py).
         _nsys_push("cxr.lines.accum")
         # ONE sync for every block's row lengths, then pure slicing.
         counts = _to_cpu(xp.stack(coh_counts)) if coh_blocks else np.zeros((0, N_g), int)
@@ -850,9 +873,11 @@ def _batched_coherent_finalize(
             E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = row[:8]
             L_i = row[8]  # escape distance for the in-medium phase
             elec_id_i = row[9]  # emitting electron id (decoherence_active only)
+            half_dL_i, apb_i, bma_i, q_i = row[10:14]  # formation factor
             wm_i = float(wm_rows[i_row])
             if _use_jit_coherent_reduction:
                 per_line_i = (E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi)
+                formation_i = (half_dL_i, apb_i, bma_i, q_i)
                 out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
                 run_coherent_reduction_kernel(
                     *per_line_i,
@@ -861,6 +886,10 @@ def _batched_coherent_finalize(
                     mosaic_weight=1.0 if decoherence_active else wm_i,
                     L_esc=L_i,
                     delta_omega=delta_omega_grid,
+                    half_dL=half_dL_i,
+                    apb=apb_i,
+                    bma=bma_i,
+                    q=q_i,
                     config=DEFAULT_COHERENT_KERNEL_CONFIG,
                 )
                 if decoherence_active:
@@ -869,6 +898,7 @@ def _batched_coherent_finalize(
                         elec_id_i,
                         per_line_i,
                         L_i,
+                        formation_i,
                         xp.zeros(E_grid.size, dtype=REAL),
                     )
                     F_row = _row_decoherence_factor(st, G[i_row])
@@ -878,11 +908,22 @@ def _batched_coherent_finalize(
             f_p = xp.zeros(E_grid.size, dtype=cdtype)
             for j0 in range(0, E_r_i.size, chunk):
                 sl = slice(j0, min(j0 + chunk, E_r_i.size))
-                x = aw_i[sl][:, None] * (E_grid[None, :] - E_r_i[sl][:, None]) / xp.pi
                 arg = ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]
                 arg = arg - L_i[sl][:, None] * delta_omega_grid[None, :]
                 ph = xp.exp(1j * arg)
-                SP = xp.sinc(x).astype(cdtype) * ph
+                F = formation_profile(
+                    E_grid,
+                    delta_omega_grid,
+                    E_r_i[sl],
+                    aw_i[sl],
+                    half_dL_i[sl],
+                    apb_i[sl],
+                    bma_i[sl],
+                    q_i[sl],
+                    sinc_cutoff=None,
+                    xp=xp,
+                )
+                SP = F.astype(cdtype) * ph
                 f_s += (csr[sl] + 1j * csi[sl]) @ SP
                 f_p += (cpr[sl] + 1j * cpi[sl]) @ SP
             flat_total = xp.abs(f_s) ** 2 + xp.abs(f_p) ** 2
@@ -890,8 +931,7 @@ def _batched_coherent_finalize(
                 grouped_total = _coherent_electron_grouped_row(
                     st,
                     elec_id_i,
-                    aw_i,
-                    E_r_i,
+                    _FormationLines((E_r_i, aw_i, half_dL_i, apb_i, bma_i, q_i)),
                     ps_i * HBARC_EV_ANG,  # ps_i is d_geom/HBARC_EV_ANG; undo the fold
                     gp_i,
                     L_i,
@@ -1013,11 +1053,11 @@ def _accumulate_batched(st):
         and np.dtype(REAL) == np.dtype(np.float32)
     )
     if _use_jit_coherent_stream:
+        from ..coherent_grouped_jit_kernel import run_coherent_grouped_intensity_kernel
         from ..coherent_stream_jit_kernel import (
             DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             allocate_coherent_fields,
             run_coherent_field_accumulation_kernel,
-            run_coherent_grouped_intensity_kernel,
             run_coherent_prologue_kernel,
         )
 
@@ -1041,6 +1081,13 @@ def _accumulate_batched(st):
         # in that (default) case. See the
         # coherent-inter-electron-decoherence block above.
         _coh_phase_slope = xp.ascontiguousarray(d_all_geom / HBARC_EV_ANG, dtype=REAL)
+        # Piece-end escape distances for the formation factor: the prologue
+        # turns them into per-(segment, g) attenuation constants, and half
+        # their difference is the g-independent refractive slope.
+        # Validation: coherent-formation-absorption
+        _coh_L_start = xp.ascontiguousarray(st.escape_ends[0], dtype=REAL)
+        _coh_L_end = xp.ascontiguousarray(st.escape_ends[1], dtype=REAL)
+        _coh_half_dL = xp.ascontiguousarray(0.5 * (_coh_L_end - _coh_L_start), dtype=REAL)
         coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
 
         def _stream_segment_block(sel, n_sel, *, group_starts=None, grouped_out=None):
@@ -1079,8 +1126,14 @@ def _accumulate_batched(st):
                 g_dot_ep=_coh_g_dot_ep,
                 v_dot_n=v_dot_n_all[sel],
                 n_re_tab=n_re_tab_g,
+                L_start=_coh_L_start[sel],
+                L_end=_coh_L_end[sel],
                 config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             )
+            # Formation mode appends the pair-layout attenuation constants
+            # (apb, bma, q) to the historical eight line arrays.
+            line_data = coh_line_data[:8]
+            f_apb, f_bma, f_q = coh_line_data[8:]
             _nsys_pop()
             _nsys_push("cxr.lines.coherent_field")
             common = {
@@ -1090,26 +1143,30 @@ def _accumulate_batched(st):
                 # the prologue's other outputs are pair-sized.
                 "L_esc": L_esc_full[sel].reshape(-1),
                 "delta_omega": delta_omega_grid,
+                "half_dL": _coh_half_dL[sel],
+                "apb": f_apb,
+                "bma": f_bma,
+                "q": f_q,
                 "sinc_cutoff": sinc_cutoff,
                 "config": DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             }
             if group_starts is None:
                 run_coherent_field_accumulation_kernel(
-                    *coh_line_data,
+                    *line_data,
                     E_grid,  # ty: ignore[too-many-positional-arguments]
                     fields=coherent_fields,
                     **common,
                 )
             else:
                 run_coherent_grouped_intensity_kernel(
-                    *coh_line_data,
+                    *line_data,
                     E_grid,  # ty: ignore[too-many-positional-arguments]
                     group_starts,
                     out=grouped_out,
                     **common,
                 )
             _nsys_pop()
-            del coh_line_data  # release scratch before the next block allocates
+            del coh_line_data, line_data  # release scratch before the next block allocates
 
         def _stream_field_mag2():
             """|f_s|^2 + |f_p|^2 of the current field planes, as (N_g, n_E).

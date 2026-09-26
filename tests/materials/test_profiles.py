@@ -90,9 +90,10 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # the same spectrum. Re-minted again for issue #89: default cases now select
     # the ELSEPA elastic model, which changes every trajectory. Re-minted again
     # for issue #181's `line_escape_model` marker: the incoherent line route
-    # now scores the segment-mean escape.
+    # now scores the segment-mean escape, and the coherent route the per-piece
+    # formation integral under absorption.
     assert case_content_key(case) == (
-        "eefead2d211653aad1d3fd2762acf565128def40d557840e79a11aac19060c75"
+        "5f414f5d9cd4a66f57021ed47655ad69b13254c75afbeaf1f11f9876b7280859"
     )
 
 
@@ -103,7 +104,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "0bcdbd64d1212c341b4e982b1874059379525ac450dc61f668ad1eb8966c8415"
+        "6cf10f1a6206b607ab3585d121e1aa6f3f880307404f531431b32aa3691d9d4d"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -403,7 +404,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "0bcdbd64d1212c341b4e982b1874059379525ac450dc61f668ad1eb8966c8415"
+        "6cf10f1a6206b607ab3585d121e1aa6f3f880307404f531431b32aa3691d9d4d"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -417,42 +418,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "5e6ef3c364b9790a83c6190c30d23e83a66cda4df15149dc54d66f4d70a6d26c",
+            "65fc365235b981edc7b9304a2633076c3bc32d8ee57e5ec30fe6a9573cb2f095",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "c7bc082b1892dbcef62b56d3df9b18ccf03c3c696c40fca4933a762414eedfa4",
+            "f926d6188bb22e30f03db71d9e590f5a0d17b52a57277b63652251d98c32a8ce",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "788b13a37adcba9a0e5b224bff918aabf6351dd1770d77f8859ffccd782d20fa",
+            "335afb8e9944bf387a9d40207c74c0bbe999dab3966d51266d17082721d4b3b1",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "4e2d1937cc204a6023258d5ffaf74159e9947e4112d0875d636aab2763b0c1dd",
+            "a4d18c323a1fe893958e6c9de9109c4f32131d61839343b4eaac9e41b29b6219",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "1b6deb18f9a6f0224fb16f7b7a4555d9f8dfd365271dc89ba14932194e0882b5",
+            "7248e9216298eca795e1c203c77ee3e52037fc1d952f14b4514fc907e4e5807d",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "60cc249538caac430a362e141b415ff11aa232a2f82970491ed58ee7df45a07b",
+            "4391daa52927fd2fe952dbaa3571839fa19b754f80745519f01b206d63a8ee4e",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "97f4fdabdbab4f50ad49e214d108e095d4a5b8b7b18023b175be01ef2c03e7ff",
+            "52b1ffdd2396c0e5ad34116c80cac3aeb9b69d0a7fa9923bfe85bfbf2ce1567b",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "4eb0940f99404c1ba9b58524c98d7edcdb35c4b1e36b01ba50eba0caca0eec58",
+            "83d2a30a612e41f342c364547cc06ca8e127beef29c0a20a67f66428b43f4950",
         ),
     ],
 )
@@ -623,7 +624,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # default continuum of issue #86, and again for issue #181's line-escape
     # marker) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "0bcdbd64d1212c341b4e982b1874059379525ac450dc61f668ad1eb8966c8415"
+        "6cf10f1a6206b607ab3585d121e1aa6f3f880307404f531431b32aa3691d9d4d"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -636,7 +637,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # again for issue #89's default ELSEPA elastic model, and for issue #181's
     # line-escape marker.
     assert survey_incoherent["parameter_sha256"] == (
-        "833e5401410bab31cb2897375ea56b2b4d3979ae5ac095dc354759f43f1d6ec3"
+        "cd33e30d7a1a2837f37c5a5899d1f46d203a395f972bce03a8f190ca7c418937"
     )
 
 

@@ -244,7 +244,13 @@ def test_micron_scale_depth_separation_inverts_the_interference():
     becomes destructive. That is the whole reason this model exists.
     """
     z1, z2 = 5_000.0, 5_000.0 + 9_900.0  # escape paths ~1 micron apart
-    i_E = int(_spectrum(coherent=True).argmax())
+    # Read the interference on the line core (+-0.2 eV of a ~1 eV wide line),
+    # at the bin where the vacuum part -- turning ~2.4 rad/eV here -- is
+    # farthest from a node, so the sign flip below is unambiguous.
+    peak = int(_spectrum(coherent=True).argmax())
+    step = float(E_GRID[1] - E_GRID[0])
+    core = range(peak - int(0.2 / step), peak + int(0.2 / step) + 1, 400)
+    i_E = max(core, key=lambda i: abs(np.cos(_phase_terms(z1, z2, float(E_GRID[i]))[0])))
     E = float(E_GRID[i_E])
     vacuum_part, medium_part = _phase_terms(z1, z2, E)
     assert abs(abs(medium_part) - np.pi) < 0.05  # this geometry is tuned to half a cycle
@@ -256,18 +262,41 @@ def test_micron_scale_depth_separation_inverts_the_interference():
     np.testing.assert_allclose(measured, -np.cos(vacuum_part), atol=0.05)
 
 
+def _escape_path_resonance_eV(passes=6):
+    """Root of ``v = 0`` for the coherent formation factor, by iteration.
+
+    Along the +z flight ``L_esc = z / (-n_z)``, so the in-medium escape leg
+    adds ``-delta omega / (-n_z)`` per unit depth to the vacuum phase slope:
+    ``omega (1 - v.n_hat - beta delta / (-n_z)) = v.g``. This is the
+    Snell-refracted normal wavevector ``k_z = omega (-n_z - delta / (-n_z))``
+    of a flat exit face, not the unrefracted bulk ``1 - Re n (v.n_hat)``.
+    """
+    E = _vacuum_resonance_eV()
+    for _ in range(passes):
+        delta = 1.0 - float(refractive_index(CRYSTAL, np.array([E])).real[0])
+        E = HBARC_EV_ANG * V_DOT_G / (1.0 - V_DOT_N - BETA * delta / (-N_Z))
+    return E
+
+
 @_needs_fp64_grid
-def test_single_segment_coherent_is_pure_phase_under_refraction():
-    """One segment has no relative phase, so the new factor must cancel in |.|^2."""
-    seg = _one_segment(9_000.0)
-    coh = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True)
-    inc = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
+def test_single_segment_coherent_line_sits_on_the_escape_path_root():
+    """Validation: coherent-formation-absorption.
+
+    One segment's coherent self-term is ``|t_L F|^2`` of the formation integral
+    of the phase the coherent sum applies between segments, so its line centre
+    is where that phase is stationary along the flight -- the escape-path
+    (Snell) root -- not the incoherent route's bulk in-medium root. Absorption
+    keeps ``|F|^2`` even in ``v``, so it does not move the peak.
+    """
+    coh = mc_spectrum(_one_segment(9_000.0), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True)
     assert coh.max() > 0.0
-    # Incoherent escape is the segment mean, coherent the midpoint (issue
-    # #181): one line, so a constant T_mid / <T> <= 1 separates them.
-    scale = float(coh.sum() / inc.sum())
-    assert 0.99 < scale <= 1.0
-    np.testing.assert_allclose(coh, scale * inc, rtol=1e-10, atol=1e-14 * inc.max())
+    measured = float(E_GRID[coh.argmax()])
+    step = float(E_GRID[1] - E_GRID[0])
+
+    E_esc = _escape_path_resonance_eV()
+    np.testing.assert_allclose(measured, E_esc, atol=2.0 * step)
+    # The two roots are resolved apart by thousands of bins, so this is no tie.
+    assert E_esc - _in_medium_resonance_eV() > 1000.0 * step
 
 
 # --- case-dict plumbing ----------------------------------------------------

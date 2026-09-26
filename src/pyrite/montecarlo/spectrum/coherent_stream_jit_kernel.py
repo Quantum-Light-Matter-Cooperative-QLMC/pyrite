@@ -28,12 +28,17 @@ import cupy as xp
 import numpy as np
 
 from .._cupy_jit import jit
+from .coherent_jit_kernel import _formation_im, _formation_re
 
 F32_ZERO = np.float32(0.0)
 F32_ONE = np.float32(1.0)
 F32_TWO = np.float32(2.0)
 F32_TEN = np.float32(10.0)
 F32_TINY = np.float32(1.0e-20)
+F32_HALF = np.float32(0.5)
+F32_QUARTER = np.float32(0.25)
+# ``_formation.FORMATION_SMALL_Q``: |q| below which a+b, b-a come from cosh/sinh.
+F32_FORMATION_SMALL_Q = np.float32(0.5)
 F32_MAX = np.float32(np.finfo(np.float32).max)
 
 U32_ZERO = np.uint32(0)
@@ -126,6 +131,8 @@ def _coherent_prologue_kernel(
     gamma,
     t_L,
     L_esc,
+    L_start,
+    L_end,
     line_electron,
     r_flat,
     g_flat,
@@ -149,6 +156,9 @@ def _coherent_prologue_kernel(
     cs_im_out,
     cp_re_out,
     cp_im_out,
+    apb_out,
+    bma_out,
+    q_out,
     lo_keep,
     hi_keep,
     hbarc,
@@ -156,6 +166,7 @@ def _coherent_prologue_kernel(
     alpha_fs,
     pref_c1,
     use_medium,
+    use_formation,
     n_pairs,
     n_seg,
     n_g,
@@ -192,6 +203,7 @@ def _coherent_prologue_kernel(
     gz = g_flat[gbase + U32_TWO]
 
     dnm = denom[seg]
+    dnm_vac = dnm
     v_dot_g = vx * gx + vy * gy + vz * gz
 
     # In-medium resonance root. The Maxwell dispersion relation k = n(omega) omega
@@ -260,7 +272,33 @@ def _coherent_prologue_kernel(
 
     duration = t_L[seg]
     gm = gamma[seg]
-    transmission = xp.exp(-(L_esc[seg] * mu))
+    # Formation mode (issue #181): the attenuation moves out of the amplitude
+    # into the per-piece formation constants of ``_formation.
+    # formation_coefficients`` -- tau at the piece ends, ordered along travel --
+    # which the field kernels turn into the complex factor F.
+    # Validation: coherent-formation-absorption
+    transmission = F32_ONE
+    apb_v = F32_ZERO
+    bma_v = F32_ZERO
+    q_v = F32_ZERO
+    if use_formation:
+        tau_s = L_start[seg] * mu
+        tau_e = L_end[seg] * mu
+        q_v = F32_QUARTER * (tau_e - tau_s)
+        if xp.abs(q_v) < F32_FORMATION_SMALL_Q:
+            c0 = xp.exp(-(F32_QUARTER * (tau_s + tau_e)))
+            apb_v = F32_TWO * c0 * xp.cosh(q_v)
+            bma_v = -(F32_TWO * c0 * xp.sinh(q_v))
+        else:
+            a_end = xp.exp(-(F32_HALF * tau_s))
+            b_end = xp.exp(-(F32_HALF * tau_e))
+            apb_v = a_end + b_end
+            bma_v = b_end - a_end
+        # Written so a NaN falls through to rejection, like the root guard.
+        if not (apb_v > F32_ZERO and apb_v < F32_MAX and bma_v == bma_v):
+            return
+    else:
+        transmission = xp.exp(-(L_esc[seg] * mu))
     amp = xp.sqrt(alpha_fs * omega / pref_c1 * transmission)
     if amp != amp or amp <= F32_ZERO or amp >= F32_MAX or duration <= F32_ZERO:
         return
@@ -308,6 +346,14 @@ def _coherent_prologue_kernel(
     # the pair layout the field reducer already understands.
     if use_medium:
         aw_out[pair] = dnm * duration / (F32_TWO * hbarc)
+    # Formation mode centres the line on the VACUUM sinc centre and width; the
+    # field kernels add the escape-path refractive slope (``_formation``).
+    if use_formation:
+        E_r_out[pair] = hbarc * (v_dot_g / dnm_vac)
+        aw_out[pair] = dnm_vac * duration / (F32_TWO * hbarc)
+        apb_out[pair] = apb_v
+        bma_out[pair] = bma_v
+        q_out[pair] = q_v
     rbase = seg * U32_THREE
     g_phase_out[pair] = (
         r_flat[rbase] * gx + r_flat[rbase + U32_ONE] * gy + r_flat[rbase + U32_TWO] * gz
@@ -345,6 +391,10 @@ def _field_kernel_1e(
     E_grid,
     L_esc,
     delta_omega,
+    half_dL,
+    apb,
+    bma,
+    q,
     fs_re,
     fs_im,
     fp_re,
@@ -352,6 +402,7 @@ def _field_kernel_1e(
     aw_pair,
     slope_pair,
     use_medium,
+    use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
     n_seg,
@@ -398,17 +449,45 @@ def _field_kernel_1e(
             Lj = F32_ZERO
             if use_medium:
                 Lj = L_esc[seg]
-            x = aa * (E0 - Er)
-            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-            phase = ps * E0 - gp
-            if use_medium:
-                phase = phase - Lj * dw0
-            cph = xp.cos(phase)
-            sph = xp.sin(phase)
-            sr0 += s * (csr * cph - csi * sph)
-            si0 += s * (csr * sph + csi * cph)
-            pr0 += s * (cpr * cph - cpi * sph)
-            pi0 += s * (cpr * sph + cpi * cph)
+            hd = F32_ZERO
+            ab = F32_ZERO
+            bm = F32_ZERO
+            qq = F32_ZERO
+            if use_formation:
+                hd = half_dL[seg]
+                ab = apb[line]
+                bm = bma[line]
+                qq = q[line]
+            if use_formation:
+                v = aa * (E0 - Er) - hd * dw0
+                fr = F32_ZERO
+                fi = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                    sv = xp.sin(v)
+                    cv = xp.cos(v)
+                    fr = _formation_re(v, sv, cv, ab, bm, qq)
+                    fi = _formation_im(v, sv, cv, ab, bm, qq)
+                phase = ps * E0 - gp - Lj * dw0
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                er = fr * cph - fi * sph
+                ei = fr * sph + fi * cph
+                sr0 += csr * er - csi * ei
+                si0 += csr * ei + csi * er
+                pr0 += cpr * er - cpi * ei
+                pi0 += cpr * ei + cpi * er
+            else:
+                x = aa * (E0 - Er)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+                phase = ps * E0 - gp
+                if use_medium:
+                    phase = phase - Lj * dw0
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                sr0 += s * (csr * cph - csi * sph)
+                si0 += s * (csr * sph + csi * cph)
+                pr0 += s * (cpr * cph - cpi * sph)
+                pi0 += s * (cpr * sph + cpi * cph)
         seg += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -451,6 +530,10 @@ def _field_kernel_2e(
     E_grid,
     L_esc,
     delta_omega,
+    half_dL,
+    apb,
+    bma,
+    q,
     fs_re,
     fs_im,
     fp_re,
@@ -458,6 +541,7 @@ def _field_kernel_2e(
     aw_pair,
     slope_pair,
     use_medium,
+    use_formation,
     sinc_cutoff,
     use_sinc_cutoff,
     n_seg,
@@ -517,31 +601,78 @@ def _field_kernel_2e(
             Lj = F32_ZERO
             if use_medium:
                 Lj = L_esc[seg]
+            hd = F32_ZERO
+            ab = F32_ZERO
+            bm = F32_ZERO
+            qq = F32_ZERO
+            if use_formation:
+                hd = half_dL[seg]
+                ab = apb[line]
+                bm = bma[line]
+                qq = q[line]
 
-            x = aa * (E0 - Er)
-            s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-            phase = ps * E0 - gp
-            if use_medium:
-                phase = phase - Lj * dw0
-            cph = xp.cos(phase)
-            sph = xp.sin(phase)
-            sr0 += s * (csr * cph - csi * sph)
-            si0 += s * (csr * sph + csi * cph)
-            pr0 += s * (cpr * cph - cpi * sph)
-            pi0 += s * (cpr * sph + cpi * cph)
-
-            if has1:
-                x = aa * (E1 - Er)
-                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-                phase = ps * E1 - gp
-                if use_medium:
-                    phase = phase - Lj * dw1
+            if use_formation:
+                v = aa * (E0 - Er) - hd * dw0
+                fr = F32_ZERO
+                fi = F32_ZERO
+                if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                    sv = xp.sin(v)
+                    cv = xp.cos(v)
+                    fr = _formation_re(v, sv, cv, ab, bm, qq)
+                    fi = _formation_im(v, sv, cv, ab, bm, qq)
+                phase = ps * E0 - gp - Lj * dw0
                 cph = xp.cos(phase)
                 sph = xp.sin(phase)
-                sr1 += s * (csr * cph - csi * sph)
-                si1 += s * (csr * sph + csi * cph)
-                pr1 += s * (cpr * cph - cpi * sph)
-                pi1 += s * (cpr * sph + cpi * cph)
+                er = fr * cph - fi * sph
+                ei = fr * sph + fi * cph
+                sr0 += csr * er - csi * ei
+                si0 += csr * ei + csi * er
+                pr0 += cpr * er - cpi * ei
+                pi0 += cpr * ei + cpi * er
+            else:
+                x = aa * (E0 - Er)
+                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+                phase = ps * E0 - gp
+                if use_medium:
+                    phase = phase - Lj * dw0
+                cph = xp.cos(phase)
+                sph = xp.sin(phase)
+                sr0 += s * (csr * cph - csi * sph)
+                si0 += s * (csr * sph + csi * cph)
+                pr0 += s * (cpr * cph - cpi * sph)
+                pi0 += s * (cpr * sph + cpi * cph)
+
+            if has1:
+                if use_formation:
+                    v = aa * (E1 - Er) - hd * dw1
+                    fr = F32_ZERO
+                    fi = F32_ZERO
+                    if use_sinc_cutoff == U32_ZERO or (v >= -sinc_cutoff and v <= sinc_cutoff):
+                        sv = xp.sin(v)
+                        cv = xp.cos(v)
+                        fr = _formation_re(v, sv, cv, ab, bm, qq)
+                        fi = _formation_im(v, sv, cv, ab, bm, qq)
+                    phase = ps * E1 - gp - Lj * dw1
+                    cph = xp.cos(phase)
+                    sph = xp.sin(phase)
+                    er = fr * cph - fi * sph
+                    ei = fr * sph + fi * cph
+                    sr1 += csr * er - csi * ei
+                    si1 += csr * ei + csi * er
+                    pr1 += cpr * er - cpi * ei
+                    pi1 += cpr * ei + cpi * er
+                else:
+                    x = aa * (E1 - Er)
+                    s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
+                    phase = ps * E1 - gp
+                    if use_medium:
+                        phase = phase - Lj * dw1
+                    cph = xp.cos(phase)
+                    sph = xp.sin(phase)
+                    sr1 += s * (csr * cph - csi * sph)
+                    si1 += s * (csr * sph + csi * cph)
+                    pr1 += s * (cpr * cph - cpi * sph)
+                    pi1 += s * (cpr * sph + cpi * cph)
         seg += nthreads
 
     shared = jit.shared_memory(xp.float32, None)
@@ -593,141 +724,6 @@ _FIELD_KERNELS = {1: _field_kernel_1e, 2: _field_kernel_2e}
 
 
 @jit.rawkernel()
-def _grouped_intensity_kernel(
-    E_r,
-    aw,
-    phase_slope,
-    g_phase,
-    cs_re,
-    cs_im,
-    cp_re,
-    cp_im,
-    E_grid,
-    L_esc,
-    delta_omega,
-    group_starts,
-    grouped,
-    aw_pair,
-    slope_pair,
-    use_medium,
-    sinc_cutoff,
-    use_sinc_cutoff,
-    n_seg,
-    n_groups,
-    n_g,
-    n_E,
-    e_blocks,
-    energies_per_block,
-):
-    """Accumulate ``sum_e |sum_{j in e} field_j|^2`` without per-e launches."""
-    block = jit.blockIdx.x
-    g = block // e_blocks
-    eb = block - g * e_blocks
-    if g >= n_g:
-        return
-    k0 = eb * energies_per_block
-    k1 = k0 + U32_ONE
-    has1 = energies_per_block == U32_TWO and k1 < n_E
-    tid = jit.threadIdx.x
-    nthreads = jit.blockDim.x
-    E0 = E_grid[k0]
-    dw0 = F32_ZERO
-    if use_medium:
-        dw0 = delta_omega[k0]
-    E1 = F32_ZERO
-    dw1 = F32_ZERO
-    if has1:
-        E1 = E_grid[k1]
-        if use_medium:
-            dw1 = delta_omega[k1]
-
-    mag0 = F32_ZERO
-    mag1 = F32_ZERO
-    group = tid
-    base = g * n_seg
-    while group < n_groups:
-        sr0 = F32_ZERO
-        si0 = F32_ZERO
-        pr0 = F32_ZERO
-        pi0 = F32_ZERO
-        sr1 = F32_ZERO
-        si1 = F32_ZERO
-        pr1 = F32_ZERO
-        pi1 = F32_ZERO
-        seg = group_starts[group]
-        stop = group_starts[group + U32_ONE]
-        while seg < stop:
-            line = base + seg
-            csr = cs_re[line]
-            csi = cs_im[line]
-            cpr = cp_re[line]
-            cpi = cp_im[line]
-            if csr != F32_ZERO or csi != F32_ZERO or cpr != F32_ZERO or cpi != F32_ZERO:
-                Er = E_r[line]
-                aw_i = seg
-                if aw_pair:
-                    aw_i = line
-                slope_i = seg
-                if slope_pair:
-                    slope_i = line
-                aa = aw[aw_i]
-                ps = phase_slope[slope_i]
-                gp = g_phase[line]
-                Lj = F32_ZERO
-                if use_medium:
-                    Lj = L_esc[seg]
-
-                x = aa * (E0 - Er)
-                s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-                phase = ps * E0 - gp
-                if use_medium:
-                    phase = phase - Lj * dw0
-                cph = xp.cos(phase)
-                sph = xp.sin(phase)
-                sr0 += s * (csr * cph - csi * sph)
-                si0 += s * (csr * sph + csi * cph)
-                pr0 += s * (cpr * cph - cpi * sph)
-                pi0 += s * (cpr * sph + cpi * cph)
-
-                if has1:
-                    x = aa * (E1 - Er)
-                    s = _sinc_windowed(x, sinc_cutoff, use_sinc_cutoff)
-                    phase = ps * E1 - gp
-                    if use_medium:
-                        phase = phase - Lj * dw1
-                    cph = xp.cos(phase)
-                    sph = xp.sin(phase)
-                    sr1 += s * (csr * cph - csi * sph)
-                    si1 += s * (csr * sph + csi * cph)
-                    pr1 += s * (cpr * cph - cpi * sph)
-                    pi1 += s * (cpr * sph + cpi * cph)
-            seg += U32_ONE
-        mag0 += sr0 * sr0 + si0 * si0 + pr0 * pr0 + pi0 * pi0
-        if has1:
-            mag1 += sr1 * sr1 + si1 * si1 + pr1 * pr1 + pi1 * pi1
-        group += nthreads
-
-    shared = jit.shared_memory(xp.float32, None)
-    o0 = U32_ZERO
-    o1 = nthreads
-    shared[tid] = mag0
-    shared[o1 + tid] = mag1
-    jit.syncthreads()
-    stride = nthreads // U32_TWO
-    while stride > U32_ZERO:
-        if tid < stride:
-            shared[tid] += shared[tid + stride]
-            shared[o1 + tid] += shared[o1 + tid + stride]
-        jit.syncthreads()
-        stride //= U32_TWO
-    if tid == U32_ZERO:
-        out = g * n_E + k0
-        grouped[out] += shared[o0]
-        if has1:
-            grouped[out + U32_ONE] += shared[o1]
-
-
-@jit.rawkernel()
 def _finalize_fields_kernel(fs_re, fs_im, fp_re, fp_im, wm, spec, n_g, n_E):
     k = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     if k >= n_E:
@@ -762,6 +758,24 @@ def _dummy():
 def _validate_threads(nthreads, name):
     if nthreads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError(f"{name} must be one of 32, 64, 128, 256, 512, 1024")
+
+
+def _formation_args(half_dL, apb, bma, q, *, use_medium, n_seg, n_pairs):
+    """Validate the field kernels' formation arguments; bind dummies when off."""
+    formation = (half_dL, apb, bma, q)
+    use_formation = half_dL is not None
+    if any((f is None) == use_formation for f in formation):
+        raise ValueError("half_dL, apb, bma and q must be given together")
+    if not use_formation:
+        dummy = _dummy()
+        return False, dummy, dummy, dummy, dummy
+    if not use_medium:
+        raise ValueError("the formation factor needs L_esc and delta_omega")
+    if int(half_dL.size) != n_seg:
+        raise ValueError("half_dL must have one entry per segment")
+    if any(int(f.size) != n_pairs for f in (apb, bma, q)):
+        raise ValueError("apb, bma and q must use the pair layout n_g*n_seg")
+    return True, half_dL, apb, bma, q
 
 
 def allocate_coherent_fields(n_g, n_E):
@@ -806,6 +820,8 @@ def run_coherent_prologue_kernel(
     aw_seg=None,
     v_dot_n=None,
     n_re_tab=None,
+    L_start=None,
+    L_end=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Build g-major coherent line data for one contiguous segment block.
@@ -832,6 +848,14 @@ def run_coherent_prologue_kernel(
     passed in for the same reason ``hbarc`` is: this module cannot import the
     line core. It bounds how far the last fixed-point pass may move ``denom``
     before the pair is rejected as non-converged.
+
+    Formation mode (issue #181) takes the per-segment escape distances
+    ``L_start``/``L_end`` at the piece ends, ordered along travel, together and
+    only under the refractive model. The coefficients then carry no
+    transmission, ``E_r``/``aw`` are the vacuum sinc centre and width, and the
+    tuple gains three pair-layout entries ``(apb, bma, q)`` of
+    ``_formation.formation_coefficients`` for the field kernels.
+    Validation: coherent-formation-absorption
     """
     nthreads = int(config.prologue_nthreads)
     _validate_threads(nthreads, "prologue_nthreads")
@@ -856,6 +880,14 @@ def run_coherent_prologue_kernel(
             raise ValueError("n_re_tab must use the E_tab grid")
         if aw_seg is not None:
             raise ValueError("aw_seg cannot be hoisted per segment under the refractive model")
+    if (L_start is None) != (L_end is None):
+        raise ValueError("L_start and L_end must be given together")
+    use_formation = L_start is not None
+    if use_formation:
+        if not use_medium:
+            raise ValueError("the formation factor needs the refractive model (v_dot_n, n_re_tab)")
+        if int(L_start.size) != n_seg or int(L_end.size) != n_seg:
+            raise ValueError("L_start and L_end must have one entry per segment")
 
     G = g_flat.reshape(n_g, 3)
     ES = es_flat.reshape(n_g, 3)
@@ -884,7 +916,7 @@ def run_coherent_prologue_kernel(
 
     # Only g-dependent quantities live in pair scratch; under the refractive
     # model the half-width joins them.
-    n_slots = 7 if use_medium else 6
+    n_slots = (7 if use_medium else 6) + (3 if use_formation else 0)
     storage = xp.empty(n_slots * n_pairs, dtype=xp.float32)
     E_r = storage[0 * n_pairs : 1 * n_pairs]
     g_phase = storage[1 * n_pairs : 2 * n_pairs]
@@ -894,11 +926,19 @@ def run_coherent_prologue_kernel(
     cp_im = storage[5 * n_pairs : 6 * n_pairs]
     if use_medium:
         aw_seg = storage[6 * n_pairs : 7 * n_pairs]
+    formation = ()
+    if use_formation:
+        formation = tuple(storage[i * n_pairs : (i + 1) * n_pairs] for i in (7, 8, 9))
+    line_data = (E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im, *formation)
     if n_pairs == 0:
-        return E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im
+        return line_data
 
     if not use_medium:
         v_dot_n = n_re_tab = _dummy()
+    if use_formation:
+        apb_out, bma_out, q_out = formation
+    else:
+        L_start = L_end = apb_out = bma_out = q_out = _dummy()
 
     nblocks = (n_pairs + nthreads - 1) // nthreads
     _coherent_prologue_kernel(
@@ -911,6 +951,8 @@ def run_coherent_prologue_kernel(
             gamma,
             t_L,
             L_esc,
+            L_start,
+            L_end,
             line_electron,
             r_flat,
             g_flat,
@@ -934,6 +976,9 @@ def run_coherent_prologue_kernel(
             cs_im,
             cp_re,
             cp_im,
+            apb_out,
+            bma_out,
+            q_out,
             np.float32(lo_keep),
             np.float32(hi_keep),
             np.float32(hbarc),
@@ -941,6 +986,7 @@ def run_coherent_prologue_kernel(
             np.float32(alpha_fs),
             np.float32(pref_c1),
             np.uint32(1 if use_medium else 0),
+            np.uint32(1 if use_formation else 0),
             np.uint32(n_pairs),
             np.uint32(n_seg),
             np.uint32(n_g),
@@ -948,7 +994,7 @@ def run_coherent_prologue_kernel(
             np.uint32(n_tab),
         ),
     )
-    return E_r, aw_seg, phase_slope_seg, g_phase, cs_re, cs_im, cp_re, cp_im
+    return line_data
 
 
 def run_coherent_field_accumulation_kernel(
@@ -967,6 +1013,10 @@ def run_coherent_field_accumulation_kernel(
     n_seg,
     L_esc=None,
     delta_omega=None,
+    half_dL=None,
+    apb=None,
+    bma=None,
+    q=None,
     sinc_cutoff=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
@@ -987,6 +1037,13 @@ def run_coherent_field_accumulation_kernel(
     together or both omitted; when omitted the kernel evaluates the vacuum
     phase expression unchanged. When ``sinc_cutoff`` is given, each line is
     omitted outside that magnitude of the unscaled sinc argument.
+
+    Formation mode (issue #181) takes the segment-layout ``half_dL`` and the
+    pair-layout ``(apb, bma, q)`` from the prologue, all four together and only
+    with the in-medium pair; each line then contributes the complex formation
+    factor ``F(v)`` of ``_formation`` with ``v = aw (E - E_r) - half_dL
+    delta_omega`` in place of the sinc, and the cutoff bounds ``|v|``.
+    Validation: coherent-formation-absorption
     """
     nthreads = int(config.reduction_nthreads)
     _validate_threads(nthreads, "reduction_nthreads")
@@ -1017,6 +1074,9 @@ def run_coherent_field_accumulation_kernel(
             raise ValueError("delta_omega must have one entry per energy bin")
     else:
         L_esc = delta_omega = _dummy()
+    use_formation, half_dL, apb, bma, q = _formation_args(
+        half_dL, apb, bma, q, use_medium=use_medium, n_seg=n_seg, n_pairs=n_g * n_seg
+    )
     use_sinc_cutoff = sinc_cutoff is not None
     cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
 
@@ -1039,6 +1099,10 @@ def run_coherent_field_accumulation_kernel(
             E_grid,
             L_esc,
             delta_omega,
+            half_dL,
+            apb,
+            bma,
+            q,
             fs_re,
             fs_im,
             fp_re,
@@ -1046,6 +1110,7 @@ def run_coherent_field_accumulation_kernel(
             np.uint32(1 if aw_pair else 0),
             np.uint32(1 if slope_pair else 0),
             np.uint32(1 if use_medium else 0),
+            np.uint32(1 if use_formation else 0),
             cutoff,
             np.uint32(1 if use_sinc_cutoff else 0),
             np.uint32(n_seg),
@@ -1056,99 +1121,6 @@ def run_coherent_field_accumulation_kernel(
         shared_mem=shared_bytes,
     )
     return fields
-
-
-def run_coherent_grouped_intensity_kernel(
-    E_r,
-    aw,
-    phase_slope,
-    g_phase,
-    cs_re,
-    cs_im,
-    cp_re,
-    cp_im,
-    E_grid,
-    group_starts,
-    *,
-    out,
-    n_g,
-    n_seg,
-    L_esc=None,
-    delta_omega=None,
-    sinc_cutoff=None,
-    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
-):
-    """Add grouped field intensities for one compact, whole-electron block.
-
-    ``sinc_cutoff`` uses the same unscaled-argument window as the flat field
-    accumulator so both terms of the decoherence blend have identical support.
-    """
-    nthreads = int(config.reduction_nthreads)
-    _validate_threads(nthreads, "reduction_nthreads")
-    epb = int(config.energies_per_block)
-    if epb not in _FIELD_KERNELS:
-        raise ValueError(f"energies_per_block must be one of {tuple(_FIELD_KERNELS)}")
-    n_g = int(n_g)
-    n_seg = int(n_seg)
-    n_E = int(E_grid.size)
-    n_groups = int(group_starts.size) - 1
-    if n_groups < 0:
-        raise ValueError("group_starts must contain at least one offset")
-    if n_g == 0 or n_seg == 0 or n_E == 0 or n_groups == 0:
-        return out
-    aw_pair = int(aw.size) != n_seg
-    if aw_pair and int(aw.size) != n_g * n_seg:
-        raise ValueError("aw must have length n_seg or n_g*n_seg")
-    slope_pair = int(phase_slope.size) != n_seg
-    if slope_pair and int(phase_slope.size) != n_g * n_seg:
-        raise ValueError("phase_slope must have length n_seg or n_g*n_seg")
-    if int(out.size) != n_g * n_E:
-        raise ValueError("out must have shape (n_g, n_E)")
-    if (L_esc is None) != (delta_omega is None):
-        raise ValueError("L_esc and delta_omega must be given together")
-    use_medium = L_esc is not None
-    if use_medium:
-        if int(L_esc.size) != n_seg:
-            raise ValueError("L_esc must have one entry per segment")
-        if int(delta_omega.size) != n_E:
-            raise ValueError("delta_omega must have one entry per energy bin")
-    else:
-        L_esc = delta_omega = _dummy()
-    use_sinc_cutoff = sinc_cutoff is not None
-    cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
-    e_blocks = (n_E + epb - 1) // epb
-    _grouped_intensity_kernel(
-        (n_g * e_blocks,),
-        (nthreads,),
-        (
-            E_r,
-            aw,
-            phase_slope,
-            g_phase,
-            cs_re,
-            cs_im,
-            cp_re,
-            cp_im,
-            E_grid,
-            L_esc,
-            delta_omega,
-            group_starts,
-            out.reshape(-1),
-            np.uint32(1 if aw_pair else 0),
-            np.uint32(1 if slope_pair else 0),
-            np.uint32(1 if use_medium else 0),
-            cutoff,
-            np.uint32(1 if use_sinc_cutoff else 0),
-            np.uint32(n_seg),
-            np.uint32(n_groups),
-            np.uint32(n_g),
-            np.uint32(n_E),
-            np.uint32(e_blocks),
-            np.uint32(epb),
-        ),
-        shared_mem=2 * nthreads * np.dtype(np.float32).itemsize,
-    )
-    return out
 
 
 def finalize_coherent_fields(

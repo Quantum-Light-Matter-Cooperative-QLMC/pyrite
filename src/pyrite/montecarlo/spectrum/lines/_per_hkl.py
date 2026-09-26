@@ -9,12 +9,16 @@ route is checked against.
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
-from ....materials.attenuation import _mu_total_inv_ang, _stack_tau
+from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
-from ...groove import escape_distance_ang
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
+from ._formation import (
+    formation_coefficients,
+    formation_profile,
+    formation_window_half_width,
+)
 from ._kernels import (
     _flight_blocks,
     _in_medium_kinematics,
@@ -27,7 +31,6 @@ from ._kernels import (
     _polarization_pair,
     _reflection_tabulation,
     _rowdot3,
-    _segment_escape_distance,
     _sincsq_lineshape,
 )
 
@@ -42,6 +45,80 @@ def _sinc_window_bounds(E_grid, lo, hi):
     i0 = max(int(_to_cpu(xp.searchsorted(E_grid, lo, side="right"))) - 1, 0)
     i1 = min(int(_to_cpu(xp.searchsorted(E_grid, hi, side="right"))) + 1, E_grid.size)
     return i0, i1
+
+
+class _FormationLines(tuple):
+    """Per-line data of the complex formation factor, one entry per line.
+
+    ``(E_vac, a_vac, half_dL, apb, bma, q)``: the vacuum sinc centre and
+    width, half the escape-distance change along the piece, and the
+    attenuation constants of ``_formation.formation_coefficients``. A plain
+    tuple subclass so the rows gather with one comprehension.
+    Validation: coherent-formation-absorption
+    """
+
+    __slots__ = ()
+
+    def take(self, sel):
+        return _FormationLines(a[sel] for a in self)
+
+
+def _formation_lines(st, idx, t_L, v_dot_g, mu):
+    """Formation-factor lines and midpoint escape for the kept piece rows ``idx``.
+
+    The escape distance is affine on each piece row (``_setup`` split the
+    segments), so its end values give the midpoint phase distance
+    ``(L_start + L_end)/2``, the refractive slope ``half_dL``, and the
+    attenuation ``tau = mu L`` at both ends. The sinc centre and width are the
+    VACUUM ones: the in-medium part of the intra-piece phase slope is the
+    escape-path term, which ``half_dL`` carries.
+    Returns ``(L_esc_mid, lines)``. Validation: coherent-formation-absorption
+    """
+    L_start, L_end = (a[idx] for a in st.escape_ends)
+    denom_vac = st.denom_all[idx]
+    apb, bma, q = formation_coefficients(mu * L_start, mu * L_end, xp=xp)
+    lines = _FormationLines(
+        (
+            HBARC_EV_ANG * v_dot_g / denom_vac,
+            denom_vac * t_L / (2.0 * HBARC_EV_ANG),
+            0.5 * (L_end - L_start),
+            apb,
+            bma,
+            q,
+        )
+    )
+    return 0.5 * (L_start + L_end), lines
+
+
+def _formation_good(amp, t_L, lines):
+    """Live lines: finite positive amplitude and a finite, non-vanishing
+    attenuation profile (``apb = 0`` only where both ends are opaque)."""
+    _, _, _, apb, bma, _ = lines
+    return (
+        xp.isfinite(amp) & (amp > 0) & (t_L > 0) & xp.isfinite(apb) & (apb > 0) & xp.isfinite(bma)
+    )
+
+
+def _formation_SP(st, lines, e_sl=slice(None), sinc_cutoff=None):
+    """``F[j, k]``: the complex formation factor of ``lines`` on ``E_grid[e_sl]``."""
+    E_vac, a_vac, half_dL, apb, bma, q = lines
+    return formation_profile(
+        st.E_grid[e_sl],
+        st.delta_omega_grid[e_sl],
+        E_vac,
+        a_vac,
+        half_dL,
+        apb,
+        bma,
+        q,
+        sinc_cutoff=sinc_cutoff,
+        xp=xp,
+    ).astype(st.cdtype)
+
+
+def _delta_omega_max(st):
+    """Host bound ``max |delta(E) omega(E)|`` over the grid, for windows."""
+    return float(_to_cpu(xp.abs(st.delta_omega_grid).max())) if st.E_grid.size else 0.0
 
 
 def _row_decoherence_factor(st, g_vec_d):
@@ -77,19 +154,18 @@ def _row_decoherence_factor(st, g_vec_d):
 
 
 def _coherent_electron_grouped_row(
-    st, elec_id_sel, a_width_sel, E_r_sel, d_geom_sel, g_phase_sel, L_esc_sel, coefs_sel
+    st, elec_id_sel, lines_sel, d_geom_sel, g_phase_sel, L_esc_sel, coefs_sel
 ):
     """sum_e |sum_{j in e} E_j|^2 for one row's kept, finite segments,
     using the SAME group-then-reduce-then-square pattern as the
     flight-grouped incoherent path (7b) above, keyed by electron
-    instead of flight. Every ``*_sel`` array is already restricted
-    to this row's kept, finite segments and shares one length;
-    ``coefs_sel``: per-polarization complex per-segment
-    coefficients (same restriction)."""
+    instead of flight. Every ``*_sel`` array (and every entry of the
+    :class:`_FormationLines` ``lines_sel``) is already restricted to this
+    row's kept, finite segments and shares one length; ``coefs_sel``:
+    per-polarization complex per-segment coefficients (same restriction)."""
     req = st.request
     chunk = req.chunk
     E_grid = st.E_grid
-    cdtype = st.cdtype
     omega_grid = st.omega_grid
     delta_omega_grid = st.delta_omega_grid
     sinc_cutoff = req.sinc_cutoff
@@ -101,22 +177,16 @@ def _coherent_electron_grouped_row(
     bounds = np.append(starts, gid.size)
     row_total = xp.zeros(E_grid.size, dtype=REAL)
     perm_xp = xp.asarray(perm)
-    aw_p = a_width_sel[perm_xp]
-    Er_p = E_r_sel[perm_xp]
+    lines_p = lines_sel.take(perm_xp)
     d_p = d_geom_sel[perm_xp]
     gp_p = g_phase_sel[perm_xp]
     Lesc_p = L_esc_sel[perm_xp]
     coefs_p = [c[perm_xp] for c in coefs_sel]
     for ka, kb in _flight_blocks(bounds, chunk):
         rows = slice(bounds[ka], bounds[kb])
-        x_unscaled = aw_p[rows][:, None] * (E_grid[None, :] - Er_p[rows][:, None])
-        x = x_unscaled / xp.pi
         arg = d_p[rows][:, None] * omega_grid[None, :] - gp_p[rows][:, None]
         arg = arg - Lesc_p[rows][:, None] * delta_omega_grid[None, :]
-        sinc = xp.sinc(x)
-        if sinc_cutoff is not None:
-            sinc = xp.where(xp.abs(x_unscaled) <= sinc_cutoff, sinc, 0.0)
-        SP = sinc.astype(cdtype) * xp.exp(1j * arg)
+        SP = _formation_SP(st, lines_p.take(rows), sinc_cutoff=sinc_cutoff) * xp.exp(1j * arg)
         offsets = bounds[ka:kb] - bounds[ka]
         for c in coefs_p:
             field = xp.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
@@ -124,7 +194,7 @@ def _coherent_electron_grouped_row(
     return row_total
 
 
-def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
+def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, formation_sel, out):
     """sum_e |sum_{j in e} E_j|^2 for one row on the float32 CUDA-JIT
     reduction kernel -- the device counterpart of
     ``_coherent_electron_grouped_row`` above.
@@ -137,12 +207,13 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
     launches per row (the segments themselves are still touched once in
     total); the mosaic weight is applied outside, by the blend.
 
-    ``per_line_sel`` is the 8-tuple the kernel takes (E_r, a_width,
+    ``per_line_sel`` is the 8-tuple the kernel takes (E_vac, a_vac,
     phase_slope, g_phase, and the two complex polarization coefficients
     split into real/imag), already restricted to this row's kept lines
-    and sharing one length with ``elec_id_sel``/``L_esc_sel``. The request's
-    sinc cutoff is forwarded unchanged so the grouped and flat terms retain
-    identical line support."""
+    and sharing one length with ``elec_id_sel``/``L_esc_sel``;
+    ``formation_sel`` is the matching ``(half_dL, apb, bma, q)``. The
+    request's sinc cutoff is forwarded unchanged so the grouped and flat
+    terms retain identical line support."""
     E_grid = st.E_grid
     delta_omega_grid = st.delta_omega_grid
 
@@ -161,10 +232,12 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
     perm_xp = xp.asarray(perm)
     cols = [xp.ascontiguousarray(a[perm_xp], dtype=REAL) for a in per_line_sel]
     L_p = xp.ascontiguousarray(L_esc_sel[perm_xp], dtype=REAL)
+    form_p = [xp.ascontiguousarray(a[perm_xp], dtype=REAL) for a in formation_sel]
     E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
     dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
     for b0, b1 in zip(bounds[:-1], bounds[1:], strict=True):
         sl = slice(int(b0), int(b1))
+        half_dL, apb, bma, q = (f[sl] for f in form_p)
         run_coherent_reduction_kernel(
             *(c[sl] for c in cols),
             E_grid_c,  # ty: ignore[too-many-positional-arguments]
@@ -172,23 +245,29 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_line_sel, L_esc_sel, out):
             mosaic_weight=1.0,
             L_esc=L_p[sl],
             delta_omega=dom_c,
+            half_dL=half_dL,
+            apb=apb,
+            bma=bma,
+            q=q,
             sinc_cutoff=st.request.sinc_cutoff,
             config=DEFAULT_COHERENT_KERNEL_CONFIG,
         )
     return out
 
 
-def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_abs, L_esc, pol_A):
+def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines, pol_A):
     """Step 7c: coherent (phased) accumulation for one reflection and
     crystallite orientation.
 
     Builds the complex field per polarization within THIS row, squares it,
     and adds ``|field|^2 * wm`` to ``spec``; reflections and mosaic
-    orientations stay incoherent. The un-squared finite-time factor
-    ``Q = t_L sinc(a_width (E - E_res) / pi)`` carries the amplitude scale
-    (its modulus-square is the incoherent ``t_L^2 sinc^2``), and the
-    emission-time/retardation phase is ``exp[i omega(E) d_j]`` with
-    ``d_j = t_abs,j - n_hat.r_j``.
+    orientations stay incoherent. Each piece row carries the un-squared
+    finite-time factor ``Q = t_L F``, ``F`` the complex formation factor of
+    ``_formation`` (``sinc(v)`` without absorption or escape-path change;
+    under absorption a damped sinc whose modulus-square integrates to the
+    segment-mean transmission), and the emission-time/retardation phase
+    ``exp[i omega(E) d_j]`` with ``d_j = t_abs,j - n_hat.r_j``, plus the
+    midpoint in-medium term. Validation: coherent-formation-absorption
     """
     req = st.request
     chunk = req.chunk
@@ -203,8 +282,8 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
     d_all_geom = st.d_all_geom
     decoherence_active = st.decoherence_active
 
-    amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
-    a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+    # The attenuation lives in the formation factor, not the amplitude.
+    amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG))
     # Geometric-only (offset-free) phase: identical to d_all/seg_r
     # when no decoherence-relevant offset is configured, so this is
     # a no-op swap in that (default) case. See the
@@ -212,7 +291,8 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
     d = d_all_geom[idx]
     g_phase = _matvec3(seg_r_geom[idx], g_vec_d)
     coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
-    good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+    good = _formation_good(amp, t_L, lines)
+    E_vac, a_vac, half_dL, apb, bma, q = lines
 
     # GPU float32 fast path: reduce the two complex polarization fields
     # directly in a raw kernel. This avoids materializing the dense
@@ -230,7 +310,8 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
     # single per-line scalar against the energy axis. The in-medium term
     # is a SECOND (per-segment scalar) x (per-energy table) product, so
     # it rides along as its own ``L_esc``/``delta_omega`` pair rather
-    # than being absorbed into that slope.
+    # than being absorbed into that slope; the formation factor's
+    # refractive slope ``half_dL`` is a third such product.
     _use_jit_coherent_reduction = (
         _policy._USE_JIT_COHERENT_REDUCTION
         and getattr(xp, "__name__", "") == "cupy"
@@ -246,8 +327,8 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
         if sel.size:
             c_s, c_p = coefs
             per_line_sel = (
-                xp.ascontiguousarray(E_r[sel], dtype=REAL),
-                xp.ascontiguousarray(a_width[sel], dtype=REAL),
+                xp.ascontiguousarray(E_vac[sel], dtype=REAL),
+                xp.ascontiguousarray(a_vac[sel], dtype=REAL),
                 xp.ascontiguousarray(d[sel] / HBARC_EV_ANG, dtype=REAL),
                 xp.ascontiguousarray(g_phase[sel], dtype=REAL),
                 xp.ascontiguousarray(c_s[sel].real, dtype=REAL),
@@ -255,12 +336,16 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
                 xp.ascontiguousarray(c_p[sel].real, dtype=REAL),
                 xp.ascontiguousarray(c_p[sel].imag, dtype=REAL),
             )
+            formation_sel = tuple(
+                xp.ascontiguousarray(a[sel], dtype=REAL) for a in (half_dL, apb, bma, q)
+            )
             L_esc_sel = xp.ascontiguousarray(L_esc[sel], dtype=REAL)
             E_grid_c = xp.ascontiguousarray(E_grid, dtype=REAL)
             dom_c = xp.ascontiguousarray(delta_omega_grid, dtype=REAL)
             # Decoherence-inactive: unchanged single fused call
             # straight into spec with the row's mosaic weight.
             out_flat = spec if not decoherence_active else xp.zeros(E_grid.size, dtype=REAL)
+            f_half_dL, f_apb, f_bma, f_q = formation_sel
             run_coherent_reduction_kernel(
                 *per_line_sel,
                 E_grid_c,
@@ -268,6 +353,10 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
                 mosaic_weight=1.0 if decoherence_active else wm,
                 L_esc=L_esc_sel,
                 delta_omega=dom_c,
+                half_dL=f_half_dL,
+                apb=f_apb,
+                bma=f_bma,
+                q=f_q,
                 sinc_cutoff=sinc_cutoff,
                 config=DEFAULT_COHERENT_KERNEL_CONFIG,
             )
@@ -277,6 +366,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
                     seg_elec_id[idx][sel],
                     per_line_sel,
                     L_esc_sel,
+                    formation_sel,
                     xp.zeros(E_grid.size, dtype=REAL),
                 )
                 F_row = _row_decoherence_factor(st, g_vec_d)
@@ -287,37 +377,39 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
     if sinc_cutoff is None:
         for j0 in range(0, idx.size, chunk):
             sl = slice(j0, min(j0 + chunk, idx.size))
-            m = good[sl]
-            if not m.any():
+            m = xp.flatnonzero(good[sl]) + j0
+            if not m.size:
                 continue
-            x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
-            arg = d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]
-            arg = arg - L_esc[sl][m, None] * delta_omega_grid[None, :]
-            ph = xp.exp(1j * arg)
-            SP = xp.sinc(x).astype(cdtype) * ph
+            arg = d[m, None] * omega_grid[None, :] - g_phase[m, None]
+            arg = arg - L_esc[m, None] * delta_omega_grid[None, :]
+            SP = _formation_SP(st, lines.take(m)) * xp.exp(1j * arg)
             for c, f in zip(coefs, fields, strict=True):
-                f += c[sl][m] @ SP
+                f += c[m] @ SP
     else:
-        order = xp.argsort(E_r)
+        # Window on the formation argument v: |F| <= 1/|v|, so dropping
+        # |v| > sinc_cutoff is the same conservative tail cut the undamped
+        # sinc had. The energy window around E_vac widens by the largest
+        # refractive shift |half_dL| max|delta omega|.
+        dom_max = _delta_omega_max(st)
+        half_all = formation_window_half_width(a_vac, half_dL, dom_max, sinc_cutoff)
+        order = xp.argsort(E_vac)
         blk = 8192
         for j0 in range(0, order.size, blk):
             sel = order[j0 : j0 + blk]
             sel = sel[good[sel]]
             if sel.size == 0:
                 continue
-            half = sinc_cutoff / a_width[sel]
-            lo = float(_to_cpu((E_r[sel] - half).min()))
-            hi = float(_to_cpu((E_r[sel] + half).max()))
+            half = half_all[sel]
+            lo = float(_to_cpu((E_vac[sel] - half).min()))
+            hi = float(_to_cpu((E_vac[sel] + half).max()))
             i0, i1 = _sinc_window_bounds(E_grid, lo, hi)
             if i1 <= i0:
                 continue
-            x_unscaled = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None])
-            x = x_unscaled / xp.pi
             arg = d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None]
             arg = arg - L_esc[sel][:, None] * delta_omega_grid[None, i0:i1]
-            ph = xp.exp(1j * arg)
-            sinc = xp.where(xp.abs(x_unscaled) <= sinc_cutoff, xp.sinc(x), 0.0)
-            SP = sinc.astype(cdtype) * ph
+            SP = _formation_SP(
+                st, lines.take(sel), slice(i0, i1), sinc_cutoff=sinc_cutoff
+            ) * xp.exp(1j * arg)
             for c, f in zip(coefs, fields, strict=True):
                 f[i0:i1] += c[sel] @ SP
     flat_total = sum(xp.abs(f) ** 2 for f in fields)
@@ -326,8 +418,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_a
         grouped_total = _coherent_electron_grouped_row(
             st,
             seg_elec_id[idx][sel_full],
-            a_width[sel_full],
-            E_r[sel_full],
+            lines.take(sel_full),
             d[sel_full],
             g_phase[sel_full],
             L_esc[sel_full],
@@ -363,8 +454,6 @@ def _accumulate_reflection(
     groove = req.groove
     coherent = req.coherent
     abs_comp = st.abs_comp
-    thickness = st.thickness
-    n_hat = st.n_hat
     E_grid = st.E_grid
     spec = st.spec
     spec_pxr = st.spec_pxr
@@ -380,12 +469,9 @@ def _accumulate_reflection(
     E_tab_g = st.E_tab_g
     log_mu_tab_g = st.log_mu_tab_g
     n_re_tab_g = st.n_re_tab_g
-    finite_footprint = st.finite_footprint
-    cdtype = st.cdtype
     omega_grid = st.omega_grid
     delta_omega_grid = st.delta_omega_grid
     d_all = st.d_all
-    L_esc_all = st.L_esc_all
 
     # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
     #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
@@ -483,53 +569,26 @@ def _accumulate_reflection(
         A2_cbs += a2_cbs
 
     # -- 6. Beer-Lambert escape factor ----------------------------------------
-    # straight path along n_hat to whichever face the photon exits. With a
-    # LAYERED absorber (layers) the optical depth sums mu_i*dz_i across the
-    # film-on-substrate stack; otherwise it's the single-slab path. The
-    # geometric path is mosaic-independent; the optical depth uses E_r (the
-    # orientation-shifted line energy), so it is recomputed per orientation.
-    z_mid = seg_r[idx, 2]
+    # Straight path along n_hat to whichever face the photon exits. The escape
+    # GEOMETRY -- slab, finite footprint (nearest prism face), blazed groove,
+    # or the layered stack -- is g-independent and lives in the setup's linear
+    # escape pieces (``escape_pieces`` / ``escape_ends``, cut once per call by
+    # ``segment_escape``). Only mu depends on the orientation-shifted line
+    # energy E_r, so it is evaluated here per orientation: the tabulated
+    # compound value for a single slab, exact per-point values for a groove
+    # (Validation: blazed-groove-geometry) or per layer.
     if groove is not None:
-        # Blazed sawtooth entrance face: closed-form path to the working
-        # facet (grooves shorten, never lengthen, the flat-face path). Takes
-        # precedence over any finite footprint -- the mm-scale crystal extent
-        # only classifies launch hit/miss (hit_frac, set in transport); the
-        # groove escape treats the slab as laterally periodic. At depth z,
-        # the side-edge-affected strip is
-        # L_esc*cos(tp) = z*cot(tp) + O(groove spacing), capped by the
-        # crystal width. The guard above guarantees layers is None and
-        # n_hat[2] < 0 here.
-        # Validation: blazed-groove-geometry
-        L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
         mu_layers = [_mu_total_inv_ang(abs_comp, E_r)]
-        tau = L_esc * mu_layers[0]
-    elif finite_footprint:
-        # the escape DISTANCE is g-independent, so it is computed once per
-        # case (L_esc_all, below the loop's stacking prologue) instead of per
-        # reflection/orientation; only the idx selection is per-g.
-        assert L_esc_all is not None  # set whenever finite_footprint and no groove
-        L_esc = L_esc_all[idx]
-        if layers is None:
-            mu_layers = [mu_i]
-            tau = L_esc * mu_i
-        else:
-            mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
-            tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
+    elif layers is None:
+        mu_layers = [mu_i]
     else:
-        if layers is None:
-            if n_hat[2] < 0:
-                L_esc = z_mid / (-n_hat[2])  # out the entrance face
-            else:
-                L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
-            mu_layers = [mu_i]
-            tau = L_esc * mu_i
-        else:
-            mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
-            tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
-    if st.escape_pieces is None:
-        # Coherent and flight-grouped reductions: midpoint escape on the
-        # amplitude (issue #181).
-        T_abs = xp.exp(-tau)
+        mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
+    if st.escape_ends is not None:
+        # Coherent and flight-grouped reductions: the rows are linear escape
+        # pieces (``_setup``), and each carries its exact complex formation
+        # integral under absorption and the escape-path refractive slope.
+        # Both routes refuse layers, so one mu. Validation: coherent-formation-absorption
+        L_esc, lines = _formation_lines(st, idx, t_L, vdg, mu_layers[0])
     else:
         # Incoherent route: the segment mean of exp(-tau) over the same escape
         # geometry, split into linear pieces (issue #181, as #176 for
@@ -541,19 +600,19 @@ def _accumulate_reflection(
     # -- 7b. flight-grouped incoherent accumulation ---------------------------
     # The same complex per-row field the coherent path builds, but reduced
     # per PHYSICAL FLIGHT: substeps of one flight add coherently, whole
-    # flights add incoherently. At frozen energy and clock this is an exact
-    # algebraic identity with the unsplit row (the substep sinc times the
-    # Dirichlet sum over substep offsets rebuilds the parent's
-    # ``t_L sinc(P t_L / pi)``), so refining the energy tolerance changes
+    # flights add incoherently. Each substep piece carries the formation
+    # integral of the same phase that separates it from its neighbours, so
+    # at frozen energy and clock the pieces sum exactly to the unsplit
+    # flight's field (the Dirichlet identity of the undamped sinc is its
+    # mu -> 0, dL -> 0 case). Refining the energy tolerance therefore changes
     # only the quadrature of the energy sweep along the flight -- which is
     # the point -- and not the number of independent emitters.
     if gid_all is not None:  # i.e. ``grouped``, narrowed for the gather below
-        amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
-        a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+        amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG))
         d = d_all[idx]
         g_phase = _matvec3(seg_r[idx], g_vec_d)
         coefs = [(amp * t_L) * A_e for A_e in pol_A]
-        good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+        good = _formation_good(amp, t_L, lines)
         sel = np.flatnonzero(good)
         if sel.size == 0:
             return
@@ -567,10 +626,9 @@ def _accumulate_reflection(
         bounds = np.append(starts, sel.size)
         for ka, kb in _flight_blocks(bounds, chunk):
             rows = sel[bounds[ka] : bounds[kb]]
-            x = a_width[rows][:, None] * (E_grid[None, :] - E_r[rows][:, None]) / xp.pi
             arg = d[rows][:, None] * omega_grid[None, :] - g_phase[rows][:, None]
             arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, :]
-            SP = xp.sinc(x).astype(cdtype) * xp.exp(1j * arg)
+            SP = _formation_SP(st, lines.take(rows)) * xp.exp(1j * arg)
             # Blocks break only on flight boundaries, so no flight is split
             # across two reductions and squared twice.
             offsets = bounds[ka:kb] - bounds[ka]
@@ -583,13 +641,12 @@ def _accumulate_reflection(
     # Build the complex field per polarization within THIS reflection and
     # orientation, square it, and add |field|^2 * wm to spec (reflections and
     # mosaic orientations remain incoherent). The un-squared finite-time
-    # factor Q = t_L sinc(a_width(E-E_res)/pi) carries the amplitude scale
-    # (|Q|^2 = t_L^2 sinc^2); the emission-time/retardation phase is
-    # exp[i omega(E) d_j] with d_j = t_abs,j - n_hat.r_j.
+    # factor Q = t_L F carries the amplitude scale (F the complex formation
+    # factor; |Q|^2 = t_L^2 sinc^2 without absorption or refraction); the
+    # emission-time/retardation phase is exp[i omega(E) d_j] with
+    # d_j = t_abs,j - n_hat.r_j.
     if coherent:
-        _accumulate_reflection_coherent(
-            st, g_vec_d, wm, idx, om, t_L, dnm, E_r, T_abs, L_esc, pol_A
-        )
+        _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, lines, pol_A)
         return
 
     # -- 7. accumulate the finite-segment lineshape ---------------------------
@@ -655,7 +712,7 @@ def _accumulate_per_hkl(st):
     sinc_cutoff windowing, and the flight-grouped incoherent reduction --
     everything the batched ``(n_seg, N_g)`` path does not cover. The stacking
     prologue does every host->device transfer once per case rather than once
-    per row, and records the g-independent escape distance on the setup.
+    per row.
     """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
     # runner imports this module, so a top-level import would be circular.
@@ -666,15 +723,12 @@ def _accumulate_per_hkl(st):
     hkl_list = req.hkl_list
     B_ang2 = req.B_ang2
     use_henke = req.use_henke
-    groove = req.groove
     info = st.info
-    segments = st.segments
     R_orient = st.R_orient
     n_hat = st.n_hat
     n_hat_d = st.n_hat_d
     E_tab = st.E_tab
     mosaic_quad = st.mosaic_quad
-    finite_footprint = st.finite_footprint
 
     # Stacking prologue: every host->device transfer this path needs is done
     # ONCE per case here, not once per (reflection, orientation) inside the
@@ -720,14 +774,6 @@ def _accumulate_per_hkl(st):
     N_DOT_G = _matvec3(G, n_hat_d)
     G_DOT_ES = _rowdot3(G, ES)
     G_DOT_EP = _rowdot3(G, EP)
-    # g-independent escape distance: one pass per case, sliced per g inside
-    # _accumulate_reflection (only the finite-footprint, non-grooved branch
-    # reads it).
-    st.L_esc_all = (
-        _segment_escape_distance(segments, n_hat, xp=xp)
-        if finite_footprint and groove is None
-        else None
-    )
     _nsys_pop()
 
     for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):

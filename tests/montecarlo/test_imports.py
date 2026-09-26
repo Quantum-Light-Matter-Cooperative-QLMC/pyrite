@@ -21,6 +21,7 @@ import pytest
         "pyrite.montecarlo.spectrum.line_jit_kernel",
         "pyrite.montecarlo.spectrum.coherent_jit_kernel",
         "pyrite.montecarlo.spectrum.coherent_stream_jit_kernel",
+        "pyrite.montecarlo.spectrum.coherent_grouped_jit_kernel",
     ],
 )
 def test_rawkernel_import_does_not_emit_experimental_warning(module: str) -> None:
