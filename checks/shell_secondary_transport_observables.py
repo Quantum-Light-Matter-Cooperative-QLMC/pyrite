@@ -3,7 +3,8 @@
 Runs ``simulate_trajectories(secondary_threshold_eV=T_s)`` on Si and MoS2
 slabs 1.2 CSDA ranges thick at 20 and 100 keV (primary cutoff 1 keV, the
 SBETHE floor), for ``T_s`` = off, 10, 5, 2 and 1 keV, with soft straggling,
-``max_dE_frac=0.02`` and the per-electron CPU core. Seeds are the replicates
+``max_dE_frac=0.02``, screened-Rutherford elastic scattering and the
+per-electron CPU core. Seeds are the replicates
 for every quoted uncertainty (standard error across seeds).
 
 Per (material, beam, T_s):
@@ -31,8 +32,8 @@ agreement to about 10% is the expectation, not an exact identity.
 Validation: shell-secondary-transport
 
 Run (remote CPU; never locally at full size):
-  uv run python checks/shell_secondary_transport_observables.py --quick
-  uv run python checks/shell_secondary_transport_observables.py --output REPORT.json
+  PYRITE_MC_BACKEND=cpu uv run python checks/shell_secondary_transport_observables.py --quick
+  PYRITE_MC_BACKEND=cpu uv run python checks/shell_secondary_transport_observables.py --output REPORT.json
 """
 
 import argparse
@@ -90,6 +91,7 @@ def _run(key, E0, thickness, threshold, seed, Ne):
         max_dE_frac=0.02,
         straggling=True,
         transport_core="per-electron",
+        elastic_model="sr",
         stopping_tables=[resolve_catalog_table(key).arrays()],
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,
