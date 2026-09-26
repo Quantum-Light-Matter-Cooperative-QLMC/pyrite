@@ -28,6 +28,7 @@ Source equations, assumptions, and limiting cases are documented in
 ``docs/physics/radiation-physics/bremsstrahlung.md``.
 """
 
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -377,7 +378,36 @@ def evaluate_bremslib(staged: _StagedBremsLib, state: _BremsLibSegmentState, pho
     )
 
 
+def resolve_auto_model(segments, comp, bremslib_tables):
+    """Pick ``"bremslib"`` or ``"eedl"`` for ``cross_section_model="auto"``.
+
+    BremsLib needs segment directions and a table for every composition
+    element; supplied tables are used as given, else the installed release is
+    resolved through the driver-side loader (imported here because the physics
+    core otherwise takes its tables as arguments).
+    """
+    if segments.get("v_hat") is None:
+        return "eedl", bremslib_tables
+    elements = [element for element, _ in comp]
+    if bremslib_tables is not None:
+        if all(element in bremslib_tables for element in elements):
+            return "bremslib", bremslib_tables
+        warnings.warn(
+            "bremsstrahlung_model 'auto': the supplied BremsLib tables do not cover "
+            f"{', '.join(elements)}; using EEDL with an isotropic photon angle",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return "eedl", None
+    from ...xsgen.bremslib.tables import load_bremsstrahlung_tables, resolve_bremsstrahlung_model
+
+    if resolve_bremsstrahlung_model("auto", elements) != "bremslib":
+        return "eedl", None
+    return "bremslib", load_bremsstrahlung_tables(elements)
+
+
 __all__ = [
+    "resolve_auto_model",
     "BREMSSTRAHLUNG_BREMSLIB_MODEL",
     "BremsLibBremsstrahlungTable",
     "bremslib_segment_state",

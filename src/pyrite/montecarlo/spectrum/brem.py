@@ -26,6 +26,7 @@ from .brem_bremslib import (
     BremsLibBremsstrahlungTable,
     bremslib_segment_state,
     evaluate_bremslib,
+    resolve_auto_model,
     stage_bremslib_table,
 )
 from .brem_unit_base import _unit_base_panels
@@ -857,15 +858,15 @@ def mc_brem_spectrum(
     groove=None,
     electron_limit=None,
     E_cut_keV=None,
-    cross_section_model: BremsstrahlungModel = "eedl",
+    cross_section_model: BremsstrahlungModel | Literal["auto"] = "auto",
     bremslib_tables: Mapping[str, BremsLibBremsstrahlungTable] | None = None,
 ):
     """Return the incoherent bremsstrahlung density from transport segments.
 
     The result is the Beer--Lambert-attenuated track-length estimate in photons
     per eV per sr per incident electron toward ``n_hat``. EEDL MF=23/MT=527
-    totals and MF=26/MT=527 photon distributions are the default and emit
-    isotropically; the retained Bethe--Heitler backend is selectable and
+    totals and MF=26/MT=527 photon distributions emit isotropically and are
+    the ``"auto"`` fallback; the retained Bethe--Heitler backend is selectable and
     supplies missing-coverage fallback. ``"bremslib"`` weights each segment by
     the BremsLib double differential cross section at its emission angle
     ``arccos(v_hat . n_hat)``.
@@ -897,9 +898,13 @@ def mc_brem_spectrum(
     E_cut_keV
         Optional post-transport electron-energy cutoff in keV.
     cross_section_model
-        ``"eedl"`` (default) for evaluated MF=23/527 totals and normalized
-        MF=26/527 photon spectra, ``"bethe-heitler"`` for the retained
-        analytic Bethe--Heitler + Elwert backend, or ``"bremslib"`` for the
+        ``"auto"`` (default) uses the direction-resolved BremsLib model when
+        the segments carry directions ``v_hat`` and a table resolves for every
+        composition element (the supplied ``bremslib_tables``, else the
+        installed release), and otherwise warns and uses ``"eedl"``.
+        ``"eedl"`` selects evaluated MF=23/527 totals and normalized
+        MF=26/527 photon spectra, ``"bethe-heitler"`` the retained
+        analytic Bethe--Heitler + Elwert backend, and ``"bremslib"`` the
         direction-resolved BremsLib model. Missing EEDL coverage warns and
         falls back to Bethe--Heitler for affected elements or segments; an
         element without a BremsLib table, or a segment energy outside it,
@@ -925,11 +930,13 @@ def mc_brem_spectrum(
         raise ValueError(
             "coupled radiative tracks require mc_soft_brem_spectrum and mc_hard_brem_event_spectrum"
         )
+    comp = _normalize_composition(element, n_atoms_per_ang3, composition)
+    if cross_section_model == "auto":
+        cross_section_model, bremslib_tables = resolve_auto_model(segments, comp, bremslib_tables)
     cross_section_model = _validate_bremsstrahlung_model(cross_section_model)
     supplied_bremslib = (
         _require_bremslib_tables(bremslib_tables) if cross_section_model == "bremslib" else {}
     )
-    comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     segments = _clip_segments_to_cutoff(segments, E_cut_keV, comp, layers)
     thickness = segments["thickness_ang"]
     if electron_limit is None:
