@@ -14,6 +14,7 @@ import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
+from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
 from ._kernels import (
@@ -631,7 +632,6 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     denom = blk.denom
     gamma = blk.gamma
     t_L = blk.t_L
-    L_esc = blk.L_esc
     omega_res = blk.omega_res
     detuning = blk.detuning
     k_dot_g = blk.k_dot_g
@@ -674,10 +674,13 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
         A2_cbs = A2_cbs + a2c
 
     # -- 6+7. Beer-Lambert escape factor + weights (fused prefactor) -----
-    # mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted);
-    # _line_weight_core folds T_abs = exp(-L_esc mu) into the PXR
-    # prefactor as one launch. a_width stays inline (needs ones_like).
-    pref = _line_weight_core(omega_res, t_L, L_esc, mu, ALPHA_FS, _PREF_C1)
+    # mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted).
+    # T_abs is the segment mean of exp(-L_esc(s) mu) over the linear escape
+    # pieces, not its midpoint value: exact integrated line yield, sinc^2
+    # shape kept (issue #181). Validation: segment-escape-average
+    frac, path_start, path_end = (a[blk.sb] for a in st.escape_pieces)
+    T_abs = piece_mean_transmission(frac, path_start, path_end, mu[..., None], xp=xp)
+    pref = _line_weight_core(omega_res, t_L, T_abs, ALPHA_FS, _PREF_C1)
     a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
     weight = pref * A2 * WM
     good = keep & xp.isfinite(weight) & (weight > 0)

@@ -54,8 +54,9 @@ def mc_spectrum(
                       * sinc^2[(1-beta*v.n)*(omega-omega_res)*t_L/2] * T_abs
 
     with A = A_PXR + A_CBS per polarization (Feranchuk Eqs. 13/14 at omega_res),
-    t_L = L_seg/beta, and T_abs the Beer-Lambert escape factor from the segment
-    midpoint. The finite-time sinc^2 is the centered integral of ``exp(i 2 P t)``
+    t_L = L_seg/beta, and T_abs the Beer-Lambert escape factor: its mean along
+    the segment (incoherent route; exact integrated yield), or its midpoint
+    value on the amplitude (coherent and flight-grouped). The finite-time sinc^2 is the centered integral of ``exp(i 2 P t)``
     over ``t_L`` (normalized-sinc convention) under a constant segment velocity
     and amplitude; at zero detuning it is ``t_L**2``.
 
@@ -63,7 +64,8 @@ def mc_spectrum(
 
     Physical model, documented once under ``docs/physics/``:
 
-    - escape and self-absorption from the segment midpoint, and the in-medium
+    - escape and self-absorption (segment mean or midpoint, above; Validation:
+      segment-escape-average), and the in-medium
       dispersion ``k = n(omega) omega`` that both the kinematics and the
       coherent propagation phase run on -- real part only, bulk response, so
       grazing geometry is out of scope: radiation-physics/photon-escape-and-dispersion.md

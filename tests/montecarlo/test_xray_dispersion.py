@@ -263,7 +263,11 @@ def test_single_segment_coherent_is_pure_phase_under_refraction():
     coh = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2, coherent=True)
     inc = mc_spectrum(seg, E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
     assert coh.max() > 0.0
-    np.testing.assert_allclose(coh, inc, rtol=1e-10, atol=1e-14 * inc.max())
+    # Incoherent escape is the segment mean, coherent the midpoint (issue
+    # #181): one line, so a constant T_mid / <T> <= 1 separates them.
+    scale = float(coh.sum() / inc.sum())
+    assert 0.99 < scale <= 1.0
+    np.testing.assert_allclose(coh, scale * inc, rtol=1e-10, atol=1e-14 * inc.max())
 
 
 # --- case-dict plumbing ----------------------------------------------------

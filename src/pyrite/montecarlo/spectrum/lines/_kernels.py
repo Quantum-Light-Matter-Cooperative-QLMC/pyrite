@@ -447,12 +447,12 @@ if hasattr(xp, "fuse"):
     _line_kin_core = xp.fuse()(_line_kin_core)
 
 
-def _line_weight_core(omega_res, t_L, L_esc, mu, alpha_fs, pref_c1):
-    """PXR prefactor incl. the Beer-Lambert escape factor as one fused kernel:
-    ``T_abs = exp(-L_esc mu)`` folded into ``alpha_fs om / (4 pi^2 hbar c)
-    t_L^2 T_abs``. Pure kernel-merge of the identical inline step 6/7 expression
-    (``t_L**2`` written ``t_L*t_L``) -> bit-for-bit, no new validation debt."""
-    T_abs = xp.exp(-(L_esc * mu))
+def _line_weight_core(omega_res, t_L, T_abs, alpha_fs, pref_c1):
+    """PXR prefactor incl. the escape transmission as one fused kernel:
+    ``alpha_fs om / (4 pi^2 hbar c) t_L^2 T_abs``. Pure kernel-merge of the
+    identical inline step 6/7 expression (``t_L**2`` written ``t_L*t_L``) ->
+    bit-for-bit, no new validation debt. ``T_abs`` is the segment-mean
+    transmission. Validation: segment-escape-average"""
     return alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs
 
 

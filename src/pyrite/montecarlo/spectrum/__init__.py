@@ -43,6 +43,7 @@ from .diagnostics import (
     subdivide_flights,
 )
 from .lines import (
+    LINE_ESCAPE_MODEL,
     REAL,
     _INTERP_GATHER_LINE_TABLES_F32,
     _JIT_COHERENT_PAIR_TARGET,

@@ -88,9 +88,11 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # for issue #91's `l-shell-ck-lorentzian-v5` marker: L-shell Coster--Kronig
     # redistribution changes the L line yields themselves, so v4 records are not
     # the same spectrum. Re-minted again for issue #89: default cases now select
-    # the ELSEPA elastic model, which changes every trajectory.
+    # the ELSEPA elastic model, which changes every trajectory. Re-minted again
+    # for issue #181's `line_escape_model` marker: the incoherent line route
+    # now scores the segment-mean escape.
     assert case_content_key(case) == (
-        "8683f64c5a5ecf9a1135015ad652cd3fd3b1030dd9541d1f806e70b6c1f8af4d"
+        "eefead2d211653aad1d3fd2762acf565128def40d557840e79a11aac19060c75"
     )
 
 
@@ -101,7 +103,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "d76215e5540087ce7cfdd0a605f07acda95f49e1d113a4cc74ef092e5c954f40"
+        "0bcdbd64d1212c341b4e982b1874059379525ac450dc61f668ad1eb8966c8415"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -401,7 +403,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "d76215e5540087ce7cfdd0a605f07acda95f49e1d113a4cc74ef092e5c954f40"
+        "0bcdbd64d1212c341b4e982b1874059379525ac450dc61f668ad1eb8966c8415"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -415,42 +417,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "0aef70fd23283a5bdad8fc102173bb7c853d66cee064ebbbd5fddb1d5756a073",
+            "5e6ef3c364b9790a83c6190c30d23e83a66cda4df15149dc54d66f4d70a6d26c",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "7f61f32352323c3d787e16d219ccbdcb91e5ad0b0f50b99b92b7a2f13b31389e",
+            "c7bc082b1892dbcef62b56d3df9b18ccf03c3c696c40fca4933a762414eedfa4",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "34de9e659b08ba1842ffa78b5f8bccd9af9d9d94de51f0c6a6f22044a659e158",
+            "788b13a37adcba9a0e5b224bff918aabf6351dd1770d77f8859ffccd782d20fa",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "4492b7b9440108747b9ff7fd5a8a76bb5e15a08084f4e2fd7743ba4296262468",
+            "4e2d1937cc204a6023258d5ffaf74159e9947e4112d0875d636aab2763b0c1dd",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "fe3fc22dd849acd7ce4e09479e60dedc0515951fe3810729796a35f325762ecb",
+            "1b6deb18f9a6f0224fb16f7b7a4555d9f8dfd365271dc89ba14932194e0882b5",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "8996ece9c3e56f83d73e2fc3a22f6dfb8157993cd0efc876f1e731bbd808e67e",
+            "60cc249538caac430a362e141b415ff11aa232a2f82970491ed58ee7df45a07b",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "57d97ac675858846a312bb9f11fa0cb536bf53da6a921ca5abc451b6f69509f9",
+            "97f4fdabdbab4f50ad49e214d108e095d4a5b8b7b18023b175be01ef2c03e7ff",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "097cbe5ef65e1365b4584ea8691234af55b14ed5b5fa80641d81e5ead0c19501",
+            "4eb0940f99404c1ba9b58524c98d7edcdb35c4b1e36b01ba50eba0caca0eec58",
         ),
     ],
 )
@@ -466,8 +468,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     characteristic radiation was introduced, for the EEDL bremsstrahlung
     generation marker, for natural Lorentzian characteristic profiles, for
     issue #88's physical finite-window convention, for issue #91's
-    `l-shell-ck-lorentzian-v5` L-shell Coster--Kronig relaxation marker, and
-    for issue #89's ELSEPA elastic model becoming the default.
+    `l-shell-ck-lorentzian-v5` L-shell Coster--Kronig relaxation marker, for
+    issue #89's ELSEPA elastic model becoming the default, and for issue
+    #181's segment-mean line-escape marker.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in
@@ -617,9 +620,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # convention, again for issue #125's automatic bundled line grids, again
     # for issue #91's L-shell Coster--Kronig relaxation marker, and again for
     # issue #89's default ELSEPA elastic model, and again for the BremsLib
-    # default continuum of issue #86) must stay bit-for-bit.
+    # default continuum of issue #86, and again for issue #181's line-escape
+    # marker) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "d76215e5540087ce7cfdd0a605f07acda95f49e1d113a4cc74ef092e5c954f40"
+        "0bcdbd64d1212c341b4e982b1874059379525ac450dc61f668ad1eb8966c8415"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -629,9 +633,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # instead of 0 eV, so the declared sweep payload this digest hashes moved.
     # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
     # bandwidth request the resolver raises, so it was left alone. Re-minted
-    # again for issue #89's default ELSEPA elastic model.
+    # again for issue #89's default ELSEPA elastic model, and for issue #181's
+    # line-escape marker.
     assert survey_incoherent["parameter_sha256"] == (
-        "a06665e8387e4f37e6efd60f6e48de0b8cfafe1bbaf9f8abbaf421149ac9e5c7"
+        "833e5401410bab31cb2897375ea56b2b4d3979ae5ac095dc354759f43f1d6ec3"
     )
 
 

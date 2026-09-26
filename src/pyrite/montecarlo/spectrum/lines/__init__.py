@@ -88,7 +88,7 @@ from ._policy import (
     _USE_JIT_COHERENT_STREAM,
     _USE_JIT_LINE_REDUCTION,
 )
-from ._setup import SpectrumRequest, _prepare_spectrum, _SpectrumSetup
+from ._setup import LINE_ESCAPE_MODEL, SpectrumRequest, _prepare_spectrum, _SpectrumSetup
 from ._spectrum import (
     _finalize_spectrum,
     _mc_spectrum,

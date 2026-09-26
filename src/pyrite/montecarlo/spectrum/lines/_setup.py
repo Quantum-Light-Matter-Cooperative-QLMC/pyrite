@@ -16,6 +16,7 @@ from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
+from ..segment_escape import segment_escape_pieces
 from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_line_quadrature
 from ._kernels import (
     _clip_segments_to_cutoff,
@@ -25,6 +26,12 @@ from ._kernels import (
     _observation_direction,
     _validate_groove_escape_direction,
 )
+
+# Generation marker for the line route's photon-escape model, hashed into the
+# dataset and case-content identities like ``characteristic_model``. A
+# constant, not a selector: the incoherent route scores the segment-mean
+# escape since issue #181, which orphans midpoint-era line spectra once.
+LINE_ESCAPE_MODEL = "segment-mean-incoherent-v1"
 
 
 @dataclass(frozen=True, eq=False)
@@ -130,6 +137,10 @@ class _SpectrumSetup:
     decoherence_A_pop: Any
     xy0_pop: Any
     L_esc_all: Any = None
+    # Incoherent routes only: padded linear escape pieces per segment
+    # (``segment_escape.segment_escape_pieces``), for the segment-mean
+    # transmission. Validation: segment-escape-average
+    escape_pieces: Any = None
     # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
@@ -511,6 +522,17 @@ def _prepare_spectrum(request):
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
+    # Incoherent emission scores the segment mean of exp(-tau), not its
+    # midpoint value (issue #181, as #176 did for characteristic lines). The
+    # escape pieces are g-independent, so both routes share one pass; mu
+    # varies per (segment, reflection) and is applied by the route. The
+    # coherent route and the flight-grouped reduction -- a coherent sum per
+    # flight -- keep the midpoint escape on the amplitude for now.
+    escape_pieces = (
+        None
+        if coherent or grouped
+        else segment_escape_pieces(segments, n_hat, layers=layers, groove=groove, xp=xp)
+    )
 
     return _SpectrumSetup(
         request=request,
@@ -555,4 +577,5 @@ def _prepare_spectrum(request):
         xy0_pop=xy0_pop,
         bin_edges=bin_edges,
         bin_inv_width=bin_inv_width,
+        escape_pieces=escape_pieces,
     )

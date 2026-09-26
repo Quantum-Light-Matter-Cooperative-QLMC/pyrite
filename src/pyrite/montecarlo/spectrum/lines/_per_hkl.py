@@ -12,6 +12,7 @@ from ...._backend import REAL, _to_cpu, xp
 from ....materials.attenuation import _mu_total_inv_ang, _stack_tau
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ...groove import escape_distance_ang
+from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
 from ._kernels import (
@@ -481,7 +482,7 @@ def _accumulate_reflection(
         A2_pxr += a2_pxr
         A2_cbs += a2_cbs
 
-    # -- 6. Beer-Lambert escape factor from the segment midpoint -------------
+    # -- 6. Beer-Lambert escape factor ----------------------------------------
     # straight path along n_hat to whichever face the photon exits. With a
     # LAYERED absorber (layers) the optical depth sums mu_i*dz_i across the
     # film-on-substrate stack; otherwise it's the single-slab path. The
@@ -500,7 +501,8 @@ def _accumulate_reflection(
         # n_hat[2] < 0 here.
         # Validation: blazed-groove-geometry
         L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
-        tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+        mu_layers = [_mu_total_inv_ang(abs_comp, E_r)]
+        tau = L_esc * mu_layers[0]
     elif finite_footprint:
         # the escape DISTANCE is g-independent, so it is computed once per
         # case (L_esc_all, below the loop's stacking prologue) instead of per
@@ -508,8 +510,10 @@ def _accumulate_reflection(
         assert L_esc_all is not None  # set whenever finite_footprint and no groove
         L_esc = L_esc_all[idx]
         if layers is None:
+            mu_layers = [mu_i]
             tau = L_esc * mu_i
         else:
+            mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
             tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
     else:
         if layers is None:
@@ -517,10 +521,22 @@ def _accumulate_reflection(
                 L_esc = z_mid / (-n_hat[2])  # out the entrance face
             else:
                 L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
+            mu_layers = [mu_i]
             tau = L_esc * mu_i
         else:
+            mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
             tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
-    T_abs = xp.exp(-tau)
+    if st.escape_pieces is None:
+        # Coherent and flight-grouped reductions: midpoint escape on the
+        # amplitude (issue #181).
+        T_abs = xp.exp(-tau)
+    else:
+        # Incoherent route: the segment mean of exp(-tau) over the same escape
+        # geometry, split into linear pieces (issue #181, as #176 for
+        # characteristic lines). Validation: segment-escape-average
+        frac, path_start, path_end = (a[idx] for a in st.escape_pieces)
+        mu = xp.stack([xp.asarray(m, dtype=REAL) for m in mu_layers], axis=-1)[:, None, :]
+        T_abs = piece_mean_transmission(frac, path_start, path_end, mu, xp=xp)[:, 0]
 
     # -- 7b. flight-grouped incoherent accumulation ---------------------------
     # The same complex per-row field the coherent path builds, but reduced

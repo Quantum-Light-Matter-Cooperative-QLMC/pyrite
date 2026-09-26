@@ -248,4 +248,57 @@ def mean_transmission(tau_start, tau_end, xp=np):
     return xp.exp(-lo) * ratio
 
 
-__all__ = ["mean_transmission", "segment_escape_paths"]
+def segment_escape_pieces(segments, n_hat, *, layers=None, groove=None, xp=np):
+    """Linear escape pieces of every segment, padded to one row per segment.
+
+    Returns ``(fraction, path_start, path_end)`` with shapes ``(N, P)``,
+    ``(N, P, K)`` and ``(N, P, K)``: ``N`` segments, ``P`` the largest piece
+    count, ``K`` layers (1 for a single slab). Padding slots carry zero
+    fraction and zero paths, so they add nothing in
+    :func:`piece_mean_transmission`. This layout suits consumers whose ``mu``
+    varies per (segment, reflection) and so cannot use the flat ``owner`` rows
+    of :func:`segment_escape_paths`. Validation: segment-escape-average
+    """
+    n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
+    owner, fraction, path_start, path_end = segment_escape_paths(
+        segments, xp.arange(n_rows), n_hat, layers=layers, groove=groove, xp=xp
+    )
+    counts = xp.bincount(owner, minlength=n_rows)
+    n_pieces = max(1, int(counts.max())) if n_rows else 1
+    # ``owner`` is ascending (row-major nonzero), so a piece's slot is its
+    # offset from its owner's first piece.
+    slot = xp.arange(owner.size) - (xp.cumsum(counts) - counts)[owner]
+    n_layers = int(path_start.shape[1])
+    frac = xp.zeros((n_rows, n_pieces), dtype=REAL)
+    start = xp.zeros((n_rows, n_pieces, n_layers), dtype=REAL)
+    end = xp.zeros((n_rows, n_pieces, n_layers), dtype=REAL)
+    frac[owner, slot] = fraction
+    start[owner, slot] = path_start
+    end[owner, slot] = path_end
+    return frac, start, end
+
+
+def piece_mean_transmission(fraction, path_start, path_end, mu, xp=np):
+    """Segment mean of ``exp(-tau)`` over padded linear pieces.
+
+    ``fraction`` and ``path_*`` are row-selected outputs of
+    :func:`segment_escape_pieces`; ``mu`` has shape ``(N, M, K)`` -- per row,
+    per column (e.g. reflection), per layer. Returns ``(N, M)``, the
+    fraction-weighted sum of :func:`mean_transmission` over each row's pieces.
+    Validation: segment-escape-average
+    """
+    total = None
+    for p in range(int(fraction.shape[1])):
+        tau_start = xp.sum(path_start[:, None, p, :] * mu, axis=-1)
+        tau_end = xp.sum(path_end[:, None, p, :] * mu, axis=-1)
+        term = fraction[:, p, None] * mean_transmission(tau_start, tau_end, xp=xp)
+        total = term if total is None else total + term
+    return total
+
+
+__all__ = [
+    "mean_transmission",
+    "piece_mean_transmission",
+    "segment_escape_paths",
+    "segment_escape_pieces",
+]

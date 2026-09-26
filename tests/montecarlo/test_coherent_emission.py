@@ -135,9 +135,14 @@ def test_single_segment_coherent_equals_incoherent_self_term():
 
     incoherent = mc_spectrum(segments, E_GRID, coherent=False, **KWARGS)
     coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
+    # The incoherent route scores the segment-mean escape, the coherent route
+    # its midpoint value (issue #181). One segment has one line energy, so the
+    # two differ by the constant T_mid / <T> <= 1 (Jensen), here within 1e-7.
+    scale = float(coherent.sum() / incoherent.sum())
+    assert 1.0 - 1e-7 < scale <= 1.0
     peak = max(np.max(np.abs(coherent)), np.max(np.abs(incoherent)))
     assert np.max(incoherent) > 0.0
-    np.testing.assert_allclose(coherent, incoherent, rtol=RTOL, atol=peak * ATOL)
+    np.testing.assert_allclose(coherent, scale * incoherent, rtol=RTOL, atol=peak * ATOL)
 
 
 def test_coherent_decoherence_blend_matches_reference_formula():
