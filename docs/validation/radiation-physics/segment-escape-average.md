@@ -152,10 +152,39 @@ The stack's outer boundaries are $z=0$ and $z=T$. On a piece where the $z$ face 
 
 **Verdict:** `rederived`. The derivation matches the implementation symbolically, and it matches numerically to the brute-force resolution. The CUDA hardware parity run, the #176 split ladder and the line-route quantification are still pending. They do not affect this verdict.
 
+## Fresh-context verification of the issue #181 incoherent-line extension (2026-09-26)
+
+A separate context that did not write the implementation verified the extension. It read the ledger row and the section above, derived the result below, and only then read `segment_escape.py::{segment_escape_pieces,piece_mean_transmission}`, `lines/_batched.py::_batched_incoherent_block`, `lines/_per_hkl.py::_accumulate_reflection` and `lines/_setup.py::_prepare_spectrum`.
+
+**Parseval.** With $h(t)=e^{-\tau(t)/2}$ on $[0,t_L]$ and zero elsewhere, Plancherel gives $\int\lvert\hat h(q)\rvert^2dq=2\pi\int_0^{t_L}e^{-\tau}dt=2\pi t_L\langle e^{-\tau}\rangle$. The kept shape integrates to $\int t_L^2\operatorname{sinc}^2(qt_L/2)\,dq=2\pi t_L$. So $T=\langle e^{-\tau}\rangle$ reproduces the exact integrated yield and $T=e^{-\bar\tau}$ undercounts it (Jensen). This matches {eq}`eq-segment-escape-line`. The same identity is the coherent route's $\int\lvert F\rvert^2dv=\pi\langle e^{-\tau}\rangle$ (`coherent-formation-absorption`, verified the same day).
+
+**Padded layout.**
+
+- `segment_escape_pieces` scatters the flat `segment_escape_paths` rows to slot `arange - (cumsum(counts) - counts)[owner]`. That is correct because `owner` ascends. Padding slots hold zero fraction and zero paths, so they add $0\cdot\langle e^{-0}\rangle=0$.
+- `piece_mean_transmission` returns $\sum_pf_p\,\langle e^{-\tau}\rangle_p$ with $\tau=\sum_K\mu_K\ell_K$, and its broadcasts are $(N,1,K)\times(N,M,K)$.
+- In the batched block, $\mu$ is `mu[..., None]`, shape $(n_b,N_g,1)$, on the single slab (the batched route has no layers).
+- In the per-hkl route, $\mu$ is stacked per layer in the order of `layers`, the same order the paths use. The groove takes the absorber $\mu$ and the single slab the tabulated `mu_i`, as the midpoint code did.
+- Rows align with `idx`, because the incoherent route does not expand pieces and the pieces are cut after `_clip_segments_to_cutoff`.
+- `_line_weight_core` now takes $T$ directly.
+- No incoherent line path still evaluates a midpoint $e^{-\mu L}$.
+
+**Independent oracle** (scratch script, CPU backend). The absorbed-to-transparent ratio of `mc_spectrum` (incoherent; transparent means the piece paths are zeroed) is compared with a separately written $2\times10^6$-point midpoint mean of $e^{-\tau}$ along the segment. The oracle uses its own geometry: slab exit through $z=0$; box minimum over the $z=0$ and $+x$ faces; layered overlap of the exit ray with each layer. $\mu$ is captured from the run.
+
+| case | code ratio | brute-force mean | relative difference | shape residual |
+| --- | --- | --- | --- | --- |
+| slab, batched, 1 and 5 pieces | 0.5590590948 | 0.5590590948 | $1\times10^{-14}$ | $8\times10^{-16}$ |
+| finite box with face switch, batched, 1 and 5 pieces | 0.7208540402 | 0.7208540402 | $3\times10^{-15}$ | $4\times10^{-16}$ |
+| Cu film on hopg, crossing the interface, per-hkl, 1 and 5 pieces | 0.2262001498 | 0.2262001498 | $2\times10^{-13}$ | $4\times10^{-16}$ |
+
+`tests/montecarlo/test_line_segment_escape.py` and `test_segment_escape.py` pass.
+
+**Observation.** With the coherent slice, single-segment coherent and incoherent spectra agree in $v$-integral but not in energy integral: they differ by $1-O(\delta)$ through the two routes' different $dv/dE$ (measured $0.99977$ at hopg 002, 100 keV). They also differ by the $O(\delta)$ line-centre offset. See `coherent-formation-absorption`.
+
+**Verdict for the extension:** `rederived`. It matches symbolically and numerically to the oracle's resolution. The #176 verdict above is unchanged.
+
 ## Status
 
-`rederived` (fresh-context re-derivation above, 2026-09-25). Human sign-off pending. Pending:
+`rederived` (fresh-context re-derivation above, 2026-09-25; issue #181 incoherent-line extension verified 2026-09-26). Human sign-off pending. Pending:
 
 - CUDA hardware execution of the parity tests;
-- fresh-context verification of the issue #181 incoherent-line extension (the Parseval step and the padded piece layout);
 - re-measurement of the #176 hopg C K split ladder;

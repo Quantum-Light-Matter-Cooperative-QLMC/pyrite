@@ -51,10 +51,10 @@ from ...transport import beta_from_keV
 from ..segment_escape import segment_escape_paths
 from ._kernels import _SEG_ARRAYS
 
-# |w|^2 below which F takes its second-order series. The closed form is
-# cancellation-free in its real part and loses only absolute rounding in its
-# imaginary part, so the switch only guards the 0/0 at w = 0; the dropped
-# O(|w|^4/120) term is below 1e-14 there.
+# |w|^2 below which F takes its second-order series. The closed form loses
+# at most absolute rounding (epsilon times the 1/|v| envelope), so the switch
+# only guards the 0/0 at w = 0. The series keeps cosh(q) exactly in a+b but
+# cuts the bracket, so its truncation is ~q^4/8, about 1e-13 at the switch.
 FORMATION_SERIES_W2 = 1.0e-6
 # |q| below which a+b and b-a are formed from exp(-tau_c/2) and cosh/sinh(q):
 # b - a cancels for small q. Above it both exponentials are <= 1 and far apart.
