@@ -149,6 +149,29 @@ Options:
                                   overrides it.
   --wait                          Wait for remote completion and pull results.
   --detach                        Return after remote submission.
+  --source [analytic|gpt_gdf]     Override beam source; gpt_gdf replaces analytic phase
+                                  space (local runs).
+  --gdf-shape-only / --no-gdf-shape-only
+                                  Use profile sweep energies with GDF
+                                  positions/directions/weights; discard crossing times.
+                                  Default: import energies.
+  --gdf-path PATH                 GPT time-output file; relative to current directory.
+  --gdf-time-s NUMBER             Select time in seconds; required for multiple time
+                                  blocks.
+  --gdf-time-tolerance-s NUMBER   Absolute time tolerance in seconds [default: 1e-15].
+  --gdf-normalization [pyrite_current|gdf_charge]
+                                  Configured current or GDF bunch charge times
+                                  repetition rate.
+  --gdf-repetition-rate-hz NUMBER
+                                  Required positive repetition rate for gdf_charge
+                                  normalization.
+  --gdf-z-origin-m NUMBER         Explicit target origin along GPT lab z in meters;
+                                  required for GDF.
+  --gdf-screen-position-m NUMBER  Select GPT screen coordinate in meters; excludes
+                                  --gdf-time-s.
+  --gdf-screen-tolerance-m NUMBER
+                                  Absolute screen-coordinate tolerance in meters
+                                  [default: 1e-9].
   --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
                                   provisional and reduced.  [default: full]
   -o, --output [table|json|wide]  Output format; only json is a stable automation
@@ -1802,12 +1825,14 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  create  Create a new named beam NAME.
-  delete  Delete a named beam; irreversible.
-  list    List named beams with label and profile-reference counts.
-  rename  Rename beam NAME to NEW_NAME.
-  set     Update fields on an existing named beam NAME.
-  show    Show one named beam's fields.
+  create       Create a new named beam NAME.
+  delete       Delete a named beam; irreversible.
+  gdf-inspect  List GPT outputs and inspect lab coordinates to choose a target z...
+  gdf-times    List GPT time-output times in seconds and particle counts (CPU only).
+  list         List named beams with label and profile-reference counts.
+  rename       Rename beam NAME to NEW_NAME.
+  set          Update fields on an existing named beam NAME.
+  show         Show one named beam's fields.
 ```
 
 ## `pyrite beam create`
@@ -1857,6 +1882,38 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
+```
+
+## `pyrite beam gdf-inspect`
+
+```text
+Usage: pyrite beam gdf-inspect [OPTIONS] PATH
+
+  List GPT outputs and inspect lab coordinates to choose a target z origin.
+
+  A sole time output is inspected automatically. Otherwise choose --time-s or --screen-
+  position-m. The centroid is a placement choice; the file cannot infer the physical
+  target location. Screen labels need not equal lab z.
+
+Options:
+  --time-s NUMBER                 Select time output in seconds.
+  --time-tolerance-s NUMBER       [default: 1e-15]
+  --screen-position-m NUMBER      Select screen coordinate in meters; excludes --time-s.
+  --screen-tolerance-m NUMBER     [default: 1e-09]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite beam gdf-times`
+
+```text
+Usage: pyrite beam gdf-times [OPTIONS] PATH
+
+  List GPT time-output times in seconds and particle counts (CPU only).
+
+Options:
+  -h, --help  Show this message and exit.
 ```
 
 ## `pyrite beam list`

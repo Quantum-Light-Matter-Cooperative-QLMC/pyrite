@@ -190,6 +190,9 @@ def material_sweep(
             # the other -- otherwise every such profile would fail build_cases.
             beam_changes.setdefault("transverse_fwhm_x_mm", None)
             beam_changes.setdefault("transverse_fwhm_y_mm", None)
+        if beam_changes.get("source") == "gpt_gdf":
+            beam_changes.setdefault("transverse_fwhm_x_mm", None)
+            beam_changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **beam_changes)
     resolved_catalog_detector = catalog_detector(catalog_profile)
     legacy_detector = {
@@ -284,6 +287,9 @@ def material_sweep(
     target_over = {k: overrides.pop(k) for k in list(overrides) if k in _TARGET_OVERRIDE_KEYS}
     if overrides:
         sweep = replace(sweep, **overrides)
+    if beam_over.get("source") == "gpt_gdf":
+        beam_over.setdefault("transverse_fwhm_x_mm", None)
+        beam_over.setdefault("transverse_fwhm_y_mm", None)
     if beam_over:
         sweep = replace(sweep, beam=beam_replace(sweep.beam, **beam_over))
     if target_over:

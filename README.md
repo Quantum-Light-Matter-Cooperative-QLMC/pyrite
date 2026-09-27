@@ -210,3 +210,6 @@ before scientific use.
 
 Academic research code under active development. No project license currently
 attached; contact author regarding reuse.
+
+Native GPT `.gdf` electron-beam snapshots are supported as a local beam source;
+see [GDF beam import](docs/guides/gpt-gdf-beams.md) for configuration and CLI examples.

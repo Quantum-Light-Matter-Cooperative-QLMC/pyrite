@@ -560,3 +560,10 @@ Importable repository maintenance implementations behind `pyrite-dev`: package s
 
 ### `apps/_compile_nb.py`
 Internal notebook-compile helper; not public API.
+
+### `montecarlo/gdf.py`
+
+CPU-only EasyGDF adapter: raw GPT time/screen selection and coordinate inspection, electron validation,
+correlated weighted resampling, and explicit lab-to-entrance projection.
+`BeamSpec` resolves the source into hashed `Case.gdf_source` metadata; transport
+receives numeric initial-state arrays through its existing backend boundary.

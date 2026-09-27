@@ -70,3 +70,5 @@ Derivation can be remote for heavy work. The stored artifact contains full bound
 ## Diagnose precedence
 
 Start with `pyrite config list`, then inspect shell variables and the resolved profile/material. Empty configuration environment variables are errors, not a request to fall through. See [Configuration and profile resolution](../repo-design/configuration-resolution.md) for the complete chain.
+
+For native GPT time-output electron beams, see [GDF beam import](gpt-gdf-beams.md),including named beam configuration, run overrides, and normalization.
