@@ -273,8 +273,21 @@ spacing. Its 1 um 10/100 case passed the truncation audit at 8,891 nodes:
 21.64 s transport, 0.22 s lines, 1,319 MiB host and 229 MiB device peak.
 The second case, 1 mm 10/100, produced no result through the 30-minute SLURM
 limit; status queries slowed to tens of seconds and the SSH proxy intermittently
-rejected handshakes. Terminal scheduler state and peak memory could not be
-retrieved. The third, 1 mm 80/180 case did not produce a result either. This
-does not establish which stage consumed the time or whether the host ran out
-of memory. A lower-memory collection path and stage-level timing are needed
-before another Ne=20,000 1 mm run.
+rejected handshakes. `scontrol show job 189` later reported `TIMEOUT`,
+`Reason=TimeLimit`, `RunTime=00:30:15`, `ExitCode=143:0`, and a 12,000 MB
+memory allocation. `slurm-189.err` confirms cancellation due to time limit.
+No peak RSS was available (`sacct` accounting disabled); the user account
+could not read system kernel messages. The third, 1 mm 80/180 case did not
+run. This is a confirmed timeout, not a confirmed OOM kill.
+
+Likely pressure: Ne=100 1 mm produced 277,612 segments and 555,224 line
+entries. Linear scaling to Ne=20,000 implies roughly 55.5 M segments and
+111 M line entries. The exact-weight selector retains three FP32 arrays per
+line (~1.24 GiB together), concatenates them into another population, then
+the stop solver filters/copies them and makes 60 full-population passes with
+FP64 temporaries. This can require many GiB of host memory beyond the
+resident trajectories, and many billions of line evaluations. The production
+report logs `transport_wall_s` only after grid selection, so it cannot isolate
+transport, line collection, stop search, or local-spacing planning. Add
+stage-level timings and peak RSS, then use a bounded-memory selector before
+another Ne=20,000 1 mm run.
