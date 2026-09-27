@@ -582,7 +582,8 @@ Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
   ParaView, VisIt, and PyVista.
 
 Options:
-  --out-dir DIR  Write <artifact-name>.vtp into DIR (default: beside each artifact).
+  --out-dir DIR  Write .vtp files under DIR, mirroring each ARTIFACT directory (default:
+                 beside each artifact).
   --no-vacuum    Omit grooved runs' vacuum legs.
   --overwrite    Replace existing .vtp outputs.
   -h, --help     Show this message and exit.

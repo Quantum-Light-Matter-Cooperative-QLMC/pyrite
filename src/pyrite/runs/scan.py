@@ -394,7 +394,16 @@ def run(args):
         incomplete = False
         for material in materials:
             remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
-            if not _run_material(args, material, max_seconds=remaining):
+            try:
+                complete = _run_material(args, material, max_seconds=remaining)
+            except Exception as error:
+                from ..montecarlo.trajectories import TrajectoryArtifactError
+
+                if not isinstance(error, TrajectoryArtifactError):
+                    raise
+                # An actionable user error (existing/stale artifacts), not a crash.
+                raise SystemExit(str(error)) from None
+            if not complete:
                 incomplete = True
         if incomplete:
             raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains

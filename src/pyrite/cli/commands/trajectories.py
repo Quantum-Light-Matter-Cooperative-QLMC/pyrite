@@ -8,13 +8,20 @@ from ...console import output as _cli_core
 
 
 def _artifacts(paths):
-    """Expand directories to their artifacts; keep explicit files as given."""
+    """Expand directories to ``(artifact, path relative to its root)`` pairs.
+
+    A directory's artifacts keep their layout below it (every case has an
+    ``E0_<E>keV.h5`` file, so names alone collide); an explicit file is its
+    own name.
+    """
     found = []
     for path in paths:
         if path.is_dir():
-            found.extend(sorted(p for p in path.rglob("*.h5") if p.is_file()))
+            found.extend(
+                (p, p.relative_to(path)) for p in sorted(path.rglob("*.h5")) if p.is_file()
+            )
         else:
-            found.append(path)
+            found.append((path, Path(path.name)))
     return found
 
 
@@ -42,7 +49,7 @@ def _artifacts(paths):
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
     metavar="DIR",
-    help="Write <artifact-name>.vtp into DIR (default: beside each artifact).",
+    help="Write .vtp files under DIR, mirroring each ARTIFACT directory (default: beside each artifact).",
 )
 @click.option("--no-vacuum", is_flag=True, help="Omit grooved runs' vacuum legs.")
 @click.option("--overwrite", is_flag=True, help="Replace existing .vtp outputs.")
@@ -53,12 +60,15 @@ def command(artifacts, out_dir, no_vacuum, overwrite):
     paths = _artifacts(artifacts)
     if not paths:
         raise _cli_core.CLIError("no trajectory artifacts (*.h5) found")
-    targets = [((out_dir or path.parent) / path.with_suffix(".vtp").name, path) for path in paths]
+    targets = [
+        ((out_dir / rel if out_dir is not None else path).with_suffix(".vtp"), path)
+        for path, rel in paths
+    ]
     names = [target for target, _ in targets]
     if len(set(names)) != len(names):
         raise click.UsageError(
-            "several artifacts map to the same output name; omit --out-dir to write "
-            "each beside its artifact"
+            "several artifacts map to the same output path; pass their common "
+            "directory instead of individual files"
         )
     existing = [target for target in names if target.exists()]
     if existing and not overwrite:

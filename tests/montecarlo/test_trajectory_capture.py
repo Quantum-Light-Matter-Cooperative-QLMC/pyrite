@@ -601,3 +601,34 @@ def test_export_cli_writes_beside_artifacts_and_refuses_to_clobber(tmp_path):
     assert (tmp_path / "run" / "a" / "E0_20keV.vtp").is_file()
     assert again.exit_code == 1 and "--overwrite" in again.output
     assert forced.exit_code == 0
+
+
+def test_export_cli_out_dir_mirrors_a_run_directory(tmp_path):
+    from pyrite.cli.commands.trajectories import command
+
+    segs = simulate_trajectories(20.0, 5, 2000.0, seed=0, **_SI)
+    run = tmp_path / "run"
+    for name in ("a", "b"):  # every case has the same E0 file name
+        write_trajectory_artifact(run / name / "E0_20keV.h5", segs, case=_case(name))
+
+    result = CliRunner().invoke(command, [str(run), "--out-dir", str(tmp_path / "vtp")])
+
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "vtp" / "a" / "E0_20keV.vtp").is_file()
+    assert (tmp_path / "vtp" / "b" / "E0_20keV.vtp").is_file()
+
+
+def test_run_reports_artifact_conflicts_without_a_traceback(monkeypatch):
+    from pyrite.cli.commands import scan as scan_cli
+    from pyrite.runs import scan
+    from tests.helpers.cli import invoke
+
+    def _refuse(*_args, **_kwargs):
+        raise TrajectoryArtifactExistsError("1 trajectory artifact(s) already exist")
+
+    monkeypatch.setattr(scan, "_run_material", _refuse)
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--trajectories", "traj"])
+
+    assert result.exit_code == 1
+    assert "already exist" in result.stderr
+    assert "Traceback" not in result.stderr
