@@ -260,7 +260,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
 def candidate(args: argparse.Namespace) -> dict[str, Any]:
     """float32: the measured axis on the pickled segments, against FP64."""
     from .._backend import BACKEND, REAL
-    from .convergence import segment_fingerprint
+    from .convergence import lineshape_deviation, segment_fingerprint
     from .convergence_case import CaseLadder
 
     if np.dtype(REAL) != np.dtype(np.float32):
@@ -277,11 +277,22 @@ def candidate(args: argparse.Namespace) -> dict[str, Any]:
         started = time.perf_counter()
         lines = np.asarray(ladder.lines(item["measured"]), dtype=float)
         wall = time.perf_counter() - started
-        fp64_yield, fp64_centroid = _yield_and_centroid(item["measured"], item["lines_fp64"])
-        f32_yield, f32_centroid = _yield_and_centroid(item["measured"], lines)
+        grid, reference = item["measured"], item["lines_fp64"]
+        fp64_yield, fp64_centroid = _yield_and_centroid(grid, reference)
+        f32_yield, f32_centroid = _yield_and_centroid(grid, lines)
+        # Where the centroid moves: its per-node contribution difference.
+        moment = (lines - reference) * (grid - fp64_centroid)
+        worst = int(np.argmax(np.abs(moment)))
         row["float32"] = {
             "yield_rel": (f32_yield - fp64_yield) / fp64_yield if fp64_yield else 0.0,
             "centroid_shift_eV": f32_centroid - fp64_centroid,
+            "fp64_centroid_eV": fp64_centroid,
+            "deviation": lineshape_deviation(grid, reference, lines),
+            "worst_moment_node_eV": float(grid[worst]),
+            "moment_share_above_20keV": float(
+                np.trapezoid(np.where(grid > 20_000.0, moment, 0.0), grid)
+                / (np.trapezoid(moment, grid) or 1.0)
+            ),
             "wall_s": wall,
             "device_peak_mib": _peak_mib(),
         }

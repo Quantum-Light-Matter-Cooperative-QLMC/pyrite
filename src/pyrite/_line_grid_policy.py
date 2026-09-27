@@ -161,9 +161,11 @@ BANDWIDTH_POLICIES = (AUTOMATIC_BANDWIDTH_POLICY, RESONANCE_BANDWIDTH_POLICY)
 #: Upper-edge truncation share of ``resonance-population``: the bandwidth row of
 #: ``tbl-line-budget-allocation``, a fraction of integrated incoherent line
 #: yield. The spectrum phase gates the production-weight truncation on it; the
-#: edge is chosen from the ``t_L**2`` proxy at a tenth of it.
+#: edge is chosen from the ``t_L**2`` proxy at half of it. Measured on 5 MeV
+#: h-BN (#192), the true loss sat 2.5-5x below the proxy target, and the audit
+#: bound is itself 2x the exact far tail.
 DEFAULT_BANDWIDTH_TRUNCATION = 1.0e-4
-BANDWIDTH_PROXY_SAFETY = 10.0
+BANDWIDTH_PROXY_SAFETY = 2.0
 AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
 
 #: Coarsest automatic spacing. Matches the catalog's historical 3 eV line-grid
