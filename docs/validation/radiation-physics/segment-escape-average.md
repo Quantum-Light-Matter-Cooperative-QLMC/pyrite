@@ -184,7 +184,22 @@ A separate context that did not write the implementation verified the extension.
 
 ## Status
 
-`rederived` (fresh-context re-derivation above, 2026-09-25; issue #181 incoherent-line extension verified 2026-09-26). Human sign-off pending. Pending:
+`rederived` (fresh-context re-derivation above, 2026-09-25; issue #181 incoherent-line extension verified 2026-09-26). Human sign-off pending.
 
-- CUDA hardware execution of the parity tests;
-- re-measurement of the #176 hopg C K split ladder;
+Hardware follow-up (2026-09-26, RTX 5080):
+
+- CUDA parity: `test_spectrum_cuda_cheap_hoists.py`, `test_segment_escape.py`
+  and `test_characteristic.py` pass under `PYRITE_MC_BACKEND=cuda
+  PYRITE_TEST_BACKEND=cuda`. The box/layer oracle tests now bound the
+  endpoint-path rounding at REAL (`tau eps`); CUDA misses of the old fixed
+  `1e-10` were 1.2e-9 and 7e-9 relative.
+- hopg split ladder (100 keV, 2 um, 30 deg, 20000 e x 3 seeds): C K and
+  bremsstrahlung yields are flat in k (ratio 1.0000 at k = 8 and 32, Mott
+  and ELSEPA); ELSEPA - Mott C K is -0.02 % at every k (was -15.7 % under
+  the midpoint rule).
+- PXR/CBS `spec_escape_only`, k = 32 over k = 1: +2.0 % (Mott) and +2.8 %
+  (ELSEPA) on the midpoint escape (#176 tree); +1.0 % and +0.25 % with #181.
+  The 3509 eV peak (-5.2 % / -3.1 %) does not move with #181: the
+  transparent control grows there while raw `spec` is flat, so it is
+  formation-time broadening leaving the peak window. The residual ~1 % Mott
+  drift is accepted.

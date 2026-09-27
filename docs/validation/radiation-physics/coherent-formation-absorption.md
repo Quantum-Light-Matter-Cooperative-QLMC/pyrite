@@ -74,7 +74,7 @@ Snell refraction at the face conserves the tangential wavevector, so the in-medi
 - **Series.** Below $|w|^2<10^{-6}$: $F=\tfrac{a+b}2\bigl(1-\tfrac{q^2}3-\tfrac{v^2}6\bigr)-i\tfrac{a+b}2\tfrac{qv}3$, with truncation $\approx q^4/8$ ($\cosh q$ is kept exactly in $a+b$ while the bracket is cut), about $10^{-13}$ at the switch.
 - **Rows.** `expand_escape_pieces` splits each coherent/grouped row at its escape pieces: piece length, midpoint and start age (parent $t$ + offset$/\beta$). A flight's pieces keep its grouping key. Only single slabs reach it -- both routes refuse layers.
 - **Window.** The per-hkl `sinc_cutoff` window bounds $|v|$; its energy half-width $(\text{cutoff}+|\Delta L/2|\max\delta\omega)/a_\text{vac}$ covers the refractive shift.
-- **CUDA.** Formation mode is an all-or-none launch-uniform branch; omitted, every kernel evaluates the legacy sinc unchanged. All seven kernels transpile and compile to PTX (NVRTC, compute_80) on a host without a GPU; device execution is pending.
+- **CUDA.** Formation mode is an all-or-none launch-uniform branch; omitted, every kernel evaluates the legacy sinc unchanged. All seven kernels transpile and compile to PTX (NVRTC, compute_80) on a host without a GPU; device execution passed on the RTX 5080 (2026-09-26).
 
 ## Evidence
 
@@ -168,4 +168,4 @@ The listed anchors pass: 44 passed, 1 skipped (CUDA).
 
 ## Status
 
-`rederived` (fresh-context verification above, 2026-09-26). Pending: CUDA hardware run of the gated parity tests; remote before/after run of `checks/segment_escape_split_ladder.py`. Human sign-off pending.
+`rederived` (fresh-context verification above, 2026-09-26). CUDA hardware run of the gated parity tests passed (2026-09-26); the before/after split ladder is recorded under `segment-escape-average`. Human sign-off pending.
