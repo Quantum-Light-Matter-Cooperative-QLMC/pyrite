@@ -189,6 +189,10 @@ Ne=20,000 production mode (job 20260927-094849-5e0f2102, safety 2): 1 um and
 real weight to far lines. 1 mm 45/140 at Ne=300 needs a 935 keV stop (real
 forward-scatter Doppler tail): uniform 3.3 M nodes; local spacing required.
 
+Ne=20k 1 mm (same job, done): 80/180 refused at resolution (uniform needs
+~3.4 M nodes); 10/100 resolved 271,398 nodes to 75.4 keV (transport 127 s)
+but audit refused at 6.3e-4. Both confirm items 1 and local spacing below.
+
 Next (in order):
 1. Replace the proxy with exact production weights: run the line kernel once
    on a 2-node axis [start, ceiling] with the audit in a "collect" mode
