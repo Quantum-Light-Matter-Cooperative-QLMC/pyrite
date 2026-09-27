@@ -190,9 +190,7 @@ def _spectrum_shape_metrics(
         "dominant_peak_eV": float(energy[dominant]),
         "dominant_fwhm_eV": right_eV - left_eV,
         "significant_peak_count": int(significant_peaks.size),
-        "significant_peak_energies_eV": [
-            float(energy[index]) for index in significant_peaks
-        ],
+        "significant_peak_energies_eV": [float(energy[index]) for index in significant_peaks],
     }
 
 

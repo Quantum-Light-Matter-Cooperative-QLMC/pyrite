@@ -362,14 +362,13 @@ proposals, not validated acceptance criteria.
 
 - Completed: oracle evidence/decision packet, domain/identity schema, the
   native measured-response/acquisition core with minimum bounded count APIs,
-  and the observation store plus library producer (checklist item 4, library
-  half; see "Observation store progress (2026-09-26)").
+  the observation store and producers (item 4), and the profile/CLI surface
+  plus `pyrite run` production (item 7); see "Observation store progress" and
+  "Sweep production and CLI progress" (both 2026-09-26).
 - Next: complete pixel metadata/selection APIs (item 5) and the analysis
-  workflow (item 6) over `ObservationStore`.
-- Then: CLI (item 7), which must also decide `pyrite run` sweep wiring and the
-  scalar-detector projection/migration (see open questions). CLI, app, and
-  remote workers consume the vertical backend rather than inventing parallel
-  representations.
+  workflow (item 6) over `ObservationStore`; then remote transfer and
+  lifecycle (item 8). Workers consume the vertical backend rather than
+  inventing parallel representations.
 
 ## Decisions and open questions
 
@@ -426,27 +425,47 @@ Decided:
   objects/obs/<observation_digest>.json}`, decoupled from checkpoint
   archive/slim/GC (human decision 2026-09-26). Remote transfer and
   reachability/GC rules for this tree remain item 8.
-- Checklist item 4 lands as a library producer only (human decision
-  2026-09-26): `runs.observe.produce_observation` persists or reuses one
-  scene's observation; `pyrite run` sweep wiring is deferred to item 7.
+- Item 4 first landed as a library producer (human decision 2026-09-26); the
+  human then delegated the CLI/sweep design with "whatever seems the best
+  solution in the long term -- no band-aids". Decided under that delegation:
+  - **Authority.** A profile whose physical detector has an acquisition is a
+    counting observation. Its sweep's scalar observation angle, polar
+    acceptance, and solid angle come from `PlanarDetector.scalar_detector()`,
+    so intrinsic checkpoint keys and observation source keys name the same
+    transport. Explicit scalar overrides with such a profile are errors; a
+    stored scalar detector reference is reported as superseded, never
+    silently mixed. Geometry-only physical detectors keep the old scalar
+    behavior and digests. The projection drops detector azimuth (existing
+    `scalar_detector()` contract); observations use exact geometry.
+  - **One transport per case.** Observation directions travel beside the case
+    (`run_case`/`run_cases(observation_directions=...)`), never inside it, so
+    case content keys, scalar arrays, and CAS blobs are unchanged. All three
+    scheduling branches evaluate them on the scalar transport.
+  - **Observation line grid.** Directional spectra use a grid resolved jointly
+    over every direction (finest sinc spacing, union of feature windows), not
+    the scalar grid, whose automatic windows were seeded only along the case
+    direction. Evidence: a 6 degree rotation adds seeds the scalar grid lacks.
+  - **Zero-energy nodes.** Filters are opaque at an exact 0 eV grid node
+    (`mu -> +inf` as `E -> 0+`), with `T = 1` kept for zero path; the standard
+    default brem grid starts at 0 eV and previously crashed filtered runs.
+  - **CLI tree.** `pyrite profile physical-detector show|set|reset` owns the
+    table; `profile filter add|set|rm|list|show` owns plates only. The
+    `filter add --detector-*/--shape/--pitch-mm` flags are removed (they
+    replaced the whole table and would drop scorer/response/acquisition),
+    following the #54/#62 precedent.
 
-Open for their later owning slices, not blockers for the acquisition core:
+Open for their later owning slices:
 
-- What is the reviewed CLI command tree and migration path from the existing
-  scalar `profile set --observation-angle/--polar-acceptance/--solid-angle`
-  surface? Note `profile filter add/list/rm/show` and physical-detector
-  creation through `filter add --detector-*` already exist (see staleness
-  audit); the tree must extend, not duplicate, them.
-- How does `pyrite run PROFILE` produce observations for a sweep? Sweep cases
-  are built from the profile's scalar detector, while observation source
-  identity uses the physical detector's scalar projection, so their content
-  keys only coincide if the projection becomes authoritative for profiles with
-  a physical observation. A directional observation also needs its own
-  transport pass per case: scalar checkpoints keep one direction.
+- Remote runs (`pyrite run --remote`) produce observations on the remote host
+  but do not transfer them; item 8 owns transfer, reachability, and GC.
+- `api.simulate` keys the source with per-case xsgen tables while sweeps key it
+  with the dataset-level table set, so a `produce_observation` result and a
+  sweep result for the same physics may be indexed under different source
+  keys. Unifying the two marker sets is a separate identity change, tracked in
+  [#191](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/191).
 
 The human semantics gate for the domain/native-response/acquisition slice is
-closed. CLI spelling and observation-store lifecycle remain interactive design
-points when their owning slices begin.
+closed.
 
 ## Domain and identity schema progress (2026-08-23)
 
@@ -797,10 +816,33 @@ Implemented the library half of checklist item 4:
   `link_identity` with a frozen-digest regression; `SpatialResult` retains
   `tile_directions_lab`; `instrument.attenuation.attenuation_matrix` replaces
   the private `api._attenuation_matrix` (oracle harness and filter validation
-  packet updated); `api.source_identity_digest` exposes the pre-transport key.
+  packet updated); `api.source_identity_digest` exposed the pre-transport key (later replaced by `api.observation_plan`).
 
-Not done in this slice: `pyrite run`/`material simulate` wiring, remote
-transfer, and GC/reachability.
+Not done in this slice: remote transfer and GC/reachability (item 8).
+
+## Sweep production and CLI progress (2026-09-26)
+
+- `observations.plan`: `PixelSampling` and `ObservationPlan` are the single
+  path for sampling, factor assembly, reuse matching, and layered identity,
+  used by `api.simulate`, `runs.observe.produce_observation`, and sweeps
+  (`SweepObservation`, sampling shared across cases).
+- `run_sweep(observation=...)`: reuses stored factors for read-time-only
+  changes; evaluates missing observations on the scalar transport; reruns a
+  cached case only to fill its observation, leaving the record and shards
+  untouched; directional arrays never enter records or CAS blobs.
+- `pyrite run` builds the `SweepObservation` from the profile and stores it at
+  the sibling `observations/<stem>` of the checkpoint root.
+- CLI and docs: `profile physical-detector`, `profile filter set`, `material
+  simulate` honoring scorer/acquisition, regenerated CLI reference, rewritten
+  sweep-profiles section, Python guide persistence example (executed by the
+  doc-block test).
+- Real-CLI smoke (16 by 16, 7 electrons, filter over a 0 eV brem grid):
+  produce, exposure 1 -> 3 rescored with no transport (totals exactly 3x,
+  shared true object), angular-shape change re-transported the observation
+  only with `line.h5` untouched.
+- Physics review needed (not self-adjudicated): the observation line-grid
+  union and the zero-energy opaque branch of `positioned-filter-attenuation`
+  (ledger row notes it postdates the 2026-09-13 re-derivation).
 
 ## Staleness audit (2026-09-26)
 

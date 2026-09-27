@@ -131,13 +131,15 @@ from pyrite.observations import ObservationStore, observation_from_result
 store = ObservationStore("demo", root=tempfile.mkdtemp())
 stored_digest = store.put(observation_from_result(configured))
 reopened = store.load(stored_digest)
-longer = reopened.rescore(acquisition=pr.Acquisition.uniform(
-    exposure_s=10.0,
-    minimum_eV=0.0,
-    maximum_eV=20_000.0,
-    bin_width_eV=400.0,
-    hit_threshold_eV=500.0,
-))
+longer = reopened.rescore(
+    acquisition=pr.Acquisition.uniform(
+        exposure_s=10.0,
+        minimum_eV=0.0,
+        maximum_eV=20_000.0,
+        bin_width_eV=400.0,
+        hit_threshold_eV=500.0,
+    )
+)
 store.put(longer)
 longer_image = longer.acquisition_image(pixel_chunk=1024)
 ```
