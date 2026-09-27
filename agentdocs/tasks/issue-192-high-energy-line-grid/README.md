@@ -291,3 +291,12 @@ report logs `transport_wall_s` only after grid selection, so it cannot isolate
 transport, line collection, stop search, or local-spacing planning. Add
 stage-level timings and peak RSS, then use a bounded-memory selector before
 another Ne=20,000 1 mm run.
+
+The cluster administrator reports that submissions now default to 1.5 GB per
+requested CPU core; jobs may request more with `#SBATCH --mem` or
+`--mem-per-cpu`, up to 42 GB per simulation. PyRITE's shared SLURM script
+requests 8 CPUs and does not set memory, explaining this job's 12,000 MB
+allocation. An explicit memory request is needed for a future controlled
+high-memory diagnostic, but the `TIMEOUT` state does not prove that this job
+hit its 12 GB allocation. Do not use a larger request as a substitute for
+bounded-memory selection and stage-level measurements.
