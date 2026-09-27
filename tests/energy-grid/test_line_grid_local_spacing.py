@@ -191,3 +191,37 @@ def test_measured_local_grid_refines_only_around_narrow_lines(monkeypatch):
 def test_measured_local_grid_refuses_beyond_the_point_budget(monkeypatch):
     with pytest.raises(LineGridToleranceError, match="above the 100-point budget"):
         _measured_local_grid(monkeypatch, ([5000.0], [1.0], [1.0]), max_points=100)
+
+
+def test_block_streaming_matches_one_block(monkeypatch):
+    from pyrite.montecarlo.spectrum import line_seeds
+
+    rng = np.random.default_rng(0)
+    energy = rng.uniform(1000.0, 20_000.0, 200)
+    width = rng.uniform(0.2, 5.0, 200)
+    weight = rng.uniform(0.0, 1.0, 200)
+    weight[:5] = [0.0, np.nan, -1.0, np.inf, 0.0]
+    whole = [_population(energy, width, weight)]
+    split = [
+        _population(energy[:77], width[:77], weight[:77]),
+        _population(energy[77:], width[77:], weight[77:]),
+    ]
+    kwargs = dict(
+        start_eV=50.0,
+        stop_eV=40_000.0,
+        floor_spacing_eV=0.5,
+        max_spacing_eV=3.0,
+        halo_limit=_HALO,
+        bin_eV=100.0,
+    )
+    expected = local_spacing_seeds(whole, **kwargs)
+    expected_stop = line_seeds.resonance_population_stop_eV(
+        whole, ceiling_eV=1e6, truncation_limit=1e-4
+    )
+    monkeypatch.setattr(line_seeds, "_POPULATION_BLOCK_SIZE", 7)
+    assert local_spacing_seeds(split, **kwargs) == expected
+    stop, summary = line_seeds.resonance_population_stop_eV(
+        split, ceiling_eV=1e6, truncation_limit=1e-4
+    )
+    assert stop == expected_stop[0]
+    assert summary == pytest.approx(expected_stop[1])

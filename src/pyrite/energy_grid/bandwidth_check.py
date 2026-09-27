@@ -192,9 +192,7 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
         measured = np.asarray(ladder.transport["E_grid"], dtype=float)
         record = ladder.transport["diagnostic_grid"]
         ceiling = float(case["line_grid_policy"]["bandwidth"]["stop_eV"])
-        axis = reference_axis(
-            measured, ceiling, spacing_eV=record.get("feature_width_eV")
-        )
+        axis = reference_axis(measured, ceiling, spacing_eV=record.get("feature_width_eV"))
         timings = {}
         spectra = {}
         for name, grid in (("measured", measured), ("reference", axis)):
@@ -284,6 +282,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         case = build_case(
             args.material, args.energy, config, seed=args.seed, resolution=args.resolution
         )
+        case["_profile_line_grid_stages"] = True
         row: dict[str, Any] = {**config, "real": np.dtype(REAL).name}
         started = time.perf_counter()
         try:
@@ -323,6 +322,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
             maximum_spacing_eV=float(np.diff(grid).max()),
             stop_eV=float(grid[-1]),
             measured_bandwidth=record.get("measured_bandwidth"),
+            line_grid_profile=transport["diagnostic_grid"].get("line_grid_profile"),
             line_yield=total,
             line_centroid_eV=centroid,
             device=BACKEND.device.name,

@@ -5,6 +5,7 @@ budget; it is runner-internal and has no other consumer.
 """
 
 import warnings
+from time import perf_counter
 
 import numpy as np
 
@@ -33,6 +34,19 @@ from ..spectrum.line_seeds import (
     collect_feature_seeds,
     local_spacing_seeds,
 )
+
+
+def _resident_mib():
+    """Return current Linux RSS for opt-in line-grid profiling."""
+    try:
+        with open("/proc/self/status", encoding="ascii") as status:
+            for line in status:
+                if line.startswith("VmRSS:"):
+                    return float(line.split()[1]) / 1024.0
+    except OSError:
+        return None
+    return None
+
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
 # deterministic function of these plus the seed, so they content-address the
@@ -135,11 +149,14 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
     """
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
+    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
+    profile = {"rss_before_resolution_mib": _resident_mib()} if profile_enabled else None
     start = float(bandwidth["start_eV"])
     from . import _lines_for_segments
 
     ceiling = float(bandwidth["stop_eV"])
     audit = {"start_eV": start, "stop_eV": ceiling, "collect": []}
+    stage_started = perf_counter() if profile_enabled else 0.0
     _lines_for_segments(
         segments,
         np.array([start, ceiling]),
@@ -152,15 +169,30 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         truncation_audit=audit,
     )
     chunks = audit["collect"]
-    populations = [
-        ResonancePopulation(
-            "production lines",
-            np.concatenate([chunk[0] for chunk in chunks]) if chunks else np.empty(0),
-            np.concatenate([chunk[2] for chunk in chunks]) if chunks else np.empty(0),
-            np.concatenate([chunk[1] for chunk in chunks]) if chunks else np.empty(0),
+    if profile_enabled:
+        profile.update(
+            population_collect_wall_s=perf_counter() - stage_started,
+            population_chunks=len(chunks),
+            population_lines=sum(chunk[0].size for chunk in chunks),
+            rss_after_population_collect_mib=_resident_mib(),
         )
+    stage_started = perf_counter() if profile_enabled else 0.0
+    populations = [
+        ResonancePopulation("production lines", energy, weight, width)
+        for energy, width, weight in chunks
     ]
+    if profile_enabled:
+        profile.update(
+            population_pack_wall_s=perf_counter() - stage_started,
+            population_data_bytes=sum(
+                array.nbytes
+                for population in populations
+                for array in (population.energy_eV, population.weight, population.width_eV)
+            ),
+            rss_after_population_pack_mib=_resident_mib(),
+        )
     del audit, chunks
+    stage_started = perf_counter() if profile_enabled else 0.0
     stop, bandwidth_record = case_line_stop_eV(
         case,
         populations,
@@ -169,10 +201,23 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         truncation_limit=float(bandwidth["truncation_limit"]),
         proxy_safety=BANDWIDTH_PROXY_SAFETY,
     )
+    if profile_enabled:
+        profile.update(
+            stop_search_wall_s=perf_counter() - stage_started,
+            rss_after_stop_search_mib=_resident_mib(),
+        )
     if resolution["policy"] != LOCAL_RESOLUTION_POLICY:
+        stage_started = perf_counter() if profile_enabled else 0.0
         grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
+        if profile_enabled:
+            profile.update(
+                grid_build_wall_s=perf_counter() - stage_started,
+                rss_after_grid_build_mib=_resident_mib(),
+            )
+            record["line_grid_profile"] = profile
         return grid, record, bandwidth_record
     backbone = float(resolution["max_spacing_eV"])
+    stage_started = perf_counter() if profile_enabled else 0.0
     seeds, summary = local_spacing_seeds(
         populations,
         start_eV=start,
@@ -181,10 +226,24 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         max_spacing_eV=backbone,
         halo_limit=float(resolution["halo_limit"]),
     )
+    if profile_enabled:
+        profile.update(
+            local_spacing_wall_s=perf_counter() - stage_started,
+            local_spacing_seeds=len(seeds),
+            rss_after_local_spacing_mib=_resident_mib(),
+        )
+    stage_started = perf_counter() if profile_enabled else 0.0
     plan = build_window_plan(start, stop, backbone, seeds)
     grid, record = windowed_coordinates(payload, plan, dtype=REAL, stop_eV=stop)
+    if profile_enabled:
+        profile.update(
+            grid_build_wall_s=perf_counter() - stage_started,
+            rss_after_grid_build_mib=_resident_mib(),
+        )
     record["feature_width_eV"] = float(target_step)
     record["local_spacing"] = summary
+    if profile_enabled:
+        record["line_grid_profile"] = profile
     return grid, record, bandwidth_record
 
 
@@ -233,6 +292,9 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
     hit rebuilds the coordinates from the stored plan; a plan this build would
     not make is treated as a miss.
     """
+    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
+    profile_started = perf_counter() if profile_enabled else 0.0
+    profile_rss_before = _resident_mib() if profile_enabled else None
     _refuse_coherent_resolution(case, segments, n_hat, Ne)
     windowed = payload.get("windows") is not None
     measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
@@ -251,7 +313,15 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
         grid = _cached_grid(cached)
         if grid is not None:
             _warn_lineshape_precision(cached)
-            return grid, {**cached, "cache": "hit", "cache_key": key}
+            record = {**cached, "cache": "hit", "cache_key": key}
+            if profile_enabled:
+                record["line_grid_profile"] = {
+                    "cache_hit": True,
+                    "resolution_wall_s": perf_counter() - profile_started,
+                    "rss_before_resolution_mib": profile_rss_before,
+                    "rss_after_resolution_mib": _resident_mib(),
+                }
+            return grid, record
     target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
         segments,
         n_hat,
@@ -284,9 +354,19 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
             "observable_class": record["governing_observable"],
         }
     )
+    line_grid_profile = record.pop("line_grid_profile", None)
     store_coordinates(key, record)
     _warn_lineshape_precision(record)
-    return grid, {**record, "cache": "miss", "cache_key": key}
+    result = {**record, "cache": "miss", "cache_key": key}
+    if profile_enabled:
+        result["line_grid_profile"] = {
+            **(line_grid_profile or {}),
+            "cache_hit": False,
+            "resolution_wall_s": perf_counter() - profile_started,
+            "rss_before_resolution_mib": profile_rss_before,
+            "rss_after_resolution_mib": _resident_mib(),
+        }
+    return grid, result
 
 
 def _warn_lineshape_precision(record):

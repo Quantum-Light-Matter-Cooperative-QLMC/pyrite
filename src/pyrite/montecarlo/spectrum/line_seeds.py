@@ -116,6 +116,22 @@ class ResonancePopulation:
     width_eV: np.ndarray
 
 
+_POPULATION_BLOCK_SIZE = 1 << 18
+
+
+def _population_blocks(populations: Sequence[ResonancePopulation]):
+    """Yield aligned line-array views in bounded blocks."""
+    for population in populations:
+        size = population.energy_eV.size
+        for start in range(0, size, _POPULATION_BLOCK_SIZE):
+            stop = min(start + _POPULATION_BLOCK_SIZE, size)
+            yield (
+                population.energy_eV[start:stop],
+                population.weight[start:stop],
+                population.width_eV[start:stop],
+            )
+
+
 def resonance_populations(
     segments,
     n_hat,
@@ -268,28 +284,47 @@ def resonance_population_stop_eV(
     if not 0.0 < limit < 1.0:
         raise ValueError("truncation_limit must lie in (0, 1)")
     ceiling = float(ceiling_eV)
-    energy = np.concatenate([entry.energy_eV for entry in populations] or [np.empty(0)])
-    width = np.concatenate([entry.width_eV for entry in populations] or [np.empty(0)])
-    mass = np.concatenate([entry.weight for entry in populations] or [np.empty(0)]) * width
-    keep = np.isfinite(mass) & (mass > 0.0)
-    energy, width, mass = energy[keep], width[keep], mass[keep]
+    total = 0.0
+    n_lines = 0
+    min_energy = np.inf
+    max_energy = -np.inf
+    for energy_block, weight_block, width_block in _population_blocks(populations):
+        mass = weight_block * width_block
+        keep = np.isfinite(mass) & (mass > 0.0)
+        if not keep.any():
+            continue
+        energies = energy_block[keep]
+        total += float(mass[keep].sum())
+        n_lines += int(keep.sum())
+        min_energy = min(min_energy, float(energies.min()))
+        max_energy = max(max_energy, float(energies.max()))
     summary: dict[str, Any] = {
         "truncation_limit": limit,
         "ceiling_eV": ceiling,
-        "n_lines": int(energy.size),
+        "n_lines": n_lines,
     }
-    if energy.size == 0:
+    if n_lines == 0:
         summary.update(max_resonance_eV=None, proxy_truncated_fraction=0.0, capped=False)
         return None, {**summary, "stop_eV": None}
-    total = float(mass.sum())
 
     def lost(stop):
-        return float((mass * sincsq_upper_tail_bound(width, stop - energy)).sum()) / total
+        numerator = 0.0
+        for energy_block, weight_block, width_block in _population_blocks(populations):
+            mass = weight_block * width_block
+            keep = np.isfinite(mass) & (mass > 0.0)
+            if keep.any():
+                numerator += float(
+                    (
+                        mass[keep]
+                        * sincsq_upper_tail_bound(width_block[keep], stop - energy_block[keep])
+                    ).sum()
+                )
+        return numerator / total
 
     # Lines above a trial edge count wholly, so the search may start below the
     # whole population: a rare hard-scattered line spends the share instead of
     # forcing the axis out to its resonance.
-    low = float(energy.min())
+    low = min_energy
     stop = ceiling
     if low < ceiling and lost(ceiling) <= limit:
         high = ceiling
@@ -303,7 +338,7 @@ def resonance_population_stop_eV(
                 high = middle
         stop = min(ceiling, float(np.ceil(high / round_to_eV) * round_to_eV))
     summary.update(
-        max_resonance_eV=float(energy.max()),
+        max_resonance_eV=max_energy,
         proxy_truncated_fraction=lost(stop),
         capped=stop >= ceiling,
         stop_eV=stop,
@@ -941,36 +976,42 @@ def local_spacing_seeds(
     if not 0.0 < float(halo_limit) < 1.0:
         raise ValueError("halo_limit must lie in (0, 1)")
     start, stop = float(start_eV), float(stop_eV)
-    energy = np.concatenate([entry.energy_eV for entry in populations] or [np.empty(0)])
-    width = np.concatenate([entry.width_eV for entry in populations] or [np.empty(0)])
-    narrow = np.isfinite(energy) & np.isfinite(width) & (width < backbone)
-    energy, width = energy[narrow], width[narrow]
     levels = [floor * 2.0**k for k in range(64) if floor * 2.0**k < backbone]
     summary: dict[str, Any] = {
         "floor_spacing_eV": floor,
         "max_spacing_eV": backbone,
         "halo_limit": float(halo_limit),
         "bin_eV": float(bin_eV),
-        "narrow_lines": int(energy.size),
+        "narrow_lines": 0,
     }
-    if energy.size == 0 or not levels:
+    if not levels:
         return [], {**summary, "windows": 0}
-    level = np.clip(np.floor(np.log2(np.maximum(width, floor) / floor)), 0, len(levels) - 1)
-    halo = width / (np.pi**2 * float(halo_limit))
     n_bins = int(np.ceil((stop - start) / float(bin_eV)))
-    first = np.clip(np.floor((energy - halo - start) / bin_eV), 0, n_bins).astype(np.int64)
-    last = np.clip(np.ceil((energy + halo - start) / bin_eV), 0, n_bins).astype(np.int64)
-    inside = last > first
-    first, last, level = first[inside], last[inside], level[inside].astype(np.int64)
     required = np.full(n_bins, len(levels), dtype=np.int64)
-    for k in range(len(levels)):
-        chosen = level == k
-        if not chosen.any():
+    coverage = np.zeros((len(levels), n_bins + 1), dtype=np.int64)
+    for energy_block, _, width_block in _population_blocks(populations):
+        narrow = np.isfinite(energy_block) & np.isfinite(width_block) & (width_block < backbone)
+        if not narrow.any():
             continue
-        cover = np.zeros(n_bins + 1, dtype=np.int64)
-        np.add.at(cover, first[chosen], 1)
-        np.add.at(cover, last[chosen], -1)
-        covered = np.cumsum(cover[:-1]) > 0
+        energy = energy_block[narrow]
+        width = width_block[narrow]
+        summary["narrow_lines"] += int(width.size)
+        level = np.clip(np.floor(np.log2(np.maximum(width, floor) / floor)), 0, len(levels) - 1)
+        halo = width / (np.pi**2 * float(halo_limit))
+        first = np.clip(np.floor((energy - halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+        last = np.clip(np.ceil((energy + halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+        inside = last > first
+        first, last, level = first[inside], last[inside], level[inside].astype(np.int64)
+        for k in range(len(levels)):
+            chosen = level == k
+            if not chosen.any():
+                continue
+            np.add.at(coverage[k], first[chosen], 1)
+            np.add.at(coverage[k], last[chosen], -1)
+    if summary["narrow_lines"] == 0:
+        return [], {**summary, "windows": 0}
+    for k in range(len(levels)):
+        covered = np.cumsum(coverage[k, :-1]) > 0
         required[covered & (required > k)] = k
     seeds = []
     index = 0
