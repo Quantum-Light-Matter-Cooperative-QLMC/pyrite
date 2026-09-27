@@ -8,6 +8,8 @@ run the standard remote dependency sync before its first work command.
 import shlex
 from types import SimpleNamespace
 
+import pytest
+
 from pyrite.energy_grid import convergence_job as job
 
 REMOTE = SimpleNamespace(shell_word=shlex.quote, shell_remote_dir=lambda: "/box/pyrite")
@@ -50,9 +52,22 @@ def test_precision_steps_pin_their_precision_and_share_one_payload():
 
 def test_bandwidth_job_forwards_local_resolution_to_remote_steps():
     args = job.build_parser().parse_args(
-        ["start-bandwidth", "--resolution", "local", "--json-out", "bandwidth.json"]
+        [
+            "start-bandwidth", "--resolution", "local", "--compare-resolution", "uniform",
+            "--json-out", "bandwidth.json",
+        ]
     )
     reference, candidate = job.remote_bandwidth_commands(args, "uv")
     assert "--resolution local" in reference
+    assert "--compare-resolution uniform" in reference
     assert "--payload bandwidth.segments.pkl" in reference
     assert "--payload bandwidth.segments.pkl" in candidate
+
+
+@pytest.mark.parametrize("options", [["--production"], ["--resolution", "uniform"]])
+def test_bandwidth_comparison_requires_a_distinct_reference_grid(options):
+    args = job.build_parser().parse_args(
+        ["start-bandwidth", "--compare-resolution", "uniform", *options]
+    )
+    with pytest.raises(SystemExit, match="--compare-resolution"):
+        job.start_bandwidth(args)

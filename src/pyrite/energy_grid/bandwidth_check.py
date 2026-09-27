@@ -13,6 +13,9 @@ The production audit bound is reported beside the true fraction.
 ``reference`` runs under FP64 and pickles its transport; ``candidate`` reloads
 it in a float32 process and evaluates only the measured axis, so ``compare``
 separates bandwidth truncation from backend precision on identical segments.
+With ``--compare-resolution`` the reference step additionally resolves and
+evaluates the other resolution policy (uniform vs ``resonance-local``) on the
+same pickled segments, so the two spacings compare without transport noise.
 Heavy: remote only (``python -m pyrite.energy_grid.convergence_job
 start-bandwidth``).
 
@@ -125,6 +128,55 @@ def _peak_mib() -> float | None:
     return None if peak is None else float(peak)
 
 
+def _host_peak_mib() -> float:
+    """Peak resident host memory of this process in MiB (Linux ``ru_maxrss``)."""
+    import resource
+
+    return float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) / 1024.0
+
+
+def _alternate_resolution(args, config, case, ladder, axis, reference_lines):
+    """Resolve and evaluate the other resolution policy on the same segments.
+
+    The alternate case shares the seed and every transport input, so its
+    resolved grid is a function of the identical trajectories; only the line
+    axis differs. Returns ``{"row": report fields, "payload": pickled axes}``.
+    """
+    from ..montecarlo.runner.line_grid import resolve_line_grid
+
+    alt_case = build_case(
+        args.material, args.energy, config, seed=args.seed, resolution=args.compare_resolution
+    )
+    grid, _record = resolve_line_grid(
+        alt_case,
+        ladder.transport["segs"],
+        ladder.transport["n_hat"],
+        int(ladder.transport["Ne_lines"]),
+        np.asarray(ladder.transport["E_grid"], dtype=float),
+        case.get("abs_layers"),
+        ladder.transport.get("groove"),
+    )
+    grid = np.asarray(grid, dtype=float)
+    started = time.perf_counter()
+    lines = np.asarray(_piecewise(ladder.lines, grid), dtype=float)
+    wall = time.perf_counter() - started
+    reference = np.asarray(reference_lines, dtype=float)
+    total, centroid = _yield_and_centroid(axis, reference)
+    kept, kept_centroid = _yield_and_centroid(grid, lines)
+    row = {
+        "resolution": args.compare_resolution,
+        "points": int(grid.size),
+        "minimum_spacing_eV": float(np.diff(grid).min()),
+        "maximum_spacing_eV": float(np.diff(grid).max()),
+        "stop_eV": float(grid[-1]),
+        "wall_s": wall,
+        "yield_rel": (total - kept) / total if total else 0.0,
+        "centroid_shift_eV": kept_centroid - centroid,
+        "true_fraction_above_stop": truncated_fraction(axis, reference, float(grid[-1])),
+    }
+    return {"row": row, "payload": {"grid": grid, "lines_fp64": lines}}
+
+
 def reference(args: argparse.Namespace) -> dict[str, Any]:
     """FP64: transport, evaluate measured and reference axes, pickle segments."""
     from .._backend import REAL
@@ -186,6 +238,13 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
                 "true_fraction_above_stop": truncated_fraction(axis, density, stop),
                 "true_fraction_above_2x": truncated_fraction(axis, density, doubled),
             }
+        alternate = None
+        if args.compare_resolution is not None:
+            alternate = _alternate_resolution(
+                args, config, case, ladder, axis, spectra["reference"]["lines"]
+            )
+            row["alternate"] = alternate["row"]
+        row["host_peak_mib"] = _host_peak_mib()
         rows.append(row)
         payload.append(
             {
@@ -195,6 +254,9 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
                 "fingerprint": segment_fingerprint(ladder.segments),
                 "measured": measured,
                 "lines_fp64": np.asarray(spectra["measured"]["lines"], dtype=float),
+                "alternate": None
+                if alternate is None
+                else {"resolution": args.compare_resolution, **alternate["payload"]},
             }
         )
         print(json.dumps(row, default=str), flush=True)
@@ -265,6 +327,7 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
             line_centroid_eV=centroid,
             device=BACKEND.device.name,
             device_peak_mib=_peak_mib(),
+            host_peak_mib=_host_peak_mib(),
         )
         rows.append(row)
         print(json.dumps(row, default=str), flush=True)
@@ -313,7 +376,23 @@ def candidate(args: argparse.Namespace) -> dict[str, Any]:
             ),
             "wall_s": wall,
             "device_peak_mib": _peak_mib(),
+            "host_peak_mib": _host_peak_mib(),
         }
+        alternate = item.get("alternate")
+        if alternate is not None:
+            alt_grid = np.asarray(alternate["grid"], dtype=float)
+            alt_lines = _piecewise(ladder.lines, alt_grid)
+            alt_reference = np.asarray(alternate["lines_fp64"], dtype=float)
+            alt_fp64_yield, alt_fp64_centroid = _yield_and_centroid(alt_grid, alt_reference)
+            alt_yield, alt_centroid = _yield_and_centroid(alt_grid, alt_lines)
+            row["float32"]["alternate"] = {
+                "resolution": alternate["resolution"],
+                "yield_rel": (alt_yield - alt_fp64_yield) / alt_fp64_yield
+                if alt_fp64_yield
+                else 0.0,
+                "centroid_shift_eV": alt_centroid - alt_fp64_centroid,
+                "deviation": lineshape_deviation(alt_grid, alt_reference, alt_lines),
+            }
         print(json.dumps(row["float32"]), flush=True)
     Path(args.json_out).write_text(json.dumps(report, indent=2, default=str))
     return report
@@ -328,6 +407,12 @@ def build_parser() -> argparse.ArgumentParser:
     ref.add_argument("--configs", required=True, help="tilt:azimuth:thickness_ang:ne,...")
     ref.add_argument("--seed", type=int, default=0)
     ref.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
+    ref.add_argument(
+        "--compare-resolution",
+        choices=("uniform", "local"),
+        default=None,
+        help="also resolve and evaluate this resolution on the same segments",
+    )
     ref.add_argument("--payload", required=True)
     ref.add_argument("--json-out", required=True)
     prod = commands.add_parser("production", help="production-precision axis, audit and cost")

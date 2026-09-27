@@ -371,6 +371,11 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
                 f"--energy {float(args.energy):g}",
                 f"--configs {shlex.quote(args.configs)}",
                 f"--resolution {shlex.quote(args.resolution)}",
+                *(
+                    [f"--compare-resolution {shlex.quote(args.compare_resolution)}"]
+                    if args.compare_resolution is not None
+                    else []
+                ),
                 f"--seed {int(args.seed)}",
                 f"--payload {payload} --json-out {report}",
             ]
@@ -453,6 +458,10 @@ def start_bandwidth(args: argparse.Namespace) -> str:
     from .job import _validate_remote_output_name
 
     _validate_remote_output_name(args.json_out)
+    if args.compare_resolution is not None and args.production:
+        raise SystemExit("--compare-resolution requires the FP64 reference job")
+    if args.compare_resolution == args.resolution:
+        raise SystemExit("--compare-resolution must differ from --resolution")
     if not args.material.isalnum():
         raise SystemExit("--material must be a catalog key of letters and digits")
     if not args.configs or not set(args.configs) <= set("0123456789.,:e"):
@@ -551,6 +560,11 @@ def build_parser() -> argparse.ArgumentParser:
     bandwidth.add_argument("--configs", default=DEFAULT_BANDWIDTH_CONFIGS)
     bandwidth.add_argument("--seed", type=int, default=0)
     bandwidth.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
+    bandwidth.add_argument(
+        "--compare-resolution",
+        choices=("uniform", "local"),
+        help="evaluate the other resolution on identical transported segments",
+    )
     bandwidth.add_argument(
         "--json-out", default=f"line_grid_bandwidth_{date.today()}.json", help="report JSON"
     )
