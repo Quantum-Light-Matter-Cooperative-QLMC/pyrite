@@ -154,7 +154,7 @@ DEFAULT_MAX_SPACING_EV = 3.0
 #: ``spacing/ulp``, so this collapse floor, not a spacing floor, is the control.
 DEFAULT_BACKEND_SAFETY_ULPS = 8.0
 #: Refuse rather than coarsen beyond this many line coordinates.
-DEFAULT_MAX_POINTS = 200_000
+DEFAULT_MAX_POINTS = 600_000
 #: Round the automatic ``stop`` up to a multiple of this, so nearby cases share
 #: a bandwidth (and therefore a cache entry and a checkpoint identity).
 STOP_ROUND_TO_EV = 100.0

@@ -21,7 +21,7 @@ Automatic grids are deliberately conservative — the bandwidth is a bound, not 
 | `PYRITE_ENERGY_GRID_RTOL_DETECTED_COUNTS` | per-observable override (default `1e-2`) |
 | `PYRITE_ENERGY_GRID_MAX_SPACING_EV` | coarsest admissible spacing (default `3.0`) |
 | `PYRITE_ENERGY_GRID_ULPS` | backend coordinate-precision safety factor |
-| `PYRITE_ENERGY_GRID_MAX_POINTS` | point budget before the run refuses |
+| `PYRITE_ENERGY_GRID_MAX_POINTS` | point budget before the run refuses (default `600,000`) |
 
 Setting any of these selects automatic resolution even where an opt-in stored row exists. An explicit `EnergyBins.line` still wins over all of them.
 

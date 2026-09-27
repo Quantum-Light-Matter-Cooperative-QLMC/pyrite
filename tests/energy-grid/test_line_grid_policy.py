@@ -130,6 +130,7 @@ def test_line_start_convention_matches_the_catalog():
 def test_built_in_defaults_are_per_observable():
     policy = resolve_line_grid_policy(start_eV=10.0, stop_eV=1000.0)
     assert dict(policy.rtol) == dict(DEFAULT_RTOL)
+    assert policy.max_points == 600_000
     assert len(set(dict(policy.rtol).values())) == len(OBSERVABLE_CLASSES)
     assert dict(policy.sources)["rtol.intrinsic_source"] == "built-in default"
 
