@@ -493,7 +493,7 @@ def numerics_show_command(name, fidelity, json_output):
     help=(
         "Radiative energy loss: uncoupled (default) scores the continuum after transport; "
         "bremslib-soft-hard removes it during transport as soft BremsLib loss plus sampled "
-        "hard photons. Requires --radiative-cutoff-ev, midpoint energy, no straggling and "
+        "hard photons. Requires --radiative-cutoff-ev, midpoint energy and "
         "BremsLib (under auto, cases without installed tables stay uncoupled on EEDL)."
     ),
 )

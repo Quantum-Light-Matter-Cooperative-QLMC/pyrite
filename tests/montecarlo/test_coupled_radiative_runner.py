@@ -39,8 +39,7 @@ def test_numerics_validate_coupled_radiative_requirements():
         pr.Numerics(energy_model="midpoint", radiative_model="bremslib-soft-hard")
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
         pr.Numerics(**COUPLED)
-    with pytest.raises(ValueError, match="excludes straggling"):
-        pr.Numerics(energy_model="midpoint", straggling=True, **COUPLED)
+    assert pr.Numerics(energy_model="midpoint", straggling=True, **COUPLED).straggling
     with pytest.raises(ValueError, match="requires BremsLib"):
         pr.Numerics(energy_model="midpoint", bremsstrahlung_model="eedl", **COUPLED)
     with pytest.raises(ValueError, match="radiative_model must be one of"):
@@ -66,6 +65,7 @@ def test_case_keys_are_divergence_only_and_need_bremslib():
         replace(coupled, E_cut_brem_keV=6.0)
     with pytest.raises(ValueError, match="set together"):
         replace(plain, radiative_model="bremslib-soft-hard")
+    assert replace(coupled, straggling=True)["straggling"] is True
 
 
 @pytest.mark.parametrize("resolved", ["bremslib", "eedl"])
@@ -148,8 +148,9 @@ def _coupled_case(target=None, **numerics_overrides):
     return replace(api.build_case(scene, numerics), E_cut_lines_keV=5.0, E_cut_brem_keV=5.0)
 
 
-def test_runner_transport_and_scoring_use_the_coupled_mode(synthetic_si_tables):
-    case = _coupled_case()
+@pytest.mark.parametrize("straggling", [False, True])
+def test_runner_transport_and_scoring_use_the_coupled_mode(synthetic_si_tables, straggling):
+    case = _coupled_case(straggling=straggling)
     assert case["radiative_model"] == "bremslib-soft-hard"
     tp = runner._transport_case(case)
     segments = tp["segs"]

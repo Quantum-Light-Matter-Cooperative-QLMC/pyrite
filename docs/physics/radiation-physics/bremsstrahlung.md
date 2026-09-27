@@ -94,7 +94,7 @@ Runs select the continuum through `Numerics.bremsstrahlung_model` (also `Setting
 
 ## Coupled soft/hard radiative transport
 
-The opt-in coupled mode adds soft radiative stopping and samples hard photon events that debit electron energy. Its partition, event record, straggling constraint, and scoring boundary are documented in [Hard BremsLib photon events](hard-bremsstrahlung-events.md). The default continuum remains an uncoupled track-length estimator.
+The opt-in coupled mode adds soft radiative stopping and samples hard photon events that debit electron energy. Its partition, event record, straggling treatment, and scoring boundary are documented in [Hard BremsLib photon events](hard-bremsstrahlung-events.md). The default continuum remains an uncoupled track-length estimator.
 
 ## Per-segment yield
 

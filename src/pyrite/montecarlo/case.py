@@ -173,7 +173,7 @@ class Case(Mapping[str, Any]):
     radiative_model, radiative_cutoff_eV
         Opt-in ``"bremslib-soft-hard"`` coupled radiative transport and its
         hard-photon cutoff in eV; both absent is uncoupled post-hoc scoring.
-        Requires BremsLib, ``energy_model``, no straggling or grooves, a
+        Requires BremsLib, ``energy_model``, no grooves, a
         cutoff no higher than the continuum electron cutoff, and a continuum
         cutoff no higher than the line cutoff (the soft scorer cannot reclip).
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
@@ -343,8 +343,6 @@ class Case(Mapping[str, Any]):
             raise ValueError("radiative_model requires bremsstrahlung_model='bremslib'")
         if self.energy_model != "midpoint":
             raise ValueError("radiative_model requires energy_model='midpoint'")
-        if self.straggling is not _ABSENT:
-            raise ValueError("radiative_model excludes straggling")
         if self.groove_spacing_ang is not _ABSENT:
             raise ValueError("radiative_model excludes a grooved entrance face")
         # Runner defaults when the legacy cutoff keys are absent.

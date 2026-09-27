@@ -380,7 +380,6 @@ def validate_radiative_args(
     *,
     energy_model,
     groove,
-    straggling,
     keep_segments_on_device,
 ) -> bool:
     """Check ``simulate_trajectories``' radiative arguments; True in coupled mode."""
@@ -397,8 +396,8 @@ def validate_radiative_args(
         raise ValueError("bremslib-soft-hard requires radiative_cutoff_eV and bremslib_tables")
     if not np.isfinite(radiative_cutoff_eV) or radiative_cutoff_eV <= 0.0:
         raise ValueError("radiative_cutoff_eV must be positive and finite")
-    if energy_model != "midpoint" or groove is not None or straggling:
-        raise ValueError("bremslib-soft-hard requires midpoint, ungrooved, unstraggled transport")
+    if energy_model != "midpoint" or groove is not None:
+        raise ValueError("bremslib-soft-hard requires midpoint, ungrooved transport")
     if keep_segments_on_device:
         raise ValueError("bremslib-soft-hard completes photon rows on the host")
     return True

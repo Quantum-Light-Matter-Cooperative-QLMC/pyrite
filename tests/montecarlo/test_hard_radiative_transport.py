@@ -60,9 +60,10 @@ def _run(table, core="lockstep", **kwargs):
 
 
 @pytest.mark.parametrize("core", CPU_CORES)
-def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core):
+@pytest.mark.parametrize("straggling", [False, True])
+def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core, straggling):
     table = _table(1e5)
-    result = _run(table, core)
+    result = _run(table, core, straggling=straggling)
     check_segment_event_contract(result)
     photons = result["hard_radiative_k_eV"]
     events = result["event_kind"] == EVENT_HARD_RADIATIVE
@@ -123,10 +124,11 @@ def test_hard_radiative_events_debit_energy_and_close_cpu_flights(core):
 
 
 @pytest.mark.parametrize("core", CPU_CORES)
-def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(core):
+@pytest.mark.parametrize("straggling", [False, True])
+def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(core, straggling):
     table = _table(1e5)
-    first = _run(table, core)
-    replay = _run(table, core)
+    first = _run(table, core, straggling=straggling)
+    replay = _run(table, core, straggling=straggling)
     for field in (
         "event_kind",
         "L_ang",
@@ -141,7 +143,7 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(c
         np.testing.assert_array_equal(first[field], replay[field])
 
     zero = _table(0.0)
-    coupled = _run(zero, core)
+    coupled = _run(zero, core, straggling=straggling)
     legacy = simulate_trajectories(
         E0_keV=60.0,
         Ne=80,
@@ -152,13 +154,15 @@ def test_radiative_mode_replays_and_zero_cross_section_preserves_legacy_tracks(c
         energy_model="midpoint",
         transport_core=core,
         transport_lut_config=TransportLUTConfig(enabled=False),
+        straggling=straggling,
     )
     for field in ("event_kind", "L_ang", "E_start_keV", "E_end_keV", "v_hat"):
         np.testing.assert_array_equal(coupled[field], legacy[field])
 
 
 @pytest.mark.parametrize("core", CPU_CORES)
-def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core):
+@pytest.mark.parametrize("straggling", [False, True])
+def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core, straggling):
     if not shell_configuration._default_path().is_file():
         pytest.skip("pinned SBETHE reference data have not been fetched")
     from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
@@ -178,6 +182,7 @@ def test_radiative_and_shell_collision_modes_share_the_cpu_event_contract(core):
         seed=17,
         energy_model="midpoint",
         transport_core=core,
+        straggling=straggling,
         stopping_tables=[resolve_catalog_table("silicon").arrays()],
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,

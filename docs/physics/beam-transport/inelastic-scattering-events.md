@@ -20,7 +20,7 @@ The transfer is allocated to local kinetic-energy deposition, a possible seconda
 
 The default continuous mode instead uses the **unrestricted Urban compound-Poisson straggling** around the full SBETHE mean when `straggling=True`; it samples loss fluctuations without explicit hard collisions or secondary tracks. Its per-element Urban channels retain their historical shapes and receive a shared scale factor so their summed mean equals the material SBETHE stopping rate. The [electron transport reference](electron-transport.md#stochastic-energy-loss) describes the excitation and continuum components. These two straggling laws serve different partitions of the collision loss and are selected by `inelastic_model`. The soft GOS distribution is evaluated at the row-start energy; `max_dE_frac` limits energy drift within a row. Validation: `energy-loss-straggling`, `shell-soft-hard-transport`.
 
-The separate [hard BremsLib photon mode](../radiation-physics/hard-bremsstrahlung-events.md) may run with shell soft/hard collisions, but currently requires `straggling=False`. In that combination the continuous loss contains the shell soft collision part and the BremsLib soft radiative part; sampled hard inelastic transfers and hard photons debit energy as separate events.
+The separate [hard BremsLib photon mode](../radiation-physics/hard-bremsstrahlung-events.md) may run with either collision mode and optional straggling. The collision loss is sampled by that mode's law, while the BremsLib soft radiative part is added at its mean. Sampled hard inelastic transfers and hard photons debit energy as separate events. Validation: `bremslib-radiative-partition`.
 
 ## Scope and evidence
 

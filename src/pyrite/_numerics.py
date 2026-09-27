@@ -124,7 +124,7 @@ class Numerics:
         length after transport. The opt-in ``"bremslib-soft-hard"`` removes
         radiative loss during transport: soft BremsLib loss below the photon
         cutoff ``k_c`` in eV and sampled hard photons above it. It requires
-        ``energy_model="midpoint"``, no straggling, and BremsLib (``"auto"``
+        ``energy_model="midpoint"`` and BremsLib (``"auto"``
         runs it only for cases whose tables resolve; the others stay
         uncoupled on EEDL). ``k_c`` must not exceed the electron cutoffs.
     convergence
@@ -229,8 +229,6 @@ def validate_radiative_numerics(
         )
     if energy_model != "midpoint":
         raise ValueError("radiative_model='bremslib-soft-hard' requires energy_model='midpoint'")
-    if straggling:
-        raise ValueError("radiative_model='bremslib-soft-hard' excludes straggling")
     if bremsstrahlung_model == "eedl":
         raise ValueError("radiative_model='bremslib-soft-hard' requires BremsLib, not 'eedl'")
 

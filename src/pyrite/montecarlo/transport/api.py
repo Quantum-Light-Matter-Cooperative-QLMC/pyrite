@@ -476,7 +476,6 @@ def simulate_trajectories(
         bremslib_tables,
         energy_model=energy_model,
         groove=groove,
-        straggling=straggling,
         keep_segments_on_device=keep_segments_on_device,
     )
 
