@@ -1,6 +1,6 @@
 # Photon escape and in-medium dispersion
 
-Line, bremsstrahlung, and characteristic radiation use straight-ray Beer--Lambert attenuation from each segment midpoint to the sample boundary. The PXR/CBS line model also uses bulk refractive dispersion in its resonance and coherent propagation phase. Attenuation is passive and does not feed back on emission.
+Line, bremsstrahlung, and characteristic radiation use straight-ray Beer--Lambert attenuation from each point of a segment to the sample boundary, averaged or integrated along the segment rather than taken at its midpoint. The PXR/CBS line model also uses bulk refractive dispersion in its resonance and coherent propagation phase. Attenuation is passive and does not feed back on emission.
 
 ## Attenuation coefficient
 
@@ -29,7 +29,7 @@ Outside the tabulated range the coefficient is unavailable. The line kernel lets
 
 ## Escape geometry
 
-The optical depth is $\tau=\mu\,L_{\rm esc}$ and the transmission $T_{\rm abs}=e^{-\tau}$, applied to the intensity in the incoherent kernels and as $\sqrt{T_{\rm abs}}$ to the field in the coherent one. $L_{\rm esc}$ is the straight-line distance from the segment midpoint to the sample boundary along the fixed observation direction $\hat{\mathbf n}$, in one of four geometries:
+The optical depth is $\tau=\mu\,L_{\rm esc}$ and the transmission $T_{\rm abs}=e^{-\tau}$. $L_{\rm esc}$ is the straight-line distance from an emission point to the sample boundary along the fixed observation direction $\hat{\mathbf n}$. Each segment is cut into pieces on which $L_{\rm esc}$ is affine (`segment-escape-average`). Incoherent emitters -- characteristic lines, bremsstrahlung and the incoherent PXR/CBS route -- weight their intensity by the segment mean $\langle e^{-\tau}\rangle$. The phased-field line reductions (coherent route, flight-grouped reduction) instead damp the field by $e^{-\tau/2}$ inside each piece's formation integral (`coherent-formation-absorption`), whose integral over the line is the same mean. The four escape geometries are:
 
 | Geometry | Escape path |
 |---|---|
@@ -77,7 +77,9 @@ The substitution leaves every kinematic identity intact — $\mathbf k\cdot\math
 
 ### Propagation phase
 
-Under the coherent policy the same dispersion relation moves the segment-to-segment propagation phase: each segment's field picks up $-\delta(E)\,\omega(E)\,L_{{\rm esc},j}$ over its in-crystal escape path, the real partner of the amplitude factor $\sqrt{T_{\rm abs}}$ applied over that same path. This is refused for layered absorbers, whose per-layer $\delta$ is not modelled.
+Under the coherent policy the same dispersion relation moves the segment-to-segment propagation phase: each segment's field picks up $-\delta(E)\,\omega(E)\,L_{{\rm esc},j}$ over its in-crystal escape path, the real partner of the amplitude factor $e^{-\tau/2}$ applied over that same path. This is refused for layered absorbers, whose per-layer $\delta$ is not modelled.
+
+Both factors vary along a segment, and both are integrated along each linear escape piece rather than frozen at its midpoint: the piece field is $t_L e^{i\Phi_c}F$ with $F=e^{-\tau_c/2}\sinh w/w$, $w=iv-q$, $q=(\tau_{\rm end}-\tau_{\rm start})/4$ and $v=a_{\rm vac}(E-E_{\rm vac})-\delta\omega\,\Delta L_{\rm esc}/2$ on the vacuum sinc centre and width. Pieces of a straight flight therefore sum to it exactly. The coherent line centre is where this full phase is stationary; for a flat exit face that is the Snell-refracted root, which differs from the bulk resonance above by $O(\delta)$ except at normal exit. The incoherent route keeps the bulk root. See [Validation: `coherent-formation-absorption`](../../validation/radiation-physics/coherent-formation-absorption.md).
 
 That the phase runs over the *escape* path, and not some other length, is not a convention. The observation-time phase is $\omega\,(t_j + n\,L_{{\rm esc},j} + L_{\rm vac},j)$, and to first order the geometric total $L_{\rm esc}+L_{\rm vac}$ is $R-\hat{\mathbf n}\cdot\mathbf r_j$, so the vacuum term $\omega d_j$ (with $d_j=t_j-\hat{\mathbf n}\cdot\mathbf r_j$) picks up exactly the excess
 
@@ -86,7 +88,7 @@ $$
 =-\delta(E)\,\omega(E)\,L_{{\rm esc},j}.
 $$
 
-The implementation keeps real propagation and attenuation separate. The escape factor is $e^{i\,\operatorname{Re}n\,\omega L}\sqrt{T_{\rm abs}} =e^{i\omega L}e^{-i\delta\omega L}e^{-\tau/2}$. Here $\tau$ includes total narrow-beam attenuation, not only the photoabsorption associated with the imaginary optical index. Keeping the factors separate also avoids mixing the sign convention for complex $n$ with the convention for the propagated field.
+The implementation keeps real propagation and attenuation separate. The escape factor is $e^{i\,\operatorname{Re}n\,\omega L}\sqrt{T_{\rm abs}} =e^{i\omega L}e^{-i\delta\omega L}e^{-\tau/2}$, at each emission point. Here $\tau$ includes total narrow-beam attenuation, not only the photoabsorption associated with the imaginary optical index. Keeping the factors separate also avoids mixing the sign convention for complex $n$ with the convention for the propagated field.
 
 This is deliberately **not** $k(E)\,\hat{\mathbf n}\cdot\mathbf r_j$, which would charge the medium's index for the whole flight to the detector. The two agree only when the photon exits along the face normal, where $L_{\rm esc}$ and $\hat{\mathbf n}\cdot\mathbf r$ differ by a segment-independent constant — i.e. by a global phase. The term is tabulated on the **output** grid, because it is a propagation phase read across the whole spectrum rather than a coupling frozen at the line energy.
 
@@ -95,7 +97,7 @@ This is deliberately **not** $k(E)\,\hat{\mathbf n}\cdot\mathbf r_j$, which woul
 - straight photon rays: no refraction at interfaces, no Fresnel reflection or transmission, no diffraction off groove edges;
 - **bulk response only** — grazing observation geometry, where interface optics dominate, is out of scope for the refractive model;
 - passive attenuation: absorbed photons are gone, with no fluorescence, re-emission, or scattering into the detector direction;
-- the escape path is taken from the segment **midpoint**, consistent with the finite-time factor's constant-velocity segment;
+- the escape path is **affine on each piece** of a segment, which makes the segment-mean escape (incoherent) and the per-piece formation integral (coherent) exact; emission amplitudes and $\mu$ stay frozen at the segment's line energy;
 - the in-medium resonance is only reported where its fixed point **converges**; segment/reflection pairs whose root lands in the near-Cherenkov regime are dropped rather than approximated, because the emission amplitude's own perturbative expansion has failed there;
 - attenuation does not feed back on emission, and emission does not deplete the incident beam;
 - layer interfaces are sharp, static, and perpendicular to $z$;
@@ -103,7 +105,7 @@ This is deliberately **not** $k(E)\,\hat{\mathbf n}\cdot\mathbf r_j$, which woul
 
 ## Validation
 
-Ledger rows: `absorption-length` for photoabsorption and `narrow-beam-total-attenuation` for total removal, `line-absorption-tabulation` and `self-absorption` for the interpolated and layered escape, `multilayer-stack` for the stack, `finite-transverse-crystal` for the prism escape, `blazed-groove-geometry` (**`unverified`**) for the groove, and `xray-chi-zero`, `xray-refractive-index`, `xray-in-medium-resonance`, `xray-in-medium-propagation-phase` for the dispersion model.
+Ledger rows: `absorption-length` for photoabsorption and `narrow-beam-total-attenuation` for total removal, `line-absorption-tabulation` and `self-absorption` for the interpolated and layered escape, `multilayer-stack` for the stack, `finite-transverse-crystal` for the prism escape, `blazed-groove-geometry` (**`unverified`**) for the groove, and `xray-chi-zero`, `xray-refractive-index`, `xray-in-medium-resonance`, `xray-in-medium-propagation-phase` for the dispersion model; `segment-escape-average` and `coherent-formation-absorption` for the escape along a segment.
 
 The propagation-phase derivation record still contains a complex-index factorization with an inconsistent attenuation sign; the separate real-phase and transmission factors above match the implementation. That record needs correction before sign-off. Consult the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use.
 

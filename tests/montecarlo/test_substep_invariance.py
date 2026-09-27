@@ -167,16 +167,17 @@ def test_incoherent_cxr_converges_under_substep_refinement():
         errors.append(_grid_l1(refined, ref_spec))
         peak_errors.append(abs(refined.max() / ref_spec.max() - 1.0))
 
-    # Measured grid L1 4.7e-2 / 1.0e-2 / 2.0e-3 / 2.1e-4 and peak error
-    # 13% / 9.8e-3 / 5.4e-4 / 2.7e-5 down the ladder. The mandatory in-medium
-    # escape-path phase varies WITHIN a segment in a way the sinc finite-time
-    # factor does not carry, so refinement is now first-order rather than
-    # near-exact: reaching a given accuracy takes a tighter max_dE_frac than the
-    # retired vacuum kinematics needed. Convergence itself is unaffected.
+    # Measured grid L1 4.9e-2 / 1.5e-3 / 3.2e-5 / 6.5e-6 and peak error
+    # 13% / 9.7e-5 / 9.7e-7 / 5.6e-8 down the ladder. Since issue #181 each
+    # substep carries the exact formation integral of its escape pieces --
+    # absorption and the in-medium escape-leg phase included -- so the residual
+    # is the energy-loss discretization alone; with the midpoint escape and the
+    # sinc it was 2.1e-4 / 2.7e-5 at the finest step.
+    # Validation: coherent-formation-absorption
     assert errors[3] < errors[2] < errors[1] < errors[0]
-    assert errors[3] < 1e-3
+    assert errors[3] < 5e-5
     assert peak_errors[3] < peak_errors[2] < peak_errors[1] < peak_errors[0]
-    assert peak_errors[3] < 1e-4
+    assert peak_errors[3] < 1e-6
 
 
 @_grouped_is_host_only

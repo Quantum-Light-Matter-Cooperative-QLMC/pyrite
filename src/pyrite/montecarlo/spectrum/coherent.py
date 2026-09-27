@@ -4,6 +4,7 @@ Imported only by GPU paths; keeping these re-exports out of ``spectrum``'s
 package initializer preserves the CPU import path without a CuPy dependency.
 """
 
+from .coherent_grouped_jit_kernel import run_coherent_grouped_intensity_kernel
 from .coherent_jit_kernel import (
     DEFAULT_COHERENT_KERNEL_CONFIG,
     CoherentKernelConfig,
@@ -14,7 +15,6 @@ from .coherent_stream_jit_kernel import (
     CoherentStreamKernelConfig,
     finalize_coherent_fields,
     run_coherent_field_accumulation_kernel,
-    run_coherent_grouped_intensity_kernel,
     run_coherent_prologue_kernel,
 )
 

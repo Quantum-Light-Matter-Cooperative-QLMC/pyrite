@@ -3,8 +3,8 @@
 ## Claim
 
 - **ID:** `segment-escape-average`
-- **Symbols:** `montecarlo/spectrum/segment_escape.py::{segment_escape_paths,mean_transmission}`; `montecarlo/spectrum/brem_jit_kernel.py::_transmission_scalar`
-- **Consumers:** `montecarlo/spectrum/characteristic.py::mc_characteristic_spectrum`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (CPU and fused CUDA reductions)
+- **Symbols:** `montecarlo/spectrum/segment_escape.py::{segment_escape_paths,mean_transmission,segment_escape_pieces,piece_mean_transmission}`; `montecarlo/spectrum/brem_jit_kernel.py::_transmission_scalar`
+- **Consumers:** `montecarlo/spectrum/characteristic.py::mc_characteristic_spectrum`, `montecarlo/spectrum/brem.py::mc_brem_spectrum` (CPU and fused CUDA reductions); since issue #181 the incoherent PXR/CBS line route, `montecarlo/spectrum/lines/_batched.py::_batched_incoherent_block` and `montecarlo/spectrum/lines/_per_hkl.py::_accumulate_reflection` (CPU, and CUDA through the same array code)
 - **Source:** Beer--Lambert law (`self-absorption`) integrated over a uniform line source; no new physical law
 - **Intended quantity:** the escaping fraction of photons emitted uniformly along one straight transport segment, for incoherent emitters (characteristic lines, bremsstrahlung)
 
@@ -61,8 +61,27 @@ Summing {eq}`eq-segment-escape-mean` over the pieces, each weighted by its lengt
 - Photons travel in a straight line with no refraction and no re-entry. The groove's no-re-entry proof is in `blazed-groove-geometry`.
 - Attenuation is constant inside each layer.
 - **Out of scope:**
-  - The PXR/CBS line routes (`spectrum/lines/`, incoherent and coherent) keep the midpoint escape. A coherent emitter needs absorption inside the formation integral, a complex exponent per linear piece, not a plain average of the intensity. Its integrated yield takes the same segment mean by Parseval. That treatment is issue #181.
+  - The coherent PXR/CBS route and the flight-grouped incoherent reduction (a coherent sum per physical flight). A coherent emitter needs absorption inside the formation integral, a complex exponent per linear piece, not a plain average of the intensity; that treatment is `coherent-formation-absorption` (issue #181, second slice). Its Parseval integral is this mean.
   - Hard radiative events (`brem_events.py`) emit at a point, the segment endpoint, so they need no average.
+
+## Incoherent PXR/CBS line route (issue #181)
+
+One segment's line intensity is the squared formation integral. With absorption damping the amplitude by $e^{-\tau(s)/2}$ along the segment and $q$ the detuning phase rate,
+
+```{math}
+:label: eq-segment-escape-line
+
+\frac{d^2N}{dE\,d\Omega}\propto\Bigl|\int_0^{t_L}e^{iqt-\tau(t)/2}\,dt\Bigr|^2,
+\qquad
+\int_{-\infty}^{\infty}\Bigl|\int_0^{t_L}e^{iqt-\tau(t)/2}\,dt\Bigr|^2 dq
+=2\pi\int_0^{t_L}e^{-\tau(t)}\,dt=2\pi\,t_L\,\langle e^{-\tau}\rangle
+```
+
+by Parseval. The route's lineshape $t_L^2\,\mathrm{sinc}^2(\cdot)\,T$ integrates to $2\pi t_L T$ over $q$, so taking $T=\langle e^{-\tau}\rangle$ from {eq}`eq-segment-escape-mean` gives the exact integrated line yield; $T=e^{-\bar\tau}$ was the Jensen undercount. The escape paths are $g$-independent and are cut once per call (`segment_escape_pieces`, padded to one row per segment); $\mu(E_\text{res})$ varies per (segment, reflection) and is applied per piece (`piece_mean_transmission`). Layered stacks use each layer's $\mu$, the groove the absorber $\mu$, as the midpoint code did.
+
+**Line-shape decision.** The route keeps the undamped $\mathrm{sinc}^2$ shape at $E_\text{res}$. The exact single-segment shape, $|(e^{zt_L}-1)/z|^2$ with $z=iq-\kappa$, is a damped, $\kappa$-broadened sinc; relative to the kept shape its pointwise error is $O(\Delta)$ within one segment while its integral is unchanged. The ensemble line width is set by the resonance spread across segments, mosaic and detector response, far above a single segment's $1/t_L$, so carrying the damped shape through the incoherent lineshape kernels (node, bin-mean, fused CUDA) is not worth its cost.
+
+**Consequence.** The dataset and case-content identities hash the constant `line_escape_model` marker, orphaning midpoint-era line spectra once (`segment-mean-incoherent-v1`, then `segment-mean-v2-coherent-formation` with the coherent slice). Since that slice one segment's coherent self-term integrates to exactly this yield too, so single-segment coherent and incoherent spectra agree in integral and differ only in shape and in the $O(\delta)$ line-centre offset described under `coherent-formation-absorption`.
 
 ## Evidence
 
@@ -76,6 +95,7 @@ Summing {eq}`eq-segment-escape-mean` over the pieces, each weighted by its lengt
   - an absorbed-to-transparent ratio equal to the segment mean, which exceeds twice the midpoint factor in the issue's regime.
 - `tests/montecarlo/test_spectrum_cuda_cheap_hoists.py` pins the float32 CUDA reduction against the NumPy `mean_transmission` reference for distinct endpoint paths. This is CUDA-gated.
 - Model markers fork on the change: characteristic `l-shell-ck-lorentzian-segment-escape-v6`, bremsstrahlung `...-v3-unit-base-segment-escape`.
+- `tests/montecarlo/test_line_segment_escape.py` (issue #181): the incoherent line spectrum's absorbed-to-transparent ratio is split invariant to $10^{-9}$ (measured $\sim10^{-15}$) on the batched slab (ratio 0.56), the batched finite box whose exit face switches along the segment (0.72) and the per-hkl Cu-film-on-crystal stack crossing the interface (0.23); absorption rescales the single line without reshaping it; the padded piece layout reproduces the flat `owner` sum.
 
 ## Fresh-context re-derivation
 
@@ -132,9 +152,39 @@ The stack's outer boundaries are $z=0$ and $z=T$. On a piece where the $z$ face 
 
 **Verdict:** `rederived`. The derivation matches the implementation symbolically, and it matches numerically to the brute-force resolution. The CUDA hardware parity run, the #176 split ladder and the line-route quantification are still pending. They do not affect this verdict.
 
+## Fresh-context verification of the issue #181 incoherent-line extension (2026-09-26)
+
+A separate context that did not write the implementation verified the extension. It read the ledger row and the section above, derived the result below, and only then read `segment_escape.py::{segment_escape_pieces,piece_mean_transmission}`, `lines/_batched.py::_batched_incoherent_block`, `lines/_per_hkl.py::_accumulate_reflection` and `lines/_setup.py::_prepare_spectrum`.
+
+**Parseval.** With $h(t)=e^{-\tau(t)/2}$ on $[0,t_L]$ and zero elsewhere, Plancherel gives $\int\lvert\hat h(q)\rvert^2dq=2\pi\int_0^{t_L}e^{-\tau}dt=2\pi t_L\langle e^{-\tau}\rangle$. The kept shape integrates to $\int t_L^2\operatorname{sinc}^2(qt_L/2)\,dq=2\pi t_L$. So $T=\langle e^{-\tau}\rangle$ reproduces the exact integrated yield and $T=e^{-\bar\tau}$ undercounts it (Jensen). This matches {eq}`eq-segment-escape-line`. The same identity is the coherent route's $\int\lvert F\rvert^2dv=\pi\langle e^{-\tau}\rangle$ (`coherent-formation-absorption`, verified the same day).
+
+**Padded layout.**
+
+- `segment_escape_pieces` scatters the flat `segment_escape_paths` rows to slot `arange - (cumsum(counts) - counts)[owner]`. That is correct because `owner` ascends. Padding slots hold zero fraction and zero paths, so they add $0\cdot\langle e^{-0}\rangle=0$.
+- `piece_mean_transmission` returns $\sum_pf_p\,\langle e^{-\tau}\rangle_p$ with $\tau=\sum_K\mu_K\ell_K$, and its broadcasts are $(N,1,K)\times(N,M,K)$.
+- In the batched block, $\mu$ is `mu[..., None]`, shape $(n_b,N_g,1)$, on the single slab (the batched route has no layers).
+- In the per-hkl route, $\mu$ is stacked per layer in the order of `layers`, the same order the paths use. The groove takes the absorber $\mu$ and the single slab the tabulated `mu_i`, as the midpoint code did.
+- Rows align with `idx`, because the incoherent route does not expand pieces and the pieces are cut after `_clip_segments_to_cutoff`.
+- `_line_weight_core` now takes $T$ directly.
+- No incoherent line path still evaluates a midpoint $e^{-\mu L}$.
+
+**Independent oracle** (scratch script, CPU backend). The absorbed-to-transparent ratio of `mc_spectrum` (incoherent; transparent means the piece paths are zeroed) is compared with a separately written $2\times10^6$-point midpoint mean of $e^{-\tau}$ along the segment. The oracle uses its own geometry: slab exit through $z=0$; box minimum over the $z=0$ and $+x$ faces; layered overlap of the exit ray with each layer. $\mu$ is captured from the run.
+
+| case | code ratio | brute-force mean | relative difference | shape residual |
+| --- | --- | --- | --- | --- |
+| slab, batched, 1 and 5 pieces | 0.5590590948 | 0.5590590948 | $1\times10^{-14}$ | $8\times10^{-16}$ |
+| finite box with face switch, batched, 1 and 5 pieces | 0.7208540402 | 0.7208540402 | $3\times10^{-15}$ | $4\times10^{-16}$ |
+| Cu film on hopg, crossing the interface, per-hkl, 1 and 5 pieces | 0.2262001498 | 0.2262001498 | $2\times10^{-13}$ | $4\times10^{-16}$ |
+
+`tests/montecarlo/test_line_segment_escape.py` and `test_segment_escape.py` pass.
+
+**Observation.** With the coherent slice, single-segment coherent and incoherent spectra agree in $v$-integral but not in energy integral: they differ by $1-O(\delta)$ through the two routes' different $dv/dE$ (measured $0.99977$ at hopg 002, 100 keV). They also differ by the $O(\delta)$ line-centre offset. See `coherent-formation-absorption`.
+
+**Verdict for the extension:** `rederived`. It matches symbolically and numerically to the oracle's resolution. The #176 verdict above is unchanged.
+
 ## Status
 
-`rederived` (fresh-context re-derivation above, 2026-09-25). Human sign-off pending.
+`rederived` (fresh-context re-derivation above, 2026-09-25; issue #181 incoherent-line extension verified 2026-09-26). Human sign-off pending.
 
 Hardware follow-up (2026-09-26, RTX 5080):
 
@@ -147,6 +197,9 @@ Hardware follow-up (2026-09-26, RTX 5080):
   bremsstrahlung yields are flat in k (ratio 1.0000 at k = 8 and 32, Mott
   and ELSEPA); ELSEPA - Mott C K is -0.02 % at every k (was -15.7 % under
   the midpoint rule).
-- PXR/CBS line routes, still on the midpoint escape here: `spec_escape_only`
-  drifts +2.0 % (Mott) and +2.8 % (ELSEPA) from k = 1 to 32, +2.4 % / +3.5 %
-  on the 1754 eV peak. Treated in issue #181.
+- PXR/CBS `spec_escape_only`, k = 32 over k = 1: +2.0 % (Mott) and +2.8 %
+  (ELSEPA) on the midpoint escape (#176 tree); +1.0 % and +0.25 % with #181.
+  The 3509 eV peak (-5.2 % / -3.1 %) does not move with #181: the
+  transparent control grows there while raw `spec` is flat, so it is
+  formation-time broadening leaving the peak window. The residual ~1 % Mott
+  drift is accepted.

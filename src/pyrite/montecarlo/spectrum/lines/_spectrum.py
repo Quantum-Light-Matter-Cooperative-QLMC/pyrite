@@ -54,16 +54,23 @@ def mc_spectrum(
                       * sinc^2[(1-beta*v.n)*(omega-omega_res)*t_L/2] * T_abs
 
     with A = A_PXR + A_CBS per polarization (Feranchuk Eqs. 13/14 at omega_res),
-    t_L = L_seg/beta, and T_abs the Beer-Lambert escape factor from the segment
-    midpoint. The finite-time sinc^2 is the centered integral of ``exp(i 2 P t)``
-    over ``t_L`` (normalized-sinc convention) under a constant segment velocity
-    and amplitude; at zero detuning it is ``t_L**2``.
+    t_L = L_seg/beta, and T_abs the Beer-Lambert escape factor's mean along the
+    segment (exact integrated yield). The finite-time sinc^2 is the centered
+    integral of ``exp(i 2 P t)`` over ``t_L`` (normalized-sinc convention) under
+    a constant segment velocity and amplitude; at zero detuning it is
+    ``t_L**2``. The phased-field reductions (coherent, flight-grouped) instead
+    take ``t_L F`` per linear escape piece -- the exact formation integral with
+    the amplitude damped by ``exp(-tau/2)`` and phased by the in-medium escape
+    leg along the piece, centred on the escape-path root -- whose square
+    integrates to the same mean.
 
     Validation: finite-time-lineshape
 
     Physical model, documented once under ``docs/physics/``:
 
-    - escape and self-absorption from the segment midpoint, and the in-medium
+    - escape and self-absorption (segment mean or per-piece formation integral,
+      above; Validation: segment-escape-average, coherent-formation-absorption),
+      and the in-medium
       dispersion ``k = n(omega) omega`` that both the kinematics and the
       coherent propagation phase run on -- real part only, bulk response, so
       grazing geometry is out of scope: radiation-physics/photon-escape-and-dispersion.md

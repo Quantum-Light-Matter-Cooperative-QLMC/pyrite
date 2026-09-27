@@ -334,18 +334,24 @@ def test_per_hkl_route_puts_the_line_at_the_same_resonance():
     assert peak_eV == pytest.approx(_resonance_eV(), abs=float(E_GRID[1] - E_GRID[0]))
 
 
-def test_per_hkl_route_records_the_escape_distance_for_a_finite_footprint():
-    """The escape distance is g-independent, so the route hoists it per case."""
-    st = _prepare_spectrum(
-        _request(segments=_segments(footprint=True), sinc_cutoff=3.0, coherent=True)
-    )
-    assert st.L_esc_all is None
+def test_coherent_setup_carries_the_escape_ends_of_every_piece_row():
+    """The escape geometry is g-independent, so the setup computes it once.
+
+    Coherent rows are split at their linear escape pieces; every piece row
+    carries its escape distance at both ends for the formation integral.
+    Validation: coherent-formation-absorption
+    """
+    segments = _segments(footprint=True)
+    st = _prepare_spectrum(_request(segments=segments, sinc_cutoff=3.0, coherent=True))
+
+    assert st.escape_pieces is None  # the incoherent padded layout is not built
+    L_start, L_end = (to_host(x) for x in st.escape_ends)
+    assert L_start.shape == L_end.shape
+    assert L_start.shape[0] >= segments["L_ang"].size
+    assert np.all(L_start > 0.0) and np.all(L_end > 0.0)
 
     _accumulate_per_hkl(st)
-
-    assert st.L_esc_all is not None
-    assert st.L_esc_all.shape == (4,)
-    assert np.all(st.L_esc_all > 0.0)
+    assert st.spec.max() > 0.0
 
 
 def test_the_two_routes_agree_on_a_case_both_can_run():

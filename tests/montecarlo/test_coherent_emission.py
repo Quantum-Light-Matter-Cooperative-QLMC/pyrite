@@ -135,9 +135,16 @@ def test_single_segment_coherent_equals_incoherent_self_term():
 
     incoherent = mc_spectrum(segments, E_GRID, coherent=False, **KWARGS)
     coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
-    peak = max(np.max(np.abs(coherent)), np.max(np.abs(incoherent)))
+    # The coherent self-term is |t_L F|^2 of the complex formation integral,
+    # whose Parseval integral is the incoherent route's segment-mean escape
+    # (issue #181), so the integrated yields agree. The coherent line sits on
+    # the escape-path (Snell) root, the incoherent one on the bulk in-medium
+    # root: an O(delta) shift of a line ~1e5 times wider, the only residual.
+    # Validation: coherent-formation-absorption
     assert np.max(incoherent) > 0.0
-    np.testing.assert_allclose(coherent, incoherent, rtol=RTOL, atol=peak * ATOL)
+    np.testing.assert_allclose(coherent.sum(), incoherent.sum(), rtol=1e-6)
+    peak = max(np.max(np.abs(coherent)), np.max(np.abs(incoherent)))
+    np.testing.assert_allclose(coherent, incoherent, rtol=RTOL, atol=peak * 2e-5)
 
 
 def test_coherent_decoherence_blend_matches_reference_formula():
@@ -377,17 +384,13 @@ def test_identical_in_phase_electrons_reach_n_squared_limit():
     np.testing.assert_allclose(pair, 2.0 * single, rtol=RTOL)
 
 
-# Subdivision invariance is EXACT only for the vacuum phase, whose linear
-# variation along a segment is exactly what the sinc finite-time factor sums.
-# The mandatory in-medium leg adds ``-delta(E) omega(E) L_esc,j``, whose
-# within-segment variation the sinc does not carry, so splitting a flight now
-# moves the coherent result at first order in ``delta * omega * dL_esc``.
-# Measured on this geometry (hopg 002, 30 keV, near-grazing exit so L_esc is
-# ~100x the depth step): 7.8e-6 of peak at the full 40 Ang flight, falling to
-# 4.0e-6 / 2.9e-6 / 1.1e-6 as the flight is shortened to 20 / 10 / 5 Ang. The
-# gate therefore checks the residual is bounded AND shrinks with the segment
-# length, which is what "discretization artifact, not a modelling error" means.
-SPLIT_RESIDUAL_TOL = 2e-5
+# Subdivision invariance is exact: each piece carries the complex formation
+# integral of the same propagation phase that separates pieces -- vacuum
+# retardation, reciprocal harmonic, and the in-medium escape leg
+# ``-delta(E) omega(E) L_esc,j`` with its within-piece slope (issue #181) --
+# so a flight's halves sum to it to rounding. Before issue #181 the sinc
+# dropped the escape-leg slope and the residual was 1e-6..1e-5 of peak.
+SPLIT_RESIDUAL_TOL = max(1e-12, 1000.0 * float(np.finfo(REAL).eps))
 
 
 def _split_residual(length, sinc_cutoff):
@@ -413,8 +416,8 @@ def test_straight_flight_is_invariant_to_two_half_segments(sinc_cutoff):
 
     A constant-velocity segment integral is independent of numerical
     subdivision when each stored midpoint position is paired with midpoint
-    transport age -- exactly for the vacuum phase, and to first order in the
-    in-medium escape-path phase.  ``None`` selects the batched route; a very
+    transport age -- exactly, including the in-medium escape-path phase
+    (Validation: coherent-formation-absorption).  ``None`` selects the batched route; a very
     large finite cutoff selects the per-reflection route without removing this
     grid's tails.
     """
@@ -430,7 +433,6 @@ def test_straight_flight_is_invariant_to_two_half_segments(sinc_cutoff):
 
     residuals = [_split_residual(length, sinc_cutoff) for length in (40.0, 20.0, 10.0, 5.0)]
     assert max(residuals) < SPLIT_RESIDUAL_TOL
-    assert residuals[-1] < 0.5 * residuals[0]  # shrinks with the segment length
 
 
 @pytest.mark.parametrize("sinc_cutoff", [None, 4.0])

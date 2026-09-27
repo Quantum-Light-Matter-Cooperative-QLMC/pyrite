@@ -415,8 +415,12 @@ def single_segment_anchor(
     """
     beta = beta_from_keV(E0_keV)
     E_line = line_energy_eV(anchor, E0_keV)
+    # The closed form is absorption-free (L_abs -> infinity). The segment ends
+    # on the entrance face, so its escape path is zero all along it; since
+    # issue #181 the segment-mean escape would otherwise absorb any part of it
+    # inside the slab (a midpoint on the face used to suffice).
     fake = {
-        "r_mid": np.array([[0.0, 0.0, 0.0]]),
+        "r_mid": np.array([[0.0, 0.0, -0.5 * L_seg_ang]]),
         "v_hat": np.array([[0.0, 0.0, 1.0]]),
         "L_ang": np.array([L_seg_ang]),
         "E_keV": np.array([E0_keV]),

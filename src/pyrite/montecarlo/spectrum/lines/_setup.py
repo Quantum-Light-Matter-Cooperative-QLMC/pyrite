@@ -16,7 +16,9 @@ from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
+from ..segment_escape import segment_escape_pieces
 from ._bin_quadrature import BIN_MEAN_QUADRATURE, bin_axis, validate_line_quadrature
+from ._formation import expand_escape_pieces
 from ._kernels import (
     _clip_segments_to_cutoff,
     _elemental_log_mu_table,
@@ -25,6 +27,14 @@ from ._kernels import (
     _observation_direction,
     _validate_groove_escape_direction,
 )
+
+# Generation marker for the line route's photon-escape model, hashed into the
+# dataset and case-content identities like ``characteristic_model``. A
+# constant, not a selector: the incoherent route scores the segment-mean
+# escape since issue #181, and the phased-field routes the exact per-piece
+# formation integral under absorption since its second slice; each move
+# orphans the previous generation's line spectra once.
+LINE_ESCAPE_MODEL = "segment-mean-v2-coherent-formation"
 
 
 @dataclass(frozen=True, eq=False)
@@ -85,8 +95,7 @@ class _SpectrumSetup:
     test can drive directly.
 
     Mutable, and deliberately so: ``spec`` / ``spec_pxr`` / ``spec_cbs`` are
-    accumulated into in place by whichever route runs, and ``L_esc_all`` is
-    filled in by the per-hkl route's stacking prologue.
+    accumulated into in place by whichever route runs.
     """
 
     request: SpectrumRequest
@@ -129,7 +138,14 @@ class _SpectrumSetup:
     finite_footprint_F: Any
     decoherence_A_pop: Any
     xy0_pop: Any
-    L_esc_all: Any = None
+    # Incoherent routes only: padded linear escape pieces per segment
+    # (``segment_escape.segment_escape_pieces``), for the segment-mean
+    # transmission. Validation: segment-escape-average
+    escape_pieces: Any = None
+    # Phased-field routes only (coherent, flight-grouped): escape distance at
+    # the start and end of every piece row, ordered along travel, for the
+    # complex formation integral. Validation: coherent-formation-absorption
+    escape_ends: Any = None
     # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
@@ -256,23 +272,7 @@ def _prepare_spectrum(request):
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
     spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
 
-    # Every per-row emission coefficient is evaluated at ONE energy along the
-    # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
-    # own representative energy, so the row becomes a midpoint evaluation of its
-    # emission integral rather than a left-endpoint one; the resulting t_L =
-    # L/beta(E_repr) is then exactly the transported flight duration
-    # ``t_end - t_start``, and ``t_ang + t_L/2`` exactly its midpoint age.
-    # Frozen rows carry no representative energy and stay bit-for-bit.
-    # Validation: substep-radiation-invariance
-    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    seg_E = xp.asarray(segments[E_field], dtype=REAL)
-    seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
-    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
-    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
-    seg_elec_id = xp.asarray(segments["elec_id"])
-    line_electron = seg_elec_id < Ne
-    beta_all = beta_from_keV(seg_E)  # speed/c per segment
-    v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
+    n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
 
     # Physical-flight grouping for the DEFAULT (incoherent) reduction. Numerical
     # substeps of one flight are integration detail: summing |A_j Q_j|^2 over
@@ -286,7 +286,7 @@ def _prepare_spectrum(request):
     # Validation: substep-radiation-invariance
     gid_all = None
     grouped = False
-    if not coherent and segments.get("flight_id") is not None and seg_E.size:
+    if not coherent and segments.get("flight_id") is not None and n_rows:
         flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
         # A secondary-transport shower shares one electron_id; its flights
         # belong to separate tracks (#94).
@@ -325,6 +325,42 @@ def _prepare_spectrum(request):
             "coherently (the A_PXR*A_CBS cross term survives). Request the "
             "total, or transport without max_dE_frac."
         )
+
+    # The phased-field reductions (coherent, flight-grouped) evaluate each
+    # segment's exact complex formation integral under absorption, which needs
+    # the escape path affine along a row. Split every segment at its linear
+    # escape pieces into collinear rows -- each with its own length, midpoint,
+    # and start age -- and carry the escape distance at both ends. The pieces
+    # of a straight flight sum exactly to its field, and grouping keys are
+    # gathered with them so a flight's pieces still add coherently. Both routes
+    # refuse layers, so the single-slab (K = 1) paths suffice.
+    # Validation: coherent-formation-absorption
+    escape_ends = None
+    if coherent or grouped:
+        segments, piece_owner, esc_start, esc_end = expand_escape_pieces(
+            segments, n_hat, groove=groove, xp=xp
+        )
+        escape_ends = (esc_start, esc_end)
+        if gid_all is not None:
+            gid_all = gid_all[np.asarray(_to_cpu(piece_owner))]
+
+    # Every per-row emission coefficient is evaluated at ONE energy along the
+    # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
+    # own representative energy, so the row becomes a midpoint evaluation of its
+    # emission integral rather than a left-endpoint one; the resulting t_L =
+    # L/beta(E_repr) is then exactly the transported flight duration
+    # ``t_end - t_start``, and ``t_ang + t_L/2`` exactly its midpoint age.
+    # Frozen rows carry no representative energy and stay bit-for-bit.
+    # Validation: substep-radiation-invariance
+    E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    seg_E = xp.asarray(segments[E_field], dtype=REAL)
+    seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
+    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
+    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
+    seg_elec_id = xp.asarray(segments["elec_id"])
+    line_electron = seg_elec_id < Ne
+    beta_all = beta_from_keV(seg_E)  # speed/c per segment
+    v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
 
     # Closed-form bin integration covers the incoherent, per-row intensity sum
     # only. Each refusal names a reduction whose square is taken after a sum of
@@ -511,6 +547,17 @@ def _prepare_spectrum(request):
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
+    # Incoherent emission scores the segment mean of exp(-tau), not its
+    # midpoint value (issue #181, as #176 did for characteristic lines). The
+    # escape pieces are g-independent, so both routes share one pass; mu
+    # varies per (segment, reflection) and is applied by the route. The
+    # coherent route and the flight-grouped reduction -- a coherent sum per
+    # flight -- instead carry ``escape_ends`` on their piece rows (above).
+    escape_pieces = (
+        None
+        if coherent or grouped
+        else segment_escape_pieces(segments, n_hat, layers=layers, groove=groove, xp=xp)
+    )
 
     return _SpectrumSetup(
         request=request,
@@ -555,4 +602,6 @@ def _prepare_spectrum(request):
         xy0_pop=xy0_pop,
         bin_edges=bin_edges,
         bin_inv_width=bin_inv_width,
+        escape_pieces=escape_pieces,
+        escape_ends=escape_ends,
     )

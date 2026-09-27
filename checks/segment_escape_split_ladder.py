@@ -11,13 +11,14 @@ Scored per ``k`` on the same trajectories (paired over seeds):
 
 * ``spec_characteristic`` -- total and per-peak yield (hopg: C K, 277 eV);
 * ``brem_wide`` integrated over its grid;
-* ``spec`` -- incoherent PXR/CBS line total and per-peak yield. These routes
-  keep the midpoint escape (a coherent-amplitude decision is still open), so
-  their drift with ``k`` measures the size of that midpoint bias. Splitting
-  also shortens each piece's formation time, which broadens every line; peak
-  windows can shed tail yield for that reason alone. A transparent control
-  (escape distance zeroed) carries the broadening only; ``spec_escape_only``
-  is the absorbed-over-transparent ratio and isolates the escape bias.
+* ``spec`` -- incoherent PXR/CBS line total and per-peak yield. Since issue
+  #181 this route also scores the segment-mean escape, so its escape bias
+  should be flat in ``k``; before #181 its drift measured the midpoint bias.
+  Splitting also shortens each piece's formation time, which broadens every
+  line; peak windows can shed tail yield for that reason alone. A transparent
+  control (escape paths zeroed) carries the broadening only;
+  ``spec_escape_only`` is the absorbed-over-transparent ratio and isolates the
+  escape bias.
 
 ``ratio`` is the seed mean of ``yield(k) / yield(1)``; ``se`` its standard
 error over seeds. ``--models mott,elsepa`` also reports the ELSEPA-minus-Mott
@@ -49,7 +50,6 @@ from pyrite.montecarlo import runner  # noqa: E402
 from pyrite.montecarlo.spectrum import brem, characteristic  # noqa: E402
 from pyrite.montecarlo.spectrum.lines import _batched as lines_batched  # noqa: E402
 from pyrite.montecarlo.spectrum.lines import _kernels  # noqa: E402
-from pyrite.montecarlo.spectrum.lines import _per_hkl as lines_per_hkl  # noqa: E402
 from pyrite.montecarlo.spectrum.lines import _setup as lines_setup  # noqa: E402
 
 MATERIAL = "hopg"
@@ -118,17 +118,23 @@ def split_after_clip(k):
 
 @contextmanager
 def transparent_lines():
-    """Zero the PXR/CBS escape distance: the line control without absorption.
+    """Zero the PXR/CBS escape paths: the line control without absorption.
 
     Its drift with ``k`` is the formation-time broadening alone, so the
-    absorbed-over-transparent ratio isolates the midpoint escape bias.
+    absorbed-over-transparent ratio isolates the escape bias. Zeroes both the
+    midpoint distance, the formation-piece escape ends (coherent and
+    flight-grouped reductions) and the segment-mean escape pieces (incoherent
+    route, issue #181).
     """
     patches = [
         (lines_batched, "_segment_escape_distance"),
         (lines_batched, "_escape_length"),
-        (lines_per_hkl, "_segment_escape_distance"),
+        (lines_setup, "segment_escape_pieces"),
+        (lines_setup, "expand_escape_pieces"),
     ]
     saved = [getattr(module, name) for module, name in patches]
+    real_pieces = lines_setup.segment_escape_pieces
+    real_expand = lines_setup.expand_escape_pieces
 
     def zero_distance(segments, n_hat, *, xp):
         return xp.zeros(xp.asarray(segments["L_ang"]).shape, dtype=REAL)
@@ -136,9 +142,18 @@ def transparent_lines():
     def zero_length(z_mid, thickness, n_z):
         return xp.zeros_like(xp.asarray(z_mid, dtype=REAL))
 
+    def zero_pieces(*args, **kwargs):
+        fraction, start, end = real_pieces(*args, **kwargs)
+        return fraction, xp.zeros_like(start), xp.zeros_like(end)
+
+    def zero_expand(*args, **kwargs):
+        pieces, owner, start, end = real_expand(*args, **kwargs)
+        return pieces, owner, xp.zeros_like(start), xp.zeros_like(end)
+
     lines_batched._segment_escape_distance = zero_distance
     lines_batched._escape_length = zero_length
-    lines_per_hkl._segment_escape_distance = zero_distance
+    lines_setup.segment_escape_pieces = zero_pieces
+    lines_setup.expand_escape_pieces = zero_expand
     try:
         yield
     finally:
