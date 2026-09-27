@@ -77,6 +77,8 @@ NUMERICS_GROUPS = (
             ("secondary_threshold_eV", "secondary threshold (eV)"),
             ("elastic_model", "elastic model"),
             ("bremsstrahlung_model", "bremsstrahlung model"),
+            ("radiative_model", "radiative model"),
+            ("radiative_cutoff_eV", "radiative cutoff (eV)"),
         ),
     ),
 )
@@ -324,6 +326,8 @@ def resolve_numerics(
         "secondary_threshold_eV": numerics.secondary_threshold_eV,
         "elastic_model": numerics.elastic_model,
         "bremsstrahlung_model": numerics.bremsstrahlung_model,
+        "radiative_model": numerics.radiative_model,
+        "radiative_cutoff_eV": numerics.radiative_cutoff_eV,
     }
     sources = {
         key: (
@@ -560,6 +564,8 @@ def _identity_v1(
         secondary_threshold_eV = settings_payload.pop("secondary_threshold_eV", None)
         elastic_model = str(settings_payload.pop("elastic_model", "mott"))
         settings_brem_model = str(settings_payload.pop("bremsstrahlung_model", "auto"))
+        radiative_model = str(settings_payload.pop("radiative_model", "uncoupled"))
+        radiative_cutoff_eV = settings_payload.pop("radiative_cutoff_eV", None)
     else:  # pragma: no cover - settings is always a jsonable Mapping here
         emission = str(getattr(settings, "emission", "incoherent"))
         straggling = bool(getattr(settings, "straggling", False))
@@ -570,6 +576,8 @@ def _identity_v1(
         secondary_threshold_eV = getattr(settings, "secondary_threshold_eV", None)
         elastic_model = str(getattr(settings, "elastic_model", "mott"))
         settings_brem_model = str(getattr(settings, "bremsstrahlung_model", "auto"))
+        radiative_model = str(getattr(settings, "radiative_model", "uncoupled"))
+        radiative_cutoff_eV = getattr(settings, "radiative_cutoff_eV", None)
     if emission != "incoherent":
         resolved["emission"] = emission
     transport_numerics = {}
@@ -616,9 +624,14 @@ def _identity_v1(
     # instead of the historical analytic Bethe--Heitler approximation.
     requested = settings_brem_model if bremsstrahlung_model is None else bremsstrahlung_model
     validate_bremsstrahlung_model(requested)
-    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(
-        resolve_bremsstrahlung_model(requested, _target_elements(sweep.target))
-    )
+    resolved_brem_model = resolve_bremsstrahlung_model(requested, _target_elements(sweep.target))
+    resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(resolved_brem_model)
+    # Coupled radiative transport (#172): divergence-only, and recorded only
+    # when BremsLib resolved, because an EEDL fallback runs uncoupled.
+    if radiative_model != "uncoupled" and resolved_brem_model == "bremslib":
+        transport_numerics["radiative_model"] = radiative_model
+        transport_numerics["radiative_cutoff_eV"] = float(cast(float, radiative_cutoff_eV))
+        resolved["transport_numerics"] = transport_numerics
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and
     # `transport_numerics` above and unlike the four model constants: a run

@@ -56,6 +56,7 @@ _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
 _INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
 _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
+_RADIATIVE_MODEL_VALUES = ("uncoupled", "bremslib-soft-hard")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -72,6 +73,8 @@ _NUMERICS_FIELD_NAMES = {
     "secondary-threshold-ev": "secondary_threshold_eV",
     "elastic-model": "elastic_model",
     "bremsstrahlung-model": "bremsstrahlung_model",
+    "radiative-model": "radiative_model",
+    "radiative-cutoff-ev": "radiative_cutoff_eV",
 }
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -270,6 +273,11 @@ def _emit_show(payload):
         emit_result(f"  elastic model: {numerics['elastic_model']}")
     if "bremsstrahlung_model" in numerics:
         emit_result(f"  bremsstrahlung model: {numerics['bremsstrahlung_model']}")
+    if "radiative_model" in numerics:
+        emit_result(
+            f"  radiative model: {numerics['radiative_model']}"
+            f" (k_c {numerics.get('radiative_cutoff_eV', 0.0):g} eV)"
+        )
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
@@ -479,6 +487,25 @@ def numerics_show_command(name, fidelity, json_output):
         "their angular model when installed ('pyrite tables fetch bremslib') and warns and "
         "falls back to EEDL otherwise; bremslib requires them; eedl is the packaged EEDL "
         "continuum with an isotropic photon angle."
+    ),
+)
+@click.option(
+    "--radiative-model",
+    type=click.Choice(_RADIATIVE_MODEL_VALUES),
+    help=(
+        "Radiative energy loss: uncoupled (default) scores the continuum after transport; "
+        "bremslib-soft-hard removes it during transport as soft BremsLib loss plus sampled "
+        "hard photons. Requires --radiative-cutoff-ev, midpoint energy, no straggling and "
+        "BremsLib (under auto, cases without installed tables stay uncoupled on EEDL)."
+    ),
+)
+@click.option(
+    "--radiative-cutoff-ev",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="EV",
+    help=(
+        "Hard-photon cutoff k_c in eV for bremslib-soft-hard; must not exceed the "
+        "continuum electron cutoff (1000 eV by default)."
     ),
 )
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

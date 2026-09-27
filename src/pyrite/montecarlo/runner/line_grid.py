@@ -102,6 +102,8 @@ _RESOLUTION_INPUT_KEYS = (
     "inelastic_model",
     "inelastic_cutoff_eV",
     "secondary_threshold_eV",
+    "radiative_model",
+    "radiative_cutoff_eV",
     "elastic_model",
     "abs_layers",
     "Ne",

@@ -113,6 +113,7 @@ from .case_tables import (
 from .case_tables import (
     _case_elastic_kwargs,
     _case_inelastic_kwargs,
+    _case_radiative_kwargs,
     _case_stopping_tables,
 )
 from .case_tables import (
@@ -573,7 +574,8 @@ def _transport_case(
     E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
 
     core = _case_transport_core(case, transport_core)
-    resident = keep_segments_on_device and core == "cuda"
+    # Coupled radiative rows complete their photons on the host.
+    resident = keep_segments_on_device and core == "cuda" and "radiative_model" not in case
     straggling = bool(case.get("straggling", False))
     # The CUDA LUT kernel has no Urban sampler and no shell soft/hard mode.
     # Production straggling or shell runs therefore select the exact CUDA
@@ -610,6 +612,7 @@ def _transport_case(
             stopping_tables=stopping_tables,
             **_case_inelastic_kwargs(case),
             **_case_elastic_kwargs(case),
+            **_case_radiative_kwargs(case),
             **(
                 {"transport_lut_config": transport_lut_config}
                 if transport_lut_config is not None
@@ -1185,6 +1188,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 abs_layers,
                 groove=tp.get("groove"),
                 Ne=Ne_brem,
+                event_segments=segs,
             )
         except Exception as error:
             if not _is_gpu_oom(error):

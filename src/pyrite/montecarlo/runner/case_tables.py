@@ -123,6 +123,23 @@ def _case_bremslib_tables(case):
     return load_bremsstrahlung_tables(elements)
 
 
+def _case_radiative_kwargs(case):
+    """``simulate_trajectories`` kwargs of a case's opt-in coupled radiative mode.
+
+    Empty for uncoupled scoring. The coupled mode reads the same BremsLib
+    tables as the continuum scorer, so transport and spectrum agree on the
+    table identity recorded on the rows.
+    """
+    model = case.get("radiative_model")
+    if model is None:
+        return {}
+    return dict(
+        radiative_model=model,
+        radiative_cutoff_eV=float(case["radiative_cutoff_eV"]),
+        bremslib_tables=_case_bremslib_tables(case),
+    )
+
+
 def _composition_elements(composition):
     return [row[0] for row in composition]
 

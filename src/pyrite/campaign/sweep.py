@@ -49,6 +49,7 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
+    validate_radiative_numerics,
 )
 from .._photon_continuum_floor import floored_lattice_start_eV
 from ..detectors import Detector
@@ -670,11 +671,15 @@ def _case_elements(case: Case) -> tuple[str, ...]:
     return tuple(dict.fromkeys(str(row[0]) for comp in compositions for row in comp))
 
 
-def _resolve_auto_bremsstrahlung(cases: list[Case]) -> list[Case]:
+def _resolve_auto_bremsstrahlung(
+    cases: list[Case], radiative: dict[str, Any] | None = None
+) -> list[Case]:
     """Replace ``bremsstrahlung_model="auto"`` by the source each case will use.
 
     A case records only the resolved choice, so identity and content keys
     never depend on what happened to be installed unless BremsLib really ran.
+    ``radiative`` holds the coupled-mode keys; they join only cases that
+    resolve to BremsLib, so an EEDL fallback case stays uncoupled.
     """
     from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
 
@@ -685,7 +690,7 @@ def _resolve_auto_bremsstrahlung(cases: list[Case]) -> list[Case]:
         if elements not in resolved:
             resolved[elements] = resolve_bremsstrahlung_model("auto", elements)
         out.append(
-            replace(case, bremsstrahlung_model="bremslib")
+            replace(case, bremsstrahlung_model="bremslib", **(radiative or {}))
             if resolved[elements] == "bremslib"
             else case
         )
@@ -705,6 +710,8 @@ def build_cases(
     elastic_model="elsepa",
     bremsstrahlung_model="auto",
     secondary_threshold_eV=None,
+    radiative_model="uncoupled",
+    radiative_cutoff_eV=None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -729,6 +736,19 @@ def build_cases(
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)
+    validate_radiative_numerics(
+        radiative_model, radiative_cutoff_eV, energy_model, straggling, bremsstrahlung_model
+    )
+    # Opt-in coupled radiative transport (#172): divergence-only keys that
+    # need BremsLib, so under "auto" they join after per-case resolution.
+    radiative = (
+        {
+            "radiative_model": radiative_model,
+            "radiative_cutoff_eV": float(cast(float, radiative_cutoff_eV)),
+        }
+        if radiative_model != "uncoupled"
+        else {}
+    )
     target = sweep.target
     cp = sweep_crystal_params(sweep)
     # line grid: fine + narrow (per-material default or detector mapping/fixed
@@ -1024,7 +1044,7 @@ def build_cases(
                         **({"elastic_model": "elsepa"} if elastic_model == "elsepa" else {}),
                         # Opt-in BremsLib continuum: divergence-only, like the above.
                         **(
-                            {"bremsstrahlung_model": "bremslib"}
+                            {"bremsstrahlung_model": "bremslib", **radiative}
                             if bremsstrahlung_model == "bremslib"
                             else {}
                         ),
@@ -1045,7 +1065,7 @@ def build_cases(
                     )
                 )
     if bremsstrahlung_model == "auto":
-        cases = _resolve_auto_bremsstrahlung(cases)
+        cases = _resolve_auto_bremsstrahlung(cases, radiative)
     return cases
 
 

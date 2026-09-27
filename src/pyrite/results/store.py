@@ -22,6 +22,7 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_elastic_model,
     validate_inelastic_numerics,
+    validate_radiative_numerics,
 )
 from .._spectral_components import line_spectrum
 from ..detectors import Detector, LegacyEDS
@@ -104,6 +105,9 @@ class Settings:
     bremsstrahlung_model
         ``"auto"`` (default: BremsLib when installed, else EEDL), ``"eedl"`` or
         ``"bremslib"`` continuum source.
+    radiative_model, radiative_cutoff_eV
+        ``"uncoupled"`` (default) post-hoc continuum, or the opt-in coupled
+        ``"bremslib-soft-hard"`` transport and its hard-photon cutoff in eV.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -127,6 +131,8 @@ class Settings:
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
+    radiative_model: Literal["uncoupled", "bremslib-soft-hard"] = "uncoupled"
+    radiative_cutoff_eV: float | None = None
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
     # "both" runs one transport and stores both spectra. Run-affecting, so
@@ -152,6 +158,13 @@ class Settings:
         )
         validate_elastic_model(self.elastic_model)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)
+        validate_radiative_numerics(
+            self.radiative_model,
+            self.radiative_cutoff_eV,
+            self.energy_model,
+            self.straggling,
+            self.bremsstrahlung_model,
+        )
 
     @property
     def coherent_emission(self) -> bool:

@@ -153,6 +153,11 @@ def _simulation_scene(document, material, profile_name):
             bremsstrahlung_model=cast(
                 Literal["auto", "eedl", "bremslib"], transport.get("bremsstrahlung_model", "auto")
             ),
+            radiative_model=cast(
+                Literal["uncoupled", "bremslib-soft-hard"],
+                transport.get("radiative_model", "uncoupled"),
+            ),
+            radiative_cutoff_eV=cast(float | None, transport.get("radiative_cutoff_eV")),
         ),
         catalog.profile_emission(profile_name) or "incoherent",
     )

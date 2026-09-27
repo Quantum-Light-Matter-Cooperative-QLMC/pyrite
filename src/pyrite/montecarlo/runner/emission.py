@@ -16,6 +16,7 @@ def _brem_wide_from_segments(
     abs_layers,
     groove=None,
     Ne=None,
+    event_segments=None,
 ):
     """Bremsstrahlung background on ``E_brem`` from already-transported brem
     segments ``segs_b``. EVERY layer radiates with its OWN composition (each
@@ -24,7 +25,12 @@ def _brem_wide_from_segments(
     layer (``n_layers == 1``) is exactly the old single-material brem. Honors
     ``brem_chunk`` (segments per GPU matmul). Pure move of _spectrum_case's brem
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
-    the SAME multilayer background as a live sweep."""
+    the SAME multilayer background as a live sweep.
+
+    A coupled radiative case (``radiative_model``) instead sums soft track
+    length below its cutoff and the hard photons transport sampled; see
+    :func:`_coupled_brem_from_segments`. ``event_segments`` are the host rows
+    for the hard photons (default ``segs_b``), kept at transport precision."""
     from .. import runner
 
     brem_chunk = runner._admit_chunk(
@@ -35,6 +41,17 @@ def _brem_wide_from_segments(
         intermediates=runner._EEDL_BREM_DENSE_INTERMEDIATES,
     )
     n_lay = int(segs_b.get("n_layers", 1))
+    if case.get("radiative_model") is not None:
+        return _coupled_brem_from_segments(
+            segs_b,
+            E_brem,
+            case,
+            n_hat,
+            abs_layers,
+            Ne=Ne,
+            event_segments=segs_b if event_segments is None else event_segments,
+            brem_chunk=brem_chunk,
+        )
     # The case records the resolved continuum: BremsLib gets one table set for
     # the whole stack (angular weighting per segment from ``v_hat``), and
     # anything else is pinned to EEDL so mc_brem_spectrum's "auto" never
@@ -77,6 +94,64 @@ def _brem_wide_from_segments(
             **model_kwargs,
         )
     return brem_wide
+
+
+def _coupled_brem_from_segments(
+    segs_b, E_brem, case, n_hat, abs_layers, *, Ne, event_segments, brem_chunk
+):
+    """Coupled-mode continuum: soft BremsLib track length plus hard photon events.
+
+    Each layer's soft part radiates with its own composition, like the
+    uncoupled estimator; the hard photons already carry their emitting element
+    and are scored once through the whole stack. Transport stopped every
+    continuum electron at ``E_cut_brem_keV`` (the case requires it not to
+    exceed the line cutoff), so no reclipping is requested.
+
+    Validation: bremslib-radiative-event-spectrum
+    """
+    from .. import runner
+    from ..spectrum.brem_events import mc_hard_brem_event_spectrum, mc_soft_brem_spectrum
+
+    if case.get("E_cut_brem_keV", 1.0) > case.get("E_cut_lines_keV", 5.0):
+        raise ValueError("coupled radiative scoring requires E_cut_brem_keV <= E_cut_lines_keV")
+    tables = runner._case_bremslib_tables(case)
+    if tables is None:
+        raise ValueError("coupled radiative scoring requires bremsstrahlung_model='bremslib'")
+    cutoff_eV = float(case["radiative_cutoff_eV"])
+    n_lay = int(segs_b.get("n_layers", 1))
+    layer_views = (
+        [(segs_b, case["composition"])]
+        if n_lay == 1
+        else [
+            (runner._segments_in_layer(segs_b, index), abs_layers[index][2])
+            for index in range(n_lay)
+        ]
+    )
+    brem_wide = np.zeros(E_brem.shape, dtype=float)
+    for segments, composition in layer_views:
+        if segments["L_ang"].size == 0:
+            continue
+        brem_wide = brem_wide + mc_soft_brem_spectrum(
+            segments,
+            E_brem,
+            composition=composition,
+            n_hat=n_hat,
+            chunk=brem_chunk,
+            layers=abs_layers,
+            electron_limit=Ne,
+            cutoff_eV=cutoff_eV,
+            bremslib_tables=tables,
+        )
+    return brem_wide + mc_hard_brem_event_spectrum(
+        event_segments,
+        E_brem,
+        composition=case["composition"],
+        n_hat=n_hat,
+        electron_limit=Ne,
+        layers=abs_layers,
+        cutoff_eV=cutoff_eV,
+        bremslib_tables=tables,
+    )
 
 
 def _characteristic_from_segments(
@@ -186,16 +261,18 @@ def _brem_for_case(case, E_brem):
         stopping_tables=runner._case_stopping_tables(case),
         # The elastic model is transport physics: a repair replays it.
         **runner._case_elastic_kwargs(case),
-        # The shell soft/hard mode changes the transport physics, so a repair
-        # of such a case must replay it; continuous cases are unchanged.
+        # The shell soft/hard and coupled radiative modes change the transport
+        # physics, so a repair of such a case must replay them; other cases
+        # are unchanged.
         **(
             dict(
                 energy_model=case.get("energy_model", "frozen"),
                 max_dE_frac=case.get("max_dE_frac", 0.0),
                 straggling=bool(case.get("straggling", False)),
                 **runner._case_inelastic_kwargs(case),
+                **runner._case_radiative_kwargs(case),
             )
-            if case.get("inelastic_model") is not None
+            if case.get("inelastic_model") is not None or case.get("radiative_model") is not None
             else {}
         ),
     )

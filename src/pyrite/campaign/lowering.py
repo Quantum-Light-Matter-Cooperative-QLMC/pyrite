@@ -43,6 +43,8 @@ def build_case(scene: Scene, numerics: Numerics) -> Case:
         secondary_threshold_eV=numerics.secondary_threshold_eV,
         elastic_model=numerics.elastic_model,
         bremsstrahlung_model=numerics.bremsstrahlung_model,
+        radiative_model=numerics.radiative_model,
+        radiative_cutoff_eV=numerics.radiative_cutoff_eV,
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -66,6 +68,8 @@ def build_sweep_cases(sweep: Sweep, numerics: Numerics | None = None) -> list[Ca
             secondary_threshold_eV=getattr(settings, "secondary_threshold_eV", None),
             elastic_model=getattr(settings, "elastic_model", "elsepa"),
             bremsstrahlung_model=getattr(settings, "bremsstrahlung_model", "auto"),
+            radiative_model=getattr(settings, "radiative_model", "uncoupled"),
+            radiative_cutoff_eV=getattr(settings, "radiative_cutoff_eV", None),
         )
     resolved = Numerics() if numerics is None else numerics
     cases = []

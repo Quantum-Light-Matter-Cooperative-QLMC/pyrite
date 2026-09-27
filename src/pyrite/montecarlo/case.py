@@ -71,6 +71,8 @@ _CASE_KEY_ORDER = (
     "secondary_threshold_eV",
     "elastic_model",
     "bremsstrahlung_model",
+    "radiative_model",
+    "radiative_cutoff_eV",
     "beam_uvw",
     "surface_hkl",
     "mosaic_fwhm_rad",
@@ -168,6 +170,12 @@ class Case(Mapping[str, Any]):
     bremsstrahlung_model
         Opt-in ``"bremslib"`` continuum source with its angular model; absent
         is the packaged EEDL continuum, so existing case keys stay valid.
+    radiative_model, radiative_cutoff_eV
+        Opt-in ``"bremslib-soft-hard"`` coupled radiative transport and its
+        hard-photon cutoff in eV; both absent is uncoupled post-hoc scoring.
+        Requires BremsLib, ``energy_model``, no straggling or grooves, a
+        cutoff no higher than the continuum electron cutoff, and a continuum
+        cutoff no higher than the line cutoff (the soft scorer cannot reclip).
     E_cut_lines_keV, E_cut_brem_keV, sinc_cutoff, brem_step_eV
         Legacy/manual cutoff, truncation, and grid controls.
     """
@@ -239,6 +247,8 @@ class Case(Mapping[str, Any]):
     secondary_threshold_eV: float | _Absent = _ABSENT
     elastic_model: Literal["elsepa"] | _Absent = _ABSENT
     bremsstrahlung_model: Literal["bremslib"] | _Absent = _ABSENT
+    radiative_model: Literal["bremslib-soft-hard"] | _Absent = _ABSENT
+    radiative_cutoff_eV: float | _Absent = _ABSENT
 
     # Legacy/manual-only controls accepted during the Mapping support window.
     azimuth_rad: float | _Absent = _ABSENT
@@ -306,6 +316,10 @@ class Case(Mapping[str, Any]):
             raise ValueError("elastic_model must be absent or 'elsepa'")
         if self.bremsstrahlung_model is not _ABSENT and self.bremsstrahlung_model != "bremslib":
             raise ValueError("bremsstrahlung_model must be absent or 'bremslib'")
+        if (self.radiative_model is _ABSENT) != (self.radiative_cutoff_eV is _ABSENT):
+            raise ValueError("radiative_model and radiative_cutoff_eV are set together")
+        if self.radiative_model is not _ABSENT:
+            self._validate_radiative()
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")
@@ -320,6 +334,30 @@ class Case(Mapping[str, Any]):
                     "line_quadrature='bin-mean' is incompatible with max_dE_frac: "
                     "numerical substeps add amplitudes before squaring"
                 )
+
+    def _validate_radiative(self) -> None:
+        if self.radiative_model != "bremslib-soft-hard":
+            raise ValueError("radiative_model must be absent or 'bremslib-soft-hard'")
+        _positive("radiative_cutoff_eV", self.radiative_cutoff_eV)
+        if self.bremsstrahlung_model != "bremslib":
+            raise ValueError("radiative_model requires bremsstrahlung_model='bremslib'")
+        if self.energy_model != "midpoint":
+            raise ValueError("radiative_model requires energy_model='midpoint'")
+        if self.straggling is not _ABSENT:
+            raise ValueError("radiative_model excludes straggling")
+        if self.groove_spacing_ang is not _ABSENT:
+            raise ValueError("radiative_model excludes a grooved entrance face")
+        # Runner defaults when the legacy cutoff keys are absent.
+        E_cut_brem = (
+            1.0 if self.E_cut_brem_keV is _ABSENT else float(cast(float, self.E_cut_brem_keV))
+        )
+        E_cut_lines = (
+            5.0 if self.E_cut_lines_keV is _ABSENT else float(cast(float, self.E_cut_lines_keV))
+        )
+        if E_cut_brem > E_cut_lines:
+            raise ValueError("radiative_model requires E_cut_brem_keV <= E_cut_lines_keV")
+        if float(cast(float, self.radiative_cutoff_eV)) > E_cut_brem * 1e3:
+            raise ValueError("radiative_cutoff_eV must not exceed the continuum electron cutoff")
 
     def to_dict(self) -> dict[str, Any]:
         """Return the exact legacy mapping shape and insertion order.
