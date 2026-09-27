@@ -17,7 +17,7 @@ from pyrite import api
 from pyrite.campaign import profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import dataset_identity
-from pyrite.campaign.sweep import build_cases
+from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
@@ -100,6 +100,36 @@ def test_identity_records_coupling_only_when_bremslib_runs(monkeypatch, resolved
     else:
         assert "radiative_model" not in numerics
         assert coupled["parameter_sha256"] == base["parameter_sha256"]
+
+
+@pytest.mark.parametrize("bremsstrahlung_model", ["bremslib", "auto"])
+def test_grooves_fall_back_to_uncoupled_without_a_coupling_identity(
+    monkeypatch, bremsstrahlung_model
+):
+    monkeypatch.setattr(profiles, "resolve_bremsstrahlung_model", lambda *_args: "bremslib")
+    monkeypatch.setattr(bremslib_tables, "resolve_bremsstrahlung_model", lambda *_args: "bremslib")
+    sweep = Sweep(
+        material="hopg",
+        tilt_deg=45.0,
+        tilt_azim_deg=180.0,
+        groove_spacing_ang=2.0e4,
+        thickness_ang=2.0e5,
+        beam=BeamSpec(energy_keV=100.0),
+    )
+    with pytest.warns(UserWarning, match="unavailable for grooves"):
+        cases = build_cases(
+            sweep, 4, 4, energy_model="midpoint", bremsstrahlung_model=bremsstrahlung_model, **COUPLED
+        )
+    assert cases and all("radiative_model" not in case for case in cases)
+    assert all(case["bremsstrahlung_model"] == "bremslib" for case in cases)
+
+    settings = replace(
+        default_settings(), energy_model="midpoint", bremsstrahlung_model=bremsstrahlung_model
+    )
+    base = dataset_identity("hopg", "full", settings, sweep)
+    coupled = dataset_identity("hopg", "full", replace(settings, **COUPLED), sweep)
+    assert coupled["parameter_sha256"] == base["parameter_sha256"]
+    assert "radiative_model" not in coupled["resolved_parameters"]["transport_numerics"]
 
 
 def _synthetic_table(element, atomic_number):

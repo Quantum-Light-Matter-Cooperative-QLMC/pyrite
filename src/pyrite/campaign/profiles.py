@@ -628,7 +628,11 @@ def _identity_v1(
     resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(resolved_brem_model)
     # Coupled radiative transport (#172): divergence-only, and recorded only
     # when BremsLib resolved, because an EEDL fallback runs uncoupled.
-    if radiative_model != "uncoupled" and resolved_brem_model == "bremslib":
+    if (
+        radiative_model != "uncoupled"
+        and resolved_brem_model == "bremslib"
+        and sweep_payload.get("groove_spacing_ang") is None
+    ):
         transport_numerics["radiative_model"] = radiative_model
         transport_numerics["radiative_cutoff_eV"] = float(cast(float, radiative_cutoff_eV))
         resolved["transport_numerics"] = transport_numerics

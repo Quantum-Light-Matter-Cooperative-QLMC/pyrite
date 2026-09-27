@@ -892,6 +892,15 @@ def build_cases(
         cp, name_stem=name_stem, beam_uvw=beam_uvw, n_families=sweep.n_families
     )
 
+    if radiative and any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries):
+        warnings.warn(
+            "coupled BremsLib radiative transport is unavailable for grooves; "
+            "using uncoupled bremsstrahlung scoring",
+            UserWarning,
+            stacklevel=2,
+        )
+        radiative = {}
+
     if gdf is not None and any(
         g.case_keys().get("groove_spacing_ang") is not None for g in geometries
     ):
