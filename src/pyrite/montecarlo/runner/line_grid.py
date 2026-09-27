@@ -4,6 +4,7 @@ Split out of ``runner/__init__`` to keep that module inside the source-size
 budget; it is runner-internal and has no other consumer.
 """
 
+import sys
 import warnings
 from time import perf_counter
 
@@ -46,6 +47,16 @@ def _resident_mib():
     except OSError:
         return None
     return None
+
+
+def _profile_stage(profile, **fields):
+    """Record opt-in line-grid stage fields and flush them to stderr.
+
+    Immediate output survives a scheduler time limit that discards the report.
+    """
+    profile.update(fields)
+    items = " ".join(f"{name}={value}" for name, value in fields.items())
+    print(f"line-grid profile: {items}", file=sys.stderr, flush=True)
 
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
@@ -150,7 +161,9 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     profile_enabled = bool(case.get("_profile_line_grid_stages", False))
-    profile = {"rss_before_resolution_mib": _resident_mib()} if profile_enabled else None
+    profile = {} if profile_enabled else None
+    if profile_enabled:
+        _profile_stage(profile, rss_before_resolution_mib=_resident_mib())
     start = float(bandwidth["start_eV"])
     from . import _lines_for_segments
 
@@ -170,7 +183,8 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
     )
     chunks = audit["collect"]
     if profile_enabled:
-        profile.update(
+        _profile_stage(
+            profile,
             population_collect_wall_s=perf_counter() - stage_started,
             population_chunks=len(chunks),
             population_lines=sum(chunk[0].size for chunk in chunks),
@@ -182,7 +196,8 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         for energy, width, weight in chunks
     ]
     if profile_enabled:
-        profile.update(
+        _profile_stage(
+            profile,
             population_pack_wall_s=perf_counter() - stage_started,
             population_data_bytes=sum(
                 array.nbytes
@@ -202,7 +217,8 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         proxy_safety=BANDWIDTH_PROXY_SAFETY,
     )
     if profile_enabled:
-        profile.update(
+        _profile_stage(
+            profile,
             stop_search_wall_s=perf_counter() - stage_started,
             rss_after_stop_search_mib=_resident_mib(),
         )
@@ -210,7 +226,8 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         stage_started = perf_counter() if profile_enabled else 0.0
         grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
         if profile_enabled:
-            profile.update(
+            _profile_stage(
+                profile,
                 grid_build_wall_s=perf_counter() - stage_started,
                 rss_after_grid_build_mib=_resident_mib(),
             )
@@ -227,7 +244,8 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         halo_limit=float(resolution["halo_limit"]),
     )
     if profile_enabled:
-        profile.update(
+        _profile_stage(
+            profile,
             local_spacing_wall_s=perf_counter() - stage_started,
             local_spacing_seeds=len(seeds),
             rss_after_local_spacing_mib=_resident_mib(),
@@ -236,7 +254,8 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
     plan = build_window_plan(start, stop, backbone, seeds)
     grid, record = windowed_coordinates(payload, plan, dtype=REAL, stop_eV=stop)
     if profile_enabled:
-        profile.update(
+        _profile_stage(
+            profile,
             grid_build_wall_s=perf_counter() - stage_started,
             rss_after_grid_build_mib=_resident_mib(),
         )

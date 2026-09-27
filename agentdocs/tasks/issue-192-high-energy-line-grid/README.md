@@ -328,3 +328,39 @@ Production job `20260927-133647-a1e30b15` / SLURM 204 requested the same
 crash the lab computer. SSH is currently unreachable, so its final SLURM state,
 exit code, and logs are unconfirmed. Do not submit another production run until
 the failure is recovered and the memory profile is improved.
+
+## Job 204 outcome and stage profile (2026-09-27)
+
+The lab host did not reboot (uptime 4 days at 15:43). SLURM 204 ended
+`TIMEOUT` at its 2 h limit (`ExitCode=143:0`) without finishing the first
+case (1 mm 10/100, Ne=20,000); stdout was empty and no report was written. The
+host was concurrently loaded by 16 non-SLURM `pw.x` processes from another
+user (load ~37 on 32 cores), which plausibly explains the SSH unresponsiveness.
+
+Stage timings are now also flushed to stderr as they happen
+(`line-grid profile: ...`), so a timed-out job still shows its last stage.
+
+Local CPU profile, `bandwidth_check production --resolution local`, h-BN
+5 MeV, 1 mm 10/100, seed 0, FP64 NumPy:
+
+| Ne | segments | lines | collect s | stop search s | final line eval s | nodes | stop eV | host peak MiB |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 20 | 54,580 | 109,160 | 21.2 | 0.13 | 52.8 | 33,576 | 13,500 | 3,623 |
+| 80 | 222,428 | 444,856 | 20.3 | 0.27 | 330.9 | 53,766 | 41,900 | 3,818 |
+
+Collection cost is nearly flat in Ne; the population itself is 24 bytes/line
+(FP64) and the stop search/local planner are sub-second. Final line
+evaluation scales as lines x nodes (3.7e9 -> 2.4e10 pair evaluations, 6.5x
+-> 6.3x time): both the NumPy path and the CUDA reduction kernel
+(`line_jit_kernel._kernel_*`) evaluate every line at every node. At Ne=20,000
+this extrapolates to ~1e8 lines x 1e5-3e5 nodes = 1e13-3e13 sinc evaluations,
+and the measured stop grows with Ne (rare Doppler-boosted lines), so the
+node count grows too. That, not selector memory, is the likely cause of the
+2 h timeout. Bounded-memory streaming (`ec8f273d`) stays, but a larger memory
+request would not help.
+
+Scalable options (decision needed): per-line windowed evaluation (sorted lines,
+each node sums only lines within K first-zero widths; truncated tail
+<= 2/(pi**2 K) of each line, K ~ 2e3 for 1e-4) with a derivation, ledger row,
+and CPU/GPU kernel; or cap production Ne for 1 mm cases. No production rerun
+until one is chosen.
