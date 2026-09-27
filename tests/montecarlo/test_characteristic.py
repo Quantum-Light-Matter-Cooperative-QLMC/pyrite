@@ -554,4 +554,4 @@ def test_l_shell_transfer_skips_absent_subshells():
 
 
 def test_characteristic_model_marker_records_the_ck_relaxation():
-    assert characteristic.CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-v5")
+    assert characteristic.CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-segment-escape-v6")

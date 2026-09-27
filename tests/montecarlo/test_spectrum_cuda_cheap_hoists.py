@@ -5,6 +5,7 @@ import pytest
 
 from pyrite._backend import BACKEND
 from pyrite.montecarlo.spectrum.lines import _RESONANCE_ROOT_RTOL
+from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
 
 cp = pytest.importorskip("cupy")
 
@@ -112,7 +113,13 @@ def test_directional_bremslib_kernel_matches_chunked_cuda_fallback(monkeypatch):
     np.testing.assert_allclose(fused, fallback, rtol=5e-4, atol=1e-20)
 
 
+def _segment_ends(paths):
+    """Start/end escape paths ``(n_seg, 2, n_layers)``; ends differ so the mean is exercised."""
+    return np.stack((paths, 1.7 * paths + 15.0), axis=1).astype(np.float32)
+
+
 def _old_weighted_brem_reference(T, L, paths, mu, E, *, Z, density_cm3):
+    """``paths`` is ``(n_seg, 2, n_layers)``; the weight is the segment-mean transmission."""
     alpha = 7.2973525693e-3
     re2 = 7.9407877e-26
     mc2 = 510.99895
@@ -133,8 +140,9 @@ def _old_weighted_brem_reference(T, L, paths, mu, E, *, Z, density_cm3):
             dsig = (
                 (16.0 / 3.0) * alpha * re2 * Z**2 / max(k_eV, 1.0e-30) / (p_i * p_i) * born * elwert
             )
-            tau = float(np.dot(paths[line], mu[:, k]))
-            out[k] += path_weight * dsig * np.exp(-tau)
+            tau0 = float(np.dot(paths[line, 0], mu[:, k]))
+            tau1 = float(np.dot(paths[line, 1], mu[:, k]))
+            out[k] += path_weight * dsig * mean_transmission(tau0, tau1)
     return out
 
 
@@ -163,6 +171,7 @@ def test_brem_raw_kernel_incident_hoist_matches_old_formula(n_layers):
             ],
             dtype=np.float32,
         )
+    paths = _segment_ends(paths)
 
     T_d = cp.asarray(T)
     L_d = cp.asarray(L)
@@ -231,6 +240,7 @@ def test_eedl_brem_raw_kernel_matches_staged_numpy_reference():
     E = np.array([80.0, 250.0, 900.0, 15_000.0, 40_000.0], dtype=np.float32)
     paths = np.array([[20.0], [50.0], [80.0], [100.0]], dtype=np.float32)
     mu = np.array([[3e-4, 2e-4, 9e-5, 3e-5, 5e-6]], dtype=np.float32)
+    paths = _segment_ends(paths)
     panel_pdf = np.array(
         [
             [3.0e-3, 1.8e-3, 7.0e-4, 1.0e-5, 0.0],
@@ -296,7 +306,11 @@ def test_eedl_brem_raw_kernel_matches_staged_numpy_reference():
             )
             weight = density * L[line] * 1.0e-8 * differential_scale[line]
             expected[energy_index] += (
-                weight * probability * np.exp(-paths[line, 0] * mu[0, energy_index])
+                weight
+                * probability
+                * mean_transmission(
+                    paths[line, 0, 0] * mu[0, energy_index], paths[line, 1, 0] * mu[0, energy_index]
+                )
             )
     expected += _old_weighted_brem_reference(
         T[3:],

@@ -14,8 +14,6 @@ import xraydb
 from ..._backend import REAL, _to_cpu, xp
 from ...materials.atomic import Z_TABLE
 from ...materials.attenuation import (
-    _layer_dz,
-    _layer_path_length,
     _mu_total_inv_ang,
     _normalize_composition,
 )
@@ -31,21 +29,19 @@ from ..eedl_ionization import (
 )
 from ..eedl_ionization import EEDLSubshellTable as EEDLSubshellTable
 from ..eedl_ionization import load_eedl_shell_ionization as load_eedl_shell_ionization
-from ..groove import escape_distance_ang
 from .lines import (
     _clip_segments_to_cutoff,
-    _escape_length,
     _observation_direction,
-    _segment_escape_distance,
     _validate_groove_escape_direction,
 )
+from .segment_escape import mean_transmission, segment_escape_paths
 
 CHARACTERISTIC_ENDF_PARSERPY_VERSION = package_version("endf-parserpy")
 CHARACTERISTIC_XRAYDB_VERSION = package_version("xraydb")
 CHARACTERISTIC_MODEL = (
     f"eedl-2025-{CHARACTERISTIC_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
-    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-l-shell-ck-lorentzian-v5"
+    f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-l-shell-ck-lorentzian-segment-escape-v6"
 )
 _MIN_RELAXATION_CUTOFF_EV = 50.0
 CHARACTERISTIC_TRANSPORT_FLOOR_KEV = 1.0
@@ -662,26 +658,19 @@ def mc_characteristic_spectrum(
 
     seg_elec_id = xp.asarray(segments["elec_id"])
     segment_index = xp.flatnonzero(seg_elec_id < int(Ne))
-    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[segment_index]
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[segment_index]
     E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     seg_E = xp.asarray(segments[E_field], dtype=REAL)[segment_index]
     if int(seg_E.size) == 0:
         return _to_cpu(spec)
 
-    thickness = segments["thickness_ang"]
-    z_mid = seg_r[:, 2]
-    finite_footprint = (
-        segments.get("crystal_width_ang") is not None
-        and segments.get("crystal_height_ang") is not None
+    # Escape paths from both segment ends: the yield carries the segment mean
+    # of exp(-tau), not its midpoint value (issue #176).
+    owner, fraction, path_start, path_end = segment_escape_paths(
+        segments, segment_index, n_hat, layers=layers, groove=groove, xp=xp
     )
-    if groove is not None:
-        L_esc = xp.asarray(escape_distance_ang(seg_r[:, 0], z_mid, groove), dtype=REAL)
-    elif finite_footprint:
-        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[segment_index]
-    else:
-        L_esc = _escape_length(z_mid, thickness, n_hat[2])
-    inv_nz = 1.0 / max(abs(float(n_hat[2])), 1.0e-12)
+    seg_L = seg_L[owner] * fraction
+    seg_E = seg_E[owner]
     severe_truncation: list[tuple[str, str, float]] = []
 
     for el, number_density_ang3 in comp:
@@ -738,26 +727,10 @@ def mc_characteristic_spectrum(
             shell_sigma_cm2 = _interpolate_shell_cross_sections(table, seg_E[sl])
             path_cm = seg_L[sl] * 1.0e-8
             for work_index, (_profile, response, mu, layer_mu) in enumerate(line_work):
-                if layers is None:
-                    transmission = xp.exp(-L_esc[sl] * mu)
-                elif finite_footprint:
-                    tau = 0.0
-                    for (z_top, z_bot, _composition), mu_i in zip(layers, layer_mu, strict=True):
-                        path = _layer_path_length(
-                            z_mid[sl],
-                            n_hat[2],
-                            L_esc[sl],
-                            float(z_top),
-                            float(z_bot),
-                        )
-                        tau = tau + path * mu_i
-                    transmission = xp.exp(-tau)
-                else:
-                    tau = 0.0
-                    for (z_top, z_bot, _composition), mu_i in zip(layers, layer_mu, strict=True):
-                        dz = _layer_dz(z_mid[sl], n_hat[2], float(z_top), float(z_bot))
-                        tau = tau + dz * inv_nz * mu_i
-                    transmission = xp.exp(-tau)
+                mu_by_layer = xp.asarray([mu] if layers is None else layer_mu, dtype=REAL)
+                transmission = mean_transmission(
+                    path_start[sl] @ mu_by_layer, path_end[sl] @ mu_by_layer, xp=xp
+                )
                 effective_line_sigma_cm2 = shell_sigma_cm2 @ response
                 line_yields[work_index] += xp.sum(
                     number_density_ang3 * 1.0e24 * path_cm * effective_line_sigma_cm2 * transmission

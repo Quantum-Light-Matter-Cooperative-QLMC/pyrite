@@ -90,7 +90,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # the same spectrum. Re-minted again for issue #89: default cases now select
     # the ELSEPA elastic model, which changes every trajectory.
     assert case_content_key(case) == (
-        "bbf8fc733b547801feb88ea9059c173141f996439a9ee31b5c91babf936422d0"
+        "8683f64c5a5ecf9a1135015ad652cd3fd3b1030dd9541d1f806e70b6c1f8af4d"
     )
 
 
@@ -101,7 +101,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "7f10cdd0936b4e7aed25c8ee884d3fd59e03beadac8a40c68f3a5683df903515"
+        "d76215e5540087ce7cfdd0a605f07acda95f49e1d113a4cc74ef092e5c954f40"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -355,7 +355,7 @@ def test_characteristic_model_marker_orphans_previous_line_models():
     assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
     assert "eedl" in CHARACTERISTIC_MODEL
     assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
-    assert CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-v5")
+    assert CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-segment-escape-v6")
 
 
 def test_case_content_key_separates_characteristic_models():
@@ -401,7 +401,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "7f10cdd0936b4e7aed25c8ee884d3fd59e03beadac8a40c68f3a5683df903515"
+        "d76215e5540087ce7cfdd0a605f07acda95f49e1d113a4cc74ef092e5c954f40"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -415,42 +415,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "5e4972b4f321df024483e58a43bd8b3f4a564fa675577a077b9645fff4c8dccc",
+            "0aef70fd23283a5bdad8fc102173bb7c853d66cee064ebbbd5fddb1d5756a073",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "fd160ab1bf936f22e4c18e57dbbc84d92e07d28e5925cfc2d8fbaec7bcf5d6ad",
+            "7f61f32352323c3d787e16d219ccbdcb91e5ad0b0f50b99b92b7a2f13b31389e",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "9eda4fb43437437ce5c9d0fbee4ae9769bb7b8f0a2b9d3bd75b8e57fa0202057",
+            "34de9e659b08ba1842ffa78b5f8bccd9af9d9d94de51f0c6a6f22044a659e158",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "444f5c65ff185e2ac09757d8757e16f308a9575c76ba2b2e6ee806ef5f2eefea",
+            "4492b7b9440108747b9ff7fd5a8a76bb5e15a08084f4e2fd7743ba4296262468",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "f3d21d541696c998003738b16ce60184f77ce3e9fa18326b5d639cc79ffcd89d",
+            "fe3fc22dd849acd7ce4e09479e60dedc0515951fe3810729796a35f325762ecb",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "cab3e43ebd5fa6779b085a33f0924bb9fdba83a37cfc28b90fcfd276dccbbcb2",
+            "8996ece9c3e56f83d73e2fc3a22f6dfb8157993cd0efc876f1e731bbd808e67e",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "cc2d553fae79ad71f92461277555e0e2467dc09891ffdc48c9438c3c0920d01d",
+            "57d97ac675858846a312bb9f11fa0cb536bf53da6a921ca5abc451b6f69509f9",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "1f8684f32d140bb941da991c0f67d204d9e175a92b452e20414b05206fe8677e",
+            "097cbe5ef65e1365b4584ea8691234af55b14ed5b5fa80641d81e5ead0c19501",
         ),
     ],
 )
@@ -619,7 +619,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #89's default ELSEPA elastic model, and again for the BremsLib
     # default continuum of issue #86) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "7f10cdd0936b4e7aed25c8ee884d3fd59e03beadac8a40c68f3a5683df903515"
+        "d76215e5540087ce7cfdd0a605f07acda95f49e1d113a4cc74ef092e5c954f40"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -631,7 +631,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # bandwidth request the resolver raises, so it was left alone. Re-minted
     # again for issue #89's default ELSEPA elastic model.
     assert survey_incoherent["parameter_sha256"] == (
-        "f12d19ced8d4226e4dce277eb3ed53b95458e5937faad962e0b01f1b9e50c100"
+        "a06665e8387e4f37e6efd60f6e48de0b8cfafe1bbaf9f8abbaf421149ac9e5c7"
     )
 
 
