@@ -4,29 +4,30 @@
 
 PyRITE reads electron-impact subshell-ionization cross sections from the packaged 2025 Livermore Evaluated Electron Data Library (EEDL), distributed in ENDF-6 form as NDS-IAEA-226. The parser accepts ENDF File 23, MT 534--572 TAB1 sections and converts their tabulated cross sections from barns to cm$^2$. Each section declares interpolation law 2, so the incident-energy dependence is evaluated piecewise linearly and set to zero outside the tabulated range.
 
-EEDL supplies vacancy-production cross sections, but not the relaxation data used here. Line energy $E_{ai\ell}$, fluorescence yield $\omega_{ai}$, conditional radiative intensity $I_{ai\ell}$, and L-shell Coster--Kronig probabilities $f_{ij}$ come from the Elam tables exposed by xraydb. Natural initial- and final-hole widths come from xraydb's compiled Krause--Oliver and Keski-Rahkonen--Krause tables. For segment $j$ in an emitting material, the bin-averaged track-length estimator is
+EEDL supplies vacancy-production cross sections but no relaxation data. Since issue #91 (model `v7`), relaxation comes from the packaged EPICS2025 EADL, ENDF File 28, MT 533: per subshell $i$ its binding energy $B_i$, occupancy, and every radiative ($i\to j$) and nonradiative ($i\to(j,k)$) transition with energy and probability. Line energies are xraydb's (Elam) where xraydb tabulates the same level pair, EADL transition energies otherwise. Natural initial- and final-hole widths come from xraydb's compiled Krause--Oliver and Keski-Rahkonen--Krause tables. For segment $j$ in an emitting material, the bin-averaged track-length estimator is
 
 ```{math}
 :label: eq-characteristic-track-length
 
 \left.\frac{d^2N}{dE\,d\Omega}\right|_b
 =\frac{1}{4\pi N_e\,\Delta E_b}
-\sum_{j,a,i,\ell}
-n_a L_j\,\sigma_{ai}(T_j)
-\left[\sum_{i'}T^a_{ii'}\,\omega_{ai'}I_{ai'\ell}\right]
-\exp[-\tau_j(E_{ai\ell})]\,q_{ai\ell b}.
+\sum_{j,a,p,\ell}
+n_a L_j\,\sigma_{ap}(T_j)
+\left[\sum_{i}V^a_{pi}\,R^a_{i\ell}\right]
+\langle e^{-\tau_j(E_{a\ell})}\rangle\,q_{a\ell b}.
 ```
 
-Here $a$ is an element, $i$ the subshell the incident electron ionized, $i'$ the subshell the photon was emitted from, $\ell$ a line from that vacancy, $T_j$ the representative electron energy, and $b$ an energy bin. $T^a$ is the L-shell Coster--Kronig vacancy transfer
+Here $a$ is an element, $p$ the subshell the incident electron ionized, $i$ any subshell the resulting cascade reaches, $\ell$ a line, $T_j$ the representative electron energy, and $b$ an energy bin. $R^a_{i\ell}$ is the probability that one decay of a vacancy in $i$ emits $\ell$, and $V^a$ the expected vacancy count
 
 ```{math}
-:label: eq-characteristic-ck-transfer
+:label: eq-characteristic-eadl-cascade
 
-T^a_{L_1L_1}&=1-f_{12}-f_{13}, & T^a_{L_1L_2}&=f_{12}, & T^a_{L_1L_3}&=f_{13},\\
-T^a_{L_2L_2}&=1-f_{23}, & T^a_{L_2L_3}&=f_{23}, & T^a_{ii}&=1\ \text{otherwise},
+V^a=(\mathbb{1}-D^a)^{-1}=\sum_{m\ge0}(D^a)^m,
+\qquad
+D^a_{ij}=\sum_{i\to j}F+\sum_{i\to(j,k)}F+\sum_{i\to(k,j)}F,
 ```
 
-all other entries zero. Every row sums to one: Coster--Kronig moves one L hole outward without creating a second L hole. xraydb's $f_{13}$ is a *total* probability that already contains the $L_1\to L_2\to L_3$ route, so it acts on the primary $L_1$ population while $f_{23}$ acts only on the primary $L_2$ population; feeding the transferred $f_{12}N_{L_1}$ through $f_{23}$ as well would count that route twice. With $T^a=\mathbb{1}$ the estimator reduces to the direct-vacancy form $\omega_{ai}I_{ai\ell}$ exactly. The factor $q_{ai\ell b}$ is the unconditioned natural Lorentzian mass in bin $b$:
+with $F$ the EADL transition probability, so a nonradiative decay adds one hole to each of its two daughter subshells. Subshells with $B_i\leq B_{\rm cut}$ have zero rows in $D^a$ and $R^a$. In decreasing-binding-energy order (equal energies by designator) every EADL transition fills from a less tightly bound subshell, so $D^a$ is strictly upper-triangular and nilpotent and the series is a finite sum, evaluated exactly by forward substitution. With $B_{\rm cut}$ above every binding energy, $V^a=\mathbb{1}$ and the estimator is the direct-vacancy form with EADL branching. The factor $q_{a\ell b}$ is the unconditioned natural Lorentzian mass in bin $b$:
 
 ```{math}
 q_{\ell b}=\frac{1}{\pi}\left[
@@ -45,25 +46,28 @@ The result is photons eV$^{-1}$ sr$^{-1}$ per incident electron. The factor $1/(
 - Dividing the analytically integrated Lorentzian mass by $\Delta E_b$ produces the spectral density represented on PyRITE's line-grid centres. Detector broadening remains a separate downstream operation.
 - Every line above the relaxation-data cutoff contributes its physical mass in the requested line grid, including tails from an off-grid centre. No finite-window renormalization is applied.
 - The transition FWHM is the sum of the pertinent initial- and final-hole widths. Combined final labels such as `M4,5` use the mean available component width. A missing final width contributes zero; a missing initial width fails closed.
-- Packaged EEDL bytes are verified before first use against SHA-256 `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`. The resolved xraydb package version is included in the characteristic-model checkpoint marker.
+- Packaged EEDL bytes are verified before first use against SHA-256 `f3ef54f66efaa606a4a5ea7afb3cfe10e35a22b543887dafb3fc7ec830d1769c`, and packaged EADL bytes against `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`. Both checksum prefixes, the endf-parserpy and xraydb versions, and the fluorescence-yield source are part of the characteristic-model checkpoint marker.
+- EADL binding and transition energies are in eV and EADL probabilities are dimensionless, so $V^a$, $R^a$ and $V^aR^a$ are dimensionless counts per primary vacancy.
 
 ## Assumptions and scope
 
-The estimator treats independent atoms. A primary L vacancy is redistributed across the L subshells by {eq}`eq-characteristic-ck-transfer` before the radiative yields are applied; every other vacancy radiates from the subshell it was created in.
+The estimator treats independent atoms and relaxes every primary vacancy bound above the 50 eV cutoff through {eq}`eq-characteristic-eadl-cascade`. The relaxation cutoff bounds vacancy propagation by binding energy; photons at or below it are also not scored.
 
-Excluded, because xraydb's tables do not specify them:
+Declared approximations and validity limits:
 
-- Auger-fed daughter vacancies, including the outer-shell spectator vacancy the Coster--Kronig electron leaves behind. Bound where it can be bounded: whenever the K shell is open the K-fed L population is under 2% of the direct L population, since $\sigma_L\gg\sigma_K$. The M and N population fed by L Auger decay is larger and is not bounded here.
-- M-shell Coster--Kronig. xraydb's M-shell values are not a probability distribution -- the finals of Cr M1 sum to 3.82, and 134 (Z, initial) pairs exceed one -- so they are excluded rather than renormalized. L-shell values sum to at most one for every $3\leq Z\leq98$, which is what makes $T^a$ row-stochastic.
-- Radiative branching outside the Elam line list. $\omega_{ai}$ is distributed over only the lines xraydb tabulates for that subshell, whose intensities sum to one by construction; that conserves the subshell's radiative total but over-assigns intensity to tabulated lines wherever the source table omits weak ones. An EEDL shell with a nonzero fluorescence yield and no xraydb line list at all is retained, emits zero photons, and raises a `RuntimeWarning` rather than being silently approximated.
-- Secondary fluorescence: $\exp(-\tau_j)$ is a pure sink, so an absorbed characteristic photon does not re-emit.
-- Auger-electron transport, multiple-vacancy shifts, satellite structure.
+- Energy accounting: per primary vacancy, $B_p$ equals expected photon energy plus Auger-electron energy plus terminal-vacancy binding plus an EADL transition-energy defect, because EADL transition energies are not differences of its single-vacancy binding energies. The identity closes to the $10^{-5}$ branching-sum precision. The defect is under 1.5% of $B_p$ for every K primary and reaches about 6% for L primaries above 100 eV (Si L2, K L1).
+- Auger electrons are not transported; their energy is booked but they do not ionize or radiate.
+- Independent single-vacancy rates: no multiple-vacancy shifts, rate changes, or satellites.
+- M and N lines absent from xraydb use calculated EADL energies, which can differ from measured values by tens of eV and carry no multiplet splitting.
+- Secondary fluorescence: the escape factor is a pure sink, so an absorbed characteristic photon does not re-emit.
+- EADL's L3 branch shape for 3d metals puts Lℓ/Lα1 at 1--3, against about 0.1 in xraydb; 3d-metal L-line ratios are not claimed.
+- EADL and Elam (xraydb) disagree on radiative yields and Coster--Kronig branching; the default uses EADL throughout, and `fluorescence_yields="elam"` rescales only the radiative/nonradiative split.
 
-Characteristic emission uses the bremsstrahlung electron population and its default 1 keV transport cutoff, rather than the PXR/CBS population's default 5 keV cutoff. This preserves more low-energy ionization path while sharing the same trajectories as the rest of a case. The stopping/scattering model is not validated below 1 keV, so characteristic scoring resolves an omitted cutoff to 1 keV and rejects `E_cut_brem_keV < 1`. Low-binding-energy vacancy production below that floor is omitted. The 50 eV relaxation cutoff is a photon-line data cutoff and does not override the electron transport-validity boundary.
+Characteristic emission uses the bremsstrahlung electron population and its default 1 keV transport cutoff, rather than the PXR/CBS population's default 5 keV cutoff. This preserves more low-energy ionization path while sharing the same trajectories as the rest of a case. The stopping/scattering model is not validated below 1 keV, so characteristic scoring resolves an omitted cutoff to 1 keV and rejects `E_cut_brem_keV < 1`. Low-binding-energy vacancy production below that floor is omitted. The 50 eV relaxation cutoff bounds atomic relaxation and does not override the electron transport-validity boundary. Cascade M and N lines below 1 keV from parents ionized above the floor do not validate sub-keV transport.
 
 For multilayers, each layer emits using its own elemental composition and all layers attenuate the escaping photon. Passive absorber elements are not loaded as EEDL emitters for another layer. Atomic relaxation is incoherent, so the same characteristic component is added once to whichever of PyRITE's incoherent or optional coherent PXR/CBS spectra a consumer selects. It is kept as its own array, `spec_characteristic`, persisted in its own `characteristic.h5` component, and can be hidden in the analysis app without modifying stored results. The control defaults to showing the component.
 
-A single natural-width Lorentzian is used per xraydb transition. The empirical multi-Lorentzian fits of Hölzer et al. demonstrate satellite and asymmetric structure in 3d-transition-metal lines, but do not supply a universal parameterization for the full EEDL element/shell domain. That finer structure, chemical shifts, and multiple-vacancy broadening are intentionally excluded.
+A single natural-width Lorentzian is used per transition. The empirical multi-Lorentzian fits of Hölzer et al. demonstrate satellite and asymmetric structure in 3d-transition-metal lines, but do not supply a universal parameterization for the full EEDL element/shell domain. That finer structure, chemical shifts, and multiple-vacancy broadening are intentionally excluded.
 
 ## Limits and regression evidence
 
@@ -223,6 +227,17 @@ The two documentation corrections requested above were applied to the maintained
 
 ## Issue #91 implementation-context note, 2026-09-21
 
+Superseded by the EADL cascade of 2026-09-27 below; kept as the record of `v5`/`v6`. The transfer those versions applied was
+
+```{math}
+:label: eq-characteristic-ck-transfer
+
+T^a_{L_1L_1}&=1-f_{12}-f_{13}, & T^a_{L_1L_2}&=f_{12}, & T^a_{L_1L_3}&=f_{13},\\
+T^a_{L_2L_2}&=1-f_{23}, & T^a_{L_2L_3}&=f_{23}, & T^a_{ii}&=1\ \text{otherwise},
+```
+
+with xraydb's total Coster--Kronig probabilities $f_{ij}$ and stored product $\sum_{i'}T^a_{ii'}\omega_{ai'}I_{ai'\ell}$.
+
 `v4` to `v5` adds one physical process: L-shell Coster--Kronig redistribution of primary vacancies, {eq}`eq-characteristic-ck-transfer`, applied in `_l_shell_vacancy_transfer` and folded into `line_yield_per_vacancy` at table construction. Nothing in the Lorentzian convention, the window treatment, the bin-edge clamp, the escape geometry, or the transport floor changes, and the hot loop is untouched — `line_yield_per_vacancy` was already `(n_shell, n_line)` and simply becomes dense, so the change costs nothing per segment.
 
 Why it is a correction rather than a refinement: the Elam $\omega_i$ are Krause pure subshell radiative yields — Au's 0.107 / 0.334 / 0.320 reproduce Krause & Oliver (1979) exactly — so Coster--Kronig transfer is by construction *absent* from them. Applying $\omega_i$ to the primary population therefore leaves the L holes in the subshell that created them, which is not where they radiate from.
@@ -240,3 +255,180 @@ This supersedes the "Direct branching $\omega_i b_{if}$" row of the frozen 2026-
 The model marker moves to `l-shell-ck-lorentzian-v5`, so dataset identities and case-content keys fork from `v4`; `v4` records hold un-redistributed L line yields and are not the same spectrum. The shipped profile digest pins in `tests/materials/test_profiles.py` were re-minted accordingly.
 
 This is an implementation-context review only. Units, row normalization, the $T^a=\mathbb{1}$ limit, the forced sign, and the double-counting guard all have anchors, but fresh-context source-to-code validation of the Coster--Kronig claim — in particular whether Elam's tabulated $f_{ij}$ are the total probabilities this derivation assumes, checked against Krause (1979) or Campbell (2003) directly rather than through xraydb — is still pending. The ledger status therefore stays `filtered`; no human sign-off is claimed.
+
+## Issue #91 EADL cascade implementation-context note, 2026-09-27
+
+`v6` to `v7` replaces the xraydb relaxation model with the EADL cascade of {eq}`eq-characteristic-eadl-cascade`. The L-shell-only transfer {eq}`eq-characteristic-ck-transfer` and its Elam $\omega_iI_{i\ell}$ product are removed. Changes in behaviour:
+
+- **Cascade.** Every primary vacancy bound above 50 eV relaxes through all EADL radiative and nonradiative transitions: K-fed L, L-fed M/N, and L- and M-shell Coster--Kronig. `vacancy_cascade` builds $D^a$ and evaluates $V^a$ by forward substitution. `line_yield_per_vacancy` $=V^a[p,:]\,R^a$ is precomputed, so the hot loop's `shell_sigma_cm2 @ response` is unchanged.
+- **Cutoff contract.** `relaxation_cutoff_eV` bounds propagation by binding energy: subshells at or below it neither decay nor act as primaries, and photons at or below it are still dropped. Previously it only filtered emitted-line energy.
+- **Lines.** There is one line per EADL radiative transition above 50 eV. xraydb energy and label are used where xraydb tabulates the same level pair, including grouped `M4,5`-style levels, and the EADL energy and an IUPAC `i-j` label otherwise, recorded in `line_source`. Across $3\leq Z\leq98$ no level pair is claimed by two xraydb lines, and every EADL-only line above 50 eV has an xraydb initial-level width. Lines are not pruned. EADL-only lines carry 1.5% (Cu) to about 10% (U) of a representative weighted photon yield, and they raise the line count to 26 (Cu), 108 (Au) and 146 (U), which costs proportionally more in the per-line escape loop and in line-grid seeding.
+- **Yields.** EADL radiative yields are the default. `fluorescence_yields="elam"` rescales each subshell's radiative branch to xraydb $\omega_i$ and its nonradiative branch to $1-\omega_i$. Both choices are part of the marker.
+
+Checks built from data or algebra the implementation does not use for its own result:
+
+- **EEDL sum rule.** $\sum_{MT=534}^{572}\sigma$ against MT=522 read directly from the tape agrees to $10^{-5}$ for C, Cu and Au at 1 keV, 10 keV, 100 keV and 1 MeV. This covers the designator map, the barn units, and missing or doubled subshells. It replaces the carbon regression pin as the independent evidence for the cross-section read.
+- **Bethe band.** EEDL/Bethe with $b=0.9$, $c=0.65$ and EADL occupancies lies within 0.85--1.15 for Si K, Cu K/L2/L3 at 30 keV and Au L3/M5 at 100 keV.
+- **EADL invariants, Z=1--100.** The worst per-subshell $|\sum F-1|$ is $1.7\times10^{-6}$; tolerance is $10^{-5}$. Occupancies sum to $Z$ exactly. Every daughter is present and strictly later in cascade order; the only equal-binding pairs are Mg, Al and Si $L_2/L_3$, ordered by designator. 204 nonradiative transitions carry ETR $=0$, EADL's clamp for energetically marginal super-Coster--Kronig electrons, so they are accepted. No radiative transition has a nonpositive energy.
+- **Exactness.** $V^a$ matches `numpy.linalg.inv` of $\mathbb{1}-D^a$ to $10^{-12}$, and $(D^a)^n=0$ for Si, Cu and Au.
+- **Probability.** Each decay row of $D^a$ sums to $\omega_i+2(1-\omega_i)$: one hole consumed, one or two created.
+- **Energy.** The budget identity closes within $5\times10^{-6}$ relative for C, Si, Cu and Au K and for Cu and Au L primaries. The transition-energy defect is below 1.5% of $B_p$ for these cases (corrected after the independent verification below: the bound holds for all K primaries, while L primaries reach about 6%). Cu K emits 3521.7 eV of photons per 8986 eV hole, consistent with $\omega_K\approx0.43$.
+- **Limits.** A cutoff above every binding energy gives $V=\mathbb{1}$. A 1.2 keV cutoff in Cu removes every L-origin line and leaves K lines at their per-decay EADL probabilities.
+- **Source disagreement recorded, not reconciled.** EADL/Elam $\omega$ ranges over 0.87--1.20 for K and 0.47--2.0 for L subshells above 200 eV from about Ti up; lighter elements reach 7.2 (S L1), as found by the independent verification below. Cu Coster--Kronig is $f_{12}=0.240$, $f_{13}=0.572$ and $f_{23}=0.009$ in EADL, against 0.30, 0.681 (total) and 0.47 in xraydb's Elam tables. Resolving which is right needs measured L-line intensity ratios. This is the main open physics question for L spectra.
+
+The marker moves to `...-eadl-cascade-eadl-yields-lorentzian-segment-escape-v7` and now includes the EADL checksum prefix. Shipped profile digest pins in `tests/materials/test_profiles.py` were re-minted for the identity fork.
+
+Still pending: comparison of K, L and M cascade spectra against an independent cascade implementation (PENELOPE `pdrelax`, Geant4 G4EMLOW `fluor/`, or EGSnrc) for a low-, mid- and high-Z element, and fresh-context source-to-code validation of {eq}`eq-characteristic-eadl-cascade` and the ENDF MF=28 field mapping. This is an implementation-context review only; the ledger row stays `filtered` and no human sign-off is claimed.
+
+## Independent verification of the issue #91 EADL cascade, 2026-09-27
+
+Fresh-context verification of the `v7` cascade (`...-eadl-cascade-eadl-yields-lorentzian-segment-escape-v7`) at commit `eafc6581` (cascade files identical to `a655a414`). The verifier read the ledger row, the physics page, and this write-up, then derived the cascade and parsed the packaged `EADL2025.ALL` with a scratch fixed-column ENDF-6 reader that uses no PyRITE code. The implementation bodies of `eadl_relaxation.py` and `characteristic.py` were read only after the derivation and the independent numbers below were fixed.
+
+### Sources consulted
+
+- The packaged EPICS2025 EADL tape itself: raw MF=28/MT=533 records for C, Si, Cu, Au and U, and every element for Z=3--99.
+- xraydb 4.5.8 (Elam, Ravel & Sieber 2002 tables): edges, fluorescence yields, Coster--Kronig probabilities, and line lists.
+- Not accessible in this context: the ENDF-102 manual text for File 28, Perkins et al. UCRL-50400 Vol. 30 (EADL tables), and Krause (1979). ENDF field semantics are therefore established from the manual layout as recalled and from internal consistency of the tape, not from the manual text. The "Krause" numbers are xraydb's, which come from Elam's compilation.
+
+### Derivation, fixed before reading the implementation
+
+**MF=28/MT=533 layout.** A HEAD record carries NSS. Each subshell is a LIST record with $C_1={\rm SUBI}$, $N_1=6(N_{\rm TR}+1)$, and $N_2=N_{\rm TR}$. Its body is ${\rm EBI},{\rm ELN},0,0,0,0$, followed by $N_{\rm TR}$ sextets ${\rm SUBJ},{\rm SUBK},{\rm ETR},{\rm FTR},0,0$. SUBJ is the subshell whose electron fills the vacancy. SUBK is the subshell that ejects the electron, or $0$ for a radiative transition. ETR is the photon or electron energy in eV, and FTR is the fractional probability. Designators are sequential: $1={\rm K}$, $2={\rm L}_1$, $3={\rm L}_2$, $4={\rm L}_3$, $5={\rm M}_1$, and so on up to $39={\rm Q}_3$. The 39 designators match EEDL MT 534--572.
+
+The tape confirms this reading without circularity. In Cu, SUBI $=1..10$ has occupancies $2,2,2,4,2,2,4,4,6,1$, which are $2j+1$ for K through N$_1$ and sum to $Z=29$. The EBI values 8986, 1103, 958, 938, 127, 82 and 80 eV match xraydb's K, L$_{1-3}$ and M$_{1-3}$ edges (8979, 1097, 952, 933, 122.5 eV) within the expected single-vacancy offset. Radiative ETR is close to $B_i-B_j$. For nonradiative transitions, ETR is close to $B_i-B_j-B_k$: Cu L$_1$--L$_3$M$_1$ has ETR 27.4 eV against 38 eV.
+
+**Cu K spot values from the raw tape.** Kα$_1$ (K--L$_3$) has ETR 8005.71 eV and FTR 0.255668. Kα$_2$ (K--L$_2$) has 7984.67 eV and 0.131119. Kβ$_3$ and Kβ$_1$ (K--M$_{2,3}$) have 0.0158899 and 0.0310908, and K--M$_{4,5}$ has $4.38737\times10^{-5}$ in total. K--L$_1$ is absent. Hence $\omega_K=0.43381$ (xraydb: 0.441), Kα$_1$/Kα$_2=1.950$ (xraydb: 1.961), and EADL Kα energies are about 41 eV below the measured 8046.3/8026.7 eV, so preferring xraydb energies is justified.
+
+**Vacancy counting.** Let $n_i$ be the expected number of vacancies that ever occupy $i$ for one primary vacancy in $p$. Each vacancy in a decaying subshell decays once. A radiative branch moves the hole to SUBJ. A nonradiative branch leaves holes in SUBJ and in SUBK, which is two holes in one subshell when SUBJ $=$ SUBK. Therefore
+
+$$
+D_{ij}=\sum_{b\in i,\ {\rm rad}}F_b\,\delta_{j,J_b}
++\sum_{b\in i,\ {\rm nonrad}}F_b\,(\delta_{j,J_b}+\delta_{j,K_b}),
+\qquad
+n^{\mathsf T}=e_p^{\mathsf T}+n^{\mathsf T}D
+\;\Rightarrow\;
+n^{\mathsf T}=e_p^{\mathsf T}(\mathbb 1-D)^{-1}.
+$$
+
+The row sum is $\sum_j D_{ij}=\omega_i+2(1-\omega_i)=2-\omega_i$. If every daughter is less bound than its parent, $D$ is strictly upper-triangular in decreasing-binding order and $D^n=0$. Then $V=\mathbb 1+VD$ can be solved column by column: $V_{\cdot c}=e_c+\sum_{q<c}V_{\cdot q}D_{qc}$. The result is exact, not a truncated series. A cutoff that makes subshell $i$ non-decaying zeroes row $i$ of $D$ and of $R$. With every row zeroed, $V=\mathbb 1$. The line yield is $Y_{p\ell}=\sum_i V_{pi}R_{i\ell}$.
+
+**Energy budget.** For each decaying $i$, $\sum_b F_b=1$, and
+
+$$
+B_i=\sum_b F_b\big[E_b+B_{J_b}+[{\rm nonrad}]B_{K_b}+\delta_b\big],
+$$
+
+where $\delta_b$ is the defect of branch $b$. Weight by $V_{pi}$ and sum over the decaying subshells. The identity $\sum_i V_{pi}D_{ij}=V_{pj}-\delta_{pj}$ turns the daughter binding energies into a telescoping sum, which gives
+
+$$
+B_p=E_\gamma+E_e+\sum_{j\ \rm terminal}V_{pj}B_j+\Delta_p .
+$$
+
+A terminal subshell is below the cutoff *or* has no EADL transitions. Omitting the second case breaks the closure: U O$_{4,5}$ at 110/101 eV and P$_1$ at 52 eV have $N_{\rm TR}=0$. The scratch cascade first omitted that case and U failed to close by 4%. With the case included, it closed.
+
+**Elam rescale.** Scale the radiative branch by $\omega^E/\omega^A$ and the nonradiative branch by $(1-\omega^E)/(1-\omega^A)$. The total is $\omega^E+(1-\omega^E)=1$. The same radiative factor must multiply $R$, and the $D$ row sum becomes $2-\omega^E$.
+
+### Comparison with the implementation
+
+| item | independent result | implementation | verdict |
+| --- | --- | --- | --- |
+| field map | SUBI, EBI, ELN, NTR, (SUBJ, SUBK, ETR, FTR); SUBK $=0$ is radiative; sequential designators | `_extract_eadl_relaxation` reads the same fields; `EEDL_SUBSHELL_LABELS` is 1=K, 2=L1, ... | pass |
+| capacity | $2j+1$ with $j=\lfloor(m+1)/2\rfloor-\tfrac12$ | `2 * ((index + 1) // 2)` | pass |
+| cascade order | $(-B_i,\ \text{designator})$; daughters strictly later | `_cascade_key`; rank check rejects violations | pass |
+| $D$ | the equation above, including $+2F$ when $J=K$ | `daughters[row, first] += ...; daughters[row, second] += ...` | pass; max $\lvert\Delta D\rvert=0$ for C, Si, Cu, Au, U |
+| $V$ | dense `inv` of $\mathbb 1-D$ from the scratch reader | forward substitution | pass; max $\lvert\Delta V\rvert\leq 9\times10^{-16}$ |
+| $V=\mathbb 1$ limit | cutoff above every $B_i$ | `vacancy_cascade(r, 1e7)` | pass (exact identity) |
+| budget identity | terminal $=$ below cutoff or $N_{\rm TR}=0$ | `decays = B > cutoff and (n_rad + n_aug)` | pass; closure $\leq 10^{-6}$ relative, including U |
+| Elam rescale | radiative $\times\omega^E/\omega^A$, nonradiative $\times(1-\omega^E)/(1-\omega^A)$, same factor in $D$ and $R$ | `_branching_scales` (nonradiative denominator is $\sum F_{\rm aug}$, which equals $1-\omega^A$ to $10^{-5}$); applied in `vacancy_cascade` and to `emission` | pass; Cu and Au: $\sum_\ell R_{i\ell}=\omega^E_i$ and $D$ row sum $=2-\omega^E_i$ for every decaying subshell |
+| line yields | Cu K primary: K--L$_3$ 0.255668, K--L$_2$ 0.131119, K--M$_{4,5}$ $4.38737\times10^{-5}$; cascade-fed L$_3$--M$_5$ 0.0035816, L$_3$--M$_1$ 0.0039117 | `line_yield_per_vacancy` K row: identical to printed precision | pass |
+
+Line join (`_xraydb_line_index`, `_expand_levels`, `_parse_characteristic_file`): Kβ$_5$ (K--M$_{4,5}$) claims both K--M$_4$ and K--M$_5$, whose EADL probabilities sum into the one xraydb-energy column. Kα$_3$ (K--L$_1$, xraydb intensity $3\times10^{-4}$) has no EADL radiative branch and is omitted. Lines with no xraydb level pair take EADL `ETR` with `line_source="eadl"`: Cu has 14 of 26 lines from EADL, including the M1/E2 lines L$_2$--M$_3$ and L$_3$--M$_{2,3}$ and the intrashell L$_1$--L$_{2,3}$ lines at 128 and 149 eV. Tables for Z=3--98 load in both yield modes without any xraydb pair being claimed twice. Line counts are 26 (Cu), 108 (Au) and 146 (U), matching the note. The EADL-only share of the "representative weighted photon yield" (1.5% to 10%) was not reproduced, because that weighting is not defined in the write-up.
+
+Reported numbers checked from raw data: Cu K photon energy 3521.7 eV per 8986 eV hole (pass). EADL Cu $f_{12}=0.2401$, $f_{13}=0.5721$, $f_{23}=0.00895$ (pass). xraydb Cu $0.30$, $0.681$, $0.47$ (pass, as xraydb values; the `total=True` query returns the same numbers). EADL/Elam $\omega_K$ over 0.867 (Ne) to 1.201 (C) for K subshells above 200 eV (pass).
+
+### Discrepancies (documentation and declared bounds, not code)
+
+1. **Transition-energy defect bound is false as stated.** The claim appears in the ledger Notes, the physics page ("For K and L primaries bound above about 100 eV the defect is under 1.5%"), this write-up's Assumptions and 2026-09-27 note, and the docstring of `test_cascade_energy_budget_closes_within_the_eadl_transition_defect`. An independent scan over Z=3--99 of K, L$_1$, L$_2$ and L$_3$ primaries bound above 100 eV found:
+   - K: maximum $\lvert\Delta_p\rvert/B_p$ is 1.44%, so the claim holds for K.
+   - L: 35 of the 353 K and L primaries exceed 1.5%, and all 35 are L primaries.
+   - Worst above 100 eV: Si L$_2$ at 104 eV, $-6.3\%$ (the page already mentions this case).
+   - Other L$_1$ and L$_{2,3}$ cases: K L$_1$ at 381 eV, $+5.96\%$; Ca L$_1$ at 441 eV, $+5.46\%$; P L$_2$ at 135 eV, $-5.0\%$; Ti L$_1$ at 567 eV, $+4.44\%$.
+   - High-binding L$_1$ cases: Ga L$_1$ at 1302 eV, $+2.95\%$; Sr L$_1$ at 2219 eV, $+2.43\%$; Ba L$_1$ at 5991 eV, $+1.78\%$.
+   - Failing L$_1$ primaries span Z=13--57.
+
+   The test passes only because its parametrization (C, Si, Cu K; Cu L$_1$, L$_3$; Au K, L$_3$) misses these cases. The identity itself is exact; only the declared bound is wrong. Suggested wording: "K primaries under 1.5%; L primaries up to about 6% below 600 eV and up to 3% for L$_1$ through Z≈57."
+2. **The L-subshell $\omega$ ratio range is scope-limited.** "EADL/Elam $\omega$ spans 0.47--2.0 for L subshells above 200 eV" holds only from about Ti upward. Lighter elements with L edges above 200 eV reach S L$_1$ 7.18, Cl L$_1$ 5.18, Ca L$_2$ 3.70, Ca L$_3$ 3.50 and K L$_1$ 3.32. The minimum, 0.471 (W L$_1$), is confirmed.
+3. **Attribution.** The 0.30, 0.681 and 0.47 values are xraydb/Elam Coster--Kronig probabilities. This review could not check them against Krause (1979) directly, so "Krause's" should read "Elam/xraydb (after Krause)" unless someone checks the primary table.
+
+### Validity-limit completeness
+
+The stated limits are accurate: untransported Auger electrons, independent single-vacancy rates, EADL energies for M/N lines missing from xraydb, no secondary fluorescence, and the sub-keV caveat. Two limits are missing:
+
+- **The shape of EADL radiative branches is not validated.** For 3d metals, EADL's L$_3$ radiative branching gives L$_3$--M$_1$/L$_3$--M$_5$ (Lℓ/Lα$_1$) of 2.93 (Fe), 1.49 (Ni), 1.09 (Cu) and 0.83 (Zn). xraydb gives 0.12, 0.09, 0.08 and 0.07. For Au the two sources agree (0.065 vs 0.052). The Elam option keeps the EADL branch shape, so it cannot correct this. Together with the Coster--Kronig disagreement, 3d-metal L-line ratios are unvalidated in both yield modes. The limit list should say so.
+- **The Elam option also rescales M, N and O subshells** to xraydb yields. For outer levels these are coarse (Au O$_{1-3}$ $\omega=0$), and any subshell with EADL $\omega=0$ or no nonradiative branch is silently kept at EADL. This is documented in the `_branching_scales` docstring but not on the physics page.
+
+Minor, not a defect:
+
+- Primary selection uses the EEDL binding energy, while the cascade uses the EADL one. A mismatch across 50 eV only moves zero-yield rows.
+- `relaxation_energy_budget` has no `fluorescence_yields` argument, so the energy identity is verified only for the default EADL mode.
+
+### Test run
+
+`uv run pyrite-dev test tests/montecarlo/test_eadl_relaxation.py tests/montecarlo/test_characteristic.py tests/montecarlo/test_eedl_ionization_consistency.py`: 60 passed.
+
+### Verdict
+
+- **Claim**: `characteristic-radiation` (issue #91 cascade). Code: `montecarlo/eadl_relaxation.py::{_extract_eadl_relaxation,vacancy_cascade,relaxation_energy_budget}` and `montecarlo/spectrum/characteristic.py::{_parse_characteristic_file,_cascade_yields}`. Source: EADL ENDF-6 MF=28/MT=533 and {eq}`eq-characteristic-eadl-cascade`.
+- **Filters**: units pass; limits pass ($V=\mathbb 1$; exact nilpotent substitution); signs and conventions pass.
+- **Re-derivation**: matches for the field map, $D$, $V$, $Y$, the budget identity and the Elam rescale. The difference is in declared bounds: the transition-energy defect bound for L primaries, where the first failing case is K L$_1$ at 381 eV with 5.96% against the 1.5% declared.
+- **Verdict**: `rederived` for the cascade equations and their code. Documentation discrepancies 1--3 and the missing branch-shape limit need text fixes; none changes a computed number.
+- **Suggested ledger change (human applies)**: change the status from `filtered` to `rederived` only after the defect-bound sentence is corrected to K < 1.5% and L up to about 6%, and the L-$\omega$ range is scoped to Z ≳ 22. Also record the independent MF=28 and cascade verification and remove "fresh-context source-to-code verification of the cascade are pending" from Notes. Comparison against PENELOPE/Geant4/EGSnrc and measured L-line ratios remains pending. No sign-off.
+
+## Independent-implementation comparison against xraylib, 2026-09-27
+
+`checks/xraylib_cascade_oracle.py` compares the `v7` cascade with xraylib 4.3.0's Kissel full cascade (`CS_FluorShell_Kissel_Cascade`, `CS_FluorLine_Kissel_Cascade`), which is pinned in the `oracle` dependency group. Run it with `uv run --group oracle python checks/xraylib_cascade_oracle.py`; the record is `check-records/xraylib_cascade_oracle.jsonl` at revision `9aa69796`.
+
+**What is independent.** xraylib's cascade code is separate from PyRITE's. It propagates K to L, K and L to M, and L and M Coster--Kronig vacancies through M5 using precomputed per-element constants. Its fluorescence yields, Coster--Kronig probabilities and radiative rates come from Krause-based compilations. Its nonradiative topology is EADL97, an earlier release of the library PyRITE packages. The comparison is therefore independent evidence for the implementation — the $D$ assembly, the $V$ solve and the join to lines — but only partial evidence for the EADL data. It is not the PENELOPE, Geant4 or EGSnrc comparison that the checklist names.
+
+**Method.** Both sides take the same primaries: xraylib's `CS_Photo_Partial` for K through M5 at one photon energy. This isolates relaxation from ionization; the EEDL electron-impact cross sections are not involved. Energies are chosen to open selected primaries: Si at 3 keV (K and L), Cu at 12 keV (K, L, M) and 5 keV (L, M), and Au at 100 keV (K, L, M), 15 keV (L, M), 12.5 keV (L3, M) and 5 keV (M). Two quantities are compared:
+
+- vacancy enhancement $n_i/P_i$, where $n=PV$ and xraylib's $n_i$ is `CS_FluorShell_Kissel_Cascade` $/\,\omega_i$. This tests topology and is gated at 10% for K and L subshells in all three elements and for Au M subshells.
+- line cross section $\sum_i n_iF_{i\ell}$ per level pair. This also carries the EADL-versus-Krause yield difference, so it is gated at 5% only for Kα$_{1,2}$ in all three elements and for Au L$_3$--M$_{4,5}$ and L$_3$--N$_5$. Other lines are reported without a gate.
+
+**Vacancy enhancement.** Every gated subshell agrees within 8%:
+
+| element, primaries | subshell | xraylib $n/P$ | PyRITE $n/P$ | ratio |
+| --- | --- | --- | --- | --- |
+| Si, K+L | L$_1$ / L$_2$ / L$_3$ | 7.98 / 76.7 / 78.0 | 7.99 / 77.3 / 78.3 | 1.002 / 1.008 / 1.003 |
+| Cu, K+L+M | L$_1$ / L$_2$ / L$_3$ | 3.88 / 31.1 / 33.1 | 3.98 / 30.5 / 33.6 | 1.027 / 0.979 / 1.014 |
+| Cu, L+M | L$_2$ / L$_3$ | 1.627 / 1.630 | 1.502 / 1.648 | 0.923 / 1.012 |
+| Au, K+L+M | L$_1$ / L$_2$ / L$_3$ | 1.235 / 7.79 / 15.0 | 1.244 / 7.79 / 15.3 | 1.007 / 1.001 / 1.021 |
+| Au, K+L+M | M$_1$ … M$_5$ | 3.93 … 1193 | 3.88 … 1172 | 0.960--0.986 |
+| Au, L+M | M$_1$ … M$_5$ | 2.36 … 25.8 | 2.30 … 25.9 | 0.959--1.008 |
+| Au, M only | M$_4$ / M$_5$ | 1.500 / 1.776 | 1.406 / 1.668 | 0.937 / 0.939 |
+
+The largest gated difference, Cu L$_2$ fed from L$_1$ at 0.923, is the recorded Coster--Kronig disagreement: EADL has $f_{12}=0.240$ where the Krause-based compilation has about 0.30. The Au M$_{4,5}$ deficit of about 6% from M-only primaries has the same origin, in M-shell Coster--Kronig. Near-valence M subshells of Si and Cu are reported without a gate. Their enhancement differs by +20% to +33% for Si M$_1$ and Cu M$_{1,2}$, and by 3.6--3.9x for Cu M$_4$, which lies below the 50 eV cutoff and therefore neither decays nor emits. Neither code models these outer levels reliably, and they produce no line in the scored band.
+
+**Line cross sections.** The gated lines agree within 3.5%:
+
+- Kα$_{1,2}$ is 0.973 for Si, 0.966 for Cu and 1.001 for Au.
+- Au L$_3$--M$_{4,5}$ and L$_3$--N$_5$ are 0.988--1.016 across all four Au cases.
+
+The reported lines, with the EADL and `elam` ratios to xraylib, and their causes:
+
+- **Kβ$_{1,3}$.** Cu 0.88 and 0.89; Au 0.97 and 0.99; Si 0.60 and 0.53. This is the EADL K--M radiative rate. For Si the M shell is valence, which is also why xraylib's Si Kβ is weak evidence.
+- **Au L$_1$ lines (L$_1$--M$_{2,3}$).** 0.71, and 0.82--0.91 with `elam`. This follows EADL's lower Au $\omega_{L_1}$.
+- **Au L$_2$ lines.** 1.08--1.09, and 0.99 with `elam`.
+- **Au Lℓ (L$_3$--M$_1$).** 1.15--1.18 in both modes. This is an EADL branch-shape difference.
+- **Cu L lines.** Lα$_1$ is 0.43 (`elam` 0.54), Lℓ is 6.8 (`elam` 8.5), and Lβ$_1$ is 0.80 (`elam` 0.50). This is the recorded 3d-metal validity limit, EADL's L$_3$ branch shape together with the Coster--Kronig disagreement. The independent code reproduces it, so it is a data difference rather than a propagation error.
+- **Au M lines.** Mα (M$_5$--N$_{6,7}$) is 1.12--1.20 (`elam` 0.97--1.03), Mβ (M$_4$--N$_6$) is 1.11--1.21 (`elam` 0.98--1.06), M$_5$--N$_6$ is 0.84--0.90, and M$_3$--N$_5$ (Mγ) is 2.5 (`elam` 1.37). The Mγ difference is an EADL radiative-rate difference that also appears with M-only primaries, where no propagation is involved.
+
+**Verdict.** Every gated check passes. The cascade propagation agrees with an independent implementation for K, L and M primaries in a low-Z (Si), a mid-Z (Cu) and a high-Z (Au) element. This covers K-fed L, L-fed M and Coster--Kronig transfer, and the differences follow the recorded Coster--Kronig disagreement. Line-level differences outside the gates are all attributable to the recorded EADL-versus-Krause yield and branch-shape disagreements. The `elam` option removes most of the total-yield component but not the branch shape.
+
+Still open:
+
+- a comparison against PENELOPE `pdrelax`, Geant4 or EGSnrc, with nonradiative topology that is not EADL-derived and with transport-level spectra;
+- measured L-line intensity ratios, which alone can settle the Coster--Kronig question and the 3d-metal L branch shape.
+
+Both are tracked in #196.
+
+No ledger status change is suggested, and no sign-off is claimed.

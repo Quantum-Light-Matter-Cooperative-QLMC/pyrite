@@ -59,6 +59,7 @@ run through the collector.
 | `sinc_bin_integration.py` | Bin-mean line quadrature on one transport: yield against an exact node reference, and CPU/CuPy/fused-CUDA agreement (remote only at 300 keV). |
 | `substep_invariance.py` | Measures emitted-radiation invariance under numerical transport substepping. |
 | `transport_core_goldens.py` | Verifies bit-for-bit CPU transport-core golden outputs. |
+| `xraylib_cascade_oracle.py` | Pinned xraylib Kissel full-cascade comparison of EADL vacancy propagation and K/L/M line cross sections for Si, Cu and Au from shared photoionization primaries; gates vacancy enhancement and K-alpha/Au L3 lines (#91). |
 | `cxr_analysis_feranchuk.ipynb`, `cxr_analysis_feranchuk.md` | Legacy paired notebook retained for historical Feranchuk analysis; it emits no records. Keep output-free. |
 
 Run commands are documented in each check. Heavy Monte Carlo or GPU work must

@@ -27,6 +27,16 @@ uv run --group oracle python checks/dans_diffraction_oracle.py
 
 The program returns nonzero for a missing backend, non-finite result, or threshold violation. It tightly compares shared Waasmaier–Kirfel non-resonant factors and separately bounds Chantler/FFAST versus independent Henke/CXRO dispersive factors at 1, 2, 3, and 8 keV. This external comparison is implementation evidence; it does not replace fresh-context re-derivation or human sign-off.
 
+### Optional external relaxation-cascade oracle
+
+Run the pinned, validation-only xraylib backend with:
+
+```bash
+uv run --group oracle python checks/xraylib_cascade_oracle.py
+```
+
+It feeds xraylib's photoionization primaries into both xraylib's Kissel full cascade and PyRITE's EADL cascade, and gates per-subshell vacancy enhancement at 10% and K-alpha and Au L3 line cross sections at 5% for Si, Cu and Au. Other lines are reported, because they carry the recorded EADL-versus-Krause yield disagreement. xraylib's nonradiative topology is EADL97, so the comparison checks PyRITE's implementation independently but its EADL data only partly. It does not replace fresh-context re-derivation or human sign-off.
+
 ## Status lifecycle
 
 ```text

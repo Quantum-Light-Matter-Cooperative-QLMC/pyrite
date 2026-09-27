@@ -16,6 +16,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/collision_statistics_refinement.py": ("energy-controlled-propagation",),
     "checks/cross_reflection_coherence.py": ("cross-reflection-coherence",),
     "checks/dans_diffraction_oracle.py": ("dans-diffraction-oracle",),
+    "checks/xraylib_cascade_oracle.py": ("characteristic-radiation",),
     "checks/detector_solid_angle_check.py": (
         "detector-eaglexo",
         "detector-line-broadening",

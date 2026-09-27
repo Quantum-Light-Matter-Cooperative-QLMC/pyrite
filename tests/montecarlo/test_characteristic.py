@@ -53,11 +53,25 @@ def test_packaged_eedl_bytes_match_pinned_checksum():
         assert stream.readline().endswith(b"\r\n"), "CRLF lost to eol normalization"
 
 
+def test_packaged_eadl_bytes_match_published_file():
+    """Keep the cascade's source file byte-for-byte reproducible."""
+    path = characteristic.CHARACTERISTIC_DATA_DIR / characteristic.CHARACTERISTIC_EADL_FILENAME
+
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c"
+    )
+    assert (
+        characteristic.CHARACTERISTIC_EADL_SHA256 == hashlib.sha256(path.read_bytes()).hexdigest()
+    )
+    with path.open("rb") as stream:
+        assert stream.readline().endswith(b"\r\n"), "CRLF lost to eol normalization"
+
+
 def test_packaged_carbon_eedl_values_and_relaxation_join():
     table = characteristic.load_characteristic_cross_sections("C")
 
     assert table.atomic_number == 6
-    assert table.ionization_shell_labels[:4] == ("K", "L1", "L2", "L3")
+    assert table.ionization_shell_labels == ("K",)
     assert table.shell_binding_energy_eV[0] == 288.0
     sigma_k_30kev = np.interp(
         30_000.0,
@@ -68,9 +82,8 @@ def test_packaged_carbon_eedl_values_and_relaxation_join():
     # here passes ``atol=0.0``: the default 1e-8 absolute tolerance dwarfs a
     # ~5.4e-20 cm^2 cross section, so even zero would satisfy it.
     assert np.isclose(sigma_k_30kev, 5.4137330932220697e-20, rtol=1.0e-13, atol=0.0)
-    assert np.isclose(table.shell_fluorescence_yield[0], 0.0014, atol=0.0)
-    assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.0014, atol=0.0)
-    assert {266.2, 277.0} <= set(table.line_energy_eV)
+    assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.001682088, rtol=1e-12, atol=0.0)
+    assert set(table.line_energy_eV) == {277.0}
     ka1 = table.line_labels.index("Ka1")
     # A Lorentzian transition width is the sum of the initial- and final-hole
     # widths: C K (0.0868 eV) + C L3 (0.0045 eV).
@@ -350,9 +363,9 @@ def test_absorber_elements_do_not_load_unused_ionization_tables(monkeypatch):
     loaded = []
     real_load = characteristic.load_characteristic_cross_sections
 
-    def tracked_load(element, *, data_dir=None):
+    def tracked_load(element, **kwargs):
         loaded.append(element)
-        return real_load(element, data_dir=data_dir)
+        return real_load(element, **kwargs)
 
     monkeypatch.setattr(characteristic, "load_characteristic_cross_sections", tracked_load)
     monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
@@ -424,134 +437,143 @@ def test_runner_keeps_characteristic_separate_from_both_line_modes(monkeypatch):
     np.testing.assert_array_equal(line_spectrum(output, coherent=True), 2.0 + characteristic_line)
 
 
-def _l_shell_ck(element: str) -> tuple[float, float, float]:
-    return (
-        xraydb.ck_probability(element, "L1", "L2"),
-        xraydb.ck_probability(element, "L1", "L3"),
-        xraydb.ck_probability(element, "L2", "L3"),
-    )
-
-
-def test_ck_free_light_element_keeps_an_identity_vacancy_transfer():
-    """Elements without tabulated L Coster--Kronig reduce to the direct product.
-
-    xraydb reports no L Coster--Kronig for Z <= 11, so carbon's transfer must be
-    the identity and its line yields must stay at the pre-cascade
-    ``omega_i * I_il``. This is the limiting case that keeps the v4 carbon
-    anchors above valid.
-    """
+def test_carbon_l_subshells_bound_below_the_cutoff_are_not_primaries():
+    """C L1-L3 (< 20 eV) can never radiate above the 50 eV floor."""
     table = characteristic.load_characteristic_cross_sections("C")
 
-    assert _l_shell_ck("C") == (0.0, 0.0, 0.0)
-    assert np.array_equal(table.vacancy_transfer, np.eye(len(table.ionization_shell_labels)))
-    assert np.isclose(table.line_yield_per_vacancy[0].sum(), 0.0014, atol=0.0)
+    assert table.ionization_shell_labels == ("K",)
+    assert table.relaxation_shell_labels == ("K", "L1", "L2", "L3")
+    assert table.vacancy_transfer.shape == (1, 4)
     assert not table.vacancy_transfer.flags.writeable
 
 
-def test_copper_l_shell_coster_kronig_redistributes_primary_vacancies():
-    """Row ``i`` holds where one primary vacancy in ``i`` ends up.
+def test_carbon_k_emission_is_the_eadl_radiative_branch():
+    """Source values: EADL2025 Z=6 K radiative FTR (K-L2, K-L3)."""
+    table = characteristic.load_characteristic_cross_sections("C")
+    elam = characteristic.load_characteristic_cross_sections("C", fluorescence_yields="elam")
 
-    Coster--Kronig moves the L hole outward without creating a second L hole,
-    so every row sums to one. xraydb's ``f13`` is a *total* probability that
-    already contains the L1 -> L2 -> L3 route, which is why it is fed from the
-    primary L1 population and ``f23`` is applied only to the primary L2
-    population: routing ``f12 * N_L1`` through ``f23`` as well would count that
-    path twice.
-    """
-    table = characteristic.load_characteristic_cross_sections("Cu")
-    index = {label: i for i, label in enumerate(table.ionization_shell_labels)}
-    f12, f13, f23 = _l_shell_ck("Cu")
-    transfer = table.vacancy_transfer
-
-    assert (f12, f13, f23) == (0.3, 0.681, 0.47)
-    assert transfer[index["L1"], index["L1"]] == pytest.approx(1.0 - f12 - f13)
-    assert transfer[index["L1"], index["L2"]] == pytest.approx(f12)
-    assert transfer[index["L1"], index["L3"]] == pytest.approx(f13)
-    assert transfer[index["L1"], index["L3"]] != pytest.approx(f13 + f12 * f23)
-    assert transfer[index["L2"], index["L2"]] == pytest.approx(1.0 - f23)
-    assert transfer[index["L2"], index["L3"]] == pytest.approx(f23)
-    assert transfer[index["L3"], index["L3"]] == 1.0
-    assert np.allclose(transfer.sum(axis=1), 1.0)
-    # Decay fills a hole from a less-bound shell, so vacancies only ever move
-    # to higher indices: the transfer is upper triangular.
-    assert not np.tril(transfer, -1).any()
-
-
-def test_m_and_k_shell_rows_are_left_as_identity():
-    """Only the L shell is redistributed by this slice.
-
-    xraydb's M-shell Coster--Kronig values are not a probability distribution --
-    the finals of Cr M1 sum to 3.82 and 134 (Z, initial) pairs exceed one -- so
-    they are deliberately excluded until EADL supplies a normalized topology.
-    A K vacancy's own transfer stays the identity because its Auger daughters
-    are not propagated by this slice either.
-    """
-    table = characteristic.load_characteristic_cross_sections("Cu")
-    index = {label: i for i, label in enumerate(table.ionization_shell_labels)}
-    identity = np.eye(len(table.ionization_shell_labels))
-
-    for label in ("K", "M1", "M2", "M3", "M4", "M5"):
-        assert np.array_equal(table.vacancy_transfer[index[label]], identity[index[label]])
-
-
-def test_copper_l_emission_gains_the_independently_computed_ck_factor():
-    """Total L emission against an expectation built only from source tables.
-
-    Expected total is ``sum_i n_i omega_i`` with ``n`` from the
-    Krause/Elam Coster--Kronig factors and ``N`` the EEDL primary populations;
-    the pre-cascade value is ``sum_i N_i omega_i``. For Cu at 30 keV that
-    ratio is 1.2347 -- the L1 hole is the one being moved, and omega_L3 is
-    6.9x omega_L1.
-    """
-    table = characteristic.load_characteristic_cross_sections("Cu")
-    index = {label: i for i, label in enumerate(table.ionization_shell_labels)}
-    f12, f13, f23 = _l_shell_ck("Cu")
-    sigma = {
-        label: float(
-            np.interp(
-                30_000.0,
-                table.projectile_energy_eV_by_shell[index[label]],
-                table.ionization_cross_sections_cm2_by_shell[index[label]],
-            )
-        )
-        for label in ("L1", "L2", "L3")
-    }
-    omega = {
-        label: float(table.shell_fluorescence_yield[index[label]]) for label in ("L1", "L2", "L3")
-    }
-    populated = {
-        "L1": sigma["L1"] * (1.0 - f12 - f13),
-        "L2": sigma["L2"] * (1.0 - f23) + f12 * sigma["L1"],
-        "L3": sigma["L3"] + f23 * sigma["L2"] + f13 * sigma["L1"],
-    }
-    expected = sum(populated[label] * omega[label] for label in populated)
-    direct = sum(sigma[label] * omega[label] for label in sigma)
-
-    emitted = sum(
-        sigma[label] * float(table.line_yield_per_vacancy[index[label]].sum()) for label in sigma
+    np.testing.assert_allclose(
+        table.line_yield_per_vacancy[0], [0.000561488, 0.0011206], rtol=1e-15, atol=0
+    )
+    assert table.shell_fluorescence_yield[0] == pytest.approx(0.001682088, rel=1e-12)
+    # Elam/Krause C omega_K is 0.0014; the flag rescales the radiative branch only.
+    assert elam.line_yield_per_vacancy[0].sum() == pytest.approx(0.0014, rel=1e-12)
+    assert elam.line_yield_per_vacancy[0, 1] / elam.line_yield_per_vacancy[0, 0] == pytest.approx(
+        0.0011206 / 0.000561488, rel=1e-12
     )
 
-    assert emitted == pytest.approx(expected, rel=1.0e-12)
-    assert emitted / direct == pytest.approx(1.2347, abs=5.0e-4)
+
+def test_copper_lines_join_xraydb_energies_and_keep_eadl_only_transitions():
+    table = characteristic.load_characteristic_cross_sections("Cu")
+    lines = dict(
+        zip(
+            table.line_labels,
+            zip(table.line_source, table.line_energy_eV, strict=True),
+            strict=True,
+        )
+    )
+
+    assert lines["Ka1"] == ("xraydb", 8046.3)
+    assert lines["Kb5"][0] == "xraydb"  # xraydb K-M4,5 claims both EADL K-M4 and K-M5
+    assert "Ka3" not in lines  # dipole-forbidden K-L1: no EADL radiative branch
+    assert lines["L3-N1"] == ("eadl", 930.38)
+    kb5 = table.line_labels.index("Kb5")
+    k_row = table.relaxation_shell_labels.index("K")
+    k = table.relaxation.subshells[k_row]
+    k_m45 = k.radiative_probability[np.isin(k.radiative_final, [8, 9])].sum()
+    assert table.radiative_yield_per_decay[k_row, kb5] == pytest.approx(k_m45, rel=1e-15)
 
 
-def test_l_shell_transfer_rejects_coster_kronig_probabilities_over_one(monkeypatch):
-    """A CK table whose L1 finals exceed unity is a data error, not a rescale."""
-    monkeypatch.setattr(characteristic.xraydb, "ck_probability", lambda *_a, **_k: 0.6)
+def test_cascade_visits_are_the_exact_inverse_of_i_minus_d():
+    """Forward substitution against an independent dense solve."""
+    for element in ("Si", "Cu", "Au"):
+        relaxation = characteristic.load_characteristic_cross_sections(element).relaxation
+        daughters, visits = characteristic.vacancy_cascade(relaxation, 50.0)
 
-    with pytest.raises(ValueError, match="Coster--Kronig"):
-        characteristic._l_shell_vacancy_transfer("Cu", ("K", "L1", "L2", "L3"))
-
-
-def test_l_shell_transfer_skips_absent_subshells():
-    """Transfer is only wired between subshells the EEDL table actually carries."""
-    transfer = characteristic._l_shell_vacancy_transfer("Cu", ("K", "L1", "L2"))
-    f12, _f13, _f23 = _l_shell_ck("Cu")
-
-    assert transfer[1, 2] == pytest.approx(f12)
-    assert transfer[1, 1] == pytest.approx(1.0 - f12)
-    assert np.allclose(transfer.sum(axis=1), 1.0)
+        assert not np.tril(daughters).any(), "cascade order must make D strictly upper-triangular"
+        np.testing.assert_allclose(
+            visits, np.linalg.inv(np.eye(len(daughters)) - daughters), rtol=1e-12, atol=1e-12
+        )
+        n = len(daughters)
+        assert not np.linalg.matrix_power(daughters, n).any(), "D must be nilpotent"
 
 
-def test_characteristic_model_marker_records_the_ck_relaxation():
-    assert characteristic.CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-segment-escape-v6")
+def test_cascade_cutoff_above_every_binding_is_the_direct_vacancy_limit():
+    relaxation = characteristic.load_characteristic_cross_sections("Cu").relaxation
+    daughters, visits = characteristic.vacancy_cascade(relaxation, 1.0e6)
+
+    assert not daughters.any()
+    np.testing.assert_array_equal(visits, np.eye(len(visits)))
+
+
+def test_copper_k_vacancy_feeds_l_emission_and_conserves_probability():
+    """Each decay row sums to one plus the number of extra holes it creates."""
+    table = characteristic.load_characteristic_cross_sections("Cu")
+    relaxation = table.relaxation
+    daughters, visits = characteristic.vacancy_cascade(relaxation, 50.0)
+    for row, shell in enumerate(relaxation.subshells):
+        if shell.binding_energy_eV <= 50.0:
+            continue
+        radiative = shell.radiative_probability.sum()
+        auger = shell.auger_probability.sum()
+        assert radiative + auger == pytest.approx(1.0, abs=1e-5)
+        assert daughters[row].sum() == pytest.approx(radiative + 2.0 * auger, rel=1e-12)
+
+    k = table.ionization_shell_labels.index("K")
+    l_lines = [i for i, shell in enumerate(table.line_initial_shell) if shell.startswith("L")]
+    assert table.line_yield_per_vacancy[k, l_lines].sum() > 0.0
+    assert visits[0, table.relaxation_shell_labels.index("L3")] == pytest.approx(0.902, abs=5e-4)
+
+
+def test_relaxation_cutoff_bounds_vacancy_propagation_by_binding_energy():
+    """EADL binds Cu L1 at 1103 eV: a 1.2 keV cutoff stops every L decay, not K."""
+    table = characteristic.load_characteristic_cross_sections("Cu")
+    transfer, yields = characteristic._cascade_line_yields(table, 1200.0)
+    k = table.ionization_shell_labels.index("K")
+    initial = np.asarray(table.line_initial_shell)
+
+    assert not yields[:, initial != "K"].any()
+    k_lines = initial == "K"
+    np.testing.assert_allclose(
+        yields[k, k_lines], table.radiative_yield_per_decay[0, k_lines], rtol=0, atol=0
+    )
+    assert transfer[k, table.relaxation_shell_labels.index("L3")] > 0.0
+
+
+def test_elam_flag_imposes_xraydb_omega_and_keeps_probability():
+    table = characteristic.load_characteristic_cross_sections("Cu", fluorescence_yields="elam")
+    for label in ("K", "L1", "L2", "L3"):
+        index = table.ionization_shell_labels.index(label)
+        assert table.shell_fluorescence_yield[index] == pytest.approx(
+            xraydb.xray_edge("Cu", label).fyield, rel=1e-12
+        )
+    daughters, _visits = characteristic.vacancy_cascade(
+        table.relaxation, 50.0, fluorescence_yields=table.relaxation_fluorescence_yields
+    )
+    k = table.relaxation.subshells[0]
+    omega = xraydb.xray_edge("Cu", "K").fyield
+    assert daughters[0].sum() == pytest.approx(omega + 2.0 * (1.0 - omega), rel=1e-12)
+    assert k.fluorescence_yield != pytest.approx(omega, rel=1e-3)
+
+
+def test_characteristic_rejects_an_unknown_yield_source():
+    with pytest.raises(ValueError, match="fluorescence_yields"):
+        characteristic.load_characteristic_cross_sections("Cu", fluorescence_yields="krause")
+
+
+def test_characteristic_model_marker_records_the_eadl_cascade():
+    marker = characteristic.CHARACTERISTIC_MODEL
+
+    assert f"eadl-2025-{characteristic.CHARACTERISTIC_EADL_SHA256[:12]}" in marker
+    assert marker.endswith("eadl-cascade-eadl-yields-lorentzian-segment-escape-v7")
+    assert characteristic.characteristic_model_marker("elam") != marker
+
+
+def test_light_elements_without_subshells_above_the_cutoff_load_empty_tables():
+    """No H or He subshell is bound above 50 eV: nothing can radiate, nothing raises."""
+    for element in ("H", "He"):
+        table = characteristic.load_characteristic_cross_sections(element)
+
+        assert table.ionization_shell_labels == ()
+        assert table.line_labels == ()
+        assert table.line_yield_per_vacancy.shape == (0, 0)

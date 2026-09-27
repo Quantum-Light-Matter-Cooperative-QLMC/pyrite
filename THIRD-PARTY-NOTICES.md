@@ -1,16 +1,31 @@
 # Third-Party Notices
 
 PyRITE is distributed under the UCLA Academic Software License (see
-`LICENSE.txt`; academic/nonprofit use only). The external codes below are
+`LICENSE.txt`; academic/nonprofit use only). The external data and codes below
+carry their own licenses and attribution requirements. The external codes are
 integrated as separate driver-tier tooling (`pyrite.xsgen`, tracked under
 `agentdocs/specs/2026-09-21-external-fortran-code-integration.md` and GitHub
-issue #161) and carry their own licenses and attribution requirements. This
-notice lists them in advance of that integration landing, per issue #162.
+issue #161); their notices were prepared in advance of that integration,
+per issue #162.
 
 None of PyRITE's own source is licensed under any of the terms below. This
 file exists to satisfy the attribution obligations that follow from
 redistributing these codes, from invoking them, and from redistributing
 tables derived or resampled from their output.
+
+## EPICS2025 EADL atomic relaxation data
+
+- **Author**: D. E. Cullen, Livermore Evaluated Atomic Data Library (EADL),
+  `NDS-IAEA-224`.
+- **License**: Creative Commons Attribution 4.0 International,
+  <https://creativecommons.org/licenses/by/4.0/>, as stated on the
+  [EPICS2025 distribution page](https://nuclear.llnl.gov/EPICS/index.html).
+- **Source**: the unmodified ENDF-6 `EADL2025.ALL` file from
+  <https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL>, evaluated August
+  2023 and distributed January 2025. SHA-256:
+  `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`.
+- **Nature of PyRITE's use**: PyRITE redistributes the published file unchanged
+  for future atomic-relaxation calculations. The current model does not read it.
 
 ELSEPA and SBETHE are both CC BY-NC 3.0. PyRITE is itself distributed for
 academic/nonprofit use only, so the NonCommercial clause imposes no
