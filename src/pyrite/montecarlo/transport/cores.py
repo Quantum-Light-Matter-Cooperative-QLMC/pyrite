@@ -420,8 +420,6 @@ def make_cpu_transport_core(
                 )
             else:
                 dEds = _dEds_spliced_compound_scalar(J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j)
-            if radiative:
-                dEds -= rad_soft * 1e-3
             stopping_scale = 1.0
             # Only the Urban sampler reads the scale. Without straggling the
             # LUT cores carry zero dummy element tables, so the reference
@@ -436,6 +434,14 @@ def make_cpu_transport_core(
                         J_arr, k_arr, coeff_arr, E_cross_arr, 0.0, E_j
                     )
                 stopping_scale = dEds / reference_dEds
+            # Soft radiative stopping [keV/Ang] joins after the collision-only
+            # scale. A straggled row samples the collision loss and adds the
+            # soft radiative loss as its mean (variance <= k_c S_rad,soft
+            # neglected). Validation: bremslib-radiative-partition
+            rad_dEds = 0.0
+            if radiative:
+                rad_dEds = rad_soft * 1e-3
+                dEds -= rad_dEds
             cutoff_j = limited_j = False
             geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
             if inelastic and straggle_on:
@@ -457,8 +463,9 @@ def make_cpu_transport_core(
                     il_omega2[L, il_lo + 1] - il_omega2[L, il_lo]
                 )
                 stragg_loss, _ = _soft_loss_sample_keV(
-                    -dEds * step_j, omega2 * step_j, flight_key, _SM64_ZERO
+                    -(dEds + rad_dEds) * step_j, omega2 * step_j, flight_key, _SM64_ZERO
                 )
+                stragg_loss += rad_dEds * step_j
                 stragg_dE[e] += stragg_loss
                 delta_cut = E_j - E_cut_e
                 if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
@@ -515,6 +522,7 @@ def make_cpu_transport_core(
                         _SM64_ZERO,
                         stopping_scale,
                     )
+                stragg_loss += rad_dEds * step_j
                 stragg_dE[e] += stragg_loss
                 delta_cut = E_j - E_cut_e
                 if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):

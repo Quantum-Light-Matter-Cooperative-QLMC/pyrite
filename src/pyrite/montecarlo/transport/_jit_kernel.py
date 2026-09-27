@@ -248,7 +248,8 @@ def _transport_kernel(
     on the ``rad_keys`` stream schedules hard photons, which debit energy
     without deflecting the electron. ``rad_*`` are the packed radiative tables
     flattened C-order (see ``_jit_radiative_device``); off, they and the two
-    photon row columns are never read. The mode excludes straggling.
+    photon row columns are never read. With straggling the soft radiative
+    loss is added to the sampled collision loss as its mean.
     """
     # The launch indices are uint32, and every other index here is int32. In
     # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
@@ -486,8 +487,12 @@ def _transport_kernel(
                 E_j,
             )
             stopping_scale = dEds / reference_dEds
+        # Soft radiative stopping joins after the collision-only scale; a
+        # straggled row adds it to the sampled collision loss as its mean.
+        rad_dEds = F64_ZERO
         if rad_on == I32_ONE:
-            dEds -= rad_soft * F64_KEV_PER_EV
+            rad_dEds = rad_soft * F64_KEV_PER_EV
+            dEds -= rad_dEds
         cutoff_j = False
         # The numerical energy-loss cap is the only step limit that does not
         # close a physical flight: it emits a row and resumes with the same
@@ -533,7 +538,10 @@ def _transport_kernel(
             omega2 = il_omega2[il_row + il_lo] + il_f * (
                 il_omega2[il_row + il_lo + I32_ONE] - il_omega2[il_row + il_lo]
             )
-            stragg_loss = _soft_loss_sample_keV(-dEds * step_j, omega2 * step_j, flight_key)
+            stragg_loss = _soft_loss_sample_keV(
+                -(dEds + rad_dEds) * step_j, omega2 * step_j, flight_key
+            )
+            stragg_loss += rad_dEds * step_j
             stragg_dE[e] += stragg_loss
             delta_cut = E_j - E_cut_e
             if stragg_loss > delta_cut or (stragg_loss == delta_cut and not geometry_event):
@@ -725,6 +733,7 @@ def _transport_kernel(
 
                 stragg_loss += dE_elem
                 i_el2 += I32_ONE
+            stragg_loss += rad_dEds * step_j
 
             # Diagnostic, unchanged from slice D: the SAMPLED loss, which on a
             # cutoff row exceeds the applied loss by exactly the overshoot the
