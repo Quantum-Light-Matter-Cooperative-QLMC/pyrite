@@ -2,8 +2,8 @@
 
 Full radiative + nonradiative atomic-relaxation cascade, replacing the
 direct-vacancy fluorescence estimator.
-GitHub issue: #91. Prospective branch: `issue-91-relaxation-cascade`
-(not created yet — triage stopped before branch setup).
+GitHub issue: #91. Branch/worktree: `issue-91-relaxation-cascade`
+(`.worktrees/issue-91-relaxation-cascade`).
 
 Baseline under review: `src/pyrite/montecarlo/spectrum/characteristic.py`
 (`lorentzian-v4`, ledger row `characteristic-radiation`, status `filtered`).
@@ -173,35 +173,35 @@ split into its own issue if it is dispatched separately from the EADL work.
 
 ## Checklist
 
-- [ ] Add the MT=522 sum rule (`sum MT 534-572 / MT 522 == 1`, Z = 6/29/79,
+- [x] Add the MT=522 sum rule (`sum MT 534-572 / MT 522 == 1`, Z = 6/29/79,
       1 keV-1 MeV) and a Bethe-ratio band as independent internal-consistency
       tests. `tests/montecarlo/test_characteristic.py:71` currently pins carbon
       `sigma_K` to `rtol=1e-13` against the implementation — a regression pin,
       not independent evidence, and it cannot catch a designator-map or unit
       error.
-- [ ] Interim L-shell CK redistribution from `xraydb.ck_probability`, M-shell CK
+- [x] Interim L-shell CK redistribution from `xraydb.ck_probability`, M-shell CK
       gated off with the sum-violation evidence recorded.
-- [ ] Package and pin EADL2025 (`EADL2025.ALL`, MF=28/MT=533) next to
+- [x] Package and pin EADL2025 (`EADL2025.ALL`, MF=28/MT=533) next to
       `EEDL.endf`; resolve provenance/redistribution note in
       `src/pyrite/data/characteristic_cross_sections/README.md`.
-- [ ] EADL MF=28 parser + validation (`sum FTR = 1` per subshell, daughter
+- [x] EADL MF=28 parser + validation (`sum FTR = 1` per subshell, daughter
       designators in range, ETR positive, occupancy consistent).
-- [ ] Binding-energy-ordered vacancy-transfer matrix, `(I - D^T)^-1` Neumann
+- [x] Binding-energy-ordered vacancy-transfer matrix, `(I - D^T)^-1` Neumann
       solve, cutoff by binding energy.
-- [ ] Radiative emission matrix; xraydb energy/width join by `(initial, final)`
+- [x] Radiative emission matrix; xraydb energy/width join by `(initial, final)`
       level pair with per-line provenance recorded.
-- [ ] Optional `omega_i^Elam` renormalization flag; model marker updated;
+- [x] Optional `omega_i^Elam` renormalization flag; model marker updated;
       checkpoint identity fork documented.
-- [ ] `relaxation_cutoff_eV` contract migration.
-- [ ] Energy accounting: cascade energy balance per primary vacancy within the
+- [x] `relaxation_cutoff_eV` contract migration.
+- [x] Energy accounting: cascade energy balance per primary vacancy within the
       declared approximation.
 - [ ] Reference-spectrum comparison (PENELOPE/Geant4/EGSnrc) for K, L and M
       primary vacancies on at least one low-Z, one mid-Z and one high-Z element.
-- [ ] Physics docs + validation write-up + ledger row updated; untransported
+- [x] Physics docs + validation write-up + ledger row updated; untransported
       Auger electrons, absent secondary fluorescence, missing experimental M/N
       line data, and multiple-vacancy effects recorded as explicit validity
       limits.
-- [ ] Items 5 and 6 of the review (yield spread over tabulated lines only;
+- [x] Items 5 and 6 of the review (yield spread over tabulated lines only;
       no secondary fluorescence) written into the scope section of
       `docs/physics/radiation-physics/characteristic-radiation.md` — they are
       currently unstated approximations, and they are the only review findings
@@ -214,3 +214,28 @@ split into its own issue if it is dispatched separately from the EADL work.
 - Secondary fluorescence from reabsorbed characteristic photons (own issue; the
   present `exp(-tau)` is a pure sink).
 - Multiple-vacancy shifts, satellites, chemical shifts.
+
+## Progress, 2026-09-27
+
+Landed on the branch: `montecarlo/eadl_relaxation.py` (checksummed MF=28
+loader/validator, `vacancy_cascade`, `relaxation_energy_budget`) and
+`characteristic.py` rewired to it (model `...-eadl-cascade-eadl-yields-...-v7`,
+`fluorescence_yields="eadl"|"elam"`, binding-energy `relaxation_cutoff_eV`).
+The interim xraydb L-shell CK transfer (v5/v6, landed on main earlier) is
+removed; EADL supplies all CK. Evidence and numbers:
+`docs/validation/radiation-physics/characteristic-radiation.md`, 2026-09-27
+note.
+
+Remaining:
+
+- Reference-spectrum comparison (PENELOPE `pdrelax` / Geant4 `fluor/` /
+  EGSnrc) for K, L, M primaries, low/mid/high Z. Needs external reference
+  data; not packaged.
+- Fresh-context `physics-validation` of the cascade and MF=28 field mapping.
+- Open physics question: EADL vs Krause CK (Cu f23 0.009 vs 0.47) and
+  omega (L subshells 0.47-2.0x). Needs measured L-line ratios to settle.
+- Cost: line count 24 -> 95 for W; characteristic scoring ~2.5x on CPU and
+  proportionally more line-grid seeds. Consider a yield floor for seeding only.
+- Pre-existing, unrelated failures on main: `test_high_energy_profile_range_...`,
+  `test_packaged_profiles_have_explicit_membership`, 1200-line budget for
+  `transport/api.py`.

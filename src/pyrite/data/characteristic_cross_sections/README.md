@@ -12,9 +12,9 @@ The packaged bytes are the EPICS2025 distribution downloaded verbatim from
 Upstream records are 75 columns with CRLF line endings. The pin asserts those
 published bytes, so `.gitattributes` marks this file `-text` to exempt it from
 the repository's `eol=lf` normalization; re-normalizing it would break the pin.
-Characteristic line energies, fluorescence yields, conditional line
-intensities, and natural atomic-level widths are supplied separately by
-xraydb at runtime. PyRITE sums the initial- and final-level widths to obtain
+Characteristic line energies (where xraydb tabulates the transition), optional
+Elam fluorescence yields, and natural atomic-level widths are supplied
+separately by xraydb at runtime. PyRITE sums the initial- and final-level widths to obtain
 each transition's Lorentzian FWHM. The resolved xraydb version is included in
 PyRITE's characteristic-model identity marker so a relaxation-database update
 cannot reuse an older checkpoint.
@@ -31,6 +31,9 @@ It retains the upstream 75-column CRLF records through the `-text`
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); see the repository's
 [third-party notices](../../../../THIRD-PARTY-NOTICES.md) for attribution.
 
-This EADL file is packaged for the planned atomic-relaxation cascade. The
-current characteristic-radiation model still reads EEDL and xraydb only;
-adding EADL does not change its spectra or checkpoint identity.
+PyRITE reads EADL File 28 for the characteristic-radiation relaxation
+cascade: subshell binding energies, occupancies, and radiative and
+nonradiative transition probabilities and energies. xraydb still supplies line
+energies where it tabulates the same level pair, natural level widths, and the
+optional Elam fluorescence yields. The EADL checksum prefix is part of the
+characteristic-model identity marker.

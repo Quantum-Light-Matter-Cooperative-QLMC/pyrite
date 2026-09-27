@@ -91,9 +91,11 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # the ELSEPA elastic model, which changes every trajectory. Re-minted again
     # for issue #181's `line_escape_model` marker: the incoherent line route
     # now scores the segment-mean escape, and the coherent route the per-piece
-    # formation integral under absorption.
+    # formation integral under absorption. Re-minted again for issue #91's
+    # `eadl-cascade` marker: the EADL relaxation cascade replaces direct-vacancy
+    # xraydb yields, so v6 records are not the same spectrum.
     assert case_content_key(case) == (
-        "5f414f5d9cd4a66f57021ed47655ad69b13254c75afbeaf1f11f9876b7280859"
+        "3902631a6ed4fc0978490a4568078438c2335bd81f096987773e08dfb43b4df6"
     )
 
 
@@ -104,7 +106,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "6cf10f1a6206b607ab3585d121e1aa6f3f880307404f531431b32aa3691d9d4d"
+        "9a9b7a2eb5b778f40c5156cc80dd64f55171e00da1f638270bbf4ceb64e391cc"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
@@ -357,8 +359,9 @@ def test_characteristic_model_marker_orphans_previous_line_models():
 
     assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
     assert "eedl" in CHARACTERISTIC_MODEL
+    assert "eadl" in CHARACTERISTIC_MODEL
     assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
-    assert CHARACTERISTIC_MODEL.endswith("l-shell-ck-lorentzian-segment-escape-v6")
+    assert CHARACTERISTIC_MODEL.endswith("eadl-cascade-eadl-yields-lorentzian-segment-escape-v7")
 
 
 def test_case_content_key_separates_characteristic_models():
@@ -404,7 +407,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "6cf10f1a6206b607ab3585d121e1aa6f3f880307404f531431b32aa3691d9d4d"
+        "9a9b7a2eb5b778f40c5156cc80dd64f55171e00da1f638270bbf4ceb64e391cc"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -418,42 +421,42 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "65fc365235b981edc7b9304a2633076c3bc32d8ee57e5ec30fe6a9573cb2f095",
+            "95fa8973cc2a3fb863dd88df8df2fd04abcfd92a8c6c0d717c8265a3720e6cf2",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "f926d6188bb22e30f03db71d9e590f5a0d17b52a57277b63652251d98c32a8ce",
+            "1b2ab747e5941ef15304ead9f423ade9f3a1ab22047dce562ac4d45bb39a75ef",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "335afb8e9944bf387a9d40207c74c0bbe999dab3966d51266d17082721d4b3b1",
+            "0eb6354b392f10ef714e08c10a029dfbdbb1953858ef169fde73a7c5c8648b33",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "a4d18c323a1fe893958e6c9de9109c4f32131d61839343b4eaac9e41b29b6219",
+            "54303225782b3ce1e3b8ec35ae57c360e9e0b6eb79c03ff47165129a072b676e",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "7248e9216298eca795e1c203c77ee3e52037fc1d952f14b4514fc907e4e5807d",
+            "96eb892d98416bc14ee85397766fd3c020bddd8e09d246a4c3a251af37d253ee",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "4391daa52927fd2fe952dbaa3571839fa19b754f80745519f01b206d63a8ee4e",
+            "22b701e1b0d08c0adacdd188817935ef6151f97ae25d070e9f5c9c90c706a628",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "52b1ffdd2396c0e5ad34116c80cac3aeb9b69d0a7fa9923bfe85bfbf2ce1567b",
+            "5d653e5802df5e27c514cafeb7ba60d6d2589a30ed39b932caf42d958d078b11",
         ),
         (
             "promising_low_ne",
             "hopg",
-            "83d2a30a612e41f342c364547cc06ca8e127beef29c0a20a67f66428b43f4950",
+            "15eb076d56105d1431e71cf1b20340730eb0e082e70a3a3017808ef3c07288ba",
         ),
     ],
 )
@@ -622,9 +625,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # for issue #91's L-shell Coster--Kronig relaxation marker, and again for
     # issue #89's default ELSEPA elastic model, and again for the BremsLib
     # default continuum of issue #86, and again for issue #181's line-escape
-    # marker) must stay bit-for-bit.
+    # marker, and again for issue #91's EADL relaxation cascade) must stay
+    # bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "6cf10f1a6206b607ab3585d121e1aa6f3f880307404f531431b32aa3691d9d4d"
+        "9a9b7a2eb5b778f40c5156cc80dd64f55171e00da1f638270bbf4ceb64e391cc"
     )
     survey_incoherent = dataset_identity(
         "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
@@ -637,7 +641,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # again for issue #89's default ELSEPA elastic model, and for issue #181's
     # line-escape marker.
     assert survey_incoherent["parameter_sha256"] == (
-        "cd33e30d7a1a2837f37c5a5899d1f46d203a395f972bce03a8f190ca7c418937"
+        "612b9b3c4188f2ba3c6e4c728d89c43b59f2fdb6da76a852b5e8128341690731"
     )
 
 
