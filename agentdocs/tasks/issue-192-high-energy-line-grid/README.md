@@ -136,6 +136,43 @@ plus a sinc-squared tail margin. The closed-form ceiling stays the hard cap;
    margin, never exceeds the ceiling, identity unchanged for default cases,
    and refusal diagnostics.
 
+## Measured-bandwidth results (2026-09-27)
+
+Implemented opt-in `resonance-population` (commits `8e168d34`, `6196f44c`);
+measured with `convergence_job start-bandwidth` (FP64 reference axis to the
+ceiling on identical segments, float32 candidate). h-BN, 5 MeV, seed 0.
+
+| thickness | tilt/azim | Ne | nodes measured / ceiling | h eV | stop eV | true loss above stop | line eval s (meas/ref) |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 1 um | 10/100 | 2000 | 42,239 / 1,415,405 | 1.216 | 51,400 | 3.8e-6 | 1.1 / 24.4 |
+| 1 um | 80/140 | 2000 | 115,075 / 5,432,472 | 0.317 | 36,500 | 2.2e-6 | 1.2 / 27.7 |
+| 1 um | 80/180 | 2000 | 115,154 / 5,436,201 | 0.317 | 36,500 | 2.2e-6 | 0.7 / 27.3 |
+| 1 um | 10/100 | 300 | 40,018 / 1,415,401 | 1.216 | 48,700 | 3.9e-6 | 0.9 / 24.4 |
+| 1 um | 80/140 | 300 | 65,975 / 3,140,381 | 0.548 | 36,200 | 3.4e-6 | 0.6 / 24.8 |
+| 10 um | 10/100 | 300 | 96,974 / 4,176,879 | 0.412 | 40,000 | 2.7e-6 | 0.8 / 25.4 |
+| 100 um | 10/100 | 300 | 136,602 / 6,034,819 | 0.285 | 39,000 | 1.8e-6 | 3.2 / 35.1 |
+| 1 mm | 80/180 | 100 | 132,164 / 6,361,385 | 0.270 | 35,800 | 2.2e-6 | 12.4 / 80.7 |
+| 1 mm | 10/100 | 100 | 512,370 / 5,939,098 | 0.290 | 148,500 | 2e-16 | 16.1 / 59.0 |
+| 1 mm | 10/100 | 300 | refused: 1,286,877 at 0.290 eV over [50, 373,000] eV | | | | |
+
+Characteristic loss above stop <= 4.6e-7 everywhere. Line centroid shifts
+0.07-0.37 eV (<= 1e-4 relative). float32 vs FP64 on the measured axis:
+yield <= 5e-5; centroid <= 0.006 eV except 1 mm 10/100 (3.4 eV on a 148 keV
+axis -- a backend-precision finding, not bandwidth). The proxy edge (1e-5)
+over-predicts true loss by 2.5-5x; the tail bound itself is 2x the exact far
+tail.
+
+1 mm at 10/100 is not a stray-line artifact (the far-line fix did not move
+it): forward-scattered segments with small `1 - v.n` resonate Doppler-boosted
+up to ~66 keV (Ne=100) and carry real proxy weight, and their lines are wide.
+The band there is genuinely ~0.1-0.4 MeV at 1e-5-1e-4, while the global
+0.29 eV spacing is set by long straight flights near 5-9 keV. A uniform axis
+cannot hold both; energy-dependent spacing (fine where narrow features
+resonate, coarse where only wide ones do) is the scalable fix. Proxy safety
+2 instead of 10 cuts that stop to 67.9 keV / 234k nodes at Ne=100 but does not
+address the Ne scaling. Production runs use Ne=20,000 (per user); not yet
+measured. Profile opt-in deferred until #195 (materials/profile rework) lands.
+
 ## Remaining decision
 
 Measure identical 5 MeV trajectories under candidate bandwidths/grids on the
