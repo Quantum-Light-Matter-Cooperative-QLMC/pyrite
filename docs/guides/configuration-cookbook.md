@@ -18,6 +18,8 @@ PYRITE_PROFILE=sub_100keV pyrite run -m hopg --fidelity survey
 PYRITE_HOME=/scratch/my-run pyrite checkpoint list  # archive shelf in that workspace
 ```
 
+For the complete inventory, accepted formats, defaults, and operational controls, see the [environment-variable reference](../repo-design/configuration-resolution.md#environment-variable-reference).
+
 ## Create and inspect a campaign
 
 ```bash
@@ -69,6 +71,6 @@ Derivation can be remote for heavy work. The stored artifact contains full bound
 
 ## Diagnose precedence
 
-Start with `pyrite config list`, then inspect shell variables and the resolved profile/material. Empty configuration environment variables are errors, not a request to fall through. See [Configuration and profile resolution](../repo-design/configuration-resolution.md) for the complete chain.
+Start with `pyrite config list`, then inspect shell variables and the resolved profile/material. Empty configuration environment variables are errors, not a request to fall through. See [Configuration and profile resolution](../repo-design/configuration-resolution.md) for the complete chain and environment-variable reference.
 
 For native GPT time-output electron beams, see [GDF beam import](gpt-gdf-beams.md),including named beam configuration, run overrides, and normalization.
