@@ -207,3 +207,15 @@ def test_audit_accumulates_and_gates_the_upper_edge():
     record = check_line_truncation(case, narrow)
     assert record["upper_fraction_bound"] <= 1e-4
     assert record["lower_fraction_bound"] > 0.0
+
+
+def test_light_far_line_spends_the_share_instead_of_widening_the_axis():
+    main = _population(5000.0, 1.0, weight=[1.0])
+    stray = _population(60_000.0, 1.0, weight=[1e-9])
+    alone, _ = resonance_population_stop_eV([main], ceiling_eV=1e6, truncation_limit=1e-5)
+    both, summary = resonance_population_stop_eV(
+        [main, stray], ceiling_eV=1e6, truncation_limit=1e-5
+    )
+    assert both < 60_000.0
+    assert both == pytest.approx(alone, abs=200.0)
+    assert summary["proxy_truncated_fraction"] <= 1e-5

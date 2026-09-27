@@ -350,6 +350,18 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
     module = "run --no-sync python -m pyrite.energy_grid.bandwidth_check"
     payload = shlex.quote(f"{stem}.segments.pkl")
     report = shlex.quote(args.json_out)
+    if args.production:
+        return [
+            " ".join(
+                [
+                    f"env -u PYRITE_FP64 PYRITE_MC_BACKEND=cuda {uv} {module} production",
+                    f"--material {shlex.quote(args.material)}",
+                    f"--energy {float(args.energy):g}",
+                    f"--configs {shlex.quote(args.configs)}",
+                    f"--seed {int(args.seed)} --json-out {report}",
+                ]
+            )
+        ]
     return [
         " ".join(
             [
@@ -541,6 +553,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bandwidth.add_argument(
         "--time-limit-minutes", type=int, default=DEFAULT_PRECISION_TIME_LIMIT_MINUTES
+    )
+    bandwidth.add_argument(
+        "--production",
+        action="store_true",
+        help="production precision and audit only; no FP64 reference axis",
     )
     bandwidth.add_argument("--no-sync", action="store_true")
     bandwidth.add_argument("--dry-run", action="store_true")

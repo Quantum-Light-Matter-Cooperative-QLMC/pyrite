@@ -190,6 +190,73 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
     return report
 
 
+def production(args: argparse.Namespace) -> dict[str, Any]:
+    """Production precision at production electron counts: axis, audit, cost.
+
+    No reference axis and no pickle, so it scales to counts whose segments a
+    full-ceiling evaluation could not afford. The audit is the one the spectrum
+    phase gates on; a refusal is recorded, not raised.
+    """
+    from .._backend import BACKEND, REAL, _to_cpu
+    from .._line_grid_policy import LineGridToleranceError
+    from ..montecarlo import runner
+    from ..montecarlo.runner.line_grid import check_line_truncation, line_truncation_audit
+
+    rows = []
+    for config in parse_configs(args.configs):
+        case = build_case(args.material, args.energy, config, seed=args.seed)
+        row: dict[str, Any] = {**config, "real": np.dtype(REAL).name}
+        started = time.perf_counter()
+        try:
+            transport = runner._transport_case(case, keep_segments_on_device=True)
+        except LineGridToleranceError as error:
+            row["refused"] = str(error)
+            rows.append(row)
+            print(json.dumps(row, default=str), flush=True)
+            continue
+        row["transport_wall_s"] = time.perf_counter() - started
+        grid = np.asarray(transport["E_grid"], dtype=float)
+        audit = line_truncation_audit(case, grid)
+        started = time.perf_counter()
+        lines = runner._lines_for_segments(
+            transport["segs"],
+            grid,
+            case,
+            transport["n_hat"],
+            case.get("abs_layers"),
+            transport.get("groove"),
+            coherent=False,
+            Ne=transport["Ne_lines"],
+            truncation_audit=audit,
+        )
+        row["lines_wall_s"] = time.perf_counter() - started
+        try:
+            row["truncation_audit"] = check_line_truncation(case, audit)
+        except LineGridToleranceError as error:
+            row["refused"] = str(error)
+        record = transport["diagnostic_grid"]
+        density = np.asarray(lines, dtype=float)
+        total, centroid = _yield_and_centroid(grid, density)
+        row.update(
+            n_segments=int(np.asarray(_to_cpu(transport["segs"]["L_ang"])).size),
+            points=int(grid.size),
+            spacing_eV=float(grid[1] - grid[0]),
+            stop_eV=float(grid[-1]),
+            measured_bandwidth=record.get("measured_bandwidth"),
+            line_yield=total,
+            line_centroid_eV=centroid,
+            device=BACKEND.device.name,
+            device_peak_mib=_peak_mib(),
+        )
+        rows.append(row)
+        print(json.dumps(row, default=str), flush=True)
+        del transport, lines
+        BACKEND.release_memory()
+    report = {"material": args.material, "energy_keV": args.energy, "rows": rows}
+    Path(args.json_out).write_text(json.dumps(report, indent=2, default=str))
+    return report
+
+
 def candidate(args: argparse.Namespace) -> dict[str, Any]:
     """float32: the measured axis on the pickled segments, against FP64."""
     from .._backend import BACKEND, REAL
@@ -233,6 +300,12 @@ def build_parser() -> argparse.ArgumentParser:
     ref.add_argument("--seed", type=int, default=0)
     ref.add_argument("--payload", required=True)
     ref.add_argument("--json-out", required=True)
+    prod = commands.add_parser("production", help="production-precision axis, audit and cost")
+    prod.add_argument("--material", default="hbn")
+    prod.add_argument("--energy", type=float, default=5000.0)
+    prod.add_argument("--configs", required=True, help="tilt:azimuth:thickness_ang:ne,...")
+    prod.add_argument("--seed", type=int, default=0)
+    prod.add_argument("--json-out", required=True)
     cand = commands.add_parser("candidate", help="float32 measured-axis evaluation")
     cand.add_argument("--payload", required=True)
     cand.add_argument("--json-out", required=True)
@@ -243,6 +316,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "reference":
         reference(args)
+    elif args.command == "production":
+        production(args)
     else:
         candidate(args)
     return 0

@@ -250,6 +250,9 @@ def resonance_population_stop_eV(
     bound of ``line-grid-kinematic-bandwidth``; a population that cannot meet
     the limit below it returns the ceiling.
 
+    Lines resonating above ``stop`` count wholly, so a population may leave its
+    lightest, farthest lines outside the axis within ``truncation_limit``.
+
     Limiting case: a single straight flight gives
     ``stop = E_res + width / (pi**2 truncation_limit)``, before rounding.
 
@@ -279,7 +282,10 @@ def resonance_population_stop_eV(
     def lost(stop):
         return float((mass * sincsq_upper_tail_bound(width, stop - energy)).sum()) / total
 
-    low = float(energy.max())
+    # Lines above a trial edge count wholly, so the search may start below the
+    # whole population: a rare hard-scattered line spends the share instead of
+    # forcing the axis out to its resonance.
+    low = float(energy.min())
     stop = ceiling
     if low < ceiling and lost(ceiling) <= limit:
         high = ceiling
