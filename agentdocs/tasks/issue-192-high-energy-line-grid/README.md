@@ -245,3 +245,36 @@ segments; measure Ne=20,000 on the remote host, especially collection peak host
 memory (the collector currently holds three arrays per line) and the 1 mm
 cases. Then obtain fresh-context physics validation, add the local spacing
 regressions, and decide whether any `high_energy` profile can opt in.
+
+## Remote resolution comparison (2026-09-27)
+
+Job `20260927-124515-ff585938` used seed 0, one GPU, FP64 full-ceiling
+reference and FP32 replay on identical segments. `--resolution local
+--compare-resolution uniform`; line spectra only, no detector response.
+The remote h-BN case used the EEDL fallback because BremsLib B/N tables were
+absent. Results were pulled to `/tmp/issue192_resolution_compare_20260927.json`.
+
+| thickness | tilt/azim | Ne | local / uniform / ceiling nodes | local / uniform line-yield error | local / uniform centroid shift | FP32 local yield error | FP64 peak host / device MiB |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 1 um | 10/100 | 300 | 8,536 / 10,324 / 1,415,387 | 2.34e-5 / 2.37e-5 | -0.724 / -0.724 eV | 2.65e-6 | 1,898 / 3,505 |
+| 1 mm | 10/100 | 100 | 76,157 / 434,712 / 5,939,087 | -4.78e-5 / 8.7e-10 | 2.86 / 0.000003 eV | -1.07e-6 | 2,281 / 3,505 |
+| 1 mm | 80/180 | 100 | 20,359 / 37,155 / 6,361,347 | -6.42e-4 / -5.60e-4 | 0.950 / 0.783 eV | -4.71e-6 | 2,475 / 3,505 |
+
+All line-yield differences are below the 1e-3 intrinsic-source target. The
+80/180 difference is mostly grid quadrature/phase error: actual line yield
+above the stop is only 2.12e-5, and the uniform truncated grid differs by
+5.60e-4 too. FP32 line-yield errors on the local axis are <=4.71e-6.
+Device peak is a process-wide high-water mark, not a per-axis comparison.
+Reference evaluations took 24-51 s; local evaluations 0.29-6.1 s. These
+single runs have no repeat/spread estimate. Detector counts were not measured.
+
+Production job `20260927-124933-d2e44852` uses Ne=20,000, FP32 and local
+spacing. Its 1 um 10/100 case passed the truncation audit at 8,891 nodes:
+21.64 s transport, 0.22 s lines, 1,319 MiB host and 229 MiB device peak.
+The second case, 1 mm 10/100, produced no result through the 30-minute SLURM
+limit; status queries slowed to tens of seconds and the SSH proxy intermittently
+rejected handshakes. Terminal scheduler state and peak memory could not be
+retrieved. The third, 1 mm 80/180 case did not produce a result either. This
+does not establish which stage consumed the time or whether the host ran out
+of memory. A lower-memory collection path and stage-level timing are needed
+before another Ne=20,000 1 mm run.
