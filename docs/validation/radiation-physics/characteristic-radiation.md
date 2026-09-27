@@ -382,3 +382,51 @@ Minor, not a defect:
 - **Re-derivation**: matches for the field map, $D$, $V$, $Y$, the budget identity and the Elam rescale. The difference is in declared bounds: the transition-energy defect bound for L primaries, where the first failing case is K L$_1$ at 381 eV with 5.96% against the 1.5% declared.
 - **Verdict**: `rederived` for the cascade equations and their code. Documentation discrepancies 1--3 and the missing branch-shape limit need text fixes; none changes a computed number.
 - **Suggested ledger change (human applies)**: change the status from `filtered` to `rederived` only after the defect-bound sentence is corrected to K < 1.5% and L up to about 6%, and the L-$\omega$ range is scoped to Z ≳ 22. Also record the independent MF=28 and cascade verification and remove "fresh-context source-to-code verification of the cascade are pending" from Notes. Comparison against PENELOPE/Geant4/EGSnrc and measured L-line ratios remains pending. No sign-off.
+
+## Independent-implementation comparison against xraylib, 2026-09-27
+
+`checks/xraylib_cascade_oracle.py` compares the `v7` cascade with xraylib 4.3.0's Kissel full cascade (`CS_FluorShell_Kissel_Cascade`, `CS_FluorLine_Kissel_Cascade`), which is pinned in the `oracle` dependency group. Run it with `uv run --group oracle python checks/xraylib_cascade_oracle.py`; the record is `check-records/xraylib_cascade_oracle.jsonl` at revision `9aa69796`.
+
+**What is independent.** xraylib's cascade code is separate from PyRITE's. It propagates K to L, K and L to M, and L and M Coster--Kronig vacancies through M5 using precomputed per-element constants. Its fluorescence yields, Coster--Kronig probabilities and radiative rates come from Krause-based compilations. Its nonradiative topology is EADL97, an earlier release of the library PyRITE packages. The comparison is therefore independent evidence for the implementation — the $D$ assembly, the $V$ solve and the join to lines — but only partial evidence for the EADL data. It is not the PENELOPE, Geant4 or EGSnrc comparison that the checklist names.
+
+**Method.** Both sides take the same primaries: xraylib's `CS_Photo_Partial` for K through M5 at one photon energy. This isolates relaxation from ionization; the EEDL electron-impact cross sections are not involved. Energies are chosen to open selected primaries: Si at 3 keV (K and L), Cu at 12 keV (K, L, M) and 5 keV (L, M), and Au at 100 keV (K, L, M), 15 keV (L, M), 12.5 keV (L3, M) and 5 keV (M). Two quantities are compared:
+
+- vacancy enhancement $n_i/P_i$, where $n=PV$ and xraylib's $n_i$ is `CS_FluorShell_Kissel_Cascade` $/\,\omega_i$. This tests topology and is gated at 10% for K and L subshells in all three elements and for Au M subshells.
+- line cross section $\sum_i n_iF_{i\ell}$ per level pair. This also carries the EADL-versus-Krause yield difference, so it is gated at 5% only for Kα$_{1,2}$ in all three elements and for Au L$_3$--M$_{4,5}$ and L$_3$--N$_5$. Other lines are reported without a gate.
+
+**Vacancy enhancement.** Every gated subshell agrees within 8%:
+
+| element, primaries | subshell | xraylib $n/P$ | PyRITE $n/P$ | ratio |
+| --- | --- | --- | --- | --- |
+| Si, K+L | L$_1$ / L$_2$ / L$_3$ | 7.98 / 76.7 / 78.0 | 7.99 / 77.3 / 78.3 | 1.002 / 1.008 / 1.003 |
+| Cu, K+L+M | L$_1$ / L$_2$ / L$_3$ | 3.88 / 31.1 / 33.1 | 3.98 / 30.5 / 33.6 | 1.027 / 0.979 / 1.014 |
+| Cu, L+M | L$_2$ / L$_3$ | 1.627 / 1.630 | 1.502 / 1.648 | 0.923 / 1.012 |
+| Au, K+L+M | L$_1$ / L$_2$ / L$_3$ | 1.235 / 7.79 / 15.0 | 1.244 / 7.79 / 15.3 | 1.007 / 1.001 / 1.021 |
+| Au, K+L+M | M$_1$ … M$_5$ | 3.93 … 1193 | 3.88 … 1172 | 0.960--0.986 |
+| Au, L+M | M$_1$ … M$_5$ | 2.36 … 25.8 | 2.30 … 25.9 | 0.959--1.008 |
+| Au, M only | M$_4$ / M$_5$ | 1.500 / 1.776 | 1.406 / 1.668 | 0.937 / 0.939 |
+
+The largest gated difference, Cu L$_2$ fed from L$_1$ at 0.923, is the recorded Coster--Kronig disagreement: EADL has $f_{12}=0.240$ where the Krause-based compilation has about 0.30. The Au M$_{4,5}$ deficit of about 6% from M-only primaries has the same origin, in M-shell Coster--Kronig. Near-valence M subshells of Si and Cu are reported without a gate. Their enhancement differs by +20% to +33% for Si M$_1$ and Cu M$_{1,2}$, and by 3.6--3.9x for Cu M$_4$, which lies below the 50 eV cutoff and therefore neither decays nor emits. Neither code models these outer levels reliably, and they produce no line in the scored band.
+
+**Line cross sections.** The gated lines agree within 3.5%:
+
+- Kα$_{1,2}$ is 0.973 for Si, 0.966 for Cu and 1.001 for Au.
+- Au L$_3$--M$_{4,5}$ and L$_3$--N$_5$ are 0.988--1.016 across all four Au cases.
+
+The reported lines, with the EADL and `elam` ratios to xraylib, and their causes:
+
+- **Kβ$_{1,3}$.** Cu 0.88 and 0.89; Au 0.97 and 0.99; Si 0.60 and 0.53. This is the EADL K--M radiative rate. For Si the M shell is valence, which is also why xraylib's Si Kβ is weak evidence.
+- **Au L$_1$ lines (L$_1$--M$_{2,3}$).** 0.71, and 0.82--0.91 with `elam`. This follows EADL's lower Au $\omega_{L_1}$.
+- **Au L$_2$ lines.** 1.08--1.09, and 0.99 with `elam`.
+- **Au Lℓ (L$_3$--M$_1$).** 1.15--1.18 in both modes. This is an EADL branch-shape difference.
+- **Cu L lines.** Lα$_1$ is 0.43 (`elam` 0.54), Lℓ is 6.8 (`elam` 8.5), and Lβ$_1$ is 0.80 (`elam` 0.50). This is the recorded 3d-metal validity limit, EADL's L$_3$ branch shape together with the Coster--Kronig disagreement. The independent code reproduces it, so it is a data difference rather than a propagation error.
+- **Au M lines.** Mα (M$_5$--N$_{6,7}$) is 1.12--1.20 (`elam` 0.97--1.03), Mβ (M$_4$--N$_6$) is 1.11--1.21 (`elam` 0.98--1.06), M$_5$--N$_6$ is 0.84--0.90, and M$_3$--N$_5$ (Mγ) is 2.5 (`elam` 1.37). The Mγ difference is an EADL radiative-rate difference that also appears with M-only primaries, where no propagation is involved.
+
+**Verdict.** Every gated check passes. The cascade propagation agrees with an independent implementation for K, L and M primaries in a low-Z (Si), a mid-Z (Cu) and a high-Z (Au) element. This covers K-fed L, L-fed M and Coster--Kronig transfer, and the differences follow the recorded Coster--Kronig disagreement. Line-level differences outside the gates are all attributable to the recorded EADL-versus-Krause yield and branch-shape disagreements. The `elam` option removes most of the total-yield component but not the branch shape.
+
+Still open:
+
+- a comparison against PENELOPE `pdrelax`, Geant4 or EGSnrc, with nonradiative topology that is not EADL-derived and with transport-level spectra;
+- measured L-line intensity ratios, which alone can settle the Coster--Kronig question and the 3d-metal L branch shape.
+
+No ledger status change is suggested, and no sign-off is claimed.

@@ -228,9 +228,13 @@ note.
 
 Remaining:
 
-- Reference-spectrum comparison (PENELOPE `pdrelax` / Geant4 `fluor/` /
-  EGSnrc) for K, L, M primaries, low/mid/high Z. Needs external reference
-  data; not packaged.
+- Independent-implementation comparison done 2026-09-27 against xraylib's
+  Kissel full cascade (`checks/xraylib_cascade_oracle.py`, oracle group):
+  Si/Cu/Au, K/L/M primaries, vacancy enhancement within 8%, Kalpha and Au L3
+  lines within 3.5%; record `xraylib_cascade_oracle.jsonl`. xraylib Auger
+  topology is EADL97, so data independence is partial. PENELOPE `pdrelax` /
+  Geant4 / EGSnrc (non-EADL topology, transport-level spectra) still open —
+  human decides whether xraylib suffices for the checklist item.
 - Fresh-context validation done 2026-09-27: cascade re-derived, no code
   defects; defect bound and omega ranges corrected in docs. Suggested ledger
   `filtered` -> `rederived` awaits the human.

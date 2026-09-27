@@ -1,0 +1,1 @@
+{"check": "checks/xraylib_cascade_oracle.py", "ledger_id": "characteristic-radiation", "measured_value": null, "recorded_at": "2026-09-27T16:26:03.300937+00:00", "reference_value": null, "revision": "9aa69796f8e65619eda8639ca9de1e1019356995", "schema_revision": 1, "tolerance": null, "verdict": "pass"}
