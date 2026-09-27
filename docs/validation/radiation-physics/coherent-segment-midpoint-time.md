@@ -1,4 +1,4 @@
-# Validation: `coherent-segment-midpoint-time`
+# `coherent-segment-midpoint-time`
 
 ## Claim and source equation
 

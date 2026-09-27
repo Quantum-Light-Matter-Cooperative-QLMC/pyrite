@@ -1,4 +1,4 @@
-# Validation: `mos2-debye-waller-00l`
+# `mos2-debye-waller-00l`
 
 ## Claim and source
 

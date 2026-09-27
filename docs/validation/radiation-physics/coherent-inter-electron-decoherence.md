@@ -1,4 +1,4 @@
-# Validation: `coherent-inter-electron-decoherence`
+# `coherent-inter-electron-decoherence`
 
 ## Claim and where it enters
 

@@ -1,4 +1,4 @@
-# Validation: `closed-form-flux`
+# `closed-form-flux`
 
 ## Claim and source
 

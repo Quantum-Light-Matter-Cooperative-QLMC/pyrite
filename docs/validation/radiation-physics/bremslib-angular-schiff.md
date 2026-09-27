@@ -1,4 +1,4 @@
-# Validation: `bremslib-angular-schiff`
+# `bremslib-angular-schiff`
 
 ## Scope and question
 

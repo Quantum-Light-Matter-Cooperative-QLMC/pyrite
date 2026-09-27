@@ -1,4 +1,4 @@
-# Validation: `coherent-line-spectrum`
+# `coherent-line-spectrum`
 
 ## Claim and scope
 

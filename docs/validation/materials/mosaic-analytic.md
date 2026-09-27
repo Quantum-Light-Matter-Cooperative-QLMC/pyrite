@@ -1,4 +1,4 @@
-# Validation: `mosaic-analytic`
+# `mosaic-analytic`
 
 ## Claim and source
 

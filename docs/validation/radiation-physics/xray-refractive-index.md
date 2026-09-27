@@ -1,4 +1,4 @@
-# Validation: xray-refractive-index
+# xray-refractive-index
 
 ## Independent derivation
 

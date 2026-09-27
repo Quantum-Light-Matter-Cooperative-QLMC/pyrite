@@ -1,4 +1,4 @@
-# Validation: absorption-length
+# absorption-length
 
 ## Independent derivation
 

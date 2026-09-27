@@ -1,4 +1,4 @@
-# Validation: `grazing-optical-constants`, `grazing-reflectivity`
+# `grazing-optical-constants`, `grazing-reflectivity`
 
 **Claim 1 (`grazing-optical-constants`).** Complex refractive index `n = 1 − δ − iβ` of a material from its Henke/Chantler anomalous scattering factors: `δ(E) = (r_e λ²/2π)·n_atomic·f1(E)`, `f1 = Z + f'(E)`; `β(E) = (r_e λ²/2π)·n_atomic·f2(E)`.
 

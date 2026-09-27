@@ -1,4 +1,4 @@
-# Validation: `xray-in-medium-resonance`
+# `xray-in-medium-resonance`
 
 ## Claim and source
 

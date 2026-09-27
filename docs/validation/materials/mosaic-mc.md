@@ -1,4 +1,4 @@
-# Validation: mosaic-mc
+# mosaic-mc
 
 ## Claim
 

@@ -1,4 +1,4 @@
-# Validation: `2h-tas2-debye-waller-002`
+# `2h-tas2-debye-waller-002`
 
 ## Claim and source
 

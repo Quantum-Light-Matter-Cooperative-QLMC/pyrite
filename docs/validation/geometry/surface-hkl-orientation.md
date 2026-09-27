@@ -1,4 +1,4 @@
-# Validation: surface-hkl-orientation
+# surface-hkl-orientation
 
 - **Claim id**: `surface-hkl-orientation`
 - **Anchor**: `src/pyrite/montecarlo/geometry.py::_orientation_R`; plumbing through `src/pyrite/campaign/sweep.py`, `src/pyrite/montecarlo/spectrum/lines.py`, `src/pyrite/montecarlo/detector.py`, `src/pyrite/montecarlo/runner/__init__.py`

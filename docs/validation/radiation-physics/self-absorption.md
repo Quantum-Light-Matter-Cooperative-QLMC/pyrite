@@ -1,4 +1,4 @@
-# Validation: self-absorption
+# self-absorption
 
 ## Claim
 

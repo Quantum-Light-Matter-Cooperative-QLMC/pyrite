@@ -1,4 +1,4 @@
-# Validation: `atomic-form-factor`
+# `atomic-form-factor`
 
 ## Claim and sources
 

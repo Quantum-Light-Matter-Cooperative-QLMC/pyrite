@@ -1,4 +1,4 @@
-# Validation: finite-time-lineshape
+# finite-time-lineshape
 
 ## Independent derivation
 

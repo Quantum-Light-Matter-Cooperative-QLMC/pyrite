@@ -1,4 +1,4 @@
-# Validation: `external-brem-subtraction`
+# `external-brem-subtraction`
 
 Independent verification of weighted external-background normalization and subtraction.
 

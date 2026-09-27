@@ -1,4 +1,4 @@
-# Validation: `pxr-amplitude`
+# `pxr-amplitude`
 
 ## Claim and source
 

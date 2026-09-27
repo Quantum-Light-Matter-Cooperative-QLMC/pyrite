@@ -1,4 +1,4 @@
-# Validation: sinc-bin-integration
+# sinc-bin-integration
 
 Implementation-context derivation and measurements for the bin-mean line quadrature (#116), followed by the independent fresh-context re-derivation the methodology requires (see [Independent re-derivation](#independent-re-derivation)). Human sign-off is pending.
 

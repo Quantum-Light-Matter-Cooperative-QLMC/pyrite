@@ -1,4 +1,4 @@
-# Validation: `brem-source-comparison`
+# `brem-source-comparison`
 
 ## Scope and question
 

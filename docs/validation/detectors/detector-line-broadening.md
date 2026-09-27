@@ -1,4 +1,4 @@
-# Validation: `detector-line-broadening`
+# `detector-line-broadening`
 
 **Claim.** EDS polar-aperture line broadening, Zhai et al. 2025 SI Eq. (14): `FWHM_Δθobs = (2√(2ln2)/3)·(∂Ep/∂θobs)·Δθobs`, with the paper's full second line `∂Ep/∂θobs = −Ep·(−cosφ cosθ v_x − sinφ cosθ v_y + sinθ v_z)/(c − cosφ sinθ v_x − sinφ sinθ v_y − cosθ v_z)`.
 

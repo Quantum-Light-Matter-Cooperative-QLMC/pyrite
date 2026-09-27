@@ -1,4 +1,4 @@
-# Validation: line-energy-dispersion
+# line-energy-dispersion
 
 ## Independent derivation
 
