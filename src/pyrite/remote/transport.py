@@ -157,7 +157,7 @@ def _sync_ignored(path: Path) -> bool:
     )
 
 
-_ENERGY_GRID_ARTIFACT_ROOT = Path("src/pyrite/data/energy-grid-artifacts")
+_ENERGY_GRID_ARTIFACT_ROOT = Path("src/pyrite/data/catalog/energy-grid-artifacts")
 
 
 def _local_energy_grid_artifacts() -> dict[str, Path]:

@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `debye-waller-catalog-provenance`
 
 - **Claim:** every production `B_ang2` is tied to a phase- and temperature-specific primary refinement, with scalar approximation scope stated
-- **Code:** `data/materials.toml::crystals.*.B_ang2`; `materials/crystal.py::{structure_factor,U_g}`
+- **Code:** `data/catalog/crystals/*.toml::B_ang2`; `materials/crystal.py::{structure_factor,U_g}`
 - **Source:** per-material primary refinements collected in [audit](materials/debye-waller-audit.md)
 - **Status:** discrepancy
 - **Checks:** baseline inventory; `B=8π²Uiso`; tensor limit `exp[-gᵀU_jg/2]`; phase, temperature, site, convention, and reflection-scope checks
@@ -45,7 +45,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `cod-lattice-catalog-geometry`
 
 - **Claim:** six lattice parameters of every COD-pinned catalog crystal agree with the pinned external COD record
-- **Code:** `data/materials.toml::crystals.*.cod_id`; `data/cifs/*.cif`
+- **Code:** `data/catalog/crystals/*.toml::cod_id`; `data/cifs/*.cif`
 - **Source:** Crystallography Open Database records pinned by `cod_id`
 - **Status:** anchored
 - **Checks:** all 35 COD ids re-fetch; local and external `a,b,c` agree within `0.01 Å`, and `α,β,γ` within `0.1°`; committed cache coverage is exact

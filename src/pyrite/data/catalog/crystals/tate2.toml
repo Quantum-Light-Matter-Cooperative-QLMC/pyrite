@@ -1,0 +1,11 @@
+cif = "cifs/tate2.cif"
+validation_id = "tate2-c2m-structure"
+full_name = "Tantalum Ditelluride"
+formula = "TaTe2"
+phase = "1T'"
+cod_id = 2310358
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "In the preserved ambient Brown/COD 2310358 C2/m setting, distorted TaTe2 cleaves on (001); C centering permits 001 and the explicit basis gives a finite coupling."

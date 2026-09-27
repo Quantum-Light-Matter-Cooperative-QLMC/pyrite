@@ -1,0 +1,16 @@
+cif = "cifs/mos2.cif"
+validation_id = "mos2-cif-migration"
+full_name = "Molybdenum Disulfide"
+formula = "MoS2"
+phase = "2H"
+cod_id = 9007660
+# B33 = 8*pi^2 * multiplicity-weighted U33 from Schoenfeld, Huang & Moss (1983),
+# the paper this entry's cod_id cites. The 2H deposit (COD 9007660) omits the
+# ADP loop; the 3R deposit (COD 9007661) from the same paper carries it, and
+# the two polytypes share identical trigonal-prismatic layers. Mo U33 = 0.00750,
+# S U33 = 0.00510 Ang^2 -> (2*0.00750 + 4*0.00510)/6 = 0.00590 Ang^2.
+# Basal (00l) only. See docs/validation/materials/mos2-debye-waller-00l.md
+B_ang2 = 0.47
+surface_hkl = [0, 0, 2]
+layers_per_cell = 2
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

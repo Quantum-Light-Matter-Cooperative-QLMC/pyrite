@@ -25,7 +25,7 @@ added **in quadrature** with the energy-dispersive spectrometer (EDS) resolution
 - `montecarlo.mosaic_fwhm_eV(E, ψ, η_rad)` — the formula above.
 - `montecarlo.mosaic_psi_rad(case, E_pk)` — $\psi$ for the reflection whose nominal (unscattered-beam) resonance is nearest the peak; uses the shared `montecarlo._orientation_R` (extracted from `mc_spectrum`).
 - `results.store_result` — adds the term in quadrature, gated on `case["mosaic_fwhm_rad"]`, capped at `E_pk`.
-- `data/materials.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
+- `data/catalog/crystals/<key>.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
 - `Scene(target=Slab(…, mosaic=True), …)` → public case lowering → `case["mosaic_fwhm_rad"]`. `mosaic` is target state; the width comes from the catalog crystal. Route and quadrature controls live under `Numerics.convergence`.
 - `plots.plot_mosaic_comparison` — overlay grades from one record.
 - Tests: `tests/montecarlo/test_mosaic.py`.

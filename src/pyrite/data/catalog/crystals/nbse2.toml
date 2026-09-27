@@ -1,0 +1,8 @@
+cif = "cifs/nbse2.cif"
+validation_id = "nbse2-2ha-structure"
+full_name = "Niobium Diselenide"
+formula = "NbSe2"
+phase = "2H"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 2]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

@@ -1,0 +1,8 @@
+thickness_ang = {values = [20000.0]}
+energy_keV = {values = [30.0, 100.0]}
+tilt_deg = {values = [45.0]}
+tilt_azim_deg = {values = [180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+detector = {observation_angle_deg = 90.0}
+materials = ["hopg"]
+beam = "emittance_demo"

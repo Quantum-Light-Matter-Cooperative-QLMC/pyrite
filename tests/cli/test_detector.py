@@ -34,7 +34,7 @@ solid_angle_sr = 0.066
 def _catalog(tmp_path, monkeypatch, text=_CATALOG):
     path = tmp_path / "materials.toml"
     path.write_text(text)
-    monkeypatch.setattr(_catalog_io, "_MATERIALS_TOML", path)
+    monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", path)
     monkeypatch.setattr(_catalog_io, "validate", lambda *_args: None)
     return path
 

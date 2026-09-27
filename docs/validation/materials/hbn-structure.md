@@ -2,7 +2,7 @@
 
 **Claim.** Bulk hexagonal boron nitride (h-BN), space group P6₃/mmc (No. 194), represented as an explicit four-atom conventional-cell basis with `a = 2.504 Å`, `c = 6.661 Å`.
 
-**Code.** `src/pyrite/data/cifs/hbn.cif` and `src/pyrite/data/materials.toml::[crystals.hbn]` **Anchor.** `tests/materials/test_crystallography.py::test_hbn_structure_sane` **Source.** Standard bulk h-BN; canonical structure determination Pease, *Acta Cryst.* **5**, 356 (1952): `a = 2.5040 Å`, `c = 6.6612 Å`. **Verifier context.** Independent session; did not author the implementation. Derived from the cited canonical structure, not from the code.
+**Code.** `src/pyrite/data/cifs/hbn.cif` and `src/pyrite/data/catalog/crystals/hbn.toml` **Anchor.** `tests/materials/test_crystallography.py::test_hbn_structure_sane` **Source.** Standard bulk h-BN; canonical structure determination Pease, *Acta Cryst.* **5**, 356 (1952): `a = 2.5040 Å`, `c = 6.6612 Å`. **Verifier context.** Independent session; did not author the implementation. Derived from the cited canonical structure, not from the code.
 
 ## Independent derivation
 

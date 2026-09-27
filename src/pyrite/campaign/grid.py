@@ -6,7 +6,7 @@ def grid_names(material, fidelity="full", catalog_profile="standard"):
     """Config names in the CURRENT grid for ``material`` -- exactly the set
     ``config.material_sweep(material, catalog_profile=catalog_profile)`` ->
     ``sweep.build_cases`` produces now. A stale config is any name NOT in this
-    set. ``catalog_profile`` selects the named materials.toml profile whose
+    set. ``catalog_profile`` selects the named catalog profile whose
     grid a profile-variant checkpoint was swept on.
 
     The ``config`` / ``sweep`` imports are function-local on purpose: ``config``

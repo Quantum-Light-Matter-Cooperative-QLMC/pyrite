@@ -1,0 +1,11 @@
+cif = "cifs/hbn.cif"
+validation_id = "hbn-structure"
+full_name = "Hexagonal Boron Nitride"
+formula = "BN"
+phase = "2H"
+cod_id = 9008997
+B_ang2 = 3.45
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
+hkl_families = [[0, 0, 2], [0, 0, 4]]
+hkl_reason = "Layered h-BN is scanned with the c-axis normal; keep the basal (00l) family explicit to match the HOPG orientation model."

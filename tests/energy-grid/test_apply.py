@@ -116,7 +116,7 @@ def test_apply_file_writes_and_validates(tmp_path, monkeypatch, capsys):
     toml_path.write_text(BASE_TOML)
     json_path = tmp_path / "combined.json"
     json_path.write_text(_json.dumps(COMBINED))
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     stamped = []
     monkeypatch.setattr(
         apply._provenance, "set_brem", lambda m, s, note=None: stamped.append((m, s))
@@ -362,7 +362,7 @@ def test_artifact_setters_restore_catalog_and_provenance_when_stamping_fails(
     provenance_path = tmp_path / "line_grid_provenance.toml"
     toml_path.write_text(BASE_TOML)
     provenance_path.write_text("# existing provenance\n")
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
     monkeypatch.setattr(
@@ -385,7 +385,7 @@ def test_apply_validation_failure_leaves_catalog_and_provenance_unchanged(tmp_pa
     toml_path.write_text(BASE_TOML)
     provenance_path.write_text("# existing provenance\n")
     json_path.write_text(_json.dumps(COMBINED))
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
     monkeypatch.setattr(
         apply,
@@ -407,7 +407,7 @@ def test_apply_provenance_failure_rolls_back_both_files(tmp_path, monkeypatch):
     toml_path.write_text(BASE_TOML)
     provenance_path.write_text("# existing provenance\n")
     json_path.write_text(_json.dumps(COMBINED))
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
     monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
@@ -442,7 +442,7 @@ def test_apply_rejects_invalid_line_domains_before_write(
     combined["hopg"]["line_rows"][0][field] = value
     toml_path.write_text(BASE_TOML)
     json_path.write_text(_json.dumps(combined))
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
 
     with pytest.raises(ValueError, match=match):
         apply.apply_file(json_path)
@@ -474,7 +474,7 @@ def test_validated_line_row_flattens_separate_derived_criteria():
 def test_set_line_grid_stamps_manual_inline_and_autocomputes_num(tmp_path, monkeypatch, capsys):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     calls = []
     monkeypatch.setattr(
         apply._provenance,
@@ -497,7 +497,7 @@ def test_set_line_grid_rejects_invalid_domain_without_writes(tmp_path, monkeypat
     provenance_path = tmp_path / "line_grid_provenance.toml"
     toml_path.write_text(BASE_TOML)
     provenance_path.write_text("# existing provenance\n")
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
 
     with pytest.raises(ValueError, match="stop must be greater than start"):
@@ -512,7 +512,7 @@ def test_set_brem_rejects_invalid_step_without_writes(tmp_path, monkeypatch):
     provenance_path = tmp_path / "line_grid_provenance.toml"
     toml_path.write_text(BASE_TOML)
     provenance_path.write_text("# existing provenance\n")
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
 
     with pytest.raises(ValueError, match="step"):
@@ -533,7 +533,7 @@ def test_delete_line_grid_removes_material_entry_without_shared_fallback(tmp_pat
         + "]\n"
     )
     toml_path.write_text(text)
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
 
     deleted = apply.delete_line_grid("hopg", [30.0, 100.0])
@@ -548,7 +548,7 @@ def test_delete_line_grid_removes_material_entry_without_shared_fallback(tmp_pat
 def test_delete_line_grid_dry_run_prints_diff_and_writes_nothing(tmp_path, monkeypatch, capsys):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
 
     deleted = apply.delete_line_grid("hopg", [100.0], dry_run=True)
@@ -561,7 +561,7 @@ def test_delete_line_grid_dry_run_prints_diff_and_writes_nothing(tmp_path, monke
 def test_delete_line_grid_fails_closed_when_catalog_changed_after_preview(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
     toml_path.write_text(BASE_TOML + "\n# concurrent edit\n")
 
@@ -574,7 +574,7 @@ def test_delete_line_grid_fails_closed_when_catalog_changed_after_preview(tmp_pa
 def test_delete_line_grid_unknown_energy_errors_without_writes(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
 
     with pytest.raises(ValueError, match=r"no line-grid row at \[50\.0\] keV"):
@@ -586,7 +586,7 @@ def test_delete_line_grid_unknown_energy_errors_without_writes(tmp_path, monkeyp
 def test_delete_line_grid_unknown_material_errors_without_writes(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
-    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "_CATALOG_PATH", toml_path)
 
     with pytest.raises(ValueError, match="no energy_grids entry for material"):
         apply.delete_line_grid("ghost", [30.0])

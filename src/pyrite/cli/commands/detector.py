@@ -2,7 +2,6 @@
 
 import difflib
 import re
-from pathlib import Path
 
 import click
 import tomlkit
@@ -68,7 +67,7 @@ def _referencing_profiles(document, name):
 def _write(document, original, dry_run, done_message):
     try:
         proposed = tomlkit.dumps(document)
-        _catalog_io.validate(_catalog_io._MATERIALS_TOML, proposed)
+        _catalog_io.validate(_catalog_io._CATALOG_PATH, proposed)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     if dry_run:
@@ -77,13 +76,13 @@ def _write(document, original, dry_run, done_message):
                 difflib.unified_diff(
                     original.splitlines(True),
                     proposed.splitlines(True),
-                    "materials.toml (current)",
-                    "materials.toml (proposed)",
+                    "catalog (current)",
+                    "catalog (proposed)",
                 )
             )
         )
         return 0
-    _catalog_io.atomic_write(_catalog_io._MATERIALS_TOML, proposed)
+    _catalog_io.atomic_write(_catalog_io._CATALOG_PATH, proposed)
     emit_result(done_message)
     return 0
 
@@ -304,16 +303,16 @@ def delete_command(name, yes, dry_run, json_output):
             return 0
     proposed = tomlkit.dumps(document)
     try:
-        current = Path(_catalog_io._MATERIALS_TOML).read_text(encoding="utf-8")
+        current = _catalog_io.current_text()
         if current != original:
             raise ValueError("material catalog changed after preview; rerun command")
-        _catalog_io.validate(_catalog_io._MATERIALS_TOML, proposed)
+        _catalog_io.validate(_catalog_io._CATALOG_PATH, proposed)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.detector.delete", {}, str(exc)))
             return 1
         raise CLIError(str(exc)) from None
-    _catalog_io.atomic_write(_catalog_io._MATERIALS_TOML, proposed)
+    _catalog_io.atomic_write(_catalog_io._CATALOG_PATH, proposed)
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.detector.delete", {"deleted": name}))
         return 0

@@ -1,0 +1,8 @@
+cif = "cifs/hfs2.cif"
+validation_id = "hfs2-structure"
+full_name = "Hafnium Disulfide"
+formula = "HfS2"
+phase = "1T"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

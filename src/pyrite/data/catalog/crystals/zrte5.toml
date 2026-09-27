@@ -1,0 +1,9 @@
+cif = "cifs/zrte5.cif"
+validation_id = "zrte5-cmcm-structure"
+full_name = "Zirconium Pentatelluride"
+formula = "ZrTe5"
+B_ang2 = 0.6
+surface_hkl = [0, 1, 0]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 2, 0]]
+hkl_reason = "Room-temperature Cmcm ZrTe5 layers lie in the a-c plane and cleave on (010); C centering extinguishes (010), so pin the first allowed parallel (020) family."

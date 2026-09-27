@@ -1,0 +1,10 @@
+cif = "cifs/ges.cif"
+validation_id = "ges-pnma-structure"
+full_name = "Germanium Sulfide"
+formula = "GeS"
+cod_id = 8104282
+B_ang2 = 1.07
+surface_hkl = [1, 0, 0]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[2, 0, 0]]
+hkl_reason = "In standard Pnma GeS the long a axis is the layer normal and (100) is the cleavage plane; odd h00 are extinct, so pin the first allowed parallel (200) family."

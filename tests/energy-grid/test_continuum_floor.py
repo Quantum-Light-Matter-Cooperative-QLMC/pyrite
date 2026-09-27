@@ -15,6 +15,7 @@ import tomllib
 import numpy as np
 import pytest
 
+from pyrite._catalog_layout import read_raw, read_text
 from pyrite._grid_semantics import (
     node_bin_edges_and_widths,
     rebin_piecewise_constant_density,
@@ -22,7 +23,7 @@ from pyrite._grid_semantics import (
 )
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
-from pyrite.energy_grid.apply import _MATERIALS_TOML, apply_bounds, resolved_show_inputs
+from pyrite.energy_grid.apply import _CATALOG_PATH, apply_bounds, resolved_show_inputs
 from pyrite.energy_grid.derive import wide_brem_grid
 from pyrite.energy_grid.floor import (
     DATA_SUPPORT_LIMITS_EV,
@@ -37,7 +38,7 @@ from pyrite.materials.attenuation import plasma_energy_eV
 
 
 def _catalog_profiles() -> list[str]:
-    return list(tomllib.loads(_MATERIALS_TOML.read_text())["profiles"])
+    return list(read_raw(_CATALOG_PATH)["profiles"])
 
 
 # --- the floor itself -------------------------------------------------------
@@ -293,7 +294,7 @@ def test_no_profile_declares_a_start_that_differs_per_profile(profile_name):
     about the same material's grid, which is what
     ``test_case_content_key_matches_across_profiles_for_shared_cases`` forbids.
     """
-    raw = tomllib.loads(_MATERIALS_TOML.read_text())
+    raw = read_raw(_CATALOG_PATH)
     profile = raw["profiles"][profile_name]
 
     default = profile.get("E_grid_brem")
@@ -346,7 +347,7 @@ def test_artifact_resolved_brem_grids_start_inside_the_modelled_band():
 
 def test_derived_brem_row_is_written_at_the_medium_floor_not_zero():
     """``apply_bounds`` is where a derived grid's first node is decided."""
-    text = _MATERIALS_TOML.read_text()
+    text = read_text(_CATALOG_PATH)
     combined = {
         "hopg": {
             "line_rows": [{"energy_keV": 30.0, "stop_eV": 9_000.0, "num": 2_001}],

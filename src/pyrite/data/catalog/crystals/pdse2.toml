@@ -1,0 +1,9 @@
+cif = "cifs/pdse2.cif"
+validation_id = "pdse2-pbca-structure"
+full_name = "Palladium Diselenide"
+formula = "PdSe2"
+cod_id = 4310736
+mp_id = "mp-2418"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

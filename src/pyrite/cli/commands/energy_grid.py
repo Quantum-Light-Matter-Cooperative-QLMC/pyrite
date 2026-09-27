@@ -518,7 +518,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
     if not yes:
         energy_list = ", ".join(f"{e:g}" for e in energies)
         try:
-            preview_original = Path(apply._MATERIALS_TOML).read_text(encoding="utf-8")
+            preview_original = apply._read_catalog(apply._CATALOG_PATH)
             apply.remove_line_rows(material, energies, profile=resolved_profile, dry_run=True)
         except (KeyError, ValueError, OSError) as exc:
             _expected_failure(exc)
@@ -566,7 +566,7 @@ def rm_command(material, energies, yes, dry_run, catalog_profile, json_output):
 def verify_command(checkpoint_dir):
     """Verify stored and profile/lock-referenced immutable artifacts."""
     try:
-        report = artifact_gc.verify_artifacts(apply._MATERIALS_TOML, checkpoint_dir)
+        report = artifact_gc.verify_artifacts(apply._CATALOG_PATH, checkpoint_dir)
     except (OSError, ValueError, artifact_gc.ArtifactGCError) as exc:
         _expected_failure(exc)
     if not report.ok:
@@ -598,7 +598,7 @@ def gc_command(checkpoint_dir, prune_all, yes):
     """Reclaim unreachable immutable artifacts after a 14-day grace window."""
     try:
         plan = artifact_gc.plan_gc(
-            apply._MATERIALS_TOML,
+            apply._CATALOG_PATH,
             checkpoint_dir,
             prune_all=prune_all,
         )

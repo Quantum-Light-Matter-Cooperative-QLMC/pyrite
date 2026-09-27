@@ -28,7 +28,7 @@ The single-material path remains a clean special case of the stack-aware pipelin
 | Brem | per-layer emitting segments with the same cross-stack escape depth | `mc_brem_spectrum` |
 | Geometry | whole slab shares one normal/tilt | `montecarlo.tilted_geometry` |
 | Compound µ | `composition=[(el,n),…]` | `_normalize_composition`, `_mu_total_inv_ang` |
-| Crystalline Si/sapphire | bundled phase-specific CIFs + catalog crystal rows | `data/cifs/`, `data/materials.toml` |
+| Crystalline Si/sapphire | bundled phase-specific CIFs + catalog crystal rows | `data/cifs/`, `data/catalog/crystals/` |
 
 Two things the recent **xraydb migration** already unblocked: substrate elements (O, Al for SiO₂ / sapphire) need **no** hand-added atomic data — `henke_dispersion`/`load_henke` resolve any element — and `composition`-based compound absorption already works for amorphous layers. Sapphire itself is now represented as crystalline corundum, so it also carries its own PXR/CBS radiator.
 
@@ -120,10 +120,10 @@ The implementation selected (A). Options (B) and (C) are retained here only as t
 
 ## Catalog / "adding a stack" checklist
 
-N-layer stacks are live in `data/materials.toml`; `substrate = "key"` remains two-layer sugar. To add a named stack runnable as `pyrite run standard -m <key>`:
+N-layer stacks are live in `data/catalog/materials/`; `substrate = "key"` remains two-layer sugar. To add a named stack runnable as `pyrite run standard -m <key>`:
 
-1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and a `[crystals.<key>]` row. Add amorphous number densities under `[media.<key>]`.
-2. Add one `[materials.<run-key>]` row with the film `crystal`, a profile or scan overrides, and either `substrate` or an ordered inline `stack` (never both).
+1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and a `crystals/<key>.toml` object. Add amorphous number densities in `media/<key>.toml`.
+2. Add one `materials/<run-key>.toml` object with the film `crystal`, a profile or scan overrides, and either `substrate` or an ordered inline `stack` (never both).
 3. Run `uv run pyrite material validate`. Transport support errors are fatal; missing Mott CSVs warn and use the analytic fallback.
 
 The material run key is the CLI/checkpoint name; the film crystal key drives crystallography. No transport, radiation, absorption, or plotting registry edit is required.

@@ -178,8 +178,9 @@ Core geometry conventions are documented in the
 
 ## Data and outputs
 
-[`src/pyrite/data/materials.toml`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/src/pyrite/data/materials.toml) is immutable
-catalog source for crystals, media, scan profiles, materials, and stacks.
+[`src/pyrite/data/catalog/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/tree/main/src/pyrite/data/catalog)
+is immutable catalog source for crystals, media, scan profiles, materials, and
+stacks, one TOML file per object.
 Phase-specific CIFs live under `src/pyrite/data/cifs/`; production loading is
 offline. `uv run pyrite material validate` checks the bundled catalog.
 

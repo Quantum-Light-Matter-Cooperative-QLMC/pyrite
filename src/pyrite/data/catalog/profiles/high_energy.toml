@@ -1,0 +1,6 @@
+materials = ["hbn", "mose2", "mos2"]
+thickness_ang = {values = [10000.0, 1000000.0, 10000000.0, 100000000.0]}
+energy_keV = {values = [100.0, 500.0, 1000.0]}
+tilt_deg = {values = [10.0, 30.0, 50.0, 70.0]}
+tilt_azim_deg = {values = [140.0, 180.0]}
+E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }

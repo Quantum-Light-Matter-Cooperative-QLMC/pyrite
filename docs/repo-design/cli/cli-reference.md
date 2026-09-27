@@ -1793,10 +1793,10 @@ Options:
 ```text
 Usage: pyrite material validate [OPTIONS] [MANIFEST]
 
-  Validate bundled material catalog or an explicit full catalog TOML.
+  Validate bundled material catalog or an explicit full catalog.
 
-  With no MANIFEST, reloads packaged materials.toml. Performs no simulation, network
-  access, or GPU probe.
+  MANIFEST is a single catalog TOML file or a catalog directory. With no MANIFEST,
+  reloads the packaged catalog. Performs no simulation, network access, or GPU probe.
 
 Options:
   -h, --help  Show this message and exit.

@@ -1,6 +1,26 @@
 # Materials catalog schema
 
-The bundled `pyrite/data/materials.toml` is the canonical schema-version-1 catalog for crystals, media, runnable materials, beams, detectors, and campaign profiles. `load_material_catalog()` validates the entire document and returns deeply immutable typed records. Invalid or unknown fields fail closed with grouped, location-qualified errors.
+The bundled `pyrite/data/catalog/` directory is the canonical schema-version-1 catalog for crystals, media, runnable materials, beams, detectors, and campaign profiles. `load_material_catalog()` validates the entire document and returns deeply immutable typed records. Invalid or unknown fields fail closed with grouped, location-qualified errors.
+
+## Catalog layout
+
+A catalog is either a catalog directory with one TOML file per object, or a single TOML file holding every table. Both load, validate, and accept CLI edits identically; the bundled catalog is a directory.
+
+```text
+catalog/
+  catalog.toml            # schema_version = 1 (root keys only)
+  crystals/<name>.toml    # one file per [crystals.<name>]
+  media/<name>.toml
+  materials/<name>.toml
+  beams/<name>.toml
+  detectors/<name>.toml
+  profiles/<name>.toml    # profile fields plus its [overrides.MATERIAL] tables
+  energy-grid-artifacts/  # immutable line-grid artifacts, not catalog source
+```
+
+An object file holds the object's body without its `[table.name]` header; sub-tables are relative (`[validation]`, `[[stack]]`, `[overrides.hopg]`, `[longitudinal]`). The file stem is the object name, so a name cannot be defined twice. Stems use letters, digits, `.`, `_`, and `-`, start with a letter or digit, and must not differ from another stem in the same table only by case. Unknown entries, non-`.toml` files, and table content placed in `catalog.toml` are rejected with the offending path; names beginning with `.` are ignored. Directory objects are ordered by name, while a single file keeps declaration order; order affects listings, never identity.
+
+CLI edits assemble the directory into one document, apply the change, validate the whole result, and then rewrite only the object files whose text changed (creating or deleting files for new, renamed, or removed objects). The single-file examples below show `[table.NAME]` headers; in a directory the same body lives in `table/NAME.toml`.
 
 ## Root tables
 
@@ -79,7 +99,8 @@ Named detector objects define observation angle, full polar acceptance, and soli
 Prefer `pyrite profile`, `pyrite beam`, `pyrite detector`, `pyrite material`, and `pyrite energy-grid` for supported mutations. Validate a complete alternate catalog without running simulation:
 
 ```bash
-pyrite material validate path/to/materials.toml
+pyrite material validate path/to/catalog        # directory
+pyrite material validate path/to/materials.toml  # single file
 ```
 
 New crystal phases require a packaged CIF, explicit provenance, a validation record and ledger row, and transport support for every constituent element.

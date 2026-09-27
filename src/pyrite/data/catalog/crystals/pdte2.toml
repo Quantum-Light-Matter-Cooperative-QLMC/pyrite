@@ -1,0 +1,13 @@
+cif = "cifs/pdte2.cif"
+validation_id = "pdte2-p3m1-structure"
+full_name = "Palladium Ditelluride"
+formula = "PdTe2"
+phase = "1T"
+cod_id = 2004955
+# 113(2) K Pell et al. refinement: multiplicity-weighted common basal
+# projection of Pd U33=0.0074(4) and Te U33=0.0079(3) A2.
+B_ang2 = 0.61
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal 1T-PdTe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."

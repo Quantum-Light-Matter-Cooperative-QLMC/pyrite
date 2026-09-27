@@ -1,13 +1,13 @@
 """Per-material catalog rows and immutable artifacts cannot couple materials."""
 
 import json
-import shutil
 
 import numpy as np
 import pytest
 import tomlkit
 
 from pyrite import DATA_DIR
+from pyrite._catalog_layout import read_text
 from pyrite.campaign import config
 from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import build_cases
@@ -19,7 +19,7 @@ from pyrite.materials import load_material_catalog
 def catalog_path(tmp_path):
     (tmp_path / "energy-grid-artifacts").mkdir()
     path = tmp_path / "materials.toml"
-    shutil.copyfile(DATA_DIR / "materials.toml", path)
+    path.write_text(read_text(DATA_DIR / "catalog"))
     return path
 
 

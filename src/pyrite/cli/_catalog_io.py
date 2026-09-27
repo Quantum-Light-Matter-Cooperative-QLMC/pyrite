@@ -6,7 +6,8 @@ from pathlib import Path
 
 import tomlkit
 
-from pyrite.energy_grid.apply import _MATERIALS_TOML
+from pyrite._catalog_layout import catalog_root, read_text, write_text
+from pyrite.energy_grid.apply import _CATALOG_PATH
 from pyrite.materials.catalog import load_material_catalog
 
 RANGES = {
@@ -29,15 +30,19 @@ def display(values):
     return ", ".join(f"{value:g}" for value in values)
 
 
+def current_text(path=None):
+    """Return the catalog as one TOML text (a directory is assembled)."""
+    return read_text(_CATALOG_PATH if path is None else path)
+
+
 def catalog_text(path=None):
-    source = Path(_MATERIALS_TOML if path is None else path)
-    text = source.read_text()
+    text = current_text(path)
     return text, tomlkit.parse(text)
 
 
 def validate(path, text):
-    path = Path(path)
-    fd, temporary = tempfile.mkstemp(dir=path.parent, suffix=".toml.tmp")
+    """Load ``text`` as the catalog at ``path`` would, without touching it."""
+    fd, temporary = tempfile.mkstemp(dir=catalog_root(path), prefix=".", suffix=".toml.tmp")
     try:
         with os.fdopen(fd, "w") as stream:
             stream.write(text)
@@ -47,15 +52,8 @@ def validate(path, text):
 
 
 def atomic_write(path, text):
-    path = Path(path)
-    fd, temporary = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as stream:
-            stream.write(text)
-        os.replace(temporary, path)
-    except BaseException:
-        Path(temporary).unlink(missing_ok=True)
-        raise
+    """Store ``text``; a directory catalog rewrites only changed object files."""
+    write_text(path, text)
 
 
 def values_item(values):

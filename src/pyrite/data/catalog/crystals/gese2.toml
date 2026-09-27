@@ -1,0 +1,11 @@
+cif = "cifs/gese2.cif"
+validation_id = "gese2-beta-p21c-structure"
+full_name = "Germanium Diselenide"
+formula = "GeSe2"
+phase = "beta"
+mp_id = "mp-540625"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Layered beta-GeSe2 in the transformed standard P21/c:b1 setting cleaves on (001); the c-glide extinguishes odd 00l, so pin the first allowed parallel (002) family and orient by the reciprocal surface normal."

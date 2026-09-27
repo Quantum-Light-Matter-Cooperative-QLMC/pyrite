@@ -1,0 +1,9 @@
+cif = "cifs/mote2.cif"
+validation_id = "mote2-bulk-structure"
+full_name = "Molybdenum Ditelluride"
+formula = "MoTe2"
+phase = "2H"
+cod_id = 2310465
+B_ang2 = 0.6
+surface_hkl = [0, 0, 2]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

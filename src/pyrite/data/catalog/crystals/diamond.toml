@@ -1,0 +1,8 @@
+cif = "cifs/diamond.cif"
+validation_id = "diamond-cif-migration"
+full_name = "Diamond"
+formula = "C"
+cod_id = 9008564
+B_ang2 = 0.21
+surface_hkl = [4, 0, 0]
+E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }

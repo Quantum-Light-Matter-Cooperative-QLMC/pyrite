@@ -127,5 +127,5 @@ def line_shift_fraction(
 def spacing_num(start_eV: float, stop_eV: float, target_spacing_eV: float = 3.0) -> int:
     """The endpoint-inclusive ``num`` for ``linspace(start_eV, stop_eV, num)``
     closest to ``target_spacing_eV`` uniform spacing -- the convention already
-    used by every ``E_grid_line_by_energy`` row in materials.toml."""
+    used by every ``E_grid_line_by_energy`` row in the material catalog."""
     return int(round((stop_eV - start_eV) / target_spacing_eV)) + 1

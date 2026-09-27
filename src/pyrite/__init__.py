@@ -18,7 +18,7 @@ from .paths import data_dir
 
 __version__ = "0.3.0"
 
-# Packaged data (materials.toml, cifs/, mott_transport_cross_sections/,
+# Packaged data (catalog/, cifs/, mott_transport_cross_sections/,
 # eaglexo_qe.csv, legacy atomic_scattering_factors/). Resolved relative to this
 # file so it works installed (wheel) or from a source checkout.
 DATA_DIR = data_dir()

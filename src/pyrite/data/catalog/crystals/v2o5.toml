@@ -1,0 +1,10 @@
+cif = "cifs/v2o5.cif"
+validation_id = "v2o5-010-structure"
+full_name = "Vanadium Pentoxide"
+formula = "V2O5"
+cod_id = 2020756
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 50.0, stop = 4000.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Use standard-Pmmn (001), equivalent to the historical V2O5(010) layered cut, so the reciprocal vector remains parallel to the slab normal; standard-Pmmn (010) is a different extinct direction."

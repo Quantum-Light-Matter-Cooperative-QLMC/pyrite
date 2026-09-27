@@ -1,7 +1,7 @@
 """Independent regeneration of tests/data/material_catalog_golden.json.
 
 `pyrite-dev regen-golden` rebuilds the serialized catalog snapshot the
-material-catalog golden test asserts against. It re-loads materials.toml from
+material-catalog golden test asserts against. It re-loads the catalog from
 disk via ``load_material_catalog`` (NOT the process-global ``CATALOG`` singleton)
 so the regenerated golden always reflects on-disk state after a
 ``pyrite energy-grid apply``. Crystal physics fingerprints come from the low-level
@@ -17,18 +17,17 @@ import difflib
 import hashlib
 import json
 import sys
-import tomllib
 from pathlib import Path
 
 import numpy as np
 
+from pyrite._catalog_layout import bundled_catalog, read_raw
 from pyrite.materials import crystal as _crystal
 from pyrite.materials.catalog import load_material_catalog
 
 GOLDEN_PATH = (
     Path(__file__).resolve().parents[3] / "tests" / "data" / "material_catalog_golden.json"
 )
-_MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
 _SOURCE_CHECKOUT_ERROR = (
     "error: `pyrite-dev regen-golden` is source-checkout-only; installed wheels "
     "do not contain tests/data/material_catalog_golden.json. Run it from an editable "
@@ -177,8 +176,7 @@ def _serialize_resolved_stack(catalog, spec) -> dict:
 
 
 def _special_grids(catalog) -> dict:
-    with open(_MATERIALS_TOML, "rb") as f:
-        raw = tomllib.load(f)
+    raw = read_raw(bundled_catalog())
     mote2_arange = raw["crystals"]["mote2"]["E_grid"]["arange"]
     return {
         "hbn_thickness_ang": [float(x) for x in catalog.material("hbn").scan.thickness_ang],

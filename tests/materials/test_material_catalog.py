@@ -3,7 +3,6 @@
 import hashlib
 import json
 import pickle
-import tomllib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -1115,10 +1114,9 @@ def test_profile_longitudinal_policy_rejects_invalid_combinations(tmp_path, poli
 
 
 def test_bundled_crystal_validation_ids_are_ledgered():
-    from pyrite import DATA_DIR
+    from pyrite._catalog_layout import bundled_catalog, read_raw
 
-    with (DATA_DIR / "materials.toml").open("rb") as stream:
-        raw = tomllib.load(stream)
+    raw = read_raw(bundled_catalog())
     validation_ids = {
         row["validation_id"].strip()
         for row in raw["crystals"].values()

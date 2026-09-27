@@ -1071,7 +1071,7 @@ def _(MATERIAL, crystal_tab, mo, penetration_tab):
     # transport or builds a lattice figure.
     if MATERIAL is None:
         view = mo.callout(
-            mo.md("**No materials configured.** Check `data/materials.toml`."),
+            mo.md("**No materials configured.** Check `data/catalog/`."),
             kind="info",
         )
     else:

@@ -231,13 +231,11 @@ def test_no_packaged_brem_grid_reaches_the_elam_ceiling() -> None:
     objects, so the guard holds whatever the projection layer does with the
     field.
     """
-    import tomllib
-    from pathlib import Path
 
+    from pyrite._catalog_layout import bundled_catalog, read_raw
     from pyrite.materials.atomic import ELAM_E_MAX_EV
-    from pyrite.materials.catalog import DATA_DIR
 
-    data = tomllib.loads((Path(DATA_DIR) / "materials.toml").read_text(encoding="utf-8"))
+    data = read_raw(bundled_catalog())
 
     def _stops(node):
         if isinstance(node, dict):

@@ -19,6 +19,13 @@ from datetime import timedelta
 from pathlib import Path
 
 from pyrite import _energy_grid_artifacts as artifacts
+from pyrite._catalog_layout import (
+    ARTIFACT_DIR,
+    CatalogLayoutError,
+    catalog_root,
+    load_raw,
+    read_sources,
+)
 from pyrite.checkpoints import campaign_lock
 
 DEFAULT_GRACE = timedelta(days=14)
@@ -125,12 +132,29 @@ def _validate_digest(value: object, *, label: str) -> str:
     return value
 
 
-def _catalog_roots(catalog_path: Path) -> tuple[set[str], FileSnapshot]:
+def _catalog_document(catalog_path: Path) -> tuple[object, bytes]:
+    """Parse a file or directory catalog; return it with its snapshot bytes."""
+    if catalog_path.is_dir() and not catalog_path.is_symlink():
+        try:
+            sources = read_sources(catalog_path)
+            raw = load_raw(sources, origin=catalog_path)
+        except CatalogLayoutError as exc:
+            raise ArtifactGCError(f"invalid catalog {catalog_path}: {exc}") from None
+        except OSError as exc:
+            raise ArtifactGCError(f"cannot read catalog {catalog_path}: {exc}") from exc
+        data = b"".join(
+            name.encode() + b"\0" + hashlib.sha256(content).digest() for name, content in sources
+        )
+        return raw, data
     data = _regular_bytes(catalog_path, label="catalog")
     try:
-        raw = tomllib.loads(data.decode("utf-8"))
+        return tomllib.loads(data.decode("utf-8")), data
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ArtifactGCError(f"invalid catalog {catalog_path}: {exc}") from None
+
+
+def _catalog_roots(catalog_path: Path) -> tuple[set[str], FileSnapshot]:
+    raw, data = _catalog_document(catalog_path)
     profiles = raw.get("profiles") if isinstance(raw, Mapping) else None
     if not isinstance(profiles, Mapping):
         raise ArtifactGCError(f"invalid catalog {catalog_path}: profiles must be a table")
@@ -314,7 +338,7 @@ def plan_gc(
     """Inventory roots, record orphan age, and return a deletion-free GC plan."""
     catalog = Path(catalog_path)
     checkpoints = Path(checkpoint_dir)
-    store = Path(store_root) if store_root is not None else catalog.parent / "energy-grid-artifacts"
+    store = Path(store_root) if store_root is not None else catalog_root(catalog) / ARTIFACT_DIR
     now = float(clock())
     if not math.isfinite(now) or now < 0:
         raise ValueError("clock must return a finite nonnegative timestamp")
@@ -401,7 +425,7 @@ def verify_artifacts(
     """Detect missing/corrupt referenced artifacts and corrupt stored objects."""
     catalog = Path(catalog_path)
     checkpoints = Path(checkpoint_dir)
-    store = Path(store_root) if store_root is not None else catalog.parent / "energy-grid-artifacts"
+    store = Path(store_root) if store_root is not None else catalog_root(catalog) / ARTIFACT_DIR
     catalog_roots, _ = _catalog_roots(catalog)
     lock_roots, _, lock_sources = _lock_roots(checkpoints)
     roots = catalog_roots | lock_roots

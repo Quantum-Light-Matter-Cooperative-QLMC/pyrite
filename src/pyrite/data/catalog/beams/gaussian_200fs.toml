@@ -1,0 +1,8 @@
+label = "200 fs Gaussian bunch, 0.1 mm spot"
+transverse_fwhm_mm = 0.1
+rep_rate_hz = 5000.0
+bunch_charge_pc = 1.0
+
+[longitudinal]
+kind = "gaussian"
+envelope_rms_fs = 200.0

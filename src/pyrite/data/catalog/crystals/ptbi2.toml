@@ -1,0 +1,10 @@
+cif = "cifs/ptbi2.cif"
+validation_id = "ptbi2-p31m-structure"
+full_name = "Platinum Dibismuthide"
+formula = "PtBi2"
+phase = "beta"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal trigonal beta-PtBi2(001) symmetric cut parallel to the c-axis-normal layered surface."

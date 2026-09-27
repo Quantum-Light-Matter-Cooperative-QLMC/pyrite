@@ -3,7 +3,7 @@
 ## Claim and source
 
 - Claim: the catalog's scalar `B_ang2 = 0.47` is a common basal projection for 2H-MoS2 `(00l)`, transferred from the 3R deposit of the same refinement, not an isotropic displacement parameter.
-- Code: `data/materials.toml::crystals.mos2.B_ang2`.
+- Code: `data/catalog/crystals/mos2.toml::B_ang2`.
 - Source: Schoenfeld, Huang & Moss, "Anisotropic mean-square displacements (MSD) in single crystals of 2H- and 3R-MoS2", *Acta Cryst. B* **39**, 404--407 (1983), doi:10.1107/S0108768183002645; COD 9007660 (2H, the structure this entry cites) and COD 9007661 (3R, same paper).
 - Intended quantity and units: one amplitude Debye--Waller coefficient in square angstroms for the reciprocal `c*` direction.
 

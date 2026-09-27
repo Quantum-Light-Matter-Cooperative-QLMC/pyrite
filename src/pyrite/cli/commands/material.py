@@ -64,7 +64,7 @@ def _simulation_scene(document, material, profile_name):
     from pyrite.montecarlo.transverse import TransverseDistribution
 
     _catalog_io.existing_profile(document, profile_name)
-    catalog = load_material_catalog(_catalog_io._MATERIALS_TOML, profile=profile_name)
+    catalog = load_material_catalog(_catalog_io._CATALOG_PATH, profile=profile_name)
     try:
         spec = catalog.material(material)
     except KeyError:
@@ -381,7 +381,7 @@ def _set(
         for label in reset:
             target.pop(_catalog_io.RANGES[label], None)
         proposed = tomlkit.dumps(document)
-        _catalog_io.validate(_catalog_io._MATERIALS_TOML, proposed)
+        _catalog_io.validate(_catalog_io._CATALOG_PATH, proposed)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     if dry_run:
@@ -390,13 +390,13 @@ def _set(
                 difflib.unified_diff(
                     original.splitlines(True),
                     proposed.splitlines(True),
-                    "materials.toml (current)",
-                    "materials.toml (proposed)",
+                    "catalog (current)",
+                    "catalog (proposed)",
                 )
             )
         )
         return 0
-    _catalog_io.atomic_write(_catalog_io._MATERIALS_TOML, proposed)
+    _catalog_io.atomic_write(_catalog_io._CATALOG_PATH, proposed)
     emit_result(f"updated profile {profile_name}, material {material}")
     return 0
 

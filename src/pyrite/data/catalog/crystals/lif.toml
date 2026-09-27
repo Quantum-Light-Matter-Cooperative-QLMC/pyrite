@@ -1,0 +1,7 @@
+cif = "cifs/lif.cif"
+validation_id = "lif-cif-migration"
+full_name = "Lithium Fluoride"
+formula = "LiF"
+cod_id = 1010990
+B_ang2 = 0.5
+surface_hkl = [1, 0, 0]
