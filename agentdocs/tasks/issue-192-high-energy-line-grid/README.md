@@ -300,3 +300,31 @@ allocation. An explicit memory request is needed for a future controlled
 high-memory diagnostic, but the `TIMEOUT` state does not prove that this job
 hit its 12 GB allocation. Do not use a larger request as a substitute for
 bounded-memory selection and stage-level measurements.
+
+## Remote CUDA rerun with higher CPU memory allocation (2026-09-27)
+
+`convergence_job start-bandwidth` now accepts optional `--mem-per-cpu`; absent
+the flag, SLURM keeps the site's allocation. The first 5,250 MB/core request (42,000 MB for 8 CPUs) was
+rejected because the GPU node reports 40,960 MB total. Retried at 5,000
+MB/core: SLURM confirmed `ReqTRES mem=40000M`, 8 CPUs, one GPU (over three
+times the prior 12,000 MB allocation). This left only 960 MB below the
+reported physical node memory for the OS and other system use; that was too
+aggressive and may have contributed to the lab host crash. Do not repeat this
+allocation.
+
+Comparison job `20260927-133559-2ca77464` / SLURM 203 completed. Seed 0,
+5 MeV h-BN, local resolution compared against uniform and full-ceiling FP64
+reference on identical trajectories. For 1 um 10/100 (Ne=2,000), 1 mm 10/100
+(Ne=200), and 1 mm 80/180 (Ne=200), local line-yield errors were respectively
+`2.35e-5`, `-3.55e-5`, and `2.09e-5`; maximum host RSS was 2,679 MiB and the
+reported device high-water mark was 5,972 MiB. Characteristic-yield errors
+were below `1.53e-6`. Local grids had 8,744 / 69,360 / 28,244 nodes versus
+1,415,387 / 5,899,823 / 6,371,926 full-ceiling points. Report pulled to
+`/tmp/issue192_mem_comparison_20260927.json`.
+
+Production job `20260927-133647-a1e30b15` / SLURM 204 requested the same
+40,000 MB allocation for two 1 mm, Ne=20,000 configurations (`10/100`,
+`80/180`). The user subsequently reported that the production run appeared to
+crash the lab computer. SSH is currently unreachable, so its final SLURM state,
+exit code, and logs are unconfirmed. Do not submit another production run until
+the failure is recovered and the memory profile is improved.
