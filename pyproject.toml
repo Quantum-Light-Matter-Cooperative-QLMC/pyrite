@@ -87,11 +87,13 @@ docs = [
     "sphinxcontrib-bibtex>=2.6",
 ]
 
-# Independent crystallography oracle. Validation-only; never imported by the
-# production package unless an explicit oracle check is requested.
+# Independent validation oracles (crystallography, relaxation cascade).
+# Validation-only; never imported by the production package unless an explicit
+# oracle check is requested.
 oracle = [
     "Dans-Diffraction==3.4.0",
     "mp-api>=0.46.4",
+    "xraylib==4.3.0",
 ]
 
 
