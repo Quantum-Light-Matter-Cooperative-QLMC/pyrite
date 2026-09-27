@@ -1,0 +1,11 @@
+cif = "cifs/vte2.cif"
+validation_id = "vte2-c2m-structure"
+full_name = "Vanadium Ditelluride"
+formula = "VTe2"
+phase = "1T'"
+cod_id = 1535594
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "In the preserved COD 1535594 C2/m setting, ambient distorted VTe2 cleaves on (001); C centering permits 001 and the idealized stoichiometric basis gives a finite coupling."

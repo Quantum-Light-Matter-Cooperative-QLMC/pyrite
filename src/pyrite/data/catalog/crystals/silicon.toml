@@ -1,0 +1,8 @@
+cif = "cifs/silicon.cif"
+validation_id = "silicon-cif-migration"
+full_name = "Silicon"
+formula = "Si"
+cod_id = 9011998
+B_ang2 = 0.46
+surface_hkl = [4, 4, 0]
+E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }

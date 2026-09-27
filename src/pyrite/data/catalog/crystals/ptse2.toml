@@ -1,0 +1,9 @@
+cif = "cifs/ptse2.cif"
+validation_id = "ptse2-cif-migration"
+full_name = "Platinum Diselenide"
+formula = "PtSe2"
+phase = "1T"
+cod_id = 1539198
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

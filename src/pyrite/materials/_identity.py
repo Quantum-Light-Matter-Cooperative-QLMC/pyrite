@@ -1,6 +1,6 @@
 """Derive one display identity — formula, phase, cut — for a catalog material.
 
-Display labels used to be hand-authored strings in ``data/materials.toml`` that
+Display labels used to be hand-authored strings in the material catalog that
 re-stated data the catalog already held, and drifted from it: labels naming a
 phase the crystal did not declare, labels quoting a pinned reflection order
 where they meant the surface cut, and parentheses doing double duty for mineral

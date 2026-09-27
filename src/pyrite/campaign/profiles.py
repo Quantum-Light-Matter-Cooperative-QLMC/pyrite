@@ -867,7 +867,7 @@ _VARIANT_STEM_RE = re.compile(
 
 def _catalog_profile_candidates() -> tuple[str, ...]:
     """Catalog profiles a hashed variant stem could belong to: ``standard``
-    first (the common case), then every named profile in materials.toml.
+    first (the common case), then every named catalog profile.
     Local import breaks the config/profiles import cycle (same pattern as
     :func:`named_profile_identity`)."""
     from ..materials import CATALOG

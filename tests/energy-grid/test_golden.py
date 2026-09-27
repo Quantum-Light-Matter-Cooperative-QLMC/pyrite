@@ -53,7 +53,7 @@ def test_build_golden_does_not_import_catalog_singleton():
 
     The low-level resolver loader (load_material_catalog) and crystal physics are
     permitted (see module docstring); the packaged singleton is not, so regen
-    always reflects on-disk materials.toml, never a stale in-memory catalog.
+    always reflects the on-disk catalog, never a stale in-memory catalog.
     """
     tree = ast.parse(inspect.getsource(golden))
     imported_names = {

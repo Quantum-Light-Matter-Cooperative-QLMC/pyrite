@@ -1,0 +1,10 @@
+cif = "cifs/gese.cif"
+validation_id = "gese-pnma-structure"
+full_name = "Germanium Selenide"
+formula = "GeSe"
+cod_id = 4003515
+B_ang2 = 1.10
+surface_hkl = [1, 0, 0]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[2, 0, 0]]
+hkl_reason = "In the COD 4003515 standard-Pnma setting, GeSe cleaves on (100); odd h00 are extinct, so pin the first allowed parallel (200) family rather than importing 00l indices from alternate settings."

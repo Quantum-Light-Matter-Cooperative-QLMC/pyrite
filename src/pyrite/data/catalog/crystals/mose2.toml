@@ -1,0 +1,9 @@
+cif = "cifs/mose2.cif"
+validation_id = "mose2-cif-migration"
+full_name = "Molybdenum Diselenide"
+formula = "MoSe2"
+phase = "2H"
+mp_id = "mp-1634"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 2]
+E_grid = { arange = { start = 350.0, stop = 1750.0, step = 3.0 } }

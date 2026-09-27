@@ -3,7 +3,7 @@
 ## Claim and source
 
 - Claim: the catalog's scalar `B_ang2 = 1.30` is a common basal projection for 2H graphite `(00l)`, not an isotropic displacement parameter.
-- Code: `data/materials.toml::crystals.hopg.B_ang2`.
+- Code: `data/catalog/crystals/hopg.toml::B_ang2`.
 - Source: Trucano & Chen, "Structure of graphite by neutron diffraction", *Nature* **258**, 136--137 (1975), doi:10.1038/258136a0; COD 9011577.
 - Intended quantity and units: one amplitude Debye--Waller coefficient in square angstroms for the reciprocal `c*` direction.
 

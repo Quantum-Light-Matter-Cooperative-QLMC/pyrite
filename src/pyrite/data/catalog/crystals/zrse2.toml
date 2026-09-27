@@ -1,0 +1,8 @@
+cif = "cifs/zrse2.cif"
+validation_id = "zrse2-cif-migration"
+full_name = "Zirconium Diselenide"
+formula = "ZrSe2"
+phase = "1T"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

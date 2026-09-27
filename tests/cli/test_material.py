@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from pyrite import cli
+from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import material
 from tests.helpers.cli import assert_clean_result, invoke
@@ -39,7 +40,7 @@ energy_keV = { values = [60.0] }
 def _catalog(tmp_path, monkeypatch):
     catalog = tmp_path / "materials.toml"
     catalog.write_text(_CATALOG)
-    monkeypatch.setattr(_catalog_io, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", catalog)
     monkeypatch.setattr(_catalog_io, "validate", lambda *_args: None)
     return catalog
 
@@ -268,6 +269,7 @@ def _single_scene_catalog(tmp_path, monkeypatch, *, energies="[30.0]"):
     data = tmp_path / "data"
     shutil.copytree(DATA_DIR, data)
     catalog = data / "materials.toml"
+    catalog.write_text(read_text(data / "catalog"))
     with catalog.open("a") as stream:
         stream.write(
             f"""
@@ -300,7 +302,7 @@ distance_mm = 200.0
 polar_deg = 90.0
 """
         )
-    monkeypatch.setattr(_catalog_io, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", catalog)
     return _catalog_io.catalog_text()[1]
 
 

@@ -5,14 +5,15 @@ records and parsing helpers live in private sibling modules.
 """
 
 import functools
-import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
 from typing import cast
 
-from .. import DATA_DIR
+from .._catalog_layout import CatalogLayoutError, Sources, bundled_catalog, catalog_root
+from .._catalog_layout import load_raw as _load_raw
+from .._catalog_layout import read_sources as _read_sources
 from ._beam_detector_parse import _parse_beams, _parse_detectors
 from ._catalog_decode import LineGridByEnergy, _Errors, _grid
 from ._parse import (
@@ -48,7 +49,8 @@ def load_material_catalog(
     Parameters
     ----------
     path
-        TOML catalog path. ``None`` loads the packaged ``materials.toml``.
+        Single-file TOML catalog or catalog directory (one file per object).
+        ``None`` loads the packaged catalog directory.
     profile
         Profile whose inherited scan grids and artifact references are resolved.
 
@@ -62,28 +64,30 @@ def load_material_catalog(
     MaterialConfigError
         If the file cannot be read, parsed, or validated for ``profile``.
     """
-    source = Path(DATA_DIR) / "materials.toml" if path is None else Path(path)
+    source = bundled_catalog() if path is None else Path(path)
 
     try:
-        content = source.read_bytes()
+        sources = _read_sources(source)
+    except CatalogLayoutError as exc:
+        raise MaterialConfigError(exc.messages) from exc
     except OSError as exc:
         raise MaterialConfigError((f"{source}: {exc}",)) from exc
 
-    return _load_material_catalog_cached(source, content, profile)
+    return _load_material_catalog_cached(source, sources, profile)
 
 
 @functools.lru_cache(maxsize=32)
 def _load_material_catalog_cached(
     source: Path,
-    content: bytes,
+    sources: Sources,
     profile: str,
 ) -> MaterialCatalog:
     errors = _Errors()
 
     try:
-        raw = tomllib.loads(content.decode("utf-8"))
-    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
-        raise MaterialConfigError((f"{source}: {exc}",)) from exc
+        raw = _load_raw(sources, origin=source)
+    except CatalogLayoutError as exc:
+        raise MaterialConfigError(exc.messages) from exc
 
     if not isinstance(raw, Mapping):
         raise MaterialConfigError((f"{source}: root must be a table",))
@@ -157,7 +161,7 @@ def _load_material_catalog_cached(
         if "gdf_path" in fields:
             beam_path = Path(str(fields["gdf_path"])).expanduser()
             if not beam_path.is_absolute():
-                beam_path = source.parent / beam_path
+                beam_path = catalog_root(source) / beam_path
             profile_beams[name] = MappingProxyType({**fields, "gdf_path": str(beam_path.resolve())})
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)

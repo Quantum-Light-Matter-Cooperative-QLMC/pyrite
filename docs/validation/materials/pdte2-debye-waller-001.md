@@ -3,7 +3,7 @@
 ## Claim and source
 
 - Claim: the catalog's scalar `B_ang2 = 0.61` is a common basal projection for 1T-PdTe2 `(001)`, not an isotropic displacement parameter.
-- Code: `data/materials.toml::crystals.pdte2.B_ang2`.
+- Code: `data/catalog/crystals/pdte2.toml::B_ang2`.
 - Source: Pell, Mironov & Ibers, *Acta Cryst. C* **52**, 1331--1332 (1996), doi:10.1107/S0108270195016246; COD 2004955.
 - Intended quantity and units: one amplitude Debye--Waller coefficient in square angstroms for the reciprocal `c*` direction.
 
@@ -52,7 +52,7 @@ This equivalence fixes the direction and rules out interpreting `0.61` as `U33` 
 Inspection after fixing the derivation found:
 
 - the source CIF independently downloaded from COD 2004955 contains `Pd U33=0.0074(4)` and `Te U33=0.0079(3) Ang^2`;
-- `materials.toml` stores `B_ang2 = 0.61` and pins only basal `(001)`;
+- `crystals/pdte2.toml` stores `B_ang2 = 0.61` and pins only basal `(001)`;
 - `debye_waller` returns `exp[-B (g / 4 pi)^2]`, exactly the independently derived amplitude factor;
 - `structure_factor` applies that factor once to each atom.
 

@@ -5,7 +5,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `pdte2-debye-waller-001`
 
 - **Claim:** 113(2) K 1T-PdTe2 common basal projection `B33=0.61 Å²` for pinned `(001)`
-- **Code:** `data/materials.toml::crystals.pdte2.B_ang2`
+- **Code:** `data/catalog/crystals/pdte2.toml::B_ang2`
 - **Source:** Pell, Mironov & Ibers, *Acta Cryst. C* **52**, 1331–1332 (1996), doi:10.1107/S0108270195016246, COD 2004955
 - **Status:** unverified
 - **Checks:** source gives Pd `U33=0.0074(4)` and Te `U33=0.0079(3) Å²`; multiplicity-weighted `B33=8π²(0.00773)=0.6106 Å²`; site agreement, unit occupancy, basal-only scope, and 10 keV intensity sensitivity checked
@@ -15,7 +15,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `2h-tas2-debye-waller-002`
 
 - **Claim:** 295 K 2H-TaS2 common basal projection `B33=0.53 Å²` for pinned `(002)`
-- **Code:** `data/materials.toml::crystals.2h_tas2.B_ang2`
+- **Code:** `data/catalog/crystals/2h_tas2.toml::B_ang2`
 - **Source:** Meetsma *et al.*, *Acta Cryst. C* **46**, 1598–1599 (1990), doi:10.1107/S0108270190000014, COD 9007815
 - **Status:** unverified
 - **Checks:** source gives Ta `U33=0.0065(2)` and S `U33=0.0068(8) Å²`; multiplicity-weighted `B33=8π²(0.00670)=0.5290 Å²`; site agreement, unit occupancy, basal-only scope, and 10 keV intensity sensitivity checked
@@ -25,7 +25,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `diamond-cif-migration`
 
 - **Claim:** bundled diamond CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/diamond.cif`; `data/materials.toml::crystals.diamond`
+- **Code:** `data/cifs/diamond.cif`; `data/catalog/crystals/diamond.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -35,7 +35,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `silicon-cif-migration`
 
 - **Claim:** bundled silicon CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/silicon.cif`; `data/materials.toml::crystals.silicon`
+- **Code:** `data/cifs/silicon.cif`; `data/catalog/crystals/silicon.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -45,7 +45,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `lif-cif-migration`
 
 - **Claim:** bundled LiF CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/lif.cif`; `data/materials.toml::crystals.lif`
+- **Code:** `data/cifs/lif.cif`; `data/catalog/crystals/lif.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -55,7 +55,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `hopg-cif-migration`
 
 - **Claim:** bundled HOPG CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/hopg.cif`; `data/materials.toml::crystals.hopg`
+- **Code:** `data/cifs/hopg.cif`; `data/catalog/crystals/hopg.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and pinned-reflection golden
@@ -65,7 +65,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mose2-cif-migration`
 
 - **Claim:** bundled 2H-MoSe2 single-crystal lattice and P1-expanded basis
-- **Code:** `data/cifs/mose2.cif`; `data/materials.toml::crystals.mose2`
+- **Code:** `data/cifs/mose2.cif`; `data/catalog/crystals/mose2.toml`
 - **Source:** Bronsema, *Z. Anorg. Allg. Chem.* **540/541**, 15--17 (1986), doi:10.1002/zaac.19865400904
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -75,7 +75,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `wse2-cif-migration`
 
 - **Claim:** bundled 2H-WSe2 single-crystal lattice and P1-expanded basis
-- **Code:** `data/cifs/wse2.cif`; `data/materials.toml::crystals.wse2`
+- **Code:** `data/cifs/wse2.cif`; `data/catalog/crystals/wse2.toml`
 - **Source:** Schutte, De Boer & Jellinek, *J. Solid State Chem.* **70**, 207--209 (1987), doi:10.1016/0022-4596(87)90057-0; COD 9012193
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, dominant-reflection golden, COD lattice comparison
@@ -85,7 +85,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `ptse2-cif-migration`
 
 - **Claim:** bundled 1T-PtSe2 CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/ptse2.cif`; `data/materials.toml::crystals.ptse2`
+- **Code:** `data/cifs/ptse2.cif`; `data/catalog/crystals/ptse2.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -95,7 +95,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `pts2-p3m1-structure`
 
 - **Claim:** 1T PtS2 P-3m1 experimental lattice + explicit PtS2 primitive-cell basis, c-axis-normal layered slab
-- **Code:** `data/cifs/pts2.cif`; `data/materials.toml::crystals.pts2`
+- **Code:** `data/cifs/pts2.cif`; `data/catalog/crystals/pts2.toml`
 - **Source:** Furuseth, Selte & Kjekshus, *Acta Chem. Scand.* **19**, 257--258 (1965); COD 1537200 (CC0)
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Pt+2S stoichiometry; full source basis; finite basal `(001)` `F_g`, `chi_g`, `U_g`; COD lattice comparison
@@ -105,7 +105,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `pds2-pbca-structure`
 
 - **Claim:** ambient PdS2 Pbca lattice + explicit 4Pd+8S conventional-cell basis, reciprocal-(001)-normal layered slab
-- **Code:** `data/cifs/pds2.cif`; `data/materials.toml::crystals.pds2`
+- **Code:** `data/cifs/pds2.cif`; `data/catalog/crystals/pds2.toml`
 - **Source:** Gronvold & Rost, Acta Cryst. 10, 329--331 (1957); COD 2310589 (CC0)
 - **Status:** unverified
 - **Checks:** orthorhombic volume; 4Pd+8S stoichiometry; full expanded source basis; odd-00l extinction handled by pinned finite `(002)`; finite `chi_g`, `U_g`
@@ -115,7 +115,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `pdte2-p3m1-structure`
 
 - **Claim:** 1T PdTe2 P-3m1 lattice + explicit primitive-cell basis, reciprocal-(001)-normal layered slab
-- **Code:** `data/cifs/pdte2.cif`; `data/materials.toml::crystals.pdte2`
+- **Code:** `data/cifs/pdte2.cif`; `data/catalog/crystals/pdte2.toml`
 - **Source:** Pell, Mironov & Ibers, Acta Cryst. C52, 1331--1332 (1996); COD 2004955 (CC0)
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Pd+2Te stoichiometry; full source basis; finite basal `(001)` `F_g`, `chi_g`, `U_g`
@@ -125,7 +125,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `ptbi2-p31m-structure`
 
 - **Claim:** layered trigonal beta-PtBi2 P31m lattice + explicit 3Pt+6Bi conventional-cell basis, reciprocal-(001)-normal slab
-- **Code:** `data/cifs/ptbi2.cif`; `data/materials.toml::crystals.ptbi2`
+- **Code:** `data/cifs/ptbi2.cif`; `data/catalog/crystals/ptbi2.toml`
 - **Source:** Feng et al., Nature Communications 10, 4765 (2019), Supplementary Tables I--II (CC BY 4.0)
 - **Status:** unverified
 - **Checks:** hexagonal volume; 3Pt+6Bi stoichiometry; full P31m-expanded basis; finite basal `(001)` `F_g`, `chi_g`, `U_g`
@@ -135,7 +135,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `ptte2-p3m1-structure`
 
 - **Claim:** 1T PtTe2 P-3m1 lattice + explicit primitive-cell basis, reciprocal-(001)-normal layered slab
-- **Code:** `data/cifs/ptte2.cif`; `data/materials.toml::crystals.ptte2`
+- **Code:** `data/cifs/ptte2.cif`; `data/catalog/crystals/ptte2.toml`
 - **Source:** Furuseth, Selte & Kjekshus, Acta Chem. Scand. 19, 257--258 (1965); COD 1537197 (CC0)
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Pt+2Te stoichiometry; full source basis; finite basal `(001)` `F_g`, `chi_g`, `U_g`
@@ -145,7 +145,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `pdse2-pbca-structure`
 
 - **Claim:** ambient PdSe2 Pbca experimental lattice + explicit 4Pd+8Se conventional-cell basis, c-axis-normal layered slab
-- **Code:** `data/cifs/pdse2.cif`; `data/materials.toml::crystals.pdse2`
+- **Code:** `data/cifs/pdse2.cif`; `data/catalog/crystals/pdse2.toml`
 - **Source:** Soulard et al., *Inorg. Chem.* **43**, 1943--1949 (2004), doi:10.1021/ic0352396; COD 4310736 (CC0)
 - **Status:** unverified
 - **Checks:** orthorhombic volume; 4Pd+8Se stoichiometry; full expanded source basis; finite basal `(002)` `F_g`, `chi_g`, `U_g`; COD lattice comparison
@@ -155,7 +155,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tise2-001-structure`
 
 - **Claim:** ambient normal-state 1T-TiSe2 P-3m1 lattice + explicit one-formula-unit basis, c-axis-normal layered slab
-- **Code:** `data/cifs/tise2.cif`; `data/materials.toml::crystals.tise2`
+- **Code:** `data/cifs/tise2.cif`; `data/catalog/crystals/tise2.toml`
 - **Source:** Vaterlaus, *Helv. Phys. Acta* **57**, 884 (1984), Table 2.4
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Ti+2Se stoichiometry; finite basal `(001)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(001)` catalog projection
@@ -165,7 +165,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `nbte2-c2m-structure`
 
 - **Claim:** ambient distorted 1T'' NbTe2 C2/m conventional cell, reciprocal-normal (001) cleavage surface, and allowed basal (001) reflection
-- **Code:** `data/cifs/nbte2.cif`; `data/materials.toml::crystals.nbte2`
+- **Code:** `data/cifs/nbte2.cif`; `data/catalog/crystals/nbte2.toml`
 - **Source:** Brown, *Acta Cryst.* **20**, 264--267 (1966); COD 2310357 (CC0)
 - **Status:** unverified
 - **Checks:** monoclinic volume; 6Nb+12Te stoichiometry; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -175,7 +175,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tite2-p3m1-structure`
 
 - **Claim:** ambient 1T-TiTe2 P-3m1 experimental cell + explicit one-formula-unit basis, reciprocal-normal (001) cleavage surface
-- **Code:** `data/cifs/tite2.cif`; `data/materials.toml::crystals.tite2`
+- **Code:** `data/cifs/tite2.cif`; `data/catalog/crystals/tite2.toml`
 - **Source:** Kuznetsova et al., *Phys. Rev. B* **72**, 085418 (2005); NIST JARVIS JVASP-335 cross-check
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Ti+2Te stoichiometry; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -185,7 +185,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `vse2-p3m1-structure`
 
 - **Claim:** ambient normal-state 1T-VSe2 P-3m1 experimental cell + explicit one-formula-unit basis, reciprocal-normal (001) cleavage surface
-- **Code:** `data/cifs/vse2.cif`; `data/materials.toml::crystals.vse2`
+- **Code:** `data/cifs/vse2.cif`; `data/catalog/crystals/vse2.toml`
 - **Source:** Barua et al., *Sci. Rep.* **7**, 10964 (2017), CC BY 4.0; Stahl et al., *Inorganics* **11**, 481 (2023), CC BY 4.0; JVASP-10 cross-check
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1V+2Se stoichiometry; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -195,7 +195,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `vte2-c2m-structure`
 
 - **Claim:** ambient distorted 1T'' VTe2 C2/m conventional cell, reciprocal-normal (001) cleavage surface, and allowed basal (001) reflection
-- **Code:** `data/cifs/vte2.cif`; `data/materials.toml::crystals.vte2`
+- **Code:** `data/cifs/vte2.cif`; `data/catalog/crystals/vte2.toml`
 - **Source:** Bronsema, Bus & Wiegers, *J. Solid State Chem.* **53**, 415--421 (1984); COD 1535594 (CC0)
 - **Status:** unverified
 - **Checks:** monoclinic volume; idealized 6V+12Te stoichiometry; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -205,7 +205,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `gep-c2m-structure`
 
 - **Claim:** layered ambient-pressure M_L-GeP C2/m conventional cell, reciprocal-normal (10-1) surface orientation, and allowed parallel (20-2) reflection
-- **Code:** `data/cifs/gep.cif`; `data/materials.toml::crystals.gep`
+- **Code:** `data/cifs/gep.cif`; `data/catalog/crystals/gep.toml`
 - **Source:** COD 1562070 (CC0); Lee et al., *J. Solid State Chem.* **224**, 62--70 (2015), doi:10.1016/j.jssc.2014.04.021
 - **Status:** unverified
 - **Checks:** monoclinic volume; Ge12P12 stoichiometry; finite `(20-2)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -215,7 +215,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `ges-pnma-structure`
 
 - **Claim:** ambient alpha-GeS standard-Pnma cell, reciprocal-normal (100) surface orientation, and allowed parallel (200) reflection
-- **Code:** `data/cifs/ges.cif`; `data/materials.toml::crystals.ges`
+- **Code:** `data/cifs/ges.cif`; `data/catalog/crystals/ges.toml`
 - **Source:** COD 8104282 (CC0); Wiedemeier and von Schnering, *Z. Kristallogr.* **148**, 295--303 (1978), doi:10.1524/zkri.1978.148.3-4.295
 - **Status:** unverified
 - **Checks:** orthorhombic volume; Ge4S4 stoichiometry; finite `(200)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -225,7 +225,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `gese-pnma-structure`
 
 - **Claim:** ambient alpha-GeSe standard-Pnma cell, reciprocal-normal (100) surface orientation, and allowed parallel (200) reflection
-- **Code:** `data/cifs/gese.cif`; `data/materials.toml::crystals.gese`
+- **Code:** `data/cifs/gese.cif`; `data/catalog/crystals/gese.toml`
 - **Source:** COD 4003515 (CC0); Murgatroyd et al., *Chem. Mater.* **32** (2020), doi:10.1021/acs.chemmater.0c00453
 - **Status:** unverified
 - **Checks:** orthorhombic volume; Ge4Se4 stoichiometry; finite `(200)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -235,7 +235,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `gese2-beta-p21c-structure`
 
 - **Claim:** layered beta-GeSe2 experimental initial structure transformed losslessly to standard P21/c:b1, reciprocal-normal (001) surface orientation, and allowed parallel (002) reflection
-- **Code:** `data/cifs/gese2.cif`; `data/materials.toml::crystals.gese2`
+- **Code:** `data/cifs/gese2.cif`; `data/catalog/crystals/gese2.toml`
 - **Source:** Materials Project mp-540625 initial structure, matminer `mp_all_20181018` snapshot (CC BY 4.0); Dittmar and Schaefer, *Acta Cryst.* B32, 2726--2728 (1976), doi:10.1107/S0567740876008704
 - **Status:** unverified
 - **Checks:** monoclinic volume; Ge16Se32 stoichiometry; finite `(002)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -245,7 +245,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `res2-mp572758-structure`
 
 - **Claim:** distorted-1T ReS2 doubled-c P-1 DFT model with reciprocal-normal (001) cleavage orientation and dominant single-layer basal (002) reflection (odd 00l are near-extinct supercell harmonics)
-- **Code:** `data/cifs/res2.cif`; `data/materials.toml::crystals.res2`
+- **Code:** `data/cifs/res2.cif`; `data/catalog/crystals/res2.toml`
 - **Source:** Materials Project mp-572758, matminer `mp_all_20181018` snapshot (CC BY 4.0); compared against Lamfers et al., *J. Alloys Compd.* **241**, 34--39 (1996), doi:10.1016/0925-8388(96)02313-4
 - **Status:** unverified
 - **Checks:** triclinic volume; exact Re8S16 full basis; finite `(002)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -255,7 +255,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `rese2-cod1539529-structure`
 
 - **Claim:** ambient distorted-1T ReSe2 P-1 historical model with reciprocal-normal (001) cleavage orientation and allowed basal (001) reflection
-- **Code:** `data/cifs/rese2.cif`; `data/materials.toml::crystals.rese2`
+- **Code:** `data/cifs/rese2.cif`; `data/catalog/crystals/rese2.toml`
 - **Source:** Alcock and Kjekshus, *Acta Chem. Scand.* **19**, 79--94 (1965); COD 1539529 (CC0)
 - **Status:** unverified
 - **Checks:** triclinic volume; exact Re4Se8 full basis; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -265,7 +265,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `2h-tas2-p63mmc-structure`
 
 - **Claim:** room-temperature parent 2H-TaS2 P63/mmc conventional cell, reciprocal-normal (001) cleavage orientation, and first allowed parallel (002) reflection
-- **Code:** `data/cifs/2h_tas2.cif`; `data/materials.toml::crystals.2h_tas2`
+- **Code:** `data/cifs/2h_tas2.cif`; `data/catalog/crystals/2h_tas2.toml`
 - **Source:** Meetsma et al., *Acta Cryst.* C46, 1598--1599 (1990); COD 9007815 (CC0)
 - **Status:** unverified
 - **Checks:** hexagonal volume; exact Ta2S4 full basis; odd-00l extinction; finite `(002)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -275,7 +275,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `2h-tase2-p63mmc-structure`
 
 - **Claim:** room-temperature parent 2H-TaSe2 P63/mmc conventional cell, reciprocal-normal (001) cleavage orientation, and first allowed parallel (002) reflection
-- **Code:** `data/cifs/2h_tase2.cif`; `data/materials.toml::crystals.2h_tase2`
+- **Code:** `data/cifs/2h_tase2.cif`; `data/catalog/crystals/2h_tase2.toml`
 - **Source:** Brown and Beerntsen, *Acta Cryst.* **18**, 31--36 (1965); COD 2310532 (CC0)
 - **Status:** unverified
 - **Checks:** hexagonal volume; exact Ta2Se4 full basis; odd-00l extinction; finite `(002)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -285,7 +285,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tate2-c2m-structure`
 
 - **Claim:** ambient distorted-1T TaTe2 C2/m conventional cell in the Brown long-a setting, reciprocal-normal (001) cleavage orientation, and allowed basal (001) reflection
-- **Code:** `data/cifs/tate2.cif`; `data/materials.toml::crystals.tate2`
+- **Code:** `data/cifs/tate2.cif`; `data/catalog/crystals/tate2.toml`
 - **Source:** Brown, *Acta Cryst.* **20**, 264--267 (1966); COD 2310358 (CC0)
 - **Status:** unverified
 - **Checks:** monoclinic volume; exact Ta6Te12 full basis; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -295,7 +295,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `fete-p4nmm-idealized-structure`
 
 - **Claim:** idealized stoichiometric beta-FeTe PbO-type framework derived from an experimental P4/nmm Fe1.095Te parent, reciprocal-normal (001) cleavage orientation, and allowed basal (001) reflection
-- **Code:** `data/cifs/fete.cif`; `data/materials.toml::crystals.fete`
+- **Code:** `data/cifs/fete.cif`; `data/catalog/crystals/fete.toml`
 - **Source:** Rodriguez et al., *J. Am. Chem. Soc.* **132**, 10006--10008 (2010), doi:10.1021/ja104004t; COD 4102703 (CC0)
 - **Status:** unverified
 - **Checks:** tetragonal volume; exact retained Fe2Te2 full-occupancy framework basis; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection; idealization disclosure
@@ -305,7 +305,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `wte2-td-pnm21-structure`
 
 - **Claim:** ambient orthorhombic Td-WTe2 Pnm21 conventional cell in the Brown axis setting, reciprocal-normal (001) cleavage orientation, and first allowed parallel (002) reflection
-- **Code:** `data/cifs/wte2.cif`; `data/materials.toml::crystals.wte2`
+- **Code:** `data/cifs/wte2.cif`; `data/catalog/crystals/wte2.toml`
 - **Source:** Brown, *Acta Cryst.* **20**, 268--274 (1966); COD 2310355 (CC0)
 - **Status:** unverified
 - **Checks:** orthorhombic volume; exact W4Te8 full basis; odd-00l extinction; finite `(002)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -315,7 +315,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `zrte3-p21m-structure`
 
 - **Claim:** room-temperature type-A ZrTe3 P21/m parent cell, reciprocal-normal (001) cleavage orientation, and allowed basal (001) reflection
-- **Code:** `data/cifs/zrte3.cif`; `data/materials.toml::crystals.zrte3`
+- **Code:** `data/cifs/zrte3.cif`; `data/catalog/crystals/zrte3.toml`
 - **Source:** Furuseth and Fjellvag, *Acta Chem. Scand.* **45**, 694--697 (1991), doi:10.3891/acta.chem.scand.45-0694; COD 1559502 (CC0)
 - **Status:** unverified
 - **Checks:** monoclinic volume; exact Zr2Te6 full basis; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -325,7 +325,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `zrte5-cmcm-structure`
 
 - **Claim:** room-temperature orthorhombic ZrTe5 Cmcm cell, reciprocal-normal (010) cleavage orientation, and first allowed parallel (020) reflection
-- **Code:** `data/cifs/zrte5.cif`; `data/materials.toml::crystals.zrte5`
+- **Code:** `data/cifs/zrte5.cif`; `data/catalog/crystals/zrte5.toml`
 - **Source:** Fjellvag and Kjekshus, *Solid State Commun.* **60**, 91--93 (1986), ICSD 85506; open values re-tabulated by Facio et al., *SciPost Phys.* **14**, 066 (2023), Table 1 structure B (CC BY 4.0)
 - **Status:** unverified
 - **Checks:** orthorhombic volume; exact Zr4Te20 full basis; C-centering (010) extinction; finite `(020)` `F_g`, `chi_g`, `U_g`; pinned surface/reflection
@@ -335,7 +335,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `black-phosphorus-020-structure`
 
 - **Claim:** ambient black-phosphorus Cmce lattice + explicit 8P conventional-cell basis, b-axis-normal layered slab
-- **Code:** `data/cifs/black_phosphorus.cif`; `data/materials.toml::crystals.black_phosphorus`
+- **Code:** `data/cifs/black_phosphorus.cif`; `data/catalog/crystals/black_phosphorus.toml`
 - **Source:** Brown & Rundqvist, Acta Cryst. 19, 684--685 (1965), doi:10.1107/S0365110X65004140
 - **Status:** unverified
 - **Checks:** orthorhombic volume; 8P stoichiometry; finite basal `(020)` `F_g`, `chi_g`, `U_g`; pinned `[010]` / `±(020)` catalog projection
@@ -345,7 +345,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `4h-sic-0004-structure`
 
 - **Claim:** ambient 4H-SiC hexagonal conventional cell, configured as a symmetric basal (0004) cut
-- **Code:** `data/cifs/4h_sic.cif`; `data/materials.toml::crystals.4h_sic`
+- **Code:** `data/cifs/4h_sic.cif`; `data/catalog/crystals/4h_sic.toml`
 - **Source:** 4H-SiC room-temperature powder refinement
 - **Status:** unverified
 - **Checks:** hexagonal volume; 4Si+4C; finite `(0004)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(0004)` catalog projection
@@ -355,7 +355,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `6h-sic-0006-structure`
 
 - **Claim:** ambient 6H-SiC hexagonal conventional cell, configured as a symmetric basal (0006) cut
-- **Code:** `data/cifs/6h_sic.cif`; `data/materials.toml::crystals.6h_sic`
+- **Code:** `data/cifs/6h_sic.cif`; `data/catalog/crystals/6h_sic.toml`
 - **Source:** Capitani et al., *American Mineralogist* **92**, 403–407 (2007)
 - **Status:** unverified
 - **Checks:** hexagonal volume; 6Si+6C; finite `(0006)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(0006)` catalog projection
@@ -365,7 +365,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `hfse2-cif-migration`
 
 - **Claim:** bundled 1T-HfSe2 CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/hfse2.cif`; `data/materials.toml::crystals.hfse2`
+- **Code:** `data/cifs/hfse2.cif`; `data/catalog/crystals/hfse2.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -375,7 +375,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `zrse2-cif-migration`
 
 - **Claim:** bundled 1T-ZrSe2 CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/zrse2.cif`; `data/materials.toml::crystals.zrse2`
+- **Code:** `data/cifs/zrse2.cif`; `data/catalog/crystals/zrse2.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -385,7 +385,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `ws2-cif-migration`
 
 - **Claim:** bundled 2H-WS2 CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/ws2.cif`; `data/materials.toml::crystals.ws2`
+- **Code:** `data/cifs/ws2.cif`; `data/catalog/crystals/ws2.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -395,7 +395,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mos2-cif-migration`
 
 - **Claim:** bundled 2H-MoS2 CIF preserves the pre-CIF catalog's structure and derived physics
-- **Code:** `data/cifs/mos2.cif`; `data/materials.toml::crystals.mos2`
+- **Code:** `data/cifs/mos2.cif`; `data/catalog/crystals/mos2.toml`
 - **Source:** —
 - **Status:** unverified
 - **Checks:** lattice, expanded basis, volume, composition, structure factor, and dominant-reflection golden
@@ -405,7 +405,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mote2-bulk-structure`
 
 - **Claim:** 2H-MoTe2 bulk lattice + basis (a=3.517 Å, c=13.96 Å)
-- **Code:** `data/cifs/mote2.cif`; `data/materials.toml::crystals.mote2`
+- **Code:** `data/cifs/mote2.cif`; `data/catalog/crystals/mote2.toml`
 - **Source:** literature / Materials Project
 - **Status:** unverified
 - **Checks:** cell volume + stoichiometry check
@@ -415,7 +415,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mote2-product-structure`
 
 - **Claim:** 2H-MoTe2 product-page lattice + basis used for few-layer MoTe2-on-sapphire scans
-- **Code:** `data/cifs/mote2_product.cif`; `data/materials.toml::crystals.mote2_product`
+- **Code:** `data/cifs/mote2_product.cif`; `data/catalog/crystals/mote2_product.toml`
 - **Source:** 2D Semiconductors product page
 - **Status:** unverified
 - **Checks:** unit conversion nm→Å + cell-volume check
@@ -425,7 +425,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `hfs2-structure`
 
 - **Claim:** bulk 1T-HfS2 P-3m1 lattice + three-atom primitive-cell basis
-- **Code:** `data/cifs/hfs2.cif`; `data/materials.toml::crystals.hfs2`
+- **Code:** `data/cifs/hfs2.cif`; `data/catalog/crystals/hfs2.toml`
 - **Source:** 2D Semiconductors product lattice; Neal et al., npj 2D Mater. Appl. 5, 45 (2021); Iwasaki et al., JPSJ 51, 2233 (1982)
 - **Status:** rederived
 - **Checks:** V=65.82 Å³; 1 Hf + 2 S; z=0.25 gives d(Hf-S)=2.544 Å and 2.90 Å sheet thickness; odd basal (001) allowed
@@ -435,7 +435,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `hfte2-001-structure`
 
 - **Claim:** 1T-HfTe2 P-3m1 Materials Project relaxed lattice + explicit 1a/2d primitive basis, configured as a symmetric (001) cut
-- **Code:** `data/cifs/hfte2.cif`; `data/materials.toml::crystals.hfte2`
+- **Code:** `data/cifs/hfte2.cif`; `data/catalog/crystals/hfte2.toml`
 - **Source:** Materials Project mp-32887
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Hf+2Te; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(001)` catalog projection
@@ -445,7 +445,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `sapphire-corundum-structure`
 
 - **Claim:** α-Al2O3/sapphire corundum lattice + explicit conventional-cell basis, B_ang2=0.25
-- **Code:** `data/cifs/sapphire.cif`; `data/materials.toml::crystals.sapphire`
+- **Code:** `data/cifs/sapphire.cif`; `data/catalog/crystals/sapphire.toml`
 - **Source:** Newnham & de Haan 1962; B_ang2 literature ~0.25
 - **Status:** unverified
 - **Checks:** cell volume + stoichiometry check
@@ -455,7 +455,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `hbn-structure`
 
 - **Claim:** h-BN P6_3/mmc layered/eclipsed lattice + explicit four-atom conventional-cell basis
-- **Code:** `data/cifs/hbn.cif`; `data/materials.toml::crystals.hbn`
+- **Code:** `data/cifs/hbn.cif`; `data/catalog/crystals/hbn.toml`
 - **Source:** Pease, Acta Cryst 5, 356 (1952)
 - **Status:** rederived
 - **Checks:** V=36.17 Å³ ✓; 2B+2N ✓; basis ≡ Pease Wyckoff under shift (2/3,1/3,3/4) ✓; AA′ registry ✓ (anchor green)
@@ -465,7 +465,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `hbn-debye-waller-00l`
 
 - **Claim:** room-temperature h-BN basal-reflection Debye–Waller coefficient `B33=3.45 Å²` (`U33=0.0437 Å²`) used for pinned `(002)/(004)`
-- **Code:** `data/materials.toml::crystals.hbn.B_ang2`
+- **Code:** `data/catalog/crystals/hbn.toml::B_ang2`
 - **Source:** Pease, *Acta Cryst.* **5**, 356–361 (1952), Table 1 and Fig. 3; doi:10.1107/S0365110X52001064
 - **Status:** unverified
 - **Checks:** weighted fit of `ln[(Fobs/Fcalc)²]` vs `l²` for `002/004/006/008`: slope `−0.03888(834)`, then `B33=−2c²·slope=3.45(74) Å²`; `U33=B33/(8π²)=0.0437(94) Å²`; catalog golden pins chosen value
@@ -475,7 +475,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `nbs2-2ha-structure`
 
 - **Claim:** 2H-a NbS2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis
-- **Code:** `data/cifs/nbs2.cif`; `data/materials.toml::crystals.nbs2`
+- **Code:** `data/cifs/nbs2.cif`; `data/catalog/crystals/nbs2.toml`
 - **Source:** supplier a/c via El Youbi et al., PRB 103, 155105 (2021) supplement; z via Heil et al., PRB 98, 075120 (2018); AFLOW `AB2_hP6_194_b_f-002`
 - **Status:** unverified
 - **Checks:** cell volume; 2Nb+4S; aligned Nb columns; finite `F_g`, `chi_g`, `U_g`
@@ -485,7 +485,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `nbse2-2ha-structure`
 
 - **Claim:** 2H-a NbSe2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis
-- **Code:** `data/cifs/nbse2.cif`; `data/materials.toml::crystals.nbse2`
+- **Code:** `data/cifs/nbse2.cif`; `data/catalog/crystals/nbse2.toml`
 - **Source:** a/c via Wang et al., APL 123, 153505 (2023); experimental z range via Johannes et al., PRB 73, 205102 (2006) and primary refinements; AFLOW `AB2_hP6_194_b_f-002`
 - **Status:** unverified
 - **Checks:** cell volume; 2Nb+4Se; aligned Nb columns; finite `F_g`, `chi_g`, `U_g`
@@ -495,7 +495,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `fes2-pyrite-structure`
 
 - **Claim:** cubic pyrite FeS2 Pa-3 lattice + explicit 4a(Fe)/8c(S) conventional-cell basis
-- **Code:** `data/cifs/fes2.cif`; `data/materials.toml::crystals.fes2`
+- **Code:** `data/cifs/fes2.cif`; `data/catalog/crystals/fes2.toml`
 - **Source:** Finklea, Cathey & Amma, Acta Crystallogr. A32, 529 (1976); a=5.4166 A, x(S)=0.386
 - **Status:** unverified
 - **Checks:** cell volume; 4 Fe + 8 S; idealized x gives S-S dimer ~2.14 A and Fe-S ~2.27 A (lit. ~2.16 A / ~2.26 A); finite `(200)` `F_g`, `chi_g`, `U_g`
@@ -505,7 +505,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `v2o5-010-structure`
 
 - **Claim:** alpha-V2O5 standard-Pmmn lattice + explicit two-formula-unit basis for the layered cut conventionally indexed as (010)
-- **Code:** `data/cifs/v2o5.cif`; `data/materials.toml::crystals.v2o5`
+- **Code:** `data/cifs/v2o5.cif`; `data/catalog/crystals/v2o5.toml`
 - **Source:** McColl et al. 2018; Sipr et al. 1999
 - **Status:** unverified
 - **Checks:** orthorhombic volume; 4V+10O; finite `(001)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(001)` catalog projection
@@ -515,7 +515,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `tis2-003-structure`
 
 - **Claim:** 1T-TiS2 P-3m1 lattice + explicit one-formula-unit basis for a symmetric (003) cut
-- **Code:** `data/cifs/tis2.cif`; `data/materials.toml::crystals.tis2`
+- **Code:** `data/cifs/tis2.cif`; `data/catalog/crystals/tis2.toml`
 - **Source:** Brown et al. 1998
 - **Status:** unverified
 - **Checks:** hexagonal volume; 1Ti+2S; finite `(003)` `F_g`, `chi_g`, `U_g`; pinned `[001]` / `±(003)` catalog projection

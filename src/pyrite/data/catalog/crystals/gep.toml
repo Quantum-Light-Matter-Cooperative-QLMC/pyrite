@@ -1,0 +1,10 @@
+cif = "cifs/gep.cif"
+validation_id = "gep-c2m-structure"
+full_name = "Germanium Phosphide"
+formula = "GeP"
+cod_id = 1562070
+B_ang2 = 0.35
+surface_hkl = [1, 0, -1]
+E_grid = { arange = { start = 50.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[2, 0, -2]]
+hkl_reason = "In the preserved COD 1562070 C2/m setting, layered GeP cleaves on (10-1); C centering extinguishes that plane, so pin the first allowed parallel (20-2) family and orient by its reciprocal surface normal."

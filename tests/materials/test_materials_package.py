@@ -52,11 +52,19 @@ from pathlib import Path
 real_open = Path.open
 
 def guarded_open(path, *args, **kwargs):
-    if path.name == "materials.toml":
+    if "catalog" in Path(path).parts:
         raise AssertionError("bundled catalog was loaded eagerly")
     return real_open(path, *args, **kwargs)
 
+real_iterdir = Path.iterdir
+
+def guarded_iterdir(path):
+    if "catalog" in path.parts:
+        raise AssertionError("bundled catalog was listed eagerly")
+    return real_iterdir(path)
+
 Path.open = guarded_open
+Path.iterdir = guarded_iterdir
 import pyrite.materials.catalog
 print("catalog module imported lazily")
 """

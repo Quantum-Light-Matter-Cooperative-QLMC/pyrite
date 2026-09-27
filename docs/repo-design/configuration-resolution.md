@@ -3,7 +3,7 @@
 PyRITE has three distinct configuration layers. Keeping them separate prevents surprising runs and makes dataset identity reproducible.
 
 1. **CLI context** selects the current campaign profile, remote target, and workspace root.
-2. **Catalog profiles** select campaign grids, membership, beam, detector, and emission policy from `materials.toml`.
+2. **Catalog profiles** select campaign grids, membership, beam, detector, and emission policy from the material catalog (`data/catalog/profiles/`).
 3. **Fidelity presets** (`full` or `survey`) set workload and reduce resolved grids. Fidelity is not a catalog profile.
 
 ## CLI context precedence

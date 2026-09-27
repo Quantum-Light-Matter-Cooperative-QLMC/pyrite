@@ -1,0 +1,11 @@
+cif = "cifs/wte2.cif"
+validation_id = "wte2-td-pnm21-structure"
+full_name = "Tungsten Ditelluride"
+formula = "WTe2"
+phase = "Td"
+cod_id = 2310355
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Ambient Td-WTe2 in the preserved Brown/COD 2310355 Pnm21 axis setting cleaves on (001); odd 00l are extinct, so pin the first allowed parallel (002) family."

@@ -22,9 +22,9 @@ def test_remote_artifact_inventory_accepts_only_content_matching_names(monkeypat
         transport,
         "_ssh_capture",
         lambda command: (
-            f"{digest}  /remote/src/pyrite/data/energy-grid-artifacts/aa/{digest}.json\n"
+            f"{digest}  /remote/src/pyrite/data/catalog/energy-grid-artifacts/aa/{digest}.json\n"
             + "b" * 64
-            + "  /remote/src/pyrite/data/energy-grid-artifacts/cc/"
+            + "  /remote/src/pyrite/data/catalog/energy-grid-artifacts/cc/"
             + "c" * 64
             + ".json\n"
         ),
@@ -44,7 +44,7 @@ def test_sync_code_skips_remote_hashes_and_sends_only_missing_objects(tmp_path, 
     source = local_root / "src"
     source.mkdir(parents=True)
     (source / "regular.py").write_text("VALUE = 1\n")
-    store = source / "pyrite" / "data" / "energy-grid-artifacts"
+    store = source / "pyrite" / "data" / "catalog" / "energy-grid-artifacts"
     present = artifacts.write_artifact(store, _identity("hopg", 40))
     missing = artifacts.write_artifact(store, _identity("hbn", 50))
 
@@ -58,7 +58,7 @@ def test_sync_code_skips_remote_hashes_and_sends_only_missing_objects(tmp_path, 
             return ""
         inventory_commands.append(command)
         return (
-            f"{present.digest}  /remote/src/pyrite/data/energy-grid-artifacts/"
+            f"{present.digest}  /remote/src/pyrite/data/catalog/energy-grid-artifacts/"
             f"{present.digest[:2]}/{present.digest}.json\n"
         )
 
@@ -82,4 +82,4 @@ def test_sync_code_skips_remote_hashes_and_sends_only_missing_objects(tmp_path, 
     assert any(missing.digest in name for name in archived)
     assert not any(present.digest in name for name in archived)
     assert len(inventory_commands) == 1
-    assert "/remote/src/pyrite/data/energy-grid-artifacts" in inventory_commands[0]
+    assert "/remote/src/pyrite/data/catalog/energy-grid-artifacts" in inventory_commands[0]

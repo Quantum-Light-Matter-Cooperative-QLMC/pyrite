@@ -1,0 +1,11 @@
+cif = "cifs/2h_tase2.cif"
+validation_id = "2h-tase2-p63mmc-structure"
+full_name = "Tantalum Diselenide"
+formula = "TaSe2"
+phase = "2H"
+cod_id = 2310532
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Room-temperature 2H-TaSe2 cleaves on (001), but P63/mmc stacking extinguishes odd 00l; pin the first allowed parallel (002) family."

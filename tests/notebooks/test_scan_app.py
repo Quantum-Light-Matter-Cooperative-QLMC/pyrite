@@ -13,7 +13,7 @@ def test_scan_app_discovers_ordered_material_labels_from_catalog() -> None:
     assert "CATALOG.material_keys" in source
     assert ".label" in source
     assert "from pyrite.campaign.config import COLLAPSE_AZIMUTH, MATERIALS" not in source
-    assert "data/materials.toml" in source
+    assert "data/catalog/" in source
     assert "analysis app" in source
     assert "analysis notebook" not in source
 

@@ -1,0 +1,8 @@
+materials = ["hopg", "hbn", "diamond", "silicon", "mose2", "wse2", "nbs2", "nbse2", "mote2", "mote2_product", "ptse2", "pts2", "pds2", "pdte2", "ptbi2", "ptte2", "pdse2", "hfs2", "hfte2", "nbte2", "tite2", "vse2", "vte2", "gep", "ges", "gese", "gese2", "res2", "rese2", "2h_tas2", "2h_tase2", "tate2", "fete", "fes2", "wte2", "zrte3", "zrte5", "hfse2", "zrse2", "v2o5", "tis2", "tise2", "black_phosphorus", "4h_sic", "6h_sic", "ws2", "mos2", "mos2-on-sapphire", "mos2-on-sio2-si", "sapphire"]
+thickness_ang = {values = [10000.0, 100000.0, 1000000.0, 10000000.0]}
+energy_keV = {values = [30.0, 40.0, 50.0, 60.0]}
+tilt_deg = {values = [15.0, 45.0, 75.0]}
+tilt_azim_deg = {values = [100.0, 140.0, 180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+detector = {observation_angle_deg = 90.0}
+n_electrons = {values = [300]}

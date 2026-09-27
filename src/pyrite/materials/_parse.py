@@ -11,6 +11,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR
+from .._catalog_layout import ARTIFACT_DIR, catalog_root
 from .._energy_grid_artifacts import ArtifactError, load_artifact
 from .._numerics import validate_profile_numerics
 from ._beam_detector_parse import (
@@ -649,7 +650,7 @@ def _load_profile_artifacts(
             all_refs[name] = MappingProxyType(refs)
 
     selected: dict[str, tuple[str, Mapping[str, object]]] = {}
-    store_root = source.parent / "energy-grid-artifacts"
+    store_root = catalog_root(source) / ARTIFACT_DIR
     for material, digest in all_refs.get(profile_name, {}).items():
         path = f"profiles.{profile_name}.energy_grid_refs.{material}"
         try:

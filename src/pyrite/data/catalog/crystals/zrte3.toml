@@ -1,0 +1,10 @@
+cif = "cifs/zrte3.cif"
+validation_id = "zrte3-p21m-structure"
+full_name = "Zirconium Tritelluride"
+formula = "ZrTe3"
+cod_id = 1559502
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Room-temperature parent-phase ZrTe3 cleaves on (001); the explicit COD 1559502 P21/m basis gives a finite (001) coupling, so pin the first basal harmonic."

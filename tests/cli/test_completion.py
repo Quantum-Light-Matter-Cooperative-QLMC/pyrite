@@ -37,7 +37,7 @@ def missing_catalog(monkeypatch):
     )
     for reader in readers:
         reader.cache_clear()
-    monkeypatch.setattr(_catalog_keys, "data_dir", lambda: Path("/missing"))
+    monkeypatch.setattr(_catalog_keys, "bundled_catalog", lambda: Path("/missing"))
     yield
     monkeypatch.undo()
     for reader in readers:

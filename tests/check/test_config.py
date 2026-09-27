@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from pyrite import DATA_DIR, cli
+from pyrite._catalog_layout import read_text
 
 
 def test_check_config_validates_bundled_catalog_without_running_simulation(capsys) -> None:
@@ -17,8 +18,17 @@ def test_check_config_validates_bundled_catalog_without_running_simulation(capsy
     assert "50 materials, 49 crystals" in output
 
 
-def test_check_config_accepts_an_explicit_full_catalog(capsys) -> None:
-    catalog_path = DATA_DIR / "materials.toml"
+def test_check_config_accepts_an_explicit_catalog_directory(capsys) -> None:
+    catalog_path = DATA_DIR / "catalog"
+
+    assert cli.main(["material", "validate", str(catalog_path)]) is None
+
+    assert str(catalog_path) in capsys.readouterr().out
+
+
+def test_check_config_accepts_an_explicit_single_file_catalog(tmp_path: Path, capsys) -> None:
+    catalog_path = tmp_path / "materials.toml"
+    catalog_path.write_text(read_text(DATA_DIR / "catalog"))
 
     assert cli.main(["material", "validate", str(catalog_path)]) is None
 
@@ -49,15 +59,10 @@ def test_check_config_reports_malformed_bundled_catalog_without_import_traceback
 import sys
 from pathlib import Path
 
+import pyrite._catalog_layout as layout
+
 invalid = Path(sys.argv[1])
-real_open = Path.open
-
-def redirected_open(path, *args, **kwargs):
-    if path.name == "materials.toml":
-        return real_open(invalid, *args, **kwargs)
-    return real_open(path, *args, **kwargs)
-
-Path.open = redirected_open
+layout.bundled_catalog = lambda: invalid
 from pyrite import cli
 cli.main(["material", "validate"])
 """

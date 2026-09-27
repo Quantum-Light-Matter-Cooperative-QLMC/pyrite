@@ -1,0 +1,12 @@
+cif = "cifs/pts2.cif"
+validation_id = "pts2-p3m1-structure"
+full_name = "Platinum Disulfide"
+formula = "PtS2"
+phase = "1T"
+cod_id = 1537200
+mp_id = "mp-762"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal 1T-PtS2(001) symmetric cut parallel to the c-axis-normal cleavage surface; geometry follows the COD 1537200 experimental redetermination."

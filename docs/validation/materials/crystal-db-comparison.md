@@ -12,7 +12,7 @@ The local catalog splits into two data classes with very different external cove
 |---|---|---|---|
 | lattice `a, b, c, α, β, γ` | `cifs/*.cif` | yes (COD / Materials Project) | **yes** |
 | basis positions + occupancy | `cifs/*.cif` | yes | yes (after P1 expansion) |
-| `B_ang2` (isotropic Debye–Waller) | `materials.toml` | **no** — COD/MP do not carry a reliable isotropic B | **no** |
+| `B_ang2` (isotropic Debye–Waller) | catalog `crystals/*.toml` | **no** — COD/MP do not carry a reliable isotropic B | **no** |
 
 **Key finding:** this cross-check validates *geometry only*. It does **not** clear `issue_notes.md` item #1 (placeholder Debye–Waller factors) — external databases don't ship isotropic B, so those still need a literature/temperature source and a separate check. The two notes look linked but aren't; treating this test as DW coverage would give a false sense of safety.
 

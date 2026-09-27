@@ -34,8 +34,9 @@ def _run(args: SimpleNamespace) -> None:
 @click.command(
     "check-config",
     help=(
-        "Validate bundled material catalog or an explicit full catalog TOML.\n\n"
-        "With no MANIFEST, reloads packaged materials.toml. Performs no simulation, "
+        "Validate bundled material catalog or an explicit full catalog.\n\n"
+        "MANIFEST is a single catalog TOML file or a catalog directory. With no "
+        "MANIFEST, reloads the packaged catalog. Performs no simulation, "
         "network access, or GPU probe."
     ),
 )

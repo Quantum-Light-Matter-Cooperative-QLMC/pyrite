@@ -1,0 +1,10 @@
+cif = "cifs/wse2.cif"
+validation_id = "wse2-cif-migration"
+full_name = "Tungsten Diselenide"
+formula = "WSe2"
+phase = "2H"
+cod_id = 9012193
+mp_id = "mp-1821"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 2]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }

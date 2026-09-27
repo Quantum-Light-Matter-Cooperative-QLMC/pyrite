@@ -124,7 +124,7 @@ def _(
     MATERIAL = material_ui.value
 
     settings = default_settings()
-    sweep = material_sweep(MATERIAL)  # full parametric grid (data/materials.toml)
+    sweep = material_sweep(MATERIAL)  # full parametric grid (data/catalog/)
 
     cases = build_configured_cases(sweep, settings)
     cases, dropped = gate_cases_by_penetration(cases)

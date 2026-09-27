@@ -1,0 +1,11 @@
+cif = "cifs/tise2.cif"
+validation_id = "tise2-001-structure"
+full_name = "Titanium Diselenide"
+formula = "TiSe2"
+phase = "1T"
+cod_id = 1537860
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the basal 1T-TiSe2(001) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal layered slab."

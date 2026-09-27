@@ -1,0 +1,10 @@
+cif = "cifs/black_phosphorus.cif"
+validation_id = "black-phosphorus-020-structure"
+full_name = "Black Phosphorus"
+formula = "P"
+cod_id = 9012486
+B_ang2 = 0.6
+surface_hkl = [0, 1, 0]
+E_grid = { arange = { start = 50.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 2, 0]]
+hkl_reason = "Pin the allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel to the b-axis-normal layered slab."

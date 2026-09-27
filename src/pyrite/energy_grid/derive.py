@@ -1,6 +1,6 @@
 """Empirically derive per-beam-energy line-grid upper bounds (``stop``) for
 the standard profile's ``E_grid_line_by_energy`` in
-``src/pyrite/data/materials.toml``, from simulated coherent-line intensity
+the ``src/pyrite/data/catalog/`` profiles, from simulated coherent-line intensity
 coverage rather than an undocumented cap.
 
 See docs/adr/0005-energy-grid-schema-decisions.md for the

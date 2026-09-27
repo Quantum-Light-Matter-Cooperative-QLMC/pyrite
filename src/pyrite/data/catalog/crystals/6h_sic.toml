@@ -1,0 +1,11 @@
+cif = "cifs/6h_sic.cif"
+validation_id = "6h-sic-0006-structure"
+full_name = "Silicon Carbide"
+formula = "SiC"
+phase = "6H"
+cod_id = 9010158
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 50.0, stop = 3000.0, step = 3.0 } }
+hkl_families = [[0, 0, 6]]
+hkl_reason = "Pin the basal 6H-SiC (0006) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal slab."

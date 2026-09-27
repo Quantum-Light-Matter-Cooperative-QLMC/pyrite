@@ -6,8 +6,8 @@ mutable annotations must live outside this store so they cannot change a
 campaign's artifact digest.
 
 This is a store, not a stage of the derivation pipeline: it imports nothing
-first-party, the bytes live beside ``materials.toml`` in
-``data/energy-grid-artifacts/``, and it has two readers on opposite sides of the
+first-party, the bytes live in ``energy-grid-artifacts/`` inside a catalog
+directory (``data/catalog/``) or beside a single-file catalog, and it has two readers on opposite sides of the
 package graph -- ``materials.catalog`` resolves ``[profiles.*.energy_grid_refs]``
 at catalog-load time, and ``energy_grid.apply`` / ``energy_grid.gc`` write and
 collect. It therefore sits at the package root, below both, rather than inside

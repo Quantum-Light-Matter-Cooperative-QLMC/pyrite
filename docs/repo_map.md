@@ -180,7 +180,7 @@ Immutable, content-addressed energy-grid artifact store: canonical `cxr.energy-g
 Material domain package. Narrow top-level API expose immutable `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`, `CrystalSpec`, `MediumSpec`, `MaterialIdentity`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`), `load_material_catalog`, compatibility projections (`CRYSTALS`, `MATERIALS`, `MATERIAL_LABELS`). Implementation helpers stay in submodules below.
 
 ### `materials/catalog.py`
-Thin schema-version-1 load/cache owner for packaged `data/materials.toml`. Owns `load_material_catalog`, the default `CATALOG` singleton, and compatibility exports for the frozen public record types. The exported types retain their historical `pyrite.materials.catalog` pickle identity even though their definitions live in `_schema.py`. `material_keys` preserve TOML declaration order.
+Thin schema-version-1 load/cache owner for the packaged `data/catalog/` directory (on-disk layout in `pyrite/_catalog_layout.py`). Owns `load_material_catalog`, the default `CATALOG` singleton, and compatibility exports for the frozen public record types. The exported types retain their historical `pyrite.materials.catalog` pickle identity even though their definitions live in `_schema.py`. `material_keys` preserve declaration order for a single-file catalog and file-name order for a catalog directory.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`, `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`, `load_material_catalog`.
 - Deps: `materials._schema`, `materials._parse`, `DATA_DIR`. Imports no driver package, so `materials` remains a leaf component of the dependency DAG.
 
@@ -198,7 +198,7 @@ Beam, detector, filter, and physical-detector catalog parsing. Detector blocks r
 - Deps: `materials._catalog_decode`; imports no driver or detector package.
 
 ### `materials/_identity.py`
-Display identity for a material — chemical formula, crystal phase, crystal cut — and the label derived from them. Labels are never authored in `data/materials.toml`; `[materials.*]` may only override the *name* segment via `display_name`, and the cut is always appended, so a label cannot contradict its crystal record. The cut is the declared slab normal reduced to its primitive representative, rendered `(hkl)` when the crystal declares `surface_hkl` and `[uvw]` when it declares `beam_uvw` — the two are mutually exclusive spellings of the same axis, and nothing is converted between them. Every packaged crystal declares `surface_hkl`, so every label reads `(hkl)`; a cell on hexagonal axes renders four Miller–Bravais indices instead — `(0001)`, not `(001)`.
+Display identity for a material — chemical formula, crystal phase, crystal cut — and the label derived from them. Labels are never authored in the catalog; `[materials.*]` may only override the *name* segment via `display_name`, and the cut is always appended, so a label cannot contradict its crystal record. The cut is the declared slab normal reduced to its primitive representative, rendered `(hkl)` when the crystal declares `surface_hkl` and `[uvw]` when it declares `beam_uvw` — the two are mutually exclusive spellings of the same axis, and nothing is converted between them. Every packaged crystal declares `surface_hkl`, so every label reads `(hkl)`; a cell on hexagonal axes renders four Miller–Bravais indices instead — `(0001)`, not `(001)`.
 - Public: `MaterialIdentity`, `reduce_indices`, `format_indices`, `bravais_indices`, `hexagonal_setting`; `CutFrame` alias.
 - Deps: none (leaf).
 
@@ -454,7 +454,10 @@ Terminal presentation primitives shared by the CLI and the domain packages, and 
 `-R/--remote`: the one shared option whose callback validates through `remote.config`, which `console/` sits below and cannot import.
 
 ### `_catalog_keys.py`
-Offline `[materials|profiles|beams|detectors].*` key reads straight from the packaged TOML, without importing the scientific material modules. Shell completion, `runs.scan`'s material validation and checkpoint identity resolution all need catalog keys where a `materials` import would be far too expensive.
+Offline `[materials|profiles|beams|detectors].*` key reads by listing the packaged catalog directory's object files, without importing the scientific material modules. Shell completion, `runs.scan`'s material validation and checkpoint identity resolution all need catalog keys where a `materials` import would be far too expensive.
+
+### `_catalog_layout.py`
+On-disk catalog layout: a single TOML file or a one-object-per-file catalog directory (`catalog.toml` plus `<table>/<name>.toml`). Owns layout validation, the plain `tomllib` assembly the loader and artifact GC read, the assembled `tomlkit` text CLI editors and `energy_grid.apply` mutate, the split write-back that rewrites only changed object files, and the artifact-store root (`catalog_root`). Import-light: no `pyrite.materials`; `tomlkit` only inside the text round trip.
 
 ### `console/dashboard/`
 Shared live terminal dashboard package used by local scans and remote jobs. `render.py` owns frame composition, `state.py` owns progress parsing and terminal sanitization, and `poll.py` owns non-blocking keyboard input. `__init__.py` exports the fifteen names with callers outside the package and nothing else; anything absent from `__all__` is internal and imported from its owning module.

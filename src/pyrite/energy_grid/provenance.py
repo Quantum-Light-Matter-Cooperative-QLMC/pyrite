@@ -1,6 +1,6 @@
 """Tool-owned source/note store for pyrite energy-grid bounds (NOT the catalog).
 
-materials.toml holds pure grid values; this sidecar records who set each grid and
+The material catalog holds pure grid values; this sidecar records who set each grid and
 why. New artifact-backed records are keyed profile -> material -> channel ->
 energy; legacy material-global records remain the standard-profile fallback.
 Used for sticky-manual protection in `apply` and for `show`. Absent file == no

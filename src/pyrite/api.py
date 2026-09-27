@@ -150,7 +150,7 @@ def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
     This is the production path `pyrite scan` and `pyrite material blaze` take,
     not a compatibility shim: `runs.scan` and `runs.blaze` both default their
     `build_cases` hook to it. The pair it accepts is the config-driven campaign
-    description assembled from `data/materials.toml`, which is why the lowering
+    description assembled from the `data/catalog/` material catalog, which is why the lowering
     lives behind one named function rather than in each runner.
     """
     from .campaign.legacy import adapt_configured_sweep

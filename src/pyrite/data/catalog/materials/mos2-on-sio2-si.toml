@@ -1,0 +1,6 @@
+display_name = "MoS2 on SiO2/Si"
+crystal = "mos2"
+stack = [
+    { material = "sio2", thickness_ang = 2850.0 },
+    { material = "silicon", thickness_ang = 5000000.0 },
+]

@@ -1,0 +1,11 @@
+label = "Compressed microbunch, 0.1 mm spot"
+transverse_fwhm_mm = 0.1
+rep_rate_hz = 5000.0
+bunch_charge_pc = 1.0
+
+[longitudinal]
+kind = "compressed"
+retained_coherence = 0.9
+spacing_periods = 1
+modulation_depth = 1.0
+timing_jitter_fs = 0.0

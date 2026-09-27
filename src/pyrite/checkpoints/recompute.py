@@ -694,7 +694,7 @@ def repair_line_spec(
     Target line grid per record (see :func:`_target_line_grid`): ``line_step_eV``
     (explicit uniform spacing), else ``from_config`` rebuilds it from
     ``material``'s current ``E_grid_line_by_energy`` at the record's E0 (edit
-    materials.toml, ``pyrite reline`` re-runs lines on the new grid), else the
+    the catalog, ``pyrite reline`` re-runs lines on the new grid), else the
     record's existing grid (pure ``line_ne`` bump). ``line_ne`` overrides
     ``case["Ne"]``.
 

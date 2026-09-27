@@ -1,0 +1,10 @@
+cif = "cifs/4h_sic.cif"
+validation_id = "4h-sic-0004-structure"
+full_name = "Silicon Carbide"
+formula = "SiC"
+phase = "4H"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 50.0, stop = 3000.0, step = 3.0 } }
+hkl_families = [[0, 0, 4]]
+hkl_reason = "Pin the basal 4H-SiC (0004) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal slab."

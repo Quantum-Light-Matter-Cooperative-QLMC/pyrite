@@ -1,0 +1,16 @@
+cif = "cifs/hopg.cif"
+validation_id = "hopg-cif-migration"
+full_name = "Highly Oriented Pyrolytic Graphite"
+formula = "C"
+phase = "2H"
+cod_id = 9011577
+# B33 = 8*pi^2 * mean(U33) from the same Trucano & Chen neutron refinement this
+# entry's cod_id already cites: C1 U33 = 0.01600, C2 U33 = 0.01700 Ang^2, equal
+# multiplicity -> mean 0.01650 Ang^2. Basal (00l) only; g || c, so U33 is the
+# projection the pinned family probes. See docs/validation/materials/hopg-debye-waller-00l.md
+B_ang2 = 1.30
+surface_hkl = [0, 0, 1]
+mosaic_fwhm_deg = 0.8
+E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
+hkl_families = [[0, 0, 2], [0, 0, 4]]
+hkl_reason = "HOPG is fiber-textured, so only the basal (00l) c-axis reflections are coherent; skip the automatic dominant-reflections search."

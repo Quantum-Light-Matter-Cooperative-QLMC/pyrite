@@ -164,7 +164,7 @@ line_by_energy = [
 E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
 """
     )
-    monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(energy_grid.apply, "_CATALOG_PATH", catalog)
     monkeypatch.setattr(energy_grid.apply._provenance, "load", lambda: {})
 
     document = _document(invoke(material_command, ["show", "hopg", "-o", "json"]))
@@ -202,7 +202,7 @@ E_grid_brem = {{ arange = {{ start = 0, stop = 10, step = 1 }} }}
 energy_grid_refs = {{ hopg = "{stored.digest}" }}
 """
     )
-    monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(energy_grid.apply, "_CATALOG_PATH", catalog)
     monkeypatch.setattr(energy_grid.apply._provenance, "load", lambda: {})
 
     document = _document(

@@ -48,7 +48,8 @@ def _inspect_wheel(wheel: Path) -> None:
     assert "Name: pyrite-xray" in metadata.splitlines()
     assert f"Version: {PROJECT_VERSION}" in metadata.splitlines()
     assert "pyrite/__init__.py" in names
-    assert "pyrite/data/materials.toml" in names
+    assert "pyrite/data/catalog/catalog.toml" in names
+    assert "pyrite/data/catalog/profiles/standard.toml" in names
     assert "pyrite/apps/analysis_app.py" in names
     assert "pyrite/apps/_design.css" in names
     assert "pyrite/apps/trace_app.py" in names
@@ -81,7 +82,7 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
             "import pyrite; dist = distribution('pyrite-xray'); "
             "assert dist.metadata['Name'] == 'pyrite-xray'; "
             "assert dist.version == pyrite.__version__; "
-            "assert (pyrite.DATA_DIR / 'materials.toml').is_file(); "
+            "assert (pyrite.DATA_DIR / 'catalog' / 'catalog.toml').is_file(); "
             "from pyrite.materials import CATALOG; "
             "from pyrite.runs.scan import resolve_profile_materials; "
             "standard = CATALOG.profile_materials('standard'); "

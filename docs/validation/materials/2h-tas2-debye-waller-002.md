@@ -3,7 +3,7 @@
 ## Claim and source
 
 - Claim: the catalog's scalar `B_ang2 = 0.53` is a common basal projection for 2H-TaS2 `(002)`, not an isotropic displacement parameter.
-- Code: `data/materials.toml::crystals.2h_tas2.B_ang2`.
+- Code: `data/catalog/crystals/2h_tas2.toml::B_ang2`.
 - Source: Meetsma *et al.*, *Acta Cryst. C* **46**, 1598--1599 (1990), doi:10.1107/S0108270190000014; COD 9007815.
 - Intended quantity and units: one amplitude Debye--Waller coefficient in square angstroms for the reciprocal `c*` direction.
 
@@ -52,7 +52,7 @@ This is the `l = 2` specialization of the standard anisotropic basal projection.
 Inspection after fixing the derivation found:
 
 - the source CIF independently downloaded from COD 9007815 contains `Ta U33=0.00650` and `S U33=0.00680 Ang^2`;
-- `materials.toml` stores `B_ang2 = 0.53` and pins basal `(002)`;
+- `crystals/2h_tas2.toml` stores `B_ang2 = 0.53` and pins basal `(002)`;
 - `debye_waller` returns `exp[-B (g / 4 pi)^2]`, exactly the independently derived amplitude factor;
 - `structure_factor` applies that factor once to each atom.
 

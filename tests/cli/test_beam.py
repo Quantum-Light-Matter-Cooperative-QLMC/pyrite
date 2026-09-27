@@ -32,7 +32,7 @@ bunch_charge_pc = 2.5
 def _catalog(tmp_path, monkeypatch, text=_CATALOG):
     catalog = tmp_path / "materials.toml"
     catalog.write_text(text)
-    monkeypatch.setattr(_catalog_io, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", catalog)
     monkeypatch.setattr(_catalog_io, "validate", lambda *_args: None)
     return catalog
 

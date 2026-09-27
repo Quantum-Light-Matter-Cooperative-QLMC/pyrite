@@ -1,0 +1,9 @@
+cif = "cifs/ws2.cif"
+validation_id = "ws2-cif-migration"
+full_name = "Tungsten Disulfide"
+formula = "WS2"
+phase = "2H"
+cod_id = 9012191
+B_ang2 = 0.6
+surface_hkl = [0, 0, 2]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
