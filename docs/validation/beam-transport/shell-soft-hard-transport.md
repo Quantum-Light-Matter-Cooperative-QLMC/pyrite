@@ -1,5 +1,42 @@
 # Shell soft/hard inelastic transport
 
+## Independent verification (2026-09-27; derived before implementation inspection)
+
+Source: [PENELOPE-2024, NEA/MBDAV/R(2024)1](https://www.oecd-nea.org/upload/docs/application/pdf/2025-07/nea_mbdav_r_2024_1_penelope-2024_2025-07-10_15-48-34_125.pdf), §§3.2 and 4.2, especially Eqs. 3.124–3.134, 4.44–4.47, and 4.50–4.63. This claim concerns the inelastic collision partition only; the report's Eqs. 4.46–4.47 also include a separate radiative contribution, which is absent here.
+
+Let $d\sigma_k/dW$ be the shell-model energy-loss cross section for channel $k$, and define restricted moments $\sigma_{s,k}^{(n)}=\int_{W\leq W_c}W^n(d\sigma_k/dW)\,dW$ and $\sigma_{h,k}^{(n)}=\int_{W>W_c}W^n(d\sigma_k/dW)\,dW$. Sum over channels to obtain $M_1=\sigma_s^{(1)}+\sigma_h^{(1)}$. At one stopping-table node, the model's raw stopping is $N M_1$ in eV per length, whereas the corrected SBETHE table prescribes $S$ in the same units. Multiplying every restricted rate and moment by the single positive factor $S/(N M_1)$ gives
+
+$$
+S_s=S\frac{\sigma_s^{(1)}}{M_1},\qquad
+\mu_k=S\frac{\sigma_{h,k}^{(0)}}{M_1},\qquad
+\Omega_s^2=S\frac{\sigma_s^{(2)}}{M_1}.
+$$
+
+Consequently $S_s+\sum_k\mu_k\langle W\rangle_{h,k}=S$, because $\langle W\rangle_{h,k}=\sigma_{h,k}^{(1)}/\sigma_{h,k}^{(0)}$. If $S$ uses eV/Å, the dimensions are $[S_s]=\mathrm{eV/\mathring A}$, $[\mu_k]=\mathring A^{-1}$, and $[\Omega_s^2]=\mathrm{eV^2/\mathring A}$. The limiting all-soft cutoff gives $\sigma_h^{(n)}=0$, hence $S_s=S$, $\mu_h=0$, and no hard-event draw can affect the continuous trajectory. The strict $W_c>W_{cb}$ domain keeps the conduction-band delta loss below the hard threshold.
+
+With the hazards frozen over a row, independent unit-rate exponential optical depths $\tau_{\rm el}$ and $\tau_h$ imply candidate distances $s_{\rm el}=\tau_{\rm el}/\mu_{\rm el}$ and $s_h=\tau_h/\mu_h$. The next row ends at the shortest physical candidate or geometry, energy-cutoff, or numerical-cap distance; a truncated flight consumes the appropriate optical depth. A hard event selects channel $k$ with probability $\mu_k/\mu_h$, samples $W>W_c$ conditional on that channel, and changes the primary energy by $E_{\rm next}=E_{\rm end}-W$. Both $S_s$ and $W$ are nonnegative energy losses. This is a left-endpoint hazard approximation: varying the rates along the step would require the integrated optical-depth treatment discussed around Eq. 4.65 of the source.
+
+For a row of length $s$, Eqs. 4.51–4.56 give $m=\langle w\rangle=S_s s$ and $v=\operatorname{var}(w)=\Omega_s^2s$. These have units of energy and energy squared. The source's nonnegative artificial loss law has three branches. For $m^2>9v$, a normal draw centred on $m$ is truncated symmetrically at three standard deviations; its pre-truncation width must be slightly greater than $\sqrt v$ to restore the target variance. For $3v<m^2\leq9v$, $w$ is uniform on $[m-\sqrt{3v},m+\sqrt{3v}]$, with mean $m$ and variance $v$. For $m^2\leq3v$, let $w=0$ with probability $a$ and otherwise draw uniformly on $[0,w_0]$. Solving $m=(1-a)w_0/2$ and $m^2+v=(1-a)w_0^2/3$ independently gives
+
+$$
+w_0=\frac{3(m^2+v)}{2m},\qquad
+a=1-\frac{4m^2}{3(m^2+v)}.
+$$
+
+At $m^2=3v$, $a=0$ and $w_0=2m$, matching the adjacent uniform branch. At $v=0$, the deterministic value is $w=m$. For $m=0$, positive $v$ would be inconsistent with a nonnegative shell-loss distribution; zero mean and variance give zero loss. These filters establish dimensions, limiting behavior, and loss sign before comparison with the implementation.
+
+### Source-to-code comparison and verdict
+
+After the derivation above was recorded, I inspected the implementation. In `shell_transport.py`, `build_shell_inelastic_tables` computes $M_1$ as `soft1 + hard1`, adds $\ln(\sigma_s^{(1)}/M_1)$ to the logarithmic stopping table, and uses `stopping_eV_per_ang / total1` for each channel's zeroth moment and the soft second moment. Its factor `1e-6` converts the latter from eV²/Å to keV²/Å. Thus the three node formulas and their units match. `validate_shell_cutoff` enforces the strict $W_c>W_{cb}$ inequality.
+
+In `cores.py`, independent negative logarithms initiate elastic and hard optical depths. The hard candidate is $\tau_h/\mu_h$; after a truncated row the code subtracts $s\mu_h$ from the surviving depth. It interpolates channel rates at row-start energy, draws a channel against their cumulative sum, samples $W$ and recoil at that same energy, and marks an ordinary hard row `EVENT_HARD_INELASTIC`. It applies $E_{\rm next}=E_{\rm end}-W$ after recording that row. A hard collision that leaves the primary at or below $E_{\rm cut}$ instead marks the terminal row `EVENT_CUTOFF`; its nonzero hard transfer remains recorded. The exact CUDA kernel uses the same hazard, channel, and energy update conventions. `hard_event_energy_accounting` assigns the inner-shell binding share and splits the remaining $W$ into either emitted secondary energy or local deposit, so those three shares sum to $W$.
+
+In `hard_inelastic.py` and `_jit_shell_device.py`, the soft sampler's case boundaries are $m^2>9v$ and $m^2>3v$. Its uniform half-width is $\sqrt{3v}$; its final branch has `weight` $=(3v-m^2)/(3v+3m^2)=a$ and `top` $=3(v+m^2)/(2m)=w_0$. Both implementations return $m$ when $v=0$ and zero when $m\leq0$. The symmetric Gaussian branch uses the documented width correction and rejects draws beyond three target standard deviations. There is no divergent factor, sign, or exponent in these inspected terms.
+
+The focused CPU anchor `tests/montecarlo/test_shell_soft_hard_transport.py` passed 19/19 tests on 2026-09-27. It includes node closure, all three sampler regimes, the bitwise all-soft limit, hard event bookkeeping, and per-electron energy conservation. The pre-existing macroscopic anchor on this page supplies additional numerical evidence across 5, 20, and 100 keV. I did not rerun its heavy sweep or the hardware-gated CUDA suite. The official report's indexed text supplied Eqs. 4.44–4.56; direct PDF retrieval returned HTTP 503, so the published case thresholds and Gaussian correction were checked against the derivation docstring and their moment identities rather than a newly downloaded page image.
+
+**Verdict:** `rederived` for the stopping closure, hard hazard, event energy update, and soft-loss law; no source-to-code discrepancy identified. This does not independently certify hard-transfer and recoil distributions, which have separate ledger claims, or imply human sign-off. The full docs build succeeded. The generated HTML for this page renders its math spans and display blocks, and contains no literal dollar delimiter.
+
 `Validation: shell-soft-hard-transport` — status `unverified`. Physics:
 [shell soft/hard transport](../../physics/beam-transport/shell-soft-hard-transport.md).
 Ledger row: [`shell-soft-hard-transport`](../ledger-transport-background.md#shell-soft-hard-transport).

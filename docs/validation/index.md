@@ -65,6 +65,7 @@ beam-transport/gos-soft-hard-partition
 beam-transport/line-grid-sinc-convergence
 beam-transport/line-spectrum-error-budget
 beam-transport/line-window-seeding
+beam-transport/legacy-stopping-comparison
 beam-transport/longitudinal-bunch-sampling
 beam-transport/longitudinal-target-timing
 beam-transport/radiation-error-estimators

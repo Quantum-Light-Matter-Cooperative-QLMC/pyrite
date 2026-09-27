@@ -2,17 +2,17 @@
 
 PyRITE transports independent incident electrons through crystalline or layered matter as piecewise-linear segments. Each segment records position, direction, kinetic energy, path length, material, and elapsed flight time for the radiation kernels.
 
-This page states the transport loop and the propagation rules that control it. The models it calls are documented separately in [Elastic scattering](elastic-scattering.md) and [Stopping power and the energy cutoff](stopping-power.md), the beam it starts from in [Beam phase space](beam-phase-space.md) and [Longitudinal bunch structure](longitudinal-structure.md), the boundaries that confine it in [Transport geometry and boundaries](../geometry/transport-geometry.md), and what it hands downstream in [Transport outputs](transport-outputs.md).
+This page states the transport loop and the propagation rules that control it. The models it calls are documented separately in [Elastic scattering](elastic-scattering.md), [Stopping power and the energy cutoff](stopping-power.md), and [Inelastic scattering and energy-loss straggling](inelastic-scattering-events.md); the beam it starts from in [Beam phase space](beam-phase-space.md) and [Longitudinal bunch structure](longitudinal-structure.md), the boundaries that confine it in [Transport geometry and boundaries](../geometry/transport-geometry.md), and what it hands downstream in [Transport outputs](transport-outputs.md).
 
 ## Model
 
-At each material step the transport samples an elastic free path, advances the electron, applies either the mean energy loss or an Urban fluctuation about that mean, and samples an elastic deflection. The implementation uses tabulated NIST SRD 64 Mott/Browning transport data and the per-element Joy--Luo/Berger--Seltzer stopping-power splice. Compound rates are assembled from element number densities. In a stack, the active layer determines rates, stopping and straggling; flights are truncated at interfaces before continuing with the next medium.
+At each material step the transport samples an elastic free path, advances the electron, applies either the mean energy loss or a fluctuation about that mean, and samples an elastic deflection. The default elastic model uses ELSEPA partial-wave tables; Mott/Browning remains selectable. Each layer's collision stopping comes from its SBETHE material table. The opt-in shell soft/hard model also samples discrete inelastic collisions. In a stack, the active layer determines rates, stopping and straggling; flights are truncated at interfaces before continuing with the next medium.
 
 Vacuum legs do not scatter, stop, or radiate, but their distance advances the transport clock. Transport ends when the electron exits permanently, falls below the model cutoff, or exhausts the bounded step budget.
 
 ### Stochastic energy loss
 
-With `straggling=False` (the default), a material row loses the deterministic mean $Cs$, where $C=\lvert dE/ds\rvert$ is the spliced stopping magnitude at the row's start energy and $s$ is its material path length. With `straggling=True`, that loss is replaced by the unrestricted Urban compound-Poisson draw described by the Geant4 Physics Reference Manual and ultimately motivated by Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`:
+In the default continuous inelastic mode, `straggling=False` gives deterministic loss from the layer's SBETHE table, with positive stopping magnitude $S(E)=\lvert dE/ds\rvert$. With `straggling=True`, that loss is replaced by an unrestricted Urban compound-Poisson draw whose mean is scaled to $S(E)$. The construction follows the Geant4 Physics Reference Manual and Bichsel's thin-detector treatment{cite:p}`geant4prm,bichsel1988`:
 
 $$
 \Delta E
@@ -20,10 +20,10 @@ $$
 \qquad n_i\sim\operatorname{Poisson}(s\Sigma_i),
 $$
 
-where the continuum marks follow a $1/\epsilon^2$ density from $E_0=10$ eV to the Moller ceiling $T_{\max}=E/2$. The two excitation levels obey $f_1+f_2=1$ and $f_1\ln E_1+f_2\ln E_2=\ln I$; each element is sampled independently using its own stopping contribution. Consequently,
+where the continuum marks follow a $1/\epsilon^2$ density from $E_0=10$ eV to the Moller ceiling $T_{\max}=E/2$. The two excitation levels obey $f_1+f_2=1$ and $f_1\ln E_1+f_2\ln E_2=\ln I$; each element's historical channel contribution is scaled so the compound mean matches SBETHE. Consequently,
 
 $$
-\langle\Delta E\rangle=Cs,
+\langle\Delta E\rangle=S(E)s,
 \qquad
 \operatorname{Var}(\Delta E)
 =s\left(\Sigma_1E_1^2+\Sigma_2E_2^2
@@ -52,7 +52,7 @@ $$
 
 The clock advances by $s/\beta(\tfrac12(E_{\rm start}+E_{\rm end}))$. The update is third-order local and second-order global, one order above the frozen rule. A cutoff-stopped flight separately evaluates the stopping rate at $(E_{\rm start}+E_{\rm cut})/2$ and assigns $E_{\rm end}=E_{\rm cut}$, so the frozen rule's CSDA range overshoot disappears.
 
-With straggling enabled, the random draw replaces both deterministic energy updates: $E_{\rm end}=E_{\rm start}-\Delta E$. `energy_model` still selects the clock's representative energy — the start energy for `"frozen"`, the realized $(E_{\rm start}+E_{\rm end})/2$ for `"midpoint"` — and therefore the returned row schema. The Urban mean is a left-endpoint $C(E_{\rm start})s$ quadrature; `max_dE_frac` controls its energy-drift error.
+With straggling enabled, the random draw replaces both deterministic energy updates: $E_{\rm end}=E_{\rm start}-\Delta E$. `energy_model` still selects the clock's representative energy — the start energy for `"frozen"`, the realized $(E_{\rm start}+E_{\rm end})/2$ for `"midpoint"` — and therefore the returned row schema. The Urban mean is a left-endpoint $S(E_{\rm start})s$ quadrature; `max_dE_frac` controls its energy-drift error.
 
 For coherent emission the midpoint rule is a prerequisite: holding $\beta$ fixed across a flight costs hundreds of radians of emission phase per micron of trajectory, against $10^{-3}$--$10^{-1}$ rad for the midpoint rule on the same flights.
 

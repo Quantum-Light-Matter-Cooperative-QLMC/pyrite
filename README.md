@@ -131,7 +131,7 @@ photon escape → detector scoring.
   independent piecewise-linear flights use explicit
   elastic collisions and condensed energy loss, deterministic by default with
   optional Urban straggling. The default samples ELSEPA partial-wave elastic
-  cross sections, with Joy-Luo/Berger-Seltzer stopping;
+  cross sections, with material-level SBETHE collision stopping;
   beamline space charge and secondary electrons are not modeled.
 - **[Crystal source](docs/physics/materials/structure-factor.md):** phase-specific
   structures, complex atomic form factors, Debye-Waller factors, selected
