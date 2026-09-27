@@ -14,6 +14,7 @@ Validation: coherent-formation-absorption
 import numpy as np
 import pytest
 
+from pyrite.materials.crystal import HBARC_EV_ANG
 from pyrite.montecarlo.spectrum import mc_spectrum
 from pyrite.montecarlo.spectrum.lines import _setup as lines_setup
 from pyrite.montecarlo.spectrum.lines._formation import (
@@ -89,7 +90,10 @@ def test_formation_factor_stays_below_the_sinc_envelope():
         assert np.all(np.abs(F) <= 1.0 / v * (1.0 + 1e-12))
 
 
-def _track(pieces, *, length=40000.0, z_mid=25000.0, direction=(0.0, 0.0, 1.0), **extra):
+TRACK_LENGTH_ANG = 40000.0
+
+
+def _track(pieces, *, length=TRACK_LENGTH_ANG, z_mid=25000.0, direction=(0.0, 0.0, 1.0), **extra):
     """One straight segment, re-cut into ``pieces`` collinear pieces."""
     v = np.asarray(direction, dtype=float)
     v /= np.linalg.norm(v)
@@ -157,10 +161,13 @@ def test_coherent_spectrum_is_invariant_under_segment_splitting(case):
     spectra = [_spectrum(_track(k, **geometry), coherent=True, **kwargs) for k in SPLITS]
     peak = float(spectra[0].max())
     assert peak > 0.0
+    # Piece ages and emitter phases round at REAL, so the device bound scales
+    # with the largest flight phase, omega t ~ k0 L / beta (~7e4 rad here).
+    beta = float(beta_from_keV(np.array([E_KEV]))[0])
+    phase_rad = E_GRID.max() / HBARC_EV_ANG * TRACK_LENGTH_ANG / beta
+    atol = scaled_rtol(1e-9, eps_multiple=phase_rad) * peak
     for spectrum in spectra[1:]:
-        np.testing.assert_allclose(
-            spectrum, spectra[0], rtol=0, atol=scaled_rtol(1e-9, eps_multiple=1e4) * peak
-        )
+        np.testing.assert_allclose(spectrum, spectra[0], rtol=0, atol=atol)
 
 
 @pytest.mark.parametrize("case", CASES, ids=list(CASES))
