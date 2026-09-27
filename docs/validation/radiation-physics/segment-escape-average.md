@@ -134,7 +134,19 @@ The stack's outer boundaries are $z=0$ and $z=T$. On a piece where the $z$ face 
 
 ## Status
 
-`rederived` (fresh-context re-derivation above, 2026-09-25). Human sign-off pending. Pending:
+`rederived` (fresh-context re-derivation above, 2026-09-25). Human sign-off pending.
 
-- CUDA hardware execution of the parity tests;
-- re-measurement of the #176 hopg C K split ladder;
+Hardware follow-up (2026-09-26, RTX 5080):
+
+- CUDA parity: `test_spectrum_cuda_cheap_hoists.py`, `test_segment_escape.py`
+  and `test_characteristic.py` pass under `PYRITE_MC_BACKEND=cuda
+  PYRITE_TEST_BACKEND=cuda`. The box/layer oracle tests now bound the
+  endpoint-path rounding at REAL (`tau eps`); CUDA misses of the old fixed
+  `1e-10` were 1.2e-9 and 7e-9 relative.
+- hopg split ladder (100 keV, 2 um, 30 deg, 20000 e x 3 seeds): C K and
+  bremsstrahlung yields are flat in k (ratio 1.0000 at k = 8 and 32, Mott
+  and ELSEPA); ELSEPA - Mott C K is -0.02 % at every k (was -15.7 % under
+  the midpoint rule).
+- PXR/CBS line routes, still on the midpoint escape here: `spec_escape_only`
+  drifts +2.0 % (Mott) and +2.8 % (ELSEPA) from k = 1 to 32, +2.4 % / +3.5 %
+  on the 1754 eV peak. Treated in issue #181.

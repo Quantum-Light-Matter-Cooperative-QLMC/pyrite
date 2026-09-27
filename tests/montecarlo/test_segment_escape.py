@@ -11,8 +11,12 @@ from pyrite._backend import REAL, xp
 from pyrite.montecarlo.groove import blazed_groove_spec, escape_distance_ang
 from pyrite.montecarlo.spectrum import brem, characteristic
 from pyrite.montecarlo.spectrum.segment_escape import mean_transmission, segment_escape_paths
+from tests.helpers import scaled_rtol
 
 MU_INV_ANG = 1.0 / 300.0  # C K-like: attenuation length comparable to a segment
+# Endpoint escape paths round at REAL, so exp(-tau) carries a relative error
+# ~tau eps(REAL); the box/layer oracles below reach tau ~25.
+ESCAPE_RTOL = scaled_rtol(1e-10, eps_multiple=30.0)
 
 
 def _absorbing_mu(_composition, energy):
@@ -160,7 +164,7 @@ def test_finite_side_exit_crosses_absorber_layer_at_exact_breakpoint(pieces):
         quad(transmission, 0.0, z_cross, epsrel=1e-12)[0]
         + quad(transmission, z_cross, 10.0, epsrel=1e-12)[0]
     ) / 10.0
-    np.testing.assert_allclose(actual, expected, rtol=1e-10)
+    np.testing.assert_allclose(actual, expected, rtol=ESCAPE_RTOL)
     assert np.all(np.bincount(owner, minlength=pieces) > 0)
 
 
@@ -184,7 +188,7 @@ def test_finite_box_track_starting_on_entrance_face_escapes_through_it(layered):
     expected = (
         quad(lambda s: np.exp(-MU_INV_ANG * s * v_z / n_hat[2] * -1.0), 0.0, 400.0)[0] / 400.0
     )
-    np.testing.assert_allclose(actual, expected, rtol=1e-10)
+    np.testing.assert_allclose(actual, expected, rtol=ESCAPE_RTOL)
     np.testing.assert_allclose(start.sum(axis=1)[owner == 0][0], 0.0, atol=1e-6)
 
 
