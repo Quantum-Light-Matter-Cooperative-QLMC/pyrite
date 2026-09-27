@@ -674,15 +674,9 @@ def _transport_case(
     return tp
 
 
-from .emission import (
-    _brem_for_case as _brem_for_case,
-)
-from .emission import (
-    _brem_wide_from_segments as _brem_wide_from_segments,
-)
-from .emission import (
-    _characteristic_from_segments as _characteristic_from_segments,
-)
+from .emission import _brem_for_case as _brem_for_case
+from .emission import _brem_wide_from_segments as _brem_wide_from_segments
+from .emission import _characteristic_from_segments as _characteristic_from_segments
 
 
 def _lines_for_segments(

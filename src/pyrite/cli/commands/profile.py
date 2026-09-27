@@ -274,10 +274,8 @@ def _emit_show(payload):
     if "bremsstrahlung_model" in numerics:
         emit_result(f"  bremsstrahlung model: {numerics['bremsstrahlung_model']}")
     if "radiative_model" in numerics:
-        emit_result(
-            f"  radiative model: {numerics['radiative_model']}"
-            f" (k_c {numerics.get('radiative_cutoff_eV', 0.0):g} eV)"
-        )
+        k_c = numerics.get("radiative_cutoff_eV", 0.0)
+        emit_result(f"  radiative model: {numerics['radiative_model']} (k_c {k_c:g} eV)")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
     refs = payload["energy_grid_refs"]
