@@ -105,9 +105,7 @@ def main(argv=None) -> int:
     except TableNotFoundError as exc:
         print(f"SKIP: released BremsLib tables are not installed: {exc}")
         return 2
-    energies = [
-        float(t) for t in table.incident_energy_MeV if 0.001 <= t <= T_MAX_MEV * (1 + 1e-9)
-    ]
+    energies = [float(t) for t in table.incident_energy_MeV if 0.001 <= t <= T_MAX_MEV * (1 + 1e-9)]
     results = compare_sources(table, elements, energies, bremslib_tables=tables)
 
     failures = []

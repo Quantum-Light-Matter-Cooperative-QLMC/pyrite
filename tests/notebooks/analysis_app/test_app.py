@@ -94,7 +94,10 @@ def test_characteristic_checkbox_matches_spectrum_component_controls() -> None:
 
     assert controls_source.count('"characteristic": mo.ui.checkbox(') == 3
     assert controls_source.count('label="show characteristic radiation"') == 3
-    assert controls_source.count('value=False,\n                label="show characteristic radiation"') == 3
+    assert (
+        controls_source.count('value=False,\n                label="show characteristic radiation"')
+        == 3
+    )
     assert "characteristic_ui" not in source
     assert all('controls["characteristic"]' in view_source for view_source in view_sources)
     assert all(

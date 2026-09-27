@@ -20,7 +20,7 @@ def _resolved_domain(
     try:
         resolved_lower = float(str(lower).replace(",", ""))
         resolved_upper = float(str(upper).replace(",", ""))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None, (f"{axis_name}: invalid manual limits; using automatic domain.",)
     if not math.isfinite(resolved_lower) or not math.isfinite(resolved_upper):
         return None, (f"{axis_name}: non-finite manual limits; using automatic domain.",)
