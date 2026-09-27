@@ -93,7 +93,7 @@ Snell refraction at the face conserves the tangential wavevector, so the in-medi
 
 ## Open items
 
-- The incoherent route and every amplitude still use the bulk root $1-\operatorname{Re}n\,\mathbf v\cdot\hat{\mathbf n}$, which for a flat exit face is the unrefracted wavevector. Coherent and incoherent line centres therefore differ by $O(\delta)$ (0.21 eV of 1600 eV above). Whether `xray-in-medium-resonance` should move to the escape-path root is a separate physics question, not changed here.
+- The incoherent route and every amplitude still use the bulk root $1-\operatorname{Re}n\,\mathbf v\cdot\hat{\mathbf n}$, which for a flat exit face is the unrefracted wavevector. Coherent and incoherent line centres therefore differ by $O(\delta)$ (0.21 eV of 1600 eV above). Moving `xray-in-medium-resonance` and the incoherent route to the escape-path root is tracked as issue #187, not changed here.
 - `expand_escape_pieces` advances piece ages with a float64 $\beta$ while the device $t_L$ uses REAL $\beta$: a rounding-level clock mismatch on float32 backends.
 
 ## Fresh-context verification (2026-09-26)
