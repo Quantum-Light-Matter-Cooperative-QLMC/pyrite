@@ -231,7 +231,11 @@ Remaining:
 - Reference-spectrum comparison (PENELOPE `pdrelax` / Geant4 `fluor/` /
   EGSnrc) for K, L, M primaries, low/mid/high Z. Needs external reference
   data; not packaged.
-- Fresh-context `physics-validation` of the cascade and MF=28 field mapping.
+- Fresh-context validation done 2026-09-27: cascade re-derived, no code
+  defects; defect bound and omega ranges corrected in docs. Suggested ledger
+  `filtered` -> `rederived` awaits the human.
+- New validity limit: EADL L3 branch shape for 3d metals (Fe Ll/La1 2.9 vs
+  xraydb 0.12). 3d-metal L ratios not claimed; needs measured data.
 - Open physics question: EADL vs Krause CK (Cu f23 0.009 vs 0.47) and
   omega (L subshells 0.47-2.0x). Needs measured L-line ratios to settle.
 - Cost: line count 24 -> 95 for W; characteristic scoring ~2.5x on CPU and

@@ -125,31 +125,34 @@ def test_packaged_checksum_mismatch_fails_closed(monkeypatch, tmp_path):
         eadl._verify_packaged_eadl.cache_clear()
 
 
-@pytest.mark.parametrize(
-    ("element", "label"),
-    [("C", "K"), ("Si", "K"), ("Cu", "K"), ("Cu", "L1"), ("Cu", "L3"), ("Au", "K"), ("Au", "L3")],
-)
-def test_cascade_energy_budget_closes_within_the_eadl_transition_defect(element, label):
+def test_cascade_energy_budget_closes_within_the_eadl_transition_defect():
     """Primary binding = photons + electrons + terminal holes + declared defect.
 
     The identity is exact up to the EADL branching-sum tolerance. The defect is
     the declared approximation: EADL transition energies are not differences
-    of its single-vacancy binding energies. For K and L primaries bound above
-    ~100 eV it stays within 1.5 % of the primary binding energy.
+    of its single-vacancy binding energies. Swept over every K and L primary
+    bound above 100 eV for Z = 3..98, it stays under 1.5 % of the primary
+    binding energy for K and reaches about 6 % for L (Si L2, K L1).
     """
-    relaxation = eadl.load_eadl_relaxation(element)
-    designator = relaxation.shell_designators[relaxation.shell_labels.index(label)]
-    budget = eadl.relaxation_energy_budget(relaxation, designator, 50.0)
-    accounted = (
-        budget.photon_eV
-        + budget.electron_eV
-        + budget.terminal_binding_eV
-        + budget.transition_energy_defect_eV
-    )
+    worst = {"K": 0.0, "L": 0.0}
+    for atomic_number in range(3, 99):
+        relaxation = eadl.load_eadl_relaxation(xraydb.atomic_symbol(atomic_number))
+        for shell, label in zip(relaxation.subshells, relaxation.shell_labels, strict=True):
+            if label not in ("K", "L1", "L2", "L3") or shell.binding_energy_eV <= 100.0:
+                continue
+            budget = eadl.relaxation_energy_budget(relaxation, shell.shell_designator, 50.0)
+            accounted = (
+                budget.photon_eV
+                + budget.electron_eV
+                + budget.terminal_binding_eV
+                + budget.transition_energy_defect_eV
+            )
+            assert accounted == pytest.approx(budget.primary_binding_eV, rel=5.0e-6)
+            defect = abs(budget.transition_energy_defect_eV) / budget.primary_binding_eV
+            worst[label[0]] = max(worst[label[0]], defect)
 
-    assert accounted == pytest.approx(budget.primary_binding_eV, rel=5.0e-6)
-    assert abs(budget.transition_energy_defect_eV) <= 0.015 * budget.primary_binding_eV
-    assert budget.photon_eV > 0.0 and budget.electron_eV > 0.0
+    assert worst["K"] < 0.015
+    assert 0.05 < worst["L"] < 0.07
 
 
 def test_copper_k_budget_matches_its_fluorescence_scale():
