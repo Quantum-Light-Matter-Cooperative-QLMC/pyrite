@@ -63,6 +63,8 @@ beam-transport/gos-moller-close
 beam-transport/gos-optical-quadrature
 beam-transport/gos-soft-hard-partition
 beam-transport/line-grid-sinc-convergence
+beam-transport/line-grid-resonance-bandwidth
+beam-transport/line-grid-resonance-local-spacing
 beam-transport/line-spectrum-error-budget
 beam-transport/line-window-seeding
 beam-transport/legacy-stopping-comparison

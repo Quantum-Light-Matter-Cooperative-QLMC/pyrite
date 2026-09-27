@@ -9,7 +9,7 @@ directly.
 
 import numpy as np
 
-from ...._backend import REAL, array_namespace, xp
+from ...._backend import REAL, _to_cpu, array_namespace, xp
 from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import HBARC_EV_ANG, M_E_EV, U_g, chi_g
 from ...geometry import first_prism_exit
@@ -87,12 +87,21 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight):
     has mass ``w pi / a_w``; beyond a distance ``D`` on one side at most
     ``min(1, 1 / (pi a_w D))`` of it, all of it when the resonance lies past
     that edge (``line_seeds.sincsq_upper_tail_bound``). Sums stay on the device
-    until the runner reads them. Production weights, so this audits the
-    ``t_L**2`` proxy the edge was chosen with.
+    until the runner reads them. ``collect`` instead retains the production
+    resonance, width and coefficient for measured grid construction.
 
     Validation: line-grid-resonance-bandwidth
     """
     if audit is None or E_r.size == 0:
+        return
+    if "collect" in audit:
+        audit["collect"].append(
+            (
+                np.asarray(_to_cpu(E_r), dtype=REAL),
+                np.asarray(_to_cpu(xp.pi / a_width), dtype=REAL),
+                np.asarray(_to_cpu(weight), dtype=REAL),
+            )
+        )
         return
     mass = weight * (xp.pi / a_width)
     tiny = xp.finfo(E_r.dtype).tiny

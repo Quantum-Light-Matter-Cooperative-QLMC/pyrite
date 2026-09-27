@@ -717,6 +717,8 @@ def _batched_incoherent_block(st, bt, blk, line_batch):
     aw_f = a_width.reshape(-1)[gm_idx]
     w_f = weight.reshape(-1)[gm_idx]
     _accumulate_edge_truncation(req.truncation_audit, E_r_f, aw_f, w_f)
+    if req.truncation_audit is not None and "collect" in req.truncation_audit:
+        return
 
     _nsys_push("cxr.lines.accum")
 

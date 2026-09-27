@@ -221,3 +221,27 @@ node count, wall time, peak memory, and float32/float64 agreement. The current
 but the observed 1.21575 eV target needs 1,415,388 nodes. Do not narrow the
 bandwidth or change the resolution policy until the 0.1% intrinsic-source
 error budget has evidence. Keep deliberate refusal when no candidate fits.
+
+## Continuation: production-weight selector
+
+The measured-grid path now runs the existing incoherent line kernels once on
+the two-node `[start, ceiling]` axis. Their audit hook collects each emitted
+line's resonance, first-zero width, and production coefficient after the same
+filters the final spectrum uses. Both kernel routes skip density accumulation
+during collection. The bandwidth solver and local spacing planner consume this
+population. `groove` and layers are forwarded from transport; the measured
+cache revision and B-factor key were updated. Default automatic cases do not
+take this path.
+
+Focused tests: 17 bandwidth tests pass, including a two-electron 5 MeV h-BN
+transport case. Scoped Ruff passes; Sphinx builds. Full lint stops at the
+pre-existing import-order error in `tests/montecarlo/test_multilayer.py`; full
+typecheck reports missing optional app dependencies. The ledger rows and two
+unverified derivation pages now describe the production-weight selector and
+local spacing rule.
+
+Next: extend `start-bandwidth` to compare local and uniform grids on identical
+segments; measure Ne=20,000 on the remote host, especially collection peak host
+memory (the collector currently holds three arrays per line) and the 1 mm
+cases. Then obtain fresh-context physics validation, add the local spacing
+regressions, and decide whether any `high_energy` profile can opt in.

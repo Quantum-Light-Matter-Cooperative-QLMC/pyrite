@@ -55,7 +55,9 @@ def parse_configs(text: str) -> list[dict[str, float]]:
     return configs
 
 
-def build_case(material: str, energy_keV: float, config, *, seed: int) -> dict[str, Any]:
+def build_case(
+    material: str, energy_keV: float, config, *, seed: int, resolution: str = "uniform"
+) -> dict[str, Any]:
     """One production case under the ``resonance-population`` bandwidth."""
     from ..campaign.config import material_sweep
     from ..campaign.sweep import build_cases
@@ -67,17 +69,24 @@ def build_case(material: str, energy_keV: float, config, *, seed: int) -> dict[s
         tilt_deg=config["tilt_deg"],
         tilt_azim_deg=config["tilt_azim_deg"],
     )
-    sweep = dataclasses.replace(sweep, line_grid_policy={"bandwidth": RESONANCE_BANDWIDTH_POLICY})
+    policy = {"bandwidth": RESONANCE_BANDWIDTH_POLICY}
+    if resolution == "local":
+        policy["resolution"] = "resonance-local"
+    elif resolution != "uniform":
+        raise ValueError(f"unknown bandwidth resolution {resolution!r}")
+    sweep = dataclasses.replace(sweep, line_grid_policy=policy)
     ne = int(config["n_electrons"])
     case = dict(build_cases(sweep, n_electrons=ne, n_electrons_brem=ne)[0])
     case["seed"] = int(seed)
     return case
 
 
-def reference_axis(measured: np.ndarray, ceiling_eV: float) -> np.ndarray:
-    """The measured nodes continued at their own spacing up to ``ceiling_eV``."""
+def reference_axis(
+    measured: np.ndarray, ceiling_eV: float, *, spacing_eV: float | None = None
+) -> np.ndarray:
+    """Uniform reference through the ceiling at the case's sinc spacing."""
     start, stop = float(measured[0]), float(measured[-1])
-    step = (stop - start) / (measured.size - 1)
+    step = float(spacing_eV) if spacing_eV is not None else (stop - start) / (measured.size - 1)
     count = int(np.floor((float(ceiling_eV) - start) / step)) + 1
     return start + step * np.arange(max(count, measured.size))
 
@@ -124,12 +133,16 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
 
     rows, payload = [], []
     for config in parse_configs(args.configs):
-        case = build_case(args.material, args.energy, config, seed=args.seed)
+        case = build_case(
+            args.material, args.energy, config, seed=args.seed, resolution=args.resolution
+        )
         ladder = CaseLadder(case)
         measured = np.asarray(ladder.transport["E_grid"], dtype=float)
         record = ladder.transport["diagnostic_grid"]
         ceiling = float(case["line_grid_policy"]["bandwidth"]["stop_eV"])
-        axis = reference_axis(measured, ceiling)
+        axis = reference_axis(
+            measured, ceiling, spacing_eV=record.get("feature_width_eV")
+        )
         timings = {}
         spectra = {}
         for name, grid in (("measured", measured), ("reference", axis)):
@@ -149,7 +162,9 @@ def reference(args: argparse.Namespace) -> dict[str, Any]:
             "transport_wall_s": ladder.transport_wall_s,
             "measured_points": int(measured.size),
             "reference_points": int(axis.size),
-            "spacing_eV": float(measured[1] - measured[0]),
+            "minimum_spacing_eV": float(np.diff(measured).min()),
+            "maximum_spacing_eV": float(np.diff(measured).max()),
+            "reference_spacing_eV": float(axis[1] - axis[0]),
             "stop_eV": stop,
             "ceiling_eV": ceiling,
             "measured_bandwidth": record.get("measured_bandwidth"),
@@ -204,7 +219,9 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
 
     rows = []
     for config in parse_configs(args.configs):
-        case = build_case(args.material, args.energy, config, seed=args.seed)
+        case = build_case(
+            args.material, args.energy, config, seed=args.seed, resolution=args.resolution
+        )
         row: dict[str, Any] = {**config, "real": np.dtype(REAL).name}
         started = time.perf_counter()
         try:
@@ -240,7 +257,8 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
         row.update(
             n_segments=int(np.asarray(_to_cpu(transport["segs"]["L_ang"])).size),
             points=int(grid.size),
-            spacing_eV=float(grid[1] - grid[0]),
+            minimum_spacing_eV=float(np.diff(grid).min()),
+            maximum_spacing_eV=float(np.diff(grid).max()),
             stop_eV=float(grid[-1]),
             measured_bandwidth=record.get("measured_bandwidth"),
             line_yield=total,
@@ -309,6 +327,7 @@ def build_parser() -> argparse.ArgumentParser:
     ref.add_argument("--energy", type=float, default=5000.0)
     ref.add_argument("--configs", required=True, help="tilt:azimuth:thickness_ang:ne,...")
     ref.add_argument("--seed", type=int, default=0)
+    ref.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
     ref.add_argument("--payload", required=True)
     ref.add_argument("--json-out", required=True)
     prod = commands.add_parser("production", help="production-precision axis, audit and cost")
@@ -316,6 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
     prod.add_argument("--energy", type=float, default=5000.0)
     prod.add_argument("--configs", required=True, help="tilt:azimuth:thickness_ang:ne,...")
     prod.add_argument("--seed", type=int, default=0)
+    prod.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
     prod.add_argument("--json-out", required=True)
     cand = commands.add_parser("candidate", help="float32 measured-axis evaluation")
     cand.add_argument("--payload", required=True)

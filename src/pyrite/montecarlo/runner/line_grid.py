@@ -27,9 +27,9 @@ from ..._line_windows import build_window_plan, window_plan_from_payload
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
 from ..spectrum.line_seeds import (
     SEEDING_REVISION,
+    ResonancePopulation,
     SeedContext,
     case_line_stop_eV,
-    case_resonance_populations,
     collect_feature_seeds,
     local_spacing_seeds,
 )
@@ -82,6 +82,7 @@ _WINDOW_INPUT_KEYS = (
     "mosaic_mc_nodes",
     "layer_radiators",
 )
+_WEIGHT_INPUT_KEYS = ("B_ang2",)
 
 
 def _cached_grid(cached):
@@ -125,7 +126,7 @@ def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
     return grid, record
 
 
-def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step):
+def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_layers, groove):
     """``resonance-population`` axis of this case (#192), under the ceiling cap.
 
     Uniform at the sinc-Nyquist step, or -- under ``resonance-local`` -- fine
@@ -135,9 +136,31 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step):
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     start = float(bandwidth["start_eV"])
-    populations = case_resonance_populations(
-        case, segments, n_hat, electron_limit=Ne, band_eV=(start, float(bandwidth["stop_eV"]))
+    from . import _lines_for_segments
+
+    ceiling = float(bandwidth["stop_eV"])
+    audit = {"start_eV": start, "stop_eV": ceiling, "collect": []}
+    _lines_for_segments(
+        segments,
+        np.array([start, ceiling]),
+        case,
+        n_hat,
+        abs_layers,
+        groove,
+        coherent=False,
+        Ne=Ne,
+        truncation_audit=audit,
     )
+    chunks = audit["collect"]
+    populations = [
+        ResonancePopulation(
+            "production lines",
+            np.concatenate([chunk[0] for chunk in chunks]) if chunks else np.empty(0),
+            np.concatenate([chunk[2] for chunk in chunks]) if chunks else np.empty(0),
+            np.concatenate([chunk[1] for chunk in chunks]) if chunks else np.empty(0),
+        )
+    ]
+    del audit, chunks
     stop, bandwidth_record = case_line_stop_eV(
         case,
         populations,
@@ -199,7 +222,7 @@ def _refuse_coherent_resolution(case, segments, n_hat, Ne):
     )
 
 
-def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
+def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, groove):
     """Resolve an automatic case-local line grid from this run's trajectories.
 
     Consults the content-addressed cache first, so a repeated case pays the
@@ -213,7 +236,11 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     _refuse_coherent_resolution(case, segments, n_hat, Ne)
     windowed = payload.get("windows") is not None
     measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
-    keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed or measured else ())
+    keys = (
+        _RESOLUTION_INPUT_KEYS
+        + (_WINDOW_INPUT_KEYS if windowed or measured else ())
+        + (_WEIGHT_INPUT_KEYS if measured else ())
+    )
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
     if windowed or measured:
@@ -237,7 +264,7 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
             grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
         elif measured:
             grid, record, bandwidth_record = _measured_line_grid(
-                payload, case, segments, n_hat, Ne, target_step
+                payload, case, segments, n_hat, Ne, target_step, abs_layers, groove
             )
         else:
             grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
@@ -268,7 +295,7 @@ def _warn_lineshape_precision(record):
         warnings.warn(message, LineShapePrecisionWarning, stacklevel=3)
 
 
-def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
+def resolve_line_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove=None):
     """Choose this case's line grid once its own trajectories exist.
 
     Three paths, all before the spectrum phase and none of which starts a second
@@ -293,7 +320,9 @@ def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
             "diagnostic derivation and automatic resolution are exclusive"
         )
     if policy_payload is not None:
-        return _resolve_policy_line_grid(policy_payload, case, segments, n_hat, Ne)
+        return _resolve_policy_line_grid(
+            policy_payload, case, segments, n_hat, Ne, abs_layers, groove
+        )
     if diagnostic_grid is None:
         return E_grid, None
     target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(

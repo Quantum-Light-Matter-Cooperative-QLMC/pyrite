@@ -23,9 +23,15 @@ from pyrite._line_grid_policy import (
 )
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
-from pyrite.montecarlo.runner.line_grid import check_line_truncation, line_truncation_audit
+from pyrite.energy_grid.bandwidth_check import reference_axis
+from pyrite.montecarlo.runner.line_grid import (
+    _measured_line_grid,
+    check_line_truncation,
+    line_truncation_audit,
+)
 from pyrite.montecarlo.spectrum.line_seeds import (
     ResonancePopulation,
+    case_line_stop_eV,
     characteristic_stop_eV,
     resonance_population_stop_eV,
     sincsq_upper_tail_bound,
@@ -207,6 +213,72 @@ def test_audit_accumulates_and_gates_the_upper_edge():
     record = check_line_truncation(case, narrow)
     assert record["upper_fraction_bound"] <= 1e-4
     assert record["lower_fraction_bound"] > 0.0
+
+
+def test_production_line_collection_retains_resonance_width_and_weight():
+    audit = {"start_eV": 50.0, "stop_eV": 2000.0, "collect": []}
+    _accumulate_edge_truncation(
+        audit, xp.asarray([500.0, 900.0]), xp.asarray([np.pi, np.pi / 10]),
+        xp.asarray([2.0, 0.5]),
+    )
+    energy, width, weight = audit["collect"][0]
+    np.testing.assert_allclose(energy, [500.0, 900.0])
+    np.testing.assert_allclose(width, [1.0, 10.0])
+    np.testing.assert_allclose(weight, [2.0, 0.5])
+    assert "line_mass" not in audit
+
+
+def test_measured_grid_uses_collected_production_weights(monkeypatch):
+    from pyrite.montecarlo import runner
+
+    policy = resolve_line_grid_policy(
+        start_eV=50.0, stop_eV=100_000.0,
+        per_call={"bandwidth": RESONANCE_BANDWIDTH_POLICY},
+    ).payload()
+    case = {"composition": [("B", 0.5), ("N", 0.5)]}
+    collected = (
+        np.array([500.0, 900.0]), np.array([1.0, 100.0]),
+        np.array([100.0, 1.0]),
+    )
+
+    def collect(_segments, axis, _case, _direction, _layers, _groove, **kwargs):
+        np.testing.assert_array_equal(axis, [50.0, 100_000.0])
+        kwargs["truncation_audit"]["collect"].append(collected)
+        return np.zeros(axis.size)
+
+    monkeypatch.setattr(runner, "_lines_for_segments", collect)
+    grid, _record, bandwidth = _measured_line_grid(
+        policy, case, {}, np.array([0.0, 0.0, 1.0]), 2, 1.0, None, None
+    )
+    expected, _ = case_line_stop_eV(
+        case, [ResonancePopulation("production lines", collected[0], collected[2], collected[1])],
+        start_eV=50.0, ceiling_eV=100_000.0, truncation_limit=1e-4, proxy_safety=2.0,
+    )
+    assert grid[-1] == expected == bandwidth["stop_eV"]
+
+
+def test_small_hbn_case_collects_production_lines_before_resolution():
+    from pyrite.montecarlo.runner import _transport_case
+
+    sweep = material_sweep("hbn")
+    sweep = replace(
+        sweep,
+        beam=replace(sweep.beam, energy_keV=5000.0),
+        line_grid_policy=_RESONANCE,
+    )
+    case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
+    result = _transport_case(case, transport_core="lockstep")
+    record = result["diagnostic_grid"]
+    assert record["measured_bandwidth"]["kinematic"]["n_lines"] > 0
+    assert result["E_grid"][-1] < case["line_grid_policy"]["bandwidth"]["stop_eV"]
+
+
+def test_local_grid_reference_keeps_sinc_spacing_to_ceiling():
+    local = np.array([50.0, 50.5, 51.0, 54.0, 57.0])
+    reference = reference_axis(local, 100.0, spacing_eV=0.5)
+    assert reference[0] == 50.0
+    assert reference[-1] == 100.0
+    np.testing.assert_allclose(np.diff(reference), 0.5)
 
 
 def test_light_far_line_spends_the_share_instead_of_widening_the_axis():

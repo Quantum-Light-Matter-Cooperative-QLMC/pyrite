@@ -81,7 +81,8 @@ EDGE_NATIVE_NODES = 3
 #: Bumped whenever the same inputs would seed different windows; it keys the
 #: resolved-grid speed cache so a plan from older seeding is not reused.
 #: 2: in-medium kinematic root; secondary absorption edges.
-SEEDING_REVISION = 2
+#: 3: measured bandwidth and local spacing use production line weights.
+SEEDING_REVISION = 3
 
 #: Kinematic resonances below this are dropped by the line kernels too.
 _MIN_RESONANCE_EV = 10.0
@@ -102,7 +103,7 @@ def _weighted_quantiles(values, weights, probabilities):
 
 @dataclass(frozen=True, slots=True)
 class ResonancePopulation:
-    """One reflection's radiating segments: resonance, ``t_L**2`` proxy, width.
+    """Radiating lines: resonance, line coefficient, and first-zero width.
 
     ``width_eV`` is the sinc first-zero width ``pi / a_w`` of each line,
     ``2 pi hbar c / (denominator t_L)``, with the same in-medium denominator
@@ -244,12 +245,12 @@ def resonance_population_stop_eV(
     ``W_i width_i * width_i / (pi**2 (stop - E_i))``
     (:func:`sincsq_upper_tail_bound`). ``stop`` is the smallest value, rounded up
     to ``round_to_eV``, whose summed tail bound is at most ``truncation_limit``
-    of the summed line mass, with ``W_i`` replaced by the ``t_L**2`` proxy.
+    of the summed line mass. The caller supplies ``W_i`` in ``weight``.
 
-    Assumptions: the proxy omits ``|A|**2``, ``omega`` and escape absorption, so
-    this selects the edge and does not certify it; the spectrum phase measures
-    the truncated fraction with the production weights and the runner refuses a
-    case above its share. ``stop`` never exceeds ``ceiling_eV``, the closed-form
+    Assumptions: each line's coefficient is constant in energy, as in the
+    production kernel. The spectrum phase measures the truncated fraction again
+    and the runner refuses a case above its share. ``stop`` never exceeds
+    ``ceiling_eV``, the closed-form
     bound of ``line-grid-kinematic-bandwidth``; a population that cannot meet
     the limit below it returns the ceiling.
 
@@ -862,7 +863,7 @@ def case_line_stop_eV(
 ) -> tuple[float, dict[str, Any]]:
     """Measured line-axis ``stop`` for one case: PXR/CBS and characteristic lines.
 
-    ``populations`` come from :func:`case_resonance_populations` over
+    ``populations`` contain every production line over
     ``(start_eV, ceiling_eV)``; their edge is chosen at
     ``truncation_limit / proxy_safety`` (:func:`resonance_population_stop_eV`).
     Characteristic lines use their exact per-line bound at ``truncation_limit``

@@ -358,6 +358,7 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
                     f"--material {shlex.quote(args.material)}",
                     f"--energy {float(args.energy):g}",
                     f"--configs {shlex.quote(args.configs)}",
+                    f"--resolution {shlex.quote(args.resolution)}",
                     f"--seed {int(args.seed)} --json-out {report}",
                 ]
             )
@@ -369,6 +370,7 @@ def remote_bandwidth_commands(args: argparse.Namespace, uv: str) -> list[str]:
                 f"--material {shlex.quote(args.material)}",
                 f"--energy {float(args.energy):g}",
                 f"--configs {shlex.quote(args.configs)}",
+                f"--resolution {shlex.quote(args.resolution)}",
                 f"--seed {int(args.seed)}",
                 f"--payload {payload} --json-out {report}",
             ]
@@ -548,6 +550,7 @@ def build_parser() -> argparse.ArgumentParser:
     bandwidth.add_argument("--energy", type=float, default=5000.0)
     bandwidth.add_argument("--configs", default=DEFAULT_BANDWIDTH_CONFIGS)
     bandwidth.add_argument("--seed", type=int, default=0)
+    bandwidth.add_argument("--resolution", choices=("uniform", "local"), default="uniform")
     bandwidth.add_argument(
         "--json-out", default=f"line_grid_bandwidth_{date.today()}.json", help="report JSON"
     )

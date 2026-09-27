@@ -46,3 +46,13 @@ def test_precision_steps_pin_their_precision_and_share_one_payload():
     for step in (fp64, fp32):
         assert "--payload precision.segments.pkl" in step
     assert "--reference precision.fp64.npz --candidate precision.fp32.npz" in compare
+
+
+def test_bandwidth_job_forwards_local_resolution_to_remote_steps():
+    args = job.build_parser().parse_args(
+        ["start-bandwidth", "--resolution", "local", "--json-out", "bandwidth.json"]
+    )
+    reference, candidate = job.remote_bandwidth_commands(args, "uv")
+    assert "--resolution local" in reference
+    assert "--payload bandwidth.segments.pkl" in reference
+    assert "--payload bandwidth.segments.pkl" in candidate

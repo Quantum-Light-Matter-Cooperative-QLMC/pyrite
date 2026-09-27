@@ -641,7 +641,9 @@ def _transport_case(
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second
     # Monte Carlo job is started for either path; see runner/line_grid.py.
-    E_grid, diagnostic_grid_result = resolve_line_grid(case, segs_all, n_hat, Ne, E_grid)
+    E_grid, diagnostic_grid_result = resolve_line_grid(
+        case, segs_all, n_hat, Ne, E_grid, layers, groove
+    )
 
     tp: dict[str, Any] = dict(
         E_grid=E_grid,
