@@ -4,11 +4,12 @@
 
 Coherent X-ray radiation and electron transport in crystals.
 
-This site renders current CLI and API references, user guides, physical-model documentation, and validation records. Start with the [getting-started guide](guides/getting-started.md). The [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme) remains the canonical scientific overview and installation reference.
+This site renders current CLI and API references, user guides, physical-model documentation, and validation records. Start with the [getting-started guide](guides/getting-started.md). The [project overview](project-readme.md) includes the canonical scientific overview and installation reference.
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 1
 
+project-readme
 guides/index
 physics/index
 computation/index
