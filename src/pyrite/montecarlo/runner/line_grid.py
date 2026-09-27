@@ -11,6 +11,7 @@ import numpy as np
 from ..._backend import REAL
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
+    LineGridToleranceError,
     LineShapePrecisionWarning,
     cached_coordinates,
     coordinate_cache_key,
@@ -179,10 +180,16 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
         electron_limit=Ne,
         aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
     )
-    if windowed:
-        grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
-    else:
-        grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
+    try:
+        if windowed:
+            grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
+        else:
+            grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
+    except LineGridToleranceError as exc:
+        raise LineGridToleranceError(
+            f"{case['name']} at {case['E0_keV']:g} keV "
+            f"(backend {np.dtype(REAL).name}): {exc}"
+        ) from exc
     record.update(
         {
             "aliased_weight_fraction": aliased_fraction,
