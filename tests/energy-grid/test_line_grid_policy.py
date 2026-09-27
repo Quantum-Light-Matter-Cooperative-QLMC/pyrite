@@ -201,6 +201,20 @@ def test_supported_energy_without_a_stored_row_builds_cases():
     assert float(np.diff(grid).max()) <= payload["resolution"]["max_spacing_eV"] + 1e-9
 
 
+def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch):
+    monkeypatch.setenv("PYRITE_ENERGY_GRID_MAX_POINTS", "200000")
+    sweep = material_sweep("hbn")
+    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=5000.0))
+
+    with pytest.raises(LineGridToleranceError) as caught:
+        build_cases(sweep, n_electrons=2, n_electrons_brem=2)
+
+    message = str(caught.value)
+    assert "hbn at 5000 keV" in message
+    assert "even at the 3 eV maximum spacing" in message
+    assert "No transport was started" in message
+
+
 def test_stored_row_still_wins_over_automatic_resolution():
     sweep, stored = _stored_energy_sweep()
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]

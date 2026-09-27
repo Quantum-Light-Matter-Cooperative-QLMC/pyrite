@@ -37,6 +37,7 @@ from .._grid_semantics import resolution_num
 from .._line_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     LineGridPolicy,
+    LineGridToleranceError,
     environment_overrides_present,
     kinematic_line_stop_eV,
     line_quadrature_from_payload,
@@ -641,6 +642,16 @@ def _line_grid_for_energy(
             return np.asarray(stored, dtype=float), None
     policy = _automatic_line_grid_policy(sweep, cp, float(energy_keV))
     num = resolution_num(policy.start_eV, policy.stop_eV, policy.max_spacing_eV)
+    if num > policy.max_points:
+        raise LineGridToleranceError(
+            f"automatic line grid for {sweep.target.material} at {energy_keV:g} keV "
+            f"needs at least {num} coordinates over "
+            f"[{policy.start_eV:g}, {policy.stop_eV:g}] eV, even at the "
+            f"{policy.max_spacing_eV:g} eV maximum spacing; the budget is "
+            f"{policy.max_points}. Increase PYRITE_ENERGY_GRID_MAX_POINTS in "
+            "the compute environment or supply a validated explicit grid. "
+            "No transport was started."
+        )
     grid = np.linspace(policy.start_eV, policy.stop_eV, num)
     return grid, policy.payload()
 
