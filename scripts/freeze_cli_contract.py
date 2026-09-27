@@ -105,6 +105,17 @@ INTENTIONAL_P0_CORRECTIONS = [
             "usage errors."
         ),
     },
+    {
+        "id": "profile-filter-detector-flags-removed",
+        "paths": ["profile filter add"],
+        "contract": (
+            "A profile's physical detector is set only through `pyrite profile physical-detector "
+            "set`; `profile filter add` no longer accepts `--detector-distance-mm`, "
+            "`--detector-*-deg`, `--detector-offset-mm`, `--shape`, or `--pitch-mm`, which "
+            "replaced the whole table and dropped its scorer, response, and acquisition. They "
+            "are plain 'no such option' usage errors."
+        ),
+    },
 ]
 
 

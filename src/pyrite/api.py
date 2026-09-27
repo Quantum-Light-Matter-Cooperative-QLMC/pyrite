@@ -138,6 +138,28 @@ def _package_version(name: str) -> str | None:
         return None
 
 
+def run_provenance(case: Case | Mapping[str, Any], xsgen_tables: Mapping[str, str] | None):
+    """Software, backend, and physics-model provenance of one transport case.
+
+    Shared by :func:`simulate` results and persisted observations, so every
+    producer records the same keys.
+    """
+    return {
+        "xsgen_tables": xsgen_tables,
+        "stopping_model": STOPPING_MODEL,
+        "characteristic_model": CHARACTERISTIC_MODEL,
+        "bremsstrahlung_model": case_bremsstrahlung_marker(case),
+        "backend": BACKEND.name,
+        "device": BACKEND.device,
+        "versions": {
+            "pyrite": __version__,
+            "numpy": np.__version__,
+            "xraydb": _package_version("xraydb"),
+            "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
+        },
+    }
+
+
 def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
     """Lower a configured `campaign.sweep.Sweep`/`Settings` pair to cases.
 
@@ -247,22 +269,11 @@ def simulate(
             "scene": scene,
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case, xsgen_tables=xsgen_tables),
-            "xsgen_tables": xsgen_tables,
             # Automatic case-local line grids (issue #101): the policy is what
             # identity hashes, the resolved record is what the run actually
             # sampled. Both absent for an explicit or stored grid.
             **_line_grid_provenance(case, output),
-            "stopping_model": STOPPING_MODEL,
-            "characteristic_model": CHARACTERISTIC_MODEL,
-            "bremsstrahlung_model": case_bremsstrahlung_marker(case),
-            "backend": BACKEND.name,
-            "device": BACKEND.device,
-            "versions": {
-                "pyrite": __version__,
-                "numpy": np.__version__,
-                "xraydb": _package_version("xraydb"),
-                "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
-            },
+            **run_provenance(case, xsgen_tables),
         },
         coherent_spectrum=(None if coherent is None else np.asarray(coherent)),
         characteristic_spectrum=(None if characteristic is None else np.asarray(characteristic)),
@@ -407,22 +418,11 @@ def _simulate_planar(
             "scene": scene,
             "numerics": numerics,
             "identity_digest": source_digest,
-            "xsgen_tables": xsgen_tables,
             **_line_grid_provenance(case, output),
             "observation_identity_digest": observation_digest,
             "observation": observation,
             **identity_provenance,
-            "stopping_model": STOPPING_MODEL,
-            "characteristic_model": CHARACTERISTIC_MODEL,
-            "bremsstrahlung_model": case_bremsstrahlung_marker(case),
-            "backend": BACKEND.name,
-            "device": BACKEND.device,
-            "versions": {
-                "pyrite": __version__,
-                "numpy": np.__version__,
-                "xraydb": _package_version("xraydb"),
-                "endf-parserpy": BREM_ENDF_PARSERPY_VERSION,
-            },
+            **run_provenance(case, xsgen_tables),
         },
         coherent_spectrum=coherent_average,
         characteristic_spectrum=characteristic_average,

@@ -116,6 +116,7 @@ def run_sweep(
     transport_only=False,
     metadata_only_complete=False,
     trajectory_capture=None,
+    observation=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -199,6 +200,15 @@ def run_sweep(
         are checked before any transport (see ``preflight_capture``), and the
         metadata-only completion shortcut is skipped. None (default) captures
         nothing and leaves the run unchanged.
+    observation : optional :class:`~pyrite.observations.SweepObservation`. Every
+        case then also needs its counting observation in ``observation.store``.
+        A stored observation with matching true-spatial factors is reused and
+        only rescored; otherwise the case's physical-detector directions are
+        evaluated on the same transport as its scalar record. A case whose
+        scalar record is already cached but whose observation is missing runs
+        again for the observation only; its cached record is kept. Directional
+        arrays never enter the scalar record or the CAS blob. Ignored with
+        ``transport_only``.
 
     Returns True iff every requested ``(name, E0_keV)`` pair ended up in
     ``results`` (i.e. the sweep ran to completion, budget or not); False if
@@ -348,6 +358,7 @@ def run_sweep(
         if (
             metadata_only_complete
             and trajectory_capture is None
+            and observation is None
             and on_chunk is None
             and not _checkpoint_store.has_parts(path.name, path.parent)
             and manifest_fresh
@@ -436,7 +447,31 @@ def run_sweep(
     if cache_write:
         _write_case_manifest(checkpoint_path, cases, _content_key, dataset_identity)
 
-    todo = [c for c in cases if not (c["name"] in results and c["E0_keV"] in results[c["name"]])]
+    def _has_record(case):
+        return case["name"] in results and case["E0_keV"] in results[case["name"]]
+
+    # Observation production: reuse what the store can already rescore, and
+    # queue the rest for directional evaluation on their own transport.
+    observation_plans = {}
+    observation_only = set()
+    if observation is not None and not transport_only:
+        reused_observations = 0
+        for c in cases:
+            plan = observation.plan(c)
+            stored = plan.find_reusable(observation.store)
+            if stored is not None:
+                observation.store.put(stored)
+                reused_observations += 1
+                continue
+            observation_plans[(c["name"], c["E0_keV"])] = plan
+            if _has_record(c):
+                observation_only.add((c["name"], c["E0_keV"]))
+        print(
+            f"observations: {len(observation_plans)} to produce, {reused_observations} reused "
+            f"({observation.store.path})"
+        )
+
+    todo = [c for c in cases if not _has_record(c) or (c["name"], c["E0_keV"]) in observation_plans]
     cached_cases = len(cases) - len(todo)
     print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
     if trajectory_capture is not None:
@@ -478,6 +513,8 @@ def run_sweep(
     group_remaining = defaultdict(int)
     energies_remaining = {}
     for c in todo:
+        if (c["name"], c["E0_keV"]) in observation_only:
+            continue
         if c["name"] not in energies_remaining:
             group_remaining[group_key(c)] += 1
         energies_remaining[c["name"]] = energies_remaining.get(c["name"], 0) + 1
@@ -499,6 +536,25 @@ def run_sweep(
             if on_progress is not None:
                 on_progress(completed_new_cases, len(cases), cached_cases)
 
+            return
+
+        directional = out.pop("directional", None)
+        key = (case["name"], case["E0_keV"])
+        plan = observation_plans.get(key)
+        if plan is not None and directional is not None:
+            assert observation is not None
+            observation.store.put(plan.assemble(directional, observation.provenance_fn(case)))
+            del observation_plans[key]
+        if key in observation_only:
+            # The scalar record was already cached; this run owed only the
+            # observation, so the resumed record and its shards stay as they were.
+            completed_new_cases += 1
+            if case_cost_fn is not None:
+                done_cost += case_cost_fn(case)
+            if on_cost is not None and case_cost_fn is not None:
+                on_cost(done_cost, total_cost)
+            if on_progress is not None:
+                on_progress(completed_new_cases, len(cases), cached_cases)
             return
 
         store_result(results, case, out)
@@ -550,11 +606,22 @@ def run_sweep(
             on_chunk(group_names[g])
 
     should_stop = None if deadline is None else (lambda: time_fn() >= deadline)
-    profile_callbacks = {}
+    run_cases_options = {}
+    if trajectory_capture is not None:
+        run_cases_options["trajectory_capture"] = trajectory_capture
+    if observation_plans:
+        run_cases_options["observation_directions"] = [
+            (
+                None
+                if (plan := observation_plans.get((c["name"], c["E0_keV"]))) is None
+                else plan.directions_sample
+            )
+            for c in todo
+        ]
     if on_timing is not None:
-        profile_callbacks["on_timing"] = on_timing
+        run_cases_options["on_timing"] = on_timing
     if on_activity is not None:
-        profile_callbacks["on_activity"] = on_activity
+        run_cases_options["on_activity"] = on_activity
 
     t0 = time.perf_counter()
     run_cases(
@@ -565,11 +632,10 @@ def run_sweep(
         should_stop=should_stop,
         keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
         transport_only=transport_only,
-        **({} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}),
-        **profile_callbacks,
+        **run_cases_options,
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
-    complete = all(c["name"] in results and c["E0_keV"] in results[c["name"]] for c in cases)
+    complete = all(_has_record(c) for c in cases) and not observation_plans
     if _sharded:
         if complete:
             # Completion publishes one authoritative component pair. Budget pauses

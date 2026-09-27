@@ -225,9 +225,7 @@ class StoredObservation:
         identity = link_identity(
             self.identity.payload["true_spatial"],
             response_payload(new_response),
-            acquisition_payload(
-                new_acquisition, rep_rate_hz=new_rate, bunch_charge_pc=new_charge
-            ),
+            acquisition_payload(new_acquisition, rep_rate_hz=new_rate, bunch_charge_pc=new_charge),
         )
         spatial = (
             self.spatial
@@ -279,9 +277,7 @@ def observation_from_result(result: Result) -> StoredObservation:
     )
 
 
-def _decode_detector(
-    true_payload: Mapping[str, Any], response: DetectorResponse
-) -> PlanarDetector:
+def _decode_detector(true_payload: Mapping[str, Any], response: DetectorResponse) -> PlanarDetector:
     geometry = true_payload["detector_geometry"]
     pose = geometry["pose"]
     pixels = geometry["pixels"]
@@ -474,7 +470,9 @@ class ObservationStore:
             identities != payload["attenuation_arrays"]
             or _array_identity(directions) != payload["representative_directions_lab"]
         ):
-            raise ObservationStoreError(f"true-spatial arrays do not match their identity in {path}")
+            raise ObservationStoreError(
+                f"true-spatial arrays do not match their identity in {path}"
+            )
         return payload, ray_map, directions, factors
 
     # -- records ------------------------------------------------------------
@@ -530,7 +528,7 @@ class ObservationStore:
                 ).observation_digest
                 == observation.digest
             )
-        except (ObservationStoreError, KeyError, TypeError):
+        except ObservationStoreError, KeyError, TypeError:
             valid = False
         if not valid:
             self._write_record(observation)

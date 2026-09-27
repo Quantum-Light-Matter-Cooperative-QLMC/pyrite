@@ -12,8 +12,9 @@ persistable :class:`~pyrite.observations.StoredObservation` from the runner's
 directional output.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import Any
 
 import numpy as np
@@ -34,6 +35,7 @@ from ..instrument.geometry import (
 from ..instrument.observation import payload_digest, true_spatial_payload
 from ..montecarlo.geometry import directions_to_sample_frame
 from ..results.model import PixelRayMap, SpatialResult, SpectralFactors
+from ..results.store import DEFAULT_BUNCH_CHARGE_PC, DEFAULT_REP_RATE_HZ
 from .store import ObservationStore, ObservationStoreError, StoredObservation
 
 
@@ -140,20 +142,28 @@ class ObservationPlan:
     bunch_charge_pc: float
     emission: str
     brem_source: str = "mc"
-    #: Pixel rays and angular tiles of the detector, derived at construction.
-    sampling: PixelSampling = field(init=False, repr=False, compare=False)
+    #: Pixel rays and angular tiles of the detector. Derived when omitted; a
+    #: sweep passes one shared instance because it depends only on the
+    #: detector and scorer, never on the case.
+    sampling: PixelSampling | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "sampling",
-            PixelSampling.of(self.observation.detector, self.observation.scorer.angular_shape),
-        )
+        if self.sampling is None:
+            object.__setattr__(
+                self,
+                "sampling",
+                PixelSampling.of(self.observation.detector, self.observation.scorer.angular_shape),
+            )
+
+    @property
+    def _sampling(self) -> PixelSampling:
+        assert self.sampling is not None
+        return self.sampling
 
     @property
     def directions_sample(self) -> np.ndarray:
         """Sample-frame directions the runner evaluates for this case."""
-        return self.sampling.directions_sample(
+        return self._sampling.directions_sample(
             tilt_deg=self.tilt_deg, tilt_azim_deg=self.tilt_azim_deg
         )
 
@@ -161,7 +171,7 @@ class ObservationPlan:
         return true_spatial_payload(
             self.source_identity_digest,
             self.observation,
-            representative_directions_lab=self.sampling.directions_lab,
+            representative_directions_lab=self._sampling.directions_lab,
             attenuation_arrays=attenuation,
         )
 
@@ -206,7 +216,7 @@ class ObservationPlan:
         producing run.
         """
         observation = self.observation
-        spatial = self.sampling.spatial(
+        spatial = self._sampling.spatial(
             output,
             detector=observation.detector,
             filters=observation.filters,
@@ -217,7 +227,7 @@ class ObservationPlan:
             observation,
             rep_rate_hz=self.rep_rate_hz,
             bunch_charge_pc=self.bunch_charge_pc,
-            representative_directions_lab=self.sampling.directions_lab,
+            representative_directions_lab=self._sampling.directions_lab,
             attenuation_arrays=(
                 spatial.line.mu_by_filter_inv_mm,
                 spatial.background.mu_by_filter_inv_mm,
@@ -234,4 +244,48 @@ class ObservationPlan:
         )
 
 
-__all__ = ["ObservationPlan", "PixelSampling"]
+@dataclass(frozen=True)
+class SweepObservation:
+    """The counting observation a profile sweep produces for each of its cases.
+
+    Parameters
+    ----------
+    observation
+        Resolved physical detector, response, scorer, filters, and acquisition.
+    store
+        Destination store for this sweep's dataset stem.
+    content_key_fn
+        The sweep's own case content key, so every observation is indexed under
+        the key its intrinsic checkpoint record is stored under.
+    emission
+        Profile emission policy.
+    provenance_fn
+        ``case -> mapping`` of JSON-compatible software/model provenance.
+    """
+
+    observation: ResolvedObservation
+    store: ObservationStore
+    content_key_fn: Callable[[Mapping[str, Any]], str]
+    emission: str
+    provenance_fn: Callable[[Mapping[str, Any]], Mapping[str, Any]]
+
+    @cached_property
+    def sampling(self) -> PixelSampling:
+        """Pixel sampling shared by every case of the sweep."""
+        return PixelSampling.of(self.observation.detector, self.observation.scorer.angular_shape)
+
+    def plan(self, case: Mapping[str, Any]) -> ObservationPlan:
+        """Plan this observation for one sweep case."""
+        return ObservationPlan(
+            self.observation,
+            source_identity_digest=self.content_key_fn(case),
+            tilt_deg=float(case.get("tilt_deg", 0.0)),
+            tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
+            rep_rate_hz=float(case.get("rep_rate_hz", DEFAULT_REP_RATE_HZ)),
+            bunch_charge_pc=float(case.get("bunch_charge_pc", DEFAULT_BUNCH_CHARGE_PC)),
+            emission=self.emission,
+            sampling=self.sampling,
+        )
+
+
+__all__ = ["ObservationPlan", "PixelSampling", "SweepObservation"]

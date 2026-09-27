@@ -235,7 +235,7 @@ def profile_payload(document, name):
     }
 
 
-def add_filter(document, profile_name, row, physical_detector=None):
+def add_filter(document, profile_name, row):
     profile = existing_profile(document, profile_name)
     filters = filter_rows(profile)
     name = row.get("name")
@@ -245,28 +245,157 @@ def add_filter(document, profile_name, row, physical_detector=None):
         profile["filters"] = tomlkit.aot()
         filters = profile["filters"]
     filters.append(row)
-    if physical_detector is not None:
-        profile["physical_detector"] = physical_detector
+
+
+def _filter_index(filters, profile_name, identifier):
+    """Resolve a filter by one-based list index or display name."""
+    if identifier.isdigit():
+        candidate = int(identifier) - 1
+        if 0 <= candidate < len(filters):
+            return candidate
+    index = next((i for i, row in enumerate(filters) if row.get("name") == identifier), None)
+    if index is None:
+        raise ValueError(
+            f"profile {profile_name!r} has no filter {identifier!r}; use 'pyrite profile filter list {profile_name}'"
+        )
+    return index
+
+
+def update_filter(document, profile_name, identifier, changes):
+    """Merge ``changes`` into one filter in place, keeping its position.
+
+    Returns the updated row as a plain mapping. A new ``name`` must stay unique
+    within the profile; order is never changed, because it is part of the
+    observation's identity.
+    """
+    profile = existing_profile(document, profile_name)
+    filters = filter_rows(profile)
+    index = _filter_index(filters, profile_name, identifier)
+    row = filters[index]
+    new_name = changes.get("name")
+    if new_name is not None and any(
+        other.get("name") == new_name for position, other in enumerate(filters) if position != index
+    ):
+        raise ValueError(f"profile {profile_name!r} already has a filter named {new_name!r}")
+    for key, value in changes.items():
+        row[key] = list(value) if isinstance(value, tuple) else value
+    return dict(row.unwrap() if hasattr(row, "unwrap") else row)
 
 
 def remove_filter(document, profile_name, identifier):
     profile = existing_profile(document, profile_name)
     filters = filter_rows(profile)
-    index = None
-    if identifier.isdigit():
-        candidate = int(identifier) - 1
-        if 0 <= candidate < len(filters):
-            index = candidate
-    if index is None:
-        index = next((i for i, row in enumerate(filters) if row.get("name") == identifier), None)
-    if index is None:
-        raise ValueError(
-            f"profile {profile_name!r} has no filter {identifier!r}; use 'pyrite profile filter list {profile_name}'"
-        )
+    index = _filter_index(filters, profile_name, identifier)
     removed = filters.pop(index)
     if not filters:
         profile.pop("filters", None)
     return dict(removed.unwrap() if hasattr(removed, "unwrap") else removed)
+
+
+#: Nested ``physical_detector`` sections that ``reset`` can remove one at a time.
+PHYSICAL_SECTIONS = ("scorer", "response", "acquisition")
+_ACQUISITION_AXIS_KEYS = (
+    "measured_edges_eV",
+    "measured_min_eV",
+    "measured_max_eV",
+    "measured_bin_width_eV",
+)
+
+
+def _toml_value(value):
+    if isinstance(value, dict):
+        table = tomlkit.table()
+        for key, item in value.items():
+            table[key] = _toml_value(item)
+        return table
+    return list(value) if isinstance(value, tuple) else value
+
+
+def own_physical_detector(profile):
+    """Return the profile's own ``physical_detector`` table, or ``None``."""
+    table = profile.get("physical_detector")
+    if table is not None and not isinstance(table, dict):
+        raise ValueError("profile physical_detector must be a table")
+    return table
+
+
+def set_physical_detector(
+    document, name, *, geometry, scorer=None, response=None, acquisition=None
+):
+    """Merge updates into ``name``'s physical detector.
+
+    Returns ``"created"`` for a new table, ``"copied"`` when the profile first
+    received a local copy of ``standard``'s, else ``"updated"``.
+
+    A profile inheriting ``standard``'s detector first receives a profile-local
+    copy, so editing it never changes ``standard``. ``response`` with a new
+    ``kind`` replaces that section (parameters of another kind never leak into
+    it); without one, parameters merge into the existing Timepix3 response. An
+    acquisition axis (explicit edges, or min/max/bin width) replaces the other
+    spelling, and ``mode = "expected"`` drops any realization seed.
+    """
+    profile = existing_profile(document, name)
+    table = own_physical_detector(profile)
+    status = "updated"
+    if table is None:
+        inherited = physical_detector_row(profile, profile_rows(document))
+        status = "created" if inherited is None else "copied"
+        if inherited is None and "distance_mm" not in geometry:
+            raise ValueError(
+                f"profile {name!r} has no physical detector; creating one requires --distance-mm"
+            )
+        plain = {} if inherited is None else inherited.unwrap()
+        table = _toml_value(plain)
+        profile["physical_detector"] = table
+    for key, value in geometry.items():
+        table[key] = _toml_value(value)
+    if scorer:
+        section = table.setdefault("scorer", tomlkit.table())
+        for key, value in scorer.items():
+            section[key] = _toml_value(value)
+    if response:
+        current = table.get("response")
+        kind = response.get("kind")
+        parameters = {key: value for key, value in response.items() if key != "kind"}
+        effective_kind = kind if kind is not None else (current or {}).get("kind")
+        if parameters and effective_kind != "timepix3":
+            raise ValueError("Timepix3 response options require --response timepix3")
+        if kind is not None and (current is None or current.get("kind") != kind):
+            table["response"] = _toml_value(dict(response))
+        else:
+            for key, value in parameters.items():
+                current[key] = _toml_value(value)
+    if acquisition:
+        section = table.setdefault("acquisition", tomlkit.table())
+        if any(key in acquisition for key in _ACQUISITION_AXIS_KEYS):
+            for key in _ACQUISITION_AXIS_KEYS:
+                section.pop(key, None)
+        if acquisition.get("mode") == "expected":
+            section.pop("seed", None)
+        for key, value in acquisition.items():
+            section[key] = _toml_value(value)
+    return status
+
+
+def reset_physical_detector(document, name, sections=()):
+    """Remove ``name``'s physical detector, or only the named nested sections."""
+    profile = existing_profile(document, name)
+    table = own_physical_detector(profile)
+    if table is None:
+        if physical_detector_row(profile, profile_rows(document)) is not None:
+            raise ValueError(
+                f"profile {name!r} inherits the standard physical detector; reset 'standard' "
+                f"or give {name!r} its own with 'pyrite profile physical-detector set'"
+            )
+        raise ValueError(f"profile {name!r} has no physical detector")
+    if not sections:
+        profile.pop("physical_detector")
+        return
+    missing = [section for section in sections if section not in table]
+    if missing:
+        raise ValueError(f"profile {name!r} physical detector has no {', '.join(missing)} section")
+    for section in sections:
+        table.pop(section)
 
 
 def clone_grid(value):

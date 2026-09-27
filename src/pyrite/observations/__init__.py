@@ -9,7 +9,7 @@ pixel sampling, factor assembly, and layered identity are built for every
 producer.
 """
 
-from .plan import ObservationPlan, PixelSampling
+from .plan import ObservationPlan, PixelSampling, SweepObservation
 from .store import (
     ObservationStore,
     ObservationStoreError,
@@ -25,5 +25,6 @@ __all__ = [
     "StoredObservation",
     "default_observation_root",
     "PixelSampling",
+    "SweepObservation",
     "observation_from_result",
 ]

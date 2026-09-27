@@ -166,9 +166,7 @@ def test_response_rescoring_keeps_true_factors(tmp_path) -> None:
     assert rescored.identity.acquisition_digest == stored.identity.acquisition_digest
     assert rescored.identity.response_digest != stored.identity.response_digest
     assert loaded.spatial.detector.response == timepix
-    assert (
-        rescored.digest == _simulate(response=timepix).provenance["observation_identity_digest"]
-    )
+    assert rescored.digest == _simulate(response=timepix).provenance["observation_identity_digest"]
 
 
 def test_angular_sampling_change_is_a_new_true_object(tmp_path) -> None:

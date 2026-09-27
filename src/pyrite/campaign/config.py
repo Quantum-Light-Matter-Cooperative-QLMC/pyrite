@@ -33,6 +33,7 @@ from ..montecarlo import simulate_trajectories
 from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
+from .observation import resolve_profile_observation
 from .profiles import get_fidelity_preset, resolve_numerics
 from .sweep import BeamSpec, Sweep, beam_replace, target_from_flat, target_replace
 
@@ -166,7 +167,12 @@ def material_sweep(
     CLI/checkpoint name.
 
     ``profile`` is a campaign alias for ``catalog_profile`` (fidelity now has its
-    own ``fidelity=`` keyword; it no longer squats on ``profile=``)."""
+    own ``fidelity=`` keyword; it no longer squats on ``profile=``).
+
+    A profile whose physical detector declares an acquisition (a counting
+    observation) derives the scalar observation angle, polar acceptance, and
+    solid angle from that detector's projection; scalar detector overrides are
+    then rejected with ``ValueError``."""
     if profile is not None:
         catalog_profile = profile
     spec = _material_spec(material, catalog_profile=catalog_profile)
@@ -212,6 +218,27 @@ def material_sweep(
     resolved_detector = (
         detector if detector is not None else replace(resolved_catalog_detector, **supplied_legacy)
     )
+    observation = resolve_profile_observation(_catalog(catalog_profile), catalog_profile)
+    if observation is not None:
+        # A counting physical detector is the one source of observation
+        # geometry: the scalar acceptance the source cases are built with is
+        # its projection, so intrinsic checkpoints and observation artifacts
+        # name the same transport. Any other scalar geometry would silently
+        # disagree with the detector the observation is scored on.
+        if detector is not None or supplied_legacy:
+            raise ValueError(
+                f"profile {catalog_profile!r} has a counting physical detector, which defines "
+                "the observation angle, polar acceptance, and solid angle; remove the "
+                "detector=/theta_obs_deg/dtheta_obs_deg/domega_sr override or change the "
+                "physical detector pose instead"
+            )
+        projection = observation.scalar_detector()
+        resolved_detector = replace(
+            resolved_catalog_detector,
+            observation_angle_deg=projection.observation_angle_deg,
+            polar_acceptance_deg=projection.polar_acceptance_deg,
+            solid_angle_sr=projection.solid_angle_sr,
+        )
     current_bins = resolved_detector.energy_bins
     missing = object()
     line_override = overrides.pop("E_grid_line", missing)

@@ -209,7 +209,10 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
         background_energy_eV=np.array([50.0, 100.0]),
         background=np.array([0.1, 0.2]),
         spatial=spatial,
-        provenance={"observation_identity_digest": "abc"},
+        provenance={
+            "observation_identity_digest": "abc",
+            "scene": SimpleNamespace(acquisition=None),
+        },
     )
     monkeypatch.setattr(_catalog_io, "catalog_text", lambda: ("", object()))
     monkeypatch.setattr(
@@ -221,6 +224,7 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
             "detector",
             ("filter",),
             "scorer",
+            "acquisition",
             "numerics",
             "incoherent",
         ),
@@ -242,6 +246,8 @@ def test_simulate_formats_result_and_uses_single_scene_api(monkeypatch):
     assert calls[0][0][:3] == ("beam", "target", "detector")
     assert calls[0][1]["filters"] == ("filter",)
     assert calls[0][1]["pixel_scorer"] == "scorer"
+    assert calls[0][1]["acquisition"] == "acquisition"
+    assert payload["acquisition"] is None
 
     wide = invoke(material.command, ["simulate", "hopg", "-o", "wide"])
     assert_clean_result(wide)
@@ -263,7 +269,7 @@ def test_simulate_json_reports_resolution_errors(monkeypatch):
     assert "physical_detector is required" in document["errors"][0]["message"]
 
 
-def _single_scene_catalog(tmp_path, monkeypatch, *, energies="[30.0]"):
+def _single_scene_catalog(tmp_path, monkeypatch, *, energies="[30.0]", physical_extra=""):
     from pyrite import DATA_DIR
 
     data = tmp_path / "data"
@@ -292,7 +298,7 @@ distance_mm = 400.0
 polar_deg = 90.0
 shape = [2, 3]
 pitch_mm = [0.1, 0.2]
-
+{physical_extra}
 [[profiles.single.filters]]
 name = "half"
 material = "silicon"
@@ -311,8 +317,8 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     from pyrite.instrument import FilterPlate, PlanarDetector
 
     document = _single_scene_catalog(tmp_path, monkeypatch)
-    beam, target, detector, filters, scorer, numerics, emission = material._simulation_scene(
-        document, "hopg", "single"
+    beam, target, detector, filters, scorer, acquisition, numerics, emission = (
+        material._simulation_scene(document, "hopg", "single")
     )
 
     assert isinstance(beam, Beam)
@@ -329,6 +335,33 @@ def test_simulation_scene_resolves_real_profile_objects(tmp_path, monkeypatch):
     assert numerics.energy_model == "midpoint"
     assert emission == "incoherent"
     assert scorer.angular_shape == (1, 1)
+    assert acquisition is None
+
+
+def test_simulation_scene_uses_the_profile_counting_observation(tmp_path, monkeypatch):
+    from pyrite.detectors import IdealPhotonCounter
+
+    document = _single_scene_catalog(
+        tmp_path,
+        monkeypatch,
+        physical_extra="""
+[profiles.single.physical_detector.scorer]
+angular_shape = [2, 3]
+
+[profiles.single.physical_detector.acquisition]
+exposure_s = 2.0
+measured_edges_eV = [0.0, 100.0, 200.0]
+""",
+    )
+    _beam, _target, detector, _filters, scorer, acquisition, _numerics, _emission = (
+        material._simulation_scene(document, "hopg", "single")
+    )
+
+    assert scorer.angular_shape == (2, 3)
+    assert acquisition.exposure_s == 2.0
+    assert acquisition.measured_edges_eV == (0.0, 100.0, 200.0)
+    assert isinstance(detector.response, IdealPhotonCounter)
+    assert detector.energy_bins.line is not None
 
 
 def test_simulation_scene_rejects_non_singleton_profile_grid(tmp_path, monkeypatch):

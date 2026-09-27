@@ -208,30 +208,37 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert payload["overrides"] == {"hopg": ["thickness_ang"]}
 
 
-def test_filter_crud_creates_physical_detector_and_exposes_json(tmp_path, monkeypatch):
-    catalog = _catalog(tmp_path, monkeypatch)
+_FILTER_ADD = [
+    "filter",
+    "add",
+    "standard",
+    "--name",
+    "half",
+    "--material",
+    "silicon",
+    "--thickness-mm",
+    "0.1",
+    "--size-mm",
+    "7.04",
+    "14.08",
+    "--distance-mm",
+    "200",
+    "--offset-mm",
+    "3.52",
+    "0",
+]
 
-    added = invoke(
+
+def test_filter_crud_exposes_json(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    created = invoke(
         profile.command,
         [
-            "filter",
-            "add",
+            "physical-detector",
+            "set",
             "standard",
-            "--name",
-            "half",
-            "--material",
-            "silicon",
-            "--thickness-mm",
-            "0.1",
-            "--size-mm",
-            "7.04",
-            "14.08",
+            "-y",
             "--distance-mm",
-            "200",
-            "--offset-mm",
-            "3.52",
-            "0",
-            "--detector-distance-mm",
             "300",
             "--shape",
             "2",
@@ -241,9 +248,11 @@ def test_filter_crud_creates_physical_detector_and_exposes_json(tmp_path, monkey
             "0.2",
         ],
     )
+    assert_clean_result(created, stdout="updated physical detector for profile standard\n")
+
+    added = invoke(profile.command, _FILTER_ADD)
     assert_clean_result(added, stdout="added filter to profile standard\n")
     assert "[[profiles.standard.filters]]" in catalog.read_text()
-    assert "[profiles.standard.physical_detector]" in catalog.read_text()
 
     listed = invoke(profile.command, ["filter", "list", "standard", "-o", "json"])
     assert_clean_result(listed)
@@ -262,7 +271,7 @@ def test_filter_crud_creates_physical_detector_and_exposes_json(tmp_path, monkey
     assert "filters" not in catalog.read_text()
 
 
-def test_filter_add_preserves_detector_and_rejects_partial_detector_options(tmp_path, monkeypatch):
+def test_filter_add_no_longer_edits_the_physical_detector(tmp_path, monkeypatch):
     catalog = _catalog(
         tmp_path,
         monkeypatch,
@@ -273,34 +282,45 @@ distance_mm = 400.0
 shape = [4, 5]
 """,
     )
-    base = [
-        "filter",
-        "add",
-        "standard",
-        "--material",
-        "silicon",
-        "--thickness-mm",
-        "0.1",
-        "--size-mm",
-        "2",
-        "3",
-        "--distance-mm",
-        "200",
-    ]
 
-    added = invoke(profile.command, base)
+    added = invoke(profile.command, _FILTER_ADD)
     assert_clean_result(added)
     text = catalog.read_text()
     assert "distance_mm = 400.0" in text
     assert "shape = [4, 5]" in text
 
-    invalid = invoke(profile.command, [*base, "--shape", "2", "3"])
-    assert invalid.exit_code == 1
-    assert "--shape require --detector-distance-mm" in invalid.stderr
+    moved = invoke(profile.command, [*_FILTER_ADD, "--detector-distance-mm", "300"])
+    assert moved.exit_code == 2
+    assert "No such option" in moved.stderr
 
-    pose_invalid = invoke(profile.command, [*base, "--detector-roll-deg", "5"])
-    assert pose_invalid.exit_code == 1
-    assert "--detector-roll-deg require --detector-distance-mm" in pose_invalid.stderr
+
+def test_filter_set_updates_in_place_and_keeps_order(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    invoke(profile.command, _FILTER_ADD)
+    second = [*_FILTER_ADD]
+    second[second.index("half")] = "second"
+    invoke(profile.command, second)
+
+    updated = invoke(
+        profile.command,
+        ["filter", "set", "standard", "half", "--thickness-mm", "0.25", "--name", "thick"],
+    )
+    assert_clean_result(updated, stdout="updated filter thick on profile standard\n")
+    rows = json.loads(invoke(profile.command, ["filter", "list", "standard", "-o", "json"]).stdout)[
+        "payload"
+    ]["filters"]
+    assert [row["name"] for row in rows] == ["thick", "second"]
+    assert rows[0]["thickness_mm"] == 0.25
+
+    before = catalog.read_text()
+    duplicate = invoke(profile.command, ["filter", "set", "standard", "1", "--name", "second"])
+    assert duplicate.exit_code == 2
+    assert "already has a filter named 'second'" in duplicate.stderr
+    empty = invoke(profile.command, ["filter", "set", "standard", "1"])
+    assert empty.exit_code == 2
+    missing = invoke(profile.command, ["filter", "set", "standard", "nope", "--thickness-mm", "1"])
+    assert missing.exit_code == 2
+    assert catalog.read_text() == before
 
 
 def test_show_renders_hand_authored_inline_beam_block(tmp_path, monkeypatch):

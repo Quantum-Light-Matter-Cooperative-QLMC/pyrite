@@ -664,6 +664,34 @@ def _resolved_run(args, material):
     return settings, sweep, identity, stem
 
 
+def _sweep_observation(args, identity, settings, stem, content_key_fn):
+    """The profile's counting observation for this sweep, or ``None``.
+
+    Observations for ``<checkpoint_dir>/<stem>`` live in the sibling
+    ``observations/<stem>`` store, so a custom checkpoint root keeps both
+    together and neither participates in the other's lifecycle.
+    """
+    from ..campaign.observation import resolve_profile_observation
+    from ..materials import CATALOG, load_material_catalog
+
+    profile = str(identity.get("catalog_profile", "standard"))
+    catalog = CATALOG if profile == "standard" else load_material_catalog(profile=profile)
+    observation = resolve_profile_observation(catalog, profile)
+    if observation is None:
+        return None
+    from ..api import run_provenance
+    from ..observations import ObservationStore, SweepObservation
+
+    xsgen_tables = identity["resolved_parameters"].get("xsgen_tables")
+    return SweepObservation(
+        observation=observation,
+        store=ObservationStore(stem, Path(args.checkpoint_dir).resolve().parent / "observations"),
+        content_key_fn=content_key_fn,
+        emission=settings.emission,
+        provenance_fn=lambda case: run_provenance(case, xsgen_tables),
+    )
+
+
 def _checkpoint_stem(args, material):
     return _resolved_run(args, material)[3]
 
@@ -967,6 +995,7 @@ def _run_material(args, material, max_seconds=None):
                 "parameter_sha256": identity["parameter_sha256"],
             },
         )
+    content_key_fn = partial(case_content_key, xsgen_tables=xsgen_tables)
     try:
         if progress_timer is not None:
             progress_timer.start()
@@ -977,7 +1006,7 @@ def _run_material(args, material, max_seconds=None):
             checkpoint_path=ckpt,
             max_workers=args.workers,
             resume=cache_read,
-            content_key_fn=partial(case_content_key, xsgen_tables=xsgen_tables),
+            content_key_fn=content_key_fn,
             cache_read=cache_read,
             cache_write=cache_write,
             progress=not getattr(args, "no_progress", False),
@@ -1013,6 +1042,7 @@ def _run_material(args, material, max_seconds=None):
             ),
             metadata_only_complete=True,
             **capture_kw,
+            observation=_sweep_observation(args, identity, settings, stem, content_key_fn),
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --

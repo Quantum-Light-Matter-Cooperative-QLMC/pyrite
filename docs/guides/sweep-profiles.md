@@ -116,21 +116,29 @@ A beam table -- named or inline -- decodes into `BeamSpec`. The nested `longitud
 
 Both sub-tables join `parameter_sha256` only when they diverge from the inert defaults, so a profile that never sets them hashes exactly as it did before the keys existed and resumes into its existing checkpoints.
 
-## Finite filters and one physical detector
+## Physical detector, filters, and counting observations
 
-Finite downstream filter plates are profile-local observation settings. They are not part of `pyrite run`, `Sweep`, or checkpoint identity. Use `pyrite material simulate` for a single in-memory scene on a physical pixel detector; it follows the validated planar pixel-ray path and records a separate observation digest.
+A `[profiles.NAME.physical_detector]` table places one planar pixel detector: pose (`distance_mm`, `polar_deg`, `azimuth_deg`, `roll_deg`, `offset_mm`) and pixel grid (`shape`, `pitch_mm`; omitted, one 256 by 256 Timepix3-style chip at 0.055 mm). Optional nested tables add the angular `scorer` (`angular_shape`, nearest-tile reconstruction), the detector `response` (`ideal` or uncalibrated `timepix3`), and an `acquisition` (exposure, reporting-bin edges, post-response hit threshold, expected or seeded Poisson counts). A profile without its own table inherits `standard`'s.
 
-Each `[[profiles.NAME.filters]]` table describes one `FilterPlate`. Its pose uses the same source-centred observation fields as the Python API. A `[profiles.NAME.physical_detector]` table is required by `material simulate`; it supplies the detector pose and pixel geometry. Omitting `shape` and `pitch_mm` selects a 256 by 256 Timepix3-style grid at 0.055 mm pitch.
-
-Use `pyrite profile filter add|rm|list|show` to edit and inspect plates. The `add` command validates the plate with the same public object used by the Python API. It can also create or deliberately replace the physical-detector table with `--detector-distance-mm` and the prefixed pose flags; `--shape` and `--pitch-mm` require that distance. For example:
+Edit it with `pyrite profile physical-detector show|set|reset`; `set` changes only the fields given and gives an inheriting profile its own copy first, so `standard` never changes. Each `[[profiles.NAME.filters]]` table is one `FilterPlate`, edited in declared order with `pyrite profile filter add|set|rm|list|show`. For example:
 
 ```bash
+pyrite profile physical-detector set filter_demo --distance-mm 400 --polar-deg 60 \
+  --shape 256 256 --angular-shape 5 5
 pyrite profile filter add filter_demo --name half_filter --material silicon \
-  --thickness-mm 0.1 --size-mm 7.04 14.08 --distance-mm 200 \
-  --detector-distance-mm 400
+  --thickness-mm 0.1 --size-mm 7.04 14.08 --distance-mm 200
+pyrite profile physical-detector set filter_demo --exposure-s 1 \
+  --measured-range-ev 0 20000 --measured-bin-width-ev 400 --hit-threshold-ev 500
 ```
 
-`pyrite material simulate MATERIAL --profile NAME` requires singleton thickness, energy, polar, and azimuth profile grids, because it runs exactly one scene. It prints a compact line/background and pixel-grid summary; `-o json` emits its stable envelope and `-o wide` emits one tab-separated summary line. Pass `--output-file PATH.npz` to write the complete factorized spatial arrays. The command never creates a checkpoint.
+With an acquisition the profile is a **counting observation**, and two things change for `pyrite run`:
+
+- The sweep's scalar observation angle, polar acceptance, and solid angle come from the physical detector's projection, so the intrinsic checkpoint and the observation describe the same transport. Scalar detector overrides on such a profile are rejected, and `pyrite profile show` marks the scalar detector as superseded.
+- Every case also stores a factorized observation under `observations/<stem>/`, beside the `checkpoints/` root, evaluated on the same transport as the scalar record (see [Python API workflow](python-api-workflow.md) for reading one back).
+
+What an edit costs on the next run: pose and pixel grid change the projection and therefore the dataset; angular shape and filters re-evaluate observations on new transport while cached scalar records are kept; response, acquisition, and beam normalization only rescore stored observations, with no transport. Remote transfer and garbage collection of observation stores are not implemented yet.
+
+`pyrite material simulate MATERIAL --profile NAME` runs one in-memory scene on the physical detector, using the profile's scorer and, when present, its acquisition. It requires singleton thickness, energy, polar, and azimuth grids, prints a compact line/background and pixel-grid summary (`-o json` is the stable envelope and adds total counts for a counting observation; `-o wide` is one tab-separated line), writes the complete factorized spatial arrays with `--output-file PATH.npz`, and never creates a checkpoint or observation store.
 
 The bundled `emittance_demo` beam is the worked example: a Courant-Snyder waist (`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized emittance and a 0.05 m beta function, plus a 0.1% energy spread, run by `hopg_emittance_demo` over hopg at 30 and 100 keV. Because the stored emittance is normalized, that one beam is the same physical beam at both energies -- 0.12 mm and 2.4 mrad RMS at 30 keV, shrinking as `1/sqrt(beta*gamma)` at 100 keV. A `transverse` table clears the spot FWHM that a beam otherwise defaults to; the two spellings are mutually exclusive, and specifying both is an error rather than a precedence rule. The `compressed_microbunch` beam, run by `hopg_hbn_compressed_microbunch`, is the longitudinal counterpart.
 
