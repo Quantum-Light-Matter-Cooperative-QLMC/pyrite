@@ -100,6 +100,42 @@ Characteristic lines are deposited as exact Lorentzian bin masses and set
 neither spacing nor bandwidth; a separate characteristic grid would not reduce
 the node count. h-BN K lines lie below 1 keV.
 
+## Next slice: trajectory-measured bandwidth (approved direction 2026-09-27)
+
+Add a bandwidth policy, working name `resonance-population`, beside
+`kinematic-ceiling`. After transport, `runner/line_grid.py` sets `stop_eV`
+from the case's own in-medium resonance population (every line segment x
+reflection x mosaic orientation, the same roots `kinematic_line_seeds` solves)
+plus a sinc-squared tail margin. The closed-form ceiling stays the hard cap;
+`start_eV` is unchanged. Spacing stays the measured sinc spacing.
+
+1. Derivation first (physics skill): the upper-tail yield fraction above
+   `stop` as a sum over segments of weight x sinc-squared tail beyond
+   `(stop - E_i) / width_i`. Solve `stop` so the lost fraction stays within
+   the intrinsic-source budget share. Decide the weight: the `t_L**2` proxy
+   omits `|A|**2`, `omega` and absorption, so either bound per reflection
+   (weight-free) or use the production prefactor. Short, wide segments
+   dominate a max-over-segments margin; quantify that before choosing.
+   Source equation, assumptions, limiting case, `Validation: <id>`, and ledger
+   row, then fresh-context validation.
+2. Policy plumbing in `_line_grid_policy.py` (payload, identity, cache key).
+   The measured stop joins the resolved record. Case-build pre-transport
+   refusal applies only to closed-form bandwidths; the measured policy refuses
+   after transport, before the spectrum, if it still exceeds the budget.
+3. Opt-in only: `high_energy` profile `line_grid_policy` selects it. The
+   default automatic policy and every other profile's identity stay unchanged;
+   a default flip is a later, separately evidenced decision.
+4. Remote validation (`pyrite remote`): identical 5 MeV h-BN trajectories,
+   1 um and 1 mm, extreme orientations, production Ne. Compare the new grid
+   against a full-ceiling reference (budget lifted), and a stop with 2x margin:
+   integrated line yield, centroid/shape, detector counts, node count,
+   wall time, peak GPU memory, float32 vs float64.
+5. Restore 5,000 keV (and 30 keV) h-BN to `high_energy` only if step 4
+   passes; run `pyrite run high_energy -R -m hbn`.
+6. Regressions: stop covers a synthetic straight-flight population plus
+   margin, never exceeds the ceiling, identity unchanged for default cases,
+   and refusal diagnostics.
+
 ## Remaining decision
 
 Measure identical 5 MeV trajectories under candidate bandwidths/grids on the
