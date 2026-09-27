@@ -53,6 +53,17 @@ def test_packaged_eedl_bytes_match_pinned_checksum():
         assert stream.readline().endswith(b"\r\n"), "CRLF lost to eol normalization"
 
 
+def test_packaged_eadl_bytes_match_published_file():
+    """Keep the future cascade's source file byte-for-byte reproducible."""
+    path = characteristic.CHARACTERISTIC_DATA_DIR / "EADL2025.ALL"
+
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == (
+        "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c"
+    )
+    with path.open("rb") as stream:
+        assert stream.readline().endswith(b"\r\n"), "CRLF lost to eol normalization"
+
+
 def test_packaged_carbon_eedl_values_and_relaxation_join():
     table = characteristic.load_characteristic_cross_sections("C")
 

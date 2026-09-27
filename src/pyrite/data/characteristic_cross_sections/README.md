@@ -18,3 +18,19 @@ xraydb at runtime. PyRITE sums the initial- and final-level widths to obtain
 each transition's Lorentzian FWHM. The resolved xraydb version is included in
 PyRITE's characteristic-model identity marker so a relaxation-database update
 cannot reuse an older checkpoint.
+
+`EADL2025.ALL` is the EPICS2025 Livermore Evaluated Atomic Data Library
+(EADL), also by D. E. Cullen. It supplies atomic relaxation data in ENDF-6
+File 28, MT 533, for elements Z=1--100. Its header identifies the evaluation
+as `NDS-IAEA-224`, evaluated August 2023 and distributed January 2025.
+The file was downloaded without modification from
+<https://nuclear.llnl.gov/EPICS/ENDF2025/EADL2025.ALL> and is pinned by
+SHA-256 `78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c`.
+It retains the upstream 75-column CRLF records through the `-text`
+`.gitattributes` rule. EPICS distributes the data under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); see the repository's
+[third-party notices](../../../../THIRD-PARTY-NOTICES.md) for attribution.
+
+This EADL file is packaged for the planned atomic-relaxation cascade. The
+current characteristic-radiation model still reads EEDL and xraydb only;
+adding EADL does not change its spectra or checkpoint identity.
