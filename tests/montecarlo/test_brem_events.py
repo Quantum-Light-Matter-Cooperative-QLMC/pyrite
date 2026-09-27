@@ -6,10 +6,12 @@ Validation: bremslib-radiative-event-spectrum
 import numpy as np
 import pytest
 
+from pyrite._grid_semantics import node_bin_edges_and_widths
 from pyrite.montecarlo.spectrum import brem_events
 from pyrite.montecarlo.spectrum.brem_bremslib import (
     bremslib_segment_state,
     evaluate_bremslib,
+    evaluate_bremslib_rows,
     prepare_bremslib_table,
     stage_bremslib_table,
 )
@@ -251,3 +253,64 @@ def test_cutoff_below_grid_scores_every_bin_as_hard(monkeypatch, table):
     assert got[0] > 0.0 and np.all(got[1:] == 0.0)
     above = brem_events._cutoff_edge(grid, 60_000.0)[2]
     assert above == 3
+
+
+def _random_events(n, seed=3):
+    rng = np.random.default_rng(seed)
+    energy_keV = rng.uniform(20.0, 150.0, n)
+    flight = rng.normal(size=(n, 3))
+    flight /= np.linalg.norm(flight, axis=1)[:, None]
+    return energy_keV, rng.uniform(15_000.0, 0.95 * energy_keV * 1e3), flight
+
+
+def test_row_evaluation_is_the_diagonal_of_the_grid_evaluation(table):
+    staged = stage_bremslib_table(table)
+    energy_keV, photon_eV, flight = _random_events(40)
+    for cos_theta in (None, flight[:, 2]):
+        state = bremslib_segment_state(staged, energy_keV, cos_theta)
+        np.testing.assert_allclose(
+            evaluate_bremslib_rows(staged, state, photon_eV),
+            np.diag(evaluate_bremslib(staged, state, photon_eV)),
+            rtol=1e-12,
+            atol=0.0,
+        )
+
+
+def test_vectorized_event_weights_match_per_event_evaluation(monkeypatch, table):
+    """The per-element vector pass reproduces the per-event DDCS/SDCS loop."""
+    monkeypatch.setattr(brem_events, "_mu_total_inv_ang", _mu_by_composition({"C": 0.0}))
+    silicon = prepare_bremslib_table(synthetic_bremslib_arrays(), atomic_number=14)
+    tables = {"C": table, "Si": silicon}
+    n = 60
+    energy_keV, photon_eV, flight = _random_events(n)
+    element = np.where(np.arange(n) % 3 == 0, 14, 6)
+    segments = {
+        "event_kind": np.full(n, EVENT_HARD_RADIATIVE),
+        "hard_radiative_k_eV": photon_eV,
+        "hard_radiative_Z": element.astype(np.int16),
+        "E_end_keV": energy_keV,
+        "r_mid": np.tile([0.0, 0.0, 50.0], (n, 1)),
+        "v_hat": flight,
+        "L_ang": np.zeros(n),
+        "Ne": n,
+        "thickness_ang": 100.0,
+    }
+    grid = np.arange(10_000.0, 150_001.0, 5_000.0)
+    got = brem_events.mc_hard_brem_event_spectrum(
+        segments,
+        grid,
+        cutoff_eV=1_000.0,
+        bremslib_tables=tables,
+        composition=[("C", 0.1)],
+        n_hat=[0.0, 0.0, 1.0],
+    )
+    staged = {6: stage_bremslib_table(table), 14: stage_bremslib_table(silicon)}
+    weights = []
+    for Z, T, k, v in zip(element, energy_keV, photon_eV, flight, strict=True):
+        s = staged[int(Z)]
+        sdcs = evaluate_bremslib(s, bremslib_segment_state(s, [T]), [k])[0, 0]
+        ddcs = evaluate_bremslib(s, bremslib_segment_state(s, [T], [v[2]]), [k])[0, 0]
+        weights.append(ddcs / sdcs)
+    edges, widths = node_bin_edges_and_widths(grid)
+    expected = np.histogram(photon_eV, bins=edges, weights=weights)[0] / (n * widths)
+    np.testing.assert_allclose(got, expected, rtol=1e-12, atol=0.0)

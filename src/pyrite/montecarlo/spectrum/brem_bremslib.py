@@ -354,6 +354,27 @@ def _along_reduced_energy(staged, values, top, reduced):
     return v0 + fraction * (v1 - v0)
 
 
+def _evaluate(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_eV):
+    """Physical cross section at photon energies broadcast against the rows.
+
+    ``photon_eV`` is ``(1, NE)`` for a shared grid or ``(Nsegment, 1)`` for
+    one photon energy per row; the result has the broadcast shape.
+    """
+    T_eV = state.incident_energy_keV * REAL(1.0e3)
+    reduced = photon_eV / xp.maximum(T_eV, REAL(1.0e-30))[:, None]
+    top = staged.top_reduced_energy
+    lower = _along_reduced_energy(staged, state.lower_values, top[state.lower_row], reduced)
+    upper = _along_reduced_energy(staged, state.upper_values, top[state.lower_row + 1], reduced)
+    scaled = lower + state.energy_fraction[:, None] * (upper - lower)
+    Z = REAL(staged.table.atomic_number)
+    physical = (photon_eV > REAL(0.0)) & (reduced <= REAL(1.0))
+    return xp.where(
+        physical,
+        scaled * REAL(_MB_CM2) * Z * Z / xp.maximum(photon_eV, REAL(1.0e-30)),
+        REAL(0.0),
+    )
+
+
 def evaluate_bremslib(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_energy_eV):
     """Return ``d sigma/dk`` [cm²/eV] or ``d2 sigma/(dk dOmega)`` [cm²/eV/sr].
 
@@ -362,20 +383,18 @@ def evaluate_bremslib(staged: _StagedBremsLib, state: _BremsLibSegmentState, pho
 
     Validation: bremslib-angular-model
     """
-    photon_eV = xp.asarray(photon_energy_eV, dtype=REAL)
-    T_eV = state.incident_energy_keV * REAL(1.0e3)
-    reduced = photon_eV[None, :] / xp.maximum(T_eV, REAL(1.0e-30))[:, None]
-    top = staged.top_reduced_energy
-    lower = _along_reduced_energy(staged, state.lower_values, top[state.lower_row], reduced)
-    upper = _along_reduced_energy(staged, state.upper_values, top[state.lower_row + 1], reduced)
-    scaled = lower + state.energy_fraction[:, None] * (upper - lower)
-    Z = REAL(staged.table.atomic_number)
-    physical = (photon_eV[None, :] > REAL(0.0)) & (reduced <= REAL(1.0))
-    return xp.where(
-        physical,
-        scaled * REAL(_MB_CM2) * Z * Z / xp.maximum(photon_eV[None, :], REAL(1.0e-30)),
-        REAL(0.0),
-    )
+    return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[None, :])
+
+
+def evaluate_bremslib_rows(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_energy_eV):
+    """:func:`evaluate_bremslib` with one photon energy per row; shape ``(Nsegment,)``.
+
+    The diagonal of the ``(Nsegment, Nsegment)`` grid evaluation, without
+    forming it: row ``i`` is evaluated at ``photon_energy_eV[i]``.
+
+    Validation: bremslib-angular-model
+    """
+    return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[:, None])[:, 0]
 
 
 def resolve_auto_model(segments, comp, bremslib_tables):
@@ -412,6 +431,7 @@ __all__ = [
     "BremsLibBremsstrahlungTable",
     "bremslib_segment_state",
     "evaluate_bremslib",
+    "evaluate_bremslib_rows",
     "prepare_bremslib_table",
     "solid_angle_integral",
     "stage_bremslib_table",

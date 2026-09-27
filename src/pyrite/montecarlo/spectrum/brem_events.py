@@ -15,7 +15,7 @@ from .brem import mc_brem_spectrum
 from .brem_bremslib import (
     BremsLibBremsstrahlungTable,
     bremslib_segment_state,
-    evaluate_bremslib,
+    evaluate_bremslib_rows,
     stage_bremslib_table,
 )
 from .lines import _observation_direction
@@ -204,27 +204,31 @@ def mc_hard_brem_event_spectrum(
         tau += path[:, index] * np.nan_to_num(mu, nan=0.0, posinf=0.0, neginf=0.0)
     transmission = np.exp(-tau)
     tables_by_Z = {table.atomic_number: table for table in bremslib_tables.values()}
-    staged_by_Z = {
-        atomic_number: stage_bremslib_table(table) for atomic_number, table in tables_by_Z.items()
-    }
+    # One vectorized pass per emitting element: each event is evaluated at
+    # its own (T, k, cos theta), the diagonal of the grid evaluation.
     weights = np.empty(k.size, dtype=float)
-    for i, (atomic_number, T, photon_eV, flight) in enumerate(zip(Z, energy, k, v, strict=True)):
-        staged = staged_by_Z.get(int(atomic_number))
-        if staged is None:
+    for atomic_number in np.unique(Z):
+        table = tables_by_Z.get(int(atomic_number))
+        if table is None:
             raise ValueError(f"no BremsLib table for hard-radiative Z={atomic_number}")
-        if (
-            not staged.table.minimum_incident_energy_keV
-            <= T / 1e3
-            <= staged.table.maximum_incident_energy_keV
+        rows = np.flatnonzero(Z == atomic_number)
+        T_keV = energy[rows] / 1e3
+        if np.any(T_keV < table.minimum_incident_energy_keV) or np.any(
+            T_keV > table.maximum_incident_energy_keV
         ):
             raise ValueError("hard-radiative event is outside the BremsLib table")
-        isotropic = bremslib_segment_state(staged, [T / 1e3])
-        directional = bremslib_segment_state(staged, [T / 1e3], [float(flight @ direction)])
-        sdcs = float(BACKEND.to_cpu(evaluate_bremslib(staged, isotropic, [photon_eV]))[0, 0])
-        ddcs = float(BACKEND.to_cpu(evaluate_bremslib(staged, directional, [photon_eV]))[0, 0])
-        if not np.isfinite(sdcs) or sdcs <= 0.0 or not np.isfinite(ddcs) or ddcs < 0.0:
+        staged = stage_bremslib_table(table)
+        isotropic = bremslib_segment_state(staged, T_keV)
+        directional = bremslib_segment_state(staged, T_keV, v[rows] @ direction)
+        sdcs = np.asarray(
+            BACKEND.to_cpu(evaluate_bremslib_rows(staged, isotropic, k[rows])), dtype=float
+        )
+        ddcs = np.asarray(
+            BACKEND.to_cpu(evaluate_bremslib_rows(staged, directional, k[rows])), dtype=float
+        )
+        if np.any(~np.isfinite(sdcs) | (sdcs <= 0.0) | ~np.isfinite(ddcs) | (ddcs < 0.0)):
             raise ValueError("hard-radiative event has an invalid BremsLib conditional angle")
-        weights[i] = ddcs / sdcs
+        weights[rows] = ddcs / sdcs
     spectrum = np.histogram(k, bins=edges, weights=weights * transmission)[0] / (Ne * widths)
     spectrum[:split] = 0.0
     return spectrum
