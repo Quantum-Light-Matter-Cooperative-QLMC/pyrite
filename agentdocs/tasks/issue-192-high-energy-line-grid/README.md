@@ -58,6 +58,48 @@ spacing, five orientations fit 600,000 nodes and four still need about
 771,000–1,394,000 nodes. This spacing is not measured for the other eight
 orientations; these counts are capacity estimates, not convergence evidence.
 
+## Local resonance measurement (2026-09-27)
+
+Scratch check on the CPU backend: `build_ladder_case("hbn", 5000, tilt, azim,
+thickness)` at seed 0, one `runner._transport_case` with the point budget
+lifted, then the vacuum resonance `hbar c v.g / (1 - v.n)` for every
+line-electron segment and every case reflection (same `g` construction as
+`kinematic_line_seeds`, no mosaic in this case). Weighted by the `t_L**2`
+proxy. The automatic grid reproduced the reported failure exactly: 1,415,388
+nodes at 1.21575 eV for 1 um, 10 deg/100 deg.
+
+| thickness | tilt/azim | uniform nodes | spacing eV | joint bound eV | max resonance eV | 99.9% eV |
+|---|---|---:|---:|---:|---:|---:|
+| 1 um (Ne 100) | 10/100 | 1,415,388 | 1.216 | 109,925 | 7,720 | 7,720 |
+| 1 um | 10/140 | 1,415,388 | 1.216 | 253,612 | 7,670 | 7,669 |
+| 1 um | 10/180 | 1,415,388 | 1.216 | 318,251 | 7,644 | 7,643 |
+| 1 um | 45/100 | 1,971,250 | 0.873 | 237,724 | 5,359 | 5,359 |
+| 1 um | 45/140 | 1,971,250 | 0.873 | 936,916 | 5,312 | 5,312 |
+| 1 um | 45/180 | 1,971,250 | 0.873 | 1,219,392 | 5,242 | 5,242 |
+| 1 um | 80/100 | 2,942,791 | 0.585 | 313,993 | 1,444 | 1,427 |
+| 1 um | 80/140 | 3,217,986 | 0.535 | 1,300,283 | 1,460 | 1,450 |
+| 1 um | 80/180 | 2,925,720 | 0.588 | 1,694,754 | 1,451 | 1,407 |
+| 1 mm (Ne 10) | 10/100 | 6,481,315 | 0.265 | 109,925 | 9,370 | 9,289 |
+
+Every orientation needs 1.4-6.5 M uniform nodes, but no segment resonates
+above 9.4 keV against a 1.72 MeV ceiling. The joint-geometry bound is
+direction-agnostic in the electron and stays loose (110 keV-1.69 MeV), so
+it does not rescue five of nine 1 um orientations. The bandwidth is set by the
+*measured* resonance population, which is 2-3 orders narrower than any
+closed-form bound. Even at the 1 mm spacing, a 50 keV band is about 190,000
+nodes.
+
+Caveats: vacuum root (production seeding uses the in-medium root; `Re n < 1`
+above the optical region only lowers it); small Ne; `t_L**2` proxy ignores
+`|A|**2` and absorption. Content above the population is only sinc-squared
+tail (`~2/(pi**2 k)` of a line's yield beyond `k` feature widths), so a
+trajectory-derived stop needs an explicit tail margin sized to the 1e-3
+budget.
+
+Characteristic lines are deposited as exact Lorentzian bin masses and set
+neither spacing nor bandwidth; a separate characteristic grid would not reduce
+the node count. h-BN K lines lie below 1 keV.
+
 ## Remaining decision
 
 Measure identical 5 MeV trajectories under candidate bandwidths/grids on the
