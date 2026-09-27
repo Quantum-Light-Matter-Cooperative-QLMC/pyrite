@@ -12,6 +12,7 @@ from ..._backend import REAL, _to_cpu
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
     BANDWIDTH_PROXY_SAFETY,
+    LOCAL_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     LineGridToleranceError,
     LineShapePrecisionWarning,
@@ -28,7 +29,9 @@ from ..spectrum.line_seeds import (
     SEEDING_REVISION,
     SeedContext,
     case_line_stop_eV,
+    case_resonance_populations,
     collect_feature_seeds,
+    local_spacing_seeds,
 )
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
@@ -122,19 +125,44 @@ def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
     return grid, record
 
 
-def _measured_stop(payload, case, segments, n_hat, Ne):
-    """``resonance-population`` edge of this case (#192), under the ceiling cap."""
+def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step):
+    """``resonance-population`` axis of this case (#192), under the ceiling cap.
+
+    Uniform at the sinc-Nyquist step, or -- under ``resonance-local`` -- fine
+    only where narrow lines resonate, on a backbone at the maximum spacing.
+    Returns ``(grid, record, bandwidth_record)``.
+    """
     bandwidth = payload["bandwidth"]
-    return case_line_stop_eV(
+    resolution = payload["resolution"]
+    start = float(bandwidth["start_eV"])
+    populations = case_resonance_populations(
+        case, segments, n_hat, electron_limit=Ne, band_eV=(start, float(bandwidth["stop_eV"]))
+    )
+    stop, bandwidth_record = case_line_stop_eV(
         case,
-        segments,
-        n_hat,
-        electron_limit=Ne,
-        start_eV=float(bandwidth["start_eV"]),
+        populations,
+        start_eV=start,
         ceiling_eV=float(bandwidth["stop_eV"]),
         truncation_limit=float(bandwidth["truncation_limit"]),
         proxy_safety=BANDWIDTH_PROXY_SAFETY,
     )
+    if resolution["policy"] != LOCAL_RESOLUTION_POLICY:
+        grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
+        return grid, record, bandwidth_record
+    backbone = float(resolution["max_spacing_eV"])
+    seeds, summary = local_spacing_seeds(
+        populations,
+        start_eV=start,
+        stop_eV=stop,
+        floor_spacing_eV=min(float(target_step), backbone),
+        max_spacing_eV=backbone,
+        halo_limit=float(resolution["halo_limit"]),
+    )
+    plan = build_window_plan(start, stop, backbone, seeds)
+    grid, record = windowed_coordinates(payload, plan, dtype=REAL, stop_eV=stop)
+    record["feature_width_eV"] = float(target_step)
+    record["local_spacing"] = summary
+    return grid, record, bandwidth_record
 
 
 def _refuse_coherent_resolution(case, segments, n_hat, Ne):
@@ -208,8 +236,9 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
         if windowed:
             grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
         elif measured:
-            stop, bandwidth_record = _measured_stop(payload, case, segments, n_hat, Ne)
-            grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
+            grid, record, bandwidth_record = _measured_line_grid(
+                payload, case, segments, n_hat, Ne, target_step
+            )
         else:
             grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
     except LineGridToleranceError as exc:

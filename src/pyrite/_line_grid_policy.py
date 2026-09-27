@@ -74,6 +74,9 @@ __all__ = [
     "BANDWIDTH_POLICIES",
     "BANDWIDTH_PROXY_SAFETY",
     "AUTOMATIC_RESOLUTION_POLICY",
+    "DEFAULT_LOCAL_HALO_LIMIT",
+    "LOCAL_RESOLUTION_POLICY",
+    "RESOLUTION_POLICIES",
     "COVERAGE_BANDWIDTH_POLICY",
     "DEFAULT_BANDWIDTH_COVERAGE",
     "DEFAULT_BANDWIDTH_TRUNCATION",
@@ -167,6 +170,14 @@ BANDWIDTH_POLICIES = (AUTOMATIC_BANDWIDTH_POLICY, RESONANCE_BANDWIDTH_POLICY)
 DEFAULT_BANDWIDTH_TRUNCATION = 1.0e-4
 BANDWIDTH_PROXY_SAFETY = 2.0
 AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
+#: Energy-dependent spacing from the measured resonance population (#192).
+#: Opt-in, and only under the ``resonance-population`` bandwidth that measures
+#: that population.
+LOCAL_RESOLUTION_POLICY = "resonance-local"
+RESOLUTION_POLICIES = (AUTOMATIC_RESOLUTION_POLICY, LOCAL_RESOLUTION_POLICY)
+#: Per-line tail share outside the fine halo of ``resonance-local``: the
+#: quadrature-backbone row of ``tbl-line-budget-allocation`` split in two.
+DEFAULT_LOCAL_HALO_LIMIT = 1.0e-4
 
 #: Coarsest automatic spacing. Matches the catalog's historical 3 eV line-grid
 #: convention, so automatic resolution is never worse than the legacy grids.
@@ -327,6 +338,7 @@ class LineGridPolicy:
     windows: tuple[tuple[str, Any], ...] | None = None
     quadrature: str = DEFAULT_LINE_QUADRATURE
     bandwidth_truncation: float | None = None
+    halo_limit: float | None = None
 
     def payload(self) -> dict[str, Any]:
         """Canonical JSON-able payload carried on the case."""
@@ -362,6 +374,8 @@ class LineGridPolicy:
                 **payload["bandwidth"],
                 "truncation_limit": self.bandwidth_truncation,
             }
+        if self.resolution_policy == LOCAL_RESOLUTION_POLICY:
+            payload["resolution"] = {**payload["resolution"], "halo_limit": self.halo_limit}
         return payload
 
     @property
@@ -611,6 +625,29 @@ def resolve_line_grid_policy(
                 sources["bandwidth"] = label
             bandwidth_policy = chosen
             break
+    # Resolution follows the same per-call > stored order, with no environment
+    # layer; the source is recorded only for a non-default choice.
+    resolution_policy = AUTOMATIC_RESOLUTION_POLICY
+    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
+        if layer.get("resolution") is not None:
+            chosen = str(layer["resolution"])
+            if chosen not in RESOLUTION_POLICIES:
+                raise ValueError(
+                    f"{label} line-grid resolution must be one of {list(RESOLUTION_POLICIES)}, "
+                    f"got {chosen!r}"
+                )
+            if chosen != resolution_policy:
+                sources["resolution"] = label
+            resolution_policy = chosen
+            break
+    halo_limit = None
+    if resolution_policy == LOCAL_RESOLUTION_POLICY:
+        if bandwidth_policy != RESONANCE_BANDWIDTH_POLICY:
+            raise ValueError(
+                "the resonance-local resolution reads the measured resonance population "
+                "and needs the resonance-population bandwidth"
+            )
+        halo_limit = DEFAULT_LOCAL_HALO_LIMIT
     truncation = None
     if bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
         if windows is not None:
@@ -624,7 +661,7 @@ def resolve_line_grid_policy(
         bandwidth_policy=bandwidth_policy,
         start_eV=float(start_eV),
         stop_eV=float(stop_eV),
-        resolution_policy=AUTOMATIC_RESOLUTION_POLICY,
+        resolution_policy=resolution_policy,
         max_spacing_eV=max_spacing,
         aliased_weight_limit=strictest,
         rtol=tuple(sorted(rtol.items())),
@@ -634,6 +671,7 @@ def resolve_line_grid_policy(
         windows=None if windows is None else tuple(sorted(windows.items())),
         quadrature=quadrature,
         bandwidth_truncation=truncation,
+        halo_limit=halo_limit,
     )
 
 
@@ -715,6 +753,7 @@ def windowed_coordinates(
     plan: WindowPlan,
     *,
     dtype=np.float32,
+    stop_eV: float | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Validate a window plan against the policy budget and backend precision.
 
@@ -723,14 +762,24 @@ def windowed_coordinates(
     budget or backend ULP shortfall raises :class:`LineGridToleranceError`; the
     plan is never coarsened. Precision is judged interval by interval, so a fine
     window low on the axis is held to the ulp at its own energy.
+
+    A ``resonance-local`` resolution plans its own pieces without a windows
+    block, and ``stop_eV`` then replaces the payload's measured-bandwidth cap.
     """
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     windows = payload.get("windows")
-    if windows is None:
+    local = resolution["policy"] == LOCAL_RESOLUTION_POLICY
+    if windows is None and not local:
         raise ValueError("line-grid policy payload carries no windows block")
     start = float(bandwidth["start_eV"])
     stop = float(bandwidth["stop_eV"])
+    if stop_eV is not None:
+        if not start < float(stop_eV) <= stop:
+            raise ValueError(
+                f"measured line-grid stop {stop_eV!r} eV lies outside ({start:g}, {stop:g}] eV"
+            )
+        stop = float(stop_eV)
     backbone = float(resolution["max_spacing_eV"])
     if (plan.start_eV, plan.stop_eV, plan.backbone_spacing_eV) != (start, stop, backbone):
         raise ValueError(
@@ -764,7 +813,7 @@ def windowed_coordinates(
         "schema": int(payload.get("schema", WINDOWED_LINE_GRID_POLICY_SCHEMA)),
         "bandwidth_policy": str(bandwidth["policy"]),
         "resolution_policy": str(resolution["policy"]),
-        "window_policy": str(windows["policy"]),
+        "window_policy": str(resolution["policy"] if windows is None else windows["policy"]),
         "start_eV": start,
         "stop_eV": stop,
         "num": int(num),

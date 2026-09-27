@@ -173,6 +173,41 @@ resonate, coarse where only wide ones do) is the scalable fix. Proxy safety
 address the Ne scaling. Production runs use Ne=20,000 (per user); not yet
 measured. Profile opt-in deferred until #195 (materials/profile rework) lands.
 
+## Handoff (2026-09-27, end of session)
+
+Approved by user: options 1 (energy-dependent spacing) and 3 (proxy safety 2).
+Branch rebased onto #195/#198 by user.
+
+Done: proxy safety 2 (`ee20cc76`); opt-in `resolution = "resonance-local"`
+(`line_seeds.local_spacing_seeds`, `_measured_line_grid`, generalized
+`windowed_coordinates`). 1 mm 10/100 Ne=100: 56,791 nodes local vs 234,183
+uniform, same 67.9 keV stop. No dedicated tests or ledger row yet.
+
+Ne=20,000 production mode (job 20260927-094849-5e0f2102, safety 2): 1 um and
+10 um pass audit (4-5e-5) at 12-41k nodes; 100 um REFUSED after transport
+(audit 4.3e-4): the t_L**2 proxy omits omega |A|^2 T_abs, and absorption shifts
+real weight to far lines. 1 mm 45/140 at Ne=300 needs a 935 keV stop (real
+forward-scatter Doppler tail): uniform 3.3 M nodes; local spacing required.
+
+Next (in order):
+1. Replace the proxy with exact production weights: run the line kernel once
+   on a 2-node axis [start, ceiling] with the audit in a "collect" mode
+   (`_accumulate_edge_truncation` appends E_r, a_width, weight); build one
+   ResonancePopulation(weight=w, width=pi/a) and feed both
+   `resonance_population_stop_eV` and `local_spacing_seeds`. Needs `groove`
+   passed into `resolve_line_grid` (runner `_transport_case` l.644). Then drop
+   `case_resonance_populations`. Watch host memory at Ne=20k/1 mm (~110 M lines).
+2. Tests + ledger row `line-grid-resonance-local-spacing`; budget doc: halo
+   share and the lower-edge (~1e-4) finding; write-up page for both rows.
+3. Remote: `start-bandwidth` extended to compare local vs uniform on identical
+   segments; `--production` at Ne=20,000 incl. 1 mm.
+4. float32 3.4 eV centroid shift on 148 keV axis (1 mm) still unexplained;
+   new candidate diagnostics (`moment_share_above_20keV`) not yet run. No
+   beam-energy float64 switch planned; precision keys on axis top/spacing.
+5. Profile opt-in on the post-#195 layout; nonuniform grids are refused by
+   EagleXO(resolve_energy=True) and LegacyEDS(convolve=True) -- confirm with
+   user before enabling local spacing in `high_energy`.
+
 ## Remaining decision
 
 Measure identical 5 MeV trajectories under candidate bandwidths/grids on the

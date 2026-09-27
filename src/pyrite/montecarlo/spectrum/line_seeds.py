@@ -38,11 +38,14 @@ __all__ = [
     "SeedContext",
     "absorption_edge_brackets",
     "absorption_edge_seeds",
+    "LOCAL_SPACING_SOURCE",
     "case_line_stop_eV",
+    "case_resonance_populations",
     "characteristic_line_seeds",
     "characteristic_stop_eV",
     "collect_feature_seeds",
     "kinematic_line_seeds",
+    "local_spacing_seeds",
     "register_seed_provider",
     "resonance_population_stop_eV",
     "resonance_populations",
@@ -794,34 +797,23 @@ def _kinematic_provider(context: SeedContext):
     return seeds, summary
 
 
-def case_line_stop_eV(
+def case_resonance_populations(
     case: Mapping[str, Any],
     segments: Mapping[str, Any],
     n_hat,
     *,
     electron_limit: int | None,
-    start_eV: float,
-    ceiling_eV: float,
-    truncation_limit: float,
-    proxy_safety: float,
-    round_to_eV: float = 100.0,
-) -> tuple[float, dict[str, Any]]:
-    """Measured line-axis ``stop`` for one case: PXR/CBS and characteristic lines.
+    band_eV: tuple[float, float],
+) -> list[ResonancePopulation]:
+    """Every radiating layer's resonance populations, read as the kernels read them.
 
-    The kinematic population is read per radiating layer exactly as
-    :func:`_kinematic_provider` reads it, with the in-medium root tabulated over
-    ``(start_eV, ceiling_eV)``, and its edge is chosen at
-    ``truncation_limit / proxy_safety`` (:func:`resonance_population_stop_eV`).
-    Characteristic lines use their exact per-line bound at ``truncation_limit``
-    (:func:`characteristic_stop_eV`). The larger edge wins, rounded up to
-    ``round_to_eV``, never above ``ceiling_eV`` and at least one rounding step
-    above ``start_eV``.
+    Per layer exactly as :func:`_kinematic_provider` reads it, with the in-medium
+    root tabulated over ``band_eV``.
 
     Validation: line-grid-resonance-bandwidth
     """
     from .lines import _segments_in_layer
 
-    band = (float(start_eV), float(ceiling_eV))
     compositions = _case_compositions(case)
     radiators = case.get("layer_radiators")
     if radiators is None:
@@ -852,9 +844,34 @@ def case_line_stop_eV(
                 electron_limit=electron_limit,
                 label_prefix=prefix,
                 composition=composition,
-                band_eV=band,
+                band_eV=(float(band_eV[0]), float(band_eV[1])),
             )
         )
+    return populations
+
+
+def case_line_stop_eV(
+    case: Mapping[str, Any],
+    populations: Sequence[ResonancePopulation],
+    *,
+    start_eV: float,
+    ceiling_eV: float,
+    truncation_limit: float,
+    proxy_safety: float,
+    round_to_eV: float = 100.0,
+) -> tuple[float, dict[str, Any]]:
+    """Measured line-axis ``stop`` for one case: PXR/CBS and characteristic lines.
+
+    ``populations`` come from :func:`case_resonance_populations` over
+    ``(start_eV, ceiling_eV)``; their edge is chosen at
+    ``truncation_limit / proxy_safety`` (:func:`resonance_population_stop_eV`).
+    Characteristic lines use their exact per-line bound at ``truncation_limit``
+    (:func:`characteristic_stop_eV`). The larger edge wins, rounded up to
+    ``round_to_eV``, never above ``ceiling_eV`` and at least one rounding step
+    above ``start_eV``.
+
+    Validation: line-grid-resonance-bandwidth
+    """
     kinematic_stop, kinematic = resonance_population_stop_eV(
         populations,
         ceiling_eV=ceiling_eV,
@@ -862,7 +879,7 @@ def case_line_stop_eV(
         round_to_eV=round_to_eV,
     )
     characteristic_edge, characteristic = characteristic_stop_eV(
-        compositions, truncation_limit=truncation_limit
+        _case_compositions(case), truncation_limit=truncation_limit
     )
     edges = [value for value in (kinematic_stop, characteristic_edge) if value is not None]
     stop = max([float(start_eV) + round_to_eV, *edges])
@@ -874,6 +891,108 @@ def case_line_stop_eV(
         "kinematic": kinematic,
         "characteristic": characteristic,
     }
+
+
+LOCAL_SPACING_SOURCE = "pxr-local"
+
+
+def local_spacing_seeds(
+    populations: Sequence[ResonancePopulation],
+    *,
+    start_eV: float,
+    stop_eV: float,
+    floor_spacing_eV: float,
+    max_spacing_eV: float,
+    halo_limit: float,
+    bin_eV: float = 100.0,
+) -> tuple[list[FeatureSeed], dict[str, Any]]:
+    """Energy-dependent spacing: fine only where narrow lines resonate.
+
+    Each line narrower than ``max_spacing_eV`` needs nodes no farther apart
+    than its first-zero width ``w`` (``h <= pi / a_w`` integrates its
+    ``sinc**2`` exactly on a uniform grid, ledger row ``line-grid-sinc-convergence``),
+    but only within a halo ``D = w / (pi**2 halo_limit)``: beyond it the line
+    keeps at most ``halo_limit`` of its mass (:func:`sincsq_upper_tail_bound`),
+    which is all a coarser sampling there can misplace. Required spacings are
+    quantised to ``floor_spacing_eV * 2**k``, with ``floor_spacing_eV`` the
+    case's global sinc-Nyquist step, so lines the global rule already lets alias
+    (their weight is inside its aliased-weight budget) are held to that floor
+    rather than refined further. Bins of ``bin_eV`` take the finest level any
+    overlapping halo asks for; runs of equal level become one seed each.
+
+    Assumptions: no weighting beyond the population itself -- every
+    sub-backbone line is resolved within its halo, so this is at least as fine
+    as the uniform step around every line that step resolves. Nonuniform
+    trapezoid error inside a halo is not bounded here; the window ladder
+    measures it.
+
+    Limiting case: one line of width ``w`` gives one window of spacing
+    ``<= w`` spanning ``E_res +- D``, rounded out to bins, on the backbone.
+
+    Returns ``(seeds, summary)``.
+
+    Validation: line-grid-resonance-local-spacing
+    """
+    floor = float(floor_spacing_eV)
+    backbone = float(max_spacing_eV)
+    if not 0.0 < floor:
+        raise ValueError("floor_spacing_eV must be positive")
+    if not 0.0 < float(halo_limit) < 1.0:
+        raise ValueError("halo_limit must lie in (0, 1)")
+    start, stop = float(start_eV), float(stop_eV)
+    energy = np.concatenate([entry.energy_eV for entry in populations] or [np.empty(0)])
+    width = np.concatenate([entry.width_eV for entry in populations] or [np.empty(0)])
+    narrow = np.isfinite(energy) & np.isfinite(width) & (width < backbone)
+    energy, width = energy[narrow], width[narrow]
+    levels = [floor * 2.0**k for k in range(64) if floor * 2.0**k < backbone]
+    summary: dict[str, Any] = {
+        "floor_spacing_eV": floor,
+        "max_spacing_eV": backbone,
+        "halo_limit": float(halo_limit),
+        "bin_eV": float(bin_eV),
+        "narrow_lines": int(energy.size),
+    }
+    if energy.size == 0 or not levels:
+        return [], {**summary, "windows": 0}
+    level = np.clip(np.floor(np.log2(np.maximum(width, floor) / floor)), 0, len(levels) - 1)
+    halo = width / (np.pi**2 * float(halo_limit))
+    n_bins = int(np.ceil((stop - start) / float(bin_eV)))
+    first = np.clip(np.floor((energy - halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+    last = np.clip(np.ceil((energy + halo - start) / bin_eV), 0, n_bins).astype(np.int64)
+    inside = last > first
+    first, last, level = first[inside], last[inside], level[inside].astype(np.int64)
+    required = np.full(n_bins, len(levels), dtype=np.int64)
+    for k in range(len(levels)):
+        chosen = level == k
+        if not chosen.any():
+            continue
+        cover = np.zeros(n_bins + 1, dtype=np.int64)
+        np.add.at(cover, first[chosen], 1)
+        np.add.at(cover, last[chosen], -1)
+        covered = np.cumsum(cover[:-1]) > 0
+        required[covered & (required > k)] = k
+    seeds = []
+    index = 0
+    while index < n_bins:
+        k = int(required[index])
+        run = index
+        while run < n_bins and required[run] == k:
+            run += 1
+        if k < len(levels):
+            lo = start + index * bin_eV
+            hi = min(stop, start + run * bin_eV)
+            seeds.append(
+                FeatureSeed(
+                    source=LOCAL_SPACING_SOURCE,
+                    label=f"{lo:.0f}-{hi:.0f} eV",
+                    centre_eV=lo,
+                    below_eV=0.0,
+                    above_eV=hi - lo,
+                    spacing_eV=levels[k],
+                )
+            )
+        index = run
+    return seeds, {**summary, "windows": len(seeds), "levels_eV": levels}
 
 
 def _case_compositions(case: Mapping[str, Any]) -> list[list[tuple[str, float]]]:
