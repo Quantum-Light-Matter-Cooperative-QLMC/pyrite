@@ -90,7 +90,7 @@ class SpectralFactors:
         transmission, and detector response have not been applied.
     mu_by_filter_inv_mm
         Linear attenuation coefficients with shape ``(n_filter, n_energy)`` in
-        inverse mm.
+        inverse mm; ``+inf`` marks an energy at which the filter is opaque.
     """
 
     energy_eV: np.ndarray
@@ -111,8 +111,10 @@ class SpectralFactors:
             raise ValueError("mu_by_filter_inv_mm must have shape (n_filter, n_energy)")
         if not np.all(np.isfinite(intrinsic)):
             raise ValueError("intrinsic_by_tile must contain finite values")
-        if not np.all(np.isfinite(coefficient)) or np.any(coefficient < 0.0):
-            raise ValueError("mu_by_filter_inv_mm must contain finite non-negative values")
+        if np.any(np.isnan(coefficient)) or np.any(coefficient < 0.0):
+            raise ValueError(
+                "mu_by_filter_inv_mm must contain non-negative values (+inf marks an opaque energy)"
+            )
         object.__setattr__(self, "energy_eV", energy)
         object.__setattr__(self, "intrinsic_by_tile", intrinsic)
         object.__setattr__(self, "mu_by_filter_inv_mm", coefficient)
@@ -136,6 +138,9 @@ class SpatialResult:
         Optional characteristic-radiation factors. ``line`` and
         ``coherent_line`` exclude it; the ``"line_total"`` and
         ``"coherent_total"`` components add it.
+    tile_directions_lab
+        Optional representative unit direction per angular tile with shape
+        ``(n_tile, 3)`` in the lab frame; required to persist the result.
     """
 
     ray_map: PixelRayMap
@@ -144,8 +149,17 @@ class SpatialResult:
     detector: PlanarDetector
     coherent_line: SpectralFactors | None = None
     characteristic_line: SpectralFactors | None = None
+    tile_directions_lab: np.ndarray | None = None
 
     def __post_init__(self) -> None:
+        if self.tile_directions_lab is not None:
+            directions = _readonly_array(self.tile_directions_lab, dtype=float)
+            n_tile = int(np.max(self.ray_map.tile_index)) + 1
+            if directions.shape != (n_tile, 3):
+                raise ValueError("tile_directions_lab must have shape (n_tile, 3)")
+            if not np.all(np.isfinite(directions)):
+                raise ValueError("tile_directions_lab must contain finite values")
+            object.__setattr__(self, "tile_directions_lab", directions)
         for name in ("line", "background"):
             factor = getattr(self, name)
             if not isinstance(factor, SpectralFactors):

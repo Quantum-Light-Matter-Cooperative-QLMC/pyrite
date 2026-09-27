@@ -134,6 +134,7 @@ from .chunking import (
 from .chunking import (
     _real_itemsize as _real_itemsize,
 )
+from .directions import directional_outputs, validated_directions
 from .line_grid import check_line_truncation, line_truncation_audit, resolve_line_grid
 
 _RESOURCE_POLICY.n_cpus = _usable_cpus()
@@ -208,6 +209,7 @@ def run_case(
     keep_segments_on_device: bool = False,
     transport_core: str = "auto",
     trajectory_capture: TrajectoryCapture | None = None,
+    observation_directions=None,
 ) -> dict[str, Any]:
     """Run transport, line emission, and bremsstrahlung for one case.
 
@@ -234,6 +236,11 @@ def run_case(
     trajectory_capture
         Opt-in writer of this case's transport result; ``None`` (default)
         writes nothing. Capture never changes transport draws or spectra.
+    observation_directions
+        Optional ``(N, 3)`` sample-frame unit vectors of a physical detector.
+        When given, the output also carries ``"directional"``: spectra at every
+        direction from the same transport (see :func:`run_case_directions`).
+        The scalar arrays are unchanged by it.
 
     Returns
     -------
@@ -241,16 +248,23 @@ def run_case(
         Line and bremsstrahlung arrays and grids, transport fractions, segment
         count, resolved crystal, incident energy, and optional timing metrics.
     """
-    return _spectrum_case(
+    transport = _transport_case(
         case,
-        _transport_case(
-            case,
-            record_timing,
-            transport_core=transport_core,
-            keep_segments_on_device=keep_segments_on_device,
-            trajectory_capture=trajectory_capture,
-        ),
         record_timing,
+        transport_core=transport_core,
+        keep_segments_on_device=keep_segments_on_device,
+        trajectory_capture=trajectory_capture,
+    )
+    out = _spectrum_case(case, transport, record_timing)
+    if observation_directions is not None:
+        out["directional"] = _directional_outputs(case, transport, observation_directions)
+    return out
+
+
+def _directional_outputs(case, transport, n_hats, spectrum=None) -> dict[str, Any]:
+    """Evaluate observation directions on one transport; see :mod:`.directions`."""
+    return directional_outputs(
+        case, transport, n_hats, _spectrum_case if spectrum is None else spectrum
     )
 
 
@@ -268,44 +282,13 @@ def run_case_directions(
     transported electron segments; this function never places downstream
     photon geometry in the electron navigator.
     """
-    directions = np.asarray(n_hats, dtype=float)
-    if directions.ndim != 2 or directions.shape[1] != 3 or not directions.shape[0]:
-        raise ValueError("n_hats must have shape (N, 3) with N positive")
-    if not np.all(np.isfinite(directions)):
-        raise ValueError("n_hats must contain only finite values")
-    if not np.allclose(np.linalg.norm(directions, axis=1), 1.0, rtol=0.0, atol=1.0e-12):
-        raise ValueError("n_hats must contain unit vectors")
-
+    directions = validated_directions(n_hats)
     transport = _transport_case(
         case,
         transport_core=transport_core,
         keep_segments_on_device=True,
     )
-    outputs = []
-    for direction in directions:
-        directional_transport = dict(transport)
-        directional_transport["n_hat"] = direction
-        outputs.append(_spectrum_case(case, directional_transport))
-
-    first = outputs[0]
-    result = {
-        key: value
-        for key, value in first.items()
-        if key not in {"spec", "spec_coherent", "spec_characteristic", "brem", "brem_wide"}
-    }
-    result["spec_by_direction"] = np.stack([np.asarray(output["spec"]) for output in outputs])
-    result["spec_characteristic_by_direction"] = np.stack(
-        [np.asarray(output["spec_characteristic"]) for output in outputs]
-    )
-    result["brem_by_direction"] = np.stack([np.asarray(output["brem"]) for output in outputs])
-    result["brem_wide_by_direction"] = np.stack(
-        [np.asarray(output["brem_wide"]) for output in outputs]
-    )
-    if "spec_coherent" in first:
-        result["spec_coherent_by_direction"] = np.stack(
-            [np.asarray(output["spec_coherent"]) for output in outputs]
-        )
-    return result
+    return _directional_outputs(case, transport, directions)
 
 
 def _beam_kwargs(case):

@@ -277,7 +277,7 @@ def score_acquisition(
         underflow_realized = np.empty(expected.shape[0], dtype=np.int64)
         overflow_realized = np.empty(expected.shape[0], dtype=np.int64)
         below_cut_realized = np.empty(expected.shape[0], dtype=np.int64)
-        for index, (row, column) in enumerate(resolved_coordinates):
+        for index, (row, column) in enumerate(resolved_coordinates.tolist()):
             means = np.concatenate(
                 (
                     [

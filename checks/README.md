@@ -48,6 +48,7 @@ run through the collector.
 | `multilayer_check.py` | First-slice stack transport and front/back escape checks. |
 | `multilayer_slice3_check.py` | Per-layer crystalline-radiation and incoherent-sum checks. |
 | `multilayer_validation_check.py` | Closed-form stack attenuation and depth-range scaling anchors. |
+| `pixel_reconstruction_oracle.py` | Nearest-tile pixel angular reconstruction against direct per-pixel evaluation from one transport, across angular shapes and representative pixels (#23); decision evidence only, no ledger claim, emits no records. |
 | `radiation_error_estimator_calibration.py` | Calibrates warning thresholds for the radiation error estimator. |
 | `shell_ionization_comparison.py` | Pinned Bote–Salvat `xion.f` transcription, local EEDL shell interpolation, and characteristic-production ratios for the 24 catalogue elements. |
 | `brem_angular_comparison.py` | BremsLib angular shape (enclosed-flux angles) against the Schiff formula, Koch–Motz 2BS, for the 24 catalogue elements at 5–30 MeV. |

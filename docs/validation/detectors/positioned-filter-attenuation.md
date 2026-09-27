@@ -372,7 +372,7 @@ with `SpectralFactors.intrinsic_by_tile` documented as "photons per incident ele
 
 **Single ownership of $\Delta\Omega_p$ confirmed.** `spectra(measured=True)` calls `self.detector.score(..., scale=1.0)`, and `scale` is the *only* hook through which any response in `detectors/spec.py` (`Timepix`, `EagleXO`, `LegacyEDS`) applies a flux normalisation — each does `intrinsic_density * scale` and then applies QE/blur only. The $\Omega\times\mathrm{QE}$ reading of the Eagle module belongs to the legacy scalar path (`case['domega_sr'] -> r['scale']`), which never composes with `ray_map.solid_angle_sr`. The $D_p^{-4}$ failure mode of [I.5](#i5-solid-angle-and-the-flux-definition) does not occur.
 
-Filter ordering is consistent by construction: `api.py::_attenuation_matrix` and `geometry.py::filter_path_lengths` both iterate `scene.filters` in declaration order, so row $j$ of `mu_by_filter_inv_mm` pairs with column $j$ of `path_length_mm`. Order invariance makes a mispairing harmless for $T_p$ only if the permutation is joint; it is.
+Filter ordering is consistent by construction: `instrument/attenuation.py::attenuation_matrix` and `geometry.py::filter_path_lengths` both iterate `scene.filters` in declaration order, so row $j$ of `mu_by_filter_inv_mm` pairs with column $j$ of `path_length_mm`. Order invariance makes a mispairing harmless for $T_p$ only if the permutation is joint; it is.
 
 ### II.4 Numeric diff
 
@@ -505,6 +505,7 @@ so plate order cannot change transmission. Declared order remains part of proven
 
 - $\mu_j$ has units $\mathrm{mm}^{-1}$, $\ell_{pj}$ has units mm, and the exponential argument is dimensionless.
 - Zero filters, zero path length, or an uncovered pixel gives $T_p(E)=1$ exactly. For a normal ray through a full plate, $\ell = t$. For finite positive $\mu\ell$, $0 < T \leq 1$.
+- A photon-energy node at exactly $E=0$ takes the photoabsorption limit $\mu_j\to+\infty$ as $E\to0^+$ (tabulated coefficients exist only for $E>0$): $T_p(0)=0$ when $\ell_{pj}>0$ for any such plate, and $T_p(0)=1$ when every $\ell_{pj}=0$, since a zero path contributes no optical depth. Added 2026-09-26 (#23), after the 2026-09-13 re-derivation.
 - A homogeneous passive filter and independent primary-photon attenuation are assumed. The model excludes scattering, fluorescence, diffraction, secondary production, surface reflection, and detector charge transport.
 - Pixels are sampled by centre rays from a point source. The model does not integrate the finite pixel sensitive area or an extended emission volume.
 

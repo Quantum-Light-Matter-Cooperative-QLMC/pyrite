@@ -32,6 +32,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/multilayer_check.py": ("multilayer-stack", "self-absorption"),
     "checks/multilayer_slice3_check.py": ("multilayer-stack", "self-absorption"),
     "checks/multilayer_validation_check.py": ("multilayer-stack", "self-absorption"),
+    # Decision evidence for the pixel angular-reconstruction policy (#23); v1
+    # makes no ledgered reconstruction-accuracy claim, so it emits no records.
+    "checks/pixel_reconstruction_oracle.py": (),
     "checks/shell_ionization_comparison.py": ("eedl-shell-ionization-comparison",),
     "checks/brem_angular_comparison.py": ("bremslib-angular-schiff",),
     "checks/radiation_error_estimator_calibration.py": ("radiation-error-estimators",),

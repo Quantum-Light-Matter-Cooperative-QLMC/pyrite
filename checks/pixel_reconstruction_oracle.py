@@ -62,10 +62,9 @@ from scipy.signal import find_peaks, peak_widths
 
 import pyrite as pr
 from pyrite import api
-from pyrite.api import _attenuation_matrix
 from pyrite.detectors import Timepix3
 from pyrite.instrument import FilterPlate, PixelGrid, PlanarDetector, PlanarPose
-from pyrite.instrument.attenuation import primary_transmission
+from pyrite.instrument.attenuation import attenuation_matrix, primary_transmission
 from pyrite.instrument.geometry import angular_tiles, filter_path_lengths, planar_detector_rays
 from pyrite.montecarlo.geometry import directions_to_sample_frame
 from pyrite.montecarlo.runner import run_case_directions
@@ -332,7 +331,7 @@ def run(
             pixel_spec = spec_by_direction[n_tile:]
             pixel_brem = brem_by_direction[n_tile:]
 
-            line_mu = _attenuation_matrix(filters, line_energy)
+            line_mu = attenuation_matrix(filters, line_energy)
 
             for pixel_slot, (name, (row, col)) in enumerate(
                 zip(pixel_names, pixel_coords, strict=True)

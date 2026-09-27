@@ -26,17 +26,9 @@ from .instrument import (
     PixelScorer,
     PlanarDetector,
     ResolvedObservation,
-    observation_identity,
-)
-from .instrument.geometry import (
-    angular_tiles,
-    filter_path_lengths,
-    planar_detector_rays,
 )
 from .materials import CATALOG, MediumSpec
-from .materials.attenuation import linear_attenuation_inv_mm
 from .montecarlo import Case, run_case
-from .montecarlo.geometry import directions_to_sample_frame
 from .montecarlo.runner import (
     _case_bremslib_table_records,
     _case_elastic_table_records,
@@ -48,7 +40,8 @@ from .montecarlo.spectrum import (
     CHARACTERISTIC_MODEL,
 )
 from .montecarlo.transport import STOPPING_MODEL
-from .results.model import PixelRayMap, Result, SpatialResult, SpectralFactors
+from .observations.plan import ObservationPlan, PixelSampling
+from .results.model import Result
 from .xsgen.store import identity_markers
 
 
@@ -145,12 +138,6 @@ def _package_version(name: str) -> str | None:
         return None
 
 
-def _attenuation_matrix(filters: tuple[FilterPlate, ...], energy_eV: np.ndarray) -> np.ndarray:
-    if not filters:
-        return np.empty((0, energy_eV.size), dtype=float)
-    return np.stack([linear_attenuation_inv_mm(plate.material, energy_eV) for plate in filters])
-
-
 def build_configured_cases(old_sweep: Any, settings: Any) -> list[Case]:
     """Lower a configured `campaign.sweep.Sweep`/`Settings` pair to cases.
 
@@ -239,14 +226,7 @@ def simulate(
             f"Numerics.backend={resolved_numerics.backend!r} does not match the active "
             f"backend {BACKEND.name!r}; select the backend before importing pyrite"
         )
-    case = build_case(scene, resolved_numerics)
-    xsgen_tables = identity_markers(
-        [
-            *_case_stopping_table_records(case),
-            *_case_elastic_table_records(case),
-            *_case_bremslib_table_records(case),
-        ]
-    )
+    case, xsgen_tables = _source_case(scene, resolved_numerics)
     if isinstance(scene.detector, PlanarDetector):
         return _simulate_planar(scene, resolved_numerics, case, xsgen_tables)
     output = run_case(case, transport_core=resolved_numerics.transport_core)
@@ -289,6 +269,52 @@ def simulate(
     )
 
 
+def _source_case(scene: Scene, numerics: Numerics) -> tuple[Case, dict[str, str]]:
+    """Lower ``scene`` to its transport case and cross-section table markers."""
+    case = build_case(scene, numerics)
+    xsgen_tables = identity_markers(
+        [
+            *_case_stopping_table_records(case),
+            *_case_elastic_table_records(case),
+            *_case_bremslib_table_records(case),
+        ]
+    )
+    return case, xsgen_tables
+
+
+def observation_plan(scene: Scene, numerics: Numerics) -> ObservationPlan:
+    """Plan ``scene``'s counting observation without running transport.
+
+    The plan carries the same source content key, sample-frame directions,
+    and identity inputs :func:`simulate` uses, so a stored observation it
+    recognises is exactly one ``simulate`` would produce.
+
+    Raises
+    ------
+    ValueError
+        If ``scene`` lacks a pixelated detector or an acquisition.
+    """
+    detector = scene.detector
+    if not isinstance(detector, PlanarDetector) or scene.acquisition is None:
+        raise ValueError("observation production requires a pixelated detector and acquisition")
+    case, xsgen_tables = _source_case(scene, numerics)
+    return ObservationPlan(
+        ResolvedObservation(
+            detector=detector,
+            scorer=PixelScorer() if scene.pixel_scorer is None else scene.pixel_scorer,
+            filters=scene.filters,
+            acquisition=scene.acquisition,
+        ),
+        source_identity_digest=case_content_key(case, xsgen_tables=xsgen_tables),
+        tilt_deg=float(case.get("tilt_deg", 0.0)),
+        tilt_azim_deg=float(case.get("tilt_azim_deg", 0.0)),
+        rep_rate_hz=scene.beam.rep_rate_hz,
+        bunch_charge_pc=scene.beam.bunch_charge_pc,
+        emission=scene.emission,
+        brem_source=scene.brem_source,
+    )
+
+
 def _line_grid_provenance(case, output) -> dict[str, object]:
     """Resolved line-grid policy and coordinates, when resolution was automatic.
 
@@ -317,86 +343,58 @@ def _simulate_planar(
     detector = scene.detector
     assert isinstance(detector, PlanarDetector)
     scorer = PixelScorer() if scene.pixel_scorer is None else scene.pixel_scorer
-    rays = planar_detector_rays(detector)
-    tile_index, directions_lab = angular_tiles(rays, scorer.angular_shape)
-    directions_sample = directions_to_sample_frame(
-        directions_lab,
-        np.deg2rad(float(case.get("tilt_deg", 0.0))),
-        np.deg2rad(float(case.get("tilt_azim_deg", 0.0))),
-    )
-    output = run_case_directions(
-        case,
-        directions_sample,
-        transport_core=numerics.transport_core,
-    )
-    energy = np.asarray(output["E_grid"])
-    background_energy = np.asarray(output["E_grid_brem"])
-    line_mu = _attenuation_matrix(scene.filters, energy)
-    background_mu = _attenuation_matrix(scene.filters, background_energy)
-    ray_map = PixelRayMap(
-        tile_index=tile_index,
-        solid_angle_sr=rays.solid_angle_sr,
-        path_length_mm=filter_path_lengths(rays, scene.filters),
-    )
-    line = SpectralFactors(energy, np.asarray(output["spec_by_direction"]), line_mu)
-    background_intrinsic = np.asarray(output["brem_wide_by_direction"])
-    if scene.brem_source != "mc":
-        background_intrinsic = np.zeros_like(background_intrinsic)
-    background = SpectralFactors(background_energy, background_intrinsic, background_mu)
-    coherent = (
-        None
-        if "spec_coherent_by_direction" not in output
-        else SpectralFactors(
-            energy,
-            np.asarray(output["spec_coherent_by_direction"]),
-            line_mu,
-        )
-    )
-    characteristic = SpectralFactors(
-        energy,
-        np.asarray(output["spec_characteristic_by_direction"]),
-        line_mu,
-    )
-    spatial = SpatialResult(
-        ray_map=ray_map,
-        line=line,
-        background=background,
-        detector=detector,
-        coherent_line=coherent,
-        characteristic_line=characteristic,
-    )
-    selected_line = coherent if scene.emission == "coherent" else line
-    selected_name = "coherent" if selected_line is coherent else "line"
     source_digest = case_content_key(case, xsgen_tables=xsgen_tables)
+    tilt_deg = float(case.get("tilt_deg", 0.0))
+    tilt_azim_deg = float(case.get("tilt_azim_deg", 0.0))
+    identity_provenance: dict[str, Any] = {}
     if scene.acquisition is None:
+        sampling = PixelSampling.of(detector, scorer.angular_shape)
+        output = run_case_directions(
+            case,
+            sampling.directions_sample(tilt_deg=tilt_deg, tilt_azim_deg=tilt_azim_deg),
+            transport_core=numerics.transport_core,
+        )
+        spatial = sampling.spatial(
+            output, detector=detector, filters=scene.filters, brem_source=scene.brem_source
+        )
         observation_digest, observation = _observation_provenance(
             source_digest,
             scene,
             scorer,
-            (line_mu, background_mu),
+            (spatial.line.mu_by_filter_inv_mm, spatial.background.mu_by_filter_inv_mm),
         )
-        identity_provenance: dict[str, Any] = {}
     else:
-        layered_identity = observation_identity(
-            source_digest,
+        plan = ObservationPlan(
             ResolvedObservation(
                 detector=detector,
                 scorer=scorer,
                 filters=scene.filters,
                 acquisition=scene.acquisition,
             ),
+            source_identity_digest=source_digest,
+            tilt_deg=tilt_deg,
+            tilt_azim_deg=tilt_azim_deg,
             rep_rate_hz=scene.beam.rep_rate_hz,
             bunch_charge_pc=scene.beam.bunch_charge_pc,
-            representative_directions_lab=directions_lab,
-            attenuation_arrays=(line_mu, background_mu),
+            emission=scene.emission,
+            brem_source=scene.brem_source,
         )
-        observation_digest = layered_identity.observation_digest
-        observation = dict(layered_identity.payload)
+        output = run_case_directions(
+            case, plan.directions_sample, transport_core=numerics.transport_core
+        )
+        stored = plan.assemble(output, provenance={})
+        spatial = stored.spatial
+        observation_digest = stored.digest
+        observation = dict(stored.identity.payload)
         identity_provenance = {
-            "true_spatial_digest": layered_identity.true_spatial_digest,
-            "response_digest": layered_identity.response_digest,
-            "acquisition_digest": layered_identity.acquisition_digest,
+            "true_spatial_digest": stored.identity.true_spatial_digest,
+            "response_digest": stored.identity.response_digest,
+            "acquisition_digest": stored.identity.acquisition_digest,
         }
+    energy = spatial.line.energy_eV
+    background_energy = spatial.background.energy_eV
+    coherent = spatial.coherent_line
+    selected_name = "coherent" if scene.emission == "coherent" else "line"
     coherent_average = None if coherent is None else spatial.average_density("coherent")
     characteristic_average = spatial.average_density("characteristic")
     return Result(

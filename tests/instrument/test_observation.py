@@ -152,6 +152,24 @@ def test_identity_layers_change_only_for_their_owner() -> None:
     assert normalization_changed.acquisition_digest != identity.acquisition_digest
 
 
+def test_layered_identity_digests_are_frozen() -> None:
+    # Persisted observation objects are named by these digests; a change here
+    # orphans every stored observation and needs a schema-version bump.
+    identity = _identity(_observation())
+    assert identity.true_spatial_digest == (
+        "5eb1eab25cf81a22b227a24aa299cb1437eb47bfce88f93d2fa23037341e1a37"
+    )
+    assert identity.response_digest == (
+        "9c733f339ace37b0698bd1b444d78b654738c5064d3cd22ee1c14d45a2d0f3e8"
+    )
+    assert identity.acquisition_digest == (
+        "cc185164cd45fb807796d6da15618b9c08b9068fba2f3e9e66957ccddc81fac2"
+    )
+    assert identity.observation_digest == (
+        "bd6949a77da984e9379ed83f86b3e3c3dcb241f7840499127d4aab7cf2c7df6a"
+    )
+
+
 def test_poisson_identity_freezes_coordinate_stable_rng_version() -> None:
     observation = _observation(
         acquisition=Acquisition(

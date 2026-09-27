@@ -20,9 +20,11 @@ fidelity contract needed for Timepix/Time-over-threshold use, where each pixel
 must expose a discrete true-energy and, when requested, measured-energy
 spectrum without an eager `(ny, nx, energy)` allocation.
 
-The landed spatial result is currently in-memory only. It has no persisted
+The landed spatial result was originally in-memory only, with no persisted
 observation artifact, analysis-app detector-image view, or profile/CLI lowering
-for physical detector and filter objects. Complete the user workflow: configure
+for physical detector and filter objects. (As of 2026-09-26 a persisted store,
+profile lowering, and partial filter/physical-detector CLI exist; see "Staleness
+audit (2026-09-26)".) Complete the user workflow: configure
 the detector, acquisition, angular scorer, and filters from the CLI; run or
 rescore an observation; persist its factorized products separately from the
 intrinsic checkpoint; and inspect detector images and per-pixel spectra in the
@@ -183,6 +185,9 @@ lowering/result contract. Physical pixel geometry and filter attenuation stay
 unchanged unless investigation exposes a concrete defect.
 
 ## Initial exploration checkpoint (2026-08-15)
+
+Historical: several statements below were superseded; see "Staleness audit
+(2026-09-26)" before relying on the call graph or gap list.
 
 This checkpoint is source-level exploration only. It records the seams that
 must be stabilized before implementation; no source, test, public-doc, or
@@ -355,12 +360,16 @@ proposals, not validated acceptance criteria.
 
 ### Next implementation slices
 
-- Completed: oracle evidence/decision packet, domain/identity schema, and the
-  native measured-response/acquisition core with minimum bounded count APIs.
-- Next: observation codec/index and local runner production.
-- Then: complete pixel metadata/selection APIs and the analysis workflow. CLI,
-  app, and remote workers consume the vertical backend rather than inventing
-  parallel representations.
+- Completed: oracle evidence/decision packet, domain/identity schema, the
+  native measured-response/acquisition core with minimum bounded count APIs,
+  and the observation store plus library producer (checklist item 4, library
+  half; see "Observation store progress (2026-09-26)").
+- Next: complete pixel metadata/selection APIs (item 5) and the analysis
+  workflow (item 6) over `ObservationStore`.
+- Then: CLI (item 7), which must also decide `pyrite run` sweep wiring and the
+  scalar-detector projection/migration (see open questions). CLI, app, and
+  remote workers consume the vertical backend rather than inventing parallel
+  representations.
 
 ## Decisions and open questions
 
@@ -412,13 +421,28 @@ Decided:
   recorded, coordinate-stable seeded Poisson streams and are never presented
   as expectations.
 
+- Observation artifacts live at a separate root,
+  `<workspace>/observations/<stem>/{index.json, objects/true/<true_spatial_digest>.h5,
+  objects/obs/<observation_digest>.json}`, decoupled from checkpoint
+  archive/slim/GC (human decision 2026-09-26). Remote transfer and
+  reachability/GC rules for this tree remain item 8.
+- Checklist item 4 lands as a library producer only (human decision
+  2026-09-26): `runs.observe.produce_observation` persists or reuses one
+  scene's observation; `pyrite run` sweep wiring is deferred to item 7.
+
 Open for their later owning slices, not blockers for the acquisition core:
 
 - What is the reviewed CLI command tree and migration path from the existing
   scalar `profile set --observation-angle/--polar-acceptance/--solid-angle`
-  surface?
-- Which observation-artifact location/lifecycle supports both local and remote
-  runs without coupling it to intrinsic checkpoint garbage collection?
+  surface? Note `profile filter add/list/rm/show` and physical-detector
+  creation through `filter add --detector-*` already exist (see staleness
+  audit); the tree must extend, not duplicate, them.
+- How does `pyrite run PROFILE` produce observations for a sweep? Sweep cases
+  are built from the profile's scalar detector, while observation source
+  identity uses the physical detector's scalar projection, so their content
+  keys only coincide if the projection becomes authoritative for profiles with
+  a physical observation. A directional observation also needs its own
+  transport pass per case: scalar checkpoints keep one direction.
 
 The human semantics gate for the domain/native-response/acquisition slice is
 closed. CLI spelling and observation-store lifecycle remain interactive design
@@ -744,6 +768,73 @@ cannot be confined to exact detector/`g` alignment. Human review must choose
 the tolerance and reconstruction/safety policy before Slice 2 generalizes
 `PixelScorer`. No production physics or validation-ledger state changed.
 
+## Observation store progress (2026-09-26)
+
+Implemented the library half of checklist item 4:
+
+- `pyrite.observations.ObservationStore` at the decided separate root. True
+  objects hold only factorized arrays (tile map, solid angles, filter paths,
+  representative tile directions, per-tile intrinsic spectra, attenuation);
+  records hold the three canonical layer payloads; `index.json` maps source
+  content key to observation digests under an `flock`. Writes are temp +
+  `os.replace` in object -> record -> index order; reads verify schema, per-
+  dataset SHA-256, payload digests, and the stored attenuation/direction
+  hashes. `put` is idempotent and replaces corrupt/truncated objects;
+  `verify()` reports broken entries and leftover temporaries.
+- `StoredObservation` reopens without transport and reproduces `Result`
+  expected and Poisson counts exactly; `rescore(acquisition=, response=,
+  rep_rate_hz=, bunch_charge_pc=)` reuses the true payload, and its digest
+  equals a fresh `simulate` with the same settings.
+- `runs.observe.produce_observation(scene, numerics, store)` reuses a stored
+  observation when the true-spatial identity recomputed before transport
+  (source key, geometry, ordered filters, scorer, tile directions,
+  attenuation on the stored grids) matches, and otherwise simulates and
+  stores. Tests prove that acquisition/normalization/response/filter-label
+  changes skip transport, while angular-shape, filter-thickness, no-filter,
+  and source changes transport.
+- Supporting refactors: `observation_identity` split into
+  `true_spatial_payload`/`response_payload`/`acquisition_payload`/
+  `link_identity` with a frozen-digest regression; `SpatialResult` retains
+  `tile_directions_lab`; `instrument.attenuation.attenuation_matrix` replaces
+  the private `api._attenuation_matrix` (oracle harness and filter validation
+  packet updated); `api.source_identity_digest` exposes the pre-transport key.
+
+Not done in this slice: `pyrite run`/`material simulate` wiring, remote
+transfer, and GC/reachability.
+
+## Staleness audit (2026-09-26)
+
+Checked against the branch after rebase onto `main`:
+
+- Stale: "profile persistence ... accept only the scalar Detector" and "no
+  campaign lowering" for physical detectors/filters. `materials` catalog now
+  decodes `profile_physical_detectors`/`profile_filters`;
+  `campaign/observation.py` lowers filters, physical detectors, responses,
+  scorers, and acquisitions (`resolve_profile_observation`).
+- Stale: "The physical path exists only through `api._simulate_planar`".
+  `pyrite material simulate MATERIAL --profile P` runs one physical-detector
+  scene through `simulate` (filesystem-free except `--output-file` `.npz`). It
+  still passes a default `PixelScorer()` and no acquisition, so it does not
+  consume the profile's resolved scorer/response/acquisition. Item 7 owns
+  that gap.
+- Stale: CLI "no profile/CLI lowering". `pyrite profile filter
+  add/list/rm/show` exists, and `filter add --detector-distance-mm/--shape/
+  --pitch-mm/--detector-*` creates the profile physical detector. Missing:
+  filter `set/reset`, and response/scorer/acquisition editing. `pyrite
+  detector` manages scalar named detectors only.
+- Resolved by item 3: the `Timepix3.score` interpolation/shape-preserving
+  limitation no longer blocks native reporting bins (`native_score`, including
+  nonuniform true grids after the #100/#114 rebase).
+- Still accurate: `run_case_directions` performs one transport, then loops
+  directions; `SpatialResult.spectra(measured=True)` loops per pixel;
+  `AnalysisContext` loads one intrinsic checkpoint and has no observation
+  inventory.
+- Superseded: Slice 1 text saying "Slice 2 must not generalize `PixelScorer`"
+  and "human review must choose the tolerance" is closed by the 2026-08-23
+  `nearest_tile` decision under "Decisions and open questions".
+- Fixed: the skill reference `run-cxr-mc` is now `run-pyrite`; the former does
+  not exist.
+
 ## Delegation and required skills
 
 - Owner: `lead-task`; the work crosses angular radiation evaluation, numerical
@@ -753,7 +844,7 @@ the tolerance and reconstruction/safety policy before Slice 2 generalizes
   `performance`, `regression-testing`, `physics-review`, `cli-ui-ux`,
   `notebook-workflow`, and `documentation-maintenance`; use
   `physics-validation` for any new ledgered reconstruction/counting claim.
-- Use `remote-gpu-jobs` and `run-cxr-mc` for representative heavy/final runtime
+- Use `remote-gpu-jobs` and `run-pyrite` for representative heavy/final runtime
   evidence. Do not benchmark a 512 by 512 full spectral cube locally.
 - No delegation slice is self-contained enough for one-shot execution until
   the reconstruction and hardware-geometry decisions are reviewed.

@@ -212,7 +212,8 @@ def _array_identity(array: np.ndarray) -> dict[str, Any]:
     }
 
 
-def _digest(payload: Mapping[str, Any]) -> str:
+def payload_digest(payload: Mapping[str, Any]) -> str:
+    """SHA-256 of a canonical identity payload's compact sorted-key JSON."""
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
@@ -233,16 +234,14 @@ def _response_semantics(response: object) -> str:
     return "response-defined"
 
 
-def observation_identity(
+def true_spatial_payload(
     source_identity_digest: str,
     observation: ResolvedObservation,
     *,
-    rep_rate_hz: float,
-    bunch_charge_pc: float,
     representative_directions_lab: np.ndarray,
     attenuation_arrays: tuple[np.ndarray, ...],
-) -> ObservationIdentity:
-    """Build independent true-spatial, response, acquisition, and full digests."""
+) -> dict[str, Any]:
+    """Canonical true-spatial identity payload: source, geometry, filters, and scorer."""
     if (
         not isinstance(source_identity_digest, str)
         or len(source_identity_digest) != 64
@@ -250,7 +249,7 @@ def observation_identity(
     ):
         raise ValueError("source_identity_digest must be a lowercase SHA-256 digest")
     detector = observation.detector
-    true_payload = {
+    return {
         "schema": "pyrite.true-spatial.v1",
         "source_identity_digest": source_identity_digest,
         "detector_geometry": {
@@ -276,9 +275,11 @@ def observation_identity(
             "filter_interactions": "primary-attenuation-only",
         },
     }
-    response = detector.response
-    assert response is not None
-    response_payload = {
+
+
+def response_payload(response: object) -> dict[str, Any]:
+    """Canonical read-time detector-response identity payload."""
+    return {
         "schema": "pyrite.response.v1",
         "type": f"{type(response).__module__}.{type(response).__qualname__}",
         "config": _canonical_value(response),
@@ -287,9 +288,18 @@ def observation_identity(
             "uniform-uncalibrated" if isinstance(response, Timepix3) else "uniform-ideal"
         ),
     }
-    acquisition_payload = {
+
+
+def acquisition_payload(
+    acquisition: Acquisition,
+    *,
+    rep_rate_hz: float,
+    bunch_charge_pc: float,
+) -> dict[str, Any]:
+    """Canonical acquisition identity payload, including beam normalization."""
+    return {
         "schema": "pyrite.acquisition.v1",
-        "config": _canonical_value(observation.acquisition),
+        "config": _canonical_value(acquisition),
         "bin_semantics": "half-open",
         "event_accounting": ["underflow", "overflow", "below-cut", "registered"],
         "normalization": {
@@ -300,25 +310,38 @@ def observation_identity(
                 "bunch_charge_pc", bunch_charge_pc, minimum=0.0, open_minimum=False
             ),
         },
-        "realization_rng": (REALIZATION_RNG if observation.acquisition.mode == "poisson" else None),
+        "realization_rng": (REALIZATION_RNG if acquisition.mode == "poisson" else None),
     }
-    true_digest = _digest(true_payload)
-    response_digest = _digest(response_payload)
-    acquisition_digest = _digest(acquisition_payload)
+
+
+def link_identity(
+    true_payload: Mapping[str, Any],
+    response: Mapping[str, Any],
+    acquisition: Mapping[str, Any],
+) -> ObservationIdentity:
+    """Digest three layer payloads and link them into one observation identity.
+
+    Rescoring a stored observation reuses its ``true_payload`` unchanged, so the
+    true-spatial digest, and the factors it names, survive response and
+    acquisition changes.
+    """
+    true_digest = payload_digest(true_payload)
+    response_digest = payload_digest(response)
+    acquisition_digest = payload_digest(acquisition)
     links = {
         "schema": "pyrite.observation.v2",
         "true_spatial_digest": true_digest,
         "response_digest": response_digest,
         "acquisition_digest": acquisition_digest,
     }
-    observation_digest = _digest(links)
+    observation_digest = payload_digest(links)
     payload = MappingProxyType(
         {
             **links,
             "observation_identity_digest": observation_digest,
-            "true_spatial": true_payload,
-            "response": response_payload,
-            "acquisition": acquisition_payload,
+            "true_spatial": dict(true_payload),
+            "response": dict(response),
+            "acquisition": dict(acquisition),
         }
     )
     return ObservationIdentity(
@@ -330,11 +353,44 @@ def observation_identity(
     )
 
 
+def observation_identity(
+    source_identity_digest: str,
+    observation: ResolvedObservation,
+    *,
+    rep_rate_hz: float,
+    bunch_charge_pc: float,
+    representative_directions_lab: np.ndarray,
+    attenuation_arrays: tuple[np.ndarray, ...],
+) -> ObservationIdentity:
+    """Build independent true-spatial, response, acquisition, and full digests."""
+    response = observation.detector.response
+    assert response is not None
+    return link_identity(
+        true_spatial_payload(
+            source_identity_digest,
+            observation,
+            representative_directions_lab=representative_directions_lab,
+            attenuation_arrays=attenuation_arrays,
+        ),
+        response_payload(response),
+        acquisition_payload(
+            observation.acquisition,
+            rep_rate_hz=rep_rate_hz,
+            bunch_charge_pc=bunch_charge_pc,
+        ),
+    )
+
+
 __all__ = [
     "Acquisition",
     "AcquisitionMode",
     "ObservationIdentity",
     "REALIZATION_RNG",
     "ResolvedObservation",
+    "acquisition_payload",
+    "link_identity",
     "observation_identity",
+    "payload_digest",
+    "response_payload",
+    "true_spatial_payload",
 ]

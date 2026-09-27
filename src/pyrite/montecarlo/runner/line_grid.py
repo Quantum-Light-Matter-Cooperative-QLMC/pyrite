@@ -140,55 +140,50 @@ def _cached_grid(cached):
         return None
 
 
-def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
+def _windowed_line_grid(payload, case, segments, n_hats, Ne, feature_widths_eV):
     """Seed, plan and validate a piecewise line axis from this run's segments.
 
     The backbone is the policy's maximum spacing. Every provider the policy
-    names contributes windows, and kinematic window spacing follows the sinc
-    feature width measured on these same segments.
+    names contributes windows for every observation direction in ``n_hats``,
+    and each direction's kinematic window spacing follows the sinc feature
+    width measured on these same segments along that direction. The plan
+    depends only on the union of seeds, so one direction reproduces the
+    single-direction plan exactly.
     """
     windows = payload["windows"]
     start = float(payload["bandwidth"]["start_eV"])
     stop = float(payload["bandwidth"]["stop_eV"])
-    context = SeedContext(
-        case=case,
-        segments=segments,
-        n_hat=np.asarray(n_hat, dtype=float),
-        electron_limit=Ne,
-        start_eV=start,
-        stop_eV=stop,
-        feature_width_eV=float(feature_width_eV),
-        samples_per_feature=int(windows["samples_per_feature"]),
-        aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
-        tail_widths=float(windows["tail_widths"]),
-    )
-    seeds, summaries = collect_feature_seeds(context, windows["providers"])
+    seeds = []
+    summaries = []
+    for n_hat, feature_width_eV in zip(n_hats, feature_widths_eV, strict=True):
+        context = SeedContext(
+            case=case,
+            segments=segments,
+            n_hat=np.asarray(n_hat, dtype=float),
+            electron_limit=Ne,
+            start_eV=start,
+            stop_eV=stop,
+            feature_width_eV=float(feature_width_eV),
+            samples_per_feature=int(windows["samples_per_feature"]),
+            aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
+            tail_widths=float(windows["tail_widths"]),
+        )
+        direction_seeds, direction_summary = collect_feature_seeds(context, windows["providers"])
+        seeds.extend(direction_seeds)
+        summaries.append(direction_summary)
     plan = build_window_plan(start, stop, float(payload["resolution"]["max_spacing_eV"]), seeds)
     grid, record = windowed_coordinates(payload, plan, dtype=REAL)
-    record["feature_width_eV"] = float(feature_width_eV)
-    record["window_seeds"] = summaries
+    record["feature_width_eV"] = float(min(feature_widths_eV))
+    record["window_seeds"] = summaries[0] if len(summaries) == 1 else summaries
     return grid, record
 
 
-def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_layers, groove):
-    """``resonance-population`` axis of this case (#192), under the ceiling cap.
-
-    Uniform at the sinc-Nyquist step, or -- under ``resonance-local`` -- fine
-    only where narrow lines resonate, on a backbone at the maximum spacing.
-    Returns ``(grid, record, bandwidth_record)``.
-    """
-    bandwidth = payload["bandwidth"]
-    resolution = payload["resolution"]
-    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
-    profile = {} if profile_enabled else None
-    if profile_enabled:
-        _profile_stage(profile, rss_before_resolution_mib=_resident_mib())
-    start = float(bandwidth["start_eV"])
+def _direction_populations(case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile):
+    """Every production line along ``n_hat`` over ``(start, ceiling)``."""
     from . import _lines_for_segments
 
-    ceiling = float(bandwidth["stop_eV"])
     audit = {"start_eV": start, "stop_eV": ceiling, "collect": []}
-    stage_started = perf_counter() if profile_enabled else 0.0
+    stage_started = perf_counter() if profile is not None else 0.0
     _lines_for_segments(
         segments,
         np.array([start, ceiling]),
@@ -201,7 +196,7 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         truncation_audit=audit,
     )
     chunks = audit["collect"]
-    if profile_enabled:
+    if profile is not None:
         _profile_stage(
             profile,
             population_collect_wall_s=perf_counter() - stage_started,
@@ -209,12 +204,12 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
             population_lines=sum(chunk[0].size for chunk in chunks),
             rss_after_population_collect_mib=_resident_mib(),
         )
-    stage_started = perf_counter() if profile_enabled else 0.0
+    stage_started = perf_counter() if profile is not None else 0.0
     populations = [
         ResonancePopulation("production lines", energy, weight, width)
         for energy, width, weight in chunks
     ]
-    if profile_enabled:
+    if profile is not None:
         _profile_stage(
             profile,
             population_pack_wall_s=perf_counter() - stage_started,
@@ -225,22 +220,56 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
             ),
             rss_after_population_pack_mib=_resident_mib(),
         )
-    del audit, chunks
-    stage_started = perf_counter() if profile_enabled else 0.0
-    stop, bandwidth_record = case_line_stop_eV(
-        case,
-        populations,
-        start_eV=start,
-        ceiling_eV=float(bandwidth["stop_eV"]),
-        truncation_limit=float(bandwidth["truncation_limit"]),
-        proxy_safety=BANDWIDTH_PROXY_SAFETY,
-    )
+    return populations
+
+
+def _measured_line_grid(payload, case, segments, n_hats, Ne, target_step, abs_layers, groove):
+    """``resonance-population`` axis of this case (#192), under the ceiling cap.
+
+    Uniform at the sinc-Nyquist step, or -- under ``resonance-local`` -- fine
+    only where narrow lines resonate, on a backbone at the maximum spacing.
+    Each direction in ``n_hats`` measures its own line population and stop
+    edge; the grid ends at the largest edge and, under ``resonance-local``,
+    refines the union of every direction's local-spacing seeds, so one
+    direction reproduces the single-direction axis exactly.
+    Returns ``(grid, record, bandwidth_record)``.
+    """
+    bandwidth = payload["bandwidth"]
+    resolution = payload["resolution"]
+    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
+    profile = {} if profile_enabled else None
     if profile_enabled:
-        _profile_stage(
-            profile,
-            stop_search_wall_s=perf_counter() - stage_started,
-            rss_after_stop_search_mib=_resident_mib(),
+        _profile_stage(profile, rss_before_resolution_mib=_resident_mib())
+    start = float(bandwidth["start_eV"])
+    ceiling = float(bandwidth["stop_eV"])
+    direction_populations = []
+    bandwidth_records = []
+    for n_hat in n_hats:
+        populations = _direction_populations(
+            case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile
         )
+        stage_started = perf_counter() if profile_enabled else 0.0
+        _direction_stop, direction_record = case_line_stop_eV(
+            case,
+            populations,
+            start_eV=start,
+            ceiling_eV=ceiling,
+            truncation_limit=float(bandwidth["truncation_limit"]),
+            proxy_safety=BANDWIDTH_PROXY_SAFETY,
+        )
+        if profile_enabled:
+            _profile_stage(
+                profile,
+                stop_search_wall_s=perf_counter() - stage_started,
+                rss_after_stop_search_mib=_resident_mib(),
+            )
+        direction_populations.append(populations)
+        bandwidth_records.append(direction_record)
+    stop = max(record["stop_eV"] for record in bandwidth_records)
+    if len(bandwidth_records) == 1:
+        bandwidth_record = bandwidth_records[0]
+    else:
+        bandwidth_record = {"stop_eV": stop, "directions": bandwidth_records}
     if resolution["policy"] != LOCAL_RESOLUTION_POLICY:
         stage_started = perf_counter() if profile_enabled else 0.0
         grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
@@ -254,14 +283,20 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
         return grid, record, bandwidth_record
     backbone = float(resolution["max_spacing_eV"])
     stage_started = perf_counter() if profile_enabled else 0.0
-    seeds, summary = local_spacing_seeds(
-        populations,
-        start_eV=start,
-        stop_eV=stop,
-        floor_spacing_eV=min(float(target_step), backbone),
-        max_spacing_eV=backbone,
-        halo_limit=float(resolution["halo_limit"]),
-    )
+    seeds = []
+    summaries = []
+    for populations in direction_populations:
+        direction_seeds, direction_summary = local_spacing_seeds(
+            populations,
+            start_eV=start,
+            stop_eV=stop,
+            floor_spacing_eV=min(float(target_step), backbone),
+            max_spacing_eV=backbone,
+            halo_limit=float(resolution["halo_limit"]),
+        )
+        seeds.extend(direction_seeds)
+        summaries.append(direction_summary)
+    del direction_populations
     if profile_enabled:
         _profile_stage(
             profile,
@@ -279,7 +314,7 @@ def _measured_line_grid(payload, case, segments, n_hat, Ne, target_step, abs_lay
             rss_after_grid_build_mib=_resident_mib(),
         )
     record["feature_width_eV"] = float(target_step)
-    record["local_spacing"] = summary
+    record["local_spacing"] = summaries[0] if len(summaries) == 1 else summaries
     if profile_enabled:
         record["line_grid_profile"] = profile
     return grid, record, bandwidth_record
@@ -330,10 +365,25 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
     hit rebuilds the coordinates from the stored plan; a plan this build would
     not make is treated as a miss.
     """
+    return _resolve_policy_grid(
+        payload, case, segments, (n_hat,), Ne, abs_layers, groove, observation=False
+    )
+
+
+def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove, *, observation):
+    """Resolve one policy grid that serves every direction in ``n_hats``.
+
+    The uniform spacing is the finest any direction needs, and windowed or
+    measured seeds are the union over directions. ``observation``
+    distinguishes a physical detector's direction set from the case's own
+    scalar direction in the speed-cache key; the scalar grid and its cache
+    entries are unchanged.
+    """
     profile_enabled = bool(case.get("_profile_line_grid_stages", False))
     profile_started = perf_counter() if profile_enabled else 0.0
     profile_rss_before = _resident_mib() if profile_enabled else None
-    _refuse_coherent_resolution(case, segments, n_hat, Ne)
+    for n_hat in n_hats:
+        _refuse_coherent_resolution(case, segments, n_hat, Ne)
     windowed = payload.get("windows") is not None
     measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
     keys = (
@@ -345,6 +395,8 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
     inputs["backend_dtype"] = np.dtype(REAL).name
     if windowed or measured:
         inputs["seeding_revision"] = SEEDING_REVISION
+    if observation:
+        inputs["observation_directions"] = np.asarray(n_hats, dtype=float).tolist()
     key = coordinate_cache_key(payload, inputs)
     cached = cached_coordinates(key)
     if cached is not None:
@@ -360,19 +412,21 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
                     "rss_after_resolution_mib": _resident_mib(),
                 }
             return grid, record
-    target_step, aliased_fraction, spacing_segments = sinc_feature_spacing(
-        segments,
-        n_hat,
-        electron_limit=Ne,
-        aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
-    )
+    limit = float(payload["resolution"]["aliased_weight_limit"])
+    spacings = [
+        sinc_feature_spacing(segments, n_hat, electron_limit=Ne, aliased_weight_limit=limit)
+        for n_hat in n_hats
+    ]
+    steps = [spacing[0] for spacing in spacings]
+    target_step = min(steps)
+    _, aliased_fraction, spacing_segments = spacings[steps.index(target_step)]
     bandwidth_record = None
     try:
         if windowed:
-            grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
+            grid, record = _windowed_line_grid(payload, case, segments, n_hats, Ne, steps)
         elif measured:
             grid, record, bandwidth_record = _measured_line_grid(
-                payload, case, segments, n_hat, Ne, target_step, abs_layers, groove
+                payload, case, segments, n_hats, Ne, target_step, abs_layers, groove
             )
         else:
             grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
@@ -382,6 +436,8 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne, abs_layers, gr
         ) from exc
     if bandwidth_record is not None:
         record["measured_bandwidth"] = bandwidth_record
+    if observation:
+        record["observation_direction_count"] = len(n_hats)
     record.update(
         {
             "aliased_weight_fraction": aliased_fraction,
@@ -411,6 +467,26 @@ def _warn_lineshape_precision(record):
     message = lineshape_precision_warning(record)
     if message is not None:
         warnings.warn(message, LineShapePrecisionWarning, stacklevel=3)
+
+
+def resolve_observation_line_grid(case, segments, n_hats, Ne, E_grid, abs_layers=None, groove=None):
+    """Choose one line grid covering every physical-detector direction.
+
+    An automatic policy resolves from all directions jointly -- finest sinc
+    spacing, the union of feature windows, and the widest measured bandwidth
+    -- so lines that move across the detector stay inside refined windows.
+    The scalar case grid is not reused: its windows are seeded only along the
+    case's own direction. An explicit or stored grid is already final and is
+    returned unchanged, as is a diagnostic-derivation case.
+
+    Returns ``(E_grid, record)``; ``record`` is ``None`` for a final grid.
+    """
+    policy_payload = case.get("line_grid_policy")
+    if policy_payload is None or case.get("_diagnostic_line_grid") is not None:
+        return E_grid, None
+    return _resolve_policy_grid(
+        policy_payload, case, segments, n_hats, Ne, abs_layers, groove, observation=True
+    )
 
 
 def resolve_line_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove=None):

@@ -3,6 +3,7 @@
 import os
 import warnings
 from contextlib import nullcontext
+from functools import partial
 from time import perf_counter
 from typing import Any
 
@@ -20,6 +21,7 @@ from . import (
     _case_transport_core,
     _cpu_pool_workers,
     _cpu_spectrum_backend,
+    _directional_outputs,
     _ensure_pool_limit,
     _gpu_pipeline_prefetch,
     _gpu_pipeline_workers,
@@ -151,6 +153,7 @@ def run_cases(
     on_activity=None,
     transport_only=False,
     trajectory_capture=None,
+    observation_directions=None,
 ):
     """
     Run typed cases or compatibility mappings through ``run_case``.
@@ -184,6 +187,11 @@ def run_cases(
         Opt-in :class:`~pyrite.montecarlo.trajectories.TrajectoryCapture`;
         each case's transport result is written by the process that
         transported it. ``None`` (default) writes nothing.
+    observation_directions
+        Optional sequence aligned with ``cases``; each entry is ``None`` or an
+        ``(N, 3)`` array of sample-frame physical-detector directions. A case
+        with directions also returns ``out["directional"]`` evaluated on the
+        same transport as its scalar arrays, on every scheduling branch.
 
     Returns
     -------
@@ -298,6 +306,18 @@ def run_cases(
     results: list[Any] = [None] * n
     if n == 0:
         return results
+    if observation_directions is not None and len(observation_directions) != n:
+        raise ValueError("observation_directions must align with cases")
+
+    def _directions(index):
+        return None if observation_directions is None else observation_directions[index]
+
+    def _direction_kwargs(index):
+        # Forwarded only when a case has directions, so every scalar-only run
+        # calls run_case exactly as before.
+        directions = _directions(index)
+        return {} if directions is None else {"observation_directions": directions}
+
     fallback_reason = None
     if use_gpu:
         try:
@@ -370,12 +390,13 @@ def run_cases(
                         on_timing is not None,
                         keep_segments_on_device=True,
                         **capture_kw,
+                        **_direction_kwargs(i),
                     )
                 else:
                     out = (
-                        run_case(cases[i], True, **capture_kw)
+                        run_case(cases[i], True, **capture_kw, **_direction_kwargs(i))
                         if on_timing is not None
-                        else run_case(cases[i], **capture_kw)
+                        else run_case(cases[i], **capture_kw, **_direction_kwargs(i))
                     )
 
                     if fallback_reason is not None:
@@ -524,6 +545,20 @@ def run_cases(
                     with _cpu_spectrum_backend():
                         out = _spectrum_case(cases[i], tp, on_timing is not None)
                     out["_backend_fallback_reason"] = reason
+                directions = _directions(i)
+                if directions is not None:
+                    if "_backend_fallback_reason" in out:
+                        with _cpu_spectrum_backend():
+                            out["directional"] = _directional_outputs(cases[i], tp, directions)
+                    else:
+                        out["directional"] = _directional_outputs(
+                            cases[i],
+                            tp,
+                            directions,
+                            spectrum=partial(
+                                _spectrum_case_retry, spec_chunk_cap=learned_spec_chunk
+                            ),
+                        )
                 # The payload is dead here; holding it until the next iteration
                 # rebinds tp would put prefetch + 1 of them in the driver.
                 del tp
@@ -566,9 +601,9 @@ def run_cases(
             # core (_worker_init) -- a pool of CUDA contexts is what this pool
             # exists to avoid.
             (
-                ex.submit(run_case, c, True, **capture_kw)
+                ex.submit(run_case, c, True, **capture_kw, **_direction_kwargs(i))
                 if on_timing is not None
-                else ex.submit(run_case, c, **capture_kw)
+                else ex.submit(run_case, c, **capture_kw, **_direction_kwargs(i))
             ): i
             for i, c in enumerate(cases)
         }

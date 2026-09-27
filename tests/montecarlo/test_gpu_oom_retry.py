@@ -355,3 +355,41 @@ def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
         "cxr.brem",
         "cxr.interpolate",
     ]
+
+
+def test_gpu_pipeline_evaluates_directions_on_the_pipelined_transport(monkeypatch):
+    transports = []
+    directional_calls = []
+
+    def fake_transport(case, record_timing=False, **_kwargs):
+        transports.append(case["name"])
+        return {"E_grid": np.zeros(2000), "E_brem": np.zeros(2000), "name": case["name"]}
+
+    def fake_directional(case, tp, directions, spectrum=None):
+        assert tp["name"] == case["name"]
+        assert spectrum.func is scheduling._spectrum_case_retry
+        directional_calls.append((case["name"], len(directions)))
+        return {"spec_by_direction": np.zeros((len(directions), 2))}
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(scheduling, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(scheduling, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(scheduling, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(scheduling, "_transport_case", fake_transport)
+    monkeypatch.setattr(
+        scheduling, "_spectrum_case_retry", lambda case, tp, **_kwargs: {"name": case["name"]}
+    )
+    monkeypatch.setattr(scheduling, "_directional_outputs", fake_directional)
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    out = runner.run_cases(
+        [{"name": "observed"}, {"name": "scalar"}],
+        max_workers=2,
+        progress=False,
+        observation_directions=[np.zeros((3, 3)), None],
+    )
+
+    assert transports == ["observed", "scalar"]
+    assert directional_calls == [("observed", 3)]
+    assert out[0]["directional"]["spec_by_direction"].shape == (3, 2)
+    assert "directional" not in out[1]
