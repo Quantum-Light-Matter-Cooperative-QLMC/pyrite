@@ -41,20 +41,50 @@ the ledger notes of `xray-in-medium-resonance` as an open question.
   external DB, 2 test_docs errors); lint, typecheck, docs build,
   `validation-ledger --check` clean.
 
+## Hardware verification (2026-09-26, lab box RTX 5080)
+
+Committed trees shipped to `~/scratch/pyrite-181` (#181) and
+`~/scratch/pyrite-181-base` (#176 tip `ee1adcbb`); SLURM jobs 160-165.
+
+- CUDA: the three CUDA-gated files plus
+  `test_coherent_formation_absorption.py` under `PYRITE_MC_BACKEND=cuda
+  PYRITE_TEST_BACKEND=cuda`: 79 passed, 1 skipped (child-session guard).
+  The first run failed `test_coherent_spectrum_is_invariant_under_segment_splitting`
+  (all three cases) by 1.6e-3 of peak in 3 bins at the line centre against
+  a hard-coded `eps_multiple=1e4`. That is float32 phase rounding (piece ages
+  of ~7e4 A); the device bound now derives from the flight phase
+  `k0 L / beta` (~7e4 rad). fp64 host floor unchanged at 1e-9.
+- `checks/segment_escape_split_ladder.py` (full: hopg, 100 keV, 2 um, 30 deg,
+  20000 e x 3 seeds). The #181 run first crashed: the transparent control
+  patched the removed `_per_hkl._segment_escape_distance`; it now zeroes the
+  `expand_escape_pieces` escape ends. Control rows are identical before and
+  after. `spec_escape_only` ratio k=32 / k=1:
+
+  | metric | before (#176) | after (#181) |
+  |---|---|---|
+  | mott total | 1.0201 | 1.0097 +- 0.0012 |
+  | mott 1754 eV | 1.0236 | 1.0101 +- 0.0012 |
+  | elsepa total | 1.0276 | 1.0025 +- 0.0003 |
+  | elsepa 1754 eV | 1.0351 | 1.0024 +- 0.0003 |
+  | 3509 eV (mott / elsepa) | 0.9486 / 0.9696 | 0.9483 / 0.9689 |
+
+  The 3509 eV row does not move with #181: raw `spec` there is flat (+0.2 %)
+  while the transparent control grows +5.7 %, so it is formation-time
+  broadening shedding window yield, not escape bias. The residual ~1 % Mott
+  drift (~8 se) is accepted by the user. Characteristic and brem flat;
+  ELSEPA - Mott C K -0.02 % at every k.
+
 ## Remaining acceptance
 
-- User runs CUDA-gated tests on hardware:
-  `tests/montecarlo/test_coherent_formation_absorption_cuda.py`,
-  `tests/montecarlo/test_xray_dispersion_cuda.py`,
-  `tests/montecarlo/test_spectrum_cuda_cheap_hoists.py`, plus the CUDA-backend
-  run of the CPU formation tests.
 - Fresh-context physics validation of `coherent-formation-absorption` and the
-  #181 extension of `segment-escape-average`.
-- Remote before/after run of `checks/segment_escape_split_ladder.py`.
+  #181 extension of `segment-escape-average`, if not already covered by
+  `aebedcc7`.
 
 ## Open risks
 
 - Kernel cost: two extra sin/cos per (line, energy) in formation mode, plus
   more rows (segments split at escape pieces) on the coherent route.
 - `expand_escape_pieces` advances piece ages with float64 beta while device
-  `t_L` uses REAL beta (rounding-level clock mismatch on float32).
+  `t_L` uses REAL beta (rounding-level clock mismatch on float32). Measured
+  on hardware: within the phase-scaled float32 bound (1.6e-3 of peak on a
+  40 um track).
