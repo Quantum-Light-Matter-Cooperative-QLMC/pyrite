@@ -8,9 +8,11 @@ import warnings
 
 import numpy as np
 
-from ..._backend import REAL
+from ..._backend import REAL, _to_cpu
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
+    BANDWIDTH_PROXY_SAFETY,
+    RESONANCE_BANDWIDTH_POLICY,
     LineGridToleranceError,
     LineShapePrecisionWarning,
     cached_coordinates,
@@ -22,7 +24,12 @@ from ..._line_grid_policy import (
 )
 from ..._line_windows import build_window_plan, window_plan_from_payload
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
-from ..spectrum.line_seeds import SEEDING_REVISION, SeedContext, collect_feature_seeds
+from ..spectrum.line_seeds import (
+    SEEDING_REVISION,
+    SeedContext,
+    case_line_stop_eV,
+    collect_feature_seeds,
+)
 
 # Case fields the automatic line-grid resolution depends on. Transport is a
 # deterministic function of these plus the seed, so they content-address the
@@ -115,6 +122,21 @@ def _windowed_line_grid(payload, case, segments, n_hat, Ne, feature_width_eV):
     return grid, record
 
 
+def _measured_stop(payload, case, segments, n_hat, Ne):
+    """``resonance-population`` edge of this case (#192), under the ceiling cap."""
+    bandwidth = payload["bandwidth"]
+    return case_line_stop_eV(
+        case,
+        segments,
+        n_hat,
+        electron_limit=Ne,
+        start_eV=float(bandwidth["start_eV"]),
+        ceiling_eV=float(bandwidth["stop_eV"]),
+        truncation_limit=float(bandwidth["truncation_limit"]),
+        proxy_safety=BANDWIDTH_PROXY_SAFETY,
+    )
+
+
 def _refuse_coherent_resolution(case, segments, n_hat, Ne):
     """Refuse automatic resolution on the coherent route (issue #117).
 
@@ -162,10 +184,11 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
     """
     _refuse_coherent_resolution(case, segments, n_hat, Ne)
     windowed = payload.get("windows") is not None
-    keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed else ())
+    measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    keys = _RESOLUTION_INPUT_KEYS + (_WINDOW_INPUT_KEYS if windowed or measured else ())
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
-    if windowed:
+    if windowed or measured:
         inputs["seeding_revision"] = SEEDING_REVISION
     key = coordinate_cache_key(payload, inputs)
     cached = cached_coordinates(key)
@@ -180,16 +203,21 @@ def _resolve_policy_line_grid(payload, case, segments, n_hat, Ne):
         electron_limit=Ne,
         aliased_weight_limit=float(payload["resolution"]["aliased_weight_limit"]),
     )
+    bandwidth_record = None
     try:
         if windowed:
             grid, record = _windowed_line_grid(payload, case, segments, n_hat, Ne, target_step)
+        elif measured:
+            stop, bandwidth_record = _measured_stop(payload, case, segments, n_hat, Ne)
+            grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
         else:
             grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
     except LineGridToleranceError as exc:
         raise LineGridToleranceError(
-            f"{case['name']} at {case['E0_keV']:g} keV "
-            f"(backend {np.dtype(REAL).name}): {exc}"
+            f"{case['name']} at {case['E0_keV']:g} keV (backend {np.dtype(REAL).name}): {exc}"
         ) from exc
+    if bandwidth_record is not None:
+        record["measured_bandwidth"] = bandwidth_record
     record.update(
         {
             "aliased_weight_fraction": aliased_fraction,
@@ -270,3 +298,43 @@ def resolve_line_grid(case, segments, n_hat, Ne, E_grid):
         "n_spacing_segments": spacing_segments,
         "observable_class": "intrinsic_source",
     }
+
+
+def line_truncation_audit(case, E_grid):
+    """Empty edge-truncation audit for a ``resonance-population`` case, else ``None``."""
+    payload = case.get("line_grid_policy")
+    if payload is None or payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
+        return None
+    grid = np.asarray(E_grid, dtype=float)
+    return {"start_eV": float(grid[0]), "stop_eV": float(grid[-1])}
+
+
+def check_line_truncation(case, audit):
+    """Gate a measured bandwidth on its production-weight truncation (#192).
+
+    The upper-edge fraction is the bandwidth share this policy spends and is
+    refused above ``truncation_limit``. The lower edge is reported only: the
+    ``start`` convention predates this policy and is not its share.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    total = float(_to_cpu(audit.get("line_mass", 0.0)))
+    above = float(_to_cpu(audit.get("mass_above", 0.0)))
+    below = float(_to_cpu(audit.get("mass_below", 0.0)))
+    limit = float(case["line_grid_policy"]["bandwidth"]["truncation_limit"])
+    record = {
+        "start_eV": audit["start_eV"],
+        "stop_eV": audit["stop_eV"],
+        "truncation_limit": limit,
+        "upper_fraction_bound": above / total if total > 0.0 else 0.0,
+        "lower_fraction_bound": below / total if total > 0.0 else 0.0,
+    }
+    if record["upper_fraction_bound"] > limit:
+        raise LineGridToleranceError(
+            f"{case['name']} at {case['E0_keV']:g} keV: the measured line bandwidth "
+            f"[{audit['start_eV']:g}, {audit['stop_eV']:g}] eV may truncate "
+            f"{record['upper_fraction_bound']:.3g} of the line yield above its edge "
+            f"with production weights, above the {limit:g} bandwidth share. Use the "
+            "kinematic-ceiling bandwidth or supply an explicit grid."
+        )
+    return record

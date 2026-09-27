@@ -13,7 +13,11 @@ bandwidth
     ``kinematic-ceiling`` bound below -- closed form, no simulation. The stored
     catalog artifacts instead carry ``coverage-0.95``, a *bandwidth* policy
     measured by ``energy_grid.derive``: 95% of integrated coherent-line
-    intensity. Neither is an accuracy statement.
+    intensity. Neither is an accuracy statement. ``resonance-population``
+    (#192, opt-in) keeps the ceiling as a cap but stops where the case's own
+    resonance population and characteristic lines leave at most
+    :data:`DEFAULT_BANDWIDTH_TRUNCATION` of their mass above the axis; the
+    spectrum phase audits that share with the production weights.
 
 resolution
     How finely that interval is sampled. Owned by the sinc Nyquist estimator
@@ -67,13 +71,18 @@ from .paths import cache_dir
 
 __all__ = [
     "AUTOMATIC_BANDWIDTH_POLICY",
+    "BANDWIDTH_POLICIES",
+    "BANDWIDTH_PROXY_SAFETY",
     "AUTOMATIC_RESOLUTION_POLICY",
     "COVERAGE_BANDWIDTH_POLICY",
     "DEFAULT_BANDWIDTH_COVERAGE",
+    "DEFAULT_BANDWIDTH_TRUNCATION",
     "FLOAT32_LINESHAPE_BINADE_EV",
     "LINE_GRID_POLICY_SCHEMA",
     "LINE_QUADRATURES",
     "QUADRATURE_LINE_GRID_POLICY_SCHEMA",
+    "RESONANCE_BANDWIDTH_POLICY",
+    "RESONANCE_LINE_GRID_POLICY_SCHEMA",
     "OBSERVABLE_CLASSES",
     "WINDOWED_LINE_GRID_POLICY_SCHEMA",
     "WINDOW_POLICY",
@@ -102,6 +111,9 @@ WINDOWED_LINE_GRID_POLICY_SCHEMA = 2
 #: Payload version of a policy selecting a non-default line quadrature (#116),
 #: with or without windows. A ``node`` policy keeps schema 1 or 2 unchanged.
 QUADRATURE_LINE_GRID_POLICY_SCHEMA = 3
+#: Payload version of a policy selecting the ``resonance-population`` bandwidth
+#: (#192). Every other policy keeps its schema and payload unchanged.
+RESONANCE_LINE_GRID_POLICY_SCHEMA = 4
 
 #: Line quadratures, default first. Restated from
 #: ``montecarlo.spectrum.lines._bin_quadrature`` so this module stays a leaf; a
@@ -143,6 +155,15 @@ DEFAULT_RTOL: Mapping[str, float] = {"intrinsic_source": 1.0e-3, "detected_count
 DEFAULT_BANDWIDTH_COVERAGE = 0.95
 COVERAGE_BANDWIDTH_POLICY = "coverage-0.95"
 AUTOMATIC_BANDWIDTH_POLICY = "kinematic-ceiling"
+#: Trajectory-measured bandwidth under the ceiling cap (#192). Opt-in only.
+RESONANCE_BANDWIDTH_POLICY = "resonance-population"
+BANDWIDTH_POLICIES = (AUTOMATIC_BANDWIDTH_POLICY, RESONANCE_BANDWIDTH_POLICY)
+#: Upper-edge truncation share of ``resonance-population``: the bandwidth row of
+#: ``tbl-line-budget-allocation``, a fraction of integrated incoherent line
+#: yield. The spectrum phase gates the production-weight truncation on it; the
+#: edge is chosen from the ``t_L**2`` proxy at a tenth of it.
+DEFAULT_BANDWIDTH_TRUNCATION = 1.0e-4
+BANDWIDTH_PROXY_SAFETY = 10.0
 AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
 
 #: Coarsest automatic spacing. Matches the catalog's historical 3 eV line-grid
@@ -303,6 +324,7 @@ class LineGridPolicy:
     sources: tuple[tuple[str, str], ...]
     windows: tuple[tuple[str, Any], ...] | None = None
     quadrature: str = DEFAULT_LINE_QUADRATURE
+    bandwidth_truncation: float | None = None
 
     def payload(self) -> dict[str, Any]:
         """Canonical JSON-able payload carried on the case."""
@@ -330,6 +352,14 @@ class LineGridPolicy:
         if self.quadrature != DEFAULT_LINE_QUADRATURE:
             payload["schema"] = QUADRATURE_LINE_GRID_POLICY_SCHEMA
             payload["quadrature"] = self.quadrature
+        if self.bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
+            # stop_eV stays the closed-form ceiling: the cap the measured edge
+            # may not exceed, and the placeholder grid's extent.
+            payload["schema"] = RESONANCE_LINE_GRID_POLICY_SCHEMA
+            payload["bandwidth"] = {
+                **payload["bandwidth"],
+                "truncation_limit": self.bandwidth_truncation,
+            }
         return payload
 
     @property
@@ -563,8 +593,33 @@ def resolve_line_grid_policy(
                 sources["quadrature"] = label
             break
 
+    # Bandwidth follows per-call > stored > the caller's argument, with no
+    # environment layer, like windows and quadrature. The source is recorded
+    # only for a non-default choice, keeping historical payloads unchanged.
+    bandwidth_policy = str(bandwidth_policy)
+    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
+        if layer.get("bandwidth") is not None:
+            chosen = str(layer["bandwidth"])
+            if chosen not in BANDWIDTH_POLICIES:
+                raise ValueError(
+                    f"{label} line-grid bandwidth must be one of {list(BANDWIDTH_POLICIES)}, "
+                    f"got {chosen!r}"
+                )
+            if chosen != bandwidth_policy:
+                sources["bandwidth"] = label
+            bandwidth_policy = chosen
+            break
+    truncation = None
+    if bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
+        if windows is not None:
+            raise ValueError(
+                "the resonance-population bandwidth takes its budget share from the "
+                "feature-window row and cannot be combined with windows"
+            )
+        truncation = DEFAULT_BANDWIDTH_TRUNCATION
+
     return LineGridPolicy(
-        bandwidth_policy=str(bandwidth_policy),
+        bandwidth_policy=bandwidth_policy,
         start_eV=float(start_eV),
         stop_eV=float(stop_eV),
         resolution_policy=AUTOMATIC_RESOLUTION_POLICY,
@@ -576,6 +631,7 @@ def resolve_line_grid_policy(
         sources=tuple(sorted(sources.items())),
         windows=None if windows is None else tuple(sorted(windows.items())),
         quadrature=quadrature,
+        bandwidth_truncation=truncation,
     )
 
 
@@ -584,6 +640,7 @@ def resolved_coordinates(
     target_spacing_eV: float,
     *,
     dtype=np.float32,
+    stop_eV: float | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Turn a measured target spacing into the resolved uniform line grid.
 
@@ -591,11 +648,20 @@ def resolved_coordinates(
     own trajectories. Failure to satisfy the point budget or the backend ULP
     floor raises :class:`LineGridToleranceError` with the unmet tolerance and an
     actionable correction; neither is ever met by coarsening.
+
+    ``stop_eV`` replaces the payload's stop for a measured bandwidth; it must
+    lie inside the payload's ``(start, stop]``, which is then a cap.
     """
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     start = float(bandwidth["start_eV"])
     stop = float(bandwidth["stop_eV"])
+    if stop_eV is not None:
+        if not start < float(stop_eV) <= stop:
+            raise ValueError(
+                f"measured line-grid stop {stop_eV!r} eV lies outside ({start:g}, {stop:g}] eV"
+            )
+        stop = float(stop_eV)
     maximum_spacing = float(resolution["max_spacing_eV"])
     max_points = int(resolution["max_points"])
     safety_ulps = float(resolution["backend_safety_ulps"])

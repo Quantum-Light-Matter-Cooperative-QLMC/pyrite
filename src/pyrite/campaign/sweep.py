@@ -36,6 +36,7 @@ from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
 from .._grid_semantics import resolution_num
 from .._line_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
+    RESONANCE_BANDWIDTH_POLICY,
     LineGridPolicy,
     LineGridToleranceError,
     environment_overrides_present,
@@ -630,6 +631,7 @@ def _line_grid_for_energy(
     trajectories.
     """
     assert sweep.detector is not None
+    assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     bins = sweep.detector.energy_bins
     override = bool(sweep.line_grid_policy) or environment_overrides_present()
     if bins.line is not None and not sweep.line_grid_policy:
@@ -642,7 +644,11 @@ def _line_grid_for_energy(
             return np.asarray(stored, dtype=float), None
     policy = _automatic_line_grid_policy(sweep, cp, float(energy_keV))
     num = resolution_num(policy.start_eV, policy.stop_eV, policy.max_spacing_eV)
-    if num > policy.max_points:
+    if policy.bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
+        # The ceiling only caps a measured edge, so it proves nothing about
+        # the budget; the runner refuses after transport instead.
+        num = min(num, policy.max_points)
+    elif num > policy.max_points:
         raise LineGridToleranceError(
             f"automatic line grid for {sweep.target.material} at {energy_keV:g} keV "
             f"needs at least {num} coordinates over "

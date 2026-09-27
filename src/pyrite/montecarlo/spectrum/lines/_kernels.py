@@ -80,6 +80,34 @@ if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallb
     _sincsq_lineshape = xp.fuse()(_sincsq_lineshape)
 
 
+def _accumulate_edge_truncation(audit, E_r, a_width, weight):
+    """Add these lines' whole and out-of-axis ``sinc**2`` mass to ``audit``.
+
+    ``audit`` carries the axis ``start_eV``/``stop_eV``. A line of weight ``w``
+    has mass ``w pi / a_w``; beyond a distance ``D`` on one side at most
+    ``min(1, 1 / (pi a_w D))`` of it, all of it when the resonance lies past
+    that edge (``line_seeds.sincsq_upper_tail_bound``). Sums stay on the device
+    until the runner reads them. Production weights, so this audits the
+    ``t_L**2`` proxy the edge was chosen with.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    if audit is None or E_r.size == 0:
+        return
+    mass = weight * (xp.pi / a_width)
+    tiny = xp.finfo(E_r.dtype).tiny
+    beyond = []
+    for distance in (audit["stop_eV"] - E_r, E_r - audit["start_eV"]):
+        tail = 1.0 / (xp.pi * a_width * xp.maximum(distance, tiny))
+        beyond.append(xp.where(distance > 0.0, xp.minimum(tail, 1.0), 1.0))
+    for key, value in (
+        ("line_mass", mass),
+        ("mass_above", mass * beyond[0]),
+        ("mass_below", mass * beyond[1]),
+    ):
+        audit[key] = audit.get(key, 0.0) + value.sum(dtype=xp.float64)
+
+
 def _line_amp_sq_core(
     chi_re,
     chi_im,

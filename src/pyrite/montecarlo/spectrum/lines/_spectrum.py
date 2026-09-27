@@ -43,6 +43,7 @@ def mc_spectrum(
     _table_cache=None,
     longitudinal_rms_fs=None,
     line_quadrature="node",
+    truncation_audit=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron] on
@@ -134,6 +135,11 @@ def mc_spectrum(
         yield-only quadrature: it smooths peak height and width. Incoherent
         only; refused with ``coherent``, ``sinc_cutoff``, or numerical
         substeps. Validation: sinc-bin-integration
+    truncation_audit
+        Optional mutable mapping holding the axis ``start_eV``/``stop_eV``;
+        incoherent routes add each line's whole and out-of-axis mass bound
+        (``line_mass``, ``mass_above``, ``mass_below``, un-normalised device
+        scalars). Validation: line-grid-resonance-bandwidth
 
     Returns
     -------
@@ -181,6 +187,7 @@ def mc_spectrum(
         _table_cache=_table_cache,
         longitudinal_rms_fs=longitudinal_rms_fs,
         line_quadrature=line_quadrature,
+        truncation_audit=truncation_audit,
     )
     return _mc_spectrum(request)
 
