@@ -150,6 +150,7 @@ def run_cases(
     on_timing=None,
     on_activity=None,
     transport_only=False,
+    trajectory_capture=None,
 ):
     """
     Run typed cases or compatibility mappings through ``run_case``.
@@ -179,6 +180,10 @@ def run_cases(
         Optional callback receiving driver phase-transition mappings.
     transport_only
         Run transport without spectrum calculation; output slots are ``None``.
+    trajectory_capture
+        Opt-in :class:`~pyrite.montecarlo.trajectories.TrajectoryCapture`;
+        each case's transport result is written by the process that
+        transported it. ``None`` (default) writes nothing.
 
     Returns
     -------
@@ -266,6 +271,8 @@ def run_cases(
         )
 
     progress_label = _case_progress_label(cases)
+    # Passed only when requested so capture-free calls keep their exact shape.
+    capture_kw = {} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}
 
     def _maybe_bar(iterable):
         if not progress:
@@ -354,6 +361,7 @@ def run_cases(
                     _transport_case(
                         cases[i],
                         record_timing=on_timing is not None,
+                        **capture_kw,
                     )
                     out = None
                 elif keep_segments_on_device:
@@ -361,9 +369,14 @@ def run_cases(
                         cases[i],
                         on_timing is not None,
                         keep_segments_on_device=True,
+                        **capture_kw,
                     )
                 else:
-                    out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
+                    out = (
+                        run_case(cases[i], True, **capture_kw)
+                        if on_timing is not None
+                        else run_case(cases[i], **capture_kw)
+                    )
 
                     if fallback_reason is not None:
                         out["_backend_fallback_reason"] = fallback_reason
@@ -432,9 +445,9 @@ def run_cases(
                 # none of them may open a CUDA context on the device this
                 # process is driving.
                 fut = (
-                    ex.submit(_transport_case, cases[i], True)
+                    ex.submit(_transport_case, cases[i], True, **capture_kw)
                     if on_timing is not None
-                    else ex.submit(_transport_case, cases[i])
+                    else ex.submit(_transport_case, cases[i], **capture_kw)
                 )
 
                 if timing is not None:
@@ -552,7 +565,11 @@ def run_cases(
             # Workers run the spectrum on NumPy and the transport on the CPU
             # core (_worker_init) -- a pool of CUDA contexts is what this pool
             # exists to avoid.
-            (ex.submit(run_case, c, True) if on_timing is not None else ex.submit(run_case, c)): i
+            (
+                ex.submit(run_case, c, True, **capture_kw)
+                if on_timing is not None
+                else ex.submit(run_case, c, **capture_kw)
+            ): i
             for i, c in enumerate(cases)
         }
         _activity("cpu_pool", in_flight_case_count=len(futures))

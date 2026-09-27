@@ -115,6 +115,7 @@ def run_sweep(
     cache_write=True,
     transport_only=False,
     metadata_only_complete=False,
+    trajectory_capture=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -191,6 +192,13 @@ def run_sweep(
     cache_write : write each finished case into the CAS (default True; ignored
         when ``content_key_fn`` is None). Set False by ``--no-cache`` / ``-p`` so
         an ephemeral or measurement run never populates the shared store.
+    trajectory_capture : optional ``montecarlo.trajectories.TrajectoryCapture``.
+        When given, every case this call transports writes its transport result
+        to one HDF5 artifact before its spectrum runs. Resumed or cache-replayed
+        cases are not re-transported and get no new artifact. Existing artifacts
+        are checked before any transport (see ``preflight_capture``), and the
+        metadata-only completion shortcut is skipped. None (default) captures
+        nothing and leaves the run unchanged.
 
     Returns True iff every requested ``(name, E0_keV)`` pair ended up in
     ``results`` (i.e. the sweep ran to completion, budget or not); False if
@@ -339,6 +347,7 @@ def run_sweep(
         )
         if (
             metadata_only_complete
+            and trajectory_capture is None
             and on_chunk is None
             and not _checkpoint_store.has_parts(path.name, path.parent)
             and manifest_fresh
@@ -430,6 +439,20 @@ def run_sweep(
     todo = [c for c in cases if not (c["name"] in results and c["E0_keV"] in results[c["name"]])]
     cached_cases = len(cases) - len(todo)
     print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
+    if trajectory_capture is not None:
+        from ..montecarlo.trajectories import preflight_capture
+
+        plan = preflight_capture(trajectory_capture, cases, todo)
+        print(
+            f"trajectories: writing {plan.to_write} case(s) to {trajectory_capture.root}"
+            + (f" (replacing {plan.replaced})" if plan.replaced else "")
+            + (f"; {plan.kept} already captured" if plan.kept else "")
+        )
+        if plan.missing_cached:
+            print(
+                f"trajectories: {plan.missing_cached} cached case(s) have no artifact "
+                "and are not re-transported; rerun with --recompute to capture them"
+            )
     if on_runtime is not None:
         on_runtime(runner.runtime_plan(todo, max_workers))
     completed_new_cases = 0
@@ -542,6 +565,7 @@ def run_sweep(
         should_stop=should_stop,
         keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
         transport_only=transport_only,
+        **({} if trajectory_capture is None else {"trajectory_capture": trajectory_capture}),
         **profile_callbacks,
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")

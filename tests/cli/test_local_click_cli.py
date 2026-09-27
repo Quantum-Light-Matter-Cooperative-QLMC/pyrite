@@ -83,6 +83,34 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
     }
 
 
+def test_run_trajectory_capture_is_opt_in(monkeypatch, tmp_path):
+    seen = _capture(monkeypatch, scan, "run")
+    plain = invoke(scan_cli.command, ["standard", "-m", "hopg"])
+    assert_clean_result(plain)
+    assert "trajectories" not in seen
+
+    seen.clear()
+    captured = invoke(
+        scan_cli.command,
+        ["standard", "-m", "hopg", "--trajectories", str(tmp_path), "--overwrite-trajectories"],
+    )
+    assert_clean_result(captured)
+    assert (seen["trajectories"], seen["overwrite_trajectories"]) == (tmp_path, True)
+
+
+def test_run_overwrite_trajectories_requires_trajectories(monkeypatch):
+    monkeypatch.setattr(scan, "run", lambda _args: None)
+    result = invoke(scan_cli.command, ["standard", "-m", "hopg", "--overwrite-trajectories"])
+    assert result.exit_code == 2
+    assert "--overwrite-trajectories requires --trajectories" in result.stderr
+
+
+def test_perf_does_not_offer_trajectory_capture():
+    result = invoke(performance_command, ["--help"])
+    assert_clean_result(result)
+    assert "--trajectories" not in result.stdout
+
+
 @pytest.mark.parametrize(
     ("extra", "expected"),
     [

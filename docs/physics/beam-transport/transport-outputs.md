@@ -179,6 +179,10 @@ What the outputs deliberately do **not** carry:
 
 Two matching radiation-side estimators, `cxr_endpoint_resonance_drift` and `brem_endpoint_quadrature_error`, report the spectral consequence of one-point evaluation. None of these are on a default call path; they are instruments for deciding whether a step control is fine enough.
 
+## Saving the result
+
+`pyrite run --trajectories DIR` writes each transported case's complete result, with units and provenance, to a versioned HDF5 file and can export its segments to VTK PolyData; see [Save electron trajectories](../../guides/working-with-results.md#save-electron-trajectories). Capture reads the mapping without consuming random draws, so it never changes the transport or the spectra.
+
 ## Checking convergence
 
 Nothing in the output signals whether a run is converged. Two independent axes have to be checked:

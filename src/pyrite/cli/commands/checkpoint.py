@@ -14,6 +14,7 @@ _COMMANDS = {
     "merge": "pyrite.cli.commands.archive.union_command",
     "gc": "pyrite.cli.commands.cleanup.gc_command",
     "rm": "pyrite.cli.commands.cleanup.rm_command",
+    "export-trajectories": "pyrite.cli.commands.trajectories.command",
 }
 
 _COMMAND_HELP = {
@@ -25,6 +26,7 @@ _COMMAND_HELP = {
     "merge": "Merge a shelved checkpoint into active slot.",
     "gc": "Reclaim records obsolete under current scan profiles.",
     "rm": "Delete local datasets and newly unreachable shared cases.",
+    "export-trajectories": "Export captured trajectories to VTK PolyData.",
 }
 
 _RECOMPUTE_COMMANDS = {

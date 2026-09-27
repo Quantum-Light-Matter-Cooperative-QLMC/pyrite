@@ -123,6 +123,13 @@ Options:
                                   stores nothing shared.
   --recompute                     Ignore cached cases and recompute fresh, but
                                   repopulate the shared per-case cache with the results.
+  --trajectories DIR              Opt in to saving each transported case's full
+                                  electron-transport result as HDF5 under DIR/<stem>/.
+                                  Files can be much larger than checkpoints; cached
+                                  cases are not re-transported (use --recompute to
+                                  capture them).
+  --overwrite-trajectories        Replace existing trajectory files for cases this run
+                                  transports; requires --trajectories.
   --no-progress                   Disable progress bars/dashboard.
   -v, --verbose                   Increase dashboard detail.
   --preset [zhai]                 Run a named reproduction workflow; zhai runs here
@@ -335,14 +342,15 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  slim       Shrink one checkpoint for transfer.
-  recompute  Recompute selected checkpoint datasets.
-  archive    Copy an active checkpoint to long-term shelf.
-  restore    Copy a shelved checkpoint back to active slot.
-  list       List long-term checkpoint shelf.
-  merge      Merge a shelved checkpoint into active slot.
-  gc         Reclaim records obsolete under current scan profiles.
-  rm         Delete local datasets and newly unreachable shared cases.
+  slim                 Shrink one checkpoint for transfer.
+  recompute            Recompute selected checkpoint datasets.
+  archive              Copy an active checkpoint to long-term shelf.
+  restore              Copy a shelved checkpoint back to active slot.
+  list                 List long-term checkpoint shelf.
+  merge                Merge a shelved checkpoint into active slot.
+  gc                   Reclaim records obsolete under current scan profiles.
+  rm                   Delete local datasets and newly unreachable shared cases.
+  export-trajectories  Export captured trajectories to VTK PolyData.
 ```
 
 ## `pyrite checkpoint slim`
@@ -558,6 +566,27 @@ Options:
   --checkpoint-dir DIR  Checkpoint root containing active datasets, archives, and shared
                         CAS blobs.  [default: checkpoints]
   -h, --help            Show this message and exit.
+```
+
+## `pyrite checkpoint export-trajectories`
+
+```text
+Usage: pyrite checkpoint export-trajectories [OPTIONS] ARTIFACT...
+
+  Export captured trajectory segments to VTK PolyData (.vtp).
+
+  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, or a directory
+  searched recursively for them. Each artifact becomes one .vtp of two-point line cells
+  in the slab frame [angstrom] with per-segment cell data, including electron_id; per-
+  electron arrays, tallies, and metadata stay only in the HDF5 artifact. Opens in
+  ParaView, VisIt, and PyVista.
+
+Options:
+  --out-dir DIR  Write .vtp files under DIR, mirroring each ARTIFACT directory (default:
+                 beside each artifact).
+  --no-vacuum    Omit grooved runs' vacuum legs.
+  --overwrite    Replace existing .vtp outputs.
+  -h, --help     Show this message and exit.
 ```
 
 ## `pyrite config`

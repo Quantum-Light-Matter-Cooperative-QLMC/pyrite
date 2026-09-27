@@ -86,6 +86,7 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
     conflict = invoke(scan.command, ["--remote", "--wait", "--detach"])
     local_only = invoke(scan.command, ["--remote", "--checkpoint-dir", "elsewhere"])
     local_wait = invoke(scan.command, ["--wait"])
+    local_capture = invoke(scan.command, ["--remote", "--trajectories", "traj"])
 
     assert conflict.exit_code == 2
     assert "--wait and --detach are mutually exclusive" in conflict.stderr
@@ -93,6 +94,8 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
     assert "local-only option(s): --checkpoint-dir" in local_only.stderr
     assert local_wait.exit_code == 2
     assert "--wait/--detach require -R/--remote" in local_wait.stderr
+    assert local_capture.exit_code == 2
+    assert "local-only option(s): --trajectories" in local_capture.stderr
 
 
 def test_cpu_profile_flags_require_remote_and_reach_the_job(monkeypatch):
