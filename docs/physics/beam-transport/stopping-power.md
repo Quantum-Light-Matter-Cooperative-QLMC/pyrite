@@ -185,10 +185,10 @@ dropping $\delta$, that is $\delta$ divided by the bracket of
 ```
 
 $\delta$ rises monotonically with $\beta\gamma$, so the 300 keV row bounds the
-whole range. At 25 keV the omission is about 45 times smaller than the 6%
+measured range through 300 keV. At 25 keV the omission is about 45 times smaller than the 6%
 Joy–Luo error {eq}`eq-stopping-bs` was introduced to remove, and below the
 unmodeled shell corrections and omitted delta-ray transport listed under
-*Assumptions and limits*. At the 300 keV ceiling it is 1.5%, stated and
+*Assumptions and limits*. At the 300 keV measured endpoint it is 1.5%, stated and
 uncorrected. Applying $\delta$ properly would need per-*material* coefficients:
 it does not Bragg-add, so the per-element values above bound a compound's
 $\delta$ without being able to compose it. The Sternheimer–Peierls general

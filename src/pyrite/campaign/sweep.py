@@ -92,17 +92,6 @@ MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.it
 # sync so a bunch sampled in fs and an age plotted in fs use one conversion).
 C_ANG_PER_FS = 2997.924580
 
-# Relativistic-regime ceiling for the beam energy (PLACEHOLDER, decision 9
-# sub-decision open). ``beta_from_keV`` is already relativistic, but the Zhai
-# PXR/CBS radiation kernels are a NONRELATIVISTIC derivation, so a MeV-scale
-# beam (REGAE, 3-5 MeV) would leave the model's validity *silently*. BeamSpec
-# refuses (raises) above this ceiling rather than return wrong numbers. 300 keV
-# is the top of the current catalog working range (hopg) and is allowed
-# (strict ``>`` refusal); it sits well below the 3-5 MeV REGAE regime. The exact
-# value needs a physics call and is flagged in the validation ledger.
-# Validation: relativistic-ceiling (placeholder)
-BEAM_ENERGY_CEILING_KEV = 300.0
-
 if TYPE_CHECKING:
     from ..montecarlo.gdf import GDFBeam
 
@@ -577,30 +566,6 @@ class Sweep:
         self.detector = base
 
 
-def _reject_relativistic_energies(energies: np.ndarray) -> None:
-    """Refuse beam energies above the nonrelativistic PXR/CBS validity ceiling.
-
-    ``beta_from_keV`` is relativistic, but the Zhai PXR/CBS radiation kernels are
-    a NONRELATIVISTIC derivation, so a MeV-scale beam (REGAE, 3-5 MeV) would
-    leave the model's validity *silently*. ``build_cases`` raises here rather
-    than emit wrong numbers -- no valid result exists above the ceiling today, so
-    a warning would be a correctness trap (decision 9). See
-    :data:`BEAM_ENERGY_CEILING_KEV` (placeholder) and the future relativistic /
-    channeling work (TODO On-Hold #1/#2).
-
-    Validation: relativistic-ceiling
-    """
-    hottest = float(np.max(np.atleast_1d(energies)))
-    if hottest > BEAM_ENERGY_CEILING_KEV:
-        raise ValueError(
-            f"beam energy {hottest:g} keV exceeds the nonrelativistic PXR/CBS "
-            f"model ceiling of {BEAM_ENERGY_CEILING_KEV:g} keV: the Zhai PXR/CBS "
-            "kernels are a nonrelativistic derivation and yield no valid result "
-            "above it. Relativistic / channeling support (REGAE 3-5 MeV) is "
-            "future work (TODO On-Hold #1/#2)."
-        )
-
-
 def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
     """The crystallography mapping a sweep's cases are built from.
 
@@ -763,7 +728,6 @@ def build_cases(
         if gdf is None or sweep.beam.gdf_shape_only
         else np.array([gdf.energy_keV.max()])
     )
-    _reject_relativistic_energies(energies)
     resolved_line = tuple(_line_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
     line_grids = tuple(grid for grid, _ in resolved_line)
     line_policies = tuple(policy for _, policy in resolved_line)

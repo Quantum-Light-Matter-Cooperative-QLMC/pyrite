@@ -120,7 +120,7 @@ Charge × rep rate does not normalize the spectrum to absolute flux. There are n
    S = \frac{\gamma - 1}{\gamma^3 \beta^2 (1 - \beta \cos\theta_\mathrm{obs})}
    ```
 
-(`energy_grid.bounds.line_shift_fraction`). `S` is largest at the *low* energy end: 0.46 at 30 keV, falling to 0.24 at the 300 keV model ceiling, with the nonrelativistic limit `S -> 1/2`. `margined_stop` cuts the window 15% above the measured coverage energy, so the margin is only consumed once the beam spread reaches ~33% RMS, far outside both any real photoinjector and the first-order expansion `S` is derived under. No gate on `energy_spread_frac` is warranted. The full kernel is measured against `S` in `tests/montecarlo/test_beam_energy_spread_grid.py` (a 5% beam energy step moves the 30 keV hopg line by 2.28%, against 2.30% predicted).
+(`energy_grid.bounds.line_shift_fraction`). Over the measured 30–300 keV range, `S` is largest at the *low* energy end: 0.46 at 30 keV, falling to 0.24 at 300 keV, with the nonrelativistic limit `S -> 1/2`. `margined_stop` cuts the window 15% above the measured coverage energy, so the margin is only consumed once the beam spread reaches ~33% RMS, far outside both any real photoinjector and the first-order expansion `S` is derived under. No gate on `energy_spread_frac` is warranted. The full kernel is measured against `S` in `tests/montecarlo/test_beam_energy_spread_grid.py` (a 5% beam energy step moves the 30 keV hopg line by 2.28%, against 2.30% predicted).
 2. **The analytic broadening helpers do not widen.** `mosaic_fwhm_eV`, `aperture_fwhm_eV` and `mosaic_psi_rad` (`montecarlo/detector.py`) stay at the nominal `beam_dir` and `E0_keV` by design. They are diagnostics, not the spectrum.
 
 ## Limiting cases

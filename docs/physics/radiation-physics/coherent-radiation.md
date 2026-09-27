@@ -1,8 +1,10 @@
 # Coherent PXR and CBS radiation
 
-The line-spectrum kernel is the core radiation model of PyRITE. It follows the nonrelativistic PXR/CBS treatment of {cite:t}`feranchuk2000`, in the form used by {cite:t}`zhai2025` for van der Waals crystals; {cite:t}`baryshevsky2005` is the book-length treatment of the same theory. It combines parametric X-ray radiation (PXR) and coherent bremsstrahlung (CBS) amplitudes for a set of reciprocal-lattice reflections, evaluates them once per transported trajectory segment, applies the finite-flight-time line profile, attenuates the photon on its way out of the sample, and sums the result over segments, electrons, reflections, and crystallite orientations.
+The line-spectrum kernel is the core radiation model of PyRITE. It uses vector PXR/CBS amplitudes with relativistic velocity and CBS corrections, drawing on {cite:t}`feranchuk2000` and {cite:t}`zhai2025` for van der Waals crystals; {cite:t}`baryshevsky2005` gives a book-length treatment. It combines parametric X-ray radiation (PXR) and coherent bremsstrahlung (CBS) amplitudes for a set of reciprocal-lattice reflections, evaluates them once per transported trajectory segment, applies the finite-flight-time line profile, attenuates the photon on its way out of the sample, and sums the result over segments, electrons, reflections, and crystallite orientations.
 
 The kernel is kinematic (Born): the crystal supplies static Fourier components of its susceptibility and its electrostatic potential, the electron supplies a straight constant-velocity flight, and the emitted field is first order in both.
+
+There is no fixed 300 keV beam-energy gate. The documented transport checks and scattering data extend to roughly 300 keV; higher-energy predictions, including 3–5 MeV beams, still need transport and radiation validation. See the [relativistic PXR/CBS assessment](../../research/physics/relativistic-pxr-cbs.md) for the remaining model limits.
 
 ## Emission geometry
 
