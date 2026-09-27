@@ -97,6 +97,7 @@ def _slurm_batch_script(
     reservation_stems: list[str] | None = None,
     time_limit: str = config.SLURM_TIME,
     cpus_per_task: int = config.SLURM_CPUS_PER_MATERIAL,
+    mem_per_cpu: str | None = None,
 ) -> str:
     """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
     vendor = config.remote_gpu_vendor()
@@ -123,6 +124,7 @@ def _slurm_batch_script(
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node={config.SLURM_GPUS}
 #SBATCH --cpus-per-task={cpus_per_task}
+{f"#SBATCH --mem-per-cpu={mem_per_cpu}" if mem_per_cpu else ""}
 #SBATCH --gres=gpu:{config.SLURM_GPUS}
 #SBATCH --time={time_limit}
 #SBATCH --output={sbatch_jobdir}/slurm-%j.out

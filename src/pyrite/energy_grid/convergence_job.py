@@ -458,6 +458,9 @@ def start_bandwidth(args: argparse.Namespace) -> str:
     from .job import _validate_remote_output_name
 
     _validate_remote_output_name(args.json_out)
+    mem = args.mem_per_cpu
+    if mem is not None and (not mem[:-1].isdigit() or mem[-1] not in "KMGTP"):
+        raise SystemExit("--mem-per-cpu must be an integer followed by K, M, G, T, or P")
     if args.compare_resolution is not None and args.production:
         raise SystemExit("--compare-resolution requires the FP64 reference job")
     if args.compare_resolution == args.resolution:
@@ -474,6 +477,7 @@ def start_bandwidth(args: argparse.Namespace) -> str:
         _precision_payload(jobdir, commands, remote, _uv_sync_block(), label="bandwidth"),
         job_name=BANDWIDTH_JOB_KIND,
         time_limit=str(int(args.time_limit_minutes)),
+        mem_per_cpu=args.mem_per_cpu,
     )
     metadata = "\n".join(
         [
@@ -570,6 +574,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bandwidth.add_argument(
         "--time-limit-minutes", type=int, default=DEFAULT_PRECISION_TIME_LIMIT_MINUTES
+    )
+    bandwidth.add_argument(
+        "--mem-per-cpu",
+        default=None,
+        help="optional SLURM memory per CPU core; default uses the site's allocation",
     )
     bandwidth.add_argument(
         "--production",

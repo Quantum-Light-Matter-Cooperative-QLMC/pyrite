@@ -53,8 +53,13 @@ def test_precision_steps_pin_their_precision_and_share_one_payload():
 def test_bandwidth_job_forwards_local_resolution_to_remote_steps():
     args = job.build_parser().parse_args(
         [
-            "start-bandwidth", "--resolution", "local", "--compare-resolution", "uniform",
-            "--json-out", "bandwidth.json",
+            "start-bandwidth",
+            "--resolution",
+            "local",
+            "--compare-resolution",
+            "uniform",
+            "--json-out",
+            "bandwidth.json",
         ]
     )
     reference, candidate = job.remote_bandwidth_commands(args, "uv")
@@ -70,4 +75,11 @@ def test_bandwidth_comparison_requires_a_distinct_reference_grid(options):
         ["start-bandwidth", "--compare-resolution", "uniform", *options]
     )
     with pytest.raises(SystemExit, match="--compare-resolution"):
+        job.start_bandwidth(args)
+
+
+@pytest.mark.parametrize("value", ["", "5000", "M", "5.5G", "-1M", "5000MB"])
+def test_bandwidth_job_rejects_malformed_memory_requests(value):
+    args = job.build_parser().parse_args(["start-bandwidth", "--mem-per-cpu", value])
+    with pytest.raises(SystemExit, match="--mem-per-cpu"):
         job.start_bandwidth(args)
