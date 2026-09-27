@@ -17,11 +17,13 @@ def _resolved_domain(
         return None, ()
 
     warnings: list[str] = []
-    if lower is None or upper is None or not math.isfinite(lower) or not math.isfinite(upper):
+    try:
+        resolved_lower = float(str(lower).replace(",", ""))
+        resolved_upper = float(str(upper).replace(",", ""))
+    except (TypeError, ValueError):
+        return None, (f"{axis_name}: invalid manual limits; using automatic domain.",)
+    if not math.isfinite(resolved_lower) or not math.isfinite(resolved_upper):
         return None, (f"{axis_name}: non-finite manual limits; using automatic domain.",)
-
-    resolved_lower = float(lower)
-    resolved_upper = float(upper)
 
     if logarithmic and resolved_lower <= 0:
         if resolved_upper <= 0:
@@ -63,7 +65,10 @@ def resolve_axis_spec(
         axis_name="x-axis",
     )
 
-    if include_y_domain:
+    if include_y_domain and (values.get("ymin"), values.get("ymax")) not in (
+        (0, 0),
+        ("0", "0"),
+    ):
         y_domain, y_warnings = _resolved_domain(
             auto=auto,
             lower=values.get("ymin"),

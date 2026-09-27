@@ -5,6 +5,8 @@ from pathlib import Path
 
 import altair as alt
 
+from pyrite.apps.analysis_ui.axes import resolve_axis_spec
+from pyrite.apps.analysis_ui.controls import _grid_limits, make_spectrum_axes
 from pyrite.apps.analysis_ui.models import AnalysisContext
 
 APP = Path(__file__).parents[3] / "src" / "pyrite" / "apps" / "analysis_app.py"
@@ -92,6 +94,7 @@ def test_characteristic_checkbox_matches_spectrum_component_controls() -> None:
 
     assert controls_source.count('"characteristic": mo.ui.checkbox(') == 3
     assert controls_source.count('label="show characteristic radiation"') == 3
+    assert controls_source.count('value=False,\n                label="show characteristic radiation"') == 3
     assert "characteristic_ui" not in source
     assert all('controls["characteristic"]' in view_source for view_source in view_sources)
     assert all(
@@ -283,3 +286,53 @@ def test_auto_domain_controls_replace_zero_sentinel_copy() -> None:
     assert 'mo.ui.switch(value=auto, label=f"Auto {prefix} domain")' in controls_source
     assert "if auto:" in axes_source
     assert "return None" in axes_source
+
+
+def test_grid_limits_use_full_line_and_brem_arrays() -> None:
+    source = [
+        {"E_grid": [40.0, 5000.0], "E_grid_brem": [20.0, 150000.0]},
+        {"E_grid": [30.0, 6000.0], "E_grid_brem": [10.0, 200000.0]},
+    ]
+    assert _grid_limits(source, "E_grid") == (30.0, 6000.0)
+    assert _grid_limits(source, "E_grid_brem") == (10.0, 200000.0)
+
+
+def test_axis_defaults_use_grid_endpoints_and_log_floor() -> None:
+    class FakeUI:
+        @staticmethod
+        def switch(*, value, label):
+            return value
+
+        @staticmethod
+        def text(*, value, label):
+            return value
+
+        @staticmethod
+        def dictionary(elements):
+            return elements
+
+    class FakeMo:
+        ui = FakeUI()
+
+    axes = make_spectrum_axes(
+        FakeMo(),
+        narrow_auto=False,
+        narrow_xmin=30.0,
+        narrow_xmax=6000.0,
+        broad_auto=False,
+        broad_xmin=10.0,
+        broad_xmax=200000.0,
+        broad_xlog=True,
+    )
+    assert (axes["narrow"]["xmin"], axes["narrow"]["xmax"]) == ("30", "6000")
+    assert (axes["broad"]["xmin"], axes["broad"]["xmax"]) == ("10", "200000")
+    assert resolve_axis_spec(axes["broad"]).x_domain == (10.0, 200000.0)
+    detector_axis = {**axes["broad"], "ymin": "0", "ymax": "0"}
+    assert resolve_axis_spec(detector_axis, include_y_domain=True).warnings == ()
+
+
+def test_manual_axis_accepts_incomplete_and_invalid_text() -> None:
+    base = {"auto": False, "xmin": "20", "xmax": "1,000", "xlog": True}
+    assert resolve_axis_spec(base).x_domain == (20.0, 1000.0)
+    for xmax in ("", "0", "not a number"):
+        assert resolve_axis_spec({**base, "xmax": xmax}).x_domain is None

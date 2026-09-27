@@ -164,13 +164,14 @@ def test_penetration_tab_wires_groove_control_to_trajectory_sweep() -> None:
     assert '_nc.get("groove_spacing_ang")' in source
 
 
-def test_penetration_controls_offer_material_presets_and_bounded_manual_values() -> None:
+def test_penetration_controls_offer_material_presets_and_uncapped_energy() -> None:
     source = APP.read_text()
 
     for grid in ("scan.energy_keV", "scan.thickness_ang", "scan.tilt_deg"):
         assert grid in source
-    for bound in ("start=1.0", "stop=300.0", "start=0.001", "stop=10000.0", "stop=89.9"):
+    for bound in ("start=1.0", "start=0.001", "stop=10000.0", "stop=89.9"):
         assert bound in source
+    assert 'start=1.0, step=1.0, value=_energy_values[0], label="(keV)"' in source
     # The compact control-row layout supplies the "Crystal thickness" label once
     # via the shared row label; the manual widget's own label is just the unit.
     assert 'label="(µm)"' in source

@@ -212,7 +212,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         label="",
     )
     penetration_energy_manual_ui = mo.ui.number(
-        start=1.0, stop=300.0, step=1.0, value=_energy_values[0], label="(keV)"
+        start=1.0, step=1.0, value=_energy_values[0], label="(keV)"
     )
 
     penetration_thickness_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")

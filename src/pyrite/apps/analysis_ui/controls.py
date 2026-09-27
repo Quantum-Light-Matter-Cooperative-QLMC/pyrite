@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 
 from pyrite._formatting import fmt_thickness
@@ -22,6 +23,17 @@ def _spread_default(values: Sequence[float], count: int = 4) -> list[float]:
     return [values[index] for index in indexes]
 
 
+def _grid_limits(source, key: str) -> tuple[float, float]:
+    """Positive lower and full upper endpoint of the selected photon grid."""
+    values = [
+        float(energy)
+        for record in source
+        for energy in (record.get(key) if record.get(key) is not None else record.get("E_grid", ()))
+        if math.isfinite(float(energy)) and float(energy) > 0
+    ]
+    return (min(values), max(values)) if values else (1.0, 1.0)
+
+
 def make_axis_controls(
     mo,
     *,
@@ -37,14 +49,14 @@ def make_axis_controls(
 ):
     elements = {
         "auto": mo.ui.switch(value=auto, label=f"Auto {prefix} domain"),
-        "xmin": mo.ui.number(value=xmin, label=f"{prefix} x-min (eV)"),
-        "xmax": mo.ui.number(value=xmax, label=f"{prefix} x-max (eV)"),
+        "xmin": mo.ui.text(value=f"{xmin:g}", label=f"{prefix} x-min (eV)"),
+        "xmax": mo.ui.text(value=f"{xmax:g}", label=f"{prefix} x-max (eV)"),
         "xlog": mo.ui.switch(value=xlog, label=f"{prefix} log x"),
         "ylog": mo.ui.switch(value=ylog, label=f"{prefix} log y"),
     }
     if include_y_domain:
-        elements["ymin"] = mo.ui.number(value=ymin, label=f"{prefix} y-min")
-        elements["ymax"] = mo.ui.number(value=ymax, label=f"{prefix} y-max")
+        elements["ymin"] = mo.ui.text(value=f"{ymin:g}", label=f"{prefix} y-min")
+        elements["ymax"] = mo.ui.text(value=f"{ymax:g}", label=f"{prefix} y-max")
     return mo.ui.dictionary(elements)
 
 
@@ -53,10 +65,12 @@ def make_spectrum_axes(
     *,
     narrow_auto: bool,
     narrow_xmax: float,
+    narrow_xmin: float = 0.0,
     narrow_xlog: bool = False,
     narrow_ylog: bool = False,
     broad_auto: bool,
     broad_xmax: float,
+    broad_xmin: float = 0.0,
     broad_xlog: bool = False,
     broad_ylog: bool = True,
     include_y_domain: bool = False,
@@ -67,7 +81,7 @@ def make_spectrum_axes(
                 mo,
                 prefix="narrow",
                 auto=narrow_auto,
-                xmin=0.0,
+                xmin=narrow_xmin,
                 xmax=narrow_xmax,
                 xlog=narrow_xlog,
                 ylog=narrow_ylog,
@@ -77,7 +91,7 @@ def make_spectrum_axes(
                 mo,
                 prefix="broad",
                 auto=broad_auto,
-                xmin=0.0,
+                xmin=broad_xmin,
                 xmax=broad_xmax,
                 xlog=broad_xlog,
                 ylog=broad_ylog,
@@ -113,10 +127,13 @@ def axes_panel(mo, axes, *, include_y_domain: bool = False):
 
 
 def make_energy_controls(mo, results):
-    tilts = sorted({record["case"]["tilt_deg"] for record in records(results)})
+    source = records(results)
+    line_min, line_max = _grid_limits(source, "E_grid")
+    brem_min, brem_max = _grid_limits(source, "E_grid_brem")
+    tilts = sorted({record["case"]["tilt_deg"] for record in source})
     tilt_options = _options(tilts, "deg")
     thickness_options = _thickness_options(results)
-    inventory = thicknesses_by_energy(results) if records(results) else {}
+    inventory = thicknesses_by_energy(results) if source else {}
     default_thickness = (
         fmt_thickness(inventory[min(inventory)][-1]) if inventory else list(thickness_options)[-1]
     )
@@ -136,22 +153,27 @@ def make_energy_controls(mo, results):
             "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "characteristic": mo.ui.checkbox(
-                value=True,
+                value=False,
                 label="show characteristic radiation",
             ),
             "axes": make_spectrum_axes(
                 mo,
-                narrow_auto=False,
-                narrow_xmax=3000.0,
-                broad_auto=False,
-                broad_xmax=30000.0,
+                narrow_auto=not source,
+                narrow_xmin=line_min,
+                narrow_xmax=line_max,
+                broad_auto=not source,
+                broad_xmin=brem_min,
+                broad_xmax=brem_max,
             ),
         }
     )
 
 
 def make_dimension_controls(mo, results, *, varying_key: str):
-    values = sweep_values(results) if records(results) else {}
+    source = records(results)
+    line_min, line_max = _grid_limits(source, "E_grid")
+    brem_min, brem_max = _grid_limits(source, "E_grid_brem")
+    values = sweep_values(results) if source else {}
     energies = values.get("E0_keV", [])
     thicknesses = values.get("thickness_ang", [])
 
@@ -203,15 +225,17 @@ def make_dimension_controls(mo, results, *, varying_key: str):
             "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "characteristic": mo.ui.checkbox(
-                value=True,
+                value=False,
                 label="show characteristic radiation",
             ),
             "axes": make_spectrum_axes(
                 mo,
-                narrow_auto=False if varying_key == "tilt_deg" else True,
-                narrow_xmax=3000.0 if varying_key == "tilt_deg" else 0.0,
-                broad_auto=False if varying_key == "tilt_deg" else True,
-                broad_xmax=30000.0 if varying_key == "tilt_deg" else 0.0,
+                narrow_auto=not source,
+                narrow_xmin=line_min,
+                narrow_xmax=line_max,
+                broad_auto=not source,
+                broad_xmin=brem_min,
+                broad_xmax=brem_max,
             ),
         }
     )
@@ -229,7 +253,10 @@ def make_heatmap_energy_control(mo, results):
 
 
 def make_detector_controls(mo, results):
-    values = sweep_values(results) if records(results) else {}
+    source = records(results)
+    line_min, line_max = _grid_limits(source, "E_grid")
+    brem_min, brem_max = _grid_limits(source, "E_grid_brem")
+    values = sweep_values(results) if source else {}
     tilt_options = _options(values.get("tilt_deg", [])[::-1], "deg")
     azimuth_options = _options(values.get("tilt_azim_deg", []), "deg")
     thickness_options = _thickness_options(results)
@@ -253,11 +280,13 @@ def make_detector_controls(mo, results):
             ),
             "axes": make_spectrum_axes(
                 mo,
-                narrow_auto=True,
-                narrow_xmax=0.0,
+                narrow_auto=not source,
+                narrow_xmin=line_min,
+                narrow_xmax=line_max,
                 narrow_ylog=True,
-                broad_auto=True,
-                broad_xmax=0.0,
+                broad_auto=not source,
+                broad_xmin=brem_min,
+                broad_xmax=brem_max,
                 broad_xlog=True,
                 broad_ylog=True,
                 include_y_domain=True,
@@ -266,21 +295,25 @@ def make_detector_controls(mo, results):
     )
 
 
-def make_case_axes(mo):
+def make_case_axes(mo, basket=()):
+    line_min, line_max = _grid_limits(basket, "E_grid")
+    brem_min, brem_max = _grid_limits(basket, "E_grid_brem")
     return mo.ui.dictionary(
         {
             "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "characteristic": mo.ui.checkbox(
-                value=True,
+                value=False,
                 label="show characteristic radiation",
             ),
             "axes": make_spectrum_axes(
                 mo,
-                narrow_auto=True,
-                narrow_xmax=0.0,
-                broad_auto=True,
-                broad_xmax=0.0,
+                narrow_auto=not basket,
+                narrow_xmin=line_min,
+                narrow_xmax=line_max,
+                broad_auto=not basket,
+                broad_xmin=brem_min,
+                broad_xmax=brem_max,
             ),
         }
     )
