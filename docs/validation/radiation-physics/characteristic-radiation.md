@@ -429,4 +429,6 @@ Still open:
 - a comparison against PENELOPE `pdrelax`, Geant4 or EGSnrc, with nonradiative topology that is not EADL-derived and with transport-level spectra;
 - measured L-line intensity ratios, which alone can settle the Coster--Kronig question and the 3d-metal L branch shape.
 
+Both are tracked in #196.
+
 No ledger status change is suggested, and no sign-off is claimed.

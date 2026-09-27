@@ -234,7 +234,7 @@ Remaining:
   lines within 3.5%; record `xraylib_cascade_oracle.jsonl`. xraylib Auger
   topology is EADL97, so data independence is partial. PENELOPE `pdrelax` /
   Geant4 / EGSnrc (non-EADL topology, transport-level spectra) still open —
-  human decides whether xraylib suffices for the checklist item.
+  moved to #196 with measured L-line ratios.
 - Fresh-context validation done 2026-09-27: cascade re-derived, no code
   defects; defect bound and omega ranges corrected in docs. Suggested ledger
   `filtered` -> `rederived` awaits the human.
