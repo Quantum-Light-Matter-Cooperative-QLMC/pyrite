@@ -50,7 +50,6 @@ from pyrite.montecarlo import runner  # noqa: E402
 from pyrite.montecarlo.spectrum import brem, characteristic  # noqa: E402
 from pyrite.montecarlo.spectrum.lines import _batched as lines_batched  # noqa: E402
 from pyrite.montecarlo.spectrum.lines import _kernels  # noqa: E402
-from pyrite.montecarlo.spectrum.lines import _per_hkl as lines_per_hkl  # noqa: E402
 from pyrite.montecarlo.spectrum.lines import _setup as lines_setup  # noqa: E402
 
 MATERIAL = "hopg"
@@ -123,17 +122,19 @@ def transparent_lines():
 
     Its drift with ``k`` is the formation-time broadening alone, so the
     absorbed-over-transparent ratio isolates the escape bias. Zeroes both the
-    midpoint distance (coherent and flight-grouped reductions) and the
-    segment-mean escape pieces (incoherent route, issue #181).
+    midpoint distance, the formation-piece escape ends (coherent and
+    flight-grouped reductions) and the segment-mean escape pieces (incoherent
+    route, issue #181).
     """
     patches = [
         (lines_batched, "_segment_escape_distance"),
         (lines_batched, "_escape_length"),
-        (lines_per_hkl, "_segment_escape_distance"),
         (lines_setup, "segment_escape_pieces"),
+        (lines_setup, "expand_escape_pieces"),
     ]
     saved = [getattr(module, name) for module, name in patches]
     real_pieces = lines_setup.segment_escape_pieces
+    real_expand = lines_setup.expand_escape_pieces
 
     def zero_distance(segments, n_hat, *, xp):
         return xp.zeros(xp.asarray(segments["L_ang"]).shape, dtype=REAL)
@@ -145,10 +146,14 @@ def transparent_lines():
         fraction, start, end = real_pieces(*args, **kwargs)
         return fraction, xp.zeros_like(start), xp.zeros_like(end)
 
+    def zero_expand(*args, **kwargs):
+        pieces, owner, start, end = real_expand(*args, **kwargs)
+        return pieces, owner, xp.zeros_like(start), xp.zeros_like(end)
+
     lines_batched._segment_escape_distance = zero_distance
     lines_batched._escape_length = zero_length
-    lines_per_hkl._segment_escape_distance = zero_distance
     lines_setup.segment_escape_pieces = zero_pieces
+    lines_setup.expand_escape_pieces = zero_expand
     try:
         yield
     finally:
