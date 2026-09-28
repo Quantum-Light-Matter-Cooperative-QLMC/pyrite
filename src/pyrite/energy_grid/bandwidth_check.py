@@ -275,8 +275,16 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
     from .._backend import BACKEND, REAL, _to_cpu
     from .._line_grid_policy import LineGridToleranceError
     from ..montecarlo import runner
-    from ..montecarlo.runner.line_grid import check_line_truncation, line_truncation_audit
+    from ..montecarlo.runner.line_grid import (
+        _device_mib,
+        check_line_truncation,
+        line_truncation_audit,
+    )
+    from ..montecarlo.runner.oom import _ensure_pool_limit
 
+    # Production caps the CuPy pool; without it an over-budget allocation can
+    # spill into shared host memory under WSL instead of raising.
+    _ensure_pool_limit()
     rows = []
     for config in parse_configs(args.configs):
         case = build_case(
@@ -292,22 +300,44 @@ def production(args: argparse.Namespace) -> dict[str, Any]:
             rows.append(row)
             print(json.dumps(row, default=str), flush=True)
             continue
+        except Exception as error:
+            if not runner._is_gpu_oom(error):
+                raise
+            row.update(device_oom="transport", error=str(error), device_at_oom=_device_mib())
+            rows.append(row)
+            print(json.dumps(row, default=str), flush=True)
+            BACKEND.release_memory()
+            continue
         row["transport_wall_s"] = time.perf_counter() - started
+        row["device_after_transport"] = _device_mib()
+        row["segments_on_device"] = not isinstance(transport["segs"]["L_ang"], np.ndarray)
+        print(json.dumps({"stage": "transport", **row}, default=str), flush=True)
         grid = np.asarray(transport["E_grid"], dtype=float)
         audit = line_truncation_audit(case, grid)
         started = time.perf_counter()
-        lines = runner._lines_for_segments(
-            transport["segs"],
-            grid,
-            case,
-            transport["n_hat"],
-            case.get("abs_layers"),
-            transport.get("groove"),
-            coherent=False,
-            Ne=transport["Ne_lines"],
-            truncation_audit=audit,
-        )
+        try:
+            lines = runner._lines_for_segments(
+                transport["segs"],
+                grid,
+                case,
+                transport["n_hat"],
+                case.get("abs_layers"),
+                transport.get("groove"),
+                coherent=False,
+                Ne=transport["Ne_lines"],
+                truncation_audit=audit,
+            )
+        except Exception as error:
+            if not runner._is_gpu_oom(error):
+                raise
+            row.update(device_oom="lines", error=str(error), device_at_oom=_device_mib())
+            rows.append(row)
+            print(json.dumps(row, default=str), flush=True)
+            del transport
+            BACKEND.release_memory()
+            continue
         row["lines_wall_s"] = time.perf_counter() - started
+        row["device_after_lines"] = _device_mib()
         try:
             row["truncation_audit"] = check_line_truncation(case, audit)
         except LineGridToleranceError as error:

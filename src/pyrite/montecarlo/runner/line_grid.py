@@ -10,7 +10,7 @@ from time import perf_counter
 
 import numpy as np
 
-from ..._backend import REAL, _to_cpu
+from ..._backend import BACKEND, REAL, _to_cpu
 from ..._grid_semantics import resolution_num, validate_backend_spacing
 from ..._line_grid_policy import (
     BANDWIDTH_PROXY_SAFETY,
@@ -49,11 +49,27 @@ def _resident_mib():
     return None
 
 
+def _device_mib():
+    """Pool-used and driver-used device MiB for opt-in profiling, if a GPU."""
+    stats = BACKEND.allocator_stats()
+    out = {
+        "device_used_mib": stats.get("used_mib"),
+        "device_reserved_mib": stats.get("reserved_mib"),
+    }
+    runtime = getattr(getattr(getattr(BACKEND, "cp", None), "cuda", None), "runtime", None)
+    if runtime is not None:
+        free, total = runtime.memGetInfo()
+        out["device_driver_used_mib"] = (total - free) / (1 << 20)
+    return out
+
+
 def _profile_stage(profile, **fields):
     """Record opt-in line-grid stage fields and flush them to stderr.
 
     Immediate output survives a scheduler time limit that discards the report.
+    Device occupancy is sampled at every stage.
     """
+    fields.update(_device_mib())
     profile.update(fields)
     items = " ".join(f"{name}={value}" for name, value in fields.items())
     print(f"line-grid profile: {items}", file=sys.stderr, flush=True)
