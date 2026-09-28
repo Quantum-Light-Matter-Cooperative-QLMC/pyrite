@@ -113,11 +113,65 @@ def test_remote_host_rejects_ssh_option_and_shell_syntax_before_subprocess(monke
         transport._ssh_capture(":")
 
 
-def test_non_nvidia_remote_vendor_fails_before_script_generation(monkeypatch):
-    monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "amd")
+def test_intel_remote_vendor_fails_before_script_generation(monkeypatch):
+    monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "intel")
 
-    with pytest.raises(ValueError, match="do not yet support amd"):
+    with pytest.raises(ValueError, match="do not yet support intel"):
         scripts._slurm_batch_script("job1", "echo ok", job_name="pyrite-test")
+
+
+def _use_amd_target(monkeypatch):
+    monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "amd")
+    monkeypatch.setattr(config, "SLURM_PARTITION", "gpu-amd")
+    monkeypatch.setattr(config, "SLURM_NODELIST", "qlmc-ace")
+    monkeypatch.setattr(config, "SLURM_GRES", "gpu:radeon8060s:1")
+
+
+def test_amd_slurm_batch_script_selects_rocm_target_without_nvidia_modules(monkeypatch):
+    _use_amd_target(monkeypatch)
+
+    script = scripts._slurm_batch_script("j", "echo payload", job_name="pyrite-j")
+
+    assert "#SBATCH --partition=gpu-amd\n#SBATCH --nodelist=qlmc-ace\n#SBATCH --nodes=1" in script
+    assert "#SBATCH --gres=gpu:radeon8060s:1" in script
+    assert "module" not in script
+    assert "export PYRITE_MC_BACKEND=rocm" in script
+    assert 'export UV_PROJECT_ENVIRONMENT="/path/to/pyrite/.venv-amd"' in script
+    assert 'echo "partition: gpu-amd"' in script
+    assert "rocminfo" in script
+    assert "rocm-smi" in script
+    subprocess.run(["bash", "-n"], input=script, text=True, check=True)
+
+
+def test_amd_uv_sync_builds_cupy_against_hip(monkeypatch):
+    _use_amd_target(monkeypatch)
+
+    block = scripts._uv_sync_block()
+
+    assert 'CUPY_INSTALL_USE_HIP=1 "uv" sync --package pyrite-xray --no-dev --extra amd' in block
+
+
+def test_nvidia_uv_sync_does_not_request_hip():
+    block = scripts._uv_sync_block()
+
+    assert "CUPY_INSTALL_USE_HIP" not in block
+    assert "--extra nvidia" in block
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value", "key"),
+    [
+        ("REMOTE_GPU_VENDOR", "arm", "remote.gpu_vendor"),
+        ("SLURM_PARTITION", "gpu amd", "remote.partition"),
+        ("SLURM_NODELIST", "ace;reboot", "remote.nodelist"),
+        ("SLURM_GRES", "gpu:1\n#SBATCH --x", "remote.gres"),
+    ],
+)
+def test_slurm_profile_rejects_unsafe_values(monkeypatch, attribute, value, key):
+    monkeypatch.setattr(config, attribute, value)
+
+    with pytest.raises(SystemExit, match=key):
+        scripts._slurm_batch_script("j", "echo payload", job_name="pyrite-j")
 
 
 def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
@@ -977,6 +1031,9 @@ def test_slurm_batch_script_requests_the_lab_gpu_profile():
     assert "module load cuda openmpi hdf5 2>/dev/null || true" in script
     assert "echo payload" in script
     assert "--mem" not in script
+    assert "--nodelist" not in script
+    assert "PYRITE_MC_BACKEND" not in script
+    assert "rocm" not in script
 
 
 def test_slurm_batch_script_requests_optional_memory_per_cpu():
@@ -2249,8 +2306,9 @@ def test_status_snapshot_uses_one_partition_bounded_squeue_query():
     command = viewer._status_remote_command('JOB="j"', 2)
 
     assert command.count("squeue ") == 1
-    assert "--partition=" in command
-    assert "gpu" in command
+    assert '--partition="$PART"' in command
+    assert '#SBATCH --partition=//p" "$D/run.sh"' in command
+    assert 'PART="gpu"' in command
     assert "--states=PENDING,RUNNING" in command
     assert "--sort=-p,i" in command
 
@@ -2276,6 +2334,37 @@ def test_status_snapshot_preserves_squeue_failure(monkeypatch, tmp_path):
 
     assert result.returncode == 17
     assert "scheduler-unavailable" in result.stderr
+
+
+def test_status_snapshot_ranks_job_in_its_own_partition(monkeypatch, tmp_path):
+    job = tmp_path / "jobs" / "j"
+    job.mkdir(parents=True)
+    (job / "meta").write_text("job: j\nslurm_job_id: 20\n")
+    (job / "state").write_text("queued\n")
+    (job / "run.sh").write_text("#!/usr/bin/env bash\n#SBATCH --partition=gpu-amd\n")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    squeue = fake_bin / "squeue"
+    squeue.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$SQUEUE_ARGS"\n')
+    squeue.chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    args = tmp_path / "squeue-args"
+
+    result = subprocess.run(
+        ["bash", "-c", viewer._status_remote_command('JOB="j"', 0)],
+        capture_output=True,
+        text=True,
+        env={
+            **os.environ,
+            "PATH": f"{fake_bin}:{os.environ['PATH']}",
+            "SQUEUE_ARGS": str(args),
+        },
+        check=True,
+    )
+
+    assert "--partition=gpu-amd" in args.read_text().splitlines()
+    queue = presentation.marked_sections(result.stdout)["QUEUE"]
+    assert queue.startswith("cohort_partition=gpu-amd|")
 
 
 def test_status_framing_keeps_marker_like_payload_inside_original_section():

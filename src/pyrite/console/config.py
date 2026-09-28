@@ -32,11 +32,36 @@ CONFIG_PATH = state_dir() / "config.toml"
 _SETTINGS = {
     "profile.current": ("PYRITE_PROFILE", "standard"),
     "remote.target": ("PYRITE_REMOTE_HOST", ""),
+    "remote.gpu_vendor": ("PYRITE_REMOTE_GPU_VENDOR", "nvidia"),
+    "remote.partition": ("PYRITE_REMOTE_PARTITION", "gpu"),
+    "remote.nodelist": ("PYRITE_REMOTE_NODELIST", "any"),
+    "remote.gres": ("PYRITE_REMOTE_GRES", "gpu:1"),
     "workspace.root": ("PYRITE_HOME", "."),
     "catalog.path": ("PYRITE_CATALOG", str(data_dir() / "catalog")),
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
+}
+
+# One-line help per key, shown by ``pyrite config --help`` / ``config set --help``.
+_DESCRIPTIONS = {
+    "profile.current": "Default catalog scan profile.",
+    "remote.target": "SSH alias of the SLURM head node (required).",
+    "remote.gpu_vendor": "Remote GPU vendor: nvidia or amd.",
+    "remote.partition": "SLURM partition for new remote jobs.",
+    "remote.nodelist": "SLURM node list for new remote jobs, or 'any'.",
+    "remote.gres": "SLURM gres request, e.g. gpu:radeon8060s:1.",
+    "workspace.root": "Workspace directory for checkpoints and outputs.",
+    "catalog.path": "Material catalog directory or file.",
+    "xsgen.bremslib_source": "BremsLib source tree for table generation.",
+    "xsgen.elsepa_source": "ELSEPA source tree for table generation.",
+    "xsgen.sbethe_source": "SBETHE source tree for table generation.",
+}
+# Built-in defaults that read better as a phrase than as their raw value.
+_DEFAULT_LABELS = {
+    "remote.target": "unset",
+    "workspace.root": "current directory",
+    "catalog.path": "bundled catalog",
 }
 
 
@@ -53,6 +78,12 @@ class ResolvedValue:
 def keys() -> tuple[str, ...]:
     """Return supported context keys in stable display order."""
     return tuple(_SETTINGS)
+
+
+def describe(key: str) -> tuple[str, str, str]:
+    """Return ``(environment variable, built-in default label, one-line help)`` for KEY."""
+    env_name, default = _SETTINGS[key]
+    return env_name, _DEFAULT_LABELS.get(key, default), _DESCRIPTIONS[key]
 
 
 def _store_path_for_read() -> Path:

@@ -42,6 +42,11 @@ def _pin_remote_paths(monkeypatch):
     monkeypatch.setattr(config, "HOST", "remote-host")
     monkeypatch.setattr(config, "REMOTE_DIR", "/path/to/pyrite")
     monkeypatch.setattr(config, "REMOTE_UV", "uv")
+    # The SLURM target profile likewise resolves through the developer's store.
+    monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "nvidia")
+    monkeypatch.setattr(config, "SLURM_PARTITION", "gpu")
+    monkeypatch.setattr(config, "SLURM_NODELIST", "any")
+    monkeypatch.setattr(config, "SLURM_GRES", "gpu:1")
     package = sys.modules.get("pyrite.remote")
     if package is not None:
         monkeypatch.setattr(package, "HOST", "remote-host")

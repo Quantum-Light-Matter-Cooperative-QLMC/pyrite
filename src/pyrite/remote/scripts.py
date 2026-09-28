@@ -89,6 +89,43 @@ for stem in {stem_words}; do \
 done"""
 
 
+def _nvidia_prelude() -> str:
+    return "module purge 2>/dev/null || true\nmodule load cuda openmpi hdf5 2>/dev/null || true"
+
+
+def _amd_prelude() -> str:
+    """ROCm job environment: no modules, own venv, backend pinned to ``rocm``.
+
+    AMD nodes share ``REMOTE_DIR`` with NVIDIA nodes, and the two ``uv sync``
+    extras install different CuPy builds, so AMD jobs keep a separate project
+    environment instead of rebuilding the shared ``.venv`` on every switch.
+    Pinning the backend makes a missing HIP stack fail instead of running on CPU.
+    """
+    venv = config.shell_word(config.remote_path(".venv-amd"))
+    return (
+        f"export UV_PROJECT_ENVIRONMENT={venv}\n"
+        'export ROCM_HOME="${ROCM_HOME:-/opt/rocm}"\n'
+        "export PYRITE_MC_BACKEND=rocm"
+    )
+
+
+_VENDOR_PRELUDES = {"nvidia": _nvidia_prelude, "amd": _amd_prelude}
+# Extra job-log header lines; NVIDIA's header predates these and stays unchanged.
+_VENDOR_LOG_PROBES = {
+    "amd": """  echo "gpu_vendor: amd"
+  echo "backend: $PYRITE_MC_BACKEND"
+  if command -v rocminfo >/dev/null 2>&1; then
+    echo "gfx: $(rocminfo 2>/dev/null | grep -o -m1 'gfx[0-9a-f]*' || echo unknown)"
+  else
+    echo "gfx: unknown (rocminfo not on PATH)"
+  fi
+  if command -v rocm-smi >/dev/null 2>&1; then
+    rocm-smi --showproductname --showmeminfo vram 2>&1 || true
+  fi
+""",
+}
+
+
 def _slurm_batch_script(
     jobid: str,
     payload: str,
@@ -99,13 +136,21 @@ def _slurm_batch_script(
     cpus_per_task: int = config.SLURM_CPUS_PER_MATERIAL,
     mem_per_cpu: str | None = None,
 ) -> str:
-    """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
+    """Wrap a CXR queue payload in the configured one-GPU SLURM target profile.
+
+    Partition, node list, gres, and vendor come from ``remote.*`` config. Every
+    node is assumed to see ``REMOTE_DIR`` on a shared filesystem: the script,
+    job bookkeeping, and checkpoints all live there.
+    """
     vendor = config.remote_gpu_vendor()
-    if vendor != "nvidia":
+    if vendor not in _VENDOR_PRELUDES:
         raise ValueError(
-            f"pyrite remote lab-box scripts do not yet support {vendor}; "
+            f"pyrite remote SLURM scripts do not yet support {vendor}; "
             "use a site-specific SLURM template from docs/guides/running-on-a-cluster.md"
         )
+    partition = config.slurm_partition()
+    nodelist = config.slurm_nodelist()
+    nodelist_line = f"#SBATCH --nodelist={nodelist}\n" if nodelist else ""
     reservation_stems = reservation_stems or []
     transport._check_shell_tokens([jobid, *reservation_stems])
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -126,19 +171,18 @@ def _slurm_batch_script(
     )
     return f"""#!/usr/bin/env bash
 #SBATCH --job-name={job_name}
-#SBATCH --partition={config.SLURM_PARTITION}
-#SBATCH --nodes=1
+#SBATCH --partition={partition}
+{nodelist_line}#SBATCH --nodes=1
 #SBATCH --ntasks-per-node={config.SLURM_GPUS}
 #SBATCH --cpus-per-task={cpus_per_task}
 {f"#SBATCH --mem-per-cpu={mem_per_cpu}" if mem_per_cpu else ""}
-#SBATCH --gres=gpu:{config.SLURM_GPUS}
+#SBATCH --gres={config.slurm_gres()}
 #SBATCH --time={time_limit}
 #SBATCH --output={sbatch_jobdir}/slurm-%j.out
 #SBATCH --error={sbatch_jobdir}/slurm-%j.err
 
 set -u
-module purge 2>/dev/null || true
-module load cuda openmpi hdf5 2>/dev/null || true
+{_VENDOR_PRELUDES[vendor]()}
 
 export PYRITE_HOME={config.shell_word(config.remote_dir())}
 {catalog_export}
@@ -179,8 +223,8 @@ echo "running $(date -Is)" > "$JOBDIR/state"
   echo "===== SLURM job ${{SLURM_JOB_ID:-unknown}} ====="
   echo "host: $(hostname)"
   echo "gpus: {config.SLURM_GPUS}"
-  echo "partition: {config.SLURM_PARTITION}"
-  echo "started: $(date -Is)"
+  echo "partition: {partition}"
+{_VENDOR_LOG_PROBES.get(vendor, "")}  echo "started: $(date -Is)"
 }} >> "$JOBDIR/log"
 
 {payload}"""

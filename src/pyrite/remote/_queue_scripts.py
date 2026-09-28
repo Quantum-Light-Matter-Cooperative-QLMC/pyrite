@@ -83,10 +83,15 @@ def _uv_sync_block(once: bool = False) -> str:
     is pure per-slice startup overhead. The sentinel is written only after a
     successful sync, so a failed sync still exits 1 and the next slice retries.
     Delete ``$JOBDIR/.synced`` to force a re-sync (e.g. after a mid-chain
-    dependency bump)."""
+    dependency bump).
+
+    AMD targets build CuPy from source against the node's ROCm toolchain, which
+    ``CUPY_INSTALL_USE_HIP=1`` selects; NVIDIA installs the prebuilt wheel."""
+    vendor = config.remote_gpu_vendor()
+    build_env = "CUPY_INSTALL_USE_HIP=1 " if vendor == "amd" else ""
     sync = f"""uv_sync_start_ns=$(date +%s%N)
 uv_sync_rc=0
-{config.shell_remote_uv()} sync --package pyrite-xray --no-dev --extra {config.remote_gpu_vendor()} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
+{build_env}{config.shell_remote_uv()} sync --package pyrite-xray --no-dev --extra {vendor} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
 uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
 printf 'timing: uv sync %d.%03d s\\n' \
   "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"
