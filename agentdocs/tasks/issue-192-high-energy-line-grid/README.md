@@ -394,3 +394,40 @@ device in bounded blocks.
 The 80/180 stop is 798 keV (rare Doppler-boosted forward lines); local spacing
 keeps it at 304k nodes. The lower-edge bound (2.3e-4, 4.7e-4) exceeds 1e-4
 and is not gated; it matches the earlier lower-edge finding.
+
+## Electron-block streaming (2026-09-27)
+
+Device-scaling job SLURM 207 (pool capped at 11.4 GiB via the runner's
+`_ensure_pool_limit`): resident segments cost ~86 B each (1.46 GiB at 17 M), but
+population collection at Ne=8,000 OOMed on single ~0.85 GB allocations: the
+per-segment setup arrays outside the kernel's `(n_block, N_g)` bound. Fix
+(`607031a3`): on a GPU, incoherent `_lines_for_segments` splits into disjoint
+electron-aligned blocks sized from pool headroom (1,024 B/segment after SLURM
+209 calibration); a block OOM restores the audit and doubles the count. Cases
+that fit, CPU runs and coherent sums are unchanged.
+
+SLURM 209, 1 mm, local resolution, FP32, same caps (24 GB host):
+
+| case | Ne | segments | blocks | stop eV | nodes | transport s | line eval s | host peak MiB | upper / lower | line yield |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|
+| 80/180 | 8k | 34.0 M | 2->4 | 797,400 | 307,346 | 51.4 | 76.1 | 4,157 | 4.5e-5 / 4.5e-4 | 2.66e-8 |
+| 10/100 | 8k | 21.8 M | 2 | 672,400 | 270,781 | 22.7 | 97.2 | 4,157 | 5.0e-5 / 2.2e-3 | 2.59e-6 |
+| 10/100 | 20k | 54.6 M | 4->8 | 623,300 | 256,073 | 61.4 | 215.3 | 6,731 | 5.0e-5 / 2.0e-3 | 1.18e-6 |
+| 80/180 | 20k | 85.7 M | 4->8 | 791,100 | 308,871 | 108.1 | 175.7 | 18,007 | 4.7e-5 / 1.2e-3 | 2.53e-8 |
+
+All Ne=20,000 1 mm cases now complete. At 85.7 M segments the resident
+transport fell back to host segments (18 GB host peak). Line-eval throughput is
+flat at 1.1-1.3e11 pairs/s; kernel launch tuning is tracked in #200.
+
+Block invariance (SLURM 210, forced 16 blocks): 10/100 Ne=4,000 yield
+relative change 2.5e-9, Ne=8,000 5.0e-8, identical nodes/stop/audit. Blocking
+is exact to FP32 summation order.
+
+Open finding: 10/100 line yield jumps ~70x from Ne=4,000 (3.74e-8, centroid
+7.08 keV, stop 35.4 keV) to Ne=8,000 (2.59e-6, 18.6 keV, 672 keV), then 1.18e-6
+at 20,000. 80/180 is stable (2.5-2.8e-8). Electrons 4,000-7,999 therefore
+contain rare, very heavy far lines: a heavy-tailed line-weight estimator
+(candidate: near-zero `1 - n v.n` denominators on forward-scattered segments),
+not a grid effect. The lower-edge bound also reaches 2e-3, above the 1e-3
+budget, and is ungated. Needs per-electron yield attribution before any
+production conclusion.
