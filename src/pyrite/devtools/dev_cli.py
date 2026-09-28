@@ -497,7 +497,8 @@ def cmd_verify(args: argparse.Namespace) -> None:
     cmd_docs(argparse.Namespace(linkcheck=False))
     cmd_lint(args)
     cmd_typecheck(args)
-    cmd_test(args)
+    if not getattr(args, "skip_tests", False):
+        cmd_test(args)
 
 
 def cmd_regen_golden(args: argparse.Namespace) -> None:
@@ -675,6 +676,11 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
     smoke.add_argument("--output-dir", default="smoke_out")
     smoke.set_defaults(func=cmd_smoke)
     verify = sub.add_parser("verify")
+    verify.add_argument(
+        "--skip-tests",
+        action="store_true",
+        help="run the full non-test verification gate (CI runs tests in domain suites)",
+    )
     verify.add_argument("pytest_args", nargs=argparse.REMAINDER)
     verify.set_defaults(func=cmd_verify)
     regen_golden = sub.add_parser("regen-golden")
@@ -745,9 +751,24 @@ def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> Non
         command = raw_args[0]
         func = cmd_test if command == "test" else cmd_verify
         rest = raw_args[1:]
+        if command == "verify" and rest == ["--help"]:
+            build_parser(prog_name).parse_args(raw_args)
+            return
+        skip_tests = command == "verify" and bool(rest) and rest[0] == "--skip-tests"
+        if skip_tests:
+            rest = rest[1:]
+            if rest:
+                build_parser(prog_name).error("verify --skip-tests does not accept pytest arguments")
         numba = bool(rest) and rest[0] == "--numba"
         pytest_args = rest[1:] if numba else rest
-        func(argparse.Namespace(command=command, numba=numba, pytest_args=pytest_args))
+        func(
+            argparse.Namespace(
+                command=command,
+                numba=numba,
+                pytest_args=pytest_args,
+                skip_tests=skip_tests,
+            )
+        )
         return
     args = build_parser(prog_name).parse_args(raw_args)
     args.func(args)
