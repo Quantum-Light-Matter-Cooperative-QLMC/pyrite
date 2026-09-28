@@ -1,4 +1,4 @@
-# Validation: `transverse-bunch-form-factor`
+# `transverse-bunch-form-factor`
 
 ## Claim and where it enters
 

@@ -1,4 +1,4 @@
-# Validation: `bremslib-radiative-partition`
+# `bremslib-radiative-partition`
 
 ## Scope and source
 

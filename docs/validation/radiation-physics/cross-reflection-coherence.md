@@ -1,4 +1,4 @@
-# Validation: `cross-reflection-coherence`
+# `cross-reflection-coherence`
 
 ## Claim and where it enters
 

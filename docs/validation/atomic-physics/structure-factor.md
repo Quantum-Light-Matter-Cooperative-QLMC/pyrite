@@ -1,4 +1,4 @@
-# Validation: `structure-factor`
+# `structure-factor`
 
 **Claim.** Kinematical (geometric) structure factor of a crystal unit cell, together with the isotropic Debye–Waller (thermal) attenuation factor:
 

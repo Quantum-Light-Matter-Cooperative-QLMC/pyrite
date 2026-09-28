@@ -1,4 +1,4 @@
-# Validation: `finite-footprint-longitudinal-decoherence`
+# `finite-footprint-longitudinal-decoherence`
 
 ## Claim
 

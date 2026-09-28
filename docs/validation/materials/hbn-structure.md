@@ -1,4 +1,4 @@
-# Validation: `hbn-structure`
+# `hbn-structure`
 
 **Claim.** Bulk hexagonal boron nitride (h-BN), space group P6₃/mmc (No. 194), represented as an explicit four-atom conventional-cell basis with `a = 2.504 Å`, `c = 6.661 Å`.
 

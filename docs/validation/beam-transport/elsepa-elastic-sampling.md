@@ -1,4 +1,4 @@
-# Validation: `elsepa-elastic-sampling`
+# `elsepa-elastic-sampling`
 
 ## Scope and independence
 

@@ -1,4 +1,4 @@
-# Validation: characteristic-radiation
+# characteristic-radiation
 
 ## Source model
 

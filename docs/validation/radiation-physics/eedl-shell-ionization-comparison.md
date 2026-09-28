@@ -1,4 +1,4 @@
-# Validation: `eedl-shell-ionization-comparison`
+# `eedl-shell-ionization-comparison`
 
 ## Scope and reference
 

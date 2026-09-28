@@ -1,4 +1,4 @@
-# Validation: `bremslib-angular-model`
+# `bremslib-angular-model`
 
 ## Scope and independence
 

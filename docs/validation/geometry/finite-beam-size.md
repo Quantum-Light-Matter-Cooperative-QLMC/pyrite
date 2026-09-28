@@ -1,4 +1,4 @@
-# Validation: `finite-beam-size`
+# `finite-beam-size`
 
 **Claim.** The incident electron beam's transverse entry point is drawn from an azimuthally-symmetric 2D Gaussian spot of a given FULL WIDTH AT HALF MAXIMUM (`beam_fwhm_mm`, mm), applied as a rigid per-electron `(x0, y0)` offset to every segment that electron emits; `None`/`0` (falsy) is a strict no-op reproducing the old point-source beam bit-for-bit; the offset is drawn from an RNG stream independent of the main transport `rng`. Its zero-spectrum-effect conclusion applies only when both finite-footprint dimensions are `None`.
 

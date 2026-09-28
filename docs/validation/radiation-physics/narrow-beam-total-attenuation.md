@@ -1,4 +1,4 @@
-# Validation: narrow-beam-total-attenuation
+# narrow-beam-total-attenuation
 
 Independent re-derivation of the total narrow-beam linear attenuation coefficient and of the Elam mass-to-atomic unit chain behind its scattering term. Written from the ledger row in `docs/validation/ledger-crystallography-atomic-data.md`, the two public signatures, and the cited sources; the implementation bodies were read only after the derivation and the reference numbers below were fixed.
 

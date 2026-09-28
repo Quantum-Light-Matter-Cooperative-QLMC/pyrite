@@ -1,4 +1,4 @@
-# Validation: `hfs2-structure`
+# `hfs2-structure`
 
 **Claim.** Bulk 1T-HfS2 in space group P-3m1 (No. 164), represented by a three-atom primitive hexagonal cell with `a = 3.62 A`, `c = 5.80 A`, Hf on `1a`, and S on `2d` using the idealized octahedral coordinate `z = 0.25`.
 

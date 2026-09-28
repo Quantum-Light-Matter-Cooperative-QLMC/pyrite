@@ -1,4 +1,4 @@
-# Validation: coherent-formation-absorption
+# coherent-formation-absorption
 
 ## Claim
 

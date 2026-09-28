@@ -1,4 +1,4 @@
-# Validation: segment-escape-average
+# segment-escape-average
 
 ## Claim
 

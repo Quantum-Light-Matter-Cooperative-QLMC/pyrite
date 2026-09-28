@@ -1,4 +1,4 @@
-# Validation: `hopg-debye-waller-00l`
+# `hopg-debye-waller-00l`
 
 ## Claim and source
 

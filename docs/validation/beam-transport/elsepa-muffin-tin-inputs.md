@@ -1,4 +1,4 @@
-# Validation: `elsepa-muffin-tin-inputs`
+# `elsepa-muffin-tin-inputs`
 
 ## Scope and independence
 

@@ -1,4 +1,4 @@
-# Validation: `xray-chi-zero`
+# `xray-chi-zero`
 
 ## Claim and source
 

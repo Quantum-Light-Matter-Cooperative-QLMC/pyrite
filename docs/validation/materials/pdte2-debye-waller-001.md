@@ -1,4 +1,4 @@
-# Validation: `pdte2-debye-waller-001`
+# `pdte2-debye-waller-001`
 
 ## Claim and source
 

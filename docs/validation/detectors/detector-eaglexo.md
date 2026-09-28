@@ -1,4 +1,4 @@
-# Validation: detector-eaglexo
+# detector-eaglexo
 
 ## Claim
 

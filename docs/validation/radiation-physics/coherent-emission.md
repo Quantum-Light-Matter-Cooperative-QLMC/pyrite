@@ -1,4 +1,4 @@
-# Validation: `coherent-emission`
+# `coherent-emission`
 
 ## Independent derivation (recorded before implementation inspection)
 

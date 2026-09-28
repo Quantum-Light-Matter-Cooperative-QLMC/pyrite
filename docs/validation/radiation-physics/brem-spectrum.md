@@ -1,4 +1,4 @@
-# Validation: `brem-spectrum`
+# `brem-spectrum`
 
 ```{note}
 **2026-09-25 (#174):** The Cartesian incident-panel interpolation derived below has been replaced by unit-base refinement with a $\ln T$ shape weight. See [Bremsstrahlung](../../physics/radiation-physics/bremsstrahlung.md). The ledger status is back to `filtered` until a fresh-context re-derivation covers the new interpolation. The derivation below remains valid for native panels, the MF=23 total and the isotropic estimator.

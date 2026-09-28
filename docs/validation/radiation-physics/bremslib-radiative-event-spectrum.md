@@ -1,4 +1,4 @@
-# Validation: `bremslib-radiative-event-spectrum`
+# `bremslib-radiative-event-spectrum`
 
 ## Scope and source
 

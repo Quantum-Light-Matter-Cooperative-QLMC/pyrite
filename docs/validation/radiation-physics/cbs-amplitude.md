@@ -1,4 +1,4 @@
-# Validation: `cbs-amplitude`
+# `cbs-amplitude`
 
 ## Claim and source
 

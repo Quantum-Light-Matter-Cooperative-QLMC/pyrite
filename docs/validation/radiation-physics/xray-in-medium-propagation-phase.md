@@ -1,4 +1,4 @@
-# Validation: `xray-in-medium-propagation-phase`
+# `xray-in-medium-propagation-phase`
 
 ## Claim (from the ledger row, before reading the implementation body)
 
