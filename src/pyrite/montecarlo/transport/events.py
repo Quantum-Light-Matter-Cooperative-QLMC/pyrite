@@ -15,6 +15,23 @@ from enum import IntEnum
 
 import numpy as np
 
+
+class TransportStepLimitError(RuntimeError):
+    """Some electrons were still alive after ``max_steps`` transport steps.
+
+    The trajectories are a function of the seed alone, so rerunning with a
+    larger ``max_steps`` reproduces every completed electron exactly.
+    """
+
+    def __init__(self, n_step_limited, Ne, max_steps):
+        super().__init__(
+            "incomplete electron transport: "
+            f"n_step_limited={n_step_limited}, Ne={Ne}, max_steps={max_steps}"
+        )
+        self.n_step_limited = int(n_step_limited)
+        self.max_steps = int(max_steps)
+
+
 EVENT_ELASTIC = np.int8(0)
 EVENT_SUBSTEP = np.int8(1)
 EVENT_LAYER_BOUNDARY = np.int8(2)

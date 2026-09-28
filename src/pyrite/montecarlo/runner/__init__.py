@@ -38,7 +38,12 @@ from ..spectrum import (
     mc_characteristic_spectrum as mc_characteristic_spectrum,
 )
 from ..trajectories import TrajectoryCapture
-from ..transport import TransportLUTConfig, resolve_transport_core, simulate_trajectories
+from ..transport import (
+    TransportLUTConfig,
+    TransportStepLimitError,
+    resolve_transport_core,
+    simulate_trajectories,
+)
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
 # see docs/repo-design/compute/compute-performance-optimization.md). With PYRITE_MC_TIMING set (to
@@ -196,6 +201,11 @@ from .oom import (
 )
 from .oom import _should_free as _should_free
 from .timing import _TimingAgg as _TimingAgg
+
+#: First per-electron transport step budget, and the largest the runner doubles
+#: it to after a :class:`TransportStepLimitError` (#192).
+TRANSPORT_MAX_STEPS = 20_000
+TRANSPORT_MAX_STEPS_CEILING = 8 * TRANSPORT_MAX_STEPS
 
 
 def _is_gpu_oom(error):
@@ -431,6 +441,19 @@ def _transport_case(
     stopping_tables = _case_stopping_tables(case)
 
     def _transport(keep):
+        # Thick MeV cases outlive the default step budget (5 MeV h-BN, 10 mm:
+        # ~23-32k steps). The trajectories depend on the seed alone, so a rerun
+        # at a doubled budget is exactly the run that budget gives from the start.
+        max_steps = TRANSPORT_MAX_STEPS
+        while True:
+            try:
+                return _simulate(keep, max_steps)
+            except TransportStepLimitError:
+                if max_steps >= TRANSPORT_MAX_STEPS_CEILING:
+                    raise
+                max_steps *= 2
+
+    def _simulate(keep, max_steps):
         return simulate_trajectories(
             case["E0_keV"],
             Ne_transport,
@@ -448,6 +471,7 @@ def _transport_case(
             groove=groove,
             transport_core=core,
             keep_segments_on_device=keep,
+            max_steps=max_steps,
             energy_model=case.get("energy_model", "frozen"),
             max_dE_frac=case.get("max_dE_frac", 0.0),
             straggling=straggling,
