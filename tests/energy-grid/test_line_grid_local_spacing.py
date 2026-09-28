@@ -166,7 +166,7 @@ def _measured_local_grid(monkeypatch, collected, **per_call):
     _collecting_lines(monkeypatch, *collected)
     case = {"name": "hbn test", "E0_keV": 5000.0, "composition": [("B", 0.5), ("N", 0.5)]}
     return _measured_line_grid(
-        _local_policy(**per_call), case, {}, np.array([0.0, 0.0, 1.0]), 2, 0.25, None, None
+        _local_policy(**per_call), case, {}, (np.array([0.0, 0.0, 1.0]),), 2, 0.25, None, None
     )
 
 
@@ -186,6 +186,38 @@ def test_measured_local_grid_refines_only_around_narrow_lines(monkeypatch):
     assert record["resolution_policy"] == LOCAL_RESOLUTION_POLICY
     assert record["local_spacing"]["narrow_lines"] == 1
     assert record["local_spacing"]["windows"] >= 1
+
+
+def test_measured_local_grid_over_directions_unions_lines_and_widest_stop(monkeypatch):
+    from pyrite.montecarlo import runner
+
+    # A line that moves across the detector: 5000 eV along +z, 9000 eV off-axis.
+    lines = {0.0: 5000.0, 1.0: 9000.0}
+
+    def collect(_segments, axis, _case, direction, _layers, _groove, **kwargs):
+        energy = np.array([lines[float(direction[0])]])
+        kwargs["truncation_audit"]["collect"].append((energy, np.ones(1), np.ones(1)))
+        return np.zeros(axis.size)
+
+    monkeypatch.setattr(runner, "_lines_for_segments", collect)
+    case = {"name": "hbn test", "E0_keV": 5000.0, "composition": [("B", 0.5), ("N", 0.5)]}
+    directions = (np.array([0.0, 0.0, 1.0]), np.array([1.0, 0.0, 0.0]))
+    grid, record, bandwidth = _measured_line_grid(
+        _local_policy(), case, {}, directions, 2, 0.25, None, None
+    )
+    single = [
+        _measured_line_grid(_local_policy(), case, {}, (direction,), 2, 0.25, None, None)
+        for direction in directions
+    ]
+    assert bandwidth["stop_eV"] == max(one[2]["stop_eV"] for one in single) == grid[-1]
+    assert [one["stop_eV"] for one in bandwidth["directions"]] == [
+        one[2]["stop_eV"] for one in single
+    ]
+    steps = np.diff(grid)
+    fine_nodes = grid[:-1][steps < 3.0 - 1e-9]
+    for energy in lines.values():
+        assert np.any(np.abs(fine_nodes - energy) <= 1.0)
+    assert [summary["narrow_lines"] for summary in record["local_spacing"]] == [1, 1]
 
 
 def test_measured_local_grid_refuses_beyond_the_point_budget(monkeypatch):

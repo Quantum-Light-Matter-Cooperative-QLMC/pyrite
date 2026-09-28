@@ -3,6 +3,7 @@ import shutil
 
 import pytest
 
+from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import profile
 from tests.helpers.cli import assert_clean_result, invoke
@@ -28,7 +29,8 @@ def catalog(tmp_path, monkeypatch):
     data = tmp_path / "data"
     shutil.copytree(DATA_DIR, data)
     path = data / "materials.toml"
-    monkeypatch.setattr(_catalog_io, "_MATERIALS_TOML", path)
+    path.write_text(read_text(data / "catalog"))
+    monkeypatch.setattr(_catalog_io, "_CATALOG_PATH", path)
     return path
 
 

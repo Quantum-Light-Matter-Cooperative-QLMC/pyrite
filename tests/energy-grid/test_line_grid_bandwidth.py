@@ -301,7 +301,7 @@ def test_measured_grid_uses_collected_production_weights(monkeypatch):
 
     monkeypatch.setattr(runner, "_lines_for_segments", collect)
     grid, _record, bandwidth = _measured_line_grid(
-        policy, case, {}, np.array([0.0, 0.0, 1.0]), 2, 1.0, None, None
+        policy, case, {}, (np.array([0.0, 0.0, 1.0]),), 2, 1.0, None, None
     )
     expected, _ = case_line_stop_eV(
         case,
