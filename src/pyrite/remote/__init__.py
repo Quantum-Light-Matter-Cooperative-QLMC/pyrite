@@ -1,18 +1,10 @@
 """``pyrite remote`` -- schedule heavy CXR scans on a configured remote host.
-"""``pyrite remote`` -- schedule heavy CXR scans on a configured remote host.
 
 The local machine handles interactive analysis and static-HTML export, while
 the remote host handles GPU-heavy Monte Carlo sweeps. Compute-producing
 subcommands can sync the current code, submit a SLURM batch script (see
 :mod:`pyrite.runs.scan`), and pull results into ``./checkpoints``.
-The local machine handles interactive analysis and static-HTML export, while
-the remote host handles GPU-heavy Monte Carlo sweeps. Compute-producing
-subcommands can sync the current code, submit a SLURM batch script (see
-:mod:`pyrite.runs.scan`), and pull results into ``./checkpoints``.
 
-Optional, dev-only tool. Configure an SSH host alias with
-``pyrite config set remote.target HOST`` or ``PYRITE_REMOTE_HOST`` before using
-remote commands. Other ``pyrite`` commands work without this configuration.
 Optional, dev-only tool. Configure an SSH host alias with
 ``pyrite config set remote.target HOST`` or ``PYRITE_REMOTE_HOST`` before using
 remote commands. Other ``pyrite`` commands work without this configuration.
@@ -90,7 +82,6 @@ from . import (
 # --- from config ------------------------------------------------------
 # Compatibility snapshot only; subsystem calls resolve the effective host
 # dynamically through ``config.remote_host()``.
-HOST = env_value("PYRITE_REMOTE_HOST")
 HOST = env_value("PYRITE_REMOTE_HOST")
 REMOTE_DIR = config.REMOTE_DIR
 REMOTE_UV = config.REMOTE_UV

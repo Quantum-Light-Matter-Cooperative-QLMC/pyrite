@@ -540,7 +540,6 @@ def test_click_rm_expected_failure_uses_stderr(monkeypatch):
 def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     calls = []
     monkeypatch.setattr(energy_grid.remote.config, "HOST", "remote-host")
-    monkeypatch.setattr(energy_grid.remote.config, "HOST", "remote-host")
     monkeypatch.setattr(energy_grid.remote.config, "REMOTE_DIR", "/srv/pyrite data")
     monkeypatch.setattr(energy_grid.remote, "_run", lambda command: calls.append(command))
 

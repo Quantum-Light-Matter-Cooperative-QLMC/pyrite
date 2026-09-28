@@ -5,10 +5,7 @@
 #SBATCH --mem=16G
 #SBATCH --time=00:10:00
 #SBATCH --output=sr_control_%j.log
-#SBATCH --output=sr_control_%j.log
 set -euo pipefail
-ROOT="${PYRITE_BENCH_ROOT:-$PWD}"
-cd "$ROOT/pyrite"
 ROOT="${PYRITE_BENCH_ROOT:-$PWD}"
 cd "$ROOT/pyrite"
 export PYRITE_MC_BACKEND=cpu
