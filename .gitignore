@@ -288,3 +288,4 @@ checkpoints/**/cases.json
 /observations/
 src/pyrite/apps/.claude/settings.local.json
 *.github-issues
+scripts/user_scripts/set_qlmc_ace_remote.sh
