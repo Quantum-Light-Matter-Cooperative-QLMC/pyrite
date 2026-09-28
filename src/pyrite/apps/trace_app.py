@@ -574,14 +574,21 @@ def _(
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
+        _secondary_note = None
         if penetration_secondaries_ui.value:
-            _nc = dict(
-                _nc,
-                energy_model="midpoint",
-                inelastic_model="shell-soft-hard",
-                inelastic_cutoff_eV=50.0,
-                secondary_threshold_eV=float(penetration_secondary_threshold_ui.value),
-            )
+            if _nc["crystal"] not in {"silicon", "sio2", "mos2"}:
+                _secondary_note = mo.md(
+                    "*Shell secondaries are unavailable for this material; supported materials "
+                    "are silicon, SiO₂, and MoS₂.*"
+                )
+            else:
+                _nc = dict(
+                    _nc,
+                    energy_model="midpoint",
+                    inelastic_model="shell-soft-hard",
+                    inelastic_cutoff_eV=50.0,
+                    secondary_threshold_eV=float(penetration_secondary_threshold_ui.value),
+                )
 
         # Survival-chart cache: penetration_survival_chart runs its OWN fresh
         # Ne=500-electron transport, so without caching it would redo that work
@@ -909,6 +916,7 @@ def _(
                         wrap=True,
                     ),
                     *((_groove_note,) if _groove_note is not None else ()),
+                    *((_secondary_note,) if _secondary_note is not None else ()),
                     mo.hstack(
                         [
                             penetration_secondaries_ui,
