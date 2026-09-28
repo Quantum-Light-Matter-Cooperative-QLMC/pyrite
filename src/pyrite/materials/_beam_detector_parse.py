@@ -71,7 +71,7 @@ _DETECTOR_UPPER_BOUND_MESSAGES = {
     "solid_angle_sr": "solid_angle_sr must be <= 4*pi sr",
 }
 #: A profile that omits a detector, or overrides only acceptance fields, resolves
-#: to the driver's default response (Timepix3 at 90 deg, per issue #52).
+#: to the driver's response-free 90-degree scalar observation geometry.
 _DEPRECATED_DETECTOR_KEYS = frozenset(
     {
         "response_model",

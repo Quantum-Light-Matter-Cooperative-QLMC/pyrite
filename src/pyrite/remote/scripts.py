@@ -111,6 +111,12 @@ def _slurm_batch_script(
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     sbatch_jobdir = config.sbatch_remote_path(config.JOBS_SUBDIR, jobid)
     reservations = _reservation_root()
+    remote_catalog = config.remote_catalog_path()
+    catalog_export = (
+        f"export PYRITE_CATALOG={config.shell_word(remote_catalog)}\n"
+        if remote_catalog is not None
+        else ""
+    )
     release_lines = (
         "\n  ".join(
             f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
@@ -134,6 +140,8 @@ set -u
 module purge 2>/dev/null || true
 module load cuda openmpi hdf5 2>/dev/null || true
 
+export PYRITE_HOME={config.shell_word(config.remote_dir())}
+{catalog_export}
 JOBDIR={config.shell_word(jobdir)}
 JOBID={config.shell_word(jobid)}
 RESERVATIONS={config.shell_word(reservations)}
@@ -344,7 +352,7 @@ def _prune_checkpoint_stems_command(
         f"{reserve}; "
         f"release_prune() {{ {release}; }}; trap release_prune EXIT; "
         f"cd {config.shell_remote_dir()} || exit $?; "
-        f"{config.shell_remote_uv()} run --no-sync pyrite {command}"
+        f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite {command}"
     )
     if not obsolete_stems:
         return base

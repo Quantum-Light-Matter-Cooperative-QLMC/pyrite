@@ -213,6 +213,34 @@ def _sync_entries() -> list[tuple[str, Path]]:
                     entries.append(((Path(p) / relative).as_posix(), f))
         else:
             entries.append((Path(p).as_posix(), local))
+    from .._catalog_layout import bundled_catalog, read_sources, selected_catalog
+
+    catalog = selected_catalog()
+    if catalog != bundled_catalog().resolve():
+        if not catalog.exists():
+            raise SystemExit(f"selected catalog does not exist: {catalog}")
+        if catalog.is_dir():
+            sources = [catalog / relative for relative, _ in read_sources(catalog)]
+            assets = []
+            for name in ("cifs", "energy-grid-artifacts"):
+                root = catalog / name
+                if root.is_dir():
+                    assets.extend(
+                        file
+                        for file in root.rglob("*")
+                        if not any(part.startswith(".") for part in file.relative_to(root).parts)
+                    )
+            for file in sorted((*sources, *assets)):
+                if file.is_symlink() or not file.resolve().is_relative_to(catalog):
+                    raise SystemExit(f"selected catalog contains unsafe symlink: {file}")
+                if file.is_file():
+                    entries.append(
+                        ((Path("external-catalog") / file.relative_to(catalog)).as_posix(), file)
+                    )
+        elif catalog.is_file() and not catalog.is_symlink():
+            entries.append(("external-catalog.toml", catalog))
+        else:
+            raise SystemExit(f"selected catalog is not a regular file or directory: {catalog}")
     entries.sort(key=lambda entry: entry[0])
     return entries
 
@@ -417,6 +445,11 @@ def sync_code(*, force: bool = False):
     # tar leaves the previous stamp in place rather than claiming code that
     # never landed.
     stamp = _sync_stamp(digest)
+    clear_catalog = (
+        "rm -rf external-catalog external-catalog.toml && "
+        if config.remote_catalog_path() is not None
+        else ""
+    )
     _run(
         [
             "ssh",
@@ -425,7 +458,7 @@ def sync_code(*, force: bool = False):
             f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} "
             '&& for p in src/pyrite checks; do if [ -d "$p" ]; then '
             "find \"$p\" -type f -name '*.py' -delete; fi; done "
-            "&& tar xzf /tmp/pyrite_code.tgz && rm -f /tmp/pyrite_code.tgz "
+            f"&& {clear_catalog}tar xzf /tmp/pyrite_code.tgz && rm -f /tmp/pyrite_code.tgz "
             f"&& printf %s {config.shell_arg(stamp.render())} "
             f"> {config.shell_single_word(config.remote_sync_stamp_path())}",
         ]

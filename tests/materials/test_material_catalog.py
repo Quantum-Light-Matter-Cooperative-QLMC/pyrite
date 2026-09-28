@@ -803,7 +803,6 @@ def test_named_detector_reference_resolves_to_same_value_as_inline_block(tmp_pat
     from pyrite.campaign.config import default_settings
     from pyrite.campaign.profiles import dataset_identity
     from pyrite.detectors import Detector
-    from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
 
     material_rows = """
@@ -843,7 +842,7 @@ crystal = "mos2"
     assert dict(ref_catalog.detectors["eds"]) == expected_spec
     assert ref_catalog.detector_labels["eds"] == "SEM EDS"
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
-    assert config.catalog_detector("standard") == Detector(119.0, 16.6, 0.066, response=Timepix3())
+    assert config.catalog_detector("standard") == Detector(119.0, 16.6, 0.066)
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": ref_catalog)
     ref_sweep = config.material_sweep("mos2")
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inline_catalog)
@@ -940,7 +939,6 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
 
     from pyrite.campaign import config
     from pyrite.detectors import Detector, EnergyBins
-    from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
 
     text = (
@@ -958,8 +956,8 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     catalog = load_material_catalog(path, profile="narrowed")
 
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
-    assert config.catalog_detector("standard") == Detector(91.0, 12.0, 0.05, response=Timepix3())
-    selected = Detector(119.0, 16.6, 0.066, response=Timepix3())
+    assert config.catalog_detector("standard") == Detector(91.0, 12.0, 0.05)
+    selected = Detector(119.0, 16.6, 0.066)
     assert config.catalog_detector("narrowed") == selected
 
     profiled = config.material_sweep("mos2", catalog_profile="narrowed")
@@ -969,13 +967,17 @@ def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
         detector=Detector(100.0, 8.0, 0.01),
     )
     assert replace(profiled.detector, energy_bins=EnergyBins()) == selected
+    source_density = np.array([1.0, 2.0, 3.0])
+    assert np.array_equal(
+        profiled.detector.score(np.array([100.0, 200.0, 300.0]), source_density),
+        source_density,
+    )
     assert replace(explicit.detector, energy_bins=EnergyBins()) == Detector(100.0, 8.0, 0.01)
 
 
 def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path, monkeypatch):
     from pyrite.campaign import config
     from pyrite.detectors import Detector
-    from pyrite.detectors.spec import Timepix3
     from pyrite.materials import load_material_catalog
 
     fallback = load_material_catalog(
@@ -992,7 +994,12 @@ crystal = "mos2"
     )
     assert dict(fallback.profile_detector("standard")) == {}
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": fallback)
-    assert config.catalog_detector("standard") == Detector(response=Timepix3())
+    detector = config.catalog_detector("standard")
+    assert detector == Detector()
+    source_density = np.array([1.0, 2.0, 3.0])
+    assert np.array_equal(
+        detector.score(np.array([100.0, 200.0, 300.0]), source_density), source_density
+    )
 
     text = (
         _catalog_with_two_profiles(tmp_path).read_text()
@@ -1001,7 +1008,7 @@ crystal = "mos2"
     inherited = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
     assert dict(inherited.profile_detector("narrowed")) == {"observation_angle_deg": 91.0}
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inherited)
-    assert config.catalog_detector("narrowed") == Detector(91.0, response=Timepix3())
+    assert config.catalog_detector("narrowed") == Detector(91.0)
 
 
 def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):

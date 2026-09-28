@@ -21,7 +21,7 @@ import tomlkit
 from tomlkit.exceptions import ParseError
 
 from .._env import env_value
-from ..paths import state_dir
+from ..paths import data_dir, state_dir, user_data_dir
 
 CONFIG_PATH = state_dir() / "config.toml"
 # The three ``xsgen.*_source`` defaults are the conventional sibling checkout
@@ -33,6 +33,7 @@ _SETTINGS = {
     "profile.current": ("PYRITE_PROFILE", "standard"),
     "remote.target": ("PYRITE_REMOTE_HOST", ""),
     "workspace.root": ("PYRITE_HOME", "."),
+    "catalog.path": ("PYRITE_CATALOG", str(data_dir() / "catalog")),
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
@@ -140,3 +141,16 @@ def workspace_root(explicit: str | PathLike[str] | None = None) -> Path:
     """Resolve explicit > ``PYRITE_HOME`` > config store > cwd."""
     value = resolve("workspace.root", None if explicit is None else str(explicit)).value
     return Path(value).expanduser().resolve()
+
+
+def catalog_path(explicit: str | PathLike[str] | None = None) -> Path:
+    """Resolve explicit > ``PYRITE_CATALOG`` > config store > bundled catalog."""
+    value = resolve("catalog.path", None if explicit is None else str(explicit)).value
+    return Path(value).expanduser().resolve()
+
+
+def xsgen_data_root() -> Path:
+    """Put generated tables beside checkpoints in an explicit workspace."""
+    if resolve("workspace.root").source == "built-in default":
+        return user_data_dir() / "xsgen"
+    return workspace_root() / "xsgen"

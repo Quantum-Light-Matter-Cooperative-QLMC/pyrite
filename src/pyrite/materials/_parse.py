@@ -51,19 +51,25 @@ from ._transport_data import TRANSPORT_ELEMENTS
 logger = logging.getLogger(__name__)
 
 
-def _cif_path(value: object, path: str, errors: _Errors) -> Path | None:
+def _cif_path(value: object, path: str, errors: _Errors, source: Path) -> Path | None:
     if not isinstance(value, str) or not value:
         errors.add(path, "must be a nonempty relative path")
         return None
-    candidate = (DATA_DIR / value).resolve()
-    cif_root = (DATA_DIR / "cifs").resolve()
-    if not candidate.is_relative_to(cif_root):
-        errors.add(path, "must stay inside packaged data/cifs")
+    relative = Path(value)
+    if relative.is_absolute() or relative.parts[:1] != ("cifs",) or ".." in relative.parts:
+        errors.add(path, "must be a relative path inside cifs/")
         return None
-    if not candidate.is_file():
-        errors.add(path, f"file does not exist ({value})")
-        return None
-    return candidate
+    for root in (catalog_root(source), DATA_DIR):
+        base = root.resolve()
+        cif_root = (base / "cifs").resolve()
+        candidate = (base / relative).resolve()
+        if not cif_root.is_relative_to(base) or not candidate.is_relative_to(cif_root):
+            errors.add(path, "must stay inside cifs/")
+            return None
+        if candidate.is_file():
+            return candidate
+    errors.add(path, f"file does not exist ({value})")
+    return None
 
 
 def _parse_info(
@@ -113,7 +119,7 @@ def _optional_text(value: object, path: str, errors: _Errors) -> str | None:
     return value.strip()
 
 
-def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
+def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, CrystalSpec]:
     table = _table(raw, "crystals", errors)
     if table is None:
         return {}
@@ -144,7 +150,7 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
         errors.keys(row, path, allowed)
         for name in sorted(required - set(row)):
             errors.add(f"{path}.{name}", "missing required key")
-        cif = _cif_path(row.get("cif"), f"{path}.cif", errors)
+        cif = _cif_path(row.get("cif"), f"{path}.cif", errors, source)
         validation_id = row.get("validation_id")
         if not isinstance(validation_id, str) or not validation_id.strip():
             errors.add(f"{path}.validation_id", "must be a nonempty string")

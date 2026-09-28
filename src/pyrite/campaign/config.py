@@ -27,7 +27,7 @@ from typing import Any
 import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS
-from ..detectors import Detector, EnergyBins, Timepix3
+from ..detectors import Detector, EnergyBins
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
 from ..montecarlo import simulate_trajectories
 from ..montecarlo.transverse import TransverseDistribution
@@ -93,12 +93,10 @@ def default_settings(fidelity: str = "full"):
     return get_fidelity_preset(fidelity).apply_settings(settings)
 
 
-#: The detector every profile starts from: a Timepix3 response at 90 deg, per
-#: issue #52. ``materials.catalog`` validates the acceptance fields of a
-#: ``[profiles.NAME.detector]`` block but does not build the detector -- it sits
-#: below ``detectors`` in the package graph -- so the default response and the
-#: construction both live here, on the driver side.
-DEFAULT_CATALOG_DETECTOR = Detector(response=Timepix3())
+#: Default scalar observation geometry. Source spectra stay response-free until
+#: a caller explicitly supplies a detector response or a profile configures a
+#: physical counting observation.
+DEFAULT_CATALOG_DETECTOR = Detector()
 
 
 def catalog_detector(catalog_profile: str = "standard") -> Detector:

@@ -6,7 +6,7 @@ Navigation aid for `src/pyrite/` — importable package. Read before exploring s
 
 - Root `pyrite-xray`: sole publishable distribution and owner of `src/pyrite/`, packaged data, `pyrite`, `pyrite-dev`, and the test suite. No `uv` workspace split; `uv run pyrite-dev ...` needs no `--package` flag.
 - Stable `pyrite-dev test-suite {core,cli,apps,packaging}` selectors partition all test modules; `integration` overlaps deliberately; `verify` remains full gate.
-- Runtime paths resolve through `pyrite.paths`: packaged read-only data stays package-relative; workspace artifacts use explicit path > `PYRITE_HOME` > `workspace.root` config > cwd; mutable user state uses Click's platform app directory. Marimo apps ship under `pyrite.apps`; validation figure builders and their reference data ship under `pyrite.validation`; standalone `checks/` scripts remain developer-only.
+- Runtime paths resolve through `pyrite.paths` and `console.config`: packaged read-only data stays package-relative; a complete selected catalog uses per-call `--catalog` > `PYRITE_CATALOG` > `catalog.path` > bundled; workspace artifacts use explicit path > `PYRITE_HOME` > `workspace.root` config > cwd; mutable user state uses Click's platform app directory. An explicit workspace also owns generated `xsgen/` tables and fetched reference data. Marimo apps ship under `pyrite.apps`; validation figure builders and their reference data ship under `pyrite.validation`; standalone `checks/` scripts remain developer-only.
 - Root domain implementations are grouped under `campaign/`, `checkpoints/`, `runs/`, `apps/`, `validation/`, `perf/`, and `remote/`. Former documented root module paths are compatibility re-exports only.
 
 ## Static package dependency DAG
@@ -123,6 +123,7 @@ Edges (importer -> imported):
   p8 -> p15
   p8 -> p2
   p8 -> p3
+  p8 -> p5
   p8 -> p6
   p8 -> p9
 ```
@@ -189,7 +190,7 @@ Immutable, content-addressed energy-grid artifact store: canonical `cxr.energy-g
 Material domain package. Narrow top-level API expose immutable `CATALOG`, frozen record types (`MaterialCatalog`, `CrystalInfo`, `CrystalSpec`, `MediumSpec`, `MaterialIdentity`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`), `load_material_catalog`, compatibility projections (`CRYSTALS`, `MATERIALS`, `MATERIAL_LABELS`). Implementation helpers stay in submodules below.
 
 ### `materials/catalog.py`
-Thin schema-version-1 load/cache owner for the packaged `data/catalog/` directory (on-disk layout in `pyrite/_catalog_layout.py`). Owns `load_material_catalog`, the default `CATALOG` singleton, and compatibility exports for the frozen public record types. The exported types retain their historical `pyrite.materials.catalog` pickle identity even though their definitions live in `_schema.py`. `material_keys` preserve declaration order for a single-file catalog and file-name order for a catalog directory.
+Thin schema-version-1 load/cache owner for the selected complete catalog (on-disk layout in `pyrite/_catalog_layout.py`; bundled `data/catalog/` by default). Owns `load_material_catalog`, the default `CATALOG` singleton, and compatibility exports for the frozen public record types. The exported types retain their historical `pyrite.materials.catalog` pickle identity even though their definitions live in `_schema.py`. `material_keys` preserve declaration order for a single-file catalog and file-name order for a catalog directory.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`, `MediumSpec`, `MaterialSpec`, `MaterialValidationSpec`, `ScanSpec`, `LayerSpec`, `load_material_catalog`.
 - Deps: `materials._schema`, `materials._parse`, `DATA_DIR`. Imports no driver package, so `materials` remains a leaf component of the dependency DAG.
 
@@ -199,7 +200,7 @@ Frozen catalog record types, schema constants, catalog accessors, and grouped va
 - Deps: `materials._identity`, `materials._catalog_decode`, `_numerics`, NumPy.
 
 ### `materials/_parse.py`
-Catalog validation and assembly for materials, crystals, media, profiles, stacks, scan descriptors, energy-grid artifacts, and transport support. Owns phase-specific CIF resolution below packaged `data/cifs` and pinned-reflection policy; delegates beam/detector blocks to `_beam_detector_parse.py`.
+Catalog validation and assembly for materials, crystals, media, profiles, stacks, scan descriptors, energy-grid artifacts, and transport support. Owns phase-specific CIF resolution below the selected catalog's `cifs/` with packaged `data/cifs` fallback, plus pinned-reflection policy; delegates beam/detector blocks to `_beam_detector_parse.py`.
 - Deps: `materials._schema`, `materials._beam_detector_parse`, `materials._catalog_decode`, `materials._cif`, `materials._identity`, `materials._transport_data`, `_energy_grid_artifacts`, `_numerics`, `DATA_DIR`, NumPy.
 
 ### `materials/_beam_detector_parse.py`
@@ -327,7 +328,7 @@ Pure diagnostics over sampled initial phase-space arrays: per-plane RMS size, ge
 
 ### `campaign/config.py`
 Default settings/sweep builders shared by CLI and both notebooks; per-material scan grids project from immutable `materials.CATALOG`.
-- Public: `default_settings`, `material_grid`, `material_sweep`, `trajectory_sweep`, `catalog_detector`; `MATERIALS` ordered tuple. `catalog_detector` applies the catalog's acceptance mapping onto `DEFAULT_CATALOG_DETECTOR` (Timepix3 at 90 deg); the default response lives here rather than in the catalog. The catalog speaks the flat geometry vocabulary, so both builders project their scan grid through `target_from_flat` and hand `Sweep` a built `target`. Catalog energy-grid artifacts resolve into the built detector's `EnergyBins` at this boundary.
+- Public: `default_settings`, `material_grid`, `material_sweep`, `trajectory_sweep`, `catalog_detector`; `MATERIALS` ordered tuple. `catalog_detector` applies the catalog's acceptance mapping onto `DEFAULT_CATALOG_DETECTOR` (response-free scalar geometry at 90 deg). The catalog speaks the flat geometry vocabulary, so both builders project their scan grid through `target_from_flat` and hand `Sweep` a built `target`. Catalog energy-grid artifacts resolve into the built detector's `EnergyBins` at this boundary.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`), `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`), `geometry` (`target_from_flat`), `detectors` (`Detector`, `EnergyBins`).
 
 ### `campaign/profiles.py`
@@ -466,7 +467,7 @@ One module per `pyrite` subcommand group, holding only the Click layer. `scan`/`
 Terminal presentation primitives shared by the CLI and the domain packages, and the layer everything else may depend on without depending on `cli/`. It imports `paths`, `_env` and `_catalog_keys` and nothing else first-party.
 - `output.py` — colour, Click parameter types, destructive-action confirmation, result/diagnostic emission, JSON envelopes, and `run()`, which preserves the pyrite exit contract around Click.
 - `json.py` — stable JSON payload adapters for automation.
-- `config.py` — the persistent context store (`profile.current`, `remote.target`, `workspace.root`), its per-call > `PYRITE_*` > store > built-in precedence resolver, and `workspace_root`.
+- `config.py` — the persistent context store (`profile.current`, `remote.target`, `workspace.root`, `catalog.path`), its per-call > `PYRITE_*` > store > built-in precedence resolver, and workspace/catalog path helpers.
 - `dashboard/` — below.
 
 `checkpoints`, `runs` and `remote` all emit results and render progress while they work. Sourcing that from `cli/` is what put `cli` in a bidirectional pair with each of them; the `domain-packages-stay-below-cli` and `console-stays-below-every-driver` contracts hold the split.
@@ -478,10 +479,10 @@ Terminal presentation primitives shared by the CLI and the domain packages, and 
 `-R/--remote`: the one shared option whose callback validates through `remote.config`, which `console/` sits below and cannot import.
 
 ### `_catalog_keys.py`
-Offline `[materials|profiles|beams|detectors].*` key reads by listing the packaged catalog directory's object files, without importing the scientific material modules. Shell completion, `runs.scan`'s material validation and checkpoint identity resolution all need catalog keys where a `materials` import would be far too expensive.
+Offline `[materials|profiles|beams|detectors].*` key reads by listing the selected catalog directory's object files, without importing the scientific material modules. Shell completion, `runs.scan`'s material validation and checkpoint identity resolution all need catalog keys where a `materials` import would be far too expensive.
 
 ### `_catalog_layout.py`
-On-disk catalog layout: a single TOML file or a one-object-per-file catalog directory (`catalog.toml` plus `<table>/<name>.toml`). Owns layout validation, the plain `tomllib` assembly the loader and artifact GC read, the assembled `tomlkit` text CLI editors and `energy_grid.apply` mutate, the split write-back that rewrites only changed object files, and the artifact-store root (`catalog_root`). Import-light: no `pyrite.materials`; `tomlkit` only inside the text round trip.
+On-disk catalog layout: a single TOML file or a one-object-per-file catalog directory (`catalog.toml` plus `<table>/<name>.toml`, optional `cifs/` and energy-grid artifacts). Owns selected-path lookup, layout validation, the plain `tomllib` assembly the loader and artifact GC read, the assembled `tomlkit` text CLI editors and `energy_grid.apply` mutate, the split write-back that rewrites only changed object files, and the artifact-store root (`catalog_root`). Import-light: no `pyrite.materials`; `tomlkit` only inside the text round trip.
 
 ### `console/dashboard/`
 Shared live terminal dashboard package used by local scans and remote jobs. `render.py` owns frame composition, `state.py` owns progress parsing and terminal sanitization, and `poll.py` owns non-blocking keyboard input. `__init__.py` exports the fifteen names with callers outside the package and nothing else; anything absent from `__all__` is internal and imported from its owning module.
@@ -561,7 +562,7 @@ Optional SSH/SLURM orchestration for a configured remote host: sync, bounded and
 - Public CLI: `add_subparser`, `main`.
 - The public package contains the former facade and implementation modules (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`; the Click wiring lives in `cli/commands/remote.py` and the frame rendering in `console/dashboard/`):
   - `config.py` — env-driven hosts/paths/SLURM constants.
-  - `transport.py` — ssh/scp primitives, streamed downloads, hashing, generated-cache-filtered code-tar sync, material checks; one-round-trip immutable energy-grid hash inventory skips remote objects already present with matching content.
+  - `transport.py` — ssh/scp primitives, streamed downloads, hashing, generated-cache-filtered code-tar sync, selected external-catalog staging, material checks; one-round-trip immutable energy-grid hash inventory skips remote objects already present with matching content.
   - `scripts.py` — pure SLURM/shell string + command builders, job-id minting, per-allocation dependency-sync timing.
   - `state.py` — read-only job/reservation state queries over ssh; live-job discovery joins metadata against one scheduler snapshot.
   - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle; checkpoint pulls slim, stream, and clean up through one SSH session per stem; remote performance inventory and terminal-job-only pruning revalidate scheduler, job-state, and artifact inventory before deletion.

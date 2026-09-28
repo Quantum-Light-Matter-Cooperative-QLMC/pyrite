@@ -192,7 +192,14 @@ def fetched_data_dir(code: str, name: str) -> Path:
     if name not in spec.data_dirs:
         known = ", ".join(spec.data_dirs) or "none"
         raise KeyError(f"{code!r} has no data directory {name!r}; known: {known}")
-    return user_data_dir() / "xsgen" / "reference-data" / spec.name / name
+    from ..console.config import resolve, workspace_root
+
+    root = (
+        user_data_dir()
+        if resolve("workspace.root").source == "built-in default"
+        else workspace_root()
+    )
+    return root / "xsgen" / "reference-data" / spec.name / name
 
 
 def _accepts(spec: CodeSpec, candidate: Path) -> bool:
@@ -238,7 +245,14 @@ class ResolvedSource:
         for name in self.spec.data_dirs:
             local = self.root / name
             fetched = fetched_data_dir(self.spec.name, name)
-            resolved[name] = local if local.is_dir() else fetched
+            legacy = user_data_dir() / "xsgen" / "reference-data" / self.spec.name / name
+            resolved[name] = (
+                local
+                if local.is_dir()
+                else fetched
+                if fetched.is_dir() or not legacy.is_dir()
+                else legacy
+            )
         return resolved
 
 

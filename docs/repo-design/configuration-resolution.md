@@ -139,7 +139,7 @@ and is not read by the PyRITE package. Standard/external variables such as
 
 `pyrite run [PROFILE]` uses the positional profile when present; otherwise it uses `profile.current`. The selected `[profiles.NAME]` row supplies shared scan values. `[profiles.NAME.overrides.MATERIAL]` replaces values for one material. An explicit membership list limits the campaign; an absent list means every configured material. `-m/--material` narrows that resolved membership and does not create another profile.
 
-Named beam references resolve to beam values before hashing. Detector settings inherit the selected profile's block, then the `standard` detector block, then the built-in detector defaults. An explicit emission policy overrides the fidelity preset's default. The photon dispersion model is not configurable: the in-medium relation always applies. Energy-grid references are verified and resolved for the selected profile before a material sweep is built.
+Named beam references resolve to beam values before hashing. Detector settings inherit the selected profile's block, then the `standard` detector block, then the built-in 90-degree scalar geometry. The built-in detector has no spectral response; scoring preserves the source spectrum apart from acceptance scaling. An explicit emission policy overrides the fidelity preset's default. The photon dispersion model is not configurable: the in-medium relation always applies. Energy-grid references are verified and resolved for the selected profile before a material sweep is built.
 
 ## Run resolution order
 

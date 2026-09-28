@@ -39,6 +39,16 @@ from pyrite.energy_grid.bounds import line_start_eV as _line_start_eV
 from pyrite.energy_grid.bounds import spacing_num
 
 _CATALOG_PATH = bundled_catalog()
+
+
+def active_catalog_path() -> Path:
+    """Return the selected catalog, preserving the default-path test seam."""
+    from ..console.config import catalog_path
+
+    selected = catalog_path()
+    return _CATALOG_PATH if selected == bundled_catalog().resolve() else selected
+
+
 load_material_catalog = None
 
 
@@ -366,8 +376,10 @@ def _profile_row(document, profile: str):
     return selected
 
 
-def _artifact_store_root(catalog_path: Path | str = _CATALOG_PATH) -> Path:
-    return catalog_root(catalog_path) / ARTIFACT_DIR
+def _artifact_store_root(catalog_path: Path | str | None = None) -> Path:
+    return (
+        catalog_root(active_catalog_path() if catalog_path is None else catalog_path) / ARTIFACT_DIR
+    )
 
 
 def _existing_artifact_rows(
@@ -452,7 +464,7 @@ def add_file(
     if not combined:
         raise ValueError("no selected energy-grid results to add")
 
-    path = Path(_CATALOG_PATH if catalog_path is None else catalog_path)
+    path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
     document = tomlkit.parse(original)
     _profile_row(document, profile)
@@ -554,7 +566,7 @@ def remove_line_rows(
 ) -> tuple[list[float], str]:
     """Repoint ``profile`` to a new artifact without selected line rows."""
     wanted = {_positive_float(energy, "energy") for energy in energies}
-    path = Path(_CATALOG_PATH if catalog_path is None else catalog_path)
+    path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
     if expected_original is not None and original != expected_original:
         raise ValueError("material catalog changed after preview; rerun command")
@@ -656,7 +668,7 @@ def set_line_artifact(
     catalog_path=None,
 ) -> str:
     """Set one manual line row by creating an immutable replacement artifact."""
-    path = Path(_CATALOG_PATH if catalog_path is None else catalog_path)
+    path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
     document = tomlkit.parse(original)
     if material not in document.get("materials", {}):
@@ -721,7 +733,7 @@ def set_brem_artifact(
     """Set manual brem bounds by creating an immutable replacement artifact."""
     from pyrite.energy_grid.defaults import load_defaults
 
-    path = Path(_CATALOG_PATH if catalog_path is None else catalog_path)
+    path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
     document = tomlkit.parse(original)
     if material not in document.get("materials", {}):
@@ -835,14 +847,14 @@ def apply_file(
     if materials:
         wanted = set(materials.split(",") if isinstance(materials, str) else materials)
         combined = {m: v for m, v in combined.items() if m in wanted}
-    original = _read_catalog(_CATALOG_PATH)
+    original = _read_catalog(active_catalog_path())
     new_text, skipped = apply_bounds(original, combined, force=force)
-    _validate_catalog_text(_CATALOG_PATH, new_text)
+    _validate_catalog_text(active_catalog_path(), new_text)
     if dry_run:
         _print_diff(original, new_text)
         return
     provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
-    _write_catalog(_CATALOG_PATH, new_text)
+    _write_catalog(active_catalog_path(), new_text)
 
     try:
         source = f"derived job {slurm_id} ({date})"
@@ -850,7 +862,7 @@ def apply_file(
             if force or not _provenance.is_manual_brem(material):
                 _provenance.set_brem(material, source)
     except BaseException:
-        _write_catalog(_CATALOG_PATH, original)
+        _write_catalog(active_catalog_path(), original)
         _restore(_provenance.PROVENANCE_PATH, provenance_original)
         raise
     if skipped:
@@ -876,17 +888,17 @@ def set_line_grid(material, energy, stop_eV, *, num=None, start_eV=None, note=No
         else _positive_int(spacing_num(start, stop, 3.0), "num")
     )
     row = {"energy_keV": e, "start_eV": start, "stop_eV": stop, "num": n}
-    original = _read_catalog(_CATALOG_PATH)
+    original = _read_catalog(active_catalog_path())
     document = tomlkit.parse(original)
     _merge_line_rows(document, material, [row], True, "manual")
     new_text = tomlkit.dumps(document)
-    _validate_catalog_text(_CATALOG_PATH, new_text)
+    _validate_catalog_text(active_catalog_path(), new_text)
     provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
-    _write_catalog(_CATALOG_PATH, new_text)
+    _write_catalog(active_catalog_path(), new_text)
     try:
         _provenance.set_line(material, e, "manual", note=note)
     except BaseException:
-        _write_catalog(_CATALOG_PATH, original)
+        _write_catalog(active_catalog_path(), original)
         _restore(_provenance.PROVENANCE_PATH, provenance_original)
         raise
     _warn_stale_golden()
@@ -908,7 +920,7 @@ def delete_line_grid(
     automatic case-local policy; they never inherit another material's rows.
     """
     wanted = {_positive_float(e, "energy") for e in energies}
-    original = _read_catalog(_CATALOG_PATH)
+    original = _read_catalog(active_catalog_path())
     if expected_original is not None and original != expected_original:
         raise ValueError("material catalog changed after preview; rerun command")
     document = tomlkit.parse(original)
@@ -927,11 +939,11 @@ def delete_line_grid(
     else:
         del root[material]
     new_text = tomlkit.dumps(document)
-    _validate_catalog_text(_CATALOG_PATH, new_text)
+    _validate_catalog_text(active_catalog_path(), new_text)
     if dry_run:
         _print_diff(original, new_text)
         return sorted(wanted)
-    _write_catalog(_CATALOG_PATH, new_text)
+    _write_catalog(active_catalog_path(), new_text)
     return sorted(wanted)
 
 
@@ -943,17 +955,17 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
         step_eV if step_eV is not None else load_defaults()["brem_step_ev"],
         "step",
     )
-    original = _read_catalog(_CATALOG_PATH)
+    original = _read_catalog(active_catalog_path())
     document = tomlkit.parse(original)
     _merge_brem(document, material, {"stop_eV": stop, "step_eV": step}, True, _provenance)
     new_text = tomlkit.dumps(document)
-    _validate_catalog_text(_CATALOG_PATH, new_text)
+    _validate_catalog_text(active_catalog_path(), new_text)
     provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
-    _write_catalog(_CATALOG_PATH, new_text)
+    _write_catalog(active_catalog_path(), new_text)
     try:
         _provenance.set_brem(material, "manual", note=note)
     except BaseException:
-        _write_catalog(_CATALOG_PATH, original)
+        _write_catalog(active_catalog_path(), original)
         _restore(_provenance.PROVENANCE_PATH, provenance_original)
         raise
     _warn_stale_golden()
@@ -999,7 +1011,7 @@ def set_brem_geometric(
     """
     from pyrite.energy_grid.floor import geometric_continuum_grid
 
-    path = Path(_CATALOG_PATH if catalog_path is None else catalog_path)
+    path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     original = _read_catalog(path)
     document = tomlkit.parse(original)
     if material not in document.get("materials", {}):
@@ -1052,7 +1064,7 @@ def resolved_show_inputs(
     stores ``0.0`` precisely because it names no medium, so showing it verbatim
     would report a band no case ever gets.
     """
-    path = Path(_CATALOG_PATH if catalog_path is None else catalog_path)
+    path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     raw = read_raw(path)
     profiles = raw.get("profiles", {})
     if profile not in profiles:

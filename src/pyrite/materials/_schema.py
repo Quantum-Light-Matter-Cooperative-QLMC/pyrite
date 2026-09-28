@@ -455,9 +455,10 @@ class MaterialCatalog:
     profile_beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit profile detector blocks, as validated acceptance fields rather
     #: than built detectors -- ``campaign.config`` applies them onto its default
-    #: response. Missing selected-profile blocks inherit ``standard``; missing
-    #: standard falls back to :data:`_DEFAULT_PROFILE_DETECTOR_SPEC`, which
-    #: leaves every default in place (Timepix3 at 90 deg).
+    #: response-free geometry. Missing selected-profile blocks inherit
+    #: ``standard``; missing standard falls back to
+    #: :data:`_DEFAULT_PROFILE_DETECTOR_SPEC`, which
+    #: leaves the response-free 90-degree scalar geometry in place.
     profile_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit ``profiles.NAME.emission`` overrides ("incoherent"/"coherent"/
     #: "both"), keyed by profile; profiles with no emission key are absent (the

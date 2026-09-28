@@ -175,7 +175,7 @@ def filter_set_command(profile_name, identifier, dry_run, **values):
     try:
         updated = _profile_edit.update_filter(document, profile_name, identifier, changes)
         filter_from_row(updated)
-        _catalog_io.validate(_catalog_io._CATALOG_PATH, tomlkit.dumps(document))
+        _catalog_io.validate(_catalog_io.active_catalog_path(), tomlkit.dumps(document))
     except (ValueError, TypeError) as exc:
         raise click.UsageError(str(exc)) from None
     label = updated.get("name") or identifier

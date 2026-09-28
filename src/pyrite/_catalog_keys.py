@@ -14,7 +14,7 @@ import re
 import tomllib
 from functools import lru_cache
 
-from ._catalog_layout import bundled_catalog, object_keys
+from ._catalog_layout import bundled_catalog, object_keys, selected_catalog
 
 # ``@`` is allowed so ``<material>@<label>-<digest>`` checkpoint @-stems surface
 # in local checkpoint-stem completion alongside legacy ``--<fidelity>-`` stems.
@@ -23,7 +23,14 @@ SAFE_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]*")
 
 def _section_keys(section: str) -> tuple[str, ...]:
     try:
-        keys = object_keys(bundled_catalog(), section)
+        from .console.config import resolve
+
+        path = (
+            bundled_catalog()
+            if resolve("catalog.path").source == "built-in default"
+            else selected_catalog()
+        )
+        keys = object_keys(path, section)
     except OSError, tomllib.TOMLDecodeError:
         return ()
     return tuple(key for key in keys if SAFE_TOKEN_RE.fullmatch(key))

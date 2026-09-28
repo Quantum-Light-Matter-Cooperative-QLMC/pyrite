@@ -5,7 +5,8 @@ directory::
 
     catalog.toml            # root keys only (``schema_version``)
     <table>/<name>.toml     # body of ``[<table>.<name>]``, without the header
-    energy-grid-artifacts/  # immutable grid artifacts (not catalog source)
+    cifs/                  # catalog-owned crystal structures
+    energy-grid-artifacts/ # immutable grid artifacts (not catalog source)
 
 The object name is the file stem, so a name and its file cannot disagree and a
 name cannot be defined twice. Entries whose name starts with ``.`` are ignored
@@ -57,6 +58,15 @@ def bundled_catalog() -> Path:
     return data_dir() / "catalog"
 
 
+def selected_catalog() -> Path:
+    """Return the effective complete catalog for the current invocation."""
+    from .console.config import catalog_path, resolve
+
+    if resolve("catalog.path").source == "built-in default":
+        return bundled_catalog()
+    return catalog_path()
+
+
 def catalog_root(path: Path | str) -> Path:
     """Directory that anchors artifacts and relative paths for ``path``."""
     path = Path(path)
@@ -83,12 +93,14 @@ def read_sources(path: Path | str) -> Sources:
     if not manifest.is_file():
         errors.append(f"{manifest}: missing catalog manifest")
     for entry in _visible(path.iterdir()):
-        if entry.name in (MANIFEST, ARTIFACT_DIR):
+        if entry.name == MANIFEST:
+            continue
+        if entry.name in (ARTIFACT_DIR, "cifs") and entry.is_dir():
             continue
         if entry.name not in OBJECT_TABLES or not entry.is_dir():
             errors.append(
                 f"{entry}: unexpected catalog entry; expected {MANIFEST}, "
-                f"{ARTIFACT_DIR}/, or one of {', '.join(f'{t}/' for t in OBJECT_TABLES)}"
+                f"cifs/, {ARTIFACT_DIR}/, or one of {', '.join(f'{t}/' for t in OBJECT_TABLES)}"
             )
     if manifest.is_file():
         sources.append((MANIFEST, manifest.read_bytes()))

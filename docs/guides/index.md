@@ -16,6 +16,7 @@ analysis-tutorial
 running-on-a-cluster
 performance-profile-analysis
 sweep-profiles
+external-catalog
 gpt-gdf-beams
 troubleshooting
 ```

@@ -347,14 +347,10 @@ class TableManifest:
 
 
 def user_table_dir() -> Path:
-    """Return the per-user table directory.
+    """Return the writable table directory in the selected workspace."""
+    from ..console.config import xsgen_data_root
 
-    Under :func:`pyrite.paths.user_data_dir`, not the workspace: tables are
-    expensive, target-scoped, and not run-specific, so regenerating tungsten
-    for every new workspace would be waste. This is the first real use of
-    ``user_data_dir()``, which until now was reserved.
-    """
-    return user_data_dir() / "xsgen" / "tables"
+    return xsgen_data_root() / "tables"
 
 
 def packaged_table_dir() -> Path:
@@ -362,9 +358,11 @@ def packaged_table_dir() -> Path:
     return data_dir() / "xsgen" / "tables"
 
 
-def search_dirs() -> tuple[Path, Path]:
+def search_dirs() -> tuple[Path, ...]:
     """Return the resolution tiers, most-preferred first."""
-    return (user_table_dir(), packaged_table_dir())
+    legacy = user_data_dir() / "xsgen" / "tables"
+    selected = user_table_dir()
+    return tuple(dict.fromkeys((selected, legacy, packaged_table_dir())))
 
 
 @dataclass(frozen=True)
@@ -411,7 +409,8 @@ def resolve(key: str) -> StoredTable | None:
     in both is served from the user directory, so a locally regenerated table
     overrides a shipped one without having to delete it.
     """
-    for tier, root in zip(("user", "packaged"), search_dirs(), strict=True):
+    for root in search_dirs():
+        tier = "packaged" if root == packaged_table_dir() else "user"
         payload, manifest_path = _paths_for(root, key)
         if not (payload.is_file() and manifest_path.is_file()):
             continue
@@ -562,7 +561,8 @@ def identity_markers(tables: Iterable[StoredTable]) -> dict[str, str]:
 def iter_stored() -> Iterator[StoredTable]:
     """Yield every stored table, user tier first, without duplicate keys."""
     seen: set[str] = set()
-    for tier, root in zip(("user", "packaged"), search_dirs(), strict=True):
+    for root in search_dirs():
+        tier = "packaged" if root == packaged_table_dir() else "user"
         if not root.is_dir():
             continue
         for manifest_path in sorted(root.glob("*.json")):

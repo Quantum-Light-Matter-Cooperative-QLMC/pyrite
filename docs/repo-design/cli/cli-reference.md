@@ -76,13 +76,16 @@ Options:
   --version                    Show the version and exit.
   --color [auto|always|never]  Color human output: auto for terminals, always, or never.
                                [default: auto]
+  --catalog PATH               Use a complete catalog file or directory for this
+                               command; overrides PYRITE_CATALOG and catalog.path. Edits
+                               write there.
   -h, --help                   Show this message and exit.
 
 Commands:
   run         Run a profile's MC sweeps and write checkpoints.
   app         Launch or export interactive analysis notebooks.
   checkpoint  Inspect, transform, recompute, archive, and reclaim checkpoints.
-  config      Set and inspect current profile and remote-target defaults.
+  config      Set profile, catalog, workspace, and remote defaults.
   remote      Run and manage MC sweeps on a remote GPU host.
   job         List, inspect, follow, or stop asynchronous remote jobs.
   profile     Manage named catalog campaigns and material membership.
@@ -636,8 +639,9 @@ Commands:
 ## `pyrite config get`
 
 ```text
-Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root|xsgen.b
-                         remslib_source|xsgen.elsepa_source|xsgen.sbethe_source}
+Usage: pyrite config get [OPTIONS] {profile.current|remote.target|workspace.root|catalog
+                         .path|xsgen.bremslib_source|xsgen.elsepa_source|xsgen.sbethe_so
+                         urce}
 
   Print the effective value for KEY.
 
@@ -659,8 +663,9 @@ Options:
 ## `pyrite config set`
 
 ```text
-Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root|xsgen.b
-                         remslib_source|xsgen.elsepa_source|xsgen.sbethe_source} VALUE
+Usage: pyrite config set [OPTIONS] {profile.current|remote.target|workspace.root|catalog
+                         .path|xsgen.bremslib_source|xsgen.elsepa_source|xsgen.sbethe_so
+                         urce} VALUE
 
   Persist VALUE for KEY.
 

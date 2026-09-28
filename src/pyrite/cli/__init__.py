@@ -1,6 +1,8 @@
 """PyRITE Click command-line entry point."""
 
+import os
 from collections.abc import Sequence
+from pathlib import Path
 
 import click
 
@@ -26,7 +28,7 @@ _COMMAND_HELP = {
     "run": "Run a profile's MC sweeps and write checkpoints.",
     "app": "Launch or export interactive analysis notebooks.",
     "checkpoint": "Inspect, transform, recompute, archive, and reclaim checkpoints.",
-    "config": "Set and inspect current profile and remote-target defaults.",
+    "config": "Set profile, catalog, workspace, and remote defaults.",
     "remote": "Run and manage MC sweeps on a remote GPU host.",
     "job": "List, inspect, follow, or stop asynchronous remote jobs.",
     "profile": "Manage named catalog campaigns and material membership.",
@@ -35,6 +37,27 @@ _COMMAND_HELP = {
     "detector": "Manage named detector geometries.",
     "tables": "Inspect generated cross-section tables and external code trees.",
 }
+
+
+def _catalog_option(ctx: click.Context, _param: click.Parameter, catalog: Path | None) -> None:
+    if catalog is None or ctx.resilient_parsing:
+        return
+    from ..materials.catalog import MaterialConfigError, load_material_catalog
+
+    try:
+        load_material_catalog(catalog)
+    except MaterialConfigError as exc:
+        raise click.BadParameter(str(exc), param_hint="--catalog") from exc
+    previous = os.environ.get("PYRITE_CATALOG")
+    os.environ["PYRITE_CATALOG"] = str(catalog.resolve())
+
+    def restore_catalog() -> None:
+        if previous is None:
+            os.environ.pop("PYRITE_CATALOG", None)
+        else:
+            os.environ["PYRITE_CATALOG"] = previous
+
+    ctx.call_on_close(restore_catalog)
 
 
 @click.command(
@@ -46,6 +69,17 @@ _COMMAND_HELP = {
 )
 @click.version_option(__version__, prog_name="PyRITE", message="PyRITE %(version)s")
 @color_option
+@click.option(
+    "--catalog",
+    type=click.Path(exists=True, path_type=Path),
+    is_eager=True,
+    callback=_catalog_option,
+    expose_value=False,
+    help=(
+        "Use a complete catalog file or directory for this command; overrides "
+        "PYRITE_CATALOG and catalog.path. Edits write there."
+    ),
+)
 def command() -> None:
     """Manage coherent X-ray radiation simulation campaigns.
 
