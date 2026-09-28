@@ -9,7 +9,7 @@ needs BremsLib, so its divergence-only keys follow the same resolution.
 from dataclasses import replace
 from typing import Any, cast
 
-from .._numerics import validate_radiative_numerics
+from .._numerics import DEFAULT_RADIATIVE_CUTOFF_EV, validate_radiative_numerics
 from ..montecarlo.case import Case
 
 
@@ -18,9 +18,14 @@ def radiative_case_keys(
 ) -> dict[str, Any]:
     """Validate the coupled radiative settings; return its case keys (empty if uncoupled)."""
     validate_radiative_numerics(model, cutoff_eV, energy_model, straggling, bremsstrahlung_model)
-    if model == "uncoupled":
+    if model == "uncoupled" or (model == "auto" and bremsstrahlung_model == "eedl"):
         return {}
-    return {"radiative_model": model, "radiative_cutoff_eV": float(cast(float, cutoff_eV))}
+    return {
+        "radiative_model": "bremslib-soft-hard",
+        "radiative_cutoff_eV": (
+            DEFAULT_RADIATIVE_CUTOFF_EV if cutoff_eV is None else float(cast(float, cutoff_eV))
+        ),
+    }
 
 
 def _case_elements(case: Case) -> tuple[str, ...]:

@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 
+from ..._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from ...materials.attenuation import _normalize_composition
 from ..geometry import beam_frame_basis, project_beam_entry, validate_transverse_dimensions
 from ..groove import entry_points
@@ -70,7 +71,7 @@ def simulate_trajectories(
     keep_segments_on_device=False,
     transport_lut_config=DEFAULT_TRANSPORT_LUT_CONFIG,
     collect_diagnostics=False,
-    energy_model="frozen",
+    energy_model="midpoint",
     max_dE_frac=0.0,
     straggling=False,
     stopping_tables=None,
@@ -78,7 +79,7 @@ def simulate_trajectories(
     inelastic_cutoff_eV=None,
     inelastic_materials=None,
     elastic_tables=None,
-    radiative_model="uncoupled",
+    radiative_model="auto",
     radiative_cutoff_eV=None,
     bremslib_tables=None,
     gdf_source=None,
@@ -246,8 +247,9 @@ def simulate_trajectories(
           docs/physics/beam-transport/shell-soft-hard-transport.md.
           Validation: shell-soft-hard-transport
 
-    radiative_model: "uncoupled" (default) keeps post-hoc brem scoring and the
-      existing tracks. "bremslib-soft-hard" (exact cores only, no LUT) adds
+    radiative_model: "auto" (default) couples when BremsLib tables are supplied,
+      otherwise keeps post-hoc brem scoring and the existing tracks.
+      "bremslib-soft-hard" (exact cores only, no LUT) adds
       soft BremsLib loss below ``radiative_cutoff_eV`` and explicit photons
       above it; see ``hard_radiative.validate_radiative_args`` for its
       requirements and ``spectrum.brem_events`` for scoring. Validation:
@@ -281,7 +283,7 @@ def simulate_trajectories(
     budget only bound memory and replay behavior; neither changes results.
 
     energy_model: how a physical flight's energy and clock advance along it.
-      "frozen" (default) -- the historical left-endpoint rule: stopping power
+      "frozen" -- the historical left-endpoint rule: stopping power
           and beta evaluated once at the flight's start energy and held
           constant over its whole length. BIT-FOR-BIT unchanged.
       "midpoint" -- explicit midpoint RK2:
@@ -478,6 +480,8 @@ def simulate_trajectories(
         groove=groove,
         keep_segments_on_device=keep_segments_on_device,
     )
+    if radiative_mode and radiative_cutoff_eV is None:
+        radiative_cutoff_eV = DEFAULT_RADIATIVE_CUTOFF_EV
 
     requested_core = transport_core
     if launch is None:  # a launched generation names its per-electron core

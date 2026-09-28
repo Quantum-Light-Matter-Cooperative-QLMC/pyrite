@@ -20,6 +20,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .._numerics import (
+    DEFAULT_RADIATIVE_CUTOFF_EV,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
     Convergence,
@@ -633,8 +634,12 @@ def _identity_v1(
         and resolved_brem_model == "bremslib"
         and sweep_payload.get("groove_spacing_ang") is None
     ):
-        transport_numerics["radiative_model"] = radiative_model
-        transport_numerics["radiative_cutoff_eV"] = float(cast(float, radiative_cutoff_eV))
+        transport_numerics["radiative_model"] = "bremslib-soft-hard"
+        transport_numerics["radiative_cutoff_eV"] = (
+            DEFAULT_RADIATIVE_CUTOFF_EV
+            if radiative_cutoff_eV is None
+            else float(cast(float, radiative_cutoff_eV))
+        )
         resolved["transport_numerics"] = transport_numerics
     # Externally generated cross-section tables (issue #161), as table key ->
     # provenance-manifest digest. A *divergence-only* key, like `emission` and

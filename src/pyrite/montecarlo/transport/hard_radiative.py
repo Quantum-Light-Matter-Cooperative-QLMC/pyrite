@@ -3,6 +3,7 @@
 Validation: bremslib-radiative-partition
 """
 
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -383,8 +384,8 @@ def validate_radiative_args(
     keep_segments_on_device,
 ) -> bool:
     """Check ``simulate_trajectories``' radiative arguments; True in coupled mode."""
-    if radiative_model not in ("uncoupled", "bremslib-soft-hard"):
-        raise ValueError("radiative_model must be 'uncoupled' or 'bremslib-soft-hard'")
+    if radiative_model not in ("auto", "uncoupled", "bremslib-soft-hard"):
+        raise ValueError("radiative_model must be 'auto', 'uncoupled' or 'bremslib-soft-hard'")
     if radiative_model == "uncoupled":
         if radiative_cutoff_eV is not None or bremslib_tables is not None:
             raise ValueError(
@@ -392,9 +393,21 @@ def validate_radiative_args(
                 "radiative_model='bremslib-soft-hard'"
             )
         return False
-    if radiative_cutoff_eV is None or bremslib_tables is None:
-        raise ValueError("bremslib-soft-hard requires radiative_cutoff_eV and bremslib_tables")
-    if not np.isfinite(radiative_cutoff_eV) or radiative_cutoff_eV <= 0.0:
+    if radiative_model == "auto" and groove is not None and bremslib_tables is not None:
+        warnings.warn(
+            "coupled BremsLib radiative transport is unavailable for grooves; "
+            "using uncoupled scoring",
+            UserWarning,
+            stacklevel=2,
+        )
+        return False
+    if radiative_model == "auto" and bremslib_tables is None:
+        return False
+    if bremslib_tables is None:
+        raise ValueError("bremslib-soft-hard requires bremslib_tables")
+    if radiative_cutoff_eV is not None and (
+        not np.isfinite(radiative_cutoff_eV) or radiative_cutoff_eV <= 0.0
+    ):
         raise ValueError("radiative_cutoff_eV must be positive and finite")
     if energy_model != "midpoint" or groove is not None:
         raise ValueError("bremslib-soft-hard requires midpoint, ungrooved transport")

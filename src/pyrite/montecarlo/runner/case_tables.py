@@ -124,7 +124,7 @@ def _case_bremslib_tables(case):
 
 
 def _case_radiative_kwargs(case):
-    """``simulate_trajectories`` kwargs of a case's opt-in coupled radiative mode.
+    """``simulate_trajectories`` kwargs for a coupled radiative case.
 
     Empty for uncoupled scoring. The coupled mode reads the same BremsLib
     tables as the continuum scorer, so transport and spectrum agree on the

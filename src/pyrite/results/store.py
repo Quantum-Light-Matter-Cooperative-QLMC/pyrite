@@ -106,8 +106,9 @@ class Settings:
         ``"auto"`` (default: BremsLib when installed, else EEDL), ``"eedl"`` or
         ``"bremslib"`` continuum source.
     radiative_model, radiative_cutoff_eV
-        ``"uncoupled"`` (default) post-hoc continuum, or the opt-in coupled
-        ``"bremslib-soft-hard"`` transport and its hard-photon cutoff in eV.
+        ``"auto"`` (default) couples when BremsLib resolves; ``"uncoupled"``
+        selects post-hoc continuum scoring. The hard-photon cutoff defaults
+        to 1000 eV when coupling runs.
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     """
@@ -124,14 +125,14 @@ class Settings:
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
     straggling: bool = False
-    energy_model: Literal["frozen", "midpoint"] = "frozen"
+    energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
-    radiative_model: Literal["uncoupled", "bremslib-soft-hard"] = "uncoupled"
+    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
     # Emission policy (tri-state). "incoherent" (default) is the incoherent line
     # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;

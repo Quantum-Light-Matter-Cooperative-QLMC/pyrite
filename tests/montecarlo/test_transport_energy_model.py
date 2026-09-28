@@ -73,7 +73,7 @@ def _single_flight(thickness_ang, energy_model="midpoint", E0_keV=25.0):
     return result
 
 
-def test_frozen_energy_model_is_the_bit_for_bit_default():
+def test_midpoint_energy_model_is_the_bit_for_bit_default():
     common = dict(
         E0_keV=40.0,
         Ne=32,
@@ -83,15 +83,15 @@ def test_frozen_energy_model_is_the_bit_for_bit_default():
         transport_core="lockstep",
     )
     default = simulate_trajectories(**common)
-    frozen = simulate_trajectories(**common, energy_model="frozen")
+    midpoint = simulate_trajectories(**common, energy_model="midpoint")
 
-    assert default.keys() == frozen.keys()
-    assert "E_end_keV" not in default
-    assert "t_end_ang" not in default
+    assert default.keys() == midpoint.keys()
+    assert "E_end_keV" in default
+    assert "t_end_ang" in default
     for key in ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer"):
-        np.testing.assert_array_equal(default[key], frozen[key])
+        np.testing.assert_array_equal(default[key], midpoint[key])
     for key in ("n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped"):
-        assert default[key] == frozen[key]
+        assert default[key] == midpoint[key]
 
 
 def test_canonical_start_fields_alias_the_compatibility_spellings():
@@ -116,7 +116,7 @@ def test_midpoint_adds_end_state_without_adding_rows():
         seed=7,
         transport_core="lockstep",
     )
-    frozen = simulate_trajectories(**common)
+    frozen = simulate_trajectories(**common, energy_model="frozen")
     midpoint = simulate_trajectories(**common, energy_model="midpoint")
 
     assert set(midpoint) - set(frozen) == {
@@ -223,7 +223,7 @@ def test_midpoint_cutoff_distance_is_shorter_than_the_frozen_extrapolation():
         seed=5,
         transport_core="lockstep",
     )
-    frozen = simulate_trajectories(**common)
+    frozen = simulate_trajectories(**common, energy_model="frozen")
     midpoint = simulate_trajectories(**common, energy_model="midpoint")
     # |dE/ds| grows as E falls, so the frozen rule overshoots the true range.
     assert midpoint["L_ang"].sum() < frozen["L_ang"].sum()
@@ -430,7 +430,7 @@ def test_per_electron_midpoint_carries_the_lockstep_schema(use_lut):
         transport_core="per-electron",
         transport_lut_config=TransportLUTConfig(enabled=use_lut),
     )
-    frozen = simulate_trajectories(**common)
+    frozen = simulate_trajectories(**common, energy_model="frozen")
     midpoint = simulate_trajectories(**common, energy_model="midpoint")
 
     assert set(midpoint) - set(frozen) == {

@@ -34,10 +34,9 @@ ELASTIC_MODELS = ("mott", "elsepa")
 #: which is BremsLib when every layer element's table is installed and EEDL,
 #: with a warning, otherwise. A case records only the resolved choice.
 BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
-#: ``simulate_trajectories`` radiative-loss couplings (issue #172): post-hoc
-#: ``"uncoupled"`` continuum scoring, or opt-in ``"bremslib-soft-hard"``
-#: soft radiative stopping plus explicit hard photons.
-RADIATIVE_MODELS = ("uncoupled", "bremslib-soft-hard")
+#: The default resolves coupling when BremsLib tables are available.
+RADIATIVE_MODELS = ("auto", "uncoupled", "bremslib-soft-hard")
+DEFAULT_RADIATIVE_CUTOFF_EV = 1000.0
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -120,13 +119,13 @@ class Numerics:
         EEDL. ``"bremslib"`` requires the tables; ``"eedl"`` selects the
         packaged EEDL continuum with an isotropic photon angle.
     radiative_model, radiative_cutoff_eV
-        ``"uncoupled"`` (default) scores the continuum from electron track
-        length after transport. The opt-in ``"bremslib-soft-hard"`` removes
+        ``"auto"`` (default) couples when BremsLib resolves for every layer
+        and otherwise uses uncoupled EEDL scoring. ``"uncoupled"`` always
+        scores the continuum from electron track length. ``"bremslib-soft-hard"`` removes
         radiative loss during transport: soft BremsLib loss below the photon
-        cutoff ``k_c`` in eV and sampled hard photons above it. It requires
-        ``energy_model="midpoint"`` and BremsLib (``"auto"``
-        runs it only for cases whose tables resolve; the others stay
-        uncoupled on EEDL). ``k_c`` must not exceed the electron cutoffs.
+        cutoff ``k_c`` in eV and sampled hard photons above it. The default
+        cutoff is 1000 eV. Coupling requires ``energy_model="midpoint"``;
+        ``k_c`` must not exceed the electron cutoffs.
     convergence
         Reflection and mosaic convergence controls.
     """
@@ -138,14 +137,14 @@ class Numerics:
     transport_core: str = "auto"
     backend: str = "auto"
     straggling: bool = False
-    energy_model: Literal["frozen", "midpoint"] = "frozen"
+    energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
     inelastic_model: Literal["continuous", "shell-soft-hard"] = "continuous"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
     elastic_model: Literal["mott", "elsepa"] = "elsepa"
     bremsstrahlung_model: Literal["auto", "eedl", "bremslib"] = "auto"
-    radiative_model: Literal["uncoupled", "bremslib-soft-hard"] = "uncoupled"
+    radiative_model: Literal["auto", "uncoupled", "bremslib-soft-hard"] = "auto"
     radiative_cutoff_eV: float | None = None
     convergence: Convergence = field(default_factory=Convergence)
 
@@ -207,7 +206,7 @@ def validate_radiative_numerics(
     straggling: object,
     bremsstrahlung_model: object,
 ) -> None:
-    """Validate the opt-in coupled radiative mode's run-level settings.
+    """Validate the coupled radiative mode's run-level settings.
 
     Geometry (no grooves) and the cutoff's bound by the electron cutoffs are
     checked per case, where both are known.
@@ -218,6 +217,8 @@ def validate_radiative_numerics(
         if cutoff_eV is not None:
             raise ValueError("radiative_cutoff_eV requires radiative_model='bremslib-soft-hard'")
         return
+    if cutoff_eV is None:
+        cutoff_eV = DEFAULT_RADIATIVE_CUTOFF_EV
     if (
         isinstance(cutoff_eV, bool)
         or not isinstance(cutoff_eV, (int, float))
@@ -229,7 +230,7 @@ def validate_radiative_numerics(
         )
     if energy_model != "midpoint":
         raise ValueError("radiative_model='bremslib-soft-hard' requires energy_model='midpoint'")
-    if bremsstrahlung_model == "eedl":
+    if model == "bremslib-soft-hard" and bremsstrahlung_model == "eedl":
         raise ValueError("radiative_model='bremslib-soft-hard' requires BremsLib, not 'eedl'")
 
 

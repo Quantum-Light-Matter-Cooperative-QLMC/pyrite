@@ -31,14 +31,17 @@ COUPLED = {"radiative_model": "bremslib-soft-hard", "radiative_cutoff_eV": 1000.
 
 
 def test_numerics_validate_coupled_radiative_requirements():
+    assert pr.Numerics().radiative_model == "auto"
+    assert pr.Numerics().energy_model == "midpoint"
     numerics = pr.Numerics(energy_model="midpoint", **COUPLED)
     assert numerics.radiative_model == "bremslib-soft-hard"
     with pytest.raises(ValueError, match="radiative_cutoff_eV requires"):
-        pr.Numerics(radiative_cutoff_eV=1000.0)
+        pr.Numerics(radiative_model="uncoupled", radiative_cutoff_eV=1000.0)
+    assert pr.Numerics(radiative_model="bremslib-soft-hard").radiative_cutoff_eV is None
     with pytest.raises(ValueError, match="finite positive radiative_cutoff_eV"):
-        pr.Numerics(energy_model="midpoint", radiative_model="bremslib-soft-hard")
+        pr.Numerics(radiative_cutoff_eV=0.0)
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
-        pr.Numerics(**COUPLED)
+        pr.Numerics(energy_model="frozen", **COUPLED)
     assert pr.Numerics(energy_model="midpoint", straggling=True, **COUPLED).straggling
     with pytest.raises(ValueError, match="requires BremsLib"):
         pr.Numerics(energy_model="midpoint", bremsstrahlung_model="eedl", **COUPLED)
@@ -48,7 +51,9 @@ def test_numerics_validate_coupled_radiative_requirements():
 
 def test_case_keys_are_divergence_only_and_need_bremslib():
     sweep = material_sweep("silicon")
-    plain = build_cases(sweep, 4, 4, energy_model="midpoint", bremsstrahlung_model="bremslib")[0]
+    plain = build_cases(sweep, 4, 4, bremsstrahlung_model="bremslib", radiative_model="uncoupled")[
+        0
+    ]
     coupled = build_cases(
         sweep, 4, 4, energy_model="midpoint", bremsstrahlung_model="bremslib", **COUPLED
     )[0]
@@ -84,7 +89,7 @@ def test_identity_records_coupling_only_when_bremslib_runs(monkeypatch, resolved
         profiles, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
     )
     sweep = material_sweep("silicon")
-    settings = replace(default_settings(), energy_model="midpoint")
+    settings = replace(default_settings(), radiative_model="uncoupled")
     base = dataset_identity("silicon", "full", settings, sweep)
     coupled = dataset_identity("silicon", "full", replace(settings, **COUPLED), sweep)
     other = dataset_identity(
@@ -100,6 +105,24 @@ def test_identity_records_coupling_only_when_bremslib_runs(monkeypatch, resolved
     else:
         assert "radiative_model" not in numerics
         assert coupled["parameter_sha256"] == base["parameter_sha256"]
+
+
+@pytest.mark.parametrize("resolved", ["bremslib", "eedl"])
+def test_default_radiative_mode_resolves_with_the_continuum_source(monkeypatch, resolved):
+    monkeypatch.setattr(
+        bremslib_tables, "resolve_bremsstrahlung_model", lambda _model, _elements: resolved
+    )
+    monkeypatch.setattr(profiles, "resolve_bremsstrahlung_model", lambda *_args: resolved)
+    sweep = material_sweep("silicon")
+    case = build_cases(sweep, 4, 4)[0]
+    identity = dataset_identity("silicon", "full", default_settings(), sweep)
+    assert case["energy_model"] == "midpoint"
+    assert ("radiative_model" in case) is (resolved == "bremslib")
+    numerics = identity["resolved_parameters"]["transport_numerics"]
+    assert ("radiative_model" in numerics) is (resolved == "bremslib")
+    if resolved == "bremslib":
+        assert case["radiative_cutoff_eV"] == 1000.0
+        assert numerics["radiative_cutoff_eV"] == 1000.0
 
 
 @pytest.mark.parametrize("bremsstrahlung_model", ["bremslib", "auto"])
@@ -118,7 +141,12 @@ def test_grooves_fall_back_to_uncoupled_without_a_coupling_identity(
     )
     with pytest.warns(UserWarning, match="unavailable for grooves"):
         cases = build_cases(
-            sweep, 4, 4, energy_model="midpoint", bremsstrahlung_model=bremsstrahlung_model, **COUPLED
+            sweep,
+            4,
+            4,
+            energy_model="midpoint",
+            bremsstrahlung_model=bremsstrahlung_model,
+            **COUPLED,
         )
     assert cases and all("radiative_model" not in case for case in cases)
     assert all(case["bremsstrahlung_model"] == "bremslib" for case in cases)

@@ -669,14 +669,14 @@ def build_cases(
     n_electrons_brem=100,
     coherent_emission=False,
     straggling=False,
-    energy_model="frozen",
+    energy_model="midpoint",
     max_dE_frac=0.0,
     inelastic_model="continuous",
     inelastic_cutoff_eV=None,
     elastic_model="elsepa",
     bremsstrahlung_model="auto",
     secondary_threshold_eV=None,
-    radiative_model="uncoupled",
+    radiative_model="auto",
     radiative_cutoff_eV=None,
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian

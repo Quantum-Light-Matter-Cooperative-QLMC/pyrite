@@ -44,6 +44,7 @@ def test_cutoff_crossing_clips_terminal_flight_exactly(transport_core):
         seed=4,
         max_steps=20,
         transport_core=transport_core,
+        energy_model="frozen",
     )
 
     terminal_start = result["E_keV"][-1]

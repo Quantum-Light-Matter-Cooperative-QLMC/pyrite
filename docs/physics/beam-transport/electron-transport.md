@@ -38,7 +38,7 @@ The derivation, domain limits and measured observable response are [`energy-loss
 
 ## Energy-controlled propagation
 
-`energy_model` selects how one physical flight's energy and clock advance along it. `"frozen"` (the default) is the historical left-endpoint rule: energy, speed, stopping power, and elastic hazard are held at the flight-start value for the whole flight. `Numerics`, campaign profiles and the CLI expose this setting, `max_dE_frac`, and `straggling`.
+`energy_model` selects how one physical flight's energy and clock advance along it. `"midpoint"` is the default. `"frozen"` is the historical left-endpoint rule: energy, speed, stopping power, and elastic hazard are held at the flight-start value for the whole flight. `Numerics`, campaign profiles and the CLI expose this setting, `max_dE_frac`, and `straggling`.
 
 `"midpoint"` advances the flight with explicit midpoint RK2:
 

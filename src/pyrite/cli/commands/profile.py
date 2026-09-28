@@ -7,6 +7,7 @@ import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+from pyrite._numerics import DEFAULT_RADIATIVE_CUTOFF_EV
 from pyrite.campaign import profile_edit as _profile_edit
 from pyrite.campaign.profiles import FIDELITY_NAMES, resolve_numerics
 from pyrite.cli import _catalog_io
@@ -56,7 +57,7 @@ _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
 _INELASTIC_MODEL_VALUES = ("continuous", "shell-soft-hard")
 _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
-_RADIATIVE_MODEL_VALUES = ("uncoupled", "bremslib-soft-hard")
+_RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
     "line-electrons": "n_electrons",
@@ -260,7 +261,7 @@ def _emit_show(payload):
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
     numerics = payload["transport_numerics"]
     emit_result(f"  straggling: {numerics.get('straggling', False)}")
-    emit_result(f"  energy model: {numerics.get('energy_model', 'frozen')}")
+    emit_result(f"  energy model: {numerics.get('energy_model', 'midpoint')}")
     emit_result(f"  max dE fraction: {numerics.get('max_dE_frac', 0.0):g}")
     if "inelastic_model" in numerics:
         emit_result(
@@ -274,7 +275,7 @@ def _emit_show(payload):
     if "bremsstrahlung_model" in numerics:
         emit_result(f"  bremsstrahlung model: {numerics['bremsstrahlung_model']}")
     if "radiative_model" in numerics:
-        k_c = numerics.get("radiative_cutoff_eV", 0.0)
+        k_c = numerics.get("radiative_cutoff_eV") or DEFAULT_RADIATIVE_CUTOFF_EV
         emit_result(f"  radiative model: {numerics['radiative_model']} (k_c {k_c:g} eV)")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
@@ -491,10 +492,10 @@ def numerics_show_command(name, fidelity, json_output):
     "--radiative-model",
     type=click.Choice(_RADIATIVE_MODEL_VALUES),
     help=(
-        "Radiative energy loss: uncoupled (default) scores the continuum after transport; "
-        "bremslib-soft-hard removes it during transport as soft BremsLib loss plus sampled "
-        "hard photons. Requires --radiative-cutoff-ev, midpoint energy and "
-        "BremsLib (under auto, cases without installed tables stay uncoupled on EEDL)."
+        "Radiative energy loss: auto (default) couples when BremsLib resolves; "
+        "uncoupled scores after transport; bremslib-soft-hard uses soft loss plus "
+        "sampled hard photons. Coupling requires midpoint energy and BremsLib. "
+        "Missing tables and grooved targets fall back to uncoupled scoring."
     ),
 )
 @click.option(
@@ -502,7 +503,7 @@ def numerics_show_command(name, fidelity, json_output):
     type=click.FloatRange(min=0.0, min_open=True),
     metavar="EV",
     help=(
-        "Hard-photon cutoff k_c in eV for bremslib-soft-hard; must not exceed the "
+        "Hard-photon cutoff k_c in eV for coupled transport (default 1000); must not exceed the "
         "continuum electron cutoff (1000 eV by default)."
     ),
 )

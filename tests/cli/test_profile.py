@@ -659,7 +659,10 @@ def test_set_emission_invalid_value_rejected(tmp_path, monkeypatch):
 def test_set_transport_numerics_round_trips_and_validates_coupling(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    invalid = invoke(profile.command, ["set", "sub_100keV", "--max-de-frac", "0.02"])
+    invalid = invoke(
+        profile.command,
+        ["set", "sub_100keV", "--energy-model", "frozen", "--max-de-frac", "0.02"],
+    )
     assert invalid.exit_code == 1
     assert "requires energy_model='midpoint'" in invalid.stderr
 
@@ -696,7 +699,7 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
     assert "line electrons: 60 (fidelity)" in shown.stdout
     assert "reflection families: 2 (fidelity)" in shown.stdout
     assert "mosaic nodes: 5 (built-in)" in shown.stdout
-    assert "energy model: frozen (built-in)" in shown.stdout
+    assert "energy model: midpoint (built-in)" in shown.stdout
 
     machine = invoke(
         profile.command,
@@ -768,7 +771,15 @@ def test_numerics_set_dry_run_write_validation_and_reset(tmp_path, monkeypatch):
 
     invalid = invoke(
         profile.command,
-        ["numerics", "set", "sub_100keV", "--maximum-fractional-energy-loss", "0.02"],
+        [
+            "numerics",
+            "set",
+            "sub_100keV",
+            "--energy-model",
+            "frozen",
+            "--maximum-fractional-energy-loss",
+            "0.02",
+        ],
     )
     assert invalid.exit_code == 1
     assert "requires energy_model='midpoint'" in invalid.stderr
@@ -1407,6 +1418,8 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
             "sub_100keV",
             "--inelastic-model",
             "shell-soft-hard",
+            "--energy-model",
+            "frozen",
             "--inelastic-cutoff-ev",
             "50",
         ],

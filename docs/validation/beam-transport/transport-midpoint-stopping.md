@@ -94,7 +94,7 @@ so the predictor never falls below the cutoff. The low-energy Joy--Luo branch th
 
 - `s → 0`: `E_mid → E_start`, so both the energy and clock updates reduce to the frozen rule. The two schemes' mutual difference vanishes as `s²`, not `s³`: it *is* the frozen rule's own local truncation term. `s³` is the midpoint rule's local error against the exact solution, which is the quantity the numerical evidence below measures.
 - `dE/ds` constant in `E` (a hypothetical energy-independent stopping power): `(dE/ds)(E_mid) = (dE/ds)(E_start)` identically and the two schemes agree exactly, as does the clock when `β` is likewise constant.
-- `energy_model="frozen"` (the default) is bit-for-bit identical to the pre-change core, pinned by `tests/montecarlo/test_transport_energy_model.py::test_frozen_energy_model_is_the_bit_for_bit_default`.
+- `energy_model="frozen"` (the historical option) is bit-for-bit identical to the pre-change core, available through an explicit `energy_model="frozen"` selection.
 
 ## Numerical evidence
 
