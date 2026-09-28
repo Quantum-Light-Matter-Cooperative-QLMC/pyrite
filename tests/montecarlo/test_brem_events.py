@@ -91,19 +91,50 @@ def test_hard_event_requires_matching_bremslib_coverage(monkeypatch, table):
             element="C",
             n_atoms_per_ang3=0.1,
         )
-    with pytest.raises(ValueError, match="bin edge"):
-        brem_events.mc_soft_brem_spectrum(
-            {},
-            [10_000.0, 20_000.0, 30_000.0],
-            cutoff_eV=16_000.0,
+
+
+def test_cutoff_inside_a_bin_splits_it_between_soft_width_and_hard_events(monkeypatch, table):
+    # Production brem grids put k_c = 1 keV on a node, mid-bin.
+    monkeypatch.setattr(
+        brem_events, "_mu_total_inv_ang", lambda _comp, energy: np.zeros_like(energy)
+    )
+    monkeypatch.setattr(
+        brem_events, "mc_brem_spectrum", lambda *_args, **_kwargs: np.array([1.0, 2.0, 3.0])
+    )
+    grid = [10_000.0, 20_000.0, 30_000.0]  # edges 5, 15, 25, 35 keV
+    soft = brem_events.mc_soft_brem_spectrum(
+        {}, grid, cutoff_eV=20_000.0, bremslib_tables={"C": table}
+    )
+    np.testing.assert_allclose(soft, [1.0, 1.0, 0.0])
+    on_edge = brem_events.mc_soft_brem_spectrum(
+        {}, grid, cutoff_eV=np.nextafter(15_000.0, 16_000.0), bremslib_tables={"C": table}
+    )
+    np.testing.assert_allclose(on_edge, [1.0, 0.0, 0.0], atol=1e-12)
+    first_bin = brem_events.mc_soft_brem_spectrum(
+        {}, grid, cutoff_eV=10_000.0, bremslib_tables={"C": table}
+    )
+    np.testing.assert_allclose(first_bin, [0.5, 0.0, 0.0])
+
+    segments = _segments()  # one hard photon at 20 keV, in the straddling bin
+    hard = brem_events.mc_hard_brem_event_spectrum(
+        segments,
+        grid,
+        cutoff_eV=20_000.0,
+        bremslib_tables={"C": table},
+        element="C",
+        n_atoms_per_ang3=0.1,
+        n_hat=[0.0, 0.0, 1.0],
+    )
+    assert hard[0] == 0.0 and hard[1] > 0.0 and hard[2] == 0.0
+    segments["hard_radiative_k_eV"][0] = 19_000.0
+    with pytest.raises(ValueError, match="cutoff"):
+        brem_events.mc_hard_brem_event_spectrum(
+            segments,
+            grid,
+            cutoff_eV=20_000.0,
             bremslib_tables={"C": table},
-        )
-    with pytest.raises(ValueError, match="bin edge"):
-        brem_events.mc_soft_brem_spectrum(
-            {},
-            [10_000.0, 20_000.0, 30_000.0],
-            cutoff_eV=np.nextafter(15_000.0, 16_000.0),
-            bremslib_tables={"C": table},
+            element="C",
+            n_atoms_per_ang3=0.1,
         )
 
 

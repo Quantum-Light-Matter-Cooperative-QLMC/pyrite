@@ -23,11 +23,7 @@ from .segment_escape import _escape_paths_at
 
 
 def _cutoff_edge(E_grid_eV, cutoff_eV):
-    """Bin edges, widths and the first hard bin of a soft/hard split.
-
-    A cutoff inside the grid must be a bin edge. One at or below the lowest
-    edge makes every bin hard; one at or above the highest makes every bin soft.
-    """
+    """Bin edges, widths and the bin containing the soft/hard split."""
     edges, widths = node_bin_edges_and_widths(E_grid_eV)
     cutoff = float(cutoff_eV)
     if not np.isfinite(cutoff) or cutoff <= 0.0:
@@ -36,10 +32,7 @@ def _cutoff_edge(E_grid_eV, cutoff_eV):
         return edges, widths, 0
     if cutoff >= edges[-1]:
         return edges, widths, widths.size
-    match = np.flatnonzero(edges == cutoff)
-    if match.size != 1:
-        raise ValueError("hard photon cutoff inside the grid must equal an energy-bin edge")
-    return edges, widths, int(match[0])
+    return edges, widths, int(np.searchsorted(edges, cutoff, side="right") - 1)
 
 
 def _check_transport_partition(segments, cutoff_eV, bremslib_tables):
@@ -61,17 +54,17 @@ def _check_transport_partition(segments, cutoff_eV, bremslib_tables):
 
 
 def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **kwargs):
-    """Track-length bremsstrahlung below a bin-aligned hard-photon cutoff.
+    """Track-length bremsstrahlung below the hard-photon cutoff.
 
     ``mc_brem_spectrum`` remains the uncoupled compatibility estimator. This
     wrapper is for the soft side of coupled scoring; add its result to
     :func:`mc_hard_brem_event_spectrum` on the same energy grid. A cutoff
-    inside the grid must be a bin edge, so no histogram bin straddles the
-    soft/hard boundary; one below the grid leaves no soft bin to score.
+    inside a bin contributes its below-cutoff fraction of that bin's width;
+    one below the grid leaves no soft bin to score.
 
     Validation: bremslib-radiative-event-spectrum
     """
-    _, _, split = _cutoff_edge(E_grid_eV, cutoff_eV)
+    edges, widths, split = _cutoff_edge(E_grid_eV, cutoff_eV)
     _check_transport_partition(segments, cutoff_eV, bremslib_tables)
     if "cross_section_model" in kwargs:
         raise ValueError("coupled soft scoring always uses the BremsLib cross section")
@@ -79,7 +72,7 @@ def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **
         raise NotImplementedError(
             "coupled soft scoring cannot reclip electron tracks at a new cutoff"
         )
-    if split == 0:
+    if cutoff_eV <= edges[0]:
         return np.zeros(np.asarray(E_grid_eV).size, dtype=float)
     uncoupled_view = dict(segments)
     uncoupled_view.pop("radiative", None)
@@ -92,6 +85,8 @@ def mc_soft_brem_spectrum(segments, E_grid_eV, *, cutoff_eV, bremslib_tables, **
     )
     soft = np.asarray(full).copy()
     soft[split:] = 0.0
+    if split < soft.size and edges[split] < cutoff_eV:
+        soft[split] = full[split] * (cutoff_eV - edges[split]) / widths[split]
     return soft
 
 
