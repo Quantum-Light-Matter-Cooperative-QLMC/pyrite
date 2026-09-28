@@ -660,6 +660,7 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
 
 # ---- _cpu_pool_workers memory-aware sizing (2026-07-18 OOM fix) -------------
 # The uncapped ncpu*3//4 = 24-worker pool OOM'd remote-host (45 GiB box, ~5.5 GB
+# The uncapped ncpu*3//4 = 24-worker pool OOM'd remote-host (45 GiB box, ~5.5 GB
 # anon-rss per full-case worker at 200 keV): the kernel killed one worker and
 # BrokenProcessPool lost the whole run. These tests pin the host probes so the
 # sizing is deterministic on any machine.
@@ -681,6 +682,7 @@ def _patch_host(
     budget_mb=6_144,
     pipeline_budget_mb=1_536,
 ):
+    """Fake a host for _cpu_pool_workers; defaults reproduce remote-host's shape."""
     """Fake a host for _cpu_pool_workers; defaults reproduce remote-host's shape."""
     from pyrite.montecarlo import runner
 
@@ -745,6 +747,7 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
 # ---- _gpu_pipeline_workers memory-aware sizing -------------------------------
 # The GPU-pipeline transport pool spawns full worker processes just like the CPU
 # pool, but originally sized them as ncpu//2 with no RAM cap. On remote-host that OOM'd
+# pool, but originally sized them as ncpu//2 with no RAM cap. On remote-host that OOM'd
 # a worker at pool startup and the first submit raised BrokenProcessPool, losing
 # the whole hopg scan (exit 1). The cap now binds this path too.
 
@@ -794,6 +797,7 @@ def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypat
     assert runner._gpu_pipeline_workers(None, 980) < 2
 
 
+# ---- in-flight payload budgeting (2026-08-08 remote-host swap incident) -------------
 # ---- in-flight payload budgeting (2026-08-08 remote-host swap incident) -------------
 # Budgeting only the workers let promising/mose2 run 16 workers with 18 cases in
 # flight on a 45 GB box -- 34 host-resident segment payloads, peak tree RSS
