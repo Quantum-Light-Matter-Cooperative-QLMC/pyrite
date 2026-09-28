@@ -15,8 +15,8 @@ from typing import Any
 
 import numpy as np
 import pytest
-from pyrite._spectral_components import line_spectrum
 
+from pyrite._spectral_components import line_spectrum
 from pyrite.campaign.sweep import (
     BeamSpec,
     LayerSpec,

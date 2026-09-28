@@ -86,7 +86,7 @@ def iter_electron_blocks(segments, n_blocks):
             cuts.append(cut)
     cuts.append(n)
     for start, stop in zip(cuts[:-1], cuts[1:], strict=True):
-        rows = slice(start, stop) if ordered else np.sort(order[start:stop])
+        rows = slice(start, stop) if order is None else np.sort(order[start:stop])
         block = dict(segments)
         for key in _SEG_ARRAYS:
             if key in block:
